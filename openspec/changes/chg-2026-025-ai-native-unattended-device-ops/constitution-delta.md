@@ -51,6 +51,20 @@ outcomeUnknown、unresolved destructive intent、身份不确定、broker/review
 均 SHALL 永久终止 campaign，不得自动 replay/recovery。CI、后台 daemon/scheduler 与普通
 continuation 不能自行 mint 或扩大 campaign。
 
+同一交互 invocation 在有效 campaign 内 MAY 自动反复修复并刷写，无需每个 attempt 再取得
+用户消息，但只能在上一 terminal 为 `safeToReflash`、本轮取得 fresh reservation 且所有 pins
+重算一致时继续。repairer SHALL 隔离为 read-only、无源码/network/device/Runtime/authority
+能力，只接收标准化失败与既往 closed strategy 摘要，并只能改变有界 starting-mode/timeout/
+poll strategy；该 strategy 仍须经固定 candidate target 校验、immutable artifact pin 与独立
+adversarial review。repairer/candidate/reviewer 均不得改变或提出 argv、operation、partition、
+plan、archive、step-set、target、broker 或 authorization。
+
+destructive intent 前的 Loader transition 失败，只有 merged broker fresh readback 证明同一
+durable target 仍处于 registered HDC-normal/Loader mode 时 MAY 分类 `safeToReflash`。无 fresh
+reservation、target/topology 漂移、readback 不可得、unknown/unresolved/unsafe partial、repair/
+review 拒绝、成功、过期或预算耗尽均 SHALL 永久停止；不得以“自动修复”为由猜测设备状态或
+降低 fail-closed 边界。
+
 产品无法密码学证明聊天账号/传输 provenance，本策略显式信任交互式 Agent 如实转交用户
 确认；Agent SHALL NOT 伪造未发生的确认，亦 SHALL NOT 自行创建、修改或批准 standing
 authorization(POL-AGENT-001 适用)。AI adversarial review 是用户已确认 delegated envelope

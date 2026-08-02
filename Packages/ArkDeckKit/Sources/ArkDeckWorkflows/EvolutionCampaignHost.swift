@@ -91,6 +91,7 @@ public enum RockchipEvolutionCampaignPlanning {
 public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   private let ledger: RockchipEvolutionCampaignLedger
   private let usageLedger: AgentAuthorityUsageLedger
+  private let repairer: any RockchipEvolutionStrategyRepairing
   private let builder: any RockchipEvolutionCandidateBuilding
   private let reviewer: any RockchipEvolutionAdversarialReviewing
   private let flash: any RockchipEvolutionFlashDispatching
@@ -100,11 +101,14 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     throws
   {
     let roots = try RockchipEvolutionProductRoots.load()
+    let repairer = try Self.repairer(
+      environment: environment, workingDirectory: roots.repairerRoot.path)
     let reviewer = try Self.reviewer(
       environment: environment, workingDirectory: roots.reviewerRoot.path)
     try self.init(
       ledger: RockchipEvolutionCampaignLedger(root: roots.campaignLedgerRoot),
       usageLedger: AgentAuthorityUsageLedger(root: roots.usageRoot),
+      repairer: repairer,
       builder: ProductRockchipEvolutionCandidateBuilder(stateRoot: roots.candidateRoot),
       reviewer: reviewer,
       flash: RockchipFlashExecutionHost(),
@@ -114,6 +118,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   package init(
     ledger: RockchipEvolutionCampaignLedger,
     usageLedger: AgentAuthorityUsageLedger,
+    repairer: any RockchipEvolutionStrategyRepairing,
     builder: any RockchipEvolutionCandidateBuilding,
     reviewer: any RockchipEvolutionAdversarialReviewing,
     flash: any RockchipEvolutionFlashDispatching,
@@ -121,6 +126,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   ) throws {
     self.ledger = ledger
     self.usageLedger = usageLedger
+    self.repairer = repairer
     self.builder = builder
     self.reviewer = reviewer
     self.flash = flash
@@ -174,51 +180,94 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       throw RockchipEvolutionCampaignError.invalidAssertion("archiveURL")
     }
     var document = try reconcileUnresolved(initial)
-    guard !document.isTerminal, document.assertion.isValid(at: nowUTC()) else {
-      throw RockchipEvolutionCampaignError.campaignStopped("terminalOrExpired")
-    }
-    let build: RockchipEvolutionCandidateBuild
-    do { build = try await builder.build(assertion: document.assertion) } catch let error
-      as RockchipEvolutionCampaignError
+    var observation: RockchipEvolutionFailureObservation?
+    if document.reservedAttemptCount > 0,
+      document.events.last(where: { $0.kind == .attemptTerminal })?.disposition == .safeToReflash
     {
-      if Self.invalidatesCampaign(error) {
+      observation = try RockchipEvolutionFailureObservation(
+        attemptOrdinal: document.reservedAttemptCount,
+        failureCode: "campaign.safeToReflash")
+    }
+    while true {
+      guard !document.isTerminal, document.assertion.isValid(at: nowUTC()) else {
+        throw RockchipEvolutionCampaignError.campaignStopped("terminalOrExpired")
+      }
+      guard document.reservedAttemptCount < document.assertion.maxAttempts else {
         _ = try? ledger.stop(
-          campaignID: document.campaignID, reasonCode: "candidateEnvelopeDrift", at: nowUTC())
+          campaignID: document.campaignID, reasonCode: "attemptBudgetExhausted", at: nowUTC())
+        throw RockchipEvolutionCampaignError.campaignStopped("attemptBudgetExhausted")
       }
-      throw error
-    }
-    let review: RockchipEvolutionReviewReceipt
-    do {
-      review = try await reviewer.review(
-        RockchipEvolutionAdversarialReviewRequest(
-          assertion: document.assertion, candidate: build.pin,
-          immutableDiff: build.reviewDiff, priorAttempts: document.events))
-    } catch {
-      _ = try? ledger.stop(
-        campaignID: document.campaignID, reasonCode: "adversarialReviewRejected", at: nowUTC())
-      throw error
-    }
-    document = try ledger.appendCandidate(
-      campaignID: document.campaignID, candidate: build.pin,
-      review: review, at: nowUTC())
-    let permit = try RockchipEvolutionCampaignAttemptPermit(
-      assertion: document.assertion, candidate: build.pin, review: review)
-    let request = try RockchipFlashExecutionRequest(
-      evolutionCampaignAttempt: permit, archiveURL: archiveURL,
-      targetLocationSelector: targetLocationSelector)
-    do {
-      let result = try await flash.execute(request)
-      let closed = try reconcileUnresolved(ledger.load(document.campaignID))
-      guard let terminal = closed.events.last(where: { $0.kind == .attemptTerminal }),
-        terminal.disposition == .succeeded, let ordinal = terminal.ordinal
-      else {
-        throw RockchipEvolutionCampaignError.campaignStopped("missingSuccessfulTerminal")
+      let priorCandidates = document.events.compactMap(\.candidate)
+      guard priorCandidates.count < document.assertion.maxAttempts else {
+        _ = try? ledger.stop(
+          campaignID: document.campaignID, reasonCode: "candidateBudgetExhausted", at: nowUTC())
+        throw RockchipEvolutionCampaignError.campaignStopped("candidateBudgetExhausted")
       }
-      return RockchipEvolutionCampaignExecutionResult(
-        campaignID: document.campaignID, attemptOrdinal: ordinal, flash: result)
-    } catch {
-      _ = try? reconcileUnresolved(ledger.load(document.campaignID))
-      throw error
+      let strategy: RockchipEvolutionTypedStrategy
+      do {
+        strategy = try await repairer.propose(
+          assertion: document.assertion, observation: observation,
+          priorCandidates: priorCandidates)
+      } catch {
+        _ = try? ledger.stop(
+          campaignID: document.campaignID, reasonCode: "strategyRepairRejected", at: nowUTC())
+        throw error
+      }
+      let build: RockchipEvolutionCandidateBuild
+      do {
+        build = try await builder.build(assertion: document.assertion, strategy: strategy)
+      } catch let error as RockchipEvolutionCampaignError {
+        if Self.invalidatesCampaign(error) {
+          _ = try? ledger.stop(
+            campaignID: document.campaignID, reasonCode: "candidateEnvelopeDrift", at: nowUTC())
+        }
+        throw error
+      }
+      let review: RockchipEvolutionReviewReceipt
+      do {
+        review = try await reviewer.review(
+          RockchipEvolutionAdversarialReviewRequest(
+            assertion: document.assertion, candidate: build.pin,
+            immutableDiff: build.reviewDiff, priorAttempts: document.events))
+      } catch {
+        _ = try? ledger.stop(
+          campaignID: document.campaignID, reasonCode: "adversarialReviewRejected", at: nowUTC())
+        throw error
+      }
+      document = try ledger.appendCandidate(
+        campaignID: document.campaignID, candidate: build.pin,
+        review: review, at: nowUTC())
+      let permit = try RockchipEvolutionCampaignAttemptPermit(
+        assertion: document.assertion, candidate: build.pin, review: review)
+      let request = try RockchipFlashExecutionRequest(
+        evolutionCampaignAttempt: permit, archiveURL: archiveURL,
+        targetLocationSelector: targetLocationSelector)
+      let reservedBeforeDispatch = document.reservedAttemptCount
+      do {
+        let result = try await flash.execute(request)
+        let closed = try reconcileUnresolved(ledger.load(document.campaignID))
+        guard let terminal = closed.events.last(where: { $0.kind == .attemptTerminal }),
+          terminal.disposition == .succeeded, let ordinal = terminal.ordinal
+        else {
+          throw RockchipEvolutionCampaignError.campaignStopped("missingSuccessfulTerminal")
+        }
+        return RockchipEvolutionCampaignExecutionResult(
+          campaignID: document.campaignID, attemptOrdinal: ordinal, flash: result)
+      } catch {
+        document = (try? reconcileUnresolved(ledger.load(document.campaignID))) ?? document
+        guard document.reservedAttemptCount == reservedBeforeDispatch + 1 else {
+          _ = try? ledger.stop(
+            campaignID: document.campaignID, reasonCode: "admissionOrTargetDrift", at: nowUTC())
+          throw error
+        }
+        guard
+          let terminal = document.events.last(where: { $0.kind == .attemptTerminal }),
+          terminal.disposition == .safeToReflash, let ordinal = terminal.ordinal,
+          document.reservedAttemptCount < document.assertion.maxAttempts
+        else { throw error }
+        observation = try RockchipEvolutionFailureObservation(
+          attemptOrdinal: ordinal, failureCode: Self.failureCode(error))
+      }
     }
   }
 
@@ -270,6 +319,34 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     }
   }
 
+  private static func failureCode(_ error: any Error) -> String {
+    guard let error = error as? RockchipFlashExecutionError else {
+      if let campaign = error as? RockchipEvolutionCampaignError {
+        switch campaign {
+        case .admissionRejected: return "campaign.admissionRejected"
+        case .candidateRejected: return "campaign.candidateRejected"
+        default: return "campaign.safeFailure"
+        }
+      }
+      return "flash.safeFailure"
+    }
+    switch error {
+    case .admissionRejected: return "flash.admissionRejected"
+    case .authorizationGateRejected: return "flash.authorizationGateRejected"
+    case .authorizationConsumptionRejected: return "flash.authorizationConsumptionRejected"
+    case .storageRejected: return "flash.storageRejected"
+    case .stagingRejected: return "flash.stagingRejected"
+    case .loweringRejected: return "flash.loweringRejected"
+    case .executableIdentityDrift: return "flash.executableIdentityDrift"
+    case .persistenceRejected: return "flash.persistenceRejected"
+    case .semanticFailure(let stepID, _): return "flash.semanticFailure:\(stepID)"
+    case .cancelledAtSafeBoundary: return "flash.cancelledAtSafeBoundary"
+    case .invalidRequest: return "flash.invalidRequest"
+    case .productionConfigurationUnavailable: return "flash.configurationUnavailable"
+    case .recoveryRequired, .postflightMismatch: return "flash.unsafeFailure"
+    }
+  }
+
   private static func reviewer(
     environment: [String: String], workingDirectory: String
   ) throws -> CodexRockchipEvolutionAdversarialReviewer {
@@ -280,6 +357,17 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     return try CodexRockchipEvolutionAdversarialReviewer(
       executablePath: path, modelName: model, workingDirectory: workingDirectory)
   }
+
+  private static func repairer(
+    environment: [String: String], workingDirectory: String
+  ) throws -> CodexRockchipEvolutionStrategyRepairer {
+    guard environment[HarnessVendorConfiguration.providerKey]?.lowercased() == "codex",
+      let path = environment[HarnessVendorConfiguration.codexPathKey],
+      let model = environment[HarnessVendorConfiguration.modelKey]
+    else { throw RockchipEvolutionCampaignError.candidateRejected("codexRepairerRequired") }
+    return try CodexRockchipEvolutionStrategyRepairer(
+      executablePath: path, modelName: model, workingDirectory: workingDirectory)
+  }
 }
 
 private struct RockchipEvolutionProductRoots {
@@ -287,6 +375,7 @@ private struct RockchipEvolutionProductRoots {
   let usageRoot: URL
   let campaignLedgerRoot: URL
   let candidateRoot: URL
+  let repairerRoot: URL
   let reviewerRoot: URL
 
   static func load() throws -> Self {
@@ -298,8 +387,9 @@ private struct RockchipEvolutionProductRoots {
     let usage = root.appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
     let campaign = usage.appending(path: "evolution-campaigns", directoryHint: .isDirectory)
     let candidates = root.appending(path: "EvolutionCandidates", directoryHint: .isDirectory)
+    let repairer = candidates.appending(path: "Repairer", directoryHint: .isDirectory)
     let reviewer = candidates.appending(path: "Reviewer", directoryHint: .isDirectory)
-    for directory in [root, usage, campaign, candidates, reviewer] {
+    for directory in [root, usage, campaign, candidates, repairer, reviewer] {
       try manager.createDirectory(
         at: directory, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
@@ -309,7 +399,7 @@ private struct RockchipEvolutionProductRoots {
     }
     return Self(
       arkDeckRoot: root, usageRoot: usage,
-      campaignLedgerRoot: campaign, candidateRoot: candidates,
+      campaignLedgerRoot: campaign, candidateRoot: candidates, repairerRoot: repairer,
       reviewerRoot: reviewer)
   }
 }

@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 10
-status: proposed # r1 经 #281 正式批准；r2-r9 已合入；r10 active-mode removal 待维护者 review/merge
+revision: 11
+status: proposed # r1 经 #281 正式批准；r2-r10 已合入；r11 autonomous safe-repair loop 待维护者 review/merge
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,19 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r11 autonomous safe-repair loop（2026-08-02）：r8-r10 已完成一次 campaign authority、
+> 默认入口和单一 Harness 模型，但 production host 每次命令仍只执行一个 attempt，失败证据
+> 不进入 repair model，candidate strategy 也只能缩小起始模式。r11 将同一 invocation 内已由
+> broker durable 分类为 `safeToReflash` 的失败自动回灌给独立、read-only Codex repairer；
+> repairer 只能产生 closed mode/timing strategy，不能产生 argv/path/step/authority 或访问
+> workspace/device。task-owned candidate target 再次验证 strategy，独立 adversarial reviewer
+> PASS 后，merged broker 以 fresh admission 执行下一 ordinal，直至 success 或预算/安全停止。
+> Loader transition 的异常只有在现场重新读到同一 durable target 且仍处注册模式时才可标记
+> safe；没有新 reservation 的 admission/target failure、unknown/unresolved/unsafe partial、
+> reviewer/repairer rejection、drift、过期或超限仍永久停止。本 revision 不扩大 8 attempts/
+> 4 hours/1 concurrency，不让 candidate/repairer 接触 USB/HDC/RockUSB，也不允许重试任何
+> destructive outcome 不确定的失败。
 
 > r10 active-mode removal（2026-08-02）：r9 已由维护者通过 #958 合入，但内部 Harness
 > snapshot/status/coordinator 仍持久化、输出并分支 `normal|evolution`，CLI 的新 workspace
@@ -234,6 +247,28 @@ In scope:
   `evolutionAllowedOperations` 不做翻译。
 - **历史 authority 只读**：删除 `validatedChatConfirmation` 的 public creation surface；
   decoder/Journal/Manifest/export compatibility 与所有新 reserve/dispatch 拒绝保持不变。
+
+### r11 autonomous safe-repair loop
+
+- **一个命令跑完整个安全预算**：首次 `flash execute` 或恢复后的 `flash continue` 在同一
+  process 内自动串行执行 repair → candidate build/test → independent review → fresh broker
+  admission → Flash；调用者不再为每个 `safeToReflash` attempt 手工重复命令或确认。
+- **失败证据只进入闭合修复面**：repairer 只接收 normalized failure code、ordinal 与此前
+  strategy pins；输出仅包含 registered starting modes、Loader discovery timeout/poll、HDC
+  command timeout 与 read-only RockUSB timeout。unknown key、重复 strategy、越界数值或任何
+  command/path/device/authority 字段直接拒绝。
+- **无源码补丁也有诚实 candidate pin**：baseline 与 AI strategy 作为 immutable synthetic
+  strategy diff 进入 candidate digest/review artifact；`changedFiles=[]` 如实表示没有未合入
+  production source 被执行。历史无 tuning 字段 strategy 以 protected-main defaults 解码，
+  新编码始终写出完整 closed shape。
+- **只有 fresh reservation 后的已知安全失败可循环**：Loader transition error 必须重新读到
+  相同 stable identity/binding 且处于 HDC-normal 或 Loader；下一 attempt 仍重新 admission。
+  dispatch 前失败且没有新增 ordinal 视作 admission/target drift 并永久封口，不得把旧的
+  safe terminal 当作新失败的重试许可。
+- **双预算与原停止条件不变**：candidate evaluations 和 destructive attempts 均不超过确认的
+  `maxAttempts`；success、unknown、unresolved、unsafe partial、review/repair rejection、
+  identity/plan/toolchain drift、过期或超限立即停止。最终 production source promotion 仍走
+  正常 PR；campaign 中间 strategy 不需要逐 attempt PR。
 
 ### r2 security-remediation additions
 

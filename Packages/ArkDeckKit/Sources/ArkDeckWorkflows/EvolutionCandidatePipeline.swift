@@ -21,7 +21,8 @@ public struct RockchipEvolutionCandidateBuild: Sendable, Equatable {
 
 public protocol RockchipEvolutionCandidateBuilding: Sendable {
   func build(
-    assertion: RockchipEvolutionCampaignConfirmationAssertion
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    strategy: RockchipEvolutionTypedStrategy
   ) async throws -> RockchipEvolutionCandidateBuild
 }
 
@@ -89,7 +90,8 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   }
 
   public func build(
-    assertion: RockchipEvolutionCampaignConfirmationAssertion
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    strategy proposedStrategy: RockchipEvolutionTypedStrategy
   ) async throws -> RockchipEvolutionCandidateBuild {
     guard assertion.isValid(at: Self.timestamp()) else {
       throw RockchipEvolutionCampaignError.expired
@@ -128,9 +130,6 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     )
     .stdout.data
     let changedFiles = Array(Set(Self.nulSeparated(tracked + untracked))).sorted()
-    guard !changedFiles.isEmpty else {
-      throw RockchipEvolutionCampaignError.candidateRejected("noCandidateDiff")
-    }
     guard changedFiles.allSatisfy(Self.isCandidateSource),
       changedFiles.count <= assertion.maxChangedFiles
     else { throw RockchipEvolutionCampaignError.candidateRejected("scopeDrift") }
@@ -153,6 +152,16 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       guard reviewDiff.count <= Self.maximumReviewDiffBytes else {
         throw RockchipEvolutionCampaignError.candidateRejected("diffBytes")
       }
+    }
+    let proposedStrategyData = try JSONEncoder.sorted.encode(proposedStrategy)
+    reviewDiff.append(
+      Data(
+        "\n--- /dev/null\n+++ b/Packages/ArkDeckKit/Sources/ArkDeckHarness/Candidate/strategy-proposal.json\n+"
+          .utf8))
+    reviewDiff.append(proposedStrategyData)
+    reviewDiff.append(Data("\n".utf8))
+    guard reviewDiff.count <= Self.maximumReviewDiffBytes else {
+      throw RockchipEvolutionCampaignError.candidateRejected("diffBytes")
     }
     let changedLines = Self.changedLineCount(reviewDiff)
     guard changedLines <= assertion.maxDiffLines else {
@@ -214,6 +223,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       "operationReference": .string(
         RockchipEvolutionCampaignConfirmationAssertion.operationReference),
       "stepSetDigestSHA256": .string(assertion.stepSetDigestSHA256),
+      "strategy": try JSONDecoder().decode(JSONValue.self, from: proposedStrategyData),
       "userdataImpact": .string(RockchipEvolutionCampaignConfirmationAssertion.dataImpact),
     ])
     try Self.writeOwnerOnly(request, to: requestURL)
@@ -236,6 +246,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     }
     guard strategy.archiveDigestSHA256 == assertion.archiveDigestSHA256,
       strategy.stepSetDigestSHA256 == assertion.stepSetDigestSHA256,
+      strategy == proposedStrategy,
       try Self.executableSHA256(candidateURL) == executableDigest,
       try sourceDigest(baseCommitOID: assertion.baseCommitOID, files: changedFiles)
         == sourceTreeDigest
@@ -483,6 +494,166 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
 
   private static func timestamp() -> String {
     ISO8601DateFormatter().string(from: Date())
+  }
+}
+
+public struct RockchipEvolutionFailureObservation: Sendable, Equatable {
+  public let attemptOrdinal: Int
+  public let failureCode: String
+
+  public init(attemptOrdinal: Int, failureCode: String) throws {
+    guard attemptOrdinal > 0,
+      failureCode.range(
+        of: #"^[a-z][a-zA-Z0-9._:-]{0,127}$"#, options: .regularExpression)
+        == failureCode.startIndex..<failureCode.endIndex
+    else { throw RockchipEvolutionCampaignError.candidateRejected("failureObservation") }
+    self.attemptOrdinal = attemptOrdinal
+    self.failureCode = failureCode
+  }
+}
+
+public protocol RockchipEvolutionStrategyRepairing: Sendable {
+  var repairerID: String { get }
+  func propose(
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    observation: RockchipEvolutionFailureObservation?,
+    priorCandidates: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy
+}
+
+/// The repair model has no workspace, Runtime, authority or device port. It receives only a
+/// normalized failure code and prior closed strategies, then returns timing/mode values that the
+/// isolated candidate executable and merged broker both validate. The first attempt is the
+/// protected-main baseline and never needs a model call.
+public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyRepairing {
+  public let repairerID: String
+  private let executablePath: String
+  private let executableSHA256: String
+  private let modelName: String
+  private let workingDirectory: String
+  private let transport: any HarnessCodexTransport
+
+  public init(
+    executablePath: String,
+    modelName: String,
+    workingDirectory: String,
+    transport: any HarnessCodexTransport = CodexCLIProcessTransport()
+  ) throws {
+    let executableURL = URL(fileURLWithPath: executablePath)
+      .resolvingSymlinksInPath().standardizedFileURL
+    let workingURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
+      .resolvingSymlinksInPath().standardizedFileURL
+    var isDirectory: ObjCBool = false
+    guard executablePath.hasPrefix("/"), executableURL.path == executablePath,
+      FileManager.default.isExecutableFile(atPath: executablePath),
+      workingDirectory.hasPrefix("/"), workingURL.path == workingDirectory,
+      FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory),
+      isDirectory.boolValue,
+      !modelName.isEmpty, modelName.utf8.count <= 200,
+      modelName.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "._:-".contains($0)) })
+    else { throw RockchipEvolutionCampaignError.candidateRejected("repairerConfiguration") }
+    self.executablePath = executablePath
+    executableSHA256 = RockchipEvolutionCampaignConfirmationAssertion.sha256(
+      try Data(contentsOf: executableURL))
+    self.modelName = modelName
+    self.workingDirectory = workingDirectory
+    self.transport = transport
+    repairerID =
+      "codex-evolution-strategy-repairer@1:"
+      + String(
+        RockchipEvolutionCampaignConfirmationAssertion.sha256(
+          Data("\(executableSHA256)|\(modelName)".utf8)
+        ).prefix(16))
+  }
+
+  public func propose(
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    observation: RockchipEvolutionFailureObservation?,
+    priorCandidates: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    if observation == nil {
+      return try Self.strategy(
+        assertion: assertion, modes: [.hdcNormal, .loader],
+        loaderTimeout: RockchipEvolutionTypedStrategy.defaultLoaderDiscoveryTimeoutSeconds,
+        pollMilliseconds: RockchipEvolutionTypedStrategy.defaultLoaderPollIntervalMilliseconds,
+        hdcTimeout: RockchipEvolutionTypedStrategy.defaultHDCCommandTimeoutSeconds,
+        readOnlyTimeout: RockchipEvolutionTypedStrategy.defaultReadOnlyCommandTimeoutSeconds)
+    }
+    let prior = priorCandidates.suffix(8).map { candidate in
+      let strategy = candidate.strategy
+      return "\(strategy.digestSHA256):modes=\(strategy.allowedStartingModes.map(\.rawValue).joined(separator: ",")):loader=\(strategy.loaderDiscoveryTimeoutSeconds):poll=\(strategy.loaderPollIntervalMilliseconds):hdc=\(strategy.hdcCommandTimeoutSeconds):read=\(strategy.readOnlyCommandTimeoutSeconds)"
+    }.joined(separator: "\n")
+    let prompt = """
+      You are a bounded firmware-campaign strategy repairer. You have no filesystem, shell,
+      Runtime, device, USB/HDC/RockUSB, network configuration, or authority port. A merged broker
+      owns every device action. Select a NEW closed strategy for the normalized safe-to-retry
+      failure below. Do not invent commands, paths, steps, partitions, retries, or authorization.
+      Answer exactly one JSON object with these keys and no prose:
+      {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":45,"loaderPollIntervalMilliseconds":500,"hdcCommandTimeoutSeconds":20,"readOnlyCommandTimeoutSeconds":15}
+      Constraints: modes is a non-empty subset of hdcNormal|loader; loader timeout 15...120;
+      poll 100...2000; HDC timeout 5...60; read-only timeout 5...60. The result must differ
+      from every prior strategy.
+      failure=\(observation!.failureCode)
+      attempt=\(observation!.attemptOrdinal)
+      prior:\n\(prior)
+      """
+    let response = try await transport.send(
+      HarnessCodexProcessRequest(
+        executablePath: executablePath, executableSHA256: executableSHA256,
+        arguments: [
+          "exec", "--ephemeral", "--ignore-user-config", "--ignore-rules",
+          "--sandbox", "read-only", "--skip-git-repo-check", "-C", workingDirectory,
+          "--color", "never", "--model", modelName, prompt,
+        ], workingDirectory: workingDirectory, timeoutSeconds: 300))
+    guard let root = try? JSONDecoder().decode(JSONValue.self, from: response),
+      case .object(let fields) = root,
+      Set(fields.keys) == [
+        "allowedStartingModes", "loaderDiscoveryTimeoutSeconds",
+        "loaderPollIntervalMilliseconds", "hdcCommandTimeoutSeconds",
+        "readOnlyCommandTimeoutSeconds",
+      ],
+      case .array(let modeValues)? = fields["allowedStartingModes"],
+      case .integer(let loaderTimeout)? = fields["loaderDiscoveryTimeoutSeconds"],
+      case .integer(let pollMilliseconds)? = fields["loaderPollIntervalMilliseconds"],
+      case .integer(let hdcTimeout)? = fields["hdcCommandTimeoutSeconds"],
+      case .integer(let readOnlyTimeout)? = fields["readOnlyCommandTimeoutSeconds"]
+    else { throw RockchipEvolutionCampaignError.candidateRejected("repairResponseShape") }
+    let modes = try modeValues.map { value -> RockchipEvolutionStartingMode in
+      guard case .string(let raw) = value, let mode = RockchipEvolutionStartingMode(rawValue: raw)
+      else { throw RockchipEvolutionCampaignError.candidateRejected("repairStartingMode") }
+      return mode
+    }
+    guard [loaderTimeout, pollMilliseconds, hdcTimeout, readOnlyTimeout].allSatisfy({
+      $0 >= Int64(Int.min) && $0 <= Int64(Int.max)
+    }) else { throw RockchipEvolutionCampaignError.candidateRejected("repairInteger") }
+    let proposed = try Self.strategy(
+      assertion: assertion, modes: modes, loaderTimeout: Int(loaderTimeout),
+      pollMilliseconds: Int(pollMilliseconds), hdcTimeout: Int(hdcTimeout),
+      readOnlyTimeout: Int(readOnlyTimeout))
+    guard !priorCandidates.contains(where: { $0.strategy.digestSHA256 == proposed.digestSHA256 })
+    else { throw RockchipEvolutionCampaignError.candidateRejected("repeatedStrategy") }
+    return proposed
+  }
+
+  private static func strategy(
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    modes: [RockchipEvolutionStartingMode],
+    loaderTimeout: Int,
+    pollMilliseconds: Int,
+    hdcTimeout: Int,
+    readOnlyTimeout: Int
+  ) throws -> RockchipEvolutionTypedStrategy {
+    try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2",
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: modes,
+      loaderDiscoveryTimeoutSeconds: loaderTimeout,
+      loaderPollIntervalMilliseconds: pollMilliseconds,
+      hdcCommandTimeoutSeconds: hdcTimeout,
+      readOnlyCommandTimeoutSeconds: readOnlyTimeout,
+      userdataImpact: assertion.userdataImpact)
   }
 }
 

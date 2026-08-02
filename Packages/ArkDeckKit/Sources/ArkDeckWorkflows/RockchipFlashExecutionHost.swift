@@ -329,7 +329,9 @@ struct RockchipHDCTransitionConfiguration: Sendable {
   let usbTopology: String
   let alternateModeIdentities: [RockchipPostflightIdentity]
   let currentIdentity: @Sendable () throws -> RockchipProductUSBIdentity
-  let waitForLoader: @Sendable () async throws -> RockchipDeviceObservation
+  let waitForLoader:
+    @Sendable (_ timeoutSeconds: Int, _ pollIntervalMilliseconds: Int) async throws
+    -> RockchipDeviceObservation
 
   init(
     executableURL: URL,
@@ -339,7 +341,9 @@ struct RockchipHDCTransitionConfiguration: Sendable {
     usbTopology: String,
     alternateModeIdentities: [RockchipPostflightIdentity] = [],
     currentIdentity: @escaping @Sendable () throws -> RockchipProductUSBIdentity,
-    waitForLoader: @escaping @Sendable () async throws -> RockchipDeviceObservation
+    waitForLoader:
+      @escaping @Sendable (_ timeoutSeconds: Int, _ pollIntervalMilliseconds: Int) async throws
+      -> RockchipDeviceObservation
   ) {
     self.executableURL = executableURL
     self.executableSHA256 = executableSHA256
@@ -381,10 +385,22 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
     command: RockchipClosedCommand,
     admissionIdentity: ProcessExecutableIdentityReceipt
   ) throws -> RockchipPreparedCommand {
+    try prepare(
+      command: command, admissionIdentity: admissionIdentity,
+      evolutionStrategy: nil)
+  }
+
+  func prepare(
+    command: RockchipClosedCommand,
+    admissionIdentity: ProcessExecutableIdentityReceipt,
+    evolutionStrategy: RockchipEvolutionTypedStrategy?
+  ) throws -> RockchipPreparedCommand {
+    let readOnlyTimeout = evolutionStrategy?.readOnlyCommandTimeoutSeconds
+      ?? RockchipEvolutionTypedStrategy.defaultReadOnlyCommandTimeoutSeconds
     let request = ProcessIdentityBoundRequest(
       process: ProcessRequest(
         executable: executableURL, arguments: command.arguments, environment: [:],
-        timeout: command.isCriticalWrite ? nil : 15),
+        timeout: command.isCriticalWrite ? nil : TimeInterval(readOnlyTimeout)),
       expectedSHA256: executableSHA256)
     let prepared = try executor.prepareIdentityBoundLaunch(request)
     guard Self.sameDescriptor(prepared.executableIdentity, admissionIdentity) else {
@@ -403,12 +419,14 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
 
     let hdcPrepared: ProcessPreparedIdentityBoundLaunch
     do {
+      let hdcTimeout = evolutionStrategy?.hdcCommandTimeoutSeconds
+        ?? RockchipEvolutionTypedStrategy.defaultHDCCommandTimeoutSeconds
       hdcPrepared = try executor.prepareIdentityBoundLaunch(
         ProcessIdentityBoundRequest(
           process: ProcessRequest(
             executable: hdcTransition.executableURL,
             arguments: hdcTransition.arguments,
-            environment: [:], timeout: 20),
+            environment: [:], timeout: TimeInterval(hdcTimeout)),
           expectedSHA256: hdcTransition.executableSHA256))
     } catch {
       prepared.close()
@@ -416,42 +434,54 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
     }
     return RockchipPreparedCommand(executableIdentity: prepared.executableIdentity) {
       defer { hdcPrepared.close() }
-      let current = try hdcTransition.currentIdentity()
-      guard Self.matches(current, transition: hdcTransition) else {
-        throw RockchipHDCTransitionError.identityDrift
-      }
-      if current.isHDCNormal {
-        let transition = try await self.executor.executePreparedIdentityBoundLaunch(
-          hdcPrepared, evaluating: RockchipHDCTransitionSemanticEvaluator())
-        guard transition.semantic == .succeeded else {
-          if case .failed(let failure) = transition.semantic { throw failure }
-          throw RockchipHDCTransitionError.processDidNotExitSuccessfully
-        }
-        let loader = try await hdcTransition.waitForLoader()
-        guard Self.matchesLoaderObservation(loader) else {
+      do {
+        let current = try hdcTransition.currentIdentity()
+        guard Self.matches(current, transition: hdcTransition) else {
           throw RockchipHDCTransitionError.identityDrift
         }
-        // The `ld` observation proves one expected Loader but its LocationID is libusb-local.
-        // Re-read IOKit after the transition so serial digest + IOKit topology, not a
-        // cross-namespace integer comparison, prove that the Loader is the durable target.
-        let loaderIdentity = try hdcTransition.currentIdentity()
-        guard loaderIdentity.isLoader,
-          Self.matchesConfirmedModeIdentity(loaderIdentity, transition: hdcTransition)
-        else {
-          throw RockchipHDCTransitionError.identityDrift
+        if current.isHDCNormal {
+          let transition = try await self.executor.executePreparedIdentityBoundLaunch(
+            hdcPrepared, evaluating: RockchipHDCTransitionSemanticEvaluator())
+          guard transition.semantic == .succeeded else {
+            if case .failed(let failure) = transition.semantic { throw failure }
+            throw RockchipHDCTransitionError.processDidNotExitSuccessfully
+          }
+          let loader = try await hdcTransition.waitForLoader(
+            evolutionStrategy?.loaderDiscoveryTimeoutSeconds
+              ?? RockchipEvolutionTypedStrategy.defaultLoaderDiscoveryTimeoutSeconds,
+            evolutionStrategy?.loaderPollIntervalMilliseconds
+              ?? RockchipEvolutionTypedStrategy.defaultLoaderPollIntervalMilliseconds)
+          guard Self.matchesLoaderObservation(loader) else {
+            throw RockchipHDCTransitionError.identityDrift
+          }
+          // The `ld` observation proves one expected Loader but its LocationID is libusb-local.
+          // Re-read IOKit after the transition so serial digest + IOKit topology, not a
+          // cross-namespace integer comparison, prove that the Loader is the durable target.
+          let loaderIdentity = try hdcTransition.currentIdentity()
+          guard loaderIdentity.isLoader,
+            Self.matchesConfirmedModeIdentity(loaderIdentity, transition: hdcTransition)
+          else {
+            throw RockchipHDCTransitionError.identityDrift
+          }
+        } else {
+          // The device may already have reached Loader between admission and
+          // the durable step boundary.  In that case the HDC descriptor is
+          // closed unused and no duplicate reboot command is dispatched.
+          guard current.isLoader else { throw RockchipHDCTransitionError.identityDrift }
         }
-      } else {
-        // The device may already have reached Loader between admission and
-        // the durable step boundary.  In that case the HDC descriptor is
-        // closed unused and no duplicate reboot command is dispatched.
-        guard current.isLoader else { throw RockchipHDCTransitionError.identityDrift }
+        let result = try await self.executor.executePreparedIdentityBoundLaunch(
+          prepared, evaluating: RockchipCommandSemanticEvaluator(command: command))
+        return RockchipExecutionAttempt(
+          execution: result.execution, semantic: result.semantic,
+          executableIdentity: result.executableIdentity,
+          semanticCode: "rockchip.enter-loader.readback-confirmed")
+      } catch {
+        guard let readback = try? hdcTransition.currentIdentity(),
+          Self.matches(readback, transition: hdcTransition)
+        else { throw error }
+        throw RockchipPreparedCommandFailure.confirmedSafeToRetry(
+          "loader transition failed with bound target in a registered mode: \(error)")
       }
-      let result = try await self.executor.executePreparedIdentityBoundLaunch(
-        prepared, evaluating: RockchipCommandSemanticEvaluator(command: command))
-      return RockchipExecutionAttempt(
-        execution: result.execution, semantic: result.semantic,
-        executableIdentity: result.executableIdentity,
-        semanticCode: "rockchip.enter-loader.readback-confirmed")
     }
   }
 
@@ -1013,13 +1043,13 @@ private enum RockchipProductionExecutionComposition {
       currentIdentity: {
         try usbProbe.singleDAYU200()
       },
-      waitForLoader: {
+      waitForLoader: { timeoutSeconds, pollIntervalMilliseconds in
         let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .seconds(45))
+        let deadline = clock.now.advanced(by: .seconds(timeoutSeconds))
         repeat {
           let attempt = await loaderDiscovery.discover(using: settings.tool)
           if attempt.diagnostic == .offline {
-            try await Task.sleep(for: .milliseconds(500))
+            try await Task.sleep(for: .milliseconds(pollIntervalMilliseconds))
             continue
           }
           guard attempt.diagnostic == nil,
@@ -2381,7 +2411,8 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         usbTopology: token.facts.usbTopology,
         postflightIdentities: postflightIdentities,
         executableIdentity: token.facts.executableIdentity,
-        evidenceClass: .production)
+        evidenceClass: .production,
+        evolutionStrategy: permit.candidate.strategy)
     }
   }
 

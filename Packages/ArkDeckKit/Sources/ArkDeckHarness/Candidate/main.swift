@@ -12,6 +12,7 @@ struct CandidateInput: Decodable {
   let archiveDigestSHA256: String
   let stepSetDigestSHA256: String
   let userdataImpact: String
+  let strategy: CandidateStrategy
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case operationReference
@@ -19,6 +20,7 @@ struct CandidateInput: Decodable {
     case archiveDigestSHA256
     case stepSetDigestSHA256
     case userdataImpact
+    case strategy
   }
 
   init(from decoder: any Decoder) throws {
@@ -37,6 +39,7 @@ struct CandidateInput: Decodable {
     archiveDigestSHA256 = try container.decode(String.self, forKey: .archiveDigestSHA256)
     stepSetDigestSHA256 = try container.decode(String.self, forKey: .stepSetDigestSHA256)
     userdataImpact = try container.decode(String.self, forKey: .userdataImpact)
+    strategy = try container.decode(CandidateStrategy.self, forKey: .strategy)
   }
 }
 
@@ -48,13 +51,54 @@ private struct CandidateDynamicCodingKey: CodingKey {
   init?(intValue: Int) { return nil }
 }
 
-struct CandidateOutput: Encodable {
+struct CandidateStrategy: Codable {
   let operationReference: String
   let deviceProfileReference: String
   let archiveDigestSHA256: String
   let stepSetDigestSHA256: String
   let allowedStartingModes: [String]
+  let loaderDiscoveryTimeoutSeconds: Int
+  let loaderPollIntervalMilliseconds: Int
+  let hdcCommandTimeoutSeconds: Int
+  let readOnlyCommandTimeoutSeconds: Int
   let userdataImpact: String
+
+  private enum CodingKeys: String, CodingKey, CaseIterable {
+    case operationReference
+    case deviceProfileReference
+    case archiveDigestSHA256
+    case stepSetDigestSHA256
+    case allowedStartingModes
+    case loaderDiscoveryTimeoutSeconds
+    case loaderPollIntervalMilliseconds
+    case hdcCommandTimeoutSeconds
+    case readOnlyCommandTimeoutSeconds
+    case userdataImpact
+  }
+
+  init(from decoder: any Decoder) throws {
+    let dynamic = try decoder.container(keyedBy: CandidateDynamicCodingKey.self)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    guard Set(dynamic.allKeys.map(\.stringValue)) == Set(CodingKeys.allCases.map(\.stringValue))
+    else {
+      throw DecodingError.dataCorruptedError(
+        forKey: .operationReference, in: container,
+        debugDescription: "candidate strategy must have a closed shape")
+    }
+    operationReference = try container.decode(String.self, forKey: .operationReference)
+    deviceProfileReference = try container.decode(String.self, forKey: .deviceProfileReference)
+    archiveDigestSHA256 = try container.decode(String.self, forKey: .archiveDigestSHA256)
+    stepSetDigestSHA256 = try container.decode(String.self, forKey: .stepSetDigestSHA256)
+    allowedStartingModes = try container.decode([String].self, forKey: .allowedStartingModes)
+    loaderDiscoveryTimeoutSeconds = try container.decode(
+      Int.self, forKey: .loaderDiscoveryTimeoutSeconds)
+    loaderPollIntervalMilliseconds = try container.decode(
+      Int.self, forKey: .loaderPollIntervalMilliseconds)
+    hdcCommandTimeoutSeconds = try container.decode(Int.self, forKey: .hdcCommandTimeoutSeconds)
+    readOnlyCommandTimeoutSeconds = try container.decode(
+      Int.self, forKey: .readOnlyCommandTimeoutSeconds)
+    userdataImpact = try container.decode(String.self, forKey: .userdataImpact)
+  }
 }
 
 private func fail(_ message: String) -> Never {
@@ -81,24 +125,24 @@ guard input.operationReference == "flash.dayu200@1",
     of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
   input.stepSetDigestSHA256.range(
     of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
-  input.userdataImpact == "ERASE-USERDATA"
+  input.userdataImpact == "ERASE-USERDATA",
+  input.strategy.operationReference == input.operationReference,
+  input.strategy.deviceProfileReference == input.deviceProfileReference,
+  input.strategy.archiveDigestSHA256 == input.archiveDigestSHA256,
+  input.strategy.stepSetDigestSHA256 == input.stepSetDigestSHA256,
+  Set(input.strategy.allowedStartingModes).isSubset(of: ["hdcNormal", "loader"]),
+  !input.strategy.allowedStartingModes.isEmpty,
+  (15...120).contains(input.strategy.loaderDiscoveryTimeoutSeconds),
+  (100...2_000).contains(input.strategy.loaderPollIntervalMilliseconds),
+  (5...60).contains(input.strategy.hdcCommandTimeoutSeconds),
+  (5...60).contains(input.strategy.readOnlyCommandTimeoutSeconds),
+  input.strategy.userdataImpact == input.userdataImpact
 else { fail("request outside published strategy") }
-
-let output = CandidateOutput(
-  operationReference: input.operationReference,
-  deviceProfileReference: input.deviceProfileReference,
-  archiveDigestSHA256: input.archiveDigestSHA256,
-  stepSetDigestSHA256: input.stepSetDigestSHA256,
-  // Candidate code may narrow this set in a future attempt.  It cannot add a
-  // mode because the broker decodes the closed enum and independently checks
-  // the live mode before destructive admission.
-  allowedStartingModes: ["hdcNormal", "loader"],
-  userdataImpact: input.userdataImpact)
 
 let encoder = JSONEncoder()
 encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
 do {
-  FileHandle.standardOutput.write(try encoder.encode(output))
+  FileHandle.standardOutput.write(try encoder.encode(input.strategy))
   FileHandle.standardOutput.write(Data("\n".utf8))
 } catch {
   fail("strategy encoding failed")

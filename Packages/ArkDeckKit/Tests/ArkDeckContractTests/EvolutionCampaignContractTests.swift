@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckHarness
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -314,6 +315,24 @@ final class EvolutionCampaignContractTests: XCTestCase {
     var strategy = try XCTUnwrap(
       JSONSerialization.jsonObject(with: JSONEncoder().encode(pins.candidate.strategy))
         as? [String: Any])
+    let legacyStrategy = strategy.filter { key, _ in
+      ![
+        "loaderDiscoveryTimeoutSeconds", "loaderPollIntervalMilliseconds",
+        "hdcCommandTimeoutSeconds", "readOnlyCommandTimeoutSeconds",
+      ].contains(key)
+    }
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        RockchipEvolutionTypedStrategy.self,
+        from: JSONSerialization.data(withJSONObject: legacyStrategy)),
+      pins.candidate.strategy)
+    strategy["loaderDiscoveryTimeoutSeconds"] = NSNull()
+    XCTAssertThrowsError(
+      try JSONDecoder().decode(
+        RockchipEvolutionTypedStrategy.self,
+        from: JSONSerialization.data(withJSONObject: strategy)))
+    strategy["loaderDiscoveryTimeoutSeconds"] =
+      pins.candidate.strategy.loaderDiscoveryTimeoutSeconds
     strategy["executable"] = "/usr/local/bin/rkdeveloptool"
     XCTAssertThrowsError(
       try JSONDecoder().decode(
@@ -343,6 +362,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let flash = CountingEvolutionFlash()
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger, usageLedger: AgentAuthorityUsageLedger(root: usageRoot),
+      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
           pin: pins.candidate, reviewDiff: Data("diff".utf8))),
@@ -378,6 +398,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
           pin: pins.candidate, reviewDiff: Data("immutable diff".utf8))),
@@ -391,6 +412,120 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let rejectedDispatches = await flash.dispatchCount()
     XCTAssertEqual(rejectedDispatches, 0)
     XCTAssertTrue(try ledger.load(assertion.campaignID).isTerminal)
+  }
+
+  func testHostAutomaticallyRepairsAndContinuesSafeFailureUntilSuccess() async throws {
+    let root = temporaryDirectory("campaign-auto-repair")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let baseline = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let repaired = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 90,
+      loaderPollIntervalMilliseconds: 250, hdcCommandTimeoutSeconds: 45,
+      readOnlyCommandTimeoutSeconds: 30, userdataImpact: "ERASE-USERDATA")
+    let flash = SafeFailureThenSuccessEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: ScriptedEvolutionRepairer(baseline: baseline, repaired: repaired),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    let result = try await host.executeConfirmedCampaign(
+      confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 2)
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 2)
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertTrue(document.isTerminal)
+    XCTAssertEqual(
+      document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.safeToReflash, .succeeded])
+    XCTAssertEqual(document.events.compactMap(\.candidate).map(\.strategy), [baseline, repaired])
+  }
+
+  func testHostNeverRetriesFailureWithoutFreshAttemptReservation() async throws {
+    let root = temporaryDirectory("campaign-pre-admission-stop")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let baseline = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let flash = RejectingBeforeReservationEvolutionFlash()
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: FixedEvolutionRepairer(strategy: baseline),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    await ain019AssertThrowsAsync(
+      try await host.executeConfirmedCampaign(
+        confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 1)
+    let stopped = try ledger.load(assertion.campaignID)
+    XCTAssertTrue(stopped.isTerminal)
+    XCTAssertEqual(stopped.events.last?.reasonCode, "admissionOrTargetDrift")
+    XCTAssertEqual(stopped.reservedAttemptCount, 0)
+  }
+
+  func testCodexRepairerAcceptsOnlyClosedNewTypedStrategy() async throws {
+    let root = temporaryDirectory("campaign-repairer")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let assertion = try makeAssertion()
+    let prior = try makePins(assertion: assertion, ordinal: 1).candidate
+    let response = Data(
+      """
+      {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":90,"loaderPollIntervalMilliseconds":250,"hdcCommandTimeoutSeconds":45,"readOnlyCommandTimeoutSeconds":30}
+      """.utf8)
+    let repairer = try CodexRockchipEvolutionStrategyRepairer(
+      executablePath: "/usr/bin/true", modelName: "contract-model",
+      workingDirectory: root.path, transport: FixedEvolutionCodexTransport(response: response))
+    let strategy = try await repairer.propose(
+      assertion: assertion,
+      observation: RockchipEvolutionFailureObservation(
+        attemptOrdinal: 1, failureCode: "flash.semanticFailure:enter-loader"),
+      priorCandidates: [prior])
+    XCTAssertEqual(strategy.loaderDiscoveryTimeoutSeconds, 90)
+    XCTAssertEqual(strategy.loaderPollIntervalMilliseconds, 250)
+    XCTAssertEqual(strategy.hdcCommandTimeoutSeconds, 45)
+    XCTAssertEqual(strategy.readOnlyCommandTimeoutSeconds, 30)
+
+    let invalid = try CodexRockchipEvolutionStrategyRepairer(
+      executablePath: "/usr/bin/true", modelName: "contract-model",
+      workingDirectory: root.path,
+      transport: FixedEvolutionCodexTransport(
+        response: Data(
+          """
+          {"allowedStartingModes":["loader"],"loaderDiscoveryTimeoutSeconds":90,"loaderPollIntervalMilliseconds":250,"hdcCommandTimeoutSeconds":45,"readOnlyCommandTimeoutSeconds":30,"argv":["wlx"]}
+          """.utf8)))
+    await ain019AssertThrowsAsync(
+      try await invalid.propose(
+        assertion: assertion,
+        observation: RockchipEvolutionFailureObservation(
+          attemptOrdinal: 1, failureCode: "flash.semanticFailure:enter-loader"),
+        priorCandidates: [prior]))
   }
 
   func testCandidateTargetAndSandboxHaveNoRuntimeDeviceNetworkOrRawProcessSurface() throws {
@@ -499,11 +634,137 @@ final class EvolutionCampaignContractTests: XCTestCase {
 private struct FixedEvolutionBuilder: RockchipEvolutionCandidateBuilding {
   let build: RockchipEvolutionCandidateBuild
 
-  func build(assertion _: RockchipEvolutionCampaignConfirmationAssertion) async throws
+  func build(
+    assertion _: RockchipEvolutionCampaignConfirmationAssertion,
+    strategy _: RockchipEvolutionTypedStrategy
+  ) async throws
     -> RockchipEvolutionCandidateBuild
   {
     build
   }
+}
+
+private struct FixedEvolutionRepairer: RockchipEvolutionStrategyRepairing {
+  let strategy: RockchipEvolutionTypedStrategy
+  let repairerID = "fixed-evolution-repairer"
+
+  func propose(
+    assertion _: RockchipEvolutionCampaignConfirmationAssertion,
+    observation _: RockchipEvolutionFailureObservation?,
+    priorCandidates _: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    strategy
+  }
+}
+
+private struct ScriptedEvolutionRepairer: RockchipEvolutionStrategyRepairing {
+  let baseline: RockchipEvolutionTypedStrategy
+  let repaired: RockchipEvolutionTypedStrategy
+  let repairerID = "scripted-evolution-repairer"
+
+  func propose(
+    assertion _: RockchipEvolutionCampaignConfirmationAssertion,
+    observation: RockchipEvolutionFailureObservation?,
+    priorCandidates _: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    observation == nil ? baseline : repaired
+  }
+}
+
+private struct StrategyEchoEvolutionBuilder: RockchipEvolutionCandidateBuilding {
+  func build(
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    strategy: RockchipEvolutionTypedStrategy
+  ) async throws -> RockchipEvolutionCandidateBuild {
+    let suffix = String(strategy.digestSHA256.prefix(24)).uppercased()
+    let candidate = try RockchipEvolutionCandidatePin(
+      candidateID: "ECAND-\(suffix)", producerID: "strategy-echo-builder",
+      baseCommitOID: assertion.baseCommitOID,
+      sourceTreeDigestSHA256: String(repeating: "6", count: 64),
+      diffDigestSHA256: strategy.digestSHA256,
+      allowedPathSetDigestSHA256: String(repeating: "8", count: 64),
+      executableDigestSHA256: String(repeating: "9", count: 64),
+      toolchainDigestSHA256: assertion.candidateToolchainDigestSHA256,
+      changedFiles: [], changedLines: 1, diffArtifactID: "strategy-diff-\(suffix)",
+      buildEvidenceArtifactID: "strategy-build-\(suffix)",
+      testEvidenceArtifactID: "strategy-test-\(suffix)", strategy: strategy)
+    return RockchipEvolutionCandidateBuild(
+      pin: candidate, reviewDiff: try JSONEncoder().encode(strategy))
+  }
+}
+
+private struct PassingEvolutionReviewer: RockchipEvolutionAdversarialReviewing {
+  let reviewerID = "passing-independent-reviewer"
+
+  func review(_ request: RockchipEvolutionAdversarialReviewRequest) async throws
+    -> RockchipEvolutionReviewReceipt
+  {
+    try RockchipEvolutionReviewReceipt(
+      reviewID: "EREVIEW-\(String(request.candidate.strategy.digestSHA256.prefix(24)).uppercased())",
+      reviewerID: reviewerID, candidateID: request.candidate.candidateID,
+      candidateExecutableDigestSHA256: request.candidate.executableDigestSHA256,
+      planDigestSHA256: request.assertion.planDigestSHA256, result: .pass, issues: [],
+      createdAt: "2026-08-02T08:00:00Z")
+  }
+}
+
+private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispatching {
+  let ledger: RockchipEvolutionCampaignLedger
+  let now: String
+  private var count = 0
+
+  init(ledger: RockchipEvolutionCampaignLedger, now: String) {
+    self.ledger = ledger
+    self.now = now
+  }
+
+  func execute(_ request: RockchipFlashExecutionRequest) async throws
+    -> RockchipFlashExecutionResult
+  {
+    guard case .evolutionCampaign(let permit) = request.authority else {
+      throw RockchipEvolutionCampaignError.admissionRejected("campaignPermitRequired")
+    }
+    count += 1
+    let ordinal = count
+    _ = try ledger.reserveAttempt(
+      campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
+      reviewID: permit.review.reviewID, ordinal: ordinal,
+      reservationID: "reservation-auto-\(ordinal)", jobID: "job-auto-\(ordinal)",
+      sessionID: "session-auto-\(ordinal)", at: now)
+    if ordinal == 1 {
+      _ = try ledger.closeAttempt(
+        campaignID: permit.assertion.campaignID, ordinal: ordinal,
+        jobID: "job-auto-\(ordinal)", sessionID: "session-auto-\(ordinal)",
+        disposition: .safeToReflash, destructiveIntentEventIDs: [], at: now)
+      throw RockchipFlashExecutionError.semanticFailure(
+        stepID: "enter-loader", detail: "contract safe failure")
+    }
+    _ = try ledger.closeAttempt(
+      campaignID: permit.assertion.campaignID, ordinal: ordinal,
+      jobID: "job-auto-\(ordinal)", sessionID: "session-auto-\(ordinal)",
+      disposition: .succeeded, destructiveIntentEventIDs: ["intent-auto-\(ordinal)"], at: now)
+    return RockchipFlashExecutionResult(
+      sessionID: "session-auto-\(ordinal)", jobID: "job-auto-\(ordinal)",
+      status: .succeeded, evidenceClass: .contractFake, manifestURL: nil)
+  }
+
+  func dispatchCount() -> Int { count }
+}
+
+private actor RejectingBeforeReservationEvolutionFlash: RockchipEvolutionFlashDispatching {
+  private var count = 0
+
+  func execute(_: RockchipFlashExecutionRequest) async throws -> RockchipFlashExecutionResult {
+    count += 1
+    throw RockchipFlashExecutionError.admissionRejected("fresh target drift")
+  }
+
+  func dispatchCount() -> Int { count }
+}
+
+private struct FixedEvolutionCodexTransport: HarnessCodexTransport {
+  let response: Data
+  func send(_: HarnessCodexProcessRequest) async throws -> Data { response }
 }
 
 private struct RejectingEvolutionReviewer: RockchipEvolutionAdversarialReviewing {

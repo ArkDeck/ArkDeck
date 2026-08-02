@@ -353,11 +353,20 @@ public enum RockchipEvolutionStartingMode: String, Codable, CaseIterable, Sendab
 /// modes are acceptable; it cannot describe a process, executable, argv,
 /// action, target, authority or new Catalog step.
 public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
+  public static let defaultLoaderDiscoveryTimeoutSeconds = 45
+  public static let defaultLoaderPollIntervalMilliseconds = 500
+  public static let defaultHDCCommandTimeoutSeconds = 20
+  public static let defaultReadOnlyCommandTimeoutSeconds = 15
+
   public let operationReference: String
   public let deviceProfileReference: String
   public let archiveDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let allowedStartingModes: [RockchipEvolutionStartingMode]
+  public let loaderDiscoveryTimeoutSeconds: Int
+  public let loaderPollIntervalMilliseconds: Int
+  public let hdcCommandTimeoutSeconds: Int
+  public let readOnlyCommandTimeoutSeconds: Int
   public let userdataImpact: String
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
@@ -366,6 +375,10 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
     case archiveDigestSHA256
     case stepSetDigestSHA256
     case allowedStartingModes
+    case loaderDiscoveryTimeoutSeconds
+    case loaderPollIntervalMilliseconds
+    case hdcCommandTimeoutSeconds
+    case readOnlyCommandTimeoutSeconds
     case userdataImpact
   }
 
@@ -375,6 +388,10 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
     archiveDigestSHA256: String,
     stepSetDigestSHA256: String,
     allowedStartingModes: [RockchipEvolutionStartingMode],
+    loaderDiscoveryTimeoutSeconds: Int = Self.defaultLoaderDiscoveryTimeoutSeconds,
+    loaderPollIntervalMilliseconds: Int = Self.defaultLoaderPollIntervalMilliseconds,
+    hdcCommandTimeoutSeconds: Int = Self.defaultHDCCommandTimeoutSeconds,
+    readOnlyCommandTimeoutSeconds: Int = Self.defaultReadOnlyCommandTimeoutSeconds,
     userdataImpact: String
   ) throws {
     let modes = Array(Set(allowedStartingModes)).sorted { $0.rawValue < $1.rawValue }
@@ -382,23 +399,38 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
       deviceProfileReference == "dayu200@2",
       RockchipEvolutionCampaignConfirmationAssertion.isSHA256(archiveDigestSHA256),
       RockchipEvolutionCampaignConfirmationAssertion.isSHA256(stepSetDigestSHA256),
-      !modes.isEmpty, userdataImpact == RockchipEvolutionCampaignConfirmationAssertion.dataImpact
+      !modes.isEmpty,
+      (15...120).contains(loaderDiscoveryTimeoutSeconds),
+      (100...2_000).contains(loaderPollIntervalMilliseconds),
+      (5...60).contains(hdcCommandTimeoutSeconds),
+      (5...60).contains(readOnlyCommandTimeoutSeconds),
+      userdataImpact == RockchipEvolutionCampaignConfirmationAssertion.dataImpact
     else { throw RockchipEvolutionCampaignError.candidateRejected("typedStrategy") }
     self.operationReference = operationReference
     self.deviceProfileReference = deviceProfileReference
     self.archiveDigestSHA256 = archiveDigestSHA256
     self.stepSetDigestSHA256 = stepSetDigestSHA256
     self.allowedStartingModes = modes
+    self.loaderDiscoveryTimeoutSeconds = loaderDiscoveryTimeoutSeconds
+    self.loaderPollIntervalMilliseconds = loaderPollIntervalMilliseconds
+    self.hdcCommandTimeoutSeconds = hdcCommandTimeoutSeconds
+    self.readOnlyCommandTimeoutSeconds = readOnlyCommandTimeoutSeconds
     self.userdataImpact = userdataImpact
   }
 
   public init(from decoder: any Decoder) throws {
     let dynamic = try decoder.container(keyedBy: RockchipEvolutionDynamicCodingKey.self)
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    guard
-      Set(dynamic.allKeys.map(\.stringValue))
-        == Set(CodingKeys.allCases.map(\.stringValue))
-    else {
+    let keys = Set(dynamic.allKeys.map(\.stringValue))
+    let currentKeys = Set(CodingKeys.allCases.map(\.stringValue))
+    let tuningKeys: Set<String> = [
+      CodingKeys.loaderDiscoveryTimeoutSeconds.rawValue,
+      CodingKeys.loaderPollIntervalMilliseconds.rawValue,
+      CodingKeys.hdcCommandTimeoutSeconds.rawValue,
+      CodingKeys.readOnlyCommandTimeoutSeconds.rawValue,
+    ]
+    let isLegacyShape = keys == currentKeys.subtracting(tuningKeys)
+    guard keys == currentKeys || isLegacyShape else {
       throw RockchipEvolutionCampaignError.candidateRejected("typedStrategyClosedShape")
     }
     try self.init(
@@ -408,6 +440,18 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
       stepSetDigestSHA256: container.decode(String.self, forKey: .stepSetDigestSHA256),
       allowedStartingModes: container.decode(
         [RockchipEvolutionStartingMode].self, forKey: .allowedStartingModes),
+      loaderDiscoveryTimeoutSeconds: isLegacyShape
+        ? Self.defaultLoaderDiscoveryTimeoutSeconds
+        : container.decode(Int.self, forKey: .loaderDiscoveryTimeoutSeconds),
+      loaderPollIntervalMilliseconds: isLegacyShape
+        ? Self.defaultLoaderPollIntervalMilliseconds
+        : container.decode(Int.self, forKey: .loaderPollIntervalMilliseconds),
+      hdcCommandTimeoutSeconds: isLegacyShape
+        ? Self.defaultHDCCommandTimeoutSeconds
+        : container.decode(Int.self, forKey: .hdcCommandTimeoutSeconds),
+      readOnlyCommandTimeoutSeconds: isLegacyShape
+        ? Self.defaultReadOnlyCommandTimeoutSeconds
+        : container.decode(Int.self, forKey: .readOnlyCommandTimeoutSeconds),
       userdataImpact: container.decode(String.self, forKey: .userdataImpact))
   }
 
@@ -478,7 +522,7 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
         sourceTreeDigestSHA256, diffDigestSHA256, allowedPathSetDigestSHA256,
         executableDigestSHA256, toolchainDigestSHA256,
       ].allSatisfy(RockchipEvolutionCampaignConfirmationAssertion.isSHA256),
-      !files.isEmpty, changedLines >= 0,
+      changedLines >= 0,
       [diffArtifactID, buildEvidenceArtifactID, testEvidenceArtifactID].allSatisfy({
         $0.range(of: #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#, options: .regularExpression)
           == $0.startIndex..<$0.endIndex
