@@ -23,9 +23,6 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
 
   override func tearDownWithError() throws {
     if let receiveRoot { try? FileManager.default.removeItem(at: receiveRoot) }
-    for key in ["ARKDECK_FAKE_HDC_RECV_MODE", "ARKDECK_FAKE_HDC_RECV_PAYLOAD"] {
-      unsetenv(key)
-    }
   }
 
   private struct FactsPort: HDCObservationFactsPort {
@@ -330,10 +327,12 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
 
   /// The whole leg for real: the descriptor-bound dispatcher spawns a child
   /// that writes the file, and the receipt carries what the host measured.
+  /// Fixture knobs travel as explicit child environment: the spawn base
+  /// allowlist drops everything a test process merely exports.
   func testDispatchedReceiveMeasuresTheFileTheChildWrote() async throws {
     let payload = "bytes-from-a-real-child"
-    setenv("ARKDECK_FAKE_HDC_RECV_PAYLOAD", payload, 1)
-    let (dispatcher, plan) = try makeDispatchedPlan()
+    let (dispatcher, plan) = try makeDispatchedPlan(
+      childEnvironment: ["ARKDECK_FAKE_HDC_RECV_PAYLOAD": payload])
 
     let receipt = try await dispatcher.dispatch(plan)
     let landed = try XCTUnwrap(receipt.landedArtifact)
@@ -348,8 +347,8 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   }
 
   func testDispatchedReceiveThatLandsNowhereCarriesNoArtifact() async throws {
-    setenv("ARKDECK_FAKE_HDC_RECV_MODE", "nothing", 1)
-    let (dispatcher, plan) = try makeDispatchedPlan()
+    let (dispatcher, plan) = try makeDispatchedPlan(
+      childEnvironment: ["ARKDECK_FAKE_HDC_RECV_MODE": "nothing"])
 
     let receipt = try await dispatcher.dispatch(plan)
     XCTAssertEqual(receipt.exitStatus, 0, "hdc exits cleanly even when nothing lands")
@@ -359,8 +358,8 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   /// A leftover file from an earlier attempt must not be inspected as though
   /// this transfer had produced it.
   func testStaleFileFromAnEarlierAttemptCannotPassAsThisTransfer() async throws {
-    setenv("ARKDECK_FAKE_HDC_RECV_MODE", "nothing", 1)
-    let (dispatcher, plan) = try makeDispatchedPlan()
+    let (dispatcher, plan) = try makeDispatchedPlan(
+      childEnvironment: ["ARKDECK_FAKE_HDC_RECV_MODE": "nothing"])
     let destination = try XCTUnwrap(plan.hostLanding?.destination)
     try FileManager.default.createDirectory(
       at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -372,14 +371,16 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
       "the stale file must be cleared before the transfer, not measured after it")
   }
 
-  private func makeDispatchedPlan() throws -> (DescriptorBoundProcessDispatcher, TypedProcessPlan)
-  {
+  private func makeDispatchedPlan(
+    childEnvironment: [String: String] = [:]
+  ) throws -> (DescriptorBoundProcessDispatcher, TypedProcessPlan) {
     let fixture = productsDirectory.appendingPathComponent("ArkDeckFakeHDCFixture")
     guard FileManager.default.fileExists(atPath: fixture.path) else {
       throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
     }
     let dispatcher = DescriptorBoundProcessDispatcher(
-      resolver: try FixedExecutableResolver.hashing(path: fixture.path, providerID: "hdc"))
+      resolver: try FixedExecutableResolver.hashing(path: fixture.path, providerID: "hdc"),
+      childEnvironment: childEnvironment)
     let plan = try provider.lower(
       action: .hdc(.receiveOwnedArtifact(try artifact())), context: context)
     return (dispatcher, plan)

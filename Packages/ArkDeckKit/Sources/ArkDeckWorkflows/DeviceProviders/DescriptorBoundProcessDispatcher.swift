@@ -8,6 +8,7 @@
 // hostManaged plans are refused here - they belong to their own hosts.
 
 import ArkDeckCore
+import ArkDeckOpenHarmony
 import ArkDeckProcess
 import CryptoKit
 import Foundation
@@ -81,6 +82,18 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     self.resolver = resolver
     self.outputByteBudget = outputByteBudget
     self.childEnvironment = childEnvironment
+  }
+
+  /// HDC dispatcher for the daemon composition root. The spawn base
+  /// environment is a closed allowlist, so a daemon-launcher
+  /// `OHOS_HDC_SERVER_PORT` reaches hdc children only by being named here;
+  /// otherwise hdc would silently address the default server.
+  package static func hdc(
+    resolver: any RuntimeExecutableResolving
+  ) -> DescriptorBoundProcessDispatcher {
+    DescriptorBoundProcessDispatcher(
+      resolver: resolver,
+      childEnvironment: HDCServerEndpointSelector.inheritedPortChildEnvironment())
   }
 
   public func unavailableReason(providerID: String) -> String? {

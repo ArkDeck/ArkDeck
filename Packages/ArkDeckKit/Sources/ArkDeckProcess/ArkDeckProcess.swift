@@ -122,8 +122,12 @@ public struct ProcessRequest: Sendable, Equatable {
   public let workingDirectory: URL?
   public let timeout: TimeInterval?
 
-  /// `environment` is overlaid only on this child process's inherited
-  /// environment. It never writes a user or system-wide environment value.
+  /// `environment` is overlaid on the fail-closed base environment
+  /// (`FoundationProcessExecutor.baseChildEnvironmentKeys` filtered from the
+  /// parent). Everything else in the parent environment — including any
+  /// credential the daemon itself was configured with — is never visible to
+  /// the child; a caller that needs another variable passes it here
+  /// explicitly. It never writes a user or system-wide environment value.
   public init(
     executable: URL,
     argumentZero: String? = nil,
@@ -353,6 +357,21 @@ public typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
 /// spawned process group, which also prevents a descendant from surviving the
 /// parent process.
 public final class FoundationProcessExecutor: @unchecked Sendable {
+  /// The only parent-environment keys a child process ever inherits. The
+  /// parent (arkdeck-agentd) carries credentials such as its model API key;
+  /// spawning must not republish them to every tool child. A caller that
+  /// needs any variable beyond this base names it in
+  /// `ProcessRequest.environment` explicitly.
+  public static let baseChildEnvironmentKeys: Set<String> = [
+    "PATH", "HOME", "TMPDIR", "LANG",
+  ]
+
+  static func baseChildEnvironment(
+    parent: [String: String] = ProcessInfo.processInfo.environment
+  ) -> [String: String] {
+    parent.filter { baseChildEnvironmentKeys.contains($0.key) }
+  }
+
   private let identityBoundPreSpawnHook: @Sendable (ProcessExecutableIdentityReceipt) throws -> Void
   private let identityBoundFinalLaunchHook:
     @Sendable (ProcessExecutableIdentityReceipt) async throws -> Void
@@ -738,7 +757,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       [request.argumentZero ?? request.executable.path] + request.arguments)
     defer { freeCStringVector(arguments) }
     var environment = try makeCStringVector(
-      ProcessInfo.processInfo.environment
+      Self.baseChildEnvironment()
         .merging(request.environment) { _, requested in requested }
         .sorted(by: { $0.key < $1.key })
         .map { "\($0.key)=\($0.value)" }

@@ -1,4 +1,5 @@
 import ArkDeckCore
+import ArkDeckOpenHarmony
 import ArkDeckProcess
 import ArkDeckStorage
 import CryptoKit
@@ -426,7 +427,10 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
           process: ProcessRequest(
             executable: hdcTransition.executableURL,
             arguments: hdcTransition.arguments,
-            environment: [:], timeout: TimeInterval(hdcTimeout)),
+            // The spawn base allowlist drops an inherited HDC port; name it
+            // so the loader transition addresses the configured server.
+            environment: HDCServerEndpointSelector.inheritedPortChildEnvironment(),
+            timeout: TimeInterval(hdcTimeout)),
           expectedSHA256: hdcTransition.executableSHA256))
     } catch {
       prepared.close()

@@ -202,6 +202,31 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertEqual(ProcessInfo.processInfo.environment["OHOS_HDC_SERVER_PORT"], before)
   }
 
+  /// Companion of the closed spawn base allowlist: hdc callers outside a
+  /// selected endpoint forward an inherited `OHOS_HDC_SERVER_PORT` only as a
+  /// validated explicit child variable, and an invalid value is dropped so
+  /// dispatch stays on the documented default instead of exporting garbage.
+  func testInheritedPortPassThroughForwardsOnlyAValidatedPort() {
+    XCTAssertEqual(
+      HDCServerEndpointSelector.inheritedPortChildEnvironment(
+        inheritedEnvironment: ["OHOS_HDC_SERVER_PORT": "18710"]),
+      ["OHOS_HDC_SERVER_PORT": "18710"])
+    XCTAssertEqual(
+      HDCServerEndpointSelector.inheritedPortChildEnvironment(
+        inheritedEnvironment: ["OHOS_HDC_SERVER_PORT": "08710", "PATH": "/usr/bin"]),
+      ["OHOS_HDC_SERVER_PORT": "8710"])
+    for invalid in ["0", "65536", "-1", "port", "", "8710\n"] {
+      XCTAssertEqual(
+        HDCServerEndpointSelector.inheritedPortChildEnvironment(
+          inheritedEnvironment: ["OHOS_HDC_SERVER_PORT": invalid]),
+        [:],
+        "invalid inherited port \(invalid.debugDescription) must be dropped")
+    }
+    XCTAssertEqual(
+      HDCServerEndpointSelector.inheritedPortChildEnvironment(inheritedEnvironment: [:]),
+      [:])
+  }
+
   func testExplicitNonLoopbackEndpointIsPassedToTheRegisteredCheckserverCommand() async throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "arkdeck-m1-006-explicit-host-\(UUID().uuidString)", directoryHint: .isDirectory)

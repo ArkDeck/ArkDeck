@@ -201,7 +201,7 @@ Task.detached {
       let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
       executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
       hdcExecutableResolver = resolver
-      hdcDispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
+      hdcDispatcher = DescriptorBoundProcessDispatcher.hdc(resolver: resolver)
     }
 
     let hdcProvider = HDCObservationProviderAdapter(
