@@ -133,6 +133,8 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       authorizationBlobOID: authorizationBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
+  /// Historical decoder/source-compatibility validation only. New products must use bounded
+  /// campaign confirmation, and the usage ledger rejects this kind on reserve.
   public static func validatedChatConfirmation(
     confirmationDigestSHA256: String,
     planDigestSHA256: String,
@@ -1363,8 +1365,8 @@ public struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
   }
 }
 
-/// Independent consume-on-reserve ledger for E1 capabilities and one-shot chat-confirmed E2
-/// authorities. The legacy E2 ledger above remains the standing-authorization usage store.
+/// Independent consume-on-reserve ledger for E1 capabilities and bounded Evolution campaigns.
+/// Historical chat-confirmation entries remain decodable but cannot create new reservations.
 public final class AgentAuthorityUsageLedger: @unchecked Sendable {
   public static let ledgerFileName = "agent-authority-usage.json"
   public static let lockFileName = ".agent-authority-usage.lock"
@@ -1391,6 +1393,10 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
   public func reserve(_ request: AgentAuthorityUsageReservation) throws
     -> AgentAuthorityUsageReservation
   {
+    guard request.authorizationRef.kind != .chatConfirmation else {
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "chatConfirmation is historical read-only authority")
+    }
     guard request.terminal == nil else {
       throw AuthorizationUsageLedgerError.invalidRecord(
         "Agent authority reserve request must not carry terminal")
@@ -1400,14 +1406,9 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
       if let existing = document.reservations.first(where: {
         $0.reservationID == request.reservationID
       }) {
-        guard request.authorizationRef.kind != .chatConfirmation else {
-          throw AuthorizationUsageLedgerError.usageLimitExceeded(
-            authorizationID: request.authorizationRef.sourceIdentifier,
-            maxRuns: request.maximumUses)
-        }
         guard existing == request else {
           throw AuthorizationUsageLedgerError.reservationConflict(
-          "Agent authority reservation retry fields drifted")
+            "Agent authority reservation retry fields drifted")
         }
         return existing
       }

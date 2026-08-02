@@ -66,20 +66,6 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     var clearCount: Int { lock.withLock { clears } }
   }
 
-  private final class ProvenanceCredentialProbe: @unchecked Sendable {
-    private let lock = NSLock()
-    private var loads = 0
-
-    func load() -> String? {
-      lock.withLock {
-        loads += 1
-        return "protected-main-token"
-      }
-    }
-
-    var loadCount: Int { lock.withLock { loads } }
-  }
-
   private final class ModeTransitionIdentityProbe: @unchecked Sendable {
     private let lock = NSLock()
     private let before: RockchipProductUSBIdentity
@@ -97,34 +83,6 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         return calls == 0 ? before : after
       }
     }
-  }
-
-  func testChatConfirmationDefersStandingAuthorizationKeychainCredential() throws {
-    let probe = ProvenanceCredentialProbe()
-    let loader = RockchipProductionProvenanceTokenLoader(loadToken: { probe.load() })
-    let archive = URL(fileURLWithPath: "/tmp/dayu200-images.tar.gz")
-    let assertion = try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: String(repeating: "c", count: 64),
-      planDigestSHA256: String(repeating: "d", count: 64),
-      archiveDigestSHA256: String(repeating: "a", count: 64),
-      stepSetDigestSHA256: String(repeating: "e", count: 64),
-      targetDigestSHA256: String(repeating: "b", count: 64), bindingRevision: 1)
-    let chatRequest = try RockchipFlashExecutionRequest(
-      chatConfirmation: assertion, archiveURL: archive, targetLocationSelector: "42")
-
-    XCTAssertNil(try loader.token(for: chatRequest.authority))
-    XCTAssertEqual(
-      probe.loadCount, 0,
-      "chat-confirmed execution must not ask Keychain for standing provenance")
-
-    let standingRequest = try RockchipFlashExecutionRequest(
-      authorizationID: "AUTH-TEST-AIN-018", archiveURL: archive,
-      targetLocationSelector: "42")
-    XCTAssertEqual(
-      try loader.token(for: standingRequest.authority), "protected-main-token")
-    XCTAssertEqual(
-      probe.loadCount, 1,
-      "standing authorization must still load its protected-main credential on demand")
   }
 
   func testPostflightAcceptsOnlyWholeCurrentOrConfirmedPreviousModeIdentityTuple()
@@ -318,83 +276,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertThrowsError(try spoofedNormal.installCurrentLoader())
   }
 
-  func testChatConfirmedCurrentLoaderRebindAdvancesExactlyOnceBeforeExecutionHostLoads()
-    throws
-  {
-    let root = FileManager.default.temporaryDirectory
-      .appending(path: "arkdeck-loader-rebind-\(UUID().uuidString)", directoryHint: .isDirectory)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let store = RockchipProductBindingStore(rootURL: root)
-    let normal = RockchipProductUSBIdentity(
-      serial: "normal-hdc-identity", vendorID: RockchipProbeEvidence.rockUSBVendorID,
-      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
-      topology: "18874368", productName: "HDC Device")
-    _ = try RockchipProductBindingBootstrap(probe: { normal }, store: store)
-      .installCurrentTarget()
-    let loader = RockchipProductUSBIdentity(
-      serial: "loader-rockusb-identity", vendorID: RockchipProbeEvidence.rockUSBVendorID,
-      productID: RockchipProbeEvidence.dayu200LoaderProductID,
-      topology: "17956864")
-    let rebinder = RockchipProductBindingRebinder(probe: { loader }, store: store)
-
-    let preview = try rebinder.previewCurrentLoader()
-    XCTAssertEqual(preview.currentRevision, 1)
-    XCTAssertEqual(preview.prospectiveRevision, 2)
-    XCTAssertTrue(preview.requiresRebind)
-    XCTAssertEqual(preview.usbTopology, loader.topology)
-
-    let plan = try RockchipRockUSBFlashProvider(profile: .dayu200OpenHarmony70035)
-      .makePlan(mode: .execute, archiveValidation: .valid)
-    let assertion = try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: String(repeating: "c", count: 64),
-      planDigestSHA256: plan.planDigestSHA256,
-      archiveDigestSHA256: plan.archiveSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      targetDigestSHA256: preview.targetDigestSHA256,
-      bindingRevision: preview.prospectiveRevision)
-    let receipt = try rebinder.confirmCurrentLoader(chatConfirmation: assertion)
-    XCTAssertTrue(receipt.changed)
-    XCTAssertEqual(receipt.previousRevision, 1)
-    XCTAssertEqual(receipt.revision, 2)
-    XCTAssertEqual(receipt.targetDigestSHA256, preview.targetDigestSHA256)
-
-    let stored = try store.loadExisting()
-    XCTAssertEqual(stored.revision, 2)
-    XCTAssertEqual(stored.serial, loader.serial)
-    XCTAssertEqual(stored.usbTopology, loader.topology)
-    XCTAssertTrue(stored.evidence.contains("binding:previous-revision=1"))
-    XCTAssertTrue(stored.evidence.contains("binding:previous-usb-topology=18874368"))
-    XCTAssertFalse(stored.evidence.contains { $0.contains(normal.serial) || $0.contains(loader.serial) })
-    XCTAssertEqual(
-      try stored.postflightIdentities(),
-      [
-        RockchipPostflightIdentity(
-          serialDigestSHA256: receipt.serialDigestSHA256, usbTopology: loader.topology),
-        RockchipPostflightIdentity(
-          serialDigestSHA256: RockchipExecutionTestFixture.sha256(Data(normal.serial.utf8)),
-          usbTopology: normal.topology),
-      ])
-    var metadata = stat()
-    let bindingURL = root.appending(path: RockchipProductBindingStore.bindingFileName)
-    XCTAssertEqual(lstat(bindingURL.path, &metadata), 0)
-    XCTAssertEqual(metadata.st_mode & 0o777, 0o600)
-
-    let replay = try rebinder.confirmCurrentLoader(chatConfirmation: assertion)
-    XCTAssertFalse(replay.changed)
-    XCTAssertEqual(replay.previousRevision, 2)
-    XCTAssertEqual(replay.revision, 2)
-
-    let mismatched = try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: String(repeating: "d", count: 64),
-      planDigestSHA256: plan.planDigestSHA256,
-      archiveDigestSHA256: plan.archiveSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      targetDigestSHA256: String(repeating: "0", count: 64), bindingRevision: 2)
-    XCTAssertThrowsError(try rebinder.confirmCurrentLoader(chatConfirmation: mismatched))
-    XCTAssertEqual(try store.loadExisting(), stored)
-  }
-
-  func testChatConfirmedNormalModeDispatchesExactHDCOnceBeforeClosedRockUSBSequence()
+  func testNormalModeDispatchesExactHDCOnceBeforeClosedRockUSBSequence()
     async throws
   {
     let fixture = try RockchipExecutionTestFixture.make()
@@ -453,16 +335,9 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         makePersistence: { _, _, _ in persistence },
         profiles: [.dayu200, fixture.profile],
         makeID: RockchipExecutionTestFixture.deterministicID))
-    let assertion = try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: String(repeating: "c", count: 64),
-      planDigestSHA256: fixture.plan.planDigestSHA256,
-      archiveDigestSHA256: fixture.plan.archiveSHA256,
-      stepSetDigestSHA256: fixture.plan.stepSetDigestSHA256,
-      targetDigestSHA256: String(repeating: "b", count: 64), bindingRevision: 1)
-
     let result = try await host.execute(
       RockchipFlashExecutionRequest(
-        chatConfirmation: assertion, archiveURL: fixture.archive,
+        authorizationID: "AUTH-TEST-AIN-019", archiveURL: fixture.archive,
         targetLocationSelector: "42"))
 
     XCTAssertEqual(result.status, .succeeded)
@@ -634,70 +509,6 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
 
     XCTAssertEqual(attempt.semantic, .succeeded)
     XCTAssertEqual(spawnLog.requests.map(\.arguments), [["ld"]])
-  }
-
-  func testChatConfirmedFakeExecutesOnceAndPublishesTruthfulV22Authority() async throws {
-    let fixture = try RockchipExecutionTestFixture.make()
-    defer { try? FileManager.default.removeItem(at: fixture.base) }
-    let persistence = try await fixture.makePersistence()
-    let previousModeIdentity = RockchipPostflightIdentity(
-      serialDigestSHA256: String(repeating: "d", count: 64), usbTopology: "43")
-    let admission = RecordingRockchipAdmissionPort(
-      plan: fixture.plan, receipt: fixture.executableReceipt,
-      postflightIdentities: [
-        RockchipPostflightIdentity(
-          serialDigestSHA256: String(repeating: "a", count: 64), usbTopology: "42"),
-        previousModeIdentity,
-      ])
-    let process = RecordingRockchipProcessPort(
-      executable: fixture.executable, sha256: fixture.executableSHA256)
-    let host = RockchipFlashExecutionHost(
-      dependencies: RockchipFlashExecutionDependencies(
-        admission: admission, process: process,
-        postflight: FixedRockchipPostflightPort(
-          serialDigest: previousModeIdentity.serialDigestSHA256,
-          topology: previousModeIdentity.usbTopology),
-        power: RecordingPowerBackend(),
-        makePersistence: { _, _, _ in persistence },
-        profiles: [.dayu200, fixture.profile],
-        makeID: RockchipExecutionTestFixture.deterministicID))
-    let assertion = try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: String(repeating: "c", count: 64),
-      planDigestSHA256: fixture.plan.planDigestSHA256,
-      archiveDigestSHA256: fixture.plan.archiveSHA256,
-      stepSetDigestSHA256: fixture.plan.stepSetDigestSHA256,
-      targetDigestSHA256: String(repeating: "b", count: 64), bindingRevision: 1)
-
-    let result = try await host.execute(
-      RockchipFlashExecutionRequest(
-        chatConfirmation: assertion, archiveURL: fixture.archive,
-        targetLocationSelector: "42"))
-
-    XCTAssertEqual(result.status, .succeeded)
-    XCTAssertEqual(process.arguments.count, 12)
-    let replay = try DurableJournalRecovery.inspect(
-      url: persistence.sessionRoot.appending(path: "journal.jsonl"))
-    XCTAssertEqual(replay.events.first?.schemaVersion, JournalEvent.agentAuthoritySchemaVersion)
-    XCTAssertNil(replay.authorizationReference)
-    XCTAssertEqual(replay.agentExecutionAuthorityReference?.kind, .chatConfirmation)
-    let externalIntents = replay.events.filter {
-      $0.kind == .stepIntent && ($0.stepEffect ?? .hostOnly) >= .readOnly
-    }
-    XCTAssertEqual(externalIntents.count, 13)
-    XCTAssertTrue(
-      externalIntents.allSatisfy {
-        $0.agentExecutionAuthorityReference?.kind == .chatConfirmation
-          && $0.usageReservationID == "reservation-ain-007"
-      })
-    let manifest = try SessionManifestDocument(
-      data: Data(contentsOf: try XCTUnwrap(result.manifestURL)))
-    XCTAssertEqual(manifest.schemaVersion, JournalEvent.agentAuthoritySchemaVersion)
-    XCTAssertNil(manifest.authorization?.authorizationReference)
-    XCTAssertEqual(
-      manifest.authorization?.agentExecutionAuthorityReference?.kind, .chatConfirmation)
-    XCTAssertEqual(manifest.authorization?.externalIntentEventIDs.count, 13)
-    XCTAssertEqual(admission.closedIntentIDs.count, 13)
-    XCTAssertEqual(admission.authorizeAndConsumeCount, 1)
   }
 
   func testAuthorizedFakeDescriptorExecutesExactClosedSequenceAndPublishesV21Manifest()
@@ -913,15 +724,6 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
           mainCommitOID: String(repeating: "1", count: 40),
           authorizationBlobOID: String(repeating: "2", count: 40),
           approvalPRNumber: 314))
-    case .chatConfirmation(let assertion):
-      authorityReference = .agent(
-        try .validatedChatConfirmation(
-          confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-          planDigestSHA256: assertion.planDigestSHA256,
-          archiveDigestSHA256: assertion.archiveDigestSHA256,
-          stepSetDigestSHA256: assertion.stepSetDigestSHA256,
-          targetDigestSHA256: assertion.targetDigestSHA256,
-          confirmedAt: "2026-08-01T12:00:00Z"))
     case .evolutionCampaign(let permit):
       authorityReference = .agent(try permit.assertion.authorityReference())
     }

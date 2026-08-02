@@ -3303,10 +3303,10 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - 三条 SDD/Catalog 闸、全量并行 Swift、preflight 全绿；run evidence 如实记录
   `real device=0, Flash=0`。
 
-## TASK-AIN-019 — Evolution Mode 未合入候选的 bounded E2 Flash campaign
+## TASK-AIN-019 — 默认 Evolution 路径与未合入候选的 bounded E2 Flash campaign
 
-- Status:blocked（等待 CHG-2026-025 r8 经维护者 review/merge；合入前实现、授权实例、
-  USB/HDC/RockUSB 与真实 Flash dispatch 均为 0）
+- Status:in-progress（r8 产品实现已由 #957 合入；r9 删除模式分叉与 one-shot 新执行面，
+  本实现 PR 中授权实例、USB/HDC/RockUSB 与真实 Flash dispatch 均为 0）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
@@ -3357,7 +3357,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 ### Deliverables
 
 - `evolutionCampaignConfirmation` closed request/reference/digest 与 append-only campaign/
-  attempt ledger；旧 one-shot bytes 和消费语义零变化；
+  attempt ledger；旧 one-shot bytes 仅保留 decode/export，新 reserve/admission/dispatch 拒绝；
 - task-owned candidate builder/sandbox 固定 base、allowed paths、diff、toolchain、executable
   digest，且 device/network/raw-process capability 为 0；
 - adversarial reviewer 可读取 immutable diff/build/test/plan/history，但无 repair/Runtime/
@@ -3370,6 +3370,11 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   bytes，不把 AI review 伪装成维护者批准或 standing authorization；
 - contract/fault matrix 与合入后真实 DAYU200 campaign evidence，最终 promotion 仍只生成正常
   PR candidate，不自行 merge。
+- r9：Harness caller 不再选择 `normal|evolution`；workspace envelope 自动启用 isolation/review，
+  device-only task 不创建伪 workspace；删除 mode-only branch 与 CLI flags。
+- r9：默认 `flash preview/execute/continue/status` 承载 campaign，删除 `evolution-*` 特殊命名、
+  one-shot chat request/admission/Loader-confirm/dispatch 生产路径；历史 authority decoder、
+  Journal/Manifest/export 只读兼容保留，standing/human 路径保留。
 
 ### Verification
 
@@ -3383,3 +3388,6 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   由 broker 分类 safeToReflash 时才允许下一 ordinal；candidate/reviewer 自报分类恒拒绝；
 - 三条 SDD/Catalog 闸、全量并行 Swift、TASK-AIN-019 preflight 全绿；实现 PR 如实记录
   `real device=0, Flash=0`，合入后的独立 Runtime run 再记录真实设备结果。
+- r9 默认路径/source-surface/migration tests：旧 execution-mode/evolution workspace flags/
+  evolution alias/chat flags 全拒绝，新 workspace/Flash 默认正例通过，历史 chat bytes 可读但
+  新 reserve 与 device dispatch=0。

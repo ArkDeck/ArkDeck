@@ -19,9 +19,6 @@
    - 维护者经 merged PR 预先批准、与待执行计划逐项精确一致的 standing
      authorization(目标设备身份/binding revision、固件、transport、HDC、Provider、
      Step 集合、恢复路径、有效期与次数上限);或
-   - 用户监督式交互 Agent 会话中的一次性 chat confirmation：Agent 已展示完整 canonical
-     plan/archive/step-set digest、目标 binding 摘要与数据影响，用户在同一会话明确确认，
-     且产品收到的 typed confirmation assertion 与现场重算值逐项一致;
    - 用户监督式交互 Agent 会话中的 bounded evolution campaign confirmation：Agent 除
      exact plan/target/data-impact 外，还展示并由用户确认 protected-main base、候选允许路径
      与 diff 预算、固定 build target/toolchain、有效期与 attempt 上限；产品硬限制最多 8 个
@@ -37,9 +34,9 @@
 另需 per-device typed capability evidence。普通 CI 不持 standing authorization,
 SHALL 仍只运行 schema/contract tests、fake/simulation 与 plan-only。
 
-one-shot chat confirmation 只对同一交互会话、同一 exact plan/target 的一次 admission
-生效。bounded evolution campaign confirmation 是独立 authority kind，SHALL NOT 改写或
-升级既有 one-shot confirmation，也 SHALL NOT 变成 standing authorization。campaign 中
+bounded evolution campaign confirmation SHALL NOT 变成 standing authorization。r7 one-shot
+chat confirmation 的历史 Journal/Manifest/ledger bytes SHALL 保持可读和可导出，但新 usage
+reservation、admission 与 destructive dispatch SHALL 拒绝，且不得升级成 campaign。campaign 中
 未合入 candidate MAY 在隔离、无 network/USB/HDC/RockUSB/raw-shell/authority capability 的
 固定 target 中运行，并产生现有 Catalog 可表达的 typed strategy；真实设备 transport、fresh
 target/binding readback、ordinal reservation 与 destructive dispatch SHALL 只由 protected-main
@@ -61,6 +58,11 @@ authorization(POL-AGENT-001 适用)。AI adversarial review 是用户已确认 d
 broker、Catalog 与 profile 的发布信任根。已连接 USB、Task 风险标记或事后补记仍不构成或
 追认任何 E2 authority。人类操作者亲手执行仍为有效执行路径，其 evidence 以
 executor.kind=human 记录。
+
+产品默认 Agent 路径 SHALL 使用 bounded Evolution：带 workspace envelope 的 Harness task
+不得再由 caller 选择 normal/evolution mode；交互式 Agent Flash 默认 CLI 直接进入 campaign
+preview/execute/continue/status。standing authorization 与人类 handoff 是不同信任/执行用途，
+不得因默认化删除。旧 mode/CLI/chat execution surface SHALL fail closed，不得静默回退。
 
 ## 保持不变
 

@@ -88,84 +88,6 @@ public enum RockchipDeviceBindingInstallation {
   }
 }
 
-public struct RockchipDeviceBindingRebindPreview: Sendable, Equatable {
-  public let currentRevision: Int
-  public let prospectiveRevision: Int
-  public let requiresRebind: Bool
-  public let usbTopology: String
-  public let serialDigestSHA256: String
-  public let targetDigestSHA256: String
-
-  public init(
-    currentRevision: Int,
-    prospectiveRevision: Int,
-    requiresRebind: Bool,
-    usbTopology: String,
-    serialDigestSHA256: String,
-    targetDigestSHA256: String
-  ) {
-    self.currentRevision = currentRevision
-    self.prospectiveRevision = prospectiveRevision
-    self.requiresRebind = requiresRebind
-    self.usbTopology = usbTopology
-    self.serialDigestSHA256 = serialDigestSHA256
-    self.targetDigestSHA256 = targetDigestSHA256
-  }
-}
-
-public struct RockchipDeviceBindingRebindReceipt: Sendable, Equatable {
-  public let previousRevision: Int
-  public let revision: Int
-  public let changed: Bool
-  public let usbTopology: String
-  public let serialDigestSHA256: String
-  public let targetDigestSHA256: String
-
-  public init(
-    previousRevision: Int,
-    revision: Int,
-    changed: Bool,
-    usbTopology: String,
-    serialDigestSHA256: String,
-    targetDigestSHA256: String
-  ) {
-    self.previousRevision = previousRevision
-    self.revision = revision
-    self.changed = changed
-    self.usbTopology = usbTopology
-    self.serialDigestSHA256 = serialDigestSHA256
-    self.targetDigestSHA256 = targetDigestSHA256
-  }
-}
-
-/// Product-owned current-Loader rebind surface. Preview is E0/read-only. Confirmation changes
-/// only the owner-private host binding after the same supervised chat assertion that will be
-/// consumed by Flash matches the prospective revision and target digest. It dispatches no device
-/// command and cannot accept a caller-provided identity, topology, executable, argv, or path.
-public enum RockchipDeviceBindingRebinding {
-  public static func previewCurrentLoader() throws -> RockchipDeviceBindingRebindPreview {
-    try production().previewCurrentLoader()
-  }
-
-  @discardableResult
-  public static func confirmCurrentLoader(
-    chatConfirmation assertion: RockchipChatConfirmationAssertion
-  ) throws -> RockchipDeviceBindingRebindReceipt {
-    try production().confirmCurrentLoader(chatConfirmation: assertion)
-  }
-
-  private static func production() throws -> RockchipProductBindingRebinder {
-    let manager = FileManager.default
-    let applicationSupport = try manager.url(
-      for: .applicationSupportDirectory, in: .userDomainMask,
-      appropriateFor: nil, create: true)
-    let root = applicationSupport.appending(path: "ArkDeck", directoryHint: .isDirectory)
-    return RockchipProductBindingRebinder(
-      probe: { try RockchipProductUSBProbe().singleLoader() },
-      store: RockchipProductBindingStore(rootURL: root))
-  }
-}
-
 /// Protected-main HDC tuple already registered by the Rockchip Loader-transition integration.
 /// It is deliberately not configurable by CLI/environment/PATH.
 enum RockchipHDCIntegrationProfile {
@@ -1044,10 +966,8 @@ private struct RockchipPersistedStepResult {
 
 // MARK: - Production composition
 
-/// Defers access to the standing-authorization credential until the request
-/// actually selects that authority kind.  A one-shot chat confirmation has no
-/// GitHub provenance dependency and must not trigger a Keychain prompt before
-/// its own typed admission can begin.
+/// Defers access to the standing-authorization credential until the request actually selects
+/// that authority kind. A bounded campaign has no GitHub provenance credential dependency.
 struct RockchipProductionProvenanceTokenLoader: Sendable {
   private let loadToken: @Sendable () throws -> String?
 
@@ -1318,88 +1238,6 @@ struct RockchipProductBindingStore: Sendable {
     return (readback, true)
   }
 
-  func rebind(
-    expectedCurrent: RockchipProductBindingSnapshot,
-    candidate: RockchipProductBindingSnapshot
-  ) throws -> RockchipProductBindingSnapshot {
-    try validate(expectedCurrent)
-    try validate(candidate)
-    guard candidate.revision == expectedCurrent.revision + 1 else {
-      throw configurationError("rebind revision must advance exactly once")
-    }
-    try prepareRoot()
-    let rootDescriptor = Darwin.open(
-      rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
-    guard rootDescriptor >= 0 else { throw configurationError("binding root cannot be opened") }
-    defer { Darwin.close(rootDescriptor) }
-
-    let lockDescriptor = Darwin.openat(
-      rootDescriptor, Self.lockFileName,
-      O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
-    guard lockDescriptor >= 0 else { throw configurationError("binding lock cannot be opened") }
-    defer { Darwin.close(lockDescriptor) }
-    try validateOwnedRegularFile(lockDescriptor, permissions: 0o600, label: "binding lock")
-    guard flock(lockDescriptor, LOCK_EX) == 0 else {
-      throw configurationError("binding lock cannot be acquired")
-    }
-    defer { _ = flock(lockDescriptor, LOCK_UN) }
-
-    guard let liveCurrent = try load(rootDescriptor: rootDescriptor),
-      liveCurrent == expectedCurrent
-    else { throw configurationError("durable binding changed before rebind persistence") }
-
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    var document = try encoder.encode(candidate)
-    document.append(0x0A)
-    guard document.count <= Self.maximumDocumentBytes else {
-      throw configurationError("binding document exceeds its product limit")
-    }
-
-    let temporaryName = ".rockchip-binding.\(UUID().uuidString.lowercased()).part"
-    let temporaryDescriptor = Darwin.openat(
-      rootDescriptor, temporaryName,
-      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
-    guard temporaryDescriptor >= 0 else {
-      throw configurationError("binding temporary file cannot be created")
-    }
-    var temporaryOpen = true
-    defer {
-      if temporaryOpen { Darwin.close(temporaryDescriptor) }
-      _ = unlinkat(rootDescriptor, temporaryName, 0)
-    }
-    do {
-      try writeAll(document, descriptor: temporaryDescriptor)
-      guard fchmod(temporaryDescriptor, S_IRUSR | S_IWUSR) == 0,
-        Darwin.fsync(temporaryDescriptor) == 0,
-        Darwin.fcntl(temporaryDescriptor, F_FULLFSYNC) == 0
-      else { throw configurationError("binding temporary file cannot be synchronized") }
-      guard Darwin.close(temporaryDescriptor) == 0 else {
-        throw configurationError("binding temporary file cannot be closed")
-      }
-      temporaryOpen = false
-      guard
-        renameatx_np(
-          rootDescriptor, temporaryName, rootDescriptor, Self.bindingFileName,
-          UInt32(RENAME_SWAP)) == 0
-      else { throw configurationError("binding rebind publication cannot be committed") }
-      // After RENAME_SWAP the temporary name contains the prior durable binding. Removing that
-      // name only happens after the new bytes occupy the canonical binding path atomically.
-      guard unlinkat(rootDescriptor, temporaryName, 0) == 0,
-        Darwin.fsync(rootDescriptor) == 0
-      else { throw configurationError("binding rebind directory cannot be synchronized") }
-    } catch let error as RockchipFlashExecutionError {
-      throw error
-    } catch {
-      throw configurationError("binding rebind publication failed")
-    }
-
-    guard let readback = try load(rootDescriptor: rootDescriptor), readback == candidate else {
-      throw configurationError("binding rebind write-readback failed")
-    }
-    return readback
-  }
-
   private func prepareRoot() throws {
     guard rootURL.isFileURL, rootURL.path.hasPrefix("/") else {
       throw configurationError("binding root must be an absolute file URL")
@@ -1551,165 +1389,6 @@ struct RockchipProductBindingBootstrap: Sendable {
   /// has the same cross-mode behavior as the product entry point.
   func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
     try installCurrentTarget()
-  }
-}
-
-struct RockchipProductBindingRebinder: Sendable {
-  private struct Facts {
-    let existing: RockchipProductBindingSnapshot
-    let identity: RockchipProductUSBIdentity
-    let serialDigestSHA256: String
-    let prospectiveRevision: Int
-    let requiresRebind: Bool
-    let targetDigestSHA256: String
-  }
-
-  let probe: @Sendable () throws -> RockchipProductUSBIdentity
-  let store: RockchipProductBindingStore
-
-  func previewCurrentLoader() throws -> RockchipDeviceBindingRebindPreview {
-    let facts = try currentFacts()
-    return RockchipDeviceBindingRebindPreview(
-      currentRevision: facts.existing.revision,
-      prospectiveRevision: facts.prospectiveRevision,
-      requiresRebind: facts.requiresRebind,
-      usbTopology: facts.identity.topology,
-      serialDigestSHA256: facts.serialDigestSHA256,
-      targetDigestSHA256: facts.targetDigestSHA256)
-  }
-
-  func confirmCurrentLoader(
-    chatConfirmation assertion: RockchipChatConfirmationAssertion
-  ) throws -> RockchipDeviceBindingRebindReceipt {
-    let facts = try currentFacts()
-    try validate(assertion: assertion, facts: facts)
-    guard facts.requiresRebind else {
-      return receipt(facts: facts, stored: facts.existing, changed: false)
-    }
-
-    let candidateID = Self.sha256Hex(
-      Data(
-        ["dayu200-loader", facts.serialDigestSHA256, facts.identity.topology]
-          .joined(separator: "|").utf8))
-    let identitySnapshot = try DeviceIdentitySnapshot(attributes: [
-      "mode": .string(RockchipDeviceMode.loader.rawValue),
-      "serial": .string(facts.identity.serial),
-      "usbProductID": .unsignedInteger(UInt64(facts.identity.productID)),
-      "usbTopology": .string(facts.identity.topology),
-      "usbVendorID": .unsignedInteger(UInt64(facts.identity.vendorID)),
-    ])
-    let candidateEvidence = [
-      "product:e0-iokit-single-loader-readback",
-      "usb:vendor=\(facts.identity.vendorID),product=\(facts.identity.productID)",
-      "identity:serial-sha256=\(facts.serialDigestSHA256)",
-      "rebind:chat-confirmation-sha256=\(assertion.confirmationDigestSHA256)",
-    ]
-    let candidate = try DeviceRebindCandidate(
-      candidateID: candidateID, connectKey: facts.identity.topology, transport: .usb,
-      identitySnapshot: identitySnapshot, evidence: candidateEvidence,
-      usbEvidence: USBRebindEvidence(
-        serialMatches: facts.existing.serial == facts.identity.serial,
-        daemonFingerprintMatches: false,
-        topologyMatches: facts.existing.usbTopology == facts.identity.topology,
-        expectedModeMatches: true, modelBuildMatches: true))
-    let context = DeviceRebindContext(
-      transport: .usb, disconnected: true, endpointExplicitlyAdded: false,
-      expectedModeTransition: true, candidates: [candidate],
-      profile: DeviceRebindProfilePolicy(
-        requiresManualConfirmation: true, additionalEvidenceSatisfied: true),
-      userConfirmedCandidateID: candidateID)
-    try DeviceRebindPolicy.authorizePersistence(
-      context: context, selectedCandidate: candidate, confirmedBy: .user)
-
-    let candidateSnapshot = RockchipProductBindingSnapshot(
-      revision: facts.prospectiveRevision, serial: facts.identity.serial,
-      usbTopology: facts.identity.topology,
-      evidence: candidateEvidence + [
-        "identity:previous-serial-sha256=\(Self.serialDigest(facts.existing.serial))",
-        "binding:previous-revision=\(facts.existing.revision)",
-        "binding:previous-usb-topology=\(facts.existing.usbTopology)",
-      ])
-    let stored = try store.rebind(expectedCurrent: facts.existing, candidate: candidateSnapshot)
-    return receipt(facts: facts, stored: stored, changed: true)
-  }
-
-  private func currentFacts() throws -> Facts {
-    let existing = try store.loadExisting()
-    let identity = try probe()
-    guard identity.isLoader, !identity.serial.isEmpty,
-      !identity.topology.isEmpty,
-      identity.topology.utf8.allSatisfy({ (48...57).contains($0) })
-    else {
-      throw RockchipFlashExecutionError.admissionRejected(
-        "current-Loader rebind requires exactly one IOKit 0x2207:0x350a Loader identity")
-    }
-    let requiresRebind = existing.serial != identity.serial
-      || existing.usbTopology != identity.topology
-    guard !requiresRebind || existing.revision < Int.max else {
-      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-        "durable binding revision cannot advance")
-    }
-    let prospectiveRevision = requiresRebind ? existing.revision + 1 : existing.revision
-    let serialDigestSHA256 = Self.serialDigest(identity.serial)
-    return Facts(
-      existing: existing, identity: identity, serialDigestSHA256: serialDigestSHA256,
-      prospectiveRevision: prospectiveRevision, requiresRebind: requiresRebind,
-      targetDigestSHA256: Self.targetDigest(
-        serialDigestSHA256: serialDigestSHA256, revision: prospectiveRevision,
-        topology: identity.topology))
-  }
-
-  private func validate(
-    assertion: RockchipChatConfirmationAssertion,
-    facts: Facts
-  ) throws {
-    let plan = try RockchipRockUSBFlashProvider(profile: .dayu200OpenHarmony70035)
-      .makePlan(mode: .execute, archiveValidation: .valid)
-    guard assertion.planDigestSHA256 == plan.planDigestSHA256,
-      assertion.archiveDigestSHA256 == plan.archiveSHA256,
-      assertion.stepSetDigestSHA256 == plan.stepSetDigestSHA256,
-      assertion.bindingRevision == facts.prospectiveRevision,
-      assertion.targetDigestSHA256 == facts.targetDigestSHA256
-    else {
-      throw RockchipFlashExecutionError.invalidRequest(
-        "chatConfirmation does not match the prospective Loader binding and exact plan")
-    }
-  }
-
-  private func receipt(
-    facts: Facts,
-    stored: RockchipProductBindingSnapshot,
-    changed: Bool
-  ) -> RockchipDeviceBindingRebindReceipt {
-    RockchipDeviceBindingRebindReceipt(
-      previousRevision: facts.existing.revision, revision: stored.revision, changed: changed,
-      usbTopology: stored.usbTopology,
-      serialDigestSHA256: Self.serialDigest(stored.serial),
-      targetDigestSHA256: Self.targetDigest(
-        serialDigestSHA256: Self.serialDigest(stored.serial), revision: stored.revision,
-        topology: stored.usbTopology))
-  }
-
-  private static func serialDigest(_ serial: String) -> String {
-    sha256Hex(Data(serial.utf8))
-  }
-
-  private static func targetDigest(
-    serialDigestSHA256: String,
-    revision: Int,
-    topology: String
-  ) -> String {
-    sha256Hex(
-      Data(
-        [
-          RockchipFlashProfile.targetDeviceModel, serialDigestSHA256, String(revision), topology,
-          String(RockchipProbeEvidence.rockUSBVendorID),
-          String(RockchipProbeEvidence.dayu200LoaderProductID),
-        ].joined(separator: "|").utf8))
-  }
-
-  private static func sha256Hex(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 }
 
@@ -2369,7 +2048,7 @@ private struct RockchipProductIdentityReadbackPort: RockchipIdentityReadbackFact
 /// performed here: it proves the durable serial/topology, the exact external
 /// Rockchip and HDC executable descriptors, and that the already-published
 /// execute plan contains the closed `rockusb.enter-loader` intent.  The
-/// reboot itself happens only after the one-shot E2 token is consumed and the
+/// reboot itself happens only after the selected E2 admission is consumed and the
 /// step intent is durable.
 private struct RockchipProductHDCNormalAuthorizationFactCollector:
   RockchipAuthorizationFactCollecting
@@ -2683,22 +2362,6 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         postflightIdentities: postflightIdentities,
         executableIdentity: token.facts.executableIdentity,
         evidenceClass: .production)
-    case .chatConfirmation(let assertion):
-      let service = ChatConfirmationAdmissionService(
-        factCollector: collector, usageLedger: agentUsageLedger, clock: clock,
-        bindingSerialDigestSHA256: serialDigest, bindingRevision: binding.revision)
-      let token = try await service.admit(assertion: assertion, facts: factRequest)
-      return RockchipExecutionAdmission(
-        backing: .chatConfirmation(token), plan: token.facts.plan,
-        authorityReference: .agent(token.authorizationReference),
-        usageReservationID: token.usageReservation.reservationID,
-        targetID: targetID, bindingRevision: token.facts.bindingReference.revision,
-        targetDigestSHA256: token.facts.targetDigestSHA256,
-        serialDigestSHA256: token.facts.serialDigestSHA256,
-        usbTopology: token.facts.usbTopology,
-        postflightIdentities: postflightIdentities,
-        executableIdentity: token.facts.executableIdentity,
-        evidenceClass: .production)
     case .evolutionCampaign(let permit):
       let startingMode: RockchipEvolutionStartingMode = liveIdentity.isLoader ? .loader : .hdcNormal
       let service = RockchipEvolutionCampaignAdmissionService(
@@ -2736,12 +2399,6 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
       }
       let consumed = try token.consume(at: clock.now())
       guard consumed.authorizationReference == admission.legacyAuthorizationReference,
-        consumed.usageReservation.reservationID == admission.usageReservationID,
-        consumed.facts.executableIdentity == admission.executableIdentity
-      else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }
-    case .chatConfirmation(let token):
-      let consumed = try token.consume(at: clock.now())
-      guard consumed.authorizationReference == admission.agentAuthorizationReference,
         consumed.usageReservation.reservationID == admission.usageReservationID,
         consumed.facts.executableIdentity == admission.executableIdentity
       else { throw RockchipFlashExecutionError.authorizationGateRejected("consume correlation") }

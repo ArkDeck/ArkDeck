@@ -6,7 +6,6 @@ import Foundation
 public struct RockchipFlashExecutionRequest: Sendable, Equatable {
   enum Authority: Sendable, Equatable {
     case standingAuthorization(String)
-    case chatConfirmation(RockchipChatConfirmationAssertion)
     case evolutionCampaign(RockchipEvolutionCampaignAttemptPermit)
   }
 
@@ -16,11 +15,6 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
 
   public var authorizationID: String? {
     guard case .standingAuthorization(let value) = authority else { return nil }
-    return value
-  }
-
-  public var chatConfirmation: RockchipChatConfirmationAssertion? {
-    guard case .chatConfirmation(let value) = authority else { return nil }
     return value
   }
 
@@ -45,23 +39,6 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
       targetLocationSelector == "0" || targetLocationSelector.first != "0"
     else { throw RockchipFlashExecutionError.invalidRequest("targetLocationSelector") }
     authority = .standingAuthorization(authorizationID)
-    self.archiveURL = archiveURL.standardizedFileURL
-    self.targetLocationSelector = targetLocationSelector
-  }
-
-  public init(
-    chatConfirmation: RockchipChatConfirmationAssertion,
-    archiveURL: URL,
-    targetLocationSelector: String
-  ) throws {
-    guard archiveURL.isFileURL, archiveURL.path.hasPrefix("/") else {
-      throw RockchipFlashExecutionError.invalidRequest("archiveURL")
-    }
-    guard !targetLocationSelector.isEmpty,
-      targetLocationSelector.utf8.allSatisfy({ (48...57).contains($0) }),
-      targetLocationSelector == "0" || targetLocationSelector.first != "0"
-    else { throw RockchipFlashExecutionError.invalidRequest("targetLocationSelector") }
-    authority = .chatConfirmation(chatConfirmation)
     self.archiveURL = archiveURL.standardizedFileURL
     self.targetLocationSelector = targetLocationSelector
   }
@@ -126,7 +103,7 @@ public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedEr
     case .admissionRejected(let detail): "trusted admission rejected: \(detail)"
     case .authorizationGateRejected(let detail): "authorization gate rejected: \(detail)"
     case .authorizationConsumptionRejected(let detail):
-      "one-shot authorization consumption rejected: \(detail)"
+      "authorization consumption rejected: \(detail)"
     case .storageRejected(let detail): "storage admission rejected: \(detail)"
     case .stagingRejected(let detail): "archive staging rejected: \(detail)"
     case .loweringRejected(let detail): "typed lowering rejected: \(detail)"
@@ -144,7 +121,6 @@ public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedEr
 struct RockchipExecutionAdmission: @unchecked Sendable {
   enum Backing: @unchecked Sendable {
     case standingAuthorization(RockchipAuthorizedAgentAdmission)
-    case chatConfirmation(RockchipChatConfirmedAdmission)
     case evolutionCampaign(RockchipEvolutionCampaignAdmission)
     case contractFake
   }

@@ -158,7 +158,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
         summary: "fix crash",
         desiredState: ["baseWorkspaceRevision": .string(base)]),
       budgets: budgets, policy: HarnessTaskPolicy(allowedOperations: evolutionOperations),
-      executionMode: .evolution, evolutionPolicy: evolutionPolicy)
+      evolutionPolicy: evolutionPolicy)
 
     let snapshot = try await coordinator.submit(submission)
     XCTAssertEqual(snapshot.executionMode, .evolution)
@@ -409,7 +409,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
-  func testNormalModeRemainsDefaultAndRejectsEvolutionPolicy() throws {
+  func testWorkspacePolicySelectsEvolutionWithoutCallerMode() throws {
     let base = String(repeating: "a", count: 64)
     let normal = HarnessTaskSubmission(
       type: .debugCrash, projectRef: "TestProject",
@@ -423,17 +423,15 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let evolutionPolicy = try HarnessEvolutionPolicy(
       baseRevision: base, allowedPaths: ["Sources/**"],
       allowedOperations: ["workspace.apply-patch@1"])
-    let invalid = HarnessTaskSubmission(
+    let evolution = HarnessTaskSubmission(
       type: .debugCrash, projectRef: "TestProject",
       target: HarnessTaskTargetReference(targetID: "device"),
-      goal: HarnessTaskGoal(summary: "normal"), budgets: budgets,
-      policy: HarnessTaskPolicy(allowedOperations: ["debug.observe-device@1"]),
-      executionMode: .normal, evolutionPolicy: evolutionPolicy)
-    XCTAssertThrowsError(
-      try invalid.validate(permittedOperations: ["debug.observe-device@1"])
-    ) { error in
-      XCTAssertEqual(error as? HarnessTaskSubmissionError, .evolutionPolicyNotAllowed)
-    }
+      goal: HarnessTaskGoal(summary: "evolve"), budgets: budgets,
+      policy: HarnessTaskPolicy(allowedOperations: ["workspace.apply-patch@1"]),
+      evolutionPolicy: evolutionPolicy)
+    XCTAssertEqual(evolution.executionMode, .evolution)
+    XCTAssertNoThrow(
+      try evolution.validate(permittedOperations: ["workspace.apply-patch@1"]))
     XCTAssertThrowsError(
       try HarnessEvolutionPolicy(
         baseRevision: base, allowedPaths: ["Sources/**"],

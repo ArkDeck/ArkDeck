@@ -20,6 +20,11 @@
 > 每个 candidate identity 经确定性门与独立 AI 对抗审查后成为 attempt 派生 pin；只有
 > protected-main broker 可以 preflight/readback/reserve 并执行 closed typed action。
 > AI review 不能单独成为 authority，任何 unknown destructive outcome 永久终止 campaign。
+>
+> r9 default-path note（2026-08-02）：bounded evolution campaign 成为交互式 Agent E2
+> 默认入口；standing authorization 继续服务 protected-main 后台执行。r7 chat reference 只保留
+> 历史 decoder/Journal/Manifest/export compatibility，不再允许新 reservation、admission 或
+> dispatch。Harness workspace policy 自动选择 isolation/review，caller 不再选择 mode。
 
 ## §0 设计原则
 
@@ -40,7 +45,7 @@
 | --- | --- | --- | --- |
 | **E0 只读** | `list targets`、readonly probe registry 命令面、hilog/hitrace/hidumper 采集到 owned 路径、artifact 拉取、host 侧分析 | approved change 的 ready 任务(现行机制,无新增载体) | 是,随时可执行,无窗口概念 |
 | **E1 可逆 mutation** | `setParameter`(snapshot/readback/结束恢复)、send file 到 owned 路径、rebootDevice、启停采集 | ready 任务 + per-device typed capability evidence(TR-002R 门原样保留) | 是 |
-| **E2 destructive** | flash/erase/format/unlock/真实 update dispatch | ready 任务 + **standing authorization**、同会话一次性 **chat confirmation** 或硬预算 **evolution campaign confirmation**(§2) | standing authorization 可无人值守；chat authority 由用户监督式会话签发，evolution campaign 只允许 merged broker 在闭合委托内 continuation |
+| **E2 destructive** | flash/erase/format/unlock/真实 update dispatch | ready 任务 + **standing authorization** 或同会话硬预算 **evolution campaign confirmation**(§2) | standing authorization 可无人值守；evolution campaign 只允许 merged broker 在闭合委托内 continuation |
 
 E0/E1 的既有约束原样保留:owned-path UUID 隔离与 verified-before-cleanup
 (REQ-TRACE-006)、序列号字节不入仓(redaction 工具链)、ownership unknown 即
@@ -85,28 +90,17 @@ authorization:
 - 吊销 = 维护者 merge 删除/作废该授权块的 PR;git 历史即授权审计账本;
 - 序列号等设备敏感字节按现行 redaction 规则只入摘要。
 
-### §2.2 chat confirmation
+### §2.2 historical chat confirmation compatibility
 
-chat confirmation 不创建 registry 文件，也不要求用户提供 `AUTH-ID`。顺序固定为：
-
-1. 产品现场构造 canonical typed plan，重算 plan/archive/step-set digest，并取得 fresh durable
-   binding + live identity readback；
-2. Agent 在聊天中展示上述完整 digest、脱敏 target/binding 与 userdata erase 等数据影响；
-3. 用户在同一交互会话明确确认；Agent 只把 typed confirmation assertion 传给产品，不能
-   传 raw executable/argv/shell；
-4. 产品再次重算并逐项比较，生成 invocation-scoped、one-shot、non-Codable admission；
-5. 首次 admission durable consume 后才可写 destructive intent，任一失败不退款。
-
-confirmation reference 至少携带 authority kind、confirmation digest、canonical plan digest、
-target digest 与 confirmed-at audit time；不得伪造 Git OID、PR number 或
-`standingAuthorization`。产品当前没有可信 conversation receipt port，因而无法证明消息账号/
-transport provenance，也无法从纯 CLI bytes 区分 Agent 如实转交与 Agent 自行合成。这是 r7
-经维护者显式接受的 residual risk，不得在 evidence 中隐藏。后续若引入签名 conversation
-receipt，可在不改变用户交互的前提下收紧 provenance。
+r7 chat reference 的 closed bytes、Journal/Manifest/ledger decoder 与 export 必须保持可读，
+以免历史真实设备 evidence 因产品升级失真。r9 起它不是可创建的 authority：usage ledger
+拒绝新 reservation，Rockchip request/admission/Loader-confirm/dispatch 不再暴露该分支，旧 CLI
+fields 返回 usage error。历史 record 不得升级或解释成 campaign，也不得进入 recovery replay。
 
 ### §2.3 bounded evolution campaign confirmation
 
-evolution campaign 使用新 authority kind，不解释或迁移 §2.2 的 one-shot reference。用户
+evolution campaign 是交互式 Agent E2 的默认 authority kind，不解释或迁移 §2.2 的历史
+one-shot reference。用户
 确认前展示的 canonical envelope 至少包含：protected-main base OID、fixed candidate build
 target/toolchain、allowed source paths、`maxChangedFiles`/`maxDiffLines`、plan/archive/step-set、
 target stable identity 与 binding lineage root、userdata impact、`maxAttempts` 与 `validUntil`。
@@ -154,19 +148,18 @@ destructive dispatch 永远属于 protected-main broker；candidate 不能替换
 
 ## §3 执行门校验序列(E2,首个真实设备 Step 前)
 
-1. 定位并验证 authority：standing authorization 必须来自 main 且未过期/超次；one-shot
-   chat confirmation 必须来自当前交互 invocation、未消费且非 CI/后台/recovery；evolution
+1. 定位并验证 authority：standing authorization 必须来自 main 且未过期/超次；evolution
    campaign 必须由当前会话确认，且 durable ledger/budget/base/allowed-path envelope、candidate
    派生 pins、adversarial review 与前序 terminal correlation 全有效；缺失 → policyBlocked;
 2. 逐项比对:model/serial 摘要/binding revision/firmware hash/transport/
-   hdc version/provider/step 集合/plan hash；chat confirmation 还须匹配 archive/step-set/
-   target digest，任一不符 → 零 dispatch + blocked-attempt 记录;
+   hdc version/provider/step 集合/plan/archive/step-set/target digest，任一不符 → 零 dispatch +
+   blocked-attempt 记录;
 3. 设备身份读回:向目标设备实际读取身份并与授权 target 比对(机器版"物理目标
    确认");
 4. durable 写入 intent(含 authorizationRef)→ dispatch → durable outcome;
 5. evidence 落盘:executor(kind=agent, id)、实际 authority kind/reference、目标读回、时间、
    恢复路径;schema v3。campaign 另记 ordinal、candidate/review/broker pins 与 terminal/retry
-   disposition；chat authority 不能伪写 standing authorization provenance。
+   disposition；campaign authority 不能伪写 standing authorization provenance。
 
 失败注入要求:门 2/3 的每个比对分支都必须有 contract test 用真实(非 fake 常量)
 不一致输入证伪(TR-002R real-fault 注入先例)。

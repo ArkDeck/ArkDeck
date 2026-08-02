@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 8
-status: proposed # r1 经 #281 正式批准；r2-r7 已合入；r8 bounded evolution E2 campaign 待维护者 review/merge
+revision: 9
+status: proposed # r1 经 #281 正式批准；r2-r8 已合入；r9 default Evolution 路径待维护者 review/merge
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,17 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r9 default Evolution path（2026-08-02）：r8 产品实现已由维护者通过 #957 合入，
+> 但产品仍暴露 `normal|evolution` 双 Harness 模式、`evolution-*` 特殊 Flash CLI 与可新建的
+> r7 one-shot Agent admission，导致安全较强的新路径不是默认路径，并留下三套 Agent E2
+> 分支。r9 将 bounded Evolution 变为所有带 workspace envelope 的 Agent 任务与交互式
+> Agent Flash 的默认路径：移除 caller 可选 execution-mode、移除 `evolution-*` 特殊命名，
+> 默认 `flash preview/execute/continue/status` 使用 campaign。r7 `chatConfirmation` 仅保留
+> 历史 Journal/Manifest/ledger 的只读 decode/export，禁止新 reserve/admission/dispatch；
+> standing authorization 仍供 protected-main 后台执行，人类 handoff 仍保留。该删除是
+> E2 默认策略与已发布 CLI 的破坏性修改，必须由本 r9 垂直 PR 同车交付安全文本、生产代码、
+> 迁移回归与零真实设备执行，并在维护者 merge 后才生效。
 
 > r8 bounded evolution E2 campaign（2026-08-02）：用户要求 Evolution Mode 在一次
 > 监督式确认后，可针对同一 exact DAYU200 Flash plan 自动循环“候选补丁 → 隔离构建/测试
@@ -182,6 +193,23 @@ In scope:
   PR 同车交付 policy/admission、candidate sandbox、merged broker、campaign ledger、Evolution
   wiring、CLI 与正负 fault tests。提案 merge 前禁止实现和真实设备 dispatch；实现 merge 后
   才能由新的 exact campaign confirmation 做真实设备验收。
+
+### r9 default Evolution path
+
+- **一个 Agent 路径**：带 workspace/base/scope envelope 的 Harness task 自动使用 Evolution
+  isolation/review/promotion，不再接受 `normal|evolution` caller mode；没有 workspace 的
+  device-only task 继续使用同一 Harness/Runtime 安全内核，不伪造候选 workspace。
+- **一个交互式 Agent E2 默认入口**：`arkdeck flash preview/execute/continue/status` 直接承载
+  bounded campaign；CLI 不再暴露 `evolution-*` 别名或 chat-confirmation 字段拼装面。
+- **删除执行能力，不删除历史证据**：r7 chat authority reference 的 closed decoder、Journal、
+  Manifest 与 export compatibility 保留；新 usage reservation、Rockchip request/admission token、
+  Loader confirmation 与 Agent dispatch 删除并负向测试。历史 bytes 不升级为 campaign。
+- **保留非重复能力**：standing authorization 是 merged-plan 后台 E2 authority，不被 campaign
+  取代；human handoff 是人工执行边界，也不被删除。candidate 仍无设备能力，真实 transport
+  仍只属于 protected-main broker。
+- **迁移 fail closed**：旧 `--execution-mode`、`--evolution-allowed-*`、`evolution-*` 与
+  one-shot chat execution flags 返回 usage error，不做静默映射；旧持久记录可读但不可继续
+  destructive execution。
 
 ### r2 security-remediation additions
 

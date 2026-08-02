@@ -6,9 +6,8 @@ import Foundation
 
 // TASK-RF-002. `arkdeck flash` — the product face of the RockUSB Provider.
 //
-// The human execute branch still ends at a handoff. The autonomous branch passes only the strict
-// authorization ID, archive URL and location selector into the product-owned typed executor; it
-// has no executable, argv, shell, fact receipt, storage-root or dependency-injection surface.
+// The human execute branch still ends at a handoff. Agent execution defaults to the bounded
+// Evolution campaign; an independently merged standing authorization remains available.
 // Migration guard: the obsolete executorUnavailable branch must not be restored below this host.
 
 @main
@@ -67,22 +66,16 @@ struct ArkDeckCommandLine {
       try runTrustTool(Array(arguments.dropFirst()))
     case "install-binding":
       try runInstallBinding(Array(arguments.dropFirst()))
-    case "binding-preview":
-      try runBindingPreview(Array(arguments.dropFirst()))
-    case "rebind-binding":
-      try runRebindBinding(Array(arguments.dropFirst()))
     case "plan":
       try runPlan(Array(arguments.dropFirst()))
+    case "preview":
+      try await runCampaignPreview(Array(arguments.dropFirst()))
     case "execute":
       try await runExecute(Array(arguments.dropFirst()))
-    case "evolution-preview":
-      try await runEvolutionPreview(Array(arguments.dropFirst()))
-    case "evolution-execute":
-      try await runEvolutionExecute(Array(arguments.dropFirst()))
-    case "evolution-continue":
-      try await runEvolutionContinue(Array(arguments.dropFirst()))
-    case "evolution-status":
-      try runEvolutionStatus(Array(arguments.dropFirst()))
+    case "continue":
+      try await runCampaignContinue(Array(arguments.dropFirst()))
+    case "status":
+      try runCampaignStatus(Array(arguments.dropFirst()))
     case "postflight":
       try runPostflight(Array(arguments.dropFirst()))
     default:
@@ -141,52 +134,6 @@ struct ArkDeckCommandLine {
     print("device mutation dispatch: 0")
   }
 
-  static func runBindingPreview(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed([])
-    let preview = try RockchipDeviceBindingRebinding.previewCurrentLoader()
-    print("current Loader binding preview")
-    print("current binding revision: \(preview.currentRevision)")
-    print("prospective binding revision: \(preview.prospectiveRevision)")
-    print("rebind required: \(preview.requiresRebind)")
-    print("USB topology: \(preview.usbTopology)")
-    print("serial sha256: \(preview.serialDigestSHA256)")
-    print("target sha256: \(preview.targetDigestSHA256)")
-    print("device mutation dispatch: 0")
-  }
-
-  static func runRebindBinding(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed([
-      "--chat-confirmation-digest-sha256", "--chat-confirmed-plan-sha256",
-      "--chat-confirmed-archive-sha256", "--chat-confirmed-step-set-sha256",
-      "--chat-confirmed-target-sha256", "--chat-confirmed-binding-revision",
-    ])
-    let environment = ProcessInfo.processInfo.environment
-    let authority = RockchipExecutionAuthorityResolver.resolve(
-      operatorProvided: false,
-      standardInputIsInteractive: isatty(FileHandle.standardInput.fileDescriptor) == 1,
-      environmentOverride: environment["ARKDECK_EXECUTION_AUTHORITY"])
-    guard authority == .standardAgent,
-      environment["ARKDECK_CHAT_CONFIRMATION_CONTEXT"] == "supervisedInteractiveAgent",
-      environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true"
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "binding rebind requires a supervised interactive Agent chat assertion")
-    }
-    let assertion = try chatConfirmationAssertion(options)
-    let receipt = try RockchipDeviceBindingRebinding.confirmCurrentLoader(
-      chatConfirmation: assertion)
-    print(receipt.changed ? "durable Loader binding rebound" : "durable Loader binding unchanged")
-    print("previous binding revision: \(receipt.previousRevision)")
-    print("binding revision: \(receipt.revision)")
-    print("USB topology: \(receipt.usbTopology)")
-    print("serial sha256: \(receipt.serialDigestSHA256)")
-    print("target sha256: \(receipt.targetDigestSHA256)")
-    print("device mutation dispatch: 0")
-  }
-
   // MARK: plan
 
   static func runPlan(_ arguments: [String]) throws {
@@ -211,10 +158,7 @@ struct ArkDeckCommandLine {
     let options = try CLIOptions(arguments)
     try options.validateAllowed([
       "--images", "--device-profile", "--target-location-id", "--operator",
-      "--authorization-id", "--out", "--chat-confirmation-digest-sha256",
-      "--chat-confirmed-plan-sha256", "--chat-confirmed-archive-sha256",
-      "--chat-confirmed-step-set-sha256", "--chat-confirmed-target-sha256",
-      "--chat-confirmed-binding-revision",
+      "--authorization-id", "--campaign-confirmation-digest-sha256", "--out",
     ])
     let operatorIdentity = options.value("--operator")
     let authority = RockchipExecutionAuthorityResolver.resolve(
@@ -222,20 +166,15 @@ struct ArkDeckCommandLine {
       standardInputIsInteractive: isatty(FileHandle.standardInput.fileDescriptor) == 1,
       environmentOverride: ProcessInfo.processInfo.environment["ARKDECK_EXECUTION_AUTHORITY"])
 
-    let chatOptionNames = [
-      "--chat-confirmation-digest-sha256", "--chat-confirmed-plan-sha256",
-      "--chat-confirmed-archive-sha256", "--chat-confirmed-step-set-sha256",
-      "--chat-confirmed-target-sha256", "--chat-confirmed-binding-revision",
-    ]
-    let hasChatConfirmation = chatOptionNames.contains { options.value($0) != nil }
     let authorizationID = options.value("--authorization-id")
-    guard authorizationID == nil || !hasChatConfirmation else {
+    let campaignDigest = options.value("--campaign-confirmation-digest-sha256")
+    guard authorizationID == nil || campaignDigest == nil else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "--authorization-id and chat confirmation are mutually exclusive")
+        message: "--authorization-id and campaign confirmation are mutually exclusive")
     }
 
-    if authorizationID != nil || hasChatConfirmation {
+    if authorizationID != nil || campaignDigest != nil {
       if let authorizationID,
         !RockchipStandingAuthorizationIdentifier.isValid(authorizationID)
       {
@@ -267,35 +206,26 @@ struct ArkDeckCommandLine {
           exitCode: EX_USAGE,
           message: "authorized execution requires --images and --target-location-id")
       }
-      let request: RockchipFlashExecutionRequest
       if let authorizationID {
-        request = try RockchipFlashExecutionRequest(
+        let request = try RockchipFlashExecutionRequest(
           authorizationID: authorizationID,
           archiveURL: URL(fileURLWithPath: imagesPath),
           targetLocationSelector: location)
+        let result = try await RockchipFlashExecutionHost().execute(request)
+        print("session: \(result.sessionID)")
+        print("job: \(result.jobID)")
+        print("terminal status: \(result.status.rawValue)")
+        print("evidence class: \(result.evidenceClass.rawValue)")
+        if let manifestURL = result.manifestURL { print("manifest: \(manifestURL.path)") }
+      } else if let campaignDigest {
+        try requireCampaignAgentContext(firstAdmission: true)
+        let result = try await RockchipEvolutionCampaignHost().executeConfirmedCampaign(
+          confirmationDigestSHA256: campaignDigest,
+          archiveURL: URL(fileURLWithPath: imagesPath), targetLocationSelector: location)
+        printCampaignResult(result)
       } else {
-        let environment = ProcessInfo.processInfo.environment
-        guard authority == .standardAgent,
-          environment["ARKDECK_CHAT_CONFIRMATION_CONTEXT"] == "supervisedInteractiveAgent",
-          environment["CI"] != "true", environment["GITHUB_ACTIONS"] != "true"
-        else {
-          throw CLIError(
-            exitCode: EX_USAGE,
-            message: "chat confirmation requires a supervised interactive Agent invocation; "
-              + "CI, daemon, scheduler and human-operator modes are rejected")
-        }
-        let assertion = try chatConfirmationAssertion(options)
-        request = try RockchipFlashExecutionRequest(
-          chatConfirmation: assertion,
-          archiveURL: URL(fileURLWithPath: imagesPath),
-          targetLocationSelector: location)
+        throw CLIError(exitCode: EX_USAGE, message: "Agent E2 authority is missing")
       }
-      let result = try await RockchipFlashExecutionHost().execute(request)
-      print("session: \(result.sessionID)")
-      print("job: \(result.jobID)")
-      print("terminal status: \(result.status.rawValue)")
-      print("evidence class: \(result.evidenceClass.rawValue)")
-      if let manifestURL = result.manifestURL { print("manifest: \(manifestURL.path)") }
       return
     }
 
@@ -325,8 +255,8 @@ struct ArkDeckCommandLine {
       print("Job marker: \(decision.jobMarker)")
       print(
         "execute requires a human operator at an interactive terminal (--operator plus a "
-          + "TTY); an AI caller must present either --authorization-id or a complete current "
-          + "chat-confirmation assertion to the trusted executor. "
+          + "TTY); an AI caller must present either --authorization-id or a current bounded "
+          + "campaign confirmation digest to the trusted executor. "
           + "This run is \(authority.rawValue) and real destructive dispatch stays 0.")
       try writeHandoff(handoff, options: options)
       exit(3)
@@ -392,34 +322,9 @@ struct ArkDeckCommandLine {
     }
   }
 
-  static func chatConfirmationAssertion(
-    _ options: CLIOptions
-  ) throws -> RockchipChatConfirmationAssertion {
-    guard let confirmationDigest = options.value("--chat-confirmation-digest-sha256"),
-      let planDigest = options.value("--chat-confirmed-plan-sha256"),
-      let archiveDigest = options.value("--chat-confirmed-archive-sha256"),
-      let stepSetDigest = options.value("--chat-confirmed-step-set-sha256"),
-      let targetDigest = options.value("--chat-confirmed-target-sha256"),
-      let rawBindingRevision = options.value("--chat-confirmed-binding-revision"),
-      let bindingRevision = Int(rawBindingRevision), bindingRevision > 0,
-      rawBindingRevision == String(bindingRevision)
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "chat confirmation requires the complete closed digest/binding assertion")
-    }
-    return try RockchipChatConfirmationAssertion(
-      confirmationDigestSHA256: confirmationDigest,
-      planDigestSHA256: planDigest,
-      archiveDigestSHA256: archiveDigest,
-      stepSetDigestSHA256: stepSetDigest,
-      targetDigestSHA256: targetDigest,
-      bindingRevision: bindingRevision)
-  }
+  // MARK: default bounded Evolution E2 campaign
 
-  // MARK: bounded Evolution E2 campaign
-
-  static func runEvolutionPreview(_ arguments: [String]) async throws {
+  static func runCampaignPreview(_ arguments: [String]) async throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed([
       "--images", "--max-attempts", "--max-changed-files", "--max-diff-lines",
@@ -433,7 +338,7 @@ struct ArkDeckCommandLine {
     else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "evolution-preview requires absolute --images and canonical positive budgets")
+        message: "preview requires absolute --images and canonical positive budgets")
     }
     let preview = try await RockchipEvolutionCampaignPlanning.preview(
       archiveURL: URL(fileURLWithPath: images), maxAttempts: maxAttempts,
@@ -473,28 +378,7 @@ struct ArkDeckCommandLine {
         + "ERASE-USERDATA；unknown/unsafe partial 不重试。")
   }
 
-  static func runEvolutionExecute(_ arguments: [String]) async throws {
-    let options = try CLIOptions(arguments)
-    try options.validateAllowed([
-      "--images", "--target-location-id", "--campaign-confirmation-digest-sha256",
-    ])
-    guard let images = options.value("--images"), images.hasPrefix("/"),
-      let location = options.value("--target-location-id"),
-      let digest = options.value("--campaign-confirmation-digest-sha256")
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "evolution-execute requires --images, --target-location-id and the exact "
-          + "campaign confirmation digest")
-    }
-    try requireEvolutionAgentContext(firstAdmission: true)
-    let result = try await RockchipEvolutionCampaignHost().executeConfirmedCampaign(
-      confirmationDigestSHA256: digest,
-      archiveURL: URL(fileURLWithPath: images), targetLocationSelector: location)
-    printEvolutionResult(result)
-  }
-
-  static func runEvolutionContinue(_ arguments: [String]) async throws {
+  static func runCampaignContinue(_ arguments: [String]) async throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed(["--images", "--target-location-id", "--campaign-id"])
     guard let images = options.value("--images"), images.hasPrefix("/"),
@@ -503,20 +387,20 @@ struct ArkDeckCommandLine {
     else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "evolution-continue requires --images, --target-location-id and --campaign-id")
+        message: "continue requires --images, --target-location-id and --campaign-id")
     }
-    try requireEvolutionAgentContext(firstAdmission: false)
+    try requireCampaignAgentContext(firstAdmission: false)
     let result = try await RockchipEvolutionCampaignHost().continueCampaign(
       campaignID: campaignID, archiveURL: URL(fileURLWithPath: images),
       targetLocationSelector: location)
-    printEvolutionResult(result)
+    printCampaignResult(result)
   }
 
-  static func runEvolutionStatus(_ arguments: [String]) throws {
+  static func runCampaignStatus(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
     try options.validateAllowed(["--campaign-id"])
     guard let campaignID = options.value("--campaign-id") else {
-      throw CLIError(exitCode: EX_USAGE, message: "evolution-status requires --campaign-id")
+      throw CLIError(exitCode: EX_USAGE, message: "status requires --campaign-id")
     }
     let document = try RockchipEvolutionCampaignHost().status(campaignID)
     print("campaign: \(document.campaignID)")
@@ -535,7 +419,7 @@ struct ArkDeckCommandLine {
     }
   }
 
-  static func requireEvolutionAgentContext(firstAdmission: Bool) throws {
+  static func requireCampaignAgentContext(firstAdmission: Bool) throws {
     let environment = ProcessInfo.processInfo.environment
     let authority = RockchipExecutionAuthorityResolver.resolve(
       operatorProvided: false,
@@ -555,7 +439,7 @@ struct ArkDeckCommandLine {
     }
   }
 
-  static func printEvolutionResult(_ result: RockchipEvolutionCampaignExecutionResult) {
+  static func printCampaignResult(_ result: RockchipEvolutionCampaignExecutionResult) {
     print("campaign: \(result.campaignID)")
     print("attempt ordinal: \(result.attemptOrdinal)")
     print("session: \(result.flash.sessionID)")
@@ -898,28 +782,19 @@ struct ArkDeckCommandLine {
         arkdeck flash trust-tool --path <absolute-rkdeveloptool-path> \
       --expected-sha256 <full-product-pin>
         arkdeck flash install-binding
-        arkdeck flash binding-preview
-        arkdeck flash rebind-binding \
-      --chat-confirmation-digest-sha256 <SHA256> --chat-confirmed-plan-sha256 <SHA256> \
-      --chat-confirmed-archive-sha256 <SHA256> --chat-confirmed-step-set-sha256 <SHA256> \
-      --chat-confirmed-target-sha256 <SHA256> --chat-confirmed-binding-revision <n>
         arkdeck flash plan --images <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
+        arkdeck flash preview --images <images.tar.gz> [--max-attempts <1...8>] \
+      [--max-changed-files <n>] [--max-diff-lines <n>] [--validity-seconds <1...14400>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--device-profile <dayu200@1|dayu200@2>] [--out <dir>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --authorization-id <AUTH-ID>
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --chat-confirmation-digest-sha256 <SHA256> --chat-confirmed-plan-sha256 <SHA256> \
-      --chat-confirmed-archive-sha256 <SHA256> --chat-confirmed-step-set-sha256 <SHA256> \
-      --chat-confirmed-target-sha256 <SHA256> --chat-confirmed-binding-revision <n>
-        arkdeck flash evolution-preview --images <images.tar.gz> [--max-attempts <1...8>] \
-      [--max-changed-files <n>] [--max-diff-lines <n>] [--validity-seconds <1...14400>]
-        arkdeck flash evolution-execute --images <images.tar.gz> \
-      --target-location-id <usb-location> --campaign-confirmation-digest-sha256 <SHA256>
-        arkdeck flash evolution-continue --images <images.tar.gz> \
+      --campaign-confirmation-digest-sha256 <SHA256>
+        arkdeck flash continue --images <images.tar.gz> \
       --target-location-id <usb-location> --campaign-id <ECAMP-id>
-        arkdeck flash evolution-status --campaign-id <ECAMP-id>
+        arkdeck flash status --campaign-id <ECAMP-id>
         arkdeck flash postflight --observation <observation.json> \
       [--device-profile <dayu200@1|dayu200@2>]
         arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
@@ -954,9 +829,8 @@ struct ArkDeckCommandLine {
       [--build-preset <ref>] [--test-preset <ref>] [--device-profile <ref>] \
       [--base-workspace-revision <sha256>] [--component <name>] \
       [--expected-binding-revision <n>] \
-      [--execution-mode normal|evolution] \
-      [--evolution-allowed-paths <glob,...>] \
-      [--evolution-allowed-operations <id@v,...>] [--max-attempts <n>] \
+      [--workspace-allowed-paths <glob,...>] \
+      [--workspace-allowed-operations <id@v,...>] [--max-attempts <n>] \
       [--max-changed-files <n>] [--max-diff-lines <n>] \
       [--max-wall-clock-seconds <n>] [--max-no-progress-rounds <n>] \
       [--max-action-retries-per-run <n>] [--max-e1-mutations <n>] \
@@ -973,10 +847,10 @@ struct ArkDeckCommandLine {
       doctor/operation/device/job talk only to arkdeck-agentd over its user-private socket:
       this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
 
-      A human operator at a TTY gets a handoff whose commands they run personally. The AI
-      surface accepts either an authorization ID or a closed one-shot chat confirmation assertion,
-      plus archive path and target-location selector; the product-owned host performs fresh
-      admission, durable usage reservation,
+      A human operator at a TTY gets a handoff whose commands they run personally. The Agent
+      surface defaults to a bounded campaign confirmation and separately accepts a protected-main
+      standing authorization ID, plus archive path and target-location selector; the product-owned
+      host performs fresh admission, durable usage reservation,
       descriptor-bound typed execution and terminal persistence. Caller-provided authorization
       files, fact/context documents, executables, argv and storage roots are rejected.
 
