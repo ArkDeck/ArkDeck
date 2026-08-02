@@ -20,6 +20,7 @@ readonly EXPECTED_TOOL_SHA256="038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d614
 readonly EXPECTED_HDC_SHA256="05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
 readonly EXPECTED_PLAN_SHA256="3922f6a22401a624dd393932bbfc7d3774953be79aaece08961a8bbfb77dc2b8"
 readonly EXPECTED_STEP_SET_SHA256="c8bdce2a137690081c1dd5ca38f91f25399c63778ab18b4f94000b127382fa14"
+readonly TARGET_MODEL="DAYU200 (RK3568)"
 
 usage() {
   printf 'Usage:\n' >&2
@@ -134,7 +135,7 @@ binding_serial="$(/usr/bin/plutil -extract serial raw -o - "$BINDING" 2>/dev/nul
 [[ "$target_location_id" =~ ^(0|[1-9][0-9]*)$ ]] || fail "binding USB topology is missing or invalid"
 [[ -n "$binding_serial" ]] || fail "binding serial is missing"
 binding_serial_sha256="$(printf '%s' "$binding_serial" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
-target_digest_sha256="$(printf '%s' "dayu200|${binding_serial_sha256}|${binding_revision}|${target_location_id}|8711|13578" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
+target_digest_sha256="$(printf '%s' "${TARGET_MODEL}|${binding_serial_sha256}|${binding_revision}|${target_location_id}|8711|13578" | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
 unset binding_serial
 
 printf 'READY: product prerequisite checks passed\n'

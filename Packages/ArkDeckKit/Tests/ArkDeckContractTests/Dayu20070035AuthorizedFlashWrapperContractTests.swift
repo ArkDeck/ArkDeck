@@ -1,5 +1,8 @@
+import CryptoKit
 import Foundation
 import XCTest
+
+@testable import ArkDeckWorkflows
 
 final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
   private static let planDigest =
@@ -36,6 +39,27 @@ final class Dayu20070035AuthorizedFlashWrapperContractTests: XCTestCase {
     XCTAssertFalse(source.contains("eval "))
     XCTAssertFalse(source.contains("sudo "))
     XCTAssertFalse(source.contains("exec \"$TOOL\""))
+  }
+
+  func testWrapperTargetDigestUsesTheCanonicalProductModel() throws {
+    let source = try String(contentsOf: Self.scriptURL, encoding: .utf8)
+    let canonicalModel = "DAYU200 (RK3568)"
+    let serialDigest = "958780b2ffb7090d4f22cdc1f547f9804ed0f0b605e3020f384e5d4823dc7a7e"
+
+    XCTAssertEqual(RockchipFlashProfile.targetDeviceModel, canonicalModel)
+    XCTAssertTrue(source.contains("readonly TARGET_MODEL=\"\(canonicalModel)\""))
+    XCTAssertTrue(
+      source.contains(
+        "\"${TARGET_MODEL}|${binding_serial_sha256}|${binding_revision}|${target_location_id}|8711|13578\""))
+    XCTAssertFalse(source.contains("\"dayu200|${binding_serial_sha256}"))
+
+    let targetMaterial = [canonicalModel, serialDigest, "1", "18874368", "8711", "13578"]
+      .joined(separator: "|")
+    let digest = SHA256.hash(data: Data(targetMaterial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    XCTAssertEqual(
+      digest, "f07f2eb8ae0539dc9fe4d9691cfc74776d4d7e1a8fe49ec3c57ef2819ff79428")
   }
 
   func testChatTriggerRejectsAnythingButTheFullPinnedPlanBeforeHostChecks() throws {
