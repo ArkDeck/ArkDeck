@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r14
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r15
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -41,6 +41,8 @@
 > 精确相等、`basic|full` 强度分离与 full HiLog Debug Runtime roundtrip；campaign serial
 > attempt hard limit 为 16，第 17 次拒绝。4 hours/concurrency=1 与 unsafe/unknown 永久停止
 > 不变；实现 PR 真实设备 dispatch=0。
+> r15 D2 approval closure:不改变 acceptance 方法或结论；只恢复 r14 scoped delta 的
+> `approved` 状态，维护者 merge 前 authority instance 与真实设备 dispatch 仍为 0。
 
 ## Environment
 
