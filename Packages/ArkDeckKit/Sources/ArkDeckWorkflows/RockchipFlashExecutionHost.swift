@@ -913,13 +913,31 @@ private struct RockchipPersistedStepResult {
 
 // MARK: - Production composition
 
+/// Defers access to the standing-authorization credential until the request
+/// actually selects that authority kind.  A one-shot chat confirmation has no
+/// GitHub provenance dependency and must not trigger a Keychain prompt before
+/// its own typed admission can begin.
+struct RockchipProductionProvenanceTokenLoader: Sendable {
+  private let loadToken: @Sendable () throws -> String?
+
+  init(loadToken: @escaping @Sendable () throws -> String?) {
+    self.loadToken = loadToken
+  }
+
+  func token(for authority: RockchipFlashExecutionRequest.Authority) throws -> String? {
+    guard case .standingAuthorization = authority else { return nil }
+    return try loadToken().flatMap { $0.isEmpty ? nil : $0 }
+  }
+}
+
 private enum RockchipProductionExecutionComposition {
   static func make() throws -> RockchipFlashExecutionDependencies {
     let settings = try RockchipProductExecutionSettings.load()
     let storage = try RockchipProductionStorageComposition.make()
     let clock = RockchipContinuousAdmissionClock()
     let usbProbe = RockchipProductUSBProbe()
-    let provenance = settings.githubToken.map(GitHubProtectedMainAuthorizationPort.init(token:))
+    let provenance = RockchipProductionProvenanceTokenLoader(
+      loadToken: { try RockchipProductExecutionSettings.productKeychainToken() })
     let ledger = try AuthorizationUsageLedger(root: settings.usageRoot)
     let agentLedger = try AgentAuthorityUsageLedger(root: settings.usageRoot)
     let admission = RockchipProductionAdmissionPort(
@@ -1635,18 +1653,15 @@ struct RockchipProductToolInstaller {
 private final class RockchipProductExecutionSettings: @unchecked Sendable {
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
-  let githubToken: String?
   let binding: RockchipProductBindingSnapshot
 
   private init(
     usageRoot: URL,
     tool: RockchipSelectedDiscoveryTool,
-    githubToken: String?,
     binding: RockchipProductBindingSnapshot
   ) {
     self.usageRoot = usageRoot
     self.tool = tool
-    self.githubToken = githubToken
     self.binding = binding
   }
 
@@ -1696,14 +1711,12 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(
         codeTrust: trust, quarantinePresent: quarantine))
-    let token = try productKeychainToken().flatMap { $0.isEmpty ? nil : $0 }
     let binding = try RockchipProductBindingStore(rootURL: root).loadExisting()
     return RockchipProductExecutionSettings(
-      usageRoot: usage, tool: selectedTool,
-      githubToken: token, binding: binding)
+      usageRoot: usage, tool: selectedTool, binding: binding)
   }
 
-  private static func productKeychainToken() throws -> String? {
+  fileprivate static func productKeychainToken() throws -> String? {
     let query: [CFString: Any] = [
       kSecClass: kSecClassGenericPassword,
       kSecAttrService: "dev.arkdeck.github-provenance",
@@ -2148,7 +2161,7 @@ enum RockchipProductionDiscoveryComposition {
 private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   RockchipExecutionAdmissionPort
 {
-  private let provenance: GitHubProtectedMainAuthorizationPort?
+  private let provenance: RockchipProductionProvenanceTokenLoader
   private let usageLedger: AuthorizationUsageLedger
   private let agentUsageLedger: AgentAuthorityUsageLedger
   private let binding: RockchipProductBindingSnapshot
@@ -2157,7 +2170,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   private let usbProbe: RockchipProductUSBProbe
 
   init(
-    provenance: GitHubProtectedMainAuthorizationPort?,
+    provenance: RockchipProductionProvenanceTokenLoader,
     usageLedger: AuthorizationUsageLedger,
     agentUsageLedger: AgentAuthorityUsageLedger,
     binding: RockchipProductBindingSnapshot,
@@ -2221,12 +2234,13 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
       targetID: targetID, targetLocationSelector: request.targetLocationSelector)
     switch request.authority {
     case .standingAuthorization(let authorizationID):
-      guard let provenance else {
+      guard let provenanceToken = try provenance.token(for: request.authority) else {
         throw RockchipFlashExecutionError.productionConfigurationUnavailable(
           "product GitHub provenance credential is not installed in Keychain")
       }
+      let provenancePort = GitHubProtectedMainAuthorizationPort(token: provenanceToken)
       let service = AuthorizationAdmissionService(
-        resolver: MaintainerMergedAuthorizationResolver(port: provenance),
+        resolver: MaintainerMergedAuthorizationResolver(port: provenancePort),
         factCollector: collector, usageLedger: usageLedger, clock: clock)
       let token = try await service.admit(
         AuthorizationAdmissionRequest(

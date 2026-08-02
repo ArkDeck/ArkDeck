@@ -66,6 +66,48 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     var clearCount: Int { lock.withLock { clears } }
   }
 
+  private final class ProvenanceCredentialProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var loads = 0
+
+    func load() -> String? {
+      lock.withLock {
+        loads += 1
+        return "protected-main-token"
+      }
+    }
+
+    var loadCount: Int { lock.withLock { loads } }
+  }
+
+  func testChatConfirmationDefersStandingAuthorizationKeychainCredential() throws {
+    let probe = ProvenanceCredentialProbe()
+    let loader = RockchipProductionProvenanceTokenLoader(loadToken: { probe.load() })
+    let archive = URL(fileURLWithPath: "/tmp/dayu200-images.tar.gz")
+    let assertion = try RockchipChatConfirmationAssertion(
+      confirmationDigestSHA256: String(repeating: "c", count: 64),
+      planDigestSHA256: String(repeating: "d", count: 64),
+      archiveDigestSHA256: String(repeating: "a", count: 64),
+      stepSetDigestSHA256: String(repeating: "e", count: 64),
+      targetDigestSHA256: String(repeating: "b", count: 64), bindingRevision: 1)
+    let chatRequest = try RockchipFlashExecutionRequest(
+      chatConfirmation: assertion, archiveURL: archive, targetLocationSelector: "42")
+
+    XCTAssertNil(try loader.token(for: chatRequest.authority))
+    XCTAssertEqual(
+      probe.loadCount, 0,
+      "chat-confirmed execution must not ask Keychain for standing provenance")
+
+    let standingRequest = try RockchipFlashExecutionRequest(
+      authorizationID: "AUTH-TEST-AIN-018", archiveURL: archive,
+      targetLocationSelector: "42")
+    XCTAssertEqual(
+      try loader.token(for: standingRequest.authority), "protected-main-token")
+    XCTAssertEqual(
+      probe.loadCount, 1,
+      "standing authorization must still load its protected-main credential on demand")
+  }
+
   func testTypedToolTrustRequiresExactPinAndNeverClearsQuarantineImplicitly() throws {
     let root = FileManager.default.temporaryDirectory
       .appending(path: "arkdeck-tool-trust-\(UUID().uuidString)", directoryHint: .isDirectory)
