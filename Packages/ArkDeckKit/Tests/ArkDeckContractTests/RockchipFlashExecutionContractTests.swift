@@ -80,6 +80,25 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     var loadCount: Int { lock.withLock { loads } }
   }
 
+  private final class ModeTransitionIdentityProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private let before: RockchipProductUSBIdentity
+    private let after: RockchipProductUSBIdentity
+    private var calls = 0
+
+    init(before: RockchipProductUSBIdentity, after: RockchipProductUSBIdentity) {
+      self.before = before
+      self.after = after
+    }
+
+    func current() -> RockchipProductUSBIdentity {
+      lock.withLock {
+        defer { calls += 1 }
+        return calls == 0 ? before : after
+      }
+    }
+  }
+
   func testChatConfirmationDefersStandingAuthorizationKeychainCredential() throws {
     let probe = ProvenanceCredentialProbe()
     let loader = RockchipProductionProvenanceTokenLoader(loadToken: { probe.load() })
@@ -106,6 +125,71 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(
       probe.loadCount, 1,
       "standing authorization must still load its protected-main credential on demand")
+  }
+
+  func testPostflightAcceptsOnlyWholeCurrentOrConfirmedPreviousModeIdentityTuple()
+    async throws
+  {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let current = RockchipPostflightIdentity(
+      serialDigestSHA256: String(repeating: "a", count: 64), usbTopology: "42")
+    let previous = RockchipPostflightIdentity(
+      serialDigestSHA256: String(repeating: "c", count: 64), usbTopology: "43")
+    let port = RecordingRockchipAdmissionPort(
+      plan: fixture.plan, receipt: fixture.executableReceipt,
+      postflightIdentities: [current, previous])
+    let request = try RockchipFlashExecutionRequest(
+      authorizationID: "AUTH-TEST-CROSS-MODE-POSTFLIGHT", archiveURL: fixture.archive,
+      targetLocationSelector: "42")
+    let admission = try await port.admit(
+      request: request, sessionID: "session", jobID: "job", targetID: "target")
+
+    XCTAssertTrue(
+      admission.matchesPostflight(
+        RockchipPostflightReceipt(
+          connected: true, serialDigestSHA256: current.serialDigestSHA256,
+          usbTopology: current.usbTopology)))
+    XCTAssertTrue(
+      admission.matchesPostflight(
+        RockchipPostflightReceipt(
+          connected: true, serialDigestSHA256: previous.serialDigestSHA256,
+          usbTopology: previous.usbTopology)))
+    XCTAssertFalse(
+      admission.matchesPostflight(
+        RockchipPostflightReceipt(
+          connected: true, serialDigestSHA256: current.serialDigestSHA256,
+          usbTopology: previous.usbTopology)),
+      "serial/topology components from different mode identities must not be mixed")
+    XCTAssertFalse(
+      admission.matchesPostflight(
+        RockchipPostflightReceipt(
+          connected: false, serialDigestSHA256: previous.serialDigestSHA256,
+          usbTopology: previous.usbTopology)))
+  }
+
+  func testPostflightIdentityAliasesFailClosedWhenIncompleteInvalidOrAmbiguous() throws {
+    func snapshot(evidence: [String]) -> RockchipProductBindingSnapshot {
+      RockchipProductBindingSnapshot(
+        revision: 2, serial: "loader-serial", usbTopology: "42", evidence: evidence)
+    }
+
+    XCTAssertThrowsError(
+      try snapshot(evidence: [
+        "identity:previous-serial-sha256=\(String(repeating: "a", count: 64))"
+      ]).postflightIdentities())
+    XCTAssertThrowsError(
+      try snapshot(evidence: [
+        "identity:previous-serial-sha256=not-a-digest",
+        "binding:previous-usb-topology=43",
+      ]).postflightIdentities())
+    XCTAssertThrowsError(
+      try snapshot(evidence: [
+        "identity:previous-serial-sha256=\(String(repeating: "a", count: 64))",
+        "binding:previous-usb-topology=43",
+        "identity:previous-serial-sha256=\(String(repeating: "b", count: 64))",
+        "binding:previous-usb-topology=44",
+      ]).postflightIdentities())
   }
 
   func testTypedToolTrustRequiresExactPinAndNeverClearsQuarantineImplicitly() throws {
@@ -281,6 +365,15 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertTrue(stored.evidence.contains("binding:previous-revision=1"))
     XCTAssertTrue(stored.evidence.contains("binding:previous-usb-topology=18874368"))
     XCTAssertFalse(stored.evidence.contains { $0.contains(normal.serial) || $0.contains(loader.serial) })
+    XCTAssertEqual(
+      try stored.postflightIdentities(),
+      [
+        RockchipPostflightIdentity(
+          serialDigestSHA256: receipt.serialDigestSHA256, usbTopology: loader.topology),
+        RockchipPostflightIdentity(
+          serialDigestSHA256: RockchipExecutionTestFixture.sha256(Data(normal.serial.utf8)),
+          usbTopology: normal.topology),
+      ])
     var metadata = stat()
     let bindingURL = root.appending(path: RockchipProductBindingStore.bindingFileName)
     XCTAssertEqual(lstat(bindingURL.path, &metadata), 0)
@@ -307,8 +400,17 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     let fixture = try RockchipExecutionTestFixture.make()
     defer { try? FileManager.default.removeItem(at: fixture.base) }
     let persistence = try await fixture.makePersistence()
+    let serial = "cross-mode-connect-key"
+    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let loaderSerial = "cross-mode-loader-key"
+    let loaderDigest = RockchipExecutionTestFixture.sha256(Data(loaderSerial.utf8))
+    let currentModeIdentity = RockchipPostflightIdentity(
+      serialDigestSHA256: serialDigest, usbTopology: "42")
+    let previousModeIdentity = RockchipPostflightIdentity(
+      serialDigestSHA256: loaderDigest, usbTopology: "43")
     let admission = RecordingRockchipAdmissionPort(
-      plan: fixture.plan, receipt: fixture.executableReceipt)
+      plan: fixture.plan, receipt: fixture.executableReceipt,
+      postflightIdentities: [currentModeIdentity, previousModeIdentity])
     let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let hdcExecutable = packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
@@ -318,31 +420,35 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       identityBoundPreSpawnHook: { _ in },
       launchObserver: { _ in },
       identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
-    let serial = "cross-mode-connect-key"
-    let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
     let normal = RockchipProductUSBIdentity(
       serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
       productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
       topology: "42", productName: "HDC Device")
+    let loaderIdentity = RockchipProductUSBIdentity(
+      serial: loaderSerial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "43")
+    let identityProbe = ModeTransitionIdentityProbe(before: normal, after: loaderIdentity)
     // `rkdeveloptool ld` reports VID/PID/LocationID/mode, not the normal-mode USB serial.
-    // The transition must therefore correlate the semantic Loader observation without
-    // inventing a cross-mode serial readback.
+    // Its libusb-local LocationID intentionally differs from the IOKit topology; the second
+    // IOKit readback, not that number, proves the cross-mode serial/topology identity.
     let loader = RockchipDeviceObservation(
       deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
       usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
-      locationID: 42, mode: .loader)
+      locationID: 102, mode: .loader)
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: fixture.executable, executor: processExecutor,
       executableSHA256: fixture.executableSHA256,
       hdcTransition: RockchipHDCTransitionConfiguration(
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
-        currentIdentity: { normal }, waitForLoader: { loader }))
+        alternateModeIdentities: [previousModeIdentity],
+        currentIdentity: { identityProbe.current() }, waitForLoader: { loader }))
     let host = RockchipFlashExecutionHost(
       dependencies: RockchipFlashExecutionDependencies(
         admission: admission, process: process,
         postflight: FixedRockchipPostflightPort(
-          serialDigest: String(repeating: "a", count: 64), topology: "42"),
+          serialDigest: currentModeIdentity.serialDigestSHA256,
+          topology: currentModeIdentity.usbTopology),
         power: RecordingPowerBackend(),
         makePersistence: { _, _, _ in persistence },
         profiles: [.dayu200, fixture.profile],
@@ -441,21 +547,30 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       identityBoundSpawnObserver: { _, request, _ in spawnLog.append(request) })
     let serial = "cross-mode-connect-key"
     let serialDigest = RockchipExecutionTestFixture.sha256(Data(serial.utf8))
+    let loaderSerial = "cross-mode-loader-key"
+    let loaderDigest = RockchipExecutionTestFixture.sha256(Data(loaderSerial.utf8))
     let normal = RockchipProductUSBIdentity(
       serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
       productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
       topology: "42", productName: "HDC Device")
+    let movedIdentity = RockchipProductUSBIdentity(
+      serial: loaderSerial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "43")
+    let identityProbe = ModeTransitionIdentityProbe(before: normal, after: movedIdentity)
     let movedLoader = RockchipDeviceObservation(
       deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
       usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
-      locationID: 43, mode: .loader)
+      locationID: 102, mode: .loader)
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: fixture.executable, executor: executor,
       executableSHA256: fixture.executableSHA256,
       hdcTransition: RockchipHDCTransitionConfiguration(
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
-        currentIdentity: { normal }, waitForLoader: { movedLoader }))
+        alternateModeIdentities: [
+          RockchipPostflightIdentity(serialDigestSHA256: loaderDigest, usbTopology: "42")
+        ],
+        currentIdentity: { identityProbe.current() }, waitForLoader: { movedLoader }))
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
@@ -525,15 +640,23 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     let fixture = try RockchipExecutionTestFixture.make()
     defer { try? FileManager.default.removeItem(at: fixture.base) }
     let persistence = try await fixture.makePersistence()
+    let previousModeIdentity = RockchipPostflightIdentity(
+      serialDigestSHA256: String(repeating: "d", count: 64), usbTopology: "43")
     let admission = RecordingRockchipAdmissionPort(
-      plan: fixture.plan, receipt: fixture.executableReceipt)
+      plan: fixture.plan, receipt: fixture.executableReceipt,
+      postflightIdentities: [
+        RockchipPostflightIdentity(
+          serialDigestSHA256: String(repeating: "a", count: 64), usbTopology: "42"),
+        previousModeIdentity,
+      ])
     let process = RecordingRockchipProcessPort(
       executable: fixture.executable, sha256: fixture.executableSHA256)
     let host = RockchipFlashExecutionHost(
       dependencies: RockchipFlashExecutionDependencies(
         admission: admission, process: process,
         postflight: FixedRockchipPostflightPort(
-          serialDigest: String(repeating: "a", count: 64), topology: "42"),
+          serialDigest: previousModeIdentity.serialDigestSHA256,
+          topology: previousModeIdentity.usbTopology),
         power: RecordingPowerBackend(),
         makePersistence: { _, _, _ in persistence },
         profiles: [.dayu200, fixture.profile],
@@ -755,15 +878,24 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
   private let lock = NSLock()
   let plan: RockchipFlashPlan
   let receipt: ProcessExecutableIdentityReceipt
+  let postflightIdentities: [RockchipPostflightIdentity]
   private(set) var closedStatus: AuthorizationUsageTerminalStatus?
   private(set) var closedIntentIDs: [String] = []
   private var consumeCount = 0
 
   var authorizeAndConsumeCount: Int { lock.withLock { consumeCount } }
 
-  init(plan: RockchipFlashPlan, receipt: ProcessExecutableIdentityReceipt) {
+  init(
+    plan: RockchipFlashPlan,
+    receipt: ProcessExecutableIdentityReceipt,
+    postflightIdentities: [RockchipPostflightIdentity]? = nil
+  ) {
     self.plan = plan
     self.receipt = receipt
+    self.postflightIdentities = postflightIdentities ?? [
+      RockchipPostflightIdentity(
+        serialDigestSHA256: String(repeating: "a", count: 64), usbTopology: "42")
+    ]
   }
 
   func admit(
@@ -797,6 +929,7 @@ final class RecordingRockchipAdmissionPort: @unchecked Sendable, RockchipExecuti
       usageReservationID: "reservation-ain-007", targetID: targetID,
       bindingRevision: 1, targetDigestSHA256: String(repeating: "b", count: 64),
       serialDigestSHA256: String(repeating: "a", count: 64), usbTopology: "42",
+      postflightIdentities: postflightIdentities,
       executableIdentity: receipt, evidenceClass: .contractFake)
   }
 
@@ -878,7 +1011,7 @@ struct FixedRockchipPostflightPort: RockchipExecutionPostflightPort {
   let serialDigest: String
   let topology: String
 
-  func probe(expectedTopology _: String) async throws -> RockchipPostflightReceipt {
+  func probe() async throws -> RockchipPostflightReceipt {
     RockchipPostflightReceipt(
       connected: true, serialDigestSHA256: serialDigest, usbTopology: topology)
   }

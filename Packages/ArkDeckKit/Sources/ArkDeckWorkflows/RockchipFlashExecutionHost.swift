@@ -405,8 +405,29 @@ struct RockchipHDCTransitionConfiguration: Sendable {
   let connectKey: String
   let stableIdentitySHA256: String
   let usbTopology: String
+  let alternateModeIdentities: [RockchipPostflightIdentity]
   let currentIdentity: @Sendable () throws -> RockchipProductUSBIdentity
   let waitForLoader: @Sendable () async throws -> RockchipDeviceObservation
+
+  init(
+    executableURL: URL,
+    executableSHA256: String,
+    connectKey: String,
+    stableIdentitySHA256: String,
+    usbTopology: String,
+    alternateModeIdentities: [RockchipPostflightIdentity] = [],
+    currentIdentity: @escaping @Sendable () throws -> RockchipProductUSBIdentity,
+    waitForLoader: @escaping @Sendable () async throws -> RockchipDeviceObservation
+  ) {
+    self.executableURL = executableURL
+    self.executableSHA256 = executableSHA256
+    self.connectKey = connectKey
+    self.stableIdentitySHA256 = stableIdentitySHA256
+    self.usbTopology = usbTopology
+    self.alternateModeIdentities = alternateModeIdentities
+    self.currentIdentity = currentIdentity
+    self.waitForLoader = waitForLoader
+  }
 
   var arguments: [String] {
     ["-t", connectKey, "shell", "reboot", "loader"]
@@ -485,7 +506,16 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
           throw RockchipHDCTransitionError.processDidNotExitSuccessfully
         }
         let loader = try await hdcTransition.waitForLoader()
-        guard Self.matches(loader, transition: hdcTransition) else {
+        guard Self.matchesLoaderObservation(loader) else {
+          throw RockchipHDCTransitionError.identityDrift
+        }
+        // The `ld` observation proves one expected Loader but its LocationID is libusb-local.
+        // Re-read IOKit after the transition so serial digest + IOKit topology, not a
+        // cross-namespace integer comparison, prove that the Loader is the durable target.
+        let loaderIdentity = try hdcTransition.currentIdentity()
+        guard loaderIdentity.isLoader,
+          Self.matchesConfirmedModeIdentity(loaderIdentity, transition: hdcTransition)
+        else {
           throw RockchipHDCTransitionError.identityDrift
         }
       } else {
@@ -522,14 +552,26 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
       && identity.isRegisteredDAYU200Mode
   }
 
-  private static func matches(
-    _ observation: RockchipDeviceObservation,
-    transition: RockchipHDCTransitionConfiguration
+  private static func matchesLoaderObservation(
+    _ observation: RockchipDeviceObservation
   ) -> Bool {
     observation.usbVendorID == RockchipProbeEvidence.rockUSBVendorID
       && observation.usbProductID == RockchipProbeEvidence.dayu200LoaderProductID
       && observation.mode == .loader
-      && String(observation.locationID) == transition.usbTopology
+  }
+
+  private static func matchesConfirmedModeIdentity(
+    _ identity: RockchipProductUSBIdentity,
+    transition: RockchipHDCTransitionConfiguration
+  ) -> Bool {
+    let digest = SHA256.hash(data: Data(identity.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let observed = RockchipPostflightIdentity(
+      serialDigestSHA256: digest, usbTopology: identity.topology)
+    let current = RockchipPostflightIdentity(
+      serialDigestSHA256: transition.stableIdentitySHA256,
+      usbTopology: transition.usbTopology)
+    return observed == current || transition.alternateModeIdentities.contains(observed)
   }
 }
 
@@ -1029,9 +1071,11 @@ private enum RockchipProductionExecutionComposition {
       loadToken: { try RockchipProductExecutionSettings.productKeychainToken() })
     let ledger = try AuthorizationUsageLedger(root: settings.usageRoot)
     let agentLedger = try AgentAuthorityUsageLedger(root: settings.usageRoot)
+    let postflightIdentities = try settings.binding.postflightIdentities()
     let admission = RockchipProductionAdmissionPort(
       provenance: provenance, usageLedger: ledger, agentUsageLedger: agentLedger,
       binding: settings.binding,
+      postflightIdentities: postflightIdentities,
       tool: settings.tool, clock: clock, usbProbe: usbProbe)
     let bindingSerialDigest = SHA256.hash(data: Data(settings.binding.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
@@ -1042,10 +1086,9 @@ private enum RockchipProductionExecutionComposition {
       connectKey: settings.binding.serial,
       stableIdentitySHA256: bindingSerialDigest,
       usbTopology: settings.binding.usbTopology,
+      alternateModeIdentities: Array(postflightIdentities.dropFirst()),
       currentIdentity: {
-        try usbProbe.singleDAYU200(
-          selector: settings.binding.usbTopology,
-          stableIdentitySHA256: bindingSerialDigest)
+        try usbProbe.singleDAYU200()
       },
       waitForLoader: {
         let clock = ContinuousClock()
@@ -1135,6 +1178,41 @@ struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   let serial: String
   let usbTopology: String
   let evidence: [String]
+
+  func postflightIdentities() throws -> [RockchipPostflightIdentity] {
+    let current = RockchipPostflightIdentity(
+      serialDigestSHA256: SHA256.hash(data: Data(serial.utf8)).map {
+        String(format: "%02x", $0)
+      }.joined(),
+      usbTopology: usbTopology)
+    let previousSerials = evidence.compactMap {
+      $0.hasPrefix("identity:previous-serial-sha256=")
+        ? String($0.dropFirst("identity:previous-serial-sha256=".count)) : nil
+    }
+    let previousTopologies = evidence.compactMap {
+      $0.hasPrefix("binding:previous-usb-topology=")
+        ? String($0.dropFirst("binding:previous-usb-topology=".count)) : nil
+    }
+    guard previousSerials.count == previousTopologies.count else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding carries an incomplete previous-mode identity")
+    }
+    guard !previousSerials.isEmpty else { return [current] }
+    guard previousSerials.count == 1,
+      let previousSerial = previousSerials.first,
+      let previousTopology = previousTopologies.first,
+      RockchipStandingAuthorization.isCanonicalSHA256(previousSerial),
+      !previousTopology.isEmpty,
+      previousTopology.utf8.allSatisfy({ (48...57).contains($0) }),
+      previousTopology == "0" || previousTopology.first != "0"
+    else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding previous-mode identity is invalid or ambiguous")
+    }
+    let previous = RockchipPostflightIdentity(
+      serialDigestSHA256: previousSerial, usbTopology: previousTopology)
+    return previous == current ? [current] : [current, previous]
+  }
 }
 
 struct RockchipProductBindingStore: Sendable {
@@ -2149,7 +2227,7 @@ struct RockchipProductUSBProbe: Sendable {
       requirement: .registeredDAYU200)
   }
 
-  func singleConnected(selector: String) throws -> RockchipProductUSBIdentity {
+  func singleConnected(selector: String? = nil) throws -> RockchipProductUSBIdentity {
     try single(
       selector: selector, serialDigestSHA256: nil,
       requirement: .hdcNormal)
@@ -2464,10 +2542,10 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
 private struct RockchipProductPostflightPort: RockchipExecutionPostflightPort {
   let probe: RockchipProductUSBProbe
 
-  func probe(expectedTopology: String) async throws -> RockchipPostflightReceipt {
+  func probe() async throws -> RockchipPostflightReceipt {
     let deadline = ContinuousClock.now.advanced(by: .seconds(120))
     while ContinuousClock.now < deadline {
-      if let identity = try? probe.singleConnected(selector: expectedTopology) {
+      if let identity = try? probe.singleConnected() {
         let digest = SHA256.hash(data: Data(identity.serial.utf8)).map {
           String(format: "%02x", $0)
         }.joined()
@@ -2479,7 +2557,7 @@ private struct RockchipProductPostflightPort: RockchipExecutionPostflightPort {
     }
     return RockchipPostflightReceipt(
       connected: false, serialDigestSHA256: String(repeating: "0", count: 64),
-      usbTopology: expectedTopology)
+      usbTopology: "0")
   }
 }
 
@@ -2505,6 +2583,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   private let usageLedger: AuthorizationUsageLedger
   private let agentUsageLedger: AgentAuthorityUsageLedger
   private let binding: RockchipProductBindingSnapshot
+  private let postflightIdentities: [RockchipPostflightIdentity]
   private let tool: RockchipSelectedDiscoveryTool
   private let clock: any RockchipAdmissionClock
   private let usbProbe: RockchipProductUSBProbe
@@ -2514,6 +2593,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     usageLedger: AuthorizationUsageLedger,
     agentUsageLedger: AgentAuthorityUsageLedger,
     binding: RockchipProductBindingSnapshot,
+    postflightIdentities: [RockchipPostflightIdentity],
     tool: RockchipSelectedDiscoveryTool,
     clock: any RockchipAdmissionClock,
     usbProbe: RockchipProductUSBProbe
@@ -2522,6 +2602,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     self.usageLedger = usageLedger
     self.agentUsageLedger = agentUsageLedger
     self.binding = binding
+    self.postflightIdentities = postflightIdentities
     self.tool = tool
     self.clock = clock
     self.usbProbe = usbProbe
@@ -2593,6 +2674,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         targetDigestSHA256: token.facts.targetDigestSHA256,
         serialDigestSHA256: token.facts.serialDigestSHA256,
         usbTopology: token.facts.usbTopology,
+        postflightIdentities: postflightIdentities,
         executableIdentity: token.facts.executableIdentity,
         evidenceClass: .production)
     case .chatConfirmation(let assertion):
@@ -2608,6 +2690,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         targetDigestSHA256: token.facts.targetDigestSHA256,
         serialDigestSHA256: token.facts.serialDigestSHA256,
         usbTopology: token.facts.usbTopology,
+        postflightIdentities: postflightIdentities,
         executableIdentity: token.facts.executableIdentity,
         evidenceClass: .production)
     }

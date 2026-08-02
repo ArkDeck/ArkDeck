@@ -139,8 +139,17 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   let targetDigestSHA256: String
   let serialDigestSHA256: String
   let usbTopology: String
+  let postflightIdentities: [RockchipPostflightIdentity]
   let executableIdentity: ProcessExecutableIdentityReceipt
   let evidenceClass: RockchipExecutionEvidenceClass
+
+  func matchesPostflight(_ receipt: RockchipPostflightReceipt) -> Bool {
+    guard receipt.connected else { return false }
+    return postflightIdentities.contains {
+      $0.serialDigestSHA256 == receipt.serialDigestSHA256
+        && $0.usbTopology == receipt.usbTopology
+    }
+  }
 
   var journalSchemaVersion: String {
     switch authorityReference {
@@ -251,8 +260,13 @@ struct RockchipPostflightReceipt: Sendable, Equatable {
   let usbTopology: String
 }
 
+struct RockchipPostflightIdentity: Sendable, Equatable {
+  let serialDigestSHA256: String
+  let usbTopology: String
+}
+
 protocol RockchipExecutionPostflightPort: Sendable {
-  func probe(expectedTopology: String) async throws -> RockchipPostflightReceipt
+  func probe() async throws -> RockchipPostflightReceipt
 }
 
 protocol RockchipPowerActivityLease: Sendable {
@@ -650,7 +664,7 @@ actor RockchipFlashExecutor {
     }
     let postflight: RockchipPostflightReceipt
     do {
-      postflight = try await dependencies.postflight.probe(expectedTopology: admission.usbTopology)
+      postflight = try await dependencies.postflight.probe()
     } catch {
       try? persistence.appendWaitingForRecovery(
         stepID: postflightStep.id, reason: "postflight-unavailable")
@@ -662,10 +676,7 @@ actor RockchipFlashExecutor {
     try failIfLifecycleInterrupted(
       lifecycleGate, stepID: postflightStep.id, persistence: persistence,
       admission: admission, destructiveIntentIDs: destructiveIntentIDs)
-    guard postflight.connected,
-      postflight.serialDigestSHA256 == admission.serialDigestSHA256,
-      postflight.usbTopology == admission.usbTopology
-    else {
+    guard admission.matchesPostflight(postflight) else {
       try? persistence.appendOutcome(
         step: postflightStep, intentEventID: postflightIntent, admission: admission,
         result: "failed", certainty: .outcomeUnknown,
