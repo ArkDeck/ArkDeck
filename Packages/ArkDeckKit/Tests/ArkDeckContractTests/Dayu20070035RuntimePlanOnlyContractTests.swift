@@ -367,6 +367,99 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     XCTAssertEqual(negativeDispatchCount, 0)
     XCTAssertTrue(negativeJobs.isEmpty)
     XCTAssertTrue(negativeCapabilities.isEmpty)
+
+    // E2 exact-plan capability draft against the same real archive: the
+    // envelope pins the materialized plan digest and the stable physical
+    // identity, single-use, with the uninstallable placeholder issuer. The
+    // draft is a reviewable document, never authority: nothing is installed,
+    // admitted or dispatched by producing it.
+    let draft = try await engine.draftCapability(
+      encoded(
+        try flashRequest(
+          requestID: "real-plan-only-e2-draft", lease: lease,
+          inputs: flashInputs(lease: lease, profile: profile))),
+      issuedAtUTC: "2026-08-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T01:00:00Z",
+      issuerReference: "PENDING-MAINTAINER-PR",
+      maximumUses: 1)
+    XCTAssertEqual(draft.capability.effectCeiling, .destructive)
+    XCTAssertEqual(draft.capability.exactPlanDigest, preview.materializedPlanDigest)
+    XCTAssertEqual(draft.materializedPlanDigest, preview.materializedPlanDigest)
+    guard case .stablePhysicalIdentity(let pinnedIdentity) = draft.capability.targetScope
+    else {
+      return XCTFail("a destructive draft must pin a stable physical identity")
+    }
+    XCTAssertEqual(pinnedIdentity, Self.targetIdentity)
+    XCTAssertEqual(draft.capability.maximumUses, 1)
+    XCTAssertEqual(draft.capability.exactBindingRevision, 7)
+    XCTAssertEqual(draft.capability.issuer.kind, .maintainerMergedPR)
+    XCTAssertEqual(draft.capability.issuer.reference, "PENDING-MAINTAINER-PR")
+    XCTAssertEqual(draft.operationReference, "flash.dayu200@1")
+    // The document must survive its own wire round-trip through the same
+    // validating decoder the install path uses.
+    let roundTripped = try JSONDecoder().decode(
+      RuntimeCapability.self, from: JSONEncoder().encode(draft.capability))
+    XCTAssertEqual(roundTripped, draft.capability)
+    let draftDispatchCount = await dispatchLog.snapshot()
+    let draftJobs = await engine.listJobs()
+    let draftCapabilities = try await capabilityStore.list()
+    XCTAssertEqual(draftDispatchCount, 0)
+    XCTAssertTrue(draftJobs.isEmpty)
+    XCTAssertTrue(draftCapabilities.isEmpty, "drafting must never install")
+  }
+
+  func testDestructiveDraftEnvelopeIsRefusedMultiUseBeforeAnyMaterialization() async throws {
+    // No archive, no artifact store content, no device facts needed: the
+    // single-use rule on a destructive envelope must reject before the
+    // engine resolves leases or facts, so this runs without the real-input
+    // gate. A fabricated lease string passes the static input-type check
+    // and would only fail later, during materialization.
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "arkdeck-dayu200-e2-draft-negative-\(UUID().uuidString.lowercased())",
+      isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: root, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    defer { try? FileManager.default.removeItem(at: root) }
+    let dispatchLog = DispatchLog()
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+      providers: DeviceProviderRegistry(providers: [
+        RockchipFlashProviderAdapter(
+          factsPort: FactsPort(), availability: .available)
+      ]),
+      dispatcher: RefusingDispatcher(log: dispatchLog),
+      capabilityStore: try RuntimeCapabilityStore(
+        directoryURL: root.appendingPathComponent("capabilities", isDirectory: true)),
+      artifactStore: try RuntimeArtifactStore(
+        rootURL: root.appendingPathComponent("artifacts", isDirectory: true),
+        nowUTC: { "2026-08-01T00:00:00Z" }),
+      nowUTC: { "2026-08-01T00:00:00Z" })
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    do {
+      _ = try await engine.draftCapability(
+        encoded(
+          try flashRequest(
+            requestID: "e2-draft-multi-use", lease: "lease-v1:fixture:never-resolved",
+            inputs: flashInputs(
+              lease: "lease-v1:fixture:never-resolved", profile: profile))),
+        issuedAtUTC: "2026-08-01T00:00:00Z",
+        expiresAtUTC: "2026-08-01T01:00:00Z",
+        issuerReference: "PENDING-MAINTAINER-PR",
+        maximumUses: 2)
+      XCTFail("a multi-use destructive envelope must be refused")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(_, let detail) = error else {
+        return XCTFail("unexpected rejection shape: \(error)")
+      }
+      XCTAssertTrue(detail.contains("single-use"), detail)
+      XCTAssertFalse(
+        detail.contains("lease"),
+        "the envelope rule must fire before lease materialization: \(detail)")
+    }
+    let dispatched = await dispatchLog.snapshot()
+    XCTAssertEqual(dispatched, 0)
   }
 
   private func flashInputs(

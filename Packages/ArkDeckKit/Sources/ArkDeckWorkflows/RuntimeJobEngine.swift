@@ -680,12 +680,20 @@ public actor RuntimeJobEngine {
       dispatchDisposition: "notDispatched")
   }
 
-  /// Produces a reviewable E1 standing authorization envelope without
-  /// installing a capability, admitting a Job or dispatching a provider
-  /// action. Provider availability, target facts, Artifact leases and every
-  /// selected typed plan step must materialize before a draft is returned.
-  /// The current plan digest is returned as a preview; each later admission
-  /// binds its own exact materialized digest in the durable lineage.
+  /// Produces a reviewable authorization envelope without installing a
+  /// capability, admitting a Job or dispatching a provider action. Provider
+  /// availability, target facts, Artifact leases and every selected typed
+  /// plan step must materialize before a draft is returned.
+  ///
+  /// E1 deviceMutation drafts are standing envelopes: the current plan
+  /// digest is returned as a preview, and each later admission binds its
+  /// own exact materialized digest in the durable lineage. E2 destructive
+  /// drafts are exact-plan, single-use envelopes: the materialized plan
+  /// digest is pinned into `exactPlanDigest` and the target must resolve to
+  /// a stable physical identity. Either way the draft carries no authority:
+  /// its issuer reference is a placeholder that the install gate refuses
+  /// until a maintainer-merged PR reference replaces it (the trust root for
+  /// E2 issuance is unchanged).
   public func draftCapability(
     _ requestData: Data,
     issuedAtUTC: String,
@@ -709,14 +717,23 @@ public actor RuntimeJobEngine {
     try validateInputs(request.inputs, against: descriptor)
     try validateSupportedPlanInputs(request.inputs, descriptor: descriptor)
     let effect = Self.effectiveEffect(descriptor: descriptor, inputs: request.inputs)
-    guard effect == .deviceMutation else {
+    guard effect == .deviceMutation || effect == .destructive else {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
-        "automatic capability drafting is limited to E1 deviceMutation operations")
+        "capability drafting is limited to E1 deviceMutation and E2 destructive operations")
     }
     guard (1...32).contains(maximumUses) else {
       throw RuntimeJobEngineError.rejected(
-        .invalidInput, "E1 authorization envelope maximumUses must be between 1 and 32")
+        .invalidInput, "authorization envelope maximumUses must be between 1 and 32")
+    }
+    if effect == .destructive {
+      // Refused before any materialization: the destructive envelope shape
+      // is not negotiable, so a bad request must not resolve facts first.
+      guard maximumUses == 1 else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "a destructive exact-plan capability envelope is single-use (maximumUses must be 1)")
+      }
     }
 
     var seed = requestData
@@ -776,6 +793,12 @@ public actor RuntimeJobEngine {
       let revision = query.workspaceRevision,
       let scopes = query.workspaceFileScopesDigest
     {
+      guard effect != .destructive else {
+        throw RuntimeJobEngineError.rejected(
+          .invalidRequest,
+          "a destructive capability requires a stable physical device identity, "
+            + "not a workspace subject")
+      }
       // A standing grant names the tree and its maximum writable scopes, but
       // does not pin the tree to the revision at draft time: patch, build,
       // test and revert each move it. The review payload still carries the
@@ -805,14 +828,14 @@ public actor RuntimeJobEngine {
           RuntimeCapabilityOperationScope(
             operationID: descriptor.id, version: descriptor.version)
         ],
-        effectCeiling: .deviceMutation,
+        effectCeiling: effect,
         inputConstraints: Self.exactCapabilityConstraints(for: request.inputs),
         issuedAtUTC: issuedAtUTC,
         expiresAtUTC: expiresAtUTC,
         maximumUses: maximumUses,
         issuer: RuntimeCapabilityIssuer(
           kind: .maintainerMergedPR, reference: issuerReference),
-        exactPlanDigest: nil,
+        exactPlanDigest: effect == .destructive ? materialized.planDigest : nil,
         exactBindingRevision: draftBindingRevision)
     } catch {
       throw RuntimeJobEngineError.rejected(
