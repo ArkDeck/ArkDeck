@@ -590,11 +590,46 @@ final class EvolutionCampaignContractTests: XCTestCase {
       candidateURL: URL(fileURLWithPath: "/private/tmp/candidate"),
       requestURL: URL(fileURLWithPath: "/private/tmp/request.json"))
     XCTAssertTrue(profile.contains("(deny default)"))
+    XCTAssertTrue(profile.contains("(import \"dyld-support.sb\")"))
+    XCTAssertTrue(
+      profile.contains(
+        "(allow process-exec (literal \"/private/tmp/candidate\"))"))
+    XCTAssertEqual(profile.components(separatedBy: "process-exec").count - 1, 1)
+    XCTAssertFalse(profile.contains("(allow process-exec)"))
+    XCTAssertFalse(profile.contains("process-exec*"))
     XCTAssertFalse(profile.contains("network"))
-    XCTAssertFalse(profile.contains("process-exec"))
     XCTAssertFalse(profile.lowercased().contains("usb"))
     XCTAssertFalse(profile.lowercased().contains("hdc"))
     XCTAssertFalse(profile.lowercased().contains("rockusb"))
+  }
+
+  func testCandidateSandboxLaunchesOnlyTheExactCandidateLiteral() throws {
+    let sandbox = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+    let candidate = URL(fileURLWithPath: "/usr/bin/true")
+    let otherExecutable = URL(fileURLWithPath: "/usr/bin/false")
+    let profile = ProductRockchipEvolutionCandidateBuilder.sandboxProfile(
+      candidateURL: candidate,
+      requestURL: URL(fileURLWithPath: "/private/tmp/unused-candidate-request.json"))
+
+    func run(_ executable: URL) throws -> (status: Int32, stderr: String) {
+      let process = Process()
+      let errorPipe = Pipe()
+      process.executableURL = sandbox
+      process.arguments = ["-p", profile, executable.path]
+      process.standardError = errorPipe
+      try process.run()
+      process.waitUntilExit()
+      return (
+        process.terminationStatus,
+        String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
+    }
+
+    let exact = try run(candidate)
+    XCTAssertEqual(exact.status, 0, exact.stderr)
+
+    let rejected = try run(otherExecutable)
+    XCTAssertNotEqual(rejected.status, 0)
+    XCTAssertTrue(rejected.stderr.contains("Operation not permitted"), rejected.stderr)
   }
 
   func testExpiredZeroEventPreviewDraftIsCollectedWhileHistoryAndFreshDraftsSurvive() throws {

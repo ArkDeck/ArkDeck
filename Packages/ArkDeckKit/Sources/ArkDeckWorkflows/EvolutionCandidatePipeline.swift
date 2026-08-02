@@ -527,6 +527,8 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     return """
       (version 1)
       (deny default)
+      (import "dyld-support.sb")
+      (allow process-exec (literal "\(escaped(candidateURL.path))"))
       (allow process-info*)
       (allow sysctl-read)
       (allow file-read-metadata)
