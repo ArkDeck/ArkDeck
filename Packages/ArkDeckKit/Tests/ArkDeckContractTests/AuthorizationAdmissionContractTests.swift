@@ -37,7 +37,9 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
     var toolJobID: String?
     var toolTargetID = AuthorizationAdmissionContractTests.targetID
     var toolMode = RockchipDeviceMode.loader
-    var toolLocation: UInt64 = 2
+    // rkdeveloptool's parsed libusb-local LocationID is intentionally different from the
+    // durable IOKit topology.  Positive admission must never depend on numeric equality.
+    var toolLocation: UInt64 = 102
     var toolSequence: UInt64 = 1
     var toolProfile = RockchipDiscoveryIntegrationProfile.pinnedProduction.identifier
     var toolSHA256 = RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256
@@ -271,9 +273,6 @@ final class AuthorizationAdmissionContractTests: XCTestCase {
     var badToolMode = Overrides()
     badToolMode.toolMode = .maskrom
     cases.append((.toolMismatch(field: "deviceObservation"), badToolMode))
-    var badTopology = Overrides()
-    badTopology.toolLocation = 3
-    cases.append((.toolMismatch(field: "usbTopology"), badTopology))
     var badToolProfile = Overrides()
     badToolProfile.toolProfile = "caller-profile"
     cases.append((.toolMismatch(field: "profileIdentifier"), badToolProfile))

@@ -430,12 +430,13 @@ struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
       observation.usbProductID == RockchipProbeEvidence.dayu200LoaderProductID,
       observation.mode == .loader
     else { throw RockchipAuthorizationFactError.toolMismatch(field: "deviceObservation") }
-    let observedTopology = String(observation.locationID)
-    guard topology == observedTopology else {
-      throw RockchipAuthorizationFactError.toolMismatch(field: "usbTopology")
-    }
+    // `rkdeveloptool ld` calls its libusb bus/port value `LocationID`; macOS IOKit calls
+    // its controller topology property `locationID`.  They are different namespaces and
+    // cannot be compared numerically.  The pinned tool observation proves that exactly one
+    // expected Loader is reachable.  Physical target identity remains bound by the durable
+    // serial digest + IOKit topology readback below.
     if let selector = request.targetLocationSelector {
-      guard Self.isCanonicalTopology(selector), selector == observedTopology else {
+      guard Self.isCanonicalTopology(selector), selector == topology else {
         throw RockchipAuthorizationFactError.toolMismatch(field: "targetLocationSelector")
       }
     }
