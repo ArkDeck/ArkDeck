@@ -299,7 +299,11 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     default:
       let parts = declared.components(separatedBy: ":")
       guard parts.count == 2, parts[0] == "observed", let count = Int(parts[1]) else {
-        throw XCTSkip("unrecognised expectedOutcome \(declared)")
+        // An unrecognised registry value is a registry defect; skipping here
+        // would let a typo silently drop the vector from coverage.
+        XCTFail("unrecognised expectedOutcome \(declared)")
+        struct UnrecognisedExpectedOutcome: Error {}
+        throw UnrecognisedExpectedOutcome()
       }
       return .observed(count)
     }

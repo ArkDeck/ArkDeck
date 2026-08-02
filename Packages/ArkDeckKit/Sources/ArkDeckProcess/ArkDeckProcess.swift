@@ -393,7 +393,11 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     self.identityBoundSpawnObserver = identityBoundSpawnObserver
   }
 
-  public func execute(
+  /// In-package entry point for exercising the execution core (argv
+  /// isolation, stream capture, process-group control) without identity
+  /// binding. Production callers spawn exclusively through
+  /// `executeIdentityBound`; this must never become public again.
+  package func execute(
     _ request: ProcessRequest,
     captureLimit: Int = 64 * 1024,
     onOutput: @escaping ProcessOutputHandler = { _ in }
@@ -418,8 +422,9 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
 
   /// Runs a process while allowing an Adapter to classify the complete raw
   /// byte stream. The semantic result remains independent from the process
-  /// termination status, including the exit-zero case.
-  public func execute<Evaluator: ProcessSemanticEvaluating>(
+  /// termination status, including the exit-zero case. In-package only, as
+  /// with the non-evaluating overload above.
+  package func execute<Evaluator: ProcessSemanticEvaluating>(
     _ request: ProcessRequest,
     evaluating evaluator: Evaluator,
     captureLimit: Int = 64 * 1024,

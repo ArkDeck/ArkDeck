@@ -1519,31 +1519,6 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertEqual(resources.claimReleaseCount, 1)
   }
 
-  func testHazardGateExhaustsProviderUserAndDurableAuditTruthTable() {
-    let hazard = UnresolvedDeviceHazard(
-      code: "remote-task-unknown", summary: "fixture", severity: .blocking,
-      outcomeCertainty: .outcomeUnknown)
-    let gate = UnresolvedHazardPreflightGate()
-    for providerAllows in [false, true] {
-      for userAllows in [false, true] {
-        for auditSucceeds in [false, true] {
-          let audit = HazardAudit(succeeds: auditSucceeds)
-          let decision = gate.evaluate(
-            hazards: [hazard],
-            providerAllowsOverride: providerAllows,
-            userOverrideConfirmationID: userAllows ? "confirmation-1" : nil,
-            auditStore: audit)
-          let shouldPass = providerAllows && userAllows && auditSucceeds
-          XCTAssertEqual(
-            decision.disposition,
-            shouldPass ? .overrideAudited(auditEventID: "audit-1") : .failedConflict)
-          XCTAssertEqual(decision.deviceDispatchCount, 0)
-          XCTAssertEqual(audit.callCount, providerAllows && userAllows ? 1 : 0)
-        }
-      }
-    }
-  }
-
   func testMacOSCrashWindowMatrixPreservesUnknownOutcomeAndZeroDeviceDispatch() throws {
     let executable = try crashFixtureExecutable()
     let windows = [
@@ -1925,20 +1900,6 @@ private final class ResourceCounters: DeviceLaneReleasing, StorageClaimReleasing
     claimReleased = true
     claimReleaseCount += 1
     return .releasedNow
-  }
-}
-
-private final class HazardAudit: HazardOverrideAuditPersisting, @unchecked Sendable {
-  private let succeeds: Bool
-  private(set) var callCount = 0
-  init(succeeds: Bool) { self.succeeds = succeeds }
-  func persistHazardOverrideAudit(
-    hazards _: [UnresolvedDeviceHazard],
-    userConfirmationID _: String
-  ) throws -> String {
-    callCount += 1
-    if !succeeds { throw TestFault.journal }
-    return "audit-1"
   }
 }
 

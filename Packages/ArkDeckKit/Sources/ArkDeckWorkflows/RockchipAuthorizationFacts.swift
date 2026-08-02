@@ -77,29 +77,6 @@ protocol RockchipDurableBindingFactPort: Sendable {
   func currentDurableBinding() async throws -> RockchipTrustedDurableBindingFact
 }
 
-struct RockchipDeviceBindingJournalFactPort: RockchipDurableBindingFactPort {
-  private let sessionID: String
-  private let jobID: String
-  private let targetID: String
-  private let adapter: DeviceBindingJournalAdapter
-
-  init(
-    sessionID: String, jobID: String, targetID: String,
-    adapter: DeviceBindingJournalAdapter
-  ) {
-    self.sessionID = sessionID
-    self.jobID = jobID
-    self.targetID = targetID
-    self.adapter = adapter
-  }
-
-  func currentDurableBinding() async throws -> RockchipTrustedDurableBindingFact {
-    RockchipTrustedDurableBindingFact(
-      sessionID: sessionID, jobID: jobID, targetID: targetID,
-      receipt: try await adapter.currentDurableBinding())
-  }
-}
-
 struct RockchipTrustedToolDeviceFact: Sendable, Equatable {
   let sessionID: String
   let jobID: String

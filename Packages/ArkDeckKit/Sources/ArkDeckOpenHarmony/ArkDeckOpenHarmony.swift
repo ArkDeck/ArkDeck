@@ -1276,12 +1276,6 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     deliveredEvents[recipient] = deliveredEvents[recipient] ?? []
   }
 
-  public func unregister(_ recipient: HDCServerRecipient) {
-    invalidateDispatchLeases(for: recipient.endpoint)
-    recipients.removeValue(forKey: recipient)
-    deliveredEvents.removeValue(forKey: recipient)
-  }
-
   public func updateCriticalState(
     _ state: HDCServerCriticalState, for recipient: HDCServerRecipient
   ) {

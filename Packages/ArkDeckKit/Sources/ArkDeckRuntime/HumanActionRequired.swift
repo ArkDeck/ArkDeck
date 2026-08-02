@@ -237,19 +237,6 @@ public struct HumanActionRequired: Equatable, Sendable, Codable {
         observedAtUTC: receipt.observedAtUTC))
   }
 
-  package func expiring(at observedAtUTC: String) throws -> HumanActionRequired {
-    try HumanActionValidation.timestamp(observedAtUTC, field: "observedAtUtc")
-    guard status == .waiting, let expiresAtUTC,
-      HumanActionValidation.date(observedAtUTC) >= HumanActionValidation.date(expiresAtUTC)
-    else { throw HumanActionRequiredError.invalidTransition }
-    return try HumanActionRequired(
-      actionID: actionID, jobID: jobID, stepID: stepID, category: category,
-      reasonCode: reasonCode, minimumActionKey: minimumActionKey,
-      prohibitedAutomation: prohibitedAutomation,
-      resumeProbeOperationID: resumeProbeOperationID, generatedAtUTC: generatedAtUTC,
-      expiresAtUTC: expiresAtUTC, status: .expired, resolution: nil)
-  }
-
   private func validate() throws {
     try HumanActionValidation.identifier(actionID, field: "actionId")
     try HumanActionValidation.identifier(jobID, field: "jobId")

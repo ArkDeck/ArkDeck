@@ -264,26 +264,6 @@ public final class SessionSettingsStore: @unchecked Sendable {
     }
   }
 
-  public func resetAllToDefaults(
-    expectedGeneration: UInt64
-  ) throws -> SessionSettingsSnapshot {
-    try locked {
-      let current = try loadEnvelope()
-      try requireGeneration(expectedGeneration, envelope: current)
-      let root = try standardizedAbsoluteFileURL(defaultRootProvider())
-      let envelope = PersistentSessionSettings(
-        generation: try nextGeneration(current.generation),
-        rootSource: .defaultApplicationSupport,
-        expectedRootPath: root.path,
-        totalQuotaBytes: SessionSettingsSnapshot.defaultTotalQuotaBytes,
-        safetyMarginBytes: SessionSettingsSnapshot.defaultSafetyMarginBytes,
-        retentionDays: SessionSettingsSnapshot.defaultRetentionDays,
-        bookmark: nil)
-      try persist(envelope)
-      return envelope.snapshot
-    }
-  }
-
   public func acquireRoot(
     for expected: SessionSettingsSnapshot
   ) throws -> SessionRootAccessContext {
