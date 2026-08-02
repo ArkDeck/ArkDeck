@@ -3302,3 +3302,84 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - existing standing authorization 路径与 AC-FLASH-015-01/02 canonical 回归不退化；
 - 三条 SDD/Catalog 闸、全量并行 Swift、preflight 全绿；run evidence 如实记录
   `real device=0, Flash=0`。
+
+## TASK-AIN-019 — Evolution Mode 未合入候选的 bounded E2 Flash campaign
+
+- Status:blocked（等待 CHG-2026-025 r8 经维护者 review/merge；合入前实现、授权实例、
+  USB/HDC/RockUSB 与真实 Flash dispatch 均为 0）
+- Platform:macos
+- Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
+  POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
+- Acceptance:AC-FLASH-015-01/02/03、AIN-EVOLUTION-E2-001(change-local,r8)
+- Depends on:CHG-2026-025 r8 经维护者 merged PR 批准；TASK-HFA-005 done(#955)；
+  TASK-AIN-018 done(#947)
+- Applicable failure patterns:AF-001、AF-002、AF-004、AF-006、AF-007、AF-010、
+  AF-013、AF-015、AF-017
+- Production reachability:`arkdeck harness submit --execution-mode evolution` → isolated
+  candidate patch/build/test → immutable candidate pins → independent read-only adversarial
+  review → protected-main E2 broker → fresh target/binding lineage readback → durable campaign
+  ordinal → existing `flash.dayu200@1` typed provider → artifact/evaluation → next candidate or
+  terminal promotion。candidate process 不持 device transport 或 authority。
+- Trusted fact sources:base OID/tree/diff/executable/toolchain 由 task-owned builder 现场 hash；
+  review receipt 由独立 reviewer 对 immutable Artifact 产生；plan/archive/step-set 由 merged
+  Catalog/provider materialization；target/binding 由 durable binding + fresh live probe；
+  campaign confirmation 是交互式 Agent 如实转交的 caller assertion，无密码学 conversation
+  provenance，其 residual risk 由维护者 merge r8 显式接受。
+- Allowed paths:
+  - `AGENTS.md`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/**`
+  - `Packages/ArkDeckKit/Package.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckHarness/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
+  - `Packages/ArkDeckKit/Scripts/run-dayu200-70035-authorized-flash.sh`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/contracts/**`、
+    `openspec/baselines/**`（current 正本只在后续 archive/ratification 合入）
+  - `Catalog/**`、`openspec/integrations/**`、`openspec/platforms/**`
+  - standing authorization/campaign authorization 实例（Agent 不得自行签发）
+  - candidate 可修改范围包含 authorization、broker、Catalog/profile、closed process/USB
+    lowering 或 sandbox policy
+  - caller executable/argv/shell/raw HDC/RockUSB command、candidate 直接设备 transport
+  - 实现/测试 PR 中的真实 USB/HDC/RockUSB/Flash dispatch（必须在实现经维护者 merge 后，
+    另由用户展示后 exact campaign confirmation 才能运行）
+- Risk:destructive（用户一次确认把候选选择委托给封闭 scope/build/test/review pipeline；以
+  merged broker 分权、8 attempts/4 hours/1 concurrency、逐 attempt candidate pin/fresh
+  readback/durable ordinal、safeToReflash 分类、unknown 永久停止与 truthful evidence 控制）
+- Hardware required:no（实现 PR 使用 fake/simulated fault matrix；合入后 campaign 才做
+  GJ-4/GJ-5 真实设备验收）
+- Decision-Grade:D2
+
+### Deliverables
+
+- `evolutionCampaignConfirmation` closed request/reference/digest 与 append-only campaign/
+  attempt ledger；旧 one-shot bytes 和消费语义零变化；
+- task-owned candidate builder/sandbox 固定 base、allowed paths、diff、toolchain、executable
+  digest，且 device/network/raw-process capability 为 0；
+- adversarial reviewer 可读取 immutable diff/build/test/plan/history，但无 repair/Runtime/
+  device/authority port；PASS + zero HIGH/CRITICAL issue 才产生派生 candidate pin；
+- protected-main broker 重新 materialize Catalog plan、校验 candidate strategy、fresh target/
+  binding lineage，并独占真实 provider/transport；
+- 每 attempt 独立 Job/Session/intent/outcome，只有 broker 基于 confirmed outcome/readback 给出
+  safeToReflash 才可继续；success、unknown、unresolved、unsafe partial、drift、过期/超次封口；
+- production daemon/CLI wiring 与一个最终 typed campaign 命令；不接受 raw path/argv/authority
+  bytes，不把 AI review 伪装成维护者批准或 standing authorization；
+- contract/fault matrix 与合入后真实 DAYU200 campaign evidence，最终 promotion 仍只生成正常
+  PR candidate，不自行 merge。
+
+### Verification
+
+- `AIN-EVOLUTION-E2-001`：一次 exact campaign assertion 最多产生 8 个串行 fake attempts；
+  每次均有新 candidate/review pins、fresh facts、独立 Job/Session/ordinal；success 立即封口；
+- 缺失/过期/超限/并发、旧 one-shot 升级、base/path/diff/toolchain/executable/plan/archive/
+  step-set/target lineage 漂移、review 非 PASS/HIGH/CRITICAL、candidate 请求 device/raw surface、
+  CI 自行 mint、missing terminal、broker/reviewer crash、cancel-with-intent、outcomeUnknown/
+  unresolved intent/recovery replay 全部为 destructive dispatch=0；
+- known partial failure 只有每个 destructive intent 都有 confirmed outcome，且专用 readback
+  由 broker 分类 safeToReflash 时才允许下一 ordinal；candidate/reviewer 自报分类恒拒绝；
+- 三条 SDD/Catalog 闸、全量并行 Swift、TASK-AIN-019 preflight 全绿；实现 PR 如实记录
+  `real device=0, Flash=0`，合入后的独立 Runtime run 再记录真实设备结果。

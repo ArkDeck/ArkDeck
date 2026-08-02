@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 7
-status: approved # r1 经 #281 正式批准；r2-r6 已合入；r7 chat-confirmed E2 authority 以维护者 review/merge 本修订 PR 生效
+revision: 8
+status: proposed # r1 经 #281 正式批准；r2-r7 已合入；r8 bounded evolution E2 campaign 待维护者 review/merge
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,20 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r8 bounded evolution E2 campaign（2026-08-02）：用户要求 Evolution Mode 在一次
+> 监督式确认后，可针对同一 exact DAYU200 Flash plan 自动循环“候选补丁 → 隔离构建/测试
+> → 独立 AI 对抗审查 → 真机 Flash → 诊断 → 下一候选”，直至成功或安全停止，而不为每个
+> 未合入候选重复提 PR/索取确认。r8 新增独立 `evolutionCampaignConfirmation` authority；
+> 旧 `chatConfirmation` 仍严格 one-shot。用户确认固定 protected-main base、候选允许路径与
+> diff 预算、plan/archive/step-set、稳定设备 binding lineage、工具、有效期和 attempt 上限；
+> 每个候选的 tree/diff/executable digest 由 merged broker 现场生成并在独立 adversarial
+> review PASS 后成为该 attempt 的派生 pin。候选进程不持 USB/HDC/RockUSB、raw shell 或
+> authority；只有 protected-main broker 可 reserve ordinal、fresh readback 并执行 Catalog
+> 已发布的 typed action。最多 8 个串行 attempt、最长 4 小时；任何 unknown destructive
+> outcome、未闭合 intent、越界 diff/plan、并发或 binding lineage 漂移均永久终止 campaign。
+> 本 revision 只批准 scope/契约与后继实现路径；维护者 merge 前实现、授权实例和真实设备
+> dispatch 均为 0。
 
 > r7 chat-confirmed E2 authority（2026-08-01）：维护者要求 GJ-4 的用户监督式
 > Agent 会话不再额外索取 `AUTH-ID`。本 revision 新增一次性
@@ -136,6 +150,39 @@ In scope:
   最终一命令 wrapper、durable authority evidence 与正负 contract/fault tests；PR 合入前不
   连接设备、不 dispatch Flash。
 
+### r8 bounded evolution E2 campaign
+
+- **新 authority kind，不改写旧 bytes**：新增 `evolutionCampaignConfirmation`；r7
+  `chatConfirmation` 的 schema、reference、usage 与 one-shot consume 语义保持不变，历史
+  journal/manifest/ledger bytes 不迁移、不升级为 campaign。
+- **人类确认的是委托 envelope，不是空白授权**：确认内容必须展示并覆盖 protected-main
+  base OID、candidate build target/toolchain、允许修改路径、`maxChangedFiles`/`maxDiffLines`、
+  plan/archive/step-set、target stable identity 与 binding lineage root、userdata impact、
+  `maxAttempts` 与 `validUntil`。MVP 硬上限 = 8 attempts、4 小时、1 个并发 attempt；超限
+  整体拒绝，不静默截断。
+- **未合入候选确实运行，但不拥有设备能力**：候选代码只在 task-owned isolated workspace
+  构建为固定 candidate target，通过无 USB/HDC/RockUSB/network/raw-shell 的受限进程产生
+  closed typed strategy bundle。protected-main broker 重新校验 bundle 与 Catalog/current
+  profile，拒绝 argv、可执行路径、任意 step、authorization bytes 及对 broker/授权/Catalog/
+  profile 的候选修改，然后由自身稳定 provider/transport 执行真实动作。
+- **派生候选 pin 与对抗审查**：每个 attempt 在 dispatch 前固定 base/tree/diff/source-set/
+  executable/build-toolchain digest；确定性 scope/build/test 门全绿后，由与 patch producer
+  不同的只读 adversarial reviewer 读取不可变 diff/evidence。只有 `PASS` 且无 HIGH/CRITICAL
+  issue 才可由 broker 派生 attempt pin。AI review 不是 authority；它只能在用户已确认的
+  campaign envelope 内缩小候选，不能扩大 operation、计划、目标、预算或设备能力。
+- **预检不消耗 attempt**：产品先完成旧 session E0 reconcile、retention/writer admission、
+  archive 全成员 hash、staging/lowering、power/lifecycle prerequisite 与 fresh target readback，
+  全绿后才 durable reserve attempt ordinal。host-only failure 在 destructive admission 前返回。
+- **反复 Flash 不是盲重放**：每个 attempt 独立 Job/Session/intent/outcome。只有前一 attempt
+  durable terminal 且 merged broker 基于完整 step outcome/readback 给出 `safeToReflash`，才可
+  进入下一候选；成功立即终止。`outcomeUnknown`、unresolved intent、identity uncertainty、
+  broker/reviewer crash、取消时存在 destructive intent、postflight lineage mismatch 与无法
+  证明安全的 partial write 全部永久终止，禁止 automatic replay。
+- **产品闭环**：本 proposal PR 新增 base-tree 可消费的 TASK-AIN-019；其后继唯一垂直实现
+  PR 同车交付 policy/admission、candidate sandbox、merged broker、campaign ledger、Evolution
+  wiring、CLI 与正负 fault tests。提案 merge 前禁止实现和真实设备 dispatch；实现 merge 后
+  才能由新的 exact campaign confirmation 做真实设备验收。
+
 ### r2 security-remediation additions
 
 r2 不撤回 AI Native 产品方向，但补齐 r1 未形成的可信执行闭环：
@@ -240,6 +287,12 @@ r5 不改变 r3/r4 的产品行为或 E0 effect boundary，只修复 AIN-011 开
 Out of scope / Non-goals:
 
 - `POL-AGENT-001`(Agent 不得自批规则/范围/授权)零改动;
+- AI adversarial review、CI、branch protection status 或 PR head **单独**构成 E2 authority；
+- 候选代码直接持有 USB/HDC/RockUSB、raw shell、任意 process launch、授权 secret，或绕过
+  protected-main broker 执行真实 E1/E2；
+- 候选修改 Catalog、device profile、authority/broker、target binding policy、闭合命令
+  lowering 或 campaign 自身预算；
+- 无限 attempt、无限有效期、并行 Flash、结果不明后的自动 recovery/replay；
 - 其余全部 fail-closed 宪法条款(POL-SAFETY-001/TARGET-001/HDC-001/RECOVERY-001/
   MODE-001/ARTIFACT-001/PRIVACY-001/VERIFY-001)零改动;
 - **普通 CI(GitHub Actions)权限不变**:不持 standing authorization、无设备,仍限
