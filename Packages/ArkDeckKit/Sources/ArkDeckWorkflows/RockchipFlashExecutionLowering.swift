@@ -19,12 +19,15 @@ enum RockchipClosedCommand: Sendable {
   case loaderGate(step: WorkflowStep)
   case partitionTablePrecheck(step: WorkflowStep)
   case writePartition(step: WorkflowStep, partition: String, image: StagedRockchipImage)
+  case verifyFlashReadback(
+    step: WorkflowStep, profile: RockchipFlashProfile, outputDirectory: URL)
   case reset(step: WorkflowStep)
 
   var step: WorkflowStep {
     switch self {
     case .loaderGate(let step), .partitionTablePrecheck(let step),
-      .writePartition(let step, _, _), .reset(let step):
+      .writePartition(let step, _, _), .verifyFlashReadback(let step, _, _),
+      .reset(let step):
       step
     }
   }
@@ -35,6 +38,8 @@ enum RockchipClosedCommand: Sendable {
     case .partitionTablePrecheck: ["ppt"]
     case .writePartition(_, let partition, let image):
       ["wlx", partition, image.stableDescriptorPath]
+    case .verifyFlashReadback:
+      ["verified-readback"]
     case .reset: ["rd"]
     }
   }
@@ -48,15 +53,25 @@ enum RockchipClosedCommand: Sendable {
 enum RockchipFlashExecutionLowering {
   static func commands(
     plan: RockchipFlashPlan,
-    stagedImages: [String: StagedRockchipImage]
+    stagedImages: [String: StagedRockchipImage],
+    profile suppliedProfile: RockchipFlashProfile? = nil,
+    readbackDirectory: URL = URL(fileURLWithPath: "/contract-only/readback", isDirectory: true)
   ) throws -> [RockchipClosedCommand] {
     guard plan.executionMode == .execute else {
       throw RockchipFlashExecutionLoweringError.malformedStep("executionMode")
+    }
+    guard
+      let profile = suppliedProfile
+        ?? RockchipFlashProfile.profile(
+          archiveSHA256: plan.archiveSHA256, byteCount: Int(plan.archiveSizeBytes))
+    else {
+      throw RockchipFlashExecutionLoweringError.malformedStep("profile")
     }
     var commands: [RockchipClosedCommand] = []
     var sawLoader = false
     var sawPartitionTable = false
     var sawReset = false
+    var sawReadback = false
     var partitions: [String] = []
     for step in plan.steps {
       switch step.kind {
@@ -75,6 +90,19 @@ enum RockchipFlashExecutionLowering {
           }
           sawPartitionTable = true
           commands.append(.partitionTablePrecheck(step: step))
+        } else if step.arguments["probeId"] == .string("rockusb-partition-readback") {
+          guard sawPartitionTable, !sawReadback, !sawReset,
+            partitions == profile.mappedPartitions.map(\.partitionName),
+            step.arguments["expectedState"]
+              == .string("all-mapped-partition-prefix-hashes-match-profile"),
+            readbackDirectory.isFileURL, readbackDirectory.path.hasPrefix("/")
+          else {
+            throw RockchipFlashExecutionLoweringError.malformedStep(step.id)
+          }
+          sawReadback = true
+          commands.append(
+            .verifyFlashReadback(
+              step: step, profile: profile, outputDirectory: readbackDirectory))
         } else if step.arguments["probeId"] == .string("rockusb-postflight-list-targets") {
           // Postflight is a typed product probe, not an rkdeveloptool command.
           continue
@@ -95,7 +123,7 @@ enum RockchipFlashExecutionLowering {
         partitions.append(partition)
         commands.append(.writePartition(step: step, partition: partition, image: image))
       case .rebootDevice:
-        guard sawPartitionTable, !sawReset,
+        guard sawReadback, !sawReset,
           step.arguments["targetMode"] == .string("normal"),
           step.arguments["reason"] == .string("rockusb-rd-reset-after-flash")
         else { throw RockchipFlashExecutionLoweringError.malformedStep(step.id) }
@@ -105,20 +133,12 @@ enum RockchipFlashExecutionLowering {
         throw RockchipFlashExecutionLoweringError.unsupportedStep(step.id)
       }
     }
-    if let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
-      $0.archiveSHA256 == plan.archiveSHA256
-    }) {
-      guard partitions == profile.mappedPartitions.map(\.partitionName) else {
-        throw RockchipFlashExecutionLoweringError.malformedStep("partitionOrder")
-      }
-    } else {
-      guard partitions.count == stagedImages.count,
-        Set(partitions) == Set(stagedImages.values.map(\.partitionName))
-      else { throw RockchipFlashExecutionLoweringError.malformedStep("partitionSet") }
+    guard partitions == profile.mappedPartitions.map(\.partitionName) else {
+      throw RockchipFlashExecutionLoweringError.malformedStep("partitionOrder")
     }
-    guard sawLoader, sawPartitionTable, sawReset,
+    guard sawLoader, sawPartitionTable, sawReadback, sawReset,
       commands.map(\.arguments.first) == ["ld", "ppt"]
-        + Array(repeating: "wlx", count: partitions.count) + ["rd"]
+        + Array(repeating: "wlx", count: partitions.count) + ["verified-readback", "rd"]
     else { throw RockchipFlashExecutionLoweringError.malformedStep("commandSequence") }
     return commands
   }
@@ -184,6 +204,11 @@ struct RockchipCommandSemanticEvaluator: ProcessSemanticEvaluating {
       return text.contains(RockchipRockUSBFlashProvider.writeSuccessMarker)
         ? .succeeded
         : .failed(.semanticMarkerMissing(RockchipRockUSBFlashProvider.writeSuccessMarker))
+    case .verifyFlashReadback:
+      // The descriptor-bound process port evaluates every `rl` chunk and its
+      // exact image-prefix digest. This evaluator never sees the synthetic
+      // aggregate command.
+      return .failed(.malformedStep(command.step.id))
     case .reset:
       return text.contains(RockchipRockUSBFlashProvider.resetSuccessMarker)
         ? .succeeded

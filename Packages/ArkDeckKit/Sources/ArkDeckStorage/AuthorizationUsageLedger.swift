@@ -179,7 +179,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     ].allSatisfy({ $0.agentAuthorityMatches(#"^[a-f0-9]{64}$"#) }),
       baseCommitOID.agentAuthorityMatches(#"^[a-f0-9]{40}$"#),
       bindingLineageRootRevision > 0,
-      (1...8).contains(maximumAttempts),
+      (1...16).contains(maximumAttempts),
       AuthorizationUsageValidation.isTimestamp(confirmedAt),
       AuthorizationUsageValidation.isTimestamp(validUntil),
       let confirmedDate = AuthorizationUsageValidation.date(confirmedAt),
@@ -1263,7 +1263,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     case .chatConfirmation:
       validLimits = maximumUses == 1 && maximumConcurrentJobs == 1
     case .evolutionCampaignConfirmation:
-      validLimits = (1...8).contains(maximumUses) && maximumConcurrentJobs == 1
+      validLimits = (1...16).contains(maximumUses) && maximumConcurrentJobs == 1
     case .readyTask, .standingAuthorization:
       validLimits = false
     }

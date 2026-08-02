@@ -317,6 +317,43 @@ private struct RockchipHDCTransitionSemanticEvaluator: ProcessSemanticEvaluating
   }
 }
 
+private enum RockchipReadbackSemanticResult: Sendable, Equatable {
+  case succeeded
+  case failed
+}
+
+private struct RockchipReadbackSemanticEvaluator: ProcessSemanticEvaluating {
+  typealias SemanticResult = RockchipReadbackSemanticResult
+
+  private static let maximumOutputBytes = 64 * 1_024
+  private var outputBytes = 0
+  private var stderrBytes = 0
+  private var exceededLimit = false
+
+  mutating func consume(_ chunk: ProcessOutputChunk) {
+    outputBytes += chunk.bytes.count
+    if chunk.stream == .stderr { stderrBytes += chunk.bytes.count }
+    if outputBytes > Self.maximumOutputBytes { exceededLimit = true }
+  }
+
+  mutating func finish(execution: ProcessExecutionResult) -> RockchipReadbackSemanticResult {
+    guard !exceededLimit, stderrBytes == 0, execution.termination == .exited(0) else {
+      return .failed
+    }
+    return .succeeded
+  }
+}
+
+private struct RockchipPreparedReadbackChunk: @unchecked Sendable {
+  let mapping: RockchipMappedPartition
+  let member: RockchipImagesArchiveMember
+  let byteCount: Int64
+  let exactFileSize: Int64
+  let outputURL: URL
+  let isLastForPartition: Bool
+  let prepared: ProcessPreparedIdentityBoundLaunch
+}
+
 /// Closed production seam for the already-published `rockusb.enter-loader`
 /// step.  The raw HDC connect key never comes from CLI argv: it is the serial
 /// retained by the durable binding.  Readback closures are injected only so
@@ -398,6 +435,11 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
   ) throws -> RockchipPreparedCommand {
     let readOnlyTimeout = evolutionStrategy?.readOnlyCommandTimeoutSeconds
       ?? RockchipEvolutionTypedStrategy.defaultReadOnlyCommandTimeoutSeconds
+    if case .verifyFlashReadback(_, let profile, let outputDirectory) = command {
+      return try prepareReadback(
+        profile: profile, outputDirectory: outputDirectory,
+        timeoutSeconds: readOnlyTimeout, admissionIdentity: admissionIdentity)
+    }
     let request = ProcessIdentityBoundRequest(
       process: ProcessRequest(
         executable: executableURL, arguments: command.arguments, environment: [:],
@@ -485,6 +527,163 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
         else { throw error }
         throw RockchipPreparedCommandFailure.confirmedSafeToRetry(
           "loader transition failed with bound target in a registered mode: \(error)")
+      }
+    }
+  }
+
+  private func prepareReadback(
+    profile: RockchipFlashProfile,
+    outputDirectory: URL,
+    timeoutSeconds: Int,
+    admissionIdentity: ProcessExecutableIdentityReceipt
+  ) throws -> RockchipPreparedCommand {
+    guard outputDirectory.isFileURL, outputDirectory.path.hasPrefix("/"),
+      !FileManager.default.fileExists(atPath: outputDirectory.path)
+    else {
+      throw RockchipFlashExecutionError.loweringRejected(
+        "partition readback destination is not fresh")
+    }
+    let maximumChunkSectors: Int64 = 131_072
+    var chunks: [RockchipPreparedReadbackChunk] = []
+    do {
+      for mapping in profile.mappedPartitions {
+        guard let member = profile.member(named: mapping.imageMemberName), member.sizeBytes > 0 else {
+          throw RockchipFlashExecutionError.loweringRejected(
+            "partition readback profile member is invalid")
+        }
+        var remainingBytes = member.sizeBytes
+        var consumedSectors: Int64 = 0
+        var chunkIndex = 0
+        while remainingBytes > 0 {
+          let sectors = min(maximumChunkSectors, Self.sectorCount(remainingBytes))
+          let bytes = min(remainingBytes, sectors * 512)
+          let outputURL = outputDirectory.appendingPathComponent(
+            "\(mapping.writeOrder)-\(mapping.partitionName)-\(chunkIndex).part")
+          let prepared = try executor.prepareIdentityBoundLaunch(
+            ProcessIdentityBoundRequest(
+              process: ProcessRequest(
+                executable: executableURL,
+                arguments: [
+                  "rl", String(mapping.offsetSectors + consumedSectors), String(sectors),
+                  outputURL.path,
+                ],
+                environment: [:], timeout: TimeInterval(max(60, timeoutSeconds))),
+              expectedSHA256: executableSHA256))
+          guard Self.sameDescriptor(prepared.executableIdentity, admissionIdentity) else {
+            prepared.close()
+            throw RockchipFlashExecutionError.executableIdentityDrift
+          }
+          chunks.append(
+            RockchipPreparedReadbackChunk(
+              mapping: mapping, member: member, byteCount: bytes,
+              exactFileSize: sectors * 512, outputURL: outputURL,
+              isLastForPartition: bytes == remainingBytes, prepared: prepared))
+          remainingBytes -= bytes
+          consumedSectors += sectors
+          chunkIndex += 1
+        }
+      }
+    } catch {
+      chunks.forEach { $0.prepared.close() }
+      throw error
+    }
+    guard !chunks.isEmpty else {
+      throw RockchipFlashExecutionError.loweringRejected("partition readback has no chunks")
+    }
+    let preparedChunks = chunks
+    return RockchipPreparedCommand(executableIdentity: admissionIdentity) {
+      do {
+        try FileManager.default.createDirectory(
+          at: outputDirectory, withIntermediateDirectories: false,
+          attributes: [.posixPermissions: 0o700])
+      } catch {
+        throw RockchipFlashExecutionError.loweringRejected(
+          "cannot create job-owned partition readback directory: \(error)")
+      }
+      var hasher = SHA256()
+      var lastExecution: ProcessExecutionResult?
+      do {
+        for chunk in preparedChunks {
+          guard !FileManager.default.fileExists(atPath: chunk.outputURL.path) else {
+            throw RockchipFlashExecutionError.loweringRejected(
+              "partition readback output already exists")
+          }
+          let result = try await self.executor.executePreparedIdentityBoundLaunch(
+            chunk.prepared, evaluating: RockchipReadbackSemanticEvaluator())
+          guard result.semantic == .succeeded,
+            Self.sameDescriptor(result.executableIdentity, admissionIdentity)
+          else {
+            throw RockchipFlashExecutionError.recoveryRequired(
+              stepID: "rockusb-partition-readback",
+              detail: "RockUSB readback process did not complete cleanly")
+          }
+          try Self.hashReadbackPrefix(
+            fileURL: chunk.outputURL, byteCount: chunk.byteCount,
+            exactFileSize: chunk.exactFileSize, into: &hasher)
+          try FileManager.default.removeItem(at: chunk.outputURL)
+          if chunk.isLastForPartition {
+            let observed = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            guard observed == chunk.member.sha256 else {
+              throw RockchipFlashExecutionError.recoveryRequired(
+                stepID: "rockusb-partition-readback",
+                detail: "readback hash mismatch for \(chunk.mapping.partitionName)")
+            }
+            hasher = SHA256()
+          }
+          lastExecution = result.execution
+        }
+        try FileManager.default.removeItem(at: outputDirectory)
+      } catch {
+        try? FileManager.default.removeItem(at: outputDirectory)
+        throw error
+      }
+      guard let lastExecution else {
+        throw RockchipFlashExecutionError.loweringRejected("partition readback has no result")
+      }
+      return RockchipExecutionAttempt(
+        execution: lastExecution, semantic: .succeeded,
+        executableIdentity: admissionIdentity,
+        semanticCode: "rockchip.partition-readback.hashes-confirmed")
+    }
+  }
+
+  private static func sectorCount(_ byteCount: Int64) -> Int64 {
+    (byteCount + 511) / 512
+  }
+
+  private static func hashReadbackPrefix(
+    fileURL: URL,
+    byteCount: Int64,
+    exactFileSize: Int64,
+    into hasher: inout SHA256
+  ) throws {
+    let descriptor = Darwin.open(fileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RockchipFlashExecutionError.loweringRejected(
+        "partition readback cannot be opened without following links")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_size == exactFileSize
+    else {
+      throw RockchipFlashExecutionError.loweringRejected(
+        "partition readback file size or type is invalid")
+    }
+    var remaining = byteCount
+    var buffer = [UInt8](repeating: 0, count: 1 << 20)
+    while remaining > 0 {
+      let requested = min(Int64(buffer.count), remaining)
+      let count = Darwin.read(descriptor, &buffer, Int(requested))
+      if count > 0 {
+        hasher.update(data: Data(buffer[0..<count]))
+        remaining -= Int64(count)
+      } else if count < 0, errno == EINTR {
+        continue
+      } else {
+        throw RockchipFlashExecutionError.loweringRejected(
+          "partition readback ended before expected image bytes")
       }
     }
   }
@@ -2260,22 +2459,77 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
 private struct RockchipProductPostflightPort: RockchipExecutionPostflightPort {
   let probe: RockchipProductUSBProbe
 
-  func probe() async throws -> RockchipPostflightReceipt {
+  func probe(verification: RockchipPostFlashVerificationLevel) async throws
+    -> RockchipPostflightReceipt
+  {
     let deadline = ContinuousClock.now.advanced(by: .seconds(120))
+    let hdc = ResolvedExecutable(
+      path: RockchipHDCIntegrationProfile.executableURL.path,
+      sha256: RockchipHDCIntegrationProfile.executableSHA256)
+    let runner = FoundationRockchipRuntimeCommandRunner()
     while ContinuousClock.now < deadline {
       if let identity = try? probe.singleConnected() {
         let digest = SHA256.hash(data: Data(identity.serial.utf8)).map {
           String(format: "%02x", $0)
         }.joined()
-        return RockchipPostflightReceipt(
-          connected: true, serialDigestSHA256: digest,
-          usbTopology: identity.topology)
+        do {
+          let model = try await property(
+            HDCAllowlistedProperty.productModel, connectKey: identity.serial,
+            hdc: hdc, runner: runner)
+          let version = try await property(
+            HDCAllowlistedProperty.fullBuildVersion, connectKey: identity.serial,
+            hdc: hdc, runner: runner)
+          var debugRuntimeReady = false
+          if verification == .full {
+            let receipt = try await runner.run(
+              executable: hdc,
+              arguments: ["-t", identity.serial, "shell", "hilog", "-x"],
+              timeoutSeconds: 15, outputByteBudget: 64 * 1024,
+              criticalNonInterruptible: false)
+            guard receipt.exitStatus == 0, receipt.stderr.isEmpty,
+              !receipt.stdoutTruncated, !receipt.stdout.isEmpty
+            else { throw RockchipFlashExecutionError.postflightMismatch }
+            debugRuntimeReady = true
+          }
+          return RockchipPostflightReceipt(
+            connected: true, serialDigestSHA256: digest,
+            usbTopology: identity.topology, productModel: model,
+            buildVersion: version, debugRuntimeReady: debugRuntimeReady)
+        } catch {
+          // USB can enumerate before the HDC daemon and Debug Runtime are
+          // ready. Keep the bounded postflight window open rather than
+          // accepting a transport-only reconnect as success.
+        }
       }
       try await Task.sleep(for: .seconds(1))
     }
     return RockchipPostflightReceipt(
       connected: false, serialDigestSHA256: String(repeating: "0", count: 64),
-      usbTopology: "0")
+      usbTopology: "0", productModel: "", buildVersion: "",
+      debugRuntimeReady: false)
+  }
+
+  private func property(
+    _ key: HDCAllowlistedProperty,
+    connectKey: String,
+    hdc: ResolvedExecutable,
+    runner: FoundationRockchipRuntimeCommandRunner
+  ) async throws -> String {
+    let receipt = try await runner.run(
+      executable: hdc,
+      arguments: ["-t", connectKey, "shell", "param", "get", key.rawValue],
+      timeoutSeconds: 15, outputByteBudget: 64 * 1024,
+      criticalNonInterruptible: false)
+    guard receipt.exitStatus == 0, receipt.stderr.isEmpty,
+      !receipt.stdoutTruncated,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else { throw RockchipFlashExecutionError.postflightMismatch }
+    let value = HDCObservationProviderAdapter.propertyValue(
+      fromParamGetOutput: text, requestedKey: key.rawValue)
+    guard !value.isEmpty, value.count <= 400 else {
+      throw RockchipFlashExecutionError.postflightMismatch
+    }
+    return value
   }
 }
 

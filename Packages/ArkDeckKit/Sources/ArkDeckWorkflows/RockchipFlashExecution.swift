@@ -182,6 +182,17 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
     }
   }
 
+  func matchesPostflight(
+    _ receipt: RockchipPostflightReceipt,
+    profile: RockchipFlashProfile,
+    verification: RockchipPostFlashVerificationLevel
+  ) -> Bool {
+    matchesPostflight(receipt)
+      && receipt.productModel == profile.runtimeProductModel
+      && receipt.buildVersion == profile.runtimeBuildVersion
+      && (verification == .basic || receipt.debugRuntimeReady)
+  }
+
   var journalSchemaVersion: String {
     switch authorityReference {
     case .standingAuthorization: JournalEvent.rockchipAuthorizedAgentSchemaVersion
@@ -310,6 +321,25 @@ struct RockchipPostflightReceipt: Sendable, Equatable {
   let connected: Bool
   let serialDigestSHA256: String
   let usbTopology: String
+  let productModel: String
+  let buildVersion: String
+  let debugRuntimeReady: Bool
+
+  init(
+    connected: Bool,
+    serialDigestSHA256: String,
+    usbTopology: String,
+    productModel: String = RockchipFlashProfile.dayu200.runtimeProductModel,
+    buildVersion: String = RockchipFlashProfile.dayu200.runtimeBuildVersion,
+    debugRuntimeReady: Bool = true
+  ) {
+    self.connected = connected
+    self.serialDigestSHA256 = serialDigestSHA256
+    self.usbTopology = usbTopology
+    self.productModel = productModel
+    self.buildVersion = buildVersion
+    self.debugRuntimeReady = debugRuntimeReady
+  }
 }
 
 struct RockchipPostflightIdentity: Sendable, Equatable {
@@ -318,7 +348,8 @@ struct RockchipPostflightIdentity: Sendable, Equatable {
 }
 
 protocol RockchipExecutionPostflightPort: Sendable {
-  func probe() async throws -> RockchipPostflightReceipt
+  func probe(verification: RockchipPostFlashVerificationLevel) async throws
+    -> RockchipPostflightReceipt
 }
 
 protocol RockchipPowerActivityLease: Sendable {
@@ -525,7 +556,9 @@ actor RockchipFlashExecutor {
     let commands: [RockchipClosedCommand]
     do {
       commands = try RockchipFlashExecutionLowering.commands(
-        plan: admission.plan, stagedImages: stagedImages)
+        plan: admission.plan, stagedImages: stagedImages, profile: executionProfile,
+        readbackDirectory: persistence.sessionRoot.appendingPathComponent(
+          "partition-readback", isDirectory: true))
       try persistence.appendRunning()
     } catch {
       try? dependencies.admission.closeUsage(
@@ -729,7 +762,8 @@ actor RockchipFlashExecutor {
     }
     let postflight: RockchipPostflightReceipt
     do {
-      postflight = try await dependencies.postflight.probe()
+      postflight = try await dependencies.postflight.probe(
+        verification: admission.plan.postFlashVerification)
     } catch {
       try? persistence.appendWaitingForRecovery(
         stepID: postflightStep.id, reason: "postflight-unavailable")
@@ -741,7 +775,10 @@ actor RockchipFlashExecutor {
     try failIfLifecycleInterrupted(
       lifecycleGate, stepID: postflightStep.id, persistence: persistence,
       admission: admission, destructiveIntentIDs: destructiveIntentIDs)
-    guard admission.matchesPostflight(postflight) else {
+    guard admission.matchesPostflight(
+      postflight, profile: executionProfile,
+      verification: admission.plan.postFlashVerification)
+    else {
       try? persistence.appendOutcome(
         step: postflightStep, intentEventID: postflightIntent, admission: admission,
         result: "failed", certainty: .outcomeUnknown,
@@ -756,7 +793,11 @@ actor RockchipFlashExecutor {
     try persistence.appendOutcome(
       step: postflightStep, intentEventID: postflightIntent, admission: admission,
       result: "succeeded", certainty: .confirmed,
-      semanticCode: "rockchip.postflight.connected", execution: nil)
+      semanticCode:
+        admission.plan.postFlashVerification == .full
+        ? "rockchip.postflight.exact-build-and-debug-runtime-confirmed"
+        : "rockchip.postflight.exact-build-confirmed",
+      execution: nil)
     dependencies.lifecycle.stop()
     let manifestURL: URL
     do {

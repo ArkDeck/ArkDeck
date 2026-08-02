@@ -437,7 +437,7 @@ struct ArkDeckCommandLine {
       "--validity-seconds",
     ])
     guard let images = options.value("--images"), images.hasPrefix("/"),
-      let maxAttempts = strictPositiveInt(options.value("--max-attempts") ?? "8"),
+      let maxAttempts = strictPositiveInt(options.value("--max-attempts") ?? "16"),
       let maxChangedFiles = strictPositiveInt(options.value("--max-changed-files") ?? "8"),
       let maxDiffLines = strictPositiveInt(options.value("--max-diff-lines") ?? "2000"),
       let validitySeconds = strictPositiveInt(options.value("--validity-seconds") ?? "14400")
@@ -890,7 +890,7 @@ struct ArkDeckCommandLine {
         arkdeck flash install-binding
         arkdeck flash plan --images <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
-        arkdeck flash preview --images <images.tar.gz> [--max-attempts <1...8>] \
+        arkdeck flash preview --images <images.tar.gz> [--max-attempts <1...16>] \
       [--max-changed-files <n>] [--max-diff-lines <n>] [--validity-seconds <1...14400>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--device-profile <dayu200@1|dayu200@2>] [--out <dir>]

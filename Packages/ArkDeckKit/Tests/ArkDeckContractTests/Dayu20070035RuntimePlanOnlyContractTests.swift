@@ -52,6 +52,9 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     XCTAssertEqual(profile.catalogReference, "dayu200@2")
     XCTAssertEqual(profile.firmwareVersion, "OpenHarmony-7.0.0.35-20260728_180253")
+    XCTAssertEqual(profile.runtimeProductModel, "DAYU200")
+    XCTAssertEqual(
+      profile.runtimeBuildVersion, "OpenHarmony-7.0.0.35-20260728_180253")
     XCTAssertEqual(profile.archiveSizeBytes, 730_769_584)
     XCTAssertEqual(
       profile.archiveSHA256,

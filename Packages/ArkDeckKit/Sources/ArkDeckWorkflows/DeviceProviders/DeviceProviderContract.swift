@@ -126,7 +126,10 @@ public enum RockchipProviderAction: Sendable, Equatable {
   case verifyFlashReadback(RockchipRuntimeFlashBundle)
   case rebootToNormal(stableIdentitySHA256: String)
   case waitForHDCReconnect(connectKey: String)
-  case verifyBuild(connectKey: String)
+  case verifyBuild(
+    connectKey: String,
+    expectedProductModel: String? = nil,
+    expectedBuildVersion: String? = nil)
   case capturePostFlashDiagnostics(connectKey: String, request: HDCHilogCaptureRequest)
 }
 
@@ -573,10 +576,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "rockchip.waitForHDCReconnect",
         arguments: ["connectKey": .string(connectKey)])
-    case .rockchip(.verifyBuild(let connectKey)):
-      self.init(
-        kind: "rockchip.verifyBuild",
-        arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(
+      .verifyBuild(let connectKey, let expectedProductModel, let expectedBuildVersion)):
+      var arguments: [String: JSONValue] = ["connectKey": .string(connectKey)]
+      if let expectedProductModel {
+        arguments["expectedProductModel"] = .string(expectedProductModel)
+      }
+      if let expectedBuildVersion {
+        arguments["expectedBuildVersion"] = .string(expectedBuildVersion)
+      }
+      self.init(kind: "rockchip.verifyBuild", arguments: arguments)
     case .rockchip(.capturePostFlashDiagnostics(let connectKey, let request)):
       self.init(
         kind: "rockchip.capturePostFlashDiagnostics",
@@ -986,7 +995,11 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "rockchip.waitForHDCReconnect":
       return .rockchip(.waitForHDCReconnect(connectKey: try string("connectKey")))
     case "rockchip.verifyBuild":
-      return .rockchip(.verifyBuild(connectKey: try string("connectKey")))
+      return .rockchip(
+        .verifyBuild(
+          connectKey: try string("connectKey"),
+          expectedProductModel: try optionalString("expectedProductModel"),
+          expectedBuildVersion: try optionalString("expectedBuildVersion")))
     case "rockchip.capturePostFlashDiagnostics":
       return .rockchip(.capturePostFlashDiagnostics(
         connectKey: try string("connectKey"),

@@ -2735,7 +2735,19 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     case ("wait-for-hdc", .waitForReconnect):
       return .rockchip(.waitForHDCReconnect(connectKey: connectKey))
     case ("rebind-and-verify-build", .probeDevice):
-      return .rockchip(.verifyBuild(connectKey: connectKey))
+      let bundle = try flashBundle(inputs: inputs, context: context)
+      guard
+        let profile = RockchipFlashProfile.profile(
+          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount)
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "post-flash verification requires an exact published profile")
+      }
+      return .rockchip(
+        .verifyBuild(
+          connectKey: connectKey,
+          expectedProductModel: profile.runtimeProductModel,
+          expectedBuildVersion: profile.runtimeBuildVersion))
     case ("capture-post-flash-diagnostics", .captureRemoteStdout):
       return .rockchip(.capturePostFlashDiagnostics(
         connectKey: connectKey,

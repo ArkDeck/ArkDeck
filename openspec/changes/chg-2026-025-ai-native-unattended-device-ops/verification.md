@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r11
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r14
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -37,6 +37,10 @@
 > 8 轮 closed strategy repair/build/test/review/broker execution；只把标准化 safe failure 交给
 > read-only repairer。fresh reservation 缺失、漂移、unknown/unsafe、repair/review 拒绝或成功
 > 均封口，candidate 仍无设备能力，Provider exact argv 不变；实现 PR 真实设备 dispatch=0。
+> r14 GJ-4 full verification:验证九分区 exact prefix SHA-256 回读、profile 型号/完整 build
+> 精确相等、`basic|full` 强度分离与 full HiLog Debug Runtime roundtrip；campaign serial
+> attempt hard limit 为 16，第 17 次拒绝。4 hours/concurrency=1 与 unsafe/unknown 永久停止
+> 不变；实现 PR 真实设备 dispatch=0。
 
 ## Environment
 
@@ -95,6 +99,7 @@
 | AIN-EVOLUTION-E2-001(change-local,r8) | 未合入 candidate 的 base/scope/build/test/review 派生 pins；candidate capability=0、merged broker 独占 transport；逐 attempt fresh facts/ordinal/session 与 success/unknown/unsafe/drift 封口 | planned | TASK-AIN-019 contract/fault tests；提案 PR 仅 SDD/生成器闸，real device=0 |
 | AIN-EVOLUTION-DEFAULT-001(change-local,r9-r10) | workspace task 无 mode 类型/持久字段/status/分支自动进入 Evolution；默认 Flash campaign CLI；旧 wire 与 one-shot 新建/dispatch=0，历史 bytes 可读；standing/human 保留 | planned | TASK-AIN-019 single-model/migration/source-surface tests；real device=0 |
 | AIN-EVOLUTION-REPAIR-001(change-local,r11) | 同一 invocation 自动 safe repair；repairer 仅见标准化失败并输出 bounded closed strategy；synthetic candidate diff 经 review；fresh reservation correlation 防止旧 terminal 重放；unknown/unsafe/drift 永久停止且 exact argv 不变 | planned | TASK-AIN-019 autonomous-loop/repair-shape/loader-readback/dispatch-regression tests；real device=0 |
+| AIN-GJ4-POSTFLASH-001(change-local,r14) | 九分区 exact readback；profile model/build exact equality；basic/full 分离且 full Debug Runtime roundtrip；第 17 次 reservation 拒绝 | planned | TASK-AIN-019 flash execution/runtime/campaign focused + full Swift tests；real device=0 |
 
 ## Negative and recovery tests
 
@@ -182,9 +187,10 @@
 - [ ] AIN-004 使用的新 authorization 在执行时 fresh、未超次且由产品 executor 消费
 - [ ] AIN-CHAT-AUTH-001 历史 bytes 兼容矩阵全绿；r9 后新 chat usage/admission/dispatch 恒拒绝，
   且不得伪装或升级为 standing/campaign authority
-- [ ] AIN-EVOLUTION-E2-001/AIN-EVOLUTION-DEFAULT-001/AIN-EVOLUTION-REPAIR-001 正负矩阵
+- [ ] AIN-EVOLUTION-E2-001/AIN-EVOLUTION-DEFAULT-001/AIN-EVOLUTION-REPAIR-001/
+  AIN-GJ4-POSTFLASH-001 正负矩阵
   全绿；campaign 硬上限
-  8 attempts/4 hours/1 concurrency；candidate 无 device capability、merged broker 独占真实
+  16 attempts/4 hours/1 concurrency；candidate 无 device capability、merged broker 独占真实
   transport；默认 CLI 与 workspace task 无 mode 分叉；每次派生 pins/fresh readback；同一
   invocation 的 safe failure 自动产生 reviewed closed strategy，success/unknown/unsafe partial/
   drift/无 fresh reservation 永久封口

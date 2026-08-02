@@ -86,6 +86,12 @@ public struct RockchipFlashProfile: Sendable {
 
   public let catalogReference: String
   public let firmwareVersion: String
+  /// Exact value expected from `param get const.product.model` after boot.
+  public let runtimeProductModel: String
+  /// Exact value expected from `param get const.ohos.fullname` after boot.
+  /// It is pinned separately because legacy profiles predate a versioned
+  /// archive identity, while current daily profiles require the full build pin.
+  public let runtimeBuildVersion: String
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [RockchipImagesArchiveMember]
@@ -103,12 +109,16 @@ public struct RockchipFlashProfile: Sendable {
     membershiplessPartitionsWriteForbidden: [String],
     prerequisites: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteRequirement],
     catalogReference: String = "dayu200@1",
-    firmwareVersion: String = "legacy-pinned-build"
+    firmwareVersion: String = "legacy-pinned-build",
+    runtimeProductModel: String = "DAYU200",
+    runtimeBuildVersion: String = "OpenHarmony-7.0.0.33"
   ) throws {
     guard
       catalogReference.range(
         of: #"^dayu200@[1-9][0-9]*$"#, options: .regularExpression) != nil,
-      !firmwareVersion.isEmpty
+      !firmwareVersion.isEmpty,
+      !runtimeProductModel.isEmpty,
+      !runtimeBuildVersion.isEmpty
     else {
       throw RockchipFlashProfileError.invalidProfileDefinition(
         "profile reference and firmware version must be versioned")
@@ -143,6 +153,8 @@ public struct RockchipFlashProfile: Sendable {
     }
     self.catalogReference = catalogReference
     self.firmwareVersion = firmwareVersion
+    self.runtimeProductModel = runtimeProductModel
+    self.runtimeBuildVersion = runtimeBuildVersion
     self.archiveSizeBytes = archiveSizeBytes
     self.archiveSHA256 = archiveSHA256.lowercased()
     self.members = members
@@ -279,7 +291,8 @@ public struct RockchipFlashProfile: Sendable {
         .stablePower: .optional,
       ],
       catalogReference: "dayu200@1",
-      firmwareVersion: "legacy-pinned-build"
+      firmwareVersion: "legacy-pinned-build",
+      runtimeBuildVersion: "OpenHarmony-7.0.0.33"
     )
   }()
 
@@ -367,7 +380,8 @@ public struct RockchipFlashProfile: Sendable {
         dayu200.membershiplessPartitionsWriteForbidden,
       prerequisites: dayu200.prerequisites,
       catalogReference: "dayu200@2",
-      firmwareVersion: "OpenHarmony-7.0.0.35-20260728_180253"
+      firmwareVersion: "OpenHarmony-7.0.0.35-20260728_180253",
+      runtimeBuildVersion: "OpenHarmony-7.0.0.35-20260728_180253"
     )
   }()
 

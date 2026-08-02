@@ -101,11 +101,11 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertTrue(first.allSatisfy { $0.isHexDigit && !$0.isUppercase })
   }
 
-  func testConfirmationIsClosedExactAndHardBoundedToEightAttemptsFourHoursOneConcurrency()
+  func testConfirmationIsClosedExactAndHardBoundedToSixteenAttemptsFourHoursOneConcurrency()
     throws
   {
     let assertion = try makeAssertion()
-    XCTAssertEqual(assertion.maxAttempts, 8)
+    XCTAssertEqual(assertion.maxAttempts, 16)
     XCTAssertEqual(assertion.maximumConcurrentAttempts, 1)
     XCTAssertEqual(assertion.userdataImpact, "ERASE-USERDATA")
     XCTAssertFalse(assertion.isValid(at: "2026-08-02T07:59:59Z"))
@@ -121,7 +121,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
         RockchipEvolutionCampaignConfirmationAssertion.self,
         from: JSONEncoder().encode(assertion)), assertion)
 
-    XCTAssertThrowsError(try makeAssertion(maxAttempts: 9))
+    XCTAssertThrowsError(try makeAssertion(maxAttempts: 17))
     XCTAssertThrowsError(
       try makeAssertion(validUntil: "2026-08-02T12:00:01Z"))
 
@@ -172,16 +172,16 @@ final class EvolutionCampaignContractTests: XCTestCase {
         decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
   }
 
-  func testCampaignLedgerAllowsExactlyEightSerialSafeAttemptsAndRejectsNinthOrConcurrent()
+  func testCampaignLedgerAllowsExactlySixteenSerialSafeAttemptsAndRejectsSeventeenthOrConcurrent()
     throws
   {
-    let root = temporaryDirectory("campaign-eight")
+    let root = temporaryDirectory("campaign-sixteen")
     defer { try? FileManager.default.removeItem(at: root) }
     let ledger = try RockchipEvolutionCampaignLedger(root: root)
     let assertion = try makeAssertion()
     _ = try ledger.create(assertion)
 
-    for ordinal in 1...8 {
+    for ordinal in 1...16 {
       let pins = try makePins(assertion: assertion, ordinal: ordinal)
       _ = try ledger.appendCandidate(
         campaignID: assertion.campaignID, candidate: pins.candidate,
@@ -206,30 +206,31 @@ final class EvolutionCampaignContractTests: XCTestCase {
         at: Self.confirmedAt)
     }
 
-    let ninth = try makePins(assertion: assertion, ordinal: 9)
+    let seventeenth = try makePins(assertion: assertion, ordinal: 17)
     _ = try ledger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: ninth.candidate,
-      review: ninth.review, at: Self.confirmedAt)
+      campaignID: assertion.campaignID, candidate: seventeenth.candidate,
+      review: seventeenth.review, at: Self.confirmedAt)
     XCTAssertThrowsError(
       try ledger.reserveAttempt(
-        campaignID: assertion.campaignID, candidateID: ninth.candidate.candidateID,
-        reviewID: ninth.review.reviewID, ordinal: 9, reservationID: "reservation-9",
-        jobID: "job-9", sessionID: "session-9", at: Self.confirmedAt))
+        campaignID: assertion.campaignID, candidateID: seventeenth.candidate.candidateID,
+        reviewID: seventeenth.review.reviewID, ordinal: 17,
+        reservationID: "reservation-17",
+        jobID: "job-17", sessionID: "session-17", at: Self.confirmedAt))
     let document = try ledger.load(assertion.campaignID)
-    XCTAssertEqual(document.reservedAttemptCount, 8)
+    XCTAssertEqual(document.reservedAttemptCount, 16)
     XCTAssertNil(document.activeReservation)
-    XCTAssertEqual(document.events.filter { $0.kind == .attemptReserved }.count, 8)
-    XCTAssertEqual(Set(document.events.compactMap(\.jobID)).count, 8)
-    XCTAssertEqual(Set(document.events.compactMap(\.sessionID)).count, 8)
+    XCTAssertEqual(document.events.filter { $0.kind == .attemptReserved }.count, 16)
+    XCTAssertEqual(Set(document.events.compactMap(\.jobID)).count, 16)
+    XCTAssertEqual(Set(document.events.compactMap(\.sessionID)).count, 16)
   }
 
-  func testGlobalUsageLedgerMetersEightAndSerializesOneTarget() throws {
+  func testGlobalUsageLedgerMetersSixteenAndSerializesOneTarget() throws {
     let root = temporaryDirectory("campaign-usage")
     defer { try? FileManager.default.removeItem(at: root) }
     let ledger = try AgentAuthorityUsageLedger(root: root)
     let reference = try makeAssertion().authorityReference()
 
-    for ordinal in 1...8 {
+    for ordinal in 1...16 {
       let reservation = try usageReservation(
         reference: reference, ordinal: ordinal, jobID: "job-usage-\(ordinal)")
       _ = try ledger.reserve(reservation)
@@ -246,8 +247,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
     XCTAssertThrowsError(
       try ledger.reserve(
-        usageReservation(reference: reference, ordinal: 9, jobID: "job-usage-9")))
-    XCTAssertEqual(try ledger.load().reservations.count, 8)
+        usageReservation(reference: reference, ordinal: 17, jobID: "job-usage-17")))
+    XCTAssertEqual(try ledger.load().reservations.count, 16)
   }
 
   func testSuccessUnknownAndUnsafePartialPermanentlyStopCampaign() throws {
@@ -707,7 +708,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   private func makeAssertion(
-    seed: Character = "0", maxAttempts: Int = 8,
+    seed: Character = "0", maxAttempts: Int = 16,
     validUntil: String = "2026-08-02T12:00:00Z"
   ) throws -> RockchipEvolutionCampaignConfirmationAssertion {
     try .draft(
@@ -761,7 +762,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       operationDigestSHA256: operation, targetDigestSHA256: target)
     return try AgentAuthorityUsageReservation(
       reservationID: reservationID, authorizationRef: reference,
-      ordinal: ordinal, maximumUses: 8, maximumConcurrentJobs: 1,
+      ordinal: ordinal, maximumUses: 16, maximumConcurrentJobs: 1,
       jobID: jobID, operationDigestSHA256: operation,
       targetDigestSHA256: target, reservedAt: Self.confirmedAt,
       forwardLeaseExpiresAt: "2026-08-02T08:01:00Z",
