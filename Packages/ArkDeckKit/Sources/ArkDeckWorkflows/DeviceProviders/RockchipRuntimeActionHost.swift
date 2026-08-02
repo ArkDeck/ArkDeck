@@ -523,7 +523,14 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       return result(
         summary: ["hdcState": "connected"], receipts: receipts)
 
-    case .verifyBuild(let connectKey):
+    case .verifyBuild(
+      let connectKey, let expectedProductModel, let expectedBuildVersion):
+      guard let expectedProductModel, !expectedProductModel.isEmpty,
+        let expectedBuildVersion, !expectedBuildVersion.isEmpty
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash verification has no exact published model/build pin")
+      }
       let hdc = try resolveHDC()
       let modelReceipt = try await run(
         executable: hdc,
@@ -543,12 +550,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)
       let version = try property(
         versionReceipt, key: HDCAllowlistedProperty.fullBuildVersion.rawValue)
-      guard model.localizedCaseInsensitiveContains("dayu200") else {
+      guard model == expectedProductModel else {
         throw RuntimeDispatchFailure.failed(
-          "post-flash model readback is not DAYU200")
+          "post-flash model readback does not match the published profile")
+      }
+      guard version == expectedBuildVersion else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash build readback does not match the published profile")
       }
       return result(
-        summary: ["model": model, "firmware": version],
+        summary: [
+          "model": model, "firmware": version,
+          "verification": "exact-published-profile",
+        ],
         receipts: [modelReceipt, versionReceipt])
 
     case .capturePostFlashDiagnostics(let connectKey, let request):
@@ -563,7 +577,11 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "post-flash HiLog capture returned no bytes")
       }
       return RockchipRuntimeActionExecutionResult(
-        summary: ["byteCount": String(receipt.stdout.count)],
+        summary: [
+          "byteCount": String(receipt.stdout.count),
+          "debugRuntime": "ready",
+          "verification": "full",
+        ],
         stdout: receipt.stdout,
         stderr: receipt.stderr,
         stdoutTruncated: receipt.stdoutTruncated,
@@ -1376,7 +1394,7 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     case .rockchip(.waitForHDCReconnect(let connectKey)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.wait-reconnect.v1"
-    case .rockchip(.verifyBuild(let connectKey)):
+    case .rockchip(.verifyBuild(let connectKey, _, _)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.verify-build.v1"
     case .rockchip(.capturePostFlashDiagnostics(let connectKey, _)):

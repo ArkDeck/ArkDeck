@@ -85,7 +85,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     // "No similar commands": the whole vocabulary this Provider can put in front of a human
     // is the closed design §0 surface; Maskrom/miniloader-stage commands do not exist here.
     XCTAssertEqual(
-      RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "ppt", "wlx", "wl", "rd"])
+      RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "ppt", "wlx", "wl", "rl", "rd"])
     for forbidden in ["db", "gpt", "ul", "uid", "ef"] {
       XCTAssertFalse(RockchipRockUSBFlashProvider.closedCommandSurface.contains(forbidden))
     }
@@ -97,7 +97,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
         RockchipRockUSBFlashProvider.closedCommandSurface.contains(String(verb)),
         "handoff command outside the closed surface: \(command)")
     }
-    print("TEST-AC-FLASH-001-01 PASS preflight_blocked=3 closed_surface=ld,ppt,wlx,wl,rd")
+    print("TEST-AC-FLASH-001-01 PASS preflight_blocked=3 closed_surface=ld,ppt,wlx,wl,rl,rd")
   }
 
   // MARK: - TEST-AC-FLASH-002-01 prerequisites gate
@@ -228,7 +228,12 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
       plan.steps.map(\.kind),
       [.requestConfirmation, .enterUpdater, .verifyRemoteState]
         + Array(repeating: .flashPartition, count: 9)
-        + [.rebootDevice, .verifyRemoteState])
+        + [.verifyRemoteState, .rebootDevice, .verifyRemoteState])
+    XCTAssertEqual(plan.postFlashVerification, .full)
+    XCTAssertEqual(
+      plan.steps.filter {
+        $0.arguments["probeId"] == .string("rockusb-partition-readback")
+      }.count, 1)
 
     let flashSteps = plan.steps.filter { $0.kind == .flashPartition }
     XCTAssertEqual(flashSteps.map(\.id), plan.destructiveStepIDs)
@@ -259,6 +264,11 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     let differentPlan = try provider.makePlan(
       mode: .execute, archiveValidation: .valid, planNonce: "other")
     XCTAssertNotEqual(plan.stepSetDigestSHA256, differentPlan.stepSetDigestSHA256)
+    let basic = try provider.makePlan(
+      mode: .execute, archiveValidation: .valid, postFlashVerification: .basic)
+    XCTAssertEqual(basic.postFlashVerification, .basic)
+    XCTAssertEqual(plan.stepSetDigestSHA256, basic.stepSetDigestSHA256)
+    XCTAssertNotEqual(plan.planDigestSHA256, basic.planDigestSHA256)
   }
 
   // MARK: - TEST-AC-FLASH-004-01 execution mode identity
@@ -274,6 +284,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
       XCTAssertEqual(decoded.providerIdentity, RockchipRockUSBFlashProvider.providerIdentity)
       XCTAssertEqual(decoded.profileIdentity, RockchipFlashProfile.profileIdentity)
       XCTAssertEqual(decoded.planDigestSHA256, plan.planDigestSHA256)
+      XCTAssertEqual(decoded.postFlashVerification, .full)
       XCTAssertEqual(decoded.steps.map(\.id), plan.steps.map(\.id))
       digests.insert(plan.planDigestSHA256)
       XCTAssertTrue(

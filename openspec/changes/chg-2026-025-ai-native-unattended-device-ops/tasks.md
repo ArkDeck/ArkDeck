@@ -3316,12 +3316,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   孤儿化两处必然故障；r12 后 GJ-5 的 AI Verification Gate + Adversarial Review Gate
   在 host 侧闭合，真实设备 dispatch 仍为 0；r13 收口 preview 残留——`flash preview`
   的零事件草稿 ledger 文档随 assertion 过期显式 GC，preview 与 execute/continue 入口
-  机会式清扫，append-only/single-writer 不变量保持，设备 dispatch 仍为 0）
+  机会式清扫，append-only/single-writer 不变量保持，设备 dispatch 仍为 0；r14 补齐
+  GJ-4 分区回读、精确 build 与 Debug Runtime verification，并将串行预算提高到 16；
+  本实现 PR 不连接设备、不 dispatch Flash）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
 - Acceptance:AC-FLASH-015-01/02/03、AIN-EVOLUTION-E2-001(change-local,r8)、
-  AIN-EVOLUTION-REPAIR-001(change-local,r11)
+  AIN-EVOLUTION-REPAIR-001(change-local,r11)、AIN-GJ4-POSTFLASH-001(change-local,r14)
 - Depends on:CHG-2026-025 r8 经维护者 merged PR 批准；TASK-HFA-005 done(#955)；
   TASK-AIN-018 done(#947)
 - Applicable failure patterns:AF-001、AF-002、AF-004、AF-006、AF-007、AF-010、
@@ -3359,7 +3361,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - 实现/测试 PR 中的真实 USB/HDC/RockUSB/Flash dispatch（必须在实现经维护者 merge 后，
     另由用户展示后 exact campaign confirmation 才能运行）
 - Risk:destructive（用户一次确认把候选选择委托给封闭 scope/build/test/review pipeline；以
-  merged broker 分权、8 attempts/4 hours/1 concurrency、逐 attempt candidate pin/fresh
+  merged broker 分权、16 attempts/4 hours/1 concurrency、逐 attempt candidate pin/fresh
   readback/durable ordinal、safeToReflash 分类、unknown 永久停止与 truthful evidence 控制）
 - Hardware required:no（实现 PR 使用 fake/simulated fault matrix；合入后 campaign 才做
   GJ-4/GJ-5 真实设备验收）
@@ -3415,6 +3417,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   preview 与 execute/continue 入口机会式清扫，status 保持纯读；contract tests 覆盖
   过期草稿回收、fresh 草稿/带历史文档保留、execute/continue 清扫后仍找到自身文档、
   设备 dispatch 0。
+- r14：默认 Campaign broker 在 reset 前对九个 mapped partitions 执行 sector-bound `rl`
+  分块回读并校验 exact image-prefix SHA-256；reset 后以 pinned HDC 精确比较 profile 的
+  product model 与完整 build version。`basic` 由上述门闭合，`full` 另需 bounded nonempty
+  HiLog roundtrip 证明 Debug Runtime；任一 post-effect 回读漂移/不确定均永久停止。
+- r14：campaign `maximumAttemptLimit`、CLI 默认/帮助、campaign ledger 与 global usage
+  ledger lockstep 提高到 16；4 hours、concurrency=1、fresh reservation/readback 与
+  unknown/unresolved/unsafe partial 永久停止不变，拒绝第 17 次 reservation。
 - workspace 有界销毁（#972）：`HarnessEvolutionWorkspacePort.sweepTerminalWorkspaces`
   + `HarnessEvolutionWorkspaceRetention`（终态最短存活 + 最近 K 棵 + dry-run）。
   终态（succeeded/failed/cancelled）任务的隔离树按保留策略销毁：只删 `workspace/`
@@ -3441,7 +3450,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ### Verification
 
-- `AIN-EVOLUTION-E2-001`：一次 exact campaign assertion 最多产生 8 个串行 fake attempts；
+- `AIN-EVOLUTION-E2-001`：一次 exact campaign assertion 最多产生 16 个串行 fake attempts；
   每次均有新 candidate/review pins、fresh facts、独立 Job/Session/ordinal；success 立即封口；
 - 缺失/过期/超限/并发、旧 one-shot 升级、base/path/diff/toolchain/executable/plan/archive/
   step-set/target lineage 漂移、review 非 PASS/HIGH/CRITICAL、candidate 请求 device/raw surface、
@@ -3461,6 +3470,9 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   build/review 并成功执行第 2 ordinal；closed repair JSON 的 extra command/argv/path、重复或越界
   值全拒绝；legacy strategy defaults 可读。未新增 reservation 的 failure 只 dispatch 一次并
   terminal，same-target registered-mode readback 正例可重试，跨 topology/identity 负例永久停止。
+- r14 post-flash tests：typed plan 强制 `9 wlx → exact readback → rd`；profile model/build
+  精确相等，版本 contains/nonempty 不再通过；`basic` 可不采 HiLog，`full` 必须通过 nonempty
+  Debug Runtime roundtrip；16 个串行 reservation 通过且第 17 个拒绝，unsafe/unknown 不重试。
 - r12 review-leg tests（`HarnessEvolutionReviewContractTests`，13 例，经公开 reconcile 面驱动）：
   无 reviewer/无 candidate/无 immutable diff/model 预算耗尽均 humanRequired 且零 promotion；
   REJECT 同 wake 派发 `workspace.revert-patch@1` 且 Attempt 经 `.reverted` 收口；COMMENT

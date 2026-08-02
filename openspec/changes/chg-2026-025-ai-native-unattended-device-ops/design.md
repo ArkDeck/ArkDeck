@@ -15,7 +15,7 @@
 > 接受该 residual risk。它不得用于 CI、后台无人值守、自动重试或 recovery replay。
 >
 > r8 campaign note（2026-08-02）：在不改变 r7 one-shot bytes 的前提下新增
-> `evolutionCampaignConfirmation`。用户一次确认 delegated envelope；最多 8 attempts/
+> `evolutionCampaignConfirmation`。用户一次确认 delegated envelope；r8 最多 8 attempts/
 > 4 hours/1 concurrency。未合入候选在隔离、无设备 capability 的固定 target 中运行，
 > 每个 candidate identity 经确定性门与独立 AI 对抗审查后成为 attempt 派生 pin；只有
 > protected-main broker 可以 preflight/readback/reserve 并执行 closed typed action。
@@ -35,6 +35,11 @@
 > 下一份 closed typed strategy、完成 candidate build/test/adversarial review，并由 merged broker
 > 取得 fresh reservation 后继续；用户无需逐次确认。unknown/unresolved/unsafe partial、身份或
 > admission 漂移、无新 reservation、repair/review 拒绝、success、超时或超次仍永久停止。
+>
+> r14 GJ-4 verification note（2026-08-03）：broker 只有在所有 mapped partition 的 exact
+> prefix hash 回读、正常模式重连、profile 型号/完整 build pin 精确相等后才可确认 Flash；
+> `full` 还要求 bounded nonempty HiLog roundtrip 证明 Debug Runtime，`basic` 不采集该诊断。
+> attempt 上限提高到 16，其他停止与分权条件不变。
 
 ## §0 设计原则
 
@@ -114,7 +119,7 @@ one-shot reference。用户
 确认前展示的 canonical envelope 至少包含：protected-main base OID、fixed candidate build
 target/toolchain、allowed source paths、`maxChangedFiles`/`maxDiffLines`、plan/archive/step-set、
 target stable identity 与 binding lineage root、userdata impact、`maxAttempts` 与 `validUntil`。
-MVP validator 硬上限：`maxAttempts <= 8`、有效期不超过 4 小时、并发 attempt = 1；更大或
+r14 validator 硬上限：`maxAttempts <= 16`、有效期不超过 4 小时、并发 attempt = 1；更大或
 缺失字段整体拒绝，不能静默截断。
 
 #### Candidate / broker 分权

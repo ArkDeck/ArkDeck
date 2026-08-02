@@ -46,11 +46,11 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
     let images = try RockchipFlashExecutionStager.stage(
       archiveURL: fixture.archive, sessionRoot: root, profile: fixture.profile)
     let commands = try RockchipFlashExecutionLowering.commands(
-      plan: fixture.plan, stagedImages: images)
+      plan: fixture.plan, stagedImages: images, profile: fixture.profile)
     let loader = commands[0]
     let ppt = commands[1]
     let write = commands[2]
-    let reset = commands[11]
+    let reset = commands[12]
 
     XCTAssertEqual(
       evaluate(loader, stdout: Data("not-loader\n".utf8)),
@@ -243,7 +243,7 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
         RockchipFlashExecutionRequest(
           authorizationID: "AUTH-TEST-AIN-007", archiveURL: fixture.archive,
           targetLocationSelector: "42")))
-    XCTAssertEqual(process.arguments.count, 12)
+    XCTAssertEqual(process.arguments.count, 13)
     XCTAssertEqual(admission.closedStatus, .outcomeUnknown)
     XCTAssertEqual(power.activeCount, 0)
     let replay = try DurableJournalRecovery.inspect(

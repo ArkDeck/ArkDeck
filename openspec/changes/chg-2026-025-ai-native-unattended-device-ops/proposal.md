@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 11
-status: proposed # r1 经 #281 正式批准；r2-r10 已合入；r11 autonomous safe-repair loop 待维护者 review/merge
+revision: 14
+status: proposed # r1 经 #281 正式批准；r2-r13 已合入；r14 GJ-4 full verification 待维护者 review/merge
 class: core
 core_change_level: major
 owner: lvye
@@ -10,6 +10,13 @@ platforms: [macos]
 ---
 
 # AI Native 无人值守设备操作:授权从"人类亲手执行"上移为"人类批准计划"
+
+> r14 GJ-4 full verification（2026-08-03）：默认 Flash campaign 在九分区写入后增加
+> exact prefix SHA-256 readback，重启后由 descriptor-bound HDC 精确比较 profile 的型号与
+> 完整 build pin；`basic` 到此完成，`full` 还必须完成非空 bounded HiLog 往返，证明正常
+> Debug Runtime 已恢复。campaign 硬预算从 8 提高到 16 个串行 attempts，4 hours、并发 1、
+> fresh reservation/readback 及 `unsafePartial|outcomeUnknown` 永久停止不变。本 revision
+> 不签发 authority、不连接设备、不执行真实 Flash；维护者 merge 后才成为生产安全策略。
 
 > r11 autonomous safe-repair loop（2026-08-02）：r8-r10 已完成一次 campaign authority、
 > 默认入口和单一 Harness 模型，但 production host 每次命令仍只执行一个 attempt，失败证据
@@ -193,7 +200,7 @@ In scope:
 - **人类确认的是委托 envelope，不是空白授权**：确认内容必须展示并覆盖 protected-main
   base OID、candidate build target/toolchain、允许修改路径、`maxChangedFiles`/`maxDiffLines`、
   plan/archive/step-set、target stable identity 与 binding lineage root、userdata impact、
-  `maxAttempts` 与 `validUntil`。MVP 硬上限 = 8 attempts、4 小时、1 个并发 attempt；超限
+  `maxAttempts` 与 `validUntil`。r14 硬上限 = 16 attempts、4 小时、1 个并发 attempt；超限
   整体拒绝，不静默截断。
 - **未合入候选确实运行，但不拥有设备能力**：候选代码只在 task-owned isolated workspace
   构建为固定 candidate target，通过无 USB/HDC/RockUSB/network/raw-shell 的受限进程产生

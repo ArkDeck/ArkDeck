@@ -106,6 +106,13 @@ public enum RockchipFlashExecutionMode: String, CaseIterable, Codable, Equatable
   case simulated
 }
 
+public enum RockchipPostFlashVerificationLevel: String, CaseIterable, Codable, Equatable,
+  Sendable
+{
+  case basic
+  case full
+}
+
 // MARK: - Plan
 
 public struct RockchipFlashPlan: Equatable, Sendable {
@@ -117,6 +124,7 @@ public struct RockchipFlashPlan: Equatable, Sendable {
   public let stepSetDigestSHA256: String
   public let archiveSHA256: String
   public let archiveSizeBytes: Int64
+  public let postFlashVerification: RockchipPostFlashVerificationLevel
   public let dataImpact: [String]
 
   public var containsDestructiveSteps: Bool { !destructiveStepIDs.isEmpty }
@@ -133,6 +141,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
   public let targetDeviceModel: String
   public let archiveSHA256: String
   public let archiveSizeBytes: Int64
+  public let postFlashVerification: RockchipPostFlashVerificationLevel
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let dataImpact: [String]
@@ -152,6 +161,9 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     targetDeviceModel = try container.decode(String.self, forKey: .targetDeviceModel)
     archiveSHA256 = try container.decode(String.self, forKey: .archiveSHA256)
     archiveSizeBytes = try container.decode(Int64.self, forKey: .archiveSizeBytes)
+    postFlashVerification =
+      try container.decodeIfPresent(
+        RockchipPostFlashVerificationLevel.self, forKey: .postFlashVerification) ?? .full
     planDigestSHA256 = try container.decode(String.self, forKey: .planDigestSHA256)
     stepSetDigestSHA256 = try container.decode(String.self, forKey: .stepSetDigestSHA256)
     dataImpact = try container.decode([String].self, forKey: .dataImpact)
@@ -167,6 +179,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     targetDeviceModel: String,
     archiveSHA256: String,
     archiveSizeBytes: Int64,
+    postFlashVerification: RockchipPostFlashVerificationLevel,
     planDigestSHA256: String,
     stepSetDigestSHA256: String,
     dataImpact: [String],
@@ -180,6 +193,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     self.targetDeviceModel = targetDeviceModel
     self.archiveSHA256 = archiveSHA256
     self.archiveSizeBytes = archiveSizeBytes
+    self.postFlashVerification = postFlashVerification
     self.planDigestSHA256 = planDigestSHA256
     self.stepSetDigestSHA256 = stepSetDigestSHA256
     self.dataImpact = dataImpact
@@ -197,6 +211,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     try container.encode(targetDeviceModel, forKey: .targetDeviceModel)
     try container.encode(archiveSHA256, forKey: .archiveSHA256)
     try container.encode(archiveSizeBytes, forKey: .archiveSizeBytes)
+    try container.encode(postFlashVerification, forKey: .postFlashVerification)
     try container.encode(planDigestSHA256, forKey: .planDigestSHA256)
     try container.encode(stepSetDigestSHA256, forKey: .stepSetDigestSHA256)
     try container.encode(dataImpact, forKey: .dataImpact)
@@ -219,6 +234,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     case targetDeviceModel
     case archiveSHA256 = "archiveSha256"
     case archiveSizeBytes
+    case postFlashVerification
     case planDigestSHA256 = "planDigestSha256"
     case stepSetDigestSHA256 = "stepSetDigestSha256"
     case dataImpact
@@ -312,7 +328,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
   /// `db`/`gpt`/`ul` and every other Maskrom/miniloader-stage command are deliberately
   /// absent: on an inapplicable device the Provider blocks instead of trying anything
   /// similar (AC-FLASH-001-01; #218/#220 evidence).
-  public static let closedCommandSurface: [String] = ["ld", "ppt", "wlx", "wl", "rd"]
+  public static let closedCommandSurface: [String] = ["ld", "ppt", "wlx", "wl", "rl", "rd"]
 
   public static let writeSuccessMarker = "Write LBA from file (100%)"
   public static let resetSuccessMarker = "Reset Device OK."
@@ -379,6 +395,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
   public func makePlan(
     mode: RockchipFlashExecutionMode,
     archiveValidation: RockchipArchiveValidationVerdict,
+    postFlashVerification: RockchipPostFlashVerificationLevel = .full,
     planNonce: String = "rf002"
   ) throws -> RockchipFlashPlan {
     if case .blocked(let violations) = archiveValidation {
@@ -467,6 +484,18 @@ public struct RockchipRockUSBFlashProvider: Sendable {
     steps.append(contentsOf: flashSteps)
     steps.append(
       try WorkflowStep(
+        id: "rk-\(planNonce)-verify-flash-readback",
+        kind: .verifyRemoteState,
+        declaredEffect: .readOnly,
+        declaredCancellation: .immediate,
+        declaredBindingRequirement: .confirmedDevice,
+        arguments: [
+          "probeId": .string("rockusb-partition-readback"),
+          "expectedState": .string("all-mapped-partition-prefix-hashes-match-profile"),
+        ]
+      ))
+    steps.append(
+      try WorkflowStep(
         id: "rk-\(planNonce)-rd-reset",
         kind: .rebootDevice,
         declaredEffect: .deviceMutation,
@@ -503,6 +532,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
           "provider=\(Self.providerIdentity)@\(Self.providerVersion)",
           "profile=\(RockchipFlashProfile.profileIdentity)@\(profile.planDocumentVersion)",
           "archive=\(profile.archiveSHA256)",
+          "postFlashVerification=\(postFlashVerification.rawValue)",
           "stepSet=\(stepSetDigest)",
           "target=\(RockchipFlashProfile.targetDeviceModel)",
         ].joined(separator: "\n").utf8))
@@ -516,6 +546,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
       stepSetDigestSHA256: stepSetDigest,
       archiveSHA256: profile.archiveSHA256,
       archiveSizeBytes: profile.archiveSizeBytes,
+      postFlashVerification: postFlashVerification,
       dataImpact: [
         "all 9 mapped partitions (uboot…userdata) are overwritten from the validated archive",
         "userdata is overwritten: existing user data on the device is destroyed",
@@ -533,6 +564,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
       targetDeviceModel: RockchipFlashProfile.targetDeviceModel,
       archiveSHA256: plan.archiveSHA256,
       archiveSizeBytes: plan.archiveSizeBytes,
+      postFlashVerification: plan.postFlashVerification,
       planDigestSHA256: plan.planDigestSHA256,
       stepSetDigestSHA256: plan.stepSetDigestSHA256,
       dataImpact: plan.dataImpact,

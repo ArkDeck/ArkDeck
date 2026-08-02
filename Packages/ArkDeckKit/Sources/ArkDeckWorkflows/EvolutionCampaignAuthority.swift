@@ -58,7 +58,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
   public static let schemaVersion = "1.0.0"
   public static let operationReference = "flash.dayu200@1"
   public static let candidateBuildTarget = "ArkDeckEvolutionCandidate"
-  public static let maximumAttemptLimit = 8
+  public static let maximumAttemptLimit = 16
   public static let maximumValiditySeconds: TimeInterval = 4 * 60 * 60
   public static let maximumConcurrency = 1
   public static let dataImpact = "ERASE-USERDATA"

@@ -84,6 +84,16 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     private var invocations: [Invocation] = []
     private var listCount = 0
+    private let productModel: String
+    private let buildVersion: String
+
+    init(
+      productModel: String = RockchipFlashProfile.dayu200.runtimeProductModel,
+      buildVersion: String = RockchipFlashProfile.dayu200.runtimeBuildVersion
+    ) {
+      self.productModel = productModel
+      self.buildVersion = buildVersion
+    }
 
     func run(
       executable: ResolvedExecutable,
@@ -112,11 +122,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       case let value
       where value.suffix(4)
         == ["shell", "param", "get", HDCAllowlistedProperty.productModel.rawValue]:
-        stdout = "const.product.model = DAYU200\n"
+        stdout = "const.product.model = \(productModel)\n"
       case let value
       where value.suffix(4)
         == ["shell", "param", "get", HDCAllowlistedProperty.fullBuildVersion.rawValue]:
-        stdout = "const.ohos.fullname = OpenHarmony-7.0.0.33\n"
+        stdout = "const.ohos.fullname = \(buildVersion)\n"
       case let value where value.count >= 3 && value.suffix(3) == ["shell", "hilog", "-x"]:
         stdout = "post-flash hilog\n"
       case let value where value.first == "wlx":
@@ -601,7 +611,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .verifyFlashReadback(bundle),
       .rebootToNormal(stableIdentitySHA256: identity),
       .waitForHDCReconnect(connectKey: "device-1"),
-      .verifyBuild(connectKey: "device-1"),
+      .verifyBuild(
+        connectKey: "device-1",
+        expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion),
       .capturePostFlashDiagnostics(
         connectKey: "device-1",
         request: try HDCHilogCaptureRequest(
@@ -887,7 +900,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .verifyFlashReadback(bundle),
       .rebootToNormal(stableIdentitySHA256: identity),
       .waitForHDCReconnect(connectKey: "device-1"),
-      .verifyBuild(connectKey: "device-1"),
+      .verifyBuild(
+        connectKey: "device-1",
+        expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion),
       .capturePostFlashDiagnostics(
         connectKey: "device-1",
         request: try HDCHilogCaptureRequest(
@@ -972,6 +988,38 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(receipts.count, 2)
     XCTAssertEqual(
       try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+  }
+
+  func testPostFlashBuildVerificationRejectsNonemptyButInexactProfileVersion() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let hdcSHA = String(repeating: "d", count: 64)
+    let rockchipSHA = String(repeating: "c", count: 64)
+    let log = CommandLog(buildVersion: "OpenHarmony-7.0.0.34")
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: ["hdc": ResolvedExecutable(path: "/product/hdc", sha256: hdcSHA)]),
+      runner: ScriptedCommandRunner(log: log),
+      usbProbe: FixedUSBProbe(identity: String(repeating: "a", count: 64)))
+    let action = RockchipProviderAction.verifyBuild(
+      connectKey: "device-1",
+      expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+      expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    let plan = try rockchipPlan(
+      action: action, stepID: "verify-exact-build", toolSHA256: rockchipSHA)
+    do {
+      _ = try await executor.execute(
+        action: action, descriptor: hostDescriptor(plan),
+        rockchipExecutable: ResolvedExecutable(
+          path: "/product/rkdeveloptool", sha256: rockchipSHA),
+        actionDirectory: root)
+      XCTFail("a nonempty version that differs from the profile pin must fail closed")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        return XCTFail("version mismatch must be a confirmed failure: \(failure)")
+      }
+      XCTAssertTrue(detail.contains("does not match"))
+    }
   }
 
   private func rockchipPlan(

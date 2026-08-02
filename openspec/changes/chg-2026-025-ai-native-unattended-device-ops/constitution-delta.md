@@ -21,7 +21,7 @@
      Step 集合、恢复路径、有效期与次数上限);或
    - 用户监督式交互 Agent 会话中的 bounded evolution campaign confirmation：Agent 除
      exact plan/target/data-impact 外，还展示并由用户确认 protected-main base、候选允许路径
-     与 diff 预算、固定 build target/toolchain、有效期与 attempt 上限；产品硬限制最多 8 个
+     与 diff 预算、固定 build target/toolchain、有效期与 attempt 上限；产品硬限制最多 16 个
      串行 attempt、最长 4 小时、并发数 1。未合入 candidate 的 tree/diff/executable digest
      SHALL 在每个 attempt 由 protected-main broker 现场派生，并在独立只读 adversarial
      review PASS 后成为 admission pin;

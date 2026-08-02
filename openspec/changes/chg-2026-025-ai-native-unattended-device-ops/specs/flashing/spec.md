@@ -18,7 +18,7 @@ Step),当且仅当具备以下一种 E2 authority：
 2. 用户监督式交互 Agent 会话中的 bounded evolution campaign confirmation：除 exact
    plan/target/data-impact pins 外，还固定 protected-main base、candidate build target/
    toolchain、允许修改路径、diff 预算、`maxAttempts` 与 `validUntil`。产品只接受
-   `maxAttempts <= 8`、有效期不超过 4 小时、并发 attempt = 1；每个未合入 candidate 的
+   `maxAttempts <= 16`、有效期不超过 4 小时、并发 attempt = 1；每个未合入 candidate 的
    tree/diff/executable digest 由 protected-main broker 现场派生，并经独立只读 adversarial
    review PASS 后成为该 attempt 的 pin。
 
@@ -57,6 +57,18 @@ target 仍处于 registered HDC-normal/Loader mode 时，MAY 分类 `safeToRefla
 缺失、target/topology 漂移、未新增 reservation 或任何不确定状态 SHALL 永久停止。candidate
 evaluation 与 Flash attempt 均不得超过 campaign `maxAttempts`，exact Provider argv 不得因策略
 修复改变。
+
+Flash success SHALL NOT be inferred from nine `wlx` success markers. Before reset, the merged
+broker SHALL read every mapped partition by its pinned sector range and compare the exact image
+prefix SHA-256 with the selected profile. After reset it SHALL re-establish the same target lineage
+through HDC and compare `const.product.model` and `const.ohos.fullname` by exact equality with the
+profile pins. A missing/mismatched readback after device effects SHALL be terminal unsafe/unknown
+and SHALL NOT be automatically reflashed.
+
+`postFlashVerification=basic` SHALL require the partition hashes, reconnect, target lineage and
+exact model/build checks above. `postFlashVerification=full` SHALL additionally require a bounded,
+nonempty HiLog roundtrip after reconnect as proof that the normal Debug Runtime is responsive.
+Transport-only USB reconnect or a nonempty but unpinned version SHALL NOT satisfy either level.
 
 evidence SHALL 记录 executor、实际 authority kind/reference、attempt ordinal、candidate/
 review/broker pins、fresh target readback、执行时间与 retry disposition；chat authority 不得
@@ -145,3 +157,11 @@ SHALL 拒绝加载。task submit current wire 只接受 `workspaceAllowedPaths` 
   产品自动进入下一轮；success、unknown/unsafe、漂移、无新 reservation 或预算耗尽立即封口
 - AND 任一轮的 Provider operation/partition/argv、plan/archive/step-set、target 与 authority pins
   均保持不变，candidate/repairer 从不接触真实设备
+
+#### Scenario: AIN-GJ4-POSTFLASH-001 精确固件与 Debug Runtime 验证
+
+- GIVEN 一个 attempt 已对 pinned DAYU200 profile 完成九分区写入
+- WHEN broker 执行 post-flash verification
+- THEN 九分区 exact prefix SHA-256、同一 target HDC 重连、型号与完整 build pin 必须全部匹配
+- AND `basic` 在上述条件成立时通过，`full` 还必须完成 bounded nonempty HiLog roundtrip
+- AND 版本漂移、仅 USB 重连、空 HiLog 或任一回读不确定都不得发布 success 或自动再次刷写

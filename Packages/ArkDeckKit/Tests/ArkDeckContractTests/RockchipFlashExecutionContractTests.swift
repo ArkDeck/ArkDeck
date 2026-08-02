@@ -135,6 +135,26 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         RockchipPostflightReceipt(
           connected: false, serialDigestSHA256: previous.serialDigestSHA256,
           usbTopology: previous.usbTopology)))
+    let noDebugRuntime = RockchipPostflightReceipt(
+      connected: true, serialDigestSHA256: current.serialDigestSHA256,
+      usbTopology: current.usbTopology,
+      productModel: fixture.profile.runtimeProductModel,
+      buildVersion: fixture.profile.runtimeBuildVersion,
+      debugRuntimeReady: false)
+    XCTAssertTrue(
+      admission.matchesPostflight(
+        noDebugRuntime, profile: fixture.profile, verification: .basic))
+    XCTAssertFalse(
+      admission.matchesPostflight(
+        noDebugRuntime, profile: fixture.profile, verification: .full))
+    XCTAssertFalse(
+      admission.matchesPostflight(
+        RockchipPostflightReceipt(
+          connected: true, serialDigestSHA256: current.serialDigestSHA256,
+          usbTopology: current.usbTopology,
+          productModel: fixture.profile.runtimeProductModel,
+          buildVersion: "OpenHarmony-7.0.0.34", debugRuntimeReady: true),
+        profile: fixture.profile, verification: .full))
   }
 
   func testPostflightIdentityAliasesFailClosedWhenIncompleteInvalidOrAmbiguous() throws {
@@ -287,7 +307,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertThrowsError(try spoofedNormal.installCurrentLoader())
   }
 
-  func testNormalModeDispatchesExactHDCOnceBeforeClosedRockUSBSequence()
+  func testNormalModeDispatchesExactHDCOnceAndReadbackFailureBlocksReset()
     async throws
   {
     let fixture = try RockchipExecutionTestFixture.make()
@@ -346,12 +366,17 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         makePersistence: { _, _, _ in persistence },
         profiles: [.dayu200, fixture.profile],
         makeID: RockchipExecutionTestFixture.deterministicID))
-    let result = try await host.execute(
-      RockchipFlashExecutionRequest(
-        authorizationID: "AUTH-TEST-AIN-019", archiveURL: fixture.archive,
-        targetLocationSelector: "42"))
-
-    XCTAssertEqual(result.status, .succeeded)
+    do {
+      _ = try await host.execute(
+        RockchipFlashExecutionRequest(
+          authorizationID: "AUTH-TEST-AIN-019", archiveURL: fixture.archive,
+          targetLocationSelector: "42"))
+      XCTFail("a tool that cannot materialize partition readback must block reset")
+    } catch let error as RockchipFlashExecutionError {
+      guard case .recoveryRequired = error else {
+        return XCTFail("post-write readback failure must require recovery: \(error)")
+      }
+    }
     let requests = spawnLog.requests
     XCTAssertEqual(requests.count, 13)
     XCTAssertEqual(requests[0].executable, hdcExecutable)
@@ -359,7 +384,9 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(requests[1].arguments, ["ld"])
     XCTAssertEqual(requests[2].arguments, ["ppt"])
     XCTAssertEqual(requests[3...11].map { $0.arguments.first }, Array(repeating: "wlx", count: 9))
-    XCTAssertEqual(requests[12].arguments, ["rd"])
+    XCTAssertEqual(requests[12].arguments.first, "rl")
+    XCTAssertFalse(requests.contains { $0.arguments.first == "rd" })
+    XCTAssertEqual(admission.closedStatus, .outcomeUnknown)
     let replay = try DurableJournalRecovery.inspect(
       url: persistence.sessionRoot.appending(path: "journal.jsonl"))
     let loaderOutcome = try XCTUnwrap(
@@ -401,7 +428,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
         stagedImages: RockchipFlashExecutionStager.stage(
-          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile),
+        profile: fixture.profile
       ).first)
     let prepared = try process.prepare(
       command: command, admissionIdentity: fixture.executableReceipt)
@@ -463,7 +491,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
         stagedImages: RockchipFlashExecutionStager.stage(
-          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile),
+        profile: fixture.profile
       ).first)
     let prepared = try process.prepare(
       command: command, admissionIdentity: fixture.executableReceipt)
@@ -513,7 +542,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
         stagedImages: RockchipFlashExecutionStager.stage(
-          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile),
+        profile: fixture.profile
       ).first)
     let prepared = try process.prepare(
       command: command, admissionIdentity: fixture.executableReceipt)
@@ -565,7 +595,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
         stagedImages: RockchipFlashExecutionStager.stage(
-          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile)
+          archiveURL: fixture.archive, sessionRoot: fixture.base, profile: fixture.profile),
+        profile: fixture.profile
       ).first)
     let strategy = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
@@ -619,13 +650,14 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(result.evidenceClass, .contractFake)
     XCTAssertEqual(result.manifestURL, persistence.sessionRoot.appending(path: "manifest.json"))
     let arguments = process.arguments
-    XCTAssertEqual(arguments.count, 12)
+    XCTAssertEqual(arguments.count, 13)
     XCTAssertEqual(arguments[0], ["ld"])
     XCTAssertEqual(arguments[1], ["ppt"])
     XCTAssertEqual(
       arguments[2...10].map { Array($0.prefix(2)) },
       fixture.profile.mappedPartitions.map { ["wlx", $0.partitionName] })
-    XCTAssertEqual(arguments[11], ["rd"])
+    XCTAssertEqual(arguments[11], ["verified-readback"])
+    XCTAssertEqual(arguments[12], ["rd"])
     XCTAssertTrue(
       arguments.flatMap { $0 }.allSatisfy {
         !$0.contains("sudo") && $0 != "sh" && $0 != "bash" && $0 != "wl"
@@ -683,7 +715,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(admission.closedStatus, .succeeded)
     XCTAssertEqual(admission.closedIntentIDs.count, 9)
     print(
-      "TEST-AIN-DISPATCH-001 PASS argv=1ld+1ppt+9wlx+1rd schema=2.1.0 "
+      "TEST-AIN-DISPATCH-001 PASS argv=1ld+1ppt+9wlx+1verified-readback+1rd schema=2.1.0 "
         + "pathSource=installedOrdinaryBookmark evidence=contractFake "
         + "realDevice=0 hdc=0 network=0 shell=0")
   }
@@ -876,6 +908,23 @@ final class RecordingRockchipProcessPort: @unchecked Sendable, RockchipExecution
       prepared.close()
       throw RockchipFlashExecutionError.executableIdentityDrift
     }
+    if case .verifyFlashReadback = command {
+      return RockchipPreparedCommand(executableIdentity: prepared.executableIdentity) {
+        defer { prepared.close() }
+        self.lock.withLock { self.recordedArguments.append(command.arguments) }
+        let execution = ProcessExecutionResult(
+          termination: .exited(0),
+          stdout: ProcessStreamCapture(
+            data: Data(), totalByteCount: 0, wasTruncated: false),
+          stderr: ProcessStreamCapture(
+            data: Data(), totalByteCount: 0, wasTruncated: false))
+        self.lock.withLock { self.recordedTerminations.append(execution.termination) }
+        return RockchipExecutionAttempt(
+          execution: execution, semantic: .succeeded,
+          executableIdentity: prepared.executableIdentity,
+          semanticCode: "rockchip.partition-readback.contract-fake-confirmed")
+      }
+    }
     return RockchipPreparedCommand(executableIdentity: prepared.executableIdentity) {
       self.lock.withLock { self.recordedArguments.append(command.arguments) }
       let result = try await self.executor.executePreparedIdentityBoundLaunch(
@@ -893,7 +942,9 @@ struct FixedRockchipPostflightPort: RockchipExecutionPostflightPort {
   let serialDigest: String
   let topology: String
 
-  func probe() async throws -> RockchipPostflightReceipt {
+  func probe(verification _: RockchipPostFlashVerificationLevel) async throws
+    -> RockchipPostflightReceipt
+  {
     RockchipPostflightReceipt(
       connected: true, serialDigestSHA256: serialDigest, usbTopology: topology)
   }
