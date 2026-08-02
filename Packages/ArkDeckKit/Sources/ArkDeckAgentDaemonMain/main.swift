@@ -4,8 +4,10 @@
 // production providers registered, zero network. `--state-dir` exists for
 // tests and never widens permissions.
 
+import ArkDeckAgentComposition
 import ArkDeckAgentDaemon
 import ArkDeckHarness
+import ArkDeckRuntime
 import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin

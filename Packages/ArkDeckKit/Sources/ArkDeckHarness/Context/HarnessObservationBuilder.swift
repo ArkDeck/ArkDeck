@@ -24,6 +24,7 @@
 // per question, so one crash cannot be counted twice.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import CryptoKit
 import Foundation
 

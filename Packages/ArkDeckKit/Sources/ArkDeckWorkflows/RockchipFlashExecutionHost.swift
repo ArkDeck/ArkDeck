@@ -1126,9 +1126,9 @@ struct RockchipProductionStorageComposition: Sendable {
   }
 }
 
-struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
-  let revision: Int
-  let serial: String
+package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
+  package let revision: Int
+  package let serial: String
   let usbTopology: String
   let evidence: [String]
 
@@ -1168,14 +1168,16 @@ struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   }
 }
 
-struct RockchipProductBindingStore: Sendable {
+package struct RockchipProductBindingStore: Sendable {
+  package init(rootURL: URL) { self.rootURL = rootURL }
+
   static let bindingFileName = "rockchip-binding.json"
   static let lockFileName = ".rockchip-binding.lock"
   static let maximumDocumentBytes = 64 * 1_024
 
   let rootURL: URL
 
-  func loadExisting() throws -> RockchipProductBindingSnapshot {
+  package func loadExisting() throws -> RockchipProductBindingSnapshot {
     try prepareRoot()
     let rootDescriptor = Darwin.open(
       rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)

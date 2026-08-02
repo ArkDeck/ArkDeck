@@ -3,6 +3,7 @@ import XCTest
 
 @testable import ArkDeckHarness
 @testable import ArkDeckStorage
+@testable import ArkDeckAgentComposition
 @testable import ArkDeckWorkflows
 
 final class EvolutionCampaignContractTests: XCTestCase {

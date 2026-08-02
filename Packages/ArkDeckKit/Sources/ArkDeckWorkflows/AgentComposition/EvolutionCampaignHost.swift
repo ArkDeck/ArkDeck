@@ -2,6 +2,7 @@
 // (CHG-2026-025 r8, TASK-AIN-019).
 
 import ArkDeckHarness
+import ArkDeckWorkflows
 import ArkDeckStorage
 import CryptoKit
 import Darwin

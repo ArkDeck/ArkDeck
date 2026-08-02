@@ -323,11 +323,11 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
     return (try? encoder.encode(JSONValue.object(object))) ?? Data()
   }
 
-  static func sha256(_ data: Data) -> String {
+  package static func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
-  static func isSHA256(_ value: String) -> Bool {
+  package static func isSHA256(_ value: String) -> Bool {
     value.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression)
       == value.startIndex..<value.endIndex
   }

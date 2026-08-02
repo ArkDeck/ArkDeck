@@ -1,3 +1,4 @@
+import ArkDeckAgentComposition
 import ArkDeckCore
 import ArkDeckWorkflows
 import CryptoKit

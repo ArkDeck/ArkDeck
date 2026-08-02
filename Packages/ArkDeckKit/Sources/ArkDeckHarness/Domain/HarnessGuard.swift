@@ -18,6 +18,7 @@
 // stance, in a test and in the daemon.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import CryptoKit
 import Foundation
 

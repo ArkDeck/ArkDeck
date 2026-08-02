@@ -9,6 +9,7 @@
 // workspace.  The CLI receives only `HarnessVendorEnvelope.text(context)`.
 
 import ArkDeckCore
+import ArkDeckHarness
 import ArkDeckProcess
 import CryptoKit
 import Foundation

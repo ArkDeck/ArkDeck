@@ -1,6 +1,7 @@
 // Production RuntimeArtifactStore adapter for ArkDeckHarness.
 
 import ArkDeckHarness
+import ArkDeckWorkflows
 import ArkDeckStorage
 import Foundation
 
