@@ -2770,6 +2770,8 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     switch rockchipAction {
     case .enterLoader:
       descriptor = "rockchip.hdc.enter-loader.v1"
+    case .observeHDCNormalUSB:
+      descriptor = "rockchip.iokit.observe-hdc-normal.v1"
     case .waitForHDCDisconnect:
       descriptor = "rockchip.hdc.wait-disconnect.v1"
     case .waitForLoader:
@@ -2861,12 +2863,12 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
         throw DeviceProviderError.factsUnavailable(
           "Loader transition recovery has no matching descriptor-bound HDC target")
       }
-      // The original command's intended postcondition was Loader. If the
-      // exact same binding/connect key is freshly reachable in HDC-normal,
-      // that postcondition is absent and this reversible transition did not
-      // complete. Confirming that negative is what lets the engine finalize
-      // the parked job without ever replaying its reboot command.
-      action = .rockchip(.waitForHDCReconnect(connectKey: connectKey))
+      // The original command's intended postcondition was Loader. Observe the
+      // same connect-key identity directly in the normal USB personality;
+      // this proof does not depend on an HDC server being present. Seeing that
+      // exact negative postcondition lets the engine finalize the parked job
+      // without ever replaying its reboot command.
+      action = .rockchip(.observeHDCNormalUSB(connectKey: connectKey))
     case .rockchip(.flashPartitions(let bundle)):
       action = .rockchip(.verifyFlashReadback(bundle))
     case .rockchip(.rebootToNormal):

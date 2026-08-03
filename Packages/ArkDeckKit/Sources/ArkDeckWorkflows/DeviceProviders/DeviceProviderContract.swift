@@ -119,6 +119,7 @@ public struct RockchipRuntimeFlashBundle: Sendable, Equatable {
 /// legacy authorization token.
 public enum RockchipProviderAction: Sendable, Equatable {
   case enterLoader(connectKey: String)
+  case observeHDCNormalUSB(connectKey: String)
   case waitForHDCDisconnect(connectKey: String)
   case waitForLoader(stableIdentitySHA256: String)
   case rebindLoader(stableIdentitySHA256: String)
@@ -257,7 +258,8 @@ package enum TypedProviderAction: Sendable, Equatable {
       return .deviceMutation
     case .rockchip(.enterLoader), .rockchip(.rebootToNormal):
       return .deviceMutation
-    case .rockchip(.waitForHDCDisconnect), .rockchip(.waitForLoader),
+    case .rockchip(.observeHDCNormalUSB), .rockchip(.waitForHDCDisconnect),
+      .rockchip(.waitForLoader),
       .rockchip(.rebindLoader), .rockchip(.verifyFlashReadback),
       .rockchip(.waitForHDCReconnect), .rockchip(.verifyBuild),
       .rockchip(.capturePostFlashDiagnostics):
@@ -547,6 +549,10 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case .rockchip(.enterLoader(let connectKey)):
       self.init(
         kind: "rockchip.enterLoader",
+        arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(.observeHDCNormalUSB(let connectKey)):
+      self.init(
+        kind: "rockchip.observeHDCNormalUSB",
         arguments: ["connectKey": .string(connectKey)])
     case .rockchip(.waitForHDCDisconnect(let connectKey)):
       self.init(
@@ -977,6 +983,8 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         try nativeDeployment(), expectation: expectation))
     case "rockchip.enterLoader":
       return .rockchip(.enterLoader(connectKey: try string("connectKey")))
+    case "rockchip.observeHDCNormalUSB":
+      return .rockchip(.observeHDCNormalUSB(connectKey: try string("connectKey")))
     case "rockchip.waitForHDCDisconnect":
       return .rockchip(.waitForHDCDisconnect(connectKey: try string("connectKey")))
     case "rockchip.waitForLoader":

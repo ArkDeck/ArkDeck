@@ -161,6 +161,9 @@ protocol RockchipRuntimeUSBProbing: Sendable {
   func singleLoader(
     stableIdentitySHA256: String
   ) throws -> RockchipRuntimeLoaderIdentity
+  func singleHDCNormal(
+    stableIdentitySHA256: String
+  ) throws -> RockchipRuntimeLoaderIdentity
 }
 
 struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
@@ -170,6 +173,17 @@ struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
     stableIdentitySHA256: String
   ) throws -> RockchipRuntimeLoaderIdentity {
     let identity = try probe.singleLoader(
+      stableIdentitySHA256: stableIdentitySHA256)
+    return RockchipRuntimeLoaderIdentity(
+      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
+        .map { String(format: "%02x", $0) }.joined(),
+      topology: identity.topology)
+  }
+
+  func singleHDCNormal(
+    stableIdentitySHA256: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
+    let identity = try probe.singleConnected(
       stableIdentitySHA256: stableIdentitySHA256)
     return RockchipRuntimeLoaderIdentity(
       serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
@@ -473,6 +487,11 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           ],
           receipts: receipts)
       } catch {
+        if let normal = try? exactHDCNormalIdentity(connectKey: connectKey) {
+          throw RuntimeDispatchFailure.failed(
+            "exact bound HDC-normal USB readback proves the Loader transition did not complete "
+              + "at topology \(normal.topology)")
+        }
         if let unresolvedHDCFailure { throw unresolvedHDCFailure }
         // Even exit 0 is not the semantic boundary for a command whose
         // success disconnects its transport. Without the exact bound Loader
@@ -480,6 +499,16 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.outcomeUnknown(
           "HDC reboot-loader exited but the exact bound Loader was not observed")
       }
+
+    case .observeHDCNormalUSB(let connectKey):
+      let identity = try exactHDCNormalIdentity(connectKey: connectKey)
+      return result(
+        summary: [
+          "hdcNormalIdentitySha256": identity.serialDigestSHA256,
+          "usbState": "hdc-normal",
+          "usbTopology": identity.topology,
+        ],
+        receipts: [])
 
     case .waitForHDCDisconnect(let connectKey):
       let receipts = try await waitForHDC(
@@ -803,6 +832,14 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       expectedConnected
         ? "descriptor-bound HDC target did not reconnect before the deadline"
         : "descriptor-bound HDC target did not disconnect before the deadline")
+  }
+
+  private func exactHDCNormalIdentity(
+    connectKey: String
+  ) throws -> RockchipRuntimeLoaderIdentity {
+    let identity = SHA256.hash(data: Data(connectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return try usbProbe.singleHDCNormal(stableIdentitySHA256: identity)
   }
 
   private func waitForLoader(
@@ -1444,6 +1481,9 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     case .rockchip(.enterLoader(let connectKey)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.enter-loader.v1"
+    case .rockchip(.observeHDCNormalUSB(let connectKey)):
+      return connectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.iokit.observe-hdc-normal.v1"
     case .rockchip(.waitForHDCDisconnect(let connectKey)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.wait-disconnect.v1"
