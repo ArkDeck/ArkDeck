@@ -68,6 +68,7 @@ cases:
   - { acceptance_id: AC-FLASH-014-01, test_id: TEST-AC-FLASH-014-01, method: realHardwareMatrix, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-014-01, minimum_evidence: realHardware, hardware_capability: flash }
   - { acceptance_id: AC-FLASH-015-01, test_id: TEST-AC-FLASH-015-01, method: agentExecutionPolicyContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-015-02, test_id: TEST-AC-FLASH-015-02, method: labAuthorizationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-02, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-015-03, test_id: TEST-AC-FLASH-015-03, method: boundedE2BrokerContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-03, minimum_evidence: contract }
 
   - { acceptance_id: AC-HDC-001-01, test_id: TEST-AC-HDC-001-01, method: toolchainContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-01, minimum_evidence: contract }
   - { acceptance_id: AC-HDC-001-02, test_id: TEST-AC-HDC-001-02, method: toolchainDiagnosticsContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-02, minimum_evidence: platform }

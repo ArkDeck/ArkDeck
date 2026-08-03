@@ -62,9 +62,44 @@ Raw Artifact SHALL 不被原地修改。过滤、合并、符号化和格式转�
 
 Agent MAY 起草 proposal、delta、ADR、design 和 tasks；Agent SHALL NOT 自行批准产品范围、Safety invariant、Acceptance Scenario、Core schema 或 baseline 变化。为修复实现而放宽测试或规格被禁止。
 
-## POL-AGENT-002 Autonomous agents never execute real destructive hardware workflows
+## POL-AGENT-002 Autonomous destructive execution requires exact E2 authority
 
-自主 Agent 和普通 CI SHALL NOT 对真实设备 dispatch Flash、erase、format、unlock、真实 update package 或其他 `destructive` Step；它们 MAY 运行 schema/contract tests、fake/simulation、plan-only，并 MAY 生成供人工审核的精确计划。真实硬件 destructive evidence 只能由人类操作者亲自执行产生，且 SHALL 在 evidence 中记录操作者、物理目标确认（设备身份/序列号）、执行时间与恢复路径。把 USB 设备连接到 Agent 主机、Task 标为 high risk 或用户在聊天中说“继续”均不构成该授权。
+自主 Agent MAY 对真实设备 dispatch 已发布 Catalog 所定义的 `destructive` typed Step，
+当且仅当持有以下一种、且与本次 dispatch 精确一致的 E2 authority：
+
+1. 维护者经 merged PR 预先批准的 `standingAuthorization`，逐项 pin 目标身份与 binding
+   revision、firmware、transport、HDC、Provider、plan digest、Step 集合、recovery path、
+   有效期与使用次数；或
+2. 用户监督式交互 Agent 会话中的 `evolutionCampaignConfirmation`。Agent SHALL 在同一会话
+   展示 exact plan/archive/step-set、脱敏 target/binding、userdata impact、protected-main
+   base、candidate allowed paths/diff budget、build target/toolchain、validity 和 attempt
+   limit，并如实取得用户确认。campaign 最多 16 个串行 attempts、四小时、并发一。
+
+每个真实 destructive Step 前，protected-main broker SHALL 从已发布 typed plan 重新计算
+plan/step set、读取 fresh target/binding facts，并校验 authority、candidate/review pins、
+reservation ordinal、有效期和全部预算。任一缺失、已消费、漂移、过期、超限、非 PASS
+review、无 fresh reservation、身份/拓扑不确定、`outcomeUnknown`、unresolved intent 或
+unsafe partial write SHALL fail closed：新 destructive dispatch 数为 0，并持久记录 blocker
+或 terminal disposition。
+
+candidate 仅可在确认的 allowed paths/diff budget 内 build/test；repairer 不得取得 source
+workspace，reviewer 只可读 immutable candidate/diff/build/test artifacts。candidate、repairer
+与 reviewer 均不得取得 network、USB/HDC/RockUSB、raw shell、Runtime 或 authority
+capability，且不得改变 argv、operation、partition、plan、archive、step set、target、broker
+或 authorization。只有 protected-main broker 可在 fresh readback 与 durable reservation 后
+dispatch。只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash`
+时，同一 invocation 才 MAY 自动继续下一轮；success、unknown、unresolved、unsafe partial、
+drift、review/repairer 拒绝、取消后的 destructive intent、过期或预算耗尽均 SHALL 永久停止。
+
+普通 CI、后台 daemon/scheduler、无有效 E2 authority 的 Agent 和 caller-supplied
+authorization/context SHALL 只运行 contract/fake/simulated/plan-only。USB 连接、Task 风险标记、
+事后 evidence 或未绑定 exact plan 的聊天消息都不构成 authority。Agent SHALL NOT 伪造未发生
+的确认，也 SHALL NOT 自行创建、修改、批准或吊销 standing authorization；历史 one-shot
+`chatConfirmation` 和 legacy execution mode 仅可 decode/export，新 admission/reservation/
+dispatch 必须拒绝。真实 hardware evidence SHALL 如实记录 executor（human 或 agent）、实际
+authority kind/reference、fresh target confirmation、时间、typed step 与 recovery path；
+`evolutionCampaignConfirmation` SHALL NOT 记作 standing authorization，schema-valid evidence
+也 SHALL NOT mint、扩大或事后追认 authority。人类亲手执行仍是有效路径。
 
 ## Governance
 

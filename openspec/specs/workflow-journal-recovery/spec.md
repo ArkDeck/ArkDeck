@@ -33,63 +33,49 @@ Workflow SHALL 只组合批准的 typed step，例如 HDC/remote tool、send/rec
 - THEN Core classification 覆盖该声明
 - AND step 仍为 destructive
 
-### Requirement: REQ-WF-004 Agent real-hardware evidence uses trusted Runtime facts
+### Requirement: REQ-WF-004 Trusted Runtime facts and truthful hardware evidence
 
-当 Agent 执行的真实设备 run 被声明为 realHardware evidence 时，Runtime SHALL
-从 product-owned durable target/job/step records、fresh descriptor-bound device/tool
-observations、admission authority decision 与 immutable Artifact metadata 投影
-hardware-evidence record。record SHALL 如实包含 executor、operation/job/catalog、
-actual effect 与 step kinds、authority reference、target identity digest/binding、
-model/firmware、transport/provider/toolchain、同 operation 的 typed E0 preflight
-readback 所记录的 target confirmation method/time、执行时间与 Artifact
-reference/hash。该 preflight MAY 是首个 device step，但 SHALL 在后续
-evidence-bearing capture 与任何 E1/E2 effect 前完成。Runtime/evidence caller SHALL
-NOT 提交或覆盖这些 trusted facts；
-post-run evidence packaging MAY 仅补充 `evidenceId`、`acceptanceIds`、`validUntil`
-与 `notes` 等不授予 execution authority 的 claim metadata，其验收归属仍 SHALL 由
-approved verification plan 与维护者 review 判定。
+Runtime SHALL 仅从同一 Job 的 durable intent/outcome、trusted target/binding/tool facts 和
+已发布 Artifact metadata 推导 realHardware evidence。Agent E0/readOnly SHALL 记录
+`defaultReadOnlyPolicy`；E1/deviceMutation SHALL 记录 `runtimeCapability`；E2/destructive
+SHALL 记录 `standingAuthorization` 或 `evolutionCampaignConfirmation`。每个 E2 evidence
+reference SHALL 精确匹配首个 destructive intent 前接受的 authority；campaign reference
+还 SHALL 包含 durable campaign/attempt 和 ordinal correlation。schema validation、evidence
+packaging、imported Manifest、caller assertion 或事后聊天消息 SHALL NOT mint、变更、扩大或
+追溯提供 authority。
 
-Agent E0/readOnly、E1/deviceMutation 与 E2/destructive evidence 的 authority kind
-SHALL 分别为 `defaultReadOnlyPolicy`、`runtimeCapability` 与
-`standingAuthorization`，并与该 run 的 admission decision 精确关联。该映射只记录
-execution authority provenance；hardware-evidence schema validation SHALL NOT mint
-capability、批准 plan 或触发 device dispatch，E2 是否允许仍由当时适用的 approved
-Safety policy 决定。
+缺失、stale、mismatched、unknown 或非 durable trusted facts；authority/effect mismatch；
+未匹配 intent/outcome；缺失 candidate/review pin；或不可验证 Artifact hash SHALL 阻止 evidence
+publication。该 blocker SHALL NOT 把 Job 变为 success，也 SHALL NOT dispatch 或 replay device
+Step。target identity 与 raw artifacts 继续适用隐私和不可变规则；历史 V2/V3 evidence 保持
+不可变、可 decode。
 
-任一 required fact 缺失、unknown、stale、binding/identity 不一致、
-authority/effect 不匹配或 Artifact bytes/hash 不可验证时，Runtime SHALL 返回结构化
-`evidenceIncomplete`，SHALL NOT 发布 schema-valid realHardware record，且 SHALL NOT
-使 Acceptance Scenario 进入 PASS。V2 历史 evidence SHALL 保持不可变；V3 writer
-SHALL NOT 通过有损或人工补写自动迁移旧记录。
+#### Scenario: AC-WF-004-01 Agent evidence facts complete
 
-#### Scenario: AC-WF-004-01 Agent E0 evidence facts complete
+- GIVEN Agent 完成真实 E0、E1 或 E2 typed run，且同一 Job 有完整 fresh target/binding/tool
+  facts、admission decision、durable Step outcomes 和 immutable Artifact metadata
+- WHEN Runtime projects hardware evidence
+- THEN record 包含实际 executor/effect/Step kinds、匹配的 `defaultReadOnlyPolicy`、
+  `runtimeCapability`、`standingAuthorization` 或 `evolutionCampaignConfirmation` provenance、
+  target confirmation 和 Artifact hashes
+- AND record 通过 schema 与 semantic correlation validation，且不 mint authority
 
-- GIVEN Agent 经 published typed operation 在真实设备执行 E0/readOnly run
-- AND同一 target/binding 的 fresh machine readback、admission decision、durable
-  step outcomes 与 immutable Artifact metadata 完整
-- WHEN Runtime 投影 hardware-evidence V3
-- THEN record 包含 `executor.kind=agent` 与 `defaultReadOnlyPolicy` authority
-- AND包含 model、serial digest、firmware、binding、target confirmation time、
-  tool/provider/transport、actual step kinds 与 Artifact hashes
-- AND该 record 通过 schema 与 semantic correlation validation
+#### Scenario: AC-WF-004-02 Required evidence facts are untrusted or incomplete
 
-#### Scenario: AC-WF-004-02 Required evidence fact is untrusted or incomplete
+- GIVEN Agent run 缺少 required trusted fact、target/binding stale 或 mismatch、authority/effect
+  mismatch，或 Artifact hash 不可验证
+- WHEN Runtime 被请求发布 hardware evidence
+- THEN Runtime 返回 `evidenceIncomplete`，schema-valid realHardware publication 为 0
+- AND caller fields、historical receipt、human text 或事后聊天消息不能使 run PASS 或 authorize Step
 
-- GIVEN Agent run 缺少任一 required fact，或事实 stale、binding/identity 不一致、
-  Artifact hash 不可验证
-- WHEN caller 请求 hardware-evidence output
-- THEN Runtime 返回 `evidenceIncomplete`
-- AND schema-valid realHardware publication 数为 0
-- AND caller 自报字段、旧 receipt 或人工补写不能使该 run PASS
+#### Scenario: AC-WF-004-03 Campaign evidence cannot substitute for authority
 
-#### Scenario: AC-WF-004-03 Actual effect and authority do not match
-
-- GIVEN Agent run 的 actual maximum effect 与 admission authority kind/reference
-  不匹配、缺失、过期或 unknown
-- WHEN hardware-evidence projector 校验 provenance
-- THEN schema-valid realHardware publication 数为 0
-- AND provider/device dispatch 数不因 schema validation 增加
-- AND事后 evidence 不能补发 execution authority
+- GIVEN destructive Agent Job 声称 `evolutionCampaignConfirmation`，但 evidence 缺少匹配的
+  durable campaign/attempt reservation、authority pin、fresh target confirmation、intent/outcome
+  correlation 或 actual Artifact hash
+- WHEN Runtime projects Job
+- THEN evidence publication 为 0，Job 如实报告 incomplete/policy blocker
+- AND不发生新 device dispatch、authority minting 或 replay
 
 ### Requirement: REQ-JOB-001 Distinct Job terminal states
 

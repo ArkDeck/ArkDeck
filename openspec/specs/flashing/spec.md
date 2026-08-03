@@ -168,18 +168,55 @@ MVP SHALL 至少在一个明确设备型号、固件、HDC 版本和 Provider �
 
 ### Requirement: REQ-FLASH-015 Agent and ordinary CI destructive boundary
 
-自主 Agent/普通 CI 的执行凭据 SHALL 只允许 Flash workflow 的 contract、fake、simulated 或 plan-only 分支，并 SHALL 在真实 binding 与 `destructive` Step 同时出现时 fail closed。真实硬件 Flash/erase/format/unlock/update dispatch SHALL 由人类操作者亲自执行；执行前 SHALL 存在与待执行计划精确一致的人工确认（目标设备身份/binding revision、固件、transport、HDC、Provider 与 Step 集合），evidence SHALL 记录 operator、物理目标确认、执行时间与恢复路径。普通 Task、聊天确认、已连接 USB、事后 run 或 hardware evidence 均不得升级或补发该权限。
+自主 Agent MAY dispatch 含 `destructive` Step 的真实 Flash workflow，当且仅当 trusted host
+已验证精确 E2 authority：匹配 pending plan/target 的 maintainer-merged
+`standingAuthorization`，或同一受监督交互 Agent 会话中未消费的
+`evolutionCampaignConfirmation`。standing authorization SHALL pin target identity/binding
+revision、firmware、transport、HDC、Provider、plan/Step set、recovery path、validity 和 use
+limit。campaign 还 SHALL pin protected-main base、candidate allowed paths/diff budget、build
+target/toolchain、exact plan/target/data impact、validity 和 `maxAttempts`；最多 16 个串行
+attempts、四小时、并发一。
 
-#### Scenario: AC-FLASH-015-01 普通 Agent Task 请求真实刷写
+每个真实 destructive Step 前，protected-main broker SHALL re-materialize 已发布 typed plan、
+验证全部 authority 和 candidate/review pins、取得 fresh target/binding readback 并 durable
+reserve ordinal。任一缺失、过期、已消费、漂移、超预算、非 PASS review、无 fresh
+reservation、非 terminal predecessor、身份/拓扑不确定、`outcomeUnknown`、unresolved intent
+或 unsafe partial write SHALL fail closed：destructive dispatch 为 0，Job 记录精确 blocker/
+terminal disposition。candidate、repairer、reviewer 不得访问设备 transport 或 authority，且
+不得扩展 argv、operation、partition、plan、archive、step set 或 target。只有 broker 可
+dispatch；它只有在上一 attempt durable terminal 且完整 outcome/readback 分类为
+`safeToReflash` 时 MAY 在同一 invocation 继续。任何 uncertain/unsafe outcome 不得 replay。
 
-- GIVEN 一个普通 AI Agent/CI 任务拥有真实设备 binding，并生成含 flashPartition 的 execute plan
-- WHEN workflow authorization gate 校验 execution class
-- THEN destructive dispatch 数为 0，Job 标记 policyBlocked 并生成受控人工 handoff
-- AND 只有由人类操作者亲自执行的 run 才能产生 realHardware evidence
+普通 CI、daemon/scheduler 和无上述 exact E2 authority 的 Agent SHALL 保持在 contract、fake、
+simulated 或 plan-only 分支。legacy one-shot `chatConfirmation` 只可 decode/export，不能
+reserve、admit 或 dispatch。evidence SHALL 记录真实 executor、authority kind/reference、fresh
+target confirmation、attempt ordinal 和 recovery/terminal disposition；campaign 不得记作
+standing authorization。evidence 或事后聊天消息不得追溯授权 dispatch。
 
-#### Scenario: AC-FLASH-015-02 人工确认与待执行计划或目标不一致
+#### Scenario: AC-FLASH-015-01 Missing E2 authority blocks real Flash
 
-- GIVEN 待执行计划的 target binding、固件、transport、HDC、Provider 或 Step 集合与人工确认的内容任一不同，或人工确认缺失
-- WHEN 执行器在首个真实设备 Step 前校验人工确认
-- THEN 真实设备 dispatch 数为 0，run 不得产生 verified realHardware evidence
-- AND 后续补写 run、hardware evidence 或聊天确认不能把该次执行追认为已授权
+- GIVEN 一个 Agent 或 CI 有真实 device binding 和含 `flashPartition` 的 execute plan，
+  但没有匹配 standing authorization 或同会话未消费 campaign confirmation
+- WHEN trusted host 校验 execution gate
+- THEN destructive dispatch 数为 0，Job 为 `policyBlocked` 并记录缺失 authority 原因
+- AND run 不得发布 realHardware evidence
+
+#### Scenario: AC-FLASH-015-02 E2 drift or unsafe predecessor blocks the next attempt
+
+- GIVEN 一个 pending Agent Flash 有 authority，但任一 target/binding、firmware、transport、
+  HDC、Provider、plan/Step set、base/scope/toolchain/budget、candidate/review pin、reservation、
+  freshness、predecessor terminal state 或 readback 缺失、变化、过期、已消费、unsafe 或 unknown
+- WHEN broker 在首个真实 device Step 前校验 attempt
+- THEN destructive dispatch 数为 0，Job 记录具体 blocker 或 terminal stop
+- AND 后续 run record、hardware evidence 或聊天消息不能追溯授权
+
+#### Scenario: AC-FLASH-015-03 Exact E2 authority permits bounded Agent dispatch
+
+- GIVEN Agent 有匹配 maintainer-merged standing authorization 或同会话未消费 campaign
+  confirmation，且 broker 已 re-materialize 已发布 plan、通过独立 review（如适用）、取得
+  fresh target/binding readback 并在 16-attempt/four-hour/single-concurrency 预算内 reserve ordinal
+- WHEN broker dispatches execute plan
+- THEN 仅声明的 typed destructive Steps 运行，并持久写入 intent/outcome
+- AND realHardware evidence 记录 `executor.kind=agent`、实际 authority kind/reference、fresh
+  target confirmation、attempt ordinal 和 terminal/recovery disposition
+- AND success 或任何 unsafe/unknown/drift/expiry/budget terminal condition 永久关闭 campaign

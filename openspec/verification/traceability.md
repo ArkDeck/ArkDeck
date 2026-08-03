@@ -46,7 +46,7 @@
 | REQ-FLASH-006 | no real connectKey/process + simulated evidence classification |
 | REQ-FLASH-008/009/010/012/013 | critical process/power/rebind/postflight/recovery evidence |
 | REQ-FLASH-014 | exact real hardware matrix evidence |
-| REQ-FLASH-015 | standard Agent/CI real destructive dispatch = 0；controlled lab exact plan/target authorization mismatch/expiry dispatch = 0；owner-attested run + approved hardware evidence |
+| REQ-FLASH-015 | 无 exact E2 authority 的 Agent/CI destructive dispatch = 0；target/plan/review/reservation/budget drift 或 unsafe/unknown predecessor = 0；仅有匹配 standing authorization 或 bounded campaign 的 broker 可作有界 typed dispatch，并记录真实 authority provenance |
 | REQ-UX-007 | permissionDenied/offline/unauthorized separation；sudo/driver/udev/group/ACL mutation call counter = 0 |
 
 当测试落盘时，每项必须扩展为具体 `TEST-*` 和 `EVD-*`，不得只保留范围级映射。
