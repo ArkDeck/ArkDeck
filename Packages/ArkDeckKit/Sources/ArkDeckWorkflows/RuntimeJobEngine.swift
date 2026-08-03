@@ -1099,7 +1099,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
-        return status(of: current.record)
+        return statusAndReleaseTerminalRuntime(current.record)
       case .confirmedNotExecuted(let reason),
         .confirmedNotExecutedWithDiagnostic(let reason, _),
         .failed(let reason):
@@ -1113,7 +1113,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return status(of: current.record)
+        return statusAndReleaseTerminalRuntime(current.record)
       }
     } catch let failure as RuntimeArtifactPublicationFailure {
       var current = jobs[jobID] ?? runtime
@@ -1129,7 +1129,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: current.record, outcome: .confirmed,
         state: JobState.failed.rawValue)
-      return status(of: current.record)
+      return statusAndReleaseTerminalRuntime(current.record)
     }
 
     var current = jobs[jobID] ?? runtime
@@ -1157,7 +1157,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return status(of: current.record)
+        return statusAndReleaseTerminalRuntime(current.record)
       }
       current = jobs[jobID] ?? current
       try transition(&current, from: .finalizing, to: .succeeded, reason: "finalized")
@@ -1167,7 +1167,7 @@ public actor RuntimeJobEngine {
     jobs[jobID] = current
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
-    return status(of: current.record)
+    return statusAndReleaseTerminalRuntime(current.record)
   }
 
   private func executeSteps(
@@ -2893,20 +2893,11 @@ public actor RuntimeJobEngine {
   }
 
   public func status(jobID: String) throws -> RuntimeJobStatus {
-    if let runtime = jobs[jobID] { return status(of: runtime.record) }
-    guard
-      let persisted = try jobRepository.job(jobID: jobID),
-      let data = persisted.initialRecordData,
-      let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
-    else { throw RuntimeJobEngineError.jobNotFound(jobID) }
-    return status(of: record)
+    status(of: try recordForRead(jobID: jobID))
   }
 
   public func evidenceSnapshot(jobID: String) throws -> RuntimeJobEvidenceSnapshot {
-    guard let runtime = jobs[jobID] else {
-      throw RuntimeJobEngineError.jobNotFound(jobID)
-    }
-    let record = runtime.record
+    let record = try recordForRead(jobID: jobID)
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
       operationReference: record.operationReference,
@@ -2932,17 +2923,15 @@ public actor RuntimeJobEngine {
   /// text, so an artifact that was selected but failed remains an evidence
   /// blocker.
   public func intentionallyOmittedArtifactNames(jobID: String) throws -> Set<String> {
-    guard let runtime = jobs[jobID] else {
-      throw RuntimeJobEngineError.jobNotFound(jobID)
-    }
+    let record = try recordForRead(jobID: jobID)
     guard
       let descriptor = RuntimeOperationCatalog.descriptor(
-        reference: runtime.record.operationReference)
+        reference: record.operationReference)
     else {
       throw RuntimeJobEngineError.internalFailure(
-        "persisted operation \(runtime.record.operationReference) is unavailable")
+        "persisted operation \(record.operationReference) is unavailable")
     }
-    let inputs = runtime.record.request.inputs
+    let inputs = record.request.inputs
     var omittedSteps: Set<String> = []
     for step in descriptor.steps where step.isOptional {
       if let upstream = Self.optionalStepUpstream[descriptor.reference]?[step.stepID],
@@ -2959,8 +2948,26 @@ public actor RuntimeJobEngine {
       })
   }
 
+  /// Returns both active Runtime snapshots and durable terminal history.  The
+  /// latter is projected from SQLite so callers keep the established `job.list`
+  /// behaviour without forcing the daemon to retain a journal writer per
+  /// completed job.
   public func listJobs() -> [RuntimeJobStatus] {
-    jobs.values.map { status(of: $0.record) }.sorted { $0.jobID < $1.jobID }
+    var statuses: [String: RuntimeJobStatus] = [:]
+    if let persisted = try? jobRepository.allJobs() {
+      for row in persisted {
+        guard let data = row.initialRecordData,
+          let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+        else { continue }
+        statuses[record.jobID] = status(of: record)
+      }
+    }
+    // Active snapshots can contain timeline entries accumulated since their
+    // last durable projection; they take precedence over the history index.
+    for runtime in jobs.values {
+      statuses[runtime.record.jobID] = status(of: runtime.record)
+    }
+    return statuses.values.sorted { $0.jobID < $1.jobID }
   }
 
   /// Reads compact terminal history from SQLite.  Active jobs still return
@@ -3308,8 +3315,12 @@ public actor RuntimeJobEngine {
   }
 
   public func reconcile(jobID: String) async throws -> RuntimeJobStatus {
-    guard var runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
-    guard runtime.record.outcomeUnknown else { return status(of: runtime.record) }
+    guard var runtime = jobs[jobID] else {
+      return status(of: try recordForRead(jobID: jobID))
+    }
+    guard runtime.record.outcomeUnknown else {
+      return statusAndReleaseTerminalRuntime(runtime.record)
+    }
     let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
     var inspection = try DurableJournalRecovery.inspect(url: journalURL)
 
@@ -3357,7 +3368,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: runtime.record, outcome: .confirmed,
         state: JobState.failed.rawValue)
-      return status(of: runtime.record)
+      return statusAndReleaseTerminalRuntime(runtime.record)
     }
     guard inspection.unknownOutcomes.isEmpty else {
       runtime.record.timeline.append(
@@ -3653,7 +3664,7 @@ public actor RuntimeJobEngine {
       // remaining plan before its lineage node can authorize another Job.
       break
     }
-    return status(of: runtime.record)
+    return statusAndReleaseTerminalRuntime(runtime.record)
   }
 
   // MARK: Helpers
@@ -5197,6 +5208,34 @@ public actor RuntimeJobEngine {
     try jobRepository.updateJobState(
       jobID: record.jobID, state: record.state, updatedAtUTC: nowUTC(),
       recordData: try record.durableData())
+  }
+
+  /// Terminal jobs have no further dispatch or recovery path.  Their durable
+  /// record and SQLite row remain queryable, so retaining a FileDurableJournal
+  /// and detailed runtime projection in the daemon only makes memory grow with
+  /// history.  Outcome-unknown jobs are deliberately excluded: they remain
+  /// active until an explicit reconciliation reaches a certain terminal state.
+  private func statusAndReleaseTerminalRuntime(_ record: RuntimeJobRecord) -> RuntimeJobStatus {
+    let jobStatus = status(of: record)
+    if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
+      jobs.removeValue(forKey: record.jobID)
+      cancellationRequests.remove(record.jobID)
+    }
+    return jobStatus
+  }
+
+  /// Terminal history is read from its durable SQLite projection after the
+  /// in-memory runtime has been released.  A missing or malformed projection
+  /// is never guessed at as a status because doing so could hide an unknown
+  /// external-effect outcome.
+  private func recordForRead(jobID: String) throws -> RuntimeJobRecord {
+    if let runtime = jobs[jobID] { return runtime.record }
+    guard
+      let persisted = try jobRepository.job(jobID: jobID),
+      let data = persisted.initialRecordData,
+      let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+    else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    return record
   }
 
   private func status(of record: RuntimeJobRecord) -> RuntimeJobStatus {

@@ -30,6 +30,12 @@ case "$lane" in
     ARKDECK_RUN_SLOW_ARTIFACT_TESTS=1 \
       run_lane slow-artifact swift test --package-path "$package" \
       --filter RuntimeArtifactContractTests/testLargeTextFilePublicationStreamsRedactionAcrossReadBoundaries
+    ARKDECK_RUN_LONG_RUNTIME_TESTS=1 \
+      run_lane slow-runtime swift test --package-path "$package" \
+      --filter RuntimeJobEngineContractTests/testLongRunSimulationKeepsTerminalHistoryOutOfRecoveryMemory
+    ARKDECK_RUN_LONG_JOURNAL_TESTS=1 \
+      run_lane slow-journal swift test --package-path "$package" \
+      --filter JournalRecoveryContractTests/testIncrementalJournalCursorScalesPastTenThousandDurableEvents
     ;;
   full)
     run_lane full swift test --package-path "$package" --parallel --num-workers 8

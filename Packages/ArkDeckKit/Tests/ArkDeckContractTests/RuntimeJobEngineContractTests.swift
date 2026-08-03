@@ -313,21 +313,93 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(terminalCompletion.state, "succeeded")
     let active = try await engine.submit(
       observeRequest(idempotencyKey: "idem-active-history-01", requestID: "req-active-history-01"))
+    let listedBeforeRestart = Set((await engine.listJobs()).map(\.jobID))
+    XCTAssertEqual(listedBeforeRestart, Set([terminal.jobID, active.jobID]))
 
     let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let recovered = try await reopened.recoverActiveJobs()
     XCTAssertEqual(recovered.map(\.jobID), [active.jobID])
     XCTAssertEqual(recovered.map(\.state), ["preflight"])
 
-    // Active Runtime memory is bounded by work that can still move.  The
-    // completed job remains available through the SQLite history projection
-    // without a startup journal replay or a JobRuntime allocation.
-    let activeRuntimeJobs = await reopened.listJobs()
-    XCTAssertEqual(activeRuntimeJobs.map(\.jobID), [active.jobID])
+    // Terminal history remains visible through the normal list surface, but
+    // recovery above has reopened only the active job; the completed job was
+    // never replayed or given a fresh JobRuntime allocation.
+    let listedJobs = await reopened.listJobs()
+    XCTAssertEqual(Set(listedJobs.map(\.jobID)), Set([terminal.jobID, active.jobID]))
     let terminalStatus = try await reopened.status(jobID: terminal.jobID)
     XCTAssertEqual(terminalStatus.state, "succeeded")
     let history = try await reopened.listJobs(pageSize: 10)
     XCTAssertEqual(Set(history.jobs.map(\.jobID)), Set([terminal.jobID, active.jobID]))
+  }
+
+  /// A repeatable long-run simulation for the macOS Runtime.  It deliberately
+  /// keeps the default contract suite short; the slow lane runs this with
+  /// `ARKDECK_RUN_LONG_RUNTIME_TESTS=1` before a release or a soak window.
+  ///
+  /// Each batch creates durable jobs and completes a small terminal slice;
+  /// the test then recreates the Runtime from disk.  This proves that restart
+  /// recovery reopens only active work while the growing terminal history
+  /// remains queryable through SQLite pagination rather than daemon memory.
+  func testLongRunSimulationKeepsTerminalHistoryOutOfRecoveryMemory() async throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_LONG_RUNTIME_TESTS"] == "1" else {
+      throw XCTSkip("set ARKDECK_RUN_LONG_RUNTIME_TESTS=1 to run the 1,000-job Runtime simulation")
+    }
+
+    let cycles = 10
+    let jobsPerCycle = 100
+    let completedPerCycle = 10
+    let expectedJobCount = cycles * jobsPerCycle
+    let expectedTerminalCount = cycles * completedPerCycle
+    var expectedActiveIDs = Set<String>()
+    var expectedTerminalIDs = Set<String>()
+
+    // One daemon accepts the full workload, then exits once.  This reflects
+    // the production lifetime more accurately than retaining a chain of
+    // short-lived test actors in one XCTest process.
+    do {
+      let dispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (engine, _) = try makeEngine(dispatcher: dispatcher)
+      for cycle in 0..<cycles {
+        for offset in 0..<jobsPerCycle {
+          let index = cycle * jobsPerCycle + offset
+          let accepted = try await engine.submit(
+            observeRequest(
+              idempotencyKey: "idem-long-run-\(index)", requestID: "req-long-run-\(index)"))
+          if offset < completedPerCycle {
+            let completion = try await engine.run(jobID: accepted.jobID)
+            XCTAssertEqual(completion.state, "succeeded")
+            expectedTerminalIDs.insert(accepted.jobID)
+          } else {
+            expectedActiveIDs.insert(accepted.jobID)
+          }
+        }
+      }
+      let firstHistoryPage = try await engine.listJobs(pageSize: 97)
+      XCTAssertEqual(firstHistoryPage.jobs.count, 97)
+    }
+
+    // Simulate a clean daemon process loss and restart.  Recovery must not
+    // redispatch terminal work, nor allocate an in-memory runtime for it.
+    let restartDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (restarted, _) = try makeEngine(dispatcher: restartDispatcher)
+    let recovered = try await restarted.recoverActiveJobs()
+    XCTAssertEqual(Set(recovered.map(\.jobID)), expectedActiveIDs)
+    XCTAssertTrue(recovered.allSatisfy { $0.state == "preflight" })
+    XCTAssertEqual(restartDispatcher.dispatchCount, 0)
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    var cursor: String?
+    var historyIDs = Set<String>()
+    repeat {
+      let page = try await reopened.listJobs(pageSize: 97, cursor: cursor)
+      historyIDs.formUnion(page.jobs.map(\.jobID))
+      cursor = page.nextCursor
+    } while cursor != nil
+
+    XCTAssertEqual(historyIDs.count, expectedJobCount)
+    XCTAssertEqual(historyIDs, expectedActiveIDs.union(expectedTerminalIDs))
+    XCTAssertEqual(expectedTerminalIDs.count, expectedTerminalCount)
+    XCTAssertEqual(expectedActiveIDs.count, expectedJobCount - expectedTerminalCount)
   }
 
   func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {

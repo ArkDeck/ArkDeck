@@ -2,10 +2,69 @@ import ArkDeckCore
 import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin
+import Dispatch
 import Foundation
 import XCTest
 
 final class JournalRecoveryContractTests: XCTestCase {
+  /// A real durable append benchmark for the writer cursor.  The 10,000
+  /// diagnostic events are valid journal records and each one uses the same
+  /// fsync path as production; only the last append and one explicit recovery
+  /// are timed, so the assertion detects accidental full-history replays on
+  /// the hot append path without treating a fast disk as correctness.
+  func testIncrementalJournalCursorScalesPastTenThousandDurableEvents() throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_LONG_JOURNAL_TESTS"] == "1" else {
+      throw XCTSkip("set ARKDECK_RUN_LONG_JOURNAL_TESTS=1 to run the 10,000-event journal benchmark")
+    }
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "incremental-cursor.jsonl")
+    let journal = try FileDurableJournal(url: journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "created", sequence: 0, sessionID: "cursor-session", jobID: "cursor-job",
+        timestamp: timestamp, executionMode: "execute"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "preflight", sequence: 1, sessionID: "cursor-session", jobID: "cursor-job",
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "cursor benchmark"))
+
+    for sequence in 2...10_001 {
+      try journal.appendAndSynchronize(try cursorBenchmarkWarning(sequence: sequence))
+    }
+
+    let appendStarted = DispatchTime.now().uptimeNanoseconds
+    try journal.appendAndSynchronize(try cursorBenchmarkWarning(sequence: 10_002))
+    let appendElapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - appendStarted
+    XCTAssertLessThan(
+      appendElapsedNanoseconds, UInt64(1_000_000_000),
+      "the hot append path must validate its cursor, not replay 10,000 records")
+
+    let recoveryStarted = DispatchTime.now().uptimeNanoseconds
+    let recovery = try DurableJournalRecovery.inspect(url: journalURL)
+    let recoveryElapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - recoveryStarted
+    XCTAssertEqual(recovery.events.count, 10_003)
+    XCTAssertEqual(recovery.lastDurableSequence, 10_002)
+    XCTAssertLessThan(
+      recoveryElapsedNanoseconds, UInt64(5_000_000_000),
+      "a 10,000-event journal must remain recoverable within the restart budget")
+    print(
+      "ARKDECK_JOURNAL_CURSOR events=10003 appendNanoseconds=\(appendElapsedNanoseconds) "
+        + "recoveryNanoseconds=\(recoveryElapsedNanoseconds)")
+  }
+
+  private func cursorBenchmarkWarning(sequence: Int) throws -> JournalEvent {
+    try JournalEvent(
+      eventID: "warning-\(sequence)", sequence: sequence,
+      sessionID: "cursor-session", jobID: "cursor-job", timestamp: timestamp,
+      kind: .warning,
+      payload: [
+        "code": .string("cursorBenchmark"),
+        "message": .string("incremental durable append"),
+        "details": .object(["sequence": .integer(Int64(sequence))]),
+      ])
+  }
+
   func testAgentAuthorityV22RoundTripsE0E1E2AndRejectsUsageDrift() throws {
     let references: [(AgentExecutionAuthorityReference, String?, WorkflowEffect)] = [
       (
