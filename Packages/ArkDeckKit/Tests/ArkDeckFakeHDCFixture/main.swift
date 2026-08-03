@@ -155,8 +155,15 @@ case .slow:
 case .crash:
   exit(23)
 case .oversized:
+  // The process port retains a bounded 64 KiB capture per stream. Emit one
+  // chunk past that cap so the capture is provably truncated, and no more:
+  // the reading side classifies every chunk as it arrives, so a megabyte here
+  // could not be drained inside the command timeout on a loaded host. The
+  // command was then guillotined mid-drain and whether truncation had already
+  // been observed came down to scheduling.
+  let captureLimit = 64 * 1024
   let chunk = Data(repeating: 0x61, count: 8 * 1024)
-  for _ in 0..<128 { FileHandle.standardOutput.write(chunk) }
+  for _ in 0..<(captureLimit / chunk.count + 1) { FileHandle.standardOutput.write(chunk) }
   FileHandle.standardOutput.write(Data("[Fail] Offline after transfer\n".utf8))
 case .endpoint:
   let selected = ProcessInfo.processInfo.environment["OHOS_HDC_SERVER_PORT"] ?? "missing"
