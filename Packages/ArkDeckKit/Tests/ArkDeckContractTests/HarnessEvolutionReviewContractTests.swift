@@ -683,7 +683,107 @@ final class HarnessEvolutionReviewContractTests: XCTestCase {
     XCTAssertTrue(transport.recorded.isEmpty, "no model call may precede integrity checks")
   }
 
+  // MARK: Claude Code adapter
+
+  func testClaudeCodeReviewerSharesTheClosedVerdictContractAndBindsIdentity() async throws {
+    let transport = RecordingCodexTransport(response: #"{"result":"PASS","issues":[]}"#)
+    let reviewer = try ClaudeCodeHarnessAdversarialReviewer(
+      executablePath: "/usr/bin/true", modelName: "claude-sonnet-5",
+      workingDirectory: rootURL.path, transport: transport,
+      nowUTC: { reviewNow })
+    let request = try adapterRequest()
+
+    let review = try await reviewer.review(request)
+
+    XCTAssertEqual(review.result, .pass)
+    XCTAssertEqual(review.reviewerID, reviewer.reviewerID)
+    XCTAssertTrue(
+      review.reviewerID.hasPrefix("claude-code-harness-adversarial-reviewer@1:"))
+    XCTAssertTrue(review.reviewID.hasPrefix("HREVIEW-"))
+    XCTAssertEqual(review.candidatePatchID, request.candidatePatch.candidatePatchID)
+    XCTAssertEqual(review.evaluationID, request.evaluation.evaluationID)
+
+    // Non-interactive print mode, one turn, no codex-only surface: a run
+    // that tries anything but answering cannot return a parseable verdict.
+    let sent = try XCTUnwrap(transport.recorded.first)
+    XCTAssertTrue(sent.arguments.starts(with: ["--print", "--output-format", "text"]))
+    XCTAssertEqual(
+      sent.arguments.firstIndex(of: "--max-turns").map { sent.arguments[$0 + 1] }, "1")
+    XCTAssertEqual(
+      sent.arguments.firstIndex(of: "--model").map { sent.arguments[$0 + 1] },
+      "claude-sonnet-5")
+    XCTAssertFalse(sent.arguments.contains("--sandbox"))
+    XCTAssertFalse(sent.arguments.contains("--dangerously-skip-permissions"))
+    let prompt = try XCTUnwrap(sent.arguments.last)
+    XCTAssertTrue(prompt.contains(request.unifiedDiff))
+    XCTAssertTrue(prompt.contains(request.originalProblem))
+  }
+
+  func testClaudeCodeReviewerRefusesFencedOrRejectingResponsesLikeCodex() async throws {
+    // A fenced answer is prose around the verdict, not the verdict: the
+    // shared closed parse refuses it whichever CLI produced it.
+    let fenced = RecordingCodexTransport(
+      response: "```json\n{\"result\":\"PASS\",\"issues\":[]}\n```")
+    do {
+      _ = try await makeClaudeCodeReviewer(transport: fenced).review(adapterRequest())
+      XCTFail("a fenced response must be refused by the closed parse")
+    } catch let error as HarnessCLIAdversarialReviewError {
+      XCTAssertEqual(error, .responseShape)
+    }
+
+    let reject = RecordingCodexTransport(
+      response: #"{"result":"REJECT","issues":[{"severity":"HIGH","description":"regression"}]}"#)
+    let review = try await makeClaudeCodeReviewer(transport: reject).review(adapterRequest())
+    XCTAssertEqual(review.result, .reject)
+    XCTAssertEqual(
+      review.issues, [HarnessReviewIssue(severity: .high, description: "regression")])
+  }
+
   // MARK: Environment composition
+
+  func testClaudeCodeReviewerCompositionSelectsTheVendorByItsOwnKeys() throws {
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.adversarialReviewer(environment: [
+        HarnessVendorConfiguration.reviewerClaudeCodePathKey: "/usr/bin/true"
+      ])
+    ) { error in
+      XCTAssertEqual(error as? HarnessVendorConfigurationError, .providerRequired)
+    }
+
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.adversarialReviewer(environment: [
+        HarnessVendorConfiguration.reviewerProviderKey: "claude-code",
+        HarnessVendorConfiguration.reviewerModelKey: "claude-sonnet-5",
+        HarnessVendorConfiguration.reviewerClaudeCodePathKey: "/usr/bin/true",
+      ])
+    ) { error in
+      XCTAssertEqual(
+        error as? HarnessVendorConfigurationError, .missingCodexWorkingDirectory)
+    }
+
+    // The codex keys cannot stand in for the claude-code vendor: each CLI is
+    // named through its own key so the operator's role assignment is exact.
+    XCTAssertThrowsError(
+      try HarnessVendorConfiguration.adversarialReviewer(environment: [
+        HarnessVendorConfiguration.reviewerProviderKey: "claude-code",
+        HarnessVendorConfiguration.reviewerModelKey: "claude-sonnet-5",
+        HarnessVendorConfiguration.reviewerCodexPathKey: "/usr/bin/true",
+        HarnessVendorConfiguration.reviewerCodexWorkingDirectoryKey: rootURL.path,
+      ])
+    ) { error in
+      XCTAssertEqual(error as? HarnessVendorConfigurationError, .malformedExecutable)
+    }
+
+    let reviewer = try HarnessVendorConfiguration.adversarialReviewer(environment: [
+      HarnessVendorConfiguration.reviewerProviderKey: "claude-code",
+      HarnessVendorConfiguration.reviewerModelKey: "claude-sonnet-5",
+      HarnessVendorConfiguration.reviewerClaudeCodePathKey: "/usr/bin/true",
+      HarnessVendorConfiguration.reviewerClaudeCodeWorkingDirectoryKey: rootURL.path,
+    ])
+    XCTAssertTrue(
+      try XCTUnwrap(reviewer).reviewerID.hasPrefix(
+        "claude-code-harness-adversarial-reviewer@1:"))
+  }
 
   func testReviewerCompositionIsExplicitClosedAndFailClosed() throws {
     XCTAssertNil(try HarnessVendorConfiguration.adversarialReviewer(environment: [:]))
@@ -904,6 +1004,15 @@ final class HarnessEvolutionReviewContractTests: XCTestCase {
   ) throws -> CodexHarnessAdversarialReviewer {
     try CodexHarnessAdversarialReviewer(
       executablePath: "/usr/bin/true", modelName: "review-model",
+      workingDirectory: rootURL.path, transport: transport,
+      nowUTC: { reviewNow })
+  }
+
+  private func makeClaudeCodeReviewer(
+    transport: RecordingCodexTransport
+  ) throws -> ClaudeCodeHarnessAdversarialReviewer {
+    try ClaudeCodeHarnessAdversarialReviewer(
+      executablePath: "/usr/bin/true", modelName: "claude-sonnet-5",
       workingDirectory: rootURL.path, transport: transport,
       nowUTC: { reviewNow })
   }

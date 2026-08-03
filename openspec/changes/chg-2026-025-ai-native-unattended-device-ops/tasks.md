@@ -3506,3 +3506,12 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   `READY_FOR_NORMAL_PR`；两测试均经变异对照证伪（放宽预算门、删 promotion 记录
   各自打红）；`JourneyWorkspacePort` 的 sweep conformance 由 #975 以 fail-loud
   `SweepUnsupported` 收口；设备 dispatch=0。
+- claude-code reviewer vendor tests（`HarnessEvolutionReviewContractTests`，+3 例）：
+  `ClaudeCodeHarnessAdversarialReviewer` 与 Codex 适配器共享同一 closed prompt/verdict
+  面（抽出 `HarnessCLIAdversarialReviewSupport`，公共错误改名 `HarnessCLIAdversarialReviewError`
+  并保留 typealias 兼容）；argv 钉 `--print --output-format text --max-turns 1 --model`、
+  无 `--sandbox`/`--dangerously-skip-permissions`，单 turn 结构性禁止工具往返；fenced
+  响应按 shared closed parse 拒绝；env 组合新增 `claude-code` provider 与
+  `ARKDECK_HARNESS_REVIEWER_CLAUDE_CODE_PATH/_WORKDIR` 专属键（codex 键不得顶替），
+  provider 缺失时任一 reviewer 键在场即 providerRequired；未配置仍 fail-closed
+  `adversarialReviewerUnavailable`；设备 dispatch=0。

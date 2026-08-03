@@ -111,18 +111,24 @@ public enum HarnessVendorConfiguration {
   public static let reviewerModelKey = "ARKDECK_HARNESS_REVIEWER_MODEL"
   public static let reviewerCodexPathKey = "ARKDECK_HARNESS_REVIEWER_CODEX_PATH"
   public static let reviewerCodexWorkingDirectoryKey = "ARKDECK_HARNESS_REVIEWER_CODEX_WORKDIR"
+  public static let reviewerClaudeCodePathKey = "ARKDECK_HARNESS_REVIEWER_CLAUDE_CODE_PATH"
+  public static let reviewerClaudeCodeWorkingDirectoryKey =
+    "ARKDECK_HARNESS_REVIEWER_CLAUDE_CODE_WORKDIR"
 
   /// The independent adversarial reviewer for the Evolution path. Absent
   /// configuration returns nil and the coordinator fails closed at review
   /// time (`adversarialReviewerUnavailable`); it is never silently replaced
   /// by the decision gateway, because the builder reviewing its own patch
-  /// would not be a review.
+  /// would not be a review. Two local CLI vendors are supported — `codex`
+  /// and `claude-code` — and each names its executable through its own key,
+  /// so a host with both installed states which one holds the reviewer role.
   public static func adversarialReviewer(
     environment: [String: String],
     transport: any HarnessCodexTransport = CodexCLIProcessTransport()
   ) throws -> (any HarnessAdversarialReviewing)? {
     let configuredKeys = [
       reviewerModelKey, reviewerCodexPathKey, reviewerCodexWorkingDirectoryKey,
+      reviewerClaudeCodePathKey, reviewerClaudeCodeWorkingDirectoryKey,
     ]
     guard let rawProvider = nonempty(environment[reviewerProviderKey]) else {
       guard !configuredKeys.contains(where: { nonempty(environment[$0]) != nil }) else {
@@ -130,7 +136,17 @@ public enum HarnessVendorConfiguration {
       }
       return nil
     }
-    guard rawProvider.lowercased() == "codex" else {
+    let provider = rawProvider.lowercased()
+    let pathKey: String
+    let workingDirectoryKey: String
+    switch provider {
+    case "codex":
+      pathKey = reviewerCodexPathKey
+      workingDirectoryKey = reviewerCodexWorkingDirectoryKey
+    case "claude-code":
+      pathKey = reviewerClaudeCodePathKey
+      workingDirectoryKey = reviewerClaudeCodeWorkingDirectoryKey
+    default:
       throw HarnessVendorConfigurationError.unsupportedProvider(rawProvider)
     }
     guard let model = nonempty(environment[reviewerModelKey]), model.utf8.count <= 200,
@@ -140,15 +156,22 @@ public enum HarnessVendorConfiguration {
     else {
       throw HarnessVendorConfigurationError.malformedModelName
     }
-    guard let path = nonempty(environment[reviewerCodexPathKey]), path.hasPrefix("/") else {
+    guard let path = nonempty(environment[pathKey]), path.hasPrefix("/") else {
       throw HarnessVendorConfigurationError.malformedExecutable
     }
-    guard let workingDirectory = nonempty(environment[reviewerCodexWorkingDirectoryKey]) else {
+    guard let workingDirectory = nonempty(environment[workingDirectoryKey]) else {
       throw HarnessVendorConfigurationError.missingCodexWorkingDirectory
     }
-    return try CodexHarnessAdversarialReviewer(
-      executablePath: path, modelName: model, workingDirectory: workingDirectory,
-      transport: transport)
+    switch provider {
+    case "codex":
+      return try CodexHarnessAdversarialReviewer(
+        executablePath: path, modelName: model, workingDirectory: workingDirectory,
+        transport: transport)
+    default:
+      return try ClaudeCodeHarnessAdversarialReviewer(
+        executablePath: path, modelName: model, workingDirectory: workingDirectory,
+        transport: transport)
+    }
   }
 
   private static func nonempty(_ value: String?) -> String? {
