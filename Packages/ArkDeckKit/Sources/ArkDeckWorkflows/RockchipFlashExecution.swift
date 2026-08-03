@@ -77,6 +77,20 @@ public struct RockchipFlashExecutionResult: Sendable, Equatable {
   public let status: RockchipFlashExecutionStatus
   public let evidenceClass: RockchipExecutionEvidenceClass
   public let manifestURL: URL?
+
+  public init(
+    sessionID: String,
+    jobID: String,
+    status: RockchipFlashExecutionStatus,
+    evidenceClass: RockchipExecutionEvidenceClass,
+    manifestURL: URL?
+  ) {
+    self.sessionID = sessionID
+    self.jobID = jobID
+    self.status = status
+    self.evidenceClass = evidenceClass
+    self.manifestURL = manifestURL
+  }
 }
 
 public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedError {
