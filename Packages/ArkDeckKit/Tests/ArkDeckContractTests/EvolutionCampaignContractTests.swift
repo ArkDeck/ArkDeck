@@ -154,6 +154,28 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(roundTrippedEvent.usageReservationID, "reservation-campaign")
   }
 
+  func testCampaignReferenceValidationDiagnosticNamesTheSixteenAttemptLimit() {
+    XCTAssertThrowsError(
+      try AgentExecutionAuthorityReference.validatedEvolutionCampaignConfirmation(
+        campaignDigestSHA256: digest("a"),
+        baseCommitOID: String(repeating: "b", count: 40),
+        planDigestSHA256: digest("c"),
+        archiveDigestSHA256: digest("d"),
+        stepSetDigestSHA256: digest("e"),
+        targetStableIdentitySHA256: digest("f"),
+        bindingLineageRootRevision: 1,
+        confirmedAt: Self.confirmedAt,
+        validUntil: Self.validUntil,
+        maximumAttempts: 17)
+    ) { error in
+      guard case AuthorizationUsageLedgerError.invalidRecord(let detail) = error else {
+        return XCTFail("wrong validation error: \(error)")
+      }
+      XCTAssertTrue(detail.contains("16 attempt/4 hour envelope"))
+      XCTAssertFalse(detail.contains("8 attempt/4 hour envelope"))
+    }
+  }
+
   private func runCLI(_ arguments: [String]) throws -> (status: Int32, output: String) {
     let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
