@@ -3,11 +3,12 @@ import ArkDeckStorage
 import Foundation
 
 // TASK-RF-002. REQ-FLASH-015 Agent/CI destructive boundary and the REQ-FLASH-007/008
-// safety gates for the RockUSB Provider. Nothing in this file can dispatch a device
-// command: its public output is either a human handoff document or a fail-closed decision.
-// The internal AI path accepts only a one-shot admission minted by AuthorizationAdmissionService;
-// it never accepts caller-provided authorization bytes/context and never returns command strings.
-// The dispatch monitor exists to make the in-process zero visible in evidence.
+// safety gates for the RockUSB Provider. This is a legacy direct-human-handoff
+// compatibility route: nothing in this file can dispatch a device command, mint campaign
+// authority, or impersonate the merged Runtime E2 broker. Its public output is therefore a
+// compatibility handoff document or a fail-closed decision; bounded campaign dispatch uses
+// the engine lane with fresh reservation/readback instead. The dispatch monitor makes this
+// compatibility route's in-process zero visible in evidence.
 
 // MARK: - Dispatch instrumentation
 
@@ -28,9 +29,8 @@ public struct RockchipDispatchSnapshot: Codable, Equatable, Sendable {
   }
 }
 
-/// Counts dispatch attempts. The RF-002 codebase intentionally contains no code path that
-/// records into it — contract tests snapshot it after every branch to prove the invariant
-/// "Agent/CI destructive dispatch is always 0" is structural, not situational.
+/// Counts dispatch attempts in the retired direct-handoff route only. It deliberately has no
+/// recording path; this says nothing about the separately brokered Runtime E2 lane.
 public actor RockchipFlashDispatchMonitor {
   private var counts: [RockchipObservedDispatchKind: Int] = [:]
 
@@ -144,9 +144,9 @@ public struct RockchipManualFlashConfirmation: Equatable, Sendable {
 
 // MARK: - Human handoff
 
-/// The only executable artifact this codebase produces for a real flash: an exact,
-/// human-readable command sequence on the closed design §0 surface. A human operator runs
-/// these commands personally; ArkDeck never does.
+/// Legacy direct-human-handoff compatibility output: an exact human-readable command sequence
+/// on the closed design §0 surface. It is never an Agent E2 authority and cannot be converted
+/// into a Runtime campaign reservation or broker dispatch.
 public struct RockchipHumanHandoff: Equatable, Sendable {
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
@@ -171,18 +171,17 @@ public struct RockchipHumanHandoff: Equatable, Sendable {
     var requirements: [String] = []
     if noteMissingStandingAuthorization {
       requirements.append(
-        "No valid standing authorization carrier covers this plan (CHG-2026-025): either a "
-          + "maintainer merges an AUTH-*.json readiness carrier for unattended agent "
-          + "execution, or a human operator executes the commands personally.")
+        "This legacy handoff route has no covering standing authorization. It cannot create "
+          + "a campaign confirmation or dispatch: use the merged Runtime E2 broker, or keep "
+          + "the sequence as a human-executed compatibility handoff.")
     }
     requirements.append(contentsOf: [
-      "Execution requires either a human operator running every command personally, or a "
-        + "standing authorization approved by a maintainer-merged PR whose pins match "
-        + "this plan exactly (REQ-FLASH-015).",
-      "Before the first real device step, the authorizing record (human manual "
-        + "confirmation, or the standing authorization pins for an unattended run) must "
-        + "exactly match this plan: target identity, firmware archive SHA-256, transport, "
-        + "toolchain fingerprint, Provider identity, plan and step-set digest.",
+      "This compatibility handoff is not an Agent E2 authority. Agent execution must enter "
+        + "the merged Runtime broker with an exact standing authorization or bounded campaign "
+        + "confirmation whose pins match this plan (POL-AGENT-002).",
+      "Before the first real device step, the authorizing record must exactly match this plan: "
+        + "target identity, firmware archive SHA-256, transport, toolchain fingerprint, "
+        + "Provider identity, plan and step-set digest.",
       "`ld` must report 0x2207:0x350a Loader before anything else (mode gate).",
       "`ppt` output must match the FA-001 §2 15-row baseline before any wlx write; "
         + "the `wl <BeginSec>` fallback sector values come from the Profile, never from "
@@ -206,8 +205,8 @@ public struct RockchipHumanHandoff: Equatable, Sendable {
 public enum RockchipEvidenceEligibility: String, Codable, Equatable, Sendable {
   /// This in-process run can never produce realHardware evidence by itself.
   case notEligible
-  /// The gate passed for a human operator; the human-executed run (and only it) may
-  /// produce realHardware evidence.
+  /// The legacy compatibility gate passed for a human-executed handoff. The result does not
+  /// represent brokered Agent E2 evidence.
   case humanExecutedRunMayProduceRealHardwareEvidence
   /// A verifier-minted admission passed the plan-binding check. TASK-AIN-006 still has no
   /// executor, so this is admission-only and cannot by itself produce realHardware evidence.
@@ -218,9 +217,8 @@ public enum RockchipAuthorizationOutcome: Equatable, Sendable {
   case allowedNonExecuteBranch
   case blockedByPrerequisites([RockchipPrerequisiteViolation])
   case blockedDestructiveConfirmationDeclined
-  /// Agent/CI credential with an execute plan and no covering standing authorization:
-  /// Job is marked policyBlocked and a controlled handoff is produced that names the
-  /// missing authorization carrier (AC-FLASH-015-01).
+  /// The legacy route has no covering standing authorization. It remains policyBlocked and
+  /// emits a compatibility handoff; it must not substitute for a campaign broker.
   case policyBlocked(handoff: RockchipHumanHandoff)
   case blockedMissingManualConfirmation
   case blockedManualConfirmationMismatch(fields: [String])
@@ -247,8 +245,8 @@ public struct RockchipAuthorizationDecision: Equatable, Sendable {
   /// device-binding journal adapter.
   public let jobMarker: String
   public let dispatchSnapshot: RockchipDispatchSnapshot
-  /// Set only when an internal verifier-minted admission was supplied. This typed reference is
-  /// audit identity and cannot reconstruct the non-Codable one-shot admission capability.
+  /// Set only when the legacy verifier supplied an admission. This typed reference is audit
+  /// identity only; it cannot reconstruct a Runtime E2 authority or campaign reservation.
   public let authorizationRef: AuthorizationReference?
 
   init(

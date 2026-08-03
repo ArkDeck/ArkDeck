@@ -188,7 +188,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       validUntilDate.timeIntervalSince(confirmedDate) <= 4 * 60 * 60
     else {
       throw AuthorizationUsageLedgerError.invalidRecord(
-        "evolution campaign confirmation requires closed pins and an 8 attempt/4 hour envelope")
+        "evolution campaign confirmation requires closed pins and a 16 attempt/4 hour envelope")
     }
     return .evolutionCampaignConfirmation(
       campaignDigestSHA256: campaignDigestSHA256,

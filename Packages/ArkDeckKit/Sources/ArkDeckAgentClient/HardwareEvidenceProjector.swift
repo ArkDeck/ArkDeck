@@ -11,6 +11,9 @@ public enum RuntimeHardwareEvidenceAuthorityKind: String, Codable, Sendable {
   case defaultReadOnlyPolicy
   case runtimeCapability
   case standingAuthorization
+  /// Bounded E2 campaign evidence. This is provenance only; decoding it can
+  /// never mint an authority or reach a device dispatcher.
+  case evolutionCampaignConfirmation
 }
 
 public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
@@ -19,6 +22,17 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let admittedAtUTC: String
   public let validUntilUTC: String?
   public let consumptionFingerprintSHA256: String?
+  /// All campaign fields are daemon-owned durable correlation facts. They are
+  /// optional only so older read-only snapshots remain decodable; a campaign
+  /// record with any one missing is never published as hardware evidence.
+  public let campaignID: String?
+  public let attemptID: String?
+  public let attemptOrdinal: Int?
+  public let planDigest: String?
+  public let targetBindingDigest: String?
+  public let candidateDigest: String?
+  public let reviewDigest: String?
+  public let brokerDigest: String?
 
   enum CodingKeys: String, CodingKey {
     case kind
@@ -26,6 +40,14 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     case admittedAtUTC = "admittedAtUtc"
     case validUntilUTC = "validUntilUtc"
     case consumptionFingerprintSHA256 = "consumptionFingerprintSha256"
+    case campaignID = "campaignId"
+    case attemptID = "attemptId"
+    case attemptOrdinal
+    case planDigest
+    case targetBindingDigest
+    case candidateDigest
+    case reviewDigest
+    case brokerDigest
   }
 }
 
@@ -177,11 +199,11 @@ public struct HardwareEvidenceIncomplete: Sendable, Equatable {
 }
 
 public enum HardwareEvidenceProjectionResult: Sendable, Equatable {
-  case published(HardwareEvidenceV3Record)
+  case published(HardwareEvidenceV4Record)
   case evidenceIncomplete(HardwareEvidenceIncomplete)
 }
 
-public struct HardwareEvidenceV3Record: Codable, Sendable, Equatable {
+public struct HardwareEvidenceV4Record: Codable, Sendable, Equatable {
   public let schemaVersion: String
   public let evidenceId: String
   public let executor: Executor
@@ -209,6 +231,14 @@ public struct HardwareEvidenceV3Record: Codable, Sendable, Equatable {
   public struct Authority: Codable, Sendable, Equatable {
     public let kind: RuntimeHardwareEvidenceAuthorityKind
     public let reference: String
+    public let campaignId: String?
+    public let attemptId: String?
+    public let attemptOrdinal: Int?
+    public let planDigest: String?
+    public let targetBindingDigest: String?
+    public let candidateDigest: String?
+    public let reviewDigest: String?
+    public let brokerDigest: String?
   }
 
   public struct Runtime: Codable, Sendable, Equatable {
@@ -333,15 +363,19 @@ public enum HardwareEvidenceProjector {
       }
     }
 
-    let expectedAuthority: RuntimeHardwareEvidenceAuthorityKind
-    switch effect {
-    case .E0: expectedAuthority = .defaultReadOnlyPolicy
-    case .E1: expectedAuthority = .runtimeCapability
-    case .E2: expectedAuthority = .standingAuthorization
-    }
     let authority = receipt.authority
+    let authorityMatchesEffect: Bool
+    switch effect {
+    case .E0:
+      authorityMatchesEffect = authority?.kind == .defaultReadOnlyPolicy
+    case .E1:
+      authorityMatchesEffect = authority?.kind == .runtimeCapability
+    case .E2:
+      authorityMatchesEffect = authority?.kind == .standingAuthorization
+        || authority?.kind == .evolutionCampaignConfirmation
+    }
     if receipt.executor == .agent {
-      if authority?.kind != expectedAuthority || authority?.reference.isEmpty != false {
+      if !authorityMatchesEffect || authority?.reference.isEmpty != false {
         reasons.append("actual effect and admission authority do not match")
       }
       if observation.confirmationMethod != "machineReadback" {
@@ -363,6 +397,25 @@ public enum HardwareEvidenceProjector {
         !validSHA256(authority.consumptionFingerprintSHA256 ?? "")
       {
         reasons.append("capability consumption fingerprint is absent or malformed")
+      }
+      if authority.kind == .evolutionCampaignConfirmation {
+        guard
+          nonempty(authority.campaignID) != nil,
+          nonempty(authority.attemptID) != nil,
+          let attemptOrdinal = authority.attemptOrdinal,
+          attemptOrdinal >= 1,
+          let planDigest = authority.planDigest,
+          let targetBindingDigest = authority.targetBindingDigest,
+          let candidateDigest = authority.candidateDigest,
+          let reviewDigest = authority.reviewDigest,
+          let brokerDigest = authority.brokerDigest,
+          [planDigest, targetBindingDigest, candidateDigest, reviewDigest, brokerDigest]
+            .allSatisfy(validSHA256),
+          authority.consumptionFingerprintSHA256 == planDigest
+        else {
+          reasons.append("campaign authority correlation is absent, malformed, or drifted")
+          return incomplete(reasons)
+        }
       }
     }
 
@@ -433,33 +486,43 @@ public enum HardwareEvidenceProjector {
     }
 
     guard reasons.isEmpty, let terminal else { return incomplete(reasons) }
-    let record = HardwareEvidenceV3Record(
-      schemaVersion: "3.0.0",
+    let record = HardwareEvidenceV4Record(
+      schemaVersion: "4.0.0",
       evidenceId: claims.evidenceID,
-      executor: HardwareEvidenceV3Record.Executor(
+      executor: HardwareEvidenceV4Record.Executor(
         kind: receipt.executor,
         id: receipt.executorID,
         authority: authority.map {
-          HardwareEvidenceV3Record.Authority(kind: $0.kind, reference: $0.reference)
+          HardwareEvidenceV4Record.Authority(
+            kind: $0.kind,
+            reference: $0.reference,
+            campaignId: $0.campaignID,
+            attemptId: $0.attemptID,
+            attemptOrdinal: $0.attemptOrdinal,
+            planDigest: $0.planDigest,
+            targetBindingDigest: $0.targetBindingDigest,
+            candidateDigest: $0.candidateDigest,
+            reviewDigest: $0.reviewDigest,
+            brokerDigest: $0.brokerDigest)
         }),
-      runtime: HardwareEvidenceV3Record.Runtime(
+      runtime: HardwareEvidenceV4Record.Runtime(
         operationReference: receipt.operationReference,
         jobId: jobID,
         catalogDigest: receipt.catalogDigest,
         terminalState: terminal,
         startedAt: started,
         finishedAt: finished),
-      targetConfirmation: HardwareEvidenceV3Record.TargetConfirmation(
+      targetConfirmation: HardwareEvidenceV4Record.TargetConfirmation(
         confirmedDeviceIdentitySHA256: identity,
         bindingRevision: bindingRevision,
         confirmedAt: confirmed,
         method: observation.confirmationMethod),
-      device: HardwareEvidenceV3Record.Device(
+      device: HardwareEvidenceV4Record.Device(
         model: model,
         serialSHA256: identity,
         firmware: firmware,
         bindingRevision: bindingRevision),
-      toolchain: HardwareEvidenceV3Record.Toolchain(
+      toolchain: HardwareEvidenceV4Record.Toolchain(
         hdcVersion: observation.toolVersion,
         hdcSHA256: observation.toolSHA256),
       transport: transport,
@@ -470,7 +533,7 @@ public enum HardwareEvidenceProjector {
       executedAt: finished,
       validUntil: claims.validUntilUTC,
       artifacts: receipt.artifacts.map {
-        HardwareEvidenceV3Record.Artifact(
+        HardwareEvidenceV4Record.Artifact(
           reference: $0.reference, sha256: $0.sha256, note: nil)
       },
       deviations: nil,

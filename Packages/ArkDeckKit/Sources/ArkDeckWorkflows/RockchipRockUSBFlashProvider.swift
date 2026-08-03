@@ -7,8 +7,10 @@ import Foundation
 // The command surface is the closed design §0 face proven by CHG-2026-016 attempt #5:
 // enter Loader → `ld` mode gate → `ppt` precheck → per-partition `wlx` → `rd` → postflight.
 // This Provider never dispatches a device command itself: it produces typed plans,
-// prerequisite/authorization verdicts, human handoffs and honest outcome assessments;
-// real destructive execution belongs to a human operator (REQ-FLASH-015).
+// prerequisite/authorization verdicts, legacy human-handoff compatibility output and
+// honest outcome assessments. Runtime E2 dispatch, when an exact standing authorization
+// or bounded campaign confirmation exists, belongs exclusively to the merged broker;
+// this Provider remains incapable of direct dispatch (POL-AGENT-002).
 
 public enum RockchipFlashProviderError: Error, Equatable, Sendable {
   case archiveNotValidated([RockchipArchiveViolation])
