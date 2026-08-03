@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 1
+revision: 2
 status: proposed
 class: core
 core_change_level: major
@@ -10,6 +10,14 @@ platforms: [macos, windows, linux]
 ---
 
 # 将有界 E2 campaign 提升为 Core 正本
+
+> r2（2026-08-03）：r1 已由维护者通过 #1014 审查并合入，但 `AGENTS.md` 仍把
+> Runtime Agent 的允许路径分散在“禁令”长段、旧 ready-task 措辞与 Repo-plane
+> `host_loop` 隔离说明之间。r2 增加 `agents-delta.md`：明确已发布 typed operation
+> 的 Runtime Agent 是可执行主体，E0 不需要 Git Task/PR，E1/E2 分别消费 Runtime
+> capability / exact E2 authority；同时保留 host_loop 的 Repo-plane 隔离。r2 不把
+> 无 authority、身份不明、unknown outcome 或 raw-shell destructive dispatch 变为可执行，
+> 也不在本 PR 创建 authority 或接触设备。
 
 ## Why
 
@@ -47,6 +55,10 @@ In scope:
   fresh target confirmation、attempt ordinal 和 terminal disposition。Schema validity 仍不
   mint authority，事后 evidence 仍不得追认 dispatch。
 - enforcement 与 verification policy 统一到同一 E0/E1/E2 词汇和 campaign 限制。
+- `AGENTS.md` 的候选同步移除对有效 Runtime Agent 的人类代执行、Git task/PR 或
+  legacy execution-mode 依赖：已发布 operation 的 E0 可按默认只读策略运行，E1/E2
+  由对应 typed authority 准入。`host_loop` 保持 Repo Agent Plane，不能代替 Runtime
+  dispatch；它的禁令不是 Runtime Agent 的授权规则。
 - archive/ratification 时创建 `CORE-4.0.0`，将 macOS 标为
   `needsReverification`，Windows/Linux 标为 `deferred`；不产生支持或真机通过声明。
 
@@ -122,7 +134,8 @@ Observable behavior:
 ## Approval and implementation sequence
 
 This proposal is a D1 Core/Safety decision. It intentionally remains `proposed` until a human
-maintainer reviews and merges it. After approval, the sole task below may synchronize the
+maintainer explicitly approves the r2 policy scope; r1's review/merge did not authorize this
+additional `AGENTS.md` synchronization. After approval, the sole task below may synchronize the
 current Core files and run the listed host-only checks. A separate human review is required for
 change verification/archive and baseline ratification. No merge grants an authority instance;
 each real attempt still needs its own valid standing authorization or in-session campaign
