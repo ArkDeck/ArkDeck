@@ -109,6 +109,33 @@ public enum RuntimeRequestedOutput: String, Codable, Sendable, CaseIterable {
   case hardwareEvidence
 }
 
+/// Names the bounded-campaign usage reservation carrying this request's E2
+/// authority. The reservation was made by the campaign admission service
+/// (nine-gate check, merged code) and embeds the full confirmation pins the
+/// engine re-verifies; it is not a capability and never mints one.
+public struct RuntimeCampaignReservationReference: Equatable, Sendable, Codable {
+  public let reservationID: String
+
+  enum CodingKeys: String, CodingKey {
+    case reservationID = "reservationId"
+  }
+
+  public init(reservationID: String) {
+    self.reservationID = reservationID
+  }
+
+  func validate() throws {
+    guard !reservationID.isEmpty, reservationID.count <= 128,
+      reservationID.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") })
+    else {
+      throw RuntimeOperationRequestRejection(
+        code: .authorizationRequired,
+        path: "$.campaignReservation.reservationId",
+        message: "campaign reservation must name a ledger reservation identifier")
+    }
+  }
+}
+
 public struct RuntimeCapabilityReference: Equatable, Sendable, Codable {
   public let capabilityID: String
 
@@ -180,6 +207,15 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   public let inputs: [String: JSONValue]
   public let requestedOutputs: [RuntimeRequestedOutput]
   public let authorization: RuntimeCapabilityReference?
+  /// Campaign-lane E2 authority: names an OPEN usage-ledger reservation the
+  /// bounded-campaign admission service made after its own nine-gate check.
+  /// The engine re-verifies the reservation's embedded confirmation pins
+  /// (target identity, archive digest, validity window, ordinal budget) and
+  /// closes the reservation with the job's terminal. Mutually exclusive
+  /// with `authorization`: a request carries exactly one E2 authority kind.
+  /// Schema 2.x minor addition — old decoders ignore it, old wire decodes
+  /// with it absent.
+  public let campaignReservation: RuntimeCampaignReservationReference?
   public let clientContext: RuntimeClientContext?
 
   enum CodingKeys: String, CodingKey {
@@ -192,6 +228,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     case inputs
     case requestedOutputs
     case authorization
+    case campaignReservation
     case clientContext
   }
 
@@ -203,6 +240,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     inputs: [String: JSONValue] = [:],
     requestedOutputs: [RuntimeRequestedOutput] = [.derivedArtifacts],
     authorization: RuntimeCapabilityReference? = nil,
+    campaignReservation: RuntimeCampaignReservationReference? = nil,
     clientContext: RuntimeClientContext? = nil
   ) throws {
     self.requestID = requestID
@@ -212,6 +250,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     self.inputs = inputs
     self.requestedOutputs = requestedOutputs
     self.authorization = authorization
+    self.campaignReservation = campaignReservation
     self.clientContext = clientContext
     try validate()
   }
@@ -310,6 +349,8 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
       ?? [.derivedArtifacts]
     self.authorization = try container.decodeIfPresent(
       RuntimeCapabilityReference.self, forKey: .authorization)
+    self.campaignReservation = try container.decodeIfPresent(
+      RuntimeCampaignReservationReference.self, forKey: .campaignReservation)
     self.clientContext = try container.decodeIfPresent(
       RuntimeClientContext.self, forKey: .clientContext)
     try validate()
@@ -326,6 +367,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     try container.encode(inputs, forKey: .inputs)
     try container.encode(requestedOutputs, forKey: .requestedOutputs)
     try container.encodeIfPresent(authorization, forKey: .authorization)
+    try container.encodeIfPresent(campaignReservation, forKey: .campaignReservation)
     try container.encodeIfPresent(clientContext, forKey: .clientContext)
   }
 
@@ -341,6 +383,13 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     try target.validate()
     try operation.validate()
     try authorization?.validate()
+    try campaignReservation?.validate()
+    if authorization != nil, campaignReservation != nil {
+      throw RuntimeOperationRequestRejection(
+        code: .authorizationRequired,
+        path: "$.campaignReservation",
+        message: "a request carries exactly one E2 authority kind, not both")
+    }
     try clientContext?.validate()
     guard requestedOutputs.count <= 8,
       Set(requestedOutputs).count == requestedOutputs.count

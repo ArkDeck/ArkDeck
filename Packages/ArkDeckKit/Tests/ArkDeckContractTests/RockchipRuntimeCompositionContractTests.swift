@@ -461,7 +461,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(
       facts.serverFacts["componentSigningTeam"],
       BundledRockchipComponent.signingTeamIdentifier)
-    XCTAssertEqual(facts.profileID, "dayu200@1")
+    // Facts the adoption record cannot support are reported unknown, never
+    // fabricated: the old "dayu200@1"/"hdc" literals were guesses flowing
+    // into evidence as if measured.
+    XCTAssertEqual(facts.profileID, "unknown")
+    XCTAssertEqual(facts.deviceMode, "unknown")
   }
 
   func testProductionRockchipRouteUsesReviewedSignedIdentityAndRejectsLegacyPlan()
