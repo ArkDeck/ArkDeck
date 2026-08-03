@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckHarness
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
@@ -1433,6 +1434,48 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
     XCTAssertEqual(evidence.authority?.kind, .runtimeCapability)
     XCTAssertEqual(evidence.authority?.reference, automatic.capability.capabilityID)
+  }
+
+  /// The GJ-5 window's revoked-envelope repro, driven through the real engine
+  /// (CHG-2026-025, TASK-AIN-019). What matters here is not that the refusal
+  /// happens — the store already guaranteed that — but that the *reason*
+  /// leaves the engine as a machine token. Without it the harness can only see
+  /// that authorization was involved, and reports a withdrawn grant as a
+  /// missing one.
+  func testARevokedCapabilityRejectionNamesItsReasonForTheHarness() async throws {
+    let dispatcher = ScriptedDispatcher()
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    try await capabilities.revoke(
+      capabilityID: "CAP-RT-HAP-001", atUTC: "2026-07-29T00:00:00Z",
+      reason: "maintainer withdrew the debug envelope")
+
+    do {
+      let acceptance = try await engine.submit(
+        hapRequest(lease: lease, key: "idem-hap-revoked"))
+      _ = try await engine.run(jobID: acceptance.jobID)
+      XCTFail("a revoked capability must never admit a mutation")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(let code, let detail) = error else {
+        return XCTFail("unexpected rejection shape: \(error)")
+      }
+      XCTAssertEqual(code, .authorizationRequired, detail)
+      XCTAssertTrue(
+        detail.contains("\(RuntimeJobEngine.capabilityDenialMarker)revoked]"),
+        "the denial reason must survive as a token, not only as reflected prose: \(detail)")
+      // End to end: the harness classifies this exact production message as a
+      // revocation rather than as the generic authorization code.
+      XCTAssertEqual(
+        HarnessTaskCoordinator.semanticCode(from: detail), "authorizationRevoked")
+    }
+
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.isEmpty,
+      "refusal precedes every dispatch: \(dispatcher.dispatchedActions)")
+    let untouched = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(untouched?.consumptionCount, 0)
+    XCTAssertEqual(untouched?.remainingUses, 5)
   }
 
   func testOfflineTargetFailsDurablyBeforeCapabilityConsumptionOrMutation() async throws {

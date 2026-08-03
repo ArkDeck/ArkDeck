@@ -1291,12 +1291,17 @@ public actor HarnessTaskCoordinator {
       // operation reference is the minimum durable context a maintainer needs
       // to prepare the matching typed grant. Keep other admission failures on
       // the existing environment-unavailable path.
-      let isAuthorizationRequired = semanticCode == "authorizationRequired"
+      //
+      // Family membership, not equality with the generic code: a revoked or
+      // exhausted grant is still an authorization block, and testing for the
+      // one code would route every specific denial to the wrong category the
+      // moment the runtime learned to name it.
+      let isAuthorization = semanticCode.hasPrefix("authorization")
       let block: HarnessHumanBlock =
-        isAuthorizationRequired ? .authorizationApproval : .environmentUnavailable
+        isAuthorization ? .authorizationApproval : .environmentUnavailable
       let blockReason =
-        isAuthorizationRequired
-        ? "submissionRejected:authorizationRequired:\(intent.operationReference)"
+        isAuthorization
+        ? "submissionRejected:\(semanticCode):\(intent.operationReference)"
         : "submissionRejected:\(semanticCode)"
       let blocked = try await recordBlock(
         snapshot, block: block,
@@ -1305,7 +1310,7 @@ public actor HarnessTaskCoordinator {
       return .rejected(
         HarnessReconcileOutcome(
           snapshot: blocked.snapshot, action: .stoppedForHuman,
-          reasonCode: isAuthorizationRequired ? blockReason : "submissionRejected"))
+          reasonCode: isAuthorization ? blockReason : "submissionRejected"))
     }
     // Any other failure (transport, unknown) leaves the intent at
     // `submitted` and propagates: the next wake resolves it through the
@@ -2571,9 +2576,21 @@ public actor HarnessTaskCoordinator {
     return refs
   }
 
+  /// Marker the runtime prefixes to the machine-readable half of a capability
+  /// rejection. Its counterpart is `RuntimeJobEngine.capabilityDenialMarker`;
+  /// the two planes are deliberately decoupled and cannot share a constant, so
+  /// a contract test pins them to each other instead.
+  static let capabilityDenialMarker = "[denial:"
+
   /// Collapse a runtime rejection message into a stable, identifier-shaped
   /// semantic code so a fingerprint does not vary with prose.
   static func semanticCode(from message: String) -> String {
+    // The runtime's own denial code outranks every heuristic below, because
+    // those can only recognise that authorization was *involved*. Reporting a
+    // revoked, expired and exhausted grant all as "authorization required"
+    // describes none of them: each needs a different maintainer action, and
+    // the task retries into the same wall until a human reads runtime logs.
+    if let denial = capabilityDenialCode(in: message) { return denial }
     let lowered = message.lowercased()
     if lowered.contains("has not been adopted") { return "targetNotAdopted" }
     if lowered.contains("runtime unavailable") || lowered.contains("unavailable") {
@@ -2584,6 +2601,23 @@ public actor HarnessTaskCoordinator {
     }
     if lowered.contains("binding") { return "bindingMismatch" }
     return "rejected"
+  }
+
+  /// The runtime's typed capability denial in this file's vocabulary. The
+  /// `authorization` prefix is load-bearing: it keeps the whole family on the
+  /// approval path below, where only the single generic code used to live.
+  /// A token that is not identifier-shaped is prose that reached here by
+  /// accident, and degrades to the family code rather than entering a
+  /// fingerprint and splintering one failure into many.
+  static func capabilityDenialCode(in message: String) -> String? {
+    guard let marker = message.range(of: capabilityDenialMarker),
+      let close = message[marker.upperBound...].firstIndex(of: "]")
+    else { return nil }
+    let token = message[marker.upperBound..<close]
+    guard (1...48).contains(token.count),
+      token.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })
+    else { return "authorizationRequired" }
+    return "authorization" + token.prefix(1).uppercased() + token.dropFirst()
   }
 
   static func summary(of evaluation: HarnessEvaluation) -> String {

@@ -4328,7 +4328,33 @@ public actor RuntimeJobEngine {
       return PreparedAuthorization(reference: authorization, evidence: nil)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
-        .authorizationRequired, "capability denied: \(error)")
+        .authorizationRequired,
+        "capability denied \(Self.capabilityDenialMarker)\(Self.denialCode(of: error))]: "
+          + "\(error)")
+    }
+  }
+
+  /// Opens the machine-readable half of a capability rejection message, closed
+  /// by `]`. Its counterpart is `HarnessTaskCoordinator.capabilityDenialMarker`;
+  /// the two planes are deliberately decoupled and cannot share a constant, so
+  /// a contract test pins them to each other instead.
+  static let capabilityDenialMarker = "[denial:"
+
+  /// Why the capability layer refused *this* execution, as a stable
+  /// identifier. `"\(error)"` alone carries the reason only inside Swift's
+  /// reflected description, which is an implementation detail and not a
+  /// contract — so a caller wanting the reason must scrape prose, and a caller
+  /// that declines to scrape reports every refusal as the same generic
+  /// "authorization required". Only decisions are named: a store that could
+  /// not be read is an environment fault, not a verdict on the grant.
+  static func denialCode(of error: RuntimeCapabilityStoreError) -> String {
+    switch error {
+    case .denied(let denial): return denial.reason.rawValue
+    case .lineageBlocked: return "lineageBlocked"
+    case .capabilityNotFound: return "capabilityNotFound"
+    case .capabilityAlreadyInstalled, .reservationConflict, .outcomeConflict,
+      .storeCorrupted, .ioFailure:
+      return "unclassified"
     }
   }
 
