@@ -32,6 +32,16 @@ public struct AgentClient: Sendable {
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { throw AgentClientError.connectFailed("cannot create socket") }
     defer { close(fd) }
+    // The daemon closes the connection on an oversize frame and on restart, so
+    // writing into a closed peer must surface as a transport error the caller
+    // can handle. Without this the default SIGPIPE disposition kills the whole
+    // process mid-request instead.
+    var suppressSignal: Int32 = 1
+    guard
+      setsockopt(
+        fd, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
+        socklen_t(MemoryLayout<Int32>.size)) == 0
+    else { throw AgentClientError.transport("cannot suppress SIGPIPE") }
     if let timeoutSeconds {
       guard timeoutSeconds > 0 else {
         throw AgentClientError.transport("timeout must be positive")
@@ -86,9 +96,15 @@ public struct AgentClient: Sendable {
     }
     guard sendOK else { throw AgentClientError.transport("short write") }
 
+    // Only bytes that arrived since the last search can hold the terminator.
+    // Rescanning the whole buffer after every read is quadratic in response
+    // size, and responses run up to the 8 MB bound below; `memchr` also beats
+    // the byte-at-a-time `Collection` scan on the bytes it does look at.
     var buffer = Data()
+    var scannedByteCount = 0
     var chunk = [UInt8](repeating: 0, count: 64 * 1024)
-    while !buffer.contains(0x0A) {
+    var terminatorOffset: Int
+    while true {
       let count = read(fd, &chunk, chunk.count)
       if count <= 0 {
         if errno == EAGAIN || errno == EWOULDBLOCK {
@@ -100,11 +116,14 @@ public struct AgentClient: Sendable {
       if buffer.count > 8 * 1024 * 1024 {
         throw AgentClientError.transport("oversized response")
       }
+      if let offset = Self.frameTerminatorOffset(in: buffer, from: scannedByteCount) {
+        terminatorOffset = offset
+        break
+      }
+      scannedByteCount = buffer.count
     }
-    guard let newlineIndex = buffer.firstIndex(of: 0x0A) else {
-      throw AgentClientError.malformedResponse("no frame terminator")
-    }
-    let line = buffer.subdata(in: buffer.startIndex..<newlineIndex)
+    let line = buffer.subdata(
+      in: buffer.startIndex..<(buffer.startIndex + terminatorOffset))
     let response: AgentWireResponse
     do {
       response = try JSONDecoder().decode(AgentWireResponse.self, from: line)
@@ -120,6 +139,21 @@ public struct AgentClient: Sendable {
     throw AgentClientError.daemonError(
       code: response.error?.code ?? "unknown",
       message: response.error?.message ?? "daemon returned no error detail")
+  }
+
+  /// Offset of the first frame terminator at or after `searchedByteCount`,
+  /// relative to `buffer.startIndex`, or nil while the response is incomplete.
+  private static func frameTerminatorOffset(
+    in buffer: Data, from searchedByteCount: Int
+  ) -> Int? {
+    guard searchedByteCount < buffer.count else { return nil }
+    return buffer.withUnsafeBytes { raw -> Int? in
+      guard let base = raw.baseAddress,
+        let hit = memchr(
+          base.advanced(by: searchedByteCount), 0x0A, raw.count - searchedByteCount)
+      else { return nil }
+      return base.distance(to: UnsafeRawPointer(hit))
+    }
   }
 
   private struct AgentWireRequest: Codable {
