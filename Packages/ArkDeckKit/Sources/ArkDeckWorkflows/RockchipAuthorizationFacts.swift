@@ -171,10 +171,6 @@ protocol RockchipIdentityReadbackFactPort: Sendable {
 /// Both collectors return the identical closed fact shape consumed by the standing-authorization
 /// and bounded-campaign gates.
 protocol RockchipAuthorizationFactCollecting: Sendable {
-  func collect(
-    request: RockchipAuthorizationFactRequest,
-    grant: VerifiedAuthorizationGrant
-  ) async throws -> RockchipTrustedAuthorizationFacts
 
   func collect(
     request: RockchipAuthorizationFactRequest,
@@ -288,15 +284,6 @@ struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
     self.provider = provider
   }
 
-  func collect(
-    request: RockchipAuthorizationFactRequest,
-    grant: VerifiedAuthorizationGrant
-  ) async throws -> RockchipTrustedAuthorizationFacts {
-    try await collect(
-      request: request,
-      expectation: RockchipAuthorizationFactExpectation(
-        standingAuthorization: grant.authorization))
-  }
 
   func collect(
     request: RockchipAuthorizationFactRequest,

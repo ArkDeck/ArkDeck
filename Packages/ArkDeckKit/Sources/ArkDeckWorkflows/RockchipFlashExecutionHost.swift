@@ -1141,15 +1141,6 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
   let usbProbe: RockchipProductUSBProbe
   let clock: any RockchipAdmissionClock
 
-  func collect(
-    request: RockchipAuthorizationFactRequest,
-    grant: VerifiedAuthorizationGrant
-  ) async throws -> RockchipTrustedAuthorizationFacts {
-    try await collect(
-      request: request,
-      expectation: RockchipAuthorizationFactExpectation(
-        standingAuthorization: grant.authorization))
-  }
 
   func collect(
     request: RockchipAuthorizationFactRequest,

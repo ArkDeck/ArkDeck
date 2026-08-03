@@ -3340,7 +3340,16 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   (`capability draft` → merged PR 回填 → install → `job submit`,不做自动翻译,
   否则等于 agent 自铸 capability);九门准入服务与 staging 保留——engine 车道
   正用(实测复核后修正了「删除 staging」的原计划);campaign host 不再有默认执行
-  车道。真实设备 dispatch 仍为 0)
+  车道。真实设备 dispatch 仍为 0;r18(T25 W3)退役 legacy `AuthorizationUsageLedger`
+  standing 半区:standing 准入服务与 provenance resolver(#1001 后零生产调用者)、
+  `authorizeUnattended`、fact collector 的 standing 重载、以及 legacy ledger 本体
+  全部删除;`flash reconcile` 改为只读报告(删掉标准分支后 close 每条路径都只会
+  defer 到 `flash continue`,一个关不掉任何东西的 close 动词会把没做的事报成做了)。
+  **逐符号 rg 后保留六项共享词表**:`AuthorizationReference`(journal/manifest
+  历史解码)、`AuthorizationUsageTerminalStatus`(RuntimeJobEngine 在用)、
+  `AuthorizationUsageLedgerError`、fault point/injector、`AuthorizationUsageValidation`
+  基础校验(campaign ledger 共用)、`AuthorityLane.standingAuthorization`(降为历史
+  解码标签)。真实设备 dispatch 仍为 0)
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001

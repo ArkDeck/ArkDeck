@@ -18,7 +18,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
   private var base: URL!
   private var sessionsRoot: URL!
   private var usageRoot: URL!
-  private var standingLedger: AuthorizationUsageLedger!
   private var agentLedger: AgentAuthorityUsageLedger!
 
   private static let fixedNow = Date(timeIntervalSince1970: 1_770_000_000)
@@ -29,7 +28,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     sessionsRoot = base.appending(path: "Sessions", directoryHint: .isDirectory)
     usageRoot = base.appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: sessionsRoot, withIntermediateDirectories: true)
-    standingLedger = try AuthorizationUsageLedger(root: usageRoot)
     agentLedger = try AgentAuthorityUsageLedger(root: usageRoot)
   }
 
@@ -39,12 +37,15 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
 
   private func reconciler() -> RockchipFlashSessionReconciler {
     RockchipFlashSessionReconciler(
-      sessionsRoot: sessionsRoot, standingLedger: standingLedger, agentLedger: agentLedger,
-      now: { Self.fixedNow })
+      sessionsRoot: sessionsRoot, agentLedger: agentLedger, now: { Self.fixedNow })
   }
 
   private static let timestamp = "2026-08-02T10:00:00Z"
 
+
+  /// Historical standing authority. Its ledger was retired (T25/W3); the
+  /// reference type survives so past journals still decode, and these
+  /// sessions must still be scanned, flagged and reported.
   private func standingReference() throws -> AuthorizationReference {
     try AuthorizationReference(
       authorizationID: "AUTH-2026-025-DAYU200-777",
@@ -197,15 +198,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     }
   }
 
-  private func reserveStanding(_ reservationID: String, jobID: String) throws {
-    _ = try standingLedger.reserve(
-      AuthorizationUsageReservation(
-        reservationID: reservationID, authorizationRef: try standingReference(), ordinal: 1,
-        maxRuns: 1, jobID: jobID,
-        planDigestSHA256: String(repeating: "1", count: 64),
-        targetDigestSHA256: String(repeating: "2", count: 64),
-        reservedAt: Self.timestamp, terminal: nil))
-  }
 
   /// Agent reservation IDs are canonical derivations; mint the real one.
   private func reserveAgent(jobID: String) throws -> String {
@@ -228,65 +220,11 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
 
   // MARK: - Finding unresolved sessions
 
-  func testDanglingDestructiveIntentClosesOutcomeUnknownWithIntentEventID() throws {
-    try reserveStanding("RES-STANDING-1", jobID: "job-1")
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-dangling", jobID: "job-1",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-1")
-    try session.running()
-    try session.intent(
-      try flashStep(id: "write-system"), eventID: "evt-intent-system",
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-1")
 
-    let findings = try reconciler().scan()
-    XCTAssertEqual(findings.map(\.sessionID), ["session-dangling"])
-    let finding = try XCTUnwrap(findings.first)
-    XCTAssertEqual(finding.lane, .standingAuthorization)
-    XCTAssertEqual(finding.currentState, .running)
-    XCTAssertEqual(finding.outstandingIntents.map(\.eventID), ["evt-intent-system"])
-    XCTAssertEqual(
-      finding.ledgerState, .openStandingReservation(reservationID: "RES-STANDING-1"))
-
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition,
-      .closedStandingReservation(reservationID: "RES-STANDING-1", status: .outcomeUnknown))
-    let reservation = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-STANDING-1" })
-    let terminal = try XCTUnwrap(reservation.terminal)
-    XCTAssertEqual(terminal.status, .outcomeUnknown)
-    XCTAssertEqual(terminal.destructiveIntentEventIDs, ["evt-intent-system"])
-  }
-
-  func testCrashBeforeFirstIntentClosesInterrupted() throws {
-    try reserveStanding("RES-STANDING-2", jobID: "job-2")
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-early-crash", jobID: "job-2",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-2")
-    try session.transition(.queued, .preflight, eventID: "evt-preflight")
-
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    XCTAssertTrue(finding.outstandingIntents.isEmpty)
-
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition,
-      .closedStandingReservation(reservationID: "RES-STANDING-2", status: .interrupted))
-    let terminal = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-STANDING-2" }?
-        .terminal)
-    XCTAssertEqual(terminal.status, .interrupted)
-    XCTAssertEqual(terminal.destructiveIntentEventIDs, [])
-  }
 
   func testCleanCrashBetweenStepsIsStillFlagged() throws {
     // The dangerous quiet case: the last outcome is durable and confirmed,
     // no intent dangles, no tail is torn — yet the run is dead mid-flight.
-    try reserveStanding("RES-STANDING-3", jobID: "job-3")
     var session = try SessionBuilder(
       sessionsRoot: sessionsRoot, sessionID: "session-between-steps", jobID: "job-3",
       schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
@@ -306,16 +244,14 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     XCTAssertTrue(finding.outstandingIntents.isEmpty)
     XCTAssertFalse(finding.hasTornTail)
     XCTAssertEqual(finding.lastConfirmedStepID, "write-uboot")
-    // No unresolved mutation is visible, so the honest terminal is
-    // `interrupted` — the ordinal is still consumed.
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition,
-      .closedStandingReservation(reservationID: "RES-STANDING-3", status: .interrupted))
+    // No unresolved mutation is visible. The reservation this journal names
+    // lives in the retired standing ledger, so it reports as missing — and
+    // the session still requires attention rather than dropping out.
+    XCTAssertEqual(finding.ledgerState, .missing(reservationID: "RES-STANDING-3"))
+    XCTAssertTrue(finding.requiresAttention)
   }
 
   func testTornTailFlagsOutcomeUnknown() throws {
-    try reserveStanding("RES-STANDING-4", jobID: "job-4")
     var session = try SessionBuilder(
       sessionsRoot: sessionsRoot, sessionID: "session-torn", jobID: "job-4",
       schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
@@ -326,11 +262,8 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
 
     let finding = try XCTUnwrap(try reconciler().scan().first)
     XCTAssertTrue(finding.hasTornTail)
-    // A torn tail can hide a destructive intent; fail closed.
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition,
-      .closedStandingReservation(reservationID: "RES-STANDING-4", status: .outcomeUnknown))
+    // A torn tail can hide a destructive intent; it stays flagged.
+    XCTAssertTrue(finding.requiresAttention)
   }
 
   func testFinalizedSessionIsNotFlagged() throws {
@@ -376,94 +309,17 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     XCTAssertEqual(finding.campaignID, "ECAMP-" + String(repeating: "F", count: 24))
     XCTAssertEqual(finding.ledgerState, .openAgentReservation(reservationID: reservationID))
 
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(closure.disposition, .agentLaneDeferred(reservationID: reservationID))
-    // The campaign ledger has exactly one writer; the reconciler must not
-    // have touched a byte of it.
+    // The campaign ledger has exactly one writer; the reconciler reports and
+    // never writes, so it must not have touched a byte of it.
     let agentBytesAfter = try Data(
       contentsOf: usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName))
     XCTAssertEqual(agentBytesBefore, agentBytesAfter)
   }
 
-  func testJournalNamingAMissingReservationHasNothingToClose() throws {
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-missing-res", jobID: "job-7",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-NEVER-WRITTEN")
-    try session.running()
-
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    XCTAssertEqual(finding.ledgerState, .missing(reservationID: "RES-NEVER-WRITTEN"))
-    XCTAssertEqual(
-      try reconciler().close(finding).disposition, .nothingToClose)
-  }
 
   // MARK: - Idempotence and settlement
 
-  func testCloseIsIdempotentAndSettledSessionsDropOutOfScan() throws {
-    try reserveStanding("RES-STANDING-8", jobID: "job-8")
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-settle", jobID: "job-8",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-8")
-    try session.running()
-    try session.intent(
-      try flashStep(id: "write-system"), eventID: "evt-intent-8",
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-8")
 
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    let first = try reconciler().close(finding)
-    // Retrying against the pre-closure finding is safe: the derived
-    // terminal is deterministic, so the ledger accepts the byte-identical
-    // retry instead of conflicting.
-    let second = try reconciler().close(finding)
-    XCTAssertEqual(first, second)
-
-    // The authority record is settled: the session no longer demands
-    // attention, and a fresh inspection reports the closed state.
-    XCTAssertEqual(try reconciler().scan(), [])
-    let settled = try reconciler().inspect(sessionID: "session-settle")
-    XCTAssertEqual(settled.ledgerState, .closed(reservationID: "RES-STANDING-8"))
-    XCTAssertEqual(
-      try reconciler().close(settled).disposition,
-      .alreadyClosed(reservationID: "RES-STANDING-8"))
-  }
-
-  func testUnknownOutcomeIntentIsCarriedIntoTheTerminal() throws {
-    // A live process that wrote an explicitly unknown outcome and then
-    // died: the intent is not dangling, but its outcome is unknown — the
-    // terminal must still name it.
-    try reserveStanding("RES-STANDING-9", jobID: "job-9")
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-unknown-outcome", jobID: "job-9",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-9")
-    try session.running()
-    try session.intent(
-      try flashStep(id: "write-system"), eventID: "evt-intent-9",
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-9")
-    try session.outcome(
-      stepID: "write-system", intentEventID: "evt-intent-9", eventID: "evt-out-9",
-      certainty: .outcomeUnknown,
-      authorizationRef: try standingReference(), usageReservationID: "RES-STANDING-9")
-    try session.transition(.running, .waitingForRecovery, eventID: "evt-park")
-
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    XCTAssertEqual(finding.currentState, .waitingForRecovery)
-    XCTAssertEqual(finding.unknownOutcomes.map(\.correlatedIntentEventID), ["evt-intent-9"])
-
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition,
-      .closedStandingReservation(reservationID: "RES-STANDING-9", status: .outcomeUnknown))
-    let terminal = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-STANDING-9" }?
-        .terminal)
-    XCTAssertEqual(terminal.destructiveIntentEventIDs, ["evt-intent-9"])
-  }
 
   func testEmptySessionsRootScansClean() throws {
     XCTAssertEqual(try reconciler().scan(), [])
@@ -472,7 +328,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
   // MARK: - Liveness, post-terminal orphans, races (adversarial review C1/C2/C6)
 
   func testLiveSessionIsExcludedFromScanAndCloseIsRefused() throws {
-    try reserveStanding("RES-LIVE-1", jobID: "job-live")
     var session = try SessionBuilder(
       sessionsRoot: sessionsRoot, sessionID: "session-live", jobID: "job-live",
       schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
@@ -490,10 +345,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     let live = try reconciler().inspect(sessionID: "session-live")
     XCTAssertTrue(live.isLive)
     XCTAssertFalse(live.requiresAttention)
-    XCTAssertEqual(try reconciler().close(live).disposition, .sessionLive)
-    let untouched = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-LIVE-1" })
-    XCTAssertNil(untouched.terminal, "a live run's reservation must never be closed")
 
     // The kernel releases the lock on process death; releasing here flips
     // the same session straight into closable debt.
@@ -501,104 +352,10 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     XCTAssertEqual(try reconciler().scan().map(\.sessionID), ["session-live"])
   }
 
-  func testTerminalSucceededJournalWithOpenReservationClosesSucceeded() throws {
-    // Crash window between the durable `finalized` event and closeUsage:
-    // the journal proves success, the reservation is still open. The
-    // reconciler completes the dead process's own pending write.
-    try reserveStanding("RES-TERM-1", jobID: "job-term")
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-terminal-open", jobID: "job-term",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-TERM-1")
-    try session.running()
-    try session.intent(
-      try flashStep(id: "write-system"), eventID: "evt-term-intent",
-      authorizationRef: try standingReference(), usageReservationID: "RES-TERM-1")
-    try session.outcome(
-      stepID: "write-system", intentEventID: "evt-term-intent", eventID: "evt-term-out",
-      authorizationRef: try standingReference(), usageReservationID: "RES-TERM-1")
-    try session.finalized()
 
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    XCTAssertTrue(finding.terminalWithOpenAuthority)
-    XCTAssertFalse(finding.journalUnresolved)
-    XCTAssertEqual(finding.confirmedMutationIntentEventIDs, ["evt-term-intent"])
-
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition,
-      .closedStandingReservation(reservationID: "RES-TERM-1", status: .succeeded))
-    let terminal = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-TERM-1" }?
-        .terminal)
-    XCTAssertEqual(terminal.status, .succeeded)
-    XCTAssertEqual(terminal.destructiveIntentEventIDs, ["evt-term-intent"])
-    // Settled: authority closed, so the session drops out of scan.
-    XCTAssertEqual(try reconciler().scan(), [])
-  }
-
-  func testCloseRaceAgainstAnotherTerminalSettlesAsAlreadyClosed() throws {
-    try reserveStanding("RES-RACE-1", jobID: "job-race")
-    var session = try SessionBuilder(
-      sessionsRoot: sessionsRoot, sessionID: "session-race", jobID: "job-race",
-      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
-    try session.jobCreated(
-      authorizationRef: try standingReference(), usageReservationID: "RES-RACE-1")
-    try session.running()
-    try session.intent(
-      try flashStep(id: "write-system"), eventID: "evt-race-intent",
-      authorizationRef: try standingReference(), usageReservationID: "RES-RACE-1")
-
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    // Another closer (the dying process, or a concurrent reconcile) wins
-    // the write-once terminal between our scan and our close.
-    _ = try standingLedger.close(
-      reservationID: "RES-RACE-1",
-      terminal: AuthorizationUsageTerminal(
-        status: .failed, closedAt: "2026-08-02T10:30:00Z",
-        destructiveIntentEventIDs: ["evt-race-intent"]))
-
-    let closure = try reconciler().close(finding)
-    XCTAssertEqual(
-      closure.disposition, .alreadyClosed(reservationID: "RES-RACE-1"))
-    let terminal = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-RACE-1" }?
-        .terminal)
-    XCTAssertEqual(terminal.status, .failed, "the racing writer's truth stands")
-  }
 
   // MARK: - Sessionless orphaned reservations (adversarial review C4)
 
-  func testSessionlessStandingReservationIsSweptAndClosesFailClosed() throws {
-    // The session directory is gone (GC, disk-space move, crash before the
-    // journal survived); only the open reservation remains. The session
-    // scan is blind here by construction — the ledger sweep is not.
-    try reserveStanding("RES-ORPHAN-1", jobID: "job-orphan")
-    XCTAssertEqual(try reconciler().scan(), [])
-
-    let orphans = try reconciler().orphanedReservations()
-    XCTAssertEqual(orphans.map(\.reservationID), ["RES-ORPHAN-1"])
-    let orphan = try XCTUnwrap(orphans.first)
-    XCTAssertEqual(orphan.lane, .standingAuthorization)
-
-    let closure = try reconciler().closeOrphan(orphan)
-    XCTAssertEqual(
-      closure.disposition, .closedStandingReservation(reservationID: "RES-ORPHAN-1"))
-    let terminal = try XCTUnwrap(
-      standingLedger.load().reservations.first { $0.reservationID == "RES-ORPHAN-1" }?
-        .terminal)
-    XCTAssertEqual(terminal.status, .outcomeUnknown)
-    XCTAssertEqual(
-      terminal.destructiveIntentEventIDs, [],
-      "no journal survives, so no intent may be claimed")
-    XCTAssertEqual(try reconciler().orphanedReservations(), [])
-    // Retry against the stale orphan value derives a byte-identical
-    // terminal, which the write-once ledger accepts idempotently.
-    XCTAssertEqual(
-      try reconciler().closeOrphan(orphan).disposition,
-      .closedStandingReservation(reservationID: "RES-ORPHAN-1"))
-  }
 
   func testSessionlessAgentReservationIsReportedWithCampaignHintAndDeferred() throws {
     let reservationID = try reserveAgent(jobID: "job-agent-orphan")
@@ -608,12 +365,8 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     let orphans = try reconciler().orphanedReservations()
     XCTAssertEqual(orphans.map(\.reservationID), [reservationID])
     let orphan = try XCTUnwrap(orphans.first)
-    XCTAssertEqual(orphan.lane, .agentCampaign)
     XCTAssertEqual(orphan.campaignID, "ECAMP-" + String(repeating: "F", count: 24))
 
-    XCTAssertEqual(
-      try reconciler().closeOrphan(orphan).disposition,
-      .agentLaneDeferred(reservationID: reservationID))
     let agentBytesAfter = try Data(
       contentsOf: usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName))
     XCTAssertEqual(agentBytesBefore, agentBytesAfter, "campaign ledger keeps one writer")
@@ -622,7 +375,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
   func testSessionLinkedAndClosedReservationsAreNotOrphans() throws {
     // Linked-open: a session directory names the reservation, so the sweep
     // must not double-report it — the session finding owns it.
-    try reserveStanding("RES-LINKED-1", jobID: "job-linked")
     var session = try SessionBuilder(
       sessionsRoot: sessionsRoot, sessionID: "session-linked", jobID: "job-linked",
       schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
@@ -633,8 +385,6 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     XCTAssertEqual(try reconciler().scan().map(\.sessionID), ["session-linked"])
 
     // Closed reservations are settled history, never orphans.
-    let finding = try XCTUnwrap(try reconciler().scan().first)
-    _ = try reconciler().close(finding)
     XCTAssertEqual(try reconciler().orphanedReservations(), [])
   }
 
@@ -655,6 +405,5 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     let finding = try XCTUnwrap(try reconciler().scan().first)
     XCTAssertNotNil(finding.journalError)
     XCTAssertTrue(finding.requiresAttention)
-    XCTAssertEqual(try reconciler().close(finding).disposition, .nothingToClose)
   }
 }
