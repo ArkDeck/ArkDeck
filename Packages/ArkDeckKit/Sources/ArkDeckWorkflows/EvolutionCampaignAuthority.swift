@@ -957,7 +957,12 @@ actor RockchipEvolutionCampaignAdmissionService {
       campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
         candidateDigestSHA256: permit.candidate.digestSHA256,
         reviewDigestSHA256: permit.review.digestSHA256,
-        brokerDigestSHA256: assertion.brokerExecutableDigestSHA256))
+        brokerDigestSHA256: assertion.brokerExecutableDigestSHA256,
+        executionTuning: try AgentAuthorityCampaignExecutionTuning(
+          loaderDiscoveryTimeoutSeconds: permit.candidate.strategy.loaderDiscoveryTimeoutSeconds,
+          loaderPollIntervalMilliseconds: permit.candidate.strategy.loaderPollIntervalMilliseconds,
+          hdcCommandTimeoutSeconds: permit.candidate.strategy.hdcCommandTimeoutSeconds,
+          readOnlyCommandTimeoutSeconds: permit.candidate.strategy.readOnlyCommandTimeoutSeconds)))
     do { _ = try usageLedger.reserve(reservation) } catch let error as AuthorizationUsageLedgerError
     {
       throw RockchipEvolutionCampaignError.admissionRejected("usage:\(error)")

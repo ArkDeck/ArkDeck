@@ -76,6 +76,46 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
     XCTAssertNil(try RuntimeOperationCodec.decodeRequest(legacy).campaignReservation)
   }
 
+  func testCampaignExecutionTuningIsBoundedAndLegacyProvenanceRemainsReadable()
+    throws
+  {
+    let tuning = try AgentAuthorityCampaignExecutionTuning(
+      loaderDiscoveryTimeoutSeconds: 90,
+      loaderPollIntervalMilliseconds: 250,
+      hdcCommandTimeoutSeconds: 7,
+      readOnlyCommandTimeoutSeconds: 9)
+    let provenance = try AgentAuthorityCampaignEvidenceProvenance(
+      candidateDigestSHA256: String(repeating: "a", count: 64),
+      reviewDigestSHA256: String(repeating: "b", count: 64),
+      brokerDigestSHA256: String(repeating: "c", count: 64),
+      executionTuning: tuning)
+    let encoded = try JSONEncoder().encode(provenance)
+    XCTAssertEqual(
+      try JSONDecoder().decode(
+        AgentAuthorityCampaignEvidenceProvenance.self, from: encoded), provenance)
+
+    var legacy = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    legacy.removeValue(forKey: "executionTuning")
+    XCTAssertNil(
+      try JSONDecoder().decode(
+        AgentAuthorityCampaignEvidenceProvenance.self,
+        from: JSONSerialization.data(withJSONObject: legacy)).executionTuning)
+
+    var invalid = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    invalid["executionTuning"] = [
+      "loaderDiscoveryTimeoutSeconds": 14,
+      "loaderPollIntervalMilliseconds": 250,
+      "hdcCommandTimeoutSeconds": 7,
+      "readOnlyCommandTimeoutSeconds": 9,
+    ]
+    XCTAssertThrowsError(
+      try JSONDecoder().decode(
+        AgentAuthorityCampaignEvidenceProvenance.self,
+        from: JSONSerialization.data(withJSONObject: invalid)))
+  }
+
   // MARK: - Facts honesty (ungated)
 
   func testTargetFactsPortReportsUnknownInsteadOfFabricating() async throws {

@@ -785,6 +785,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   private struct ProbeCommand: Sendable {
     let executable: ResolvedExecutable
     let arguments: [String]
+    let timeoutSeconds: Int?
     let criticalNonInterruptible: Bool
   }
 
@@ -807,13 +808,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     func run(
       executable: ResolvedExecutable,
       arguments: [String],
-      timeoutSeconds _: Int?,
+      timeoutSeconds: Int?,
       outputByteBudget _: Int,
       criticalNonInterruptible: Bool
     ) async throws -> ProviderSubprocessReceipt {
       recorded.append(
         ProbeCommand(
           executable: executable, arguments: arguments,
+          timeoutSeconds: timeoutSeconds,
           criticalNonInterruptible: criticalNonInterruptible))
       guard !responses.isEmpty else {
         throw RuntimeDispatchFailure.failed("no scripted response remains")
@@ -868,6 +870,46 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(invocations.map(\.arguments), [
       ["-t", "device-1", "target", "boot", "-bootloader"], ["ld"],
     ])
+  }
+
+  func testEnterLoaderUsesOnlyBrokerRecordedCampaignTiming() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let tuning = try AgentAuthorityCampaignExecutionTuning(
+      loaderDiscoveryTimeoutSeconds: 90,
+      loaderPollIntervalMilliseconds: 250,
+      hdcCommandTimeoutSeconds: 7,
+      readOnlyCommandTimeoutSeconds: 9)
+    let runner = ProbeCommandRunner(responses: [
+      .success(""),
+      .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"),
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner,
+      usbProbe: FixedUSBProbe(identity: identity))
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: "device-1"),
+      stepID: "enter-loader-tuned", toolSHA256: rockchip.sha256)
+    let descriptor = hostDescriptor(plan, executionTuning: tuning)
+    XCTAssertEqual(descriptor.executionTuning, tuning)
+
+    _ = try await executor.execute(
+      action: .enterLoader(connectKey: "device-1"), descriptor: descriptor,
+      rockchipExecutable: rockchip, actionDirectory: root)
+
+    let invocations = await runner.invocations()
+    XCTAssertEqual(invocations.map(\.arguments), [
+      ["-t", "device-1", "target", "boot", "-bootloader"], ["ld"],
+    ])
+    XCTAssertEqual(invocations.map(\.timeoutSeconds), [7, 9])
   }
 
   func testEnterLoaderKeepsTimedOutHDCUnknownWithoutExactLoader() async throws {
@@ -1569,12 +1611,24 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   }
 
   private func hostDescriptor(
-    _ plan: TypedProcessPlan
+    _ plan: TypedProcessPlan,
+    executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
   ) -> HostManagedProcessDescriptor {
     guard case .hostManaged(let descriptor) = plan.kind else {
       preconditionFailure("expected host-managed plan")
     }
-    return descriptor
+    guard let executionTuning else { return descriptor }
+    return HostManagedProcessDescriptor(
+      identifier: descriptor.identifier,
+      jobID: descriptor.jobID,
+      stepID: descriptor.stepID,
+      targetID: descriptor.targetID,
+      bindingRevision: descriptor.bindingRevision,
+      connectKey: descriptor.connectKey,
+      expectedIdentitySHA256: descriptor.expectedIdentitySHA256,
+      providerExecutableSHA256: descriptor.providerExecutableSHA256,
+      actionSHA256: descriptor.actionSHA256,
+      executionTuning: executionTuning)
   }
 
   private func flashBundle() -> RockchipRuntimeFlashBundle {

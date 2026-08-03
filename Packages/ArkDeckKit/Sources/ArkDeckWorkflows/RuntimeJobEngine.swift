@@ -1335,6 +1335,8 @@ public actor RuntimeJobEngine {
           resolvedFacts, record: jobs[jobID]?.record,
           providerID: descriptor.provider.rawValue)
       }
+      let campaignExecutionTuning = try campaignExecutionTuning(
+        for: jobs[jobID]?.record.request)
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
         targetID: targetID,
@@ -1345,7 +1347,8 @@ public actor RuntimeJobEngine {
         toolSHA256: resolvedFacts?.toolSHA256,
         nowUTC: nowUTC(),
         resolvedInputArtifact: resolvedArtifact,
-        additionalInputArtifacts: additionalArtifacts)
+        additionalInputArtifacts: additionalArtifacts,
+        campaignExecutionTuning: campaignExecutionTuning)
       let action: TypedProviderAction
       do {
         action = try provider.action(
@@ -4069,6 +4072,32 @@ public actor RuntimeJobEngine {
         .authorizationRequired,
         "target binding revision precedes the campaign's lineage root")
     }
+  }
+
+  /// Reads only the timing controls that the protected campaign broker copied
+  /// into this request's already-admitted reservation. The campaign CLI never
+  /// supplies these through operation inputs, so a caller cannot alter the
+  /// command/readback timing after the broker has reviewed the candidate.
+  private func campaignExecutionTuning(
+    for request: RuntimeOperationRequest?
+  ) throws -> AgentAuthorityCampaignExecutionTuning? {
+    guard let campaign = request?.campaignReservation else { return nil }
+    guard let ledger = agentUsageLedger else {
+      throw RuntimeDispatchFailure.failed(
+        "campaign timing is unavailable in this runtime (no usage ledger)")
+    }
+    guard let reservation = try ledger.load().reservations.first(where: {
+      $0.reservationID == campaign.reservationID
+    }), reservation.terminal == nil,
+      case .evolutionCampaignConfirmation = reservation.authorizationRef
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "campaign timing reservation is absent, terminal, or not a campaign authority")
+    }
+    // Historical campaign reservations did not persist execution tuning.
+    // They retain the legacy fixed timing rather than gaining a caller-owned
+    // fallback, while every new broker reservation carries the typed value.
+    return reservation.campaignEvidenceProvenance?.executionTuning
   }
 
   /// Resolves the published E1 policy into a durable capability envelope.

@@ -443,6 +443,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     rockchipExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult {
+    // A non-nil value was persisted by the protected broker in the admitted
+    // campaign reservation, then re-read by the Runtime while materializing
+    // this descriptor. It is never sourced from caller inputs.
+    let tuning = descriptor.executionTuning
     switch action {
     case .enterLoader(let connectKey):
       let hdc = try resolveHDC()
@@ -453,7 +457,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           executable: hdc,
           arguments: RockchipHDCIntegrationProfile.enterLoaderArguments(
             connectKey: connectKey),
-          timeoutSeconds: 20,
+          timeoutSeconds: tuning?.hdcCommandTimeoutSeconds ?? 20,
           outputByteBudget: 64 * 1024,
           criticalNonInterruptible: false)
         hdcReceipt = receipt
@@ -478,7 +482,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         let (_, loaderReceipt) = try await waitForLoader(
           stableIdentitySHA256: descriptor.expectedIdentitySHA256,
           rockchipExecutable: rockchipExecutable,
-          timeoutSeconds: enterLoaderReadbackTimeoutSeconds)
+          timeoutSeconds: tuning?.loaderDiscoveryTimeoutSeconds
+            ?? enterLoaderReadbackTimeoutSeconds,
+          pollIntervalMilliseconds: tuning?.loaderPollIntervalMilliseconds ?? 1_000,
+          commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
         var receipts = hdcReceipt.map { [$0] } ?? []
         receipts.append(loaderReceipt)
         return result(
@@ -518,7 +525,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
 
     case .waitForHDCDisconnect(let connectKey):
       let receipts = try await waitForHDC(
-        connectKey: connectKey, expectedConnected: false, timeoutSeconds: 15)
+        connectKey: connectKey, expectedConnected: false,
+        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       return result(
         summary: ["hdcState": "disconnected"], receipts: receipts)
 
@@ -526,7 +535,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       let (identity, receipt) = try await waitForLoader(
         stableIdentitySHA256: stableIdentitySHA256,
         rockchipExecutable: rockchipExecutable,
-        timeoutSeconds: 45)
+        timeoutSeconds: tuning?.loaderDiscoveryTimeoutSeconds ?? 45,
+        pollIntervalMilliseconds: tuning?.loaderPollIntervalMilliseconds ?? 1_000,
+        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       return result(
         summary: [
           "loaderIdentitySha256": identity.serialDigestSHA256,
@@ -625,7 +636,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
 
     case .waitForHDCReconnect(let connectKey):
       let receipts = try await waitForHDC(
-        connectKey: connectKey, expectedConnected: true, timeoutSeconds: 120)
+        connectKey: connectKey, expectedConnected: true, timeoutSeconds: 120,
+        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
       return result(
         summary: ["hdcState": "connected"], receipts: receipts)
 
@@ -644,14 +656,16 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "-t", connectKey, "shell", "param", "get",
           HDCAllowlistedProperty.productModel.rawValue,
         ],
-        timeoutSeconds: 15, budget: 64 * 1024)
+        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        budget: 64 * 1024)
       let versionReceipt = try await run(
         executable: hdc,
         arguments: [
           "-t", connectKey, "shell", "param", "get",
           HDCAllowlistedProperty.fullBuildVersion.rawValue,
         ],
-        timeoutSeconds: 15, budget: 64 * 1024)
+        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        budget: 64 * 1024)
       let model = try property(
         modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)
       let version = try property(
@@ -792,7 +806,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private func waitForHDC(
     connectKey: String,
     expectedConnected: Bool,
-    timeoutSeconds: Int
+    timeoutSeconds: Int,
+    commandTimeoutSeconds: Int
   ) async throws -> [ProviderSubprocessReceipt] {
     let hdc = try resolveHDC()
     let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
@@ -801,7 +816,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       let receipt = try await run(
         executable: hdc,
         arguments: ["list", "targets", "-v"],
-        timeoutSeconds: 15,
+        timeoutSeconds: commandTimeoutSeconds,
         budget: 64 * 1024)
       receipts.append(receipt)
       switch HDCObservationSemanticParser.parseTargetList(
@@ -851,17 +866,20 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private func waitForLoader(
     stableIdentitySHA256: String,
     rockchipExecutable: ResolvedExecutable,
-    timeoutSeconds: Int
+    timeoutSeconds: Int,
+    pollIntervalMilliseconds: Int = 1_000,
+    commandTimeoutSeconds: Int = 15
   ) async throws -> (RockchipRuntimeLoaderIdentity, ProviderSubprocessReceipt) {
     let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
     while ContinuousClock.now < deadline {
       if let identity = try? exactLoaderIdentity(
         stableIdentitySHA256: stableIdentitySHA256),
-        let receipt = try? await observeLoader(executable: rockchipExecutable)
+        let receipt = try? await observeLoader(
+          executable: rockchipExecutable, timeoutSeconds: commandTimeoutSeconds)
       {
         return (identity, receipt)
       }
-      try await Task.sleep(for: .seconds(1))
+      try await Task.sleep(for: .milliseconds(pollIntervalMilliseconds))
     }
     throw RuntimeDispatchFailure.failed(
       "the bound DAYU200 did not appear as one exact Loader target")
@@ -887,12 +905,13 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   }
 
   private func observeLoader(
-    executable: ResolvedExecutable
+    executable: ResolvedExecutable,
+    timeoutSeconds: Int = 15
   ) async throws -> ProviderSubprocessReceipt {
     let receipt = try await run(
       executable: executable,
       arguments: ["ld"],
-      timeoutSeconds: 15,
+      timeoutSeconds: timeoutSeconds,
       budget: 64 * 1024)
     guard
       case .observations(let observations) = RockchipLDOutputParser.parse(
