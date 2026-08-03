@@ -625,6 +625,65 @@ final class AgentDaemonContractTests: XCTestCase {
         pieceBytes: 64 * 1024, expectedResponses: 1))
   }
 
+  /// Sends one framed request and hangs up hard without reading the response.
+  /// `SO_LINGER 0` forces a reset rather than a graceful close, so the daemon's
+  /// write finds a peer that is already gone.
+  private func sendFrameAndHangUp(socketPath: String, identifier: String) throws {
+    let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+    guard fd >= 0 else { throw AgentDaemonError.io("cannot create socket") }
+    var address = sockaddr_un()
+    address.sun_family = sa_family_t(AF_UNIX)
+    withUnsafeMutableBytes(of: &address.sun_path) { buffer in
+      socketPath.utf8CString.withUnsafeBytes { source in
+        buffer.copyMemory(from: UnsafeRawBufferPointer(rebasing: source.prefix(buffer.count)))
+      }
+    }
+    let connected = withUnsafePointer(to: &address) { pointer in
+      pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+      }
+    }
+    guard connected == 0 else {
+      close(fd)
+      throw AgentDaemonError.io("connect errno \(errno)")
+    }
+    var frame = try JSONEncoder().encode(
+      AgentWireProtocol.Request(id: identifier, method: "health", params: nil))
+    frame.append(0x0A)
+    _ = frame.withUnsafeBytes { raw -> Int in
+      write(fd, raw.baseAddress!, raw.count)
+    }
+    var reset = linger(l_onoff: 1, l_linger: 0)
+    _ = setsockopt(fd, SOL_SOCKET, SO_LINGER, &reset, socklen_t(MemoryLayout<linger>.size))
+    close(fd)
+  }
+
+  /// A client that hangs up before reading its response must cost the daemon
+  /// that one connection and nothing else. The daemon is long-lived and shared
+  /// - it holds every job, session, capability and in-flight upload - so an
+  /// interrupted CLI must not be able to take it down. Without suppression the
+  /// response write raises SIGPIPE and kills this test process outright, which
+  /// is exactly the failure being pinned.
+  func testAClientHangingUpCostsOnlyItsOwnConnection() throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+
+    for round in 1...5 {
+      try sendFrameAndHangUp(
+        socketPath: server.socketURL.path, identifier: "hangup-\(round)")
+      Thread.sleep(forTimeInterval: 0.1)
+    }
+
+    let client = AgentClient(socketPath: server.socketURL.path)
+    let health = try client.request(method: "health")
+    guard case .object(let fields) = health,
+      case .string(let status)? = fields["status"]
+    else {
+      return XCTFail("daemon must still answer after clients hang up")
+    }
+    XCTAssertEqual(status, "ok")
+  }
+
   // MARK: - Client transport
 
   /// The daemon drops the connection on an oversize frame, so a request larger
