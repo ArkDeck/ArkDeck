@@ -137,6 +137,61 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   let usbTopology: String
   let evidence: [String]
 
+  /// Converts the owner-only Rockchip rebind evidence into the one adjacent
+  /// edge the generic Runtime target store may apply. Revision 1 has no edge
+  /// to apply. Later revisions must carry one unambiguous previous identity,
+  /// previous revision/topology and the explicit rebind confirmation digest;
+  /// incomplete or invented lineage never reaches the target store.
+  package func runtimeTargetLineageAdvance()
+    throws -> RuntimeTargetBindingLineageAdvance?
+  {
+    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let currentIdentities = values(prefix: "identity:serial-sha256=")
+    guard currentIdentities == [currentIdentity] else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding current identity evidence is missing or ambiguous")
+    }
+    if revision == 1 { return nil }
+
+    let previousIdentities = values(prefix: "identity:previous-serial-sha256=")
+    let previousRevisions = values(prefix: "binding:previous-revision=")
+    let previousTopologies = values(prefix: "binding:previous-usb-topology=")
+    let confirmations = values(prefix: "rebind:chat-confirmation-sha256=")
+    guard previousIdentities.count == 1,
+      previousRevisions.count == 1,
+      previousTopologies.count == 1,
+      confirmations.count == 1,
+      let previousIdentity = previousIdentities.first,
+      let previousRevisionText = previousRevisions.first,
+      let previousRevision = Int(previousRevisionText),
+      let previousTopology = previousTopologies.first,
+      let confirmation = confirmations.first,
+      RockchipStandingAuthorization.isCanonicalSHA256(previousIdentity),
+      RockchipStandingAuthorization.isCanonicalSHA256(confirmation),
+      previousIdentity != currentIdentity,
+      previousRevision > 0,
+      revision == previousRevision + 1,
+      !previousTopology.isEmpty,
+      previousTopology.utf8.allSatisfy({ (48...57).contains($0) }),
+      previousTopology == "0" || previousTopology.first != "0"
+    else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding previous identity lineage is invalid or ambiguous")
+    }
+    return RuntimeTargetBindingLineageAdvance(
+      previousStableIdentitySHA256: previousIdentity,
+      previousRevision: previousRevision,
+      currentStableIdentitySHA256: currentIdentity,
+      currentRevision: revision)
+  }
+
+  private func values(prefix: String) -> [String] {
+    evidence.compactMap {
+      $0.hasPrefix(prefix) ? String($0.dropFirst(prefix.count)) : nil
+    }
+  }
 }
 
 package struct RockchipProductBindingStore: Sendable {
@@ -158,6 +213,15 @@ package struct RockchipProductBindingStore: Sendable {
       throw configurationError("durable Rockchip binding is not installed")
     }
     return snapshot
+  }
+
+  package func loadIfPresent() throws -> RockchipProductBindingSnapshot? {
+    try prepareRoot()
+    let rootDescriptor = Darwin.open(
+      rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard rootDescriptor >= 0 else { throw configurationError("binding root cannot be opened") }
+    defer { Darwin.close(rootDescriptor) }
+    return try load(rootDescriptor: rootDescriptor)
   }
 
   func install(_ candidate: RockchipProductBindingSnapshot)

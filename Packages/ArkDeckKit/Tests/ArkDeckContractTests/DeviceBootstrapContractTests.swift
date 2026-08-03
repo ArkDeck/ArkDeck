@@ -165,6 +165,76 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(try reopened.list().count, 1)
   }
 
+  func testTargetStoreAdvancesOneExactBindingLineageEdgeIdempotently() throws {
+    let previousIdentity = String(repeating: "a", count: 64)
+    let currentIdentity = String(repeating: "b", count: 64)
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let adopted = try store.adopt(
+      stableIdentitySHA256: previousIdentity,
+      connectKey: "normal-mode-connect-key",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-29T00:00:00Z").record
+    let advance = RuntimeTargetBindingLineageAdvance(
+      previousStableIdentitySHA256: previousIdentity,
+      previousRevision: 1,
+      currentStableIdentitySHA256: currentIdentity,
+      currentRevision: 2)
+
+    let first = try store.advanceBindingLineage(advance)
+    XCTAssertTrue(first.updated)
+    XCTAssertEqual(first.record.targetID, adopted.targetID)
+    XCTAssertEqual(first.record.connectKey, adopted.connectKey)
+    XCTAssertEqual(first.record.adoptedAtUTC, adopted.adoptedAtUTC)
+    XCTAssertEqual(first.record.stablePhysicalIdentitySHA256, currentIdentity)
+    XCTAssertEqual(first.record.bindingRevision, 2)
+
+    let second = try store.advanceBindingLineage(advance)
+    XCTAssertFalse(second.updated)
+    XCTAssertEqual(second.record, first.record)
+    let reopened = try RuntimeTargetStore(directoryURL: directory)
+    XCTAssertEqual(try reopened.find(targetID: adopted.targetID), first.record)
+    XCTAssertEqual(try reopened.list().count, 1)
+  }
+
+  func testTargetStoreRejectsUnprovenSkippedAndCollidingLineage() throws {
+    let previousIdentity = String(repeating: "a", count: 64)
+    let currentIdentity = String(repeating: "b", count: 64)
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let adopted = try store.adopt(
+      stableIdentitySHA256: previousIdentity,
+      connectKey: "normal-mode-connect-key",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-29T00:00:00Z").record
+
+    XCTAssertThrowsError(
+      try store.advanceBindingLineage(
+        RuntimeTargetBindingLineageAdvance(
+          previousStableIdentitySHA256: previousIdentity,
+          previousRevision: 1,
+          currentStableIdentitySHA256: currentIdentity,
+          currentRevision: 3)))
+    XCTAssertThrowsError(
+      try store.advanceBindingLineage(
+        RuntimeTargetBindingLineageAdvance(
+          previousStableIdentitySHA256: String(repeating: "c", count: 64),
+          previousRevision: 1,
+          currentStableIdentitySHA256: currentIdentity,
+          currentRevision: 2)))
+    _ = try store.adopt(
+      stableIdentitySHA256: currentIdentity,
+      connectKey: "different-connect-key",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-29T00:01:00Z")
+    XCTAssertThrowsError(
+      try store.advanceBindingLineage(
+        RuntimeTargetBindingLineageAdvance(
+          previousStableIdentitySHA256: previousIdentity,
+          previousRevision: 1,
+          currentStableIdentitySHA256: currentIdentity,
+          currentRevision: 2)))
+    XCTAssertEqual(try store.find(targetID: adopted.targetID), adopted)
+  }
+
   func testLegacyTargetRecordRemainsReadableWithoutCachedEvidenceFields() throws {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let legacy = Data(

@@ -986,6 +986,64 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(process.terminationStatus, 0, "clean shutdown exits zero")
   }
 
+  func testProductionDaemonAdvancesRuntimeTargetFromOwnerOnlyRockchipLineage() throws {
+    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    guard FileManager.default.fileExists(atPath: binary.path) else {
+      throw XCTSkip("arkdeck-agentd binary not built")
+    }
+    let shortRoot = URL(fileURLWithPath: NSHomeDirectory())
+      .appendingPathComponent(
+        ".arkdeck-lineage-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let rockchipRoot = shortRoot.appendingPathComponent("ArkDeck", isDirectory: true)
+    let daemonState = rockchipRoot.appendingPathComponent("Agentd", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: shortRoot) }
+
+    let previousIdentity = String(repeating: "a", count: 64)
+    let serial = "loader-mode-serial"
+    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let targets = try RuntimeTargetStore(
+      directoryURL: daemonState.appendingPathComponent("targets", isDirectory: true))
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: previousIdentity,
+      connectKey: "normal-mode-connect-key",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-08-03T00:00:00Z").record
+    _ = try RockchipProductBindingStore(rootURL: rockchipRoot).install(
+      RockchipProductBindingSnapshot(
+        revision: 2,
+        serial: serial,
+        usbTopology: "17956864",
+        evidence: [
+          "identity:serial-sha256=\(currentIdentity)",
+          "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+          "identity:previous-serial-sha256=\(previousIdentity)",
+          "binding:previous-revision=1",
+          "binding:previous-usb-topology=18874368",
+        ]))
+
+    let process = try launchProductionDaemon(binary: binary, stateDirectory: daemonState)
+    defer {
+      if process.isRunning { process.terminate() }
+    }
+    let socketURL = daemonState.appendingPathComponent("agentd.sock")
+    let client = AgentClient(socketPath: socketURL.path)
+    guard case .object(let health) = try client.request(method: "health") else {
+      return XCTFail("the reconciled production daemon must answer health")
+    }
+    XCTAssertEqual(health["status"], .string("ok"))
+
+    let reconciled = try XCTUnwrap(
+      RuntimeTargetStore(
+        directoryURL: daemonState.appendingPathComponent("targets", isDirectory: true)
+      ).find(targetID: adopted.targetID))
+    XCTAssertEqual(reconciled.targetID, adopted.targetID)
+    XCTAssertEqual(reconciled.connectKey, adopted.connectKey)
+    XCTAssertEqual(reconciled.stablePhysicalIdentitySHA256, currentIdentity)
+    XCTAssertEqual(reconciled.bindingRevision, 2)
+  }
+
   /// The companion case. An "unavailable, and here is the blocker" assertion
   /// is only worth anything if configuring the missing piece removes that
   /// blocker; otherwise the test passes on a daemon that is permanently

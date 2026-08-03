@@ -207,6 +207,74 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     XCTAssertThrowsError(try spoofedNormal.installCurrentLoader())
   }
 
+  func testRebindEvidenceProducesOneAdjacentRuntimeTargetLineageEdge() throws {
+    let serial = "loader-mode-serial"
+    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let previousIdentity = String(repeating: "a", count: 64)
+    let confirmation = String(repeating: "b", count: 64)
+    let snapshot = RockchipProductBindingSnapshot(
+      revision: 2,
+      serial: serial,
+      usbTopology: "17956864",
+      evidence: [
+        "product:e0-iokit-single-loader-readback",
+        "identity:serial-sha256=\(currentIdentity)",
+        "rebind:chat-confirmation-sha256=\(confirmation)",
+        "identity:previous-serial-sha256=\(previousIdentity)",
+        "binding:previous-revision=1",
+        "binding:previous-usb-topology=18874368",
+      ])
+
+    let advance = try XCTUnwrap(snapshot.runtimeTargetLineageAdvance())
+    XCTAssertEqual(advance.previousStableIdentitySHA256, previousIdentity)
+    XCTAssertEqual(advance.previousRevision, 1)
+    XCTAssertEqual(advance.currentStableIdentitySHA256, currentIdentity)
+    XCTAssertEqual(advance.currentRevision, 2)
+
+    let initial = RockchipProductBindingSnapshot(
+      revision: 1,
+      serial: serial,
+      usbTopology: "17956864",
+      evidence: ["identity:serial-sha256=\(currentIdentity)"])
+    XCTAssertNil(try initial.runtimeTargetLineageAdvance())
+  }
+
+  func testRebindEvidenceRejectsMissingAmbiguousOrSkippedLineage() throws {
+    let serial = "loader-mode-serial"
+    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let previousIdentity = String(repeating: "a", count: 64)
+    let confirmation = String(repeating: "b", count: 64)
+    let validEvidence = [
+      "identity:serial-sha256=\(currentIdentity)",
+      "rebind:chat-confirmation-sha256=\(confirmation)",
+      "identity:previous-serial-sha256=\(previousIdentity)",
+      "binding:previous-revision=1",
+      "binding:previous-usb-topology=18874368",
+    ]
+
+    for invalid in [
+      Array(validEvidence.dropFirst()),
+      validEvidence + ["identity:previous-serial-sha256=\(String(repeating: "c", count: 64))"],
+      validEvidence.map {
+        $0.hasPrefix("rebind:chat-confirmation-sha256=")
+          ? "rebind:chat-confirmation-sha256=not-a-digest" : $0
+      },
+    ] {
+      XCTAssertThrowsError(
+        try RockchipProductBindingSnapshot(
+          revision: 2, serial: serial, usbTopology: "17956864", evidence: invalid
+        ).runtimeTargetLineageAdvance())
+    }
+    XCTAssertThrowsError(
+      try RockchipProductBindingSnapshot(
+        revision: 3, serial: serial, usbTopology: "17956864", evidence: validEvidence
+      ).runtimeTargetLineageAdvance())
+  }
+
   func testPublicRequestRejectsAuthorityAndSelectorInjection() throws {
     XCTAssertThrowsError(
       try RockchipFlashExecutionRequest(

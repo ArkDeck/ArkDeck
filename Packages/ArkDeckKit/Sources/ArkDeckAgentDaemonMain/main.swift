@@ -42,9 +42,10 @@ func utcNow() -> String {
   return formatter.string(from: Date())
 }
 
-var stateDirectory = FileManager.default.urls(
+let defaultStateDirectory = FileManager.default.urls(
   for: .applicationSupportDirectory, in: .userDomainMask
 )[0].appendingPathComponent("ArkDeck/Agentd", isDirectory: true)
+var stateDirectory = defaultStateDirectory
 
 var arguments = CommandLine.arguments.dropFirst()
 while let argument = arguments.first {
@@ -189,6 +190,26 @@ Task.detached {
     )
     let targetStore = try RuntimeTargetStore(
       directoryURL: resolvedStateDirectory.appendingPathComponent("targets", isDirectory: true))
+
+    // A Loader rebind advances the product's owner-only Rockchip binding,
+    // while the adopted Runtime target deliberately keeps its normal-mode
+    // connect key for post-flash HDC recovery. Reconcile that exact adjacent
+    // lineage edge before the engine imports an Artifact or materializes a
+    // request, so all three use one identity/revision snapshot. Custom test
+    // state directories never consult the user's production binding.
+    let rockchipRoot = resolvedStateDirectory.deletingLastPathComponent()
+    if resolvedStateDirectory.lastPathComponent == "Agentd",
+      rockchipRoot.lastPathComponent == "ArkDeck",
+      let binding = try RockchipProductBindingStore(rootURL: rockchipRoot).loadIfPresent(),
+      let advance = try binding.runtimeTargetLineageAdvance()
+    {
+      let result = try targetStore.advanceBindingLineage(advance)
+      if result.updated {
+        print(
+          "advanced runtime target \(result.record.targetID) to Rockchip binding revision "
+            + "\(result.record.bindingRevision)")
+      }
+    }
 
     // The HDC executable is supplied explicitly (no PATH search, no guess):
     // absent configuration means dispatch stays refused, never degraded.

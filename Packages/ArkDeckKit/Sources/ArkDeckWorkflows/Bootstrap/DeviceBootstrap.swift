@@ -102,6 +102,30 @@ public struct RuntimeTargetRecord: Sendable, Equatable, Codable {
   }
 }
 
+/// A single, already-proven cross-mode identity transition. The Rockchip
+/// binding store constructs this value from its owner-only lineage evidence;
+/// the target store only applies the exact previous -> current edge. Keeping
+/// the proof outside the generic store prevents a caller from advancing a
+/// target with an uncorrelated identity or a skipped revision.
+package struct RuntimeTargetBindingLineageAdvance: Sendable, Equatable {
+  package let previousStableIdentitySHA256: String
+  package let previousRevision: Int
+  package let currentStableIdentitySHA256: String
+  package let currentRevision: Int
+
+  package init(
+    previousStableIdentitySHA256: String,
+    previousRevision: Int,
+    currentStableIdentitySHA256: String,
+    currentRevision: Int
+  ) {
+    self.previousStableIdentitySHA256 = previousStableIdentitySHA256
+    self.previousRevision = previousRevision
+    self.currentStableIdentitySHA256 = currentStableIdentitySHA256
+    self.currentRevision = currentRevision
+  }
+}
+
 private struct TargetStoreDocument: Codable, Equatable {
   var schemaVersion: String
   var targets: [RuntimeTargetRecord]
@@ -158,6 +182,82 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       document.targets.append(record)
       try persist(document)
       return (record, true)
+    }
+  }
+
+  /// Advances one adopted target across a strictly adjacent, externally
+  /// proven binding lineage edge. The durable target ID and HDC connect key
+  /// remain stable: after a Loader-mode Flash the same normal-mode address is
+  /// needed for reconnect and full Debug Runtime verification.
+  ///
+  /// This is idempotent for the exact current edge. Any missing, ambiguous,
+  /// colliding or skipped lineage fails closed without changing the file.
+  package func advanceBindingLineage(
+    _ advance: RuntimeTargetBindingLineageAdvance
+  ) throws -> (record: RuntimeTargetRecord, updated: Bool) {
+    try queue.sync {
+      guard
+        Self.isCanonicalSHA256(advance.previousStableIdentitySHA256),
+        Self.isCanonicalSHA256(advance.currentStableIdentitySHA256),
+        advance.previousStableIdentitySHA256 != advance.currentStableIdentitySHA256,
+        advance.previousRevision > 0,
+        advance.currentRevision == advance.previousRevision + 1
+      else {
+        throw BootstrapError.storeFailure("invalid target binding lineage advance")
+      }
+
+      var document = try load()
+      let currentMatches = document.targets.filter {
+        $0.stablePhysicalIdentitySHA256 == advance.currentStableIdentitySHA256
+          && $0.bindingRevision == advance.currentRevision
+      }
+      let previousIdentityIndexes = document.targets.indices.filter {
+        document.targets[$0].stablePhysicalIdentitySHA256
+          == advance.previousStableIdentitySHA256
+      }
+      if currentMatches.count == 1 {
+        guard previousIdentityIndexes.isEmpty,
+          document.targets.filter({
+            $0.stablePhysicalIdentitySHA256 == advance.currentStableIdentitySHA256
+          }).count == 1
+        else {
+          throw BootstrapError.storeFailure("ambiguous completed target binding lineage")
+        }
+        return (currentMatches[0], false)
+      }
+      guard currentMatches.isEmpty else {
+        throw BootstrapError.storeFailure("ambiguous current target binding lineage")
+      }
+      guard
+        !document.targets.contains(where: {
+          $0.stablePhysicalIdentitySHA256 == advance.currentStableIdentitySHA256
+        })
+      else {
+        throw BootstrapError.storeFailure("target binding lineage collides with a durable record")
+      }
+      guard previousIdentityIndexes.count == 1,
+        let index = previousIdentityIndexes.first,
+        document.targets[index].bindingRevision == advance.previousRevision
+      else {
+        throw BootstrapError.storeFailure("previous target binding lineage is missing or ambiguous")
+      }
+      let previous = document.targets[index]
+      let current = RuntimeTargetRecord(
+        targetID: previous.targetID,
+        stablePhysicalIdentitySHA256: advance.currentStableIdentitySHA256,
+        bindingRevision: advance.currentRevision,
+        connectKey: previous.connectKey,
+        toolVersion: previous.toolVersion,
+        adoptedAtUTC: previous.adoptedAtUTC)
+      document.targets[index] = current
+      try persist(document)
+      return (current, true)
+    }
+  }
+
+  private static func isCanonicalSHA256(_ value: String) -> Bool {
+    value.count == 64 && value.allSatisfy {
+      ("0"..."9").contains($0) || ("a"..."f").contains($0)
     }
   }
 

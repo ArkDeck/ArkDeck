@@ -32,6 +32,7 @@ import XCTest
 /// this lane, and is called out in the delivering PR rather than papered over.
 final class EngineLaneCampaignDaemonContractTests: XCTestCase {
   private static let archiveEnvironmentKey = "ARKDECK_DAYU200_70035_IMAGE"
+  private static let previousTargetIdentity = String(repeating: "6", count: 64)
   private static let targetIdentity = String(repeating: "7", count: 64)
   private static let toolIdentity = String(repeating: "c", count: 64)
   private static let fixedNow = "2026-08-03T00:30:00Z"
@@ -68,9 +69,16 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
 
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
-    let adopted = try targetStore.adopt(
-      stableIdentitySHA256: Self.targetIdentity, connectKey: "usb-engine-lane",
+    let initialTarget = try targetStore.adopt(
+      stableIdentitySHA256: Self.previousTargetIdentity, connectKey: "usb-engine-lane",
       toolVersion: "3.2.0f", nowUTC: Self.fixedNow
+    ).record
+    let adopted = try targetStore.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: Self.previousTargetIdentity,
+        previousRevision: initialTarget.bindingRevision,
+        currentStableIdentitySHA256: Self.targetIdentity,
+        currentRevision: 2)
     ).record
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
@@ -89,7 +97,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       archiveDigestSHA256: profile.archiveSHA256,
       stepSetDigestSHA256: String(repeating: "d", count: 64),
       targetStableIdentitySHA256: Self.targetIdentity,
-      bindingLineageRootRevision: 1,
+      bindingLineageRootRevision: 2,
       confirmedAt: "2026-08-03T00:00:00Z",
       validUntil: "2026-08-03T03:00:00Z",
       maximumAttempts: 8)
@@ -149,7 +157,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       campaignID: "ECAMP-\(String(repeating: "A", count: 24))", ordinal: 1,
       reservationID: reservationID, jobID: "job-engine-lane-1",
       sessionID: "session-engine-lane-1",
-      targetStableIdentitySHA256: Self.targetIdentity, bindingRevision: 1,
+      targetStableIdentitySHA256: Self.targetIdentity, bindingRevision: 2,
       deviceProfileReference: profile.catalogReference,
       partitionPlan: profile.mappedPartitions.map(\.partitionName),
       archiveSHA256: profile.archiveSHA256,
