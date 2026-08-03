@@ -1,4 +1,5 @@
 import ArkDeckCore
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -39,6 +40,48 @@ public enum DurableFileError: Error, Equatable, Sendable {
   case checkpointInvalid(String)
   case intentNotDurable
   case outcomeNotDurable
+}
+
+/// The only create-or-replace path for small Runtime durable documents.
+///
+/// `FileManager.replaceItemAt` is unsuitable here because its destination
+/// must already exist.  POSIX `rename` has the required atomic semantics for
+/// both a first publication and a replacement on the same volume.  The file
+/// and its parent directory are synchronised on either path, so a successful
+/// return makes the new name durable across a sudden process loss.
+public enum DurableFileWriter {
+  public static func createOrReplaceAtomically(destination: URL, data: Data) throws {
+    try DurableFilePrimitives.requireAbsoluteFileURL(destination)
+    let directory = destination.deletingLastPathComponent()
+    try DurableFilePrimitives.createDirectoryIfNeeded(directory)
+    try DurableFilePrimitives.rejectSymbolicLink(destination)
+
+    let temporary = directory.appending(
+      path: ".\(destination.lastPathComponent).\(UUID().uuidString).tmp")
+    let descriptor = Darwin.open(
+      temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard descriptor >= 0 else {
+      throw DurableFileError.openFailed(path: temporary.path, errno: errno)
+    }
+    var descriptorOpen = true
+    defer {
+      if descriptorOpen { Darwin.close(descriptor) }
+      try? FileManager.default.removeItem(at: temporary)
+    }
+
+    try DurableFilePrimitives.writeAll(data, descriptor: descriptor, path: temporary.path)
+    try DurableFilePrimitives.fullSync(descriptor, path: temporary.path)
+    guard Darwin.close(descriptor) == 0 else {
+      descriptorOpen = false
+      throw DurableFileError.syncFailed(path: temporary.path, errno: errno)
+    }
+    descriptorOpen = false
+
+    guard Darwin.rename(temporary.path, destination.path) == 0 else {
+      throw DurableFileError.replaceFailed(path: destination.path, errno: errno)
+    }
+    try DurableFilePrimitives.syncDirectory(directory)
+  }
 }
 
 enum SessionTerminalPublicationLock {
@@ -103,11 +146,91 @@ public protocol DurableJournalAppending: Sendable {
   func abandonmentContext() throws -> JournalAbandonmentContext
 }
 
+/// The validated tail of one open journal writer.  It allows the common
+/// append path to validate only immutable metadata plus the last complete
+/// record, instead of replaying every historical event.  Any observed change
+/// outside this cursor falls back to a full replay before a new event is
+/// accepted.
+private struct JournalAppendCursor {
+  var offset: Int64
+  var lastSequence: Int?
+  var lastRecordOffset: Int64?
+  var lastRecordLength: Int
+  var lastRecordSHA256: Data?
+  var modificationSeconds: Int
+  var modificationNanoseconds: Int
+  var changeSeconds: Int
+  var changeNanoseconds: Int
+
+  init(metadata: stat, replay: JournalReplay) throws {
+    offset = Int64(metadata.st_size)
+    lastSequence = replay.lastDurableSequence
+    modificationSeconds = Int(metadata.st_mtimespec.tv_sec)
+    modificationNanoseconds = Int(metadata.st_mtimespec.tv_nsec)
+    changeSeconds = Int(metadata.st_ctimespec.tv_sec)
+    changeNanoseconds = Int(metadata.st_ctimespec.tv_nsec)
+    guard let last = replay.events.last else {
+      lastRecordOffset = nil
+      lastRecordLength = 0
+      lastRecordSHA256 = nil
+      return
+    }
+    var encoded = try JournalEventCodec.encode(last)
+    encoded.append(0x0A)
+    lastRecordOffset = offset - Int64(encoded.count)
+    lastRecordLength = encoded.count
+    lastRecordSHA256 = Data(SHA256.hash(data: encoded))
+  }
+
+  func matches(_ metadata: stat) -> Bool {
+    Int64(metadata.st_size) == offset
+      && Int(metadata.st_mtimespec.tv_sec) == modificationSeconds
+      && Int(metadata.st_mtimespec.tv_nsec) == modificationNanoseconds
+      && Int(metadata.st_ctimespec.tv_sec) == changeSeconds
+      && Int(metadata.st_ctimespec.tv_nsec) == changeNanoseconds
+  }
+
+  func validatesTail(on descriptor: Int32, path: String) throws -> Bool {
+    guard let lastRecordOffset, let lastRecordSHA256 else { return offset == 0 }
+    var data = Data(count: lastRecordLength)
+    var readOffset = 0
+    while readOffset < data.count {
+      let remaining = data.count - readOffset
+      let count = data.withUnsafeMutableBytes { buffer in
+        Darwin.pread(
+          descriptor, buffer.baseAddress!.advanced(by: readOffset), remaining,
+          off_t(lastRecordOffset) + off_t(readOffset))
+      }
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw DurableFileError.openFailed(path: path, errno: count < 0 ? errno : EIO)
+      }
+      readOffset += count
+    }
+    return Data(SHA256.hash(data: data)) == lastRecordSHA256
+  }
+
+  mutating func accept(
+    event: JournalEvent, encodedData: Data, metadata: stat
+  ) {
+    lastRecordOffset = offset
+    lastRecordLength = encodedData.count
+    lastRecordSHA256 = Data(SHA256.hash(data: encodedData))
+    offset = Int64(metadata.st_size)
+    lastSequence = event.sequence
+    modificationSeconds = Int(metadata.st_mtimespec.tv_sec)
+    modificationNanoseconds = Int(metadata.st_mtimespec.tv_nsec)
+    changeSeconds = Int(metadata.st_ctimespec.tv_sec)
+    changeNanoseconds = Int(metadata.st_ctimespec.tv_nsec)
+  }
+}
+
 public final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
   public let url: URL
   private let lock = NSLock()
   private let faultInjector: DurabilityFaultInjector
   private var appendState: JournalAppendValidationState
+  private var appendCursor: JournalAppendCursor
   private var poisoned = false
   private let boundDevice: dev_t
   private let boundInode: ino_t
@@ -164,6 +287,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
       return inspection
     }
     appendState = try JournalAppendValidationState(replay: inspection.replay)
+    appendCursor = try JournalAppendCursor(metadata: inspection.metadata, replay: inspection.replay)
     // Pin the writer to the durable journal inode it opened. External replacement of the file
     // (unlink+recreate, rename-over) must fail attributably at the next operation instead of
     // silently re-deriving state from a rewritten history. Cooperating writers on the same
@@ -192,6 +316,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     }
     try requireBoundJournal(inspection.metadata)
     appendState = try JournalAppendValidationState(replay: inspection.replay)
+    appendCursor = try JournalAppendCursor(metadata: inspection.metadata, replay: inspection.replay)
     return appendState.abandonmentContext
   }
 
@@ -219,10 +344,24 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
           throw DurableFileError.openFailed(path: url.path, errno: errno)
         }
         defer { Darwin.close(descriptor) }
-        let inspection = try DurableJournalRecovery.inspect(
-          openFileDescriptor: descriptor, path: url.path)
-        try requireBoundJournal(inspection.metadata)
-        var currentState = try JournalAppendValidationState(replay: inspection.replay)
+        var metadata = stat()
+        guard fstat(descriptor, &metadata) == 0 else {
+          throw DurableFileError.openFailed(path: url.path, errno: errno)
+        }
+        try requireBoundJournal(metadata)
+        var currentState: JournalAppendValidationState
+        var currentCursor: JournalAppendCursor
+        if appendCursor.matches(metadata), try appendCursor.validatesTail(on: descriptor, path: url.path) {
+          currentState = appendState
+          currentCursor = appendCursor
+        } else {
+          let inspection = try DurableJournalRecovery.inspect(
+            openFileDescriptor: descriptor, path: url.path)
+          try requireBoundJournal(inspection.metadata)
+          currentState = try JournalAppendValidationState(replay: inspection.replay)
+          currentCursor = try JournalAppendCursor(
+            metadata: inspection.metadata, replay: inspection.replay)
+        }
         try currentState.validate(event)
         mutationStarted = true
         try faultInjector.check(.journalWrite)
@@ -231,8 +370,15 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         try DurableFilePrimitives.fullSync(descriptor, path: url.path)
         try faultInjector.check(.journalDirectorySync)
         try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
+        var finalMetadata = stat()
+        guard fstat(descriptor, &finalMetadata) == 0 else {
+          throw DurableFileError.openFailed(path: url.path, errno: errno)
+        }
+        try requireBoundJournal(finalMetadata)
         currentState.accept(event)
         appendState = currentState
+        currentCursor.accept(event: event, encodedData: data, metadata: finalMetadata)
+        appendCursor = currentCursor
       }
     } catch {
       if mutationStarted { poisoned = true }

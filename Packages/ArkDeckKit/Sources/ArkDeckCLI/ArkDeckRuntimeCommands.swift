@@ -975,7 +975,29 @@ enum RuntimeCLI {
           method: "job.plan", params: ["requestJson": .string(requestJSON)]),
         json: json)
     case "list":
-      emit(try client.request(method: "job.list"), json: json)
+      let pageSize: Int?
+      if let index = rest.firstIndex(of: "--page-size"), index + 1 < rest.count {
+        guard let value = Int(rest[index + 1]), (1...1_000).contains(value) else {
+          throw CLIError(exitCode: EX_USAGE, message: "--page-size must be 1...1000")
+        }
+        pageSize = value
+      } else {
+        pageSize = nil
+      }
+      let cursor = rest.firstIndex(of: "--cursor").flatMap { index in
+        index + 1 < rest.count ? rest[index + 1] : nil
+      }
+      if rest.contains("--cursor"), cursor == nil {
+        throw CLIError(exitCode: EX_USAGE, message: "--cursor requires a value")
+      }
+      if pageSize != nil || cursor != nil {
+        var params: [String: JSONValue] = [:]
+        if let pageSize { params["pageSize"] = .integer(Int64(pageSize)) }
+        if let cursor { params["cursor"] = .string(cursor) }
+        emit(try client.request(method: "job.list-page", params: params), json: json)
+      } else {
+        emit(try client.request(method: "job.list"), json: json)
+      }
     case "status":
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job status requires --job <id>")

@@ -68,7 +68,11 @@ let package = Package(
         "ArkDeckHarness", "ArkDeckWorkflows",
       ],
       path: "Sources/ArkDeckWorkflows/AgentComposition"),
-    .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
+    .target(
+      name: "ArkDeckStorage",
+      dependencies: ["ArkDeckCore"],
+      linkerSettings: [.linkedLibrary("sqlite3")]
+    ),
     .executableTarget(
       name: "ArkDeckCLI",
       dependencies: [

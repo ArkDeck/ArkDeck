@@ -89,7 +89,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
   private func makeEngine(
     dispatcher: ScriptedDispatcher,
-    nowUTC: String = "2026-07-29T00:00:00Z"
+    nowUTC: String = "2026-07-29T00:00:00Z",
+    admissionFaultInjector: RuntimeAdmissionFaultInjector = .none
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
@@ -98,7 +99,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       nowUTC: { nowUTC })
     self.artifactStore = artifactStore
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
+      configuration: .init(
+        stateDirectory: stateDirectory,
+        admissionFaultInjector: admissionFaultInjector),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(factsPort: FactsPort())
       ]),
@@ -256,6 +259,93 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let afterRestart = try await reopened.submit(observeRequest())
     XCTAssertTrue(afterRestart.deduplicated)
     XCTAssertEqual(afterRestart.jobID, first.jobID)
+  }
+
+  func testFreshStateAdmissionCreatesEveryDurableProjectionAndSurvivesRestart() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let accepted = try await engine.submit(observeRequest(idempotencyKey: "idem-fresh-state-01"))
+    let jobDirectory = stateDirectory
+      .appendingPathComponent("jobs/\(accepted.jobID)", isDirectory: true)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: jobDirectory.appendingPathComponent("journal.jsonl").path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: jobDirectory.appendingPathComponent("job-record.json").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: stateDirectory.appendingPathComponent(RuntimeJobRepository.filename).path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: stateDirectory.appendingPathComponent("idempotency.json").path),
+      "new Runtime state must not retain JSON as the idempotency authority")
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await reopened.recoverPersistedJobs()
+    XCTAssertEqual(recovered.map(\.jobID), [accepted.jobID])
+    let status = try await reopened.status(jobID: accepted.jobID)
+    XCTAssertEqual(status.state, "preflight")
+  }
+
+  func testPagedJobHistoryReadsSQLiteWithoutReloadingEveryJobIntoMemory() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    var accepted: [RuntimeJobAcceptance] = []
+    for index in 1...3 {
+      accepted.append(
+        try await engine.submit(
+          observeRequest(
+            idempotencyKey: "idem-history-page-\(index)", requestID: "req-history-page-\(index)")))
+    }
+    let first = try await engine.listJobs(pageSize: 2)
+    XCTAssertEqual(first.jobs.map(\.jobID), accepted.prefix(2).map(\.jobID))
+    XCTAssertNotNil(first.nextCursor)
+    let second = try await engine.listJobs(pageSize: 2, cursor: first.nextCursor)
+    XCTAssertEqual(second.jobs.map(\.jobID), accepted.suffix(1).map(\.jobID))
+    XCTAssertNil(second.nextCursor)
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let historical = try await reopened.listJobs(pageSize: 3)
+    XCTAssertEqual(historical.jobs.map(\.jobID), accepted.map(\.jobID))
+    let status = try await reopened.status(jobID: accepted[2].jobID)
+    XCTAssertEqual(status.state, "preflight")
+  }
+
+  func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {
+    struct SimulatedProcessLoss: Error {}
+    let root = stateDirectory!
+    defer { stateDirectory = root }
+    for point in RuntimeAdmissionFaultPoint.allCases {
+      stateDirectory = root.appendingPathComponent(point.rawValue, isDirectory: true)
+      let injector = RuntimeAdmissionFaultInjector { observed in
+        if observed == point { throw SimulatedProcessLoss() }
+      }
+      let (faulty, _) = try makeEngine(
+        dispatcher: ScriptedDispatcher(script: .observationHappy),
+        admissionFaultInjector: injector)
+      let request = observeRequest(
+        idempotencyKey: "idem-admission-crash-\(point.rawValue)",
+        requestID: "req-admission-crash-\(point.rawValue)")
+      do {
+        _ = try await faulty.submit(request)
+        XCTFail("\(point.rawValue): fault injection must stop submit")
+      } catch is SimulatedProcessLoss {
+        // Simulate an abrupt process loss by abandoning this engine and
+        // reopening all state through a fresh Runtime instance below.
+      }
+
+      let dispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (reopened, _) = try makeEngine(dispatcher: dispatcher)
+      let recovered = try await reopened.recoverPersistedJobs()
+      let retry = try await reopened.submit(request)
+      switch point {
+      case .beforeAdmission:
+        XCTAssertTrue(recovered.isEmpty, "\(point.rawValue): no job may be admitted")
+        XCTAssertFalse(retry.deduplicated, "\(point.rawValue): retry must create the job")
+      case .afterAdmission, .beforeJournalAppend, .afterJournalAppend,
+        .beforeRecordPersist, .afterRecordPersist, .beforeResponse:
+        XCTAssertEqual(recovered.count, 1, "\(point.rawValue): committed job must recover")
+        XCTAssertTrue(retry.deduplicated, "\(point.rawValue): retry must reuse the committed job")
+        XCTAssertEqual(retry.jobID, recovered[0].jobID)
+        let status = try await reopened.status(jobID: retry.jobID)
+        XCTAssertEqual(status.state, "preflight")
+      }
+      XCTAssertEqual(dispatcher.dispatchCount, 0, "\(point.rawValue): recovery must not execute")
+    }
   }
 
   // MARK: - Authorization

@@ -81,6 +81,11 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let timeline: [String]
 }
 
+public struct RuntimeJobStatusPage: Sendable, Equatable {
+  public let jobs: [RuntimeJobStatus]
+  public let nextCursor: String?
+}
+
 public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case defaultReadOnlyPolicy
   case runtimeCapability
@@ -419,78 +424,31 @@ private struct RuntimeArtifactPublicationFailure: Error, Sendable {
   let detail: String
 }
 
-// MARK: - Durable idempotency ledger
+// MARK: - Admission fault injection
 
-struct IdempotencyEntry: Codable, Equatable {
-  let idempotencyKey: String
-  let jobID: String
-  let requestFingerprintSHA256: String
+/// Crash-consistency test seam. Production uses `.none`; tests inject an
+/// error immediately after the named durable boundary, discard the engine and
+/// reopen it exactly as a process restart would.
+public enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
+  case beforeAdmission
+  case afterAdmission
+  case beforeJournalAppend
+  case afterJournalAppend
+  case beforeRecordPersist
+  case afterRecordPersist
+  case beforeResponse
 }
 
-private struct IdempotencyDocument: Codable, Equatable {
-  var schemaVersion: String
-  var entries: [IdempotencyEntry]
-}
+public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
+  private let body: (RuntimeAdmissionFaultPoint) throws -> Void
 
-final class RuntimeIdempotencyLedger: @unchecked Sendable {
-  private let url: URL
-  private let queue = DispatchQueue(label: "arkdeck.idempotency-ledger")
-
-  init(url: URL) {
-    self.url = url
+  public init(_ body: @escaping (RuntimeAdmissionFaultPoint) throws -> Void) {
+    self.body = body
   }
 
-  enum Verdict: Equatable {
-    case new
-    case duplicate(jobID: String)
-    case conflict
-  }
+  public func check(_ point: RuntimeAdmissionFaultPoint) throws { try body(point) }
 
-  func lookup(key: String, fingerprint: String) throws -> Verdict {
-    try queue.sync {
-      let document = try load()
-      guard let existing = document.entries.first(where: { $0.idempotencyKey == key }) else {
-        return .new
-      }
-      return existing.requestFingerprintSHA256 == fingerprint
-        ? .duplicate(jobID: existing.jobID) : .conflict
-    }
-  }
-
-  func admit(key: String, jobID: String, fingerprint: String) throws -> Verdict {
-    try queue.sync {
-      var document = try load()
-      if let existing = document.entries.first(where: { $0.idempotencyKey == key }) {
-        return existing.requestFingerprintSHA256 == fingerprint
-          ? .duplicate(jobID: existing.jobID) : .conflict
-      }
-      document.entries.append(
-        IdempotencyEntry(idempotencyKey: key, jobID: jobID, requestFingerprintSHA256: fingerprint))
-      try persist(document)
-      return .new
-    }
-  }
-
-  private func load() throws -> IdempotencyDocument {
-    guard FileManager.default.fileExists(atPath: url.path) else {
-      return IdempotencyDocument(schemaVersion: "1.0.0", entries: [])
-    }
-    let data = try Data(contentsOf: url)
-    return try JSONDecoder().decode(IdempotencyDocument.self, from: data)
-  }
-
-  private func persist(_ document: IdempotencyDocument) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-    let data = try encoder.encode(document)
-    let temporary = url.deletingLastPathComponent()
-      .appendingPathComponent(".idempotency.tmp.\(getpid())")
-    try data.write(to: temporary, options: [])
-    let handle = try FileHandle(forWritingTo: temporary)
-    try handle.synchronize()
-    try handle.close()
-    _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
-  }
+  public static let none = RuntimeAdmissionFaultInjector { _ in }
 }
 
 // MARK: - Engine
@@ -501,13 +459,16 @@ public actor RuntimeJobEngine {
   public struct Configuration: Sendable {
     public let stateDirectory: URL
     public let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
+    public let admissionFaultInjector: RuntimeAdmissionFaultInjector
 
     public init(
       stateDirectory: URL,
-      defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy()
+      defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy(),
+      admissionFaultInjector: RuntimeAdmissionFaultInjector = .none
     ) {
       self.stateDirectory = stateDirectory
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
+      self.admissionFaultInjector = admissionFaultInjector
     }
   }
 
@@ -617,7 +578,7 @@ public actor RuntimeJobEngine {
   /// runtime cannot honor campaign-reservation requests and refuses them.
   private let agentUsageLedger: AgentAuthorityUsageLedger?
   private let mutationLane = DeviceMutationLaneCoordinator()
-  private let idempotencyLedger: RuntimeIdempotencyLedger
+  private let jobRepository: RuntimeJobRepository
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
@@ -642,8 +603,7 @@ public actor RuntimeJobEngine {
       at: configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true),
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    self.idempotencyLedger = RuntimeIdempotencyLedger(
-      url: configuration.stateDirectory.appendingPathComponent("idempotency.json"))
+    self.jobRepository = try RuntimeJobRepository(stateDirectory: configuration.stateDirectory)
   }
 
   public func operationAvailability() -> [RuntimeOperationAvailability] {
@@ -950,15 +910,15 @@ public actor RuntimeJobEngine {
         "cannot canonicalize the typed request: \(error)")
     }
     let fingerprint = Self.fingerprint(of: canonicalRequestData)
-    switch try idempotencyLedger.lookup(
-      key: request.idempotencyKey, fingerprint: fingerprint)
+    switch try jobRepository.lookup(
+      idempotencyKey: request.idempotencyKey, requestHash: fingerprint)
     {
     case .duplicate(let existingJobID):
       return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
     case .conflict:
       throw RuntimeJobEngineError.idempotencyConflict(
         "idempotency key reuse with a different request")
-    case .new:
+    case .admitted:
       break
     }
 
@@ -997,25 +957,6 @@ public actor RuntimeJobEngine {
       }
     }
 
-    switch try idempotencyLedger.admit(
-      key: request.idempotencyKey, jobID: jobID, fingerprint: fingerprint)
-    {
-    case .duplicate(let existingJobID):
-      return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
-    case .conflict:
-      throw RuntimeJobEngineError.idempotencyConflict(
-        "idempotency key reuse with a different request")
-    case .new:
-      break
-    }
-
-    let jobDirectory = configuration.stateDirectory
-      .appendingPathComponent("jobs", isDirectory: true)
-      .appendingPathComponent(jobID, isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: jobDirectory, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    let journal = try FileDurableJournal(url: jobDirectory.appendingPathComponent("journal.jsonl"))
     let timestamp = nowUTC()
     var record = RuntimeJobRecord(
       jobID: jobID,
@@ -1030,6 +971,44 @@ public actor RuntimeJobEngine {
       materializedStableTargetIdentitySHA256:
         materialized.stableTargetIdentitySHA256,
       materializedBindingRevision: materialized.bindingRevision)
+    record.state = JobState.preflight.rawValue
+    record.timeline = ["jobCreated", "queued->preflight"]
+    let recordData: Data
+    do {
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      recordData = try encoder.encode(record)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure("cannot encode initial durable job record: \(error)")
+    }
+
+    try configuration.admissionFaultInjector.check(.beforeAdmission)
+    switch try jobRepository.admit(
+      jobID: jobID,
+      idempotencyKey: request.idempotencyKey,
+      requestHash: fingerprint,
+      initialState: record.state,
+      createdAtUTC: timestamp,
+      initialRecordData: recordData)
+    {
+    case .duplicate(let existingJobID):
+      return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
+    case .conflict:
+      throw RuntimeJobEngineError.idempotencyConflict(
+        "idempotency key reuse with a different request")
+    case .admitted:
+      break
+    }
+    try configuration.admissionFaultInjector.check(.afterAdmission)
+
+    let jobDirectory = configuration.stateDirectory
+      .appendingPathComponent("jobs", isDirectory: true)
+      .appendingPathComponent(jobID, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: jobDirectory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let journal = try FileDurableJournal(url: jobDirectory.appendingPathComponent("journal.jsonl"))
+    try configuration.admissionFaultInjector.check(.beforeJournalAppend)
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
         eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
@@ -1038,10 +1017,12 @@ public actor RuntimeJobEngine {
       JournalEvent.stateTransition(
         eventID: "to-preflight", sequence: 1, sessionID: record.sessionID, jobID: jobID,
         timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted"))
-    record.state = "preflight"
-    record.timeline = ["jobCreated", "queued->preflight"]
-    try record.persist(into: jobDirectory)
+    try configuration.admissionFaultInjector.check(.afterJournalAppend)
+    try configuration.admissionFaultInjector.check(.beforeRecordPersist)
+    try persistRuntimeRecord(record)
+    try configuration.admissionFaultInjector.check(.afterRecordPersist)
     jobs[jobID] = JobRuntime(record: record, journal: journal, nextSequence: 2)
+    try configuration.admissionFaultInjector.check(.beforeResponse)
     return RuntimeJobAcceptance(jobID: jobID, deduplicated: false)
   }
 
@@ -1113,8 +1094,7 @@ public actor RuntimeJobEngine {
           &current, from: .running, to: .waitingForRecovery, reason: "outcomeUnknown: \(reason)")
         current.record.outcomeUnknown = true
         current.record.finishedAtUTC = nowUTC()
-        try current.record.persist(
-          into: jobDirectory(for: jobID))
+        try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try await recordCapabilityOutcome(
           for: current.record, outcome: .outcomeUnknown,
@@ -1128,7 +1108,7 @@ public actor RuntimeJobEngine {
         try transition(&current, from: .running, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
-        try current.record.persist(into: jobDirectory(for: jobID))
+        try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
@@ -1144,7 +1124,7 @@ public actor RuntimeJobEngine {
         &current, from: .finalizing, to: .failed,
         reason: "artifact publication failed: \(failure.detail)")
       current.record.finishedAtUTC = nowUTC()
-      try current.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(current.record)
       jobs[jobID] = current
       try await recordCapabilityOutcome(
         for: current.record, outcome: .confirmed,
@@ -1172,7 +1152,7 @@ public actor RuntimeJobEngine {
           &current, from: .finalizing, to: .failed,
           reason: "artifact finalization failed: \(failure.detail)")
         current.record.finishedAtUTC = nowUTC()
-        try current.record.persist(into: jobDirectory(for: jobID))
+        try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
@@ -1183,7 +1163,7 @@ public actor RuntimeJobEngine {
       try transition(&current, from: .finalizing, to: .succeeded, reason: "finalized")
     }
     current.record.finishedAtUTC = nowUTC()
-    try current.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(current.record)
     jobs[jobID] = current
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
@@ -1593,7 +1573,7 @@ public actor RuntimeJobEngine {
     runtime.record.outstandingResidueCount =
       outstanding.filter { $0.jobID == jobID }.count
     jobs[jobID] = runtime
-    try? runtime.record.persist(into: jobDirectory(for: jobID))
+    try? persistRuntimeRecord(runtime.record)
   }
 
   /// What this action was supposed to remove, when it is a cleanup-class
@@ -2015,7 +1995,7 @@ public actor RuntimeJobEngine {
     // become dispatchable. A crash can leave an unused pending record, but
     // it can never leave a durable external intent whose action recovery
     // must guess from a later catalog.
-    try runtime.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
     // The write-ahead gate is the production dispatch path: the closure is
     // unreachable unless the intent is durable.
@@ -2026,7 +2006,7 @@ public actor RuntimeJobEngine {
       runtime.record.recoveryStepID = nil
       runtime.record.recoveryIntentEventID = nil
       runtime.record.recoveryAction = nil
-      try? runtime.record.persist(into: jobDirectory(for: jobID))
+      try? persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       throw error
     }
@@ -2303,7 +2283,7 @@ public actor RuntimeJobEngine {
       }
     }
     do {
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
     } catch {
       throw RuntimeDispatchFailure.failed(
@@ -2913,8 +2893,13 @@ public actor RuntimeJobEngine {
   }
 
   public func status(jobID: String) throws -> RuntimeJobStatus {
-    guard let runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
-    return status(of: runtime.record)
+    if let runtime = jobs[jobID] { return status(of: runtime.record) }
+    guard
+      let persisted = try jobRepository.job(jobID: jobID),
+      let data = persisted.initialRecordData,
+      let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+    else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    return status(of: record)
   }
 
   public func evidenceSnapshot(jobID: String) throws -> RuntimeJobEvidenceSnapshot {
@@ -2976,6 +2961,23 @@ public actor RuntimeJobEngine {
 
   public func listJobs() -> [RuntimeJobStatus] {
     jobs.values.map { status(of: $0.record) }.sorted { $0.jobID < $1.jobID }
+  }
+
+  /// Reads compact terminal history from SQLite.  Active jobs still return
+  /// their in-memory snapshots above; both views use the same typed status
+  /// model and opaque cursor contract.
+  public func listJobs(pageSize: Int, cursor: String? = nil) throws -> RuntimeJobStatusPage {
+    let page = try jobRepository.listJobs(pageSize: pageSize, cursor: cursor)
+    let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
+      guard let data = persisted.initialRecordData,
+        let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "Runtime job history record \(persisted.jobID) is unreadable")
+      }
+      return status(of: record)
+    }
+    return RuntimeJobStatusPage(jobs: statuses, nextCursor: page.nextCursor)
   }
 
   public func listCleanupDebt() async throws -> [CleanupDebtRecord] {
@@ -3131,6 +3133,9 @@ public actor RuntimeJobEngine {
   /// boundary and can be resumed explicitly. Recovery itself never
   /// dispatches anything.
   public func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
+    for persisted in try jobRepository.allJobs() {
+      try restoreInitialAdmissionProjectionIfNeeded(persisted)
+    }
     let jobsRoot = configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true)
     let entries =
       (try? FileManager.default.contentsOfDirectory(
@@ -3270,7 +3275,7 @@ public actor RuntimeJobEngine {
           record.recoveryAction = nil
         }
       }
-      try record.persist(into: entry)
+      try persistRuntimeRecord(record)
       recovered.append(status(of: record))
       jobs[jobID] = JobRuntime(
         record: record, journal: journal,
@@ -3318,7 +3323,7 @@ public actor RuntimeJobEngine {
       runtime.record.state = JobState.resumeAtConfirmedSafeBoundary.rawValue
       runtime.completedStepIDs = Self.confirmedSucceededStepIDs(in: inspection)
       runtime.record.timeline.append("reconciled: durable confirmed completion")
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       return status(of: runtime.record)
     }
@@ -3333,7 +3338,7 @@ public actor RuntimeJobEngine {
       runtime.record.recoveryIntentEventID = nil
       runtime.record.recoveryAction = nil
       runtime.record.finishedAtUTC = nowUTC()
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       try await recordCapabilityOutcome(
         for: runtime.record, outcome: .confirmed,
@@ -3343,7 +3348,7 @@ public actor RuntimeJobEngine {
     guard inspection.unknownOutcomes.isEmpty else {
       runtime.record.timeline.append(
         "reconcile refused: legacy outcomeUnknown event cannot be rewritten; original not resent")
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       return status(of: runtime.record)
     }
@@ -3618,7 +3623,7 @@ public actor RuntimeJobEngine {
       runtime.record.outcomeUnknown = true
       runtime.record.timeline.append("reconcile inconclusive: \(detail)")
     }
-    try runtime.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
     switch outcome {
     case .confirmedNotExecuted:
@@ -4770,7 +4775,7 @@ public actor RuntimeJobEngine {
       // evidence while finalizing the fail-closed job; after a process
       // crash, the store's reservation-idempotent receipt reconstructs it.
       jobs[jobID] = runtime
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: capability denied before mutation: \(error)")
@@ -4863,7 +4868,7 @@ public actor RuntimeJobEngine {
       campaignCorrelation: correlation)
     runtime.record.timeline.append(
       "campaign reservation verified before first mutation")
-    try runtime.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
   }
 
@@ -5090,6 +5095,94 @@ public actor RuntimeJobEngine {
     configuration.stateDirectory
       .appendingPathComponent("jobs", isDirectory: true)
       .appendingPathComponent(jobID, isDirectory: true)
+  }
+
+  /// Recreates only the wholly absent projection left by a process loss after
+  /// the SQLite admission commit and before the first journal append.  A
+  /// partial projection is never guessed at: it is an attributable durable
+  /// corruption because it could otherwise hide an external-effect history.
+  private func restoreInitialAdmissionProjectionIfNeeded(_ persisted: RuntimePersistedJob) throws {
+    let directory = jobDirectory(for: persisted.jobID)
+    let recordURL = directory.appendingPathComponent("job-record.json")
+    let journalURL = directory.appendingPathComponent("journal.jsonl")
+    let hasRecord = FileManager.default.fileExists(atPath: recordURL.path)
+    let hasJournal = FileManager.default.fileExists(atPath: journalURL.path)
+    if hasRecord && hasJournal { return }
+    guard let data = persisted.initialRecordData else {
+      throw RuntimeJobEngineError.internalFailure(
+        "admitted job \(persisted.jobID) has no recoverable initial record")
+    }
+    let record: RuntimeJobRecord
+    do {
+      record = try JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "admitted job \(persisted.jobID) has an invalid initial record: \(error)")
+    }
+    guard record.jobID == persisted.jobID, record.state == JobState.preflight.rawValue else {
+      throw RuntimeJobEngineError.internalFailure(
+        "admitted job \(persisted.jobID) initial record does not match its transactional identity")
+    }
+    if hasJournal {
+      let inspection = try DurableJournalRecovery.inspect(url: journalURL)
+      if !hasRecord, inspection.events.isEmpty {
+        // The writer creates and fsyncs an empty journal inode before its
+        // first append.  A loss in that exact interval is still a committed
+        // admission with zero effect history, so complete the initial pair
+        // instead of classifying it as a corrupted partial projection.
+        let journal = try FileDurableJournal(url: journalURL)
+        try journal.appendAndSynchronize(
+          JournalEvent.jobCreated(
+            eventID: "job-created", sequence: 0, sessionID: record.sessionID,
+            jobID: record.jobID, timestamp: record.createdAtUTC, executionMode: "execute"))
+        try journal.appendAndSynchronize(
+          JournalEvent.stateTransition(
+            eventID: "to-preflight", sequence: 1, sessionID: record.sessionID,
+            jobID: record.jobID, timestamp: record.createdAtUTC,
+            from: .queued, to: .preflight, reason: "recovered committed admission"))
+        try record.persist(into: directory)
+        return
+      }
+      guard
+        !hasRecord,
+        inspection.events.count == 2,
+        inspection.events[0].kind == .jobCreated,
+        inspection.events[0].jobID == record.jobID,
+        inspection.events[1].kind == .stateTransition,
+        inspection.events[1].stateTransition?.from == .queued,
+        inspection.events[1].stateTransition?.to == .preflight
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "admitted job \(persisted.jobID) has a partial durable projection")
+      }
+      try record.persist(into: directory)
+      return
+    }
+    guard !hasRecord else {
+      throw RuntimeJobEngineError.internalFailure(
+        "admitted job \(persisted.jobID) has a partial durable projection")
+    }
+    try FileManager.default.createDirectory(
+      at: directory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let journal = try FileDurableJournal(url: journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "job-created", sequence: 0, sessionID: record.sessionID,
+        jobID: record.jobID, timestamp: record.createdAtUTC, executionMode: "execute"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "to-preflight", sequence: 1, sessionID: record.sessionID,
+        jobID: record.jobID, timestamp: record.createdAtUTC,
+        from: .queued, to: .preflight, reason: "recovered committed admission"))
+    try record.persist(into: directory)
+  }
+
+  private func persistRuntimeRecord(_ record: RuntimeJobRecord) throws {
+    try record.persist(into: jobDirectory(for: record.jobID))
+    try jobRepository.updateJobState(
+      jobID: record.jobID, state: record.state, updatedAtUTC: nowUTC(),
+      recordData: try record.durableData())
   }
 
   private func status(of record: RuntimeJobRecord) -> RuntimeJobStatus {
@@ -5747,16 +5840,15 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public var sessionID: String { "session-\(jobID)" }
 
   func persist(into directory: URL) throws {
+    let data = try durableData()
+    let url = directory.appendingPathComponent("job-record.json")
+    try DurableFileWriter.createOrReplaceAtomically(destination: url, data: data)
+  }
+
+  func durableData() throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-    let data = try encoder.encode(self)
-    let url = directory.appendingPathComponent("job-record.json")
-    let temporary = directory.appendingPathComponent(".job-record.tmp")
-    try data.write(to: temporary, options: [])
-    let handle = try FileHandle(forWritingTo: temporary)
-    try handle.synchronize()
-    try handle.close()
-    _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+    return try encoder.encode(self)
   }
 
   static func load(from directory: URL) throws -> RuntimeJobRecord {
