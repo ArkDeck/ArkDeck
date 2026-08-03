@@ -373,6 +373,41 @@ final class ProcessExecutorContractTests: XCTestCase {
     )
   }
 
+  /// A drain that stops before end-of-stream must never present its partial
+  /// capture as the child's whole output. The reader used to return the moment
+  /// the timeout cancelled it, so a writer blocked on a full pipe was recorded
+  /// as exactly the capture limit with `wasTruncated == false`, which no caller
+  /// can tell apart from a child that produced that much and exited.
+  func testAStoppedDrainNeverReportsItsPartialCaptureAsUntruncated() async throws {
+    let perl = URL(fileURLWithPath: "/usr/bin/perl")
+    guard FileManager.default.isExecutableFile(atPath: perl.path) else {
+      throw POSIXTestError(operation: "missing /usr/bin/perl fixture", code: ENOENT)
+    }
+    // Far more than any pipe buffer, so the child spends the run blocked in
+    // write() with produced bytes still sitting unread in the pipe.
+    let program = #"""
+      $| = 1;
+      print "a" x (1024 * 1024);
+      sleep 30;
+      """#
+    // A handler slower than the timeout keeps the reader from draining the
+    // pipe, which is what pins the capture against the limit.
+    let result = try await executor.execute(
+      ProcessRequest(executable: perl, arguments: ["-e", program], timeout: 1),
+      captureLimit: 64 * 1024,
+      onOutput: { _ in Thread.sleep(forTimeInterval: 1) }
+    )
+
+    XCTAssertEqual(result.termination, .timedOut)
+    XCTAssertTrue(
+      result.stdout.wasTruncated,
+      "a stream abandoned mid-drain cannot claim to hold the complete output")
+    XCTAssertGreaterThan(result.stdout.totalByteCount, 0)
+    XCTAssertTrue(
+      result.stderr.wasTruncated,
+      "a killed child stops writing stderr too, so neither stream is complete")
+  }
+
   func testIdentityBoundLaunchExecutesTheVerifiedDescriptorAndReturnsItsReceipt() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
