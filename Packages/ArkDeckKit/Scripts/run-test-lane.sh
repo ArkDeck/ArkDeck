@@ -24,13 +24,15 @@ run_lane() {
     -e 's/.*Executed ([0-9]+) tests?.*/\1/p' \
     -e 's/.*Test run with ([0-9]+) tests?.*/\1/p' \
     "$log" | awk '$1 > 0 { count = $1 } END { if (count != "") print count }')
-  peak_rss=$(sed -n -E \
+  maximum_resident_set=$(sed -n -E \
     's/^[[:space:]]*([0-9]+)  maximum resident set size$/\1/p' "$log" | tail -n 1)
+  peak_memory_footprint=$(sed -n -E \
+    's/^[[:space:]]*([0-9]+)  peak memory footprint$/\1/p' "$log" | tail -n 1)
   rm -f "$log"
   printf \
-    'ArkDeck test lane: %s; exitCode=%s; testCount=%s; durationSeconds=%s; peakRSSBytes=%s; slowTest=%s\n' \
+    'ArkDeck test lane: %s; exitCode=%s; testCount=%s; durationSeconds=%s; maximumResidentSetBytes=%s; peakMemoryFootprintBytes=%s; slowTest=%s\n' \
     "$label" "$status" "${test_count:-unavailable}" "$((finished - started))" \
-    "${peak_rss:-unavailable}" "$label"
+    "${maximum_resident_set:-unavailable}" "${peak_memory_footprint:-unavailable}" "$label"
   return "$status"
 }
 

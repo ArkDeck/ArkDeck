@@ -2815,161 +2815,28 @@ public actor RuntimeJobEngine {
   /// unknowns. Clean journals retain their exact confirmed provider boundary
   /// and can be resumed explicitly. Recovery itself never dispatches.
   private func recover(records persistedJobs: [RuntimePersistedJob]) async throws -> [RuntimeJobStatus] {
+    let recoveryService = RuntimeRecoveryService(
+      stateDirectory: configuration.stateDirectory, nowUTC: nowUTC)
     for persisted in persistedJobs {
-      try restoreInitialAdmissionProjectionIfNeeded(persisted)
+      try recoveryService.restoreInitialAdmissionProjectionIfNeeded(persisted)
     }
     var recovered: [RuntimeJobStatus] = []
     for persisted in persistedJobs {
-      let jobID = persisted.jobID
-      if jobs[jobID] != nil { continue }
-      let entry = jobDirectory(for: jobID)
-      guard var record = try? RuntimeJobRecord.load(from: entry) else {
-        throw RuntimeJobEngineError.internalFailure(
-          "admitted job \(jobID) has no readable durable record after recovery projection")
-      }
-      let journalURL = entry.appendingPathComponent("journal.jsonl")
-      let journal = try FileDurableJournal(url: journalURL)
-      var inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      var nextSequence = Int((inspection.lastDurableSequence ?? -1) + 1)
-
-      // A crash after reconcileOutcome may leave its mandatory triggered
-      // transition unwritten. Finish that journal-only decision before
-      // considering any provider work.
-      if let last = inspection.events.last,
-        last.kind == .reconcileOutcome,
-        case .string(let nextStateRaw)? = last.payload["nextState"],
-        let nextState = JobState(rawValue: nextStateRaw)
-      {
-        try journal.appendAndSynchronize(
-          JournalEvent.stateTransition(
-            eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-            sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-            from: .reconciling, to: nextState,
-            reason: "complete durable reconcile decision after restart",
-            triggerEventID: last.eventID))
-        nextSequence += 1
-        inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      }
-
-      let hasUnresolvedProviderIntent =
-        inspection.hasTornTail || !inspection.outstandingIntents.isEmpty
-        || !inspection.unknownOutcomes.isEmpty
-        || inspection.lastReconcileOutcomeCertainty == .outcomeUnknown
-      if hasUnresolvedProviderIntent,
-        let currentState = inspection.currentState,
-        currentState != .waitingForRecovery,
-        currentState != .reconciling,
-        JobStateMachine.isAllowedTransition(
-          from: currentState, to: .waitingForRecovery, mode: .execute)
-      {
-        try journal.appendAndSynchronize(
-          JournalEvent.stateTransition(
-            eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-            sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-            from: currentState, to: .waitingForRecovery,
-            reason: "durably park unresolved provider intent after restart"))
-        nextSequence += 1
-        inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      }
-
-      if hasUnresolvedProviderIntent {
-        record.state = (inspection.currentState ?? .waitingForRecovery).rawValue
-        record.outcomeUnknown = true
-        if record.recoveryStepID == nil {
-          record.recoveryStepID =
-            inspection.unknownOutcomes.last?.stepID
-            ?? inspection.outstandingIntents.last?.stepID
-        }
-        record.timeline.append("recovered: outstanding intents or unknown outcomes; no redispatch")
-      } else {
-        // The quiet crash window: a process killed between one durable event
-        // and the next leaves a clean journal whose non-terminal state never
-        // advances on its own. preflight/running/resumeAtConfirmedSafeBoundary
-        // keep their explicit `run` resume lane below, and
-        // waitingForRecovery/reconciling keep the reconcile lane. But
-        // cancelRequested, cancellingAtSafeBoundary and finalizing have no
-        // post-restart lane at all — `run` rejects them and `reconcile` only
-        // answers unknown outcomes — so leaving them in place presents a dead
-        // run as healthy forever. Each of these states is an already-durable
-        // decision, so recovery finishes it journal-only: a clean journal
-        // proves no step was in flight, which is exactly the cancel lane's
-        // safe boundary; and a job that never durably reached its terminal
-        // transition did not complete finalization, which is failed, never
-        // succeeded. No dispatch happens in any branch.
-        switch inspection.currentState {
-        case .cancelRequested, .cancellingAtSafeBoundary:
-          if inspection.currentState == .cancelRequested {
-            try journal.appendAndSynchronize(
-              JournalEvent.stateTransition(
-                eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-                sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-                from: .cancelRequested, to: .cancellingAtSafeBoundary,
-                reason: "process loss with no outstanding intent is a confirmed safe boundary"))
-            nextSequence += 1
-          }
-          try journal.appendAndSynchronize(
-            JournalEvent.stateTransition(
-              eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-              sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-              from: .cancellingAtSafeBoundary, to: .cancelled,
-              reason: "complete durable cancellation after restart"))
-          nextSequence += 1
-          inspection = try DurableJournalRecovery.inspect(url: journalURL)
-          record.finishedAtUTC = nowUTC()
-          record.timeline.append(
-            "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
-          )
-        case .finalizing:
-          try journal.appendAndSynchronize(
-            JournalEvent.stateTransition(
-              eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-              sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-              from: .finalizing, to: .failed,
-              reason: "finalization was interrupted before its terminal transition"))
-          nextSequence += 1
-          inspection = try DurableJournalRecovery.inspect(url: journalURL)
-          record.finishedAtUTC = nowUTC()
-          // A clean finalizing journal that carries outcomeUnknown got here
-          // through a durable confirmed reconcile decision; mirror the
-          // in-session reconcile lane, which clears the flag on this exact
-          // finalizing->failed completion.
-          if inspection.lastReconcileOutcomeCertainty == .confirmed {
-            record.outcomeUnknown = false
-            record.recoveryStepID = nil
-            record.recoveryIntentEventID = nil
-            record.recoveryAction = nil
-          }
-          record.timeline.append(
-            "recovered: finalization interrupted before terminal transition; failed without redispatch"
-          )
-        default:
-          record.timeline.append("recovered: journal clean")
-        }
-        if let currentState = inspection.currentState {
-          record.state = currentState.rawValue
-        }
-        if inspection.currentState == .resumeAtConfirmedSafeBoundary,
-          inspection.lastReconcileOutcomeCertainty == .confirmed
-        {
-          record.outcomeUnknown = false
-          record.recoveryStepID = nil
-          record.recoveryIntentEventID = nil
-          record.recoveryAction = nil
-        }
-      }
-      try persistRuntimeRecord(record)
-      recovered.append(status(of: record))
-      jobs[jobID] = JobRuntime(
-        record: record, journal: journal,
-        nextSequence: nextSequence,
-        completedStepIDs: Self.confirmedSucceededStepIDs(in: inspection))
-      if record.outcomeUnknown {
+      if jobs[persisted.jobID] != nil { continue }
+      let replayed = try recoveryService.replay(persisted)
+      try persistRuntimeRecord(replayed.record)
+      recovered.append(status(of: replayed.record))
+      jobs[persisted.jobID] = JobRuntime(
+        record: replayed.record, journal: replayed.journal,
+        nextSequence: replayed.nextSequence,
+        completedStepIDs: replayed.completedStepIDs)
+      if replayed.record.outcomeUnknown {
         try await recordCapabilityOutcome(
-          for: record, outcome: .outcomeUnknown,
+          for: replayed.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
-      } else if JobState(rawValue: record.state)?.isTerminal == true {
+      } else if JobState(rawValue: replayed.record.state)?.isTerminal == true {
         try await recordCapabilityOutcome(
-          for: record, outcome: .confirmed, state: record.state)
+          for: replayed.record, outcome: .confirmed, state: replayed.record.state)
       }
     }
     return recovered
@@ -4781,87 +4648,6 @@ public actor RuntimeJobEngine {
     configuration.stateDirectory
       .appendingPathComponent("jobs", isDirectory: true)
       .appendingPathComponent(jobID, isDirectory: true)
-  }
-
-  /// Recreates only the wholly absent projection left by a process loss after
-  /// the SQLite admission commit and before the first journal append.  A
-  /// partial projection is never guessed at: it is an attributable durable
-  /// corruption because it could otherwise hide an external-effect history.
-  private func restoreInitialAdmissionProjectionIfNeeded(_ persisted: RuntimePersistedJob) throws {
-    let directory = jobDirectory(for: persisted.jobID)
-    let recordURL = directory.appendingPathComponent("job-record.json")
-    let journalURL = directory.appendingPathComponent("journal.jsonl")
-    let hasRecord = FileManager.default.fileExists(atPath: recordURL.path)
-    let hasJournal = FileManager.default.fileExists(atPath: journalURL.path)
-    if hasRecord && hasJournal { return }
-    guard let data = persisted.initialRecordData else {
-      throw RuntimeJobEngineError.internalFailure(
-        "admitted job \(persisted.jobID) has no recoverable initial record")
-    }
-    let record: RuntimeJobRecord
-    do {
-      record = try JSONDecoder().decode(RuntimeJobRecord.self, from: data)
-    } catch {
-      throw RuntimeJobEngineError.internalFailure(
-        "admitted job \(persisted.jobID) has an invalid initial record: \(error)")
-    }
-    guard record.jobID == persisted.jobID, record.state == JobState.preflight.rawValue else {
-      throw RuntimeJobEngineError.internalFailure(
-        "admitted job \(persisted.jobID) initial record does not match its transactional identity")
-    }
-    if hasJournal {
-      let inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      if !hasRecord, inspection.events.isEmpty {
-        // The writer creates and fsyncs an empty journal inode before its
-        // first append.  A loss in that exact interval is still a committed
-        // admission with zero effect history, so complete the initial pair
-        // instead of classifying it as a corrupted partial projection.
-        let journal = try FileDurableJournal(url: journalURL)
-        try journal.appendAndSynchronize(
-          JournalEvent.jobCreated(
-            eventID: "job-created", sequence: 0, sessionID: record.sessionID,
-            jobID: record.jobID, timestamp: record.createdAtUTC, executionMode: "execute"))
-        try journal.appendAndSynchronize(
-          JournalEvent.stateTransition(
-            eventID: "to-preflight", sequence: 1, sessionID: record.sessionID,
-            jobID: record.jobID, timestamp: record.createdAtUTC,
-            from: .queued, to: .preflight, reason: "recovered committed admission"))
-        try record.persist(into: directory)
-        return
-      }
-      guard
-        !hasRecord,
-        inspection.events.count == 2,
-        inspection.events[0].kind == .jobCreated,
-        inspection.events[0].jobID == record.jobID,
-        inspection.events[1].kind == .stateTransition,
-        inspection.events[1].stateTransition?.from == .queued,
-        inspection.events[1].stateTransition?.to == .preflight
-      else {
-        throw RuntimeJobEngineError.internalFailure(
-          "admitted job \(persisted.jobID) has a partial durable projection")
-      }
-      try record.persist(into: directory)
-      return
-    }
-    guard !hasRecord else {
-      throw RuntimeJobEngineError.internalFailure(
-        "admitted job \(persisted.jobID) has a partial durable projection")
-    }
-    try FileManager.default.createDirectory(
-      at: directory, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    let journal = try FileDurableJournal(url: journalURL)
-    try journal.appendAndSynchronize(
-      JournalEvent.jobCreated(
-        eventID: "job-created", sequence: 0, sessionID: record.sessionID,
-        jobID: record.jobID, timestamp: record.createdAtUTC, executionMode: "execute"))
-    try journal.appendAndSynchronize(
-      JournalEvent.stateTransition(
-        eventID: "to-preflight", sequence: 1, sessionID: record.sessionID,
-        jobID: record.jobID, timestamp: record.createdAtUTC,
-        from: .queued, to: .preflight, reason: "recovered committed admission"))
-    try record.persist(into: directory)
   }
 
   private func persistRuntimeRecord(_ record: RuntimeJobRecord) throws {

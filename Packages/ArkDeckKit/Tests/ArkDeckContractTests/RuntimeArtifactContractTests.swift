@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import XCTest
 
 @testable import ArkDeckCore
@@ -289,6 +290,15 @@ final class RuntimeArtifactContractTests: XCTestCase {
     try writer.synchronize()
     try writer.close()
 
+    // Measure this process around publication, not the SwiftPM process tree.
+    // `swift test` may compile or launch helper processes whose rusage is not
+    // attributable to the artifact pipeline.  Sampling the test process pins
+    // the property that matters here: a 128 MiB source must not add a
+    // source-sized resident allocation while it is redacted and published.
+    let baselineResidentSet = try XCTUnwrap(currentProcessResidentSetSize())
+    let sampler = ArtifactRSSSampler(baseline: baselineResidentSet)
+    sampler.start()
+    defer { _ = sampler.stop() }
     let published = try await store.publishTextFile(
       RuntimeArtifactTextFilePublicationRequest(
         jobID: "large-text-job", sessionID: "session-large-text-job",
@@ -298,6 +308,16 @@ final class RuntimeArtifactContractTests: XCTestCase {
         bindingSnapshot: ArtifactBindingSnapshot(
           targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
         sourceFileURL: source))
+    let peakResidentSet = sampler.stop()
+    let residentGrowth = peakResidentSet - baselineResidentSet
+    XCTAssertLessThan(
+      residentGrowth, UInt64(48 * 1024 * 1024),
+      "128 MiB streaming publication must not allocate a source-sized resident buffer")
+    print(
+      "ARKDECK_ARTIFACT_STREAMING sourceBytes=\(128 * 1024 * 1024) "
+        + "baselineResidentSetBytes=\(baselineResidentSet) "
+        + "peakResidentSetBytes=\(peakResidentSet) "
+        + "residentGrowthBytes=\(residentGrowth)")
     XCTAssertGreaterThanOrEqual(published.byteCount, 128 * 1024 * 1024)
     XCTAssertTrue(published.redactionApplied)
 
@@ -309,6 +329,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertTrue(try fileContains(Data("<REDACTED>".utf8), at: resolved.fileURL))
     XCTAssertTrue(try fileContains(Data("<HOME>".utf8), at: resolved.fileURL))
   }
+
 
   func testTextFileStreamingRedactionKeepsOrdinaryKeyPrefixes() async throws {
     let store = try makeStore(home: "/Users/tester")
@@ -560,6 +581,65 @@ final class RuntimeArtifactContractTests: XCTestCase {
     }
     return false
   }
+}
+
+private final class ArtifactRSSSampler: @unchecked Sendable {
+  private let lock = NSLock()
+  private let finished = DispatchSemaphore(value: 0)
+  private var stopped = false
+  private var joined = false
+  private var peakResidentSet: UInt64
+
+  init(baseline: UInt64) {
+    peakResidentSet = baseline
+  }
+
+  func start() {
+    let sampler = self
+    Thread.detachNewThread { sampler.sampleUntilStopped() }
+  }
+
+  func stop() -> UInt64 {
+    lock.lock()
+    stopped = true
+    let shouldWait = !joined
+    joined = true
+    lock.unlock()
+    if shouldWait { _ = finished.wait(timeout: .now() + 1) }
+    lock.lock()
+    defer { lock.unlock() }
+    return peakResidentSet
+  }
+
+  private func sampleUntilStopped() {
+    defer { finished.signal() }
+    while true {
+      lock.lock()
+      let shouldStop = stopped
+      lock.unlock()
+      if shouldStop { return }
+      if let residentSet = currentProcessResidentSetSize() {
+        lock.lock()
+        peakResidentSet = max(peakResidentSet, residentSet)
+        lock.unlock()
+      }
+      usleep(5_000)
+    }
+  }
+}
+
+private func currentProcessResidentSetSize() -> UInt64? {
+  var info = mach_task_basic_info()
+  var count = mach_msg_type_number_t(
+    MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+  let result = withUnsafeMutablePointer(to: &info) { infoPointer in
+    infoPointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { reboundPointer in
+      task_info(
+        mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), reboundPointer, &count)
+    }
+  }
+  guard result == KERN_SUCCESS else { return nil }
+  return UInt64(info.resident_size)
 }
 
 func XCTAssertThrowsErrorAsync<T>(
