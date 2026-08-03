@@ -185,8 +185,52 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   private struct FixedUSBProbe: RockchipRuntimeUSBProbing {
     let identity: String
+    let normalIdentity: String?
+
+    init(identity: String, normalIdentity: String? = nil) {
+      self.identity = identity
+      self.normalIdentity = normalIdentity
+    }
 
     func singleLoader(
+      stableIdentitySHA256: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      guard stableIdentitySHA256 == identity else {
+        throw RuntimeDispatchFailure.failed("identity mismatch")
+      }
+      return RockchipRuntimeLoaderIdentity(
+        serialDigestSHA256: identity,
+        topology: "42")
+    }
+
+    func singleHDCNormal(
+      stableIdentitySHA256: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      let expected = normalIdentity ?? identity
+      guard stableIdentitySHA256 == expected else {
+        throw RuntimeDispatchFailure.failed("identity mismatch")
+      }
+      return RockchipRuntimeLoaderIdentity(
+        serialDigestSHA256: expected,
+        topology: "42")
+    }
+  }
+
+  private struct NormalOnlyUSBProbe: RockchipRuntimeUSBProbing {
+    let identity: String
+
+    init(connectKey: String) {
+      identity = SHA256.hash(data: Data(connectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+    }
+
+    func singleLoader(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw RuntimeDispatchFailure.failed("fixture has no Loader")
+    }
+
+    func singleHDCNormal(
       stableIdentitySHA256: String
     ) throws -> RockchipRuntimeLoaderIdentity {
       guard stableIdentitySHA256 == identity else {
@@ -203,6 +247,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       stableIdentitySHA256 _: String
     ) throws -> RockchipRuntimeLoaderIdentity {
       throw RuntimeDispatchFailure.failed("fixture has no Loader")
+    }
+
+    func singleHDCNormal(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw RuntimeDispatchFailure.failed("fixture has no HDC-normal device")
     }
   }
 
@@ -854,6 +904,80 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  func testEnterLoaderSettlesTimedOutHDCAsFailedWhenExactNormalUSBRemains()
+    async throws
+  {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let connectKey = "device-1"
+    let runner = ProbeCommandRunner(responses: [
+      .outcomeUnknown("process timed out before completion")
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner, usbProbe: NormalOnlyUSBProbe(connectKey: connectKey),
+      enterLoaderReadbackTimeoutSeconds: 0)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: connectKey),
+      stepID: "enter-loader-normal-readback", toolSHA256: rockchip.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .enterLoader(connectKey: connectKey),
+        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        actionDirectory: root)
+      XCTFail("exact normal USB readback must settle the transition as not completed")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        return XCTFail("expected definite failure, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("did not complete"), detail)
+    }
+    let invocations = await runner.invocations()
+    XCTAssertEqual(invocations.map(\.arguments), [
+      ["-t", connectKey, "shell", "reboot", "loader"]
+    ])
+  }
+
+  func testNormalUSBReadbackUsesExactConnectKeyIdentityWithoutHDCProcess()
+    async throws
+  {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let connectKey = "device-1"
+    let runner = ProbeCommandRunner(responses: [])
+    let probe = NormalOnlyUSBProbe(connectKey: connectKey)
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner, usbProbe: probe)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let action = RockchipProviderAction.observeHDCNormalUSB(connectKey: connectKey)
+    let plan = try rockchipPlan(
+      action: action, stepID: "observe-normal-usb", toolSHA256: rockchip.sha256)
+
+    let result = try await executor.execute(
+      action: action, descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+      actionDirectory: root)
+
+    XCTAssertEqual(result.summary["hdcNormalIdentitySha256"], probe.identity)
+    XCTAssertEqual(result.summary["usbState"], "hdc-normal")
+    XCTAssertEqual(result.summary["usbTopology"], "42")
+    XCTAssertEqual(result.subprocesses, [])
+    let invocations = await runner.invocations()
+    XCTAssertEqual(invocations.count, 0)
+  }
+
   func testProductionRockchipRouteUsesReviewedSignedIdentityAndRejectsLegacyPlan()
     async throws
   {
@@ -994,6 +1118,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let bundle = flashBundle()
     let actions: [RockchipProviderAction] = [
       .enterLoader(connectKey: "device-1"),
+      .observeHDCNormalUSB(connectKey: "device-1"),
       .waitForHDCDisconnect(connectKey: "device-1"),
       .waitForLoader(stableIdentitySHA256: identity),
       .rebindLoader(stableIdentitySHA256: identity),
@@ -1179,7 +1304,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let cases: [(TypedProviderAction, TypedProviderAction)] = [
       (
         .rockchip(.enterLoader(connectKey: "device-1")),
-        .rockchip(.waitForHDCReconnect(connectKey: "device-1"))
+        .rockchip(.observeHDCNormalUSB(connectKey: "device-1"))
       ),
       (
         .rockchip(.flashPartitions(bundle)),
@@ -1265,7 +1390,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           "hdc": ResolvedExecutable(path: "/product/hdc", sha256: hdcSHA)
         ]),
       runner: ScriptedCommandRunner(log: commandLog),
-      usbProbe: FixedUSBProbe(identity: identity),
+      usbProbe: FixedUSBProbe(
+        identity: identity,
+        normalIdentity: SHA256.hash(data: Data("device-1".utf8))
+          .map { String(format: "%02x", $0) }.joined()),
       readback: VerifiedPartitionReadback(log: readbackLog),
       stage: { _, _ in
         Dictionary(
@@ -1290,6 +1418,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let bundle = flashBundle()
     let actions: [RockchipProviderAction] = [
       .enterLoader(connectKey: "device-1"),
+      .observeHDCNormalUSB(connectKey: "device-1"),
       .waitForHDCDisconnect(connectKey: "device-1"),
       .waitForLoader(stableIdentitySHA256: identity),
       .rebindLoader(stableIdentitySHA256: identity),

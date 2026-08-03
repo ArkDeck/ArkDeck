@@ -1140,6 +1140,14 @@ struct RockchipProductUSBProbe: Sendable {
       requirement: .hdcNormal)
   }
 
+  func singleConnected(
+    stableIdentitySHA256: String
+  ) throws -> RockchipProductUSBIdentity {
+    try single(
+      selector: nil, serialDigestSHA256: stableIdentitySHA256,
+      requirement: .hdcNormal)
+  }
+
   private func single(
     selector: String?,
     serialDigestSHA256: String?,
