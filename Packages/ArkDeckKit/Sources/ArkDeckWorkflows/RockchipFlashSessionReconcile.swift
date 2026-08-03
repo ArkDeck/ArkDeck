@@ -155,6 +155,18 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
     }
   }
 
+  /// The reservation this session's journal names, resolved or not — used
+  /// to tell a ledger orphan from a reservation some session accounts for.
+  public var linkedReservationID: String? {
+    switch ledgerState {
+    case .openStandingReservation(let id), .openAgentReservation(let id),
+      .closed(let id), .missing(let id):
+      return id
+    case .none:
+      return nil
+    }
+  }
+
   /// True while there is still something actionable: an unresolved run —
   /// or a resolved run whose authority never closed — that a live owner is
   /// not about to settle itself.
@@ -165,6 +177,39 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
     if case .closed = ledgerState { return false }
     return true
   }
+}
+
+/// An open usage reservation with no session directory left to explain it:
+/// the journal was GC'd, moved, or never survived the crash. Invisible to
+/// the session scan by construction, yet on the campaign lane it still
+/// blocks its target host-wide (one open reservation per target).
+public struct RockchipFlashOrphanedReservation: Sendable, Equatable {
+  public enum Lane: String, Sendable {
+    case standingAuthorization
+    case agentCampaign
+  }
+
+  public let lane: Lane
+  public let reservationID: String
+  public let jobID: String
+  public let reservedAt: String
+  /// Campaign identity from the reservation's own authority reference, so
+  /// the operator can still be pointed at `flash continue`.
+  public let campaignID: String?
+}
+
+public struct RockchipFlashOrphanClosure: Sendable, Equatable {
+  public enum Disposition: Sendable, Equatable {
+    /// Closed `outcomeUnknown` with an empty intent list: with no journal
+    /// left there is no proof any mutation did or did not run. Fail closed.
+    case closedStandingReservation(reservationID: String)
+    case alreadyClosed(reservationID: String)
+    /// Campaign-lane orphans are drained by `flash continue`, whose
+    /// reconciliation closes the usage reservation since #982.
+    case agentLaneDeferred(reservationID: String)
+  }
+
+  public let disposition: Disposition
 }
 
 public struct RockchipFlashSessionClosure: Sendable, Equatable {
@@ -227,6 +272,73 @@ public struct RockchipFlashSessionReconciler {
   /// Every session whose outcome is unresolved and whose authority record
   /// is still open. Read-only; zero device dispatch.
   public func scan() throws -> [RockchipFlashSessionFinding] {
+    try allSessionFindings().filter(\.requiresAttention)
+  }
+
+  /// Open reservations no session directory accounts for — the session
+  /// journal was GC'd, moved, or never survived. The session scan cannot
+  /// see them; without this sweep they are permanent invisible debt (and,
+  /// on the campaign lane, a permanent target block). Read-only.
+  public func orphanedReservations() throws -> [RockchipFlashOrphanedReservation] {
+    let linked = Set(try allSessionFindings().compactMap(\.linkedReservationID))
+    var orphans: [RockchipFlashOrphanedReservation] = []
+    for reservation in try standingLedger.load().reservations
+    where reservation.terminal == nil && !linked.contains(reservation.reservationID) {
+      orphans.append(
+        RockchipFlashOrphanedReservation(
+          lane: .standingAuthorization,
+          reservationID: reservation.reservationID,
+          jobID: reservation.jobID,
+          reservedAt: reservation.reservedAt,
+          campaignID: nil))
+    }
+    for reservation in try agentLedger.load().reservations
+    where reservation.terminal == nil && !linked.contains(reservation.reservationID) {
+      orphans.append(
+        RockchipFlashOrphanedReservation(
+          lane: .agentCampaign,
+          reservationID: reservation.reservationID,
+          jobID: reservation.jobID,
+          reservedAt: reservation.reservedAt,
+          campaignID: Self.campaignID(of: reservation.authorizationRef)))
+    }
+    return orphans.sorted { $0.reservationID < $1.reservationID }
+  }
+
+  /// Close a sessionless standing orphan. With no journal left there is no
+  /// proof of what ran: `outcomeUnknown` with an empty intent list is the
+  /// only honest terminal, and the ordinal stays consumed. Campaign-lane
+  /// orphans are deferred to `flash continue`'s reconciliation.
+  public func closeOrphan(
+    _ orphan: RockchipFlashOrphanedReservation
+  ) throws -> RockchipFlashOrphanClosure {
+    guard orphan.lane == .standingAuthorization else {
+      return RockchipFlashOrphanClosure(
+        disposition: .agentLaneDeferred(reservationID: orphan.reservationID))
+    }
+    do {
+      let closed = try standingLedger.close(
+        reservationID: orphan.reservationID,
+        terminal: AuthorizationUsageTerminal(
+          status: .outcomeUnknown,
+          closedAt: ISO8601DateFormatter().string(from: now()),
+          destructiveIntentEventIDs: []))
+      return RockchipFlashOrphanClosure(
+        disposition: .closedStandingReservation(reservationID: closed.reservationID))
+    } catch AuthorizationUsageLedgerError.reservationConflict {
+      let reservation = try standingLedger.load().reservations.first {
+        $0.reservationID == orphan.reservationID
+      }
+      guard reservation?.terminal != nil else {
+        throw AuthorizationUsageLedgerError.reservationConflict(
+          "terminal race on \(orphan.reservationID) left no terminal")
+      }
+      return RockchipFlashOrphanClosure(
+        disposition: .alreadyClosed(reservationID: orphan.reservationID))
+    }
+  }
+
+  private func allSessionFindings() throws -> [RockchipFlashSessionFinding] {
     let manager = FileManager.default
     var isDirectory = ObjCBool(false)
     guard manager.fileExists(atPath: sessionsRoot.path, isDirectory: &isDirectory),
@@ -241,9 +353,17 @@ public struct RockchipFlashSessionReconciler {
         continue
       }
       guard let finding = try finding(sessionRoot: entry) else { continue }
-      if finding.requiresAttention { findings.append(finding) }
+      findings.append(finding)
     }
     return findings
+  }
+
+  private static func campaignID(of reference: AgentExecutionAuthorityReference) -> String? {
+    guard
+      case .evolutionCampaignConfirmation(let campaignDigestSHA256, _, _, _, _, _, _, _, _, _) =
+        reference
+    else { return nil }
+    return "ECAMP-" + campaignDigestSHA256.prefix(24).uppercased()
   }
 
   /// Inspect one session by ID, resolved or not (forensic view).
@@ -400,11 +520,7 @@ public struct RockchipFlashSessionReconciler {
   }
 
   private func campaignID(of replay: JournalReplay) -> String? {
-    guard
-      case .evolutionCampaignConfirmation(let campaignDigestSHA256, _, _, _, _, _, _, _, _, _) =
-        replay.agentExecutionAuthorityReference
-    else { return nil }
-    return "ECAMP-" + campaignDigestSHA256.prefix(24).uppercased()
+    replay.agentExecutionAuthorityReference.flatMap(Self.campaignID(of:))
   }
 
   private func lane(of replay: JournalReplay) -> RockchipFlashSessionFinding.AuthorityLane {

@@ -568,6 +568,76 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     XCTAssertEqual(terminal.status, .failed, "the racing writer's truth stands")
   }
 
+  // MARK: - Sessionless orphaned reservations (adversarial review C4)
+
+  func testSessionlessStandingReservationIsSweptAndClosesFailClosed() throws {
+    // The session directory is gone (GC, disk-space move, crash before the
+    // journal survived); only the open reservation remains. The session
+    // scan is blind here by construction — the ledger sweep is not.
+    try reserveStanding("RES-ORPHAN-1", jobID: "job-orphan")
+    XCTAssertEqual(try reconciler().scan(), [])
+
+    let orphans = try reconciler().orphanedReservations()
+    XCTAssertEqual(orphans.map(\.reservationID), ["RES-ORPHAN-1"])
+    let orphan = try XCTUnwrap(orphans.first)
+    XCTAssertEqual(orphan.lane, .standingAuthorization)
+
+    let closure = try reconciler().closeOrphan(orphan)
+    XCTAssertEqual(
+      closure.disposition, .closedStandingReservation(reservationID: "RES-ORPHAN-1"))
+    let terminal = try XCTUnwrap(
+      standingLedger.load().reservations.first { $0.reservationID == "RES-ORPHAN-1" }?
+        .terminal)
+    XCTAssertEqual(terminal.status, .outcomeUnknown)
+    XCTAssertEqual(
+      terminal.destructiveIntentEventIDs, [],
+      "no journal survives, so no intent may be claimed")
+    XCTAssertEqual(try reconciler().orphanedReservations(), [])
+    // Retry against the stale orphan value derives a byte-identical
+    // terminal, which the write-once ledger accepts idempotently.
+    XCTAssertEqual(
+      try reconciler().closeOrphan(orphan).disposition,
+      .closedStandingReservation(reservationID: "RES-ORPHAN-1"))
+  }
+
+  func testSessionlessAgentReservationIsReportedWithCampaignHintAndDeferred() throws {
+    let reservationID = try reserveAgent(jobID: "job-agent-orphan")
+    let agentBytesBefore = try Data(
+      contentsOf: usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName))
+
+    let orphans = try reconciler().orphanedReservations()
+    XCTAssertEqual(orphans.map(\.reservationID), [reservationID])
+    let orphan = try XCTUnwrap(orphans.first)
+    XCTAssertEqual(orphan.lane, .agentCampaign)
+    XCTAssertEqual(orphan.campaignID, "ECAMP-" + String(repeating: "F", count: 24))
+
+    XCTAssertEqual(
+      try reconciler().closeOrphan(orphan).disposition,
+      .agentLaneDeferred(reservationID: reservationID))
+    let agentBytesAfter = try Data(
+      contentsOf: usageRoot.appending(path: AgentAuthorityUsageLedger.ledgerFileName))
+    XCTAssertEqual(agentBytesBefore, agentBytesAfter, "campaign ledger keeps one writer")
+  }
+
+  func testSessionLinkedAndClosedReservationsAreNotOrphans() throws {
+    // Linked-open: a session directory names the reservation, so the sweep
+    // must not double-report it — the session finding owns it.
+    try reserveStanding("RES-LINKED-1", jobID: "job-linked")
+    var session = try SessionBuilder(
+      sessionsRoot: sessionsRoot, sessionID: "session-linked", jobID: "job-linked",
+      schemaVersion: JournalEvent.rockchipAuthorizedAgentSchemaVersion)
+    try session.jobCreated(
+      authorizationRef: try standingReference(), usageReservationID: "RES-LINKED-1")
+    try session.running()
+    XCTAssertEqual(try reconciler().orphanedReservations(), [])
+    XCTAssertEqual(try reconciler().scan().map(\.sessionID), ["session-linked"])
+
+    // Closed reservations are settled history, never orphans.
+    let finding = try XCTUnwrap(try reconciler().scan().first)
+    _ = try reconciler().close(finding)
+    XCTAssertEqual(try reconciler().orphanedReservations(), [])
+  }
+
   func testUndecodableJournalSurfacesAsFailClosedFinding() throws {
     // A complete-but-garbage line is beyond the torn-tail repair the
     // format tolerates. Regressing this path to a silent skip would be
