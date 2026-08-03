@@ -124,6 +124,34 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
   }
 }
 
+/// The pinned DAYU200 partition table, as `rkdeveloptool ppt` prints it.
+///
+/// This moved here when the in-process flash executor was retired (T25): the
+/// readback that consumes it is an engine-lane action, and it is the only
+/// surviving consumer of what used to be the lowering evaluator's semantics.
+enum RockchipPinnedPartitionTable {
+  static func matches(_ text: String) -> Bool {
+    let expectedRows = [
+      "00  00002000  uboot", "01  00004000  misc", "02  00006000  bootctrl",
+      "03  00007000  resource", "04  0000A000  boot_linux", "05  0003A000  ramdisk",
+      "06  0003C000  system", "07  0043C000  vendor", "08  0063C000  sys-prod",
+      "09  00655000  chip-prod", "10  0066E000  updater", "11  0067E000  eng_system",
+      "12  00686000  eng_chipset", "13  0069E000  chip_ckm", "14  01308000  userdata",
+    ]
+    let lines = text.split(whereSeparator: \.isNewline).map {
+      $0.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+    guard lines.contains("**********Partition Info(GPT)**********") else { return false }
+    let normalizedRows = expectedRows.map {
+      $0.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+    return lines.filter { line in
+      line.range(of: #"^[0-9]{2} [0-9A-F]{8} [A-Za-z0-9_-]+$"#, options: .regularExpression)
+        != nil
+    } == normalizedRows
+  }
+}
+
 struct RockchipRuntimeLoaderIdentity: Sendable, Equatable {
   let serialDigestSHA256: String
   let topology: String
@@ -806,7 +834,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       timeoutSeconds: 15,
       budget: 64 * 1024)
     guard let text = String(data: receipt.stdout, encoding: .utf8),
-      RockchipCommandSemanticEvaluator.matchesPinnedPartitionTable(text)
+      RockchipPinnedPartitionTable.matches(text)
     else {
       throw RuntimeDispatchFailure.failed(
         "RockUSB partition-table readback does not match the pinned DAYU200 table")

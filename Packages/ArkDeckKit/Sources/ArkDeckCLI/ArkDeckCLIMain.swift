@@ -7,9 +7,12 @@ import Foundation
 
 // TASK-RF-002. `arkdeck flash` — the product face of the RockUSB Provider.
 //
-// The human execute branch still ends at a handoff. Agent execution defaults to the bounded
-// Evolution campaign; an independently merged standing authorization remains available.
-// Migration guard: the obsolete executorUnavailable branch must not be restored below this host.
+// The human execute branch still ends at a handoff. Agent execution is the bounded Evolution
+// campaign, and it runs on the runtime job lane. The standing-authorization route no longer
+// executes in this process (T25): its runtime equivalent is a maintainer-issued exact-plan
+// capability, and `flash execute --authorization-id` now prints that path instead.
+// Migration guards: the obsolete executorUnavailable branch must not be restored below this
+// host, and no flash subcommand may regain an in-process execution stack.
 
 @main
 struct ArkDeckCommandLine {
@@ -371,17 +374,26 @@ struct ArkDeckCommandLine {
           exitCode: EX_USAGE,
           message: "authorized execution requires --images and --target-location-id")
       }
-      if let authorizationID {
-        let request = try RockchipFlashExecutionRequest(
-          authorizationID: authorizationID,
-          archiveURL: URL(fileURLWithPath: imagesPath),
-          targetLocationSelector: location)
-        let result = try await RockchipFlashExecutionHost().execute(request)
-        print("session: \(result.sessionID)")
-        print("job: \(result.jobID)")
-        print("terminal status: \(result.status.rawValue)")
-        print("evidence class: \(result.evidenceClass.rawValue)")
-        if let manifestURL = result.manifestURL { print("manifest: \(manifestURL.path)") }
+      if authorizationID != nil {
+        // The standing lane no longer executes here. Its runtime equivalent is
+        // the maintainer-signed exact-plan capability, and the two are
+        // different carriers of the same authority — translating one into the
+        // other automatically would be the agent minting its own capability
+        // (HTP-INV-6), so this hands the maintainer the exact steps instead.
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: """
+            standing-authorization flash no longer executes in this process; it runs on the \
+            runtime job lane under a maintainer-issued exact-plan capability. Steps:
+              1. arkdeck capability draft --target <id> --operation flash.dayu200@1 \
+            --inputs-file <inputs.json> --output-directory <dir>
+              2. open a PR that backfills the drafted envelope, and have the maintainer merge it
+              3. arkdeck capability install --file <cap.json>
+              4. arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz>
+              5. arkdeck job submit --request-file <request.json> --wait
+            An AUTH- identifier is not translated into a capability automatically: they are two \
+            different authority carriers, and only a merged PR can issue the second.
+            """)
       } else if let campaignDigest {
         try requireCampaignAgentContext(firstAdmission: true)
         let result = try await RockchipEvolutionCampaignHost(
@@ -604,7 +616,7 @@ struct ArkDeckCommandLine {
     guard let campaignID = options.value("--campaign-id") else {
       throw CLIError(exitCode: EX_USAGE, message: "status requires --campaign-id")
     }
-    let document = try RockchipEvolutionCampaignHost().status(campaignID)
+    let document = try RockchipEvolutionCampaignHost.status(campaignID: campaignID)
     print("campaign: \(document.campaignID)")
     print("terminal: \(document.isTerminal)")
     print("reserved attempts: \(document.reservedAttemptCount)/\(document.assertion.maxAttempts)")
@@ -990,8 +1002,6 @@ struct ArkDeckCommandLine {
       [--max-changed-files <n>] [--max-diff-lines <n>] [--validity-seconds <1...14400>]
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --operator <name> [--device-profile <dayu200@1|dayu200@2>] [--out <dir>]
-        arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --authorization-id <AUTH-ID>
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --campaign-confirmation-digest-sha256 <SHA256> --runtime-target <adopted-target-id> \
       [--socket <path>]
