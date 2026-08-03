@@ -194,8 +194,13 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
     case "cancelled":
       throw RockchipFlashExecutionError.cancelledAtSafeBoundary
     case "failed":
+      let diagnostic = RockchipFlashRuntimeDiagnostic.allCases.first { value in
+        terminal.timeline.contains(
+          "confirmed not executed enter-loader-mode [diagnostic=\(value.rawValue)]")
+      }
       throw RockchipFlashExecutionError.semanticFailure(
-        stepID: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+        stepID: diagnostic?.evolutionFailureCode
+          ?? RockchipEvolutionCampaignConfirmationAssertion.operationReference,
         detail: "runtime job \(terminal.jobID) failed: \(terminal.timeline.suffix(3).joined(separator: " | "))")
     default:
       // Any state that is not a decided terminal is unresolved by definition.

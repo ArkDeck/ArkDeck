@@ -666,6 +666,46 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(document.events.compactMap(\.candidate).map(\.strategy), [baseline, repaired])
   }
 
+  func testHostPassesClosedLoaderDiagnosticToTheRepairer() async throws {
+    let root = temporaryDirectory("campaign-loader-diagnostic")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let baseline = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let repaired = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], hdcCommandTimeoutSeconds: 45,
+      userdataImpact: "ERASE-USERDATA")
+    let repairer = CapturingEvolutionRepairer(baseline: baseline, repaired: repaired)
+    let flash = SafeFailureThenSuccessEvolutionFlash(
+      ledger: ledger, now: Self.confirmedAt,
+      failureStepID: RockchipFlashRuntimeDiagnostic.enterLoaderHDCNoCleanReceipt
+        .evolutionFailureCode)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: repairer,
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    _ = try await host.executeConfirmedCampaign(
+      confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    let observedFailureCodes = await repairer.observedFailureCodes()
+    XCTAssertEqual(
+      observedFailureCodes,
+      [RockchipFlashRuntimeDiagnostic.enterLoaderHDCNoCleanReceipt.evolutionFailureCode])
+  }
+
   func testHostStopsAfterThreeConsecutiveNoEffectAttempts() async throws {
     let root = temporaryDirectory("campaign-stop-no-effect")
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1276,6 +1316,31 @@ private struct ScriptedEvolutionRepairer: RockchipEvolutionStrategyRepairing {
   }
 }
 
+private actor CapturingEvolutionRepairer: RockchipEvolutionStrategyRepairing {
+  let baseline: RockchipEvolutionTypedStrategy
+  let repaired: RockchipEvolutionTypedStrategy
+  let repairerID = "capturing-evolution-repairer"
+  private var observations: [RockchipEvolutionFailureObservation] = []
+
+  init(baseline: RockchipEvolutionTypedStrategy, repaired: RockchipEvolutionTypedStrategy) {
+    self.baseline = baseline
+    self.repaired = repaired
+  }
+
+  func propose(
+    assertion _: RockchipEvolutionCampaignConfirmationAssertion,
+    observation: RockchipEvolutionFailureObservation?,
+    priorCandidates _: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    if let observation { observations.append(observation) }
+    return observation == nil ? baseline : repaired
+  }
+
+  func observedFailureCodes() -> [String] {
+    observations.map(\.failureCode)
+  }
+}
+
 private struct ThreeStageEvolutionRepairer: RockchipEvolutionStrategyRepairing {
   let strategies: [RockchipEvolutionTypedStrategy]
   let repairerID = "three-stage-evolution-repairer"
@@ -1333,12 +1398,19 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
   let ledger: RockchipEvolutionCampaignLedger
   let now: String
   let safeFailureCount: Int
+  let failureStepID: String
   private var count = 0
 
-  init(ledger: RockchipEvolutionCampaignLedger, now: String, safeFailureCount: Int = 1) {
+  init(
+    ledger: RockchipEvolutionCampaignLedger,
+    now: String,
+    safeFailureCount: Int = 1,
+    failureStepID: String = "flash.dayu200@1"
+  ) {
     self.ledger = ledger
     self.now = now
     self.safeFailureCount = safeFailureCount
+    self.failureStepID = failureStepID
   }
 
   // An in-process-lane fake: it reserves inside execute, so the host must
@@ -1367,7 +1439,7 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
       // normalized evolution failure code, so the host must retain a stable
       // code and continue the confirmed-safe campaign.
       throw RockchipFlashExecutionError.semanticFailure(
-        stepID: "flash.dayu200@1", detail: "contract safe failure")
+        stepID: failureStepID, detail: "contract safe failure")
     }
     _ = try ledger.closeAttempt(
       campaignID: permit.assertion.campaignID, ordinal: ordinal,

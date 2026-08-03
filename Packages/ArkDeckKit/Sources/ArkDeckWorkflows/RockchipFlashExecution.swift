@@ -93,6 +93,24 @@ public struct RockchipFlashExecutionResult: Sendable, Equatable {
   }
 }
 
+/// A closed, non-sensitive reason for a Loader transition that was proven not
+/// to have happened.  These values intentionally carry no process output,
+/// target identifier, or topology: they cross the engine-lane status boundary
+/// and become input to the bounded evolution repairer.
+public enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIterable {
+  /// The exact normal-mode readback proved no transition, while the HDC
+  /// process itself had no clean completion receipt.
+  case enterLoaderHDCNoCleanReceipt
+  /// The HDC process completed cleanly, but the exact Loader postcondition
+  /// was never observed and the original normal-mode device remained present.
+  case enterLoaderCommandCleanLoaderNotObserved
+
+  /// Bounded observation code accepted by the evolution campaign contract.
+  public var evolutionFailureCode: String {
+    "flash.\(rawValue)"
+  }
+}
+
 public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedError {
   case invalidRequest(String)
   case productionConfigurationUnavailable(String)

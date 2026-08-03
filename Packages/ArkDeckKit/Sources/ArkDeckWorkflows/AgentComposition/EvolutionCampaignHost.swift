@@ -448,7 +448,13 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     // `flash.dayu200@1`), while observations deliberately accept only the
     // narrow, bounded failure-code grammar. Keep the repair signal stable and
     // retain the exact step detail in the durable job evidence instead.
-    case .semanticFailure: return "flash.semanticFailure"
+    case .semanticFailure(let stepID, _):
+      if RockchipFlashRuntimeDiagnostic.allCases.contains(where: {
+        $0.evolutionFailureCode == stepID
+      }) {
+        return stepID
+      }
+      return "flash.semanticFailure"
     case .cancelledAtSafeBoundary: return "flash.cancelledAtSafeBoundary"
     case .invalidRequest: return "flash.invalidRequest"
     case .productionConfigurationUnavailable: return "flash.configurationUnavailable"

@@ -407,6 +407,11 @@ public enum RuntimeDispatchFailure: Error, Equatable, Sendable {
   /// not happen. This remains a failed step, but its durable intent is safe
   /// for a bounded campaign to retry after a fresh reservation/readback.
   case confirmedNotExecuted(String)
+  /// Same as `confirmedNotExecuted`, with a closed diagnostic that is safe to
+  /// expose through a job timeline to the evolution campaign.  It must never
+  /// contain raw subprocess output or device identity.
+  case confirmedNotExecutedWithDiagnostic(
+    String, diagnostic: RockchipFlashRuntimeDiagnostic)
   case failed(String)
 }
 
@@ -1115,7 +1120,9 @@ public actor RuntimeJobEngine {
           for: current.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
         return status(of: current.record)
-      case .confirmedNotExecuted(let reason), .failed(let reason):
+      case .confirmedNotExecuted(let reason),
+        .confirmedNotExecutedWithDiagnostic(let reason, _),
+        .failed(let reason):
         // The state graph routes every terminal outcome through
         // finalizing: a job always gets its wrap-up phase, success or not.
         try transition(&current, from: .running, to: .finalizing, reason: reason)
@@ -2044,6 +2051,7 @@ public actor RuntimeJobEngine {
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
       let confirmedNotExecuted: Bool
+      let diagnostic: RockchipFlashRuntimeDiagnostic?
       switch failure {
       case .outcomeUnknown:
         // The intent is durable, but there is deliberately no invented
@@ -2057,8 +2065,13 @@ public actor RuntimeJobEngine {
         throw failure
       case .confirmedNotExecuted:
         confirmedNotExecuted = true
+        diagnostic = nil
+      case .confirmedNotExecutedWithDiagnostic(_, let value):
+        confirmedNotExecuted = true
+        diagnostic = value
       case .failed:
         confirmedNotExecuted = false
+        diagnostic = nil
       }
       try current.journal.appendAndSynchronize(
         JournalEvent.stepOutcome(
@@ -2071,10 +2084,12 @@ public actor RuntimeJobEngine {
           semanticCode: confirmedNotExecuted
             ? Self.confirmedNotExecutedSemanticCode : nil))
       current.nextSequence += 1
-      current.record.timeline.append(
-        confirmedNotExecuted
-          ? "confirmed not executed \(step.stepID)"
-          : "failed \(step.stepID)")
+      if confirmedNotExecuted {
+        let suffix = diagnostic.map { " [diagnostic=\($0.rawValue)]" } ?? ""
+        current.record.timeline.append("confirmed not executed \(step.stepID)\(suffix)")
+      } else {
+        current.record.timeline.append("failed \(step.stepID)")
+      }
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
       current.record.recoveryAction = nil
