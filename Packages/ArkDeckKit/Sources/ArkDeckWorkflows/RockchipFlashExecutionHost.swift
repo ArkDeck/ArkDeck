@@ -1292,6 +1292,16 @@ private enum RockchipProductionExecutionComposition {
     let coordinator = storage.context.coordinator
     let storageProbe = SystemHostStorageProbe()
     return RockchipFlashExecutionDependencies(
+      recoverAbandonedSessions: {
+        _ = try await RockchipLegacyEnterLoaderSessionRecovery(
+          storage: storage.context,
+          agentLedger: agentLedger,
+          binding: settings.binding,
+          tool: settings.tool,
+          toolWorkingDirectory: settings.toolWorkingDirectory,
+          liveIdentity: { try usbProbe.singleDAYU200() }
+        ).recoverAll()
+      },
       admission: admission, process: process, postflight: postflight,
       power: ProductRockchipPowerActivityController(),
       makePersistence: { sessionID, jobID, plan in

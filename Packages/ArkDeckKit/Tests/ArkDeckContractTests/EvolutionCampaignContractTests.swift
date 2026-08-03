@@ -586,6 +586,46 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(document.events.compactMap(\.candidate).map(\.strategy), [baseline, repaired])
   }
 
+  func testCandidateThatExcludesLiveModeIsRepairedWithoutConsumingAttempt() async throws {
+    let root = temporaryDirectory("campaign-live-mode-repair")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let wrongMode = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal], userdataImpact: "ERASE-USERDATA")
+    let repaired = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let flash = StartingModeMismatchThenSuccessEvolutionFlash(
+      ledger: ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: ScriptedEvolutionRepairer(baseline: wrongMode, repaired: repaired),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    let result = try await host.executeConfirmedCampaign(
+      confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 1)
+    let dispatchCount = await flash.dispatchCount()
+    XCTAssertEqual(dispatchCount, 2)
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertEqual(document.reservedAttemptCount, 1)
+    XCTAssertEqual(document.events.compactMap(\.candidate).map(\.strategy), [wrongMode, repaired])
+    XCTAssertEqual(
+      document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition), [.succeeded])
+  }
+
   func testHostNeverRetriesFailureWithoutFreshAttemptReservation() async throws {
     let root = temporaryDirectory("campaign-pre-admission-stop")
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1072,6 +1112,43 @@ private actor RejectingBeforeReservationEvolutionFlash: RockchipEvolutionFlashDi
   func execute(_: RockchipFlashExecutionRequest) async throws -> RockchipFlashExecutionResult {
     count += 1
     throw RockchipFlashExecutionError.admissionRejected("fresh target drift")
+  }
+
+  func dispatchCount() -> Int { count }
+}
+
+private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFlashDispatching {
+  let ledger: RockchipEvolutionCampaignLedger
+  let now: String
+  private var count = 0
+
+  init(ledger: RockchipEvolutionCampaignLedger, now: String) {
+    self.ledger = ledger
+    self.now = now
+  }
+
+  func execute(_ request: RockchipFlashExecutionRequest) async throws
+    -> RockchipFlashExecutionResult
+  {
+    guard case .evolutionCampaign(let permit) = request.authority else {
+      throw RockchipEvolutionCampaignError.admissionRejected("campaignPermitRequired")
+    }
+    count += 1
+    if count == 1 {
+      throw RockchipFlashExecutionError.admissionRejected("startingModeNotAllowed:loader")
+    }
+    _ = try ledger.reserveAttempt(
+      campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
+      reviewID: permit.review.reviewID, ordinal: 1,
+      reservationID: "reservation-mode-1", jobID: "job-mode-1",
+      sessionID: "session-mode-1", at: now)
+    _ = try ledger.closeAttempt(
+      campaignID: permit.assertion.campaignID, ordinal: 1,
+      jobID: "job-mode-1", sessionID: "session-mode-1",
+      disposition: .succeeded, destructiveIntentEventIDs: ["intent-mode-1"], at: now)
+    return RockchipFlashExecutionResult(
+      sessionID: "session-mode-1", jobID: "job-mode-1",
+      status: .succeeded, evidenceClass: .contractFake, manifestURL: nil)
   }
 
   func dispatchCount() -> Int { count }

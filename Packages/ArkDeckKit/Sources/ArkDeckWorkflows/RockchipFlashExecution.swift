@@ -415,6 +415,7 @@ protocol RockchipExecutionPersistence: Sendable {
 }
 
 struct RockchipFlashExecutionDependencies: Sendable {
+  let recoverAbandonedSessions: @Sendable () async throws -> Void
   let admission: any RockchipExecutionAdmissionPort
   let process: any RockchipExecutionProcessPort
   let postflight: any RockchipExecutionPostflightPort
@@ -427,6 +428,7 @@ struct RockchipFlashExecutionDependencies: Sendable {
   let makeID: @Sendable (String) -> String
 
   init(
+    recoverAbandonedSessions: @escaping @Sendable () async throws -> Void = {},
     admission: any RockchipExecutionAdmissionPort,
     process: any RockchipExecutionProcessPort,
     postflight: any RockchipExecutionPostflightPort,
@@ -447,6 +449,7 @@ struct RockchipFlashExecutionDependencies: Sendable {
       "\(prefix)-\(UUID().uuidString.lowercased())"
     }
   ) {
+    self.recoverAbandonedSessions = recoverAbandonedSessions
     self.admission = admission
     self.process = process
     self.postflight = postflight
@@ -502,6 +505,15 @@ actor RockchipFlashExecutor {
   func execute(_ request: RockchipFlashExecutionRequest) async throws
     -> RockchipFlashExecutionResult
   {
+    // Recovery is deliberately before authority admission. A dead, fully
+    // read-back-resolvable predecessor must not consume a new campaign
+    // ordinal merely because its terminal Manifest was never published.
+    do {
+      try await dependencies.recoverAbandonedSessions()
+    } catch {
+      throw RockchipFlashExecutionError.storageRejected(
+        "abandoned-session recovery: \(error)")
+    }
     let sessionID = dependencies.makeID("rockchip-session")
     let jobID = dependencies.makeID("rockchip-job")
     let targetID = dependencies.makeID("rockchip-target")
@@ -509,6 +521,8 @@ actor RockchipFlashExecutor {
     do {
       admission = try await dependencies.admission.admit(
         request: request, sessionID: sessionID, jobID: jobID, targetID: targetID)
+    } catch RockchipEvolutionCampaignError.admissionRejected(let detail) {
+      throw RockchipFlashExecutionError.admissionRejected(detail)
     } catch {
       throw RockchipFlashExecutionError.admissionRejected(String(describing: error))
     }
