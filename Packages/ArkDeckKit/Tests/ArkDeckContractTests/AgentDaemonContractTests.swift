@@ -1338,7 +1338,11 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testGracefulDrainCompletesInFlightJobBeforeReleasingTheDaemonLock() async throws {
     let dispatcher = DelayedDispatcher()
-    let (handler, _) = try makeStack(dispatcher: dispatcher)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-07-29T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      artifactStore: artifactStore, dispatcher: dispatcher)
     let server = try startServer(handler)
     let client = AgentClient(socketPath: server.socketURL.path)
     let request = """
@@ -1371,6 +1375,17 @@ final class AgentDaemonContractTests: XCTestCase {
     }
     XCTAssertEqual(state, "succeeded")
     XCTAssertFalse(FileManager.default.fileExists(atPath: server.socketURL.path))
+
+    // The accepted request must drain through the durable state layers before
+    // the daemon releases its lock: its journal is replayable and its
+    // published evidence remains addressable after the client socket closes.
+    let journalURL = stateDirectory
+      .appendingPathComponent("engine/jobs/\(jobID)/journal.jsonl")
+    let journal = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertFalse(journal.hasTornTail)
+    XCTAssertTrue(journal.outstandingIntents.isEmpty)
+    let artifacts = try await artifactStore.list(jobID: jobID)
+    XCTAssertFalse(artifacts.isEmpty)
 
     let (_, reopened) = try makeStack()
     let recovered = try await reopened.recoverPersistedJobs()

@@ -578,7 +578,7 @@ public actor RuntimeJobEngine {
   /// runtime cannot honor campaign-reservation requests and refuses them.
   private let agentUsageLedger: AgentAuthorityUsageLedger?
   private let mutationLane = DeviceMutationLaneCoordinator()
-  private let jobRepository: RuntimeJobRepository
+  private let admissionService: RuntimeAdmissionService
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
@@ -603,7 +603,7 @@ public actor RuntimeJobEngine {
       at: configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true),
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    self.jobRepository = try RuntimeJobRepository(stateDirectory: configuration.stateDirectory)
+    self.admissionService = try RuntimeAdmissionService(stateDirectory: configuration.stateDirectory)
   }
 
   public func operationAvailability() -> [RuntimeOperationAvailability] {
@@ -910,7 +910,7 @@ public actor RuntimeJobEngine {
         "cannot canonicalize the typed request: \(error)")
     }
     let fingerprint = Self.fingerprint(of: canonicalRequestData)
-    switch try jobRepository.lookup(
+    switch try admissionService.lookup(
       idempotencyKey: request.idempotencyKey, requestHash: fingerprint)
     {
     case .duplicate(let existingJobID):
@@ -973,24 +973,8 @@ public actor RuntimeJobEngine {
       materializedBindingRevision: materialized.bindingRevision)
     record.state = JobState.preflight.rawValue
     record.timeline = ["jobCreated", "queued->preflight"]
-    let recordData: Data
-    do {
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      recordData = try encoder.encode(record)
-    } catch {
-      throw RuntimeJobEngineError.internalFailure("cannot encode initial durable job record: \(error)")
-    }
-
     try configuration.admissionFaultInjector.check(.beforeAdmission)
-    switch try jobRepository.admit(
-      jobID: jobID,
-      idempotencyKey: request.idempotencyKey,
-      requestHash: fingerprint,
-      initialState: record.state,
-      createdAtUTC: timestamp,
-      initialRecordData: recordData)
-    {
+    switch try admissionService.admit(record: record, requestHash: fingerprint) {
     case .duplicate(let existingJobID):
       return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
     case .conflict:
@@ -2631,7 +2615,7 @@ public actor RuntimeJobEngine {
   /// completed job.
   public func listJobs() -> [RuntimeJobStatus] {
     var statuses: [String: RuntimeJobStatus] = [:]
-    if let persisted = try? jobRepository.allJobs() {
+    if let persisted = try? admissionService.allJobs() {
       for row in persisted {
         guard let data = row.initialRecordData,
           let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
@@ -2651,7 +2635,7 @@ public actor RuntimeJobEngine {
   /// their in-memory snapshots above; both views use the same typed status
   /// model and opaque cursor contract.
   public func listJobs(pageSize: Int, cursor: String? = nil) throws -> RuntimeJobStatusPage {
-    let page = try jobRepository.listJobs(pageSize: pageSize, cursor: cursor)
+    let page = try admissionService.listJobs(pageSize: pageSize, cursor: cursor)
     let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
       guard let data = persisted.initialRecordData,
         let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
@@ -2816,7 +2800,7 @@ public actor RuntimeJobEngine {
   /// daemon launch uses `recoverActiveJobs()` so terminal history remains a
   /// SQLite query instead of thousands of journal replays.
   public func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
-    try await recover(records: try jobRepository.allJobs())
+    try await recover(records: try admissionService.allJobs())
   }
 
   /// Restart recovery for the daemon hot path.  Only non-terminal jobs can
@@ -2824,7 +2808,7 @@ public actor RuntimeJobEngine {
   /// parsed, or retained in `jobs`.  `status` and `listJobs(pageSize:cursor:)`
   /// continue to project those records directly from SQLite.
   public func recoverActiveJobs() async throws -> [RuntimeJobStatus] {
-    try await recover(records: try jobRepository.activeJobs())
+    try await recover(records: try admissionService.activeJobs())
   }
 
   /// Reopen the supplied authoritative job set, replay each journal and park
@@ -4882,9 +4866,7 @@ public actor RuntimeJobEngine {
 
   private func persistRuntimeRecord(_ record: RuntimeJobRecord) throws {
     try record.persist(into: jobDirectory(for: record.jobID))
-    try jobRepository.updateJobState(
-      jobID: record.jobID, state: record.state, updatedAtUTC: nowUTC(),
-      recordData: try record.durableData())
+    try admissionService.persist(record, at: nowUTC())
   }
 
   /// Terminal jobs have no further dispatch or recovery path.  Their durable
@@ -4908,7 +4890,7 @@ public actor RuntimeJobEngine {
   private func recordForRead(jobID: String) throws -> RuntimeJobRecord {
     if let runtime = jobs[jobID] { return runtime.record }
     guard
-      let persisted = try jobRepository.job(jobID: jobID),
+      let persisted = try admissionService.job(jobID: jobID),
       let data = persisted.initialRecordData,
       let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
     else { throw RuntimeJobEngineError.jobNotFound(jobID) }
