@@ -566,6 +566,46 @@ final class EvolutionCampaignContractTests: XCTestCase {
         priorCandidates: [prior]))
   }
 
+  func testCodexReviewerTreatsExactBaselineAsConstraintAndReportsModelRejectCode()
+    async throws
+  {
+    let root = temporaryDirectory("campaign-reviewer")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let assertion = try makeAssertion()
+    let candidate = try makePins(assertion: assertion, ordinal: 1).candidate
+    let request = RockchipEvolutionAdversarialReviewRequest(
+      assertion: assertion, candidate: candidate,
+      immutableDiff: Data("synthetic strategy-proposal.json".utf8), priorAttempts: [])
+
+    let passingTransport = RecordingEvolutionCodexTransport(
+      response: Data("{\"result\":\"PASS\",\"issues\":[]}".utf8))
+    let reviewer = try CodexRockchipEvolutionAdversarialReviewer(
+      executablePath: "/usr/bin/true", modelName: "contract-model",
+      workingDirectory: root.path, transport: passingTransport)
+    let receipt = try await reviewer.review(request)
+    XCTAssertEqual(receipt.result, .pass)
+    let recordedRequest = await passingTransport.lastRequest()
+    let prompt = try XCTUnwrap(recordedRequest?.arguments.last)
+    XCTAssertTrue(prompt.contains("Review candidate expansion"))
+    XCTAssertTrue(prompt.contains("ERASE-USERDATA"))
+    XCTAssertTrue(prompt.contains("HIGH or CRITICAL"))
+
+    let rejectingTransport = RecordingEvolutionCodexTransport(
+      response: Data(
+        "{\"result\":\"REJECT\",\"issues\":[{\"severity\":\"HIGH\",\"code\":\"AUTHORITY_SURFACE\"}]}"
+          .utf8))
+    let rejectingReviewer = try CodexRockchipEvolutionAdversarialReviewer(
+      executablePath: "/usr/bin/true", modelName: "contract-model",
+      workingDirectory: root.path, transport: rejectingTransport)
+    do {
+      _ = try await rejectingReviewer.review(request)
+      XCTFail("a model HIGH issue must reject the candidate")
+    } catch let error as RockchipEvolutionCampaignError {
+      XCTAssertEqual(error, .reviewRejected("modelReject:AUTHORITY_SURFACE"))
+    }
+  }
+
   func testCandidateTargetAndSandboxHaveNoRuntimeDeviceNetworkOrRawProcessSurface() throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -948,6 +988,20 @@ private actor RejectingBeforeReservationEvolutionFlash: RockchipEvolutionFlashDi
 private struct FixedEvolutionCodexTransport: HarnessCodexTransport {
   let response: Data
   func send(_: HarnessCodexProcessRequest) async throws -> Data { response }
+}
+
+private actor RecordingEvolutionCodexTransport: HarnessCodexTransport {
+  let response: Data
+  private var requests: [HarnessCodexProcessRequest] = []
+
+  init(response: Data) { self.response = response }
+
+  func send(_ request: HarnessCodexProcessRequest) async throws -> Data {
+    requests.append(request)
+    return response
+  }
+
+  func lastRequest() -> HarnessCodexProcessRequest? { requests.last }
 }
 
 private struct RejectingEvolutionReviewer: RockchipEvolutionAdversarialReviewing {

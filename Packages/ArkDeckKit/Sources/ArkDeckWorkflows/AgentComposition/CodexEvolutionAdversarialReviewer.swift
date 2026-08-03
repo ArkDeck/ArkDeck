@@ -216,7 +216,13 @@ public struct CodexRockchipEvolutionAdversarialReviewer:
       raw shell, arbitrary executable/argv/path, authorization access, Catalog/profile/broker
       changes, target/budget widening, or unbounded behavior. Answer one JSON object only:
       {"result":"PASS|REJECT","issues":[{"severity":"LOW|MEDIUM|HIGH|CRITICAL","code":"UPPER_CODE"}]}
-      PASS is legal only with zero HIGH/CRITICAL issues.
+      Review candidate expansion, not the already confirmed destructive operation. Values that
+      exactly equal the supplied assertion and candidate pins -- including ERASE-USERDATA,
+      dayu200@2, the registered hdcNormal/loader modes, and the exact archive/step-set digests --
+      are constraints, not widening. A sole synthetic strategy-proposal.json entry under the
+      fixed Candidate path is the trusted builder's closed strategy representation; reject it
+      only if it adds fields, changes pinned values, or widens a bound. Return REJECT if and only
+      if at least one issue is HIGH or CRITICAL. LOW/MEDIUM observations may accompany PASS.
       planDigest=\(request.assertion.planDigestSHA256)
       archiveDigest=\(request.assertion.archiveDigestSHA256)
       stepSetDigest=\(request.assertion.stepSetDigestSHA256)
@@ -245,6 +251,14 @@ public struct CodexRockchipEvolutionAdversarialReviewer:
         case .string(let code)? = fields["code"]
       else { throw RockchipEvolutionCampaignError.reviewRejected("issueShape") }
       return try RockchipEvolutionReviewIssue(severity: severity, code: code)
+    }
+    let blockingIssues = issues.filter {
+      $0.severity == .high || $0.severity == .critical
+    }
+    guard result == .pass, blockingIssues.isEmpty else {
+      let codes = issues.prefix(8).map(\.code).joined(separator: ",")
+      throw RockchipEvolutionCampaignError.reviewRejected(
+        "modelReject:\(codes.isEmpty ? "UNSPECIFIED" : codes)")
     }
     let responseDigest = RockchipEvolutionCampaignConfirmationAssertion.sha256(response)
     let receipt = try RockchipEvolutionReviewReceipt(
