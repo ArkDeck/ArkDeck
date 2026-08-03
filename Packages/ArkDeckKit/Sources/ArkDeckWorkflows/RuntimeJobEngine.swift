@@ -92,6 +92,40 @@ public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case evolutionCampaignConfirmation
 }
 
+/// Campaign correlation copied only from the broker-owned durable reservation
+/// after its fresh pre-mutation verification. It is evidence provenance and
+/// cannot be converted into a live campaign capability.
+public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
+  public let campaignID: String
+  public let attemptID: String
+  public let attemptOrdinal: Int
+  public let planDigestSHA256: String
+  public let targetBindingDigestSHA256: String
+  public let candidateDigestSHA256: String
+  public let reviewDigestSHA256: String
+  public let brokerDigestSHA256: String
+
+  public init(
+    campaignID: String,
+    attemptID: String,
+    attemptOrdinal: Int,
+    planDigestSHA256: String,
+    targetBindingDigestSHA256: String,
+    candidateDigestSHA256: String,
+    reviewDigestSHA256: String,
+    brokerDigestSHA256: String
+  ) {
+    self.campaignID = campaignID
+    self.attemptID = attemptID
+    self.attemptOrdinal = attemptOrdinal
+    self.planDigestSHA256 = planDigestSHA256
+    self.targetBindingDigestSHA256 = targetBindingDigestSHA256
+    self.candidateDigestSHA256 = candidateDigestSHA256
+    self.reviewDigestSHA256 = reviewDigestSHA256
+    self.brokerDigestSHA256 = brokerDigestSHA256
+  }
+}
+
 /// The admission decision actually consumed by this job. This record is
 /// audit provenance only: reading or projecting it cannot mint an
 /// authority or reach the dispatch port.
@@ -101,19 +135,24 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   public let admittedAtUTC: String
   public let validUntilUTC: String?
   public let consumptionFingerprintSHA256: String?
+  /// Optional only for old persisted jobs. New campaign admissions fill this
+  /// exclusively from the protected broker reservation.
+  public let campaignCorrelation: RuntimeCampaignEvidenceCorrelation?
 
   public init(
     kind: RuntimeEvidenceAuthorityKind,
     reference: String,
     admittedAtUTC: String,
     validUntilUTC: String?,
-    consumptionFingerprintSHA256: String?
+    consumptionFingerprintSHA256: String?,
+    campaignCorrelation: RuntimeCampaignEvidenceCorrelation? = nil
   ) {
     self.kind = kind
     self.reference = reference
     self.admittedAtUTC = admittedAtUTC
     self.validUntilUTC = validUntilUTC
     self.consumptionFingerprintSHA256 = consumptionFingerprintSHA256
+    self.campaignCorrelation = campaignCorrelation
   }
 }
 
@@ -4755,8 +4794,10 @@ public actor RuntimeJobEngine {
     }
     guard
       case .evolutionCampaignConfirmation(
-        _, _, _, let archiveDigestSHA256, _, let targetStableIdentitySHA256, _,
-        let confirmedAt, let validUntil, _) = openReservation.authorizationRef
+        let campaignDigestSHA256, _, _, let archiveDigestSHA256,
+        _, let targetStableIdentitySHA256, _, let confirmedAt, let validUntil, _) =
+        openReservation.authorizationRef,
+      let campaignProvenance = openReservation.campaignEvidenceProvenance
     else {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: reservation does not carry a campaign confirmation")
@@ -4789,12 +4830,22 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: campaign mutation has no materialized plan digest")
     }
+    let correlation = RuntimeCampaignEvidenceCorrelation(
+      campaignID: "ECAMP-\(campaignDigestSHA256.prefix(24).uppercased())",
+      attemptID: openReservation.reservationID,
+      attemptOrdinal: openReservation.ordinal,
+      planDigestSHA256: planDigest,
+      targetBindingDigestSHA256: openReservation.targetDigestSHA256,
+      candidateDigestSHA256: campaignProvenance.candidateDigestSHA256,
+      reviewDigestSHA256: campaignProvenance.reviewDigestSHA256,
+      brokerDigestSHA256: campaignProvenance.brokerDigestSHA256)
     runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
       kind: .evolutionCampaignConfirmation,
       reference: campaign.reservationID,
       admittedAtUTC: consumeAt,
       validUntilUTC: validUntil,
-      consumptionFingerprintSHA256: planDigest)
+      consumptionFingerprintSHA256: planDigest,
+      campaignCorrelation: correlation)
     runtime.record.timeline.append(
       "campaign reservation verified before first mutation")
     try runtime.record.persist(into: jobDirectory(for: jobID))

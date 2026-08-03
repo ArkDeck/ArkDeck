@@ -716,6 +716,37 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   }
 }
 
+/// Immutable campaign-only provenance that the protected broker records at
+/// reservation time. It is audit data, not authority: decoding it cannot
+/// reserve, consume, or dispatch anything.
+public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
+  public let candidateDigestSHA256: String
+  public let reviewDigestSHA256: String
+  public let brokerDigestSHA256: String
+
+  enum CodingKeys: String, CodingKey, CaseIterable {
+    case candidateDigestSHA256
+    case reviewDigestSHA256
+    case brokerDigestSHA256
+  }
+
+  public init(
+    candidateDigestSHA256: String,
+    reviewDigestSHA256: String,
+    brokerDigestSHA256: String
+  ) throws {
+    guard [candidateDigestSHA256, reviewDigestSHA256, brokerDigestSHA256]
+      .allSatisfy(AuthorizationUsageValidation.isSHA256)
+    else {
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "campaign evidence provenance requires canonical digests")
+    }
+    self.candidateDigestSHA256 = candidateDigestSHA256
+    self.reviewDigestSHA256 = reviewDigestSHA256
+    self.brokerDigestSHA256 = brokerDigestSHA256
+  }
+}
+
 public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   public let reservationID: String
   public let authorizationRef: AgentExecutionAuthorityReference
@@ -728,6 +759,10 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   public let reservedAt: String
   public let forwardLeaseExpiresAt: String
   public let compensationLeaseExpiresAt: String
+  /// Present only for reservations minted by the bounded campaign broker.
+  /// Historical reservations may omit it and remain readable, but cannot be
+  /// projected as complete V4 campaign hardware evidence.
+  public let campaignEvidenceProvenance: AgentAuthorityCampaignEvidenceProvenance?
   public let terminal: AgentAuthorityUsageTerminal?
 
   enum CodingKeys: String, CodingKey, CaseIterable {
@@ -742,6 +777,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     case reservedAt
     case forwardLeaseExpiresAt
     case compensationLeaseExpiresAt
+    case campaignEvidenceProvenance
     case terminal
   }
 
@@ -810,6 +846,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     reservedAt: String,
     forwardLeaseExpiresAt: String,
     compensationLeaseExpiresAt: String,
+    campaignEvidenceProvenance: AgentAuthorityCampaignEvidenceProvenance? = nil,
     terminal: AgentAuthorityUsageTerminal? = nil
   ) throws {
     let canonicalReservationID = try? Self.canonicalReservationID(
@@ -840,7 +877,9 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
       let reservedDate = AuthorizationUsageValidation.date(reservedAt),
       let forwardDate = AuthorizationUsageValidation.date(forwardLeaseExpiresAt),
       let compensationDate = AuthorizationUsageValidation.date(compensationLeaseExpiresAt),
-      reservedDate < forwardDate, forwardDate <= compensationDate
+      reservedDate < forwardDate, forwardDate <= compensationDate,
+      authorizationRef.kind == .evolutionCampaignConfirmation
+        || campaignEvidenceProvenance == nil
     else {
       throw AuthorizationUsageLedgerError.invalidRecord("invalid Agent authority reservation")
     }
@@ -855,6 +894,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     self.reservedAt = reservedAt
     self.forwardLeaseExpiresAt = forwardLeaseExpiresAt
     self.compensationLeaseExpiresAt = compensationLeaseExpiresAt
+    self.campaignEvidenceProvenance = campaignEvidenceProvenance
     self.terminal = terminal
   }
 
@@ -874,6 +914,8 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
       forwardLeaseExpiresAt: container.decode(String.self, forKey: .forwardLeaseExpiresAt),
       compensationLeaseExpiresAt: container.decode(
         String.self, forKey: .compensationLeaseExpiresAt),
+      campaignEvidenceProvenance: try container.decodeIfPresent(
+        AgentAuthorityCampaignEvidenceProvenance.self, forKey: .campaignEvidenceProvenance),
       terminal: container.decodeIfPresent(AgentAuthorityUsageTerminal.self, forKey: .terminal))
   }
 
@@ -890,6 +932,9 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     try container.encode(reservedAt, forKey: .reservedAt)
     try container.encode(forwardLeaseExpiresAt, forKey: .forwardLeaseExpiresAt)
     try container.encode(compensationLeaseExpiresAt, forKey: .compensationLeaseExpiresAt)
+    if let campaignEvidenceProvenance {
+      try container.encode(campaignEvidenceProvenance, forKey: .campaignEvidenceProvenance)
+    }
     if let terminal {
       try container.encode(terminal, forKey: .terminal)
     } else {
@@ -905,7 +950,8 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
       maximumUses: maximumUses, maximumConcurrentJobs: maximumConcurrentJobs, jobID: jobID,
       operationDigestSHA256: operationDigestSHA256, targetDigestSHA256: targetDigestSHA256,
       reservedAt: reservedAt, forwardLeaseExpiresAt: forwardLeaseExpiresAt,
-      compensationLeaseExpiresAt: compensationLeaseExpiresAt, terminal: terminal)
+      compensationLeaseExpiresAt: compensationLeaseExpiresAt,
+      campaignEvidenceProvenance: campaignEvidenceProvenance, terminal: terminal)
   }
 }
 
@@ -1317,6 +1363,11 @@ private enum AgentAuthorityUsageValidation {
         "Agent authority usage root shape is invalid")
     }
     let reservationKeys = Set(AgentAuthorityUsageReservation.CodingKeys.allCases.map(\.rawValue))
+    let historicalReservationKeys = reservationKeys.subtracting([
+      AgentAuthorityUsageReservation.CodingKeys.campaignEvidenceProvenance.rawValue,
+    ])
+    let campaignProvenanceKeys = Set(
+      AgentAuthorityCampaignEvidenceProvenance.CodingKeys.allCases.map(\.rawValue))
     let terminalKeys = Set(AgentAuthorityUsageTerminal.CodingKeys.allCases.map(\.rawValue))
     // `confirmedNotExecutedIntentEventIds` was added after schema 1.0.0 had
     // already persisted terminals in production. The decoder gives its absent
@@ -1327,7 +1378,8 @@ private enum AgentAuthorityUsageValidation {
     ])
     for value in reservations {
       guard case .object(let reservation) = value,
-        Set(reservation.keys) == reservationKeys,
+        Set(reservation.keys) == reservationKeys
+          || Set(reservation.keys) == historicalReservationKeys,
         let authority = reservation["authorizationRef"]
       else {
         throw AuthorizationUsageLedgerError.invalidRecord(
@@ -1341,6 +1393,15 @@ private enum AgentAuthorityUsageValidation {
         throw AuthorizationUsageLedgerError.invalidRecord(
           "Agent authority usage requires deviceCapability, chatConfirmation or "
             + "evolutionCampaignConfirmation")
+      }
+      if let provenance = reservation["campaignEvidenceProvenance"] {
+        guard reference.kind == .evolutionCampaignConfirmation,
+          case .object(let provenanceObject) = provenance,
+          Set(provenanceObject.keys) == campaignProvenanceKeys
+        else {
+          throw AuthorizationUsageLedgerError.invalidRecord(
+            "Agent authority campaign evidence provenance shape is not closed")
+        }
       }
       if case .object(let terminal)? = reservation["terminal"] {
         guard Set(terminal.keys) == terminalKeys

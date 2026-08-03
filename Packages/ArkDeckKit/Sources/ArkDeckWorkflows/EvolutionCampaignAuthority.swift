@@ -575,6 +575,15 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
         String.self, forKey: .testEvidenceArtifactID),
       strategy: container.decode(RockchipEvolutionTypedStrategy.self, forKey: .strategy))
   }
+
+  /// Stable identity of the complete immutable candidate record, including
+  /// its source, diff, build and test artifact pins.
+  public var digestSHA256: String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return RockchipEvolutionCampaignConfirmationAssertion.sha256(
+      (try? encoder.encode(self)) ?? Data())
+  }
 }
 
 public enum RockchipEvolutionReviewVerdict: String, Codable, Sendable {
@@ -701,6 +710,16 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
       reviewerID != candidate.producerID, result == .pass,
       !issues.contains(where: { $0.severity == .high || $0.severity == .critical })
     else { throw RockchipEvolutionCampaignError.reviewRejected("verdictOrIdentity") }
+  }
+
+  /// Stable identity of the independent review receipt. This binds the
+  /// verdict and every reviewed candidate/plan field, rather than merely its
+  /// short public identifier.
+  public var digestSHA256: String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return RockchipEvolutionCampaignConfirmationAssertion.sha256(
+      (try? encoder.encode(self)) ?? Data())
   }
 }
 
@@ -934,7 +953,11 @@ actor RockchipEvolutionCampaignAdmissionService {
       forwardLeaseExpiresAt: ISO8601DateFormatter().string(
         from: reservationDate.addingTimeInterval(30)),
       compensationLeaseExpiresAt: ISO8601DateFormatter().string(
-        from: reservationDate.addingTimeInterval(120)))
+        from: reservationDate.addingTimeInterval(120)),
+      campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
+        candidateDigestSHA256: permit.candidate.digestSHA256,
+        reviewDigestSHA256: permit.review.digestSHA256,
+        brokerDigestSHA256: assertion.brokerExecutableDigestSHA256))
     do { _ = try usageLedger.reserve(reservation) } catch let error as AuthorizationUsageLedgerError
     {
       throw RockchipEvolutionCampaignError.admissionRejected("usage:\(error)")

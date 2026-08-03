@@ -294,13 +294,25 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     XCTAssertTrue(blocker.reasons.contains("claim acceptanceIds are empty, duplicated, or malformed"))
   }
 
-  func testLegacyV2IsDetectedWithoutMigrationOrReencoding() {
-    let bytes = Data(
+  func testHistoricalAndCurrentEvidenceVersionsAreDetectedWithoutMigrationOrReencoding() throws {
+    let v2 = Data(
       """
       {"schemaVersion":"2.0.0","operator":"lvye","opaqueHistoricalBytes":"unchanged"}
       """.utf8)
-    let original = bytes
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: bytes), .legacyV2)
-    XCTAssertEqual(bytes, original, "the compatibility reader must not rewrite V2 bytes")
+    let v3 = Data("{\"schemaVersion\":\"3.0.0\"}".utf8)
+    guard case .published(let v4Record) = HardwareEvidenceProjector.project(
+      receipt: receipt(), claims: claims())
+    else {
+      return XCTFail("complete V4 fixture must publish")
+    }
+    let v4 = try JSONEncoder().encode(v4Record)
+
+    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v2), .legacyV2)
+    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v3), .legacyV3)
+    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v4), .currentV4)
+    XCTAssertEqual(v2, Data(
+      """
+      {"schemaVersion":"2.0.0","operator":"lvye","opaqueHistoricalBytes":"unchanged"}
+      """.utf8), "the compatibility reader must not rewrite V2 bytes")
   }
 }
