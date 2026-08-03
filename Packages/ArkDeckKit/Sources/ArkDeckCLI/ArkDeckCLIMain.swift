@@ -116,7 +116,8 @@ struct ArkDeckCommandLine {
     }
 
     var findings = try reconciler.scan()
-    guard !findings.isEmpty else {
+    var orphans = try reconciler.orphanedReservations()
+    guard !findings.isEmpty || !orphans.isEmpty else {
       print("no unresolved flash sessions")
       return
     }
@@ -126,12 +127,62 @@ struct ArkDeckCommandLine {
         printFlashClosure(try reconciler.close(finding))
       }
     }
+    for orphan in orphans {
+      printFlashOrphan(orphan)
+      if mode == "close" {
+        printFlashOrphanClosure(try reconciler.closeOrphan(orphan))
+      }
+    }
     if mode == "close" {
       findings = try reconciler.scan()
-      guard !findings.isEmpty else { return }
+      orphans = try reconciler.orphanedReservations()
+      guard !findings.isEmpty || !orphans.isEmpty else { return }
+      // Exit 4 while closable debt remains; exit 6 when everything left
+      // needs a different verb (campaign lane, corrupt journal, missing
+      // reservation) so scripts can tell "run close again" from "this
+      // tool cannot drain the rest".
+      let closable =
+        findings.contains { finding in
+          if case .openStandingReservation = finding.ledgerState { return true }
+          return false
+        } || orphans.contains { $0.lane == .standingAuthorization }
+      guard closable else {
+        throw CLIError(
+          exitCode: 6,
+          message:
+            "\(findings.count + orphans.count) unresolved flash item(s) need another verb "
+            + "(campaign lane or unreadable linkage)")
+      }
     }
     throw CLIError(
-      exitCode: 4, message: "\(findings.count) unresolved flash session(s)")
+      exitCode: 4,
+      message: "\(findings.count + orphans.count) unresolved flash item(s)")
+  }
+
+  private static func printFlashOrphan(_ orphan: RockchipFlashOrphanedReservation) {
+    print(
+      "orphaned reservation: \(orphan.reservationID) lane=\(orphan.lane.rawValue) "
+        + "job=\(orphan.jobID) reservedAt=\(orphan.reservedAt)")
+    print("  no session directory accounts for this open reservation")
+    switch orphan.lane {
+    case .standingAuthorization:
+      print("  next: arkdeck flash reconcile --mode close")
+    case .agentCampaign:
+      if let campaignID = orphan.campaignID {
+        print("  next: arkdeck flash continue … (campaign \(campaignID))")
+      }
+    }
+  }
+
+  private static func printFlashOrphanClosure(_ closure: RockchipFlashOrphanClosure) {
+    switch closure.disposition {
+    case .closedStandingReservation(let reservationID):
+      print("  closed: \(reservationID) terminal=outcomeUnknown (no journal survives)")
+    case .alreadyClosed(let reservationID):
+      print("  closed: \(reservationID) (already terminal)")
+    case .agentLaneDeferred(let reservationID):
+      print("  deferred: \(reservationID) belongs to the campaign lane (flash continue)")
+    }
   }
 
   private static func printFlashFinding(_ finding: RockchipFlashSessionFinding) {
@@ -140,7 +191,11 @@ struct ArkDeckCommandLine {
     header.append("state: \(finding.currentState?.rawValue ?? "unknown")")
     header.append("finalized: \(finding.finalized)")
     if finding.hasTornTail { header.append("tornTail: true") }
+    if finding.isLive { header.append("live: true") }
     print(header.joined(separator: " "))
+    if finding.isLive {
+      print("  a live run owns this session; its own terminal is authoritative")
+    }
     if let journalError = finding.journalError {
       print("  journal unreadable: \(journalError)")
     }
@@ -184,6 +239,8 @@ struct ArkDeckCommandLine {
       print("  closed: \(reservationID) (already terminal)")
     case .agentLaneDeferred(let reservationID):
       print("  deferred: \(reservationID) belongs to the campaign lane (flash continue)")
+    case .sessionLive:
+      print("  refused: a live run owns this session")
     case .nothingToClose:
       print("  nothing to close")
     }
