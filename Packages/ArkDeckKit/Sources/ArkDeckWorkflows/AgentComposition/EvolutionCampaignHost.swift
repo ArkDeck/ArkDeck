@@ -34,11 +34,37 @@ public struct RockchipEvolutionCampaignExecutionResult: Sendable, Equatable {
 }
 
 public protocol RockchipEvolutionFlashDispatching: Sendable {
-  func execute(_ request: RockchipFlashExecutionRequest) async throws
-    -> RockchipFlashExecutionResult
+  /// Non-nil when this dispatcher's executor cannot mint its own reservation.
+  /// The engine lane is that case by #992's design — the engine re-verifies
+  /// and closes an already open reservation but never reserves — so the host
+  /// runs the nine gates here, immediately before dispatch. The in-process
+  /// lane admits inside its own execute and supplies none.
+  var attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)? { get }
+
+  func execute(
+    _ request: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult
 }
 
-extension RockchipFlashExecutionHost: RockchipEvolutionFlashDispatching {}
+extension RockchipEvolutionFlashDispatching {
+  public var attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)? { nil }
+}
+
+extension RockchipFlashExecutionHost: RockchipEvolutionFlashDispatching {
+  /// The in-process lane admits inside `execute`, so nothing is ever
+  /// pre-admitted for it and a supplied attempt would mean a double reserve.
+  public func execute(
+    _ request: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
+    guard admitted == nil else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "the in-process lane mints its own reservation; it cannot accept a pre-admitted attempt")
+    }
+    return try await execute(request)
+  }
+}
 
 /// E0 preview. It hashes the complete published archive, protected-main base,
 /// candidate toolchain, running broker and durable stable target. It creates a
@@ -106,6 +132,17 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   public convenience init(environment: [String: String] = ProcessInfo.processInfo.environment)
     throws
   {
+    try self.init(
+      flash: RockchipFlashExecutionHost(), environment: environment)
+  }
+
+  /// The execution lane is the one composition decision a caller makes. The
+  /// production entry points name the engine lane explicitly; the in-process
+  /// default above remains for the standing-authorization route and for tests.
+  public convenience init(
+    flash: any RockchipEvolutionFlashDispatching,
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) throws {
     let roots = try RockchipEvolutionProductRoots.load()
     let repairer = try Self.repairer(
       environment: environment, workingDirectory: roots.repairerRoot.path)
@@ -117,7 +154,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       repairer: repairer,
       builder: ProductRockchipEvolutionCandidateBuilder(stateRoot: roots.candidateRoot),
       reviewer: reviewer,
-      flash: RockchipFlashExecutionHost(),
+      flash: flash,
       nowUTC: { ISO8601DateFormatter().string(from: Date()) })
   }
 
@@ -255,7 +292,16 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         targetLocationSelector: targetLocationSelector)
       let reservedBeforeDispatch = document.reservedAttemptCount
       do {
-        let result = try await flash.execute(request)
+        // Nine gates and the reservation mint, for the lane whose executor
+        // cannot do it itself. This runs inside the same do/catch as dispatch
+        // on purpose: an admission that reserved and then failed leaves the
+        // campaign ledger's attemptReserved event behind, and the reconcile
+        // below is what resolves it — exactly as when the in-process lane
+        // failed after admitting inside execute.
+        let admitted = try await flash.attemptAdmitter?.admitAttempt(
+          permit: permit, archiveURL: archiveURL,
+          targetLocationSelector: targetLocationSelector)
+        let result = try await flash.execute(request, admitted: admitted)
         let closed = try reconcileUnresolved(ledger.load(document.campaignID))
         guard let terminal = closed.events.last(where: { $0.kind == .attemptTerminal }),
           terminal.disposition == .succeeded, let ordinal = terminal.ordinal
@@ -387,7 +433,18 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   }
 
   private static func startingModeMismatch(_ error: any Error) -> String? {
-    guard case .admissionRejected(let detail) = error as? RockchipFlashExecutionError else {
+    // Both spellings, because both lanes reach the same gate by different
+    // routes: the in-process executor wraps the campaign rejection in a flash
+    // error, while the engine lane's admitter throws it directly.
+    let detail: String
+    switch error {
+    case let flash as RockchipFlashExecutionError:
+      guard case .admissionRejected(let value) = flash else { return nil }
+      detail = value
+    case let campaign as RockchipEvolutionCampaignError:
+      guard case .admissionRejected(let value) = campaign else { return nil }
+      detail = value
+    default:
       return nil
     }
     let prefix = "startingModeNotAllowed:"

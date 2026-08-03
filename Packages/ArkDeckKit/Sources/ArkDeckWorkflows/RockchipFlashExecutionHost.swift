@@ -1226,26 +1226,36 @@ struct RockchipProductionProvenanceTokenLoader: Sendable {
   }
 }
 
-private enum RockchipProductionExecutionComposition {
+enum RockchipProductionExecutionComposition {
+  /// The admission half of the production composition, on its own so the
+  /// in-process executor and the engine lane's attempt admitter share one
+  /// assembly instead of two that can drift.
+  static func makeAdmissionPort(
+    settings: RockchipProductExecutionSettings
+  ) throws -> RockchipProductionAdmissionPort {
+    RockchipProductionAdmissionPort(
+      provenance: RockchipProductionProvenanceTokenLoader(
+        loadToken: { try RockchipProductExecutionSettings.productKeychainToken() }),
+      usageLedger: try AuthorizationUsageLedger(root: settings.usageRoot),
+      agentUsageLedger: try AgentAuthorityUsageLedger(root: settings.usageRoot),
+      campaignLedger: try RockchipEvolutionCampaignLedger(
+        root: settings.usageRoot.appending(
+          path: "evolution-campaigns", directoryHint: .isDirectory)),
+      binding: settings.binding,
+      postflightIdentities: try settings.binding.postflightIdentities(),
+      tool: settings.tool, toolWorkingDirectory: settings.toolWorkingDirectory,
+      clock: RockchipContinuousAdmissionClock(),
+      usbProbe: RockchipProductUSBProbe())
+  }
+
   static func make() throws -> RockchipFlashExecutionDependencies {
     let settings = try RockchipProductExecutionSettings.load()
     let storage = try RockchipProductionStorageComposition.make()
     let clock = RockchipContinuousAdmissionClock()
     let usbProbe = RockchipProductUSBProbe()
-    let provenance = RockchipProductionProvenanceTokenLoader(
-      loadToken: { try RockchipProductExecutionSettings.productKeychainToken() })
-    let ledger = try AuthorizationUsageLedger(root: settings.usageRoot)
     let agentLedger = try AgentAuthorityUsageLedger(root: settings.usageRoot)
-    let campaignLedger = try RockchipEvolutionCampaignLedger(
-      root: settings.usageRoot.appending(path: "evolution-campaigns", directoryHint: .isDirectory))
     let postflightIdentities = try settings.binding.postflightIdentities()
-    let admission = RockchipProductionAdmissionPort(
-      provenance: provenance, usageLedger: ledger, agentUsageLedger: agentLedger,
-      campaignLedger: campaignLedger,
-      binding: settings.binding,
-      postflightIdentities: postflightIdentities,
-      tool: settings.tool, toolWorkingDirectory: settings.toolWorkingDirectory,
-      clock: clock, usbProbe: usbProbe)
+    let admission = try makeAdmissionPort(settings: settings)
     let bindingSerialDigest = SHA256.hash(data: Data(settings.binding.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
     let loaderDiscovery = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(
@@ -2082,7 +2092,7 @@ enum RockchipProductToolRuntimeDirectory {
   }
 }
 
-private final class RockchipProductExecutionSettings: @unchecked Sendable {
+final class RockchipProductExecutionSettings: @unchecked Sendable {
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
   let binding: RockchipProductBindingSnapshot
@@ -2656,7 +2666,10 @@ enum RockchipProductionDiscoveryComposition {
   }
 }
 
-private final class RockchipProductionAdmissionPort: @unchecked Sendable,
+/// Internal rather than private so the engine lane's attempt admitter can
+/// reach the same nine gates. Both lanes must mint their reservation here or
+/// the two lanes are not the same authority (CHG-2026-025 r16).
+final class RockchipProductionAdmissionPort: @unchecked Sendable,
   RockchipExecutionAdmissionPort
 {
   private let provenance: RockchipProductionProvenanceTokenLoader

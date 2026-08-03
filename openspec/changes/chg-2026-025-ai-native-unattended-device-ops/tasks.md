@@ -3327,7 +3327,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   预约内嵌确认 pins(目标身份/档案摘要/有效窗/序数预算),首个 mutation 前
   以 `evolutionCampaignConfirmation` 证据落档,job 终态携 journal 化 mutation
   intent 关闭预约;daemon 组合注入共享 AuthorizationUsage 台账,RPC 面零改动。
-  stack B 执行宿主的退役自此解锁为独立后续里程碑。真实设备 dispatch 仍为 0)
+  stack B 执行宿主的退役自此解锁为独立后续里程碑。真实设备 dispatch 仍为 0;
+  r16 把 campaign 设备执行从 stack B 换到 engine 车道——九门准入与预约铸造从
+  执行器内部上提到 campaign host(engine 按 #992 语义只复验与关闭、从不预约),
+  新增 `EngineLaneEvolutionFlashDispatcher`(CLI 组合根)经 artifact 导入取
+  lease、组 `flash.dayu200@1` 请求携 `campaignReservation`、submit/run 到终态,
+  outcomeUnknown 既不降级为失败也不升级为成功;standing 车道与 E2 授权语义零
+  变化,本 PR 纯执行车道搬迁。真实设备 dispatch 仍为 0)
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001

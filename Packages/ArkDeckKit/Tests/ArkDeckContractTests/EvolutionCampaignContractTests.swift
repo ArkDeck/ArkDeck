@@ -626,6 +626,96 @@ final class EvolutionCampaignContractTests: XCTestCase {
       document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition), [.succeeded])
   }
 
+  /// The engine lane's executor cannot mint its own reservation (#992: the
+  /// engine re-verifies and closes, it never reserves), so the host runs the
+  /// nine gates and mints it immediately before dispatch. This pins the
+  /// ordering and the hand-off, both of which are invisible to a dispatcher
+  /// that admits inside itself.
+  func testEngineLaneAttemptIsAdmittedBeforeItIsDispatched() async throws {
+    let root = temporaryDirectory("campaign-engine-lane-order")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let strategy = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let flash = PreAdmittingEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: FixedEvolutionRepairer(strategy: strategy),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    let result = try await host.executeConfirmedCampaign(
+      confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 1)
+    let trace = await flash.trace()
+    XCTAssertEqual(
+      trace, ["admit", "dispatch"],
+      "the reservation must exist before the engine lane submits anything")
+    // The dispatcher received the very reservation the admitter minted, not a
+    // nil it would have had to fail closed on.
+    let handedOver = await flash.receivedReservationID()
+    XCTAssertEqual(handedOver, "reservation-engine-1")
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertEqual(document.reservedAttemptCount, 1)
+    XCTAssertEqual(
+      document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.succeeded])
+  }
+
+  /// The starting-mode repair loop reaches the same gate by a different route
+  /// on this lane: the admitter throws the campaign rejection directly rather
+  /// than wrapped in a flash error. The candidate must still be repaired
+  /// without consuming an attempt.
+  func testEngineLaneStartingModeRejectionStillRepairsWithoutConsumingAttempt()
+    async throws
+  {
+    let root = temporaryDirectory("campaign-engine-lane-mode")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let wrongMode = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal], userdataImpact: "ERASE-USERDATA")
+    let repaired = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let flash = PreAdmittingEvolutionFlash(
+      ledger: ledger, now: Self.confirmedAt, rejectFirstAdmissionWithMode: "loader")
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: ScriptedEvolutionRepairer(baseline: wrongMode, repaired: repaired),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    let result = try await host.executeConfirmedCampaign(
+      confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 1)
+    let trace = await flash.trace()
+    // The refused admission never reached dispatch, and never reserved.
+    XCTAssertEqual(trace, ["admit", "admit", "dispatch"])
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertEqual(document.reservedAttemptCount, 1)
+    XCTAssertEqual(document.events.compactMap(\.candidate).map(\.strategy), [wrongMode, repaired])
+  }
+
   func testHostNeverRetriesFailureWithoutFreshAttemptReservation() async throws {
     let root = temporaryDirectory("campaign-pre-admission-stop")
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1073,10 +1163,13 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
     self.now = now
   }
 
-  func execute(_ request: RockchipFlashExecutionRequest) async throws
-    -> RockchipFlashExecutionResult
-  {
-    guard case .evolutionCampaign(let permit) = request.authority else {
+  // An in-process-lane fake: it reserves inside execute, so the host must
+  // never hand it a pre-admitted attempt.
+  func execute(
+    _ request: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
+    guard case .evolutionCampaign(let permit) = request.authority, admitted == nil else {
       throw RockchipEvolutionCampaignError.admissionRejected("campaignPermitRequired")
     }
     count += 1
@@ -1109,7 +1202,10 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
 private actor RejectingBeforeReservationEvolutionFlash: RockchipEvolutionFlashDispatching {
   private var count = 0
 
-  func execute(_: RockchipFlashExecutionRequest) async throws -> RockchipFlashExecutionResult {
+  func execute(
+    _: RockchipFlashExecutionRequest,
+    admitted _: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
     count += 1
     throw RockchipFlashExecutionError.admissionRejected("fresh target drift")
   }
@@ -1127,10 +1223,11 @@ private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFl
     self.now = now
   }
 
-  func execute(_ request: RockchipFlashExecutionRequest) async throws
-    -> RockchipFlashExecutionResult
-  {
-    guard case .evolutionCampaign(let permit) = request.authority else {
+  func execute(
+    _ request: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
+    guard case .evolutionCampaign(let permit) = request.authority, admitted == nil else {
       throw RockchipEvolutionCampaignError.admissionRejected("campaignPermitRequired")
     }
     count += 1
@@ -1183,10 +1280,124 @@ private struct RejectingEvolutionReviewer: RockchipEvolutionAdversarialReviewing
   }
 }
 
+/// Stands in for the engine lane: it cannot reserve inside execute, so it
+/// publishes an admitter and expects the host to have minted the reservation
+/// before dispatch.
+private final class PreAdmittingEvolutionFlash: RockchipEvolutionFlashDispatching,
+  @unchecked Sendable
+{
+  private let recorder: EngineLaneTrace
+  let attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)?
+
+  init(
+    ledger: RockchipEvolutionCampaignLedger,
+    now: String,
+    rejectFirstAdmissionWithMode: String? = nil
+  ) {
+    let recorder = EngineLaneTrace()
+    self.recorder = recorder
+    attemptAdmitter = ScriptedCampaignAttemptAdmitter(
+      ledger: ledger, now: now, recorder: recorder,
+      rejectFirstAdmissionWithMode: rejectFirstAdmissionWithMode)
+  }
+
+  func execute(
+    _: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
+    guard let admitted else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "the engine lane requires a campaign reservation minted before dispatch")
+    }
+    await recorder.record("dispatch", reservationID: admitted.reservationID)
+    return RockchipFlashExecutionResult(
+      sessionID: admitted.sessionID, jobID: admitted.jobID,
+      status: .succeeded, evidenceClass: .contractFake, manifestURL: nil)
+  }
+
+  func trace() async -> [String] { await recorder.entries() }
+  func receivedReservationID() async -> String? { await recorder.reservationID() }
+}
+
+private actor EngineLaneTrace {
+  private var recorded: [String] = []
+  private var dispatchedReservationID: String?
+
+  func record(_ entry: String, reservationID: String? = nil) {
+    recorded.append(entry)
+    if let reservationID { dispatchedReservationID = reservationID }
+  }
+
+  func entries() -> [String] { recorded }
+  func reservationID() -> String? { dispatchedReservationID }
+
+  private var admissions = 0
+
+  func nextAdmissionOrdinal() -> Int {
+    admissions += 1
+    return admissions
+  }
+}
+
+private struct ScriptedCampaignAttemptAdmitter: RockchipEvolutionCampaignAttemptAdmitting {
+  private let ledger: RockchipEvolutionCampaignLedger
+  private let now: String
+  private let recorder: EngineLaneTrace
+  private let rejectFirstAdmissionWithMode: String?
+
+  init(
+    ledger: RockchipEvolutionCampaignLedger,
+    now: String,
+    recorder: EngineLaneTrace,
+    rejectFirstAdmissionWithMode: String?
+  ) {
+    self.ledger = ledger
+    self.now = now
+    self.recorder = recorder
+    self.rejectFirstAdmissionWithMode = rejectFirstAdmissionWithMode
+  }
+
+  func admitAttempt(
+    permit: RockchipEvolutionCampaignAttemptPermit,
+    archiveURL _: URL,
+    targetLocationSelector _: String
+  ) async throws -> RockchipEvolutionCampaignAdmittedAttempt {
+    await recorder.record("admit")
+    let ordinal = await recorder.nextAdmissionOrdinal()
+    if ordinal == 1, let mode = rejectFirstAdmissionWithMode {
+      // The real service's spelling: the campaign error, unwrapped.
+      throw RockchipEvolutionCampaignError.admissionRejected("startingModeNotAllowed:\(mode)")
+    }
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    _ = try ledger.reserveAttempt(
+      campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
+      reviewID: permit.review.reviewID, ordinal: 1,
+      reservationID: "reservation-engine-1", jobID: "job-engine-1",
+      sessionID: "session-engine-1", at: now)
+    _ = try ledger.closeAttempt(
+      campaignID: permit.assertion.campaignID, ordinal: 1,
+      jobID: "job-engine-1", sessionID: "session-engine-1",
+      disposition: .succeeded, destructiveIntentEventIDs: ["intent-engine-1"], at: now)
+    return RockchipEvolutionCampaignAdmittedAttempt(
+      campaignID: permit.assertion.campaignID, ordinal: 1,
+      reservationID: "reservation-engine-1", jobID: "job-engine-1",
+      sessionID: "session-engine-1",
+      targetStableIdentitySHA256: permit.assertion.targetStableIdentitySHA256,
+      bindingRevision: permit.assertion.bindingLineageRootRevision,
+      deviceProfileReference: profile.catalogReference,
+      partitionPlan: profile.mappedPartitions.map(\.partitionName),
+      archiveSHA256: profile.archiveSHA256,
+      postFlashVerification: "full")
+  }
+}
+
 private actor CountingEvolutionFlash: RockchipEvolutionFlashDispatching {
   private var count = 0
 
-  func execute(_: RockchipFlashExecutionRequest) async throws -> RockchipFlashExecutionResult {
+  func execute(
+    _: RockchipFlashExecutionRequest,
+    admitted _: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
     count += 1
     throw RockchipEvolutionCampaignError.admissionRejected("unexpectedContractDispatch")
   }

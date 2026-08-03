@@ -322,6 +322,8 @@ struct ArkDeckCommandLine {
     try options.validateAllowed([
       "--images", "--device-profile", "--target-location-id", "--operator",
       "--authorization-id", "--campaign-confirmation-digest-sha256", "--out",
+      // Campaign authority only: its attempt runs on the runtime job lane.
+      "--runtime-target", "--socket",
     ])
     let operatorIdentity = options.value("--operator")
     let authority = RockchipExecutionAuthorityResolver.resolve(
@@ -382,7 +384,9 @@ struct ArkDeckCommandLine {
         if let manifestURL = result.manifestURL { print("manifest: \(manifestURL.path)") }
       } else if let campaignDigest {
         try requireCampaignAgentContext(firstAdmission: true)
-        let result = try await RockchipEvolutionCampaignHost().executeConfirmedCampaign(
+        let result = try await RockchipEvolutionCampaignHost(
+          flash: try engineLaneDispatcher(options: options)
+        ).executeConfirmedCampaign(
           confirmationDigestSHA256: campaignDigest,
           archiveURL: URL(fileURLWithPath: imagesPath), targetLocationSelector: location)
         printCampaignResult(result)
@@ -543,20 +547,55 @@ struct ArkDeckCommandLine {
 
   static func runCampaignContinue(_ arguments: [String]) async throws {
     let options = try CLIOptions(arguments)
-    try options.validateAllowed(["--images", "--target-location-id", "--campaign-id"])
+    try options.validateAllowed([
+      "--images", "--target-location-id", "--campaign-id", "--runtime-target", "--socket",
+    ])
     guard let images = options.value("--images"), images.hasPrefix("/"),
       let location = options.value("--target-location-id"),
       let campaignID = options.value("--campaign-id")
     else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "continue requires --images, --target-location-id and --campaign-id")
+        message:
+          "continue requires --images, --target-location-id and --campaign-id "
+          + "(plus --runtime-target for the runtime job lane)")
     }
     try requireCampaignAgentContext(firstAdmission: false)
-    let result = try await RockchipEvolutionCampaignHost().continueCampaign(
+    let result = try await RockchipEvolutionCampaignHost(
+      flash: try engineLaneDispatcher(options: options)
+    ).continueCampaign(
       campaignID: campaignID, archiveURL: URL(fileURLWithPath: images),
       targetLocationSelector: location)
     printCampaignResult(result)
+  }
+
+  /// A campaign attempt executes on the engine lane. There is no in-process
+  /// fallback on purpose: falling back would put two flash execution stacks
+  /// back in production behind one command, which is the condition this swap
+  /// exists to end. A daemon that is not running is a loud, closed failure.
+  private static func engineLaneDispatcher(
+    options: CLIOptions
+  ) throws -> EngineLaneEvolutionFlashDispatcher {
+    guard let runtimeTarget = options.value("--runtime-target"),
+      !runtimeTarget.isEmpty
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "a campaign attempt runs on the runtime job lane and needs --runtime-target "
+          + "<adopted target id>; the runtime refuses any target whose identity is not "
+          + "the one the campaign confirmation pins")
+    }
+    let socketPath = options.value("--socket") ?? RuntimeCLI.defaultSocketPath()
+    guard FileManager.default.fileExists(atPath: socketPath) else {
+      throw CLIError(
+        exitCode: EX_UNAVAILABLE,
+        message:
+          "the runtime daemon is not listening at \(socketPath); start arkdeck-agentd "
+          + "before running a campaign attempt")
+    }
+    return try EngineLaneEvolutionFlashDispatcher(
+      socketPath: socketPath, runtimeTargetID: runtimeTarget)
   }
 
   static func runCampaignStatus(_ arguments: [String]) throws {
@@ -954,9 +993,11 @@ struct ArkDeckCommandLine {
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
       --authorization-id <AUTH-ID>
         arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --campaign-confirmation-digest-sha256 <SHA256>
+      --campaign-confirmation-digest-sha256 <SHA256> --runtime-target <adopted-target-id> \
+      [--socket <path>]
         arkdeck flash continue --images <images.tar.gz> \
-      --target-location-id <usb-location> --campaign-id <ECAMP-id>
+      --target-location-id <usb-location> --campaign-id <ECAMP-id> \
+      --runtime-target <adopted-target-id> [--socket <path>]
         arkdeck flash status --campaign-id <ECAMP-id>
         arkdeck flash postflight --observation <observation.json> \
       [--device-profile <dayu200@1|dayu200@2>]

@@ -599,13 +599,6 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message: "flash bundle file must have the exact basename images.tar.gz")
     }
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "cannot open flash bundle file (errno \(errno))")
-    }
-    defer { Darwin.close(descriptor) }
     let profileReference: String
     if let profileIndex = arguments.firstIndex(of: "--device-profile"),
       profileIndex + 1 < arguments.count
@@ -619,6 +612,51 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message: "unsupported DAYU200 device profile \(profileReference)")
     }
+    emit(
+      try importFlashBundleResult(
+        client: client, targetID: targetID, url: url, profile: profile),
+      json: json)
+  }
+
+  /// The lease the runtime job lane needs for an already published archive.
+  /// The engine lane's campaign dispatcher uses this rather than a second
+  /// upload implementation, so both routes bind the identical bytes.
+  static func importFlashBundleLease(
+    client: AgentClient,
+    targetID: String,
+    archiveURL: URL,
+    profile: RockchipFlashProfile
+  ) throws -> String {
+    let result = try importFlashBundleResult(
+      client: client, targetID: targetID,
+      url: archiveURL.standardizedFileURL, profile: profile)
+    guard case .object(let fields) = result,
+      case .string(let lease)? = fields["lease"], !lease.isEmpty
+    else {
+      throw AgentClientError.malformedResponse(
+        "artifact.importFlashBundle.commit returned no artifact lease")
+    }
+    return lease
+  }
+
+  /// Streams the archive to the daemon and returns the commit response. The
+  /// wire name is the published member name the daemon pins; the on-disk
+  /// basename is not what identifies these bytes — the exact published size
+  /// and SHA-256 are, and they are checked before, during and after the
+  /// upload.
+  private static func importFlashBundleResult(
+    client: AgentClient,
+    targetID: String,
+    url: URL,
+    profile: RockchipFlashProfile
+  ) throws -> JSONValue {
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "cannot open flash bundle file (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
     var before = stat()
     guard fstat(descriptor, &before) == 0,
       before.st_mode & S_IFMT == S_IFREG,
@@ -711,7 +749,7 @@ enum RuntimeCLI {
       method: "artifact.importFlashBundle.commit",
       params: ["uploadId": .string(uploadID)])
     committed = true
-    emit(result, json: json)
+    return result
   }
 
   private struct HAPImportPayload {

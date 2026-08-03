@@ -128,6 +128,11 @@ let package = Package(
         "ArkDeckStorage",
         "ArkDeckAgentDaemon",
         "ArkDeckAgentClient",
+        // The engine-lane campaign dispatcher lives in the CLI composition
+        // root (it needs the campaign protocol and the daemon transport, and
+        // ArkDeckWorkflows must not gain a client edge). Its mapping is
+        // product behaviour, so it is contract-tested here.
+        "ArkDeckCLI",
         "ArkDeckFakeHDCFixture",
         "ArkDeckFakeRockchipFixture",
       ],
