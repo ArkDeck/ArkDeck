@@ -305,6 +305,31 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(status.state, "preflight")
   }
 
+  func testDaemonRecoveryReopensOnlyActiveJobsWhileTerminalHistoryStaysQueryable() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let terminal = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-terminal-history-01", requestID: "req-terminal-history-01"))
+    let terminalCompletion = try await engine.run(jobID: terminal.jobID)
+    XCTAssertEqual(terminalCompletion.state, "succeeded")
+    let active = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-active-history-01", requestID: "req-active-history-01"))
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await reopened.recoverActiveJobs()
+    XCTAssertEqual(recovered.map(\.jobID), [active.jobID])
+    XCTAssertEqual(recovered.map(\.state), ["preflight"])
+
+    // Active Runtime memory is bounded by work that can still move.  The
+    // completed job remains available through the SQLite history projection
+    // without a startup journal replay or a JobRuntime allocation.
+    let activeRuntimeJobs = await reopened.listJobs()
+    XCTAssertEqual(activeRuntimeJobs.map(\.jobID), [active.jobID])
+    let terminalStatus = try await reopened.status(jobID: terminal.jobID)
+    XCTAssertEqual(terminalStatus.state, "succeeded")
+    let history = try await reopened.listJobs(pageSize: 10)
+    XCTAssertEqual(Set(history.jobs.map(\.jobID)), Set([terminal.jobID, active.jobID]))
+  }
+
   func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {
     struct SimulatedProcessLoss: Error {}
     let root = stateDirectory!

@@ -263,6 +263,81 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertTrue(listed.isEmpty)
   }
 
+  func testLargeTextFilePublicationStreamsRedactionAcrossReadBoundaries() async throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_SLOW_ARTIFACT_TESTS"] == "1" else {
+      throw XCTSkip(
+        "slow 128 MiB artifact lane; run with ARKDECK_RUN_SLOW_ARTIFACT_TESTS=1")
+    }
+    let store = try makeStore(home: "/Users/tester")
+    let source = root.deletingLastPathComponent()
+      .appendingPathComponent("large-text-source-\(UUID().uuidString).log")
+    FileManager.default.createFile(atPath: source.path, contents: nil)
+    let writer = try FileHandle(forWritingTo: source)
+    defer {
+      try? writer.close()
+      try? FileManager.default.removeItem(at: source)
+    }
+    // 128 MiB of source is written in 64 KiB chunks.  `token` begins over a
+    // reader boundary, proving that the streaming redactor does not leak a
+    // secret merely because its key spans two input buffers.
+    let chunk = Data(repeating: 0x78, count: 64 * 1024)
+    for _ in 0..<1_024 { try writer.write(contentsOf: chunk) }
+    try writer.write(contentsOf: Data("tok".utf8))
+    try writer.write(contentsOf: Data("en:supersecret-value-that-must-not-persist\n".utf8))
+    try writer.write(contentsOf: Data("path=/Users/tester/private/workspace\n".utf8))
+    for _ in 0..<1_024 { try writer.write(contentsOf: chunk) }
+    try writer.synchronize()
+    try writer.close()
+
+    let published = try await store.publishTextFile(
+      RuntimeArtifactTextFilePublicationRequest(
+        jobID: "large-text-job", sessionID: "session-large-text-job",
+        stepID: "capture-large-log", name: "large.log", mediaType: "text/plain",
+        privacy: .standard, retentionClass: .shortLived,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+        sourceFileURL: source))
+    XCTAssertGreaterThanOrEqual(published.byteCount, 128 * 1024 * 1024)
+    XCTAssertTrue(published.redactionApplied)
+
+    let lease = try await store.leaseReference(
+      jobID: published.jobID, artifactID: published.artifactID)
+    let resolved = try await store.resolveLease(lease)
+    XCTAssertFalse(try fileContains(Data("supersecret-value-that-must-not-persist".utf8), at: resolved.fileURL))
+    XCTAssertFalse(try fileContains(Data("/Users/tester".utf8), at: resolved.fileURL))
+    XCTAssertTrue(try fileContains(Data("<REDACTED>".utf8), at: resolved.fileURL))
+    XCTAssertTrue(try fileContains(Data("<HOME>".utf8), at: resolved.fileURL))
+  }
+
+  func testTextFileStreamingRedactionKeepsOrdinaryKeyPrefixes() async throws {
+    let store = try makeStore(home: "/Users/tester")
+    let source = root.deletingLastPathComponent()
+      .appendingPathComponent("stream-prefix-\(UUID().uuidString).txt")
+    let sourceText = "tokenizer remains ordinary; secrettoken: second-secret-value\napi_key: abcdefghi\n/Users/tester/project\n"
+    try Data(sourceText.utf8).write(to: source)
+    defer { try? FileManager.default.removeItem(at: source) }
+
+    let published = try await store.publishTextFile(
+      RuntimeArtifactTextFilePublicationRequest(
+        jobID: "stream-prefix-job", sessionID: "session-stream-prefix-job",
+        stepID: "capture-log", name: "prefix.txt", mediaType: "text/plain",
+        privacy: .standard, retentionClass: .default,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+        sourceFileURL: source))
+    let text = String(
+      data: try await store.read(jobID: published.jobID, artifactID: published.artifactID),
+      encoding: .utf8) ?? ""
+    XCTAssertTrue(text.contains("tokenizer remains ordinary"), text)
+    XCTAssertTrue(text.contains("secrettoken: <REDACTED>"), text)
+    XCTAssertTrue(text.contains("api_key: <REDACTED>"), text)
+    XCTAssertFalse(text.contains("second-secret-value"), text)
+    XCTAssertFalse(text.contains("abcdefghi"), text)
+    XCTAssertFalse(text.contains("/Users/tester"), text)
+  }
+
   func testExportRefusesOverwriteAndSanitizesName() async throws {
     let store = try makeStore()
     let hostile = try await store.publish(request(name: "../evil.json"))
@@ -471,6 +546,19 @@ final class RuntimeArtifactContractTests: XCTestCase {
 
     await XCTAssertThrowsErrorAsync(
       try await store.verifiedEvidenceArtifacts(jobID: "job-1"))
+  }
+
+  private func fileContains(_ needle: Data, at url: URL) throws -> Bool {
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    var carry = Data()
+    while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+      var haystack = carry
+      haystack.append(chunk)
+      if haystack.range(of: needle) != nil { return true }
+      carry = Data(haystack.suffix(max(0, needle.count - 1)))
+    }
+    return false
   }
 }
 

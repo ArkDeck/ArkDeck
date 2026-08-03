@@ -72,10 +72,21 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  private final class DelayedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
+    let firstDispatch = DispatchSemaphore(value: 0)
+
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      firstDispatch.signal()
+      try await Task.sleep(nanoseconds: 150_000_000)
+      return try await HappyDispatcher().dispatch(plan)
+    }
+  }
+
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
-    flashBundleImportPolicy: FlashBundleImportPolicy = .production
+    flashBundleImportPolicy: FlashBundleImportPolicy = .production,
+    dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
@@ -86,7 +97,7 @@ final class AgentDaemonContractTests: XCTestCase {
       configuration: .init(
         stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
       providers: providers,
-      dispatcher: HappyDispatcher(),
+      dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -1323,6 +1334,48 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("status must survive restart")
     }
     XCTAssertEqual(recoveredState, "succeeded")
+  }
+
+  func testGracefulDrainCompletesInFlightJobBeforeReleasingTheDaemonLock() async throws {
+    let dispatcher = DelayedDispatcher()
+    let (handler, _) = try makeStack(dispatcher: dispatcher)
+    let server = try startServer(handler)
+    let client = AgentClient(socketPath: server.socketURL.path)
+    let request = """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-drain","idempotencyKey":"idem-drain-01",\
+      "target":{"targetId":"TGT-DRAIN-01","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """
+    guard
+      case .object(let submitFields) = try client.request(
+        method: "job.submit", params: ["requestJson": .string(request)]),
+      case .string(let jobID)? = submitFields["jobId"]
+    else {
+      return XCTFail("submit must return a job id")
+    }
+
+    let waitingClient = Task.detached { () -> JSONValue? in
+      try? client.request(method: "job.run", params: ["jobId": .string(jobID)])
+    }
+    XCTAssertEqual(
+      dispatcher.firstDispatch.wait(timeout: .now() + 5), .success,
+      "the daemon must observe the in-flight Runtime request before draining")
+
+    server.drainAndStop(deadline: 5)
+    self.server = nil
+    guard case .object(let result)? = await waitingClient.value,
+      case .string(let state)? = result["state"]
+    else {
+      return XCTFail("the waiting client must receive the completed Runtime status")
+    }
+    XCTAssertEqual(state, "succeeded")
+    XCTAssertFalse(FileManager.default.fileExists(atPath: server.socketURL.path))
+
+    let (_, reopened) = try makeStack()
+    let recovered = try await reopened.recoverPersistedJobs()
+    XCTAssertEqual(recovered.map(\.jobID), [jobID])
+    XCTAssertEqual(recovered.map(\.state), ["succeeded"])
   }
 
   /// Artifact identity is ID-only by construction. Export accepts only a

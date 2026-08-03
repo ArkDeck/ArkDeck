@@ -3128,23 +3128,37 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// Restart recovery: reopen every persisted job, replay its journal and
-  /// park unknowns. Clean journals retain their exact confirmed provider
-  /// boundary and can be resumed explicitly. Recovery itself never
-  /// dispatches anything.
+  /// Explicit full recovery for diagnostics and migration.  Production
+  /// daemon launch uses `recoverActiveJobs()` so terminal history remains a
+  /// SQLite query instead of thousands of journal replays.
   public func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
-    for persisted in try jobRepository.allJobs() {
+    try await recover(records: try jobRepository.allJobs())
+  }
+
+  /// Restart recovery for the daemon hot path.  Only non-terminal jobs can
+  /// need a recovery decision, therefore terminal rows are not reopened,
+  /// parsed, or retained in `jobs`.  `status` and `listJobs(pageSize:cursor:)`
+  /// continue to project those records directly from SQLite.
+  public func recoverActiveJobs() async throws -> [RuntimeJobStatus] {
+    try await recover(records: try jobRepository.activeJobs())
+  }
+
+  /// Reopen the supplied authoritative job set, replay each journal and park
+  /// unknowns. Clean journals retain their exact confirmed provider boundary
+  /// and can be resumed explicitly. Recovery itself never dispatches.
+  private func recover(records persistedJobs: [RuntimePersistedJob]) async throws -> [RuntimeJobStatus] {
+    for persisted in persistedJobs {
       try restoreInitialAdmissionProjectionIfNeeded(persisted)
     }
-    let jobsRoot = configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true)
-    let entries =
-      (try? FileManager.default.contentsOfDirectory(
-        at: jobsRoot, includingPropertiesForKeys: nil)) ?? []
     var recovered: [RuntimeJobStatus] = []
-    for entry in entries where entry.hasDirectoryPath {
-      let jobID = entry.lastPathComponent
+    for persisted in persistedJobs {
+      let jobID = persisted.jobID
       if jobs[jobID] != nil { continue }
-      guard var record = try? RuntimeJobRecord.load(from: entry) else { continue }
+      let entry = jobDirectory(for: jobID)
+      guard var record = try? RuntimeJobRecord.load(from: entry) else {
+        throw RuntimeJobEngineError.internalFailure(
+          "admitted job \(jobID) has no readable durable record after recovery projection")
+      }
       let journalURL = entry.appendingPathComponent("journal.jsonl")
       let journal = try FileDurableJournal(url: journalURL)
       var inspection = try DurableJournalRecovery.inspect(url: journalURL)

@@ -448,9 +448,9 @@ Task.detached {
         provider: hdcProvider, dispatcher: hdcDispatcher),
       targetStore: targetStore,
       nowUTC: utcNow)
-    let recovered = try await engine.recoverPersistedJobs()
+    let recovered = try await engine.recoverActiveJobs()
     if !recovered.isEmpty {
-      print("recovered \(recovered.count) persisted job(s); unknown outcomes parked")
+      print("recovered \(recovered.count) active job(s); unknown outcomes parked")
       fflush(stdout)
     }
     // Harness task plane (CHG-2026-054): one composition root, not a second

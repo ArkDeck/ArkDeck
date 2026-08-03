@@ -167,6 +167,29 @@ public final class RuntimeJobRepository: @unchecked Sendable {
     ).map(persistedJob)
   }
 
+  /// Jobs whose journal may still require recovery work.  Terminal history is
+  /// deliberately excluded: the record and terminal transition were both
+  /// durably written before this index row was advanced to a terminal state,
+  /// so reopening every terminal journal at daemon launch provides no
+  /// recovery action while making startup scale with total history.
+  ///
+  /// Unknown future states are treated as active.  That conservative default
+  /// keeps an upgraded Runtime from silently skipping a newly introduced
+  /// recovery state.
+  public func activeJobs() throws -> [RuntimePersistedJob] {
+    lock.lock()
+    defer { lock.unlock() }
+    return try query(
+      """
+      SELECT job_id, idempotency_key, request_hash, state, created_at_utc,
+             updated_at_utc, version, initial_record_json
+      FROM runtime_job
+      WHERE state NOT IN ('planned', 'succeeded', 'failed', 'cancelled', 'interrupted')
+      ORDER BY created_at_utc, job_id
+      """
+    ).map(persistedJob)
+  }
+
   public func job(jobID: String) throws -> RuntimePersistedJob? {
     lock.lock()
     defer { lock.unlock() }
