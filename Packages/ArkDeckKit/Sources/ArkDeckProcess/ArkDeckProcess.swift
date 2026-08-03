@@ -28,6 +28,13 @@ public struct ProcessOutputChunk: Sendable, Equatable {
 
 /// The in-memory portion of one stream. `totalByteCount` always includes data
 /// forwarded to `onOutput`, even when `data` is intentionally truncated.
+///
+/// `wasTruncated == false` is the only claim that this capture is the whole
+/// output the child produced, so it is set whenever any byte may be missing:
+/// output dropped at the capture limit, a drain that ended without reaching
+/// end-of-stream, or a child the executor cut short. Callers rely on the
+/// negative form as completeness evidence (POL-SAFETY-001), so an abandoned
+/// stream must never report as untruncated.
 public struct ProcessStreamCapture: Sendable, Equatable {
   public let data: Data
   public let totalByteCount: Int64
@@ -741,6 +748,9 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     let waitResult = await waitForExit(of: spawned.processIdentifier)
     await drain.waitUntilFinished()
     let groupTermination = await control.waitForProcessGroupTermination()
+    if control.termination != nil {
+      capture.recordExecutionCutShort()
+    }
     return ProcessExecutionResult(
       termination: control.termination ?? termination(from: waitResult),
       processGroupTermination: groupTermination,
@@ -856,6 +866,12 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     )
   }
 
+  /// A stop request kills the child's process group, so the write end closes
+  /// moments later. The reader keeps draining across that window instead of
+  /// abandoning bytes the child already wrote, and this bound caps the wait
+  /// when a surviving descendant holds the write end open instead.
+  private static let stoppedDrainGrace: TimeInterval = 0.5
+
   private func installReader(
     for descriptor: Int32,
     stream: ProcessStream,
@@ -863,6 +879,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     drain: PipeDrain
   ) {
     drain.enter()
+    let grace = Self.stoppedDrainGrace
     DispatchQueue.global(qos: .utility).async {
       defer {
         Darwin.close(descriptor)
@@ -874,7 +891,19 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
         events: Int16(POLLIN | POLLHUP | POLLERR),
         revents: 0
       )
-      while !drain.isCancelled {
+      // Armed on the first cancelled turn, never before it, so a cancelled
+      // reader always takes at least one more turn: a writer blocked on a full
+      // pipe leaves a buffer's worth of produced bytes behind, and returning
+      // straight away would drop them from the accounting as well as the data.
+      var drainDeadline: DispatchTime?
+      while true {
+        if drain.isCancelled {
+          let deadline = drainDeadline ?? DispatchTime.now() + grace
+          drainDeadline = deadline
+          if DispatchTime.now() >= deadline {
+            return
+          }
+        }
         pollDescriptor.revents = 0
         let pollResult = Darwin.poll(&pollDescriptor, 1, 25)
         if pollResult == -1 {
@@ -886,7 +915,6 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
         if pollResult == 0 {
           continue
         }
-        guard !drain.isCancelled else { return }
         let byteCount = buffer.withUnsafeMutableBytes { bytes in
           Darwin.read(descriptor, bytes.baseAddress, bytes.count)
         }
@@ -898,6 +926,12 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
             )
           )
           continue
+        }
+        if byteCount == 0 {
+          // The one exit that proves nothing is left unread. Every other exit
+          // leaves the stream marked incomplete on purpose.
+          capture.recordEndOfStream(for: stream)
+          return
         }
         if byteCount == -1, errno == EINTR {
           continue
@@ -1348,6 +1382,27 @@ private final class OutputCapture: @unchecked Sendable {
     onOutput(chunk)
   }
 
+  func recordEndOfStream(for stream: ProcessStream) {
+    lock.lock()
+    switch stream {
+    case .stdout:
+      stdout.recordEndOfStream()
+    case .stderr:
+      stderr.recordEndOfStream()
+    }
+    lock.unlock()
+  }
+
+  /// The executor terminated the child mid-run, so whatever it would have
+  /// written next never reached either pipe. Neither stream may claim to hold
+  /// the complete output afterwards, however cleanly its own drain ended.
+  func recordExecutionCutShort() {
+    lock.lock()
+    stdout.recordExecutionCutShort()
+    stderr.recordExecutionCutShort()
+    lock.unlock()
+  }
+
   func capture(for stream: ProcessStream) -> ProcessStreamCapture {
     lock.lock()
     defer { lock.unlock() }
@@ -1363,7 +1418,9 @@ private final class OutputCapture: @unchecked Sendable {
 private struct MutableStreamCapture {
   private var data = Data()
   private var totalByteCount: Int64 = 0
-  private var wasTruncated = false
+  private var droppedBytes = false
+  private var reachedEndOfStream = false
+  private var executionCutShort = false
 
   mutating func append(_ bytes: Data, limit: Int) {
     let (newTotal, overflowed) = totalByteCount.addingReportingOverflow(Int64(bytes.count))
@@ -1372,11 +1429,26 @@ private struct MutableStreamCapture {
     if remaining > 0 {
       data.append(bytes.prefix(remaining))
     }
-    wasTruncated = wasTruncated || overflowed || bytes.count > remaining
+    droppedBytes = droppedBytes || overflowed || bytes.count > remaining
   }
 
+  mutating func recordEndOfStream() {
+    reachedEndOfStream = true
+  }
+
+  mutating func recordExecutionCutShort() {
+    executionCutShort = true
+  }
+
+  /// Completeness is asserted only from evidence: bytes kept under the capture
+  /// limit, a drain that read through to end-of-stream, and a child left to
+  /// finish. A reader that gave up at a full pipe once reported exactly the
+  /// capture limit as untruncated output, which reads as "this is everything".
   var value: ProcessStreamCapture {
-    ProcessStreamCapture(data: data, totalByteCount: totalByteCount, wasTruncated: wasTruncated)
+    ProcessStreamCapture(
+      data: data,
+      totalByteCount: totalByteCount,
+      wasTruncated: droppedBytes || !reachedEndOfStream || executionCutShort)
   }
 }
 
