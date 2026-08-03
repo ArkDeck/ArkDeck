@@ -84,6 +84,8 @@ private enum SoakFixtureError: Error, LocalizedError {
   case missingArtifactEvidence(String)
   case outstandingCleanupDebt(Int)
   case protocolFailure(String)
+  case residentSetGrowthExceeded(actual: Int64, limit: Int64)
+  case fileDescriptorGrowthExceeded(actual: Int, limit: Int)
 
   var errorDescription: String? {
     switch self {
@@ -98,6 +100,10 @@ private enum SoakFixtureError: Error, LocalizedError {
     case .outstandingCleanupDebt(let count):
       return "\(count) cleanup-debt records remain after final recovery"
     case .protocolFailure(let message): return message
+    case .residentSetGrowthExceeded(let actual, let limit):
+      return "resident-set growth \(actual) bytes exceeds soak limit \(limit)"
+    case .fileDescriptorGrowthExceeded(let actual, let limit):
+      return "open-file-descriptor growth \(actual) exceeds soak limit \(limit)"
     }
   }
 }
@@ -177,6 +183,10 @@ private struct SoakMetrics: Codable {
   let processID: Int32
   let openFileDescriptorCount: Int?
   let maxResidentSetBytes: Int64?
+  let baselineOpenFileDescriptorCount: Int?
+  let openFileDescriptorGrowth: Int?
+  let baselineResidentSetBytes: Int64?
+  let residentSetGrowthBytes: Int64?
   let jobStates: [String: Int]
   let activeJobCount: Int
   let terminalJobCount: Int
@@ -189,6 +199,15 @@ private struct SoakMetrics: Codable {
   let outstandingCleanupDebtCount: Int
   let verifiedArtifactEvidenceJobCount: Int?
 }
+
+// A steady-state cycle creates the same ten jobs, then drains the daemon
+// before metrics are read.  The first cycle loads SQLite/Swift runtime state;
+// subsequent cycles must not retain another workload's worth of memory or
+// file descriptors.  These limits are intentionally far below the 128 MiB
+// artifact input used by the slow lane, while leaving headroom for allocator
+// and system-library variation on macOS runners.
+private let maximumResidentSetGrowthBytes: Int64 = 32 * 1024 * 1024
+private let maximumOpenFileDescriptorGrowth = 16
 
 private func currentUTC() -> String {
   ISO8601DateFormatter().string(from: Date())
@@ -441,7 +460,9 @@ private func collectMetrics(
   startedAt: Date,
   recovered: Int,
   dispatches: Int,
-  verifiedArtifactJobs: Int? = nil
+  verifiedArtifactJobs: Int? = nil,
+  baselineResidentSetBytes: Int64? = nil,
+  baselineOpenFileDescriptorCount: Int? = nil
 ) async throws -> SoakMetrics {
   let (engine, _, _, _) = try makeEngine(configuration: configuration)
   let states = try await jobStateCounts(engine)
@@ -453,19 +474,44 @@ private func collectMetrics(
   let state = treeUsage(at: configuration.stateDirectory)
   let artifacts = treeUsage(
     at: configuration.stateDirectory.appendingPathComponent("artifacts", isDirectory: true))
+  let openDescriptors = openFileDescriptorCount()
+  let residentSet = maximumResidentSetBytes()
+  let residentBaseline = baselineResidentSetBytes ?? residentSet
+  let descriptorBaseline = baselineOpenFileDescriptorCount ?? openDescriptors
+  let descriptorGrowth = openDescriptors.flatMap { current in
+    descriptorBaseline.map { current - $0 }
+  }
+  let residentGrowth = residentSet.flatMap { current in
+    residentBaseline.map { current - $0 }
+  }
   return SoakMetrics(
     schemaVersion: "arkdeck-runtime-soak/v1", runID: runID, phase: phase, cycle: cycle,
     generatedAtUTC: currentUTC(), elapsedSeconds: Int(Date().timeIntervalSince(startedAt)),
     configuredDurationSeconds: configuration.durationSeconds, jobsPerCycle: configuration.jobsPerCycle,
     recoveredThisCycle: recovered, fakeProviderCommandsThisCycle: dispatches,
     fakeProviderChildProcessCount: 0, processID: getpid(),
-    openFileDescriptorCount: openFileDescriptorCount(), maxResidentSetBytes: maximumResidentSetBytes(),
+    openFileDescriptorCount: openDescriptors, maxResidentSetBytes: residentSet,
+    baselineOpenFileDescriptorCount: descriptorBaseline,
+    openFileDescriptorGrowth: descriptorGrowth,
+    baselineResidentSetBytes: residentBaseline,
+    residentSetGrowthBytes: residentGrowth,
     jobStates: states, activeJobCount: active, terminalJobCount: terminal,
     stateFileCount: state.fileCount, stateByteCount: state.byteCount,
     journalCount: state.journalCount, journalByteCount: state.journalByteCount,
     artifactFileCount: artifacts.fileCount, artifactByteCount: artifacts.byteCount,
     outstandingCleanupDebtCount: cleanupDebt.count,
     verifiedArtifactEvidenceJobCount: verifiedArtifactJobs)
+}
+
+private func verifySteadyStateResources(_ metrics: SoakMetrics) throws {
+  if let growth = metrics.residentSetGrowthBytes, growth > maximumResidentSetGrowthBytes {
+    throw SoakFixtureError.residentSetGrowthExceeded(
+      actual: growth, limit: maximumResidentSetGrowthBytes)
+  }
+  if let growth = metrics.openFileDescriptorGrowth, growth > maximumOpenFileDescriptorGrowth {
+    throw SoakFixtureError.fileDescriptorGrowthExceeded(
+      actual: growth, limit: maximumOpenFileDescriptorGrowth)
+  }
 }
 
 private func persistMetrics(_ metrics: SoakMetrics, to stateDirectory: URL) throws {
@@ -496,6 +542,8 @@ do {
   let deadline = startedAt.addingTimeInterval(TimeInterval(configuration.durationSeconds))
   let runID = UUID().uuidString.lowercased()
   var cycle = 0
+  var baselineResidentSetBytes: Int64?
+  var baselineOpenFileDescriptorCount: Int?
 
   print(
     "ArkDeck Runtime soak started runID=\(runID) durationSeconds=\(configuration.durationSeconds) "
@@ -506,8 +554,13 @@ do {
       configuration: configuration, runID: runID, cycle: cycle, createNewJobs: true)
     let metrics = try await collectMetrics(
       configuration: configuration, runID: runID, phase: "running", cycle: cycle,
-      startedAt: startedAt, recovered: result.recovered, dispatches: result.dispatches)
+      startedAt: startedAt, recovered: result.recovered, dispatches: result.dispatches,
+      baselineResidentSetBytes: baselineResidentSetBytes,
+      baselineOpenFileDescriptorCount: baselineOpenFileDescriptorCount)
     try persistMetrics(metrics, to: configuration.stateDirectory)
+    try verifySteadyStateResources(metrics)
+    baselineResidentSetBytes = metrics.baselineResidentSetBytes
+    baselineOpenFileDescriptorCount = metrics.baselineOpenFileDescriptorCount
     print(
       "ArkDeck Runtime soak cycle=\(cycle) jobs=\(metrics.terminalJobCount + metrics.activeJobCount) "
         + "active=\(metrics.activeJobCount) recovered=\(result.recovered) "
@@ -529,7 +582,10 @@ do {
   let finalMetrics = try await collectMetrics(
     configuration: configuration, runID: runID, phase: "completed", cycle: cycle,
     startedAt: startedAt, recovered: drained.recovered, dispatches: drained.dispatches,
-    verifiedArtifactJobs: verified.verifiedArtifactJobs)
+    verifiedArtifactJobs: verified.verifiedArtifactJobs,
+    baselineResidentSetBytes: baselineResidentSetBytes,
+    baselineOpenFileDescriptorCount: baselineOpenFileDescriptorCount)
+  try verifySteadyStateResources(finalMetrics)
   try persistMetrics(finalMetrics, to: configuration.stateDirectory)
   print(
     "ArkDeck Runtime soak completed runID=\(runID) terminalJobs=\(finalMetrics.terminalJobCount) "
