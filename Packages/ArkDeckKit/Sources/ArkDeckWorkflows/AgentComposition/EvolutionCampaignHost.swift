@@ -108,6 +108,14 @@ public enum RockchipEvolutionCampaignPlanning {
 }
 
 public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
+  /// A `safeToReflash` terminal proves no external effect occurred, but it
+  /// does not make an unbounded sequence of materially identical proposals
+  /// useful. Three consecutive no-effect attempts are enough to distinguish
+  /// a transient transition race from a product-path defect; preserve the
+  /// evidence and stop before the strategy-only repair lane churns through
+  /// the confirmed Flash budget.
+  private static let maximumConsecutiveNoEffectAttempts = 3
+
   private let ledger: RockchipEvolutionCampaignLedger
   private let usageLedger: AgentAuthorityUsageLedger
   private let repairer: any RockchipEvolutionStrategyRepairing
@@ -232,6 +240,11 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     while true {
       guard !document.isTerminal, document.assertion.isValid(at: nowUTC()) else {
         throw RockchipEvolutionCampaignError.campaignStopped("terminalOrExpired")
+      }
+      guard !Self.hasRepeatedNoEffectFailure(document) else {
+        _ = try? ledger.stop(
+          campaignID: document.campaignID, reasonCode: "repeatedSafeNoEffect", at: nowUTC())
+        throw RockchipEvolutionCampaignError.campaignStopped("repeatedSafeNoEffect")
       }
       guard document.reservedAttemptCount < document.assertion.maxAttempts else {
         _ = try? ledger.stop(
@@ -397,6 +410,16 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       return true
     default:
       return false
+    }
+  }
+
+  private static func hasRepeatedNoEffectFailure(
+    _ document: RockchipEvolutionCampaignDocument
+  ) -> Bool {
+    let terminalAttempts = document.events.filter { $0.kind == .attemptTerminal }
+    guard terminalAttempts.count >= maximumConsecutiveNoEffectAttempts else { return false }
+    return terminalAttempts.suffix(maximumConsecutiveNoEffectAttempts).allSatisfy {
+      $0.disposition == .safeToReflash
     }
   }
 

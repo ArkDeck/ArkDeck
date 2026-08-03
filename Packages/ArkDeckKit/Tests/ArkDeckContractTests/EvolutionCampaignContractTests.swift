@@ -666,6 +666,52 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(document.events.compactMap(\.candidate).map(\.strategy), [baseline, repaired])
   }
 
+  func testHostStopsAfterThreeConsecutiveNoEffectAttempts() async throws {
+    let root = temporaryDirectory("campaign-stop-no-effect")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 16)
+    _ = try ledger.create(assertion)
+    let first = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
+    let second = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 46,
+      userdataImpact: "ERASE-USERDATA")
+    let third = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 47,
+      userdataImpact: "ERASE-USERDATA")
+    let flash = SafeFailureThenSuccessEvolutionFlash(
+      ledger: ledger, now: Self.confirmedAt, safeFailureCount: 3)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: ThreeStageEvolutionRepairer(strategies: [first, second, third]),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    await ain019AssertThrowsAsync(
+      try await host.executeConfirmedCampaign(
+        confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 3)
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertTrue(document.isTerminal)
+    XCTAssertEqual(document.reservedAttemptCount, 3)
+    XCTAssertEqual(document.events.last?.reasonCode, "repeatedSafeNoEffect")
+  }
+
   func testCandidateThatExcludesLiveModeIsRepairedWithoutConsumingAttempt() async throws {
     let root = temporaryDirectory("campaign-live-mode-repair")
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1230,6 +1276,22 @@ private struct ScriptedEvolutionRepairer: RockchipEvolutionStrategyRepairing {
   }
 }
 
+private struct ThreeStageEvolutionRepairer: RockchipEvolutionStrategyRepairing {
+  let strategies: [RockchipEvolutionTypedStrategy]
+  let repairerID = "three-stage-evolution-repairer"
+
+  func propose(
+    assertion _: RockchipEvolutionCampaignConfirmationAssertion,
+    observation _: RockchipEvolutionFailureObservation?,
+    priorCandidates: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    guard priorCandidates.count < strategies.count else {
+      throw RockchipEvolutionCampaignError.candidateRejected("repairScript")
+    }
+    return strategies[priorCandidates.count]
+  }
+}
+
 private struct StrategyEchoEvolutionBuilder: RockchipEvolutionCandidateBuilding {
   func build(
     assertion: RockchipEvolutionCampaignConfirmationAssertion,
@@ -1270,11 +1332,13 @@ private struct PassingEvolutionReviewer: RockchipEvolutionAdversarialReviewing {
 private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispatching {
   let ledger: RockchipEvolutionCampaignLedger
   let now: String
+  let safeFailureCount: Int
   private var count = 0
 
-  init(ledger: RockchipEvolutionCampaignLedger, now: String) {
+  init(ledger: RockchipEvolutionCampaignLedger, now: String, safeFailureCount: Int = 1) {
     self.ledger = ledger
     self.now = now
+    self.safeFailureCount = safeFailureCount
   }
 
   // An in-process-lane fake: it reserves inside execute, so the host must
@@ -1293,7 +1357,7 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
       reviewID: permit.review.reviewID, ordinal: ordinal,
       reservationID: "reservation-auto-\(ordinal)", jobID: "job-auto-\(ordinal)",
       sessionID: "session-auto-\(ordinal)", at: now)
-    if ordinal == 1 {
+    if ordinal <= safeFailureCount {
       _ = try ledger.closeAttempt(
         campaignID: permit.assertion.campaignID, ordinal: ordinal,
         jobID: "job-auto-\(ordinal)", sessionID: "session-auto-\(ordinal)",
