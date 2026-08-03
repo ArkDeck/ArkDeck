@@ -405,18 +405,21 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
   private let executableSHA256: String
   private let executor: FoundationProcessExecutor
   private let hdcTransition: RockchipHDCTransitionConfiguration?
+  private let toolWorkingDirectory: URL
 
   init(
     executableURL: URL,
     executor: FoundationProcessExecutor,
     executableSHA256: String = RockchipDiscoveryIntegrationProfile.pinnedProduction
       .executableSHA256,
-    hdcTransition: RockchipHDCTransitionConfiguration? = nil
+    hdcTransition: RockchipHDCTransitionConfiguration? = nil,
+    toolWorkingDirectory: URL
   ) {
     self.executableURL = executableURL
     self.executableSHA256 = executableSHA256
     self.executor = executor
     self.hdcTransition = hdcTransition
+    self.toolWorkingDirectory = toolWorkingDirectory
   }
 
   func prepare(
@@ -443,6 +446,7 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
     let request = ProcessIdentityBoundRequest(
       process: ProcessRequest(
         executable: executableURL, arguments: command.arguments, environment: [:],
+        workingDirectory: toolWorkingDirectory,
         timeout: command.isCriticalWrite ? nil : TimeInterval(readOnlyTimeout)),
       expectedSHA256: executableSHA256)
     let prepared = try executor.prepareIdentityBoundLaunch(request)
@@ -567,7 +571,8 @@ final class FoundationRockchipExecutionProcessPort: @unchecked Sendable,
                   "rl", String(mapping.offsetSectors + consumedSectors), String(sectors),
                   outputURL.path,
                 ],
-                environment: [:], timeout: TimeInterval(max(60, timeoutSeconds))),
+                environment: [:], workingDirectory: toolWorkingDirectory,
+                timeout: TimeInterval(max(60, timeoutSeconds))),
               expectedSHA256: executableSHA256))
           guard Self.sameDescriptor(prepared.executableIdentity, admissionIdentity) else {
             prepared.close()
@@ -1232,10 +1237,12 @@ private enum RockchipProductionExecutionComposition {
       campaignLedger: campaignLedger,
       binding: settings.binding,
       postflightIdentities: postflightIdentities,
-      tool: settings.tool, clock: clock, usbProbe: usbProbe)
+      tool: settings.tool, toolWorkingDirectory: settings.toolWorkingDirectory,
+      clock: clock, usbProbe: usbProbe)
     let bindingSerialDigest = SHA256.hash(data: Data(settings.binding.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
-    let loaderDiscovery = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter()
+    let loaderDiscovery = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(
+      toolWorkingDirectory: settings.toolWorkingDirectory)
     let hdcTransition = RockchipHDCTransitionConfiguration(
       executableURL: RockchipHDCIntegrationProfile.executableURL,
       executableSHA256: RockchipHDCIntegrationProfile.executableSHA256,
@@ -1272,7 +1279,8 @@ private enum RockchipProductionExecutionComposition {
     let process = FoundationRockchipExecutionProcessPort(
       executableURL: settings.tool.executableURL,
       executor: FoundationProcessExecutor(),
-      hdcTransition: hdcTransition)
+      hdcTransition: hdcTransition,
+      toolWorkingDirectory: settings.toolWorkingDirectory)
     let postflight = RockchipProductPostflightPort(probe: usbProbe)
     let coordinator = storage.context.coordinator
     let storageProbe = SystemHostStorageProbe()
@@ -1985,19 +1993,94 @@ struct RockchipProductToolInstaller {
   }
 }
 
+enum RockchipProductToolRuntimeDirectory {
+  static let directoryName = "RockchipToolRuntime"
+  static let configurationFileName = "config.ini"
+  static let logDirectoryName = "log"
+
+  /// Upstream rkdeveloptool reads `config.ini` and writes `log/` relative to
+  /// its current directory.  Bind those implicit files to product-owned state
+  /// so an E2 run cannot depend on, or contaminate, the caller's Git worktree.
+  static func prepare(root: URL) throws -> URL {
+    guard root.isFileURL, root.path.hasPrefix("/") else {
+      throw configurationError("Rockchip tool runtime root must be absolute")
+    }
+    let runtime = root.appending(path: directoryName, directoryHint: .isDirectory)
+      .standardizedFileURL
+    let rootPrefix = root.standardizedFileURL.path.hasSuffix("/")
+      ? root.standardizedFileURL.path : root.standardizedFileURL.path + "/"
+    guard runtime.path.hasPrefix(rootPrefix) else {
+      throw configurationError("Rockchip tool runtime escaped Application Support")
+    }
+    try prepareOwnerOnlyDirectory(runtime)
+    try prepareOwnerOnlyDirectory(
+      runtime.appending(path: logDirectoryName, directoryHint: .isDirectory))
+    try prepareEmptyConfiguration(
+      runtime.appending(path: configurationFileName, directoryHint: .notDirectory))
+    return runtime
+  }
+
+  private static func prepareOwnerOnlyDirectory(_ url: URL) throws {
+    do {
+      try FileManager.default.createDirectory(
+        at: url, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw configurationError("Rockchip tool runtime directory cannot be created")
+    }
+    var metadata = stat()
+    guard lstat(url.path, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFDIR,
+      metadata.st_uid == getuid()
+    else {
+      throw configurationError("Rockchip tool runtime directory is not owner-controlled")
+    }
+    guard chmod(url.path, 0o700) == 0 else {
+      throw configurationError("Rockchip tool runtime directory must be owner-only")
+    }
+  }
+
+  private static func prepareEmptyConfiguration(_ url: URL) throws {
+    let descriptor = Darwin.open(
+      url.path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+    guard descriptor >= 0 else {
+      throw configurationError("Rockchip tool config cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_nlink == 1,
+      metadata.st_uid == getuid(),
+      metadata.st_size == 0,
+      fchmod(descriptor, S_IRUSR | S_IWUSR) == 0,
+      fsync(descriptor) == 0
+    else {
+      throw configurationError("Rockchip tool config must be an empty owner-only regular file")
+    }
+  }
+
+  private static func configurationError(_ detail: String) -> RockchipFlashExecutionError {
+    .productionConfigurationUnavailable(detail)
+  }
+}
+
 private final class RockchipProductExecutionSettings: @unchecked Sendable {
   let usageRoot: URL
   let tool: RockchipSelectedDiscoveryTool
   let binding: RockchipProductBindingSnapshot
+  let toolWorkingDirectory: URL
 
   private init(
     usageRoot: URL,
     tool: RockchipSelectedDiscoveryTool,
-    binding: RockchipProductBindingSnapshot
+    binding: RockchipProductBindingSnapshot,
+    toolWorkingDirectory: URL
   ) {
     self.usageRoot = usageRoot
     self.tool = tool
     self.binding = binding
+    self.toolWorkingDirectory = toolWorkingDirectory
   }
 
   static func load() throws -> RockchipProductExecutionSettings {
@@ -2047,8 +2130,10 @@ private final class RockchipProductExecutionSettings: @unchecked Sendable {
       platformTrust: RockchipPlatformTrustReceipt(
         codeTrust: trust, quarantinePresent: quarantine))
     let binding = try RockchipProductBindingStore(rootURL: root).loadExisting()
+    let toolWorkingDirectory = try RockchipProductToolRuntimeDirectory.prepare(root: root)
     return RockchipProductExecutionSettings(
-      usageRoot: usage, tool: selectedTool, binding: binding)
+      usageRoot: usage, tool: selectedTool, binding: binding,
+      toolWorkingDirectory: toolWorkingDirectory)
   }
 
   fileprivate static func productKeychainToken() throws -> String? {
@@ -2292,6 +2377,7 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
   let bindingPort: RockchipProductBindingPort
   let tool: RockchipSelectedDiscoveryTool
   let selector: String
+  let toolWorkingDirectory: URL
   let usbProbe: RockchipProductUSBProbe
   let clock: any RockchipAdmissionClock
 
@@ -2386,7 +2472,9 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
     do {
       toolPrepared = try processExecutor.prepareIdentityBoundLaunch(
         ProcessIdentityBoundRequest(
-          process: ProcessRequest(executable: tool.executableURL, arguments: ["ld"], timeout: 5),
+          process: ProcessRequest(
+            executable: tool.executableURL, arguments: ["ld"],
+            workingDirectory: toolWorkingDirectory, timeout: 5),
           expectedSHA256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256))
     } catch {
       throw RockchipAuthorizationFactError.factPortFailed(name: "rockchipExecutableIdentity")
@@ -2543,8 +2631,11 @@ private struct RockchipProductPostflightPort: RockchipExecutionPostflightPort {
 /// observable to contract tests; `RockchipProductionAdmissionPort.admit` is
 /// its only production caller.
 enum RockchipProductionDiscoveryComposition {
-  static func admissionDiscoveryAdapter() -> RockchipDeviceDiscoveryAdapter {
-    RockchipDeviceDiscoveryAdapter(profile: .pinnedProduction)
+  static func admissionDiscoveryAdapter(
+    toolWorkingDirectory: URL
+  ) -> RockchipDeviceDiscoveryAdapter {
+    RockchipDeviceDiscoveryAdapter(
+      profile: .pinnedProduction, workingDirectory: toolWorkingDirectory)
   }
 }
 
@@ -2558,6 +2649,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
   private let binding: RockchipProductBindingSnapshot
   private let postflightIdentities: [RockchipPostflightIdentity]
   private let tool: RockchipSelectedDiscoveryTool
+  private let toolWorkingDirectory: URL
   private let clock: any RockchipAdmissionClock
   private let usbProbe: RockchipProductUSBProbe
 
@@ -2569,6 +2661,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     binding: RockchipProductBindingSnapshot,
     postflightIdentities: [RockchipPostflightIdentity],
     tool: RockchipSelectedDiscoveryTool,
+    toolWorkingDirectory: URL,
     clock: any RockchipAdmissionClock,
     usbProbe: RockchipProductUSBProbe
   ) {
@@ -2579,6 +2672,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
     self.binding = binding
     self.postflightIdentities = postflightIdentities
     self.tool = tool
+    self.toolWorkingDirectory = toolWorkingDirectory
     self.clock = clock
     self.usbProbe = usbProbe
   }
@@ -2606,7 +2700,8 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
         toolDevicePort: RockchipDiscoveryToolDeviceFactPort(
           sessionID: sessionID, jobID: jobID, targetID: targetID,
           observationSequence: sequence,
-          adapter: RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(),
+          adapter: RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(
+            toolWorkingDirectory: toolWorkingDirectory),
           tool: tool, clock: clock),
         prerequisitePort: RockchipProductPrerequisitePort(
           sessionID: sessionID, jobID: jobID, targetID: targetID,
@@ -2620,7 +2715,7 @@ private final class RockchipProductionAdmissionPort: @unchecked Sendable,
       collector = RockchipProductHDCNormalAuthorizationFactCollector(
         planPort: RockchipProductExecutePlanFactPort(), bindingPort: bindingPort,
         tool: tool, selector: request.targetLocationSelector,
-        usbProbe: usbProbe, clock: clock)
+        toolWorkingDirectory: toolWorkingDirectory, usbProbe: usbProbe, clock: clock)
     } else {
       throw RockchipFlashExecutionError.admissionRejected(
         "durably bound DAYU200 is not in a registered execution mode")
