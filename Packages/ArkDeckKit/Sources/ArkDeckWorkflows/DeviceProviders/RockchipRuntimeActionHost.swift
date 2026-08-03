@@ -451,7 +451,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       do {
         let receipt = try await runner.run(
           executable: hdc,
-          arguments: ["-t", connectKey, "shell", "reboot", "loader"],
+          arguments: RockchipHDCIntegrationProfile.enterLoaderArguments(
+            connectKey: connectKey),
           timeoutSeconds: 20,
           outputByteBudget: 64 * 1024,
           criticalNonInterruptible: false)

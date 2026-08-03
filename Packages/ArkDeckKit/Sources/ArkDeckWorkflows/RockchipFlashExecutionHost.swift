@@ -101,7 +101,11 @@ enum RockchipHDCIntegrationProfile {
   static let dayu200NormalProductID: UInt16 = 0x5000
 
   static func enterLoaderArguments(connectKey: String) -> [String] {
-    ["-t", connectKey, "shell", "reboot", "loader"]
+    // The HDC service owns boot-mode changes.  Keep this as a fixed typed
+    // argv rather than asking a normal-mode shell to interpret `reboot
+    // loader`: the latter was observed to complete without a Loader
+    // transition on the current DAYU200/HDC combination.
+    ["-t", connectKey, "target", "boot", "-bootloader"]
   }
 }
 
