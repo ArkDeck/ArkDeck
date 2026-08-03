@@ -355,7 +355,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
         alternateModeIdentities: [previousModeIdentity],
-        currentIdentity: { identityProbe.current() }, waitForLoader: { _, _ in loader }))
+        currentIdentity: { identityProbe.current() }, waitForLoader: { _, _ in loader }),
+      toolWorkingDirectory: fixture.base)
     let host = RockchipFlashExecutionHost(
       dependencies: RockchipFlashExecutionDependencies(
         admission: admission, process: process,
@@ -381,6 +382,10 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
     XCTAssertEqual(requests.count, 13)
     XCTAssertEqual(requests[0].executable, hdcExecutable)
     XCTAssertEqual(requests[0].arguments, ["-t", serial, "shell", "reboot", "loader"])
+    XCTAssertNil(requests[0].workingDirectory)
+    XCTAssertTrue(
+      requests.dropFirst().allSatisfy { $0.workingDirectory == fixture.base },
+      "every rkdeveloptool launch must be isolated from the caller's Git worktree")
     XCTAssertEqual(requests[1].arguments, ["ld"])
     XCTAssertEqual(requests[2].arguments, ["ppt"])
     XCTAssertEqual(requests[3...11].map { $0.arguments.first }, Array(repeating: "wlx", count: 9))
@@ -423,7 +428,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         executableURL: hdcExecutable, executableSHA256: hdcSHA256,
         connectKey: serial, stableIdentitySHA256: serialDigest, usbTopology: "42",
         currentIdentity: { normal },
-        waitForLoader: { _, _ in throw RockchipHDCTransitionError.loaderUnavailable }))
+        waitForLoader: { _, _ in throw RockchipHDCTransitionError.loaderUnavailable }),
+      toolWorkingDirectory: fixture.base)
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
@@ -486,7 +492,8 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         alternateModeIdentities: [
           RockchipPostflightIdentity(serialDigestSHA256: loaderDigest, usbTopology: "42")
         ],
-        currentIdentity: { identityProbe.current() }, waitForLoader: { _, _ in movedLoader }))
+        currentIdentity: { identityProbe.current() }, waitForLoader: { _, _ in movedLoader }),
+      toolWorkingDirectory: fixture.base)
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
@@ -537,7 +544,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
             deviceNumber: 0, usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
             usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
             locationID: 42, mode: .loader)
-        }))
+        }), toolWorkingDirectory: fixture.base)
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,
@@ -590,7 +597,7 @@ final class RockchipFlashExecutionContractTests: XCTestCase {
         waitForLoader: { timeout, poll in
           tuning.record(timeoutSeconds: timeout, pollMilliseconds: poll)
           return loader
-        }))
+        }), toolWorkingDirectory: fixture.base)
     let command = try XCTUnwrap(
       RockchipFlashExecutionLowering.commands(
         plan: fixture.plan,

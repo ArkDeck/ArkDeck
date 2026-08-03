@@ -626,18 +626,22 @@ final class RockchipExecutableBookmarkAccess {
 public actor RockchipDeviceDiscoveryAdapter {
   private let profile: RockchipDiscoveryIntegrationProfile
   private let executor: FoundationProcessExecutor
+  private let workingDirectory: URL?
 
   public init() {
     profile = .pinnedReadOnlyDiscovery
     executor = FoundationProcessExecutor()
+    workingDirectory = nil
   }
 
   init(
     profile: RockchipDiscoveryIntegrationProfile,
-    executor: FoundationProcessExecutor = FoundationProcessExecutor()
+    executor: FoundationProcessExecutor = FoundationProcessExecutor(),
+    workingDirectory: URL? = nil
   ) {
     self.profile = profile
     self.executor = executor
+    self.workingDirectory = workingDirectory
   }
 
   func processRequest(
@@ -666,6 +670,7 @@ public actor RockchipDeviceDiscoveryAdapter {
         executable: tool.executableURL,
         arguments: profile.exactArguments,
         environment: [:],
+        workingDirectory: workingDirectory,
         timeout: profile.timeout),
       expectedSHA256: profile.executableSHA256)
   }

@@ -33,7 +33,9 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
     async throws
   {
     let literal = Self.independentlyPinnedProductionSHA256
-    let adapter = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter()
+    let toolWorkingDirectory = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+    let adapter = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(
+      toolWorkingDirectory: toolWorkingDirectory)
 
     let request = try await adapter.processRequest(for: productionDeclaredTool())
     XCTAssertEqual(
@@ -44,6 +46,7 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
       "the constant RockchipAuthorizationFacts asserts must equal the independent literal")
     XCTAssertEqual(request.process.arguments, ["ld"])
     XCTAssertEqual(request.process.environment, [:])
+    XCTAssertEqual(request.process.workingDirectory, toolWorkingDirectory)
     print(
       "TEST-AIN-COMP-001 PASS leg=positive composition_pin=facts_pin=independent_literal "
         + "declaration_gate=accepted device_dispatch=0")
@@ -88,7 +91,55 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
         + "spawn=0 device_dispatch=0")
   }
 
+  func testProductToolRuntimeOwnsEmptyConfigAndLogOutsideTheCallerWorkingDirectory()
+    throws
+  {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-rockchip-runtime-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let runtime = try RockchipProductToolRuntimeDirectory.prepare(root: root)
+    let config = runtime.appending(path: RockchipProductToolRuntimeDirectory.configurationFileName)
+    let log = runtime.appending(
+      path: RockchipProductToolRuntimeDirectory.logDirectoryName, directoryHint: .isDirectory)
+
+    XCTAssertEqual(
+      runtime,
+      root.appending(
+        path: RockchipProductToolRuntimeDirectory.directoryName,
+        directoryHint: .isDirectory).standardizedFileURL)
+    XCTAssertEqual(try Data(contentsOf: config), Data())
+    XCTAssertTrue(FileManager.default.fileExists(atPath: log.path))
+    XCTAssertEqual(try permissions(of: runtime), 0o700)
+    XCTAssertEqual(try permissions(of: log), 0o700)
+    XCTAssertEqual(try permissions(of: config), 0o600)
+  }
+
+  func testProductToolRuntimeRejectsAConfigThatCouldChangeToolSemantics() throws {
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-rockchip-runtime-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let runtime = try RockchipProductToolRuntimeDirectory.prepare(root: root)
+    let config = runtime.appending(path: RockchipProductToolRuntimeDirectory.configurationFileName)
+    try Data("unexpected-option=true\n".utf8).write(to: config)
+
+    XCTAssertThrowsError(try RockchipProductToolRuntimeDirectory.prepare(root: root)) { error in
+      guard let flashError = error as? RockchipFlashExecutionError,
+        case .productionConfigurationUnavailable(let reason) = flashError
+      else { return XCTFail("expected productionConfigurationUnavailable, got \(error)") }
+      XCTAssertEqual(
+        reason, "Rockchip tool config must be an empty owner-only regular file")
+    }
+  }
+
   // MARK: - Helpers
+
+  private func permissions(of url: URL) throws -> Int {
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    return try XCTUnwrap(attributes[.posixPermissions] as? NSNumber).intValue
+  }
 
   /// A tool declared exactly in the production shape
   /// (`RockchipProductExecutionSettings.load()`): installed ordinary
