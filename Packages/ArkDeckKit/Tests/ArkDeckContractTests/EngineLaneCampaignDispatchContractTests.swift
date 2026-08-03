@@ -116,6 +116,26 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     XCTAssertThrowsError(
       try EngineLaneEvolutionFlashDispatcher.result(
         EngineLaneJobTerminal(
+          jobID: "job-loader-no-clean", state: "failed", outcomeUnknown: false,
+          timeline: [
+            "confirmed not executed enter-loader-mode "
+              + "[diagnostic=enterLoaderHDCNoCleanReceipt]"
+          ]),
+        admitted: attempt)
+    ) { error in
+      XCTAssertEqual(
+        error as? RockchipFlashExecutionError,
+        .semanticFailure(
+          stepID: RockchipFlashRuntimeDiagnostic.enterLoaderHDCNoCleanReceipt
+            .evolutionFailureCode,
+          detail: "runtime job job-loader-no-clean failed: "
+            + "confirmed not executed enter-loader-mode "
+            + "[diagnostic=enterLoaderHDCNoCleanReceipt]"))
+    }
+
+    XCTAssertThrowsError(
+      try EngineLaneEvolutionFlashDispatcher.result(
+        EngineLaneJobTerminal(
           jobID: "job-cancelled", state: "cancelled", outcomeUnknown: false,
           timeline: []),
         admitted: attempt)

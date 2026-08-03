@@ -934,10 +934,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         actionDirectory: root)
       XCTFail("exact normal USB readback must settle the transition as not completed")
     } catch let failure as RuntimeDispatchFailure {
-      guard case .confirmedNotExecuted(let detail) = failure else {
+      guard case .confirmedNotExecutedWithDiagnostic(let detail, let diagnostic) = failure else {
         return XCTFail("expected confirmed-not-executed failure, got \(failure)")
       }
       XCTAssertTrue(detail.contains("did not complete"), detail)
+      XCTAssertEqual(diagnostic, .enterLoaderHDCNoCleanReceipt)
     }
     let invocations = await runner.invocations()
     XCTAssertEqual(invocations.map(\.arguments), [

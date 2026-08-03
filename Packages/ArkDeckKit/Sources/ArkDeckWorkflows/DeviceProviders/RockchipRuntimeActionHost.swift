@@ -488,9 +488,14 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           receipts: receipts)
       } catch {
         if let normal = try? exactHDCNormalIdentity(connectKey: connectKey) {
-          throw RuntimeDispatchFailure.confirmedNotExecuted(
+          let diagnostic: RockchipFlashRuntimeDiagnostic =
+            unresolvedHDCFailure == nil
+            ? .enterLoaderCommandCleanLoaderNotObserved
+            : .enterLoaderHDCNoCleanReceipt
+          throw RuntimeDispatchFailure.confirmedNotExecutedWithDiagnostic(
             "exact bound HDC-normal USB readback proves the Loader transition did not complete "
-              + "at topology \(normal.topology)")
+              + "at topology \(normal.topology)",
+            diagnostic: diagnostic)
         }
         if let unresolvedHDCFailure { throw unresolvedHDCFailure }
         // Even exit 0 is not the semantic boundary for a command whose
