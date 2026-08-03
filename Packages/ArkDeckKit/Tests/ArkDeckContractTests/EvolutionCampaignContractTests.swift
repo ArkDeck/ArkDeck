@@ -624,7 +624,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertTrue(try ledger.load(assertion.campaignID).isTerminal)
   }
 
-  func testHostAutomaticallyRepairsAndContinuesSafeFailureUntilSuccess() async throws {
+  func testHostAutomaticallyRepairsVersionedOperationSafeFailureUntilSuccess() async throws {
     let root = temporaryDirectory("campaign-auto-repair")
     defer { try? FileManager.default.removeItem(at: root) }
     let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
@@ -1298,8 +1298,12 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
         campaignID: permit.assertion.campaignID, ordinal: ordinal,
         jobID: "job-auto-\(ordinal)", sessionID: "session-auto-\(ordinal)",
         disposition: .safeToReflash, destructiveIntentEventIDs: [], at: now)
+      // The production engine reports its versioned operation reference as
+      // the failed semantic step. Its `@` is intentionally not valid in a
+      // normalized evolution failure code, so the host must retain a stable
+      // code and continue the confirmed-safe campaign.
       throw RockchipFlashExecutionError.semanticFailure(
-        stepID: "enter-loader", detail: "contract safe failure")
+        stepID: "flash.dayu200@1", detail: "contract safe failure")
     }
     _ = try ledger.closeAttempt(
       campaignID: permit.assertion.campaignID, ordinal: ordinal,

@@ -420,7 +420,12 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     case .loweringRejected: return "flash.loweringRejected"
     case .executableIdentityDrift: return "flash.executableIdentityDrift"
     case .persistenceRejected: return "flash.persistenceRejected"
-    case .semanticFailure(let stepID, _): return "flash.semanticFailure:\(stepID)"
+    // Step identifiers are evidence identifiers, not failure-code components:
+    // published operation references contain `@` (for example
+    // `flash.dayu200@1`), while observations deliberately accept only the
+    // narrow, bounded failure-code grammar. Keep the repair signal stable and
+    // retain the exact step detail in the durable job evidence instead.
+    case .semanticFailure: return "flash.semanticFailure"
     case .cancelledAtSafeBoundary: return "flash.cancelledAtSafeBoundary"
     case .invalidRequest: return "flash.invalidRequest"
     case .productionConfigurationUnavailable: return "flash.configurationUnavailable"
