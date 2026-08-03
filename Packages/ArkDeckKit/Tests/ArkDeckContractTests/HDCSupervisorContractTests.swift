@@ -1428,14 +1428,32 @@ final class HDCSupervisorContractTests: XCTestCase {
       return XCTFail("hang timeout cannot be a semantic success")
     }
 
+    // `hang` above owns the timeout contract; this case owns truncation, so it
+    // gets a budget it cannot plausibly exhaust. Draining the fixture costs a
+    // capture-full of marker scanning on a utility-QoS reader thread, which a
+    // saturated host can stretch by more than an order of magnitude — under the
+    // former 5s budget the command was still being guillotined mid-drain.
     let oversized = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["oversized"], timeout: 5))
+        toolchain: candidate, endpoint: endpoint, arguments: ["oversized"], timeout: 60))
+    // The fixture emits one chunk past the 64 KiB capture cap and then an
+    // explicit failure marker. Pin the completed exit before reading any byte
+    // count: a timeout cancels the drain, so every count below would otherwise
+    // report only what the reader collected before the guillotine. Exiting
+    // also means the failure classification has to come from the marker rather
+    // than from the conservative timeout fallback.
+    XCTAssertEqual(oversized.execution.termination, .exited(0))
     guard case .failure = oversized.semantic else {
       return XCTFail("oversized fault output must never become semantic success")
     }
-    XCTAssertTrue(oversized.execution.stdout.wasTruncated)
-    XCTAssertGreaterThan(oversized.execution.stdout.totalByteCount, Int64(64 * 1024))
+    let oversizedStdout = oversized.execution.stdout
+    XCTAssertEqual(oversizedStdout.data.count, 64 * 1024)
+    XCTAssertGreaterThanOrEqual(oversizedStdout.totalByteCount, Int64(64 * 1024))
+    XCTAssertEqual(
+      oversizedStdout.wasTruncated,
+      oversizedStdout.totalByteCount > Int64(oversizedStdout.data.count),
+      "truncation must follow the retained capture, not a byte-count boundary race")
+    XCTAssertTrue(oversizedStdout.wasTruncated)
   }
 
   // TEST-AC-HDC-007-01 / authorizationWorkflowContract and
