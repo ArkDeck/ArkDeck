@@ -241,6 +241,118 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     XCTAssertNil(try initial.runtimeTargetLineageAdvance())
   }
 
+  func testConfirmedLineageAcceptsExactLoaderAndPreviousHDCNormalPersonalities() throws {
+    let loaderSerial = "loader-mode-serial"
+    let normalSerial = "normal-mode-connect-key"
+    let loaderIdentity = SHA256.hash(data: Data(loaderSerial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let normalIdentity = SHA256.hash(data: Data(normalSerial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let snapshot = RockchipProductBindingSnapshot(
+      revision: 2, serial: loaderSerial, usbTopology: "17956864",
+      evidence: [
+        "product:e0-iokit-single-loader-readback",
+        "identity:serial-sha256=\(loaderIdentity)",
+        "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+        "identity:previous-serial-sha256=\(normalIdentity)",
+        "binding:previous-revision=1",
+        "binding:previous-usb-topology=18874368",
+      ])
+
+    XCTAssertTrue(
+      try snapshot.matchesConfirmedLiveIdentity(
+        RockchipProductUSBIdentity(
+          serial: loaderSerial,
+          vendorID: RockchipProbeEvidence.rockUSBVendorID,
+          productID: RockchipProbeEvidence.dayu200LoaderProductID,
+          topology: "17956864")))
+    let normal = RockchipProductUSBIdentity(
+      serial: normalSerial,
+      vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "18874368", productName: "HDC Device")
+    XCTAssertTrue(try snapshot.matchesConfirmedLiveIdentity(normal))
+    XCTAssertEqual(try snapshot.confirmedHDCConnectKey(for: normal), normalSerial)
+    XCTAssertEqual(
+      RockchipHDCIntegrationProfile.enterLoaderArguments(connectKey: normalSerial),
+      ["-t", normalSerial, "shell", "reboot", "loader"])
+
+    let loader = RockchipProductUSBIdentity(
+      serial: loaderSerial,
+      vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID,
+      topology: "17956864")
+    let unrelated = RockchipProductUSBIdentity(
+      serial: "unrelated-normal",
+      vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "19791872", productName: "HDC Device")
+    let probe = RockchipProductUSBProbe(identitySource: { [loader, normal, unrelated] })
+    XCTAssertEqual(
+      try probe.singleDAYU200(selector: "17956864", binding: snapshot), loader)
+    XCTAssertEqual(
+      try probe.singleDAYU200(selector: "18874368", binding: snapshot), normal)
+    XCTAssertThrowsError(
+      try probe.singleDAYU200(selector: "19791872", binding: snapshot))
+    XCTAssertThrowsError(
+      try RockchipProductUSBProbe(identitySource: { [normal, normal] })
+        .singleDAYU200(selector: "18874368", binding: snapshot))
+  }
+
+  func testConfirmedLineageRejectsTopologyIdentityAndModeCrossWiring() throws {
+    let loaderSerial = "loader-mode-serial"
+    let normalSerial = "normal-mode-connect-key"
+    let loaderIdentity = SHA256.hash(data: Data(loaderSerial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let normalIdentity = SHA256.hash(data: Data(normalSerial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let evidence = [
+      "product:e0-iokit-single-loader-readback",
+      "identity:serial-sha256=\(loaderIdentity)",
+      "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+      "identity:previous-serial-sha256=\(normalIdentity)",
+      "binding:previous-revision=1",
+      "binding:previous-usb-topology=18874368",
+    ]
+    let snapshot = RockchipProductBindingSnapshot(
+      revision: 2, serial: loaderSerial, usbTopology: "17956864", evidence: evidence)
+
+    for rejected in [
+      RockchipProductUSBIdentity(
+        serial: normalSerial,
+        vendorID: RockchipProbeEvidence.rockUSBVendorID,
+        productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+        topology: "17956864", productName: "HDC Device"),
+      RockchipProductUSBIdentity(
+        serial: normalSerial,
+        vendorID: RockchipProbeEvidence.rockUSBVendorID,
+        productID: RockchipProbeEvidence.dayu200LoaderProductID,
+        topology: "18874368"),
+      RockchipProductUSBIdentity(
+        serial: "another-normal-device",
+        vendorID: RockchipProbeEvidence.rockUSBVendorID,
+        productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+        topology: "18874368", productName: "HDC Device"),
+    ] {
+      XCTAssertFalse(try snapshot.matchesConfirmedLiveIdentity(rejected))
+    }
+
+    let malformed = RockchipProductBindingSnapshot(
+      revision: 2, serial: loaderSerial, usbTopology: "17956864",
+      evidence: evidence.filter { !$0.hasPrefix("binding:previous-usb-topology=") })
+    XCTAssertThrowsError(
+      try malformed.matchesConfirmedLiveIdentity(
+        RockchipProductUSBIdentity(
+          serial: loaderSerial,
+          vendorID: RockchipProbeEvidence.rockUSBVendorID,
+          productID: RockchipProbeEvidence.dayu200LoaderProductID,
+          topology: "17956864")))
+  }
+
   func testRebindEvidenceRejectsMissingAmbiguousOrSkippedLineage() throws {
     let serial = "loader-mode-serial"
     let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
