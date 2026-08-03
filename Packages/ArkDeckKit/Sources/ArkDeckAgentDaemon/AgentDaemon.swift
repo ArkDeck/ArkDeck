@@ -1448,6 +1448,19 @@ public final class AgentDaemonServer: @unchecked Sendable {
   /// `__DataStorage` accessors. Frame semantics are unchanged.
   private static func serve(connectionFD: Int32, handler: RuntimeControlPlaneHandler) async {
     defer { close(connectionFD) }
+    // A client that hangs up before reading leaves this socket with no reader.
+    // The response write below already treats that as a short write and drops
+    // the connection, but the default SIGPIPE disposition kills the process
+    // before that code runs, so one interrupted client would take down a
+    // daemon holding every job, session and upload. Suppressed per connection
+    // rather than process-wide: `SIG_IGN` survives exec, and this process
+    // spawns device tools that rely on the default disposition.
+    var suppressSignal: Int32 = 1
+    guard
+      setsockopt(
+        connectionFD, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
+        socklen_t(MemoryLayout<Int32>.size)) == 0
+    else { return }
     var buffer = Data()
     var scannedByteCount = 0  // leading bytes already known to hold no terminator
     let chunkSize = 64 * 1024
