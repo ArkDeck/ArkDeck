@@ -3524,3 +3524,20 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   `ARKDECK_HARNESS_REVIEWER_CLAUDE_CODE_PATH/_WORKDIR` 专属键（codex 键不得顶替），
   provider 缺失时任一 reviewer 键在场即 providerRequired；未配置仍 fail-closed
   `adversarialReviewerUnavailable`；设备 dispatch=0。
+- revoked-capability tests（`HarnessCapabilityRevocationContractTests` 10 例 +
+  `DiagnosticsAndHAPContractTests` +1 例）：GJ-5 真机窗口暴露的两处缺陷。①
+  `RuntimeCapabilityStoreHarnessPort` 的选取条件（uses/lineage/expiry/ceiling/
+  operationScope）对已撤销信封全部成立，故 revoked grant 仍被点名进请求 authorization，
+  引擎按 revoked 正确拒绝而任务只看到"缺授权"——补 revocation 过滤，并把
+  `hasStandingCapability` 改为委托 `standingCapabilityID`，使"有没有"与"是哪一个"
+  不再由两次独立扫描回答（原缺陷正是二者答案分歧）。②`semanticCode` 把
+  revoked/expired/exhausted 一律折叠成 `authorizationRequired`：引擎改为在拒绝消息里
+  嵌入机器可读 `[denial:<code>]`（`RuntimeJobEngine.denialCode` 穷举 typed
+  `RuntimeCapabilityStoreError`，仅命名"判定"，store I/O 故障不伪装成裁决），harness
+  按闭合形状解析并保留 `authorization` 前缀族；human block 路由由等值改为族前缀判定，
+  否则新码会被误投 `environmentUnavailable`。11 个 denial reason 各自保码、非标识符
+  token 降级不进 fingerprint、既有 `authorizationRequired`/`operationUnavailable`/
+  `targetNotAdopted`/`bindingMismatch` 分类不变；两平面 marker 常量由合约测试对钉。
+  真机 engine 用例走 `debug.hap@1` 撤销后 submit，钉住生产消息形态且 consume=0。
+  五处变异对照证伪（删 revocation 过滤、拆回双扫描、删 denial 解析、路由退回等值、
+  引擎去 marker）各自打红；设备 dispatch=0。
