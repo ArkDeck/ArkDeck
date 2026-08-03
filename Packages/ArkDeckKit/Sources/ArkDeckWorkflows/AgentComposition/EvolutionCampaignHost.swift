@@ -257,14 +257,24 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
           campaignID: document.campaignID, reasonCode: "candidateBudgetExhausted", at: nowUTC())
         throw RockchipEvolutionCampaignError.campaignStopped("candidateBudgetExhausted")
       }
-      let strategy: RockchipEvolutionTypedStrategy
+      let proposedStrategy: RockchipEvolutionTypedStrategy
       do {
-        strategy = try await repairer.propose(
+        proposedStrategy = try await repairer.propose(
           assertion: document.assertion, observation: observation,
           priorCandidates: priorCandidates)
       } catch {
         _ = try? ledger.stop(
           campaignID: document.campaignID, reasonCode: "strategyRepairRejected", at: nowUTC())
+        throw error
+      }
+      let strategy: RockchipEvolutionTypedStrategy
+      do {
+        strategy = try Self.constrain(
+          proposedStrategy, toRequiredStartingModeFrom: observation)
+      } catch {
+        _ = try? ledger.stop(
+          campaignID: document.campaignID, reasonCode: "candidateModeConstraintRejected",
+          at: nowUTC())
         throw error
       }
       let build: RockchipEvolutionCandidateBuild
@@ -421,6 +431,38 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     return terminalAttempts.suffix(maximumConsecutiveNoEffectAttempts).allSatisfy {
       $0.disposition == .safeToReflash
     }
+  }
+
+  /// A pre-reservation mode mismatch is an exact live observation, not a
+  /// suggestion for the model.  Keep every model-controlled timing choice,
+  /// but add the observed mode to its closed typed entry set before the
+  /// candidate is built or reviewed.  This prevents a succession of distinct
+  /// loader-only candidates from churning before a normal-mode device can
+  /// reserve a next attempt.
+  private static func constrain(
+    _ strategy: RockchipEvolutionTypedStrategy,
+    toRequiredStartingModeFrom observation: RockchipEvolutionFailureObservation?
+  ) throws -> RockchipEvolutionTypedStrategy {
+    guard let observation,
+      let mode = requiredStartingMode(from: observation.failureCode)
+    else { return strategy }
+    return try RockchipEvolutionTypedStrategy(
+      operationReference: strategy.operationReference,
+      deviceProfileReference: strategy.deviceProfileReference,
+      archiveDigestSHA256: strategy.archiveDigestSHA256,
+      stepSetDigestSHA256: strategy.stepSetDigestSHA256,
+      allowedStartingModes: strategy.allowedStartingModes + [mode],
+      loaderDiscoveryTimeoutSeconds: strategy.loaderDiscoveryTimeoutSeconds,
+      loaderPollIntervalMilliseconds: strategy.loaderPollIntervalMilliseconds,
+      hdcCommandTimeoutSeconds: strategy.hdcCommandTimeoutSeconds,
+      readOnlyCommandTimeoutSeconds: strategy.readOnlyCommandTimeoutSeconds,
+      userdataImpact: strategy.userdataImpact)
+  }
+
+  private static func requiredStartingMode(from failureCode: String) -> RockchipEvolutionStartingMode? {
+    let prefix = "flash.startingModeNotAllowed:"
+    guard failureCode.hasPrefix(prefix) else { return nil }
+    return RockchipEvolutionStartingMode(rawValue: String(failureCode.dropFirst(prefix.count)))
   }
 
   private static func failureCode(_ error: any Error) -> String {

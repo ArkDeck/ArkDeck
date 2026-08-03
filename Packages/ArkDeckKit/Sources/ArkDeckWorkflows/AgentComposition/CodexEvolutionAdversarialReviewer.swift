@@ -85,7 +85,8 @@ public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyR
       {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":45,"loaderPollIntervalMilliseconds":500,"hdcCommandTimeoutSeconds":20,"readOnlyCommandTimeoutSeconds":15}
       Constraints: modes is a non-empty subset of hdcNormal|loader; loader timeout 15...120;
       poll 100...2000; HDC timeout 5...60; read-only timeout 5...60. The result must differ
-      from every prior strategy.
+      from every prior strategy. If failure starts with flash.startingModeNotAllowed:, the mode
+      after that colon is an observed live mode and MUST appear in allowedStartingModes.
       failure=\(observation!.failureCode)
       attempt=\(observation!.attemptOrdinal)
       prior:\n\(prior)
