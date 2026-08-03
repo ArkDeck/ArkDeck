@@ -334,6 +334,76 @@ final class ProcessAndHDCContractTests: XCTestCase {
     XCTAssertEqual(parser.finish(exitCode: 0), .failure(.explicitFailureMarker))
   }
 
+  /// Every declared marker stays detectable at every chunk boundary and in
+  /// every casing. A parser that only searched within one delivery would let
+  /// output pass that a differently timed pipe would have failed.
+  func testSemanticParserFindsEveryMarkerAtEveryChunkBoundary() {
+    let vocabulary: [(String, HDCCommandSemanticResult)] = [
+      ("unauthorized", .failure(.unauthorized)),
+      ("e000002", .failure(.unauthorized)),
+      ("e000003", .failure(.unauthorized)),
+      ("offline", .failure(.offline)),
+      ("[fail]", .failure(.explicitFailureMarker)),
+      ("errorcode", .failure(.explicitFailureMarker)),
+      ("[success]", .success),
+    ]
+    for (marker, expected) in vocabulary {
+      for casing in [marker, marker.uppercased(), marker.capitalized] {
+        let line = Array(("prefix " + casing + " suffix").utf8)
+        for split in 0...line.count {
+          var parser = HDCSemanticOutputParser()
+          parser.consume(ProcessOutputChunk(stream: .stdout, bytes: Data(line[..<split])))
+          parser.consume(ProcessOutputChunk(stream: .stderr, bytes: Data(line[split...])))
+          XCTAssertEqual(parser.finish(exitCode: 0), expected, "\(casing) split at \(split)")
+        }
+      }
+    }
+  }
+
+  /// Failure precedence is fail-closed regardless of the order the chunks
+  /// arrive in: unauthorized outranks offline, which outranks a bare failure
+  /// marker, and no later marker downgrades an earlier verdict.
+  func testSemanticParserFailurePrecedenceHoldsInEitherChunkOrder() {
+    let expected: [([String], HDCCommandFailure)] = [
+      (["[Fail]", "Offline"], .offline),
+      (["Offline", "[Fail]"], .offline),
+      (["[Fail]", "E000003"], .unauthorized),
+      (["E000003", "[Fail]"], .unauthorized),
+      (["Offline", "Unauthorized"], .unauthorized),
+      (["Unauthorized", "Offline"], .unauthorized),
+      (["ErrorCode", "Offline"], .offline),
+      (["Offline", "ErrorCode"], .offline),
+      (["[Success]", "[Fail]"], .explicitFailureMarker),
+      (["[Fail]", "[Success]"], .explicitFailureMarker),
+    ]
+    for (texts, failure) in expected {
+      var parser = HDCSemanticOutputParser()
+      for (offset, text) in texts.enumerated() {
+        parser.consume(
+          ProcessOutputChunk(
+            stream: offset.isMultiple(of: 2) ? .stdout : .stderr,
+            bytes: Data(("noise " + text + " noise").utf8)))
+      }
+      XCTAssertEqual(parser.finish(exitCode: 0), .failure(failure), texts.description)
+    }
+  }
+
+  /// A marker whose own prefix reappears inside it still matches, and a
+  /// truncated marker never classifies. Both are properties a matcher that
+  /// tracked prefix progress instead of the raw byte window would get wrong.
+  func testSemanticParserMatchesOverlappingPrefixesAndIgnoresTruncatedMarkers() {
+    var overlapping = HDCSemanticOutputParser()
+    overlapping.consume(ProcessOutputChunk(stream: .stdout, bytes: Data("una".utf8)))
+    overlapping.consume(ProcessOutputChunk(stream: .stdout, bytes: Data("unauthorized".utf8)))
+    XCTAssertEqual(overlapping.finish(exitCode: 0), .failure(.unauthorized))
+
+    var truncated = HDCSemanticOutputParser()
+    for fragment in ["unauthorize", "offlin", "[fail", "errorcod", "e00000", "[success"] {
+      truncated.consume(ProcessOutputChunk(stream: .stdout, bytes: Data((fragment + "|").utf8)))
+    }
+    XCTAssertEqual(truncated.finish(exitCode: 0), .unknownOutput)
+  }
+
 }
 
 private actor RecordingHDCServerLifecycleExecutor: HDCServerLifecycleExecutor {

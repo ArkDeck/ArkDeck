@@ -292,55 +292,164 @@ public enum HDCCommandFailure: Sendable, Equatable {
 /// TASK-M1-006 will adopt `ProcessSemanticEvaluating`; this task deliberately
 /// leaves that parser/executor wiring unchanged.
 public struct HDCSemanticOutputParser: Sendable {
-  private static let failureMarkers: [[UInt8]] = [
-    Array("unauthorized".utf8),
-    Array("e000002".utf8),
-    Array("e000003".utf8),
-    Array("offline".utf8),
-    Array("[fail]".utf8),
-    Array("errorcode".utf8),
-  ]
-  private static let successMarker = Array("[success]".utf8)
-  private static let carryLength =
-    max(
-      successMarker.count,
-      failureMarkers.map(\.count).max() ?? 0
-    ) - 1
+  private enum MarkerClassification: Sendable {
+    case unauthorized
+    case offline
+    case explicitFailure
+    case success
+  }
 
-  /// ASCII-only marker matching keeps protocol markers intact across a UTF-8
-  /// chunk boundary. Raw output itself remains available through the Process
-  /// output stream and is not decoded or rewritten here.
-  private var carry: [UInt8] = []
+  /// One marker compiled for suffix matching against the rolling window. A
+  /// marker of eight bytes or fewer lives entirely in `recent`; a longer one
+  /// spills its leading bytes into `older`.
+  private struct MarkerMatcher: Sendable {
+    let recentMask: UInt64
+    let recentValue: UInt64
+    let olderMask: UInt64
+    let olderValue: UInt64
+    let classification: MarkerClassification
+  }
+
+  /// The marker vocabulary and its classification, declared exactly once. The
+  /// matcher table and the final-byte prefilter are both derived from this
+  /// list, so a marker added here cannot be left out of the scan.
+  private static let markers: [(text: String, classification: MarkerClassification)] = [
+    ("unauthorized", .unauthorized),
+    ("e000002", .unauthorized),
+    ("e000003", .unauthorized),
+    ("offline", .offline),
+    ("[fail]", .explicitFailure),
+    ("errorcode", .explicitFailure),
+    ("[success]", .success),
+  ]
+
+  private static let matchers: [MarkerMatcher] = markers.map { marker in
+    let bytes = Array(marker.text.utf8)
+    // Both limits are declaration rules, never input conditions: a marker
+    // longer than the window, or one carrying uppercase or non-ASCII bytes,
+    // could never complete a match against case-folded output.
+    precondition(
+      (1...16).contains(bytes.count),
+      "an HDC marker must fit the 16-byte rolling window")
+    precondition(
+      bytes.allSatisfy { $0 > 0x20 && $0 < 0x7f && !(65...90).contains($0) },
+      "an HDC marker must be declared in printable lowercase ASCII")
+    let recentCount = min(8, bytes.count)
+    let olderCount = bytes.count - recentCount
+    var recentValue: UInt64 = 0
+    for byte in bytes.suffix(recentCount) { recentValue = (recentValue << 8) | UInt64(byte) }
+    var olderValue: UInt64 = 0
+    for byte in bytes.prefix(olderCount) { olderValue = (olderValue << 8) | UInt64(byte) }
+    return MarkerMatcher(
+      recentMask: lowByteMask(recentCount), recentValue: recentValue,
+      olderMask: lowByteMask(olderCount), olderValue: olderValue,
+      classification: marker.classification)
+  }
+
+  /// Only a byte that ends some marker can complete a match, so the scan
+  /// consults the matcher table for those bytes alone. Being derived from the
+  /// vocabulary, the prefilter can admit a byte no marker needs, but it can
+  /// never reject one a marker does.
+  private static let finalByteGate: (low: UInt64, high: UInt64) = {
+    var low: UInt64 = 0
+    var high: UInt64 = 0
+    for matcher in matchers {
+      // The window keeps the most recent byte in the low byte of `recent`, so
+      // a matcher's own low byte is its marker's final byte.
+      let finalByte = UInt8(matcher.recentValue & 0xff)
+      if finalByte < 64 {
+        low |= 1 << UInt64(finalByte)
+      } else {
+        high |= 1 << UInt64(finalByte - 64)
+      }
+    }
+    return (low, high)
+  }()
+
+  private static func lowByteMask(_ byteCount: Int) -> UInt64 {
+    // A 64-bit shift is undefined, so a full-width mask is spelled out.
+    byteCount >= 8 ? .max : (1 << (8 * UInt64(byteCount))) - 1
+  }
+
+  /// The case-folded tail of everything consumed so far: `recent` holds the
+  /// last eight bytes and `older` the eight before them, most recent byte
+  /// lowest. Carrying it across calls is what keeps a marker split over a
+  /// chunk boundary — or over a stdout/stderr interleave — detectable, and
+  /// ASCII-only matching keeps protocol markers intact across a UTF-8 chunk
+  /// boundary. Raw output itself remains available through the Process output
+  /// stream and is not decoded or rewritten here.
+  private var recent: UInt64 = 0
+  private var older: UInt64 = 0
   private var hasSuccessMarker = false
   private var failure: HDCCommandFailure?
 
   public init() {}
 
+  /// Scans the chunk once, case-folding on read and testing every marker at
+  /// the same time. Every byte is examined: a pipe may deliver 4–64 KiB at
+  /// once, so an early failure marker must never be hidden by later output in
+  /// the same chunk.
   public mutating func consume(_ chunk: ProcessOutputChunk) {
-    let normalizedChunk = chunk.bytes.map(asciiLowercased)
-    let searchable = carry + normalizedChunk
+    var sawUnauthorized = false
+    var sawOffline = false
+    var sawExplicitFailure = false
+    var sawSuccess = false
+    var recent = self.recent
+    var older = self.older
+    let gate = Self.finalByteGate
 
-    // Search the complete new chunk before retaining only a boundary carry.
-    // A pipe may deliver 4–64 KiB at once, so truncating before this step
-    // would allow an early failure marker to be hidden by later output.
-    if contains(searchable, marker: Array("unauthorized".utf8))
-      || contains(searchable, marker: Array("e000002".utf8))
-      || contains(searchable, marker: Array("e000003".utf8))
-    {
+    Self.matchers.withUnsafeBufferPointer { matchers in
+      chunk.bytes.withUnsafeBytes { rawChunk in
+        let bytes = rawChunk.bindMemory(to: UInt8.self)
+        var index = 0
+        while index < bytes.count {
+          let raw = bytes[index]
+          index += 1
+          let byte = (raw >= 65 && raw <= 90) ? raw + 32 : raw
+          older = (older << 8) | (recent >> 56)
+          recent = (recent << 8) | UInt64(byte)
+
+          let admitted =
+            byte < 64
+            ? (gate.low >> UInt64(byte)) & 1
+            : (byte < 128 ? (gate.high >> UInt64(byte - 64)) & 1 : 0)
+          if admitted == 0 { continue }
+
+          var candidate = 0
+          while candidate < matchers.count {
+            let matcher = matchers[candidate]
+            candidate += 1
+            guard (recent & matcher.recentMask) == matcher.recentValue,
+              (older & matcher.olderMask) == matcher.olderValue
+            else { continue }
+            switch matcher.classification {
+            case .unauthorized: sawUnauthorized = true
+            case .offline: sawOffline = true
+            case .explicitFailure: sawExplicitFailure = true
+            case .success: sawSuccess = true
+            }
+          }
+        }
+      }
+    }
+    self.recent = recent
+    self.older = older
+
+    // Classification precedence is unchanged: unauthorized outranks offline,
+    // which outranks a bare failure marker, and no marker ever downgrades a
+    // failure already recorded by an earlier chunk.
+    if sawUnauthorized {
       failure = .unauthorized
-    } else if contains(searchable, marker: Array("offline".utf8)) {
+    } else if sawOffline {
       if failure == nil || failure == .explicitFailureMarker {
         failure = .offline
       }
-    } else if contains(searchable, marker: Array("[fail]".utf8))
-      || contains(searchable, marker: Array("errorcode".utf8))
-    {
+    } else if sawExplicitFailure {
       if failure == nil {
         failure = .explicitFailureMarker
       }
     }
-    hasSuccessMarker = hasSuccessMarker || contains(searchable, marker: Self.successMarker)
-    carry = Array(searchable.suffix(Self.carryLength))
+    hasSuccessMarker = hasSuccessMarker || sawSuccess
   }
 
   public func finish(exitCode: Int32) -> HDCCommandSemanticResult {
@@ -351,18 +460,6 @@ public struct HDCSemanticOutputParser: Sendable {
       return .failure(failure)
     }
     return hasSuccessMarker ? .success : .unknownOutput
-  }
-
-  private func asciiLowercased(_ byte: UInt8) -> UInt8 {
-    (65...90).contains(byte) ? byte + 32 : byte
-  }
-
-  private func contains(_ bytes: [UInt8], marker: [UInt8]) -> Bool {
-    guard !marker.isEmpty, bytes.count >= marker.count else { return false }
-    return bytes.indices.contains { start in
-      guard start + marker.count <= bytes.endIndex else { return false }
-      return bytes[start..<(start + marker.count)].elementsEqual(marker)
-    }
   }
 }
 
