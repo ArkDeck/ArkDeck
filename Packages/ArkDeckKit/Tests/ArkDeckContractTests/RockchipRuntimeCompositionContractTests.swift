@@ -463,9 +463,313 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       BundledRockchipComponent.signingTeamIdentifier)
     // Facts the adoption record cannot support are reported unknown, never
     // fabricated: the old "dayu200@1"/"hdc" literals were guesses flowing
-    // into evidence as if measured.
+    // into evidence as if measured. With no probe composed nothing measured
+    // them, so this stays exactly where #992 left it.
     XCTAssertEqual(facts.profileID, "unknown")
     XCTAssertEqual(facts.deviceMode, "unknown")
+    XCTAssertNil(facts.buildFingerprint)
+  }
+
+  func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {
+    let published = try XCTUnwrap(
+      RockchipFlashProfile.profile(reference: "dayu200@2"))
+    XCTAssertEqual(
+      published.firmwareVersion, "OpenHarmony-7.0.0.35-20260728_180253")
+
+    let hdcOnPublishedBuild = try await probedFacts(
+      RecordingLiveModeProbe(
+        observation: RockchipLiveModeObservation(
+          deviceMode: "hdc", buildFingerprint: published.firmwareVersion)))
+    XCTAssertEqual(hdcOnPublishedBuild.facts.deviceMode, "hdc")
+    XCTAssertEqual(
+      hdcOnPublishedBuild.facts.buildFingerprint, published.firmwareVersion)
+    XCTAssertEqual(hdcOnPublishedBuild.facts.profileID, "dayu200@2")
+    // The probe is addressed by the adopted record's connect key, never by a
+    // request field.
+    let probedKeys = await hdcOnPublishedBuild.probe.observedConnectKeys()
+    XCTAssertEqual(probedKeys, ["device-1"])
+
+    // An unpublished build names no profile. Reporting the nearest published
+    // one would be the same guess #992 removed.
+    let hdcOnUnknownBuild = try await probedFacts(
+      RecordingLiveModeProbe(
+        observation: RockchipLiveModeObservation(
+          deviceMode: "hdc",
+          buildFingerprint: "OpenHarmony-9.9.9.99-20991231_000000")))
+    XCTAssertEqual(hdcOnUnknownBuild.facts.deviceMode, "hdc")
+    XCTAssertEqual(
+      hdcOnUnknownBuild.facts.buildFingerprint,
+      "OpenHarmony-9.9.9.99-20991231_000000")
+    XCTAssertEqual(hdcOnUnknownBuild.facts.profileID, "unknown")
+
+    // The RockUSB modes expose no build surface, so they name no profile
+    // either — but the mode itself is real and is reported.
+    for mode in ["loader", "maskrom"] {
+      let rockUSB = try await probedFacts(
+        RecordingLiveModeProbe(
+          observation: RockchipLiveModeObservation(
+            deviceMode: mode, buildFingerprint: nil)))
+      XCTAssertEqual(rockUSB.facts.deviceMode, mode)
+      XCTAssertNil(rockUSB.facts.buildFingerprint)
+      XCTAssertEqual(rockUSB.facts.profileID, "unknown")
+    }
+  }
+
+  func testFactsEncodeAnUnobservableTargetAsAbsentInsteadOfThrowing()
+    async throws
+  {
+    // A device that is not attached must not break the portrait: planOnly and
+    // draft both run with no device on the host. "Cannot see it" is a fact,
+    // not an error; the fail-closed gate is the engine's fresh readback at
+    // the consume point.
+    let probed = try await probedFacts(
+      RecordingLiveModeProbe(
+        failure: .notObservable("no RockUSB device and no HDC target")))
+    XCTAssertEqual(probed.facts.deviceMode, "absent")
+    XCTAssertNil(probed.facts.buildFingerprint)
+    XCTAssertEqual(probed.facts.profileID, "unknown")
+    // The adopted identity half of the portrait is unaffected.
+    XCTAssertEqual(probed.facts.executionConnectKey, "device-1")
+    XCTAssertEqual(
+      probed.facts.deviceIdentitySHA256, String(repeating: "a", count: 64))
+  }
+
+  func testLiveProbeReadsModeAndBuildFromReadOnlyCommandsOnly() async throws {
+    let hdc = ResolvedExecutable(
+      path: "/product/hdc", sha256: String(repeating: "d", count: 64))
+    let rockchip = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let resolver = FixedExecutableResolver(
+      table: ["hdc": hdc, "rockchip": rockchip])
+
+    // Connected over HDC: the mode is named by the target list and the build
+    // by the same allowlisted param the post-flash verifier pins.
+    let connected = ProbeCommandRunner(responses: [
+      .success("device-1\t\tUSB\tConnected\tlocalhost\n"),
+      .success("const.ohos.fullname = OpenHarmony-7.0.0.35-20260728_180253\n"),
+    ])
+    let hdcObservation = try await FoundationRockchipLiveModeProbe(
+      hdcResolver: resolver, rockchipResolver: resolver, runner: connected
+    ).observe(connectKey: "device-1")
+    XCTAssertEqual(hdcObservation.deviceMode, "hdc")
+    XCTAssertEqual(
+      hdcObservation.buildFingerprint, "OpenHarmony-7.0.0.35-20260728_180253")
+    let hdcCommands = await connected.invocations()
+    XCTAssertEqual(
+      hdcCommands.map(\.arguments),
+      [
+        ["list", "targets", "-v"],
+        ["-t", "device-1", "shell", "param", "get", "const.ohos.fullname"],
+      ])
+    XCTAssertEqual(hdcCommands.map(\.executable.path), [hdc.path, hdc.path])
+    XCTAssertTrue(hdcCommands.allSatisfy { !$0.criticalNonInterruptible })
+
+    // The mode was observed even though the build readback failed: a known
+    // mode with an unknown build, not a fabricated build.
+    let buildUnreadable = ProbeCommandRunner(responses: [
+      .success("device-1\t\tUSB\tConnected\tlocalhost\n"),
+      .exit(1),
+    ])
+    let partial = try await FoundationRockchipLiveModeProbe(
+      hdcResolver: resolver, rockchipResolver: resolver, runner: buildUnreadable
+    ).observe(connectKey: "device-1")
+    XCTAssertEqual(partial.deviceMode, "hdc")
+    XCTAssertNil(partial.buildFingerprint)
+
+    // Not on HDC: the RockUSB surface names loader vs maskrom, and neither
+    // carries a build.
+    for (reported, expected) in [("Loader", "loader"), ("Maskrom", "maskrom")] {
+      let runner = ProbeCommandRunner(responses: [
+        .success("[Empty]\n"),
+        .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=17\t\(reported)\n"),
+      ])
+      let observation = try await FoundationRockchipLiveModeProbe(
+        hdcResolver: resolver, rockchipResolver: resolver, runner: runner
+      ).observe(connectKey: "device-1")
+      XCTAssertEqual(observation.deviceMode, expected)
+      XCTAssertNil(observation.buildFingerprint)
+      let commands = await runner.invocations()
+      XCTAssertEqual(
+        commands.map(\.arguments), [["list", "targets", "-v"], ["ld"]])
+      XCTAssertEqual(commands.last?.executable.path, rockchip.path)
+    }
+  }
+
+  func testLiveProbeRefusesToAttributeAnAmbiguousOrMissingObservation()
+    async throws
+  {
+    let resolver = FixedExecutableResolver(
+      table: [
+        "hdc": ResolvedExecutable(
+          path: "/product/hdc", sha256: String(repeating: "d", count: 64)),
+        "rockchip": ResolvedExecutable(
+          path: "/product/Contents/MacOS/rkdeveloptool",
+          sha256: Self.reviewedSignedComponentSHA256),
+      ])
+
+    // `ld` carries no serial, so a mode read while two RockUSB devices are
+    // attached belongs to nobody in particular.
+    let ambiguous = ProbeCommandRunner(responses: [
+      .success("[Empty]\n"),
+      .success(
+        "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=17\tLoader\n"
+          + "DevNo=2\tVid=0x2207,Pid=0x350a,LocationID=18\tLoader\n"),
+    ])
+    await assertNotObservable {
+      try await FoundationRockchipLiveModeProbe(
+        hdcResolver: resolver, rockchipResolver: resolver, runner: ambiguous
+      ).observe(connectKey: "device-1")
+    }
+
+    // Nothing on either surface.
+    let nothing = ProbeCommandRunner(responses: [
+      .success("[Empty]\n"), .exit(1),
+    ])
+    await assertNotObservable {
+      try await FoundationRockchipLiveModeProbe(
+        hdcResolver: resolver, rockchipResolver: resolver, runner: nothing
+      ).observe(connectKey: "device-1")
+    }
+
+    // A target list this parser does not recognize is never downgraded to
+    // "the device is not there".
+    let malformed = ProbeCommandRunner(responses: [
+      .success("device-1\tUSB\tConnected\n")
+    ])
+    await assertNotObservable {
+      try await FoundationRockchipLiveModeProbe(
+        hdcResolver: resolver, rockchipResolver: resolver, runner: malformed
+      ).observe(connectKey: "device-1")
+    }
+
+    // No probe executable, no observation — never a PATH search.
+    await assertNotObservable {
+      try await FoundationRockchipLiveModeProbe(
+        hdcResolver: FixedExecutableResolver(table: [:]),
+        rockchipResolver: resolver,
+        runner: ProbeCommandRunner(responses: [])
+      ).observe(connectKey: "device-1")
+    }
+  }
+
+  private func assertNotObservable(
+    _ body: () async throws -> RockchipLiveModeObservation,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) async {
+    do {
+      let observation = try await body()
+      XCTFail(
+        "expected an unobservable target, got \(observation)", file: file,
+        line: line)
+    } catch is RockchipLiveModeProbeFailure {
+      return
+    } catch {
+      XCTFail(
+        "expected RockchipLiveModeProbeFailure, got \(error)", file: file,
+        line: line)
+    }
+  }
+
+  private func probedFacts(
+    _ probe: RecordingLiveModeProbe
+  ) async throws -> (facts: ProviderFacts, probe: RecordingLiveModeProbe) {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+    let adopted = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "device-1", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-03T00:00:00Z"
+    ).record
+    let facts = try await TargetStoreRockchipRuntimeFactsPort(
+      targetStore: targetStore,
+      resolver: FixedExecutableResolver(
+        table: [
+          "rockchip": ResolvedExecutable(
+            path: "/product/Contents/MacOS/rkdeveloptool",
+            sha256: Self.reviewedSignedComponentSHA256)
+        ]),
+      prober: probe,
+      nowUTC: { "2026-08-03T01:02:03Z" }
+    ).currentFacts(targetID: adopted.targetID)
+    return (facts, probe)
+  }
+
+  private actor RecordingLiveModeProbe: RockchipLiveModeProbing {
+    private let observation: RockchipLiveModeObservation?
+    private let failure: RockchipLiveModeProbeFailure?
+    private var connectKeys: [String] = []
+
+    init(observation: RockchipLiveModeObservation) {
+      self.observation = observation
+      failure = nil
+    }
+
+    init(failure: RockchipLiveModeProbeFailure) {
+      observation = nil
+      self.failure = failure
+    }
+
+    func observedConnectKeys() -> [String] { connectKeys }
+
+    func observe(
+      connectKey: String
+    ) async throws -> RockchipLiveModeObservation {
+      connectKeys.append(connectKey)
+      guard let observation else { throw failure! }
+      return observation
+    }
+  }
+
+  private struct ProbeCommand: Sendable {
+    let executable: ResolvedExecutable
+    let arguments: [String]
+    let criticalNonInterruptible: Bool
+  }
+
+  private enum ProbeResponse: Sendable {
+    case success(String)
+    case exit(Int32)
+  }
+
+  private actor ProbeCommandRunner: RockchipRuntimeCommandRunning {
+    private var responses: [ProbeResponse]
+    private var recorded: [ProbeCommand] = []
+
+    init(responses: [ProbeResponse]) {
+      self.responses = responses
+    }
+
+    func invocations() -> [ProbeCommand] { recorded }
+
+    func run(
+      executable: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      recorded.append(
+        ProbeCommand(
+          executable: executable, arguments: arguments,
+          criticalNonInterruptible: criticalNonInterruptible))
+      guard !responses.isEmpty else {
+        throw RuntimeDispatchFailure.failed("no scripted response remains")
+      }
+      switch responses.removeFirst() {
+      case .success(let stdout):
+        return ProviderSubprocessReceipt(
+          exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0)
+      case .exit(let status):
+        return ProviderSubprocessReceipt(
+          exitStatus: status, stdout: Data(), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0)
+      }
+    }
   }
 
   func testProductionRockchipRouteUsesReviewedSignedIdentityAndRejectsLegacyPlan()

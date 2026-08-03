@@ -226,15 +226,21 @@ public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
 public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   private let targetStore: RuntimeTargetStore
   private let resolver: any RuntimeExecutableResolving
+  private let prober: (any RockchipLiveModeProbing)?
   private let nowUTC: @Sendable () -> String
 
+  /// `prober: nil` keeps the record-only behaviour: mode, build and profile
+  /// are reported unknown because nothing measured them. A composed prober
+  /// replaces those unknowns with read-only measurements, never with guesses.
   package init(
     targetStore: RuntimeTargetStore,
     resolver: any RuntimeExecutableResolving,
+    prober: (any RockchipLiveModeProbing)? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.targetStore = targetStore
     self.resolver = resolver
+    self.prober = prober
     self.nowUTC = nowUTC
   }
 
@@ -249,6 +255,7 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       throw DeviceProviderError.factsUnavailable(
         "product-owned Rockchip component is unavailable: \(error)")
     }
+    let live = await liveFacts(connectKey: target.connectKey)
     return ProviderFacts(
       providerID: "rockchip",
       toolVersion: BundledRockchipComponent.reportedVersion,
@@ -262,17 +269,46 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       bindingRevision: target.bindingRevision,
       deviceIdentitySHA256: target.stablePhysicalIdentitySHA256,
       executionConnectKey: target.connectKey,
-      // This port reads the durable adoption record; it observes no live
-      // device. Facts it cannot observe are reported unknown, never
-      // fabricated: the previous "hdc"/"dayu200@1" literals were adoption-era
-      // guesses that flowed into evidence as if measured, and the real
-      // firmware profile (dayu200@2) contradicted one of them. Live mode and
-      // build truth belong to the per-action host's dedicated readbacks; the
-      // flash profile is pinned per-request by the `deviceProfile` input.
-      deviceMode: "unknown",
-      buildFingerprint: nil,
-      profileID: "unknown",
+      deviceMode: live.deviceMode,
+      buildFingerprint: live.buildFingerprint,
+      profileID: live.profileID,
       collectedAtUTC: nowUTC())
+  }
+
+  /// Without a prober the durable adoption record is all this port has, and
+  /// it cannot support any of these three: they stay unknown rather than
+  /// fabricated. The previous "hdc"/"dayu200@1" literals were adoption-era
+  /// guesses that flowed into evidence as if measured, and the real firmware
+  /// profile (dayu200@2) contradicted one of them.
+  ///
+  /// With a prober they are measured read-only. A probe failure — including a
+  /// device that is simply not attached — is encoded as `absent`, not thrown:
+  /// these facts are the pre-admission portrait, while the fail-closed
+  /// authority gates are the engine's fresh readback and reservation at the
+  /// consume point. Throwing here would take device-absent planOnly and draft
+  /// with it, and those must stay possible with no device on the host.
+  private func liveFacts(
+    connectKey: String?
+  ) async -> (deviceMode: String, buildFingerprint: String?, profileID: String) {
+    guard let prober, let connectKey else {
+      return ("unknown", nil, "unknown")
+    }
+    guard
+      let observation = try? await prober.observe(connectKey: connectKey)
+    else {
+      return ("absent", nil, "unknown")
+    }
+    // The flash profile is never inferred from a device model or a mode: only
+    // an exact published firmware fingerprint names one. Anything else stays
+    // unknown, and the per-request `deviceProfile` input remains the pin that
+    // actually authorizes a write.
+    let profileID =
+      observation.buildFingerprint.flatMap { fingerprint in
+        RockchipFlashProfile.supportedDAYU200Profiles.first {
+          $0.firmwareVersion == fingerprint
+        }?.catalogReference
+      } ?? "unknown"
+    return (observation.deviceMode, observation.buildFingerprint, profileID)
   }
 }
 
