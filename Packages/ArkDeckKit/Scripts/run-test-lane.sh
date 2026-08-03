@@ -23,6 +23,7 @@ run_lane() {
   test_count=$(sed -n -E \
     -e 's/.*Executed ([0-9]+) tests?.*/\1/p' \
     -e 's/.*Test run with ([0-9]+) tests?.*/\1/p' \
+    -e 's/^\[[0-9]+\/([0-9]+)\] Testing .*/\1/p' \
     "$log" | awk '$1 > 0 { count = $1 } END { if (count != "") print count }')
   maximum_resident_set=$(sed -n -E \
     's/^[[:space:]]*([0-9]+)  maximum resident set size$/\1/p' "$log" | tail -n 1)
