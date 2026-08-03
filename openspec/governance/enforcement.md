@@ -111,10 +111,10 @@ CI 红 = 不能合并;CI 绿 ≠ 批准。授权判断永远来自维护者 revi
 
 ## 真实硬件与 destructive 操作
 
-- 执行分级(CHG-2026-025,POL-AGENT-002):**E0** 只读采集与 host 侧分析在 approved change 的 ready 任务范围内可无人值守执行;**E1** 可逆 deviceMutation 另需 per-device typed capability evidence;**E2** destructive 须持维护者经 merged PR 预先批准的 standing authorization(逐项 pin 目标设备身份/binding revision、固件、transport、HDC、Provider、Step 集合、plan hash、恢复路径、有效期与次数),执行门在首个真实设备 Step 前逐项校验并做设备身份读回,任一缺失或不一致即 fail closed(零 dispatch,记 blocked-attempt)。
-- 普通 CI(无 standing authorization 载体的自动化,如 GitHub Actions)仍只允许 contract、fake、simulated、plan-only 分支。
-- 真实硬件 evidence 必须记录:executor(human 或 agent)、实际 effect 与 typed step kinds、按实际 effect 匹配的 authority reference(Agent E0 = default read-only policy、E1 = RuntimeCapability、E2 = standing authorization)、设备身份(型号/序列号摘要/binding)、固件/工具版本、执行时间与 Artifact reference/hash;destructive 操作另需记录执行前的目标确认(人工物理确认,或与授权逐项比对的机器身份读回)。格式见 `contracts/hardware-evidence.schema.json`;schema-valid evidence 只记录 provenance,不签发 capability 或授权 dispatch。
-- simulation/fake/plan-only 证据必须显式分类,永不计入真实硬件验收。Agent 不得自行创建、修改或批准 standing authorization;授权与吊销的载体都是维护者 merge 的 PR,git 历史即授权审计账本。
+- 执行分级(CHG-2026-025,POL-AGENT-002):**E0** 已发布 read-only operation 由默认只读策略在正常 target/tool/timeout/bytes/privacy 准入后可无人值守执行，不需要 Git Task/PR；**E1** deviceMutation 须有匹配的 per-device `RuntimeCapability`；**E2** destructive 须有精确 maintainer-merged `standingAuthorization` 或同一受监督交互会话的精确 `evolutionCampaignConfirmation`。两种 E2 authority 都须逐项匹配计划和目标；campaign 还固定 base/scope/toolchain/预算，最多 16 个串行 attempt、四小时、并发一。
+- 每个 E2 attempt 在首个真实设备 Step 前都 SHALL re-materialize typed plan、校验 authority/candidate/review pins、做 fresh target/binding readback 并 reserve ordinal。只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash` 时，才可自动继续；未知、unsafe、drifted、过期、超限、无 reservation 或非 PASS review 永久零新 dispatch。普通 CI、scheduler/daemon 与无上述 authority 的 Agent 仍只允许 contract、fake、simulated、plan-only 分支。
+- 真实硬件 evidence 必须记录 executor(human 或 agent)、实际 effect/typed Step kinds 和按实际 effect 匹配的 authority reference（Agent E0=`defaultReadOnlyPolicy`、E1=`runtimeCapability`、E2=`standingAuthorization|evolutionCampaignConfirmation`）、设备身份摘要/binding、固件/工具版本、fresh target confirmation、attempt ordinal、执行时间和 Artifact reference/hash。campaign 不得记作 standing authorization；schema-valid evidence 只记录 provenance，不签发 capability 或授权 dispatch。
+- simulation/fake/plan-only 证据必须显式分类，永不计入真实硬件验收。Agent 不得自行创建、修改或批准 standing authorization；其授权与吊销的载体仍是维护者 merge 的 PR，git 历史是授权审计账本。
 
 ## Baseline
 

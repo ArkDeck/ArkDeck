@@ -96,19 +96,26 @@ Rules:
 - Simulated Provider never receives a real binding or process executor.
 - Success requires semantic output validation and postflight, not exit code alone.
 - RecoveryGuide is guidance, not a claim that automatic recovery is possible.
-- A destructive dispatch requires durable `executionAuthority`. `standardAgent`
-  always refuses real destructive steps; `controlledHardwareLab` means a human
-  operator personally executes against a plan they confirmed: device identity +
-  binding revision, firmware, transport, HDC, Provider and the Step-kind set of
-  the pending dispatch SHALL match the human-confirmed plan, and the executor
-  SHALL revalidate them immediately before the first real-device Step. Human
-  confirmation SHALL precede the first dispatch; the executor SHALL stop when
-  any field drifts, and a run record or after-the-fact evidence cannot
-  retroactively authorize dispatch. `interactiveUser` follows normal product
-  confirmation but cannot mint support-matrix evidence. Authority is issued by
-  the trusted host entry point and journaled at Job creation; a Profile, CLI
-  argument, Task payload or imported Manifest cannot promote `standardAgent`
-  to either stronger authority.
+- A destructive dispatch requires durable `executionAuthority` validated by the trusted host
+  before the first real-device Step. `standardAgent` and ordinary CI always refuse real
+  destructive Steps. A human operator MAY personally execute an exact confirmed plan. An
+  autonomous Agent MAY dispatch only with either `standingAuthorization` from a
+  maintainer-merged PR, exactly matching device identity/binding revision, firmware, transport,
+  HDC, Provider, plan/Step set, recovery path, validity and use limit; or an unconsumed
+  same-session `evolutionCampaignConfirmation`, matching exact plan/target/data impact,
+  protected-main base, candidate allowed paths/diff budget, build target/toolchain, validity and
+  attempt budget. The trusted host SHALL re-materialize the typed plan, perform fresh
+  target/binding readback and durably reserve the attempt immediately before dispatch.
+  Campaign dispatch is limited to 16 serial attempts in four hours, concurrency one; every
+  later attempt needs a new reservation and a prior durable `safeToReflash` terminal based on
+  complete outcome/readback. Unknown, unresolved or unsafe partial outcomes, identity/topology
+  drift, expired/consumed authority, missing pins or non-PASS review stop permanently with zero
+  new dispatch. Candidate, repairer and reviewer cannot supply authority, executable/argv,
+  operation, partition, plan, archive, Step set or target and have no device transport.
+  A Profile, CLI argument, Task payload, imported Manifest, evidence record or post-hoc chat
+  text cannot promote `standardAgent`, mint/expand either E2 authority or retroactively
+  authorize dispatch. Historical one-shot `chatConfirmation` is decode/export-only; a valid
+  evidence record records provenance only and never authorizes a Provider call.
 
 ## Platform ports
 

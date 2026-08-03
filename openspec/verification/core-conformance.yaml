@@ -4,12 +4,12 @@ core_baseline: CORE-3.0.0
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
-  count: 114
+  count: 115
   selector: all-current-core-acceptance-ids
 
 acceptance_cases:
   path: openspec/verification/acceptance-cases.yaml
-  count: 114
+  count: 115
   expected_result: normative-scenario-then-and-clauses
 
 applicability:
@@ -279,10 +279,11 @@ safety_coverage:
     normal:
       - AC-FLASH-005-01
       - AC-FLASH-006-01
+      - AC-FLASH-015-03
     refusal_or_failure:
       - AC-FLASH-015-01
       - AC-FLASH-015-02
     recovery_or_restart:
       not_applicable_reason: >-
-        The standard Agent/CI gate blocks before destructive dispatch and hands
-        off to human execution; no device-side recovery is created.
+        The exact E2 gate either admits one bounded typed attempt or blocks before
+        a new destructive Step; unknown outcomes remain governed by POL-RECOVERY-001.

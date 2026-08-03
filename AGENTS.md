@@ -55,15 +55,18 @@
 - **Device Agent Runtime Plane(设备运行面)**:执行已发布(已合入 main 的
   catalog 所定义)的 typed operation,维护 runtime job/session/artifact。
   **已发布 operation 的每次执行只产生 runtime job 记录,不产生 Git task、
-  不开 PR、不要求 `changeId`/`taskId`**;运行时授权凭据是 Runtime
-  Capability(E0 默认只读策略;E1 standing capability;E2 一次性
-  exact-plan capability,其创建/修改/吊销仍走维护者 merged PR,见下方禁令)。
+  不开 PR、不要求 `changeId`/`taskId`、ready task、readiness packet 或人工
+  重述 typed plan**。E0/readOnly 由默认只读策略在 target/tool/timeout/bytes/privacy
+  准入后执行;E1/deviceMutation 只消费逐设备匹配的 `RuntimeCapability`;E2/destructive
+  只消费精确的 `standingAuthorization` 或同一受监督交互会话的
+  `evolutionCampaignConfirmation`(见 `POL-AGENT-002`)，而非 Git 载体或 legacy mode。
 - 风险分级 D0/D1/D2(决策维度,见 enforcement"决策分级")与执行分级
   E0/E1/E2(设备效果维度)正交;Runtime Plane 的日常 E0 与已授权 E1 执行
   不构成 D* 决策点。
 - `scripts/host_loop` 属 Repo Plane:仅领取仓库开发任务;其既有硬件门
   (`Hardware required` 任务拒领、仅 D0 可派发)即设备执行禁令的机械承载,
-  host_loop 不得执行 HDC、刷机、日志/trace 采集或任何设备 runtime job。
+  host_loop 不得执行 HDC、刷机、日志/trace 采集或任何设备 runtime job；该隔离
+  不限制独立、已准入的 Device Agent Runtime Job。
   产品闭环阶段 host_loop 不用于派发治理状态任务;产品缺陷修复由交互式
   Agent 会话按 `PRODUCT-LOOP.md` 直接执行。
 
@@ -79,7 +82,26 @@
 ## Agent 禁令
 
 - 不得为让实现或测试通过而修改 accepted Core requirement、Safety invariant 或 Acceptance Scenario;此类变化必须走 change proposal 并由人类批准合并。
-- 对真实设备的 destructive 操作(Flash、erase、format、unlock、真实 update)只能持有以下一种、且与待执行计划/目标逐项精确一致的 E2 authority 时执行(POL-AGENT-002)：(1)维护者经 merged PR 预先批准的 standing authorization；或(2)用户监督式交互 Agent 会话中，Agent 已展示 exact plan/archive/step-set、脱敏 target/binding、userdata 影响、protected-main base、candidate scope/diff/toolchain、有效期与 attempt 上限后，用户在同一会话作出的 bounded evolution campaign confirmation。campaign confirmation 本身即 authority，不要求或伪造 `AUTH-ID`，但硬限制最多 16 个串行 attempt、4 小时、并发 1；每次仍须独立 fresh readback/reservation。上一 attempt 仅在 merged broker 记录 `safeToReflash` 且本轮取得 fresh reservation 时，才可在同一 invocation 自动执行下一轮 read-only repair/build/test/adversarial-review/broker Flash，无需新的用户消息；repairer 只接收标准化失败并只能产生有界 closed strategy，不得接触源码、设备、Runtime、authority 或改变 argv/operation/partition/plan/target。success、unknown/unresolved/unsafe partial、无 fresh reservation、身份/admission 漂移、repair/review 拒绝、过期或超次立即永久停止。candidate 无 USB/HDC/RockUSB/network/raw-shell/authority 能力，只有 merged broker 可接触设备。产品活跃 Harness 模型、持久化与 status wire 不存在 `normal|evolution` 模式字段；workspace policy 是 isolation/review/promotion 的唯一事实源。旧 mode 字段只可做一致性解码并在与 policy 冲突时 fail closed。旧 one-shot `chatConfirmation` 仅允许历史 Journal/Manifest/ledger 的只读 decode/export，不得保留公开创建工厂、新建 usage、admission 或 dispatch。执行门须现场重算 typed plan 与 fresh target readback，任一 authority 缺失/已消费/漂移时 fail closed(零 dispatch)。只读采集与 host 侧分析(E0)在 approved change 的 ready 任务范围内可无人值守执行；可逆 deviceMutation(E1)另需 per-device typed capability evidence。evidence 必须如实记录 executor 身份(human|agent)、实际 authority kind/reference（Agent E0 = default read-only policy，E1 = RuntimeCapability，E2 = standingAuthorization|evolutionCampaignConfirmation）、目标确认与时间；campaign/chat confirmation 不得记成 standing authorization。产品当前无法密码学证明聊天账号/传输 provenance，r14 显式信任交互 Agent 如实转交 bounded campaign 确认，Agent 不得伪造未发生的确认，亦不得自行创建、修改或批准 standing authorization。
+- Device Agent Runtime Plane MAY 执行已发布 Catalog 的 typed operation。E0/readOnly
+  不需要 Git task/PR；E1/deviceMutation 须有匹配的 per-device `RuntimeCapability`；真实
+  destructive E2 只能持有与本次计划/目标逐项精确一致的 `standingAuthorization`，或同一
+  受监督交互会话中的 `evolutionCampaignConfirmation`(POL-AGENT-002)。有效 campaign
+  本身即 authority，不需要额外人工 handoff、`AUTH-ID`、legacy `chatConfirmation`、
+  `normal|evolution` 选择、Git 载体或每次 attempt 的新用户消息。campaign 固定 exact
+  plan/archive/step-set、脱敏 target/binding、userdata impact、protected-main base、
+  candidate scope/diff/toolchain、有效期和 attempt 上限，硬限制为最多 16 个串行 attempt、
+  四小时、并发一；每次均须 fresh readback/reservation。上一 attempt 只有 durable terminal
+  且 broker 分类为 `safeToReflash` 时，才可在同一 invocation 自动继续 closed repair/build/
+  test/review/broker Flash。缺失/已消费/过期/漂移 authority、非 PASS review、无 fresh
+  reservation、身份或结果未知、unresolved/unsafe partial、预算耗尽或取消后 intent 都永久
+  fail closed（零新 dispatch）。candidate 仅可在确认的 task-owned isolation 中接触 source
+  build/test；repairer 不得接触 source workspace，reviewer 只可读 immutable artifacts，三者
+  均不得接触设备/Runtime/authority 或改变 argv/operation/partition/plan/archive/step-set/target；
+  只有 protected-main broker 可 dispatch。历史 one-shot `chatConfirmation` 和 legacy mode
+  仅可 decode/export，新的 admission/reservation/dispatch 必须拒绝。evidence 如实记录
+  executor、实际 authority kind/reference、fresh target confirmation、attempt 与时间；
+  campaign 不得记作 standing authorization。Agent 不得伪造确认，亦不得创建、修改、
+  批准或吊销 standing authorization。
 - 不得把 simulation、fake、plan-only 结果记为真实设备或硬件验收;evidence 必须如实分类。
 - 不得在设备身份、外部副作用结果或 destructive step 状态不确定时猜测继续(fail closed)。
 - 不得使用 host shell 字符串拼接外部命令。
