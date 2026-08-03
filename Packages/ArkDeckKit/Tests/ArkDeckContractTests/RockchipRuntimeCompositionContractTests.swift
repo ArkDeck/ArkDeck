@@ -198,6 +198,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  private struct MissingUSBProbe: RockchipRuntimeUSBProbing {
+    func singleLoader(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw RuntimeDispatchFailure.failed("fixture has no Loader")
+    }
+  }
+
   private actor ReadbackLog {
     private var partitions: [String] = []
 
@@ -733,6 +741,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   private enum ProbeResponse: Sendable {
     case success(String)
     case exit(Int32)
+    case outcomeUnknown(String)
   }
 
   private actor ProbeCommandRunner: RockchipRuntimeCommandRunning {
@@ -768,7 +777,80 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         return ProviderSubprocessReceipt(
           exitStatus: status, stdout: Data(), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0)
+      case .outcomeUnknown(let detail):
+        throw RuntimeDispatchFailure.outcomeUnknown(detail)
       }
+    }
+  }
+
+  func testEnterLoaderSettlesTimedOutHDCWithExactLoaderReadback() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let runner = ProbeCommandRunner(responses: [
+      .outcomeUnknown("process timed out before completion"),
+      .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"),
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner,
+      usbProbe: FixedUSBProbe(identity: identity))
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: "device-1"),
+      stepID: "enter-loader-readback", toolSHA256: rockchip.sha256)
+
+    let result = try await executor.execute(
+      action: .enterLoader(connectKey: "device-1"),
+      descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+      actionDirectory: root)
+
+    XCTAssertEqual(result.summary["transition"], "normal-to-loader")
+    XCTAssertEqual(
+      result.summary["transitionEvidence"], "exact-bound-loader-readback")
+    XCTAssertEqual(result.subprocesses.count, 1)
+    let invocations = await runner.invocations()
+    XCTAssertEqual(invocations.map(\.arguments), [
+      ["-t", "device-1", "shell", "reboot", "loader"], ["ld"],
+    ])
+  }
+
+  func testEnterLoaderKeepsTimedOutHDCUnknownWithoutExactLoader() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let runner = ProbeCommandRunner(responses: [
+      .outcomeUnknown("process timed out before completion")
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner, usbProbe: MissingUSBProbe(),
+      enterLoaderReadbackTimeoutSeconds: 0)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: "device-1"),
+      stepID: "enter-loader-unresolved", toolSHA256: rockchip.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .enterLoader(connectKey: "device-1"),
+        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        actionDirectory: root)
+      XCTFail("missing Loader readback must remain unknown")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .outcomeUnknown(let detail) = failure else {
+        return XCTFail("expected outcomeUnknown, got \(failure)")
+      }
+      XCTAssertEqual(detail, "process timed out before completion")
     }
   }
 
