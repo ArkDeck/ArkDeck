@@ -3349,7 +3349,13 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   历史解码)、`AuthorizationUsageTerminalStatus`(RuntimeJobEngine 在用)、
   `AuthorizationUsageLedgerError`、fault point/injector、`AuthorizationUsageValidation`
   基础校验(campaign ledger 共用)、`AuthorityLane.standingAuthorization`(降为历史
-  解码标签)。真实设备 dispatch 仍为 0)
+  解码标签)。真实设备 dispatch 仍为 0；r19 scope amendment（待维护者 review/merge）：
+  `CHG-2026-056` 已将 current
+  `hardware-evidence` contract 升至 V4，并允许 `evolutionCampaignConfirmation`，但当前
+  `HardwareEvidenceProjector` 仍只接受 standing authority 且只写 V3。r19 仅把这个
+  已发布 E2 campaign 的 evidence-projector 同步、legacy human-handoff 文案收口与
+  `16 attempts` 诊断一致性纳入 TASK-AIN-019；不新增 operation/provider/profile/authority，
+  不改变 broker admission、candidate scope 或任何真实设备 dispatch。)
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
@@ -3374,6 +3380,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/**`
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckHarness/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`
@@ -3455,6 +3462,11 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r14：campaign `maximumAttemptLimit`、CLI 默认/帮助、campaign ledger 与 global usage
   ledger lockstep 提高到 16；4 hours、concurrency=1、fresh reservation/readback 与
   unknown/unresolved/unsafe partial 永久停止不变，拒绝第 17 次 reservation。
+- r19（本 scope amendment 合入后）：将 Runtime hardware-evidence projector 升至 V4，
+  使 E2 既可如实投影 `standingAuthorization`，也可投影包含 durable campaign/attempt
+  correlation 的 `evolutionCampaignConfirmation`；缺失 correlation 仍只返回
+  `evidenceIncomplete`，绝不 mint authority 或 dispatch。将已退役 direct human-handoff
+  路径显式标为 compatibility route，并使 `16 attempts` 诊断文字与实际校验一致。
 - workspace 有界销毁（#972）：`HarnessEvolutionWorkspacePort.sweepTerminalWorkspaces`
   + `HarnessEvolutionWorkspaceRetention`（终态最短存活 + 最近 K 棵 + dry-run）。
   终态（succeeded/failed/cancelled）任务的隔离树按保留策略销毁：只删 `workspace/`
@@ -3504,6 +3516,10 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - r14 post-flash tests：typed plan 强制 `9 wlx → exact readback → rd`；profile model/build
   精确相等，版本 contains/nonempty 不再通过；`basic` 可不采 HiLog，`full` 必须通过 nonempty
   Debug Runtime roundtrip；16 个串行 reservation 通过且第 17 个拒绝，unsafe/unknown 不重试。
+- r19 evidence/legacy tests：E2 standing 与 campaign V4 evidence 都只在完整 durable
+  admission/intent/outcome/fresh-readback correlation 下可投影；任一 campaign correlation
+  缺失、漂移或未知均为 `evidenceIncomplete` 且 dispatch=0；legacy direct human-handoff
+  只作为 compatibility route，不冒充 campaign broker。
 - r12 review-leg tests（`HarnessEvolutionReviewContractTests`，13 例，经公开 reconcile 面驱动）：
   无 reviewer/无 candidate/无 immutable diff/model 预算耗尽均 humanRequired 且零 promotion；
   REJECT 同 wake 派发 `workspace.revert-patch@1` 且 Attempt 经 `.reverted` 收口；COMMENT
