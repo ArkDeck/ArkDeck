@@ -99,6 +99,10 @@ enum RockchipHDCIntegrationProfile {
     "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
   static let reportedVersion = "3.2.0f"
   static let dayu200NormalProductID: UInt16 = 0x5000
+
+  static func enterLoaderArguments(connectKey: String) -> [String] {
+    ["-t", connectKey, "shell", "reboot", "loader"]
+  }
 }
 
 /// Production composition for the campaign lane's admission. The in-process
@@ -185,6 +189,51 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       previousRevision: previousRevision,
       currentStableIdentitySHA256: currentIdentity,
       currentRevision: revision)
+  }
+
+  /// A DAYU200 changes both its USB serial and its IOKit topology while moving
+  /// between HDC-normal and Loader on the production board.  Revision 2 keeps
+  /// the Loader identity as the stable campaign identity, but the immediately
+  /// preceding HDC-normal identity remains the only address from which the
+  /// typed `enter-loader` step can start.  Accept that alias only when the
+  /// owner-only binding carries the complete, explicitly confirmed adjacent
+  /// lineage edge.  A digest without its paired topology, a Loader claiming
+  /// the previous HDC identity, or any older/unrelated identity remains a
+  /// mismatch.
+  func matchesConfirmedLiveIdentity(
+    _ identity: RockchipProductUSBIdentity
+  ) throws -> Bool {
+    guard identity.isRegisteredDAYU200Mode else { return false }
+    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    let liveIdentity = SHA256.hash(data: Data(identity.serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+
+    // Validate the current evidence and, for revision > 1, the whole adjacent
+    // edge before accepting either personality.  This prevents a malformed
+    // lineage document from becoming useful merely because the device happens
+    // to be in its latest mode.
+    let advance = try runtimeTargetLineageAdvance()
+    if liveIdentity == currentIdentity, identity.topology == usbTopology {
+      return true
+    }
+    guard identity.isHDCNormal,
+      evidence.contains("product:e0-iokit-single-loader-readback"),
+      let advance,
+      liveIdentity == advance.previousStableIdentitySHA256,
+      let previousTopology = values(prefix: "binding:previous-usb-topology=").first,
+      identity.topology == previousTopology
+    else { return false }
+    return true
+  }
+
+  func confirmedHDCConnectKey(
+    for identity: RockchipProductUSBIdentity
+  ) throws -> String? {
+    guard identity.isHDCNormal, try matchesConfirmedLiveIdentity(identity) else { return nil }
+    return identity.serial
   }
 
   private func values(prefix: String) -> [String] {
@@ -1023,6 +1072,16 @@ struct RockchipProductUSBProbe: Sendable {
     case registeredDAYU200
   }
 
+  private let identitySource: @Sendable () throws -> [RockchipProductUSBIdentity]
+
+  init(
+    identitySource: @escaping @Sendable () throws -> [RockchipProductUSBIdentity] = {
+      try Self.systemIdentities()
+    }
+  ) {
+    self.identitySource = identitySource
+  }
+
   func singleLoader(selector: String? = nil) throws -> RockchipProductUSBIdentity {
     try single(selector: selector, serialDigestSHA256: nil, requirement: .loader)
   }
@@ -1053,6 +1112,28 @@ struct RockchipProductUSBProbe: Sendable {
       requirement: .registeredDAYU200)
   }
 
+  /// Selects one live DAYU200 personality from the exact current/previous
+  /// identities proven by the durable binding.  This differs from accepting
+  /// an arbitrary serial alias: the previous identity is usable only as the
+  /// HDC-normal side of the one confirmed adjacent lineage edge.
+  func singleDAYU200(
+    selector: String,
+    binding: RockchipProductBindingSnapshot
+  ) throws -> RockchipProductUSBIdentity {
+    // Fail closed on malformed owner-only lineage even when the host currently
+    // has no matching USB device.
+    _ = try binding.runtimeTargetLineageAdvance()
+    let matches = try identitySource().filter { identity in
+      guard identity.topology == selector else { return false }
+      return try binding.matchesConfirmedLiveIdentity(identity)
+    }
+    guard matches.count == 1, let match = matches.first else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        matches.isEmpty ? "DAYU200 target unavailable" : "DAYU200 target ambiguous")
+    }
+    return match
+  }
+
   func singleConnected(selector: String? = nil) throws -> RockchipProductUSBIdentity {
     try single(
       selector: selector, serialDigestSHA256: nil,
@@ -1066,27 +1147,9 @@ struct RockchipProductUSBProbe: Sendable {
   ) throws
     -> RockchipProductUSBIdentity
   {
-    var iterator: io_iterator_t = 0
-    guard
-      IOServiceGetMatchingServices(
-        kIOMainPortDefault, IOServiceMatching("IOUSBHostDevice"), &iterator) == KERN_SUCCESS
-    else { throw RockchipFlashExecutionError.admissionRejected("USB registry unavailable") }
-    defer { IOObjectRelease(iterator) }
+    let identities = try identitySource()
     var matches: [RockchipProductUSBIdentity] = []
-    while true {
-      let service = IOIteratorNext(iterator)
-      if service == 0 { break }
-      defer { IOObjectRelease(service) }
-      guard let vendor = number(service, "idVendor"),
-        let product = number(service, "idProduct"),
-        let location = number(service, "locationID"),
-        let serial = string(service, "USB Serial Number")
-          ?? string(service, "kUSBSerialNumberString")
-      else { continue }
-      let identity = RockchipProductUSBIdentity(
-        serial: serial, vendorID: vendor.uint16Value,
-        productID: product.uint16Value, topology: String(location.uint64Value),
-        productName: string(service, "USB Product Name"))
+    for identity in identities {
       let modeMatches: Bool
       switch requirement {
       case .loader: modeMatches = identity.isLoader
@@ -1094,7 +1157,7 @@ struct RockchipProductUSBProbe: Sendable {
       case .registeredDAYU200: modeMatches = identity.isRegisteredDAYU200Mode
       }
       guard modeMatches else { continue }
-      let digest = SHA256.hash(data: Data(serial.utf8))
+      let digest = SHA256.hash(data: Data(identity.serial.utf8))
         .map { String(format: "%02x", $0) }.joined()
       if (selector == nil || selector == identity.topology)
         && (serialDigestSHA256 == nil || serialDigestSHA256 == digest)
@@ -1109,12 +1172,39 @@ struct RockchipProductUSBProbe: Sendable {
     return match
   }
 
-  private func number(_ service: io_registry_entry_t, _ key: String) -> NSNumber? {
+  private static func systemIdentities() throws -> [RockchipProductUSBIdentity] {
+    var iterator: io_iterator_t = 0
+    guard
+      IOServiceGetMatchingServices(
+        kIOMainPortDefault, IOServiceMatching("IOUSBHostDevice"), &iterator) == KERN_SUCCESS
+    else { throw RockchipFlashExecutionError.admissionRejected("USB registry unavailable") }
+    defer { IOObjectRelease(iterator) }
+    var identities: [RockchipProductUSBIdentity] = []
+    while true {
+      let service = IOIteratorNext(iterator)
+      if service == 0 { break }
+      defer { IOObjectRelease(service) }
+      guard let vendor = number(service, "idVendor"),
+        let product = number(service, "idProduct"),
+        let location = number(service, "locationID"),
+        let serial = string(service, "USB Serial Number")
+          ?? string(service, "kUSBSerialNumberString")
+      else { continue }
+      let identity = RockchipProductUSBIdentity(
+        serial: serial, vendorID: vendor.uint16Value,
+        productID: product.uint16Value, topology: String(location.uint64Value),
+        productName: string(service, "USB Product Name"))
+      identities.append(identity)
+    }
+    return identities
+  }
+
+  private static func number(_ service: io_registry_entry_t, _ key: String) -> NSNumber? {
     IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?
       .takeRetainedValue() as? NSNumber
   }
 
-  private func string(_ service: io_registry_entry_t, _ key: String) -> String? {
+  private static func string(_ service: io_registry_entry_t, _ key: String) -> String? {
     IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?
       .takeRetainedValue() as? String
   }
@@ -1199,10 +1289,10 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
 {
   let planPort: RockchipProductExecutePlanFactPort
   let bindingPort: RockchipProductBindingPort
+  let bindingSnapshot: RockchipProductBindingSnapshot
+  let liveIdentity: RockchipProductUSBIdentity
   let tool: RockchipSelectedDiscoveryTool
-  let selector: String
   let toolWorkingDirectory: URL
-  let usbProbe: RockchipProductUSBProbe
   let clock: any RockchipAdmissionClock
 
 
@@ -1263,24 +1353,16 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
         binding.receipt.binding.identitySnapshot.attributes["serial"],
       case .string(let topology)? =
         binding.receipt.binding.identitySnapshot.attributes["usbTopology"],
-      Self.isCanonicalTopology(topology), topology == selector,
-      request.targetLocationSelector == nil || request.targetLocationSelector == topology
+      Self.isCanonicalTopology(topology), topology == bindingSnapshot.usbTopology,
+      liveIdentity.isHDCNormal,
+      request.targetLocationSelector == nil
+        || request.targetLocationSelector == liveIdentity.topology,
+      let hdcConnectKey = try bindingSnapshot.confirmedHDCConnectKey(for: liveIdentity)
     else { throw RockchipAuthorizationFactError.bindingMismatch(field: "binding") }
     let serialDigest = Self.sha256Hex(Data(serial.utf8))
     guard serialDigest == expectation.serialDigestSHA256 else {
       throw RockchipAuthorizationFactError.bindingMismatch(field: "serialDigestSHA256")
     }
-
-    let liveIdentity: RockchipProductUSBIdentity
-    do {
-      liveIdentity = try usbProbe.singleDAYU200(
-        selector: topology, stableIdentitySHA256: serialDigest)
-    } catch {
-      throw RockchipAuthorizationFactError.factPortFailed(name: "normalModeUSBReadback")
-    }
-    guard liveIdentity.isHDCNormal, liveIdentity.serial == serial,
-      liveIdentity.topology == topology
-    else { throw RockchipAuthorizationFactError.readbackMismatch(field: "normalModeIdentity") }
 
     let processExecutor = FoundationProcessExecutor()
     let toolPrepared: ProcessPreparedIdentityBoundLaunch
@@ -1311,7 +1393,9 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
         ProcessIdentityBoundRequest(
           process: ProcessRequest(
             executable: RockchipHDCIntegrationProfile.executableURL,
-            arguments: ["-t", serial, "shell", "reboot", "loader"], timeout: 20),
+            arguments: RockchipHDCIntegrationProfile.enterLoaderArguments(
+              connectKey: hdcConnectKey),
+            timeout: 20),
           expectedSHA256: RockchipHDCIntegrationProfile.executableSHA256))
     } catch {
       throw RockchipAuthorizationFactError.factPortFailed(name: "hdcExecutableIdentity")
@@ -1328,15 +1412,14 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
       Data(
         [
           expectation.targetModel, serialDigest,
-          String(binding.receipt.reference.revision), topology,
-          String(RockchipProbeEvidence.rockUSBVendorID),
-          String(RockchipProbeEvidence.dayu200LoaderProductID),
+          String(binding.receipt.reference.revision), liveIdentity.topology,
+          String(liveIdentity.vendorID), String(liveIdentity.productID),
         ].joined(separator: "|").utf8))
     return RockchipTrustedAuthorizationFacts(
       plan: plan, executableIdentity: executableIdentity,
       bindingReference: binding.receipt.reference,
       targetDigestSHA256: targetDigest, serialDigestSHA256: serialDigest,
-      usbTopology: topology, observationSequence: 1,
+      usbTopology: liveIdentity.topology, observationSequence: 1,
       readbackDeadlineMonotonicNanoseconds: reading.monotonicNanoseconds
         + RockchipAuthorizationFactCollector.maximumReadbackLifetimeNanoseconds,
       authorizationValidUntil: expectation.validUntil,
@@ -1411,8 +1494,7 @@ final class RockchipProductionAdmissionPort: @unchecked Sendable,
       String(format: "%02x", $0)
     }.joined()
     let liveIdentity = try usbProbe.singleDAYU200(
-      selector: request.targetLocationSelector,
-      stableIdentitySHA256: serialDigest)
+      selector: request.targetLocationSelector, binding: binding)
     let bindingPort = RockchipProductBindingPort(
       sessionID: sessionID, jobID: jobID, targetID: targetID, snapshot: binding)
     let collector: any RockchipAuthorizationFactCollecting
@@ -1437,8 +1519,8 @@ final class RockchipProductionAdmissionPort: @unchecked Sendable,
     } else if liveIdentity.isHDCNormal {
       collector = RockchipProductHDCNormalAuthorizationFactCollector(
         planPort: RockchipProductExecutePlanFactPort(), bindingPort: bindingPort,
-        tool: tool, selector: request.targetLocationSelector,
-        toolWorkingDirectory: toolWorkingDirectory, usbProbe: usbProbe, clock: clock)
+        bindingSnapshot: binding, liveIdentity: liveIdentity,
+        tool: tool, toolWorkingDirectory: toolWorkingDirectory, clock: clock)
     } else {
       throw RockchipFlashExecutionError.admissionRejected(
         "durably bound DAYU200 is not in a registered execution mode")
