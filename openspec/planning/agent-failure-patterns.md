@@ -196,7 +196,7 @@ shape 校验（JSON 合法、字段非空、格式匹配）被当作信任证明
 
 ### Canonical references
 
-[`POL-AGENT-002`](../constitution.md#pol-agent-002-autonomous-agents-never-execute-real-destructive-hardware-workflows)、
+[`POL-AGENT-002`](../constitution.md#pol-agent-002-autonomous-destructive-execution-requires-exact-e2-authority)、
 [`POL-TARGET-001`](../constitution.md#pol-target-001-identity-before-convenience)、
 [`AGENTS.md` 信任与批准](../../AGENTS.md#信任与批准)。
 
@@ -687,7 +687,7 @@ stdin 占用、参数签名、粘贴行为、缓冲）从未在 host 侧被实�
 
 [`AGENTS.md` Agent 禁令](../../AGENTS.md#agent-禁令)、
 [enforcement — 真实硬件与 destructive 操作](../governance/enforcement.md#真实硬件与-destructive-操作)、
-[`POL-AGENT-002`](../constitution.md#pol-agent-002-autonomous-agents-never-execute-real-destructive-hardware-workflows)。
+[`POL-AGENT-002`](../constitution.md#pol-agent-002-autonomous-destructive-execution-requires-exact-e2-authority)。
 
 ### Automation status
 
