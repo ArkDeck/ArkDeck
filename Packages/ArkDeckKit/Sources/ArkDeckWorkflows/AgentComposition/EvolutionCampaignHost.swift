@@ -266,6 +266,18 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
           campaignID: document.campaignID, attemptOrdinal: ordinal, flash: result)
       } catch {
         document = (try? reconcileUnresolved(ledger.load(document.campaignID))) ?? document
+        if document.reservedAttemptCount == reservedBeforeDispatch,
+          let mode = Self.startingModeMismatch(error)
+        {
+          // A candidate that excludes the already-read live mode is a bad
+          // typed proposal, not target drift and not a Flash attempt. Keep
+          // the campaign bounded by its candidate budget and ask the
+          // repairer for a strategy that includes the observed mode.
+          observation = try RockchipEvolutionFailureObservation(
+            attemptOrdinal: max(1, reservedBeforeDispatch + 1),
+            failureCode: "flash.startingModeNotAllowed:\(mode)")
+          continue
+        }
         guard document.reservedAttemptCount == reservedBeforeDispatch + 1 else {
           _ = try? ledger.stop(
             campaignID: document.campaignID, reasonCode: "admissionOrTargetDrift", at: nowUTC())
@@ -372,6 +384,16 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     case .productionConfigurationUnavailable: return "flash.configurationUnavailable"
     case .recoveryRequired, .postflightMismatch: return "flash.unsafeFailure"
     }
+  }
+
+  private static func startingModeMismatch(_ error: any Error) -> String? {
+    guard case .admissionRejected(let detail) = error as? RockchipFlashExecutionError else {
+      return nil
+    }
+    let prefix = "startingModeNotAllowed:"
+    guard detail.hasPrefix(prefix) else { return nil }
+    let mode = String(detail.dropFirst(prefix.count))
+    return RockchipEvolutionStartingMode(rawValue: mode)?.rawValue
   }
 
   private static func reviewer(

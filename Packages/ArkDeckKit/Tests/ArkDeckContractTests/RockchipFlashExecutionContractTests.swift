@@ -12,6 +12,23 @@ import XCTest
 final class RockchipFlashExecutionContractTests: XCTestCase {
   private enum ToolPreferenceFailure: Error { case injected }
 
+  func testLegacyEnterLoaderRecoveryReconstructsTheExactConsumedPlan() throws {
+    let plan = try RockchipLegacyEnterLoaderSessionRecovery.legacyPlan(
+      profile: .dayu200OpenHarmony70035)
+    XCTAssertEqual(
+      plan.planDigestSHA256,
+      "3922f6a22401a624dd393932bbfc7d3774953be79aaece08961a8bbfb77dc2b8")
+    XCTAssertEqual(
+      plan.stepSetDigestSHA256,
+      "c8bdce2a137690081c1dd5ca38f91f25399c63778ab18b4f94000b127382fa14")
+    XCTAssertEqual(plan.archiveSHA256, RockchipFlashProfile.dayu200OpenHarmony70035.archiveSHA256)
+    XCTAssertNotNil(plan.steps.first { $0.id == "rk-rf002-enter-loader" })
+    XCTAssertFalse(
+      plan.steps.contains {
+        $0.arguments["probeId"] == .string("rockusb-partition-readback")
+      })
+  }
+
   private final class ToolPreferenceBox: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String: Any] = [:]

@@ -854,9 +854,12 @@ actor RockchipEvolutionCampaignAdmissionService {
     }
     guard assertion.targetStableIdentitySHA256 == bindingSerialDigestSHA256,
       bindingRevision >= assertion.bindingLineageRootRevision,
-      permit.candidate.strategy.allowedStartingModes.contains(startingMode),
       try brokerExecutableDigest() == assertion.brokerExecutableDigestSHA256
     else { throw RockchipEvolutionCampaignError.admissionRejected("brokerOrTargetDrift") }
+    guard permit.candidate.strategy.allowedStartingModes.contains(startingMode) else {
+      throw RockchipEvolutionCampaignError.admissionRejected(
+        "startingModeNotAllowed:\(startingMode.rawValue)")
+    }
     let campaign = try campaignLedger.load(assertion.campaignID)
     guard campaign.assertion == assertion, !campaign.isTerminal,
       campaign.activeReservation == nil,

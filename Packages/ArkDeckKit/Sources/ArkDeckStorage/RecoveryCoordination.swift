@@ -80,6 +80,7 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
     provider: ProviderRecoveryEvidence,
     binding: RecoveryBindingEvidence
   ) throws -> ReconciliationResult {
+    let schemaVersion = session.replay.schemaVersion ?? JournalEvent.schemaVersion
     if let pending = session.replay.pendingReconcileTransition {
       let transition = try JournalEvent.stateTransition(
         eventID: audit.nextEventID(),
@@ -90,7 +91,8 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
         from: .reconciling,
         to: pending.nextState,
         reason: "complete durable reconcile outcome after restart",
-        triggerEventID: pending.outcomeEventID
+        triggerEventID: pending.outcomeEventID,
+        schemaVersion: schemaVersion
       )
       try journal.appendAndSynchronize(transition)
       return ReconciliationResult(
@@ -117,7 +119,8 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
         timestamp: audit.timestamp(),
         from: durableState,
         to: .waitingForRecovery,
-        reason: "durably record fail-closed launch recovery state"
+        reason: "durably record fail-closed launch recovery state",
+        schemaVersion: schemaVersion
       )
       try journal.appendAndSynchronize(recoveredWaiting)
       durableSequences.append(recoveredWaiting.sequence)
@@ -132,7 +135,8 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
       timestamp: audit.timestamp(),
       from: .waitingForRecovery,
       to: .reconciling,
-      reason: "begin deterministic recovery reconciliation"
+      reason: "begin deterministic recovery reconciliation",
+      schemaVersion: schemaVersion
     )
     try journal.appendAndSynchronize(enteredReconciling)
     durableSequences.append(enteredReconciling.sequence)
@@ -148,7 +152,8 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
       recoveryAttemptID: attemptID,
       sourceState: .waitingForRecovery,
       lastDurableSequence: enteredReconciling.sequence,
-      trigger: "startup"
+      trigger: "startup",
+      schemaVersion: schemaVersion
     )
     try journal.appendAndSynchronize(started)
     durableSequences.append(started.sequence)
@@ -210,7 +215,8 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
       nextState: state,
       outcomeCertainty: certainty,
       safeBoundaryConfirmed: safeBoundary,
-      evidence: provider.evidence + binding.evidence
+      evidence: provider.evidence + binding.evidence,
+      schemaVersion: schemaVersion
     )
     try journal.appendAndSynchronize(outcome)
     durableSequences.append(outcome.sequence)
@@ -225,7 +231,8 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
       from: .reconciling,
       to: state,
       reason: "persist deterministic reconcile decision",
-      triggerEventID: outcome.eventID
+      triggerEventID: outcome.eventID,
+      schemaVersion: schemaVersion
     )
     try journal.appendAndSynchronize(decisionTransition)
     durableSequences.append(decisionTransition.sequence)

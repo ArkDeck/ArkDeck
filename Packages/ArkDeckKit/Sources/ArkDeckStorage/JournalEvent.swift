@@ -396,9 +396,11 @@ public struct JournalEvent: Equatable, Sendable {
     recoveryAttemptID: String,
     sourceState: JobState,
     lastDurableSequence: Int,
-    trigger: String
+    trigger: String,
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
       timestamp: timestamp, kind: .reconcileStarted,
       payload: [
@@ -421,9 +423,11 @@ public struct JournalEvent: Equatable, Sendable {
     nextState: JobState,
     outcomeCertainty: JournalOutcomeCertainty,
     safeBoundaryConfirmed: Bool,
-    evidence: [String]
+    evidence: [String],
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     try JournalEvent(
+      schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
       timestamp: timestamp, kind: .reconcileOutcome, bindingRevision: bindingRevision,
       payload: [
