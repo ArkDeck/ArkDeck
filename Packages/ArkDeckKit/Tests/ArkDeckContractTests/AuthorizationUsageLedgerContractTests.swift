@@ -45,6 +45,34 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     XCTAssertEqual(try ledger.load().reservations.count, 2)
   }
 
+  func testTerminalPinsConfirmedNotExecutedIntentsAndDecodesHistoricalAbsence() throws {
+    let terminal = try AgentAuthorityUsageTerminal(
+      status: .failed, closedAt: "2026-08-03T12:01:12Z",
+      externalIntentEventIDs: ["intent-enter-loader-mode"],
+      confirmedNotExecutedIntentEventIDs: ["intent-enter-loader-mode"])
+    XCTAssertEqual(
+      terminal.confirmedNotExecutedIntentEventIDs, ["intent-enter-loader-mode"])
+    XCTAssertThrowsError(
+      try AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: "2026-08-03T12:01:12Z",
+        externalIntentEventIDs: ["intent-enter-loader-mode"],
+        confirmedNotExecutedIntentEventIDs: ["intent-flash-partitions"]))
+    XCTAssertThrowsError(
+      try AgentAuthorityUsageTerminal(
+        status: .outcomeUnknown, closedAt: "2026-08-03T12:01:12Z",
+        externalIntentEventIDs: ["intent-enter-loader-mode"],
+        confirmedNotExecutedIntentEventIDs: ["intent-enter-loader-mode"]))
+
+    var historical = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(terminal)) as? [String: Any])
+    historical.removeValue(forKey: "confirmedNotExecutedIntentEventIds")
+    let decoded = try JSONDecoder().decode(
+      AgentAuthorityUsageTerminal.self,
+      from: JSONSerialization.data(withJSONObject: historical))
+    XCTAssertEqual(decoded.externalIntentEventIDs, ["intent-enter-loader-mode"])
+    XCTAssertEqual(decoded.confirmedNotExecutedIntentEventIDs, [])
+  }
+
   func testE1LedgerSerializesSameTargetAndRejectsCrossKindOrClosedReserve() throws {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }

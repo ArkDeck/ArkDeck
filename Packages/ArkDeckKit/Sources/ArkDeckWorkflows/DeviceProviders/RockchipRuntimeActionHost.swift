@@ -488,7 +488,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           receipts: receipts)
       } catch {
         if let normal = try? exactHDCNormalIdentity(connectKey: connectKey) {
-          throw RuntimeDispatchFailure.failed(
+          throw RuntimeDispatchFailure.confirmedNotExecuted(
             "exact bound HDC-normal USB readback proves the Loader transition did not complete "
               + "at topology \(normal.topology)")
         }

@@ -470,6 +470,63 @@ final class EvolutionCampaignContractTests: XCTestCase {
           terminal: nil)))
   }
 
+  func testConfirmedNotExecutedMutationIntentReconcilesSafeAndContinues() async throws {
+    let root = temporaryDirectory("campaign-confirmed-not-executed")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    let pins = try makePins(assertion: assertion, ordinal: 1)
+    _ = try ledger.create(assertion)
+    _ = try ledger.appendCandidate(
+      campaignID: assertion.campaignID, candidate: pins.candidate,
+      review: pins.review, at: Self.confirmedAt)
+
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: assertion.confirmationDigestSHA256,
+      baseCommitOID: assertion.baseCommitOID,
+      planDigestSHA256: assertion.planDigestSHA256,
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      targetStableIdentitySHA256: assertion.targetStableIdentitySHA256,
+      bindingLineageRootRevision: assertion.bindingLineageRootRevision,
+      confirmedAt: assertion.confirmedAt, validUntil: assertion.validUntil,
+      maximumAttempts: assertion.maxAttempts)
+    let usage = try usageReservation(
+      reference: authorityRef, ordinal: 1, jobID: "job-loader-no-effect")
+    _ = try usageLedger.reserve(usage)
+    _ = try usageLedger.close(
+      reservationID: usage.reservationID,
+      terminal: AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: Self.confirmedAt,
+        externalIntentEventIDs: ["intent-enter-loader-mode"],
+        confirmedNotExecutedIntentEventIDs: ["intent-enter-loader-mode"]))
+    _ = try ledger.reserveAttempt(
+      campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
+      reviewID: pins.review.reviewID, ordinal: 1, reservationID: usage.reservationID,
+      jobID: "job-loader-no-effect", sessionID: "session-loader-no-effect",
+      at: Self.confirmedAt)
+
+    let flash = SuccessAfterReconciledEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger, usageLedger: usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+    let result = try await host.continueCampaign(
+      campaignID: assertion.campaignID,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 2)
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 1)
+    XCTAssertEqual(
+      try ledger.load(assertion.campaignID).events
+        .filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.safeToReflash, .succeeded])
+  }
+
   func testLedgerRejectsUnknownFieldsAndUnresolvedAttemptBecomesTerminalBeforeDispatch()
     async throws
   {
@@ -1400,6 +1457,43 @@ private actor CountingEvolutionFlash: RockchipEvolutionFlashDispatching {
   ) async throws -> RockchipFlashExecutionResult {
     count += 1
     throw RockchipEvolutionCampaignError.admissionRejected("unexpectedContractDispatch")
+  }
+
+  func dispatchCount() -> Int { count }
+}
+
+private actor SuccessAfterReconciledEvolutionFlash: RockchipEvolutionFlashDispatching {
+  let ledger: RockchipEvolutionCampaignLedger
+  let now: String
+  private var count = 0
+
+  init(ledger: RockchipEvolutionCampaignLedger, now: String) {
+    self.ledger = ledger
+    self.now = now
+  }
+
+  func execute(
+    _ request: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
+    guard case .evolutionCampaign(let permit) = request.authority, admitted == nil else {
+      throw RockchipEvolutionCampaignError.admissionRejected("campaignPermitRequired")
+    }
+    count += 1
+    let ordinal = 2
+    _ = try ledger.reserveAttempt(
+      campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
+      reviewID: permit.review.reviewID, ordinal: ordinal,
+      reservationID: "reservation-after-no-effect", jobID: "job-after-no-effect",
+      sessionID: "session-after-no-effect", at: now)
+    _ = try ledger.closeAttempt(
+      campaignID: permit.assertion.campaignID, ordinal: ordinal,
+      jobID: "job-after-no-effect", sessionID: "session-after-no-effect",
+      disposition: .succeeded,
+      destructiveIntentEventIDs: ["intent-flash-partitions"], at: now)
+    return RockchipFlashExecutionResult(
+      sessionID: "session-after-no-effect", jobID: "job-after-no-effect",
+      status: .succeeded, evidenceClass: .contractFake, manifestURL: nil)
   }
 
   func dispatchCount() -> Int { count }

@@ -190,9 +190,9 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       authorizationID: "AUTH-ENGINE-LANE-0001", archiveURL: archiveURL,
       targetLocationSelector: "42")
 
-    // The dispatcher refuses at the last hop (the engine's dispatcher never
-    // spawns), so the campaign sees a confirmed failure — not a success and
-    // not an unknown outcome.
+    // The dispatcher proves at the last hop that no external effect happened,
+    // so the campaign sees a confirmed failure — not a success and not an
+    // unknown outcome.
     do {
       _ = try await dispatcher.execute(request, admitted: admitted)
       XCTFail("the contract dispatcher never spawns, so this cannot succeed")
@@ -234,6 +234,9 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     XCTAssertEqual(
       terminal.externalIntentEventIDs.count, 1,
       "exactly the journaled mutating intent: \(terminal.externalIntentEventIDs)")
+    XCTAssertEqual(
+      terminal.confirmedNotExecutedIntentEventIDs, terminal.externalIntentEventIDs,
+      "the exact no-effect readback must remain attached to its durable intent")
 
     // The engine resolved the lease to the published bytes, not to whatever
     // the caller happened to name: this is the exact archive the campaign
@@ -255,7 +258,8 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     func unavailableReason(providerID _: String) -> String? { nil }
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
       await log.record(plan.action.effect.rawValue)
-      throw RuntimeDispatchFailure.failed("the engine-lane contract test never spawns")
+      throw RuntimeDispatchFailure.confirmedNotExecuted(
+        "the engine-lane contract test proves no process was spawned")
     }
   }
 

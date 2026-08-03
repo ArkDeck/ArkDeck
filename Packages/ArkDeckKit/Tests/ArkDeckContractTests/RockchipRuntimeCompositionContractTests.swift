@@ -904,7 +904,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
-  func testEnterLoaderSettlesTimedOutHDCAsFailedWhenExactNormalUSBRemains()
+  func testEnterLoaderSettlesTimedOutHDCAsConfirmedNotExecutedWhenExactNormalUSBRemains()
     async throws
   {
     let root = try temporaryDirectory()
@@ -934,8 +934,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         actionDirectory: root)
       XCTFail("exact normal USB readback must settle the transition as not completed")
     } catch let failure as RuntimeDispatchFailure {
-      guard case .failed(let detail) = failure else {
-        return XCTFail("expected definite failure, got \(failure)")
+      guard case .confirmedNotExecuted(let detail) = failure else {
+        return XCTFail("expected confirmed-not-executed failure, got \(failure)")
       }
       XCTAssertTrue(detail.contains("did not complete"), detail)
     }

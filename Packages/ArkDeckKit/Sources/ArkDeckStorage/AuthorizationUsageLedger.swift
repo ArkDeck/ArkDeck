@@ -667,27 +667,42 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   public let status: AuthorizationUsageTerminalStatus
   public let closedAt: String
   public let externalIntentEventIDs: [String]
+  /// Mutation intents whose exact provider readback proved that their
+  /// external effect did not happen. This is deliberately a subset of
+  /// `externalIntentEventIDs`: retaining the intent preserves the audit
+  /// trail, while the separate resolution lets a campaign distinguish a
+  /// retry-safe no-effect failure from an unsafe partial mutation.
+  public let confirmedNotExecutedIntentEventIDs: [String]
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case status
     case closedAt
     case externalIntentEventIDs = "externalIntentEventIds"
+    case confirmedNotExecutedIntentEventIDs = "confirmedNotExecutedIntentEventIds"
   }
 
   public init(
     status: AuthorizationUsageTerminalStatus,
     closedAt: String,
-    externalIntentEventIDs: [String]
+    externalIntentEventIDs: [String],
+    confirmedNotExecutedIntentEventIDs: [String] = []
   ) throws {
     guard AuthorizationUsageValidation.isTimestamp(closedAt),
       Set(externalIntentEventIDs).count == externalIntentEventIDs.count,
-      externalIntentEventIDs.allSatisfy(AuthorizationUsageValidation.isIdentifier)
+      externalIntentEventIDs.allSatisfy(AuthorizationUsageValidation.isIdentifier),
+      Set(confirmedNotExecutedIntentEventIDs).count
+        == confirmedNotExecutedIntentEventIDs.count,
+      confirmedNotExecutedIntentEventIDs.allSatisfy(
+        AuthorizationUsageValidation.isIdentifier),
+      Set(confirmedNotExecutedIntentEventIDs).isSubset(of: Set(externalIntentEventIDs)),
+      confirmedNotExecutedIntentEventIDs.isEmpty || status == .failed
     else {
       throw AuthorizationUsageLedgerError.invalidRecord("invalid Agent authority terminal")
     }
     self.status = status
     self.closedAt = closedAt
     self.externalIntentEventIDs = externalIntentEventIDs
+    self.confirmedNotExecutedIntentEventIDs = confirmedNotExecutedIntentEventIDs
   }
 
   public init(from decoder: Decoder) throws {
@@ -695,7 +710,9 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
     try self.init(
       status: container.decode(AuthorizationUsageTerminalStatus.self, forKey: .status),
       closedAt: container.decode(String.self, forKey: .closedAt),
-      externalIntentEventIDs: container.decode([String].self, forKey: .externalIntentEventIDs))
+      externalIntentEventIDs: container.decode([String].self, forKey: .externalIntentEventIDs),
+      confirmedNotExecutedIntentEventIDs: try container.decodeIfPresent(
+        [String].self, forKey: .confirmedNotExecutedIntentEventIDs) ?? [])
   }
 }
 
