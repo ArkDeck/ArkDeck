@@ -1439,9 +1439,17 @@ public final class AgentDaemonServer: @unchecked Sendable {
     }
   }
 
+  /// Only bytes that arrived since the last search can hold the next frame
+  /// terminator, so the scan starts where the previous one stopped. Re-scanning
+  /// the whole buffer after every read made a large frame quadratic: a 2 MiB
+  /// flash-bundle chunk encodes to a ~2.8 MB frame that arrives in ~8 KiB
+  /// pieces (`net.local.stream.recvspace`), so it was rescanned ~350 times, and
+  /// `Data.firstIndex(of:)` compares byte by byte through non-inlined
+  /// `__DataStorage` accessors. Frame semantics are unchanged.
   private static func serve(connectionFD: Int32, handler: RuntimeControlPlaneHandler) async {
     defer { close(connectionFD) }
     var buffer = Data()
+    var scannedByteCount = 0  // leading bytes already known to hold no terminator
     let chunkSize = 64 * 1024
     var chunk = [UInt8](repeating: 0, count: chunkSize)
     while true {
@@ -1449,9 +1457,11 @@ public final class AgentDaemonServer: @unchecked Sendable {
       if count <= 0 { return }
       buffer.append(contentsOf: chunk[0..<count])
       if buffer.count > 4 * 1024 * 1024 { return }  // frame bomb guard
-      while let newlineIndex = buffer.firstIndex(of: 0x0A) {
-        let line = buffer.subdata(in: buffer.startIndex..<newlineIndex)
-        buffer.removeSubrange(buffer.startIndex...newlineIndex)
+      while let terminatorOffset = frameTerminatorOffset(in: buffer, from: scannedByteCount) {
+        let start = buffer.startIndex
+        let line = buffer.subdata(in: start..<(start + terminatorOffset))
+        buffer.removeSubrange(start...(start + terminatorOffset))
+        scannedByteCount = 0
         guard !line.isEmpty else { continue }
         let response = await handler.handleLine(line)
         var written = 0
@@ -1467,6 +1477,24 @@ public final class AgentDaemonServer: @unchecked Sendable {
         }
         if !sent { return }
       }
+      scannedByteCount = buffer.count
+    }
+  }
+
+  /// Offset of the first frame terminator at or after `searchedByteCount`,
+  /// relative to `buffer.startIndex`, or nil while no complete frame has
+  /// arrived. `memchr` is a vectorized library call where the equivalent
+  /// `Collection` scan walks one byte at a time.
+  private static func frameTerminatorOffset(
+    in buffer: Data, from searchedByteCount: Int
+  ) -> Int? {
+    guard searchedByteCount < buffer.count else { return nil }
+    return buffer.withUnsafeBytes { raw -> Int? in
+      guard let base = raw.baseAddress,
+        let hit = memchr(
+          base.advanced(by: searchedByteCount), 0x0A, raw.count - searchedByteCount)
+      else { return nil }
+      return base.distance(to: UnsafeRawPointer(hit))
     }
   }
 }

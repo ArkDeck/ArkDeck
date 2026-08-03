@@ -393,6 +393,345 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(list.error?.code, "internalError")
   }
 
+  // MARK: - Line framing (AIN-FRAMING-001)
+
+  /// Connects, writes `payload` in `pieceBytes` slices, then reads until
+  /// `expectedResponses` newline-terminated frames have arrived. Driving the
+  /// socket by hand is the point: it pins the daemon's reassembly behaviour for
+  /// frames that span many reads, which `AgentClient` alone cannot express.
+  private func exchangeRawFrames(
+    socketPath: String, payload: Data, pieceBytes: Int, expectedResponses: Int
+  ) throws -> [String] {
+    let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+    guard fd >= 0 else { throw AgentDaemonError.io("cannot create socket") }
+    defer { close(fd) }
+    // The daemon closes the connection on an oversize frame, so writing into a
+    // closed peer must surface as EPIPE rather than killing the test process.
+    var noSignal: Int32 = 1
+    guard
+      setsockopt(
+        fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal,
+        socklen_t(MemoryLayout<Int32>.size)) == 0
+    else { throw AgentDaemonError.io("cannot suppress SIGPIPE") }
+    // A frame the daemon never answers must fail the test rather than hang it.
+    var receiveTimeout = timeval(tv_sec: 20, tv_usec: 0)
+    guard
+      setsockopt(
+        fd, SOL_SOCKET, SO_RCVTIMEO, &receiveTimeout,
+        socklen_t(MemoryLayout<timeval>.size)) == 0
+    else { throw AgentDaemonError.io("cannot bound the receive timeout") }
+    var address = sockaddr_un()
+    address.sun_family = sa_family_t(AF_UNIX)
+    withUnsafeMutableBytes(of: &address.sun_path) { buffer in
+      socketPath.utf8CString.withUnsafeBytes { source in
+        buffer.copyMemory(from: UnsafeRawBufferPointer(rebasing: source.prefix(buffer.count)))
+      }
+    }
+    let connected = withUnsafePointer(to: &address) { pointer in
+      pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+      }
+    }
+    guard connected == 0 else { throw AgentDaemonError.io("connect errno \(errno)") }
+
+    try payload.withUnsafeBytes { raw in
+      guard let base = raw.baseAddress else { return }
+      var sent = 0
+      while sent < raw.count {
+        let piece = min(pieceBytes, raw.count - sent)
+        var written = 0
+        while written < piece {
+          let result = write(fd, base + sent + written, piece - written)
+          guard result > 0 else { throw AgentDaemonError.io("short write") }
+          written += result
+        }
+        sent += piece
+      }
+    }
+
+    guard expectedResponses > 0 else { return [] }
+    var received = Data()
+    var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+    while received.filter({ $0 == 0x0A }).count < expectedResponses {
+      let count = read(fd, &chunk, chunk.count)
+      guard count > 0 else { throw AgentDaemonError.io("closed before response") }
+      received.append(contentsOf: chunk[0..<count])
+    }
+    return String(decoding: received, as: UTF8.self)
+      .split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+  }
+
+  /// A production-shaped flash-bundle chunk is a full 2 MiB, which encodes to a
+  /// ~2.8 MB frame and reaches the daemon in ~8 KiB socket reads — the frame
+  /// that made reassembly quadratic. Driving a real begin/append/commit round
+  /// trip proves byte-exactness rather than mere parseability: the staged file
+  /// must hash to the digest pinned before the upload started, so a single
+  /// dropped, duplicated or reordered byte fails the commit.
+  func testLargeFrameSurvivesManySmallSocketReads() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent(
+        "targets-framing", isDirectory: true))
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-30T00:00:00Z").record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent(
+        "artifacts-framing", isDirectory: true),
+      nowUTC: { "2026-07-30T00:00:00Z" })
+
+    var scratch = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
+    var seed: UInt64 = 0x2545_F491_4F6C_DD1D
+    for index in scratch.indices {
+      seed ^= seed << 13
+      seed ^= seed >> 7
+      seed ^= seed << 17
+      scratch[index] = UInt8(truncatingIfNeeded: seed)
+    }
+    let bytes = Data(scratch)
+    let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    let policy = FlashBundleImportPolicy(
+      expectedByteCount: bytes.count, expectedSHA256: digest
+    ) { url in
+      guard try Data(contentsOf: url) == bytes else {
+        throw FlashBundleArtifactImportError.invalidBundle("framing fixture bytes")
+      }
+      return FlashBundleImportValidation(byteCount: bytes.count, sha256: digest)
+    }
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore,
+      flashBundleImportPolicy: policy)
+    let server = try startServer(handler)
+    let client = AgentClient(socketPath: server.socketURL.path)
+
+    let begin = try client.request(
+      method: "artifact.importFlashBundle.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("images.tar.gz"),
+        "byteCount": .integer(Int64(bytes.count)),
+        "sha256": .string(digest),
+      ])
+    guard case .object(let beginFields) = begin,
+      case .string(let uploadID)? = beginFields["uploadId"]
+    else {
+      return XCTFail("flash begin must return a bounded upload identity")
+    }
+
+    let identifier = UUID().uuidString
+    var payload = try JSONEncoder().encode(
+      AgentWireProtocol.Request(
+        id: identifier, method: "artifact.importFlashBundle.append",
+        params: [
+          "uploadId": .string(uploadID),
+          "offset": .integer(0),
+          "base64": .string(bytes.base64EncodedString()),
+        ]))
+    XCTAssertGreaterThan(payload.count, 2_700_000)
+    payload.append(0x0A)
+
+    let responses = try exchangeRawFrames(
+      socketPath: server.socketURL.path, payload: payload,
+      pieceBytes: 8 * 1024, expectedResponses: 1)
+    XCTAssertEqual(responses.count, 1)
+    let appended = try JSONDecoder().decode(
+      AgentWireProtocol.Response.self, from: Data(responses[0].utf8))
+    XCTAssertEqual(appended.id, identifier)
+    XCTAssertTrue(appended.ok, appended.error?.message ?? "-")
+    XCTAssertEqual(appended.result, .object(["nextOffset": .integer(Int64(bytes.count))]))
+
+    let commit = try client.request(
+      method: "artifact.importFlashBundle.commit",
+      params: ["uploadId": .string(uploadID)])
+    guard case .object(let fields) = commit else {
+      return XCTFail("flash commit must return the published artifact facts")
+    }
+    XCTAssertEqual(fields["sha256"], .string(digest))
+    XCTAssertEqual(fields["byteCount"], .integer(Int64(bytes.count)))
+  }
+
+  /// Frame boundaries, not read boundaries, delimit requests: several frames in
+  /// one write are answered in order, and bare terminators are skipped rather
+  /// than answered or treated as corruption.
+  func testPipelinedAndEmptyFramesKeepFrameSemantics() throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+
+    let firstID = UUID().uuidString
+    let secondID = UUID().uuidString
+    var payload = Data("\n".utf8)
+    for identifier in [firstID, secondID] {
+      payload.append(
+        try JSONEncoder().encode(
+          AgentWireProtocol.Request(id: identifier, method: "health", params: nil)))
+      payload.append(contentsOf: [0x0A, 0x0A])
+    }
+
+    let responses = try exchangeRawFrames(
+      socketPath: server.socketURL.path, payload: payload,
+      pieceBytes: payload.count, expectedResponses: 2)
+    XCTAssertEqual(responses.count, 2)
+    let decoded = try responses.map {
+      try JSONDecoder().decode(AgentWireProtocol.Response.self, from: Data($0.utf8))
+    }
+    XCTAssertEqual(decoded.map(\.id), [firstID, secondID])
+    XCTAssertTrue(decoded.allSatisfy(\.ok))
+  }
+
+  /// The bytes already searched belong to the frame just consumed, so the next
+  /// frame must be searched from the start of what is left. This is the case
+  /// that catches a stale search offset: a long frame is followed by a much
+  /// shorter one, so after the long frame is consumed the remaining frame ends
+  /// well before the offset reached while accumulating its predecessor. A
+  /// scanner that resumed from that offset would leave the short frame
+  /// unanswered forever.
+  func testShortFrameTrailingALongOneIsNotSkipped() throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+
+    let longID = UUID().uuidString
+    let shortID = UUID().uuidString
+    var payload = try JSONEncoder().encode(
+      AgentWireProtocol.Request(
+        id: longID, method: "health",
+        params: ["padding": .string(String(repeating: "p", count: 512 * 1024))]))
+    payload.append(0x0A)
+    payload.append(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(id: shortID, method: "health", params: nil)))
+    payload.append(0x0A)
+
+    let responses = try exchangeRawFrames(
+      socketPath: server.socketURL.path, payload: payload,
+      pieceBytes: 8 * 1024, expectedResponses: 2)
+    XCTAssertEqual(responses.count, 2)
+    let decoded = try responses.map {
+      try JSONDecoder().decode(AgentWireProtocol.Response.self, from: Data($0.utf8))
+    }
+    XCTAssertEqual(decoded.map(\.id), [longID, shortID])
+    XCTAssertTrue(decoded.allSatisfy(\.ok))
+  }
+
+  /// The frame-bomb guard still ends the connection before an unterminated
+  /// frame can grow without bound.
+  func testUnterminatedOversizeFrameStillDisconnects() throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+    let payload = Data(repeating: 0x41, count: 5 * 1024 * 1024)  // no terminator
+    XCTAssertThrowsError(
+      try exchangeRawFrames(
+        socketPath: server.socketURL.path, payload: payload,
+        pieceBytes: 64 * 1024, expectedResponses: 1))
+  }
+
+  // MARK: - Client transport
+
+  /// The daemon drops the connection on an oversize frame, so a request larger
+  /// than the frame bomb guard finds the peer gone mid-write. That must reach
+  /// the caller as a transport error: under the default SIGPIPE disposition the
+  /// write instead kills the whole process, taking down a CLI invocation or a
+  /// campaign attempt in a way no `catch` can observe.
+  func testWriteIntoAClosedPeerFailsAsTransportNotSignal() throws {
+    let (handler, _) = try makeStack()
+    let server = try startServer(handler)
+    let client = AgentClient(socketPath: server.socketURL.path)
+
+    // Comfortably past the daemon's 4 MiB guard, so it closes before the last
+    // byte is written.
+    let oversize = String(repeating: "p", count: 6 * 1024 * 1024)
+    XCTAssertThrowsError(
+      try client.request(method: "health", params: ["padding": .string(oversize)])
+    ) { error in
+      guard case AgentClientError.transport = error else {
+        return XCTFail("expected a transport error, got \(error)")
+      }
+    }
+    // The connection is per-request, so the client must still work afterwards.
+    XCTAssertNoThrow(try client.request(method: "health"))
+  }
+
+  /// A response larger than one socket read must be reassembled from its own
+  /// frame terminator, not from read boundaries. The stand-in server writes in
+  /// small pieces so the client is forced through many partial reads.
+  func testLargeResponseIsReassembledAcrossManyReads() throws {
+    let socketURL = stateDirectory.appendingPathComponent("stub.sock")
+    try FileManager.default.createDirectory(
+      at: stateDirectory, withIntermediateDirectories: true)
+    let payloadBytes = 4 * 1024 * 1024
+    let identifier = "stub-response-id"
+    var response = try JSONEncoder().encode(
+      StubResponse(
+        id: identifier, ok: true,
+        result: .object(["padding": .string(String(repeating: "q", count: payloadBytes))]),
+        error: nil))
+    response.append(0x0A)
+
+    let listenerFD = socket(AF_UNIX, SOCK_STREAM, 0)
+    XCTAssertGreaterThanOrEqual(listenerFD, 0)
+    var address = sockaddr_un()
+    address.sun_family = sa_family_t(AF_UNIX)
+    withUnsafeMutableBytes(of: &address.sun_path) { buffer in
+      socketURL.path.utf8CString.withUnsafeBytes { source in
+        buffer.copyMemory(from: UnsafeRawBufferPointer(rebasing: source.prefix(buffer.count)))
+      }
+    }
+    let bound = withUnsafePointer(to: &address) { pointer in
+      pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        Darwin.bind(listenerFD, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+      }
+    }
+    XCTAssertEqual(bound, 0)
+    XCTAssertEqual(listen(listenerFD, 4), 0)
+
+    let served = expectation(description: "stub server answered")
+    DispatchQueue.global().async {
+      defer { close(listenerFD) }
+      let connectionFD = accept(listenerFD, nil, nil)
+      guard connectionFD >= 0 else { return served.fulfill() }
+      defer { close(connectionFD) }
+      var suppressSignal: Int32 = 1
+      _ = setsockopt(
+        connectionFD, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
+        socklen_t(MemoryLayout<Int32>.size))
+      var request = [UInt8](repeating: 0, count: 64 * 1024)
+      _ = read(connectionFD, &request, request.count)
+      response.withUnsafeBytes { raw in
+        guard let base = raw.baseAddress else { return }
+        var sent = 0
+        while sent < raw.count {
+          let piece = min(8 * 1024, raw.count - sent)
+          var written = 0
+          while written < piece {
+            let result = write(connectionFD, base + sent + written, piece - written)
+            if result <= 0 { return served.fulfill() }
+            written += result
+          }
+          sent += piece
+        }
+      }
+      served.fulfill()
+    }
+
+    let client = AgentClient(socketPath: socketURL.path)
+    let result = try client.request(method: "health", id: identifier)
+    wait(for: [served], timeout: 30)
+    guard case .object(let fields) = result,
+      case .string(let padding)? = fields["padding"]
+    else {
+      return XCTFail("stub result must survive reassembly")
+    }
+    XCTAssertEqual(padding.utf8.count, payloadBytes)
+    XCTAssertTrue(padding.allSatisfy { $0 == "q" })
+  }
+
+  private struct StubResponse: Codable {
+    let id: String
+    let ok: Bool
+    let result: JSONValue?
+    let error: AgentWireProtocol.WireError?
+  }
+
   // MARK: - UDS integration
 
   func testTwoConcurrentClientsShareOneDaemon() throws {
