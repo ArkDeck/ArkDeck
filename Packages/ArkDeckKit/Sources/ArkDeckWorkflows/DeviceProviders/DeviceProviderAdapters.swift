@@ -2821,7 +2821,8 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
           connectKey: connectKey,
           expectedIdentitySHA256: expectedIdentitySHA256,
           providerExecutableSHA256: providerExecutableSHA256,
-          actionSHA256: actionSHA256)))
+          actionSHA256: actionSHA256,
+          executionTuning: context.campaignExecutionTuning)))
   }
 
   package func verify(

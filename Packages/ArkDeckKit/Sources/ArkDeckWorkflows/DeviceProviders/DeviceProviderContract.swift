@@ -10,6 +10,7 @@
 // from "exit 0" to a verified outcome.
 
 import ArkDeckCore
+import ArkDeckStorage
 import CryptoKit
 import Foundation
 
@@ -1122,6 +1123,9 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
   public let expectedIdentitySHA256: String
   public let providerExecutableSHA256: String
   public let actionSHA256: String
+  /// Candidate timing controls copied only from an admitted Evolution
+  /// reservation. Request inputs cannot construct this descriptor.
+  public let executionTuning: AgentAuthorityCampaignExecutionTuning?
 
   package init(
     identifier: String,
@@ -1132,7 +1136,8 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
     connectKey: String,
     expectedIdentitySHA256: String,
     providerExecutableSHA256: String,
-    actionSHA256: String
+    actionSHA256: String,
+    executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
   ) {
     self.identifier = identifier
     self.jobID = jobID
@@ -1143,6 +1148,7 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
     self.expectedIdentitySHA256 = expectedIdentitySHA256
     self.providerExecutableSHA256 = providerExecutableSHA256
     self.actionSHA256 = actionSHA256
+    self.executionTuning = executionTuning
   }
 }
 
@@ -1375,6 +1381,9 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   /// Empty for every single-package request, which is what keeps those
   /// plans byte-identical (CHG-2026-049 r4).
   public let additionalInputArtifacts: [ProviderResolvedInputArtifact]
+  /// Present only when the Runtime re-read an admitted campaign reservation
+  /// and found its broker-recorded bounded tuning controls.
+  public let campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning?
 
   public init(
     jobID: String,
@@ -1387,7 +1396,8 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     toolSHA256: String? = nil,
     nowUTC: String,
     resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
-    additionalInputArtifacts: [ProviderResolvedInputArtifact] = []
+    additionalInputArtifacts: [ProviderResolvedInputArtifact] = [],
+    campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning? = nil
   ) {
     self.jobID = jobID
     self.stepID = stepID
@@ -1400,6 +1410,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     self.nowUTC = nowUTC
     self.resolvedInputArtifact = resolvedInputArtifact
     self.additionalInputArtifacts = additionalInputArtifacts
+    self.campaignExecutionTuning = campaignExecutionTuning
   }
 }
 

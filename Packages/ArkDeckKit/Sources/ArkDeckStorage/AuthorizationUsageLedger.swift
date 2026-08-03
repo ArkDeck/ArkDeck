@@ -719,21 +719,75 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
 /// Immutable campaign-only provenance that the protected broker records at
 /// reservation time. It is audit data, not authority: decoding it cannot
 /// reserve, consume, or dispatch anything.
+public struct AgentAuthorityCampaignExecutionTuning: Codable, Equatable, Sendable {
+  public let loaderDiscoveryTimeoutSeconds: Int
+  public let loaderPollIntervalMilliseconds: Int
+  public let hdcCommandTimeoutSeconds: Int
+  public let readOnlyCommandTimeoutSeconds: Int
+
+  public init(
+    loaderDiscoveryTimeoutSeconds: Int,
+    loaderPollIntervalMilliseconds: Int,
+    hdcCommandTimeoutSeconds: Int,
+    readOnlyCommandTimeoutSeconds: Int
+  ) throws {
+    guard
+      (15...120).contains(loaderDiscoveryTimeoutSeconds),
+      (100...2_000).contains(loaderPollIntervalMilliseconds),
+      (5...60).contains(hdcCommandTimeoutSeconds),
+      (5...60).contains(readOnlyCommandTimeoutSeconds)
+    else {
+      throw AuthorizationUsageLedgerError.invalidRecord(
+        "campaign execution tuning is outside the published bounds")
+    }
+    self.loaderDiscoveryTimeoutSeconds = loaderDiscoveryTimeoutSeconds
+    self.loaderPollIntervalMilliseconds = loaderPollIntervalMilliseconds
+    self.hdcCommandTimeoutSeconds = hdcCommandTimeoutSeconds
+    self.readOnlyCommandTimeoutSeconds = readOnlyCommandTimeoutSeconds
+  }
+
+  enum CodingKeys: String, CodingKey, CaseIterable {
+    case loaderDiscoveryTimeoutSeconds
+    case loaderPollIntervalMilliseconds
+    case hdcCommandTimeoutSeconds
+    case readOnlyCommandTimeoutSeconds
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    try self.init(
+      loaderDiscoveryTimeoutSeconds: container.decode(
+        Int.self, forKey: .loaderDiscoveryTimeoutSeconds),
+      loaderPollIntervalMilliseconds: container.decode(
+        Int.self, forKey: .loaderPollIntervalMilliseconds),
+      hdcCommandTimeoutSeconds: container.decode(
+        Int.self, forKey: .hdcCommandTimeoutSeconds),
+      readOnlyCommandTimeoutSeconds: container.decode(
+        Int.self, forKey: .readOnlyCommandTimeoutSeconds))
+  }
+}
+
 public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
   public let candidateDigestSHA256: String
   public let reviewDigestSHA256: String
   public let brokerDigestSHA256: String
+  /// The reviewed candidate's bounded timing controls. This is carried by
+  /// the reservation rather than request inputs, so a caller cannot tune an
+  /// engine-lane attempt after the broker has admitted it.
+  public let executionTuning: AgentAuthorityCampaignExecutionTuning?
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case candidateDigestSHA256
     case reviewDigestSHA256
     case brokerDigestSHA256
+    case executionTuning
   }
 
   public init(
     candidateDigestSHA256: String,
     reviewDigestSHA256: String,
-    brokerDigestSHA256: String
+    brokerDigestSHA256: String,
+    executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
   ) throws {
     guard [candidateDigestSHA256, reviewDigestSHA256, brokerDigestSHA256]
       .allSatisfy(AuthorizationUsageValidation.isSHA256)
@@ -744,6 +798,18 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
     self.candidateDigestSHA256 = candidateDigestSHA256
     self.reviewDigestSHA256 = reviewDigestSHA256
     self.brokerDigestSHA256 = brokerDigestSHA256
+    self.executionTuning = executionTuning
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    try self.init(
+      candidateDigestSHA256: container.decode(
+        String.self, forKey: .candidateDigestSHA256),
+      reviewDigestSHA256: container.decode(String.self, forKey: .reviewDigestSHA256),
+      brokerDigestSHA256: container.decode(String.self, forKey: .brokerDigestSHA256),
+      executionTuning: try container.decodeIfPresent(
+        AgentAuthorityCampaignExecutionTuning.self, forKey: .executionTuning))
   }
 }
 
@@ -1368,6 +1434,12 @@ private enum AgentAuthorityUsageValidation {
     ])
     let campaignProvenanceKeys = Set(
       AgentAuthorityCampaignEvidenceProvenance.CodingKeys.allCases.map(\.rawValue))
+    // Execution tuning was added after campaign provenance had been
+    // persisted. Its absence selects the legacy fixed host timing; no
+    // partially specified tuning is ever accepted.
+    let historicalCampaignProvenanceKeys = campaignProvenanceKeys.subtracting([
+      AgentAuthorityCampaignEvidenceProvenance.CodingKeys.executionTuning.rawValue,
+    ])
     let terminalKeys = Set(AgentAuthorityUsageTerminal.CodingKeys.allCases.map(\.rawValue))
     // `confirmedNotExecutedIntentEventIds` was added after schema 1.0.0 had
     // already persisted terminals in production. The decoder gives its absent
@@ -1398,6 +1470,7 @@ private enum AgentAuthorityUsageValidation {
         guard reference.kind == .evolutionCampaignConfirmation,
           case .object(let provenanceObject) = provenance,
           Set(provenanceObject.keys) == campaignProvenanceKeys
+            || Set(provenanceObject.keys) == historicalCampaignProvenanceKeys
         else {
           throw AuthorizationUsageLedgerError.invalidRecord(
             "Agent authority campaign evidence provenance shape is not closed")

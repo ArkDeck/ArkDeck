@@ -102,6 +102,11 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       validUntil: "2026-08-03T03:00:00Z",
       maximumAttempts: 8)
     let operationDigest = String(repeating: "1", count: 64)
+    let executionTuning = try AgentAuthorityCampaignExecutionTuning(
+      loaderDiscoveryTimeoutSeconds: 90,
+      loaderPollIntervalMilliseconds: 250,
+      hdcCommandTimeoutSeconds: 7,
+      readOnlyCommandTimeoutSeconds: 9)
     let reservationID = try AgentAuthorityUsageReservation.canonicalReservationID(
       authorizationRef: authorityRef, jobID: "job-engine-lane-1",
       operationDigestSHA256: operationDigest, targetDigestSHA256: Self.targetIdentity)
@@ -117,7 +122,8 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
           candidateDigestSHA256: String(repeating: "a", count: 64),
           reviewDigestSHA256: String(repeating: "b", count: 64),
-          brokerDigestSHA256: String(repeating: "c", count: 64)),
+          brokerDigestSHA256: String(repeating: "c", count: 64),
+          executionTuning: executionTuning),
         terminal: nil))
 
     let dispatchLog = DispatchLog()
@@ -158,7 +164,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     let socketPath = stateDirectory.appendingPathComponent("agentd.sock").path
 
     let admitted = RockchipEvolutionCampaignAdmittedAttempt(
-      campaignID: "ECAMP-\(String(repeating: "A", count: 24))", ordinal: 1,
+      campaignID: "ECAMP-\(String(repeating: "F", count: 24))", ordinal: 1,
       reservationID: reservationID, jobID: "job-engine-lane-1",
       sessionID: "session-engine-lane-1",
       targetStableIdentitySHA256: Self.targetIdentity, bindingRevision: 2,
@@ -213,6 +219,8 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     let dispatched = await dispatchLog.snapshot()
     XCTAssertEqual(dispatched, ["deviceMutation"], "\(dispatched)")
     XCTAssertFalse(dispatched.contains("destructive"), "\(dispatched)")
+    let dispatchedTunings = await dispatchLog.executionTunings()
+    XCTAssertEqual(dispatchedTunings, [executionTuning])
 
     // The engine's own gates ran on the real request: intent confirmed by the
     // reservation, then the reservation re-verified immediately before the
@@ -272,15 +280,34 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
 
   private actor DispatchLog {
     private var effects: [String] = []
-    func record(_ effect: String) { effects.append(effect) }
+    private var recordedExecutionTunings: [AgentAuthorityCampaignExecutionTuning?] = []
+
+    func record(
+      effect: String,
+      executionTuning: AgentAuthorityCampaignExecutionTuning?
+    ) {
+      effects.append(effect)
+      recordedExecutionTunings.append(executionTuning)
+    }
+
     func snapshot() -> [String] { effects }
+    func executionTunings() -> [AgentAuthorityCampaignExecutionTuning?] {
+      recordedExecutionTunings
+    }
   }
 
   private struct RecordingRefusingDispatcher: RuntimeProcessDispatching {
     let log: DispatchLog
     func unavailableReason(providerID _: String) -> String? { nil }
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-      await log.record(plan.action.effect.rawValue)
+      let executionTuning: AgentAuthorityCampaignExecutionTuning?
+      if case .hostManaged(let descriptor) = plan.kind {
+        executionTuning = descriptor.executionTuning
+      } else {
+        executionTuning = nil
+      }
+      await log.record(
+        effect: plan.action.effect.rawValue, executionTuning: executionTuning)
       throw RuntimeDispatchFailure.confirmedNotExecuted(
         "the engine-lane contract test proves no process was spawned")
     }
