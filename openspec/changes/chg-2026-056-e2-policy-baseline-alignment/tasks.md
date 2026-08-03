@@ -12,6 +12,7 @@
 - Depends on: maintainer review/merge approving `CHG-2026-056`; existing
   `CHG-2026-025@r15` remains the implementation provenance until archive/ratification
 - Allowed paths:
+  - `AGENTS.md`
   - `openspec/constitution.md`
   - `openspec/specs/flashing/spec.md`
   - `openspec/specs/workflow-journal-recovery/spec.md`
