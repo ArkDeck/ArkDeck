@@ -5,6 +5,20 @@ import Darwin
 import Foundation
 import XCTest
 
+/// Anti-hang bound for the fixtures below that hand a synchronous storage call
+/// to a background thread and wait for it to arrive somewhere. It is not a
+/// contract bound: the assertions after each wait decide the outcome, and an
+/// expired wait reports only that the host never got there.
+///
+/// Five seconds sat inside the noise of a saturated
+/// `swift test --parallel --num-workers 8` run. The winner of these races does
+/// nine directory fsyncs at the end of `SessionStore.createSession`, or write +
+/// fsync + rename + parent fsync in `SessionArtifactStore.publish`, on the same
+/// volume every other worker is writing to, so seconds of real stall are
+/// ordinary under that load. This is set far above any stall observed there and
+/// still fails a genuine deadlock well inside one test.
+private let storageRendezvousTimeout: TimeInterval = 60
+
 final class SessionArtifactStorageContractTests: XCTestCase {
   func testChatAuthorityV22ManifestJournalAndExportRemainTruthful() async throws {
     let reference = try historicalChatAuthority(
@@ -2738,7 +2752,8 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       faultInjector: SessionStorageFaultInjector { point in
         guard point == .manifestWrite else { return }
         manifestPaused.signal()
-        guard allowManifest.wait(timeout: .now() + 5) == .success else {
+        guard allowManifest.wait(timeout: .now() + storageRendezvousTimeout) == .success
+        else {
           throw StorageContractFault.operation
         }
       })
@@ -2767,6 +2782,9 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       allowManifest.signal()
       return XCTFail("Artifact writer did not reach the shared publication barrier")
     }
+    // Deliberately short, and deliberately not the rendezvous bound: this
+    // asserts the Artifact writer is still parked behind the shared lock, so
+    // load can only make it more certain. Widening it would only slow the test.
     XCTAssertEqual(artifactFinished.wait(timeout: .now() + 0.1), .timedOut)
     allowManifest.signal()
     let manifestWait = await waitForSemaphore(manifestFinished)
@@ -3231,7 +3249,8 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     let raceFault = SessionStorageFaultInjector { point in
       guard point == .sessionBeforeRootCreate else { return }
       reachedRootCreate.signal()
-      guard allowRootCreate.wait(timeout: .now() + 5) == .success else {
+      guard allowRootCreate.wait(timeout: .now() + storageRendezvousTimeout) == .success
+      else {
         throw StorageContractFault.operation
       }
     }
@@ -4592,7 +4611,8 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       faultInjector: SessionStorageFaultInjector { point in
         guard point == .manifestWrite else { return }
         publisherPaused.signal()
-        guard resumePublisher.wait(timeout: .now() + 5) == .success else {
+        guard resumePublisher.wait(timeout: .now() + storageRendezvousTimeout) == .success
+        else {
           throw StorageContractFault.operation
         }
       })
@@ -4600,7 +4620,7 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       defer { publisherFinished.signal() }
       publisherResult.store(Result { try publisher.publish(manifest) })
     }
-    XCTAssertEqual(publisherPaused.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(publisherPaused.wait(timeout: .now() + storageRendezvousTimeout), .success)
     DispatchQueue.global().async {
       defer { appendFinished.signal() }
       appendResult.store(
@@ -4612,10 +4632,12 @@ final class SessionArtifactStorageContractTests: XCTestCase {
               timestamp: SessionStorageFixtures.timestamp, executionMode: "simulated"))
         })
     }
+    // Short on purpose, as above: this asserts the append is still blocked
+    // behind the journal boundary, which host load can only reinforce.
     XCTAssertEqual(appendFinished.wait(timeout: .now() + 0.1), .timedOut)
     resumePublisher.signal()
-    XCTAssertEqual(publisherFinished.wait(timeout: .now() + 5), .success)
-    XCTAssertEqual(appendFinished.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(publisherFinished.wait(timeout: .now() + storageRendezvousTimeout), .success)
+    XCTAssertEqual(appendFinished.wait(timeout: .now() + storageRendezvousTimeout), .success)
     guard case .success? = publisherResult.load() else {
       return XCTFail("Manifest publisher did not complete while holding the journal boundary")
     }
@@ -5206,7 +5228,8 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       faultInjector: SessionStorageFaultInjector { point in
         guard point == .artifactWrite else { return }
         winnerPaused.signal()
-        guard allowWinner.wait(timeout: .now() + 5) == .success else {
+        guard allowWinner.wait(timeout: .now() + storageRendezvousTimeout) == .success
+        else {
           throw StorageContractFault.operation
         }
       })
@@ -6022,7 +6045,8 @@ extension SessionArtifactStorageContractTests {
   {
     await withCheckedContinuation { continuation in
       DispatchQueue.global().async {
-        continuation.resume(returning: semaphore.wait(timeout: .now() + 5))
+        continuation.resume(
+          returning: semaphore.wait(timeout: .now() + storageRendezvousTimeout))
       }
     }
   }
