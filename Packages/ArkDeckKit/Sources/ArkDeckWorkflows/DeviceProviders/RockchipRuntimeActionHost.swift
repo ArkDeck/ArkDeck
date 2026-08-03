@@ -370,12 +370,14 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private let usbProbe: any RockchipRuntimeUSBProbing
   private let stage: RockchipRuntimeStaging
   private let readback: any RockchipRuntimePartitionReadbackVerifying
+  private let enterLoaderReadbackTimeoutSeconds: Int
 
   init(
     hdcResolver: any RuntimeExecutableResolving,
     runner: any RockchipRuntimeCommandRunning = FoundationRockchipRuntimeCommandRunner(),
     usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
+    enterLoaderReadbackTimeoutSeconds: Int = 45,
     stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
       guard
         let profile = RockchipFlashProfile.profile(
@@ -407,6 +409,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     self.runner = runner
     self.usbProbe = usbProbe
     self.stage = stage
+    self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
     self.readback =
       readback ?? FoundationRockchipRuntimePartitionReadback(runner: runner)
   }
@@ -429,14 +432,54 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     switch action {
     case .enterLoader(let connectKey):
       let hdc = try resolveHDC()
-      let receipt = try await run(
-        executable: hdc,
-        arguments: ["-t", connectKey, "shell", "reboot", "loader"],
-        timeoutSeconds: 20,
-        budget: 64 * 1024,
-        effectMayHaveOccurred: true)
-      return result(
-        summary: ["transition": "normal-to-loader"], receipts: [receipt])
+      var hdcReceipt: ProviderSubprocessReceipt?
+      var unresolvedHDCFailure: RuntimeDispatchFailure?
+      do {
+        let receipt = try await runner.run(
+          executable: hdc,
+          arguments: ["-t", connectKey, "shell", "reboot", "loader"],
+          timeoutSeconds: 20,
+          outputByteBudget: 64 * 1024,
+          criticalNonInterruptible: false)
+        hdcReceipt = receipt
+        let clean =
+          receipt.exitStatus == 0 && !receipt.stdoutTruncated && receipt.stderr.isEmpty
+        if !clean {
+          unresolvedHDCFailure = .outcomeUnknown(
+            "HDC reboot-loader returned no clean semantic receipt")
+        }
+      } catch let failure as RuntimeDispatchFailure {
+        // A failed runner dispatch is known to be pre-spawn and therefore has
+        // zero device effect. Every other thrown runner result is unresolved
+        // until the exact Loader readback below settles it.
+        if case .failed = failure { throw failure }
+        unresolvedHDCFailure = failure
+      } catch {
+        unresolvedHDCFailure = .outcomeUnknown(
+          "HDC reboot-loader dispatch outcome was unobservable: \(error)")
+      }
+
+      do {
+        let (_, loaderReceipt) = try await waitForLoader(
+          stableIdentitySHA256: descriptor.expectedIdentitySHA256,
+          rockchipExecutable: rockchipExecutable,
+          timeoutSeconds: enterLoaderReadbackTimeoutSeconds)
+        var receipts = hdcReceipt.map { [$0] } ?? []
+        receipts.append(loaderReceipt)
+        return result(
+          summary: [
+            "transition": "normal-to-loader",
+            "transitionEvidence": "exact-bound-loader-readback",
+          ],
+          receipts: receipts)
+      } catch {
+        if let unresolvedHDCFailure { throw unresolvedHDCFailure }
+        // Even exit 0 is not the semantic boundary for a command whose
+        // success disconnects its transport. Without the exact bound Loader
+        // postcondition, the mutation remains unknown and cannot be replayed.
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "HDC reboot-loader exited but the exact bound Loader was not observed")
+      }
 
     case .waitForHDCDisconnect(let connectKey):
       let receipts = try await waitForHDC(
