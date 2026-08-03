@@ -121,7 +121,10 @@ let package = Package(
     ),
     .executableTarget(
       name: "ArkDeckRuntimeSoakFixture",
-      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
+      dependencies: [
+        "ArkDeckAgentClient", "ArkDeckAgentDaemon", "ArkDeckCore", "ArkDeckOpenHarmony",
+        "ArkDeckStorage", "ArkDeckWorkflows",
+      ],
       path: "Tests/ArkDeckRuntimeSoakFixture"
     ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),

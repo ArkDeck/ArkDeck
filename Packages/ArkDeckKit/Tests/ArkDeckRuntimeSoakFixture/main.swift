@@ -10,6 +10,8 @@
 // mix of successful, cancelled and restart-recovered observations, and writes
 // an atomically replaced metrics snapshot after every cycle.
 
+import ArkDeckAgentClient
+import ArkDeckAgentDaemon
 import ArkDeckCore
 import ArkDeckOpenHarmony
 import ArkDeckStorage
@@ -81,6 +83,7 @@ private enum SoakFixtureError: Error, LocalizedError {
   case tornJournal(String)
   case missingArtifactEvidence(String)
   case outstandingCleanupDebt(Int)
+  case protocolFailure(String)
 
   var errorDescription: String? {
     switch self {
@@ -94,6 +97,7 @@ private enum SoakFixtureError: Error, LocalizedError {
       return "successful job \(jobID) has no verified Artifact evidence"
     case .outstandingCleanupDebt(let count):
       return "\(count) cleanup-debt records remain after final recovery"
+    case .protocolFailure(let message): return message
     }
   }
 }
@@ -192,7 +196,7 @@ private func currentUTC() -> String {
 
 private func makeEngine(
   configuration: SoakConfiguration
-) throws -> (RuntimeJobEngine, SimulatedHDCDispatcher, RuntimeArtifactStore) {
+) throws -> (RuntimeJobEngine, SimulatedHDCDispatcher, RuntimeArtifactStore, RuntimeCapabilityStore) {
   let dispatcher = SimulatedHDCDispatcher()
   let capabilities = try RuntimeCapabilityStore(
     directoryURL: configuration.stateDirectory.appendingPathComponent(
@@ -209,7 +213,56 @@ private func makeEngine(
     capabilityStore: capabilities,
     artifactStore: artifacts,
     nowUTC: currentUTC)
-  return (engine, dispatcher, artifacts)
+  return (engine, dispatcher, artifacts, capabilities)
+}
+
+private func startDaemon(
+  configuration: SoakConfiguration,
+  engine: RuntimeJobEngine,
+  capabilities: RuntimeCapabilityStore,
+  artifacts: RuntimeArtifactStore
+) throws -> AgentDaemonServer {
+  let handler = RuntimeControlPlaneHandler(
+    engine: engine,
+    capabilityStore: capabilities,
+    providerIDs: ["hdc"],
+    nowUTC: currentUTC,
+    artifactStore: artifacts)
+  // Keep the Unix-domain socket path short enough for Darwin's 104-byte
+  // `sun_path` limit even when the caller chooses a descriptive temporary
+  // soak directory.  The server owns only transport state; the engine state
+  // remains at the parent directory and therefore survives this restart.
+  let server = AgentDaemonServer(
+    stateDirectory: configuration.stateDirectory.appendingPathComponent("d", isDirectory: true),
+    handler: handler,
+    nowUTC: currentUTC)
+  guard try server.start() == .started else {
+    throw SoakFixtureError.protocolFailure("soak daemon did not acquire its instance lock")
+  }
+  return server
+}
+
+private func submittedJobID(_ client: AgentClient, request: Data) throws -> String {
+  guard
+    case .object(let fields) = try client.request(
+      method: "job.submit",
+      params: ["requestJson": .string(String(decoding: request, as: UTF8.self))]),
+    case .string(let jobID)? = fields["jobId"]
+  else {
+    throw SoakFixtureError.protocolFailure("daemon returned no job id for submitted soak request")
+  }
+  return jobID
+}
+
+private func runJob(_ client: AgentClient, jobID: String) throws -> String {
+  guard
+    case .object(let fields) = try client.request(
+      method: "job.run", params: ["jobId": .string(jobID)]),
+    case .string(let state)? = fields["state"]
+  else {
+    throw SoakFixtureError.protocolFailure("daemon returned no job state for \(jobID)")
+  }
+  return state
 }
 
 private func observationRequest(runID: String, cycle: Int, offset: Int) -> Data {
@@ -252,28 +305,32 @@ private func executeCycle(
   cycle: Int,
   createNewJobs: Bool
 ) async throws -> (recovered: Int, dispatches: Int) {
-  let (engine, dispatcher, _) = try makeEngine(configuration: configuration)
+  let (engine, dispatcher, artifacts, capabilities) = try makeEngine(configuration: configuration)
+  let daemon = try startDaemon(
+    configuration: configuration, engine: engine, capabilities: capabilities, artifacts: artifacts)
+  defer { daemon.drainAndStop(deadline: 5) }
+  let client = AgentClient(socketPath: daemon.socketURL.path)
   let recovered = try await runRecoveredJobs(engine)
   guard createNewJobs else {
     return (recovered, await dispatcher.commandCount())
   }
 
   for offset in 0..<configuration.jobsPerCycle {
-    let accepted = try await engine.submit(
-      observationRequest(runID: runID, cycle: cycle, offset: offset))
+    let jobID = try submittedJobID(
+      client, request: observationRequest(runID: runID, cycle: cycle, offset: offset))
     // Cancel one deterministic job per eleven.  The following run persists
     // the cancellation outcome; other cycles leave a deterministic job in
     // preflight so the next fresh Runtime has to recover it from disk.
     if offset % 11 == 0 {
-      try await engine.requestCancel(jobID: accepted.jobID)
-      let status = try await engine.run(jobID: accepted.jobID)
-      guard status.state == JobState.cancelled.rawValue else {
-        throw SoakFixtureError.unexpectedState(jobID: status.jobID, state: status.state)
+      _ = try client.request(method: "job.cancel", params: ["jobId": .string(jobID)])
+      let state = try runJob(client, jobID: jobID)
+      guard state == JobState.cancelled.rawValue else {
+        throw SoakFixtureError.unexpectedState(jobID: jobID, state: state)
       }
     } else if offset % 7 != 0 {
-      let status = try await engine.run(jobID: accepted.jobID)
-      guard status.state == JobState.succeeded.rawValue else {
-        throw SoakFixtureError.unexpectedState(jobID: status.jobID, state: status.state)
+      let state = try runJob(client, jobID: jobID)
+      guard state == JobState.succeeded.rawValue else {
+        throw SoakFixtureError.unexpectedState(jobID: jobID, state: state)
       }
     }
   }
@@ -330,7 +387,7 @@ private func jobStateCounts(_ engine: RuntimeJobEngine) async throws -> [String:
 private func verifyTerminalState(
   configuration: SoakConfiguration
 ) async throws -> (states: [String: Int], verifiedArtifactJobs: Int) {
-  let (engine, _, artifacts) = try makeEngine(configuration: configuration)
+  let (engine, _, artifacts, _) = try makeEngine(configuration: configuration)
   _ = try await runRecoveredJobs(engine)
   let states = try await jobStateCounts(engine)
   let cleanupDebt = try await engine.listCleanupDebt()
@@ -386,7 +443,7 @@ private func collectMetrics(
   dispatches: Int,
   verifiedArtifactJobs: Int? = nil
 ) async throws -> SoakMetrics {
-  let (engine, _, _) = try makeEngine(configuration: configuration)
+  let (engine, _, _, _) = try makeEngine(configuration: configuration)
   let states = try await jobStateCounts(engine)
   let cleanupDebt = try await engine.listCleanupDebt()
   let active = states.reduce(into: 0) { count, entry in
