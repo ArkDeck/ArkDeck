@@ -1179,8 +1179,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let cases: [(TypedProviderAction, TypedProviderAction)] = [
       (
         .rockchip(.enterLoader(connectKey: "device-1")),
-        .rockchip(.waitForLoader(
-          stableIdentitySHA256: String(repeating: "a", count: 64)))
+        .rockchip(.waitForHDCReconnect(connectKey: "device-1"))
       ),
       (
         .rockchip(.flashPartitions(bundle)),
@@ -1215,7 +1214,15 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             "rockchip-runtime/job-reconcile/\(context.stepID)/receipt.json"),
         intent: reference,
         context: context)
-      guard case .confirmedCompleted = outcome else {
+      if index == 0 {
+        guard case .confirmedNotExecuted = outcome else {
+          return XCTFail(
+            "exact HDC-normal readback must settle enter-loader as not completed, got \(outcome)")
+        }
+      } else if case .confirmedCompleted = outcome {
+        // The flash/readback and reboot/normal pairs prove their positive
+        // postconditions rather than the negative enter-loader postcondition.
+      } else {
         return XCTFail("dedicated readback must confirm completion, got \(outcome)")
       }
     }

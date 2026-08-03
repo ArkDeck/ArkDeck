@@ -2854,12 +2854,19 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
   ) throws -> TypedProcessPlan? {
     let action: TypedProviderAction
     switch intent.action {
-    case .rockchip(.enterLoader):
-      guard let identity = context.expectedIdentitySHA256 else {
+    case .rockchip(.enterLoader(let persistedConnectKey)):
+      guard let connectKey = context.connectKey, !connectKey.isEmpty,
+        connectKey == persistedConnectKey
+      else {
         throw DeviceProviderError.factsUnavailable(
-          "Loader transition recovery has no stable target identity")
+          "Loader transition recovery has no matching descriptor-bound HDC target")
       }
-      action = .rockchip(.waitForLoader(stableIdentitySHA256: identity))
+      // The original command's intended postcondition was Loader. If the
+      // exact same binding/connect key is freshly reachable in HDC-normal,
+      // that postcondition is absent and this reversible transition did not
+      // complete. Confirming that negative is what lets the engine finalize
+      // the parked job without ever replaying its reboot command.
+      action = .rockchip(.waitForHDCReconnect(connectKey: connectKey))
     case .rockchip(.flashPartitions(let bundle)):
       action = .rockchip(.verifyFlashReadback(bundle))
     case .rockchip(.rebootToNormal):
@@ -2886,6 +2893,9 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       receipt: receipt, action: plan.action, context: context)
     {
     case .verified(let summary):
+      if case .rockchip(.enterLoader) = intent.action {
+        return .confirmedNotExecuted
+      }
       return .confirmedCompleted(summary: summary)
     case .failed(let code, let detail):
       return .stillUnknown(
