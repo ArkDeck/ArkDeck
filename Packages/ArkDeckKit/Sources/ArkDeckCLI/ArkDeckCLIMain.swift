@@ -91,72 +91,39 @@ struct ArkDeckCommandLine {
 
   // MARK: reconcile
 
-  /// Host-side recovery report for interrupted flash sessions. Zero device
-  /// dispatch: reads session journals and the usage ledgers, and in
-  /// `--mode close` writes only the honest terminal on an orphaned
-  /// standing-authorization reservation. Exit 4 while anything stays
-  /// unresolved so scripts can observe the recovery debt.
+  /// Host-side recovery report for interrupted flash sessions. Read-only and
+  /// zero device dispatch: it decodes session journals and the campaign usage
+  /// ledger and prints what is still unresolved.
+  ///
+  /// It no longer writes terminals. `--mode close` existed to close orphaned
+  /// standing-authorization reservations; that lane and its ledger were retired
+  /// (T25/W3), and every remaining unresolved item is drained by
+  /// `arkdeck flash continue`, whose own reconciliation closes the campaign
+  /// reservation. A close verb that can no longer close anything would report
+  /// work it never did, so it is gone rather than kept as a no-op.
+  /// Exit 4 while anything stays unresolved, so scripts still observe the debt.
   static func runFlashReconcile(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
-    try options.validateAllowed(["--mode", "--session"])
-    let mode = options.value("--mode") ?? "report"
-    guard mode == "report" || mode == "close" else {
-      throw CLIError(exitCode: EX_USAGE, message: "--mode must be report or close")
-    }
+    try options.validateAllowed(["--session"])
     let reconciler = try RockchipFlashSessionReconciler.production()
 
     if let sessionID = options.value("--session") {
-      var finding = try reconciler.inspect(sessionID: sessionID)
+      let finding = try reconciler.inspect(sessionID: sessionID)
       printFlashFinding(finding)
-      if mode == "close", finding.requiresAttention {
-        printFlashClosure(try reconciler.close(finding))
-        finding = try reconciler.inspect(sessionID: sessionID)
-      }
       guard !finding.requiresAttention else {
         throw CLIError(exitCode: 4, message: "unresolved flash session \(sessionID)")
       }
       return
     }
 
-    var findings = try reconciler.scan()
-    var orphans = try reconciler.orphanedReservations()
+    let findings = try reconciler.scan()
+    let orphans = try reconciler.orphanedReservations()
     guard !findings.isEmpty || !orphans.isEmpty else {
       print("no unresolved flash sessions")
       return
     }
-    for finding in findings {
-      printFlashFinding(finding)
-      if mode == "close" {
-        printFlashClosure(try reconciler.close(finding))
-      }
-    }
-    for orphan in orphans {
-      printFlashOrphan(orphan)
-      if mode == "close" {
-        printFlashOrphanClosure(try reconciler.closeOrphan(orphan))
-      }
-    }
-    if mode == "close" {
-      findings = try reconciler.scan()
-      orphans = try reconciler.orphanedReservations()
-      guard !findings.isEmpty || !orphans.isEmpty else { return }
-      // Exit 4 while closable debt remains; exit 6 when everything left
-      // needs a different verb (campaign lane, corrupt journal, missing
-      // reservation) so scripts can tell "run close again" from "this
-      // tool cannot drain the rest".
-      let closable =
-        findings.contains { finding in
-          if case .openStandingReservation = finding.ledgerState { return true }
-          return false
-        } || orphans.contains { $0.lane == .standingAuthorization }
-      guard closable else {
-        throw CLIError(
-          exitCode: 6,
-          message:
-            "\(findings.count + orphans.count) unresolved flash item(s) need another verb "
-            + "(campaign lane or unreadable linkage)")
-      }
-    }
+    for finding in findings { printFlashFinding(finding) }
+    for orphan in orphans { printFlashOrphan(orphan) }
     throw CLIError(
       exitCode: 4,
       message: "\(findings.count + orphans.count) unresolved flash item(s)")
@@ -164,29 +131,16 @@ struct ArkDeckCommandLine {
 
   private static func printFlashOrphan(_ orphan: RockchipFlashOrphanedReservation) {
     print(
-      "orphaned reservation: \(orphan.reservationID) lane=\(orphan.lane.rawValue) "
-        + "job=\(orphan.jobID) reservedAt=\(orphan.reservedAt)")
+      "orphaned reservation: \(orphan.reservationID) job=\(orphan.jobID) "
+        + "reservedAt=\(orphan.reservedAt)")
     print("  no session directory accounts for this open reservation")
-    switch orphan.lane {
-    case .standingAuthorization:
-      print("  next: arkdeck flash reconcile --mode close")
-    case .agentCampaign:
-      if let campaignID = orphan.campaignID {
-        print("  next: arkdeck flash continue … (campaign \(campaignID))")
-      }
+    if let campaignID = orphan.campaignID {
+      print("  next: arkdeck flash continue … (campaign \(campaignID))")
     }
   }
 
-  private static func printFlashOrphanClosure(_ closure: RockchipFlashOrphanClosure) {
-    switch closure.disposition {
-    case .closedStandingReservation(let reservationID):
-      print("  closed: \(reservationID) terminal=outcomeUnknown (no journal survives)")
-    case .alreadyClosed(let reservationID):
-      print("  closed: \(reservationID) (already terminal)")
-    case .agentLaneDeferred(let reservationID):
-      print("  deferred: \(reservationID) belongs to the campaign lane (flash continue)")
-    }
-  }
+
+
 
   private static func printFlashFinding(_ finding: RockchipFlashSessionFinding) {
     var header = ["session: \(finding.sessionID)"]
@@ -216,9 +170,6 @@ struct ArkDeckCommandLine {
       print("  last confirmed step: \(lastConfirmed)")
     }
     switch finding.ledgerState {
-    case .openStandingReservation(let reservationID):
-      print("  authority: standing reservation=\(reservationID) (open)")
-      print("  next: arkdeck flash reconcile --mode close")
     case .openAgentReservation(let reservationID):
       print("  authority: campaign reservation=\(reservationID) (open)")
       if let campaignID = finding.campaignID {
@@ -234,20 +185,6 @@ struct ArkDeckCommandLine {
     }
   }
 
-  private static func printFlashClosure(_ closure: RockchipFlashSessionClosure) {
-    switch closure.disposition {
-    case .closedStandingReservation(let reservationID, let status):
-      print("  closed: \(reservationID) terminal=\(status.rawValue)")
-    case .alreadyClosed(let reservationID):
-      print("  closed: \(reservationID) (already terminal)")
-    case .agentLaneDeferred(let reservationID):
-      print("  deferred: \(reservationID) belongs to the campaign lane (flash continue)")
-    case .sessionLive:
-      print("  refused: a live run owns this session")
-    case .nothingToClose:
-      print("  nothing to close")
-    }
-  }
 
   // MARK: install-tool
 

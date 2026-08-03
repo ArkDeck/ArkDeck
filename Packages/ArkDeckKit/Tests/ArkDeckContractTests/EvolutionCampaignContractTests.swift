@@ -1413,13 +1413,6 @@ private struct FixedEvolutionClock: RockchipAdmissionClock {
 private struct RejectingEvolutionFacts: RockchipAuthorizationFactCollecting {
   func collect(
     request _: RockchipAuthorizationFactRequest,
-    grant _: VerifiedAuthorizationGrant
-  ) async throws -> RockchipTrustedAuthorizationFacts {
-    throw RockchipAuthorizationFactError.factPortFailed(name: "must-not-run")
-  }
-
-  func collect(
-    request _: RockchipAuthorizationFactRequest,
     expectation _: RockchipAuthorizationFactExpectation
   ) async throws -> RockchipTrustedAuthorizationFacts {
     throw RockchipAuthorizationFactError.factPortFailed(name: "must-not-run")

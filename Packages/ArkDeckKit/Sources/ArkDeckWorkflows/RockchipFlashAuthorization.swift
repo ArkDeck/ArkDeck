@@ -379,42 +379,6 @@ public struct RockchipFlashAuthorizationGate: Sendable {
       dispatchSnapshot: snapshot)
   }
 
-  /// Internal bridge for TASK-AIN-007. The trusted fact collector has already checked authority,
-  /// provenance, device identity, prerequisites and usage. This final check prevents a caller from
-  /// presenting that admission for a different plan. No command surface or intent is returned.
-  func authorizeUnattended(
-    admission: RockchipAuthorizedAgentAdmission,
-    plan: RockchipFlashPlan,
-    monitor: RockchipFlashDispatchMonitor
-  ) async -> RockchipAuthorizationDecision {
-    let snapshot = await monitor.snapshot()
-    var mismatchedFields: [String] = []
-    if plan.executionMode != .execute { mismatchedFields.append("executionMode") }
-    if plan.archiveSHA256 != admission.facts.plan.archiveSHA256 {
-      mismatchedFields.append("firmwareArchiveSha256")
-    }
-    if plan.planDigestSHA256 != admission.facts.plan.planDigestSHA256 {
-      mismatchedFields.append("planDigestSha256")
-    }
-    if plan.stepSetDigestSHA256 != admission.facts.plan.stepSetDigestSHA256 {
-      mismatchedFields.append("stepSetDigestSha256")
-    }
-    guard mismatchedFields.isEmpty else {
-      return RockchipAuthorizationDecision(
-        outcome: .blockedStandingAuthorizationMismatch(fields: mismatchedFields),
-        evidenceEligibility: .notEligible,
-        jobMarker: "standingAuthorizationMismatch",
-        dispatchSnapshot: snapshot)
-    }
-
-    return RockchipAuthorizationDecision(
-      outcome: .authorizedAgentAdmissionAccepted(
-        reservationID: admission.usageReservation.reservationID),
-      evidenceEligibility: .authorizedAgentAdmissionOnly,
-      jobMarker: "authorizedAgentAdmissionAccepted",
-      dispatchSnapshot: snapshot,
-      authorizationRef: admission.authorizationReference)
-  }
 }
 
 // MARK: - Critical-write safe boundary (AC-FLASH-008-01)
