@@ -344,7 +344,11 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
   }
 
   public func appendAndSynchronize(_ event: JournalEvent) throws {
-    let appendStarted = DispatchTime.now().uptimeNanoseconds
+    // The resource timings are a benchmark-only observation seam.  Do not
+    // make every production journal append pay for clock reads when no test
+    // has opted into those measurements.
+    let measuresAppend = appendMeasurementSink != nil
+    let appendStarted = measuresAppend ? DispatchTime.now().uptimeNanoseconds : 0
     try faultInjector.check(event.kind == .stepOutcome ? .outcomeAppend : .journalAppend)
     var data = try JournalEventCodec.encode(event)
     data.append(0x0A)
@@ -398,14 +402,17 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         try faultInjector.check(.journalWrite)
         try DurableFilePrimitives.writeAll(data, descriptor: descriptor, path: url.path)
         try faultInjector.check(.journalFileSync)
-        let fileSyncStarted = DispatchTime.now().uptimeNanoseconds
+        let fileSyncStarted = measuresAppend ? DispatchTime.now().uptimeNanoseconds : 0
         try DurableFilePrimitives.fullSync(descriptor, path: url.path)
-        let fileSyncNanoseconds = DispatchTime.now().uptimeNanoseconds - fileSyncStarted
+        let fileSyncNanoseconds = measuresAppend
+          ? DispatchTime.now().uptimeNanoseconds - fileSyncStarted
+          : 0
         try faultInjector.check(.journalDirectorySync)
-        let directorySyncStarted = DispatchTime.now().uptimeNanoseconds
+        let directorySyncStarted = measuresAppend ? DispatchTime.now().uptimeNanoseconds : 0
         try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
-        let directorySyncNanoseconds =
-          DispatchTime.now().uptimeNanoseconds - directorySyncStarted
+        let directorySyncNanoseconds = measuresAppend
+          ? DispatchTime.now().uptimeNanoseconds - directorySyncStarted
+          : 0
         var finalMetadata = stat()
         guard fstat(descriptor, &finalMetadata) == 0 else {
           throw DurableFileError.openFailed(path: url.path, errno: errno)
@@ -415,12 +422,14 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         appendState = currentState
         currentCursor.accept(event: event, encodedData: data, metadata: finalMetadata)
         appendCursor = currentCursor
-        appendMeasurementSink?(JournalAppendMeasurement(
-          validationBytesRead: validationBytesRead,
-          usedFullReplay: usedFullReplay,
-          fileSyncNanoseconds: fileSyncNanoseconds,
-          directorySyncNanoseconds: directorySyncNanoseconds,
-          totalAppendNanoseconds: DispatchTime.now().uptimeNanoseconds - appendStarted))
+        if let appendMeasurementSink {
+          appendMeasurementSink(JournalAppendMeasurement(
+            validationBytesRead: validationBytesRead,
+            usedFullReplay: usedFullReplay,
+            fileSyncNanoseconds: fileSyncNanoseconds,
+            directorySyncNanoseconds: directorySyncNanoseconds,
+            totalAppendNanoseconds: DispatchTime.now().uptimeNanoseconds - appendStarted))
+        }
       }
     } catch {
       if mutationStarted { poisoned = true }
