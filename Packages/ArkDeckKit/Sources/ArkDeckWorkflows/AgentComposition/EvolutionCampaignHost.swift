@@ -350,7 +350,10 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         disposition = .succeeded
       } else if terminal.status == .outcomeUnknown {
         disposition = .outcomeUnknown
-      } else if terminal.externalIntentEventIDs.isEmpty {
+      } else if terminal.externalIntentEventIDs.isEmpty
+        || Set(terminal.confirmedNotExecutedIntentEventIDs)
+          == Set(terminal.externalIntentEventIDs)
+      {
         disposition = .safeToReflash
       } else {
         disposition = .unsafePartial

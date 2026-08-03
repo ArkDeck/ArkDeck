@@ -364,6 +364,10 @@ extension RuntimeProcessDispatching {
 public enum RuntimeDispatchFailure: Error, Equatable, Sendable {
   /// The dispatcher cannot say whether the external effect happened.
   case outcomeUnknown(String)
+  /// Exact provider readback proved that the attempted external effect did
+  /// not happen. This remains a failed step, but its durable intent is safe
+  /// for a bounded campaign to retry after a fresh reservation/readback.
+  case confirmedNotExecuted(String)
   case failed(String)
 }
 
@@ -448,6 +452,8 @@ final class RuntimeIdempotencyLedger: @unchecked Sendable {
 // MARK: - Engine
 
 public actor RuntimeJobEngine {
+  private static let confirmedNotExecutedSemanticCode = "confirmedNotExecuted"
+
   public struct Configuration: Sendable {
     public let stateDirectory: URL
     public let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
@@ -1070,7 +1076,7 @@ public actor RuntimeJobEngine {
           for: current.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
         return status(of: current.record)
-      case .failed(let reason):
+      case .confirmedNotExecuted(let reason), .failed(let reason):
         // The state graph routes every terminal outcome through
         // finalizing: a job always gets its wrap-up phase, success or not.
         try transition(&current, from: .running, to: .finalizing, reason: reason)
@@ -1998,7 +2004,9 @@ public actor RuntimeJobEngine {
       receipt = try await dispatcher.dispatch(plan)
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
-      if case .outcomeUnknown = failure {
+      let confirmedNotExecuted: Bool
+      switch failure {
+      case .outcomeUnknown:
         // The intent is durable, but there is deliberately no invented
         // outcome. Recovery must resolve this exact outstanding intent by
         // readback; recording an outcomeUnknown stepOutcome would make the
@@ -2008,6 +2016,10 @@ public actor RuntimeJobEngine {
         current.record.recoveryStepID = step.stepID
         jobs[jobID] = current
         throw failure
+      case .confirmedNotExecuted:
+        confirmedNotExecuted = true
+      case .failed:
+        confirmedNotExecuted = false
       }
       try current.journal.appendAndSynchronize(
         JournalEvent.stepOutcome(
@@ -2016,9 +2028,14 @@ public actor RuntimeJobEngine {
           stepID: step.stepID, attempt: 1,
           correlatesToIntentEventID: intentEventID,
           result: "failed",
-          outcomeCertainty: .confirmed))
+          outcomeCertainty: .confirmed,
+          semanticCode: confirmedNotExecuted
+            ? Self.confirmedNotExecutedSemanticCode : nil))
       current.nextSequence += 1
-      current.record.timeline.append("failed \(step.stepID)")
+      current.record.timeline.append(
+        confirmedNotExecuted
+          ? "confirmed not executed \(step.stepID)"
+          : "failed \(step.stepID)")
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
       current.record.recoveryAction = nil
@@ -4806,13 +4823,14 @@ public actor RuntimeJobEngine {
     case .pending, .legacyUnverified:
       return
     }
-    let intents = mutationIntentEventIDs(for: record.jobID)
+    let intents = try mutationIntentEvidence(for: record.jobID)
     do {
       _ = try ledger.close(
         reservationID: evidence.reference,
         terminal: try AgentAuthorityUsageTerminal(
           status: status, closedAt: nowUTC(),
-          externalIntentEventIDs: intents))
+          externalIntentEventIDs: intents.all,
+          confirmedNotExecutedIntentEventIDs: intents.confirmedNotExecuted))
     } catch AuthorizationUsageLedgerError.reservationConflict {
       let existing = try? ledger.load().reservations.first {
         $0.reservationID == evidence.reference
@@ -4829,15 +4847,31 @@ public actor RuntimeJobEngine {
 
   /// The mutating intents this job durably journaled — what the campaign
   /// terminal must carry.
-  private func mutationIntentEventIDs(for jobID: String) -> [String] {
+  private func mutationIntentEvidence(
+    for jobID: String
+  ) throws -> (all: [String], confirmedNotExecuted: [String]) {
     let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
-    guard let replay = try? DurableJournalRecovery.inspect(url: journalURL) else { return [] }
+    let replay: JournalReplay
+    do {
+      replay = try DurableJournalRecovery.inspect(url: journalURL)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "campaign mutation journal is unavailable for \(jobID): \(error)")
+    }
     var identifiers: [String] = []
     for event in replay.events where event.kind == .stepIntent {
       guard let step = event.workflowStep, step.effect >= .deviceMutation else { continue }
       identifiers.append(event.eventID)
     }
-    return identifiers
+    let confirmed = Set(
+      replay.events.compactMap { event -> String? in
+        guard event.kind == .stepOutcome,
+          event.payload["semanticCode"]
+            == .string(Self.confirmedNotExecutedSemanticCode)
+        else { return nil }
+        return event.correlatedIntentEventID
+      })
+    return (identifiers, identifiers.filter(confirmed.contains))
   }
 
   private func recordCapabilityOutcome(
