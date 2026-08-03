@@ -3318,7 +3318,16 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   的零事件草稿 ledger 文档随 assertion 过期显式 GC，preview 与 execute/continue 入口
   机会式清扫，append-only/single-writer 不变量保持，设备 dispatch 仍为 0；r14 补齐
   GJ-4 分区回读、精确 build 与 Debug Runtime verification，并将串行预算提高到 16；
-  本实现 PR 不连接设备、不 dispatch Flash）
+  本实现 PR 不连接设备、不 dispatch Flash；r15 一次性收口三项遗留:①
+  `confirm-flash-intent` 从静默 no-op 变为 E2 授权断言点(capability/campaign
+  即人工确认,ADR-0004 低频审批点教义,零新交互门);② target facts port 停止
+  伪造 deviceMode/profileID(不可观测即报 unknown,不再把猜测写进 evidence);
+  ③ **campaign 授权首次接通 engine 车道**——请求 wire 新增可选
+  `campaignReservation`(2.x minor,与 capability 互斥),engine 准入逐项复验
+  预约内嵌确认 pins(目标身份/档案摘要/有效窗/序数预算),首个 mutation 前
+  以 `evolutionCampaignConfirmation` 证据落档,job 终态携 journal 化 mutation
+  intent 关闭预约;daemon 组合注入共享 AuthorizationUsage 台账,RPC 面零改动。
+  stack B 执行宿主的退役自此解锁为独立后续里程碑。真实设备 dispatch 仍为 0)
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001

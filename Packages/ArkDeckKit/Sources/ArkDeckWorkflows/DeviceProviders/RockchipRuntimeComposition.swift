@@ -262,9 +262,16 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       bindingRevision: target.bindingRevision,
       deviceIdentitySHA256: target.stablePhysicalIdentitySHA256,
       executionConnectKey: target.connectKey,
-      deviceMode: "hdc",
+      // This port reads the durable adoption record; it observes no live
+      // device. Facts it cannot observe are reported unknown, never
+      // fabricated: the previous "hdc"/"dayu200@1" literals were adoption-era
+      // guesses that flowed into evidence as if measured, and the real
+      // firmware profile (dayu200@2) contradicted one of them. Live mode and
+      // build truth belong to the per-action host's dedicated readbacks; the
+      // flash profile is pinned per-request by the `deviceProfile` input.
+      deviceMode: "unknown",
       buildFingerprint: nil,
-      profileID: "dayu200@1",
+      profileID: "unknown",
       collectedAtUTC: nowUTC())
   }
 }

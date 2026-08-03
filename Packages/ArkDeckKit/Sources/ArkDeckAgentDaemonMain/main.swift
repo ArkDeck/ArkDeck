@@ -395,12 +395,22 @@ Task.detached {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: utcNow)
+    // Campaign-lane E2 authority: the same owner-only AuthorizationUsage
+    // directory the campaign admission service reserves in — file plus flock
+    // makes the ledger safe across the CLI and daemon processes.
+    let usageRoot = try FileManager.default.url(
+      for: .applicationSupportDirectory, in: .userDomainMask,
+      appropriateFor: nil, create: true
+    )
+    .appendingPathComponent("ArkDeck", isDirectory: true)
+    .appendingPathComponent("AuthorizationUsage", isDirectory: true)
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: resolvedStateDirectory),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
+      agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
       nowUTC: utcNow)
     let bootstrap = DeviceBootstrapMachine(
       observation: ProviderBootstrapObservation(
