@@ -792,6 +792,40 @@ final class EvolutionCampaignContractTests: XCTestCase {
       document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition), [.succeeded])
   }
 
+  func testHostConstrainsRepeatedRepairToTheReadbackStartingMode() async throws {
+    let root = temporaryDirectory("campaign-mode-constraint")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    _ = try ledger.create(assertion)
+    let loaderOnly = try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: [.loader], loaderDiscoveryTimeoutSeconds: 46,
+      userdataImpact: "ERASE-USERDATA")
+    let flash = StartingModeMismatchThenSuccessEvolutionFlash(
+      ledger: ledger, now: Self.confirmedAt, rejectedStartingMode: "hdcNormal")
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger,
+      usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
+      repairer: RepeatingEvolutionRepairer(strategy: loaderOnly),
+      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+
+    let result = try await host.executeConfirmedCampaign(
+      confirmationDigestSHA256: assertion.confirmationDigestSHA256,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 1)
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertEqual(
+      document.events.compactMap(\.candidate).map(\.strategy.allowedStartingModes),
+      [[.loader], [.hdcNormal, .loader]])
+    XCTAssertEqual(document.reservedAttemptCount, 1)
+  }
+
   /// The engine lane's executor cannot mint its own reservation (#992: the
   /// engine re-verifies and closes, it never reserves), so the host runs the
   /// nine gates and mints it immediately before dispatch. This pins the
@@ -1316,6 +1350,19 @@ private struct ScriptedEvolutionRepairer: RockchipEvolutionStrategyRepairing {
   }
 }
 
+private struct RepeatingEvolutionRepairer: RockchipEvolutionStrategyRepairing {
+  let strategy: RockchipEvolutionTypedStrategy
+  let repairerID = "repeating-evolution-repairer"
+
+  func propose(
+    assertion _: RockchipEvolutionCampaignConfirmationAssertion,
+    observation _: RockchipEvolutionFailureObservation?,
+    priorCandidates _: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    strategy
+  }
+}
+
 private actor CapturingEvolutionRepairer: RockchipEvolutionStrategyRepairing {
   let baseline: RockchipEvolutionTypedStrategy
   let repaired: RockchipEvolutionTypedStrategy
@@ -1470,11 +1517,17 @@ private actor RejectingBeforeReservationEvolutionFlash: RockchipEvolutionFlashDi
 private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFlashDispatching {
   let ledger: RockchipEvolutionCampaignLedger
   let now: String
+  let rejectedStartingMode: String
   private var count = 0
 
-  init(ledger: RockchipEvolutionCampaignLedger, now: String) {
+  init(
+    ledger: RockchipEvolutionCampaignLedger,
+    now: String,
+    rejectedStartingMode: String = "loader"
+  ) {
     self.ledger = ledger
     self.now = now
+    self.rejectedStartingMode = rejectedStartingMode
   }
 
   func execute(
@@ -1486,7 +1539,8 @@ private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFl
     }
     count += 1
     if count == 1 {
-      throw RockchipFlashExecutionError.admissionRejected("startingModeNotAllowed:loader")
+      throw RockchipFlashExecutionError.admissionRejected(
+        "startingModeNotAllowed:\(rejectedStartingMode)")
     }
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
