@@ -1318,6 +1318,13 @@ private enum AgentAuthorityUsageValidation {
     }
     let reservationKeys = Set(AgentAuthorityUsageReservation.CodingKeys.allCases.map(\.rawValue))
     let terminalKeys = Set(AgentAuthorityUsageTerminal.CodingKeys.allCases.map(\.rawValue))
+    // `confirmedNotExecutedIntentEventIds` was added after schema 1.0.0 had
+    // already persisted terminals in production. The decoder gives its absent
+    // historical value the conservative empty set, so accept exactly that
+    // earlier closed shape too — never an arbitrary partial terminal.
+    let historicalTerminalKeys = terminalKeys.subtracting([
+      AgentAuthorityUsageTerminal.CodingKeys.confirmedNotExecutedIntentEventIDs.rawValue,
+    ])
     for value in reservations {
       guard case .object(let reservation) = value,
         Set(reservation.keys) == reservationKeys,
@@ -1336,7 +1343,9 @@ private enum AgentAuthorityUsageValidation {
             + "evolutionCampaignConfirmation")
       }
       if case .object(let terminal)? = reservation["terminal"] {
-        guard Set(terminal.keys) == terminalKeys else {
+        guard Set(terminal.keys) == terminalKeys
+          || Set(terminal.keys) == historicalTerminalKeys
+        else {
           throw AuthorizationUsageLedgerError.invalidRecord(
             "Agent authority terminal shape is not closed")
         }

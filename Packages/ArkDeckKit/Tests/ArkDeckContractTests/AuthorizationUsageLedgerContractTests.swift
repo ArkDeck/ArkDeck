@@ -71,6 +71,26 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
       from: JSONSerialization.data(withJSONObject: historical))
     XCTAssertEqual(decoded.externalIntentEventIDs, ["intent-enter-loader-mode"])
     XCTAssertEqual(decoded.confirmedNotExecutedIntentEventIDs, [])
+
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    let reservation = try e1Reservation(ordinal: 1, maximumUses: 1)
+    _ = try ledger.reserve(reservation)
+    _ = try ledger.close(reservationID: reservation.reservationID, terminal: terminal)
+    let ledgerURL = directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+    var reservations = try XCTUnwrap(document["reservations"] as? [[String: Any]])
+    var persistedTerminal = try XCTUnwrap(reservations[0]["terminal"] as? [String: Any])
+    persistedTerminal.removeValue(forKey: "confirmedNotExecutedIntentEventIds")
+    reservations[0]["terminal"] = persistedTerminal
+    document["reservations"] = reservations
+    try JSONSerialization.data(withJSONObject: document).write(to: ledgerURL)
+
+    let historicalLedger = try AgentAuthorityUsageLedger(root: directory)
+    let loaded = try XCTUnwrap(historicalLedger.load().reservations[0].terminal)
+    XCTAssertEqual(loaded.confirmedNotExecutedIntentEventIDs, [])
   }
 
   func testE1LedgerSerializesSameTargetAndRejectsCrossKindOrClosedReserve() throws {
