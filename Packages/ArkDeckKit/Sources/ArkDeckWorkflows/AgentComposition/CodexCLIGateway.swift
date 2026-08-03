@@ -53,13 +53,34 @@ public struct CodexCLIProcessTransport: HarnessCodexTransport {
   }
 
   public func send(_ request: HarnessCodexProcessRequest) async throws -> Data {
+    let fileManager = FileManager.default
+    let outputRoot = fileManager.temporaryDirectory.appending(
+      path: "arkdeck-codex-output-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let outputURL = outputRoot.appending(path: "last-message.json", directoryHint: .notDirectory)
+    do {
+      try fileManager.createDirectory(
+        at: outputRoot, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw HarnessDecisionGatewayError.transportFailure("codexOutputDirectoryUnavailable")
+    }
+    defer { try? fileManager.removeItem(at: outputRoot) }
+
+    // `codex exec` emits session diagnostics on stdout even with `--color
+    // never`.  Its final message is the only model payload, and the CLI's
+    // explicit output file keeps those diagnostics from becoming JSON input.
+    guard request.arguments.first == "exec" else {
+      throw HarnessDecisionGatewayError.transportFailure("codexExecRequired")
+    }
+    var arguments = request.arguments
+    arguments.insert(contentsOf: ["--output-last-message", outputURL.path], at: 1)
     let execution: ProcessIdentityBoundExecutionResult
     do {
       execution = try await executor.executeIdentityBound(
         ProcessIdentityBoundRequest(
           process: ProcessRequest(
             executable: URL(fileURLWithPath: request.executablePath),
-            arguments: request.arguments,
+            arguments: arguments,
             environment: ["NO_COLOR": "1"],
             workingDirectory: URL(fileURLWithPath: request.workingDirectory, isDirectory: true),
             timeout: TimeInterval(request.timeoutSeconds)),
@@ -71,10 +92,22 @@ public struct CodexCLIProcessTransport: HarnessCodexTransport {
     guard execution.execution.termination == .exited(0) else {
       throw HarnessDecisionGatewayError.transportFailure("codexProcessFailed")
     }
-    guard !execution.execution.stdout.wasTruncated else {
+    let size: Int64
+    do {
+      size = (try fileManager.attributesOfItem(atPath: outputURL.path)[.size] as? NSNumber)?
+        .int64Value ?? -1
+    } catch {
+      throw HarnessDecisionGatewayError.transportFailure("codexFinalMessageUnavailable")
+    }
+    guard size >= 0, size <= Int64(captureLimit) else {
       throw HarnessDecisionGatewayError.transportFailure("codexResponseTruncated")
     }
-    let response = execution.execution.stdout.data
+    let response: Data
+    do {
+      response = try Data(contentsOf: outputURL)
+    } catch {
+      throw HarnessDecisionGatewayError.transportFailure("codexFinalMessageUnavailable")
+    }
     guard !response.isEmpty else {
       throw HarnessDecisionGatewayError.transportFailure("codexResponseEmpty")
     }

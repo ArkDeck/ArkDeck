@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import XCTest
 
@@ -905,6 +906,40 @@ final class EvolutionCampaignContractTests: XCTestCase {
     } catch let error as RockchipEvolutionCampaignError {
       XCTAssertEqual(error, .reviewRejected("modelReject:AUTHORITY_SURFACE"))
     }
+  }
+
+  func testCodexProcessTransportReadsFinalMessageFileInsteadOfNoisyStandardOutput()
+    async throws
+  {
+    let root = temporaryDirectory("codex-final-message")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let executable = root.appending(path: "codex-fixture", directoryHint: .notDirectory)
+    let fixture = """
+      #!/bin/sh
+      output=''
+      while [ "$#" -gt 0 ]; do
+        if [ "$1" = '--output-last-message' ]; then
+          output="$2"
+          shift 2
+          continue
+        fi
+        shift
+      done
+      printf '%s' 'session diagnostic that is not JSON\n'
+      printf '%s' '{"result":"PASS","issues":[]}' > "$output"
+      """
+    try fixture.write(to: executable, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+    let digest = SHA256.hash(data: try Data(contentsOf: executable))
+      .map { String(format: "%02x", $0) }.joined()
+
+    let response = try await CodexCLIProcessTransport().send(
+      HarnessCodexProcessRequest(
+        executablePath: executable.path, executableSHA256: digest,
+        arguments: ["exec", "return JSON"], workingDirectory: root.path, timeoutSeconds: 10))
+
+    XCTAssertEqual(String(decoding: response, as: UTF8.self), "{\"result\":\"PASS\",\"issues\":[]}")
   }
 
   func testCandidateTargetAndSandboxHaveNoRuntimeDeviceNetworkOrRawProcessSurface() throws {
