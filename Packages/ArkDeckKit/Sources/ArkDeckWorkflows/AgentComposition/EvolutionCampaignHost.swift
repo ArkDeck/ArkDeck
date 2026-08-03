@@ -51,20 +51,7 @@ extension RockchipEvolutionFlashDispatching {
   public var attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)? { nil }
 }
 
-extension RockchipFlashExecutionHost: RockchipEvolutionFlashDispatching {
-  /// The in-process lane admits inside `execute`, so nothing is ever
-  /// pre-admitted for it and a supplied attempt would mean a double reserve.
-  public func execute(
-    _ request: RockchipFlashExecutionRequest,
-    admitted: RockchipEvolutionCampaignAdmittedAttempt?
-  ) async throws -> RockchipFlashExecutionResult {
-    guard admitted == nil else {
-      throw RockchipFlashExecutionError.admissionRejected(
-        "the in-process lane mints its own reservation; it cannot accept a pre-admitted attempt")
-    }
-    return try await execute(request)
-  }
-}
+
 
 /// E0 preview. It hashes the complete published archive, protected-main base,
 /// candidate toolchain, running broker and durable stable target. It creates a
@@ -129,16 +116,10 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   private let flash: any RockchipEvolutionFlashDispatching
   private let nowUTC: @Sendable () -> String
 
-  public convenience init(environment: [String: String] = ProcessInfo.processInfo.environment)
-    throws
-  {
-    try self.init(
-      flash: RockchipFlashExecutionHost(), environment: environment)
-  }
-
-  /// The execution lane is the one composition decision a caller makes. The
-  /// production entry points name the engine lane explicitly; the in-process
-  /// default above remains for the standing-authorization route and for tests.
+  /// There is no default execution lane. A campaign attempt runs on the
+  /// runtime job lane and nowhere else: the in-process flash executor this
+  /// used to default to has been retired (T25), and re-adding a default is
+  /// how a second execution stack comes back.
   public convenience init(
     flash: any RockchipEvolutionFlashDispatching,
     environment: [String: String] = ProcessInfo.processInfo.environment
@@ -217,6 +198,18 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
 
   public func status(_ campaignID: String) throws -> RockchipEvolutionCampaignDocument {
     try ledger.load(campaignID)
+  }
+
+  /// Reading a campaign's own ledger needs no execution lane, no repairer and
+  /// no reviewer — only the durable document. Keeping this off the
+  /// dispatcher-bearing initializer means `flash status` cannot be the reason
+  /// a default execution lane comes back.
+  public static func status(
+    campaignID: String
+  ) throws -> RockchipEvolutionCampaignDocument {
+    let roots = try RockchipEvolutionProductRoots.load()
+    return try RockchipEvolutionCampaignLedger(root: roots.campaignLedgerRoot)
+      .load(campaignID)
   }
 
   private func execute(

@@ -1,10 +1,10 @@
-// Provider adapters over the existing execution stacks (CHG-2026-047, T05).
+// Provider adapters over the runtime's execution stack (CHG-2026-047, T05).
 //
-// Compat-first: neither adapter builds a second state machine. The HDC
-// adapter composes the existing observation surfaces behind injected
-// ports (the production composition arrives with the MU-3 walking
-// skeleton); the Rockchip adapter wraps RockchipFlashExecutionHost whole,
-// keeping its proven journal/manifest/recovery semantics authoritative.
+// Neither adapter builds a second state machine. The HDC adapter composes the
+// existing observation surfaces behind injected ports; the Rockchip adapter
+// lowers each typed action for the engine's per-action host. It used to wrap
+// the in-process RockchipFlashExecutionHost whole — that host was retired in
+// T25, and the engine is now the only thing that executes flash.dayu200@1.
 
 import ArkDeckCore
 import ArkDeckOpenHarmony

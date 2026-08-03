@@ -3333,7 +3333,14 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   新增 `EngineLaneEvolutionFlashDispatcher`(CLI 组合根)经 artifact 导入取
   lease、组 `flash.dayu200@1` 请求携 `campaignReservation`、submit/run 到终态,
   outcomeUnknown 既不降级为失败也不升级为成功;standing 车道与 E2 授权语义零
-  变化,本 PR 纯执行车道搬迁。真实设备 dispatch 仍为 0)
+  变化,本 PR 纯执行车道搬迁。真实设备 dispatch 仍为 0;r17(T25)退役 stack B
+  执行宿主:`RockchipFlashExecutionHost`/`RockchipFlashExecutor`/进程口/持久化/
+  生命周期/postflight/lowering 与 legacy enter-loader 恢复全部删除(净 -4,700 行),
+  `flash.dayu200@1` 自此只有 engine 一处执行;standing 车道改为引导路径
+  (`capability draft` → merged PR 回填 → install → `job submit`,不做自动翻译,
+  否则等于 agent 自铸 capability);九门准入服务与 staging 保留——engine 车道
+  正用(实测复核后修正了「删除 staging」的原计划);campaign host 不再有默认执行
+  车道。真实设备 dispatch 仍为 0)
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、POL-AGENT-001、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
