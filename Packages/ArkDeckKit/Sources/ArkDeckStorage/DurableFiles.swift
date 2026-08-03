@@ -1,6 +1,7 @@
 import ArkDeckCore
 import CryptoKit
 import Darwin
+import Dispatch
 import Foundation
 
 public enum DurabilityFaultPoint: String, CaseIterable, Sendable {
@@ -225,6 +226,18 @@ private struct JournalAppendCursor {
   }
 }
 
+/// Per-append measurements used only by the durable-journal performance
+/// contract.  Keeping this internal prevents benchmark instrumentation from
+/// becoming a Runtime API while still making the hot-path guarantees
+/// inspectable in the package's test target.
+struct JournalAppendMeasurement: Equatable, Sendable {
+  let validationBytesRead: Int
+  let usedFullReplay: Bool
+  let fileSyncNanoseconds: UInt64
+  let directorySyncNanoseconds: UInt64
+  let totalAppendNanoseconds: UInt64
+}
+
 public final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
   public let url: URL
   private let lock = NSLock()
@@ -234,11 +247,21 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
   private var poisoned = false
   private let boundDevice: dev_t
   private let boundInode: ino_t
+  private let appendMeasurementSink: ((JournalAppendMeasurement) -> Void)?
 
-  public init(url: URL, faultInjector: DurabilityFaultInjector = .none) throws {
+  public convenience init(url: URL, faultInjector: DurabilityFaultInjector = .none) throws {
+    try self.init(url: url, faultInjector: faultInjector, appendMeasurementSink: nil)
+  }
+
+  init(
+    url: URL,
+    faultInjector: DurabilityFaultInjector = .none,
+    appendMeasurementSink: ((JournalAppendMeasurement) -> Void)?
+  ) throws {
     try DurableFilePrimitives.requireAbsoluteFileURL(url)
     self.url = url
     self.faultInjector = faultInjector
+    self.appendMeasurementSink = appendMeasurementSink
     try DurableFilePrimitives.createDirectoryIfNeeded(url.deletingLastPathComponent())
     let inspection = try SessionTerminalPublicationLock.withExclusive(
       in: url.deletingLastPathComponent()
@@ -321,6 +344,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
   }
 
   public func appendAndSynchronize(_ event: JournalEvent) throws {
+    let appendStarted = DispatchTime.now().uptimeNanoseconds
     try faultInjector.check(event.kind == .stepOutcome ? .outcomeAppend : .journalAppend)
     var data = try JournalEventCodec.encode(event)
     data.append(0x0A)
@@ -351,10 +375,17 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         try requireBoundJournal(metadata)
         var currentState: JournalAppendValidationState
         var currentCursor: JournalAppendCursor
-        if appendCursor.matches(metadata), try appendCursor.validatesTail(on: descriptor, path: url.path) {
+        var validationBytesRead = 0
+        var usedFullReplay = false
+        if appendCursor.matches(metadata),
+          try appendCursor.validatesTail(on: descriptor, path: url.path)
+        {
+          validationBytesRead = appendCursor.lastRecordLength
           currentState = appendState
           currentCursor = appendCursor
         } else {
+          usedFullReplay = true
+          validationBytesRead = Int(metadata.st_size)
           let inspection = try DurableJournalRecovery.inspect(
             openFileDescriptor: descriptor, path: url.path)
           try requireBoundJournal(inspection.metadata)
@@ -367,9 +398,14 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         try faultInjector.check(.journalWrite)
         try DurableFilePrimitives.writeAll(data, descriptor: descriptor, path: url.path)
         try faultInjector.check(.journalFileSync)
+        let fileSyncStarted = DispatchTime.now().uptimeNanoseconds
         try DurableFilePrimitives.fullSync(descriptor, path: url.path)
+        let fileSyncNanoseconds = DispatchTime.now().uptimeNanoseconds - fileSyncStarted
         try faultInjector.check(.journalDirectorySync)
+        let directorySyncStarted = DispatchTime.now().uptimeNanoseconds
         try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
+        let directorySyncNanoseconds =
+          DispatchTime.now().uptimeNanoseconds - directorySyncStarted
         var finalMetadata = stat()
         guard fstat(descriptor, &finalMetadata) == 0 else {
           throw DurableFileError.openFailed(path: url.path, errno: errno)
@@ -379,6 +415,12 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         appendState = currentState
         currentCursor.accept(event: event, encodedData: data, metadata: finalMetadata)
         appendCursor = currentCursor
+        appendMeasurementSink?(JournalAppendMeasurement(
+          validationBytesRead: validationBytesRead,
+          usedFullReplay: usedFullReplay,
+          fileSyncNanoseconds: fileSyncNanoseconds,
+          directorySyncNanoseconds: directorySyncNanoseconds,
+          totalAppendNanoseconds: DispatchTime.now().uptimeNanoseconds - appendStarted))
       }
     } catch {
       if mutationStarted { poisoned = true }

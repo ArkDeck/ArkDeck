@@ -1,5 +1,5 @@
 import ArkDeckCore
-import ArkDeckStorage
+@testable import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin
 import Dispatch
@@ -24,12 +24,22 @@ final class JournalRecoveryContractTests: XCTestCase {
       XCTAssertLessThan(
         measurement.recoveryNanoseconds, UInt64(5_000_000_000),
         "a \(historicalEventCount)-event journal must remain recoverable within the restart budget")
+      XCTAssertFalse(
+        measurement.usedFullReplay,
+        "the cursor benchmark must take the validated incremental append path")
+      XCTAssertLessThan(
+        measurement.validationBytesRead, 4_096,
+        "the hot append path must read only its validated tail, not \(historicalEventCount) records")
       print(
         "ARKDECK_JOURNAL_CURSOR historicalEvents=\(measurement.historicalEventCount) "
           + "totalEvents=\(measurement.totalEventCount) "
           + "durableAppendNanoseconds=\(measurement.durableAppendNanoseconds) "
+          + "validationBytesRead=\(measurement.validationBytesRead) "
+          + "fileSyncNanoseconds=\(measurement.fileSyncNanoseconds) "
+          + "directorySyncNanoseconds=\(measurement.directorySyncNanoseconds) "
           + "journalBytes=\(measurement.journalBytes) "
-          + "recoveryNanoseconds=\(measurement.recoveryNanoseconds)")
+          + "recoveryNanoseconds=\(measurement.recoveryNanoseconds) "
+          + "peakResidentSetBytes=\(measurement.peakResidentSetBytes)")
     }
   }
 
@@ -37,8 +47,30 @@ final class JournalRecoveryContractTests: XCTestCase {
     let historicalEventCount: Int
     let totalEventCount: Int
     let durableAppendNanoseconds: UInt64
+    let validationBytesRead: Int
+    let usedFullReplay: Bool
+    let fileSyncNanoseconds: UInt64
+    let directorySyncNanoseconds: UInt64
     let journalBytes: UInt64
     let recoveryNanoseconds: UInt64
+    let peakResidentSetBytes: Int64
+  }
+
+  private final class JournalAppendMeasurementCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var latestMeasurement: JournalAppendMeasurement?
+
+    func record(_ measurement: JournalAppendMeasurement) {
+      lock.lock()
+      latestMeasurement = measurement
+      lock.unlock()
+    }
+
+    func latest() -> JournalAppendMeasurement? {
+      lock.lock()
+      defer { lock.unlock() }
+      return latestMeasurement
+    }
   }
 
   private func measureCursorBenchmark(
@@ -47,7 +79,10 @@ final class JournalRecoveryContractTests: XCTestCase {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let journalURL = directory.appending(path: "incremental-cursor.jsonl")
-    let journal = try FileDurableJournal(url: journalURL)
+    let collector = JournalAppendMeasurementCollector()
+    let journal = try FileDurableJournal(
+      url: journalURL,
+      appendMeasurementSink: { collector.record($0) })
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
         eventID: "created", sequence: 0, sessionID: "cursor-session", jobID: "cursor-job",
@@ -64,6 +99,7 @@ final class JournalRecoveryContractTests: XCTestCase {
     let appendStarted = DispatchTime.now().uptimeNanoseconds
     try journal.appendAndSynchronize(try cursorBenchmarkWarning(sequence: finalSequence))
     let durableAppendNanoseconds = DispatchTime.now().uptimeNanoseconds - appendStarted
+    let appendMeasurement = try XCTUnwrap(collector.latest())
     let journalBytes = try XCTUnwrap(
       (try FileManager.default.attributesOfItem(atPath: journalURL.path)[.size] as? NSNumber)?
         .uint64Value)
@@ -77,8 +113,19 @@ final class JournalRecoveryContractTests: XCTestCase {
       historicalEventCount: historicalEventCount,
       totalEventCount: recovery.events.count,
       durableAppendNanoseconds: durableAppendNanoseconds,
+      validationBytesRead: appendMeasurement.validationBytesRead,
+      usedFullReplay: appendMeasurement.usedFullReplay,
+      fileSyncNanoseconds: appendMeasurement.fileSyncNanoseconds,
+      directorySyncNanoseconds: appendMeasurement.directorySyncNanoseconds,
       journalBytes: journalBytes,
-      recoveryNanoseconds: recoveryNanoseconds)
+      recoveryNanoseconds: recoveryNanoseconds,
+      peakResidentSetBytes: processPeakResidentSetBytes())
+  }
+
+  private func processPeakResidentSetBytes() -> Int64 {
+    var usage = rusage()
+    guard getrusage(RUSAGE_SELF, &usage) == 0 else { return 0 }
+    return Int64(usage.ru_maxrss)
   }
 
   private func cursorBenchmarkWarning(sequence: Int) throws -> JournalEvent {
