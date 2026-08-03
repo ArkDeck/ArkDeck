@@ -402,6 +402,51 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(expectedActiveIDs.count, expectedJobCount - expectedTerminalCount)
   }
 
+  /// Startup must be driven by the active-job index, not by total terminal
+  /// history.  Seeding the repository directly keeps this focused on the
+  /// durable SQLite/recovery boundary: executing 10,000 provider plans would
+  /// turn a startup-scaling check into a device-provider throughput test.
+  func testTenThousandTerminalHistoryDoesNotExpandRestartRecovery() async throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS"] == "1" else {
+      throw XCTSkip(
+        "set ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS=1 to run the 10,000-job history test")
+    }
+
+    let repository = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let terminalRecord = Data("{}".utf8)
+    for index in 0..<10_000 {
+      let jobID = String(format: "job-history-%05d", index)
+      let idempotencyKey = String(format: "idem-history-%05d", index)
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: jobID, idempotencyKey: idempotencyKey,
+          requestHash: "hash-\(index)", initialState: JobState.preflight.rawValue,
+          createdAtUTC: "2026-08-03T00:00:00Z", initialRecordData: terminalRecord),
+        .admitted)
+      try repository.updateJobState(
+        jobID: jobID, state: JobState.succeeded.rawValue,
+        updatedAtUTC: "2026-08-03T00:00:01Z", recordData: terminalRecord)
+    }
+
+    let started = DispatchTime.now().uptimeNanoseconds
+    let (restarted, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await restarted.recoverActiveJobs()
+    let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000
+    XCTAssertTrue(recovered.isEmpty)
+    XCTAssertLessThan(
+      elapsedSeconds, 5,
+      "terminal history must not be replayed during macOS Runtime startup")
+
+    var cursor: String?
+    var listed = 0
+    repeat {
+      let page = try repository.listJobs(pageSize: 997, cursor: cursor)
+      listed += page.jobs.count
+      cursor = page.nextCursor
+    } while cursor != nil
+    XCTAssertEqual(listed, 10_000)
+  }
+
   func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {
     struct SimulatedProcessLoss: Error {}
     let root = stateDirectory!

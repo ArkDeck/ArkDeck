@@ -23,6 +23,7 @@ let package = Package(
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
     .executable(name: "ArkDeckFakeRockchipFixture", targets: ["ArkDeckFakeRockchipFixture"]),
     .executable(name: "ArkDeckEngineCrashFixture", targets: ["ArkDeckEngineCrashFixture"]),
+    .executable(name: "ArkDeckRuntimeSoakFixture", targets: ["ArkDeckRuntimeSoakFixture"]),
   ],
   targets: [
     .target(name: "ArkDeckCore"),
@@ -117,6 +118,11 @@ let package = Package(
       name: "ArkDeckEngineCrashFixture",
       dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
       path: "Tests/ArkDeckEngineCrashFixture"
+    ),
+    .executableTarget(
+      name: "ArkDeckRuntimeSoakFixture",
+      dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
+      path: "Tests/ArkDeckRuntimeSoakFixture"
     ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(
