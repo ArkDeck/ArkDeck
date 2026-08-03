@@ -210,18 +210,27 @@ Task.detached {
         executableSHA256: executableSHA))
     let rockchipResolver = BundledRockchipExecutableResolver()
     let rockchipDispatcher: BundledRockchipRuntimeDispatcher
+    // Facts are measured only where the same per-action tool runtime is
+    // composed. Without a descriptor-bound HDC there is no read-only surface
+    // to measure the target's mode on, and a mode asserted without one is
+    // exactly the fabrication #992 removed — so the port stays record-only.
+    var rockchipProber: (any RockchipLiveModeProbing)?
     if let hdcExecutableResolver {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
         resolver: rockchipResolver,
         hdcResolver: hdcExecutableResolver,
         stateDirectory: resolvedStateDirectory)
+      rockchipProber = FoundationRockchipLiveModeProbe(
+        hdcResolver: hdcExecutableResolver,
+        rockchipResolver: rockchipResolver)
     } else {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
         resolver: rockchipResolver)
     }
     let rockchipProvider = RockchipFlashProviderAdapter(
       factsPort: TargetStoreRockchipRuntimeFactsPort(
-        targetStore: targetStore, resolver: rockchipResolver, nowUTC: utcNow),
+        targetStore: targetStore, resolver: rockchipResolver,
+        prober: rockchipProber, nowUTC: utcNow),
       // The closed typed plan is present. Executable/HDC/state availability
       // belongs to the live dispatcher so an installed product component can
       // become visible without caching a startup-only rejection.
