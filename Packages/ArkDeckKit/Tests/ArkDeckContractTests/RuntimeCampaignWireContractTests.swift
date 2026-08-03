@@ -160,6 +160,10 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         reservedAt: "2026-07-31T23:30:00Z",
         forwardLeaseExpiresAt: "2026-08-01T02:00:00Z",
         compensationLeaseExpiresAt: "2026-08-01T02:30:00Z",
+        campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
+          candidateDigestSHA256: String(repeating: "c", count: 64),
+          reviewDigestSHA256: String(repeating: "d", count: 64),
+          brokerDigestSHA256: String(repeating: "e", count: 64)),
         terminal: nil))
 
     let dispatchLog = DispatchLog()
@@ -221,6 +225,26 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
     XCTAssertTrue(
       status.timeline.contains("campaign reservation verified before first mutation"),
       "\(status.timeline)")
+    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertEqual(evidence.authority?.kind, .evolutionCampaignConfirmation)
+    XCTAssertEqual(evidence.authority?.campaignCorrelation?.campaignID, "ECAMP-FFFFFFFFFFFFFFFFFFFFFFFF")
+    XCTAssertEqual(evidence.authority?.campaignCorrelation?.attemptID, reservationID)
+    XCTAssertEqual(evidence.authority?.campaignCorrelation?.attemptOrdinal, 1)
+    XCTAssertEqual(
+      evidence.authority?.campaignCorrelation?.planDigestSHA256,
+      evidence.authority?.consumptionFingerprintSHA256)
+    XCTAssertEqual(
+      evidence.authority?.campaignCorrelation?.targetBindingDigestSHA256,
+      Self.targetIdentity)
+    XCTAssertEqual(
+      evidence.authority?.campaignCorrelation?.candidateDigestSHA256,
+      String(repeating: "c", count: 64))
+    XCTAssertEqual(
+      evidence.authority?.campaignCorrelation?.reviewDigestSHA256,
+      String(repeating: "d", count: 64))
+    XCTAssertEqual(
+      evidence.authority?.campaignCorrelation?.brokerDigestSHA256,
+      String(repeating: "e", count: 64))
     dispatched = await dispatchLog.snapshot()
     XCTAssertEqual(dispatched.count, 1, "\(dispatched)")
 

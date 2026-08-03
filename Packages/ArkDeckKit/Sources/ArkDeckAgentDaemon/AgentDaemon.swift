@@ -1173,7 +1173,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     ])
   }
 
-  private static func encodeEvidence(
+  static func encodeEvidence(
     snapshot: RuntimeJobEvidenceSnapshot,
     artifacts: [RuntimeVerifiedArtifactEvidence],
     blockers: [String]
@@ -1193,14 +1193,25 @@ public struct RuntimeControlPlaneHandler: Sendable {
     }
     let authority: JSONValue
     if let value = snapshot.authority {
-      authority = .object([
+      var fields: [String: JSONValue] = [
         "kind": .string(value.kind.rawValue),
         "reference": .string(value.reference),
         "admittedAtUtc": .string(value.admittedAtUTC),
         "validUntilUtc": optionalString(value.validUntilUTC),
         "consumptionFingerprintSha256": optionalString(
           value.consumptionFingerprintSHA256),
-      ])
+      ]
+      if let campaign = value.campaignCorrelation {
+        fields["campaignId"] = .string(campaign.campaignID)
+        fields["attemptId"] = .string(campaign.attemptID)
+        fields["attemptOrdinal"] = .integer(Int64(campaign.attemptOrdinal))
+        fields["planDigest"] = .string(campaign.planDigestSHA256)
+        fields["targetBindingDigest"] = .string(campaign.targetBindingDigestSHA256)
+        fields["candidateDigest"] = .string(campaign.candidateDigestSHA256)
+        fields["reviewDigest"] = .string(campaign.reviewDigestSHA256)
+        fields["brokerDigest"] = .string(campaign.brokerDigestSHA256)
+      }
+      authority = .object(fields)
     } else {
       authority = .null
     }

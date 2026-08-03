@@ -612,12 +612,13 @@ public enum HardwareEvidenceProjector {
   }
 }
 
-/// Read-only compatibility discriminator. V2 bytes are returned untouched;
-/// the V3 writer never attempts to migrate or re-encode them.
+/// Read-only compatibility discriminator. Historical V2/V3 bytes are returned
+/// untouched; the V4 writer never attempts to migrate or re-encode them.
 public enum HardwareEvidenceDocumentReader {
   public enum Version: String, Sendable, Equatable {
     case legacyV2 = "2.0.0"
-    case currentV3 = "3.0.0"
+    case legacyV3 = "3.0.0"
+    case currentV4 = "4.0.0"
   }
 
   public static func version(of data: Data) -> Version? {

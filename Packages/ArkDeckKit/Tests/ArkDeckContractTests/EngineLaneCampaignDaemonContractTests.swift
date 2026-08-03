@@ -114,6 +114,10 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         reservedAt: "2026-08-03T00:20:00Z",
         forwardLeaseExpiresAt: "2026-08-03T02:00:00Z",
         compensationLeaseExpiresAt: "2026-08-03T02:30:00Z",
+        campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
+          candidateDigestSHA256: String(repeating: "a", count: 64),
+          reviewDigestSHA256: String(repeating: "b", count: 64),
+          brokerDigestSHA256: String(repeating: "c", count: 64)),
         terminal: nil))
 
     let dispatchLog = DispatchLog()
@@ -223,6 +227,25 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     XCTAssertTrue(
       job.timeline.contains("campaign reservation verified before first mutation"),
       "\(job.timeline)")
+    let wireEvidence = try AgentClient(socketPath: socketPath).request(
+      method: "job.evidence", params: ["jobId": .string(job.jobID)])
+    let wireEvidenceBytes = try JSONEncoder().encode(wireEvidence)
+    let trustedEvidence = try JSONDecoder().decode(
+      RuntimeHardwareEvidenceTrustedFacts.self, from: wireEvidenceBytes)
+    XCTAssertEqual(trustedEvidence.authority?.campaignID, admitted.campaignID)
+    XCTAssertEqual(trustedEvidence.authority?.attemptID, reservationID)
+    XCTAssertEqual(trustedEvidence.authority?.attemptOrdinal, admitted.ordinal)
+    XCTAssertEqual(
+      trustedEvidence.authority?.planDigest,
+      trustedEvidence.authority?.consumptionFingerprintSHA256)
+    XCTAssertEqual(
+      trustedEvidence.authority?.targetBindingDigest, Self.targetIdentity)
+    XCTAssertEqual(
+      trustedEvidence.authority?.candidateDigest, String(repeating: "a", count: 64))
+    XCTAssertEqual(
+      trustedEvidence.authority?.reviewDigest, String(repeating: "b", count: 64))
+    XCTAssertEqual(
+      trustedEvidence.authority?.brokerDigest, String(repeating: "c", count: 64))
 
     // The job's terminal closed the reservation with exactly the journaled
     // mutating intent. Neither the dispatcher nor the campaign host closes a

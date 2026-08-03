@@ -170,10 +170,59 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         evidenceID: "EVD-AHE-RUNNER-001",
         acceptanceIDs: ["AC-WF-004-01"]))
     else {
-      return XCTFail("complete daemon-owned receipt must project to V3")
+      return XCTFail("complete daemon-owned receipt must project to V4")
     }
     XCTAssertEqual(evidence.runtime.jobId, receipt.jobID)
     XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)
+  }
+
+  func testDaemonPreservesCampaignV4CorrelationInTrustedEvidence() throws {
+    let digest = String(repeating: "a", count: 64)
+    let correlation = RuntimeCampaignEvidenceCorrelation(
+      campaignID: "ECAMP-0123456789ABCDEF01234567",
+      attemptID: "ain019-campaign-attempt-001",
+      attemptOrdinal: 1,
+      planDigestSHA256: digest,
+      targetBindingDigestSHA256: String(repeating: "b", count: 64),
+      candidateDigestSHA256: String(repeating: "c", count: 64),
+      reviewDigestSHA256: String(repeating: "d", count: 64),
+      brokerDigestSHA256: String(repeating: "e", count: 64))
+    let snapshot = RuntimeJobEvidenceSnapshot(
+      jobID: "job-campaign-evidence-001",
+      operationReference: "flash.dayu200@1",
+      catalogDigest: String(repeating: "f", count: 64),
+      targetID: "TGT-CAMPAIGN-EVIDENCE-001",
+      bindingRevision: 7,
+      providerID: "rockchip",
+      actualEffect: "destructive",
+      authority: RuntimeAdmissionEvidence(
+        kind: .evolutionCampaignConfirmation,
+        reference: "ain019-campaign-attempt-001",
+        admittedAtUTC: "2026-08-03T00:00:00Z",
+        validUntilUTC: "2026-08-03T04:00:00Z",
+        consumptionFingerprintSHA256: digest,
+        campaignCorrelation: correlation),
+      observation: nil,
+      actualStepKinds: ["flashPartition"],
+      executionMode: "execute",
+      terminalState: "failed",
+      outcomeUnknown: false,
+      startedAtUTC: "2026-08-03T00:00:01Z",
+      firstEvidenceStepAtUTC: "2026-08-03T00:00:01Z",
+      finishedAtUTC: "2026-08-03T00:00:02Z")
+    let encoded = RuntimeControlPlaneHandler.encodeEvidence(
+      snapshot: snapshot, artifacts: [], blockers: [])
+    let bytes = try JSONEncoder().encode(encoded)
+    let trusted = try JSONDecoder().decode(RuntimeHardwareEvidenceTrustedFacts.self, from: bytes)
+
+    XCTAssertEqual(trusted.authority?.campaignID, correlation.campaignID)
+    XCTAssertEqual(trusted.authority?.attemptID, correlation.attemptID)
+    XCTAssertEqual(trusted.authority?.attemptOrdinal, correlation.attemptOrdinal)
+    XCTAssertEqual(trusted.authority?.planDigest, correlation.planDigestSHA256)
+    XCTAssertEqual(trusted.authority?.targetBindingDigest, correlation.targetBindingDigestSHA256)
+    XCTAssertEqual(trusted.authority?.candidateDigest, correlation.candidateDigestSHA256)
+    XCTAssertEqual(trusted.authority?.reviewDigest, correlation.reviewDigestSHA256)
+    XCTAssertEqual(trusted.authority?.brokerDigest, correlation.brokerDigestSHA256)
   }
 
   func testUnselectedOptionalTraceDoesNotBlockPublishedCaptureEvidence() throws {
