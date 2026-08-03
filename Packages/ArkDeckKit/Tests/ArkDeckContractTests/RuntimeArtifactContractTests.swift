@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import XCTest
 
 @testable import ArkDeckCore
@@ -263,6 +264,101 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertTrue(listed.isEmpty)
   }
 
+  func testLargeTextFilePublicationStreamsRedactionAcrossReadBoundaries() async throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_SLOW_ARTIFACT_TESTS"] == "1" else {
+      throw XCTSkip(
+        "slow 128 MiB artifact lane; run with ARKDECK_RUN_SLOW_ARTIFACT_TESTS=1")
+    }
+    let store = try makeStore(home: "/Users/tester")
+    let source = root.deletingLastPathComponent()
+      .appendingPathComponent("large-text-source-\(UUID().uuidString).log")
+    FileManager.default.createFile(atPath: source.path, contents: nil)
+    let writer = try FileHandle(forWritingTo: source)
+    defer {
+      try? writer.close()
+      try? FileManager.default.removeItem(at: source)
+    }
+    // 128 MiB of source is written in 64 KiB chunks.  `token` begins over a
+    // reader boundary, proving that the streaming redactor does not leak a
+    // secret merely because its key spans two input buffers.
+    let chunk = Data(repeating: 0x78, count: 64 * 1024)
+    for _ in 0..<1_024 { try writer.write(contentsOf: chunk) }
+    try writer.write(contentsOf: Data("tok".utf8))
+    try writer.write(contentsOf: Data("en:supersecret-value-that-must-not-persist\n".utf8))
+    try writer.write(contentsOf: Data("path=/Users/tester/private/workspace\n".utf8))
+    for _ in 0..<1_024 { try writer.write(contentsOf: chunk) }
+    try writer.synchronize()
+    try writer.close()
+
+    // Measure this process around publication, not the SwiftPM process tree.
+    // `swift test` may compile or launch helper processes whose rusage is not
+    // attributable to the artifact pipeline.  Sampling the test process pins
+    // the property that matters here: a 128 MiB source must not add a
+    // source-sized resident allocation while it is redacted and published.
+    let baselineResidentSet = try XCTUnwrap(currentProcessResidentSetSize())
+    let sampler = ArtifactRSSSampler(baseline: baselineResidentSet)
+    sampler.start()
+    defer { _ = sampler.stop() }
+    let published = try await store.publishTextFile(
+      RuntimeArtifactTextFilePublicationRequest(
+        jobID: "large-text-job", sessionID: "session-large-text-job",
+        stepID: "capture-large-log", name: "large.log", mediaType: "text/plain",
+        privacy: .standard, retentionClass: .shortLived,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+        sourceFileURL: source))
+    let peakResidentSet = sampler.stop()
+    let residentGrowth = peakResidentSet - baselineResidentSet
+    XCTAssertLessThan(
+      residentGrowth, UInt64(48 * 1024 * 1024),
+      "128 MiB streaming publication must not allocate a source-sized resident buffer")
+    print(
+      "ARKDECK_ARTIFACT_STREAMING sourceBytes=\(128 * 1024 * 1024) "
+        + "baselineResidentSetBytes=\(baselineResidentSet) "
+        + "peakResidentSetBytes=\(peakResidentSet) "
+        + "residentGrowthBytes=\(residentGrowth)")
+    XCTAssertGreaterThanOrEqual(published.byteCount, 128 * 1024 * 1024)
+    XCTAssertTrue(published.redactionApplied)
+
+    let lease = try await store.leaseReference(
+      jobID: published.jobID, artifactID: published.artifactID)
+    let resolved = try await store.resolveLease(lease)
+    XCTAssertFalse(try fileContains(Data("supersecret-value-that-must-not-persist".utf8), at: resolved.fileURL))
+    XCTAssertFalse(try fileContains(Data("/Users/tester".utf8), at: resolved.fileURL))
+    XCTAssertTrue(try fileContains(Data("<REDACTED>".utf8), at: resolved.fileURL))
+    XCTAssertTrue(try fileContains(Data("<HOME>".utf8), at: resolved.fileURL))
+  }
+
+
+  func testTextFileStreamingRedactionKeepsOrdinaryKeyPrefixes() async throws {
+    let store = try makeStore(home: "/Users/tester")
+    let source = root.deletingLastPathComponent()
+      .appendingPathComponent("stream-prefix-\(UUID().uuidString).txt")
+    let sourceText = "tokenizer remains ordinary; secrettoken: second-secret-value\napi_key: abcdefghi\n/Users/tester/project\n"
+    try Data(sourceText.utf8).write(to: source)
+    defer { try? FileManager.default.removeItem(at: source) }
+
+    let published = try await store.publishTextFile(
+      RuntimeArtifactTextFilePublicationRequest(
+        jobID: "stream-prefix-job", sessionID: "session-stream-prefix-job",
+        stepID: "capture-log", name: "prefix.txt", mediaType: "text/plain",
+        privacy: .standard, retentionClass: .default,
+        sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
+        sourceFileURL: source))
+    let text = String(
+      data: try await store.read(jobID: published.jobID, artifactID: published.artifactID),
+      encoding: .utf8) ?? ""
+    XCTAssertTrue(text.contains("tokenizer remains ordinary"), text)
+    XCTAssertTrue(text.contains("secrettoken: <REDACTED>"), text)
+    XCTAssertTrue(text.contains("api_key: <REDACTED>"), text)
+    XCTAssertFalse(text.contains("second-secret-value"), text)
+    XCTAssertFalse(text.contains("abcdefghi"), text)
+    XCTAssertFalse(text.contains("/Users/tester"), text)
+  }
+
   func testExportRefusesOverwriteAndSanitizesName() async throws {
     let store = try makeStore()
     let hostile = try await store.publish(request(name: "../evil.json"))
@@ -472,6 +568,78 @@ final class RuntimeArtifactContractTests: XCTestCase {
     await XCTAssertThrowsErrorAsync(
       try await store.verifiedEvidenceArtifacts(jobID: "job-1"))
   }
+
+  private func fileContains(_ needle: Data, at url: URL) throws -> Bool {
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    var carry = Data()
+    while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+      var haystack = carry
+      haystack.append(chunk)
+      if haystack.range(of: needle) != nil { return true }
+      carry = Data(haystack.suffix(max(0, needle.count - 1)))
+    }
+    return false
+  }
+}
+
+private final class ArtifactRSSSampler: @unchecked Sendable {
+  private let lock = NSLock()
+  private let finished = DispatchSemaphore(value: 0)
+  private var stopped = false
+  private var joined = false
+  private var peakResidentSet: UInt64
+
+  init(baseline: UInt64) {
+    peakResidentSet = baseline
+  }
+
+  func start() {
+    let sampler = self
+    Thread.detachNewThread { sampler.sampleUntilStopped() }
+  }
+
+  func stop() -> UInt64 {
+    lock.lock()
+    stopped = true
+    let shouldWait = !joined
+    joined = true
+    lock.unlock()
+    if shouldWait { _ = finished.wait(timeout: .now() + 1) }
+    lock.lock()
+    defer { lock.unlock() }
+    return peakResidentSet
+  }
+
+  private func sampleUntilStopped() {
+    defer { finished.signal() }
+    while true {
+      lock.lock()
+      let shouldStop = stopped
+      lock.unlock()
+      if shouldStop { return }
+      if let residentSet = currentProcessResidentSetSize() {
+        lock.lock()
+        peakResidentSet = max(peakResidentSet, residentSet)
+        lock.unlock()
+      }
+      usleep(5_000)
+    }
+  }
+}
+
+private func currentProcessResidentSetSize() -> UInt64? {
+  var info = mach_task_basic_info()
+  var count = mach_msg_type_number_t(
+    MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+  let result = withUnsafeMutablePointer(to: &info) { infoPointer in
+    infoPointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { reboundPointer in
+      task_info(
+        mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), reboundPointer, &count)
+    }
+  }
+  guard result == KERN_SUCCESS else { return nil }
+  return UInt64(info.resident_size)
 }
 
 func XCTAssertThrowsErrorAsync<T>(

@@ -23,6 +23,7 @@ let package = Package(
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
     .executable(name: "ArkDeckFakeRockchipFixture", targets: ["ArkDeckFakeRockchipFixture"]),
     .executable(name: "ArkDeckEngineCrashFixture", targets: ["ArkDeckEngineCrashFixture"]),
+    .executable(name: "ArkDeckRuntimeSoakFixture", targets: ["ArkDeckRuntimeSoakFixture"]),
   ],
   targets: [
     .target(name: "ArkDeckCore"),
@@ -68,7 +69,11 @@ let package = Package(
         "ArkDeckHarness", "ArkDeckWorkflows",
       ],
       path: "Sources/ArkDeckWorkflows/AgentComposition"),
-    .target(name: "ArkDeckStorage", dependencies: ["ArkDeckCore"]),
+    .target(
+      name: "ArkDeckStorage",
+      dependencies: ["ArkDeckCore"],
+      linkerSettings: [.linkedLibrary("sqlite3")]
+    ),
     .executableTarget(
       name: "ArkDeckCLI",
       dependencies: [
@@ -113,6 +118,14 @@ let package = Package(
       name: "ArkDeckEngineCrashFixture",
       dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
       path: "Tests/ArkDeckEngineCrashFixture"
+    ),
+    .executableTarget(
+      name: "ArkDeckRuntimeSoakFixture",
+      dependencies: [
+        "ArkDeckAgentClient", "ArkDeckAgentDaemon", "ArkDeckCore", "ArkDeckOpenHarmony",
+        "ArkDeckStorage", "ArkDeckWorkflows",
+      ],
+      path: "Tests/ArkDeckRuntimeSoakFixture"
     ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(

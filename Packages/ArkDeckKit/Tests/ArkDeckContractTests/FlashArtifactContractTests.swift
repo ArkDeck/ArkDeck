@@ -58,23 +58,23 @@ final class FlashArtifactContractTests: XCTestCase {
 
   func testFlashStepsOwnEveryDeclaredRuntimeProduct() throws {
     XCTAssertEqual(
-      RuntimeJobEngine.artifactMapping["flash.dayu200@1"]?["rebind-and-verify-build"],
+      RuntimeArtifactService.artifactMapping["flash.dayu200@1"]?["rebind-and-verify-build"],
       ["post-flash-facts.json"])
     XCTAssertEqual(
-      RuntimeJobEngine.artifactMapping["flash.dayu200@1"]?[
+      RuntimeArtifactService.artifactMapping["flash.dayu200@1"]?[
         "capture-post-flash-diagnostics"],
       ["post-flash-hilog.txt"])
     XCTAssertEqual(
-      RuntimeJobEngine.finalizeArtifacts["flash.dayu200@1"],
+      RuntimeArtifactService.finalizeArtifacts["flash.dayu200@1"],
       ["flash-report.json"])
 
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
     let mapped =
       Set(
-        RuntimeJobEngine.artifactMapping["flash.dayu200@1", default: [:]]
+        RuntimeArtifactService.artifactMapping["flash.dayu200@1", default: [:]]
           .values.flatMap { $0 })
-      .union(RuntimeJobEngine.finalizeArtifacts["flash.dayu200@1", default: []])
+      .union(RuntimeArtifactService.finalizeArtifacts["flash.dayu200@1", default: []])
     XCTAssertEqual(mapped, Set(descriptor.artifacts.map(\.name)))
   }
 
@@ -111,7 +111,7 @@ final class FlashArtifactContractTests: XCTestCase {
       stdoutTruncated: false,
       durationSeconds: 1)
 
-    let facts = RuntimeJobEngine.artifactContents(
+    let facts = RuntimeArtifactService.artifactContents(
       name: "post-flash-facts.json",
       summary: ["model": "DAYU200", "firmware": "OpenHarmony-3.2-post-flash"],
       receipt: receipt,
@@ -132,7 +132,7 @@ final class FlashArtifactContractTests: XCTestCase {
     XCTAssertEqual(authority["reference"] as? String, "merged-pr:gj4-exact-plan")
 
     XCTAssertEqual(
-      RuntimeJobEngine.artifactContents(
+      RuntimeArtifactService.artifactContents(
         name: "post-flash-hilog.txt",
         summary: ["byteCount": "\(receipt.stdout.count)"],
         receipt: receipt,
@@ -154,7 +154,7 @@ final class FlashArtifactContractTests: XCTestCase {
       stderr: Data(),
       stdoutTruncated: false,
       durationSeconds: 1)
-    let facts = RuntimeJobEngine.artifactContents(
+    let facts = RuntimeArtifactService.artifactContents(
       name: "post-flash-facts.json",
       summary: ["model": "DAYU200", "firmware": "OpenHarmony-3.2-post-flash"],
       receipt: receipt,
@@ -196,7 +196,7 @@ final class FlashArtifactContractTests: XCTestCase {
       metadata.sha256,
       SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())
 
-    let report = try RuntimeJobEngine.finalArtifactContents(
+    let report = try RuntimeArtifactService.finalArtifactContents(
       name: "flash-report.json",
       descriptor: descriptor,
       record: record,

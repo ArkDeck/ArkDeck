@@ -283,6 +283,45 @@ public struct RuntimeArtifactFilePublicationRequest: Sendable {
   }
 }
 
+/// File-backed publication for text and JSON products.  Unlike
+/// `RuntimeArtifactFilePublicationRequest`, this path deliberately accepts
+/// sensitive text: it redacts and hashes the source while streaming it to a
+/// private staging file, then atomically publishes only the redacted bytes.
+/// No expected digest is accepted because the immutable artifact identity is
+/// derived from the post-redaction stream rather than the untrusted source.
+public struct RuntimeArtifactTextFilePublicationRequest: Sendable {
+  public let jobID: String
+  public let sessionID: String
+  public let stepID: String
+  public let name: String
+  public let mediaType: String
+  public let privacy: CatalogArtifactPrivacy
+  public let retentionClass: CatalogArtifactRetentionClass
+  public let sourceOperation: String
+  public let providerID: String
+  public let bindingSnapshot: ArtifactBindingSnapshot
+  public let sourceFileURL: URL
+
+  public init(
+    jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
+    privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
+    sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
+    sourceFileURL: URL
+  ) {
+    self.jobID = jobID
+    self.sessionID = sessionID
+    self.stepID = stepID
+    self.name = name
+    self.mediaType = mediaType
+    self.privacy = privacy
+    self.retentionClass = retentionClass
+    self.sourceOperation = sourceOperation
+    self.providerID = providerID
+    self.bindingSnapshot = bindingSnapshot
+    self.sourceFileURL = sourceFileURL
+  }
+}
+
 public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
   public let artifactID: String
   public let fileURL: URL
@@ -549,6 +588,130 @@ public actor RuntimeArtifactStore {
         sourceFD, sourceBefore: sourceBefore, expectedSHA256: digest,
         expectedByteCount: request.expectedByteCount,
         destination: destination, directory: jobDirectory)
+    }
+    try upsert(metadata, jobID: request.jobID)
+    return metadata
+  }
+
+  /// Streams a text or JSON source through the Runtime redaction policy.
+  /// The source is never materialized as one `Data` value: each bounded
+  /// chunk is transformed, hashed and written directly to a private staging
+  /// inode.  The artifact ID is bound to those redacted bytes only.
+  public func publishTextFile(
+    _ request: RuntimeArtifactTextFilePublicationRequest
+  ) throws -> RuntimeArtifactMetadata {
+    guard request.sourceFileURL.isFileURL,
+      request.sourceFileURL.path.hasPrefix("/"),
+      (request.mediaType.hasPrefix("text/") || request.mediaType == "application/json")
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "text file publication requires an absolute text or JSON source")
+    }
+    let sourceFD = Darwin.open(
+      request.sourceFileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard sourceFD >= 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot open text Artifact source (errno \(errno))")
+    }
+    defer { Darwin.close(sourceFD) }
+    var sourceBefore = stat()
+    guard fstat(sourceFD, &sourceBefore) == 0,
+      sourceBefore.st_mode & S_IFMT == S_IFREG
+    else {
+      throw RuntimeArtifactError.ioFailure("text Artifact source is not a regular file")
+    }
+
+    let jobDirectory = try directory(for: request.jobID)
+    let temporary = jobDirectory.appendingPathComponent(
+      ".tmp-redacted-\(UUID().uuidString.prefix(12).lowercased())")
+    let temporaryFD = Darwin.open(
+      temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard temporaryFD >= 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot create text Artifact staging file (errno \(errno))")
+    }
+    var temporaryIsOpen = true
+    var temporaryPublished = false
+    defer {
+      if temporaryIsOpen { Darwin.close(temporaryFD) }
+      if !temporaryPublished { _ = Darwin.unlink(temporary.path) }
+    }
+
+    let streamed = try streamRedactedText(
+      sourceFD: sourceFD, sourceBefore: sourceBefore, destinationFD: temporaryFD,
+      sourcePath: request.sourceFileURL.path)
+    guard Darwin.fsync(temporaryFD) == 0 else {
+      throw RuntimeArtifactError.ioFailure(
+        "cannot synchronize redacted Artifact staging file (errno \(errno))")
+    }
+    guard Darwin.close(temporaryFD) == 0 else {
+      temporaryIsOpen = false
+      throw RuntimeArtifactError.ioFailure(
+        "cannot close redacted Artifact staging file (errno \(errno))")
+    }
+    temporaryIsOpen = false
+
+    let identityInput = Data(
+      "\(request.jobID)\u{0}\(request.name)\u{0}\(streamed.sha256)".utf8)
+    let identity = SHA256.hash(data: identityInput).map { String(format: "%02x", $0) }.joined()
+    let createdAtUTC = nowUTC()
+    let metadata = RuntimeArtifactMetadata(
+      artifactID: "ART-\(identity.prefix(32))",
+      jobID: request.jobID,
+      sessionID: request.sessionID,
+      stepID: request.stepID,
+      name: request.name,
+      mediaType: request.mediaType,
+      byteCount: streamed.byteCount,
+      sha256: streamed.sha256,
+      createdAtUTC: createdAtUTC,
+      providerID: request.providerID,
+      sourceOperation: request.sourceOperation,
+      bindingSnapshot: request.bindingSnapshot,
+      privacy: request.privacy,
+      retention: try retentionPolicy.retention(
+        for: request.retentionClass, createdAtUTC: createdAtUTC),
+      status: .published,
+      redactionApplied: streamed.redactionApplied)
+
+    if let existing = try loadIndex(jobID: request.jobID).artifacts.first(where: {
+      $0.name == request.name
+    }), existing.status.isPublished {
+      guard
+        (existing.artifactID == metadata.artifactID || Self.isLegacyArtifactID(existing.artifactID)),
+        Self.sameImmutablePublication(existing, metadata)
+      else {
+        throw RuntimeArtifactError.artifactConflict(
+          "artifact name \(request.name) is already bound to immutable metadata or bytes")
+      }
+      _ = try storedFileURL(for: existing)
+      return existing
+    }
+
+    let destination = jobDirectory.appendingPathComponent(metadata.artifactID)
+    if FileManager.default.fileExists(atPath: destination.path) {
+      _ = try validateStoredPayload(metadata, at: destination)
+    } else {
+      let used = try totalBytesUsed()
+      guard used + streamed.byteCount <= quota.totalBytes else {
+        throw RuntimeArtifactError.quotaExceeded(
+          requestedBytes: streamed.byteCount, remainingBytes: max(0, quota.totalBytes - used))
+      }
+      guard Darwin.link(temporary.path, destination.path) == 0 else {
+        throw RuntimeArtifactError.ioFailure(
+          "cannot publish redacted Artifact without overwrite (errno \(errno))")
+      }
+      guard Darwin.unlink(temporary.path) == 0 else {
+        throw RuntimeArtifactError.ioFailure(
+          "cannot remove redacted Artifact staging link (errno \(errno))")
+      }
+      temporaryPublished = true
+      let directoryFD = Darwin.open(
+        jobDirectory.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+      if directoryFD >= 0 {
+        _ = Darwin.fsync(directoryFD)
+        Darwin.close(directoryFD)
+      }
     }
     try upsert(metadata, jobID: request.jobID)
     return metadata
@@ -1139,6 +1302,75 @@ public actor RuntimeArtifactStore {
     }
   }
 
+  private struct StreamedTextArtifact {
+    let byteCount: Int
+    let sha256: String
+    let redactionApplied: Bool
+  }
+
+  private func streamRedactedText(
+    sourceFD: Int32,
+    sourceBefore: stat,
+    destinationFD: Int32,
+    sourcePath: String
+  ) throws -> StreamedTextArtifact {
+    var pipeline = StreamingTextArtifactRedactor(homeDirectory: redaction.homeDirectory)
+    var hasher = SHA256()
+    var byteCount = 0
+    let bufferSize = 64 * 1024
+    var input = [UInt8](repeating: 0, count: bufferSize)
+    while true {
+      let readCount = input.withUnsafeMutableBytes { buffer in
+        Darwin.read(sourceFD, buffer.baseAddress, bufferSize)
+      }
+      if readCount < 0, errno == EINTR { continue }
+      guard readCount >= 0 else {
+        throw RuntimeArtifactError.ioFailure(
+          "cannot read text Artifact source (errno \(errno))")
+      }
+      if readCount == 0 { break }
+      var output = Data()
+      output.reserveCapacity(readCount)
+      pipeline.consume(input[0..<readCount], into: &output)
+      try Self.writeAll(output, to: destinationFD, label: "redacted Artifact staging file")
+      byteCount += output.count
+      hasher.update(data: output)
+    }
+    var finalOutput = Data()
+    pipeline.finish(into: &finalOutput)
+    try Self.writeAll(finalOutput, to: destinationFD, label: "redacted Artifact staging file")
+    byteCount += finalOutput.count
+    hasher.update(data: finalOutput)
+
+    var sourceAfter = stat()
+    guard fstat(sourceFD, &sourceAfter) == 0,
+      Self.sameFileIdentityAndContent(sourceBefore, sourceAfter)
+    else {
+      throw RuntimeArtifactError.ioFailure(
+        "text Artifact source changed while being redacted (\(sourcePath))")
+    }
+    return StreamedTextArtifact(
+      byteCount: byteCount,
+      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined(),
+      redactionApplied: pipeline.redactionApplied)
+  }
+
+  private static func writeAll(_ data: Data, to descriptor: Int32, label: String) throws {
+    guard !data.isEmpty else { return }
+    var offset = 0
+    try data.withUnsafeBytes { buffer in
+      while offset < data.count {
+        let written = Darwin.write(
+          descriptor, buffer.baseAddress!.advanced(by: offset), data.count - offset)
+        if written < 0, errno == EINTR { continue }
+        guard written > 0 else {
+          throw RuntimeArtifactError.ioFailure("cannot write \(label) (errno \(errno))")
+        }
+        offset += written
+      }
+    }
+  }
+
   private func storedFileURL(for metadata: RuntimeArtifactMetadata) throws -> URL {
     guard Self.isSafeArtifactID(metadata.artifactID) else {
       throw RuntimeArtifactError.indexCorrupted("unsafe artifact identifier in index")
@@ -1270,5 +1502,199 @@ public actor RuntimeArtifactStore {
     guard attributes[.type] as? FileAttributeType == .typeRegular else {
       throw RuntimeArtifactError.indexCorrupted("\(label) must be a real regular file")
     }
+  }
+}
+
+/// A bounded-memory UTF-8 byte pipeline for the two redactions enforced by
+/// `ArtifactRedactionPolicy`.  It is intentionally conservative: malformed
+/// UTF-8 and non-ASCII delimiters are treated as part of a possible secret,
+/// never as proof that a sensitive value ended.  Consequently the streaming
+/// path may redact more than the in-memory convenience path, but cannot leak
+/// a value merely because it crossed a read boundary.
+private struct StreamingTextArtifactRedactor {
+  private static let secretKeys = [
+    Array("token".utf8), Array("secret".utf8), Array("password".utf8),
+    Array("passwd".utf8), Array("api_key".utf8), Array("api-key".utf8),
+    Array("apikey".utf8), Array("authorization".utf8),
+  ]
+  private static let redacted = Array("<REDACTED>".utf8)
+  private static let homeReplacement = Array("<HOME>".utf8)
+  private static let secretKeyInitials: Set<UInt8> = Set(
+    secretKeys.compactMap(\.first))
+
+  private enum SecretState {
+    case normal
+    case separators(key: [UInt8], separators: [UInt8])
+    case valueCandidate([UInt8])
+    case discardingValue
+  }
+
+  private let homeDirectory: [UInt8]
+  private var homeCandidate: [UInt8] = []
+  private var keyCandidate: [UInt8] = []
+  private var secretState: SecretState = .normal
+  private var replacedHome = false
+  private var replacedSecret = false
+
+  init(homeDirectory: String) {
+    self.homeDirectory = Array(homeDirectory.utf8)
+  }
+
+  var redactionApplied: Bool { replacedHome || replacedSecret }
+
+  mutating func consume(_ bytes: ArraySlice<UInt8>, into output: inout Data) {
+    for byte in bytes { consumeHome(byte, into: &output) }
+  }
+
+  mutating func finish(into output: inout Data) {
+    for byte in homeCandidate { consumeSecret(byte, into: &output) }
+    homeCandidate.removeAll(keepingCapacity: true)
+    switch secretState {
+    case .normal:
+      output.append(contentsOf: keyCandidate)
+    case .separators(let key, let separators):
+      output.append(contentsOf: key)
+      output.append(contentsOf: separators)
+    case .valueCandidate(let value):
+      output.append(contentsOf: value)
+    case .discardingValue:
+      break
+    }
+    keyCandidate.removeAll(keepingCapacity: true)
+    secretState = .normal
+  }
+
+  private mutating func consumeHome(_ byte: UInt8, into output: inout Data) {
+    guard !homeDirectory.isEmpty else {
+      consumeSecret(byte, into: &output)
+      return
+    }
+    // Most log bytes cannot start the absolute home path.  Keep the common
+    // path O(1) rather than repeatedly constructing a one-byte candidate.
+    if homeCandidate.isEmpty, byte != homeDirectory[0] {
+      consumeSecret(byte, into: &output)
+      return
+    }
+    homeCandidate.append(byte)
+    while !Self.matchesExactPrefix(homeCandidate, expected: homeDirectory) {
+      consumeSecret(homeCandidate.removeFirst(), into: &output)
+    }
+    if homeCandidate == homeDirectory {
+      for replacementByte in Self.homeReplacement {
+        consumeSecret(replacementByte, into: &output)
+      }
+      homeCandidate.removeAll(keepingCapacity: true)
+      replacedHome = true
+    }
+  }
+
+  private mutating func consumeSecret(_ byte: UInt8, into output: inout Data) {
+    switch secretState {
+    case .normal:
+      consumeNormal(byte, into: &output)
+    case .separators(let key, var separators):
+      if Self.isSeparator(byte) {
+        separators.append(byte)
+        secretState = .separators(key: key, separators: separators)
+      } else if separators.isEmpty {
+        // The matched key was only a prefix of ordinary text (for example
+        // `tokenizer`).  Emit one byte before replaying the suffix so the
+        // same complete key cannot immediately re-enter this state and lose
+        // the following ordinary byte.  A secret key beginning inside that
+        // suffix is still discovered normally.
+        output.append(key[0])
+        secretState = .normal
+        for held in key.dropFirst() { consumeNormal(held, into: &output) }
+        consumeNormal(byte, into: &output)
+      } else if Self.isValueDelimiter(byte) {
+        output.append(contentsOf: key)
+        output.append(contentsOf: separators)
+        output.append(byte)
+        secretState = .normal
+      } else {
+        output.append(contentsOf: key)
+        output.append(contentsOf: separators)
+        secretState = .valueCandidate([byte])
+      }
+    case .valueCandidate(var value):
+      if Self.isValueDelimiter(byte) {
+        output.append(contentsOf: value)
+        output.append(byte)
+        secretState = .normal
+      } else {
+        value.append(byte)
+        if value.count >= 6 {
+          output.append(contentsOf: Self.redacted)
+          replacedSecret = true
+          secretState = .discardingValue
+        } else {
+          secretState = .valueCandidate(value)
+        }
+      }
+    case .discardingValue:
+      if Self.isValueDelimiter(byte) {
+        output.append(byte)
+        secretState = .normal
+      }
+    }
+  }
+
+  private mutating func consumeNormal(_ byte: UInt8, into output: inout Data) {
+    // The overwhelming majority of artifact bytes cannot begin one of the
+    // sensitive key names.  Avoid testing every key pattern for those bytes;
+    // this keeps a 128 MiB log linear in its byte count.
+    if keyCandidate.isEmpty,
+      !Self.secretKeyInitials.contains(Self.asciiLower(byte))
+    {
+      output.append(byte)
+      return
+    }
+    keyCandidate.append(byte)
+    while !Self.hasSecretKeyPrefix(keyCandidate) {
+      output.append(keyCandidate.removeFirst())
+    }
+    if Self.isSecretKey(keyCandidate) {
+      secretState = .separators(key: keyCandidate, separators: [])
+      keyCandidate.removeAll(keepingCapacity: true)
+    }
+  }
+
+  private static func isSeparator(_ byte: UInt8) -> Bool {
+    byte == 0x22 || byte == 0x27 || byte == 0x20 || byte == 0x09 || byte == 0x0A
+      || byte == 0x0D || byte == 0x0B || byte == 0x0C || byte == 0x3A || byte == 0x3D
+  }
+
+  private static func isValueDelimiter(_ byte: UInt8) -> Bool {
+    isSeparator(byte) || byte == 0x2C || byte == 0x7D
+  }
+
+  private static func hasSecretKeyPrefix(_ bytes: [UInt8]) -> Bool {
+    secretKeys.contains { matchesPrefix(bytes, expected: $0) }
+  }
+
+  private static func isSecretKey(_ bytes: [UInt8]) -> Bool {
+    secretKeys.contains { key in
+      key.count == bytes.count && matchesPrefix(bytes, expected: key)
+    }
+  }
+
+  private static func matchesPrefix(_ bytes: [UInt8], expected: [UInt8]) -> Bool {
+    guard bytes.count <= expected.count else { return false }
+    for (index, byte) in bytes.enumerated() {
+      if asciiLower(byte) != expected[index] { return false }
+    }
+    return true
+  }
+
+  private static func matchesExactPrefix(_ bytes: [UInt8], expected: [UInt8]) -> Bool {
+    guard bytes.count <= expected.count else { return false }
+    for (index, byte) in bytes.enumerated() where byte != expected[index] {
+      return false
+    }
+    return true
+  }
+
+  private static func asciiLower(_ byte: UInt8) -> UInt8 {
+    (0x41...0x5A).contains(byte) ? byte + 0x20 : byte
   }
 }

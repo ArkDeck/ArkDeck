@@ -384,6 +384,37 @@ public struct RuntimeControlPlaneHandler: Sendable {
       let statuses = await engine.listJobs()
       return success(id: request.id, result: .array(statuses.map(Self.encodeStatus)))
 
+    case "job.list-page":
+      let pageSize: Int
+      if case .integer(let raw)? = request.params?["pageSize"] {
+        guard let value = Int(exactly: raw), (1...1_000).contains(value) else {
+          return failure(id: request.id, code: .invalidParams, message: "pageSize must be 1...1000")
+        }
+        pageSize = value
+      } else {
+        pageSize = 100
+      }
+      let cursor: String?
+      if let supplied = request.params?["cursor"] {
+        guard case .string(let value) = supplied else {
+          return failure(id: request.id, code: .invalidParams, message: "cursor must be a string")
+        }
+        cursor = value
+      } else {
+        cursor = nil
+      }
+      do {
+        let page = try await engine.listJobs(pageSize: pageSize, cursor: cursor)
+        return success(
+          id: request.id,
+          result: .object([
+            "jobs": .array(page.jobs.map(Self.encodeStatus)),
+            "nextCursor": page.nextCursor.map(JSONValue.string) ?? .null,
+          ]))
+      } catch {
+        return failure(id: request.id, code: .invalidParams, message: "\(error)")
+      }
+
     case "job.status":
       guard case .string(let jobID)? = request.params?["jobId"] else {
         return failure(id: request.id, code: .invalidParams, message: "jobId is required")
@@ -1336,8 +1367,11 @@ public final class AgentDaemonServer: @unchecked Sendable {
   private var listenerFD: Int32 = -1
   private var lockFD: Int32 = -1
   private var acceptThread: Thread?
-  private let stopFlag = NSLock()
+  private let lifecycle = NSCondition()
+  private var accepting = true
   private var stopped = false
+  private var activeConnections: Set<Int32> = []
+  private var activeRequestCount = 0
 
   public init(
     stateDirectory: URL,
@@ -1415,37 +1449,101 @@ public final class AgentDaemonServer: @unchecked Sendable {
   }
 
   public func stop() {
-    stopFlag.lock()
-    stopped = true
-    stopFlag.unlock()
+    drainAndStop(deadline: 0)
+  }
+
+  /// Stop accepting new work, allow current request handlers to cross their
+  /// own durable boundaries, then close idle client sockets before releasing
+  /// the instance lock.  A bounded deadline prevents one vanished client from
+  /// making a supervisor wait forever; Runtime jobs still recover from their
+  /// journal rather than being treated as completed.
+  public func drainAndStop(deadline: TimeInterval) {
+    let cutoff = Date().addingTimeInterval(max(0, deadline))
+    lifecycle.lock()
+    guard !stopped else {
+      lifecycle.unlock()
+      return
+    }
+    accepting = false
     if listenerFD >= 0 {
       close(listenerFD)
       listenerFD = -1
     }
     unlink(socketURL.path)
+    while activeRequestCount > 0, Date() < cutoff {
+      lifecycle.wait(until: cutoff)
+    }
+    // A request that already completed may leave a client waiting for the
+    // next frame.  Closing its connection lets the task leave cleanly instead
+    // of retaining the daemon through the shutdown deadline.
+    let connections = activeConnections
+    lifecycle.unlock()
+    for connection in connections { Darwin.shutdown(connection, SHUT_RDWR) }
+    lifecycle.lock()
+    while !activeConnections.isEmpty, Date() < cutoff {
+      lifecycle.wait(until: cutoff)
+    }
+    stopped = true
     if lockFD >= 0 {
       flock(lockFD, LOCK_UN)
       close(lockFD)
       lockFD = -1
     }
+    lifecycle.broadcast()
+    lifecycle.unlock()
   }
 
-  private var isStopped: Bool {
-    stopFlag.lock()
-    defer { stopFlag.unlock() }
-    return stopped
+  private var isAccepting: Bool {
+    lifecycle.lock()
+    defer { lifecycle.unlock() }
+    return accepting && !stopped
+  }
+
+  private func register(connection: Int32) -> Bool {
+    lifecycle.lock()
+    defer { lifecycle.unlock() }
+    guard accepting && !stopped else { return false }
+    activeConnections.insert(connection)
+    return true
+  }
+
+  private func finish(connection: Int32) {
+    lifecycle.lock()
+    activeConnections.remove(connection)
+    lifecycle.broadcast()
+    lifecycle.unlock()
+  }
+
+  private func beginRequest() {
+    lifecycle.lock()
+    activeRequestCount += 1
+    lifecycle.unlock()
+  }
+
+  private func finishRequest() {
+    lifecycle.lock()
+    activeRequestCount = max(0, activeRequestCount - 1)
+    lifecycle.broadcast()
+    lifecycle.unlock()
   }
 
   private func acceptLoop() {
-    while !isStopped {
+    while isAccepting {
       let connectionFD = accept(listenerFD, nil, nil)
       guard connectionFD >= 0 else {
-        if isStopped { return }
+        if !isAccepting { return }
+        continue
+      }
+      guard register(connection: connectionFD) else {
+        close(connectionFD)
         continue
       }
       let handler = self.handler
-      Task.detached {
-        await Self.serve(connectionFD: connectionFD, handler: handler)
+      Task.detached { [self] in
+        defer { finish(connection: connectionFD) }
+        await Self.serve(
+          connectionFD: connectionFD, handler: handler,
+          beginRequest: { self.beginRequest() }, finishRequest: { self.finishRequest() })
       }
     }
   }
@@ -1457,7 +1555,12 @@ public final class AgentDaemonServer: @unchecked Sendable {
   /// pieces (`net.local.stream.recvspace`), so it was rescanned ~350 times, and
   /// `Data.firstIndex(of:)` compares byte by byte through non-inlined
   /// `__DataStorage` accessors. Frame semantics are unchanged.
-  private static func serve(connectionFD: Int32, handler: RuntimeControlPlaneHandler) async {
+  private static func serve(
+    connectionFD: Int32,
+    handler: RuntimeControlPlaneHandler,
+    beginRequest: @escaping @Sendable () -> Void,
+    finishRequest: @escaping @Sendable () -> Void
+  ) async {
     defer { close(connectionFD) }
     // A client that hangs up before reading leaves this socket with no reader.
     // The response write below already treats that as a short write and drops
@@ -1487,7 +1590,9 @@ public final class AgentDaemonServer: @unchecked Sendable {
         buffer.removeSubrange(start...(start + terminatorOffset))
         scannedByteCount = 0
         guard !line.isEmpty else { continue }
+        beginRequest()
         let response = await handler.handleLine(line)
+        finishRequest()
         var written = 0
         let total = response.count
         let sent: Bool = response.withUnsafeBytes { raw in

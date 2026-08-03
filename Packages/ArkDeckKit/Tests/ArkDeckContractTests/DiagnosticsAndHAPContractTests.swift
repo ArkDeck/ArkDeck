@@ -905,13 +905,13 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   /// at admission above (the device-side existence/size readback for
   /// `hitrace -o` is still unimplemented).
   func testTraceIsDeclaredFileBackedSoItCannotBePublishedFromStdout() throws {
-    XCTAssertTrue(RuntimeJobEngine.fileBackedArtifacts.contains("trace.htrace"))
+    XCTAssertTrue(RuntimeArtifactService.fileBackedArtifacts.contains("trace.htrace"))
     XCTAssertEqual(
-      RuntimeJobEngine.artifactMapping["capture.diagnostics@1"]?["receive-trace-artifact"],
+      RuntimeArtifactService.artifactMapping["capture.diagnostics@1"]?["receive-trace-artifact"],
       ["trace.htrace"])
     for streamed in ["hilog.txt", "ui-dump.json", "debug-hilog.txt"] {
       XCTAssertFalse(
-        RuntimeJobEngine.fileBackedArtifacts.contains(streamed),
+        RuntimeArtifactService.fileBackedArtifacts.contains(streamed),
         "\(streamed) is a captured stream and must keep publishing from the receipt")
     }
   }

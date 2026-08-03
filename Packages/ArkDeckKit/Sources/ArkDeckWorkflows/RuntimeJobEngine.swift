@@ -81,6 +81,11 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let timeline: [String]
 }
 
+public struct RuntimeJobStatusPage: Sendable, Equatable {
+  public let jobs: [RuntimeJobStatus]
+  public let nextCursor: String?
+}
+
 public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case defaultReadOnlyPolicy
   case runtimeCapability
@@ -419,78 +424,31 @@ private struct RuntimeArtifactPublicationFailure: Error, Sendable {
   let detail: String
 }
 
-// MARK: - Durable idempotency ledger
+// MARK: - Admission fault injection
 
-struct IdempotencyEntry: Codable, Equatable {
-  let idempotencyKey: String
-  let jobID: String
-  let requestFingerprintSHA256: String
+/// Crash-consistency test seam. Production uses `.none`; tests inject an
+/// error immediately after the named durable boundary, discard the engine and
+/// reopen it exactly as a process restart would.
+public enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
+  case beforeAdmission
+  case afterAdmission
+  case beforeJournalAppend
+  case afterJournalAppend
+  case beforeRecordPersist
+  case afterRecordPersist
+  case beforeResponse
 }
 
-private struct IdempotencyDocument: Codable, Equatable {
-  var schemaVersion: String
-  var entries: [IdempotencyEntry]
-}
+public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
+  private let body: (RuntimeAdmissionFaultPoint) throws -> Void
 
-final class RuntimeIdempotencyLedger: @unchecked Sendable {
-  private let url: URL
-  private let queue = DispatchQueue(label: "arkdeck.idempotency-ledger")
-
-  init(url: URL) {
-    self.url = url
+  public init(_ body: @escaping (RuntimeAdmissionFaultPoint) throws -> Void) {
+    self.body = body
   }
 
-  enum Verdict: Equatable {
-    case new
-    case duplicate(jobID: String)
-    case conflict
-  }
+  public func check(_ point: RuntimeAdmissionFaultPoint) throws { try body(point) }
 
-  func lookup(key: String, fingerprint: String) throws -> Verdict {
-    try queue.sync {
-      let document = try load()
-      guard let existing = document.entries.first(where: { $0.idempotencyKey == key }) else {
-        return .new
-      }
-      return existing.requestFingerprintSHA256 == fingerprint
-        ? .duplicate(jobID: existing.jobID) : .conflict
-    }
-  }
-
-  func admit(key: String, jobID: String, fingerprint: String) throws -> Verdict {
-    try queue.sync {
-      var document = try load()
-      if let existing = document.entries.first(where: { $0.idempotencyKey == key }) {
-        return existing.requestFingerprintSHA256 == fingerprint
-          ? .duplicate(jobID: existing.jobID) : .conflict
-      }
-      document.entries.append(
-        IdempotencyEntry(idempotencyKey: key, jobID: jobID, requestFingerprintSHA256: fingerprint))
-      try persist(document)
-      return .new
-    }
-  }
-
-  private func load() throws -> IdempotencyDocument {
-    guard FileManager.default.fileExists(atPath: url.path) else {
-      return IdempotencyDocument(schemaVersion: "1.0.0", entries: [])
-    }
-    let data = try Data(contentsOf: url)
-    return try JSONDecoder().decode(IdempotencyDocument.self, from: data)
-  }
-
-  private func persist(_ document: IdempotencyDocument) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-    let data = try encoder.encode(document)
-    let temporary = url.deletingLastPathComponent()
-      .appendingPathComponent(".idempotency.tmp.\(getpid())")
-    try data.write(to: temporary, options: [])
-    let handle = try FileHandle(forWritingTo: temporary)
-    try handle.synchronize()
-    try handle.close()
-    _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
-  }
+  public static let none = RuntimeAdmissionFaultInjector { _ in }
 }
 
 // MARK: - Engine
@@ -501,13 +459,16 @@ public actor RuntimeJobEngine {
   public struct Configuration: Sendable {
     public let stateDirectory: URL
     public let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
+    public let admissionFaultInjector: RuntimeAdmissionFaultInjector
 
     public init(
       stateDirectory: URL,
-      defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy()
+      defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy(),
+      admissionFaultInjector: RuntimeAdmissionFaultInjector = .none
     ) {
       self.stateDirectory = stateDirectory
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
+      self.admissionFaultInjector = admissionFaultInjector
     }
   }
 
@@ -617,7 +578,7 @@ public actor RuntimeJobEngine {
   /// runtime cannot honor campaign-reservation requests and refuses them.
   private let agentUsageLedger: AgentAuthorityUsageLedger?
   private let mutationLane = DeviceMutationLaneCoordinator()
-  private let idempotencyLedger: RuntimeIdempotencyLedger
+  private let admissionService: RuntimeAdmissionService
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
@@ -642,8 +603,7 @@ public actor RuntimeJobEngine {
       at: configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true),
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    self.idempotencyLedger = RuntimeIdempotencyLedger(
-      url: configuration.stateDirectory.appendingPathComponent("idempotency.json"))
+    self.admissionService = try RuntimeAdmissionService(stateDirectory: configuration.stateDirectory)
   }
 
   public func operationAvailability() -> [RuntimeOperationAvailability] {
@@ -666,7 +626,7 @@ public actor RuntimeJobEngine {
       if descriptor.reference == "debug.hap@1"
         || descriptor.reference == "deploy.native-library.app-owned@1"
         || descriptor.reference == "flash.dayu200@1"
-        || Self.workspaceOperationReferences.contains(descriptor.reference),
+        || RuntimeArtifactService.workspaceOperationReferences.contains(descriptor.reference),
         artifactStore == nil
       {
         reasons.append("runtime.artifactStoreUnavailable")
@@ -950,15 +910,15 @@ public actor RuntimeJobEngine {
         "cannot canonicalize the typed request: \(error)")
     }
     let fingerprint = Self.fingerprint(of: canonicalRequestData)
-    switch try idempotencyLedger.lookup(
-      key: request.idempotencyKey, fingerprint: fingerprint)
+    switch try admissionService.lookup(
+      idempotencyKey: request.idempotencyKey, requestHash: fingerprint)
     {
     case .duplicate(let existingJobID):
       return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
     case .conflict:
       throw RuntimeJobEngineError.idempotencyConflict(
         "idempotency key reuse with a different request")
-    case .new:
+    case .admitted:
       break
     }
 
@@ -997,25 +957,6 @@ public actor RuntimeJobEngine {
       }
     }
 
-    switch try idempotencyLedger.admit(
-      key: request.idempotencyKey, jobID: jobID, fingerprint: fingerprint)
-    {
-    case .duplicate(let existingJobID):
-      return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
-    case .conflict:
-      throw RuntimeJobEngineError.idempotencyConflict(
-        "idempotency key reuse with a different request")
-    case .new:
-      break
-    }
-
-    let jobDirectory = configuration.stateDirectory
-      .appendingPathComponent("jobs", isDirectory: true)
-      .appendingPathComponent(jobID, isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: jobDirectory, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    let journal = try FileDurableJournal(url: jobDirectory.appendingPathComponent("journal.jsonl"))
     let timestamp = nowUTC()
     var record = RuntimeJobRecord(
       jobID: jobID,
@@ -1030,6 +971,28 @@ public actor RuntimeJobEngine {
       materializedStableTargetIdentitySHA256:
         materialized.stableTargetIdentitySHA256,
       materializedBindingRevision: materialized.bindingRevision)
+    record.state = JobState.preflight.rawValue
+    record.timeline = ["jobCreated", "queued->preflight"]
+    try configuration.admissionFaultInjector.check(.beforeAdmission)
+    switch try admissionService.admit(record: record, requestHash: fingerprint) {
+    case .duplicate(let existingJobID):
+      return RuntimeJobAcceptance(jobID: existingJobID, deduplicated: true)
+    case .conflict:
+      throw RuntimeJobEngineError.idempotencyConflict(
+        "idempotency key reuse with a different request")
+    case .admitted:
+      break
+    }
+    try configuration.admissionFaultInjector.check(.afterAdmission)
+
+    let jobDirectory = configuration.stateDirectory
+      .appendingPathComponent("jobs", isDirectory: true)
+      .appendingPathComponent(jobID, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: jobDirectory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let journal = try FileDurableJournal(url: jobDirectory.appendingPathComponent("journal.jsonl"))
+    try configuration.admissionFaultInjector.check(.beforeJournalAppend)
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
         eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
@@ -1038,10 +1001,12 @@ public actor RuntimeJobEngine {
       JournalEvent.stateTransition(
         eventID: "to-preflight", sequence: 1, sessionID: record.sessionID, jobID: jobID,
         timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted"))
-    record.state = "preflight"
-    record.timeline = ["jobCreated", "queued->preflight"]
-    try record.persist(into: jobDirectory)
+    try configuration.admissionFaultInjector.check(.afterJournalAppend)
+    try configuration.admissionFaultInjector.check(.beforeRecordPersist)
+    try persistRuntimeRecord(record)
+    try configuration.admissionFaultInjector.check(.afterRecordPersist)
     jobs[jobID] = JobRuntime(record: record, journal: journal, nextSequence: 2)
+    try configuration.admissionFaultInjector.check(.beforeResponse)
     return RuntimeJobAcceptance(jobID: jobID, deduplicated: false)
   }
 
@@ -1113,13 +1078,12 @@ public actor RuntimeJobEngine {
           &current, from: .running, to: .waitingForRecovery, reason: "outcomeUnknown: \(reason)")
         current.record.outcomeUnknown = true
         current.record.finishedAtUTC = nowUTC()
-        try current.record.persist(
-          into: jobDirectory(for: jobID))
+        try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try await recordCapabilityOutcome(
           for: current.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
-        return status(of: current.record)
+        return statusAndReleaseTerminalRuntime(current.record)
       case .confirmedNotExecuted(let reason),
         .confirmedNotExecutedWithDiagnostic(let reason, _),
         .failed(let reason):
@@ -1128,12 +1092,12 @@ public actor RuntimeJobEngine {
         try transition(&current, from: .running, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
-        try current.record.persist(into: jobDirectory(for: jobID))
+        try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return status(of: current.record)
+        return statusAndReleaseTerminalRuntime(current.record)
       }
     } catch let failure as RuntimeArtifactPublicationFailure {
       var current = jobs[jobID] ?? runtime
@@ -1144,12 +1108,12 @@ public actor RuntimeJobEngine {
         &current, from: .finalizing, to: .failed,
         reason: "artifact publication failed: \(failure.detail)")
       current.record.finishedAtUTC = nowUTC()
-      try current.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(current.record)
       jobs[jobID] = current
       try await recordCapabilityOutcome(
         for: current.record, outcome: .confirmed,
         state: JobState.failed.rawValue)
-      return status(of: current.record)
+      return statusAndReleaseTerminalRuntime(current.record)
     }
 
     var current = jobs[jobID] ?? runtime
@@ -1172,22 +1136,22 @@ public actor RuntimeJobEngine {
           &current, from: .finalizing, to: .failed,
           reason: "artifact finalization failed: \(failure.detail)")
         current.record.finishedAtUTC = nowUTC()
-        try current.record.persist(into: jobDirectory(for: jobID))
+        try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return status(of: current.record)
+        return statusAndReleaseTerminalRuntime(current.record)
       }
       current = jobs[jobID] ?? current
       try transition(&current, from: .finalizing, to: .succeeded, reason: "finalized")
     }
     current.record.finishedAtUTC = nowUTC()
-    try current.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(current.record)
     jobs[jobID] = current
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
-    return status(of: current.record)
+    return statusAndReleaseTerminalRuntime(current.record)
   }
 
   private func executeSteps(
@@ -1593,7 +1557,7 @@ public actor RuntimeJobEngine {
     runtime.record.outstandingResidueCount =
       outstanding.filter { $0.jobID == jobID }.count
     jobs[jobID] = runtime
-    try? runtime.record.persist(into: jobDirectory(for: jobID))
+    try? persistRuntimeRecord(runtime.record)
   }
 
   /// What this action was supposed to remove, when it is a cleanup-class
@@ -1960,9 +1924,9 @@ public actor RuntimeJobEngine {
       jobs[jobID] = runtime
     }
     guard let artifactStore, let runtime = jobs[jobID],
-      let names = Self.artifactMapping[descriptor.reference]?[step.stepID]
+      let names = RuntimeArtifactService.artifactMapping[descriptor.reference]?[step.stepID]
     else { return }
-    let binding = Self.artifactBindingSnapshot(for: runtime.record)
+    let binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
     for name in names {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
@@ -2015,7 +1979,7 @@ public actor RuntimeJobEngine {
     // become dispatchable. A crash can leave an unused pending record, but
     // it can never leave a durable external intent whose action recovery
     // must guess from a later catalog.
-    try runtime.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
     // The write-ahead gate is the production dispatch path: the closure is
     // unreachable unless the intent is durable.
@@ -2026,7 +1990,7 @@ public actor RuntimeJobEngine {
       runtime.record.recoveryStepID = nil
       runtime.record.recoveryIntentEventID = nil
       runtime.record.recoveryAction = nil
-      try? runtime.record.persist(into: jobDirectory(for: jobID))
+      try? persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       throw error
     }
@@ -2136,7 +2100,7 @@ public actor RuntimeJobEngine {
       current.record.timeline.append(
         "failed \(step.stepID): \(code): \(detail)")
       jobs[jobID] = current
-      if Self.failedDiagnosticArtifactOperations.contains(descriptor.reference) {
+      if RuntimeArtifactService.failedDiagnosticArtifactOperations.contains(descriptor.reference) {
         try await publishDeclaredArtifacts(
           jobID: jobID, step: step,
           summary: [
@@ -2303,7 +2267,7 @@ public actor RuntimeJobEngine {
       }
     }
     do {
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
     } catch {
       throw RuntimeDispatchFailure.failed(
@@ -2325,7 +2289,7 @@ public actor RuntimeJobEngine {
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: runtime.record.operationReference)
     else { return }
-    guard let mapping = Self.artifactMapping[descriptor.reference]?[step.stepID] else {
+    guard let mapping = RuntimeArtifactService.artifactMapping[descriptor.reference]?[step.stepID] else {
       return  // this step owns no declared product
     }
     guard let artifactStore else {
@@ -2335,7 +2299,7 @@ public actor RuntimeJobEngine {
       }
       return
     }
-    let binding = Self.artifactBindingSnapshot(for: runtime.record)
+    let binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
     for name in mapping {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
@@ -2345,7 +2309,9 @@ public actor RuntimeJobEngine {
       // falling back to it would publish a transfer banner under the
       // artifact's name.
       var landed: ProviderLandedArtifact?
-      if Self.fileBackedArtifacts.contains(name) || Self.receivedRedactedArtifacts.contains(name) {
+      if RuntimeArtifactService.fileBackedArtifacts.contains(name)
+        || RuntimeArtifactService.receivedRedactedArtifacts.contains(name)
+      {
         guard let received = receipt.landedArtifact, received.sha256 != nil else {
           let detail = "\(name) has no received host file to publish"
           _ = try? await artifactStore.recordMissing(
@@ -2365,7 +2331,7 @@ public actor RuntimeJobEngine {
       // pulling the bytes into memory first.
       var contents =
         landed == nil
-        ? Self.artifactContents(
+        ? RuntimeArtifactService.artifactContents(
           name: name, summary: summary, receipt: receipt, descriptor: descriptor,
           record: runtime.record)
         : Data()
@@ -2404,7 +2370,7 @@ public actor RuntimeJobEngine {
       }
       do {
         let metadata: RuntimeArtifactMetadata
-        if let landed, Self.fileBackedArtifacts.contains(name), let sha256 = landed.sha256 {
+        if let landed, RuntimeArtifactService.fileBackedArtifacts.contains(name), let sha256 = landed.sha256 {
           metadata = try await artifactStore.publishFile(
             RuntimeArtifactFilePublicationRequest(
               jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
@@ -2459,106 +2425,6 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// Declared products whose bytes come from a device file transfer rather
-  /// than from a captured stream. They publish from the host file the
-  /// dispatcher measured, and a missing file is a recorded absence — there
-  /// is no path from "the step ran" to a published trace.
-  static let fileBackedArtifacts: Set<String> = ["trace.htrace", "screenshot.png"]
-
-  /// A confirmed process failure still owns useful bounded diagnostics.
-  /// Publishing those bytes does not turn the Job into success; it prevents
-  /// the failure path from discarding the only actionable build/test output.
-  static let failedDiagnosticArtifactOperations: Set<String> = [
-    "workspace.build-openharmony@1",
-    "workspace.run-tests@1",
-  ]
-
-  static let workspaceOperationReferences: Set<String> = [
-    "workspace.apply-patch@1",
-    "workspace.build-openharmony@1",
-    "workspace.create-checkpoint@1",
-    "workspace.revert-patch@1",
-    "workspace.run-tests@1",
-    "workspace.symbolize-crash@1",
-  ]
-
-  /// Received products that must NOT take the file-backed route. The store
-  /// refuses `text/*` and `application/json` there because file-backed
-  /// publication skips redaction, and these carry on-screen strings — the
-  /// component tree's nodes include `text` and `description`. They are read
-  /// after the budget guard and published through the redacting path.
-  static let receivedRedactedArtifacts: Set<String> = ["ui-tree.json"]
-
-  /// Which step produces which declared artifact. Kept beside the engine
-  /// rather than in the catalog schema because it is an implementation
-  /// detail of the orchestration, not part of the published contract.
-  static let artifactMapping: [String: [String: [String]]] = [
-    "analyzer.extract-crash-signature@1": [
-      "extract-crash-signature": ["crash-signature.json"]
-    ],
-    "analyzer.summarize-hilog@1": [
-      "summarize-hilog": ["hilog-summary.json"]
-    ],
-    "analyzer.summarize-trace@1": [
-      "summarize-trace": ["trace-summary.json"]
-    ],
-    "workspace.inspect-source@1": [
-      "inspect-workspace-source": ["source-inspection.txt"]
-    ],
-    "workspace.apply-patch@1": [
-      "apply-patch": ["applied-patch.json"]
-    ],
-    "workspace.build-openharmony@1": [
-      "build-project": ["build.log"]
-    ],
-    "workspace.create-checkpoint@1": [
-      "create-checkpoint": ["checkpoint.txt"]
-    ],
-    "workspace.run-tests@1": [
-      "run-tests": ["test-output.log"]
-    ],
-    "workspace.symbolize-crash@1": [
-      "symbolize-crash": ["symbolized-crash.txt"]
-    ],
-    "workspace.revert-patch@1": [
-      "revert-patch": ["revert-report.json"]
-    ],
-    "observe.device@1": [
-      "probe-host-tool": ["tool-facts.json"],
-      "read-evidence-firmware": ["device-facts.json", "binding-snapshot.json"],
-    ],
-    "capture.diagnostics@1": [
-      "observe-application-liveness": ["application-liveness.json"],
-      "capture-hilog": ["hilog.txt"],
-      "capture-ui-dump": ["ui-dump.json"],
-      "receive-trace-artifact": ["trace.htrace"],
-      "receive-ui-tree": ["ui-tree.json"],
-      "receive-screenshot": ["screenshot.png"],
-      "capture-crash-index": ["crash-index.txt"],
-      "capture-crash-log": ["crash-log.txt"],
-    ],
-    "debug.hap@1": [
-      "package-readback": ["install-readback.json"],
-      "process-readback": ["process-readback.json"],
-      "capture-diagnostics": ["debug-hilog.txt"],
-    ],
-    "deploy.native-library.app-owned@1": [
-      "atomic-publish": ["publish-report.json"],
-      "verify-loaded-library": ["verification-report.json"],
-    ],
-    "flash.dayu200@1": [
-      "rebind-and-verify-build": ["post-flash-facts.json"],
-      "capture-post-flash-diagnostics": ["post-flash-hilog.txt"],
-    ],
-  ]
-
-  /// Products the engine synthesises at finalize time rather than from a
-  /// single step: the index and summary describe the run as a whole.
-  static let finalizeArtifacts: [String: [String]] = [
-    "capture.diagnostics@1": ["artifact-index.json", "capture-summary.json"],
-    "flash.dayu200@1": ["flash-report.json"],
-  ]
-
   /// Writes the run-level index and summary. The summary states every
   /// declared product and its final status, so a caller reading only the
   /// summary still learns that (say) the trace is missing - a partial
@@ -2567,7 +2433,7 @@ public actor RuntimeJobEngine {
     jobID: String, descriptor: CatalogOperationDescriptor
   ) async throws {
     guard let runtime = jobs[jobID],
-      let names = Self.finalizeArtifacts[descriptor.reference]
+      let names = RuntimeArtifactService.finalizeArtifacts[descriptor.reference]
     else { return }
     guard let artifactStore else {
       if descriptor.reference == "flash.dayu200@1" {
@@ -2576,7 +2442,7 @@ public actor RuntimeJobEngine {
       }
       return
     }
-    let binding = Self.artifactBindingSnapshot(for: runtime.record)
+    let binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
 
     // Backstop: every declared product that never reached the index gets
     // recorded as missing here, whichever step should have produced it.
@@ -2624,7 +2490,7 @@ public actor RuntimeJobEngine {
       }
       let contents: Data
       do {
-        contents = try Self.finalArtifactContents(
+        contents = try RuntimeArtifactService.finalArtifactContents(
           name: name, descriptor: descriptor, record: runtime.record,
           recorded: recorded, finalizeArtifactNames: names,
           completedStepIDs: runtime.completedStepIDs)
@@ -2680,231 +2546,6 @@ public actor RuntimeJobEngine {
     }
   }
 
-  static func finalArtifactContents(
-    name: String,
-    descriptor: CatalogOperationDescriptor,
-    record: RuntimeJobRecord,
-    recorded: [RuntimeArtifactMetadata],
-    finalizeArtifactNames: [String],
-    completedStepIDs: Set<String>
-  ) throws -> Data {
-    var perArtifact: [String: JSONValue] = [:]
-    for declaration in descriptor.artifacts
-    where !finalizeArtifactNames.contains(declaration.name) {
-      let match = recorded.first { $0.name == declaration.name }
-      let state: String
-      var detail: String?
-      switch match?.status {
-      case .some(.published): state = "published"
-      case .some(.missing(let reason)):
-        state = "missing"
-        detail = reason
-      case .some(.truncated(let atBytes)):
-        state = "truncated"
-        detail = "at \(atBytes) bytes"
-      case nil:
-        state = "missing"
-        detail = "never produced"
-      }
-      var entry: [String: JSONValue] = [
-        "status": .string(state),
-        "required": .bool(declaration.isRequired),
-      ]
-      if let detail { entry["detail"] = .string(detail) }
-      if let match, match.status.isPublished {
-        entry["artifactId"] = .string(match.artifactID)
-        entry["byteCount"] = .integer(Int64(match.byteCount))
-        entry["sha256"] = .string(match.sha256)
-      }
-      perArtifact[declaration.name] = .object(entry)
-    }
-    let missingRequired = descriptor.artifacts.filter { declaration in
-      guard declaration.isRequired,
-        !finalizeArtifactNames.contains(declaration.name)
-      else { return false }
-      return recorded.first { $0.name == declaration.name }?.status.isPublished != true
-    }
-    var payload: [String: JSONValue] = [
-      "operation": .string(descriptor.reference),
-      "jobId": .string(record.jobID),
-      "artifacts": .object(perArtifact),
-    ]
-    if !name.contains("index") {
-      payload["completeness"] = .string(
-        missingRequired.isEmpty ? "complete" : "incomplete")
-      payload["missingRequired"] = .array(
-        missingRequired.map { .string($0.name) })
-    }
-    if descriptor.reference == "flash.dayu200@1" {
-      appendFlashArtifactLineage(to: &payload, record: record)
-      payload["verifiedSteps"] = .array(
-        completedStepIDs.sorted().map { .string($0) })
-      var requestFields: [String: JSONValue] = [:]
-      for key in ["deviceProfile", "partitionPlan", "postFlashVerification"] {
-        if let value = record.request.inputs[key] {
-          requestFields[key] = value
-        }
-      }
-      payload["request"] = .object(requestFields)
-    }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-    return try encoder.encode(payload)
-  }
-
-  static func artifactContents(
-    name: String,
-    summary: [String: String],
-    receipt: ProviderProcessReceipt,
-    descriptor: CatalogOperationDescriptor,
-    record: RuntimeJobRecord
-  ) -> Data {
-    switch name {
-    case "application-liveness.json":
-      var fields: [String: JSONValue] = [
-        "documentType": .string("arkdeck-application-liveness"),
-        "schemaVersion": .string("1.0.0"),
-        "applicationRef": .string(summary["applicationRef"] ?? ""),
-        "state": .string(summary["state"] ?? "UNKNOWN"),
-        "reasonCode": .string(summary["reasonCode"] ?? "processReadbackUnavailable"),
-        "abilityState": .string(summary["abilityState"] ?? "UNKNOWN"),
-        "processState": .string(summary["processState"] ?? "UNKNOWN"),
-        "pidObserved": .bool(summary["pidObserved"] == "true"),
-        "sourceRuntimeJobId": .string(record.jobID),
-        "sourceOperationRef": .string(descriptor.reference),
-        "observedAtUtc": .string(summary["observedAtUtc"] ?? ""),
-      ]
-      if let revision = record.request.target.expectedBindingRevision {
-        fields["targetBindingRevision"] = .integer(Int64(revision))
-      }
-      if let digest = summary["deployedArtifactDigest"] {
-        fields["deployedArtifactDigest"] = .string(digest)
-      }
-      fields["observationWindow"] = .object([
-        "startedAtUtc": .string(summary["observedAtUtc"] ?? ""),
-        "endedAtUtc": .string(summary["observedAtUtc"] ?? ""),
-      ])
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-      return (try? encoder.encode(fields)) ?? Data("{}".utf8)
-    case "source-inspection.txt", "symbolized-crash.txt":
-      // The inspection *is* its stdout. Publishing a summary instead would
-      // hand the evaluator a description of evidence rather than evidence
-      // (the #798 lesson, in a host-only shape).
-      return receipt.stdout
-    case "crash-signature.json"
-    where descriptor.reference == AnalyzerProvider.crashSignature:
-      // The analyzer's stdout is the deterministic conclusion; the published
-      // Artifact additionally carries the exact source/tool provenance the
-      // provider verified. The harness consumes this envelope rather than
-      // reparsing the raw Faultlogger listing.
-      guard let result = try? JSONDecoder().decode(
-        HarnessCrashLedgerAnalysis.self, from: receipt.stdout),
-        let analyzerRef = summary["analyzerRef"],
-        let analyzerVersion = summary["analyzerVersion"],
-        let sourceArtifactID = summary["sourceArtifactId"],
-        let sourceSHA256 = summary["sourceSha256"],
-        let sourceByteCount = summary["sourceByteCount"].flatMap(Int.init),
-        let outputSHA256 = summary["derivedSha256"],
-        let outputByteCount = summary["derivedByteCount"].flatMap(Int.init)
-      else { return Data("{}".utf8) }
-      let envelope = HarnessCrashLedgerDerivedArtifact(
-        analyzerRef: analyzerRef, analyzerVersion: analyzerVersion,
-        sourceArtifactID: sourceArtifactID, sourceSHA256: sourceSHA256,
-        sourceByteCount: sourceByteCount, analyzerOutputSHA256: outputSHA256,
-        analyzerOutputByteCount: outputByteCount, result: result)
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      return (try? encoder.encode(envelope)) ?? Data("{}".utf8)
-    case "build.log", "test-output.log":
-      var output = receipt.stdout
-      output.append(receipt.stderr)
-      return output
-    case "hilog.txt", "ui-dump.json", "debug-hilog.txt", "post-flash-hilog.txt",
-      "crash-index.txt", "crash-log.txt":
-      // Raw capture products are the bounded provider bytes themselves.
-      // Encoding only the semantic byteCount here would fabricate a log
-      // artifact while discarding the evidence the operation captured.
-      //
-      // `trace.htrace` is deliberately absent: it is produced by a device
-      // file transfer, not by stdout, and is published from the received
-      // file (`fileBackedArtifacts`).
-      return receipt.stdout
-    default:
-      break
-    }
-    var fields: [String: JSONValue] = [
-      "artifact": .string(name),
-      "operation": .string(descriptor.reference),
-      "jobId": .string(record.jobID),
-      "catalogDigest": .string(record.catalogDigest),
-    ]
-    if let observation = record.evidenceObservation {
-      if let model = observation.model { fields["model"] = .string(model) }
-      if let firmware = observation.firmware { fields["firmware"] = .string(firmware) }
-      if let transport = observation.transport { fields["transport"] = .string(transport) }
-      if let identity = observation.stableIdentitySHA256 {
-        fields["stableIdentitySha256"] = .string(identity)
-      }
-    }
-    // The verified step's summary is the product being published. It must
-    // win over the admission-time observation for post-mutation facts.
-    for (key, value) in summary {
-      fields[key] = .string(value)
-    }
-    if name == "binding-snapshot.json" {
-      fields["targetId"] = .string(record.request.target.targetID)
-      if let revision = record.request.target.expectedBindingRevision {
-        fields["expectedBindingRevision"] = .integer(Int64(revision))
-      }
-    }
-    if descriptor.reference == "flash.dayu200@1" {
-      appendFlashArtifactLineage(to: &fields, record: record)
-    }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-    return (try? encoder.encode(fields)) ?? Data("{}".utf8)
-  }
-
-  private static func appendFlashArtifactLineage(
-    to fields: inout [String: JSONValue], record: RuntimeJobRecord
-  ) {
-    fields["catalogDigest"] = .string(record.catalogDigest)
-    fields["providerId"] = .string(record.providerID)
-    fields["targetId"] = .string(record.request.target.targetID)
-    if let revision = record.request.target.expectedBindingRevision {
-      fields["expectedBindingRevision"] = .integer(Int64(revision))
-    }
-    if let identity = record.evidenceObservation?.stableIdentitySHA256
-      ?? record.materializedStableTargetIdentitySHA256
-    {
-      fields["stableIdentitySha256"] = .string(identity)
-    }
-    if let digest = record.materializedPlanDigest {
-      fields["materializedPlanDigest"] = .string(digest)
-    }
-    if let evidence = record.admissionEvidence {
-      var authority: [String: JSONValue] = [
-        "kind": .string(evidence.kind.rawValue),
-        "reference": .string(evidence.reference),
-      ]
-      if let fingerprint = evidence.consumptionFingerprintSHA256 {
-        authority["consumptionFingerprintSha256"] = .string(fingerprint)
-      }
-      fields["authority"] = .object(authority)
-    }
-  }
-
-  private static func artifactBindingSnapshot(
-    for record: RuntimeJobRecord
-  ) -> ArtifactBindingSnapshot {
-    ArtifactBindingSnapshot(
-      targetID: record.request.target.targetID,
-      bindingRevision: record.request.target.expectedBindingRevision,
-      stableIdentitySHA256: record.evidenceObservation?.stableIdentitySHA256
-        ?? record.materializedStableTargetIdentitySHA256)
-  }
-
   // MARK: Cancel / status / recovery
 
   public func requestCancel(jobID: String) throws {
@@ -2913,15 +2554,11 @@ public actor RuntimeJobEngine {
   }
 
   public func status(jobID: String) throws -> RuntimeJobStatus {
-    guard let runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
-    return status(of: runtime.record)
+    status(of: try recordForRead(jobID: jobID))
   }
 
   public func evidenceSnapshot(jobID: String) throws -> RuntimeJobEvidenceSnapshot {
-    guard let runtime = jobs[jobID] else {
-      throw RuntimeJobEngineError.jobNotFound(jobID)
-    }
-    let record = runtime.record
+    let record = try recordForRead(jobID: jobID)
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
       operationReference: record.operationReference,
@@ -2947,17 +2584,15 @@ public actor RuntimeJobEngine {
   /// text, so an artifact that was selected but failed remains an evidence
   /// blocker.
   public func intentionallyOmittedArtifactNames(jobID: String) throws -> Set<String> {
-    guard let runtime = jobs[jobID] else {
-      throw RuntimeJobEngineError.jobNotFound(jobID)
-    }
+    let record = try recordForRead(jobID: jobID)
     guard
       let descriptor = RuntimeOperationCatalog.descriptor(
-        reference: runtime.record.operationReference)
+        reference: record.operationReference)
     else {
       throw RuntimeJobEngineError.internalFailure(
-        "persisted operation \(runtime.record.operationReference) is unavailable")
+        "persisted operation \(record.operationReference) is unavailable")
     }
-    let inputs = runtime.record.request.inputs
+    let inputs = record.request.inputs
     var omittedSteps: Set<String> = []
     for step in descriptor.steps where step.isOptional {
       if let upstream = Self.optionalStepUpstream[descriptor.reference]?[step.stepID],
@@ -2970,12 +2605,47 @@ public actor RuntimeJobEngine {
     }
     return Set(
       omittedSteps.flatMap {
-        Self.artifactMapping[descriptor.reference]?[$0] ?? []
+        RuntimeArtifactService.artifactMapping[descriptor.reference]?[$0] ?? []
       })
   }
 
+  /// Returns both active Runtime snapshots and durable terminal history.  The
+  /// latter is projected from SQLite so callers keep the established `job.list`
+  /// behaviour without forcing the daemon to retain a journal writer per
+  /// completed job.
   public func listJobs() -> [RuntimeJobStatus] {
-    jobs.values.map { status(of: $0.record) }.sorted { $0.jobID < $1.jobID }
+    var statuses: [String: RuntimeJobStatus] = [:]
+    if let persisted = try? admissionService.allJobs() {
+      for row in persisted {
+        guard let data = row.initialRecordData,
+          let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+        else { continue }
+        statuses[record.jobID] = status(of: record)
+      }
+    }
+    // Active snapshots can contain timeline entries accumulated since their
+    // last durable projection; they take precedence over the history index.
+    for runtime in jobs.values {
+      statuses[runtime.record.jobID] = status(of: runtime.record)
+    }
+    return statuses.values.sorted { $0.jobID < $1.jobID }
+  }
+
+  /// Reads compact terminal history from SQLite.  Active jobs still return
+  /// their in-memory snapshots above; both views use the same typed status
+  /// model and opaque cursor contract.
+  public func listJobs(pageSize: Int, cursor: String? = nil) throws -> RuntimeJobStatusPage {
+    let page = try admissionService.listJobs(pageSize: pageSize, cursor: cursor)
+    let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
+      guard let data = persisted.initialRecordData,
+        let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "Runtime job history record \(persisted.jobID) is unreadable")
+      }
+      return status(of: record)
+    }
+    return RuntimeJobStatusPage(jobs: statuses, nextCursor: page.nextCursor)
   }
 
   public func listCleanupDebt() async throws -> [CleanupDebtRecord] {
@@ -3126,171 +2796,59 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// Restart recovery: reopen every persisted job, replay its journal and
-  /// park unknowns. Clean journals retain their exact confirmed provider
-  /// boundary and can be resumed explicitly. Recovery itself never
-  /// dispatches anything.
+  /// Explicit full recovery for diagnostics and migration.  Production
+  /// daemon launch uses `recoverActiveJobs()` so terminal history remains a
+  /// SQLite query instead of thousands of journal replays.
   public func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
-    let jobsRoot = configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true)
-    let entries =
-      (try? FileManager.default.contentsOfDirectory(
-        at: jobsRoot, includingPropertiesForKeys: nil)) ?? []
+    try await recover(records: try admissionService.allJobs())
+  }
+
+  /// Restart recovery for the daemon hot path.  Only non-terminal jobs can
+  /// need a recovery decision, therefore terminal rows are not reopened,
+  /// parsed, or retained in `jobs`.  `status` and `listJobs(pageSize:cursor:)`
+  /// continue to project those records directly from SQLite.
+  public func recoverActiveJobs() async throws -> [RuntimeJobStatus] {
+    try await recover(records: try admissionService.activeJobs())
+  }
+
+  /// Reopen the supplied authoritative job set, replay each journal and park
+  /// unknowns. Clean journals retain their exact confirmed provider boundary
+  /// and can be resumed explicitly. Recovery itself never dispatches.
+  private func recover(records persistedJobs: [RuntimePersistedJob]) async throws -> [RuntimeJobStatus] {
+    let recoveryService = RuntimeRecoveryService(
+      stateDirectory: configuration.stateDirectory, nowUTC: nowUTC)
+    for persisted in persistedJobs {
+      try recoveryService.restoreInitialAdmissionProjectionIfNeeded(persisted)
+    }
     var recovered: [RuntimeJobStatus] = []
-    for entry in entries where entry.hasDirectoryPath {
-      let jobID = entry.lastPathComponent
-      if jobs[jobID] != nil { continue }
-      guard var record = try? RuntimeJobRecord.load(from: entry) else { continue }
-      let journalURL = entry.appendingPathComponent("journal.jsonl")
-      let journal = try FileDurableJournal(url: journalURL)
-      var inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      var nextSequence = Int((inspection.lastDurableSequence ?? -1) + 1)
-
-      // A crash after reconcileOutcome may leave its mandatory triggered
-      // transition unwritten. Finish that journal-only decision before
-      // considering any provider work.
-      if let last = inspection.events.last,
-        last.kind == .reconcileOutcome,
-        case .string(let nextStateRaw)? = last.payload["nextState"],
-        let nextState = JobState(rawValue: nextStateRaw)
-      {
-        try journal.appendAndSynchronize(
-          JournalEvent.stateTransition(
-            eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-            sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-            from: .reconciling, to: nextState,
-            reason: "complete durable reconcile decision after restart",
-            triggerEventID: last.eventID))
-        nextSequence += 1
-        inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      }
-
-      let hasUnresolvedProviderIntent =
-        inspection.hasTornTail || !inspection.outstandingIntents.isEmpty
-        || !inspection.unknownOutcomes.isEmpty
-        || inspection.lastReconcileOutcomeCertainty == .outcomeUnknown
-      if hasUnresolvedProviderIntent,
-        let currentState = inspection.currentState,
-        currentState != .waitingForRecovery,
-        currentState != .reconciling,
-        JobStateMachine.isAllowedTransition(
-          from: currentState, to: .waitingForRecovery, mode: .execute)
-      {
-        try journal.appendAndSynchronize(
-          JournalEvent.stateTransition(
-            eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-            sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-            from: currentState, to: .waitingForRecovery,
-            reason: "durably park unresolved provider intent after restart"))
-        nextSequence += 1
-        inspection = try DurableJournalRecovery.inspect(url: journalURL)
-      }
-
-      if hasUnresolvedProviderIntent {
-        record.state = (inspection.currentState ?? .waitingForRecovery).rawValue
-        record.outcomeUnknown = true
-        if record.recoveryStepID == nil {
-          record.recoveryStepID =
-            inspection.unknownOutcomes.last?.stepID
-            ?? inspection.outstandingIntents.last?.stepID
-        }
-        record.timeline.append("recovered: outstanding intents or unknown outcomes; no redispatch")
-      } else {
-        // The quiet crash window: a process killed between one durable event
-        // and the next leaves a clean journal whose non-terminal state never
-        // advances on its own. preflight/running/resumeAtConfirmedSafeBoundary
-        // keep their explicit `run` resume lane below, and
-        // waitingForRecovery/reconciling keep the reconcile lane. But
-        // cancelRequested, cancellingAtSafeBoundary and finalizing have no
-        // post-restart lane at all — `run` rejects them and `reconcile` only
-        // answers unknown outcomes — so leaving them in place presents a dead
-        // run as healthy forever. Each of these states is an already-durable
-        // decision, so recovery finishes it journal-only: a clean journal
-        // proves no step was in flight, which is exactly the cancel lane's
-        // safe boundary; and a job that never durably reached its terminal
-        // transition did not complete finalization, which is failed, never
-        // succeeded. No dispatch happens in any branch.
-        switch inspection.currentState {
-        case .cancelRequested, .cancellingAtSafeBoundary:
-          if inspection.currentState == .cancelRequested {
-            try journal.appendAndSynchronize(
-              JournalEvent.stateTransition(
-                eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-                sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-                from: .cancelRequested, to: .cancellingAtSafeBoundary,
-                reason: "process loss with no outstanding intent is a confirmed safe boundary"))
-            nextSequence += 1
-          }
-          try journal.appendAndSynchronize(
-            JournalEvent.stateTransition(
-              eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-              sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-              from: .cancellingAtSafeBoundary, to: .cancelled,
-              reason: "complete durable cancellation after restart"))
-          nextSequence += 1
-          inspection = try DurableJournalRecovery.inspect(url: journalURL)
-          record.finishedAtUTC = nowUTC()
-          record.timeline.append(
-            "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
-          )
-        case .finalizing:
-          try journal.appendAndSynchronize(
-            JournalEvent.stateTransition(
-              eventID: "recovery-t-\(nextSequence)", sequence: nextSequence,
-              sessionID: record.sessionID, jobID: jobID, timestamp: nowUTC(),
-              from: .finalizing, to: .failed,
-              reason: "finalization was interrupted before its terminal transition"))
-          nextSequence += 1
-          inspection = try DurableJournalRecovery.inspect(url: journalURL)
-          record.finishedAtUTC = nowUTC()
-          // A clean finalizing journal that carries outcomeUnknown got here
-          // through a durable confirmed reconcile decision; mirror the
-          // in-session reconcile lane, which clears the flag on this exact
-          // finalizing->failed completion.
-          if inspection.lastReconcileOutcomeCertainty == .confirmed {
-            record.outcomeUnknown = false
-            record.recoveryStepID = nil
-            record.recoveryIntentEventID = nil
-            record.recoveryAction = nil
-          }
-          record.timeline.append(
-            "recovered: finalization interrupted before terminal transition; failed without redispatch"
-          )
-        default:
-          record.timeline.append("recovered: journal clean")
-        }
-        if let currentState = inspection.currentState {
-          record.state = currentState.rawValue
-        }
-        if inspection.currentState == .resumeAtConfirmedSafeBoundary,
-          inspection.lastReconcileOutcomeCertainty == .confirmed
-        {
-          record.outcomeUnknown = false
-          record.recoveryStepID = nil
-          record.recoveryIntentEventID = nil
-          record.recoveryAction = nil
-        }
-      }
-      try record.persist(into: entry)
-      recovered.append(status(of: record))
-      jobs[jobID] = JobRuntime(
-        record: record, journal: journal,
-        nextSequence: nextSequence,
-        completedStepIDs: Self.confirmedSucceededStepIDs(in: inspection))
-      if record.outcomeUnknown {
+    for persisted in persistedJobs {
+      if jobs[persisted.jobID] != nil { continue }
+      let replayed = try recoveryService.replay(persisted)
+      try persistRuntimeRecord(replayed.record)
+      recovered.append(status(of: replayed.record))
+      jobs[persisted.jobID] = JobRuntime(
+        record: replayed.record, journal: replayed.journal,
+        nextSequence: replayed.nextSequence,
+        completedStepIDs: replayed.completedStepIDs)
+      if replayed.record.outcomeUnknown {
         try await recordCapabilityOutcome(
-          for: record, outcome: .outcomeUnknown,
+          for: replayed.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
-      } else if JobState(rawValue: record.state)?.isTerminal == true {
+      } else if JobState(rawValue: replayed.record.state)?.isTerminal == true {
         try await recordCapabilityOutcome(
-          for: record, outcome: .confirmed, state: record.state)
+          for: replayed.record, outcome: .confirmed, state: replayed.record.state)
       }
     }
     return recovered
   }
 
   public func reconcile(jobID: String) async throws -> RuntimeJobStatus {
-    guard var runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
-    guard runtime.record.outcomeUnknown else { return status(of: runtime.record) }
+    guard var runtime = jobs[jobID] else {
+      return status(of: try recordForRead(jobID: jobID))
+    }
+    guard runtime.record.outcomeUnknown else {
+      return statusAndReleaseTerminalRuntime(runtime.record)
+    }
     let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
     var inspection = try DurableJournalRecovery.inspect(url: journalURL)
 
@@ -3318,7 +2876,7 @@ public actor RuntimeJobEngine {
       runtime.record.state = JobState.resumeAtConfirmedSafeBoundary.rawValue
       runtime.completedStepIDs = Self.confirmedSucceededStepIDs(in: inspection)
       runtime.record.timeline.append("reconciled: durable confirmed completion")
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       return status(of: runtime.record)
     }
@@ -3333,17 +2891,17 @@ public actor RuntimeJobEngine {
       runtime.record.recoveryIntentEventID = nil
       runtime.record.recoveryAction = nil
       runtime.record.finishedAtUTC = nowUTC()
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       try await recordCapabilityOutcome(
         for: runtime.record, outcome: .confirmed,
         state: JobState.failed.rawValue)
-      return status(of: runtime.record)
+      return statusAndReleaseTerminalRuntime(runtime.record)
     }
     guard inspection.unknownOutcomes.isEmpty else {
       runtime.record.timeline.append(
         "reconcile refused: legacy outcomeUnknown event cannot be rewritten; original not resent")
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       return status(of: runtime.record)
     }
@@ -3618,7 +3176,7 @@ public actor RuntimeJobEngine {
       runtime.record.outcomeUnknown = true
       runtime.record.timeline.append("reconcile inconclusive: \(detail)")
     }
-    try runtime.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
     switch outcome {
     case .confirmedNotExecuted:
@@ -3634,7 +3192,7 @@ public actor RuntimeJobEngine {
       // remaining plan before its lineage node can authorize another Job.
       break
     }
-    return status(of: runtime.record)
+    return statusAndReleaseTerminalRuntime(runtime.record)
   }
 
   // MARK: Helpers
@@ -3874,7 +3432,7 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "\(descriptor.reference) is runtime unavailable: \(reason)")
     }
-    if Self.workspaceOperationReferences.contains(descriptor.reference),
+    if RuntimeArtifactService.workspaceOperationReferences.contains(descriptor.reference),
       artifactStore == nil
     {
       throw RuntimeJobEngineError.rejected(
@@ -4770,7 +4328,7 @@ public actor RuntimeJobEngine {
       // evidence while finalizing the fail-closed job; after a process
       // crash, the store's reservation-idempotent receipt reconstructs it.
       jobs[jobID] = runtime
-      try runtime.record.persist(into: jobDirectory(for: jobID))
+      try persistRuntimeRecord(runtime.record)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: capability denied before mutation: \(error)")
@@ -4863,7 +4421,7 @@ public actor RuntimeJobEngine {
       campaignCorrelation: correlation)
     runtime.record.timeline.append(
       "campaign reservation verified before first mutation")
-    try runtime.record.persist(into: jobDirectory(for: jobID))
+    try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
   }
 
@@ -5090,6 +4648,39 @@ public actor RuntimeJobEngine {
     configuration.stateDirectory
       .appendingPathComponent("jobs", isDirectory: true)
       .appendingPathComponent(jobID, isDirectory: true)
+  }
+
+  private func persistRuntimeRecord(_ record: RuntimeJobRecord) throws {
+    try record.persist(into: jobDirectory(for: record.jobID))
+    try admissionService.persist(record, at: nowUTC())
+  }
+
+  /// Terminal jobs have no further dispatch or recovery path.  Their durable
+  /// record and SQLite row remain queryable, so retaining a FileDurableJournal
+  /// and detailed runtime projection in the daemon only makes memory grow with
+  /// history.  Outcome-unknown jobs are deliberately excluded: they remain
+  /// active until an explicit reconciliation reaches a certain terminal state.
+  private func statusAndReleaseTerminalRuntime(_ record: RuntimeJobRecord) -> RuntimeJobStatus {
+    let jobStatus = status(of: record)
+    if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
+      jobs.removeValue(forKey: record.jobID)
+      cancellationRequests.remove(record.jobID)
+    }
+    return jobStatus
+  }
+
+  /// Terminal history is read from its durable SQLite projection after the
+  /// in-memory runtime has been released.  A missing or malformed projection
+  /// is never guessed at as a status because doing so could hide an unknown
+  /// external-effect outcome.
+  private func recordForRead(jobID: String) throws -> RuntimeJobRecord {
+    if let runtime = jobs[jobID] { return runtime.record }
+    guard
+      let persisted = try admissionService.job(jobID: jobID),
+      let data = persisted.initialRecordData,
+      let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
+    else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    return record
   }
 
   private func status(of record: RuntimeJobRecord) -> RuntimeJobStatus {
@@ -5698,73 +5289,5 @@ public actor RuntimeJobEngine {
       declaredCancellation: step.cancellation,
       declaredBindingRequirement: step.binding,
       arguments: arguments)
-  }
-}
-
-// MARK: - Persisted job record
-
-public struct RuntimeJobRecord: Codable, Sendable, Equatable {
-  public let jobID: String
-  public let request: RuntimeOperationRequest
-  public let operationReference: String
-  public let catalogDigest: String
-  public let providerID: String
-  public let createdAtUTC: String
-  public let actualEffect: String?
-  public var admissionEvidence: RuntimeAdmissionEvidence?
-  /// Exact submit-time materialization persisted for deferred capability
-  /// consumption. Optional only so records created by older builds remain
-  /// readable; a pending mutation with any field absent fails closed.
-  public let materializedPlanDigest: String?
-  public let materializedStableTargetIdentitySHA256: String?
-  public let materializedBindingRevision: Int?
-  public var state: String = "queued"
-  public var outcomeUnknown: Bool = false
-  /// Original catalog step whose durable outcome must be reconciled.
-  /// Recovery must reconstruct this typed action; a generic probe cannot
-  /// answer whether the original mutation happened.
-  public var recoveryStepID: String?
-  /// Exact action and journal correlation persisted before dispatch.
-  /// Optional only for decoding legacy records; a missing value on an
-  /// unknown outcome fails closed and is never reconstructed.
-  var recoveryAction: PersistedTypedProviderAction?
-  var recoveryIntentEventID: String?
-  public var timeline: [String] = []
-  public var evidencePreflight: RuntimeEvidencePreflightAccumulator?
-  public var evidenceObservation: RuntimeEvidenceObservation?
-  public var actualStepKinds: [String]?
-  public var startedAtUTC: String?
-  public var firstEvidenceStepAtUTC: String?
-  public var finishedAtUTC: String?
-  /// Why a step did not run, keyed by step id, so a downstream skip can
-  /// cite the original cause instead of restating its own condition.
-  public var skipReasons: [String: String] = [:]
-  /// Device residue this job left and has not settled. Recomputed from the
-  /// debt ledger whenever the engine records or settles one, so a
-  /// `succeeded` job can never be read as a clean device (CHG-2026-049 r3).
-  public var outstandingResidueCount: Int?
-
-  public var sessionID: String { "session-\(jobID)" }
-
-  func persist(into directory: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-    let data = try encoder.encode(self)
-    let url = directory.appendingPathComponent("job-record.json")
-    let temporary = directory.appendingPathComponent(".job-record.tmp")
-    try data.write(to: temporary, options: [])
-    let handle = try FileHandle(forWritingTo: temporary)
-    try handle.synchronize()
-    try handle.close()
-    _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
-  }
-
-  static func load(from directory: URL) throws -> RuntimeJobRecord {
-    let data = try Data(contentsOf: directory.appendingPathComponent("job-record.json"))
-    return try JSONDecoder().decode(RuntimeJobRecord.self, from: data)
-  }
-
-  static func sha256Hex(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 }

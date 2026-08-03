@@ -89,7 +89,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
   private func makeEngine(
     dispatcher: ScriptedDispatcher,
-    nowUTC: String = "2026-07-29T00:00:00Z"
+    nowUTC: String = "2026-07-29T00:00:00Z",
+    admissionFaultInjector: RuntimeAdmissionFaultInjector = .none
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
@@ -98,7 +99,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       nowUTC: { nowUTC })
     self.artifactStore = artifactStore
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
+      configuration: .init(
+        stateDirectory: stateDirectory,
+        admissionFaultInjector: admissionFaultInjector),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(factsPort: FactsPort())
       ]),
@@ -256,6 +259,235 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let afterRestart = try await reopened.submit(observeRequest())
     XCTAssertTrue(afterRestart.deduplicated)
     XCTAssertEqual(afterRestart.jobID, first.jobID)
+  }
+
+  func testFreshStateAdmissionCreatesEveryDurableProjectionAndSurvivesRestart() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let accepted = try await engine.submit(observeRequest(idempotencyKey: "idem-fresh-state-01"))
+    let jobDirectory = stateDirectory
+      .appendingPathComponent("jobs/\(accepted.jobID)", isDirectory: true)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: jobDirectory.appendingPathComponent("journal.jsonl").path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: jobDirectory.appendingPathComponent("job-record.json").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: stateDirectory.appendingPathComponent(RuntimeJobRepository.filename).path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: stateDirectory.appendingPathComponent("idempotency.json").path),
+      "new Runtime state must not retain JSON as the idempotency authority")
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await reopened.recoverPersistedJobs()
+    XCTAssertEqual(recovered.map(\.jobID), [accepted.jobID])
+    let status = try await reopened.status(jobID: accepted.jobID)
+    XCTAssertEqual(status.state, "preflight")
+  }
+
+  func testPagedJobHistoryReadsSQLiteWithoutReloadingEveryJobIntoMemory() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    var accepted: [RuntimeJobAcceptance] = []
+    for index in 1...3 {
+      accepted.append(
+        try await engine.submit(
+          observeRequest(
+            idempotencyKey: "idem-history-page-\(index)", requestID: "req-history-page-\(index)")))
+    }
+    let first = try await engine.listJobs(pageSize: 2)
+    XCTAssertEqual(first.jobs.map(\.jobID), accepted.prefix(2).map(\.jobID))
+    XCTAssertNotNil(first.nextCursor)
+    let second = try await engine.listJobs(pageSize: 2, cursor: first.nextCursor)
+    XCTAssertEqual(second.jobs.map(\.jobID), accepted.suffix(1).map(\.jobID))
+    XCTAssertNil(second.nextCursor)
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let historical = try await reopened.listJobs(pageSize: 3)
+    XCTAssertEqual(historical.jobs.map(\.jobID), accepted.map(\.jobID))
+    let status = try await reopened.status(jobID: accepted[2].jobID)
+    XCTAssertEqual(status.state, "preflight")
+  }
+
+  func testDaemonRecoveryReopensOnlyActiveJobsWhileTerminalHistoryStaysQueryable() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let terminal = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-terminal-history-01", requestID: "req-terminal-history-01"))
+    let terminalCompletion = try await engine.run(jobID: terminal.jobID)
+    XCTAssertEqual(terminalCompletion.state, "succeeded")
+    let active = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-active-history-01", requestID: "req-active-history-01"))
+    let listedBeforeRestart = Set((await engine.listJobs()).map(\.jobID))
+    XCTAssertEqual(listedBeforeRestart, Set([terminal.jobID, active.jobID]))
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await reopened.recoverActiveJobs()
+    XCTAssertEqual(recovered.map(\.jobID), [active.jobID])
+    XCTAssertEqual(recovered.map(\.state), ["preflight"])
+
+    // Terminal history remains visible through the normal list surface, but
+    // recovery above has reopened only the active job; the completed job was
+    // never replayed or given a fresh JobRuntime allocation.
+    let listedJobs = await reopened.listJobs()
+    XCTAssertEqual(Set(listedJobs.map(\.jobID)), Set([terminal.jobID, active.jobID]))
+    let terminalStatus = try await reopened.status(jobID: terminal.jobID)
+    XCTAssertEqual(terminalStatus.state, "succeeded")
+    let history = try await reopened.listJobs(pageSize: 10)
+    XCTAssertEqual(Set(history.jobs.map(\.jobID)), Set([terminal.jobID, active.jobID]))
+  }
+
+  /// A repeatable long-run simulation for the macOS Runtime.  It deliberately
+  /// keeps the default contract suite short; the slow lane runs this with
+  /// `ARKDECK_RUN_LONG_RUNTIME_TESTS=1` before a release or a soak window.
+  ///
+  /// Each batch creates durable jobs and completes a small terminal slice;
+  /// the test then recreates the Runtime from disk.  This proves that restart
+  /// recovery reopens only active work while the growing terminal history
+  /// remains queryable through SQLite pagination rather than daemon memory.
+  func testLongRunSimulationKeepsTerminalHistoryOutOfRecoveryMemory() async throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_LONG_RUNTIME_TESTS"] == "1" else {
+      throw XCTSkip("set ARKDECK_RUN_LONG_RUNTIME_TESTS=1 to run the 1,000-job Runtime simulation")
+    }
+
+    let cycles = 10
+    let jobsPerCycle = 100
+    let completedPerCycle = 10
+    let expectedJobCount = cycles * jobsPerCycle
+    let expectedTerminalCount = cycles * completedPerCycle
+    var expectedActiveIDs = Set<String>()
+    var expectedTerminalIDs = Set<String>()
+
+    // One daemon accepts the full workload, then exits once.  This reflects
+    // the production lifetime more accurately than retaining a chain of
+    // short-lived test actors in one XCTest process.
+    do {
+      let dispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (engine, _) = try makeEngine(dispatcher: dispatcher)
+      for cycle in 0..<cycles {
+        for offset in 0..<jobsPerCycle {
+          let index = cycle * jobsPerCycle + offset
+          let accepted = try await engine.submit(
+            observeRequest(
+              idempotencyKey: "idem-long-run-\(index)", requestID: "req-long-run-\(index)"))
+          if offset < completedPerCycle {
+            let completion = try await engine.run(jobID: accepted.jobID)
+            XCTAssertEqual(completion.state, "succeeded")
+            expectedTerminalIDs.insert(accepted.jobID)
+          } else {
+            expectedActiveIDs.insert(accepted.jobID)
+          }
+        }
+      }
+      let firstHistoryPage = try await engine.listJobs(pageSize: 97)
+      XCTAssertEqual(firstHistoryPage.jobs.count, 97)
+    }
+
+    // Simulate a clean daemon process loss and restart.  Recovery must not
+    // redispatch terminal work, nor allocate an in-memory runtime for it.
+    let restartDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (restarted, _) = try makeEngine(dispatcher: restartDispatcher)
+    let recovered = try await restarted.recoverActiveJobs()
+    XCTAssertEqual(Set(recovered.map(\.jobID)), expectedActiveIDs)
+    XCTAssertTrue(recovered.allSatisfy { $0.state == "preflight" })
+    XCTAssertEqual(restartDispatcher.dispatchCount, 0)
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    var cursor: String?
+    var historyIDs = Set<String>()
+    repeat {
+      let page = try await reopened.listJobs(pageSize: 97, cursor: cursor)
+      historyIDs.formUnion(page.jobs.map(\.jobID))
+      cursor = page.nextCursor
+    } while cursor != nil
+
+    XCTAssertEqual(historyIDs.count, expectedJobCount)
+    XCTAssertEqual(historyIDs, expectedActiveIDs.union(expectedTerminalIDs))
+    XCTAssertEqual(expectedTerminalIDs.count, expectedTerminalCount)
+    XCTAssertEqual(expectedActiveIDs.count, expectedJobCount - expectedTerminalCount)
+  }
+
+  /// Startup must be driven by the active-job index, not by total terminal
+  /// history.  Seeding the repository directly keeps this focused on the
+  /// durable SQLite/recovery boundary: executing 10,000 provider plans would
+  /// turn a startup-scaling check into a device-provider throughput test.
+  func testTenThousandTerminalHistoryDoesNotExpandRestartRecovery() async throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS"] == "1" else {
+      throw XCTSkip(
+        "set ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS=1 to run the 10,000-job history test")
+    }
+
+    let repository = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let terminalRecord = Data("{}".utf8)
+    for index in 0..<10_000 {
+      let jobID = String(format: "job-history-%05d", index)
+      let idempotencyKey = String(format: "idem-history-%05d", index)
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: jobID, idempotencyKey: idempotencyKey,
+          requestHash: "hash-\(index)", initialState: JobState.preflight.rawValue,
+          createdAtUTC: "2026-08-03T00:00:00Z", initialRecordData: terminalRecord),
+        .admitted)
+      try repository.updateJobState(
+        jobID: jobID, state: JobState.succeeded.rawValue,
+        updatedAtUTC: "2026-08-03T00:00:01Z", recordData: terminalRecord)
+    }
+
+    let started = DispatchTime.now().uptimeNanoseconds
+    let (restarted, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await restarted.recoverActiveJobs()
+    let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000
+    XCTAssertTrue(recovered.isEmpty)
+    XCTAssertLessThan(
+      elapsedSeconds, 5,
+      "terminal history must not be replayed during macOS Runtime startup")
+
+    var cursor: String?
+    var listed = 0
+    repeat {
+      let page = try repository.listJobs(pageSize: 997, cursor: cursor)
+      listed += page.jobs.count
+      cursor = page.nextCursor
+    } while cursor != nil
+    XCTAssertEqual(listed, 10_000)
+  }
+
+  func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {
+    struct SimulatedProcessLoss: Error {}
+    let root = stateDirectory!
+    defer { stateDirectory = root }
+    for point in RuntimeAdmissionFaultPoint.allCases {
+      stateDirectory = root.appendingPathComponent(point.rawValue, isDirectory: true)
+      let injector = RuntimeAdmissionFaultInjector { observed in
+        if observed == point { throw SimulatedProcessLoss() }
+      }
+      let (faulty, _) = try makeEngine(
+        dispatcher: ScriptedDispatcher(script: .observationHappy),
+        admissionFaultInjector: injector)
+      let request = observeRequest(
+        idempotencyKey: "idem-admission-crash-\(point.rawValue)",
+        requestID: "req-admission-crash-\(point.rawValue)")
+      do {
+        _ = try await faulty.submit(request)
+        XCTFail("\(point.rawValue): fault injection must stop submit")
+      } catch is SimulatedProcessLoss {
+        // Simulate an abrupt process loss by abandoning this engine and
+        // reopening all state through a fresh Runtime instance below.
+      }
+
+      let dispatcher = ScriptedDispatcher(script: .observationHappy)
+      let (reopened, _) = try makeEngine(dispatcher: dispatcher)
+      let recovered = try await reopened.recoverPersistedJobs()
+      let retry = try await reopened.submit(request)
+      switch point {
+      case .beforeAdmission:
+        XCTAssertTrue(recovered.isEmpty, "\(point.rawValue): no job may be admitted")
+        XCTAssertFalse(retry.deduplicated, "\(point.rawValue): retry must create the job")
+      case .afterAdmission, .beforeJournalAppend, .afterJournalAppend,
+        .beforeRecordPersist, .afterRecordPersist, .beforeResponse:
+        XCTAssertEqual(recovered.count, 1, "\(point.rawValue): committed job must recover")
+        XCTAssertTrue(retry.deduplicated, "\(point.rawValue): retry must reuse the committed job")
+        XCTAssertEqual(retry.jobID, recovered[0].jobID)
+        let status = try await reopened.status(jobID: retry.jobID)
+        XCTAssertEqual(status.state, "preflight")
+      }
+      XCTAssertEqual(dispatcher.dispatchCount, 0, "\(point.rawValue): recovery must not execute")
+    }
   }
 
   // MARK: - Authorization

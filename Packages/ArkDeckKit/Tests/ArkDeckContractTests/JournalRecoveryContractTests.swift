@@ -1,11 +1,145 @@
 import ArkDeckCore
-import ArkDeckStorage
+@testable import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin
+import Dispatch
 import Foundation
 import XCTest
 
 final class JournalRecoveryContractTests: XCTestCase {
+  /// Real durable append benchmarks for the writer cursor at 100, 1,000, and
+  /// 10,000 historical events.  Every event uses the production file-sync and
+  /// directory-sync path; only the final append and an explicit recovery are
+  /// timed, so the assertion detects accidental full-history replays on the
+  /// hot path without treating a fast disk as correctness.
+  func testIncrementalJournalCursorScalesPastTenThousandDurableEvents() throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_LONG_JOURNAL_TESTS"] == "1" else {
+      throw XCTSkip("set ARKDECK_RUN_LONG_JOURNAL_TESTS=1 to run the 10,000-event journal benchmark")
+    }
+    for historicalEventCount in [100, 1_000, 10_000] {
+      let measurement = try measureCursorBenchmark(historicalEventCount: historicalEventCount)
+      XCTAssertLessThan(
+        measurement.durableAppendNanoseconds, UInt64(1_000_000_000),
+        "the hot append path must validate its cursor, not replay \(historicalEventCount) records")
+      XCTAssertLessThan(
+        measurement.recoveryNanoseconds, UInt64(5_000_000_000),
+        "a \(historicalEventCount)-event journal must remain recoverable within the restart budget")
+      XCTAssertFalse(
+        measurement.usedFullReplay,
+        "the cursor benchmark must take the validated incremental append path")
+      XCTAssertLessThan(
+        measurement.validationBytesRead, 4_096,
+        "the hot append path must read only its validated tail, not \(historicalEventCount) records")
+      print(
+        "ARKDECK_JOURNAL_CURSOR historicalEvents=\(measurement.historicalEventCount) "
+          + "totalEvents=\(measurement.totalEventCount) "
+          + "durableAppendNanoseconds=\(measurement.durableAppendNanoseconds) "
+          + "validationBytesRead=\(measurement.validationBytesRead) "
+          + "fileSyncNanoseconds=\(measurement.fileSyncNanoseconds) "
+          + "directorySyncNanoseconds=\(measurement.directorySyncNanoseconds) "
+          + "journalBytes=\(measurement.journalBytes) "
+          + "recoveryNanoseconds=\(measurement.recoveryNanoseconds) "
+          + "peakResidentSetBytes=\(measurement.peakResidentSetBytes)")
+    }
+  }
+
+  private struct CursorBenchmarkMeasurement {
+    let historicalEventCount: Int
+    let totalEventCount: Int
+    let durableAppendNanoseconds: UInt64
+    let validationBytesRead: Int
+    let usedFullReplay: Bool
+    let fileSyncNanoseconds: UInt64
+    let directorySyncNanoseconds: UInt64
+    let journalBytes: UInt64
+    let recoveryNanoseconds: UInt64
+    let peakResidentSetBytes: Int64
+  }
+
+  private final class JournalAppendMeasurementCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var latestMeasurement: JournalAppendMeasurement?
+
+    func record(_ measurement: JournalAppendMeasurement) {
+      lock.lock()
+      latestMeasurement = measurement
+      lock.unlock()
+    }
+
+    func latest() -> JournalAppendMeasurement? {
+      lock.lock()
+      defer { lock.unlock() }
+      return latestMeasurement
+    }
+  }
+
+  private func measureCursorBenchmark(
+    historicalEventCount: Int
+  ) throws -> CursorBenchmarkMeasurement {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "incremental-cursor.jsonl")
+    let collector = JournalAppendMeasurementCollector()
+    let journal = try FileDurableJournal(
+      url: journalURL,
+      appendMeasurementSink: { collector.record($0) })
+    try journal.appendAndSynchronize(
+      JournalEvent.jobCreated(
+        eventID: "created", sequence: 0, sessionID: "cursor-session", jobID: "cursor-job",
+        timestamp: timestamp, executionMode: "execute"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "preflight", sequence: 1, sessionID: "cursor-session", jobID: "cursor-job",
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "cursor benchmark"))
+    for sequence in 2...(historicalEventCount + 1) {
+      try journal.appendAndSynchronize(try cursorBenchmarkWarning(sequence: sequence))
+    }
+
+    let finalSequence = historicalEventCount + 2
+    let appendStarted = DispatchTime.now().uptimeNanoseconds
+    try journal.appendAndSynchronize(try cursorBenchmarkWarning(sequence: finalSequence))
+    let durableAppendNanoseconds = DispatchTime.now().uptimeNanoseconds - appendStarted
+    let appendMeasurement = try XCTUnwrap(collector.latest())
+    let journalBytes = try XCTUnwrap(
+      (try FileManager.default.attributesOfItem(atPath: journalURL.path)[.size] as? NSNumber)?
+        .uint64Value)
+
+    let recoveryStarted = DispatchTime.now().uptimeNanoseconds
+    let recovery = try DurableJournalRecovery.inspect(url: journalURL)
+    let recoveryNanoseconds = DispatchTime.now().uptimeNanoseconds - recoveryStarted
+    XCTAssertEqual(recovery.events.count, historicalEventCount + 3)
+    XCTAssertEqual(recovery.lastDurableSequence, finalSequence)
+    return CursorBenchmarkMeasurement(
+      historicalEventCount: historicalEventCount,
+      totalEventCount: recovery.events.count,
+      durableAppendNanoseconds: durableAppendNanoseconds,
+      validationBytesRead: appendMeasurement.validationBytesRead,
+      usedFullReplay: appendMeasurement.usedFullReplay,
+      fileSyncNanoseconds: appendMeasurement.fileSyncNanoseconds,
+      directorySyncNanoseconds: appendMeasurement.directorySyncNanoseconds,
+      journalBytes: journalBytes,
+      recoveryNanoseconds: recoveryNanoseconds,
+      peakResidentSetBytes: processPeakResidentSetBytes())
+  }
+
+  private func processPeakResidentSetBytes() -> Int64 {
+    var usage = rusage()
+    guard getrusage(RUSAGE_SELF, &usage) == 0 else { return 0 }
+    return Int64(usage.ru_maxrss)
+  }
+
+  private func cursorBenchmarkWarning(sequence: Int) throws -> JournalEvent {
+    try JournalEvent(
+      eventID: "warning-\(sequence)", sequence: sequence,
+      sessionID: "cursor-session", jobID: "cursor-job", timestamp: timestamp,
+      kind: .warning,
+      payload: [
+        "code": .string("cursorBenchmark"),
+        "message": .string("incremental durable append"),
+        "details": .object(["sequence": .integer(Int64(sequence))]),
+      ])
+  }
+
   func testAgentAuthorityV22RoundTripsE0E1E2AndRejectsUsageDrift() throws {
     let references: [(AgentExecutionAuthorityReference, String?, WorkflowEffect)] = [
       (

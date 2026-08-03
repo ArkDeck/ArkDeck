@@ -178,6 +178,7 @@ let resolvedStateDirectory = stateDirectory
 let ready = DispatchSemaphore(value: 0)
 nonisolated(unsafe) var startupFailure: (any Error)?
 nonisolated(unsafe) var startedServer: AgentDaemonServer?
+nonisolated(unsafe) var autoDriveTask: Task<Void, Never>?
 
 // Detached on purpose: the top level is @MainActor-isolated, so a plain
 // `Task { }` would inherit the main actor and deadlock against the
@@ -447,9 +448,9 @@ Task.detached {
         provider: hdcProvider, dispatcher: hdcDispatcher),
       targetStore: targetStore,
       nowUTC: utcNow)
-    let recovered = try await engine.recoverPersistedJobs()
+    let recovered = try await engine.recoverActiveJobs()
     if !recovered.isEmpty {
-      print("recovered \(recovered.count) persisted job(s); unknown outcomes parked")
+      print("recovered \(recovered.count) active job(s); unknown outcomes parked")
       fflush(stdout)
     }
     // Harness task plane (CHG-2026-054): one composition root, not a second
@@ -570,7 +571,7 @@ Task.detached {
           })
         // Started only after the socket is serving, so a failure to bind
         // cannot leave a timer dispatching against a daemon nobody can reach.
-        Task.detached { await ticker.run() }
+        autoDriveTask = Task.detached { _ = await ticker.run() }
       }
     case .alreadyRunning(let instance):
       print(
@@ -596,13 +597,26 @@ guard let server = startedServer else {
 
 signal(SIGINT, SIG_IGN)
 signal(SIGTERM, SIG_IGN)
+let shutdownLock = NSLock()
+var shutdownStarted = false
 let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal in
   let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
   source.setEventHandler {
-    server.stop()
-    print("arkdeck-agentd stopped")
-    fflush(stdout)
-    exit(0)
+    shutdownLock.lock()
+    let shouldStart = !shutdownStarted
+    shutdownStarted = true
+    shutdownLock.unlock()
+    guard shouldStart else { return }
+    autoDriveTask?.cancel()
+    Task.detached {
+      // Do not release the instance lock or terminate while a request still
+      // owns a Runtime durability boundary.  The 20-second cap is explicit:
+      // an unresponsive client cannot block macOS service shutdown forever.
+      server.drainAndStop(deadline: 20)
+      print("arkdeck-agentd stopped")
+      fflush(stdout)
+      exit(0)
+    }
   }
   source.resume()
   return source
