@@ -279,6 +279,29 @@ def parse_minos(output: str) -> str:
     raise PackageError("LC_BUILD_VERSION/minos was not found")
 
 
+def parse_macho_uuid(output: str) -> str:
+    for index, line in enumerate(output.splitlines()):
+        if line.strip() != "cmd LC_UUID":
+            continue
+        for candidate in output.splitlines()[index + 1 : index + 12]:
+            stripped = candidate.strip()
+            if not stripped.startswith("uuid "):
+                continue
+            value = stripped.split(None, 1)[1]
+            require(
+                re.fullmatch(
+                    r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+                    r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}",
+                    value,
+                )
+                is not None,
+                "LC_UUID is malformed",
+            )
+            return value.lower()
+        raise PackageError("LC_UUID value was not found")
+    raise PackageError("LC_UUID was not found")
+
+
 def parse_dependencies(output: str) -> list[str]:
     dependencies: list[str] = []
     for line in output.splitlines()[1:]:
@@ -343,6 +366,7 @@ def inspect_unsigned_component(
         "sha256": sha256_file(path),
         "fileType": file_result.stdout.strip(),
         "architectures": parse_architectures(lipo_result.stdout),
+        "machoUUID": parse_macho_uuid(load_result.stdout),
         "minimumMacOS": parse_minos(load_result.stdout),
         "loadCommandsSHA256": sha256_bytes(
             normalize_load_commands(load_result.stdout).encode("utf-8")
@@ -381,6 +405,11 @@ def validate_unsigned_facts(
     require(
         facts.get("architectures") == expected["architectures"],
         "component input architecture drift",
+    )
+    require(
+        facts.get("machoUUID") == expected["machoUUID"]
+        and facts.get("machoUUID") == registered["machoUUID"],
+        "component input Mach-O UUID drift",
     )
     require(
         facts.get("minimumMacOS") in (expected["minimumMacOS"], "14.0.0"),
@@ -540,6 +569,7 @@ def inspect_macho(path: Path, runner: Runner, env: Mapping[str, str]) -> dict[st
     )
     return {
         "architectures": parse_architectures(lipo_result.stdout),
+        "machoUUID": parse_macho_uuid(load_result.stdout),
         "minimumMacOS": parse_minos(load_result.stdout),
     }
 
@@ -632,6 +662,10 @@ def validate_archive_facts(
     require(
         component.get("architectures") == component_expected["architectures"],
         "nested component architecture drift",
+    )
+    require(
+        component.get("machoUUID") == component_expected["machoUUID"],
+        "nested component Mach-O UUID drift",
     )
     require(
         component.get("minimumMacOS")
@@ -862,7 +896,9 @@ def validate_receipt(
         tuple_value.get("component", {}).get("identifier")
         == spec["component"]["identifier"]
         and tuple_value.get("component", {}).get("unsignedSHA256")
-        == spec["component"]["sha256"],
+        == spec["component"]["sha256"]
+        and tuple_value.get("component", {}).get("machoUUID")
+        == spec["component"]["machoUUID"],
         "receipt component tuple drift",
     )
     expected_metadata = {
@@ -1122,6 +1158,10 @@ def build_release(
     require(
         registry["artifact"]["sha256"] == spec["component"]["sha256"],
         "package/registry component tuple drift",
+    )
+    require(
+        registry["artifact"]["machoUUID"] == spec["component"]["machoUUID"],
+        "package/registry component UUID drift",
     )
     require(
         registry["artifact"]["dependencies"]
@@ -1515,6 +1555,7 @@ def build_release(
                 },
                 "component": {
                     "identifier": spec["component"]["identifier"],
+                    "machoUUID": archive_facts["component"]["machoUUID"],
                     "unsignedSHA256": unsigned_facts["sha256"],
                     "signedSHA256": sha256_file(
                         app / spec["component"]["bundlePath"]
