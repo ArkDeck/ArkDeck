@@ -145,13 +145,12 @@ def advance_allowed(confirmation: MergeConfirmation) -> bool:
 
 # --------------------------------------------------------- restart decisions
 class RestartWindow(str, Enum):
-    """The six crash windows the r1 readiness enumerates."""
+    """The five crash windows retained by the host-loop worker."""
 
     AFTER_ACQUIRE = "afterAcquire"
     PR_CREATE_TIMEOUT = "prCreateTimeout"
     BODY_UPDATE = "bodyUpdate"
     HEARTBEAT = "heartbeat"
-    REVIEW_DISPATCH = "reviewDispatch"
     MERGE_OBSERVATION = "mergeObservation"
 
 
@@ -159,7 +158,6 @@ class RestartAction(str, Enum):
     RESUME = "resume"
     ADOPT_EXISTING_PR = "adoptExistingPr"
     STOP = "stop"
-    DISCARD_REVIEW = "discardReview"
     RELEASE_AND_ADVANCE = "releaseAndAdvance"
 
 
@@ -173,8 +171,6 @@ class RestartObservation:
 
     fence_intact: bool = False
     open_pr_count: int | None = None
-    head_matches: bool = False
-    review_recorded: bool = False
     merge: MergeConfirmation | None = None
 
 
@@ -213,17 +209,6 @@ def restart_decision(window: RestartWindow,
         return (RestartAction.STOP,
                 "fence expired or lost; takeover has its own exact-OID rules "
                 "and this restart does not shortcut them")
-
-    if window is RestartWindow.REVIEW_DISPATCH:
-        if observed.review_recorded:
-            return RestartAction.RESUME, "a recorded result exists; resume after it"
-        if observed.head_matches:
-            return (RestartAction.RESUME,
-                    "no result recorded and the head is unchanged; the request "
-                    "may be re-dispatched")
-        return (RestartAction.DISCARD_REVIEW,
-                "head moved while the review was in flight; the stale request "
-                "is discarded")
 
     if window is RestartWindow.MERGE_OBSERVATION:
         merge = observed.merge

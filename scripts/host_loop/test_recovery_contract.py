@@ -225,16 +225,6 @@ class RestartWindows(unittest.TestCase):
         self.assertIs(act, RestartAction.STOP)
         self.assertIn("takeover", detail)
 
-    def test_review_dispatch_re_requests_only_on_the_same_head(self):
-        act, _ = restart(RestartWindow.REVIEW_DISPATCH, head_matches=True)
-        self.assertIs(act, RestartAction.RESUME)
-        act, _ = restart(RestartWindow.REVIEW_DISPATCH, head_matches=False)
-        self.assertIs(act, RestartAction.DISCARD_REVIEW)
-
-    def test_review_dispatch_with_recorded_result_resumes(self):
-        act, _ = restart(RestartWindow.REVIEW_DISPATCH, review_recorded=True)
-        self.assertIs(act, RestartAction.RESUME)
-
     def test_merge_observation_advances_only_on_confirmation(self):
         act, _ = restart(RestartWindow.MERGE_OBSERVATION,
                          merge=MergeConfirmation(True, False, MERGE, "ok"))

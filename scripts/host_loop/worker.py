@@ -3,10 +3,9 @@
 design §4:
 
     discover -> leaseHeld -> branchPrepared -> prOpen -> checksGreen
-              -> reviewRequested -> ... (TASK-HLR-004 owns everything past checksGreen)
 
     any uncertainty/fence mismatch/API ambiguity -> reconcileRequired (no next dispatch)
-    review REQUEST_CHANGES/BLOCKED                -> workerPaused
+    failed checks                                  -> workerPaused
 
 Hard rules encoded here:
 

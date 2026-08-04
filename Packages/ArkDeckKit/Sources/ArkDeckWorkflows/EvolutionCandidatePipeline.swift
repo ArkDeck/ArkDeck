@@ -1,4 +1,4 @@
-// Task-owned candidate build/sandbox and independent review pipeline
+// Task-owned candidate build/sandbox and admission pipeline
 // (CHG-2026-025 r8, TASK-AIN-019).
 
 import ArkDeckCore
