@@ -353,7 +353,17 @@ public enum RockchipEvolutionStartingMode: String, Codable, CaseIterable, Sendab
 /// modes are acceptable; it cannot describe a process, executable, argv,
 /// action, target, authority or new Catalog step.
 public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
-  public static let defaultLoaderDiscoveryTimeoutSeconds = 45
+  /// DAYU200 can take longer than the original 45-second characterization to
+  /// re-enumerate from HDC-normal to its already-bound Loader personality.
+  /// A new campaign therefore spends the full pre-approved observation window
+  /// before declaring the E1 transition outcome unknown. This changes no
+  /// command or device effect; the timeout remains bounded by the closed
+  /// 15...120 validation below.
+  public static let defaultLoaderDiscoveryTimeoutSeconds = 120
+  /// Strategies persisted before campaign timing was made explicit did not
+  /// authorize a new wait duration. Keep decoding them at the historical
+  /// value so their durable candidate semantics and fingerprints do not drift.
+  private static let legacyLoaderDiscoveryTimeoutSeconds = 45
   public static let defaultLoaderPollIntervalMilliseconds = 500
   public static let defaultHDCCommandTimeoutSeconds = 20
   public static let defaultReadOnlyCommandTimeoutSeconds = 15
@@ -441,7 +451,7 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
       allowedStartingModes: container.decode(
         [RockchipEvolutionStartingMode].self, forKey: .allowedStartingModes),
       loaderDiscoveryTimeoutSeconds: isLegacyShape
-        ? Self.defaultLoaderDiscoveryTimeoutSeconds
+        ? Self.legacyLoaderDiscoveryTimeoutSeconds
         : container.decode(Int.self, forKey: .loaderDiscoveryTimeoutSeconds),
       loaderPollIntervalMilliseconds: isLegacyShape
         ? Self.defaultLoaderPollIntervalMilliseconds
