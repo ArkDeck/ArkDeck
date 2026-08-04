@@ -370,8 +370,8 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       disposition = .outcomeUnknown
       // Close the usage reservation too, or the target stays blocked
       // forever: the ledger admits one open reservation per target, and a
-      // crashed attempt's reservation had no other closer (adversarial
-      // review C3). `outcomeUnknown` mirrors the attempt tombstone below.
+      // crashed attempt's reservation had no other closer (regression C3).
+      // `outcomeUnknown` mirrors the attempt tombstone below.
       if usage != nil {
         do {
           _ = try usageLedger.close(
@@ -418,7 +418,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   /// A pre-reservation mode mismatch is an exact live observation, not a
   /// suggestion for the model.  Keep every model-controlled timing choice,
   /// but add the observed mode to its closed typed entry set before the
-  /// candidate is built or reviewed.  This prevents a succession of distinct
+  /// candidate is built. This prevents a succession of distinct
   /// loader-only candidates from churning before a normal-mode device can
   /// reserve a next attempt.
   private static func constrain(

@@ -28,7 +28,6 @@ public enum RockchipEvolutionCampaignError: Error, Equatable, Sendable,
   case campaignConflict
   case campaignStopped(String)
   case candidateRejected(String)
-  case reviewRejected(String)
   case admissionRejected(String)
   case persistenceRejected(String)
 
@@ -41,7 +40,6 @@ public enum RockchipEvolutionCampaignError: Error, Equatable, Sendable,
     case .campaignConflict: "evolution campaign identity or append-only history conflicted"
     case .campaignStopped(let reason): "evolution campaign is terminal: \(reason)"
     case .candidateRejected(let reason): "evolution candidate rejected: \(reason)"
-    case .reviewRejected(let reason): "adversarial review rejected: \(reason)"
     case .admissionRejected(let reason): "evolution campaign admission rejected: \(reason)"
     case .persistenceRejected(let reason): "evolution campaign persistence rejected: \(reason)"
     }
@@ -596,6 +594,8 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
   }
 }
 
+/// Historical receipt vocabulary retained only to decode and project
+/// review-bearing campaign ledgers written before the no-review admission path.
 public enum RockchipEvolutionReviewVerdict: String, Codable, Sendable {
   case pass = "PASS"
   case reject = "REJECT"
@@ -617,11 +617,11 @@ public struct RockchipEvolutionReviewIssue: Equatable, Codable, Sendable {
     case code
   }
 
-  public init(severity: RockchipEvolutionReviewSeverity, code: String) throws {
+  private init(validating severity: RockchipEvolutionReviewSeverity, code: String) throws {
     guard
       code.range(of: #"^[A-Z][A-Z0-9_-]{1,63}$"#, options: .regularExpression)
         == code.startIndex..<code.endIndex
-    else { throw RockchipEvolutionCampaignError.reviewRejected("issueCode") }
+    else { throw RockchipEvolutionCampaignError.persistenceRejected("historicalReviewIssue") }
     self.severity = severity
     self.code = code
   }
@@ -633,10 +633,10 @@ public struct RockchipEvolutionReviewIssue: Equatable, Codable, Sendable {
       Set(dynamic.allKeys.map(\.stringValue))
         == Set(CodingKeys.allCases.map(\.stringValue))
     else {
-      throw RockchipEvolutionCampaignError.reviewRejected("issueClosedShape")
+      throw RockchipEvolutionCampaignError.persistenceRejected("historicalReviewIssueShape")
     }
     try self.init(
-      severity: container.decode(RockchipEvolutionReviewSeverity.self, forKey: .severity),
+      validating: container.decode(RockchipEvolutionReviewSeverity.self, forKey: .severity),
       code: container.decode(String.self, forKey: .code))
   }
 }
@@ -662,7 +662,7 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
     case createdAt
   }
 
-  public init(
+  private init(
     reviewID: String,
     reviewerID: String,
     candidateID: String,
@@ -682,7 +682,7 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
         candidateExecutableDigestSHA256),
       RockchipEvolutionCampaignConfirmationAssertion.isSHA256(planDigestSHA256),
       RockchipEvolutionCampaignConfirmationAssertion.date(createdAt) != nil
-    else { throw RockchipEvolutionCampaignError.reviewRejected("receipt") }
+    else { throw RockchipEvolutionCampaignError.persistenceRejected("historicalReviewReceipt") }
     self.reviewID = reviewID
     self.reviewerID = reviewerID
     self.candidateID = candidateID
@@ -700,7 +700,7 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
       Set(dynamic.allKeys.map(\.stringValue))
         == Set(CodingKeys.allCases.map(\.stringValue))
     else {
-      throw RockchipEvolutionCampaignError.reviewRejected("receiptClosedShape")
+      throw RockchipEvolutionCampaignError.persistenceRejected("historicalReviewReceiptShape")
     }
     try self.init(
       reviewID: container.decode(String.self, forKey: .reviewID),
@@ -714,22 +714,14 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
       createdAt: container.decode(String.self, forKey: .createdAt))
   }
 
-  public func validate(candidate: RockchipEvolutionCandidatePin) throws {
+  func validateHistorical(candidate: RockchipEvolutionCandidatePin) throws {
     guard candidateID == candidate.candidateID,
       candidateExecutableDigestSHA256 == candidate.executableDigestSHA256,
       reviewerID != candidate.producerID, result == .pass,
       !issues.contains(where: { $0.severity == .high || $0.severity == .critical })
-    else { throw RockchipEvolutionCampaignError.reviewRejected("verdictOrIdentity") }
-  }
-
-  /// Stable identity of the independent review receipt. This binds the
-  /// verdict and every reviewed candidate/plan field, rather than merely its
-  /// short public identifier.
-  public var digestSHA256: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return RockchipEvolutionCampaignConfirmationAssertion.sha256(
-      (try? encoder.encode(self)) ?? Data())
+    else {
+      throw RockchipEvolutionCampaignError.persistenceRejected("historicalReviewCandidate")
+    }
   }
 }
 
@@ -738,16 +730,11 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
 public final class RockchipEvolutionCampaignAttemptPermit: @unchecked Sendable, Equatable {
   let assertion: RockchipEvolutionCampaignConfirmationAssertion
   let candidate: RockchipEvolutionCandidatePin
-  /// Legacy receipts remain readable for historical ledgers but new permits
-  /// do not require or mint one.
-  let review: RockchipEvolutionReviewReceipt?
 
   package init(
     assertion: RockchipEvolutionCampaignConfirmationAssertion,
-    candidate: RockchipEvolutionCandidatePin,
-    review: RockchipEvolutionReviewReceipt? = nil
+    candidate: RockchipEvolutionCandidatePin
   ) throws {
-    if let review { try review.validate(candidate: candidate) }
     guard candidate.baseCommitOID == assertion.baseCommitOID,
       candidate.toolchainDigestSHA256 == assertion.candidateToolchainDigestSHA256,
       candidate.changedFiles.count <= assertion.maxChangedFiles,
@@ -755,19 +742,17 @@ public final class RockchipEvolutionCampaignAttemptPermit: @unchecked Sendable, 
       candidate.strategy.operationReference == Self.operationReference(assertion),
       candidate.strategy.archiveDigestSHA256 == assertion.archiveDigestSHA256,
       candidate.strategy.stepSetDigestSHA256 == assertion.stepSetDigestSHA256,
-      (review == nil || review?.planDigestSHA256 == assertion.planDigestSHA256),
       candidate.changedFiles.allSatisfy(Self.isCandidateSource)
     else { throw RockchipEvolutionCampaignError.candidateRejected("campaignEnvelopeDrift") }
     self.assertion = assertion
     self.candidate = candidate
-    self.review = review
   }
 
   public static func == (
     lhs: RockchipEvolutionCampaignAttemptPermit,
     rhs: RockchipEvolutionCampaignAttemptPermit
   ) -> Bool {
-    lhs.assertion == rhs.assertion && lhs.candidate == rhs.candidate && lhs.review == rhs.review
+    lhs.assertion == rhs.assertion && lhs.candidate == rhs.candidate
   }
 
   private static func operationReference(
@@ -895,7 +880,7 @@ actor RockchipEvolutionCampaignAdmissionService {
     guard campaign.assertion == assertion, !campaign.isTerminal,
       campaign.activeReservation == nil,
       let prepared = campaign.latestCandidate,
-      prepared.candidate == permit.candidate, prepared.review == permit.review
+      prepared.candidate == permit.candidate
     else { throw RockchipEvolutionCampaignError.admissionRejected("campaignLedgerDrift") }
     let reference = try assertion.authorityReference()
     let campaignReservationIDs = Set(
@@ -968,7 +953,6 @@ actor RockchipEvolutionCampaignAdmissionService {
         from: reservationDate.addingTimeInterval(120)),
       campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
         candidateDigestSHA256: permit.candidate.digestSHA256,
-        reviewDigestSHA256: permit.review?.digestSHA256,
         brokerDigestSHA256: assertion.brokerExecutableDigestSHA256,
         executionTuning: try AgentAuthorityCampaignExecutionTuning(
           loaderDiscoveryTimeoutSeconds: permit.candidate.strategy.loaderDiscoveryTimeoutSeconds,

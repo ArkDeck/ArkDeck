@@ -325,7 +325,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
     XCTAssertEqual(try reconciler().scan(), [])
   }
 
-  // MARK: - Liveness, post-terminal orphans, races (adversarial review C1/C2/C6)
+  // MARK: - Liveness, post-terminal orphans, races (regression C1/C2/C6)
 
   func testLiveSessionIsExcludedFromScanAndCloseIsRefused() throws {
     var session = try SessionBuilder(
@@ -354,7 +354,7 @@ final class RockchipFlashSessionReconcileContractTests: XCTestCase {
 
 
 
-  // MARK: - Sessionless orphaned reservations (adversarial review C4)
+  // MARK: - Sessionless orphaned reservations (regression C4)
 
 
   func testSessionlessAgentReservationIsReportedWithCampaignHintAndDeferred() throws {

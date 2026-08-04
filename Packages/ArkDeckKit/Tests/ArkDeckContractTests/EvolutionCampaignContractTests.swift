@@ -205,21 +205,21 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
 
     for ordinal in 1...16 {
-      let pins = try makePins(assertion: assertion, ordinal: ordinal)
+      let candidate = try makeCandidate(assertion: assertion, ordinal: ordinal)
       _ = try ledger.appendCandidate(
-        campaignID: assertion.campaignID, candidate: pins.candidate,
-        review: pins.review, at: Self.confirmedAt)
+        campaignID: assertion.campaignID, candidate: candidate,
+        at: Self.confirmedAt)
       _ = try ledger.reserveAttempt(
-        campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
-        reviewID: pins.review.reviewID, ordinal: ordinal,
+        campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+        ordinal: ordinal,
         reservationID: "reservation-\(ordinal)", jobID: "job-\(ordinal)",
         sessionID: "session-\(ordinal)", at: Self.confirmedAt)
 
-      let contender = try makePins(assertion: assertion, ordinal: 100 + ordinal)
+      let contender = try makeCandidate(assertion: assertion, ordinal: 100 + ordinal)
       XCTAssertThrowsError(
         try ledger.appendCandidate(
-          campaignID: assertion.campaignID, candidate: contender.candidate,
-          review: contender.review, at: Self.confirmedAt),
+          campaignID: assertion.campaignID, candidate: contender,
+          at: Self.confirmedAt),
         "an active attempt must block a concurrent candidate/attempt")
 
       _ = try ledger.closeAttempt(
@@ -229,14 +229,14 @@ final class EvolutionCampaignContractTests: XCTestCase {
         at: Self.confirmedAt)
     }
 
-    let seventeenth = try makePins(assertion: assertion, ordinal: 17)
+    let seventeenth = try makeCandidate(assertion: assertion, ordinal: 17)
     _ = try ledger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: seventeenth.candidate,
-      review: seventeenth.review, at: Self.confirmedAt)
+      campaignID: assertion.campaignID, candidate: seventeenth,
+      at: Self.confirmedAt)
     XCTAssertThrowsError(
       try ledger.reserveAttempt(
-        campaignID: assertion.campaignID, candidateID: seventeenth.candidate.candidateID,
-        reviewID: seventeenth.review.reviewID, ordinal: 17,
+        campaignID: assertion.campaignID, candidateID: seventeenth.candidateID,
+        ordinal: 17,
         reservationID: "reservation-17",
         jobID: "job-17", sessionID: "session-17", at: Self.confirmedAt))
     let document = try ledger.load(assertion.campaignID)
@@ -284,14 +284,14 @@ final class EvolutionCampaignContractTests: XCTestCase {
       defer { try? FileManager.default.removeItem(at: root) }
       let ledger = try RockchipEvolutionCampaignLedger(root: root)
       let assertion = try makeAssertion(seed: Character(String(index + 1)))
-      let pins = try makePins(assertion: assertion, ordinal: 1)
+      let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
       _ = try ledger.create(assertion)
       _ = try ledger.appendCandidate(
-        campaignID: assertion.campaignID, candidate: pins.candidate,
-        review: pins.review, at: Self.confirmedAt)
+        campaignID: assertion.campaignID, candidate: candidate,
+        at: Self.confirmedAt)
       _ = try ledger.reserveAttempt(
-        campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
-        reviewID: pins.review.reviewID, ordinal: 1, reservationID: "reservation-1",
+        campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+        ordinal: 1, reservationID: "reservation-1",
         jobID: "job-1", sessionID: "session-1", at: Self.confirmedAt)
       _ = try ledger.closeAttempt(
         campaignID: assertion.campaignID, ordinal: 1, jobID: "job-1",
@@ -301,8 +301,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
       XCTAssertTrue(try ledger.load(assertion.campaignID).isTerminal)
       XCTAssertThrowsError(
         try ledger.appendCandidate(
-          campaignID: assertion.campaignID, candidate: pins.candidate,
-          review: pins.review, at: Self.confirmedAt))
+          campaignID: assertion.campaignID, candidate: candidate,
+          at: Self.confirmedAt))
     }
   }
 
@@ -313,11 +313,11 @@ final class EvolutionCampaignContractTests: XCTestCase {
       root: root.appending(path: "campaign"))
     let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
     let assertion = try makeAssertion()
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     _ = try campaignLedger.create(assertion)
     _ = try campaignLedger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: pins.candidate,
-      review: pins.review, at: Self.confirmedAt)
+      campaignID: assertion.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
     let reference = try assertion.authorityReference()
     _ = try usageLedger.reserve(
       usageReservation(reference: reference, ordinal: 1, jobID: "job-orphan"))
@@ -331,7 +331,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       bindingSerialDigestSHA256: Self.targetDigest, bindingRevision: 1,
       brokerExecutableDigest: { assertion.brokerExecutableDigestSHA256 })
     let permit = try RockchipEvolutionCampaignAttemptPermit(
-      assertion: assertion, candidate: pins.candidate, review: pins.review)
+      assertion: assertion, candidate: candidate)
     do {
       _ = try await service.admit(
         permit: permit,
@@ -349,35 +349,27 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(stopped.events.last?.reasonCode, "orphanedGlobalReservation")
   }
 
-  func testHistoricalReviewReceiptsAndClosedStrategyRejectExpansionOrHighSeverity() throws {
+  func testHistoricalReviewReceiptsDecodeAndClosedStrategyRejectExpansionOrHighSeverity() throws {
     let assertion = try makeAssertion()
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     XCTAssertEqual(
-      pins.candidate.strategy.loaderDiscoveryTimeoutSeconds, 120,
+      candidate.strategy.loaderDiscoveryTimeoutSeconds, 120,
       "new campaigns must wait through the entire approved Loader observation window")
     XCTAssertNoThrow(
       try RockchipEvolutionCampaignAttemptPermit(
-        assertion: assertion, candidate: pins.candidate, review: pins.review))
+        assertion: assertion, candidate: candidate))
 
-    let high = try RockchipEvolutionReviewReceipt(
-      reviewID: pins.review.reviewID, reviewerID: "independent-reviewer",
-      candidateID: pins.candidate.candidateID,
-      candidateExecutableDigestSHA256: pins.candidate.executableDigestSHA256,
-      planDigestSHA256: assertion.planDigestSHA256, result: .pass,
-      issues: [try RockchipEvolutionReviewIssue(severity: .high, code: "RAW_DEVICE_PATH")],
-      createdAt: Self.confirmedAt)
-    XCTAssertThrowsError(try high.validate(candidate: pins.candidate))
+    let high = try historicalReview(
+      candidate: candidate, assertion: assertion, reviewerID: "independent-reviewer",
+      issues: [["severity": "HIGH", "code": "RAW_DEVICE_PATH"]])
+    XCTAssertThrowsError(try high.validateHistorical(candidate: candidate))
 
-    let sameProducer = try RockchipEvolutionReviewReceipt(
-      reviewID: pins.review.reviewID, reviewerID: pins.candidate.producerID,
-      candidateID: pins.candidate.candidateID,
-      candidateExecutableDigestSHA256: pins.candidate.executableDigestSHA256,
-      planDigestSHA256: assertion.planDigestSHA256, result: .pass, issues: [],
-      createdAt: Self.confirmedAt)
-    XCTAssertThrowsError(try sameProducer.validate(candidate: pins.candidate))
+    let sameProducer = try historicalReview(
+      candidate: candidate, assertion: assertion, reviewerID: candidate.producerID)
+    XCTAssertThrowsError(try sameProducer.validateHistorical(candidate: candidate))
 
     var strategy = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: JSONEncoder().encode(pins.candidate.strategy))
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(candidate.strategy))
         as? [String: Any])
     let legacyStrategy = strategy.filter { key, _ in
       ![
@@ -391,26 +383,26 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(decodedLegacy.loaderDiscoveryTimeoutSeconds, 45)
     XCTAssertEqual(
       decodedLegacy.loaderPollIntervalMilliseconds,
-      pins.candidate.strategy.loaderPollIntervalMilliseconds)
+      candidate.strategy.loaderPollIntervalMilliseconds)
     XCTAssertEqual(
       decodedLegacy.hdcCommandTimeoutSeconds,
-      pins.candidate.strategy.hdcCommandTimeoutSeconds)
+      candidate.strategy.hdcCommandTimeoutSeconds)
     XCTAssertEqual(
       decodedLegacy.readOnlyCommandTimeoutSeconds,
-      pins.candidate.strategy.readOnlyCommandTimeoutSeconds)
-    XCTAssertEqual(decodedLegacy.operationReference, pins.candidate.strategy.operationReference)
-    XCTAssertEqual(decodedLegacy.deviceProfileReference, pins.candidate.strategy.deviceProfileReference)
-    XCTAssertEqual(decodedLegacy.archiveDigestSHA256, pins.candidate.strategy.archiveDigestSHA256)
-    XCTAssertEqual(decodedLegacy.stepSetDigestSHA256, pins.candidate.strategy.stepSetDigestSHA256)
-    XCTAssertEqual(decodedLegacy.allowedStartingModes, pins.candidate.strategy.allowedStartingModes)
-    XCTAssertEqual(decodedLegacy.userdataImpact, pins.candidate.strategy.userdataImpact)
+      candidate.strategy.readOnlyCommandTimeoutSeconds)
+    XCTAssertEqual(decodedLegacy.operationReference, candidate.strategy.operationReference)
+    XCTAssertEqual(decodedLegacy.deviceProfileReference, candidate.strategy.deviceProfileReference)
+    XCTAssertEqual(decodedLegacy.archiveDigestSHA256, candidate.strategy.archiveDigestSHA256)
+    XCTAssertEqual(decodedLegacy.stepSetDigestSHA256, candidate.strategy.stepSetDigestSHA256)
+    XCTAssertEqual(decodedLegacy.allowedStartingModes, candidate.strategy.allowedStartingModes)
+    XCTAssertEqual(decodedLegacy.userdataImpact, candidate.strategy.userdataImpact)
     strategy["loaderDiscoveryTimeoutSeconds"] = NSNull()
     XCTAssertThrowsError(
       try JSONDecoder().decode(
         RockchipEvolutionTypedStrategy.self,
         from: JSONSerialization.data(withJSONObject: strategy)))
     strategy["loaderDiscoveryTimeoutSeconds"] =
-      pins.candidate.strategy.loaderDiscoveryTimeoutSeconds
+      candidate.strategy.loaderDiscoveryTimeoutSeconds
     strategy["executable"] = "/usr/local/bin/rkdeveloptool"
     XCTAssertThrowsError(
       try JSONDecoder().decode(
@@ -419,7 +411,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testUnresolvedAttemptReconciliationAlsoClosesTheUsageReservation() async throws {
-    // Adversarial review C3: tombstoning the campaign attempt while leaving
+    // Regression C3: tombstoning the campaign attempt while leaving
     // the usage reservation open blocked the target forever — the ledger
     // admits one open reservation per target and nothing else ever closed
     // a crashed attempt's. Reconciliation must close both.
@@ -430,11 +422,11 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let ledger = try RockchipEvolutionCampaignLedger(root: campaignRoot)
     let usageLedger = try AgentAuthorityUsageLedger(root: usageRoot)
     let assertion = try makeAssertion()
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     _ = try ledger.create(assertion)
     _ = try ledger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: pins.candidate,
-      review: pins.review, at: Self.confirmedAt)
+      campaignID: assertion.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
 
     let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
       campaignDigestSHA256: String(repeating: "f", count: 64),
@@ -462,17 +454,17 @@ final class EvolutionCampaignContractTests: XCTestCase {
         compensationLeaseExpiresAt: "2026-08-02T23:30:00Z",
         terminal: nil))
     _ = try ledger.reserveAttempt(
-      campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
-      reviewID: pins.review.reviewID, ordinal: 1, reservationID: reservationID,
+      campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+      ordinal: 1, reservationID: reservationID,
       jobID: "job-crashed", sessionID: "session-crashed", at: Self.confirmedAt)
 
     let flash = CountingEvolutionFlash()
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger, usageLedger: usageLedger,
-      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate)),
+          pin: candidate)),
       flash: flash,
       nowUTC: { Self.confirmedAt })
     await ain019AssertThrowsAsync(
@@ -516,11 +508,11 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
     let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
     let assertion = try makeAssertion(maxAttempts: 3)
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     _ = try ledger.create(assertion)
     _ = try ledger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: pins.candidate,
-      review: pins.review, at: Self.confirmedAt)
+      campaignID: assertion.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
 
     let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
       campaignDigestSHA256: assertion.confirmationDigestSHA256,
@@ -542,15 +534,15 @@ final class EvolutionCampaignContractTests: XCTestCase {
         externalIntentEventIDs: ["intent-enter-loader-mode"],
         confirmedNotExecutedIntentEventIDs: ["intent-enter-loader-mode"]))
     _ = try ledger.reserveAttempt(
-      campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
-      reviewID: pins.review.reviewID, ordinal: 1, reservationID: usage.reservationID,
+      campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+      ordinal: 1, reservationID: usage.reservationID,
       jobID: "job-loader-no-effect", sessionID: "session-loader-no-effect",
       at: Self.confirmedAt)
 
     let flash = SuccessAfterReconciledEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger, usageLedger: usageLedger,
-      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
       builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
     let result = try await host.continueCampaign(
@@ -576,23 +568,23 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let usageRoot = root.appending(path: "usage")
     let ledger = try RockchipEvolutionCampaignLedger(root: campaignRoot)
     let assertion = try makeAssertion()
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     _ = try ledger.create(assertion)
     _ = try ledger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: pins.candidate,
-      review: pins.review, at: Self.confirmedAt)
+      campaignID: assertion.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
     _ = try ledger.reserveAttempt(
-      campaignID: assertion.campaignID, candidateID: pins.candidate.candidateID,
-      reviewID: pins.review.reviewID, ordinal: 1, reservationID: "missing-reservation",
+      campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+      ordinal: 1, reservationID: "missing-reservation",
       jobID: "job-1", sessionID: "session-1", at: Self.confirmedAt)
 
     let flash = CountingEvolutionFlash()
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger, usageLedger: AgentAuthorityUsageLedger(root: usageRoot),
-      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate)),
+          pin: candidate)),
       flash: flash,
       nowUTC: { Self.confirmedAt })
     await ain019AssertThrowsAsync(
@@ -619,16 +611,16 @@ final class EvolutionCampaignContractTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: root) }
     let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
     let assertion = try makeAssertion()
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     _ = try ledger.create(assertion)
     let flash = CountingEvolutionFlash()
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
-      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate)),
+          pin: candidate)),
       flash: flash,
       nowUTC: { Self.confirmedAt })
     await ain019AssertThrowsAsync(
@@ -972,7 +964,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let assertion = try makeAssertion()
-    let prior = try makePins(assertion: assertion, ordinal: 1).candidate
+    let prior = try makeCandidate(assertion: assertion, ordinal: 1)
     let response = Data(
       """
       {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":90,"loaderPollIntervalMilliseconds":250,"hdcCommandTimeoutSeconds":45,"readOnlyCommandTimeoutSeconds":30}
@@ -1116,11 +1108,11 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let freshDraft = try makeAssertion(seed: "2")
     _ = try ledger.create(freshDraft)
     let historical = try makeAssertion(seed: "3", validUntil: "2026-08-02T08:01:00Z")
-    let pins = try makePins(assertion: historical, ordinal: 1)
+    let candidate = try makeCandidate(assertion: historical, ordinal: 1)
     _ = try ledger.create(historical)
     _ = try ledger.appendCandidate(
-      campaignID: historical.campaignID, candidate: pins.candidate,
-      review: pins.review, at: Self.confirmedAt)
+      campaignID: historical.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
     let corruptURL = root.appending(path: "ECAMP-\(String(repeating: "C", count: 24)).json")
     try Data("{\"broken\":true}".utf8).write(to: corruptURL)
     try FileManager.default.setAttributes(
@@ -1163,15 +1155,15 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(expiredDraft)
     let assertion = try makeAssertion(seed: "2")
     _ = try ledger.create(assertion)
-    let pins = try makePins(assertion: assertion, ordinal: 1)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
     let flash = CountingEvolutionFlash()
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
-      repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate)),
+          pin: candidate)),
       flash: flash,
       nowUTC: { "2026-08-02T08:30:00Z" })
 
@@ -1230,11 +1222,9 @@ final class EvolutionCampaignContractTests: XCTestCase {
       maxAttempts: maxAttempts, confirmedAt: Self.confirmedAt, validUntil: validUntil)
   }
 
-  private func makePins(
+  private func makeCandidate(
     assertion: RockchipEvolutionCampaignConfirmationAssertion, ordinal: Int
-  ) throws -> (
-    candidate: RockchipEvolutionCandidatePin, review: RockchipEvolutionReviewReceipt
-  ) {
+  ) throws -> RockchipEvolutionCandidatePin {
     let suffix = String(format: "%016X", ordinal)
     let strategy = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
@@ -1252,13 +1242,28 @@ final class EvolutionCampaignContractTests: XCTestCase {
       changedLines: 1, diffArtifactID: "diff-\(ordinal)",
       buildEvidenceArtifactID: "build-\(ordinal)",
       testEvidenceArtifactID: "test-\(ordinal)", strategy: strategy)
-    let review = try RockchipEvolutionReviewReceipt(
-      reviewID: "EREVIEW-\(suffix)", reviewerID: "reviewer-\(ordinal)",
-      candidateID: candidate.candidateID,
-      candidateExecutableDigestSHA256: candidate.executableDigestSHA256,
-      planDigestSHA256: assertion.planDigestSHA256, result: .pass, issues: [],
-      createdAt: Self.confirmedAt)
-    return (candidate, review)
+    return candidate
+  }
+
+  private func historicalReview(
+    candidate: RockchipEvolutionCandidatePin,
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    reviewerID: String,
+    issues: [[String: String]] = []
+  ) throws -> RockchipEvolutionReviewReceipt {
+    let json: [String: Any] = [
+      "reviewID": "EREVIEW-0000000000000001",
+      "reviewerID": reviewerID,
+      "candidateID": candidate.candidateID,
+      "candidateExecutableDigestSHA256": candidate.executableDigestSHA256,
+      "planDigestSHA256": assertion.planDigestSHA256,
+      "result": "PASS",
+      "issues": issues,
+      "createdAt": Self.confirmedAt,
+    ]
+    return try JSONDecoder().decode(
+      RockchipEvolutionReviewReceipt.self,
+      from: JSONSerialization.data(withJSONObject: json))
   }
 
   private func usageReservation(
@@ -1435,7 +1440,7 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
     let ordinal = count
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review?.reviewID, ordinal: ordinal,
+      ordinal: ordinal,
       reservationID: "reservation-auto-\(ordinal)", jobID: "job-auto-\(ordinal)",
       sessionID: "session-auto-\(ordinal)", at: now)
     if ordinal <= safeFailureCount {
@@ -1506,7 +1511,7 @@ private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFl
     }
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review?.reviewID, ordinal: 1,
+      ordinal: 1,
       reservationID: "reservation-mode-1", jobID: "job-mode-1",
       sessionID: "session-mode-1", at: now)
     _ = try ledger.closeAttempt(
@@ -1617,7 +1622,7 @@ private struct ScriptedCampaignAttemptAdmitter: RockchipEvolutionCampaignAttempt
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review?.reviewID, ordinal: 1,
+      ordinal: 1,
       reservationID: "reservation-engine-1", jobID: "job-engine-1",
       sessionID: "session-engine-1", at: now)
     _ = try ledger.closeAttempt(
@@ -1672,7 +1677,7 @@ private actor SuccessAfterReconciledEvolutionFlash: RockchipEvolutionFlashDispat
     let ordinal = 2
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review?.reviewID, ordinal: ordinal,
+      ordinal: ordinal,
       reservationID: "reservation-after-no-effect", jobID: "job-after-no-effect",
       sessionID: "session-after-no-effect", at: now)
     _ = try ledger.closeAttempt(

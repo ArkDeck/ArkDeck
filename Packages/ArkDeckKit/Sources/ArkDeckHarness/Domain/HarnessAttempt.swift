@@ -144,6 +144,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
   public let buildArtifactIDs: [String]
   public let runtimeArtifactIDs: [String]
   public let latestEvaluationVerdict: HarnessEvaluationVerdict?
+  /// Present only when decoding an attempt persisted before review removal.
   public let review: HarnessAdversarialReview?
   public let promotionCandidate: HarnessPromotionCandidate?
   public let createdAtUTC: String
@@ -199,8 +200,41 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     buildArtifactIDs: [String] = [],
     runtimeArtifactIDs: [String] = [],
     latestEvaluationVerdict: HarnessEvaluationVerdict? = nil,
-    review: HarnessAdversarialReview? = nil,
     promotionCandidate: HarnessPromotionCandidate? = nil,
+    createdAtUTC: String,
+    updatedAtUTC: String
+  ) {
+    self.init(
+      attemptID: attemptID, htaskID: htaskID, ordinal: ordinal,
+      hypothesis: hypothesis, strategy: strategy, patchRevision: patchRevision,
+      outcome: outcome, failureFingerprint: failureFingerprint, actionRunIDs: actionRunIDs,
+      evaluationIDs: evaluationIDs, confirmedFacts: confirmedFacts, disprovedFacts: disprovedFacts,
+      evolutionWorkspace: evolutionWorkspace, candidatePatch: candidatePatch,
+      buildArtifactIDs: buildArtifactIDs, runtimeArtifactIDs: runtimeArtifactIDs,
+      latestEvaluationVerdict: latestEvaluationVerdict, historicalReview: nil,
+      promotionCandidate: promotionCandidate, createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC)
+  }
+
+  private init(
+    attemptID: String,
+    htaskID: String,
+    ordinal: Int,
+    hypothesis: String,
+    strategy: HarnessStrategyDescriptor,
+    patchRevision: String?,
+    outcome: HarnessAttemptOutcome,
+    failureFingerprint: String?,
+    actionRunIDs: [String],
+    evaluationIDs: [String],
+    confirmedFacts: [String],
+    disprovedFacts: [String],
+    evolutionWorkspace: HarnessEvolutionWorkspace?,
+    candidatePatch: HarnessCandidatePatch?,
+    buildArtifactIDs: [String],
+    runtimeArtifactIDs: [String],
+    latestEvaluationVerdict: HarnessEvaluationVerdict?,
+    historicalReview: HarnessAdversarialReview?,
+    promotionCandidate: HarnessPromotionCandidate?,
     createdAtUTC: String,
     updatedAtUTC: String
   ) {
@@ -225,7 +259,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     self.buildArtifactIDs = Self.unique(buildArtifactIDs).sorted()
     self.runtimeArtifactIDs = Self.unique(runtimeArtifactIDs).sorted()
     self.latestEvaluationVerdict = latestEvaluationVerdict
-    self.review = review
+    self.review = historicalReview
     self.promotionCandidate = promotionCandidate
     self.createdAtUTC = createdAtUTC
     self.updatedAtUTC = updatedAtUTC
@@ -375,7 +409,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
       buildArtifactIDs: buildArtifactIDs ?? self.buildArtifactIDs,
       runtimeArtifactIDs: runtimeArtifactIDs ?? self.runtimeArtifactIDs,
       latestEvaluationVerdict: latestEvaluationVerdict ?? self.latestEvaluationVerdict,
-      review: self.review,
+      historicalReview: self.review,
       promotionCandidate: promotionCandidate ?? self.promotionCandidate,
       createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC)
   }
@@ -395,6 +429,7 @@ public enum HarnessAttemptEventKind: String, CaseIterable, Codable, Sendable {
   case runtimeArtifactsRecorded
   case failureRecorded
   case evaluationRecorded
+  /// Historical journal event emitted by releases with reviewer execution.
   case reviewRecorded
   case promotionRecorded
   case resumed

@@ -178,15 +178,21 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
 
   func testDaemonPreservesCampaignV4CorrelationInTrustedEvidence() throws {
     let digest = String(repeating: "a", count: 64)
-    let correlation = RuntimeCampaignEvidenceCorrelation(
+    let currentCorrelation = RuntimeCampaignEvidenceCorrelation(
       campaignID: "ECAMP-0123456789ABCDEF01234567",
       attemptID: "ain019-campaign-attempt-001",
       attemptOrdinal: 1,
       planDigestSHA256: digest,
       targetBindingDigestSHA256: String(repeating: "b", count: 64),
       candidateDigestSHA256: String(repeating: "c", count: 64),
-      reviewDigestSHA256: String(repeating: "d", count: 64),
       brokerDigestSHA256: String(repeating: "e", count: 64))
+    var historicalJSON = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(currentCorrelation))
+        as? [String: Any])
+    historicalJSON["reviewDigestSHA256"] = String(repeating: "d", count: 64)
+    let correlation = try JSONDecoder().decode(
+      RuntimeCampaignEvidenceCorrelation.self,
+      from: JSONSerialization.data(withJSONObject: historicalJSON))
     let snapshot = RuntimeJobEvidenceSnapshot(
       jobID: "job-campaign-evidence-001",
       operationReference: "flash.dayu200@1",

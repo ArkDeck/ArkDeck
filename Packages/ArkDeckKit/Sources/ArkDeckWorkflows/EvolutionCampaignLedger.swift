@@ -52,7 +52,6 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     kind: RockchipEvolutionCampaignEventKind,
     at: String,
     candidate: RockchipEvolutionCandidatePin? = nil,
-    review: RockchipEvolutionReviewReceipt? = nil,
     ordinal: Int? = nil,
     reservationID: String? = nil,
     jobID: String? = nil,
@@ -60,6 +59,27 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     disposition: RockchipEvolutionAttemptDisposition? = nil,
     destructiveIntentEventIDs: [String] = [],
     reasonCode: String? = nil
+  ) throws {
+    try self.init(
+      sequence: sequence, kind: kind, at: at, candidate: candidate, review: nil,
+      ordinal: ordinal, reservationID: reservationID, jobID: jobID, sessionID: sessionID,
+      disposition: disposition, destructiveIntentEventIDs: destructiveIntentEventIDs,
+      reasonCode: reasonCode)
+  }
+
+  private init(
+    sequence: Int,
+    kind: RockchipEvolutionCampaignEventKind,
+    at: String,
+    candidate: RockchipEvolutionCandidatePin?,
+    review: RockchipEvolutionReviewReceipt?,
+    ordinal: Int?,
+    reservationID: String?,
+    jobID: String?,
+    sessionID: String?,
+    disposition: RockchipEvolutionAttemptDisposition?,
+    destructiveIntentEventIDs: [String],
+    reasonCode: String?
   ) throws {
     self.sequence = sequence
     self.kind = kind
@@ -110,7 +130,7 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
         jobID == nil, sessionID == nil, disposition == nil,
         destructiveIntentEventIDs.isEmpty, reasonCode == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("candidatePreparedShape") }
-      if let review { try review.validate(candidate: candidate) }
+      if let review { try review.validateHistorical(candidate: candidate) }
     case .attemptReserved:
       guard candidate == nil, review == nil, let ordinal, ordinal > 0,
         let reservationID, Self.isIdentifier(reservationID),
@@ -385,7 +405,6 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   package func appendCandidate(
     campaignID: String,
     candidate: RockchipEvolutionCandidatePin,
-    review: RockchipEvolutionReviewReceipt? = nil,
     at: String
   ) throws -> RockchipEvolutionCampaignDocument {
     return try mutate(campaignID) { document in
@@ -394,11 +413,11 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
         throw RockchipEvolutionCampaignError.campaignStopped("activeAttempt")
       }
       let permit = try RockchipEvolutionCampaignAttemptPermit(
-        assertion: document.assertion, candidate: candidate, review: review)
+        assertion: document.assertion, candidate: candidate)
       _ = permit
       let event = try RockchipEvolutionCampaignEvent(
         sequence: document.events.count + 1, kind: .candidatePrepared, at: at,
-        candidate: candidate, review: review)
+        candidate: candidate)
       return try RockchipEvolutionCampaignDocument(
         assertion: document.assertion, events: document.events + [event])
     }
@@ -408,16 +427,12 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   package func reserveAttempt(
     campaignID: String,
     candidateID: String,
-    reviewID: String? = nil,
     ordinal: Int,
     reservationID: String,
     jobID: String,
     sessionID: String,
     at: String
   ) throws -> RockchipEvolutionCampaignDocument {
-    // Retain source compatibility for readers of historical review-bearing
-    // ledgers; reservations no longer require a review identity.
-    _ = reviewID
     return try mutate(campaignID) { document in
       try requireActive(document, at: at)
       guard document.activeReservation == nil,

@@ -181,6 +181,33 @@ final class HarnessAttemptContractTests: XCTestCase {
         HarnessStrategyDescriptor.self, from: original.canonicalJSON), original)
   }
 
+  func testHistoricalReviewAttemptDecodesAndSurvivesLaterAttemptUpdates() throws {
+    let attempt = HarnessAttempt(
+      attemptID: "ATTEMPT-000000000001", htaskID: "HTASK-000000000001", ordinal: 1,
+      hypothesis: "bounded repair", strategy: try strategy(),
+      createdAtUTC: now, updatedAtUTC: now)
+    var json = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(attempt)) as? [String: Any])
+    json["review"] = [
+      "documentType": HarnessAdversarialReview.documentType,
+      "schemaVersion": HarnessAdversarialReview.schemaVersion,
+      "reviewID": "HREVIEW-0001",
+      "reviewerID": "historical-reviewer",
+      "candidatePatchID": "CANDIDATE-0001",
+      "evaluationID": "EVAL-0001",
+      "result": "PASS",
+      "issues": [],
+      "createdAtUTC": now,
+    ]
+    let decoded = try JSONDecoder().decode(
+      HarnessAttempt.self,
+      from: JSONSerialization.data(withJSONObject: json))
+    XCTAssertEqual(decoded.review?.reviewerID, "historical-reviewer")
+    XCTAssertEqual(
+      decoded.recordingActionRun("ACTION-0001", atUTC: now).review,
+      decoded.review)
+  }
+
   func testAttemptEventsAreDurableAndRejectRegression() async throws {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let snapshot = taskSnapshot()

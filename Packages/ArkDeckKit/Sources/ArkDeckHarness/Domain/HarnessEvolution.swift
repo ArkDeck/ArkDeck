@@ -481,11 +481,6 @@ public enum HarnessReviewIssueSeverity: String, CaseIterable, Codable, Sendable 
 public struct HarnessReviewIssue: Equatable, Codable, Sendable {
   public let severity: HarnessReviewIssueSeverity
   public let description: String
-
-  public init(severity: HarnessReviewIssueSeverity, description: String) {
-    self.severity = severity
-    self.description = description
-  }
 }
 
 /// Historical review record retained solely for persisted-attempt decoding and
@@ -548,7 +543,6 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
     baseRevision: String,
     workspaceRevision: String,
     evaluationID: String,
-    reviewID: String? = nil,
     artifactIDs: [String],
     createdAtUTC: String
   ) {
@@ -561,7 +555,7 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
     self.baseRevision = baseRevision
     self.workspaceRevision = workspaceRevision
     self.evaluationID = evaluationID
-    self.reviewID = reviewID
+    self.reviewID = nil
     self.artifactIDs = Array(Set(artifactIDs)).sorted()
     self.createdAtUTC = createdAtUTC
     self.disposition = "READY_FOR_NORMAL_PR"
