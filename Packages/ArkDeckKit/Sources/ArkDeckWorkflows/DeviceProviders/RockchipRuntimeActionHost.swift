@@ -794,7 +794,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         executable: rockchipExecutable,
         arguments: ["wlx", mapping.partitionName, image.stableDescriptorPath],
         timeoutSeconds: nil,
-        outputByteBudget: 64 * 1024,
+        outputByteBudget: Self.writeOutputByteBudget,
         criticalNonInterruptible: true)
       try requireSemanticSuccess(
         receipt,
@@ -1018,6 +1018,26 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     return receipt
   }
 
+  /// `wlx` prints progress for the whole partition, so its output scales with
+  /// the image, and capture keeps the *head* — while the success marker is the
+  /// last thing printed. At 64 KiB the two smallest DAYU200 partitions fit and
+  /// `boot_linux` (64 MiB, 16x `uboot`) did not, so every flash stopped at the
+  /// third partition with a truncated capture and an absent marker while the
+  /// tool itself exited 0. This budget clears the largest published partition
+  /// (`system`, 2 GiB) with room to spare and stays bounded.
+  private static let writeOutputByteBudget = 8 * 1024 * 1024
+
+  /// The last captured output, reduced to one printable line. A truncated
+  /// capture ends mid-progress, so this is the newest thing the tool said
+  /// before the receipt was rejected — enough to tell a refused write from a
+  /// budget that is still too small without re-running a destructive step.
+  package static func outputExcerpt(_ data: Data, limit: Int = 200) -> String {
+    let text = String(decoding: data.suffix(4 * limit), as: UTF8.self)
+      .map { $0.isASCII && !$0.isNewline && $0 != "\r" ? $0 : " " }
+    let collapsed = String(text).split(separator: " ").joined(separator: " ")
+    return collapsed.count <= limit ? collapsed : "…" + String(collapsed.suffix(limit))
+  }
+
   private func requireSemanticSuccess(
     _ receipt: ProviderSubprocessReceipt,
     effectMayHaveOccurred: Bool,
@@ -1050,9 +1070,11 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         reasons.append("stderrByteCount=\(receipt.stderr.count)")
       }
       if !markerMatches { reasons.append("successMarkerAbsent") }
+      reasons.append("stdoutCapturedBytes=\(receipt.stdout.count)")
       let detail =
         "typed command lacked a clean, complete semantic receipt "
-        + "(\(reasons.joined(separator: ", ")))"
+        + "(\(reasons.joined(separator: ", "))); "
+        + "last output: \(Self.outputExcerpt(receipt.stdout))"
       if effectMayHaveOccurred {
         throw RuntimeDispatchFailure.outcomeUnknown(detail)
       }
