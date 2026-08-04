@@ -148,7 +148,6 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     usageLedger: AgentAuthorityUsageLedger,
     repairer: any RockchipEvolutionStrategyRepairing,
     builder: any RockchipEvolutionCandidateBuilding,
-    reviewer: (any RockchipEvolutionAdversarialReviewing)? = nil,
     flash: any RockchipEvolutionFlashDispatching,
     nowUTC: @escaping @Sendable () -> String
   ) throws {
@@ -156,9 +155,6 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     self.usageLedger = usageLedger
     self.repairer = repairer
     self.builder = builder
-    // Compatibility-only injection point for callers compiled against the
-    // review-gated host. It is deliberately never invoked.
-    _ = reviewer
     self.flash = flash
     self.nowUTC = nowUTC
   }
@@ -529,7 +525,6 @@ private struct RockchipEvolutionProductRoots {
   let campaignLedgerRoot: URL
   let candidateRoot: URL
   let repairerRoot: URL
-  let reviewerRoot: URL
 
   static func load() throws -> Self {
     let manager = FileManager.default
@@ -541,8 +536,7 @@ private struct RockchipEvolutionProductRoots {
     let campaign = usage.appending(path: "evolution-campaigns", directoryHint: .isDirectory)
     let candidates = root.appending(path: "EvolutionCandidates", directoryHint: .isDirectory)
     let repairer = candidates.appending(path: "Repairer", directoryHint: .isDirectory)
-    let reviewer = candidates.appending(path: "Reviewer", directoryHint: .isDirectory)
-    for directory in [root, usage, campaign, candidates, repairer, reviewer] {
+    for directory in [root, usage, campaign, candidates, repairer] {
       try manager.createDirectory(
         at: directory, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
@@ -553,6 +547,6 @@ private struct RockchipEvolutionProductRoots {
     return Self(
       arkDeckRoot: root, usageRoot: usage,
       campaignLedgerRoot: campaign, candidateRoot: candidates, repairerRoot: repairer,
-      reviewerRoot: reviewer)
+    )
   }
 }

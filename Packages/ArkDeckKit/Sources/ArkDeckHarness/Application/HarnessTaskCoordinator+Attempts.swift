@@ -308,16 +308,6 @@ extension HarnessTaskCoordinator {
       updated, kind: .candidatePatchRecorded, reasonCode: "candidatePatchPublished")
   }
 
-  func recordAttemptReview(
-    _ review: HarnessAdversarialReview, taskID: String
-  ) async throws {
-    guard let attempt = try await activeAttempt(taskID) else { return }
-    let updated = attempt.recordingReview(review, atUTC: nowUTC())
-    try await store.recordAttempt(
-      updated, kind: .reviewRecorded,
-      reasonCode: "adversarialReview:\(review.result.rawValue)")
-  }
-
   func recordAttemptBuildArtifacts(_ artifactIDs: [String], taskID: String) async throws {
     guard !artifactIDs.isEmpty, let attempt = try await activeAttempt(taskID) else { return }
     let updated = attempt.recordingBuildArtifacts(artifactIDs, atUTC: nowUTC())

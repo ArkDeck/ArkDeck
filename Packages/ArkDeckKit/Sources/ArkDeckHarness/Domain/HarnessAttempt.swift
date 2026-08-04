@@ -310,12 +310,6 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     derived(runtimeArtifactIDs: runtimeArtifactIDs + artifactIDs, updatedAtUTC: atUTC)
   }
 
-  public func recordingReview(
-    _ review: HarnessAdversarialReview, atUTC: String
-  ) -> HarnessAttempt {
-    derived(review: review, updatedAtUTC: atUTC)
-  }
-
   public func recordingPromotion(
     _ candidate: HarnessPromotionCandidate, atUTC: String
   ) -> HarnessAttempt {
@@ -363,7 +357,6 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     buildArtifactIDs: [String]? = nil,
     runtimeArtifactIDs: [String]? = nil,
     latestEvaluationVerdict: HarnessEvaluationVerdict? = nil,
-    review: HarnessAdversarialReview? = nil,
     promotionCandidate: HarnessPromotionCandidate? = nil,
     updatedAtUTC: String
   ) -> HarnessAttempt {
@@ -382,7 +375,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
       buildArtifactIDs: buildArtifactIDs ?? self.buildArtifactIDs,
       runtimeArtifactIDs: runtimeArtifactIDs ?? self.runtimeArtifactIDs,
       latestEvaluationVerdict: latestEvaluationVerdict ?? self.latestEvaluationVerdict,
-      review: review ?? self.review,
+      review: self.review,
       promotionCandidate: promotionCandidate ?? self.promotionCandidate,
       createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC)
   }

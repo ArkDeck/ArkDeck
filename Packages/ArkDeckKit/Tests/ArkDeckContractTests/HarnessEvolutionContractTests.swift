@@ -209,7 +209,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertNotEqual(fields["evolutionWorkspace"], .null)
   }
 
-  func testTaskAttemptPatchBuildEvaluationReviewAndPromotionPipeline() throws {
+  func testTaskAttemptPatchBuildEvaluationAndPromotionPipeline() throws {
     let base = String(repeating: "a", count: 64)
     let patchRevision = String(repeating: "b", count: 64)
     let buildDigest = String(repeating: "c", count: 64)
@@ -247,15 +247,9 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let snapshot = try taskSnapshot(
       baseRevision: base, policy: policy,
       observedState: [HarnessRepairAttempt.observedStateKey: repair.json])
-    let review = HarnessAdversarialReview(
-      reviewID: "REVIEW-001", reviewerID: "reviewer-agent@1",
-      candidatePatchID: candidate.candidatePatchID,
-      evaluationID: evaluation.evaluationID, result: .pass, issues: [],
-      createdAtUTC: timestamp)
-
     let promotion = try HarnessPromotionGate.evaluate(
       snapshot: snapshot, attempt: attempt, evaluation: evaluation,
-      review: review, promotionCandidateID: "PROMOTION-001",
+      promotionCandidateID: "PROMOTION-001",
       createdAtUTC: timestamp)
     XCTAssertEqual(promotion.disposition, "READY_FOR_NORMAL_PR")
     XCTAssertEqual(promotion.workspaceRevision, patchRevision)
@@ -308,7 +302,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
-  func testReviewerRejectAndLoopBoundsPreventPromotion() throws {
+  func testEvolutionLoopBoundsRemainEnforced() throws {
     let base = String(repeating: "a", count: 64)
     XCTAssertThrowsError(
       try HarnessEvolutionPolicy(
@@ -319,54 +313,17 @@ final class HarnessEvolutionContractTests: XCTestCase {
         error as? HarnessEvolutionPolicyError, .invalidBudget("maxAttempts"))
     }
 
-    let policy = try HarnessEvolutionPolicy(
-      baseRevision: base, allowedPaths: ["Sources/**"], maxAttempts: 2,
-      allowedOperations: evolutionOperations)
-    let proposal = try inMemoryProposal(baseRevision: base)
-    let candidate = HarnessCandidatePatch.create(
-      proposal: proposal, diffArtifactID: "ART-DIFF", htaskID: "HTASK-EVOLUTION",
-      attemptID: "ATTEMPT-001", createdBy: .agent, createdAtUTC: timestamp
-    ).recordingMetadataArtifact("ART-CANDIDATE")
     let strategy = try HarnessStrategyDescriptor(
       hypothesisClass: "repair", selectedOperationFamily: "workspace.apply-patch",
-      patchFingerprint: proposal.patchSHA256, baseWorkspaceRevision: base,
+      patchFingerprint: String(repeating: "b", count: 64), baseWorkspaceRevision: base,
       artifactSourceSet: [], prerequisiteSet: [],
       executionExpectation: HarnessStrategyExecutionExpectation(
         targetProfile: "device", toolchainProfile: "build-ok",
         expectedNextObservation: "verify"))
-    let evaluation = passingEvaluation()
     let attempt = HarnessAttempt(
       attemptID: "ATTEMPT-001", htaskID: "HTASK-EVOLUTION", ordinal: 1,
       hypothesis: "strategy", strategy: strategy,
-      patchRevision: String(repeating: "b", count: 64),
-      evaluationIDs: [evaluation.evaluationID], candidatePatch: candidate,
-      buildArtifactIDs: ["ART-BUILD"], runtimeArtifactIDs: ["ART-RUNTIME"],
-      latestEvaluationVerdict: .pass, createdAtUTC: timestamp, updatedAtUTC: timestamp)
-    let repair = HarnessRepairAttempt(
-      proposal: proposal, patchAttemptRef: "patch-attempt",
-      patchRevision: String(repeating: "b", count: 64),
-      buildSourceRevision: String(repeating: "b", count: 64),
-      buildOutputDigest: String(repeating: "c", count: 64), testsPassed: true,
-      deployedDigest: String(repeating: "c", count: 64))
-    let snapshot = try taskSnapshot(
-      baseRevision: base, policy: policy,
-      observedState: [HarnessRepairAttempt.observedStateKey: repair.json])
-    let rejected = HarnessAdversarialReview(
-      reviewID: "REVIEW-REJECT", reviewerID: "reviewer-agent@1",
-      candidatePatchID: candidate.candidatePatchID,
-      evaluationID: evaluation.evaluationID, result: .reject,
-      issues: [HarnessReviewIssue(severity: .high, description: "unsafe ownership change")],
-      createdAtUTC: timestamp)
-    XCTAssertThrowsError(
-      try HarnessPromotionGate.evaluate(
-        snapshot: snapshot, attempt: attempt, evaluation: evaluation,
-        review: rejected, promotionCandidateID: "PROMOTION-REJECTED",
-        createdAtUTC: timestamp)
-    ) { error in
-      XCTAssertEqual(
-        error as? HarnessPromotionGateFailure, .reviewNotPassed(.reject))
-    }
-
+      createdAtUTC: timestamp, updatedAtUTC: timestamp)
     let failed = attempt.recordingFailure(
       String(repeating: "f", count: 64), outcome: .failed, atUTC: timestamp)
     XCTAssertEqual(
