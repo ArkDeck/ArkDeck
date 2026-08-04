@@ -33,6 +33,11 @@ platforms: [macos, windows, linux]
 > `AuthorizationUsageLedger`、`HardwareEvidenceProjector` 与 `AgentDaemon` 的精确文件
 > 路径，使新 campaign 可以不写 review digest，同时旧记录仍可 decode/export；不扩大
 > authority、provider、operation、设备或 dispatch 范围。
+>
+> scope correction（2026-08-04，batch 文档）：合入后的复核发现 batch digest 模板与
+> host-loop runbook 仍把独立 AI exact-head review 写成入队前提，和本 change 已合入的
+> enforcement 规则相互矛盾。补入两处精确文档路径，只删除该前提和对应必填字段；不修改
+> `scripts/host_loop/**`、CI、正常的维护者 PR review/merge 或任何 Runtime/设备边界。
 
 ## Why
 
@@ -114,6 +119,8 @@ Observable behavior:
   `AC-FLASH-015-03`, `AC-WF-004-03`.
 - Modified contracts: `provider-contracts.md` and
   `hardware-evidence.schema.json` (3.0.0 -> 4.0.0).
+- Batch navigation docs: remove their stale independent-AI-review prerequisite while preserving
+  maintainer review/merge semantics.
 - Core baseline bump: required. `CORE-4.0.0` is the candidate because this
   changes a ratified Safety policy, execution authorization boundary, contract
   enum, and the pass/fail result of a real destructive Agent request.
