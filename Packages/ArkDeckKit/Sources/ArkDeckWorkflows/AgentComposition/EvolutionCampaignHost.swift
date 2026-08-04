@@ -507,13 +507,20 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     return RockchipEvolutionStartingMode(rawValue: mode)?.rawValue
   }
 
+  /// A configured model vendor gets the repair lane; everything else gets the
+  /// published strategy. Requiring the vendor up front made an unconfigured
+  /// host refuse the whole campaign, including the first attempt, which never
+  /// asks the repairer for anything a confirmation does not already pin.
+  /// `PublishedRockchipEvolutionStrategyRepairer` still refuses to invent a
+  /// repair, so an unconfigured host loses attempt evolution — not the safety
+  /// of any attempt it does run.
   private static func repairer(
     environment: [String: String], workingDirectory: String
-  ) throws -> CodexRockchipEvolutionStrategyRepairer {
+  ) throws -> any RockchipEvolutionStrategyRepairing {
     guard environment[HarnessVendorConfiguration.providerKey]?.lowercased() == "codex",
       let path = environment[HarnessVendorConfiguration.codexPathKey],
       let model = environment[HarnessVendorConfiguration.modelKey]
-    else { throw RockchipEvolutionCampaignError.candidateRejected("codexRepairerRequired") }
+    else { return PublishedRockchipEvolutionStrategyRepairer() }
     return try CodexRockchipEvolutionStrategyRepairer(
       executablePath: path, modelName: model, workingDirectory: workingDirectory)
   }

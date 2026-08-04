@@ -37,10 +37,25 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   private let sandboxURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
 
   public convenience init(stateRoot: URL) throws {
-    try self.init(
-      sourceRoot: URL(
-        fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
-      stateRoot: stateRoot)
+    try self.init(sourceRoot: Self.configuredSourceRoot(), stateRoot: stateRoot)
+  }
+
+  /// The candidate workspace used to be whatever directory the caller happened
+  /// to be launched from, so a campaign started from anywhere but the checkout
+  /// top level died inside `git` with nothing naming the expected location.
+  /// `ARKDECK_EVOLUTION_SOURCE_ROOT` states it instead. The top-level check in
+  /// `build()` is unchanged and still applies: this decides where the root is
+  /// read from, not what counts as a valid root.
+  static func configuredSourceRoot(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> URL {
+    if let configured = environment["ARKDECK_EVOLUTION_SOURCE_ROOT"],
+      configured.hasPrefix("/")
+    {
+      return URL(fileURLWithPath: configured, isDirectory: true)
+    }
+    return URL(
+      fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
   }
 
   package init(
@@ -74,7 +89,13 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       executable: gitURL, sha256: gitSHA,
       arguments: ["rev-parse", "--show-toplevel"], timeout: 15)
     guard URL(fileURLWithPath: topLevel, isDirectory: true).standardizedFileURL == sourceRoot else {
-      throw RockchipEvolutionCampaignError.candidateRejected("taskOwnedWorkspace")
+      // The candidate diff below uses `-- .`, so a source root below the top
+      // level would silently scope the diff to a subtree and miss changes the
+      // budget is supposed to bound. The requirement stays; only the operator's
+      // ability to see which two paths disagreed is new.
+      throw RockchipEvolutionCampaignError.candidateRejected(
+        "taskOwnedWorkspace: source root \(sourceRoot.path) is not the "
+          + "repository top level \(topLevel)")
     }
     do {
       _ = try await run(
@@ -249,11 +270,8 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   }
 
   public static func currentToolchainDigest() async throws -> String {
-    let root = URL(
-      fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true
-    )
-    .standardizedFileURL
-    return try await currentToolchainDigest(sourceRoot: root)
+    return try await currentToolchainDigest(
+      sourceRoot: configuredSourceRoot().standardizedFileURL)
   }
 
   package static func currentToolchainDigest(sourceRoot: URL) async throws -> String {
@@ -265,10 +283,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   }
 
   public static func currentProtectedMainBaseCommitOID() async throws -> String {
-    let root = URL(
-      fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true
-    )
-    .standardizedFileURL
+    let root = configuredSourceRoot().standardizedFileURL
     let git = URL(fileURLWithPath: "/usr/bin/git")
     let result = try await FoundationProcessExecutor().executeIdentityBound(
       ProcessIdentityBoundRequest(
@@ -278,9 +293,19 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
         expectedSHA256: executableSHA256(git)), captureLimit: 4 * 1_024)
     let value = String(decoding: result.execution.stdout.data, as: UTF8.self)
       .trimmingCharacters(in: .whitespacesAndNewlines)
-    guard result.execution.termination == .exited(0),
-      RockchipEvolutionCampaignConfirmationAssertion.isOID(value)
-    else { throw RockchipEvolutionCampaignError.candidateRejected("protectedMainBase") }
+    // "git could not run here" and "origin/main is not a commit" both used to
+    // surface as a bare `protectedMainBase`, which reads as a governance
+    // rejection when the real cause is usually a source root that is not a
+    // checkout at all.
+    guard result.execution.termination == .exited(0) else {
+      throw RockchipEvolutionCampaignError.candidateRejected(
+        "protectedMainBase: git rev-parse in \(root.path) terminated "
+          + "\(result.execution.termination)")
+    }
+    guard RockchipEvolutionCampaignConfirmationAssertion.isOID(value) else {
+      throw RockchipEvolutionCampaignError.candidateRejected(
+        "protectedMainBase: origin/main did not resolve to a commit OID")
+    }
     return value
   }
 
@@ -410,8 +435,12 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
           environment: ["NO_COLOR": "1"], workingDirectory: sourceRoot, timeout: timeout),
         expectedSHA256: sha256), captureLimit: captureLimit)
     guard result.execution.termination == .exited(0) else {
+      // A bare `process:git` could not separate "not a repository" from a
+      // timeout, a signal or a real git failure, so a campaign that refused
+      // before touching the device left the operator nothing to act on.
       throw RockchipEvolutionCampaignError.candidateRejected(
-        "process:\(executable.lastPathComponent)")
+        "process:\(executable.lastPathComponent) "
+          + "\(arguments.first ?? "") terminated \(result.execution.termination)")
     }
     return result.execution
   }
@@ -574,6 +603,44 @@ public protocol RockchipEvolutionStrategyRepairing: Sendable {
     observation: RockchipEvolutionFailureObservation?,
     priorCandidates: [RockchipEvolutionCandidatePin]
   ) async throws -> RockchipEvolutionTypedStrategy
+}
+
+/// The vendor-free strategy source.
+///
+/// A repairer is the campaign's *repair* lane, but it was also the only source
+/// of the very first strategy, so a host without a configured model vendor
+/// refused to start a campaign at all — flashing a bound device required an
+/// external agent binary that the first attempt never consults. This supplies
+/// that first candidate from what the confirmation already pins plus the
+/// published timing defaults, so the published strategy needs no vendor.
+///
+/// It refuses to answer a repair. An observation or a prior candidate means the
+/// published strategy has already failed, and inventing a second one without a
+/// repairer would be the campaign guessing at a device it cannot observe; the
+/// host stops the campaign instead.
+public struct PublishedRockchipEvolutionStrategyRepairer:
+  RockchipEvolutionStrategyRepairing
+{
+  public let repairerID = "published-strategy@1"
+
+  public init() {}
+
+  public func propose(
+    assertion: RockchipEvolutionCampaignConfirmationAssertion,
+    observation: RockchipEvolutionFailureObservation?,
+    priorCandidates: [RockchipEvolutionCandidatePin]
+  ) async throws -> RockchipEvolutionTypedStrategy {
+    guard observation == nil, priorCandidates.isEmpty else {
+      throw RockchipEvolutionCampaignError.candidateRejected("repairerUnavailable")
+    }
+    return try RockchipEvolutionTypedStrategy(
+      operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
+      deviceProfileReference: "dayu200@2",
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      allowedStartingModes: RockchipEvolutionStartingMode.allCases,
+      userdataImpact: RockchipEvolutionCampaignConfirmationAssertion.dataImpact)
+  }
 }
 
 extension JSONEncoder {

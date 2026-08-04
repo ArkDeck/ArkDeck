@@ -1033,8 +1033,26 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       markerMatches = true
     }
     guard clean, markerMatches else {
+      // Four different rejections used to collapse into one sentence, so an
+      // operator holding an outcome-unknown destructive step could not tell a
+      // non-zero exit from a truncated capture, from stderr output, from a
+      // missing success marker — the 2026-08-04 GJ-4 flash-partitions stop had
+      // to be diagnosed by re-reading the device instead. The reasons are named
+      // here. Receipt text is not: stdout/stderr stay behind the same
+      // byte-count-and-digest boundary the persisted receipt uses, so this adds
+      // attribution without adding a new disclosure surface.
+      var reasons: [String] = []
+      if receipt.exitStatus != 0 {
+        reasons.append("exitStatus=\(receipt.exitStatus.map(String.init) ?? "none")")
+      }
+      if receipt.stdoutTruncated { reasons.append("stdoutTruncated") }
+      if !receipt.stderr.isEmpty {
+        reasons.append("stderrByteCount=\(receipt.stderr.count)")
+      }
+      if !markerMatches { reasons.append("successMarkerAbsent") }
       let detail =
-        "typed command lacked a clean, complete semantic receipt"
+        "typed command lacked a clean, complete semantic receipt "
+        + "(\(reasons.joined(separator: ", ")))"
       if effectMayHaveOccurred {
         throw RuntimeDispatchFailure.outcomeUnknown(detail)
       }
