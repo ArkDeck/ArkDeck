@@ -86,7 +86,6 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       readOnlyCommandTimeoutSeconds: 9)
     let provenance = try AgentAuthorityCampaignEvidenceProvenance(
       candidateDigestSHA256: String(repeating: "a", count: 64),
-      reviewDigestSHA256: String(repeating: "b", count: 64),
       brokerDigestSHA256: String(repeating: "c", count: 64),
       executionTuning: tuning)
     let encoded = try JSONEncoder().encode(provenance)
@@ -94,13 +93,16 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       try JSONDecoder().decode(
         AgentAuthorityCampaignEvidenceProvenance.self, from: encoded), provenance)
 
-    var legacy = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-    legacy.removeValue(forKey: "executionTuning")
-    XCTAssertNil(
-      try JSONDecoder().decode(
-        AgentAuthorityCampaignEvidenceProvenance.self,
-        from: JSONSerialization.data(withJSONObject: legacy)).executionTuning)
+    let legacy: [String: Any] = [
+      "candidateDigestSHA256": String(repeating: "a", count: 64),
+      "reviewDigestSHA256": String(repeating: "b", count: 64),
+      "brokerDigestSHA256": String(repeating: "c", count: 64),
+    ]
+    let decodedLegacy = try JSONDecoder().decode(
+      AgentAuthorityCampaignEvidenceProvenance.self,
+      from: JSONSerialization.data(withJSONObject: legacy))
+    XCTAssertEqual(decodedLegacy.reviewDigestSHA256, String(repeating: "b", count: 64))
+    XCTAssertNil(decodedLegacy.executionTuning)
 
     var invalid = try XCTUnwrap(
       JSONSerialization.jsonObject(with: encoded) as? [String: Any])
@@ -202,8 +204,12 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         compensationLeaseExpiresAt: "2026-08-01T02:30:00Z",
         campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
           candidateDigestSHA256: String(repeating: "c", count: 64),
-          reviewDigestSHA256: String(repeating: "d", count: 64),
-          brokerDigestSHA256: String(repeating: "e", count: 64)),
+          brokerDigestSHA256: String(repeating: "e", count: 64),
+          executionTuning: try AgentAuthorityCampaignExecutionTuning(
+            loaderDiscoveryTimeoutSeconds: 90,
+            loaderPollIntervalMilliseconds: 250,
+            hdcCommandTimeoutSeconds: 7,
+            readOnlyCommandTimeoutSeconds: 9)),
         terminal: nil))
 
     let dispatchLog = DispatchLog()

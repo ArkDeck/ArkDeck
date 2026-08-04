@@ -121,7 +121,6 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         compensationLeaseExpiresAt: "2026-08-03T02:30:00Z",
         campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
           candidateDigestSHA256: String(repeating: "a", count: 64),
-          reviewDigestSHA256: String(repeating: "b", count: 64),
           brokerDigestSHA256: String(repeating: "c", count: 64),
           executionTuning: executionTuning),
         terminal: nil))

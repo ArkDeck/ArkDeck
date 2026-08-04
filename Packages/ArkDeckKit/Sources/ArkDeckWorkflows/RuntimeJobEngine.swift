@@ -118,7 +118,23 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
     planDigestSHA256: String,
     targetBindingDigestSHA256: String,
     candidateDigestSHA256: String,
-    reviewDigestSHA256: String? = nil,
+    brokerDigestSHA256: String
+  ) {
+    self.init(
+      campaignID: campaignID, attemptID: attemptID, attemptOrdinal: attemptOrdinal,
+      planDigestSHA256: planDigestSHA256, targetBindingDigestSHA256: targetBindingDigestSHA256,
+      candidateDigestSHA256: candidateDigestSHA256, historicalReviewDigestSHA256: nil,
+      brokerDigestSHA256: brokerDigestSHA256)
+  }
+
+  package init(
+    campaignID: String,
+    attemptID: String,
+    attemptOrdinal: Int,
+    planDigestSHA256: String,
+    targetBindingDigestSHA256: String,
+    candidateDigestSHA256: String,
+    historicalReviewDigestSHA256: String?,
     brokerDigestSHA256: String
   ) {
     self.campaignID = campaignID
@@ -127,7 +143,7 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
     self.planDigestSHA256 = planDigestSHA256
     self.targetBindingDigestSHA256 = targetBindingDigestSHA256
     self.candidateDigestSHA256 = candidateDigestSHA256
-    self.reviewDigestSHA256 = reviewDigestSHA256
+    self.reviewDigestSHA256 = historicalReviewDigestSHA256
     self.brokerDigestSHA256 = brokerDigestSHA256
   }
 }
@@ -4440,7 +4456,7 @@ public actor RuntimeJobEngine {
       planDigestSHA256: planDigest,
       targetBindingDigestSHA256: openReservation.targetDigestSHA256,
       candidateDigestSHA256: campaignProvenance.candidateDigestSHA256,
-      reviewDigestSHA256: campaignProvenance.reviewDigestSHA256,
+      historicalReviewDigestSHA256: campaignProvenance.reviewDigestSHA256,
       brokerDigestSHA256: campaignProvenance.brokerDigestSHA256)
     runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
       kind: .evolutionCampaignConfirmation,

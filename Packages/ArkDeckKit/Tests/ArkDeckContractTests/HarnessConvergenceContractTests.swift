@@ -522,7 +522,7 @@ final class HarnessConvergenceContractTests: XCTestCase {
     XCTAssertTrue(record.verified)
     XCTAssertTrue(
       record.sensitiveOptIn,
-      "a reviewer must be able to tell a measured-under-opt-in digest from an unread one")
+      "a maintainer must be able to tell a measured-under-opt-in digest from an unread one")
     XCTAssertEqual(record.sha256, sha256Hex(Data(cleanHilog.utf8)))
   }
 

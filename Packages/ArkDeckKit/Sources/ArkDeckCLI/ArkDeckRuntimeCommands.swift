@@ -1317,8 +1317,7 @@ enum RuntimeCLI {
   /// empty-enough destination directory. The daemon already verified the
   /// diff bytes against the candidate metadata; this side re-hashes
   /// `final.patch` before writing anything, so the maintainer's bundle can
-  /// never contain bytes the wire mangled (the same both-sides digest check
-  /// the adversarial review leg performs).
+  /// never contain bytes the wire mangled.
   private static func writePromotionBundle(
     _ response: JSONValue, destinationPath: String
   ) throws -> JSONValue {

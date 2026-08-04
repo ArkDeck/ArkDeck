@@ -300,14 +300,8 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       changedLines: 1, diffArtifactID: "diff-1",
       buildEvidenceArtifactID: "build-1",
       testEvidenceArtifactID: "test-1", strategy: strategy)
-    let review = try RockchipEvolutionReviewReceipt(
-      reviewID: "EREVIEW-0000000000000001", reviewerID: "engine-lane-reviewer",
-      candidateID: candidate.candidateID,
-      candidateExecutableDigestSHA256: candidate.executableDigestSHA256,
-      planDigestSHA256: assertion.planDigestSHA256, result: .pass, issues: [],
-      createdAt: "2026-08-03T00:10:00Z")
     return try RockchipEvolutionCampaignAttemptPermit(
-      assertion: assertion, candidate: candidate, review: review)
+      assertion: assertion, candidate: candidate)
   }
 
   private final class RecordingGateway: @unchecked Sendable {

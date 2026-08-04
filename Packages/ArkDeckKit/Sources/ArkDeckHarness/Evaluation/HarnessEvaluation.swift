@@ -98,7 +98,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   public let blocker: String?
   /// True when this artifact is privacy-sensitive and was measured only
   /// because an operator named it in the run's opt-in. It is recorded so a
-  /// reviewer can tell "the evaluator never saw these bytes" from "an
+  /// maintainer can tell "the evaluator never saw these bytes" from "an
   /// operator allowed the evaluator to measure them", which are different
   /// claims about the same digest.
   public let sensitiveOptIn: Bool

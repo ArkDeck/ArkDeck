@@ -787,23 +787,35 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
 
   public init(
     candidateDigestSHA256: String,
-    reviewDigestSHA256: String? = nil,
     brokerDigestSHA256: String,
     executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
   ) throws {
+    try self.init(
+      candidateDigestSHA256: candidateDigestSHA256,
+      historicalReviewDigestSHA256: nil,
+      brokerDigestSHA256: brokerDigestSHA256,
+      executionTuning: executionTuning)
+  }
+
+  private init(
+    candidateDigestSHA256: String,
+    historicalReviewDigestSHA256: String?,
+    brokerDigestSHA256: String,
+    executionTuning: AgentAuthorityCampaignExecutionTuning?
+  ) throws {
     guard [candidateDigestSHA256, brokerDigestSHA256]
       .allSatisfy(AuthorizationUsageValidation.isSHA256),
-      reviewDigestSHA256.map(AuthorizationUsageValidation.isSHA256) ?? true,
+      historicalReviewDigestSHA256.map(AuthorizationUsageValidation.isSHA256) ?? true,
       // Review-bearing records predate execution tuning. An unreviewed record
       // is only valid for the current broker path, which always carries its
       // bounded timing controls.
-      reviewDigestSHA256 != nil || executionTuning != nil
+      historicalReviewDigestSHA256 != nil || executionTuning != nil
     else {
       throw AuthorizationUsageLedgerError.invalidRecord(
-        "campaign evidence provenance requires canonical digests and review or execution tuning")
+        "campaign evidence provenance requires canonical digests and historical review or execution tuning")
     }
     self.candidateDigestSHA256 = candidateDigestSHA256
-    self.reviewDigestSHA256 = reviewDigestSHA256
+    self.reviewDigestSHA256 = historicalReviewDigestSHA256
     self.brokerDigestSHA256 = brokerDigestSHA256
     self.executionTuning = executionTuning
   }
@@ -813,7 +825,8 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
     try self.init(
       candidateDigestSHA256: container.decode(
         String.self, forKey: .candidateDigestSHA256),
-      reviewDigestSHA256: container.decodeIfPresent(String.self, forKey: .reviewDigestSHA256),
+      historicalReviewDigestSHA256: container.decodeIfPresent(
+        String.self, forKey: .reviewDigestSHA256),
       brokerDigestSHA256: container.decode(String.self, forKey: .brokerDigestSHA256),
       executionTuning: try container.decodeIfPresent(
         AgentAuthorityCampaignExecutionTuning.self, forKey: .executionTuning))
