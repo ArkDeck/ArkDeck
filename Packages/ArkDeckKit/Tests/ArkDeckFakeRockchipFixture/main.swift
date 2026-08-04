@@ -27,12 +27,27 @@ case "ppt":
   for row in rows {
     print(row)
   }
-case "wl":
-  guard arguments.count == 3 else { fail("wl requires begin sector and descriptor path") }
-  guard arguments[1].range(of: #"^[0-9]+$"#, options: .regularExpression) != nil,
-    arguments[1] == "0" || arguments[1].first != "0"
-  else {
-    fail("invalid begin sector")
+case "wl", "wlx":
+  guard arguments.count == 3 else {
+    fail("\(operation) requires an address argument and a descriptor path")
+  }
+  if operation == "wl" {
+    guard arguments[1].range(of: #"^[0-9]+$"#, options: .regularExpression) != nil,
+      arguments[1] == "0" || arguments[1].first != "0"
+    else {
+      fail("invalid begin sector")
+    }
+  } else {
+    // `wlx` is name-addressed: the name must resolve against the same pinned
+    // DAYU200 table the `ppt` output above serves.
+    let partitionNames: Set<String> = [
+      "uboot", "misc", "bootctrl", "resource", "boot_linux", "ramdisk",
+      "system", "vendor", "sys-prod", "chip-prod", "updater", "eng_system",
+      "eng_chipset", "chip_ckm", "userdata",
+    ]
+    guard partitionNames.contains(arguments[1]) else {
+      fail("unknown partition name: \(arguments[1])", code: 66)
+    }
   }
   var metadata = stat()
   guard lstat(arguments[2], &metadata) == 0,
@@ -46,7 +61,6 @@ case "wl":
   guard Darwin.read(descriptor, &byte, 1) == 1 else {
     fail("image descriptor contains no readable byte", code: 65)
   }
-  if arguments[1] == "critical_hold" { usleep(400_000) }
   print("Write LBA from file (100%)")
 case "rl":
   guard arguments.count == 4 else { fail("rl requires begin sector, count and output path") }

@@ -463,11 +463,16 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     let guide = try XCTUnwrap(assessment.recoveryGuide)
     XCTAssertEqual(guide.deviceMode, "unknown")
     XCTAssertFalse(guide.automaticRecoveryGuaranteed)
-    // The human route writes by sector for the same reason the automated one
-    // does: `wlx <name>` was observed to truncate a 64 MiB image silently.
-    XCTAssertTrue(guide.manualRecoverySteps.contains { $0.contains("wl <beginSec> <image>") })
+    // The human route writes by name, like the automated one: `wlx` flashes
+    // landed and booted on real hardware on 2026-07-21 and 2026-08-04, while
+    // the truncation once attributed to it was an artifact of `rl` reading
+    // uniform filler past this loader's read window.
+    XCTAssertTrue(
+      guide.manualRecoverySteps.contains { $0.contains("wlx <name> <image>") })
     XCTAssertFalse(
-      guide.manualRecoverySteps.contains { $0.contains("`sudo rkdeveloptool wlx") })
+      guide.manualRecoverySteps.contains { $0.contains("wl <beginSec>") })
+    XCTAssertTrue(
+      guide.manualRecoverySteps.contains { $0.contains("do not use `rl` to judge a write") })
     XCTAssertTrue(guide.manualRecoverySteps.contains { $0.contains("Loader") })
     XCTAssertTrue(guide.disclosures.contains { $0.contains("destroy user data") })
     XCTAssertTrue(guide.disclosures.contains { $0.contains("not every failure is recoverable") })

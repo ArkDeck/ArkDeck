@@ -302,6 +302,25 @@ typealias RockchipRuntimeStaging =
   @Sendable (RockchipRuntimeFlashBundle, URL) throws
     -> [String: RockchipRuntimeStagedImageHandle]
 
+/// How much of the medium the RockUSB read path (`rl`) can actually see,
+/// established before any use of that path as a verifier. `.full` means the
+/// backup GPT named by the primary header reads back self-consistently, so
+/// sector-addressed reads reach the whole table. `.windowed` means they do
+/// not: on the 2026-08-04 DAYU200 every read at or above sector 65536
+/// returned uniform filler even where real, mounted data lay beneath —
+/// while name-addressed writes (`wlx`) demonstrably landed and booted.
+enum RockchipMediumReadDomain: Sendable, Equatable {
+  case full
+  case windowed(detail: String)
+
+  var summaryValue: String {
+    switch self {
+    case .full: return "backup-gpt-reachable"
+    case .windowed: return "lba-read-window-only"
+    }
+  }
+}
+
 protocol RockchipRuntimePartitionReadbackVerifying: Sendable {
   func verify(
     mapping: RockchipMappedPartition,
@@ -765,6 +784,32 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       let loader = try await observeLoader(executable: rockchipExecutable)
       let partitionTable = try await observePartitionTable(
         executable: rockchipExecutable)
+      var receipts = [loader, partitionTable]
+      // The read path must prove it can see the medium before it is used to
+      // judge writes. On a windowed read domain (the 2026-08-04 DAYU200)
+      // every `rl` past the window returns uniform filler regardless of what
+      // was written, so hashing readbacks there can only produce false
+      // verdicts — it once condemned a flash that had in fact landed and
+      // booted. The step then records exactly what it skipped and leaves the
+      // verdict to `rebind-and-verify-build`, which pins the booted model and
+      // build over HDC and is blind to nothing.
+      let (mediumReceipts, readDomain) = try await characterizeMediumReadDomain(
+        profile: profile, executable: rockchipExecutable,
+        actionDirectory: actionDirectory)
+      receipts.append(contentsOf: mediumReceipts)
+      if case .windowed(let detail) = readDomain {
+        return result(
+          summary: [
+            "bundleSha256": bundle.sha256,
+            "loaderIdentitySha256": identity.serialDigestSHA256,
+            "partitionHashesVerified": "0",
+            "partitionTable": "pinned-dayu200-match",
+            "readback": "skipped-lba-read-window",
+            "readDomainDetail": detail,
+            "usbTopology": identity.topology,
+          ],
+          receipts: receipts)
+      }
       let outputDirectory = actionDirectory.appendingPathComponent(
         "readback", isDirectory: true)
       do {
@@ -776,7 +821,6 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.failed(
           "cannot create job-owned partition readback directory: \(error)")
       }
-      var receipts = [loader, partitionTable]
       for mapping in profile.mappedPartitions {
         guard
           let member = profile.member(
@@ -804,6 +848,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "loaderIdentitySha256": identity.serialDigestSHA256,
           "partitionHashesVerified": String(bundle.partitionNames.count),
           "partitionTable": "pinned-dayu200-match",
+          "readback": "full-rl-hash",
           "usbTopology": identity.topology,
         ],
         receipts: receipts)
@@ -976,10 +1021,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     var receipts: [ProviderSubprocessReceipt] = []
     receipts.append(try await observeLoader(executable: rockchipExecutable))
     receipts.append(try await observePartitionTable(executable: rockchipExecutable))
-    receipts.append(
-      contentsOf: try await requireAddressableMedium(
-        profile: profile, executable: rockchipExecutable,
-        actionDirectory: actionDirectory))
+    let (mediumReceipts, readDomain) = try await characterizeMediumReadDomain(
+      profile: profile, executable: rockchipExecutable,
+      actionDirectory: actionDirectory)
+    receipts.append(contentsOf: mediumReceipts)
     for mapping in profile.mappedPartitions {
       guard
         let member = profile.member(
@@ -999,21 +1044,24 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.failed(
           "staged image identity changed before \(mapping.partitionName): \(error)")
       }
-      // `wlx <name>` lets the tool resolve the address, and on 2026-08-04 it
-      // wrote only the first 12 MiB of the 64 MiB `boot_linux` image and still
-      // reported success and exit 0; the device readback of sectors
-      // 24576..131072 came back as uniform 0xCC erased medium, so the image
-      // tail — which carries real content, not padding — never landed. `wl`
-      // writes the file at an exact sector and is already inside the reviewed
-      // closed command surface. The address is safe to state here because
-      // `observePartitionTable` above has just proved the device's own GPT
-      // equals the pinned table these offsets come from, and the guard below
-      // keeps a write inside its own partition.
+      // `wlx <name>` (name-addressed) is the write path with the only clean
+      // evidence on this hardware: full nine-partition flashes through it
+      // booted on 2026-07-21 and on 2026-08-04. The earlier note here that
+      // `wlx` "wrote only the first 12 MiB of boot_linux" rested entirely on
+      // an `rl` readback — and `rl` was later shown to return uniform filler
+      // for every sector past its read window even where real, mounted data
+      // lay beneath (see `characterizeMediumReadDomain`). No write command has
+      // ever been cleanly shown to land short; the read path was the blind
+      // one, and every sector-addressed verdict it produced is void. Boot
+      // verification is what settles a write. `wlx` resolves the address from
+      // the device's own GPT, which `observePartitionTable` above has just
+      // proved equal to the pinned table, and the guard below still refuses a
+      // mapping whose image could not fit its pinned span.
       guard let span = RockchipPinnedPartitionTable.span(for: mapping.partitionName),
         span.first == mapping.offsetSectors
       else {
         throw RuntimeDispatchFailure.failed(
-          "\(mapping.partitionName) is not at its pinned first sector; refusing an LBA write")
+          "\(mapping.partitionName) is not at its pinned first sector; refusing the write")
       }
       let imageSectors = (member.sizeBytes + 511) / 512
       if let endExclusive = span.endExclusive,
@@ -1021,14 +1069,14 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       {
         throw RuntimeDispatchFailure.failed(
           "\(mapping.partitionName) image needs \(imageSectors) sectors and would cross "
-            + "into the next pinned partition at \(endExclusive); refusing an LBA write")
+            + "into the next pinned partition at \(endExclusive); refusing the write")
       }
       // The device may be changed from the instant the child is spawned, so
       // the boundary is drawn here rather than after the receipt.
       writeDispatched = true
       let receipt = try await runner.run(
         executable: rockchipExecutable,
-        arguments: ["wl", String(mapping.offsetSectors), image.stableDescriptorPath],
+        arguments: ["wlx", mapping.partitionName, image.stableDescriptorPath],
         timeoutSeconds: nil,
         outputByteBudget: Self.writeOutputByteBudget,
         criticalNonInterruptible: true)
@@ -1054,14 +1102,16 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     } catch {
       cleanup = "required:\(error)"
     }
-    return result(
-      summary: [
-        "addressableMedium": "backup-gpt-reachable",
-        "bundleSha256": bundle.sha256,
-        "partitionCount": String(bundle.partitionNames.count),
-        "stagingCleanup": cleanup,
-      ],
-      receipts: receipts)
+    var summary = [
+      "addressableMedium": readDomain.summaryValue,
+      "bundleSha256": bundle.sha256,
+      "partitionCount": String(bundle.partitionNames.count),
+      "stagingCleanup": cleanup,
+    ]
+    if case .windowed(let detail) = readDomain {
+      summary["readDomainDetail"] = detail
+    }
+    return result(summary: summary, receipts: receipts)
   }
 
   private func waitForHDC(
@@ -1294,11 +1344,28 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   /// sector of the intended medium, so requiring that backup to parse turns
   /// "the medium is addressable" into a structural fact instead of a guess
   /// about fill bytes — a blank medium reads as uniform bytes too.
-  private func requireAddressableMedium(
+  /// Characterizes how much of the medium the RockUSB *read* path can see.
+  ///
+  /// On 2026-08-04 this device answered every `rl` at or above sector 65536
+  /// with uniform 0xCC — including sectors that provably held real data
+  /// (a superblock written on 2026-07-21 that the booted system had mounted).
+  /// The same evening a full nine-partition `wlx` flash landed and booted, so
+  /// a short read window does NOT imply a short write window: the read path
+  /// and the name-addressed write path are independent on this loader. What a
+  /// windowed read domain does mean is that `rl`-based verification is
+  /// structurally blind past the window — it must not be trusted either to
+  /// confirm or to refute a write there. Boot-side verification
+  /// (`rebind-and-verify-build`, exact model/build pins over HDC) is the
+  /// authority for those partitions.
+  ///
+  /// Fail-closed refusals stay for what a refusal can still prove: no GPT at
+  /// LBA 1 (the name-addressed write has no table to resolve against) and a
+  /// mapped image that would end past the table's last usable sector.
+  private func characterizeMediumReadDomain(
     profile: RockchipFlashProfile,
     executable: ResolvedExecutable,
     actionDirectory: URL
-  ) async throws -> [ProviderSubprocessReceipt] {
+  ) async throws -> ([ProviderSubprocessReceipt], RockchipMediumReadDomain) {
     let directory = actionDirectory.appendingPathComponent("medium", isDirectory: true)
     do {
       try FileManager.default.createDirectory(
@@ -1334,15 +1401,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     let (backupReceipt, backupBytes) = try await readSectors(
       executable: executable, offsetSectors: primary.alternateLBA, count: 1,
       directory: directory, name: "backup-gpt")
-    guard let backup = RockchipGPTHeader.parse(backupBytes),
+    if let backup = RockchipGPTHeader.parse(backupBytes),
       backup.myLBA == primary.alternateLBA
-    else {
-      throw RuntimeDispatchFailure.failed(
-        "the addressable medium ends before sector \(primary.alternateLBA): the backup GPT "
-          + "header the primary table points at does not read back, so writes past the "
-          + "reachable window would report success and land nothing")
+    {
+      return ([primaryReceipt, backupReceipt], .full)
     }
-    return [primaryReceipt, backupReceipt]
+    return (
+      [primaryReceipt, backupReceipt],
+      .windowed(
+        detail: "the backup GPT header at sector \(primary.alternateLBA) does not read "
+          + "back; the RockUSB read window on this loader ends before the medium does, "
+          + "so rl-based verification is blind past the window and boot-side "
+          + "verification is the authority for partitions beyond it")
+    )
   }
 
   private func readSectors(
