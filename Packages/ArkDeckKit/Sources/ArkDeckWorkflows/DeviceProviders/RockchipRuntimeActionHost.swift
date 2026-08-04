@@ -129,6 +129,40 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
 /// This moved here when the in-process flash executor was retired (T25): the
 /// readback that consumes it is an engine-lane action, and it is the only
 /// surviving consumer of what used to be the lowering evaluator's semantics.
+/// The primary GPT header fields this provider needs.
+///
+/// The partition table says what the medium is meant to be; the backup header
+/// it points at is what proves that medium is actually reachable, because the
+/// backup lives in the last sector of it.
+package struct RockchipGPTHeader: Equatable, Sendable {
+  package static let signature = Array("EFI PART".utf8)
+  package static let sectorBytes = 512
+
+  package let myLBA: Int64
+  package let alternateLBA: Int64
+  package let firstUsableLBA: Int64
+  package let lastUsableLBA: Int64
+
+  package static func parse(_ sector: Data) -> RockchipGPTHeader? {
+    let bytes = [UInt8](sector)
+    guard bytes.count >= 92, Array(bytes[0..<8]) == signature else { return nil }
+    func value(at offset: Int) -> Int64 {
+      var raw: UInt64 = 0
+      for index in 0..<8 {
+        raw |= UInt64(bytes[offset + index]) << (8 * UInt64(index))
+      }
+      return raw <= UInt64(Int64.max) ? Int64(raw) : -1
+    }
+    let header = Self(
+      myLBA: value(at: 24), alternateLBA: value(at: 32),
+      firstUsableLBA: value(at: 40), lastUsableLBA: value(at: 48))
+    guard header.myLBA >= 0, header.alternateLBA > 0,
+      header.firstUsableLBA >= 0, header.lastUsableLBA >= header.firstUsableLBA
+    else { return nil }
+    return header
+  }
+}
+
 enum RockchipPinnedPartitionTable {
   static let expectedRows = [
     "00  00002000  uboot", "01  00004000  misc", "02  00006000  bootctrl",
@@ -875,6 +909,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     var receipts: [ProviderSubprocessReceipt] = []
     receipts.append(try await observeLoader(executable: rockchipExecutable))
     receipts.append(try await observePartitionTable(executable: rockchipExecutable))
+    receipts.append(
+      contentsOf: try await requireAddressableMedium(
+        profile: profile, executable: rockchipExecutable,
+        actionDirectory: actionDirectory))
     for mapping in profile.mappedPartitions {
       guard
         let member = profile.member(
@@ -948,6 +986,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     }
     return result(
       summary: [
+        "addressableMedium": "backup-gpt-reachable",
         "bundleSha256": bundle.sha256,
         "partitionCount": String(bundle.partitionNames.count),
         "stagingCleanup": cleanup,
@@ -1171,6 +1210,92 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       throw RuntimeDispatchFailure.failed(
         "descriptor-bound HDC executable is unavailable: \(error)")
     }
+  }
+
+  /// Proves the medium a write will land on is the one the device's own
+  /// partition table describes — before the first destructive write.
+  ///
+  /// On 2026-08-04 every write to a sector at or above 65536 (32 MiB) on the
+  /// bound DAYU200 reported `Write LBA from file (100%)` and landed nothing,
+  /// and every read there returned uniform 0xCC, while `ld`, `ppt` and the
+  /// primary GPT — all inside that window — looked healthy. Nine partitions
+  /// were "written" and only the readback, six partitions later, noticed. The
+  /// primary header names the sector its backup lives in, which is the last
+  /// sector of the intended medium, so requiring that backup to parse turns
+  /// "the medium is addressable" into a structural fact instead of a guess
+  /// about fill bytes — a blank medium reads as uniform bytes too.
+  private func requireAddressableMedium(
+    profile: RockchipFlashProfile,
+    executable: ResolvedExecutable,
+    actionDirectory: URL
+  ) async throws -> [ProviderSubprocessReceipt] {
+    let directory = actionDirectory.appendingPathComponent("medium", isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "cannot create job-owned medium probe directory: \(error)")
+    }
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let (primaryReceipt, primaryBytes) = try await readSectors(
+      executable: executable, offsetSectors: 1, count: 1,
+      directory: directory, name: "primary-gpt")
+    guard let primary = RockchipGPTHeader.parse(primaryBytes) else {
+      throw RuntimeDispatchFailure.failed(
+        "no GPT header at LBA 1; the medium does not carry the table this flash assumes")
+    }
+
+    for mapping in profile.mappedPartitions {
+      guard let member = profile.member(named: mapping.imageMemberName) else {
+        throw RuntimeDispatchFailure.failed(
+          "pinned member is missing for \(mapping.partitionName)")
+      }
+      let lastSector = mapping.offsetSectors + (member.sizeBytes + 511) / 512 - 1
+      guard lastSector <= primary.lastUsableLBA else {
+        throw RuntimeDispatchFailure.failed(
+          "\(mapping.partitionName) would end at sector \(lastSector), past the table's "
+            + "last usable sector \(primary.lastUsableLBA)")
+      }
+    }
+
+    let (backupReceipt, backupBytes) = try await readSectors(
+      executable: executable, offsetSectors: primary.alternateLBA, count: 1,
+      directory: directory, name: "backup-gpt")
+    guard let backup = RockchipGPTHeader.parse(backupBytes),
+      backup.myLBA == primary.alternateLBA
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "the addressable medium ends before sector \(primary.alternateLBA): the backup GPT "
+          + "header the primary table points at does not read back, so writes past the "
+          + "reachable window would report success and land nothing")
+    }
+    return [primaryReceipt, backupReceipt]
+  }
+
+  private func readSectors(
+    executable: ResolvedExecutable,
+    offsetSectors: Int64,
+    count: Int64,
+    directory: URL,
+    name: String
+  ) async throws -> (ProviderSubprocessReceipt, Data) {
+    let outputURL = directory.appendingPathComponent("\(name).sector")
+    let receipt = try await run(
+      executable: executable,
+      arguments: ["rl", String(offsetSectors), String(count), outputURL.path],
+      timeoutSeconds: 30,
+      budget: 64 * 1024)
+    guard let data = try? Data(contentsOf: outputURL),
+      data.count == Int(count) * RockchipGPTHeader.sectorBytes
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "RockUSB read at sector \(offsetSectors) did not produce \(count) sector(s)")
+    }
+    try? FileManager.default.removeItem(at: outputURL)
+    return (receipt, data)
   }
 
   private func run(
