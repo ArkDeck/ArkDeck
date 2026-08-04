@@ -471,8 +471,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         let status = try await engine.reconcile(jobID: jobID)
         return success(id: request.id, result: Self.encodeStatus(status))
-      } catch {
+      } catch RuntimeJobEngineError.jobNotFound {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
+      } catch let error as RuntimeJobEngineError {
+        // Reconciliation resolves a durable intent against the device: it can
+        // fail at facts, evidence or the typed readback long after the job was
+        // found. Reporting every one of those as `notFound` denied a job the
+        // daemon had just journaled into `reconciling`, and left the operator
+        // with no way to see which gate refused. Only a genuinely absent job
+        // is notFound; the rest surface like `job.run`.
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
     case "cleanupDebt.list":
