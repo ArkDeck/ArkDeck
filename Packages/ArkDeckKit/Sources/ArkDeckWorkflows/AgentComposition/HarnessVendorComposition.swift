@@ -115,13 +115,12 @@ public enum HarnessVendorConfiguration {
   public static let reviewerClaudeCodeWorkingDirectoryKey =
     "ARKDECK_HARNESS_REVIEWER_CLAUDE_CODE_WORKDIR"
 
-  /// The independent adversarial reviewer for the Evolution path. Absent
-  /// configuration returns nil and the coordinator fails closed at review
-  /// time (`adversarialReviewerUnavailable`); it is never silently replaced
-  /// by the decision gateway, because the builder reviewing its own patch
-  /// would not be a review. Two local CLI vendors are supported — `codex`
-  /// and `claude-code` — and each names its executable through its own key,
-  /// so a host with both installed states which one holds the reviewer role.
+  /// Compatibility-only factory for callers that explicitly retain an
+  /// adversarial reviewer. Production composition does not request this
+  /// role, so it is never an admission or promotion prerequisite. Two local
+  /// CLI vendors are supported — `codex` and `claude-code` — and each names
+  /// its executable through its own key, so a host with both installed states
+  /// which one holds the optional reviewer role.
   public static func adversarialReviewer(
     environment: [String: String],
     transport: any HarnessCodexTransport = CodexCLIProcessTransport()

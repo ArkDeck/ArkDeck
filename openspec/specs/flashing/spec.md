@@ -213,7 +213,7 @@ standing authorization。evidence 或事后聊天消息不得追溯授权 dispat
 #### Scenario: AC-FLASH-015-03 Exact E2 authority permits bounded Agent dispatch
 
 - GIVEN Agent 有匹配 maintainer-merged standing authorization 或同会话未消费 campaign
-  confirmation，且 broker 已 re-materialize 已发布 plan、通过独立 review（如适用）、取得
+  confirmation，且 broker 已 re-materialize 已发布 plan、完成 candidate 的固定构建和封闭策略输出校验、取得
   fresh target/binding readback 并在 16-attempt/four-hour/single-concurrency 预算内 reserve ordinal
 - WHEN broker dispatches execute plan
 - THEN 仅声明的 typed destructive Steps 运行，并持久写入 intent/outcome

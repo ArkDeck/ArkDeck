@@ -1,13 +1,13 @@
-// Evolution adversarial-review leg contract tests (CHG-2026-025, TASK-AIN-019).
+// Evolution promotion and historical adversarial-review compatibility tests
+// (CHG-2026-025, TASK-AIN-019).
 //
-// The review leg replaces the human merge gate for unmerged Evolution
-// candidates: evaluation PASS alone must never promote. These tests drive
-// `finishEvolutionEvaluation` through the public reconcile surface and pin
-// every verdict branch: no reviewer / no candidate / no immutable diff /
-// exhausted model budget stop for a human; REJECT keeps the loop alive with a
-// rollback obligation; COMMENT stops for a human; PASS crosses the promotion
-// gate only when every recorded fact still holds. The Codex adapter half
-// pins the closed response shape and the identity binding of the verdict.
+// A production coordinator without an explicitly injected reviewer promotes
+// after the fixed candidate/evaluation gates; it must neither create review
+// evidence nor claim that a review occurred. Historical explicit-review
+// callers remain decodable and testable: REJECT keeps the loop alive with a
+// rollback obligation, COMMENT stops for a human, and PASS crosses the
+// promotion gate only when every recorded fact still holds. The adapter half
+// pins the closed response shape and identity binding of that optional role.
 
 import CryptoKit
 import XCTest
@@ -257,6 +257,19 @@ final class HarnessEvolutionReviewContractTests: XCTestCase {
     XCTAssertEqual(attempt.outcome, .succeeded)
     XCTAssertNil(attempt.review)
     XCTAssertNil(attempt.promotionCandidate?.reviewID)
+
+    let snapshot = try await stack.store.load(stack.taskID)
+    let bundle = try HarnessPromotionExport.assemble(
+      snapshot: snapshot,
+      attempts: try await stack.store.attempts(stack.taskID),
+      evaluations: try await stack.store.evaluations(stack.taskID))
+    XCTAssertNil(bundle.review)
+    let files = Dictionary(uniqueKeysWithValues: bundle.files.map { ($0.name, $0.contents) })
+    XCTAssertNil(files[HarnessPromotionExport.reviewFileName])
+    let summary = try XCTUnwrap(files[HarnessPromotionExport.summaryFileName])
+    XCTAssertTrue(summary.contains("build, tests, device verification and evaluation all"))
+    XCTAssertFalse(summary.contains("adversarial review all passed"))
+    XCTAssertFalse(summary.contains("Historical adversarial review"))
   }
 
   func testEvaluationPassWithoutACandidatePatchStopsForHuman() async throws {
