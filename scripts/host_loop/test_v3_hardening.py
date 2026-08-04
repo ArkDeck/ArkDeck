@@ -790,8 +790,7 @@ class CursorStateRejectsTypeConfusion(unittest.TestCase):
             state(last_observed_at=True).validate()
 
     def test_the_string_fields_must_be_strings(self):
-        for field, value in (("candidate_task", 1), ("lease_ref", 2),
-                             ("review_run", 3)):
+        for field, value in (("candidate_task", 1), ("lease_ref", 2)):
             with self.subTest(field=field):
                 with self.assertRaises(CursorError):
                     state(**{field: value}).validate()

@@ -34,7 +34,7 @@ MAIN = "f" * 40
 def state(**over) -> CursorState:
     base = dict(
         cursor_main_oid=MAIN, candidate_task=None, lease_ref=None, lease_oid=None,
-        pr_number=None, pr_head=None, review_run=None, last_observed_at=1000,
+        pr_number=None, pr_head=None, last_observed_at=1000,
     )
     base.update(over)
     return CursorState(**base)
