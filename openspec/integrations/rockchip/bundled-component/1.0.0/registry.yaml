@@ -13,9 +13,10 @@
     ],
     "exportedSymbolCount": 203,
     "exportedSymbolsSHA256": "0659a01d19792457e67e78a52129acb097b3f8f2e060ea54da69d46a06c9368c",
-    "loadCommandsSHA256": "37f7cb60719846d013678400ed11956900eeb79b80c5492375526c53f320f777",
+    "loadCommandsSHA256": "8c7b6c7cd732c964eb0f6aba48b152ce8c8d9704993dc9c4e512f801301f7b46",
+    "machoUUID": "8ab1a64a-f879-3fc1-a6de-63d3529c79c6",
     "minimumMacOS": "14.0",
-    "sha256": "3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a",
+    "sha256": "55f6700bdd1c311a273394791baa00713ae7cf62a372077a3d63028b5473f218",
     "size": 247488,
     "undefinedSymbolCount": 193,
     "undefinedSymbolsSHA256": "695166f61e92d97191dcf1ec324ecea1a198b57affa6c69fcd58d15ed5d42a1e",
@@ -26,12 +27,12 @@
     }
   },
   "build": {
-    "commandDigest": "ab83aeed822e85baec24956a3217c7be29082a9e66a08f71670a5825d5eb132a",
+    "commandDigest": "a5eb8b1002339bcf244e59ed25f129baef7081327dec6ecad67e743188e74a4d",
     "networkDuringBuild": "denied-by-sandbox-exec",
     "normalization": "forbidden",
-    "recipeGitBlob": "fa4289b73880540b0db19d24242d039053ae8916",
+    "recipeGitBlob": "794c127f20bb6ff06f88f4beff0f26e5f1f87e07",
     "recipePath": "openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json",
-    "recipeSHA256": "8b42fdc29d26f597f4c40506f581fd06b5df1fdc1a9cc8eac225e706ce3998f6",
+    "recipeSHA256": "22a6c7359a1b5ea97702e76568817746c8e7815981a139a1bb04b475f9f747ec",
     "sourceDateEpoch": 1779028641
   },
   "builder": {
@@ -41,11 +42,11 @@
     "hostedImage": {
       "imageOS": "macos26",
       "label": "macos-26-arm64",
-      "version": "20260720.0258.1"
+      "version": "20260728.0273.1"
     },
     "make": "GNU Make 3.81",
-    "osBuild": "25E246",
-    "osVersion": "26.4",
+    "osBuild": "25F84",
+    "osVersion": "26.5.2",
     "python": "3.9.6",
     "sdkBuild": "25F70",
     "sdkVersion": "26.5",
@@ -134,11 +135,11 @@
     "sbom": {
       "format": "SPDX-2.3 JSON",
       "path": "sbom.spdx.json",
-      "sha256": "05ae1fa74cbabe55dac1ff0bca59607b555b60fb2dbfc556e3af95671e3100ed"
+      "sha256": "1e231026acf767b5e96d00efda6e0e28a50933fa0ce6e9609b588054519fde4c"
     },
     "sourceDistributionManifest": {
       "path": "source-distribution-manifest.json",
-      "sha256": "558282ba42f6dfdfd21599f5987206bb9f6370180b1653676f826559e61dc563"
+      "sha256": "d94c2714047960014b071d60c3c1e939402d1fb719a55f6186e0fba04f85985f"
     }
   },
   "inputs": {

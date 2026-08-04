@@ -752,6 +752,18 @@ def _parse_minos(output: str) -> str:
     raise BuildError("LC_BUILD_VERSION/minos was not found")
 
 
+def _parse_macho_uuid(output: str) -> str:
+    for index, line in enumerate(output.splitlines()):
+        if line.strip() != "cmd LC_UUID":
+            continue
+        for candidate in output.splitlines()[index + 1 : index + 8]:
+            match = re.fullmatch(r"uuid ([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})", candidate.strip())
+            if match:
+                return match.group(1).lower()
+        raise BuildError("LC_UUID is malformed")
+    raise BuildError("LC_UUID was not found")
+
+
 def _normalized_symbol_lines(output: str) -> List[str]:
     symbols: List[str] = []
     for line in output.splitlines():
@@ -791,6 +803,9 @@ def inspect_artifact(
     minos = _parse_minos(load_commands)
     if minos not in ("14.0", "14.0.0"):
         raise BuildError("unsigned artifact minimum macOS drift")
+    macho_uuid = _parse_macho_uuid(load_commands)
+    if macho_uuid == "00000000-0000-0000-0000-000000000000":
+        raise BuildError("unsigned artifact LC_UUID is invalid")
     undefined_output = _decode(recorder.run([tools["nm"], "-u", str(binary)], cwd=cwd, env=env))
     exported_output = _decode(recorder.run([tools["nm"], "-gU", str(binary)], cwd=cwd, env=env))
     strings_output = _decode(
@@ -821,6 +836,7 @@ def inspect_artifact(
         "loadCommandsSHA256": sha256_bytes(
             recorder.sanitize(load_commands).encode("utf-8")
         ),
+        "machoUUID": macho_uuid,
         "minimumMacOS": minos,
         "sha256": sha256_file(binary),
         "size": binary.stat().st_size,
@@ -1391,6 +1407,11 @@ def validate_registry(path: Path, recipe: Mapping[str, Any]) -> None:
         recipe["inspection"]["directDependencyAllowlist"]
     ):
         raise BuildError("registry dependency graph disagrees with the recipe")
+    macho_uuid = registry["artifact"].get("machoUUID")
+    if not isinstance(macho_uuid, str) or not re.fullmatch(
+        r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", macho_uuid
+    ) or macho_uuid == "00000000-0000-0000-0000-000000000000":
+        raise BuildError("registry LC_UUID is missing or malformed")
     if registry["dependencies"]["nonSystemBundledDylibCount"] != 0:
         raise BuildError("registry contains a bundled non-system dylib")
     if registry["build"]["normalization"] != "forbidden":
@@ -1520,7 +1541,6 @@ def build_once(builder_id: str, work_root: Path, output_dir: Path) -> Dict[str, 
             "-mmacosx-version-min=14.0",
             "-isysroot",
             toolchain["sdkPath"],
-            "-Wl,-no_uuid",
             "-Wl,-no_adhoc_codesign",
             "-Wl,-dead_strip",
             *[str(item) for item in objects],
