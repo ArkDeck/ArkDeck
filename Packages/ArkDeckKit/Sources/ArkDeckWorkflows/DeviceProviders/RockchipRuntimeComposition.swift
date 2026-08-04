@@ -206,13 +206,17 @@ public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
       throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
         "secureTimestamp")
     }
-    guard
-      let entitlements =
-        information[kSecCodeInfoEntitlementsDict] as? [String: Any],
-      Set(entitlements.keys)
-        == ["com.apple.security.app-sandbox", "com.apple.security.inherit"],
-      entitlements["com.apple.security.app-sandbox"] as? Bool == true,
-      entitlements["com.apple.security.inherit"] as? Bool == true
+    // The child entitlement dictionary is empty, matching the TASK-BRC-003
+    // packaging contract. The Runtime Broker is a standalone daemon and is not
+    // itself sandboxed, so a child declaring `com.apple.security.inherit`
+    // aborts inside `_libsecinit_appsandbox` ("Process is not in an inherited
+    // sandbox") before `main` — the shape this guard used to require could
+    // never execute here. Emptiness stays fail-closed: `get-task-allow`, App
+    // Sandbox inheritance, child USB/file/network capability and Hardened
+    // Runtime exceptions are all rejected by having no key at all.
+    let entitlements = information[kSecCodeInfoEntitlementsDict]
+    guard entitlements == nil
+      || (entitlements as? [String: Any])?.isEmpty == true
     else {
       throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
         "entitlements")
