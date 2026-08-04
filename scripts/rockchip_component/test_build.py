@@ -72,11 +72,11 @@ class RockchipComponentBuildTests(unittest.TestCase):
             {
                 "imageOS": "macos26",
                 "label": "macos-26-arm64",
-                "version": "20260720.0258.1",
+                "version": "20260728.0273.1",
             },
         )
-        self.assertEqual(self.recipe["builder"]["osBuild"], "25E246")
-        self.assertEqual(self.recipe["builder"]["osVersion"], "26.4")
+        self.assertEqual(self.recipe["builder"]["osBuild"], "25F84")
+        self.assertEqual(self.recipe["builder"]["osVersion"], "26.5.2")
         self.assertEqual(
             self.recipe["builder"]["developerDirectoryAllowlist"],
             ["/Applications/Xcode_26.6.app/Contents/Developer"],
@@ -231,6 +231,21 @@ class RockchipComponentBuildTests(unittest.TestCase):
             build._parse_otool_dependencies(output),
             ["/usr/lib/libSystem.B.dylib", "/usr/lib/libc++.1.dylib"],
         )
+
+    def test_macho_uuid_is_required_and_canonical(self) -> None:
+        output = """Load command 7
+      cmd LC_UUID
+  cmdsize 24
+     uuid C0225A06-F7EC-5B36-8A11-FDA87D06681F
+"""
+        self.assertEqual(
+            build._parse_macho_uuid(output),
+            "c0225a06-f7ec-5b36-8a11-fda87d06681f",
+        )
+        with self.assertRaises(build.BuildError):
+            build._parse_macho_uuid("Load command 7\\n      cmd LC_UUID\\n")
+        with self.assertRaises(build.BuildError):
+            build._parse_macho_uuid("Load command 7\\n      cmd LC_BUILD_VERSION\\n")
 
     def test_receipt_path_sanitization_is_deterministic(self) -> None:
         recorder = build.CommandRecorder(
@@ -399,7 +414,8 @@ class RockchipComponentBuildTests(unittest.TestCase):
                 "artifact": {
                     "dependencies": sorted(
                         self.recipe["inspection"]["directDependencyAllowlist"]
-                    )
+                    ),
+                    "machoUUID": "c0225a06-f7ec-5b36-8a11-fda87d06681f",
                 },
                 "build": {
                     "normalization": "forbidden",
@@ -412,6 +428,13 @@ class RockchipComponentBuildTests(unittest.TestCase):
             build.validate_registry(path, self.recipe)
             mutations = [
                 {**base, "artifact": {"dependencies": ["/tmp/ambient.dylib"]}},
+                {
+                    **base,
+                    "artifact": {
+                        **base["artifact"],
+                        "machoUUID": "00000000-0000-0000-0000-000000000000",
+                    },
+                },
                 {**base, "build": {**base["build"], "normalization": "strip-after-compare"}},
                 {
                     **base,

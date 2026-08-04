@@ -15,6 +15,8 @@ The recipe:
   recipe, with its exact macOS/Xcode/SDK/Clang envelope, inside a deny-network
   `sandbox-exec` profile;
 - compares two independent build roots without output normalization;
+- requires the linker-generated Mach-O `LC_UUID`; it is retained in the
+  inspected registry and covered by the two builders' byte-identical result;
 - emits sanitized receipts plus deterministic registry, SPDX 2.3 JSON, notices and
   source-distribution metadata.
 

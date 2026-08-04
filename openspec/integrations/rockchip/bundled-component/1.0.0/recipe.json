@@ -26,11 +26,11 @@
     "hostedImage": {
       "imageOS": "macos26",
       "label": "macos-26-arm64",
-      "version": "20260720.0258.1"
+      "version": "20260728.0273.1"
     },
     "make": "GNU Make 3.81",
-    "osBuild": "25E246",
-    "osVersion": "26.4",
+    "osBuild": "25F84",
+    "osVersion": "26.5.2",
     "python": "3.9.6",
     "sdkBuild": "25F70",
     "sdkVersion": "26.5",
