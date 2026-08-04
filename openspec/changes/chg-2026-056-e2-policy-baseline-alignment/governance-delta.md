@@ -8,9 +8,11 @@
 The E2 entry SHALL list both valid autonomous authorities: exact maintainer-merged standing
 authorization and exact same-session `evolutionCampaignConfirmation`. It SHALL retain the
 16-attempt/four-hour/single-concurrency campaign budget, protected-main broker-only dispatch,
-per-attempt fresh target/binding readback and reservation, independent candidate/review pins,
-`safeToReflash`-only continuation, permanent stop for unknown/unsafe/drifted results, and honest
-authority provenance in evidence.
+per-attempt fresh target/binding readback and reservation, immutable candidate pins following
+fixed isolated build/strategy-output validation, `safeToReflash`-only continuation, permanent
+stop for unknown/unsafe/drifted results, and honest authority provenance in evidence. Independent
+adversarial review is not an E2 admission pin and must not be launched as a runtime prerequisite
+for a candidate change.
 
 The policy SHALL state that ordinary CI, scheduler/daemon, standard Agent and Agent request without
 one of these exact authorities have real destructive dispatch 0. It SHALL state that a human may

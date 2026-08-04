@@ -26,15 +26,18 @@ change ID, PR, readiness packet or a human to retype the typed plan before it ca
 The execution gate SHALL re-materialize the published typed plan and read fresh target/binding
 facts immediately before each external effect. Missing, consumed, expired or drifted authority;
 unknown identity/outcome; a missing fresh reservation; an unsafe/non-terminal predecessor; or a
-candidate/review/budget violation SHALL fail closed with zero new dispatch. A Runtime Agent SHALL
+candidate/budget violation SHALL fail closed with zero new dispatch. A valid immutable candidate
+pin follows its fixed isolated build and closed strategy-output validation; independent
+adversarial review is not an E2 admission requirement and a candidate change SHALL NOT launch a
+runtime review session. A Runtime Agent SHALL
 not execute raw shell/HDC/RockUSB strings or an undeclared operation, and SHALL not forge user
 confirmation, authority provenance or evidence.
 
 `scripts/host_loop` remains a Repo Agent Plane worker. Its ban on device Runtime jobs does not
 limit the Device Agent Runtime Plane; it prevents a repository-development dispatcher from
-becoming an untracked device executor. Candidate, repairer and reviewer remain isolated from
-device transport and authority, while the protected-main broker remains the only component that
-can dispatch an E2 plan.
+becoming an untracked device executor. Candidate and repairer remain isolated from device
+transport and authority, while the protected-main broker remains the only component that can
+dispatch an E2 plan.
 
 ## REMOVED Ambiguities
 
@@ -49,5 +52,5 @@ can dispatch an E2 plan.
 ## Unchanged safety boundaries
 
 This delta does not authorize an Agent with no E2 authority, permit mutable/unknown plan or
-target facts, replay an unknown destructive outcome, grant candidate/repairer/reviewer device
-access, or relax typed-only, identity, durability, privacy or truthful-evidence requirements.
+target facts, replay an unknown destructive outcome, grant candidate/repairer device access, or
+relax typed-only, identity, durability, privacy or truthful-evidence requirements.
