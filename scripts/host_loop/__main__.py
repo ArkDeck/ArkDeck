@@ -457,7 +457,7 @@ def _candidate_body_renderer(repo_root: str, *, fallback_change: str,
     does not know which change it will claim from until `select()` has returned.
     Binding the round's scope label instead would stamp every envelope with a
     change the task does not belong to, and that field is what the PR body
-    contract and the reviewer read. So the renderer is built per call, from the
+    contract reads. So the renderer is built per call, from the
     candidate. A candidate with no change id (a single-change round, and every
     pre-existing caller) falls back to the round's scope, which is the change id
     those callers passed.
@@ -680,7 +680,7 @@ def _load_cursor(api: ApiPort, issue_number: int | None, main_oid: str
     if issue_number is None:
         return CursorState(
             cursor_main_oid=main_oid, candidate_task=None, lease_ref=None,
-            lease_oid=None, pr_number=None, pr_head=None, review_run=None,
+            lease_oid=None, pr_number=None, pr_head=None,
             last_observed_at=int(time.time()),
         ), ""
     state, issue = load(api, issue_number)

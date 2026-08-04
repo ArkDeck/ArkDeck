@@ -123,7 +123,6 @@ PRODUCTION_MODULES = (
     "lease.py",
     "pr_envelope.py",
     "recovery.py",
-    "reviewer.py",
     "transport.py",
     "worker.py",
 )

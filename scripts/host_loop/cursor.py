@@ -2,7 +2,7 @@
 
 design §3: each host-loop queue uses one named GitHub Issue for navigation. Its
 machine block caches only: cursor main OID, candidate task, lease ref/OID, PR
-number/head, review run, last observed time. On start or recovery the runtime
+number/head, last observed time. On start or recovery the runtime
 MUST rebuild and validate it against protected main, the active `tasks.md` and
 GitHub PR metadata. A missing Issue, an unparsable machine block, or any
 conflict with those facts yields `blocked/reconcile-required`.
@@ -33,7 +33,6 @@ CURSOR_FIELDS = (
     "lease_oid",
     "pr_number",
     "pr_head",
-    "review_run",
     "last_observed_at",
 )
 
@@ -50,7 +49,6 @@ class CursorState:
     lease_oid: str | None
     pr_number: int | None
     pr_head: str | None
-    review_run: str | None
     last_observed_at: int
 
     def validate(self) -> None:
@@ -71,7 +69,7 @@ class CursorState:
         if (not isinstance(self.last_observed_at, int)
                 or isinstance(self.last_observed_at, bool)):
             raise CursorError("last_observed_at must be epoch seconds")
-        for name in ("candidate_task", "lease_ref", "review_run"):
+        for name in ("candidate_task", "lease_ref"):
             value = getattr(self, name)
             if value is not None and not isinstance(value, str):
                 raise CursorError(f"{name} must be a string or null")

@@ -59,7 +59,7 @@ LEASE_REF = f"refs/heads/agent/host-loop/leases/{TASK}"
 
 def state(**over) -> CursorState:
     base = dict(cursor_main_oid=MAIN, candidate_task=None, lease_ref=None,
-                lease_oid=None, pr_number=None, pr_head=None, review_run=None,
+                lease_oid=None, pr_number=None, pr_head=None,
                 last_observed_at=1000)
     base.update(over)
     return CursorState(**base)
