@@ -333,11 +333,11 @@ struct ArkDeckCommandLine {
             """)
       } else if let campaignDigest {
         try requireCampaignAgentContext(firstAdmission: true)
-        let result = try await RockchipEvolutionCampaignHost(
-          flash: try engineLaneDispatcher(options: options)
-        ).executeConfirmedCampaign(
-          confirmationDigestSHA256: campaignDigest,
-          archiveURL: URL(fileURLWithPath: imagesPath), targetLocationSelector: location)
+        try await requireGreenPreflight(imagesPath: imagesPath)
+        let result = try await engineLaneCampaignHost(options: options)
+          .executeConfirmedCampaign(
+            confirmationDigestSHA256: campaignDigest,
+            archiveURL: URL(fileURLWithPath: imagesPath), targetLocationSelector: location)
         printCampaignResult(result)
       } else {
         throw CLIError(exitCode: EX_USAGE, message: "Agent E2 authority is missing")
@@ -384,6 +384,12 @@ struct ArkDeckCommandLine {
         message: "execute requires --target-location-id <usb-location> to confirm the "
           + "physical target")
     }
+
+    // Ahead of the interactive prerequisite questions, not just ahead of the
+    // phrase: a red host is a refusal either way, and there is no reason to
+    // make an operator answer three questions first. `validateAndPlan` above
+    // already refused a missing --images.
+    try await requireGreenPreflight(imagesPath: options.value("--images") ?? "")
 
     let prerequisites = provider.evaluatePrerequisites(promptPrerequisites())
     if case .blockedBeforeDestructiveConfirmation(let violations) = prerequisites {
@@ -438,6 +444,29 @@ struct ArkDeckCommandLine {
     }
   }
 
+  // MARK: preflight
+
+  /// The non-destructive gate every confirmation phrase now sits behind.
+  ///
+  /// It exists because of what the 2026-08-04 campaigns cost: four confirmed
+  /// campaigns, one attempt each, all four killed by the same host-side tool
+  /// fault, and every retry needing a merged PR. None of those failures was a
+  /// product defect the campaign lane could repair, so none of them should
+  /// have consumed a campaign. Device mutation dispatch here is 0 — this is
+  /// four read-only observations and a refusal, never an execution stack.
+  static func requireGreenPreflight(imagesPath: String) async throws {
+    let receipt = await RockchipFlashPreflight().run(
+      archiveURL: URL(fileURLWithPath: imagesPath))
+    for line in receipt.renderedLines() { print(line) }
+    guard receipt.isGreen else {
+      throw CLIError(
+        exitCode: 4,
+        message: "preflight refused before any confirmation: "
+          + receipt.failedChecks.map(\.rawValue).joined(separator: ", ")
+          + ". No campaign attempt, reservation or device mutation was spent.")
+    }
+  }
+
   // MARK: default bounded Evolution E2 campaign
 
   static func runCampaignPreview(_ arguments: [String]) async throws {
@@ -456,6 +485,10 @@ struct ArkDeckCommandLine {
         exitCode: EX_USAGE,
         message: "preview requires absolute --images and canonical positive budgets")
     }
+    // Before the draft exists, not after: a preview that mints a confirmation
+    // digest against a dead host tool is how a campaign gets spent on a
+    // problem that was free to fix a second earlier.
+    try await requireGreenPreflight(imagesPath: images)
     let preview = try await RockchipEvolutionCampaignPlanning.preview(
       archiveURL: URL(fileURLWithPath: images), maxAttempts: maxAttempts,
       maxChangedFiles: maxChangedFiles, maxDiffLines: maxDiffLines,
@@ -510,9 +543,8 @@ struct ArkDeckCommandLine {
           + "(plus --runtime-target for the runtime job lane)")
     }
     try requireCampaignAgentContext(firstAdmission: false)
-    let result = try await RockchipEvolutionCampaignHost(
-      flash: try engineLaneDispatcher(options: options)
-    ).continueCampaign(
+    try await requireGreenPreflight(imagesPath: images)
+    let result = try await engineLaneCampaignHost(options: options).continueCampaign(
       campaignID: campaignID, archiveURL: URL(fileURLWithPath: images),
       targetLocationSelector: location)
     printCampaignResult(result)
@@ -522,6 +554,19 @@ struct ArkDeckCommandLine {
   /// fallback on purpose: falling back would put two flash execution stacks
   /// back in production behind one command, which is the condition this swap
   /// exists to end. A daemon that is not running is a loud, closed failure.
+  /// Everything the campaign host needs from the runtime job lane, from one
+  /// socket path: the dispatcher that submits attempts and the read-only
+  /// evidence reader reconciliation consults before it may settle an unknown
+  /// Loader transition.
+  private static func engineLaneCampaignHost(
+    options: CLIOptions
+  ) throws -> RockchipEvolutionCampaignHost {
+    try RockchipEvolutionCampaignHost(
+      flash: try engineLaneDispatcher(options: options),
+      attemptIntents: DaemonRockchipEvolutionAttemptIntents(
+        socketPath: options.value("--socket") ?? RuntimeCLI.defaultSocketPath()))
+  }
+
   private static func engineLaneDispatcher(
     options: CLIOptions
   ) throws -> EngineLaneEvolutionFlashDispatcher {
@@ -567,6 +612,10 @@ struct ArkDeckCommandLine {
       }
       if let reason = event.reasonCode { fields.append("reason=\(reason)") }
       print(fields.joined(separator: " "))
+      // The root cause, printed on its own line: it is the one field here that
+      // is prose rather than an identifier, and folding it into the columns
+      // above would make the stop event unreadable.
+      if let detail = event.detail { print("  detail: \(detail)") }
     }
   }
 

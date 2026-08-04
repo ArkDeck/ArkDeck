@@ -109,7 +109,7 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
           "process cancelled mid-flight")
       case .signalled(let signal):
         throw RuntimeDispatchFailure.outcomeUnknown(
-          "process died on signal \(signal)")
+          RockchipHostProcessDiagnostics.signalDeath(signal))
       case .waitFailed(let code), .unrecognizedWaitStatus(let code):
         throw RuntimeDispatchFailure.outcomeUnknown(
           "process wait status unresolved (\(code))")
@@ -540,6 +540,12 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           ],
           receipts: receipts)
       } catch {
+        // Both exits below carry the HDC receipt summary. Without it, a failed
+        // transition said only that the Loader was not observed, and the
+        // actual cause — a non-zero exit, a killed child, an stderr line —
+        // survived nowhere but a macOS crash report.
+        let evidence = Self.transitionEvidenceSummary(
+          receipt: hdcReceipt, failure: unresolvedHDCFailure)
         if let normal = try? exactHDCNormalIdentity(connectKey: connectKey) {
           let diagnostic: RockchipFlashRuntimeDiagnostic =
             unresolvedHDCFailure == nil
@@ -547,7 +553,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
             : .enterLoaderHDCNoCleanReceipt
           throw RuntimeDispatchFailure.confirmedNotExecutedWithDiagnostic(
             "exact bound HDC-normal USB readback proves the Loader transition did not complete "
-              + "at topology \(normal.topology)",
+              + "at topology \(normal.topology) \(evidence)",
             diagnostic: diagnostic)
         }
         if let unresolvedHDCFailure { throw unresolvedHDCFailure }
@@ -555,7 +561,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         // success disconnects its transport. Without the exact bound Loader
         // postcondition, the mutation remains unknown and cannot be replayed.
         throw RuntimeDispatchFailure.outcomeUnknown(
-          "HDC reboot-loader exited but the exact bound Loader was not observed")
+          "HDC reboot-loader exited but the exact bound Loader was not observed \(evidence)")
       }
 
     case .observeHDCNormalUSB(let connectKey):
@@ -922,6 +928,54 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       expectedConnected
         ? "descriptor-bound HDC target did not reconnect before the deadline"
         : "descriptor-bound HDC target did not disconnect before the deadline")
+  }
+
+  /// What the Loader transition command actually did, in one bounded clause.
+  /// It carries the exit status, the runner failure (which names a terminating
+  /// signal when there was one) and a truncated stderr prefix. Device identity
+  /// stays out of it: the serial-derived fields already have their own
+  /// digest/topology shapes elsewhere in this message.
+  static func transitionEvidenceSummary(
+    receipt: ProviderSubprocessReceipt?,
+    failure: RuntimeDispatchFailure?
+  ) -> String {
+    var parts: [String] = []
+    if let receipt {
+      parts.append("hdcExitStatus=\(receipt.exitStatus.map(String.init) ?? "unknown")")
+      if receipt.stdoutTruncated { parts.append("hdcOutputTruncated=true") }
+      if !receipt.stderr.isEmpty {
+        parts.append("hdcStderr=\"\(Self.evidenceText(receipt.stderr))\"")
+      }
+    } else {
+      parts.append("hdcExitStatus=none")
+    }
+    if let failure {
+      parts.append("hdcFailure=\(Self.failureDetail(failure))")
+    }
+    return "[\(parts.joined(separator: " "))]"
+  }
+
+  private static let maximumEvidenceStderrBytes = 200
+
+  private static func evidenceText(_ data: Data) -> String {
+    let prefix = data.prefix(maximumEvidenceStderrBytes)
+    guard let text = String(data: prefix, encoding: .utf8) else {
+      return "<\(data.count) non-UTF-8 bytes>"
+    }
+    let collapsed = text.unicodeScalars.map {
+      CharacterSet.controlCharacters.contains($0) || $0 == "\"" ? " " : Character($0)
+    }
+    let squeezed = String(collapsed).split(separator: " ", omittingEmptySubsequences: true)
+      .joined(separator: " ")
+    return data.count > maximumEvidenceStderrBytes ? squeezed + "…" : squeezed
+  }
+
+  private static func failureDetail(_ failure: RuntimeDispatchFailure) -> String {
+    switch failure {
+    case .outcomeUnknown(let detail), .confirmedNotExecuted(let detail),
+      .confirmedNotExecutedWithDiagnostic(let detail, _), .failed(let detail):
+      return detail
+    }
   }
 
   private func exactHDCNormalIdentity(

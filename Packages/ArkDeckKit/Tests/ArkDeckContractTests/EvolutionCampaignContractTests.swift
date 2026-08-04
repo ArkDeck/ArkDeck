@@ -1253,6 +1253,331 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
   }
 
+  // MARK: preflight sits before every confirmation phrase (TASK-AIN-019)
+
+  func testFlashPreviewRefusesOnARedPreflightBeforeMintingAConfirmation() throws {
+    // An unreadable archive is always red, so this asserts the ordering
+    // without depending on whether this host has a board or a tool.
+    let result = try runCLI([
+      "flash", "preview", "--images", "/tmp/arkdeck-ain019-absent-images.tar.gz",
+    ])
+    XCTAssertEqual(result.status, 4, result.output)
+    XCTAssertTrue(result.output.contains("flash preflight"), result.output)
+    XCTAssertTrue(result.output.contains("archiveIntegrity"), result.output)
+    XCTAssertTrue(
+      result.output.contains("device mutation dispatch: 0"), result.output)
+    // No confirmation digest, so no campaign was spent on a host problem.
+    XCTAssertFalse(result.output.contains("confirmation digest:"), result.output)
+    XCTAssertFalse(
+      result.output.contains("确认本次 Evolution Flash campaign"), result.output)
+  }
+
+  func testEveryConfirmationPhraseSitsBehindThePreflightGate() throws {
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
+      encoding: .utf8)
+    // Four call sites, each strictly before the thing it guards. A preflight
+    // printed after the prompt is a report, not a gate.
+    for (gate, guarded) in [
+      ("try await requireGreenPreflight(imagesPath: images)\n    let preview",
+        "确认本次 Evolution Flash campaign"),
+      ("try await requireGreenPreflight(imagesPath: imagesPath)",
+        "executeConfirmedCampaign("),
+      ("try await requireGreenPreflight(imagesPath: options.value(\"--images\") ?? \"\")",
+        "let confirmationPhrase = \"FLASH "),
+      ("try await requireGreenPreflight(imagesPath: images)\n    let result",
+        "continueCampaign("),
+    ] {
+      guard let gateRange = source.range(of: gate),
+        let guardedRange = source.range(of: guarded)
+      else {
+        XCTFail("missing preflight gate \(gate) or its guarded phrase \(guarded)")
+        continue
+      }
+      XCTAssertLessThan(
+        gateRange.lowerBound, guardedRange.lowerBound,
+        "preflight must run before \(guarded)")
+    }
+  }
+
+  // MARK: unknown Loader transition settled by readback (TASK-AIN-019 r11)
+
+  func testUnknownLoaderTransitionSettlesSafeWhenTheBoundTargetIsReadBackRegistered()
+    async throws
+  {
+    let context = try makeUnknownLoaderAttempt(label: "settled")
+    defer { try? FileManager.default.removeItem(at: context.root) }
+
+    let flash = SuccessAfterReconciledEvolutionFlash(
+      ledger: context.ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: context.ledger, usageLedger: context.usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: context.candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(),
+      flash: flash,
+      targetReadback: FixedEvolutionTargetReadback(
+        readback: RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: .hdcNormal,
+          usbTopology: "42")),
+      attemptIntents: FixedEvolutionAttemptIntents(kinds: ["enterUpdater"]),
+      nowUTC: { Self.confirmedAt })
+
+    let result = try await host.continueCampaign(
+      campaignID: context.assertion.campaignID,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    // The unknown attempt is settled as a no-effect failure and the campaign
+    // reserves its next ordinal instead of being sealed on attempt 1.
+    XCTAssertEqual(result.attemptOrdinal, 2)
+    XCTAssertEqual(
+      try context.ledger.load(context.assertion.campaignID).events
+        .filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.safeToReflash, .succeeded])
+    // The durable usage terminal is append-only and stays exactly as the
+    // runtime closed it: the readback settles the campaign attempt, it does
+    // not rewrite authority history.
+    let usageTerminal = try XCTUnwrap(
+      context.usageLedger.load().reservations
+        .first { $0.reservationID == context.reservationID }?.terminal)
+    XCTAssertEqual(usageTerminal.status, .outcomeUnknown)
+  }
+
+  func testUnknownLoaderTransitionStaysSealedWithoutAnExactRegisteredReadback() async throws {
+    // Each row removes exactly one leg of the proof. None of them may settle.
+    let cases: [(label: String, readback: RockchipEvolutionTargetReadback, kinds: [String])] = [
+      ("absent", .absent, ["enterUpdater"]),
+      (
+        "identity-drift",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: String(repeating: "b", count: 64),
+          registeredMode: .loader, usbTopology: "42"),
+        ["enterUpdater"]
+      ),
+      (
+        "unregistered-mode",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: nil,
+          usbTopology: "42"),
+        ["enterUpdater"]
+      ),
+      // A destructive intent is never made safe by the device coming back.
+      (
+        "destructive-intent",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: .loader,
+          usbTopology: "42"),
+        ["enterUpdater", "flashPartition"]
+      ),
+      // A build that cannot name a journaled step cannot prove anything.
+      (
+        "unrecognized-intent",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: .loader,
+          usbTopology: "42"),
+        ["enterUpdater", "someFutureKind"]
+      ),
+      // No transition intent at all is not a Loader transition failure.
+      (
+        "no-transition-intent",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: .loader,
+          usbTopology: "42"),
+        ["verifyRemoteState"]
+      ),
+    ]
+
+    for row in cases {
+      let context = try makeUnknownLoaderAttempt(label: row.label)
+      defer { try? FileManager.default.removeItem(at: context.root) }
+      let flash = CountingEvolutionFlash()
+      let host = try RockchipEvolutionCampaignHost(
+        ledger: context.ledger, usageLedger: context.usageLedger,
+        repairer: FixedEvolutionRepairer(strategy: context.candidate.strategy),
+        builder: StrategyEchoEvolutionBuilder(),
+        flash: flash,
+        targetReadback: FixedEvolutionTargetReadback(readback: row.readback),
+        attemptIntents: FixedEvolutionAttemptIntents(kinds: row.kinds),
+        nowUTC: { Self.confirmedAt })
+
+      await ain019AssertThrowsAsync(
+        try await host.continueCampaign(
+          campaignID: context.assertion.campaignID,
+          archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+          targetLocationSelector: "42"))
+      let dispatches = await flash.dispatchCount()
+      XCTAssertEqual(dispatches, 0, row.label)
+      let document = try context.ledger.load(context.assertion.campaignID)
+      XCTAssertTrue(document.isTerminal, row.label)
+      XCTAssertEqual(
+        document.events.last { $0.kind == .attemptTerminal }?.disposition,
+        .outcomeUnknown, row.label)
+    }
+  }
+
+  func testUnknownLoaderTransitionStaysSealedWhenTheRuntimeCannotBeAsked() async throws {
+    // The default composition: no evidence reader wired. Refusing to answer
+    // must behave like "not proven", never like "no destructive intents".
+    let context = try makeUnknownLoaderAttempt(label: "no-reader")
+    defer { try? FileManager.default.removeItem(at: context.root) }
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: context.ledger, usageLedger: context.usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: context.candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(),
+      flash: CountingEvolutionFlash(),
+      targetReadback: FixedEvolutionTargetReadback(
+        readback: RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: .loader,
+          usbTopology: "42")),
+      nowUTC: { Self.confirmedAt })
+
+    await ain019AssertThrowsAsync(
+      try await host.continueCampaign(
+        campaignID: context.assertion.campaignID,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+    XCTAssertEqual(
+      try context.ledger.load(context.assertion.campaignID).events
+        .last { $0.kind == .attemptTerminal }?.disposition,
+      .outcomeUnknown)
+  }
+
+  func testLoaderTransitionClassificationExcludesEveryDestructiveOrUnknownKind() {
+    // Exactly what `flash.dayu200@1` journals when it dies at the transition:
+    // its host-only prefix plus the enterUpdater intent, and nothing past it.
+    XCTAssertTrue(
+      RockchipEvolutionCampaignHost.isLoaderTransitionOnly(
+        ["verifyArtifact", "hashFile", "requestConfirmation", "enterUpdater"]))
+    XCTAssertTrue(
+      RockchipEvolutionCampaignHost.isLoaderTransitionOnly(
+        ["enterUpdater", "waitForDisconnect", "waitForReconnect", "probeDevice"]))
+    for excluded in [
+      ["enterUpdater", "flashPartition"], ["enterUpdater", "erasePartition"],
+      ["enterUpdater", "updatePackage"], ["enterUpdater", "formatPartition"],
+      ["enterUpdater", "mutateHDCServerLifecycle"], ["enterUpdater", ""],
+      ["verifyRemoteState"], [],
+    ] {
+      XCTAssertFalse(
+        RockchipEvolutionCampaignHost.isLoaderTransitionOnly(excluded), "\(excluded)")
+    }
+  }
+
+  // MARK: campaignStopped detail (TASK-AIN-019)
+
+  func testCampaignStoppedCarriesTheUnderlyingErrorAndDecodesWithoutIt() throws {
+    let root = temporaryDirectory("campaign-stop-detail")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root)
+    let assertion = try makeAssertion()
+    _ = try ledger.create(assertion)
+    let raw = "dispatch refused: process died on signal 6\nlibsecinit abort"
+    _ = try ledger.stop(
+      campaignID: assertion.campaignID, reasonCode: "admissionOrTargetDrift",
+      detail: raw, at: Self.confirmedAt)
+
+    let stopped = try XCTUnwrap(
+      try ledger.load(assertion.campaignID).events.last { $0.kind == .campaignStopped })
+    XCTAssertEqual(stopped.reasonCode, "admissionOrTargetDrift")
+    // Single-line, control-free and bounded, but still the real cause.
+    XCTAssertEqual(
+      stopped.detail, "dispatch refused: process died on signal 6 libsecinit abort")
+
+    // Oversized text is bounded rather than refused at the call site…
+    let overlong = String(repeating: "x", count: 4_000)
+    XCTAssertEqual(
+      RockchipEvolutionCampaignEvent.sanitizedDetail(overlong)?.utf8.count,
+      RockchipEvolutionCampaignEvent.maximumDetailBytes)
+    // …and the durable invariant refuses anything that skipped that step.
+    XCTAssertThrowsError(
+      try RockchipEvolutionCampaignEvent(
+        sequence: 1, kind: .campaignStopped, at: Self.confirmedAt,
+        reasonCode: "admissionOrTargetDrift", detail: overlong))
+    // `detail` belongs to a stop and to nothing else.
+    XCTAssertThrowsError(
+      try RockchipEvolutionCampaignEvent(
+        sequence: 1, kind: .attemptTerminal, at: Self.confirmedAt, ordinal: 1,
+        jobID: "job-1", sessionID: "session-1", disposition: .safeToReflash,
+        detail: "not here"))
+  }
+
+  func testCampaignDocumentsWrittenBeforeDetailStillDecode() throws {
+    let root = temporaryDirectory("campaign-stop-detail-legacy")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root)
+    let assertion = try makeAssertion()
+    _ = try ledger.create(assertion)
+    _ = try ledger.stop(
+      campaignID: assertion.campaignID, reasonCode: "attemptBudgetExhausted",
+      detail: "budget spent", at: Self.confirmedAt)
+
+    // Strip the new key exactly as a document written before this change has it.
+    let ledgerURL = root.appending(path: "\(assertion.campaignID).json")
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+    var events = try XCTUnwrap(document["events"] as? [[String: Any]])
+    for index in events.indices { events[index].removeValue(forKey: "detail") }
+    document["events"] = events
+    try JSONSerialization.data(withJSONObject: document).write(to: ledgerURL)
+
+    let reloaded = try ledger.load(assertion.campaignID)
+    XCTAssertTrue(reloaded.isTerminal)
+    XCTAssertEqual(
+      reloaded.events.last { $0.kind == .campaignStopped }?.reasonCode,
+      "attemptBudgetExhausted")
+    XCTAssertNil(reloaded.events.last { $0.kind == .campaignStopped }?.detail)
+  }
+
+  private struct UnknownLoaderAttempt {
+    let root: URL
+    let ledger: RockchipEvolutionCampaignLedger
+    let usageLedger: AgentAuthorityUsageLedger
+    let assertion: RockchipEvolutionCampaignConfirmationAssertion
+    let candidate: RockchipEvolutionCandidatePin
+    let reservationID: String
+  }
+
+  /// One campaign whose attempt 1 ended exactly the way 2026-08-04's four did:
+  /// a durable `outcomeUnknown` usage terminal carrying one Loader-transition
+  /// intent.
+  private func makeUnknownLoaderAttempt(label: String) throws -> UnknownLoaderAttempt {
+    let root = temporaryDirectory("campaign-unknown-loader-\(label)")
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
+    _ = try ledger.create(assertion)
+    _ = try ledger.appendCandidate(
+      campaignID: assertion.campaignID, candidate: candidate, at: Self.confirmedAt)
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: assertion.confirmationDigestSHA256,
+      baseCommitOID: assertion.baseCommitOID,
+      planDigestSHA256: assertion.planDigestSHA256,
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      targetStableIdentitySHA256: assertion.targetStableIdentitySHA256,
+      bindingLineageRootRevision: assertion.bindingLineageRootRevision,
+      confirmedAt: assertion.confirmedAt, validUntil: assertion.validUntil,
+      maximumAttempts: assertion.maxAttempts)
+    let usage = try usageReservation(
+      reference: authorityRef, ordinal: 1, jobID: "job-loader-unknown")
+    _ = try usageLedger.reserve(usage)
+    _ = try usageLedger.close(
+      reservationID: usage.reservationID,
+      terminal: AgentAuthorityUsageTerminal(
+        status: .outcomeUnknown, closedAt: Self.confirmedAt,
+        externalIntentEventIDs: ["intent-enter-loader-mode"]))
+    _ = try ledger.reserveAttempt(
+      campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+      ordinal: 1, reservationID: usage.reservationID,
+      jobID: "job-loader-unknown", sessionID: "session-loader-unknown",
+      at: Self.confirmedAt)
+    return UnknownLoaderAttempt(
+      root: root, ledger: ledger, usageLedger: usageLedger, assertion: assertion,
+      candidate: candidate, reservationID: usage.reservationID)
+  }
+
   private func makeAssertion(
     seed: Character = "0", maxAttempts: Int = 16,
     validUntil: String = "2026-08-02T12:00:00Z"
@@ -1736,6 +2061,18 @@ private actor SuccessAfterReconciledEvolutionFlash: RockchipEvolutionFlashDispat
   }
 
   func dispatchCount() -> Int { count }
+}
+
+private struct FixedEvolutionTargetReadback: RockchipEvolutionTargetReadbackReading {
+  let readback: RockchipEvolutionTargetReadback
+
+  func readDurableTarget() throws -> RockchipEvolutionTargetReadback { readback }
+}
+
+private struct FixedEvolutionAttemptIntents: RockchipEvolutionAttemptIntentReading {
+  let kinds: [String]
+
+  func journaledStepKinds(jobID _: String) throws -> [String] { kinds }
 }
 
 private struct FixedEvolutionClock: RockchipAdmissionClock {

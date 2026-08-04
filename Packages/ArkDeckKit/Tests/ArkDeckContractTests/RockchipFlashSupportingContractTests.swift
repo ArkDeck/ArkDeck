@@ -403,4 +403,147 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
           targetLocationSelector: selector))
     }
   }
+
+  // MARK: preflight (TASK-AIN-019)
+
+  private static let publishedArchive = RockchipFlashProfile.supportedDAYU200Profiles[0]
+  private static let boundIdentity = String(repeating: "a", count: 64)
+
+  private func preflightProbes(
+    rockUSB: RockchipFlashToolAliveness = .survivedSpawn(exitStatus: 0),
+    hdc: RockchipFlashToolAliveness = .survivedSpawn(exitStatus: 0),
+    archive: RockchipFlashArchiveIdentity? = nil,
+    boundIdentity: String = RockchipFlashSupportingContractTests.boundIdentity,
+    readback: RockchipEvolutionTargetReadback? = nil
+  ) -> RockchipFlashPreflightProbes {
+    let profile = Self.publishedArchive
+    let resolvedArchive =
+      archive
+      ?? RockchipFlashArchiveIdentity(
+        sha256: profile.archiveSHA256, byteCount: Int(profile.archiveSizeBytes))
+    let resolvedReadback =
+      readback
+      ?? RockchipEvolutionTargetReadback(
+        stableIdentitySHA256: boundIdentity, registeredMode: .loader, usbTopology: "42")
+    return RockchipFlashPreflightProbes(
+      rockUSBAliveness: { rockUSB },
+      hdcAliveness: { hdc },
+      archiveIdentity: { _ in resolvedArchive },
+      boundTargetIdentitySHA256: { boundIdentity },
+      targetReadback: { resolvedReadback })
+  }
+
+  func testPreflightPassesWhenAllFourReadOnlyChecksAnswer() async throws {
+    let receipt = await RockchipFlashPreflight(probes: preflightProbes())
+      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertTrue(receipt.isGreen, receipt.renderedLines().joined(separator: "\n"))
+    XCTAssertEqual(receipt.deviceMutationDispatchCount, 0)
+    XCTAssertEqual(
+      receipt.findings.map(\.check), RockchipFlashPreflightCheck.allCases)
+  }
+
+  func testPreflightTreatsADeviceAbsentNonZeroExitAsAliveButASignalDeathAsRed() async throws {
+    // `rkdeveloptool ld` with no board attached exits non-zero. That is an
+    // answer, not a dead tool, and refusing it would make the gate unusable.
+    let alive = await RockchipFlashPreflight(
+      probes: preflightProbes(rockUSB: .survivedSpawn(exitStatus: 1))
+    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertTrue(alive.isGreen, alive.renderedLines().joined(separator: "\n"))
+
+    // A child killed before `main` is the 2026-08-04 host fault, and the
+    // finding must hand the operator the two things it took a day to find.
+    let dead = await RockchipFlashPreflight(
+      probes: preflightProbes(rockUSB: .diedOnSignal(6))
+    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertFalse(dead.isGreen)
+    XCTAssertEqual(dead.failedChecks, [.rockUSBToolAliveness])
+    let rendered = dead.renderedLines().joined(separator: "\n")
+    XCTAssertTrue(rendered.contains("signal 6"), rendered)
+    XCTAssertTrue(rendered.contains("DiagnosticReports"), rendered)
+    XCTAssertTrue(rendered.contains("entitlement"), rendered)
+    XCTAssertTrue(rendered.contains("rockchip-component-packaging.md"), rendered)
+  }
+
+  func testPreflightRefusesAnUnavailableHDCWithAnActionableFinding() async throws {
+    let receipt = await RockchipFlashPreflight(
+      probes: preflightProbes(hdc: .unavailable("ARKDECK_HDC_PATH is unset"))
+    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertEqual(receipt.failedChecks, [.hdcToolAliveness])
+    XCTAssertFalse(
+      try XCTUnwrap(receipt.findings.first { $0.check == .hdcToolAliveness }).remediation
+        .isEmpty)
+  }
+
+  func testPreflightRefusesAnArchiveThatMatchesNoPublishedProfilePin() async throws {
+    let receipt = await RockchipFlashPreflight(
+      probes: preflightProbes(
+        archive: RockchipFlashArchiveIdentity(
+          sha256: String(repeating: "f", count: 64), byteCount: 1_234))
+    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertEqual(receipt.failedChecks, [.archiveIntegrity])
+  }
+
+  func testPreflightRefusesEveryTargetReadbackThatIsNotTheBoundRegisteredTarget() async throws {
+    let cases: [(String, RockchipEvolutionTargetReadback)] = [
+      ("absent", .absent),
+      (
+        "identity drift",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: String(repeating: "b", count: 64),
+          registeredMode: .loader, usbTopology: "42")
+      ),
+      (
+        "unregistered mode",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.boundIdentity, registeredMode: nil,
+          usbTopology: "42")
+      ),
+    ]
+    for (label, readback) in cases {
+      let receipt = await RockchipFlashPreflight(
+        probes: preflightProbes(readback: readback)
+      ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      XCTAssertEqual(receipt.failedChecks, [.targetPresence], label)
+      XCTAssertFalse(
+        try XCTUnwrap(receipt.findings.first { $0.check == .targetPresence }).remediation
+          .isEmpty, label)
+    }
+  }
+
+  func testProductTargetReadbackDistinguishesAbsenceAmbiguityAndUnregisteredModes() throws {
+    let loader = RockchipProductUSBIdentity(
+      serial: "DAYU-1", vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "42",
+      productName: nil)
+    let maskrom = RockchipProductUSBIdentity(
+      serial: "DAYU-1", vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: 0x330C, topology: "42", productName: nil)
+    let unrelated = RockchipProductUSBIdentity(
+      serial: "OTHER", vendorID: 0x05AC, productID: 0x1234, topology: "1",
+      productName: nil)
+    let expectedDigest = SHA256.hash(data: Data("DAYU-1".utf8))
+      .map { String(format: "%02x", $0) }.joined()
+
+    XCTAssertEqual(
+      try ProductRockchipEvolutionTargetReadback(identitySource: { [loader, unrelated] })
+        .readDurableTarget(),
+      RockchipEvolutionTargetReadback(
+        stableIdentitySHA256: expectedDigest, registeredMode: .loader, usbTopology: "42"))
+    // A Rockchip device in a personality this product has not registered is
+    // reported as present-but-unregistered, never as a registered mode and
+    // never as plain absence.
+    XCTAssertEqual(
+      try ProductRockchipEvolutionTargetReadback(identitySource: { [maskrom] })
+        .readDurableTarget(),
+      RockchipEvolutionTargetReadback(
+        stableIdentitySHA256: expectedDigest, registeredMode: nil, usbTopology: "42"))
+    XCTAssertEqual(
+      try ProductRockchipEvolutionTargetReadback(identitySource: { [unrelated] })
+        .readDurableTarget(), .absent)
+    // Two Rockchip devices: nothing observed can be attributed to the bound
+    // target, so the answer is absence rather than a coin flip.
+    XCTAssertEqual(
+      try ProductRockchipEvolutionTargetReadback(identitySource: { [loader, maskrom] })
+        .readDurableTarget(), .absent)
+  }
 }

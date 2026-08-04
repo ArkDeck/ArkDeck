@@ -31,6 +31,14 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
   public let disposition: RockchipEvolutionAttemptDisposition?
   public let destructiveIntentEventIDs: [String]
   public let reasonCode: String?
+  /// The underlying error a stop was made of. `reasonCode` stays the closed,
+  /// greppable classification; this is the one sentence that says which
+  /// catch-all fired and why, so a stopped campaign no longer has to be
+  /// reconstructed from macOS crash reports. Optional on purpose: campaign
+  /// documents written before this field decode unchanged.
+  public let detail: String?
+
+  public static let maximumDetailBytes = 500
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case sequence
@@ -45,6 +53,7 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     case disposition
     case destructiveIntentEventIDs
     case reasonCode
+    case detail
   }
 
   package init(
@@ -58,13 +67,14 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     sessionID: String? = nil,
     disposition: RockchipEvolutionAttemptDisposition? = nil,
     destructiveIntentEventIDs: [String] = [],
-    reasonCode: String? = nil
+    reasonCode: String? = nil,
+    detail: String? = nil
   ) throws {
     try self.init(
       sequence: sequence, kind: kind, at: at, candidate: candidate, review: nil,
       ordinal: ordinal, reservationID: reservationID, jobID: jobID, sessionID: sessionID,
       disposition: disposition, destructiveIntentEventIDs: destructiveIntentEventIDs,
-      reasonCode: reasonCode)
+      reasonCode: reasonCode, detail: detail)
   }
 
   private init(
@@ -79,7 +89,8 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     sessionID: String?,
     disposition: RockchipEvolutionAttemptDisposition?,
     destructiveIntentEventIDs: [String],
-    reasonCode: String?
+    reasonCode: String?,
+    detail: String?
   ) throws {
     self.sequence = sequence
     self.kind = kind
@@ -93,7 +104,23 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     self.disposition = disposition
     self.destructiveIntentEventIDs = Array(Set(destructiveIntentEventIDs)).sorted()
     self.reasonCode = reasonCode
+    self.detail = detail
     try validate()
+  }
+
+  /// Turns arbitrary error text into something a durable append-only document
+  /// may carry: single-line, control-free and bounded. Callers sanitize before
+  /// constructing an event; `validate()` then refuses anything that did not.
+  public static func sanitizedDetail(_ raw: String) -> String? {
+    let collapsed = raw.unicodeScalars.map {
+      CharacterSet.controlCharacters.contains($0) ? " " : Character($0)
+    }
+    let squeezed = String(collapsed).split(separator: " ", omittingEmptySubsequences: true)
+      .joined(separator: " ")
+    guard !squeezed.isEmpty else { return nil }
+    var bounded = squeezed
+    while bounded.utf8.count > maximumDetailBytes { bounded.removeLast() }
+    return bounded.isEmpty ? nil : bounded
   }
 
   public init(from decoder: any Decoder) throws {
@@ -117,37 +144,48 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
         RockchipEvolutionAttemptDisposition.self, forKey: .disposition),
       destructiveIntentEventIDs: container.decode(
         [String].self, forKey: .destructiveIntentEventIDs),
-      reasonCode: container.decodeIfPresent(String.self, forKey: .reasonCode))
+      reasonCode: container.decodeIfPresent(String.self, forKey: .reasonCode),
+      detail: container.decodeIfPresent(String.self, forKey: .detail))
   }
 
   private func validate() throws {
     guard sequence > 0, RockchipEvolutionCampaignConfirmationAssertion.date(at) != nil,
-      destructiveIntentEventIDs.allSatisfy(Self.isIdentifier)
+      destructiveIntentEventIDs.allSatisfy(Self.isIdentifier),
+      detail.map(Self.isDetail) != false
     else { throw RockchipEvolutionCampaignError.persistenceRejected("eventIdentity") }
     switch kind {
     case .candidatePrepared:
       guard let candidate, ordinal == nil, reservationID == nil,
         jobID == nil, sessionID == nil, disposition == nil,
-        destructiveIntentEventIDs.isEmpty, reasonCode == nil
+        destructiveIntentEventIDs.isEmpty, reasonCode == nil, detail == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("candidatePreparedShape") }
       if let review { try review.validateHistorical(candidate: candidate) }
     case .attemptReserved:
       guard candidate == nil, review == nil, let ordinal, ordinal > 0,
         let reservationID, Self.isIdentifier(reservationID),
         let jobID, Self.isIdentifier(jobID), let sessionID, Self.isIdentifier(sessionID),
-        disposition == nil, destructiveIntentEventIDs.isEmpty, reasonCode == nil
+        disposition == nil, destructiveIntentEventIDs.isEmpty, reasonCode == nil,
+        detail == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("attemptReservedShape") }
     case .attemptTerminal:
       guard candidate == nil, review == nil, let ordinal, ordinal > 0,
         reservationID == nil, let jobID, Self.isIdentifier(jobID),
-        let sessionID, Self.isIdentifier(sessionID), disposition != nil, reasonCode == nil
+        let sessionID, Self.isIdentifier(sessionID), disposition != nil, reasonCode == nil,
+        detail == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("attemptTerminalShape") }
     case .campaignStopped:
+      // `detail` is optional here and nowhere else: a stop is the only event
+      // whose cause lives outside the campaign's own closed vocabulary.
       guard candidate == nil, review == nil, ordinal == nil, reservationID == nil,
         jobID == nil, sessionID == nil, disposition == nil,
         destructiveIntentEventIDs.isEmpty, let reasonCode, Self.isReason(reasonCode)
       else { throw RockchipEvolutionCampaignError.persistenceRejected("campaignStoppedShape") }
     }
+  }
+
+  private static func isDetail(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.count <= maximumDetailBytes
+      && value.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) }
   }
 
   private static func isIdentifier(_ value: String) -> Bool {
@@ -474,13 +512,14 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
 
   @discardableResult
   public func stop(
-    campaignID: String, reasonCode: String, at: String
+    campaignID: String, reasonCode: String, detail: String? = nil, at: String
   ) throws -> RockchipEvolutionCampaignDocument {
     try mutate(campaignID) { document in
       if document.isTerminal { return document }
       let event = try RockchipEvolutionCampaignEvent(
         sequence: document.events.count + 1, kind: .campaignStopped, at: at,
-        reasonCode: reasonCode)
+        reasonCode: reasonCode,
+        detail: detail.flatMap(RockchipEvolutionCampaignEvent.sanitizedDetail))
       return try RockchipEvolutionCampaignDocument(
         assertion: document.assertion, events: document.events + [event])
     }
