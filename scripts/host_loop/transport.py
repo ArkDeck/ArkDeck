@@ -16,9 +16,9 @@ Design constraints (CHG-2026-030 design §1B, §3, §4, deliverables):
   expected-old-OID parameter, so genuine compare-and-swap is impossible over
   REST. Fenced lease writes therefore go through git with exact
   `--force-with-lease=<ref>:<expected-oid>` semantics.
-* The reviewer process never receives the integration credential; that is
-  enforced by construction here (reviewer code cannot obtain an `ApiPort`
-  carrying a token it did not supply) and asserted by TASK-HLR-004.
+* The installation credential is consumed only by the sender behind `ApiPort`.
+  Callers receive typed methods rather than a generic request surface, so no
+  worker path can construct a route outside this port's frozen allowlist.
 """
 
 from __future__ import annotations
