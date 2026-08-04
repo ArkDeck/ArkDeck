@@ -449,6 +449,30 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     let tuning = descriptor.executionTuning
     switch action {
     case .enterLoader(let connectKey):
+      // A fresh exact Loader readback is already the postcondition of this
+      // step. Do not send the normal-mode HDC transition command to a target
+      // that is demonstrably no longer on HDC: it cannot add evidence and a
+      // missing HDC receipt would otherwise park an already-flashable device
+      // as outcome-unknown. USB identity alone is insufficient, so pair it
+      // with the reviewed tool's `ld` receipt before treating the step as
+      // complete. If either readback is absent, retain the normal-mode path
+      // below and its existing fail-closed semantics.
+      if let loader = try? exactLoaderIdentity(
+        stableIdentitySHA256: descriptor.expectedIdentitySHA256
+      ) {
+        let loaderReceipt = try await observeLoader(
+          executable: rockchipExecutable,
+          timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+        return result(
+          summary: [
+            "transition": "already-loader",
+            "transitionEvidence": "exact-bound-loader-readback",
+            "loaderIdentitySha256": loader.serialDigestSHA256,
+            "usbTopology": loader.topology,
+          ],
+          receipts: [loaderReceipt])
+      }
+
       let hdc = try resolveHDC()
       var hdcReceipt: ProviderSubprocessReceipt?
       var unresolvedHDCFailure: RuntimeDispatchFailure?

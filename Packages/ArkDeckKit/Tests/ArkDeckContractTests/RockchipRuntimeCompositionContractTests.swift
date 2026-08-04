@@ -242,6 +242,41 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  /// Models the one-way normal-to-Loader transition without letting a test
+  /// fixture falsely claim that the Loader existed before the HDC command.
+  private final class LoaderAfterInitialProbe: @unchecked Sendable, RockchipRuntimeUSBProbing {
+    private let lock = NSLock()
+    private var loaderReads = 0
+    private let identity: String
+
+    init(identity: String) {
+      self.identity = identity
+    }
+
+    func singleLoader(
+      stableIdentitySHA256: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      guard stableIdentitySHA256 == identity else {
+        throw RuntimeDispatchFailure.failed("identity mismatch")
+      }
+      lock.lock()
+      defer { lock.unlock() }
+      loaderReads += 1
+      guard loaderReads > 1 else {
+        throw RuntimeDispatchFailure.failed("fixture Loader has not appeared yet")
+      }
+      return RockchipRuntimeLoaderIdentity(
+        serialDigestSHA256: identity,
+        topology: "42")
+    }
+
+    func singleHDCNormal(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw RuntimeDispatchFailure.failed("fixture has no HDC-normal readback")
+    }
+  }
+
   private struct MissingUSBProbe: RockchipRuntimeUSBProbing {
     func singleLoader(
       stableIdentitySHA256 _: String
@@ -850,7 +885,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             path: "/product/hdc", sha256: String(repeating: "b", count: 64))
         ]),
       runner: runner,
-      usbProbe: FixedUSBProbe(identity: identity))
+      usbProbe: LoaderAfterInitialProbe(identity: identity))
     let rockchip = ResolvedExecutable(
       path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
@@ -892,7 +927,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             path: "/product/hdc", sha256: String(repeating: "b", count: 64))
         ]),
       runner: runner,
-      usbProbe: FixedUSBProbe(identity: identity))
+      usbProbe: LoaderAfterInitialProbe(identity: identity))
     let rockchip = ResolvedExecutable(
       path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
@@ -910,6 +945,42 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       ["-t", "device-1", "target", "boot", "-bootloader"], ["ld"],
     ])
     XCTAssertEqual(invocations.map(\.timeoutSeconds), [7, 9])
+  }
+
+  func testEnterLoaderAlreadyInExactLoaderSkipsHDCAndRecordsReadback() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let runner = ProbeCommandRunner(responses: [
+      .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n")
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner,
+      usbProbe: FixedUSBProbe(identity: identity))
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: "device-1"),
+      stepID: "enter-loader-already-loader", toolSHA256: rockchip.sha256)
+
+    let result = try await executor.execute(
+      action: .enterLoader(connectKey: "device-1"),
+      descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+      actionDirectory: root)
+
+    XCTAssertEqual(result.summary["transition"], "already-loader")
+    XCTAssertEqual(
+      result.summary["transitionEvidence"], "exact-bound-loader-readback")
+    XCTAssertEqual(result.summary["loaderIdentitySha256"], identity)
+    XCTAssertEqual(result.summary["usbTopology"], "42")
+    let invocations = await runner.invocations()
+    XCTAssertEqual(invocations.map(\.arguments), [["ld"]])
+    XCTAssertEqual(result.subprocesses.count, 1)
   }
 
   func testEnterLoaderKeepsTimedOutHDCUnknownWithoutExactLoader() async throws {
