@@ -431,6 +431,174 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  // MARK: a refusal before the first write is not a partial write (TASK-AIN-019)
+
+  /// Serves the DAYU200 geometry the pinned table describes, and can be told
+  /// to make the backup GPT sector unreadable (the 2026-08-04 device) or to
+  /// fail the first `wl` (the case that must stay unresolved).
+  private actor WriteAttemptLog {
+    private(set) var writes: [String] = []
+    func note(_ argv: [String]) { writes.append(argv.joined(separator: " ")) }
+  }
+
+  private struct MediumRunner: RockchipRuntimeCommandRunning {
+    let log: WriteAttemptLog
+    var backupSectorIsErased = false
+    var firstWriteFails = false
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      var stdout = ""
+      switch arguments.first {
+      case "ld":
+        stdout = "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"
+      case "ppt":
+        stdout = Self.partitionTable
+      case "rl":
+        guard arguments.count == 4, let begin = Int64(arguments[1]),
+          let count = Int64(arguments[2])
+        else { throw RuntimeDispatchFailure.failed("unexpected rl argv") }
+        let payload =
+          (backupSectorIsErased && begin != 1)
+          ? Data(repeating: 0xCC, count: Int(count) * 512)
+          : ScriptedCommandRunner.sectors(begin: begin, count: count)
+        FileManager.default.createFile(atPath: arguments[3], contents: payload)
+        stdout = "Read LBA from device (100%)\n"
+      case "wl":
+        await log.note(arguments)
+        if firstWriteFails {
+          throw RuntimeDispatchFailure.failed("wl refused by the fixture")
+        }
+        stdout = "Write LBA from file (100%)\n"
+      default:
+        stdout = ""
+      }
+      return ProviderSubprocessReceipt(
+        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0)
+    }
+
+    private static let partitionTable =
+      """
+      **********Partition Info(GPT)**********
+      NO  LBA       Name
+      00  00002000  uboot
+      01  00004000  misc
+      02  00006000  bootctrl
+      03  00007000  resource
+      04  0000A000  boot_linux
+      05  0003A000  ramdisk
+      06  0003C000  system
+      07  0043C000  vendor
+      08  0063C000  sys-prod
+      09  00655000  chip-prod
+      10  0066E000  updater
+      11  0067E000  eng_system
+      12  00686000  eng_chipset
+      13  0069E000  chip_ckm
+      14  01308000  userdata
+      """
+  }
+
+  private func flashExecutor(
+    runner: MediumRunner, identity: String
+  ) -> FoundationRockchipRuntimeActionExecutor {
+    FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner,
+      usbProbe: FixedUSBProbe(identity: identity),
+      stage: { _, _ in
+        Dictionary(
+          uniqueKeysWithValues: RockchipFlashProfile.dayu200.mappedPartitions.map {
+            mapping in
+            let member = RockchipFlashProfile.dayu200.member(
+              named: mapping.imageMemberName)!
+            return (
+              mapping.imageMemberName,
+              RockchipRuntimeStagedImageHandle(
+                memberName: member.name, partitionName: mapping.partitionName,
+                sizeBytes: member.sizeBytes, sha256: member.sha256,
+                stableDescriptorPath: "/private/tmp/\(member.name)",
+                validation: {})
+            )
+          })
+      })
+  }
+
+  func testAMediumRefusalBeforeTheFirstWriteIsConfirmedNotExecuted() async throws {
+    // The 2026-08-04 device: the backup GPT sector the primary names does not
+    // read back. The probe correctly refuses — and because it refuses before
+    // any `wl`, the campaign must be able to retry after the medium is fixed
+    // instead of being sealed as a possible partial write.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let log = WriteAttemptLog()
+    let executor = flashExecutor(
+      runner: MediumRunner(log: log, backupSectorIsErased: true), identity: identity)
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let bundle = flashBundle()
+    let plan = try rockchipPlan(
+      action: .flashPartitions(bundle), stepID: "flash-partitions",
+      toolSHA256: component.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
+        rockchipExecutable: component, actionDirectory: root)
+      XCTFail("an unreachable medium must refuse the flash")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted(let detail) = failure else {
+        return XCTFail("expected confirmedNotExecuted, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("addressable medium ends before sector"), detail)
+    }
+    let writes = await log.writes
+    XCTAssertEqual(writes, [], "the probe must refuse before any wl")
+  }
+
+  func testAFailureAfterTheFirstWriteStaysUnresolved() async throws {
+    // The mutation control for the rule above: once a `wl` has been spawned
+    // the device may have changed, so the same failure must NOT be restated as
+    // confirmed-not-executed.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let log = WriteAttemptLog()
+    let executor = flashExecutor(
+      runner: MediumRunner(log: log, firstWriteFails: true), identity: identity)
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let bundle = flashBundle()
+    let plan = try rockchipPlan(
+      action: .flashPartitions(bundle), stepID: "flash-partitions",
+      toolSHA256: component.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
+        rockchipExecutable: component, actionDirectory: root)
+      XCTFail("a failing write must fail the flash")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        return XCTFail("a post-write failure must stay unresolved, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("wl refused by the fixture"), detail)
+    }
+    let writes = await log.writes
+    XCTAssertEqual(writes.count, 1, "exactly the first write was dispatched")
+  }
+
   func testGPTHeaderParseAcceptsOnlyARealHeader() throws {
     let primary = try XCTUnwrap(
       RockchipGPTHeader.parse(ScriptedCommandRunner.sectors(begin: 1, count: 1)))

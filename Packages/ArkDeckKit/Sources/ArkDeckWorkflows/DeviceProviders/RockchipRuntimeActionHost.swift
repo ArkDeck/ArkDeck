@@ -902,6 +902,48 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     rockchipExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult {
+    // Set immediately before the first `wl` is spawned, and never cleared. A
+    // refusal raised while it is false provably left the device untouched:
+    // everything up to that point is preparation, host-side staging and
+    // read-only proof. Reporting those as unresolved failures cost a whole
+    // campaign per refusal — the medium probe that correctly stopped a flash
+    // on 2026-08-04 wrote nothing and still tombstoned its campaign as
+    // `unsafePartial`. Keeping this a runtime flag rather than a lexical
+    // region means a guard added later inherits the right semantics.
+    var writeDispatched = false
+    do {
+      return try await flashWrites(
+        bundle: bundle, descriptor: descriptor,
+        rockchipExecutable: rockchipExecutable, actionDirectory: actionDirectory,
+        writeDispatched: &writeDispatched)
+    } catch let failure as RuntimeDispatchFailure where !writeDispatched {
+      throw Self.refusedBeforeFirstWrite(failure)
+    }
+  }
+
+  /// Restates a pre-write refusal as what it provably is. The campaign lane
+  /// treats `confirmedNotExecuted` as retry-safe, which is the whole point:
+  /// the condition that refused (an unreachable medium, a staging fault) can
+  /// be fixed and the same campaign can try again, instead of being sealed as
+  /// a possible partial write.
+  private static func refusedBeforeFirstWrite(
+    _ failure: RuntimeDispatchFailure
+  ) -> RuntimeDispatchFailure {
+    switch failure {
+    case .failed(let detail), .outcomeUnknown(let detail):
+      return .confirmedNotExecuted(detail)
+    case .confirmedNotExecuted, .confirmedNotExecutedWithDiagnostic:
+      return failure
+    }
+  }
+
+  private func flashWrites(
+    bundle: RockchipRuntimeFlashBundle,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL,
+    writeDispatched: inout Bool
+  ) async throws -> RockchipRuntimeActionExecutionResult {
     guard
       let profile = RockchipFlashProfile.profile(
         archiveSHA256: bundle.sha256, byteCount: bundle.byteCount),
@@ -981,6 +1023,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "\(mapping.partitionName) image needs \(imageSectors) sectors and would cross "
             + "into the next pinned partition at \(endExclusive); refusing an LBA write")
       }
+      // The device may be changed from the instant the child is spawned, so
+      // the boundary is drawn here rather than after the receipt.
+      writeDispatched = true
       let receipt = try await runner.run(
         executable: rockchipExecutable,
         arguments: ["wl", String(mapping.offsetSectors), image.stableDescriptorPath],
