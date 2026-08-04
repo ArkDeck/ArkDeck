@@ -1208,6 +1208,51 @@ final class EvolutionCampaignContractTests: XCTestCase {
       "preview sweeps before persisting its own draft")
   }
 
+  func testPublishedStrategyRepairerSuppliesTheFirstCandidateWithoutAVendor() async throws {
+    let assertion = try makeAssertion()
+
+    let strategy = try await PublishedRockchipEvolutionStrategyRepairer().propose(
+      assertion: assertion, observation: nil, priorCandidates: [])
+
+    XCTAssertEqual(
+      strategy.operationReference,
+      RockchipEvolutionCampaignConfirmationAssertion.operationReference)
+    XCTAssertEqual(strategy.archiveDigestSHA256, assertion.archiveDigestSHA256)
+    XCTAssertEqual(strategy.stepSetDigestSHA256, assertion.stepSetDigestSHA256)
+    XCTAssertEqual(
+      strategy.userdataImpact,
+      RockchipEvolutionCampaignConfirmationAssertion.dataImpact)
+    XCTAssertEqual(
+      strategy.loaderDiscoveryTimeoutSeconds,
+      RockchipEvolutionTypedStrategy.defaultLoaderDiscoveryTimeoutSeconds)
+    XCTAssertEqual(
+      Set(strategy.allowedStartingModes), Set(RockchipEvolutionStartingMode.allCases))
+  }
+
+  func testPublishedStrategyRepairerRefusesToInventARepair() async throws {
+    let assertion = try makeAssertion()
+    let repairer = PublishedRockchipEvolutionStrategyRepairer()
+    let observation = try RockchipEvolutionFailureObservation(
+      attemptOrdinal: 1, failureCode: "flash.outcomeUnknown")
+
+    do {
+      _ = try await repairer.propose(
+        assertion: assertion, observation: observation, priorCandidates: [])
+      XCTFail("a repair with no configured repairer must not be invented")
+    } catch let error as RockchipEvolutionCampaignError {
+      XCTAssertEqual(error, .candidateRejected("repairerUnavailable"))
+    }
+
+    do {
+      _ = try await repairer.propose(
+        assertion: assertion, observation: nil,
+        priorCandidates: [try makeCandidate(assertion: assertion, ordinal: 1)])
+      XCTFail("a second candidate with no configured repairer must not be invented")
+    } catch let error as RockchipEvolutionCampaignError {
+      XCTAssertEqual(error, .candidateRejected("repairerUnavailable"))
+    }
+  }
+
   private func makeAssertion(
     seed: Character = "0", maxAttempts: Int = 16,
     validUntil: String = "2026-08-02T12:00:00Z"
