@@ -414,6 +414,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     hdc: RockchipFlashToolAliveness = .survivedSpawn(exitStatus: 0),
     archive: RockchipFlashArchiveIdentity? = nil,
     boundIdentity: String = RockchipFlashSupportingContractTests.boundIdentity,
+    hdcNormalAlias: (identitySHA256: String, usbTopology: String)? = nil,
     readback: RockchipEvolutionTargetReadback? = nil
   ) -> RockchipFlashPreflightProbes {
     let profile = Self.publishedArchive
@@ -430,6 +431,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       hdcAliveness: { hdc },
       archiveIdentity: { _ in resolvedArchive },
       boundTargetIdentitySHA256: { boundIdentity },
+      boundTargetHDCNormalAlias: { hdcNormalAlias },
       targetReadback: { resolvedReadback })
   }
 
@@ -507,6 +509,59 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       XCTAssertFalse(
         try XCTUnwrap(receipt.findings.first { $0.check == .targetPresence }).remediation
           .isEmpty, label)
+    }
+  }
+
+  func testPreflightAcceptsTheBoundTargetThroughItsConfirmedHDCNormalAlias() async throws {
+    // The 2026-08-04 shape: revision 2 binds the Loader identity, the board
+    // sits in HDC-normal (its previous personality), and hdcNormal is an
+    // allowed starting mode. The confirmed lineage alias — same identity,
+    // same recorded topology, hdcNormal mode — is the bound target.
+    let aliasIdentity = String(repeating: "d", count: 64)
+    let receipt = await RockchipFlashPreflight(
+      probes: preflightProbes(
+        hdcNormalAlias: (identitySHA256: aliasIdentity, usbTopology: "18874368"),
+        readback: RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
+          usbTopology: "18874368"))
+    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertTrue(receipt.isGreen, receipt.renderedLines().joined(separator: "\n"))
+    let summary = try XCTUnwrap(
+      receipt.findings.first { $0.check == .targetPresence }).summary
+    XCTAssertTrue(summary.contains("confirmed hdc-normal alias"), summary)
+  }
+
+  func testPreflightRefusesAliasShapedReadbacksThatDoNotMatchTheConfirmedEdge() async throws {
+    let aliasIdentity = String(repeating: "d", count: 64)
+    let cases: [(String, (identitySHA256: String, usbTopology: String)?,
+      RockchipEvolutionTargetReadback)] = [
+      (
+        "no alias in the binding",
+        nil,
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
+          usbTopology: "18874368")
+      ),
+      (
+        "alias identity at the wrong topology",
+        (identitySHA256: aliasIdentity, usbTopology: "18874368"),
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
+          usbTopology: "999")
+      ),
+      (
+        "alias identity claiming loader mode",
+        (identitySHA256: aliasIdentity, usbTopology: "18874368"),
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: aliasIdentity, registeredMode: .loader,
+          usbTopology: "18874368")
+      ),
+    ]
+    for (label, alias, readback) in cases {
+      let receipt = await RockchipFlashPreflight(
+        probes: preflightProbes(hdcNormalAlias: alias, readback: readback)
+      ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      XCTAssertEqual(receipt.failedChecks, [.targetPresence], label)
     }
   }
 

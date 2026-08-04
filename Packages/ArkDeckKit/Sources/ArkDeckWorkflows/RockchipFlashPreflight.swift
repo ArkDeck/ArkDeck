@@ -105,6 +105,15 @@ public struct RockchipFlashPreflightProbes: Sendable {
   /// must match. Kept separate from the readback so the identity comparison
   /// stays in the preflight, where it is visible and testable.
   public var boundTargetIdentitySHA256: @Sendable () throws -> String
+  /// The one HDC-normal alias the binding's confirmed lineage accepts besides
+  /// its current identity, or nil when the lineage carries no valid edge. A
+  /// DAYU200 changes its USB serial between Loader and HDC-normal, and the
+  /// campaign's allowed starting modes include hdcNormal — a preflight that
+  /// only knows the current identity refuses the bound board in the very mode
+  /// a flash is allowed to start from (observed 2026-08-04). Defaults to no
+  /// alias, which is the fail-closed posture.
+  public var boundTargetHDCNormalAlias:
+    @Sendable () throws -> (identitySHA256: String, usbTopology: String)?
   public var targetReadback: @Sendable () throws -> RockchipEvolutionTargetReadback
 
   public init(
@@ -112,12 +121,16 @@ public struct RockchipFlashPreflightProbes: Sendable {
     hdcAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
     archiveIdentity: @escaping @Sendable (URL) throws -> RockchipFlashArchiveIdentity,
     boundTargetIdentitySHA256: @escaping @Sendable () throws -> String,
+    boundTargetHDCNormalAlias:
+      @escaping @Sendable () throws -> (identitySHA256: String, usbTopology: String)? =
+      { nil },
     targetReadback: @escaping @Sendable () throws -> RockchipEvolutionTargetReadback
   ) {
     self.rockUSBAliveness = rockUSBAliveness
     self.hdcAliveness = hdcAliveness
     self.archiveIdentity = archiveIdentity
     self.boundTargetIdentitySHA256 = boundTargetIdentitySHA256
+    self.boundTargetHDCNormalAlias = boundTargetHDCNormalAlias
     self.targetReadback = targetReadback
   }
 }
@@ -244,15 +257,32 @@ public struct RockchipFlashPreflight: Sendable {
             + "then run this preflight again"
         ])
     }
-    guard observed == expected else {
-      return RockchipFlashPreflightFinding(
-        check: .targetPresence, passed: false,
-        summary: "the attached target identity \(observed.prefix(12)) is not the bound "
-          + "target \(expected.prefix(12))",
-        remediation: [
-          "attach the bound target, or re-run `arkdeck flash install-binding` if "
-            + "this board is genuinely the new one"
-        ])
+    var identityNote = ""
+    if observed != expected {
+      // The binding may carry one confirmed HDC-normal alias: the previous
+      // personality of this same board, recorded with its topology and the
+      // explicit rebind confirmation when a later revision adopted the Loader
+      // identity. A DAYU200 changes its USB serial between modes, and
+      // hdcNormal is an allowed starting mode — so exactly that alias, in
+      // that mode, at that topology, is the bound target too. Anything else
+      // stays a mismatch, and a lineage that fails to validate provides no
+      // alias at all.
+      let alias = (try? probes.boundTargetHDCNormalAlias()) ?? nil
+      guard let alias,
+        observed == alias.identitySHA256,
+        readback.registeredMode == .hdcNormal,
+        readback.usbTopology == alias.usbTopology
+      else {
+        return RockchipFlashPreflightFinding(
+          check: .targetPresence, passed: false,
+          summary: "the attached target identity \(observed.prefix(12)) is not the bound "
+            + "target \(expected.prefix(12))",
+          remediation: [
+            "attach the bound target, or re-run `arkdeck flash install-binding` if "
+              + "this board is genuinely the new one"
+          ])
+      }
+      identityNote = " via its confirmed hdc-normal alias \(observed.prefix(12))"
     }
     guard let mode = readback.registeredMode else {
       return RockchipFlashPreflightFinding(
@@ -267,7 +297,7 @@ public struct RockchipFlashPreflight: Sendable {
     return RockchipFlashPreflightFinding(
       check: .targetPresence, passed: true,
       summary: "bound target readable in \(mode.rawValue) mode at USB topology "
-        + "\(readback.usbTopology ?? "unknown")")
+        + "\(readback.usbTopology ?? "unknown")" + identityNote)
   }
 }
 
@@ -329,6 +359,11 @@ extension RockchipFlashPreflightProbes {
         ).loadExisting()
         return SHA256.hash(data: Data(binding.serial.utf8))
           .map { String(format: "%02x", $0) }.joined()
+      },
+      boundTargetHDCNormalAlias: {
+        try RockchipProductBindingStore(
+          rootURL: try applicationSupportArkDeckRoot()
+        ).loadExisting().confirmedHDCNormalAlias()
       },
       targetReadback: { try ProductRockchipEvolutionTargetReadback().readDurableTarget() })
   }

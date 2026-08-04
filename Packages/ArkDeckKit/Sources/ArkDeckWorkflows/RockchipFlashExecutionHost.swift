@@ -219,18 +219,34 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     // edge before accepting either personality.  This prevents a malformed
     // lineage document from becoming useful merely because the device happens
     // to be in its latest mode.
-    let advance = try runtimeTargetLineageAdvance()
+    _ = try runtimeTargetLineageAdvance()
     if liveIdentity == currentIdentity, identity.topology == usbTopology {
       return true
     }
     guard identity.isHDCNormal,
-      evidence.contains("product:e0-iokit-single-loader-readback"),
-      let advance,
-      liveIdentity == advance.previousStableIdentitySHA256,
-      let previousTopology = values(prefix: "binding:previous-usb-topology=").first,
-      identity.topology == previousTopology
+      let alias = try confirmedHDCNormalAlias(),
+      liveIdentity == alias.identitySHA256,
+      identity.topology == alias.usbTopology
     else { return false }
     return true
+  }
+
+  /// The one HDC-normal personality this binding's confirmed lineage accepts
+  /// besides its current identity, or nil when there is no valid confirmed
+  /// edge (revision 1, or evidence without the explicit rebind confirmation).
+  /// This is the single source for the alias every identity comparison must
+  /// use — the executing gates through `matchesConfirmedLiveIdentity`, and
+  /// the flash preflight, which on 2026-08-04 compared raw digests instead
+  /// and refused the bound board in its HDC-normal personality even though
+  /// the campaign's own allowed starting modes include hdcNormal.
+  package func confirmedHDCNormalAlias()
+    throws -> (identitySHA256: String, usbTopology: String)?
+  {
+    guard evidence.contains("product:e0-iokit-single-loader-readback"),
+      let advance = try runtimeTargetLineageAdvance(),
+      let previousTopology = values(prefix: "binding:previous-usb-topology=").first
+    else { return nil }
+    return (advance.previousStableIdentitySHA256, previousTopology)
   }
 
   func confirmedHDCConnectKey(
