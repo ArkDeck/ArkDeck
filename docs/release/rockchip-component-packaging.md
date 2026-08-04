@@ -33,16 +33,15 @@ the old package evidence.
 The App retains exactly its existing six sandbox/device/file/network
 entitlements. `CODE_SIGN_INJECT_BASE_ENTITLEMENTS` remains disabled.
 
-The child has exactly two boolean-true entitlements:
-
-- `com.apple.security.app-sandbox`
-- `com.apple.security.inherit`
-
-`get-task-allow`, child USB/file/network capabilities, and Hardened Runtime
-exceptions are forbidden. Xcode embeds the externally built child through the
-named `Embed Rockchip Component` Copy Files/Executables phase with Code Sign On
-Copy. A separate named phase copies the five metadata files into the fixed
-resource location.
+The child entitlement dictionary is intentionally empty. The Runtime Broker is
+a standalone daemon, so an inherited App Sandbox profile would trap during
+`libsecinit` before the helper can run. The child remains fixed-path,
+Developer-ID-signed, Hardened-Runtime-protected, and strictly verified;
+`get-task-allow`, App Sandbox inheritance, child USB/file/network capabilities,
+and Hardened Runtime exceptions are forbidden. Xcode embeds the externally
+built child through the named `Embed Rockchip Component` Copy Files/Executables
+phase with Code Sign On Copy. A separate named phase copies the five metadata
+files into the fixed resource location.
 
 The release archive uses one approved Developer ID Application certificate for
 the child and App, inside-out, with Hardened Runtime and secure timestamps.

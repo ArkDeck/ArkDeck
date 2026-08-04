@@ -32,10 +32,7 @@
       "/usr/lib/libiconv.2.dylib",
       "/usr/lib/libobjc.A.dylib"
     ],
-    "entitlements": {
-      "com.apple.security.app-sandbox": true,
-      "com.apple.security.inherit": true
-    },
+    "entitlements": {},
     "identifier": "com.arkdeck.desktop.rkdeveloptool",
     "machoUUID": "8ab1a64a-f879-3fc1-a6de-63d3529c79c6",
     "minimumMacOS": "14.0",
