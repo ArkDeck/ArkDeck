@@ -194,6 +194,77 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
         AgentExecutionAuthorityReference.self, from: JSONEncoder().encode(reference)), reference)
   }
 
+  func testUnreviewedCampaignProvenancePersistsOnlyWithExecutionTuning() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let authority = try AgentExecutionAuthorityReference.validatedEvolutionCampaignConfirmation(
+      campaignDigestSHA256: String(repeating: "1", count: 64),
+      baseCommitOID: String(repeating: "a", count: 40),
+      planDigestSHA256: String(repeating: "2", count: 64),
+      archiveDigestSHA256: String(repeating: "3", count: 64),
+      stepSetDigestSHA256: String(repeating: "4", count: 64),
+      targetStableIdentitySHA256: String(repeating: "5", count: 64),
+      bindingLineageRootRevision: 2,
+      confirmedAt: "2026-08-04T00:00:00Z",
+      validUntil: "2026-08-04T03:00:00Z",
+      maximumAttempts: 16)
+    let tuning = try AgentAuthorityCampaignExecutionTuning(
+      loaderDiscoveryTimeoutSeconds: 90,
+      loaderPollIntervalMilliseconds: 250,
+      hdcCommandTimeoutSeconds: 7,
+      readOnlyCommandTimeoutSeconds: 9)
+    let provenance = try AgentAuthorityCampaignEvidenceProvenance(
+      candidateDigestSHA256: String(repeating: "6", count: 64),
+      brokerDigestSHA256: String(repeating: "7", count: 64),
+      executionTuning: tuning)
+    XCTAssertNil(provenance.reviewDigestSHA256)
+    XCTAssertThrowsError(
+      try AgentAuthorityCampaignEvidenceProvenance(
+        candidateDigestSHA256: String(repeating: "6", count: 64),
+        brokerDigestSHA256: String(repeating: "7", count: 64)))
+
+    let jobID = "job-unreviewed-campaign"
+    let reservation = try AgentAuthorityUsageReservation(
+      reservationID: AgentAuthorityUsageReservation.canonicalReservationID(
+        authorizationRef: authority, jobID: jobID,
+        operationDigestSHA256: String(repeating: "2", count: 64),
+        targetDigestSHA256: String(repeating: "5", count: 64)),
+      authorizationRef: authority,
+      ordinal: 1,
+      maximumUses: 16,
+      jobID: jobID,
+      operationDigestSHA256: String(repeating: "2", count: 64),
+      targetDigestSHA256: String(repeating: "5", count: 64),
+      reservedAt: "2026-08-04T00:01:00Z",
+      forwardLeaseExpiresAt: "2026-08-04T00:01:30Z",
+      compensationLeaseExpiresAt: "2026-08-04T00:02:30Z",
+      campaignEvidenceProvenance: provenance)
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    XCTAssertEqual(try ledger.reserve(reservation), reservation)
+    let loadedReservation = try XCTUnwrap(try ledger.load().reservations.first)
+    XCTAssertEqual(loadedReservation.campaignEvidenceProvenance, provenance)
+
+    let ledgerURL = directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+    var reservations = try XCTUnwrap(document["reservations"] as? [[String: Any]])
+    var persistedProvenance = try XCTUnwrap(
+      reservations.first?["campaignEvidenceProvenance"] as? [String: Any])
+    XCTAssertEqual(
+      Set(persistedProvenance.keys),
+      Set(["candidateDigestSHA256", "brokerDigestSHA256", "executionTuning"]))
+    persistedProvenance.removeValue(forKey: "executionTuning")
+    reservations[0]["campaignEvidenceProvenance"] = persistedProvenance
+    document["reservations"] = reservations
+    try JSONSerialization.data(withJSONObject: document).write(to: ledgerURL)
+
+    XCTAssertThrowsError(try ledger.load()) { error in
+      XCTAssertEqual(
+        error as? AuthorizationUsageLedgerError,
+        .invalidRecord("Agent authority campaign evidence provenance shape is not closed"))
+    }
+  }
+
 
 
   private func e1Reservation(

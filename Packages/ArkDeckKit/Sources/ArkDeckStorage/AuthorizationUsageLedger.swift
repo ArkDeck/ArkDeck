@@ -793,10 +793,14 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
   ) throws {
     guard [candidateDigestSHA256, brokerDigestSHA256]
       .allSatisfy(AuthorizationUsageValidation.isSHA256),
-      reviewDigestSHA256.map(AuthorizationUsageValidation.isSHA256) ?? true
+      reviewDigestSHA256.map(AuthorizationUsageValidation.isSHA256) ?? true,
+      // Review-bearing records predate execution tuning. An unreviewed record
+      // is only valid for the current broker path, which always carries its
+      // bounded timing controls.
+      reviewDigestSHA256 != nil || executionTuning != nil
     else {
       throw AuthorizationUsageLedgerError.invalidRecord(
-        "campaign evidence provenance requires canonical digests")
+        "campaign evidence provenance requires canonical digests and review or execution tuning")
     }
     self.candidateDigestSHA256 = candidateDigestSHA256
     self.reviewDigestSHA256 = reviewDigestSHA256
@@ -1443,6 +1447,13 @@ private enum AgentAuthorityUsageValidation {
     let historicalCampaignProvenanceKeys = campaignProvenanceKeys.subtracting([
       AgentAuthorityCampaignEvidenceProvenance.CodingKeys.executionTuning.rawValue,
     ])
+    // The no-review campaign path serializes its absent optional digest by
+    // omitting the key. It still carries bounded execution tuning, so accept
+    // exactly this current shape rather than permitting arbitrary partial
+    // provenance records.
+    let unreviewedCampaignProvenanceKeys = campaignProvenanceKeys.subtracting([
+      AgentAuthorityCampaignEvidenceProvenance.CodingKeys.reviewDigestSHA256.rawValue,
+    ])
     let terminalKeys = Set(AgentAuthorityUsageTerminal.CodingKeys.allCases.map(\.rawValue))
     // `confirmedNotExecutedIntentEventIds` was added after schema 1.0.0 had
     // already persisted terminals in production. The decoder gives its absent
@@ -1474,6 +1485,7 @@ private enum AgentAuthorityUsageValidation {
           case .object(let provenanceObject) = provenance,
           Set(provenanceObject.keys) == campaignProvenanceKeys
             || Set(provenanceObject.keys) == historicalCampaignProvenanceKeys
+            || Set(provenanceObject.keys) == unreviewedCampaignProvenanceKeys
         else {
           throw AuthorizationUsageLedgerError.invalidRecord(
             "Agent authority campaign evidence provenance shape is not closed")
