@@ -528,12 +528,11 @@ class ArchiveMutationTests(ContractFixture):
                 )
 
     def test_component_entitlement_and_runtime_mutations_fail(self) -> None:
-        missing = copy.deepcopy(self.spec["component"]["entitlements"])
-        del missing["com.apple.security.inherit"]
         extra = copy.deepcopy(self.spec["component"]["entitlements"])
         extra["com.apple.security.cs.disable-library-validation"] = True
         mutations = [
-            (("component", "entitlements"), missing),
+            (("component", "entitlements"), {"com.apple.security.app-sandbox": True}),
+            (("component", "entitlements"), {"com.apple.security.inherit": True}),
             (("component", "entitlements"), extra),
             (("component", "hardenedRuntime"), False),
             (("component", "strictVerification"), False),
@@ -547,6 +546,10 @@ class ArchiveMutationTests(ContractFixture):
                     path,
                     value,
                 )
+
+    def test_component_entitlements_are_empty_for_the_standalone_broker(self) -> None:
+        self.assertEqual(self.spec["component"]["entitlements"], {})
+        self.assertEqual(package.load_plist(package.COMPONENT_ENTITLEMENTS_PATH), {})
 
     def test_component_signature_mutations_fail(self) -> None:
         mutations = [
