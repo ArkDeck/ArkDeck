@@ -1,6 +1,7 @@
 // Product-facing bounded Evolution campaign composition
 // (CHG-2026-025 r8, TASK-AIN-019).
 
+import ArkDeckCore
 import ArkDeckHarness
 import ArkDeckWorkflows
 import ArkDeckStorage
@@ -121,6 +122,8 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   private let repairer: any RockchipEvolutionStrategyRepairing
   private let builder: any RockchipEvolutionCandidateBuilding
   private let flash: any RockchipEvolutionFlashDispatching
+  private let targetReadback: any RockchipEvolutionTargetReadbackReading
+  private let attemptIntents: any RockchipEvolutionAttemptIntentReading
   private let nowUTC: @Sendable () -> String
 
   /// There is no default execution lane. A campaign attempt runs on the
@@ -129,6 +132,8 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   /// how a second execution stack comes back.
   public convenience init(
     flash: any RockchipEvolutionFlashDispatching,
+    attemptIntents: any RockchipEvolutionAttemptIntentReading =
+      UnavailableRockchipEvolutionAttemptIntents(),
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) throws {
     let roots = try RockchipEvolutionProductRoots.load()
@@ -140,15 +145,25 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       repairer: repairer,
       builder: ProductRockchipEvolutionCandidateBuilder(stateRoot: roots.candidateRoot),
       flash: flash,
+      targetReadback: ProductRockchipEvolutionTargetReadback(),
+      attemptIntents: attemptIntents,
       nowUTC: { ISO8601DateFormatter().string(from: Date()) })
   }
 
+  /// `targetReadback` and `attemptIntents` default to the two values that
+  /// cannot settle anything: absence and refusal. A composition that forgets
+  /// to wire them keeps today's behaviour — an unknown attempt stays unknown —
+  /// instead of inheriting a proof it never obtained.
   package init(
     ledger: RockchipEvolutionCampaignLedger,
     usageLedger: AgentAuthorityUsageLedger,
     repairer: any RockchipEvolutionStrategyRepairing,
     builder: any RockchipEvolutionCandidateBuilding,
     flash: any RockchipEvolutionFlashDispatching,
+    targetReadback: any RockchipEvolutionTargetReadbackReading =
+      AbsentRockchipEvolutionTargetReadback(),
+    attemptIntents: any RockchipEvolutionAttemptIntentReading =
+      UnavailableRockchipEvolutionAttemptIntents(),
     nowUTC: @escaping @Sendable () -> String
   ) throws {
     self.ledger = ledger
@@ -156,6 +171,8 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     self.repairer = repairer
     self.builder = builder
     self.flash = flash
+    self.targetReadback = targetReadback
+    self.attemptIntents = attemptIntents
     self.nowUTC = nowUTC
   }
 
@@ -237,18 +254,24 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       }
       guard !Self.hasRepeatedNoEffectFailure(document) else {
         _ = try? ledger.stop(
-          campaignID: document.campaignID, reasonCode: "repeatedSafeNoEffect", at: nowUTC())
+          campaignID: document.campaignID, reasonCode: "repeatedSafeNoEffect",
+          detail: "\(Self.maximumConsecutiveNoEffectAttempts) consecutive attempts ended "
+            + "with no external effect", at: nowUTC())
         throw RockchipEvolutionCampaignError.campaignStopped("repeatedSafeNoEffect")
       }
       guard document.reservedAttemptCount < document.assertion.maxAttempts else {
         _ = try? ledger.stop(
-          campaignID: document.campaignID, reasonCode: "attemptBudgetExhausted", at: nowUTC())
+          campaignID: document.campaignID, reasonCode: "attemptBudgetExhausted",
+          detail: "\(document.reservedAttemptCount) of \(document.assertion.maxAttempts) "
+            + "confirmed attempts are already reserved", at: nowUTC())
         throw RockchipEvolutionCampaignError.campaignStopped("attemptBudgetExhausted")
       }
       let priorCandidates = document.events.compactMap(\.candidate)
       guard priorCandidates.count < document.assertion.maxAttempts else {
         _ = try? ledger.stop(
-          campaignID: document.campaignID, reasonCode: "candidateBudgetExhausted", at: nowUTC())
+          campaignID: document.campaignID, reasonCode: "candidateBudgetExhausted",
+          detail: "\(priorCandidates.count) of \(document.assertion.maxAttempts) candidates "
+            + "are already prepared", at: nowUTC())
         throw RockchipEvolutionCampaignError.campaignStopped("candidateBudgetExhausted")
       }
       let proposedStrategy: RockchipEvolutionTypedStrategy
@@ -258,7 +281,8 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
           priorCandidates: priorCandidates)
       } catch {
         _ = try? ledger.stop(
-          campaignID: document.campaignID, reasonCode: "strategyRepairRejected", at: nowUTC())
+          campaignID: document.campaignID, reasonCode: "strategyRepairRejected",
+          detail: "\(error)", at: nowUTC())
         throw error
       }
       let strategy: RockchipEvolutionTypedStrategy
@@ -268,7 +292,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       } catch {
         _ = try? ledger.stop(
           campaignID: document.campaignID, reasonCode: "candidateModeConstraintRejected",
-          at: nowUTC())
+          detail: "\(error)", at: nowUTC())
         throw error
       }
       let build: RockchipEvolutionCandidateBuild
@@ -277,7 +301,8 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       } catch let error as RockchipEvolutionCampaignError {
         if Self.invalidatesCampaign(error) {
           _ = try? ledger.stop(
-            campaignID: document.campaignID, reasonCode: "candidateEnvelopeDrift", at: nowUTC())
+            campaignID: document.campaignID, reasonCode: "candidateEnvelopeDrift",
+            detail: "\(error)", at: nowUTC())
         }
         throw error
       }
@@ -323,8 +348,12 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
           continue
         }
         guard document.reservedAttemptCount == reservedBeforeDispatch + 1 else {
+          // The catch-all. Before this carried the underlying error, a
+          // campaign that died here recorded four words and left the actual
+          // cause to be excavated from macOS crash reports.
           _ = try? ledger.stop(
-            campaignID: document.campaignID, reasonCode: "admissionOrTargetDrift", at: nowUTC())
+            campaignID: document.campaignID, reasonCode: "admissionOrTargetDrift",
+            detail: "\(error)", at: nowUTC())
           throw error
         }
         guard
@@ -354,7 +383,9 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       if terminal.status == .succeeded {
         disposition = .succeeded
       } else if terminal.status == .outcomeUnknown {
-        disposition = .outcomeUnknown
+        disposition =
+          settlesUnknownLoaderTransition(document: document, jobID: jobID)
+          ? .safeToReflash : .outcomeUnknown
       } else if terminal.externalIntentEventIDs.isEmpty
         || Set(terminal.confirmedNotExecutedIntentEventIDs)
           == Set(terminal.externalIntentEventIDs)
@@ -389,6 +420,58 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       campaignID: document.campaignID, ordinal: ordinal,
       jobID: jobID, sessionID: sessionID, disposition: disposition,
       destructiveIntentEventIDs: intents, at: nowUTC())
+  }
+
+  /// TASK-AIN-019 r11 approved exactly one way out of a failed Loader
+  /// transition: re-read the *same* durable target in a registered mode. Until
+  /// now that rule only reached the executor's own `confirmedNotExecuted`
+  /// path, so an engine-lane attempt that ended `outcomeUnknown` — which is
+  /// what a host tool killed mid-transition produces — was sealed forever and
+  /// took its whole campaign with it.
+  ///
+  /// This applies the same rule to the unknown terminal, and nowhere else:
+  ///
+  /// * only when every intent the job journaled is a Loader-transition-class
+  ///   step. One `flashPartition` (or any step whose kind can be destructive,
+  ///   or any kind this build does not recognize) and the path never applies —
+  ///   an interrupted partition write is not made safe by the device coming
+  ///   back, and `flash-partitions` keeps its unknown semantics untouched.
+  /// * only when the readback names the identity this campaign is pinned to,
+  ///   in a mode the product has registered.
+  ///
+  /// It is a pure read: no mutation is re-sent, no usage terminal is rewritten
+  /// (they are append-only), and no new terminal vocabulary is invented — the
+  /// proof is "no external effect happened", which is what `safeToReflash`
+  /// already means for the `confirmedNotExecuted` intents beside it.
+  private func settlesUnknownLoaderTransition(
+    document: RockchipEvolutionCampaignDocument,
+    jobID: String
+  ) -> Bool {
+    guard let kinds = try? attemptIntents.journaledStepKinds(jobID: jobID),
+      Self.isLoaderTransitionOnly(kinds)
+    else { return false }
+    guard let readback = try? targetReadback.readDurableTarget(),
+      let observed = readback.stableIdentitySHA256,
+      observed == document.assertion.targetStableIdentitySHA256,
+      readback.registeredMode != nil
+    else { return false }
+    return true
+  }
+
+  static func isLoaderTransitionOnly(_ rawKinds: [String]) -> Bool {
+    var sawTransition = false
+    for raw in rawKinds {
+      switch WorkflowStepRegistry.resolve(rawKind: raw) {
+      case .unsupported:
+        // An unrecognized kind is assumed destructive by the registry, and a
+        // build that cannot name a step cannot prove anything about it.
+        return false
+      case .supported(let kind, let metadata):
+        guard metadata.minimumEffect < .destructive else { return false }
+        if kind == .enterUpdater { sawTransition = true }
+      }
+    }
+    return sawTransition
   }
 
   private static func invalidatesCampaign(_ error: RockchipEvolutionCampaignError) -> Bool {

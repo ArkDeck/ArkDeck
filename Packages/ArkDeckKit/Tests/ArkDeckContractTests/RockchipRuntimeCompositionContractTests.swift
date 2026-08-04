@@ -880,6 +880,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   private enum ProbeResponse: Sendable {
     case success(String)
     case exit(Int32)
+    case exitWithStandardError(Int32, String)
     case outcomeUnknown(String)
   }
 
@@ -917,10 +918,154 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         return ProviderSubprocessReceipt(
           exitStatus: status, stdout: Data(), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0)
+      case .exitWithStandardError(let status, let stderr):
+        return ProviderSubprocessReceipt(
+          exitStatus: status, stdout: Data(), stderr: Data(stderr.utf8),
+          stdoutTruncated: false, durationSeconds: 0)
       case .outcomeUnknown(let detail):
         throw RuntimeDispatchFailure.outcomeUnknown(detail)
       }
     }
+  }
+
+  // MARK: Loader transition diagnostics (TASK-AIN-019)
+
+  func testEnterLoaderConfirmedNotExecutedCarriesTheHDCReceiptSummary() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let connectKey = "device-1"
+    let runner = ProbeCommandRunner(responses: [
+      .exitWithStandardError(1, "[Fail]Not match target and connect key\nretry later")
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner, usbProbe: NormalOnlyUSBProbe(connectKey: connectKey),
+      enterLoaderReadbackTimeoutSeconds: 0)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: connectKey),
+      stepID: "enter-loader-receipt-summary", toolSHA256: rockchip.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .enterLoader(connectKey: connectKey),
+        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        actionDirectory: root)
+      XCTFail("a Loader transition without its postcondition must fail")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecutedWithDiagnostic(let detail, _) = failure else {
+        return XCTFail("expected confirmed-not-executed failure, got \(failure)")
+      }
+      // The one line that used to be missing: what the command actually did.
+      XCTAssertTrue(detail.contains("hdcExitStatus=1"), detail)
+      XCTAssertTrue(detail.contains("Not match target and connect key"), detail)
+      // Bounded and single-line, so it survives a journal and a ledger detail.
+      XCTAssertFalse(detail.contains("\n"), detail)
+    }
+  }
+
+  func testEnterLoaderFailureNamesTheTerminatingSignalAndItsCrashReport() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let connectKey = "device-1"
+    let runner = ProbeCommandRunner(responses: [
+      .outcomeUnknown(RockchipHostProcessDiagnostics.signalDeath(6))
+    ])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner, usbProbe: NormalOnlyUSBProbe(connectKey: connectKey),
+      enterLoaderReadbackTimeoutSeconds: 0)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: connectKey),
+      stepID: "enter-loader-signal", toolSHA256: rockchip.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .enterLoader(connectKey: connectKey),
+        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        actionDirectory: root)
+      XCTFail("a Loader transition without its postcondition must fail")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecutedWithDiagnostic(let detail, _) = failure else {
+        return XCTFail("expected confirmed-not-executed failure, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("died on signal 6"), detail)
+      XCTAssertTrue(detail.contains("DiagnosticReports"), detail)
+    }
+  }
+
+  func testEnterLoaderUnknownFallbackCarriesTheHDCExitStatus() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let connectKey = "device-1"
+    // Clean exit, no Loader, and no HDC-normal readback either: the outcome is
+    // genuinely unknown, and now it says what the command reported.
+    let runner = ProbeCommandRunner(responses: [.exit(0)])
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: runner, usbProbe: MissingUSBProbe(),
+      enterLoaderReadbackTimeoutSeconds: 0)
+    let rockchip = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .enterLoader(connectKey: connectKey),
+      stepID: "enter-loader-unknown-summary", toolSHA256: rockchip.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .enterLoader(connectKey: connectKey),
+        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        actionDirectory: root)
+      XCTFail("an unobserved Loader postcondition must stay unknown")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .outcomeUnknown(let detail) = failure else {
+        return XCTFail("expected an unknown outcome, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("hdcExitStatus=0"), detail)
+    }
+  }
+
+  func testSignalDeathNamesTheSignalAndPointsAtItsCrashReport() {
+    let message = RockchipHostProcessDiagnostics.signalDeath(9)
+    XCTAssertTrue(message.contains("process died on signal 9"), message)
+    XCTAssertTrue(
+      message.contains(RockchipHostProcessDiagnostics.diagnosticReportsDirectory), message)
+    // The preflight reads its own canonical text back rather than opening a
+    // second spawn face, so the round trip is part of the contract.
+    XCTAssertEqual(
+      RockchipHostProcessDiagnostics.signalNumber(inFailureDescription: message), 9)
+    XCTAssertNil(
+      RockchipHostProcessDiagnostics.signalNumber(
+        inFailureDescription: "process timed out before completion"))
+  }
+
+  func testEvidenceSummaryTruncatesStandardErrorAndKeepsItSingleLine() {
+    let summary = FoundationRockchipRuntimeActionExecutor.transitionEvidenceSummary(
+      receipt: ProviderSubprocessReceipt(
+        exitStatus: 2, stdout: Data(),
+        stderr: Data(String(repeating: "e", count: 4_000).utf8),
+        stdoutTruncated: true, durationSeconds: 0),
+      failure: nil)
+    XCTAssertTrue(summary.contains("hdcExitStatus=2"), summary)
+    XCTAssertTrue(summary.contains("hdcOutputTruncated=true"), summary)
+    XCTAssertTrue(summary.contains("…"), summary)
+    XCTAssertLessThan(summary.utf8.count, 400)
+    XCTAssertFalse(summary.contains("\n"), summary)
   }
 
   func testEnterLoaderSettlesTimedOutHDCWithExactLoaderReadback() async throws {

@@ -1184,7 +1184,7 @@ struct RockchipProductUSBProbe: Sendable {
     return match
   }
 
-  private static func systemIdentities() throws -> [RockchipProductUSBIdentity] {
+  static func systemIdentities() throws -> [RockchipProductUSBIdentity] {
     var iterator: io_iterator_t = 0
     guard
       IOServiceGetMatchingServices(

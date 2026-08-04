@@ -207,7 +207,8 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     case .cancelled:
       throw RuntimeDispatchFailure.outcomeUnknown("process cancelled mid-flight")
     case .signalled(let signal):
-      throw RuntimeDispatchFailure.outcomeUnknown("process died on signal \(signal)")
+      throw RuntimeDispatchFailure.outcomeUnknown(
+        RockchipHostProcessDiagnostics.signalDeath(signal))
     case .waitFailed(let code), .unrecognizedWaitStatus(let code):
       throw RuntimeDispatchFailure.outcomeUnknown("process wait status unresolved (\(code))")
     }

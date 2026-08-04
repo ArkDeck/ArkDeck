@@ -213,6 +213,46 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
   }
 }
 
+/// The runtime's own answer to "what did this attempt actually journal an
+/// intent for", read over the existing evidence RPC. It lives here for the
+/// same reason the dispatcher does: the campaign protocol must not learn about
+/// the daemon transport, so the CLI composition root joins the two.
+///
+/// Read-only, and deliberately strict — one unreadable entry refuses the whole
+/// answer rather than returning a shorter list, because a silently shortened
+/// list is exactly how a partition write would go unnoticed.
+public struct DaemonRockchipEvolutionAttemptIntents: RockchipEvolutionAttemptIntentReading {
+  private let client: AgentClient
+
+  public init(socketPath: String) {
+    client = AgentClient(socketPath: socketPath)
+  }
+
+  public func journaledStepKinds(jobID: String) throws -> [String] {
+    let response: JSONValue
+    do {
+      response = try client.request(
+        method: "job.evidence", params: ["jobId": .string(jobID)])
+    } catch {
+      throw RockchipEvolutionAttemptIntentError.unavailable(
+        "job.evidence for \(jobID) failed: \(error)")
+    }
+    guard case .object(let fields) = response,
+      case .array(let entries)? = fields["actualStepKinds"]
+    else {
+      throw RockchipEvolutionAttemptIntentError.unavailable(
+        "job.evidence for \(jobID) carried no actualStepKinds array")
+    }
+    return try entries.map { entry in
+      guard case .string(let kind) = entry else {
+        throw RockchipEvolutionAttemptIntentError.unavailable(
+          "job.evidence for \(jobID) carried a non-string step kind")
+      }
+      return kind
+    }
+  }
+}
+
 extension EngineLaneRuntimeGateway {
   package static func overDaemonSocket(_ client: AgentClient) -> EngineLaneRuntimeGateway {
     EngineLaneRuntimeGateway(
