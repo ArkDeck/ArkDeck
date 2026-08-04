@@ -407,9 +407,8 @@ public enum HardwareEvidenceProjector {
           let planDigest = authority.planDigest,
           let targetBindingDigest = authority.targetBindingDigest,
           let candidateDigest = authority.candidateDigest,
-          let reviewDigest = authority.reviewDigest,
           let brokerDigest = authority.brokerDigest,
-          [planDigest, targetBindingDigest, candidateDigest, reviewDigest, brokerDigest]
+          [planDigest, targetBindingDigest, candidateDigest, brokerDigest]
             .allSatisfy(validSHA256),
           authority.consumptionFingerprintSHA256 == planDigest
         else {

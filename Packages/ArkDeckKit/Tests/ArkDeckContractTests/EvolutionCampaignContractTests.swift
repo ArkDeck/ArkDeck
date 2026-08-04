@@ -597,7 +597,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertThrowsError(try ledger.load(assertion.campaignID))
   }
 
-  func testReviewFailureAndRepeatedFirstAdmissionHaveZeroFlashDispatch() async throws {
+  func testRejectingReviewerDoesNotBlockFixedCandidateAdmission() async throws {
     let root = temporaryDirectory("campaign-host-zero")
     defer { try? FileManager.default.removeItem(at: root) }
     let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
@@ -620,8 +620,9 @@ final class EvolutionCampaignContractTests: XCTestCase {
         archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     let rejectedDispatches = await flash.dispatchCount()
-    XCTAssertEqual(rejectedDispatches, 0)
+    XCTAssertEqual(rejectedDispatches, 1)
     XCTAssertTrue(try ledger.load(assertion.campaignID).isTerminal)
+    XCTAssertNil(try ledger.load(assertion.campaignID).latestCandidate?.review)
   }
 
   func testHostAutomaticallyRepairsVersionedOperationSafeFailureUntilSuccess() async throws {
@@ -1219,7 +1220,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertThrowsError(try ledger.load(secondExpired.campaignID))
 
     let dispatches = await flash.dispatchCount()
-    XCTAssertEqual(dispatches, 0)
+    XCTAssertEqual(dispatches, 1)
   }
 
   func testPreviewSourceSweepsExpiredDraftsBeforePersistingItsOwnDraft() throws {
@@ -1473,7 +1474,7 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
     let ordinal = count
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review.reviewID, ordinal: ordinal,
+      reviewID: permit.review?.reviewID, ordinal: ordinal,
       reservationID: "reservation-auto-\(ordinal)", jobID: "job-auto-\(ordinal)",
       sessionID: "session-auto-\(ordinal)", at: now)
     if ordinal <= safeFailureCount {
@@ -1544,7 +1545,7 @@ private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFl
     }
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review.reviewID, ordinal: 1,
+      reviewID: permit.review?.reviewID, ordinal: 1,
       reservationID: "reservation-mode-1", jobID: "job-mode-1",
       sessionID: "session-mode-1", at: now)
     _ = try ledger.closeAttempt(
@@ -1679,7 +1680,7 @@ private struct ScriptedCampaignAttemptAdmitter: RockchipEvolutionCampaignAttempt
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review.reviewID, ordinal: 1,
+      reviewID: permit.review?.reviewID, ordinal: 1,
       reservationID: "reservation-engine-1", jobID: "job-engine-1",
       sessionID: "session-engine-1", at: now)
     _ = try ledger.closeAttempt(
@@ -1734,7 +1735,7 @@ private actor SuccessAfterReconciledEvolutionFlash: RockchipEvolutionFlashDispat
     let ordinal = 2
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
-      reviewID: permit.review.reviewID, ordinal: ordinal,
+      reviewID: permit.review?.reviewID, ordinal: ordinal,
       reservationID: "reservation-after-no-effect", jobID: "job-after-no-effect",
       sessionID: "session-after-no-effect", at: now)
     _ = try ledger.closeAttempt(

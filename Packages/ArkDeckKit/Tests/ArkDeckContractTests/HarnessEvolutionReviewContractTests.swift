@@ -246,16 +246,17 @@ final class HarnessEvolutionReviewContractTests: XCTestCase {
 
   // MARK: Coordinator leg
 
-  func testEvaluationPassWithoutAReviewerStopsForHumanNotPromotion() async throws {
+  func testEvaluationPassWithoutAReviewerPromotesWithoutCreatingReviewEvidence() async throws {
     let stack = try await makeReviewStack(reviewer: nil)
     let outcome = try await stack.coordinator.reconcile(stack.taskID)
 
-    XCTAssertEqual(outcome.action, .stoppedForHuman)
-    XCTAssertEqual(outcome.reasonCode, "adversarialReviewerUnavailable")
-    XCTAssertEqual(outcome.snapshot.status, .humanRequired)
+    XCTAssertEqual(outcome.action, .evaluatedSucceeded)
+    XCTAssertEqual(outcome.reasonCode, "promotionCandidateReady")
+    XCTAssertEqual(outcome.snapshot.status, .succeeded)
     let attempt = try await lastAttempt(stack)
-    XCTAssertEqual(attempt.outcome, .humanRequired)
-    XCTAssertNil(attempt.promotionCandidate)
+    XCTAssertEqual(attempt.outcome, .succeeded)
+    XCTAssertNil(attempt.review)
+    XCTAssertNil(attempt.promotionCandidate?.reviewID)
   }
 
   func testEvaluationPassWithoutACandidatePatchStopsForHuman() async throws {

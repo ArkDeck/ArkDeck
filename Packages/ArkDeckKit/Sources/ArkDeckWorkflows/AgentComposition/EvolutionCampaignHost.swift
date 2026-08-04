@@ -120,7 +120,6 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   private let usageLedger: AgentAuthorityUsageLedger
   private let repairer: any RockchipEvolutionStrategyRepairing
   private let builder: any RockchipEvolutionCandidateBuilding
-  private let reviewer: any RockchipEvolutionAdversarialReviewing
   private let flash: any RockchipEvolutionFlashDispatching
   private let nowUTC: @Sendable () -> String
 
@@ -135,14 +134,11 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     let roots = try RockchipEvolutionProductRoots.load()
     let repairer = try Self.repairer(
       environment: environment, workingDirectory: roots.repairerRoot.path)
-    let reviewer = try Self.reviewer(
-      environment: environment, workingDirectory: roots.reviewerRoot.path)
     try self.init(
       ledger: RockchipEvolutionCampaignLedger(root: roots.campaignLedgerRoot),
       usageLedger: AgentAuthorityUsageLedger(root: roots.usageRoot),
       repairer: repairer,
       builder: ProductRockchipEvolutionCandidateBuilder(stateRoot: roots.candidateRoot),
-      reviewer: reviewer,
       flash: flash,
       nowUTC: { ISO8601DateFormatter().string(from: Date()) })
   }
@@ -152,7 +148,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     usageLedger: AgentAuthorityUsageLedger,
     repairer: any RockchipEvolutionStrategyRepairing,
     builder: any RockchipEvolutionCandidateBuilding,
-    reviewer: any RockchipEvolutionAdversarialReviewing,
+    reviewer: (any RockchipEvolutionAdversarialReviewing)? = nil,
     flash: any RockchipEvolutionFlashDispatching,
     nowUTC: @escaping @Sendable () -> String
   ) throws {
@@ -160,7 +156,9 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     self.usageLedger = usageLedger
     self.repairer = repairer
     self.builder = builder
-    self.reviewer = reviewer
+    // Compatibility-only injection point for callers compiled against the
+    // review-gated host. It is deliberately never invoked.
+    _ = reviewer
     self.flash = flash
     self.nowUTC = nowUTC
   }
@@ -209,7 +207,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   }
 
   /// Reading a campaign's own ledger needs no execution lane, no repairer and
-  /// no reviewer — only the durable document. Keeping this off the
+  /// no review role — only the durable document. Keeping this off the
   /// dispatcher-bearing initializer means `flash status` cannot be the reason
   /// a default execution lane comes back.
   public static func status(
@@ -287,22 +285,10 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         }
         throw error
       }
-      let review: RockchipEvolutionReviewReceipt
-      do {
-        review = try await reviewer.review(
-          RockchipEvolutionAdversarialReviewRequest(
-            assertion: document.assertion, candidate: build.pin,
-            immutableDiff: build.reviewDiff, priorAttempts: document.events))
-      } catch {
-        _ = try? ledger.stop(
-          campaignID: document.campaignID, reasonCode: "adversarialReviewRejected", at: nowUTC())
-        throw error
-      }
       document = try ledger.appendCandidate(
-        campaignID: document.campaignID, candidate: build.pin,
-        review: review, at: nowUTC())
+        campaignID: document.campaignID, candidate: build.pin, at: nowUTC())
       let permit = try RockchipEvolutionCampaignAttemptPermit(
-        assertion: document.assertion, candidate: build.pin, review: review)
+        assertion: document.assertion, candidate: build.pin)
       let request = try RockchipFlashExecutionRequest(
         evolutionCampaignAttempt: permit, archiveURL: archiveURL,
         targetLocationSelector: targetLocationSelector)

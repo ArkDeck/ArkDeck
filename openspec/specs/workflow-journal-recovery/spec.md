@@ -45,7 +45,7 @@ packaging、imported Manifest、caller assertion 或事后聊天消息 SHALL NOT
 追溯提供 authority。
 
 缺失、stale、mismatched、unknown 或非 durable trusted facts；authority/effect mismatch；
-未匹配 intent/outcome；缺失 candidate/review pin；或不可验证 Artifact hash SHALL 阻止 evidence
+未匹配 intent/outcome；缺失 candidate pin；或不可验证 Artifact hash SHALL 阻止 evidence
 publication。该 blocker SHALL NOT 把 Job 变为 success，也 SHALL NOT dispatch 或 replay device
 Step。target identity 与 raw artifacts 继续适用隐私和不可变规则；历史 V2/V3 evidence 保持
 不可变、可 decode。

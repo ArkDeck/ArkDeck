@@ -106,11 +106,11 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
     else { throw RockchipEvolutionCampaignError.persistenceRejected("eventIdentity") }
     switch kind {
     case .candidatePrepared:
-      guard let candidate, let review, ordinal == nil, reservationID == nil,
+      guard let candidate, ordinal == nil, reservationID == nil,
         jobID == nil, sessionID == nil, disposition == nil,
         destructiveIntentEventIDs.isEmpty, reasonCode == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("candidatePreparedShape") }
-      try review.validate(candidate: candidate)
+      if let review { try review.validate(candidate: candidate) }
     case .attemptReserved:
       guard candidate == nil, review == nil, let ordinal, ordinal > 0,
         let reservationID, Self.isIdentifier(reservationID),
@@ -227,10 +227,10 @@ public struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
       }
       switch event.kind {
       case .candidatePrepared:
-        guard let candidate = event.candidate, let review = event.review,
+        guard let candidate = event.candidate,
           candidate.baseCommitOID == assertion.baseCommitOID,
           candidate.toolchainDigestSHA256 == assertion.candidateToolchainDigestSHA256,
-          review.planDigestSHA256 == assertion.planDigestSHA256
+          event.review == nil || event.review?.planDigestSHA256 == assertion.planDigestSHA256
         else { throw RockchipEvolutionCampaignError.persistenceRejected("candidateDrift") }
         candidates[candidate.candidateID] = event
       case .attemptReserved:
@@ -385,10 +385,10 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   package func appendCandidate(
     campaignID: String,
     candidate: RockchipEvolutionCandidatePin,
-    review: RockchipEvolutionReviewReceipt,
+    review: RockchipEvolutionReviewReceipt? = nil,
     at: String
   ) throws -> RockchipEvolutionCampaignDocument {
-    try mutate(campaignID) { document in
+    return try mutate(campaignID) { document in
       try requireActive(document, at: at)
       guard document.activeReservation == nil else {
         throw RockchipEvolutionCampaignError.campaignStopped("activeAttempt")
@@ -408,21 +408,23 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   package func reserveAttempt(
     campaignID: String,
     candidateID: String,
-    reviewID: String,
+    reviewID: String? = nil,
     ordinal: Int,
     reservationID: String,
     jobID: String,
     sessionID: String,
     at: String
   ) throws -> RockchipEvolutionCampaignDocument {
-    try mutate(campaignID) { document in
+    // Retain source compatibility for readers of historical review-bearing
+    // ledgers; reservations no longer require a review identity.
+    _ = reviewID
+    return try mutate(campaignID) { document in
       try requireActive(document, at: at)
       guard document.activeReservation == nil,
         ordinal == document.reservedAttemptCount + 1,
         ordinal <= document.assertion.maxAttempts,
         let prepared = document.latestCandidate,
-        prepared.candidate?.candidateID == candidateID,
-        prepared.review?.reviewID == reviewID
+        prepared.candidate?.candidateID == candidateID
       else { throw RockchipEvolutionCampaignError.campaignConflict }
       let event = try RockchipEvolutionCampaignEvent(
         sequence: document.events.count + 1, kind: .attemptReserved, at: at,

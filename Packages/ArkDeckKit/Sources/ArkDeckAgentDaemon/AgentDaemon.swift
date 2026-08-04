@@ -1239,7 +1239,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
         fields["planDigest"] = .string(campaign.planDigestSHA256)
         fields["targetBindingDigest"] = .string(campaign.targetBindingDigestSHA256)
         fields["candidateDigest"] = .string(campaign.candidateDigestSHA256)
-        fields["reviewDigest"] = .string(campaign.reviewDigestSHA256)
+        if let reviewDigest = campaign.reviewDigestSHA256 {
+          fields["reviewDigest"] = .string(reviewDigest)
+        }
         fields["brokerDigest"] = .string(campaign.brokerDigestSHA256)
       }
       authority = .object(fields)

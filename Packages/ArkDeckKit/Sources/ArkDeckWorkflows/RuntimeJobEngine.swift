@@ -107,7 +107,8 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
   public let planDigestSHA256: String
   public let targetBindingDigestSHA256: String
   public let candidateDigestSHA256: String
-  public let reviewDigestSHA256: String
+  /// Present only when projecting a historical review-bearing campaign.
+  public let reviewDigestSHA256: String?
   public let brokerDigestSHA256: String
 
   public init(
@@ -117,7 +118,7 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
     planDigestSHA256: String,
     targetBindingDigestSHA256: String,
     candidateDigestSHA256: String,
-    reviewDigestSHA256: String,
+    reviewDigestSHA256: String? = nil,
     brokerDigestSHA256: String
   ) {
     self.campaignID = campaignID

@@ -76,20 +76,19 @@ Agent MAY 起草 proposal、delta、ADR、design 和 tasks；Agent SHALL NOT 自
    limit，并如实取得用户确认。campaign 最多 16 个串行 attempts、四小时、并发一。
 
 每个真实 destructive Step 前，protected-main broker SHALL 从已发布 typed plan 重新计算
-plan/step set、读取 fresh target/binding facts，并校验 authority、candidate/review pins、
-reservation ordinal、有效期和全部预算。任一缺失、已消费、漂移、过期、超限、非 PASS
-review、无 fresh reservation、身份/拓扑不确定、`outcomeUnknown`、unresolved intent 或
+plan/step set、读取 fresh target/binding facts，并校验 authority、candidate pins、
+reservation ordinal、有效期和全部预算。任一缺失、已消费、漂移、过期、超限、无 fresh
+reservation、身份/拓扑不确定、`outcomeUnknown`、unresolved intent 或
 unsafe partial write SHALL fail closed：新 destructive dispatch 数为 0，并持久记录 blocker
 或 terminal disposition。
 
 candidate 仅可在确认的 allowed paths/diff budget 内 build/test；repairer 不得取得 source
-workspace，reviewer 只可读 immutable candidate/diff/build/test artifacts。candidate、repairer
-与 reviewer 均不得取得 network、USB/HDC/RockUSB、raw shell、Runtime 或 authority
+workspace。candidate 与 repairer 均不得取得 network、USB/HDC/RockUSB、raw shell、Runtime 或 authority
 capability，且不得改变 argv、operation、partition、plan、archive、step set、target、broker
 或 authorization。只有 protected-main broker 可在 fresh readback 与 durable reservation 后
 dispatch。只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash`
 时，同一 invocation 才 MAY 自动继续下一轮；success、unknown、unresolved、unsafe partial、
-drift、review/repairer 拒绝、取消后的 destructive intent、过期或预算耗尽均 SHALL 永久停止。
+drift、repairer 拒绝、取消后的 destructive intent、过期或预算耗尽均 SHALL 永久停止。
 
 普通 CI、后台 daemon/scheduler、无有效 E2 authority 的 Agent 和 caller-supplied
 authorization/context SHALL 只运行 contract/fake/simulated/plan-only。USB 连接、Task 风险标记、

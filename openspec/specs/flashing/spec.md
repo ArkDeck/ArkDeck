@@ -178,11 +178,11 @@ target/toolchain、exact plan/target/data impact、validity 和 `maxAttempts`；
 attempts、四小时、并发一。
 
 每个真实 destructive Step 前，protected-main broker SHALL re-materialize 已发布 typed plan、
-验证全部 authority 和 candidate/review pins、取得 fresh target/binding readback 并 durable
-reserve ordinal。任一缺失、过期、已消费、漂移、超预算、非 PASS review、无 fresh
+验证全部 authority 和 candidate pins、取得 fresh target/binding readback 并 durable
+reserve ordinal。任一缺失、过期、已消费、漂移、超预算、无 fresh
 reservation、非 terminal predecessor、身份/拓扑不确定、`outcomeUnknown`、unresolved intent
 或 unsafe partial write SHALL fail closed：destructive dispatch 为 0，Job 记录精确 blocker/
-terminal disposition。candidate、repairer、reviewer 不得访问设备 transport 或 authority，且
+terminal disposition。candidate、repairer 不得访问设备 transport 或 authority，且
 不得扩展 argv、operation、partition、plan、archive、step set 或 target。只有 broker 可
 dispatch；它只有在上一 attempt durable terminal 且完整 outcome/readback 分类为
 `safeToReflash` 时 MAY 在同一 invocation 继续。任何 uncertain/unsafe outcome 不得 replay。
@@ -204,7 +204,7 @@ standing authorization。evidence 或事后聊天消息不得追溯授权 dispat
 #### Scenario: AC-FLASH-015-02 E2 drift or unsafe predecessor blocks the next attempt
 
 - GIVEN 一个 pending Agent Flash 有 authority，但任一 target/binding、firmware、transport、
-  HDC、Provider、plan/Step set、base/scope/toolchain/budget、candidate/review pin、reservation、
+  HDC、Provider、plan/Step set、base/scope/toolchain/budget、candidate pin、reservation、
   freshness、predecessor terminal state 或 readback 缺失、变化、过期、已消费、unsafe 或 unknown
 - WHEN broker 在首个真实 device Step 前校验 attempt
 - THEN destructive dispatch 数为 0，Job 记录具体 blocker 或 terminal stop

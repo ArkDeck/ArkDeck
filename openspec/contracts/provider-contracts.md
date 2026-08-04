@@ -109,8 +109,8 @@ Rules:
   Campaign dispatch is limited to 16 serial attempts in four hours, concurrency one; every
   later attempt needs a new reservation and a prior durable `safeToReflash` terminal based on
   complete outcome/readback. Unknown, unresolved or unsafe partial outcomes, identity/topology
-  drift, expired/consumed authority, missing pins or non-PASS review stop permanently with zero
-  new dispatch. Candidate, repairer and reviewer cannot supply authority, executable/argv,
+  drift, expired/consumed authority, or missing pins stop permanently with zero
+  new dispatch. Candidate and repairer cannot supply authority, executable/argv,
   operation, partition, plan, archive, Step set or target and have no device transport.
   A Profile, CLI argument, Task payload, imported Manifest, evidence record or post-hoc chat
   text cannot promote `standardAgent`, mint/expand either E2 authority or retroactively

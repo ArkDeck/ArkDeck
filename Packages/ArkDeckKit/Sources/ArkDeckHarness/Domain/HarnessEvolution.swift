@@ -591,7 +591,8 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   public let baseRevision: String
   public let workspaceRevision: String
   public let evaluationID: String
-  public let reviewID: String
+  /// Present only when decoding a historical review-bearing promotion.
+  public let reviewID: String?
   public let artifactIDs: [String]
   public let createdAtUTC: String
   /// Promotion produces a normal PR candidate. It is never a merge claim.
@@ -605,7 +606,7 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
     baseRevision: String,
     workspaceRevision: String,
     evaluationID: String,
-    reviewID: String,
+    reviewID: String? = nil,
     artifactIDs: [String],
     createdAtUTC: String
   ) {
@@ -630,7 +631,7 @@ public enum HarnessPromotionGate {
     snapshot: HarnessTaskSnapshot,
     attempt: HarnessAttempt,
     evaluation: HarnessEvaluation,
-    review: HarnessAdversarialReview,
+    review: HarnessAdversarialReview? = nil,
     promotionCandidateID: String,
     createdAtUTC: String
   ) throws -> HarnessPromotionCandidate {
@@ -676,11 +677,13 @@ public enum HarnessPromotionGate {
     guard evaluation.verdict == .pass,
       attempt.evaluationIDs.contains(evaluation.evaluationID)
     else { throw HarnessPromotionGateFailure.evaluationNotPassed }
-    guard review.candidatePatchID == candidate.candidatePatchID,
-      review.evaluationID == evaluation.evaluationID,
-      review.result == .pass,
-      review.issues.isEmpty
-    else { throw HarnessPromotionGateFailure.reviewNotPassed(review.result) }
+    if let review {
+      guard review.candidatePatchID == candidate.candidatePatchID,
+        review.evaluationID == evaluation.evaluationID,
+        review.result == .pass,
+        review.issues.isEmpty
+      else { throw HarnessPromotionGateFailure.reviewNotPassed(review.result) }
+    }
     return HarnessPromotionCandidate(
       promotionCandidateID: promotionCandidateID,
       htaskID: snapshot.htaskID,
@@ -689,7 +692,7 @@ public enum HarnessPromotionGate {
       baseRevision: candidate.baseRevision,
       workspaceRevision: patchRevision,
       evaluationID: evaluation.evaluationID,
-      reviewID: review.reviewID,
+      reviewID: review?.reviewID,
       artifactIDs: snapshot.artifactRefs + attempt.buildArtifactIDs
         + attempt.runtimeArtifactIDs + [candidate.diffArtifactID]
         + [candidate.metadataArtifactID].compactMap { $0 },
