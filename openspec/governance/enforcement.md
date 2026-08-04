@@ -80,10 +80,11 @@ PR/决策维度,与执行分级 E0/E1/E2(设备维度,CHG-2026-025)正交。分�
 - **队列载体 = GitHub issue**(命名 `batch-YYYYMMDD-N`)。审计正本永远是批次
   合并产生的逐 PR merge 记录(`(#N)` subject 惯例);issue 只是导航,close
   即归档,不承载任何批准语义。
-- **入队门(三条全过才入队)**:CI 绿;独立 AI 合前 review APPROVE(实现与
-  review 必须是不同会话,无 APPROVE 不入队);digest 字段完整(模板
+- **入队门(两条全过才入队)**:CI 绿;digest 字段完整(模板
   `openspec/templates/batch-digest.md`,TASK-BAP-002 交付;交付前以
-  CHG-2026-027 design §2 字段面为准)。
+  CHG-2026-027 design §2 字段面为准)。独立 AI 合前/对抗 review 不是入队
+  前提，不得为 candidate 自动新建 reviewer 会话，也不得以其结果阻塞入队；
+  维护者对每个 PR 的正常 review/merge 不受影响。
 - **合并语义**:维护者按 digest 声明顺序逐 PR review/merge。**每次合并仍是
   逐项批准;digest 无批准语义;任何等级(含 D0)不存在 auto-merge;
   "CI 绿 ≠ 批准"不变**。

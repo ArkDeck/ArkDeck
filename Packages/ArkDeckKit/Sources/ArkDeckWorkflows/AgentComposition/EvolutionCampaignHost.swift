@@ -511,17 +511,6 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     return RockchipEvolutionStartingMode(rawValue: mode)?.rawValue
   }
 
-  private static func reviewer(
-    environment: [String: String], workingDirectory: String
-  ) throws -> CodexRockchipEvolutionAdversarialReviewer {
-    guard environment[HarnessVendorConfiguration.providerKey]?.lowercased() == "codex",
-      let path = environment[HarnessVendorConfiguration.codexPathKey],
-      let model = environment[HarnessVendorConfiguration.modelKey]
-    else { throw RockchipEvolutionCampaignError.reviewRejected("codexReviewerRequired") }
-    return try CodexRockchipEvolutionAdversarialReviewer(
-      executablePath: path, modelName: model, workingDirectory: workingDirectory)
-  }
-
   private static func repairer(
     environment: [String: String], workingDirectory: String
   ) throws -> CodexRockchipEvolutionStrategyRepairer {
