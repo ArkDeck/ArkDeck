@@ -28,6 +28,7 @@
   - `scripts/host_loop/recovery.py`
   - `scripts/host_loop/test_recovery_contract.py`
   - `scripts/host_loop/worker.py`
+  - `scripts/host_loop/transport.py`
   - `scripts/host_loop/cursor.py`
   - `scripts/host_loop/__main__.py`
   - `scripts/host_loop/test_cursor_contract.py`
