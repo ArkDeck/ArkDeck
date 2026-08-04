@@ -130,14 +130,35 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
 /// readback that consumes it is an engine-lane action, and it is the only
 /// surviving consumer of what used to be the lowering evaluator's semantics.
 enum RockchipPinnedPartitionTable {
+  static let expectedRows = [
+    "00  00002000  uboot", "01  00004000  misc", "02  00006000  bootctrl",
+    "03  00007000  resource", "04  0000A000  boot_linux", "05  0003A000  ramdisk",
+    "06  0003C000  system", "07  0043C000  vendor", "08  0063C000  sys-prod",
+    "09  00655000  chip-prod", "10  0066E000  updater", "11  0067E000  eng_system",
+    "12  00686000  eng_chipset", "13  0069E000  chip_ckm", "14  01308000  userdata",
+  ]
+
+  /// `(name, firstSector)` in table order, parsed from the same pinned rows the
+  /// device readback is compared against, so there is one source of truth for
+  /// the layout an LBA write is allowed to target.
+  static let entries: [(name: String, firstSector: Int64)] = expectedRows.compactMap {
+    let fields = $0.split(whereSeparator: \.isWhitespace)
+    guard fields.count == 3, let sector = Int64(fields[1], radix: 16) else { return nil }
+    return (String(fields[2]), sector)
+  }
+
+  /// The sectors a partition may occupy: its own first sector up to the next
+  /// entry's. The last entry is open-ended because the pinned table does not
+  /// carry the medium's size. `nil` for an unknown name.
+  static func span(for partitionName: String) -> (first: Int64, endExclusive: Int64?)? {
+    guard let index = entries.firstIndex(where: { $0.name == partitionName }) else {
+      return nil
+    }
+    let next = index + 1 < entries.count ? entries[index + 1].firstSector : nil
+    return (entries[index].firstSector, next)
+  }
+
   static func matches(_ text: String) -> Bool {
-    let expectedRows = [
-      "00  00002000  uboot", "01  00004000  misc", "02  00006000  bootctrl",
-      "03  00007000  resource", "04  0000A000  boot_linux", "05  0003A000  ramdisk",
-      "06  0003C000  system", "07  0043C000  vendor", "08  0063C000  sys-prod",
-      "09  00655000  chip-prod", "10  0066E000  updater", "11  0067E000  eng_system",
-      "12  00686000  eng_chipset", "13  0069E000  chip_ckm", "14  01308000  userdata",
-    ]
     let lines = text.split(whereSeparator: \.isNewline).map {
       $0.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
@@ -790,9 +811,33 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.failed(
           "staged image identity changed before \(mapping.partitionName): \(error)")
       }
+      // `wlx <name>` lets the tool resolve the address, and on 2026-08-04 it
+      // wrote only the first 12 MiB of the 64 MiB `boot_linux` image and still
+      // reported success and exit 0; the device readback of sectors
+      // 24576..131072 came back as uniform 0xCC erased medium, so the image
+      // tail — which carries real content, not padding — never landed. `wl`
+      // writes the file at an exact sector and is already inside the reviewed
+      // closed command surface. The address is safe to state here because
+      // `observePartitionTable` above has just proved the device's own GPT
+      // equals the pinned table these offsets come from, and the guard below
+      // keeps a write inside its own partition.
+      guard let span = RockchipPinnedPartitionTable.span(for: mapping.partitionName),
+        span.first == mapping.offsetSectors
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "\(mapping.partitionName) is not at its pinned first sector; refusing an LBA write")
+      }
+      let imageSectors = (member.sizeBytes + 511) / 512
+      if let endExclusive = span.endExclusive,
+        mapping.offsetSectors + imageSectors > endExclusive
+      {
+        throw RuntimeDispatchFailure.failed(
+          "\(mapping.partitionName) image needs \(imageSectors) sectors and would cross "
+            + "into the next pinned partition at \(endExclusive); refusing an LBA write")
+      }
       let receipt = try await runner.run(
         executable: rockchipExecutable,
-        arguments: ["wlx", mapping.partitionName, image.stableDescriptorPath],
+        arguments: ["wl", String(mapping.offsetSectors), image.stableDescriptorPath],
         timeoutSeconds: nil,
         outputByteBudget: Self.writeOutputByteBudget,
         criticalNonInterruptible: true)
