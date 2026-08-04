@@ -352,6 +352,9 @@ final class EvolutionCampaignContractTests: XCTestCase {
   func testCandidateReviewPinsAndClosedStrategyRejectExpansionOrHighSeverity() throws {
     let assertion = try makeAssertion()
     let pins = try makePins(assertion: assertion, ordinal: 1)
+    XCTAssertEqual(
+      pins.candidate.strategy.loaderDiscoveryTimeoutSeconds, 120,
+      "new campaigns must wait through the entire approved Loader observation window")
     XCTAssertNoThrow(
       try RockchipEvolutionCampaignAttemptPermit(
         assertion: assertion, candidate: pins.candidate, review: pins.review))
@@ -382,11 +385,25 @@ final class EvolutionCampaignContractTests: XCTestCase {
         "hdcCommandTimeoutSeconds", "readOnlyCommandTimeoutSeconds",
       ].contains(key)
     }
+    let decodedLegacy = try JSONDecoder().decode(
+      RockchipEvolutionTypedStrategy.self,
+      from: JSONSerialization.data(withJSONObject: legacyStrategy))
+    XCTAssertEqual(decodedLegacy.loaderDiscoveryTimeoutSeconds, 45)
     XCTAssertEqual(
-      try JSONDecoder().decode(
-        RockchipEvolutionTypedStrategy.self,
-        from: JSONSerialization.data(withJSONObject: legacyStrategy)),
-      pins.candidate.strategy)
+      decodedLegacy.loaderPollIntervalMilliseconds,
+      pins.candidate.strategy.loaderPollIntervalMilliseconds)
+    XCTAssertEqual(
+      decodedLegacy.hdcCommandTimeoutSeconds,
+      pins.candidate.strategy.hdcCommandTimeoutSeconds)
+    XCTAssertEqual(
+      decodedLegacy.readOnlyCommandTimeoutSeconds,
+      pins.candidate.strategy.readOnlyCommandTimeoutSeconds)
+    XCTAssertEqual(decodedLegacy.operationReference, pins.candidate.strategy.operationReference)
+    XCTAssertEqual(decodedLegacy.deviceProfileReference, pins.candidate.strategy.deviceProfileReference)
+    XCTAssertEqual(decodedLegacy.archiveDigestSHA256, pins.candidate.strategy.archiveDigestSHA256)
+    XCTAssertEqual(decodedLegacy.stepSetDigestSHA256, pins.candidate.strategy.stepSetDigestSHA256)
+    XCTAssertEqual(decodedLegacy.allowedStartingModes, pins.candidate.strategy.allowedStartingModes)
+    XCTAssertEqual(decodedLegacy.userdataImpact, pins.candidate.strategy.userdataImpact)
     strategy["loaderDiscoveryTimeoutSeconds"] = NSNull()
     XCTAssertThrowsError(
       try JSONDecoder().decode(

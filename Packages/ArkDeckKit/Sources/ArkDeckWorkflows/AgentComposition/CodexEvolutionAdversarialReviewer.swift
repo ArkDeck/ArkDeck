@@ -82,7 +82,7 @@ public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyR
       owns every device action. Select a NEW closed strategy for the normalized safe-to-retry
       failure below. Do not invent commands, paths, steps, partitions, retries, or authorization.
       Answer exactly one JSON object with these keys and no prose:
-      {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":45,"loaderPollIntervalMilliseconds":500,"hdcCommandTimeoutSeconds":20,"readOnlyCommandTimeoutSeconds":15}
+      {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":120,"loaderPollIntervalMilliseconds":500,"hdcCommandTimeoutSeconds":20,"readOnlyCommandTimeoutSeconds":15}
       Constraints: modes is a non-empty subset of hdcNormal|loader; loader timeout 15...120;
       poll 100...2000; HDC timeout 5...60; read-only timeout 5...60. The result must differ
       from every prior strategy. If failure starts with flash.startingModeNotAllowed:, the mode
