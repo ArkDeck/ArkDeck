@@ -27,6 +27,25 @@ private struct HDCNativeFileIdentity: Equatable {
 }
 
 public struct HDCObservationProviderAdapter: DeviceProvider {
+  /// The HDC provider's stable identity for a target, derived from the HDC
+  /// connect key — the address the provider actually verifies against a live
+  /// target row. This is the single source for both the daemon's facts port
+  /// and the `confirm-evidence-target` verification below; the two MUST agree
+  /// or every device-bound operation fails its identity check.
+  ///
+  /// It is deliberately NOT the target store's `stablePhysicalIdentitySHA256`:
+  /// after a Loader-mode flash the Rockchip binding lineage advances that
+  /// field to the Loader-mode identity (its campaign semantics), while the
+  /// adopted record keeps its normal-mode connect key precisely so the Debug
+  /// Runtime can come back. Feeding the campaign identity to this provider's
+  /// verification made every observe/debug operation fail with
+  /// `targetIdentityMismatch` from binding revision 2 onward (GJ-1 re-run,
+  /// 2026-08-05).
+  public static func stableIdentitySHA256(connectKey: String) -> String {
+    SHA256.hash(data: Data(connectKey.lowercased().utf8))
+      .map { String(format: "%02x", $0) }.joined()
+  }
+
   public let providerID = "hdc"
   private let factsPort: any HDCObservationFactsPort
   private let profile: HDCCompatibilityProfile
@@ -1387,8 +1406,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           return .failed(
             code: "targetNotConnected", detail: "matching target state is \(match.state)")
         }
-        let identity = SHA256.hash(data: Data(expectedConnectKey.lowercased().utf8))
-          .map { String(format: "%02x", $0) }.joined()
+        let identity = Self.stableIdentitySHA256(connectKey: expectedConnectKey)
         if let expectedIdentity = context.expectedIdentitySHA256,
           identity != expectedIdentity.lowercased()
         {
