@@ -3376,6 +3376,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   campaign confirmation 是交互式 Agent 如实转交的 caller assertion，无密码学 conversation
   provenance，其 residual risk 由维护者 merge r8 显式接受。
 - Allowed paths:
+  - `.gitignore`
   - `AGENTS.md`
   - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/**`
   - `Packages/ArkDeckKit/Package.swift`
@@ -3579,3 +3580,12 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   真机 engine 用例走 `debug.hap@1` 撤销后 submit，钉住生产消息形态且 consume=0。
   五处变异对照证伪（删 revocation 过滤、拆回双扫描、删 denial 解析、路由退回等值、
   引擎去 marker）各自打红；设备 dispatch=0。
+- 并行收尾线（独立注记，不占 r 号）：Allowed paths 增列 `.gitignore`，只为让本任务线
+  自己造成的工具产物可被忽略。上游 rkdeveloptool 相对当前目录读 `config.ini`、写
+  `log/log<YYYY-MM-DD>.txt`，而 `FoundationRockchipRuntimeCommandRunner` 构造
+  `ProcessRequest` 时不带 `workingDirectory`，因而不绑定
+  `RockchipProductToolRuntimeDirectory`（该类型的存在意义正是"E2 运行不得污染调用者
+  的 Git 工作树"），于是工具的隐式文件落进工作树；`swift test --package-path
+  Packages/ArkDeckKit` 又把测试进程的 cwd 设为该包目录，落点即 `Packages/ArkDeckKit/log/`。
+  该声明不改变任何 operation/provider/authority，不触及设备 dispatch；`.gitignore`
+  兜底与"给 runner 定 cwd"的根因修复各自独立提交。
