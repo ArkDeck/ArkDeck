@@ -38,6 +38,13 @@ platforms: [macos, windows, linux]
 > host-loop runbook 仍把独立 AI exact-head review 写成入队前提，和本 change 已合入的
 > enforcement 规则相互矛盾。补入两处精确文档路径，只删除该前提和对应必填字段；不修改
 > `scripts/host_loop/**`、CI、正常的维护者 PR review/merge 或任何 Runtime/设备边界。
+>
+> scope correction（2026-08-04，host-loop reviewer cleanup）：复核确认
+> `scripts/host_loop/reviewer.py` 没有被当前 host-loop entry point、CI 或产品 Runtime
+> 导入；其仅余离线契约测试和 cursor 中从未写入的 `review_run` cache 字段。补入该模块、
+> 测试与精确消费方路径，以删除废弃 reviewer adapter、三门 queue 逻辑和历史 cache 字段。
+> 不修改 worker/transport/lease 行为、GitHub 路由、CI workflow、维护者 review/merge 或
+> 任何 Runtime/设备边界。
 
 ## Why
 
@@ -121,6 +128,8 @@ Observable behavior:
   `hardware-evidence.schema.json` (3.0.0 -> 4.0.0).
 - Batch navigation docs: remove their stale independent-AI-review prerequisite while preserving
   maintainer review/merge semantics.
+- Host-loop cleanup: remove only the unreachable reviewer module, its offline-only contracts and
+  the unused cursor field; worker and transport behavior remain unchanged.
 - Core baseline bump: required. `CORE-4.0.0` is the candidate because this
   changes a ratified Safety policy, execution authorization boundary, contract
   enum, and the pass/fail result of a real destructive Agent request.

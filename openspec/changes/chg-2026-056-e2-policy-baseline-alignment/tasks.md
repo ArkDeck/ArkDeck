@@ -22,6 +22,14 @@
   - `openspec/governance/enforcement.md`
   - `openspec/governance/host-loop-runbook.md`
   - `openspec/templates/batch-digest.md`
+  - `scripts/README.md`
+  - `scripts/host_loop/reviewer.py`
+  - `scripts/host_loop/test_reviewer_contract.py`
+  - `scripts/host_loop/cursor.py`
+  - `scripts/host_loop/__main__.py`
+  - `scripts/host_loop/test_cursor_contract.py`
+  - `scripts/host_loop/test_v3_hardening.py`
+  - `scripts/host_loop/test_instance_contract.py`
   - `openspec/verification/policy.md`
   - `openspec/verification/acceptance-index.txt`
   - `openspec/verification/acceptance-cases.yaml`
@@ -39,7 +47,8 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
 - Forbidden paths:
-  - `Catalog/**`, `scripts/**`, and all integration/device profiles
+  - `Catalog/**`, all `scripts/**` other than the exact paths above, and all integration/device
+    profiles
   - standing authorization or campaign confirmation instances
   - real device/HDC/RockUSB tooling, raw shell command surfaces, or hardware evidence claiming a
     dispatch
@@ -54,7 +63,11 @@
 - Apply the approved deltas to current Core files without weakening the exact E2 envelope.
 - Reconcile the live batch-digest template and host-loop runbook with the no-review policy: a
   complete digest must not contain an independent-AI-review field or require a separate reviewer
-  session. Preserve normal maintainer PR review/merge and leave `scripts/host_loop/**` untouched.
+  session. Preserve normal maintainer PR review/merge and leave host-loop worker, transport and
+  lease behavior untouched.
+- Remove the unreachable host-loop reviewer module, its offline-only contract suite and the
+  never-written `review_run` cursor field. Do not modify host-loop worker, transport, lease or
+  GitHub route behavior.
 - Remove the production adversarial-review invocation from the campaign and workspace-promotion
   paths. A changed candidate must proceed only after its existing fixed isolated build and closed
   strategy-output validation; it must not create a separate reviewer process/session or require a
