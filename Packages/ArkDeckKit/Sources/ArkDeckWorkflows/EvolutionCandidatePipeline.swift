@@ -9,12 +9,9 @@ import Foundation
 
 public struct RockchipEvolutionCandidateBuild: Sendable, Equatable {
   public let pin: RockchipEvolutionCandidatePin
-  /// Bounded immutable diff bytes handed only to the read-only reviewer.
-  public let reviewDiff: Data
 
-  public init(pin: RockchipEvolutionCandidatePin, reviewDiff: Data) {
+  public init(pin: RockchipEvolutionCandidatePin) {
     self.pin = pin
-    self.reviewDiff = reviewDiff
   }
 }
 
@@ -25,38 +22,13 @@ public protocol RockchipEvolutionCandidateBuilding: Sendable {
   ) async throws -> RockchipEvolutionCandidateBuild
 }
 
-public struct RockchipEvolutionAdversarialReviewRequest: Sendable, Equatable {
-  public let assertion: RockchipEvolutionCampaignConfirmationAssertion
-  public let candidate: RockchipEvolutionCandidatePin
-  public let immutableDiff: Data
-  public let priorAttempts: [RockchipEvolutionCampaignEvent]
-
-  public init(
-    assertion: RockchipEvolutionCampaignConfirmationAssertion,
-    candidate: RockchipEvolutionCandidatePin,
-    immutableDiff: Data,
-    priorAttempts: [RockchipEvolutionCampaignEvent]
-  ) {
-    self.assertion = assertion
-    self.candidate = candidate
-    self.immutableDiff = immutableDiff
-    self.priorAttempts = priorAttempts
-  }
-}
-
-public protocol RockchipEvolutionAdversarialReviewing: Sendable {
-  var reviewerID: String { get }
-  func review(_ request: RockchipEvolutionAdversarialReviewRequest) async throws
-    -> RockchipEvolutionReviewReceipt
-}
-
 /// Identity-bound fixed-command builder.  The caller cannot supply a source
 /// path, executable, argv, build target, scratch path or sandbox profile.
 public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable,
   RockchipEvolutionCandidateBuilding
 {
   public static let producerID = "task-owned-evolution-candidate-builder@1"
-  public static let maximumReviewDiffBytes = 512 * 1_024
+  public static let maximumCandidateDiffBytes = 512 * 1_024
 
   private let sourceRoot: URL
   private let stateRoot: URL
@@ -136,40 +108,40 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     let diff = try await run(
       executable: gitURL, sha256: gitSHA,
       arguments: ["diff", "--no-ext-diff", "--binary", assertion.baseCommitOID, "--", "."],
-      timeout: 60, captureLimit: Self.maximumReviewDiffBytes + 1
+      timeout: 60, captureLimit: Self.maximumCandidateDiffBytes + 1
     ).stdout
     guard !diff.wasTruncated else {
       throw RockchipEvolutionCampaignError.candidateRejected("diffBytes")
     }
-    var reviewDiff = diff.data
+    var candidateDiff = diff.data
     let trackedFiles = Set(Self.nulSeparated(tracked))
     for path in changedFiles where !trackedFiles.contains(path) {
       let bytes = try safeSourceBytes(path)
-      reviewDiff.append(Data("\n--- /dev/null\n+++ b/\(path)\n".utf8))
-      reviewDiff.append(bytes)
-      reviewDiff.append(Data("\n".utf8))
-      guard reviewDiff.count <= Self.maximumReviewDiffBytes else {
+      candidateDiff.append(Data("\n--- /dev/null\n+++ b/\(path)\n".utf8))
+      candidateDiff.append(bytes)
+      candidateDiff.append(Data("\n".utf8))
+      guard candidateDiff.count <= Self.maximumCandidateDiffBytes else {
         throw RockchipEvolutionCampaignError.candidateRejected("diffBytes")
       }
     }
     let proposedStrategyData = try JSONEncoder.sorted.encode(proposedStrategy)
-    reviewDiff.append(
+    candidateDiff.append(
       Data(
         "\n--- /dev/null\n+++ b/Packages/ArkDeckKit/Sources/ArkDeckHarness/Candidate/strategy-proposal.json\n+"
           .utf8))
-    reviewDiff.append(proposedStrategyData)
-    reviewDiff.append(Data("\n".utf8))
-    guard reviewDiff.count <= Self.maximumReviewDiffBytes else {
+    candidateDiff.append(proposedStrategyData)
+    candidateDiff.append(Data("\n".utf8))
+    guard candidateDiff.count <= Self.maximumCandidateDiffBytes else {
       throw RockchipEvolutionCampaignError.candidateRejected("diffBytes")
     }
-    let changedLines = Self.changedLineCount(reviewDiff)
+    let changedLines = Self.changedLineCount(candidateDiff)
     guard changedLines <= assertion.maxDiffLines else {
       throw RockchipEvolutionCampaignError.candidateRejected("diffLineBudget")
     }
 
     let sourceTreeDigest = try sourceDigest(
       baseCommitOID: assertion.baseCommitOID, files: changedFiles)
-    let diffDigest = RockchipEvolutionCampaignConfirmationAssertion.sha256(reviewDiff)
+    let diffDigest = RockchipEvolutionCampaignConfirmationAssertion.sha256(candidateDiff)
     let allowedPathDigest = RockchipEvolutionCampaignConfirmationAssertion.sha256(
       RockchipEvolutionCampaignConfirmationAssertion.canonicalData([
         "allowedPaths": .array(assertion.allowedPaths.map(JSONValue.string))
@@ -253,7 +225,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     let diffArtifactID = "\(candidateID.lowercased())-diff.patch"
     let buildArtifactID = "\(candidateID.lowercased())-build.json"
     let testArtifactID = "\(candidateID.lowercased())-strategy.json"
-    try Self.writeOwnerOnly(reviewDiff, to: candidateRoot.appending(path: diffArtifactID))
+    try Self.writeOwnerOnly(candidateDiff, to: candidateRoot.appending(path: diffArtifactID))
     try Self.writeOwnerOnly(
       RockchipEvolutionCampaignConfirmationAssertion.canonicalData([
         "executableDigestSHA256": .string(executableDigest),
@@ -273,7 +245,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       changedFiles: changedFiles, changedLines: changedLines,
       diffArtifactID: diffArtifactID, buildEvidenceArtifactID: buildArtifactID,
       testEvidenceArtifactID: testArtifactID, strategy: strategy)
-    return RockchipEvolutionCandidateBuild(pin: pin, reviewDiff: reviewDiff)
+    return RockchipEvolutionCandidateBuild(pin: pin)
   }
 
   public static func currentToolchainDigest() async throws -> String {
@@ -485,7 +457,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     }
     var metadata = stat()
     guard lstat(url.path, &metadata) == 0, (metadata.st_mode & S_IFMT) == S_IFREG,
-      metadata.st_size >= 0, metadata.st_size <= Self.maximumReviewDiffBytes
+      metadata.st_size >= 0, metadata.st_size <= Self.maximumCandidateDiffBytes
     else {
       if errno == ENOENT { throw CocoaError(.fileReadNoSuchFile) }
       throw RockchipEvolutionCampaignError.candidateRejected("unsafeSourceEntry")

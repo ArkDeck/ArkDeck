@@ -1,13 +1,11 @@
-// The Codex-CLI adapters for Rockchip evolution campaigns: the adversarial
-// reviewer and the strategy repairer.
+// The Codex-CLI adapter for Rockchip evolution campaign strategy repair.
 //
 // Extracted from EvolutionCandidatePipeline.swift: these adapters are the
 // pieces of the campaign pipeline that speak to an LLM, so they live in the
 // composition target (ArkDeckAgentComposition) together with the Codex CLI
 // transport, keeping ArkDeckWorkflows free of model prompts and of any
-// dependency on the harness plane. The protocols they implement
-// (RockchipEvolutionAdversarialReviewing, RockchipEvolutionStrategyRepairing)
-// and the campaign pipeline remain in ArkDeckWorkflows.
+// dependency on the harness plane. Its protocol and the campaign pipeline
+// remain in ArkDeckWorkflows.
 
 import ArkDeckCore
 import ArkDeckWorkflows
@@ -148,135 +146,5 @@ public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyR
       hdcCommandTimeoutSeconds: hdcTimeout,
       readOnlyCommandTimeoutSeconds: readOnlyTimeout,
       userdataImpact: assertion.userdataImpact)
-  }
-}
-
-/// Codex runs in its existing read-only ephemeral mode and sees only the
-/// immutable candidate diff/pins and bounded attempt history.  This adapter
-/// has no Runtime, device, repair or authority dependency.
-public struct CodexRockchipEvolutionAdversarialReviewer:
-  RockchipEvolutionAdversarialReviewing
-{
-  public let reviewerID: String
-  private let executablePath: String
-  private let executableSHA256: String
-  private let modelName: String
-  private let workingDirectory: String
-  private let transport: any HarnessCodexTransport
-
-  public init(
-    executablePath: String,
-    modelName: String,
-    workingDirectory: String,
-    transport: any HarnessCodexTransport = CodexCLIProcessTransport()
-  ) throws {
-    let executableURL = URL(fileURLWithPath: executablePath)
-      .resolvingSymlinksInPath().standardizedFileURL
-    let workingURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
-      .resolvingSymlinksInPath().standardizedFileURL
-    var isDirectory: ObjCBool = false
-    guard executablePath.hasPrefix("/"), executableURL.path == executablePath,
-      FileManager.default.isExecutableFile(atPath: executablePath),
-      workingDirectory.hasPrefix("/"), workingURL.path == workingDirectory,
-      FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory),
-      isDirectory.boolValue,
-      !modelName.isEmpty, modelName.utf8.count <= 200,
-      modelName.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "._:-".contains($0)) })
-    else { throw RockchipEvolutionCampaignError.reviewRejected("reviewerConfiguration") }
-    self.executablePath = executablePath
-    executableSHA256 = RockchipEvolutionCampaignConfirmationAssertion.sha256(
-      try Data(contentsOf: executableURL))
-    self.modelName = modelName
-    self.workingDirectory = workingDirectory
-    self.transport = transport
-    reviewerID =
-      "codex-evolution-reviewer@1:"
-      + String(
-        RockchipEvolutionCampaignConfirmationAssertion.sha256(
-          Data("\(executableSHA256)|\(modelName)".utf8)
-        ).prefix(16))
-  }
-
-  public func review(_ request: RockchipEvolutionAdversarialReviewRequest) async throws
-    -> RockchipEvolutionReviewReceipt
-  {
-    guard
-      request.immutableDiff.count
-        <= ProductRockchipEvolutionCandidateBuilder
-        .maximumReviewDiffBytes
-    else { throw RockchipEvolutionCampaignError.reviewRejected("diffBytes") }
-    let candidateData = try JSONEncoder.sorted.encode(request.candidate)
-    let history = request.priorAttempts.suffix(24).map { event in
-      "\(event.sequence):\(event.kind.rawValue):\(event.ordinal.map(String.init) ?? "-"):"
-        + "\(event.disposition?.rawValue ?? "-")"
-    }.joined(separator: "\n")
-    let prompt = """
-      You are the independent read-only adversarial reviewer for one bounded E2 firmware
-      campaign candidate. You have no repair, Runtime, device or authority port. Review only
-      the immutable diff and pins below. Reject any attempt to add network, USB/HDC/RockUSB,
-      raw shell, arbitrary executable/argv/path, authorization access, Catalog/profile/broker
-      changes, target/budget widening, or unbounded behavior. Answer one JSON object only:
-      {"result":"PASS|REJECT","issues":[{"severity":"LOW|MEDIUM|HIGH|CRITICAL","code":"UPPER_CODE"}]}
-      Review candidate expansion, not the already confirmed destructive operation. Values that
-      exactly equal the supplied assertion and candidate pins -- including ERASE-USERDATA,
-      dayu200@2, the registered hdcNormal/loader modes, and the exact archive/step-set digests --
-      are constraints, not widening. A sole synthetic strategy-proposal.json entry under the
-      fixed Candidate path is the trusted builder's closed strategy representation; reject it
-      only if it adds fields, changes pinned values, or widens a bound. Return REJECT if and only
-      if at least one issue is HIGH or CRITICAL. LOW/MEDIUM observations may accompany PASS.
-      planDigest=\(request.assertion.planDigestSHA256)
-      archiveDigest=\(request.assertion.archiveDigestSHA256)
-      stepSetDigest=\(request.assertion.stepSetDigestSHA256)
-      candidate=\(String(decoding: candidateData, as: UTF8.self))
-      history:\n\(history)
-      immutableDiff:\n\(String(decoding: request.immutableDiff, as: UTF8.self))
-      """
-    let response = try await transport.send(
-      HarnessCodexProcessRequest(
-        executablePath: executablePath, executableSHA256: executableSHA256,
-        arguments: [
-          "exec", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-          "--sandbox", "read-only", "--skip-git-repo-check", "-C", workingDirectory,
-          "--color", "never", "--model", modelName, prompt,
-        ], workingDirectory: workingDirectory, timeoutSeconds: 300))
-    guard let root = try? JSONDecoder().decode(JSONValue.self, from: response),
-      case .object(let object) = root, Set(object.keys) == ["result", "issues"],
-      case .string(let resultText)? = object["result"],
-      let result = RockchipEvolutionReviewVerdict(rawValue: resultText),
-      case .array(let issueValues)? = object["issues"]
-    else { throw RockchipEvolutionCampaignError.reviewRejected("responseShape") }
-    let issues = try issueValues.map { value -> RockchipEvolutionReviewIssue in
-      guard case .object(let fields) = value, Set(fields.keys) == ["severity", "code"],
-        case .string(let severityText)? = fields["severity"],
-        let severity = RockchipEvolutionReviewSeverity(rawValue: severityText),
-        case .string(let code)? = fields["code"]
-      else { throw RockchipEvolutionCampaignError.reviewRejected("issueShape") }
-      return try RockchipEvolutionReviewIssue(severity: severity, code: code)
-    }
-    let blockingIssues = issues.filter {
-      $0.severity == .high || $0.severity == .critical
-    }
-    guard result == .pass, blockingIssues.isEmpty else {
-      let codes = issues.prefix(8).map(\.code).joined(separator: ",")
-      throw RockchipEvolutionCampaignError.reviewRejected(
-        "modelReject:\(codes.isEmpty ? "UNSPECIFIED" : codes)")
-    }
-    let responseDigest = RockchipEvolutionCampaignConfirmationAssertion.sha256(response)
-    let receipt = try RockchipEvolutionReviewReceipt(
-      reviewID: "EREVIEW-\(responseDigest.prefix(24).uppercased())",
-      reviewerID: reviewerID, candidateID: request.candidate.candidateID,
-      candidateExecutableDigestSHA256: request.candidate.executableDigestSHA256,
-      planDigestSHA256: request.assertion.planDigestSHA256,
-      result: result, issues: issues, createdAt: ISO8601DateFormatter().string(from: Date()))
-    try receipt.validate(candidate: request.candidate)
-    return receipt
-  }
-}
-
-extension JSONEncoder {
-  fileprivate static var sorted: JSONEncoder {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return encoder
   }
 }

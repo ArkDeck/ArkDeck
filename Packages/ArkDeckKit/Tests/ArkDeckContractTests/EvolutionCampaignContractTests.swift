@@ -349,7 +349,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(stopped.events.last?.reasonCode, "orphanedGlobalReservation")
   }
 
-  func testCandidateReviewPinsAndClosedStrategyRejectExpansionOrHighSeverity() throws {
+  func testHistoricalReviewReceiptsAndClosedStrategyRejectExpansionOrHighSeverity() throws {
     let assertion = try makeAssertion()
     let pins = try makePins(assertion: assertion, ordinal: 1)
     XCTAssertEqual(
@@ -472,8 +472,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
       repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate, reviewDiff: Data("diff".utf8))),
-      reviewer: RejectingEvolutionReviewer(), flash: flash,
+          pin: pins.candidate)),
+      flash: flash,
       nowUTC: { Self.confirmedAt })
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
@@ -551,7 +551,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let host = try RockchipEvolutionCampaignHost(
       ledger: ledger, usageLedger: usageLedger,
       repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
     let result = try await host.continueCampaign(
       campaignID: assertion.campaignID,
@@ -592,8 +592,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
       repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate, reviewDiff: Data("diff".utf8))),
-      reviewer: RejectingEvolutionReviewer(), flash: flash,
+          pin: pins.candidate)),
+      flash: flash,
       nowUTC: { Self.confirmedAt })
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
@@ -614,7 +614,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertThrowsError(try ledger.load(assertion.campaignID))
   }
 
-  func testRejectingReviewerDoesNotBlockFixedCandidateAdmission() async throws {
+  func testFixedCandidateAdmissionDoesNotRequireReviewReceipt() async throws {
     let root = temporaryDirectory("campaign-host-zero")
     defer { try? FileManager.default.removeItem(at: root) }
     let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
@@ -628,8 +628,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
       repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate, reviewDiff: Data("immutable diff".utf8))),
-      reviewer: RejectingEvolutionReviewer(), flash: flash,
+          pin: pins.candidate)),
+      flash: flash,
       nowUTC: { Self.confirmedAt })
     await ain019AssertThrowsAsync(
       try await host.executeConfirmedCampaign(
@@ -665,7 +665,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: ScriptedEvolutionRepairer(baseline: baseline, repaired: repaired),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     let result = try await host.executeConfirmedCampaign(
@@ -710,7 +710,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: repairer,
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     _ = try await host.executeConfirmedCampaign(
@@ -753,7 +753,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: ThreeStageEvolutionRepairer(strategies: [first, second, third]),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     await ain019AssertThrowsAsync(
@@ -792,7 +792,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: ScriptedEvolutionRepairer(baseline: wrongMode, repaired: repaired),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     let result = try await host.executeConfirmedCampaign(
@@ -828,7 +828,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: RepeatingEvolutionRepairer(strategy: loaderOnly),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     let result = try await host.executeConfirmedCampaign(
@@ -865,7 +865,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: FixedEvolutionRepairer(strategy: strategy),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     let result = try await host.executeConfirmedCampaign(
@@ -917,7 +917,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: ScriptedEvolutionRepairer(baseline: wrongMode, repaired: repaired),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     let result = try await host.executeConfirmedCampaign(
@@ -950,7 +950,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       ledger: ledger,
       usageLedger: AgentAuthorityUsageLedger(root: root.appending(path: "usage")),
       repairer: FixedEvolutionRepairer(strategy: baseline),
-      builder: StrategyEchoEvolutionBuilder(), reviewer: PassingEvolutionReviewer(),
+      builder: StrategyEchoEvolutionBuilder(),
       flash: flash, nowUTC: { Self.confirmedAt })
 
     await ain019AssertThrowsAsync(
@@ -1004,46 +1004,6 @@ final class EvolutionCampaignContractTests: XCTestCase {
         observation: RockchipEvolutionFailureObservation(
           attemptOrdinal: 1, failureCode: "flash.semanticFailure:enter-loader"),
         priorCandidates: [prior]))
-  }
-
-  func testCodexReviewerTreatsExactBaselineAsConstraintAndReportsModelRejectCode()
-    async throws
-  {
-    let root = temporaryDirectory("campaign-reviewer")
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let assertion = try makeAssertion()
-    let candidate = try makePins(assertion: assertion, ordinal: 1).candidate
-    let request = RockchipEvolutionAdversarialReviewRequest(
-      assertion: assertion, candidate: candidate,
-      immutableDiff: Data("synthetic strategy-proposal.json".utf8), priorAttempts: [])
-
-    let passingTransport = RecordingEvolutionCodexTransport(
-      response: Data("{\"result\":\"PASS\",\"issues\":[]}".utf8))
-    let reviewer = try CodexRockchipEvolutionAdversarialReviewer(
-      executablePath: "/usr/bin/true", modelName: "contract-model",
-      workingDirectory: root.path, transport: passingTransport)
-    let receipt = try await reviewer.review(request)
-    XCTAssertEqual(receipt.result, .pass)
-    let recordedRequest = await passingTransport.lastRequest()
-    let prompt = try XCTUnwrap(recordedRequest?.arguments.last)
-    XCTAssertTrue(prompt.contains("Review candidate expansion"))
-    XCTAssertTrue(prompt.contains("ERASE-USERDATA"))
-    XCTAssertTrue(prompt.contains("HIGH or CRITICAL"))
-
-    let rejectingTransport = RecordingEvolutionCodexTransport(
-      response: Data(
-        "{\"result\":\"REJECT\",\"issues\":[{\"severity\":\"HIGH\",\"code\":\"AUTHORITY_SURFACE\"}]}"
-          .utf8))
-    let rejectingReviewer = try CodexRockchipEvolutionAdversarialReviewer(
-      executablePath: "/usr/bin/true", modelName: "contract-model",
-      workingDirectory: root.path, transport: rejectingTransport)
-    do {
-      _ = try await rejectingReviewer.review(request)
-      XCTFail("a model HIGH issue must reject the candidate")
-    } catch let error as RockchipEvolutionCampaignError {
-      XCTAssertEqual(error, .reviewRejected("modelReject:AUTHORITY_SURFACE"))
-    }
   }
 
   func testCodexProcessTransportReadsFinalMessageFileInsteadOfNoisyStandardOutput()
@@ -1211,8 +1171,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
       repairer: FixedEvolutionRepairer(strategy: pins.candidate.strategy),
       builder: FixedEvolutionBuilder(
         build: RockchipEvolutionCandidateBuild(
-          pin: pins.candidate, reviewDiff: Data("diff".utf8))),
-      reviewer: RejectingEvolutionReviewer(), flash: flash,
+          pin: pins.candidate)),
+      flash: flash,
       nowUTC: { "2026-08-02T08:30:00Z" })
 
     await ain019AssertThrowsAsync(
@@ -1439,23 +1399,7 @@ private struct StrategyEchoEvolutionBuilder: RockchipEvolutionCandidateBuilding 
       changedFiles: [], changedLines: 1, diffArtifactID: "strategy-diff-\(suffix)",
       buildEvidenceArtifactID: "strategy-build-\(suffix)",
       testEvidenceArtifactID: "strategy-test-\(suffix)", strategy: strategy)
-    return RockchipEvolutionCandidateBuild(
-      pin: candidate, reviewDiff: try JSONEncoder().encode(strategy))
-  }
-}
-
-private struct PassingEvolutionReviewer: RockchipEvolutionAdversarialReviewing {
-  let reviewerID = "passing-independent-reviewer"
-
-  func review(_ request: RockchipEvolutionAdversarialReviewRequest) async throws
-    -> RockchipEvolutionReviewReceipt
-  {
-    try RockchipEvolutionReviewReceipt(
-      reviewID: "EREVIEW-\(String(request.candidate.strategy.digestSHA256.prefix(24)).uppercased())",
-      reviewerID: reviewerID, candidateID: request.candidate.candidateID,
-      candidateExecutableDigestSHA256: request.candidate.executableDigestSHA256,
-      planDigestSHA256: request.assertion.planDigestSHA256, result: .pass, issues: [],
-      createdAt: "2026-08-02T08:00:00Z")
+    return RockchipEvolutionCandidateBuild(pin: candidate)
   }
 }
 
@@ -1580,30 +1524,6 @@ private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFl
 private struct FixedEvolutionCodexTransport: HarnessCodexTransport {
   let response: Data
   func send(_: HarnessCodexProcessRequest) async throws -> Data { response }
-}
-
-private actor RecordingEvolutionCodexTransport: HarnessCodexTransport {
-  let response: Data
-  private var requests: [HarnessCodexProcessRequest] = []
-
-  init(response: Data) { self.response = response }
-
-  func send(_ request: HarnessCodexProcessRequest) async throws -> Data {
-    requests.append(request)
-    return response
-  }
-
-  func lastRequest() -> HarnessCodexProcessRequest? { requests.last }
-}
-
-private struct RejectingEvolutionReviewer: RockchipEvolutionAdversarialReviewing {
-  let reviewerID = "independent-adversarial-reviewer"
-
-  func review(_: RockchipEvolutionAdversarialReviewRequest) async throws
-    -> RockchipEvolutionReviewReceipt
-  {
-    throw RockchipEvolutionCampaignError.reviewRejected("contractRejection")
-  }
 }
 
 /// Stands in for the engine lane: it cannot reserve inside execute, so it

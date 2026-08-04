@@ -14,7 +14,7 @@
 //    loop crosses: observe -> capture -> pinned analyzer -> baseline fixture
 //    injection -> crash evidence -> model PROPOSE_PATCH -> checkpoint ->
 //    apply -> build -> tests -> deploy -> verification capture -> analyzer ->
-//    adversarial review -> promotion.
+//    promotion.
 //
 // Per PRODUCT-LOOP §11 the fake surfaces assert the real typed shapes: every
 // job submission decodes the production `RuntimeOperationRequest`, and the
@@ -337,25 +337,6 @@ private final class JourneyGateway: HarnessDecisionGateway, @unchecked Sendable 
   }
 }
 
-private final class JourneyReviewer: HarnessAdversarialReviewing, @unchecked Sendable {
-  let reviewerID = "journey-reviewer@1"
-  private let lock = NSLock()
-  private var requests: [HarnessAdversarialReviewRequest] = []
-
-  var receivedRequests: [HarnessAdversarialReviewRequest] { lock.withLock { requests } }
-
-  func review(_ request: HarnessAdversarialReviewRequest) async throws
-    -> HarnessAdversarialReview
-  {
-    lock.withLock { requests.append(request) }
-    return HarnessAdversarialReview(
-      reviewID: "HREVIEW-JOURNEY", reviewerID: reviewerID,
-      candidatePatchID: request.candidatePatch.candidatePatchID,
-      evaluationID: request.evaluation.evaluationID,
-      result: .pass, issues: [], createdAtUTC: journeyNow)
-  }
-}
-
 /// A grant a maintainer issued for the workspace mutations and the typed HAP
 /// deployment; the harness may only ask for it and name it (HTP-INV-6).
 private struct JourneyCapabilityGrant: HarnessCapabilityPort {
@@ -398,7 +379,6 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let jobs: JourneyJobPort
     let artifacts: JourneyArtifactPort
     let gateway: JourneyGateway
-    let reviewer: JourneyReviewer
     let workspace: JourneyWorkspacePort
     let taskID: String
     let policy: HarnessEvolutionPolicy
@@ -412,7 +392,6 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let jobs = JourneyJobPort()
     let artifacts = JourneyArtifactPort()
     let gateway = JourneyGateway()
-    let reviewer = JourneyReviewer()
     let workspace = JourneyWorkspacePort()
     let evolutionPolicy = try HarnessEvolutionPolicy(
       baseRevision: journeyBaseRevision, allowedPaths: ["Sources/**"],
@@ -426,7 +405,6 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       store: store, jobPort: jobs, artifactPort: artifacts,
       repairPort: JourneyRepairPort(),
       evolutionWorkspacePort: workspace,
-      adversarialReviewer: reviewer,
       nowUTC: { journeyNow },
       policyGuard: HarnessPolicyGuard(capabilities: JourneyCapabilityGrant()),
       decisionGateway: gateway,
@@ -466,7 +444,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(workspace.preparedSourceProjects, ["demo-app"])
     return JourneyStack(
       coordinator: coordinator, store: store, jobs: jobs, artifacts: artifacts,
-      gateway: gateway, reviewer: reviewer, workspace: workspace,
+      gateway: gateway, workspace: workspace,
       taskID: task.htaskID, policy: evolutionPolicy)
   }
 
@@ -691,7 +669,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       indexText: journeyOneEntryIndex)
     await stack.jobs.finish("JOB-13")
 
-    // Wake 14: PASS evaluation, adversarial review, promotion gate, success.
+    // Wake 14: PASS evaluation, promotion gate, success.
     let promoted = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(promoted.action, .evaluatedSucceeded)
     XCTAssertEqual(promoted.reasonCode, "promotionCandidateReady")
@@ -721,13 +699,6 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
         DebugCrashTaskHandler.analyzeCrashLedger,
       ])
 
-    // The reviewer read the immutable diff of the exact candidate.
-    XCTAssertEqual(stack.reviewer.receivedRequests.count, 1)
-    let reviewRequest = try XCTUnwrap(stack.reviewer.receivedRequests.first)
-    XCTAssertEqual(reviewRequest.unifiedDiff, journeyDiff)
-    XCTAssertEqual(
-      reviewRequest.candidatePatch.diffDigest, journeySHA256(Data(journeyDiff.utf8)))
-
     // Durable Attempt facts: the journey identity was superseded by the one
     // strategy Attempt, which closed succeeded carrying the promotion.
     let attempts = try await stack.store.attempts(stack.taskID)
@@ -735,7 +706,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(attempts.first?.outcome, .superseded)
     let strategyAttempt = try XCTUnwrap(attempts.last)
     XCTAssertEqual(strategyAttempt.outcome, .succeeded)
-    XCTAssertEqual(strategyAttempt.review?.result, .pass)
+    XCTAssertNil(strategyAttempt.review)
     XCTAssertEqual(strategyAttempt.candidatePatch?.metadataArtifactID, "ART-CANDIDATE")
     XCTAssertEqual(strategyAttempt.buildArtifactIDs, ["ART-BUILD"])
     let promotion = try XCTUnwrap(strategyAttempt.promotionCandidate)
@@ -757,7 +728,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       "promotion may only stand on evidence recorded against the strategy Attempt")
     let events = try await stack.store.attemptEvents(stack.taskID)
     XCTAssertEqual(
-      events.map(\.kind).suffix(3), [.reviewRecorded, .promotionRecorded, .closed])
+      events.map(\.kind).suffix(2), [.promotionRecorded, .closed])
 
     // The verdict that ended the task is a durable PASS evaluation.
     let evaluationID = try XCTUnwrap(promoted.snapshot.latestEvaluationID)

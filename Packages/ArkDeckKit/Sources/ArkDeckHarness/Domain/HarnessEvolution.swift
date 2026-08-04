@@ -488,40 +488,8 @@ public struct HarnessReviewIssue: Equatable, Codable, Sendable {
   }
 }
 
-/// The reviewer receives evidence and metadata only: the immutable unified
-/// diff (the bytes the candidate metadata's `diffDigest` names), the attempt
-/// history and the evaluation.  There is deliberately no patch *proposal*
-/// envelope and no operation output in this protocol, and the reviewer holds
-/// no operation or patch-writing port, so review cannot mutate the candidate
-/// under review.
-public struct HarnessAdversarialReviewRequest: Equatable, Codable, Sendable {
-  public let originalProblem: String
-  public let candidatePatch: HarnessCandidatePatch
-  /// The exact reviewed bytes.  The coordinator verifies this text hashes to
-  /// `candidatePatch.diffDigest` before review, so a reviewer verdict always
-  /// names the diff it actually read.
-  public let unifiedDiff: String
-  public let attemptHistory: [HarnessAttempt]
-  public let evaluation: HarnessEvaluation
-  public let artifactIDs: [String]
-
-  public init(
-    originalProblem: String,
-    candidatePatch: HarnessCandidatePatch,
-    unifiedDiff: String,
-    attemptHistory: [HarnessAttempt],
-    evaluation: HarnessEvaluation,
-    artifactIDs: [String]
-  ) {
-    self.originalProblem = originalProblem
-    self.candidatePatch = candidatePatch
-    self.unifiedDiff = unifiedDiff
-    self.attemptHistory = attemptHistory
-    self.evaluation = evaluation
-    self.artifactIDs = Array(Set(artifactIDs)).sorted()
-  }
-}
-
+/// Historical review record retained solely for persisted-attempt decoding and
+/// promotion export. New reviewer records have no producer.
 public struct HarnessAdversarialReview: Equatable, Codable, Sendable {
   public static let documentType = "harness-adversarial-review"
   public static let schemaVersion = "1.0.0"
@@ -536,31 +504,6 @@ public struct HarnessAdversarialReview: Equatable, Codable, Sendable {
   public let issues: [HarnessReviewIssue]
   public let createdAtUTC: String
 
-  public init(
-    reviewID: String,
-    reviewerID: String,
-    candidatePatchID: String,
-    evaluationID: String,
-    result: HarnessAdversarialReviewVerdict,
-    issues: [HarnessReviewIssue],
-    createdAtUTC: String
-  ) {
-    self.documentType = Self.documentType
-    self.schemaVersion = Self.schemaVersion
-    self.reviewID = reviewID
-    self.reviewerID = reviewerID
-    self.candidatePatchID = candidatePatchID
-    self.evaluationID = evaluationID
-    self.result = result
-    self.issues = issues
-    self.createdAtUTC = createdAtUTC
-  }
-}
-
-public protocol HarnessAdversarialReviewing: Sendable {
-  var reviewerID: String { get }
-  func review(_ request: HarnessAdversarialReviewRequest) async throws
-    -> HarnessAdversarialReview
 }
 
 public enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
@@ -573,7 +516,6 @@ public enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
   case deviceVerificationNotPassed
   case deviceEvidenceMissing
   case evaluationNotPassed
-  case reviewNotPassed(HarnessAdversarialReviewVerdict)
   case scopeCheckFailed(String)
   case stalePatch
 }
@@ -631,7 +573,6 @@ public enum HarnessPromotionGate {
     snapshot: HarnessTaskSnapshot,
     attempt: HarnessAttempt,
     evaluation: HarnessEvaluation,
-    review: HarnessAdversarialReview? = nil,
     promotionCandidateID: String,
     createdAtUTC: String
   ) throws -> HarnessPromotionCandidate {
@@ -677,13 +618,6 @@ public enum HarnessPromotionGate {
     guard evaluation.verdict == .pass,
       attempt.evaluationIDs.contains(evaluation.evaluationID)
     else { throw HarnessPromotionGateFailure.evaluationNotPassed }
-    if let review {
-      guard review.candidatePatchID == candidate.candidatePatchID,
-        review.evaluationID == evaluation.evaluationID,
-        review.result == .pass,
-        review.issues.isEmpty
-      else { throw HarnessPromotionGateFailure.reviewNotPassed(review.result) }
-    }
     return HarnessPromotionCandidate(
       promotionCandidateID: promotionCandidateID,
       htaskID: snapshot.htaskID,
@@ -692,7 +626,6 @@ public enum HarnessPromotionGate {
       baseRevision: candidate.baseRevision,
       workspaceRevision: patchRevision,
       evaluationID: evaluation.evaluationID,
-      reviewID: review?.reviewID,
       artifactIDs: snapshot.artifactRefs + attempt.buildArtifactIDs
         + attempt.runtimeArtifactIDs + [candidate.diffArtifactID]
         + [candidate.metadataArtifactID].compactMap { $0 },
