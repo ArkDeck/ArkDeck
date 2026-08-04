@@ -1258,7 +1258,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public var lifecycle: HarnessTaskLifecycle { status }
   public var stage: HarnessTaskStage { phase }
   /// The current product has no normal/evolution switch. A workspace policy is the single
-  /// source of truth for isolation, review and promotion behavior.
+  /// source of truth for isolation, validation and promotion behavior.
   public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
   /// Source project identity remains stable for memory/egress. Typed
   /// workspace operations use the isolated provider reference in Evolution.

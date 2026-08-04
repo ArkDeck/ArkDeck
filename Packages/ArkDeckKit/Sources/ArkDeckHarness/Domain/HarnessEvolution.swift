@@ -2,7 +2,7 @@
 //
 // Evolution is the automatic workspace-backed task path, not another runtime. It reuses the
 // existing Harness -> RuntimeJobEngine -> Catalog -> Provider path and adds
-// only the isolation, review and promotion facts that a device-only task does not
+// only the isolation, validation and promotion facts that a device-only task does not
 // need. None of the types in this file can execute a command, push a branch
 // or merge code.
 
@@ -484,7 +484,7 @@ public struct HarnessReviewIssue: Equatable, Codable, Sendable {
 }
 
 /// Historical review record retained solely for persisted-attempt decoding and
-/// promotion export. New reviewer records have no producer.
+/// promotion export. New attempts cannot create such a record.
 public struct HarnessAdversarialReview: Equatable, Codable, Sendable {
   public static let documentType = "harness-adversarial-review"
   public static let schemaVersion = "1.0.0"

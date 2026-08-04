@@ -657,7 +657,7 @@ public actor RuntimeJobEngine {
 
   /// Materializes the exact typed plan through the same provider, target
   /// facts and Artifact lease path used by admission, then stops. This is the
-  /// E2-safe review surface: no capability may be supplied, no Job is
+  /// E2-safe inspection surface: no capability may be supplied, no Job is
   /// admitted, and no dispatcher method is called.
   public func planOnly(_ requestData: Data) async throws -> RuntimePlanOnlyPreview {
     let request: RuntimeOperationRequest
@@ -839,7 +839,7 @@ public actor RuntimeJobEngine {
       }
       // A standing grant names the tree and its maximum writable scopes, but
       // does not pin the tree to the revision at draft time: patch, build,
-      // test and revert each move it. The review payload still carries the
+      // test and revert each move it. The capability-draft payload still carries the
       // observed revision below, and an operation request that declares
       // `expectedWorkspaceRevision` remains exactly constrained by its typed
       // input (TASK-HFA-009 r3).

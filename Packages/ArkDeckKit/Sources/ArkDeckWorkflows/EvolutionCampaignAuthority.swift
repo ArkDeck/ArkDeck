@@ -776,9 +776,8 @@ struct RockchipConsumedEvolutionCampaignAdmission: Sendable, Equatable {
 }
 
 /// Invocation-local token returned only after the merged broker has repeated
-/// every campaign/candidate/review/live-fact comparison and durably reserved
-/// this ordinal.  The campaign grants up to eight attempts; this token still
-/// consumes exactly once.
+/// every campaign/candidate/live-fact comparison and durably reserved this
+/// ordinal. This token still consumes exactly once.
 final class RockchipEvolutionCampaignAdmission: @unchecked Sendable {
   let campaignID: String
   let ordinal: Int
