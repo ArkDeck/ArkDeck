@@ -19,10 +19,11 @@ rebase --onto → resume`
 1. **advance**:各 lane 在**各自 git worktree** 内推进 approved change 的
    ready 任务;D1/D2 判断门之后的成 PR 工作在该门合入前不得开工(唯一
    允许的预跑 = 不产生 PR 的采集/勘察);D0 机械序列可同 lane 连续推进。
-2. **queue**:lane 产出 PR 且**入队三门**(guard/适用 CI 绿、独立会话
-   exact-head APPROVE、digest 完整)齐备后,按
+2. **queue**:lane 产出 PR 且**入队两门**(guard/适用 CI 绿、digest 完整)
+   齐备后,按
    `openspec/templates/batch-digest.md` 把 digest 写入当期批次 issue
-   (`batch-YYYYMMDD-N`);未过三门的 PR 不入队、不催合。
+   (`batch-YYYYMMDD-N`);未过两门的 PR 不入队、不催合。不得为 candidate
+   自动新建独立 AI reviewer 会话，也不得以其结论阻塞入队。
 3. **all-blocked summary**:全部 lane 都阻塞在人类门时,更新批次 issue
    汇总(项数、顺序、依赖、D2 项所需仓外动作)并通知维护者;不逐项催。
 4. **wait/poll**:等待维护者按 digest 顺序逐 PR review/merge。PR metadata
@@ -41,13 +42,10 @@ rebase --onto → resume`
    批次项),回到 `advance`。每次续跑在 evidence/日志记录触发它的
    merge OID 与检测时间。
 
-## 角色分离(不得复用)
+## 职责边界
 
-- **producer/watch 会话**:实现、填 digest、poll、核验、续跑;不得 review
-  自己产出的 diff,不得把实现结论充作独立 review。
-- **reviewer 会话**:独立于 producer,对 exact head 做合前 review,只写
-  `APPROVE @ <head-OID>` 或 finding 指针;head 变更后旧 APPROVE 不继承,
-  必须对新 head 重审。
+- **producer/watch 会话**:实现、填 digest、poll、核验、续跑;不得创建独立
+  AI review 作为入队步骤，也不得把自身结论或 CI 结果当作批准。
 - **维护者**:按批次 issue 声明顺序逐 PR review/merge;会话与 workflow
   均不得代为 approve 或 merge。
 
@@ -61,7 +59,7 @@ rebase --onto → resume`
 - **不确定即暂停**:poll 失败、merge 身份不明、API 与 git 账本冲突、
   凭据异常——保持暂停并汇报,不猜测续跑。
 - **协议违规即 fail**:任何 auto-merge、把 issue/digest 当批准载体、
-  判断门后投机成 PR、绕过入队三门——所在批次/drill fail closed 并如实
+  判断门后投机成 PR、绕过入队两门——所在批次/drill fail closed 并如实
   入档(evidence/postmortem)。
 
 ## Credential 边界(TASK-BAP-003 之后的形态)
