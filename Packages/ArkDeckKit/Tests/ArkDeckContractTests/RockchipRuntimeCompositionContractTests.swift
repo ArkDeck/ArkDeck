@@ -1835,6 +1835,112 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       try FileManager.default.contentsOfDirectory(atPath: root.path), [])
   }
 
+  // MARK: readback mismatch names its own cause (TASK-AIN-019)
+
+  /// The 2026-08-04 shape: `flash-partitions` reports success, the readback
+  /// disagrees, and the only durable evidence is the partition name. These
+  /// pin the three causes apart, because the raw bytes are deleted before
+  /// anyone can look at them.
+  private func readbackMismatchMessage(
+    deviceBytes: Data, imageBytes: Data, offsetSectors: Int64 = 8192
+  ) async throws -> String {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let member = RockchipImagesArchiveMember(
+      name: "boot_linux.img",
+      sizeBytes: Int64(imageBytes.count),
+      sha256: SHA256.hash(data: imageBytes).map {
+        String(format: "%02x", $0)
+      }.joined(),
+      classification: .mappedPartitionImage)
+    let mapping = RockchipMappedPartition(
+      writeOrder: 3, partitionName: "boot_linux",
+      imageMemberName: member.name, offsetSectors: offsetSectors)
+    let verifier = FoundationRockchipRuntimePartitionReadback(
+      runner: MaterializingReadbackRunner(
+        imageBytes: deviceBytes, baseSector: mapping.offsetSectors),
+      maximumChunkSectors: 4)
+    do {
+      _ = try await verifier.verify(
+        mapping: mapping, member: member,
+        executable: ResolvedExecutable(
+          path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64)),
+        outputDirectory: root)
+      XCTFail("a readback that disagrees with the image must fail")
+      return ""
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        XCTFail("expected a confirmed failure, got \(failure)")
+        return ""
+      }
+      return detail
+    }
+  }
+
+  func testReadbackMismatchNamesAShortWriteByItsErasedTail() async throws {
+    // 8 KiB of content followed by erased medium: what a write that stopped
+    // early leaves behind.
+    var device = Data(repeating: 0x5A, count: 8 * 1024)
+    device.append(Data(repeating: 0xCC, count: 24 * 1024))
+    let image = Data(repeating: 0x5A, count: 32 * 1024)
+
+    let detail = try await readbackMismatchMessage(deviceBytes: device, imageBytes: image)
+    XCTAssertTrue(detail.contains("boot_linux"), detail)
+    XCTAssertTrue(detail.contains("expected "), detail)
+    XCTAssertTrue(detail.contains("observed "), detail)
+    XCTAssertTrue(detail.contains("uniform 0xcc"), detail)
+    XCTAssertTrue(detail.contains("image offset 8192"), detail)
+    // 8192 / 512 = 16 sectors past the partition's first sector.
+    XCTAssertTrue(detail.contains("device sector \(8192 + 16)"), detail)
+    XCTAssertTrue(detail.contains("the write landed short"), detail)
+  }
+
+  func testReadbackMismatchSaysNothingWasWrittenWhenTheWholeRegionIsErased() async throws {
+    let detail = try await readbackMismatchMessage(
+      deviceBytes: Data(repeating: 0xCC, count: 32 * 1024),
+      imageBytes: Data(repeating: 0x5A, count: 32 * 1024))
+    XCTAssertTrue(detail.contains("nothing was written"), detail)
+  }
+
+  func testReadbackMismatchDistinguishesCorruptContentFromATruncatedWrite() async throws {
+    // Full-length content that simply differs: no erased tail, so the message
+    // must not claim the write landed short.
+    var device = Data(repeating: 0x5A, count: 32 * 1024 - 1)
+    device.append(0x01)
+    let image = Data(repeating: 0x5A, count: 32 * 1024)
+
+    let detail = try await readbackMismatchMessage(deviceBytes: device, imageBytes: image)
+    XCTAssertTrue(detail.contains("no erased-medium tail"), detail)
+    XCTAssertFalse(detail.contains("landed short"), detail)
+    XCTAssertFalse(detail.contains("nothing was written"), detail)
+  }
+
+  func testReadbackContentProfileTracksUniformRunsAcrossChunkBoundaries() {
+    var profile = RockchipReadbackContentProfile()
+    // A run that begins in one chunk and continues through the next two must
+    // be reported from where it actually began, not from the last chunk.
+    profile.consume(ArraySlice([UInt8](repeating: 0x5A, count: 1_000)))
+    profile.consume(ArraySlice([UInt8](repeating: 0x5A, count: 24) + [UInt8](repeating: 0xCC, count: 1_000)))
+    profile.consume(ArraySlice([UInt8](repeating: 0xCC, count: 4_000)))
+    XCTAssertEqual(profile.byteCount, 6_024)
+    XCTAssertEqual(profile.trailingByte, 0xCC)
+    XCTAssertEqual(profile.trailingRunStart, 1_024)
+    XCTAssertEqual(profile.trailingRunLength, 5_000)
+    XCTAssertTrue(profile.hasSignificantTrailingRun)
+    XCTAssertFalse(profile.isEntirelyUniform)
+
+    // A short run is ordinary content, not a signature.
+    var ordinary = RockchipReadbackContentProfile()
+    ordinary.consume(ArraySlice([UInt8](repeating: 0x11, count: 5_000) + [UInt8](repeating: 0x22, count: 8)))
+    XCTAssertFalse(ordinary.hasSignificantTrailingRun)
+    XCTAssertTrue(
+      ordinary.diagnosis(offsetSectors: 0).contains("no erased-medium tail"))
+
+    var uniform = RockchipReadbackContentProfile()
+    uniform.consume(ArraySlice([UInt8](repeating: 0xCC, count: 8_192)))
+    XCTAssertTrue(uniform.isEntirelyUniform)
+  }
+
   func testPostFlashBuildVerificationRejectsNonemptyButInexactProfileVersion() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }

@@ -255,6 +255,73 @@ protocol RockchipRuntimePartitionReadbackVerifying: Sendable {
   ) async throws -> [ProviderSubprocessReceipt]
 }
 
+/// What the device actually returned, accumulated across every readback chunk.
+///
+/// It exists because of the shape of the 2026-08-04 failures: a mismatch that
+/// says only "hash mismatch for boot_linux" cannot distinguish a write that
+/// landed short from one that landed in the wrong place from a genuinely
+/// corrupt image — and the readback chunks are deleted as soon as they are
+/// hashed, so nothing survives to tell them apart afterwards. A short write
+/// leaves the tail as erased medium (uniform `0xCC` on this device), which is
+/// a fingerprint this can capture while streaming, without keeping a byte.
+struct RockchipReadbackContentProfile {
+  /// A uniform run shorter than one page is ordinary image content, not a
+  /// signature of anything.
+  static let minimumSignificantRunBytes: Int64 = 4096
+
+  private(set) var byteCount: Int64 = 0
+  private(set) var trailingByte: UInt8?
+  private(set) var trailingRunStart: Int64 = 0
+
+  var trailingRunLength: Int64 { byteCount - trailingRunStart }
+
+  /// True when every byte read was the same value: the partition was never
+  /// written at all, rather than written short.
+  var isEntirelyUniform: Bool { byteCount > 0 && trailingRunStart == 0 }
+
+  var hasSignificantTrailingRun: Bool {
+    trailingByte != nil && trailingRunLength >= Self.minimumSignificantRunBytes
+  }
+
+  mutating func consume(_ bytes: ArraySlice<UInt8>) {
+    guard let last = bytes.last else { return }
+    let start = byteCount
+    byteCount += Int64(bytes.count)
+    // Walk back from the end only as far as the run actually extends: for
+    // ordinary content that is a handful of bytes, and for an erased tail the
+    // scan covers exactly the region worth measuring. `system` is a 2 GiB
+    // partition, so this stays on an unsafe pointer rather than paying
+    // bounds-checked subscripting per byte on the failure path.
+    let runWithinSlice: Int = bytes.withUnsafeBufferPointer { raw in
+      var index = raw.count - 1
+      while index > 0, raw[index - 1] == last { index -= 1 }
+      return index
+    }
+    if runWithinSlice == 0, trailingByte == last {
+      // The whole slice continues the run carried in from earlier chunks.
+      return
+    }
+    trailingByte = last
+    trailingRunStart = start + Int64(runWithinSlice)
+  }
+
+  /// One bounded clause naming the cause, for the failure message.
+  func diagnosis(offsetSectors: Int64) -> String {
+    guard let trailingByte, hasSignificantTrailingRun else {
+      return "no erased-medium tail, so the content differs rather than "
+        + "being truncated"
+    }
+    let hex = String(format: "0x%02x", trailingByte)
+    if isEntirelyUniform {
+      return "the whole readback is uniform \(hex): nothing was written"
+    }
+    let sector = offsetSectors + trailingRunStart / 512
+    return "uniform \(hex) from image offset \(trailingRunStart) "
+      + "(device sector \(sector)) to the end, \(trailingRunLength) bytes: "
+      + "the write landed short"
+  }
+}
+
 struct FoundationRockchipRuntimePartitionReadback:
   RockchipRuntimePartitionReadbackVerifying
 {
@@ -277,6 +344,7 @@ struct FoundationRockchipRuntimePartitionReadback:
     outputDirectory: URL
   ) async throws -> [ProviderSubprocessReceipt] {
     var hasher = SHA256()
+    var profile = RockchipReadbackContentProfile()
     var remainingBytes = member.sizeBytes
     var consumedSectors: Int64 = 0
     var chunkIndex = 0
@@ -307,11 +375,12 @@ struct FoundationRockchipRuntimePartitionReadback:
         throw RuntimeDispatchFailure.failed(
           "RockUSB partition readback did not complete cleanly")
       }
-      try Self.hashPrefix(
+      try Self.scanPrefix(
         fileURL: outputURL,
         byteCount: bytes,
         exactFileSize: sectors * 512,
-        into: &hasher)
+        into: &hasher,
+        profile: &profile)
       do {
         try FileManager.default.removeItem(at: outputURL)
       } catch {
@@ -326,8 +395,14 @@ struct FoundationRockchipRuntimePartitionReadback:
     let observed = hasher.finalize()
       .map { String(format: "%02x", $0) }.joined()
     guard observed == member.sha256 else {
+      // The bytes are gone by now — each chunk is removed as soon as it is
+      // hashed — so everything the next person needs has to be in this line.
       throw RuntimeDispatchFailure.failed(
-        "RockUSB readback hash mismatch for \(mapping.partitionName)")
+        "RockUSB readback hash mismatch for \(mapping.partitionName) "
+          + "(expected \(member.sha256.prefix(16)), observed \(observed.prefix(16)), "
+          + "\(profile.byteCount) of \(member.sizeBytes) bytes read at device sector "
+          + "\(mapping.offsetSectors)); "
+          + profile.diagnosis(offsetSectors: mapping.offsetSectors))
     }
     return receipts
   }
@@ -360,11 +435,12 @@ struct FoundationRockchipRuntimePartitionReadback:
     (byteCount + 511) / 512
   }
 
-  private static func hashPrefix(
+  private static func scanPrefix(
     fileURL: URL,
     byteCount: Int64,
     exactFileSize: Int64,
-    into hasher: inout SHA256
+    into hasher: inout SHA256,
+    profile: inout RockchipReadbackContentProfile
   ) throws {
     let descriptor = Darwin.open(
       fileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
@@ -388,6 +464,7 @@ struct FoundationRockchipRuntimePartitionReadback:
       let count = Darwin.read(descriptor, &buffer, Int(requested))
       if count > 0 {
         hasher.update(data: Data(buffer[0..<count]))
+        profile.consume(buffer[0..<count])
         remaining -= Int64(count)
       } else if count < 0, errno == EINTR {
         continue
