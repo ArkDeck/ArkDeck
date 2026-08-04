@@ -1992,6 +1992,101 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         nowUTC: "2026-07-31T00:00:00Z"))
   }
 
+  // MARK: - Engine-lane spawn working directory
+
+  /// The engine lane is the path a real flash job takes, and its runner used
+  /// to spawn with no working directory at all — so rkdeveloptool, which
+  /// falls back to cwd-relative `config.ini`/`log/` on macOS, wrote into
+  /// whatever directory the daemon was started from (observed as a stray
+  /// `Packages/ArkDeckKit/log/`). This spawns a real child and reads back the
+  /// directory it actually ran in.
+  func testEngineLaneRunnerSpawnsChildrenInProductOwnedToolRuntimeState() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let toolWorkingDirectory = try RockchipProductToolRuntimeDirectory.prepare(root: root)
+    let callerDirectory = FileManager.default.currentDirectoryPath
+    XCTAssertNotEqual(
+      toolWorkingDirectory.path, callerDirectory,
+      "the leg is vacuous unless product-owned state differs from the caller's cwd")
+
+    let receipt = try await FoundationRockchipRuntimeCommandRunner(
+      workingDirectory: toolWorkingDirectory
+    ).run(
+      executable: try Self.hashedExecutable(path: "/bin/pwd"),
+      arguments: ["-P"],
+      timeoutSeconds: 15,
+      outputByteBudget: 64 * 1024,
+      criticalNonInterruptible: false)
+
+    XCTAssertEqual(receipt.exitStatus, 0)
+    // `pwd -P` prints the physical name; the prepared URL carries Foundation's
+    // canonical one, which strips a leading `/private`. Resolve both so the
+    // comparison is between directories, not between spellings.
+    let childDirectory = URL(
+      fileURLWithPath: try XCTUnwrap(String(data: receipt.stdout, encoding: .utf8))
+        .trimmingCharacters(in: .whitespacesAndNewlines))
+    XCTAssertEqual(
+      childDirectory.resolvingSymlinksInPath().path,
+      toolWorkingDirectory.resolvingSymlinksInPath().path,
+      "every child of this runner must run inside product-owned tool state")
+    XCTAssertEqual(
+      FileManager.default.currentDirectoryPath, callerDirectory,
+      "binding the child must never move the parent's own current directory")
+  }
+
+  /// `ProcessExecutor` revalidates the directory at every launch, so the
+  /// directory can disappear between composition and dispatch. That is a
+  /// definite zero-dispatch refusal, never an unknown outcome: an
+  /// `outcomeUnknown` here would park a flashable device as unresolved.
+  func testEngineLaneRunnerTreatsALostToolRuntimeDirectoryAsZeroDispatch() async throws {
+    let missing = try temporaryDirectory()
+      .appending(path: "RockchipToolRuntime", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: missing.deletingLastPathComponent()) }
+
+    do {
+      _ = try await FoundationRockchipRuntimeCommandRunner(workingDirectory: missing).run(
+        executable: try Self.hashedExecutable(path: "/bin/pwd"),
+        arguments: ["-P"],
+        timeoutSeconds: 15,
+        outputByteBudget: 64 * 1024,
+        criticalNonInterruptible: false)
+      XCTFail("a working directory the Process port rejects must not dispatch")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let reason) = failure else {
+        return XCTFail("expected a definite refusal, got \(failure)")
+      }
+      XCTAssertTrue(
+        reason.hasPrefix("dispatch refused: "), "unexpected refusal text: \(reason)")
+      XCTAssertTrue(
+        reason.contains(missing.path), "the refusal must name the directory: \(reason)")
+    }
+  }
+
+  /// A tool runtime directory that cannot be prepared leaves the daemon
+  /// composing the refusing host. The refusal has to name the actual cause,
+  /// or `operation.list` reports a generic blocker for a fixable one.
+  func testRockchipDispatcherRefusalNamesTheToolRuntimeCause() throws {
+    let resolver = try FixedExecutableResolver.hashing(
+      path: "/bin/pwd", providerID: "rockchip")
+    let detail = "Rockchip tool runtime directory cannot be created"
+
+    let named = BundledRockchipRuntimeDispatcher(
+      resolver: resolver, unavailableDetail: detail)
+    let generic = BundledRockchipRuntimeDispatcher(resolver: resolver)
+
+    let reason = try XCTUnwrap(named.unavailableReason(providerID: "rockchip"))
+    XCTAssertTrue(reason.hasSuffix(": \(detail)"), "unexpected refusal text: \(reason)")
+    XCTAssertEqual(
+      reason, "\(try XCTUnwrap(generic.unavailableReason(providerID: "rockchip"))): \(detail)",
+      "the detail must extend the existing refusal, not replace it")
+  }
+
+  private static func hashedExecutable(path: String) throws -> ResolvedExecutable {
+    let digest = SHA256.hash(data: try Data(contentsOf: URL(fileURLWithPath: path)))
+    return ResolvedExecutable(
+      path: path, sha256: digest.map { String(format: "%02x", $0) }.joined())
+  }
+
   private func hostDescriptor(
     _ plan: TypedProcessPlan,
     executionTuning: AgentAuthorityCampaignExecutionTuning? = nil

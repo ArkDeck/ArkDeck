@@ -870,7 +870,7 @@ struct RockchipProductToolInstaller {
   }
 }
 
-enum RockchipProductToolRuntimeDirectory {
+package enum RockchipProductToolRuntimeDirectory {
   static let directoryName = "RockchipToolRuntime"
   static let configurationFileName = "config.ini"
   static let logDirectoryName = "log"
@@ -878,23 +878,42 @@ enum RockchipProductToolRuntimeDirectory {
   /// Upstream rkdeveloptool reads `config.ini` and writes `log/` relative to
   /// its current directory.  Bind those implicit files to product-owned state
   /// so an E2 run cannot depend on, or contaminate, the caller's Git worktree.
-  static func prepare(root: URL) throws -> URL {
+  ///
+  /// Every lane that spawns the tool prepares this before it composes device
+  /// dispatch: the admission/preflight lanes under the product's Application
+  /// Support root, the daemon's engine lane under its own state directory (so
+  /// a `--state-dir` daemon stays as hermetic here as it already is for the
+  /// binding).  Preparation is fail-loud by design — a caller that cannot get
+  /// a directory refuses dispatch instead of falling back to its cwd.
+  package static func prepare(root: URL) throws -> URL {
     guard root.isFileURL, root.path.hasPrefix("/") else {
       throw configurationError("Rockchip tool runtime root must be absolute")
     }
     let runtime = root.appending(path: directoryName, directoryHint: .isDirectory)
-      .standardizedFileURL
-    let rootPrefix = root.standardizedFileURL.path.hasSuffix("/")
-      ? root.standardizedFileURL.path : root.standardizedFileURL.path + "/"
-    guard runtime.path.hasPrefix(rootPrefix) else {
-      throw configurationError("Rockchip tool runtime escaped Application Support")
-    }
     try prepareOwnerOnlyDirectory(runtime)
     try prepareOwnerOnlyDirectory(
       runtime.appending(path: logDirectoryName, directoryHint: .isDirectory))
     try prepareEmptyConfiguration(
       runtime.appending(path: configurationFileName, directoryHint: .notDirectory))
-    return runtime
+    // Containment is asserted on the canonical form of both sides, and only
+    // once the directory exists.  Foundation rewrites a `/private` prefix
+    // while standardizing a path that exists and leaves it alone otherwise,
+    // so composing the check before creation made a `/private/...` state root
+    // (what `--state-dir /tmp/...` resolves to) read as an escape and refused
+    // the whole lane.  This canonical form is also exactly what
+    // `ProcessExecutor` demands before it will bind a child's current
+    // directory, so it is what callers get back: preparing a directory the
+    // spawn would then reject is not a useful outcome.  The final component
+    // cannot itself be a symlink — `prepareOwnerOnlyDirectory` lstat-checked
+    // it as a real directory.
+    let bindable = runtime.resolvingSymlinksInPath().standardizedFileURL
+    let container = root.resolvingSymlinksInPath().standardizedFileURL
+    let containerPrefix = container.path.hasSuffix("/")
+      ? container.path : container.path + "/"
+    guard bindable.path.hasPrefix(containerPrefix) else {
+      throw configurationError("Rockchip tool runtime escaped its product state root")
+    }
+    return bindable
   }
 
   private static func prepareOwnerOnlyDirectory(_ url: URL) throws {

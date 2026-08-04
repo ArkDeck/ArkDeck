@@ -283,10 +283,20 @@ extension RockchipFlashPreflightProbes {
   /// the fault it was built to catch that is the same statement — a child
   /// declaring App Sandbox inheritance aborts under either parent — but a
   /// posture that differed between the two processes would escape it.
+  ///
+  /// The runner is bound to the same product-owned tool runtime directory the
+  /// runtime spawns in, so the probe cannot drop the tool's implicit `log/`
+  /// into the directory the CLI was invoked from. A directory that cannot be
+  /// prepared makes both tool probes `unavailable` with the concrete reason;
+  /// it never degrades to an unscoped spawn.
   public static func production(
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> RockchipFlashPreflightProbes {
-    let runner = FoundationRockchipRuntimeCommandRunner()
+    let runner = Result {
+      FoundationRockchipRuntimeCommandRunner(
+        workingDirectory: try RockchipProductToolRuntimeDirectory.prepare(
+          root: try applicationSupportArkDeckRoot()))
+    }
     return RockchipFlashPreflightProbes(
       rockUSBAliveness: {
         await aliveness(
@@ -326,8 +336,15 @@ extension RockchipFlashPreflightProbes {
   private static func aliveness(
     resolve: @Sendable () throws -> ResolvedExecutable,
     arguments: [String],
-    runner: any RockchipRuntimeCommandRunning
+    runner: Result<FoundationRockchipRuntimeCommandRunner, any Error>
   ) async -> RockchipFlashToolAliveness {
+    let commandRunner: FoundationRockchipRuntimeCommandRunner
+    do {
+      commandRunner = try runner.get()
+    } catch {
+      return .unavailable(
+        "the product-owned Rockchip tool runtime directory is unavailable: \(error)")
+    }
     let executable: ResolvedExecutable
     do {
       executable = try resolve()
@@ -335,7 +352,7 @@ extension RockchipFlashPreflightProbes {
       return .unavailable("\(error)")
     }
     do {
-      let receipt = try await runner.run(
+      let receipt = try await commandRunner.run(
         executable: executable, arguments: arguments,
         timeoutSeconds: 15, outputByteBudget: 64 * 1024,
         criticalNonInterruptible: false)

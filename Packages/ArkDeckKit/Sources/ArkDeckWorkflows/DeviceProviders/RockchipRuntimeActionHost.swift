@@ -63,6 +63,27 @@ protocol RockchipRuntimeCommandRunning: Sendable {
 }
 
 struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
+  /// Product-owned current directory bound to every child spawned here.
+  ///
+  /// Upstream rkdeveloptool locates `config.ini` and `log/` next to its own
+  /// executable through `/proc/<pid>/exe`; that lookup does not exist on
+  /// macOS, so both degrade to cwd-relative and an engine-lane job started
+  /// from a checkout wrote `log/log<date>.txt` into the caller's Git worktree.
+  /// Binding the child to `RockchipProductToolRuntimeDirectory` state is the
+  /// same intent the whole-plan lane already carried, and it also pins
+  /// `config.ini` to a reviewed empty file instead of whatever happens to sit
+  /// in the caller's directory.
+  ///
+  /// This is deliberately not optional: the runner is the only spawn point of
+  /// the engine lane, so a composition that cannot name product-owned state
+  /// must refuse rather than silently inherit a cwd.
+  ///
+  /// The hdc transitions this runner also serves tolerate the bound directory
+  /// — their argv carries no relative path and hdc writes nothing to cwd
+  /// (verified: `hdc list targets -v` from a scoped directory exits 0 and
+  /// leaves it empty).
+  let workingDirectory: URL
+
   func run(
     executable: ResolvedExecutable,
     arguments: [String],
@@ -79,6 +100,7 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
           // The spawn base allowlist drops an inherited HDC port, so it is
           // named explicitly; the RockUSB tool ignores it.
           environment: HDCServerEndpointSelector.inheritedPortChildEnvironment(),
+          workingDirectory: workingDirectory,
           timeout: timeoutSeconds.map(TimeInterval.init)),
         expectedSHA256: executable.sha256)
       let result: ProcessIdentityBoundExecutionResult
@@ -484,9 +506,12 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private let readback: any RockchipRuntimePartitionReadbackVerifying
   private let enterLoaderReadbackTimeoutSeconds: Int
 
+  /// `runner` has no default on purpose. The production runner cannot be
+  /// constructed without a product-owned working directory, and this executor
+  /// is not the layer that knows one; the composition root supplies it.
   init(
     hdcResolver: any RuntimeExecutableResolving,
-    runner: any RockchipRuntimeCommandRunning = FoundationRockchipRuntimeCommandRunner(),
+    runner: any RockchipRuntimeCommandRunning,
     usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
     enterLoaderReadbackTimeoutSeconds: Int = 45,

@@ -325,22 +325,38 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let host: any RockchipRuntimeActionHosting
 
-  package init(resolver: any RuntimeExecutableResolving) {
+  /// `unavailableDetail` names the concrete missing piece when one is known —
+  /// an unpreparable tool runtime directory reaches the operator through
+  /// `operation.list` this way instead of as a generic refusal.
+  package init(
+    resolver: any RuntimeExecutableResolving,
+    unavailableDetail: String? = nil
+  ) {
     self.resolver = resolver
     host = RefusingRockchipRuntimeActionHost(
-      reason:
-        "the per-action RockUSB host requires descriptor-bound HDC and a product state directory")
+      reason: [
+        "the per-action RockUSB host requires descriptor-bound HDC and a product state directory",
+        unavailableDetail,
+      ].compactMap { $0 }.joined(separator: ": "))
   }
 
+  /// `toolWorkingDirectory` must already be prepared by
+  /// `RockchipProductToolRuntimeDirectory`. It is the current directory every
+  /// RockUSB and hdc child of this lane is spawned in, so the tool's implicit
+  /// `config.ini`/`log/` land in product-owned state instead of whatever
+  /// directory the daemon happened to be started from.
   package init(
     resolver: any RuntimeExecutableResolving,
     hdcResolver: any RuntimeExecutableResolving,
-    stateDirectory: URL
+    stateDirectory: URL,
+    toolWorkingDirectory: URL
   ) {
     self.resolver = resolver
     host = DurableRockchipRuntimeActionHost(
       executor: FoundationRockchipRuntimeActionExecutor(
-        hdcResolver: hdcResolver),
+        hdcResolver: hdcResolver,
+        runner: FoundationRockchipRuntimeCommandRunner(
+          workingDirectory: toolWorkingDirectory)),
       records: RockchipRuntimeActionRecordStore(
         rootURL: stateDirectory.appendingPathComponent(
           "rockchip-runtime", isDirectory: true)))
