@@ -37,9 +37,10 @@
       "com.apple.security.inherit": true
     },
     "identifier": "com.arkdeck.desktop.rkdeveloptool",
+    "machoUUID": "8ab1a64a-f879-3fc1-a6de-63d3529c79c6",
     "minimumMacOS": "14.0",
     "name": "rkdeveloptool",
-    "sha256": "3caee2136551b4b849daf7e9a906813354f354f8adb61e5f092de49ec7a2e56a",
+    "sha256": "55f6700bdd1c311a273394791baa00713ae7cf62a372077a3d63028b5473f218",
     "size": 247488,
     "unsigned": true,
     "version": "1.32"
@@ -60,15 +61,15 @@
     "files": [
       {
         "name": "registry.yaml",
-        "sha256": "0649cb6f0974107e15cb39e75844532dc9dbaff33a7099d0a64cc7c248e07f54"
+        "sha256": "0ba1946357edb63a7abbbaea792e483651c1aac37fd36ee23ca53b4b91848625"
       },
       {
         "name": "recipe.json",
-        "sha256": "8b42fdc29d26f597f4c40506f581fd06b5df1fdc1a9cc8eac225e706ce3998f6"
+        "sha256": "22a6c7359a1b5ea97702e76568817746c8e7815981a139a1bb04b475f9f747ec"
       },
       {
         "name": "sbom.spdx.json",
-        "sha256": "05ae1fa74cbabe55dac1ff0bca59607b555b60fb2dbfc556e3af95671e3100ed"
+        "sha256": "1e231026acf767b5e96d00efda6e0e28a50933fa0ce6e9609b588054519fde4c"
       },
       {
         "name": "THIRD-PARTY-NOTICES.txt",
@@ -76,7 +77,7 @@
       },
       {
         "name": "source-distribution-manifest.json",
-        "sha256": "558282ba42f6dfdfd21599f5987206bb9f6370180b1653676f826559e61dc563"
+        "sha256": "d94c2714047960014b071d60c3c1e939402d1fb719a55f6186e0fba04f85985f"
       }
     ]
   },
@@ -93,12 +94,12 @@
     "teamIdentifier": "8AQTYW5FKR"
   },
   "sourceArtifact": {
-    "artifactArchiveDigest": "sha256:3dc014b6e81a68942d9415a1bdb73faabbbb2472297d1ae14d7648a547628e67",
-    "artifactExpiresAt": "2026-08-26T02:53:55Z",
-    "artifactId": "8640763234",
+    "artifactArchiveDigest": "sha256:0815f86640f492036cb0d8da8acfff61505137337522f30ed7a20b6135c00a49",
+    "artifactExpiresAt": "2026-09-03T04:13:46Z",
+    "artifactId": "8879893404",
     "artifactName": "rockchip-builder-a",
-    "runHead": "01e6f9a6605f4a3a9463dcab2bf5731bd012ef48",
-    "workflowRun": "30233237693"
+    "runHead": "ab1d32c68934f5a776797e606bbe1f52dc947420",
+    "workflowRun": "30877024781"
   },
   "xcode": {
     "archiveConfiguration": "Release",

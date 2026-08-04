@@ -31,6 +31,7 @@ class ContractFixture(unittest.TestCase):
             "sha256": component["sha256"],
             "fileType": "Mach-O 64-bit executable arm64",
             "architectures": list(component["architectures"]),
+            "machoUUID": component["machoUUID"],
             "minimumMacOS": component["minimumMacOS"],
             "loadCommandsSHA256": artifact["loadCommandsSHA256"],
             "dependencies": sorted(component["dependencies"]),
@@ -76,6 +77,7 @@ class ContractFixture(unittest.TestCase):
             ),
             "bundlePath": self.spec["component"]["bundlePath"],
             "architectures": list(self.spec["component"]["architectures"]),
+            "machoUUID": self.spec["component"]["machoUUID"],
             "minimumMacOS": self.spec["component"]["minimumMacOS"],
         }
         metadata = {
@@ -142,6 +144,7 @@ class ContractFixture(unittest.TestCase):
             },
             "component": {
                 "identifier": self.spec["component"]["identifier"],
+                "machoUUID": self.spec["component"]["machoUUID"],
                 "unsignedSHA256": self.spec["component"]["sha256"],
                 "signedSHA256": "b" * 64,
             },
@@ -217,6 +220,10 @@ class PackageSourceContractTests(ContractFixture):
         self.assertEqual(
             self.spec["component"]["sha256"],
             self.registry["artifact"]["sha256"],
+        )
+        self.assertEqual(
+            self.spec["component"]["machoUUID"],
+            self.registry["artifact"]["machoUUID"],
         )
         self.assertEqual(
             self.spec["component"]["dependencies"],
@@ -351,8 +358,24 @@ class PackageSourceContractTests(ContractFixture):
             "  cmdsize 32\n"
             " platform 1\n"
             "    minos 14.0\n"
+            "Load command 10\n"
+            "       cmd LC_UUID\n"
+            "   cmdsize 24\n"
+            "      uuid 8AB1A64A-F879-3FC1-A6DE-63D3529C79C6\n"
         )
         self.assertEqual(package.parse_minos(load), "14.0")
+        self.assertEqual(
+            package.parse_macho_uuid(load),
+            "8ab1a64a-f879-3fc1-a6de-63d3529c79c6",
+        )
+        with self.assertRaises(package.PackageError):
+            package.parse_macho_uuid(load.replace("LC_UUID", "LC_LOAD_DYLIB"))
+        with self.assertRaises(package.PackageError):
+            package.parse_macho_uuid(
+                load.replace(
+                    "8AB1A64A-F879-3FC1-A6DE-63D3529C79C6", "not-a-uuid"
+                )
+            )
         self.assertTrue(
             package.normalize_load_commands(load).startswith(
                 "$OUTPUT_DIR/rkdeveloptool:"
@@ -409,6 +432,7 @@ class UnsignedInputMutationTests(ContractFixture):
             (("sha256",), "0" * 64, "hash"),
             (("fileType",), "data", "Mach-O"),
             (("architectures",), ["x86_64"], "architecture"),
+            (("machoUUID",), "0" * 36, "Mach-O UUID"),
             (("minimumMacOS",), "13.0", "minimum OS"),
             (("loadCommandsSHA256",), "0" * 64, "load commands"),
             (
@@ -482,6 +506,7 @@ class ArchiveMutationTests(ContractFixture):
             (("component", "bundlePath"), "Contents/Resources/rkdeveloptool"),
             (("component", "identifier"), "com.example.rkdeveloptool"),
             (("component", "architectures"), ["x86_64"]),
+            (("component", "machoUUID"), "0" * 36),
             (("component", "minimumMacOS"), "13.0"),
             (("nestedCodePaths",), ["Contents/MacOS/ArkDeck"]),
             (
@@ -668,6 +693,7 @@ class DmgNotaryAndReceiptMutationTests(ContractFixture):
             (("sourceArtifact", "componentSHA256"), "0" * 64),
             (("tuple", "app", "version"), "0.2.0"),
             (("tuple", "component", "identifier"), "com.example.tool"),
+            (("tuple", "component", "machoUUID"), "0" * 36),
             (("tuple", "component", "unsignedSHA256"), "0" * 64),
             (("tuple", "metadata", "sbom.spdx.json"), "0" * 64),
             (("tuple", "metadata", "THIRD-PARTY-NOTICES.txt"), "0" * 64),
