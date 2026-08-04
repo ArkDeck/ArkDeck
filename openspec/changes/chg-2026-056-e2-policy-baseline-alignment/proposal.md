@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 2
+revision: 3
 status: proposed
 class: core
 core_change_level: major
@@ -18,6 +18,15 @@ platforms: [macos, windows, linux]
 > capability / exact E2 authority；同时保留 host_loop 的 Repo-plane 隔离。r2 不把
 > 无 authority、身份不明、unknown outcome 或 raw-shell destructive dispatch 变为可执行，
 > 也不在本 PR 创建 authority 或接触设备。
+>
+> r3（2026-08-04）：维护者取消「未合入 candidate 必须先拉起独立 AI 对抗 review，
+> 才能进入设备验证/dispatch」的运行时限制。candidate 仍须在 task-owned isolation
+> 内完成固定构建和封闭策略输出校验；exact E2 authority、allowed paths/diff budget、
+> immutable candidate pin、fresh target/binding readback、durable reservation、typed-only
+> dispatch、outcome/recovery 与所有 fail-closed 条件均不变。该修订不把任何 review
+> 结论、CI 结果或 candidate 自述变成 authority，也不允许 candidate 接触设备、Runtime
+> 或 authority；它只移除每次候选修改都会新建独立 review 会话的前置门，也移除
+> workspace promotion 在既有 evaluation 通过后再强制创建的同类运行时会话。
 
 ## Why
 
@@ -50,6 +59,13 @@ In scope:
 - `REQ-FLASH-015` 及其 Scenario 同步这一准入边界，新增有效 authority 的 Agent happy
   path，同时将缺失/漂移/过期/超限、outcomeUnknown、非 safe terminal 和 readback 不确定
   保持为零 dispatch。
+- Candidate 的固定构建/策略输出校验和 immutable candidate pin 继续是 dispatch 前提；
+  独立 AI adversarial review 不再是 candidate 进入设备验证、reservation 或 dispatch 的
+  必要条件，也不再为每次 candidate 修改拉起一个运行时会话。正常的 PR/维护者审查不受
+  此变更影响。
+- workspace-backed Harness 的既有 evaluation 已通过时，直接走既有 promotion/normal PR
+  路径；不再为 promotion 再调用 adversarial reviewer。此处不改变评估标准、构建、测试、
+  设备验证或维护者的正常 PR review。
 - current workflow、provider 和 hardware-evidence contract 能表达
   `evolutionCampaignConfirmation`，并要求 evidence 如实记录 authority kind/reference、
   fresh target confirmation、attempt ordinal 和 terminal disposition。Schema validity 仍不
@@ -70,6 +86,8 @@ Observable behavior:
 - After: Agent 仅在 exact E2 authority 及全部 admission pins 仍一致时，才可由
   protected-main broker dispatch 已发布的 typed destructive Step；任何 authority 或事实
   缺失/漂移仍为 `policyBlocked`，外部 process/device dispatch 计数为 0。
+- After r3: 完成固定 candidate build 与封闭策略输出校验后，campaign 直接进入既有
+  fresh-readback/reservation/broker 验证链；不再等待或创建独立 adversarial-review session。
 
 ## Out of scope
 
@@ -79,7 +97,7 @@ Observable behavior:
   不执行 Flash、erase、format、unlock、update 或其他 device mutation。
 - 不把 fake、simulation、plan-only、CI green 或本 PR 的 review 记为 realHardware evidence；
   不提前把任一 Golden Journey 标为 `REAL_DEVICE_PASS`。
-- 不允许 agent 伪造用户确认、让 candidate/repairer/reviewer 接触设备或 authority，或对
+- 不允许 agent 伪造用户确认、让 candidate/repairer 接触设备或 authority，或对
   unknown/unsafe partial outcome 自动重放。
 
 ## Scope
@@ -111,15 +129,15 @@ Observable behavior:
   one concurrent attempt.
 - **Fail closed.** Prior to every real destructive Step the broker recalculates the typed
   plan and performs fresh target/binding readback. A missing, consumed, expired, mismatched
-  or out-of-budget authority; non-terminal predecessor; absent reservation; non-PASS review;
+  or out-of-budget authority; missing or drifted candidate pin; non-terminal predecessor; absent reservation;
   topology drift; unknown outcome; or unsafe partial write stops permanently with zero new
   dispatch.
-- **Separation of duties.** A candidate may build and test only in its task-owned isolated
-  workspace, constrained to the confirmed allowed paths and diff budget. The repairer receives
-  no workspace source; the reviewer receives only immutable candidate/diff/build/test artifacts.
-  None of candidate, repairer or reviewer has network, USB/HDC/RockUSB, Runtime or authority
-  capability. They can only propose or assess a closed strategy; only the merged broker can
-  reserve and dispatch the published typed plan. No actor can enlarge argv, operation,
+- **Candidate isolation, not a runtime review session.** A candidate may build and validate its
+  closed strategy only in its task-owned isolated workspace, constrained to the confirmed
+  allowed paths and diff budget. The repairer receives no workspace source. Neither candidate
+  nor repairer has network, USB/HDC/RockUSB, Runtime or authority capability. They can only
+  propose a closed strategy; only the merged broker can reserve and dispatch the published typed
+  plan. No actor can enlarge argv, operation,
   partition, plan, archive, step set, target or authority.
 - **Evidence honesty and privacy.** Evidence records the real executor and authority kind;
   campaign confirmation is never represented as standing authorization. Device identifiers
@@ -134,9 +152,9 @@ Observable behavior:
 ## Approval and implementation sequence
 
 This proposal is a D1 Core/Safety decision. It intentionally remains `proposed` until a human
-maintainer explicitly approves the r2 policy scope; r1's review/merge did not authorize this
-additional `AGENTS.md` synchronization. After approval, the sole task below may synchronize the
-current Core files and run the listed host-only checks. A separate human review is required for
-change verification/archive and baseline ratification. No merge grants an authority instance;
-each real attempt still needs its own valid standing authorization or in-session campaign
-confirmation.
+maintainer explicitly approves the r3 policy scope; earlier r1/r2 review/merge did not authorize
+removal of the independent-review admission condition. After approval, the sole task below may
+synchronize the current Core files and remove the runtime review invocation while running the
+listed host-only checks. A separate human review is required for change verification/archive and
+baseline ratification. No merge grants an authority instance; each real attempt still needs its
+own valid standing authorization or in-session campaign confirmation.

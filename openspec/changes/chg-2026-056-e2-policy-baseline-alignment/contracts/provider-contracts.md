@@ -24,11 +24,14 @@ durably reserve the attempt immediately before dispatch. Campaign dispatch SHALL
 serial attempts in four hours, concurrency one. Each subsequent attempt requires a new reservation
 and a prior durable `safeToReflash` terminal based on complete outcome/readback. Unknown,
 unresolved or unsafe partial outcomes, identity/topology drift, expired/consumed authority,
-missing pins or non-PASS review stop permanently with zero new dispatch.
+or a missing/drifted immutable candidate pin stop permanently with zero new dispatch. The candidate
+pin is produced only after its fixed isolated build and closed strategy-output validation;
+independent adversarial review is not a dispatch prerequisite and cannot cause a runtime review
+session for each candidate modification.
 
-Candidate, repairer and reviewer cannot supply `executionAuthority`, executable/argv, operation,
-partition, plan, archive, Step set or target; they have no device transport capability. A Profile,
-CLI argument, Task payload, imported Manifest, evidence record or post-hoc chat text cannot
+Candidate and repairer cannot supply `executionAuthority`, executable/argv, operation, partition,
+plan, archive, Step set or target; they have no device transport capability. A Profile, CLI
+argument, Task payload, imported Manifest, evidence record or post-hoc chat text cannot
 promote `standardAgent`, mint/expand either E2 authority, or retroactively authorize dispatch.
 Historical one-shot `chatConfirmation` remains decode/export-only. Authority issuance and evidence
 provenance are separate: a valid evidence record never authorizes a Provider call.

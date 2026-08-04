@@ -19,8 +19,9 @@ validation, evidence packaging, an imported Manifest, caller assertion or a late
 SHALL NOT mint, change, expand or retrospectively supply authority.
 
 Missing, stale, mismatched, unknown or non-durable trusted facts; authority/effect mismatch;
-unmatched intent/outcome; missing candidate/review pin; or unverifiable Artifact hash SHALL block
-evidence publication. This blocker SHALL NOT change the underlying Job result into success and
+unmatched intent/outcome; missing immutable candidate pin; or unverifiable Artifact hash SHALL
+block evidence publication. An independent adversarial review is not an evidence or dispatch
+prerequisite. This blocker SHALL NOT change the underlying Job result into success and
 SHALL NOT dispatch or replay a device Step. Target identity and raw artifacts retain the privacy
 and immutability rules of the current baseline.
 

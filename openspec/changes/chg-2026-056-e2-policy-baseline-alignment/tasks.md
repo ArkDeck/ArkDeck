@@ -28,19 +28,28 @@
   - `openspec/baselines/CORE-4.0.0.yaml`
   - `openspec/platforms/PLATFORM-PROFILES.lock.yaml`
   - `openspec/changes/chg-2026-056-e2-policy-baseline-alignment/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckHarness/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
 - Forbidden paths:
-  - `Catalog/**`, `Packages/**`, `scripts/**`, and all integration/device profiles
+  - `Catalog/**`, `scripts/**`, and all integration/device profiles
   - standing authorization or campaign confirmation instances
   - real device/HDC/RockUSB tooling, raw shell command surfaces, or hardware evidence claiming a
     dispatch
-- Risk: destructive (the policy changes when an Agent may dispatch; the implementation work here
-  is documentation/contract synchronization only and must perform zero external effect)
+- Risk: destructive (the policy removes an E2 pre-dispatch reviewer. Implementation may change
+  only the listed Runtime review/pin plumbing and tests, and must perform zero external effect)
 - Hardware required: no
 - Decision-Grade: D1
 
 ### Deliverables
 
 - Apply the approved deltas to current Core files without weakening the exact E2 envelope.
+- Remove the production adversarial-review invocation from the campaign and workspace-promotion
+  paths. A changed candidate must proceed only after its existing fixed isolated build and closed
+  strategy-output validation; it must not create a separate reviewer process/session or require a
+  review receipt/digest. Preserve decoder-only access to historical review-bearing records where
+  needed, but do not mint new review gates.
 - Add `AC-FLASH-015-03` to the canonical acceptance index/cases and update the `REQ-WF-004`
   evidence authority vocabulary.
 - Create `CORE-4.0.0` only in the human-reviewed archive/ratification PR; set macOS to
@@ -50,10 +59,13 @@
 ### Verification
 
 - Source review proves every current policy/contract representation has the same two authority
-  kinds, the same exact-pins/fresh-readback gate, and the same fail-closed terminal set.
-- Negative contract tests cover missing, expired, consumed, drifted, non-PASS, unknown and unsafe
-  campaign states with destructive dispatch count 0; the positive test uses only fake/provider
-  fixtures and verifies truthful authority correlation.
+  kinds, immutable-candidate/fresh-readback gate and fail-closed terminal set, without an
+  adversarial-review precondition.
+- Contract tests prove a changed candidate cannot enter admission before the fixed isolated
+  build/strategy-output validation, then reaches the fake admission path without a reviewer
+  invocation; missing, expired, consumed, drifted, unknown and unsafe campaign states retain
+  destructive dispatch count 0. The positive test uses only fake/provider fixtures and verifies
+  truthful authority correlation.
 - Run `sh scripts/check-sdd.sh`, catalog generator unit tests/generation check, full parallel
   `swift test`, and the PR path preflight before submitting the implementation/archive PR.
 

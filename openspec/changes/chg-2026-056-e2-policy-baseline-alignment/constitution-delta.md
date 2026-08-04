@@ -21,23 +21,25 @@
    attempts、四小时、并发一。
 
 在每一个真实 destructive Step 前，merged broker SHALL 从已发布 typed plan 重新计算
-plan/step set，读取 fresh target/binding facts，并校验 authority、candidate/review pins、
-reservation ordinal、有效期和全部预算。任一缺失、已消费、漂移、过期、超限、非 PASS
-review、没有 fresh reservation、身份/拓扑不确定、outcomeUnknown、unresolved intent 或
-unsafe partial write SHALL fail closed：新 destructive dispatch 数为 0，并持久记录
-blocked 或 terminal disposition。
+plan/step set，读取 fresh target/binding facts，并校验 authority、immutable candidate pin、
+reservation ordinal、有效期和全部预算。任一缺失、已消费、candidate/authority 漂移、过期、
+超限、没有 fresh reservation、身份/拓扑不确定、outcomeUnknown、unresolved intent 或 unsafe
+partial write SHALL fail closed：新 destructive dispatch 数为 0，并持久记录 blocked 或 terminal
+disposition。独立 adversarial review 不是 admission pin；candidate 修改不得因此强制创建
+review session。
 
 campaign 内未合入 candidate 只可在确认的 allowed paths/diff budget 所限定、task-owned
-isolation 中 build/test；repairer 不得取得 source workspace，reviewer 只可读取 immutable
-candidate/diff/build/test artifacts。candidate、repairer 与 adversarial reviewer 均不得取得
-network、USB/HDC/RockUSB、raw shell、Runtime 或 authority capability。它们只能在既有
-Catalog 的封闭策略空间内提出或评估 strategy；不得创建或改变 executable/argv、operation、
-partition、plan、archive、step set、target、broker 或 authorization。只有 protected-main
-broker 可在每轮 fresh readback 与 durable reservation 之后 dispatch。只有前一 attempt 已
-durable terminal 且 broker 基于完整 outcome/readback 分类为 `safeToReflash`，同一 invocation
-才 MAY 自动继续下一轮；success、unknown、unresolved、unsafe partial、drift、review/reparer
-rejection、取消后的 destructive intent、过期或预算耗尽均 SHALL 永久停止，且不得自动
-replay/recovery。
+isolation 中完成固定 build 与封闭策略输出校验，并生成 immutable candidate pin。candidate
+或其 pin 缺失/漂移 SHALL fail closed；独立 adversarial review 不是 reservation 或 dispatch
+的条件，产品不得因 candidate 修改而强制创建此类 review session。repairer 不得取得 source
+workspace。candidate 与 repairer 均不得取得 network、USB/HDC/RockUSB、raw shell、Runtime
+或 authority capability。它们只能在既有 Catalog 的封闭策略空间内提出 strategy；不得创建
+或改变 executable/argv、operation、partition、plan、archive、step set、target、broker 或
+authorization。只有 protected-main broker 可在每轮 fresh readback 与 durable reservation
+之后 dispatch。只有前一 attempt 已 durable terminal 且 broker 基于完整 outcome/readback
+分类为 `safeToReflash`，同一 invocation 才 MAY 自动继续下一轮；success、unknown、
+unresolved、unsafe partial、drift、repairer rejection、取消后的 destructive intent、过期或
+预算耗尽均 SHALL 永久停止，且不得自动 replay/recovery。
 
 普通 CI、后台 daemon/scheduler、无有效 E2 authority 的 Agent 和 caller-supplied
 authorization/context SHALL 只运行 contract/fake/simulated/plan-only 分支。已连接 USB、
