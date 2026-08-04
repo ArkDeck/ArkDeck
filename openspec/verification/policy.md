@@ -21,7 +21,7 @@
 6. **Real platform tests**:clean-host、Sandbox/SmartScreen、签名、安装、更新和辅助技术。
 7. **Real hardware matrix**:精确设备、固件、HDC、transport、权限和 Provider。
 
-低层测试不能替代高层证据。Simulation/fake 只能证明 orchestration，不证明硬件支持。真实设备 destructive 操作只有精确 E2 authority 才可执行：维护者经 merged PR 的 `standingAuthorization`，或同一受监督交互会话的精确 `evolutionCampaignConfirmation`。每次 attempt 均由 broker 校验 plan/target/authority/review/reservation/budget，并在任一漂移或未知状态 fail closed；普通 CI、scheduler/daemon 和无 authority 的 Agent 零 destructive dispatch（见 `governance/enforcement.md`）。
+低层测试不能替代高层证据。Simulation/fake 只能证明 orchestration，不证明硬件支持。真实设备 destructive 操作只有精确 E2 authority 才可执行：维护者经 merged PR 的 `standingAuthorization`，或同一受监督交互会话的精确 `evolutionCampaignConfirmation`。每次 attempt 均由 broker 校验 plan/target/authority/candidate pin、固定构建、封闭策略输出校验、reservation/budget，并在任一漂移或未知状态 fail closed；普通 CI、scheduler/daemon 和无 authority 的 Agent 零 destructive dispatch（见 `governance/enforcement.md`）。
 
 ## Core property invariants
 

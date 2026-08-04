@@ -558,7 +558,7 @@ package struct HarnessTaskMethodService: Sendable {
   /// the recorded documents, and the rendered files a client writes to a
   /// maintainer-chosen directory verbatim. `diffDigest` travels beside the
   /// files so the client can re-verify `final.patch` before writing it,
-  /// mirroring the review leg's both-sides digest check.
+  /// mirroring the candidate's both-sides digest check.
   static func encodePromotionExport(
     _ bundle: HarnessPromotionExportBundle, snapshot: HarnessTaskSnapshot
   ) -> JSONValue {

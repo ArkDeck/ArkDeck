@@ -19,7 +19,7 @@ package enum HarnessPromotionExportError: Error, Equatable, Sendable {
   /// guess which side is true.
   case inconsistentFacts(String)
   /// The immutable diff the candidate metadata names is absent or no longer
-  /// hashes to `diffDigest`. A bundle without the exact reviewed bytes is
+  /// hashes to `diffDigest`. A bundle without the exact candidate bytes is
   /// not the promotion.
   case diffUnavailable(String)
 }
@@ -182,7 +182,7 @@ package enum HarnessPromotionExport {
     lines.append(
       "Harness task `\(snapshot.htaskID)` closed with a promotion candidate: scope,")
     lines.append(
-      "build, tests, device verification, evaluation and adversarial review all")
+      "build, tests, device verification and evaluation all")
     lines.append("passed on attempt `\(attempt.attemptID)`.")
     lines.append("")
     lines.append("- Disposition: `\(promotion.disposition)`")
