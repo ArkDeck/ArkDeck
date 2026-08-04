@@ -5208,7 +5208,7 @@ public actor RuntimeJobEngine {
           "\(step.stepID) has no exact Rockchip flash action")
       }
       arguments = [
-        "providerOperationId": .string("rockusb.wlx-write"),
+        "providerOperationId": .string("rockusb.wl-write"),
         "partition": .string("dayu200_mapped_set"),
         "imageArtifactId": .string(bundle.artifactID),
         "imageSha256": .string(bundle.sha256),

@@ -129,7 +129,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         stdout = "const.ohos.fullname = \(buildVersion)\n"
       case let value where value.count >= 3 && value.suffix(3) == ["shell", "hilog", "-x"]:
         stdout = "post-flash hilog\n"
-      case let value where value.first == "wlx":
+      case let value where value.first == "wl":
         stdout = "Write LBA from file (100%)\n"
       default:
         stdout = ""
@@ -396,6 +396,34 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         exitStatus: 0, stdout: Data(provider.utf8), stderr: Data(),
         stdoutTruncated: false, durationSeconds: 0)
     }
+  }
+
+  func testEveryMappedImageFitsInsideItsPinnedPartition() throws {
+    // An LBA write states its own address, so the safety property is no longer
+    // "the tool resolved the name" but "the image cannot reach the next
+    // partition". The pinned table is the same one the device readback is
+    // compared against before the first write.
+    let profile = RockchipFlashProfile.dayu200
+    for mapping in profile.mappedPartitions {
+      let span = try XCTUnwrap(
+        RockchipPinnedPartitionTable.span(for: mapping.partitionName),
+        mapping.partitionName)
+      XCTAssertEqual(span.first, mapping.offsetSectors, mapping.partitionName)
+
+      let member = try XCTUnwrap(
+        profile.member(named: mapping.imageMemberName), mapping.imageMemberName)
+      let imageSectors = (member.sizeBytes + 511) / 512
+      if let endExclusive = span.endExclusive {
+        XCTAssertLessThanOrEqual(
+          span.first + imageSectors, endExclusive, mapping.partitionName)
+      }
+    }
+
+    // The table carries no medium size, so only the last entry is open-ended.
+    XCTAssertNil(RockchipPinnedPartitionTable.span(for: "userdata")?.endExclusive)
+    XCTAssertNotNil(RockchipPinnedPartitionTable.span(for: "boot_linux")?.endExclusive)
+    XCTAssertNil(RockchipPinnedPartitionTable.span(for: "not-a-partition"))
+    XCTAssertEqual(RockchipPinnedPartitionTable.entries.count, 15)
   }
 
   func testRejectedReceiptExcerptKeepsTheNewestOutputOnOneLine() throws {
@@ -1598,10 +1626,17 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertTrue(invocations.contains { $0.arguments == ["ld"] })
     XCTAssertTrue(invocations.contains { $0.arguments == ["ppt"] })
     XCTAssertTrue(invocations.contains { $0.arguments == ["rd"] })
-    let writes = invocations.filter { $0.arguments.first == "wlx" }
-    XCTAssertEqual(
-      writes.map { $0.arguments[1] },
-      RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName))
+    let writes = invocations.filter { $0.arguments.first == "wl" }
+    // Written by exact sector, in mapped order: `wlx <name>` let the tool pick
+    // the address and truncated a 64 MiB image to 12 MiB while reporting
+    // success, so the address is now stated from the pinned table.
+    let mapped = RockchipFlashProfile.dayu200.mappedPartitions
+    XCTAssertEqual(writes.map { $0.arguments[1] }, mapped.map { String($0.offsetSectors) })
+    for mapping in mapped {
+      XCTAssertEqual(
+        RockchipPinnedPartitionTable.span(for: mapping.partitionName)?.first,
+        mapping.offsetSectors, mapping.partitionName)
+    }
     XCTAssertTrue(writes.allSatisfy(\.criticalNonInterruptible))
     let readbackPartitions = await readbackLog.snapshot()
     XCTAssertEqual(

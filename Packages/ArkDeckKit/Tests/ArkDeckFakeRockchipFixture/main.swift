@@ -27,10 +27,12 @@ case "ppt":
   for row in rows {
     print(row)
   }
-case "wlx":
-  guard arguments.count == 3 else { fail("wlx requires partition and descriptor path") }
-  guard arguments[1].range(of: #"^[a-z0-9_]+$"#, options: .regularExpression) != nil else {
-    fail("invalid partition")
+case "wl":
+  guard arguments.count == 3 else { fail("wl requires begin sector and descriptor path") }
+  guard arguments[1].range(of: #"^[0-9]+$"#, options: .regularExpression) != nil,
+    arguments[1] == "0" || arguments[1].first != "0"
+  else {
+    fail("invalid begin sector")
   }
   var metadata = stat()
   guard lstat(arguments[2], &metadata) == 0,

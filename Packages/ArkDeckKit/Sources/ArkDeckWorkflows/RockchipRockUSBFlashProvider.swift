@@ -430,7 +430,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
           declaredCancellation: .criticalNonInterruptible,
           declaredBindingRequirement: .confirmedDevice,
           arguments: [
-            "providerOperationId": .string("rockusb.wlx-write"),
+            "providerOperationId": .string("rockusb.wl-write"),
             "partition": .string(partition.partitionName),
             "imageArtifactId": .string(member.name),
             "imageSha256": .string(member.sha256.lowercased()),
@@ -677,9 +677,12 @@ public struct RockchipRockUSBFlashProvider: Sendable {
           + "`sudo rkdeveloptool ld` that the device reports 0x2207:0x350a in Loader mode.",
         "Read the current partition table with `sudo rkdeveloptool ppt` and compare it row by "
           + "row against the FA-001 §2 baseline (15 rows).",
-        "Re-write the 9 mapped partitions with `sudo rkdeveloptool wlx <name> <image>` in "
-          + "Profile write order from a validated archive "
-          + "(the CHG-2026-016 attempt #5 verified recovery route).",
+        "Re-write the 9 mapped partitions with "
+          + "`sudo rkdeveloptool wl <beginSec> <image>` in Profile write order from a "
+          + "validated archive, using the FA-001 §2 first sector you just compared. "
+          + "The `wlx <name>` route CHG-2026-016 attempt #5 verified was observed on "
+          + "2026-08-04 to write only the leading 12 MiB of a 64 MiB image and still "
+          + "report success, so it is no longer the recovery route.",
         "Reset with `sudo rkdeveloptool rd` and confirm the device boots and reconnects.",
       ],
       disclosures: [
