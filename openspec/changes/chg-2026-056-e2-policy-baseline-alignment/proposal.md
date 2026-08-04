@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
 revision: 3
-status: proposed
+status: approved
 class: core
 core_change_level: major
 owner: lvye
@@ -27,6 +27,12 @@ platforms: [macos, windows, linux]
 > 结论、CI 结果或 candidate 自述变成 authority，也不允许 candidate 接触设备、Runtime
 > 或 authority；它只移除每次候选修改都会新建独立 review 会话的前置门，也移除
 > workspace promotion 在既有 evaluation 通过后再强制创建的同类运行时会话。
+>
+> scope correction（2026-08-04）：#1031 合入后，实施审计确认现有任务的 Runtime
+> 路径清单遗漏了三处仅负责历史 review-bearing evidence 解码/投影的既有代码。补入
+> `AuthorizationUsageLedger`、`HardwareEvidenceProjector` 与 `AgentDaemon` 的精确文件
+> 路径，使新 campaign 可以不写 review digest，同时旧记录仍可 decode/export；不扩大
+> authority、provider、operation、设备或 dispatch 范围。
 
 ## Why
 

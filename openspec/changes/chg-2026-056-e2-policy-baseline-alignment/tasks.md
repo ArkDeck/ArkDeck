@@ -2,14 +2,15 @@
 
 ## TASK-E2B-001 — Promote bounded E2 policy into the Core baseline
 
-- Status:blocked (awaiting human approval of this D1 Core/Safety proposal; no implementation,
-  authority instance, hardware connection or dispatch is authorized by this task state)
+- Status:in-progress (`CHG-2026-056@r3` was approved by the human-reviewed merge of #1031;
+  implementation remains host-only and cannot create authority instances, connect hardware, or
+  dispatch)
 - Golden Journey: GJ-4 (a correct E2 admission boundary is required before the real-device
   closed-loop Flash/verify journey can be claimed)
 - Platform: macos, windows, linux
 - Requirements: `POL-AGENT-002`, `REQ-FLASH-015`, `REQ-WF-004`
 - Acceptance: `AC-FLASH-015-01`, `AC-FLASH-015-02`, `AC-FLASH-015-03`, `AC-WF-004-03`
-- Depends on: maintainer review/merge approving `CHG-2026-056`; existing
+- Depends on: maintainer review/merge approving `CHG-2026-056` (#1031); existing
   `CHG-2026-025@r15` remains the implementation provenance until archive/ratification
 - Allowed paths:
   - `AGENTS.md`
@@ -30,6 +31,9 @@
   - `openspec/changes/chg-2026-056-e2-policy-baseline-alignment/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckHarness/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/AuthorizationUsageLedger.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
 - Forbidden paths:
@@ -38,7 +42,8 @@
   - real device/HDC/RockUSB tooling, raw shell command surfaces, or hardware evidence claiming a
     dispatch
 - Risk: destructive (the policy removes an E2 pre-dispatch reviewer. Implementation may change
-  only the listed Runtime review/pin plumbing and tests, and must perform zero external effect)
+  only the listed Runtime review/pin plumbing, historical evidence compatibility projection, and
+  tests, and must perform zero external effect)
 - Hardware required: no
 - Decision-Grade: D1
 
