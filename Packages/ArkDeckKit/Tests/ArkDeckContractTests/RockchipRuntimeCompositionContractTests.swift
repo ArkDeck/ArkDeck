@@ -398,6 +398,31 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  func testRejectedReceiptExcerptKeepsTheNewestOutputOnOneLine() throws {
+    // A truncated capture ends mid-progress, so the useful part is the end.
+    let progress = (1...400).map { "Write LBA \($0) 100%\n" }.joined()
+    let excerpt = FoundationRockchipRuntimeActionExecutor.outputExcerpt(
+      Data(progress.utf8))
+
+    XCTAssertTrue(excerpt.hasSuffix("Write LBA 400 100%"), excerpt)
+    XCTAssertFalse(excerpt.contains("Write LBA 1 100%"))
+    XCTAssertFalse(excerpt.contains("\n"))
+    XCTAssertFalse(excerpt.contains("\r"))
+    XCTAssertLessThanOrEqual(excerpt.count, 201)
+  }
+
+  func testRejectedReceiptExcerptSurvivesShortAndBinaryOutput() throws {
+    XCTAssertEqual(
+      FoundationRockchipRuntimeActionExecutor.outputExcerpt(Data("Write LBA failed".utf8)),
+      "Write LBA failed")
+    XCTAssertEqual(FoundationRockchipRuntimeActionExecutor.outputExcerpt(Data()), "")
+
+    let binary = Data([0xFF, 0xFE, 0x00]) + Data("tail".utf8)
+    let excerpt = FoundationRockchipRuntimeActionExecutor.outputExcerpt(binary)
+    XCTAssertTrue(excerpt.hasSuffix("tail"), excerpt)
+    XCTAssertFalse(excerpt.contains("\n"))
+  }
+
   func testRouterSelectsOnlyFromTypedAction() async throws {
     let log = DispatchLog()
     let router = RuntimeProcessDispatcherRouter(
