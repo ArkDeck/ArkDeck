@@ -1254,7 +1254,10 @@ final class AgentDaemonContractTests: XCTestCase {
   /// ARKDECK_* keys to decide which dispatcher, host and provider it builds -
   /// so a daemon spawned bare answers according to whatever the developer
   /// happened to export, and the test states none of it. Every ARKDECK_ key
-  /// is stripped; a case that needs one puts it back by name.
+  /// is stripped; a case that needs one puts it back by name. The child also
+  /// receives a private Foundation home under its explicit test state root:
+  /// real daemon tests run in parallel, and their Application Support or
+  /// UserDefaults state must not share the ambient runner account.
   private func launchProductionDaemon(
     binary: URL, stateDirectory: URL, hdcPath: String? = nil,
     extraEnvironment: [String: String] = [:]
@@ -1265,6 +1268,13 @@ final class AgentDaemonContractTests: XCTestCase {
     var environment = ProcessInfo.processInfo.environment.filter {
       !$0.key.hasPrefix("ARKDECK_")
     }
+    let processHome = stateDirectory
+      .appendingPathComponent("process-home", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: processHome, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    environment["HOME"] = processHome.path
+    environment["CFFIXED_USER_HOME"] = processHome.path
     if let hdcPath { environment["ARKDECK_HDC_PATH"] = hdcPath }
     environment.merge(extraEnvironment) { _, configured in configured }
     process.environment = environment
