@@ -45,6 +45,11 @@ platforms: [macos, windows, linux]
 > 测试与精确消费方路径，以删除废弃 reviewer adapter、三门 queue 逻辑和历史 cache 字段。
 > 不修改 worker/transport/lease 行为、GitHub 路由、CI workflow、维护者 review/merge 或
 > 任何 Runtime/设备边界。
+>
+> scope amendment（2026-08-04，worker cursor test）：实施前的全量字段引用扫描确认
+> `test_worker_cursor.py` 也以 `review_run` 构造 cursor fixture；补入这一个测试文件，
+> 使删除 cursor 字段的测试闭包完整。其余 scope、worker runtime、transport、lease、CI 与
+> Runtime/设备边界均不变。
 
 ## Why
 
