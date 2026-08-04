@@ -28,6 +28,7 @@
   - `scripts/host_loop/cursor.py`
   - `scripts/host_loop/__main__.py`
   - `scripts/host_loop/test_cursor_contract.py`
+  - `scripts/host_loop/test_worker_cursor.py`
   - `scripts/host_loop/test_v3_hardening.py`
   - `scripts/host_loop/test_instance_contract.py`
   - `openspec/verification/policy.md`
