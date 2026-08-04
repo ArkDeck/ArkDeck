@@ -79,6 +79,15 @@ struct TargetStoreFactsPort: HDCObservationFactsPort {
     guard let record = try targetStore.find(targetID: targetID) else {
       throw DeviceProviderError.factsUnavailable("target \(targetID) has not been adopted")
     }
+    // The HDC facts identity is derived from the connect key — the same
+    // derivation `confirm-evidence-target` verifies. The record's
+    // `stablePhysicalIdentitySHA256` is NOT usable here: after a Loader-mode
+    // flash the binding lineage advances it to the Loader-mode (campaign)
+    // identity while the connect key deliberately stays normal-mode, and
+    // publishing the campaign identity on the HDC facts made every
+    // device-bound operation fail `targetIdentityMismatch` from binding
+    // revision 2 onward. The Rockchip provider keeps publishing the store
+    // identity; each provider's identity closes over its own address surface.
     return ProviderFacts(
       providerID: "hdc",
       toolVersion: record.toolVersion,
@@ -86,7 +95,8 @@ struct TargetStoreFactsPort: HDCObservationFactsPort {
       serverFacts: [:],
       targetID: record.targetID,
       bindingRevision: record.bindingRevision,
-      deviceIdentitySHA256: record.stablePhysicalIdentitySHA256,
+      deviceIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
+        connectKey: record.connectKey),
       executionConnectKey: record.connectKey,
       deviceMode: "hdc",
       buildFingerprint: nil,

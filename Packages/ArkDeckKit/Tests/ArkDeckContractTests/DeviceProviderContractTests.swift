@@ -624,6 +624,47 @@ final class DeviceProviderContractTests: XCTestCase {
       action: action, context: context)
     else { return XCTFail("an unregistered transport row must fail closed") }
   }
+
+  func testHDCIdentityIsDerivedFromTheConnectKeyNotTheCampaignIdentity() throws {
+    // The facts port and confirm-evidence-target must share one derivation:
+    // the connect key. After a Loader-mode flash the target store's
+    // `stablePhysicalIdentitySHA256` advances to the Loader-mode (campaign)
+    // identity while the connect key stays normal-mode — publishing that
+    // campaign identity on the HDC facts made every device-bound operation
+    // fail `targetIdentityMismatch` from binding revision 2 onward
+    // (GJ-1 re-run, 2026-08-05).
+    XCTAssertEqual(
+      HDCObservationProviderAdapter.stableIdentitySHA256(
+        connectKey: "150100424A544E4600"),
+      "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      "derivation is case-insensitive over the connect key")
+    // The production DAYU200 anchor: the adopted target ID prefix is this
+    // exact derivation of its normal-mode connect key.
+    XCTAssertTrue(
+      HDCObservationProviderAdapter.stableIdentitySHA256(
+        connectKey: "150100424a544434520325874bbf4900"
+      ).hasPrefix("958780b2ffb7"))
+
+    func receipt(_ rows: String) -> ProviderProcessReceipt {
+      ProviderProcessReceipt(
+        exitStatus: 0, stdout: Data(rows.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.1)
+    }
+    let action = TypedProviderAction.hdc(.observeDevice(connectKey: "resolved-by-binding"))
+    let campaignIdentityContext = ProviderExecutionContext(
+      jobID: "job-1", stepID: "step-1", targetID: "TGT-1", bindingRevision: 1,
+      connectKey: "150100424a544e4600",
+      expectedIdentitySHA256: String(repeating: "a", count: 64),
+      toolVersion: "3.2.0f", toolSHA256: String(repeating: "a", count: 64),
+      nowUTC: "2026-07-29T00:00:00Z")
+    guard case .failed(let code, _) = try hdc.verify(
+      receipt: receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
+      action: action, context: campaignIdentityContext)
+    else {
+      return XCTFail("an expected identity that is not the connect-key derivation must fail")
+    }
+    XCTAssertEqual(code, "targetIdentityMismatch")
+  }
 }
 
 final class HDCCompatibilityProfileTests: XCTestCase {
