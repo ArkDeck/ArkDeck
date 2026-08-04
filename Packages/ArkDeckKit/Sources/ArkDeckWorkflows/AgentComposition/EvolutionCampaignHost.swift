@@ -334,7 +334,30 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         return RockchipEvolutionCampaignExecutionResult(
           campaignID: document.campaignID, attemptOrdinal: ordinal, flash: result)
       } catch {
+        if case RockchipFlashExecutionError.submissionRefused = error,
+          let current = try? ledger.load(document.campaignID),
+          let reservationID = current.activeReservation?.reservationID
+        {
+          // The daemon's authored rejection dispatched nothing — no job was
+          // created. Durable-ize that answer so the settle below reads a
+          // terminal with an empty external-intent set (exactly what
+          // `safeToReflash` requires) instead of an absence it must call
+          // unknown. If an engine-side terminal already exists it stands;
+          // this write losing a race means the request did reach a job
+          // after all, and the durable record is the authority.
+          try? _ = usageLedger.close(
+            reservationID: reservationID,
+            terminal: AgentAuthorityUsageTerminal(
+              status: .failed, closedAt: nowUTC(),
+              externalIntentEventIDs: []))
+        }
         document = (try? reconcileUnresolved(ledger.load(document.campaignID))) ?? document
+        if case RockchipFlashExecutionError.submissionRefused = error {
+          // Settled retry-safe above. Surface the refusal instead of looping
+          // the repairer against the same host fault; the operator fixes the
+          // daemon and continues the same campaign.
+          throw error
+        }
         if document.reservedAttemptCount == reservedBeforeDispatch,
           let mode = Self.startingModeMismatch(error)
         {
@@ -390,6 +413,19 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         || Set(terminal.confirmedNotExecutedIntentEventIDs)
           == Set(terminal.externalIntentEventIDs)
       {
+        disposition = .safeToReflash
+      } else if Set(terminal.confirmedNotExecutedIntentEventIDs)
+        .union(terminal.completedIntentEventIDs)
+        == Set(terminal.externalIntentEventIDs)
+      {
+        // Every dispatched mutation has a proven resolution: either its
+        // exact readback proved it never happened, or its own provider
+        // verification proved it completed. There is no unknown partial
+        // effect on the device — which is precisely what `safeToReflash`
+        // asserts. The 2026-08-04 shape this settles: nine verified writes,
+        // a verified reboot, and then a failure in a read-only wait; the
+        // device had booted the flashed build, and the campaign burned as
+        // `unsafePartial` anyway.
         disposition = .safeToReflash
       } else {
         disposition = .unsafePartial
@@ -565,6 +601,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     case .cancelledAtSafeBoundary: return "flash.cancelledAtSafeBoundary"
     case .invalidRequest: return "flash.invalidRequest"
     case .productionConfigurationUnavailable: return "flash.configurationUnavailable"
+    case .submissionRefused: return "flash.submissionRefused"
     case .recoveryRequired, .postflightMismatch: return "flash.unsafeFailure"
     }
   }

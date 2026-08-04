@@ -124,6 +124,11 @@ public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedEr
   case persistenceRejected(String)
   case semanticFailure(stepID: String, detail: String)
   case recoveryRequired(stepID: String, detail: String)
+  /// The runtime daemon answered the submission itself with a rejection —
+  /// no job was created, so provably nothing was dispatched at the device.
+  /// Distinct from `recoveryRequired`: a transport failure cannot prove the
+  /// daemon never accepted the request, but an explicit rejection can.
+  case submissionRefused(detail: String)
   case postflightMismatch
   case cancelledAtSafeBoundary
 
@@ -144,6 +149,8 @@ public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedEr
     case .semanticFailure(let stepID, let detail): "step \(stepID) failed: \(detail)"
     case .recoveryRequired(let stepID, let detail):
       "step \(stepID) has an unknown destructive outcome: \(detail)"
+    case .submissionRefused(let detail):
+      "the runtime daemon refused the submission before any job existed: \(detail)"
     case .postflightMismatch: "postflight identity or reconnect observation mismatched"
     case .cancelledAtSafeBoundary: "execution cancelled at a critical-write safe boundary"
     }

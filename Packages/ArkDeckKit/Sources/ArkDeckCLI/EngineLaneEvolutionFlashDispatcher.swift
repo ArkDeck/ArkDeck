@@ -37,6 +37,18 @@ package struct EngineLaneJobTerminal: Sendable, Equatable {
   }
 }
 
+/// The daemon explicitly rejected `job.submit` — no job identifier was ever
+/// minted, so nothing can have been dispatched. Only an authored daemon
+/// rejection may produce this; transport failures must not, because they
+/// cannot prove the daemon did not accept the request.
+package struct EngineLaneSubmissionRefusal: Error, Equatable {
+  package let detail: String
+
+  package init(detail: String) {
+    self.detail = detail
+  }
+}
+
 /// Everything the dispatcher needs from the daemon, as one injectable seam.
 /// The production value is `.overDaemonSocket`; contract tests substitute a
 /// recording gateway so the mapping can be pinned with zero RPC and zero
@@ -126,6 +138,14 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
     let terminal: EngineLaneJobTerminal
     do {
       terminal = try gateway.submitAndRun(requestJSON)
+    } catch let refusal as EngineLaneSubmissionRefusal {
+      // The daemon itself said no before a job existed. That is an authored
+      // answer, not a lost one: provably nothing was dispatched, and the
+      // campaign layer may settle the attempt retry-safe instead of sealing
+      // the whole campaign over a host configuration fault (the 2026-08-04
+      // shape: a daemon restarted without its HDC path rejected the submit
+      // and the campaign tombstoned as outcomeUnknown).
+      throw RockchipFlashExecutionError.submissionRefused(detail: refusal.detail)
     } catch {
       // Submit/run reported no terminal at all. The reservation may or may not
       // have been consumed on the other side, so this is unresolved, never a
@@ -281,11 +301,23 @@ extension EngineLaneRuntimeGateway {
             + "`arkdeck device adopt` before continuing the campaign")
       },
       submitAndRun: { requestJSON in
-        guard
-          case .object(let accepted) = try client.request(
-            method: "job.submit", params: ["requestJson": .string(requestJSON)]),
-          case .string(let jobID)? = accepted["jobId"]
-        else {
+        let accepted: [String: JSONValue]
+        do {
+          guard
+            case .object(let fields) = try client.request(
+              method: "job.submit", params: ["requestJson": .string(requestJSON)])
+          else {
+            throw AgentClientError.malformedResponse("job.submit returned no job identifier")
+          }
+          accepted = fields
+        } catch AgentClientError.daemonError(let code, let message) where code == "rejected" {
+          // An authored daemon rejection: the runtime refused the request and
+          // no job record exists. Typed so the campaign layer can settle the
+          // attempt retry-safe instead of unknown.
+          throw EngineLaneSubmissionRefusal(
+            detail: "the runtime rejected the submission: \(message)")
+        }
+        guard case .string(let jobID)? = accepted["jobId"] else {
           throw AgentClientError.malformedResponse("job.submit returned no job identifier")
         }
         let status = try client.request(

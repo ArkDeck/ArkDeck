@@ -673,19 +673,30 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   /// trail, while the separate resolution lets a campaign distinguish a
   /// retry-safe no-effect failure from an unsafe partial mutation.
   public let confirmedNotExecutedIntentEventIDs: [String]
+  /// Mutation intents whose step completed and was verified by its own
+  /// provider verification (never by a paired readback that may have been
+  /// skipped). Disjoint from `confirmedNotExecutedIntentEventIDs` by
+  /// construction: an effect cannot be both proven-absent and verified.
+  /// Together the two subsets let a settlement distinguish "every dispatched
+  /// mutation has a proven outcome" — retry-safe — from a genuine partial
+  /// write. Absent in ledgers written before 2026-08-04, which decodes as
+  /// empty and keeps the strict partial-write reading.
+  public let completedIntentEventIDs: [String]
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case status
     case closedAt
     case externalIntentEventIDs = "externalIntentEventIds"
     case confirmedNotExecutedIntentEventIDs = "confirmedNotExecutedIntentEventIds"
+    case completedIntentEventIDs = "completedIntentEventIds"
   }
 
   public init(
     status: AuthorizationUsageTerminalStatus,
     closedAt: String,
     externalIntentEventIDs: [String],
-    confirmedNotExecutedIntentEventIDs: [String] = []
+    confirmedNotExecutedIntentEventIDs: [String] = [],
+    completedIntentEventIDs: [String] = []
   ) throws {
     guard AuthorizationUsageValidation.isTimestamp(closedAt),
       Set(externalIntentEventIDs).count == externalIntentEventIDs.count,
@@ -695,7 +706,12 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
       confirmedNotExecutedIntentEventIDs.allSatisfy(
         AuthorizationUsageValidation.isIdentifier),
       Set(confirmedNotExecutedIntentEventIDs).isSubset(of: Set(externalIntentEventIDs)),
-      confirmedNotExecutedIntentEventIDs.isEmpty || status == .failed
+      confirmedNotExecutedIntentEventIDs.isEmpty || status == .failed,
+      Set(completedIntentEventIDs).count == completedIntentEventIDs.count,
+      completedIntentEventIDs.allSatisfy(AuthorizationUsageValidation.isIdentifier),
+      Set(completedIntentEventIDs).isSubset(of: Set(externalIntentEventIDs)),
+      Set(completedIntentEventIDs).isDisjoint(
+        with: Set(confirmedNotExecutedIntentEventIDs))
     else {
       throw AuthorizationUsageLedgerError.invalidRecord("invalid Agent authority terminal")
     }
@@ -703,6 +719,7 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
     self.closedAt = closedAt
     self.externalIntentEventIDs = externalIntentEventIDs
     self.confirmedNotExecutedIntentEventIDs = confirmedNotExecutedIntentEventIDs
+    self.completedIntentEventIDs = completedIntentEventIDs
   }
 
   public init(from decoder: Decoder) throws {
@@ -712,7 +729,9 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
       closedAt: container.decode(String.self, forKey: .closedAt),
       externalIntentEventIDs: container.decode([String].self, forKey: .externalIntentEventIDs),
       confirmedNotExecutedIntentEventIDs: try container.decodeIfPresent(
-        [String].self, forKey: .confirmedNotExecutedIntentEventIDs) ?? [])
+        [String].self, forKey: .confirmedNotExecutedIntentEventIDs) ?? [],
+      completedIntentEventIDs: try container.decodeIfPresent(
+        [String].self, forKey: .completedIntentEventIDs) ?? [])
   }
 }
 

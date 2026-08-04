@@ -4493,14 +4493,16 @@ public actor RuntimeJobEngine {
     case .pending, .legacyUnverified:
       return
     }
-    let intents = try mutationIntentEvidence(for: record.jobID)
+    let intents = try mutationIntentEvidence(
+      for: record.jobID, operationReference: record.operationReference)
     do {
       _ = try ledger.close(
         reservationID: evidence.reference,
         terminal: try AgentAuthorityUsageTerminal(
           status: status, closedAt: nowUTC(),
           externalIntentEventIDs: intents.all,
-          confirmedNotExecutedIntentEventIDs: intents.confirmedNotExecuted))
+          confirmedNotExecutedIntentEventIDs: intents.confirmedNotExecuted,
+          completedIntentEventIDs: intents.completed))
     } catch AuthorizationUsageLedgerError.reservationConflict {
       let existing = try? ledger.load().reservations.first {
         $0.reservationID == evidence.reference
@@ -4517,9 +4519,18 @@ public actor RuntimeJobEngine {
 
   /// The mutating intents this job durably journaled — what the campaign
   /// terminal must carry.
+  ///
+  /// Three resolutions per intent: journaled at all (`all`), proven not to
+  /// have happened (`confirmedNotExecuted`), and completed with its own
+  /// verified outcome (`completed`). A step whose truth is delegated to a
+  /// paired readback journals a succeeded outcome at dispatch, before
+  /// anything proved the effect — so those steps are excluded from
+  /// `completed` no matter what their outcome row says: their completion is
+  /// only as good as the readback, and the readback may legitimately have
+  /// been skipped.
   private func mutationIntentEvidence(
-    for jobID: String
-  ) throws -> (all: [String], confirmedNotExecuted: [String]) {
+    for jobID: String, operationReference: String
+  ) throws -> (all: [String], confirmedNotExecuted: [String], completed: [String]) {
     let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
     let replay: JournalReplay
     do {
@@ -4529,9 +4540,13 @@ public actor RuntimeJobEngine {
         "campaign mutation journal is unavailable for \(jobID): \(error)")
     }
     var identifiers: [String] = []
+    var stepIDByIntent: [String: String] = [:]
     for event in replay.events where event.kind == .stepIntent {
       guard let step = event.workflowStep, step.effect >= .deviceMutation else { continue }
       identifiers.append(event.eventID)
+      if let stepID = event.stepID {
+        stepIDByIntent[event.eventID] = stepID
+      }
     }
     let confirmed = Set(
       replay.events.compactMap { event -> String? in
@@ -4541,7 +4556,21 @@ public actor RuntimeJobEngine {
         else { return nil }
         return event.correlatedIntentEventID
       })
-    return (identifiers, identifiers.filter(confirmed.contains))
+    let succeeded = Set(
+      replay.events.compactMap { event -> String? in
+        guard event.kind == .stepOutcome,
+          event.payload["result"] == .string("succeeded")
+        else { return nil }
+        return event.correlatedIntentEventID
+      })
+    let readbackDelegated = Set((Self.readbackPairs[operationReference] ?? [:]).keys)
+    let completed = identifiers.filter { intentID in
+      guard succeeded.contains(intentID), !confirmed.contains(intentID),
+        let stepID = stepIDByIntent[intentID]
+      else { return false }
+      return !readbackDelegated.contains(stepID)
+    }
+    return (identifiers, identifiers.filter(confirmed.contains), completed)
   }
 
   private func recordCapabilityOutcome(

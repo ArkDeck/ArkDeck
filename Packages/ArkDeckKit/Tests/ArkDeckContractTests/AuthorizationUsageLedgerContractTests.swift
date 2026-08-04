@@ -45,6 +45,37 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     XCTAssertEqual(try ledger.load().reservations.count, 2)
   }
 
+  func testTerminalPinsCompletedIntentsAndDecodesHistoricalAbsence() throws {
+    // `completed` must be a subset of the dispatched intents and disjoint
+    // from the proven-absent set — an effect cannot be both verified-complete
+    // and proven never to have happened.
+    let terminal = try AgentAuthorityUsageTerminal(
+      status: .failed, closedAt: "2026-08-04T15:00:00Z",
+      externalIntentEventIDs: ["intent-flash-partitions", "intent-reboot-device"],
+      confirmedNotExecutedIntentEventIDs: ["intent-reboot-device"],
+      completedIntentEventIDs: ["intent-flash-partitions"])
+    XCTAssertEqual(terminal.completedIntentEventIDs, ["intent-flash-partitions"])
+    XCTAssertThrowsError(
+      try AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: "2026-08-04T15:00:00Z",
+        externalIntentEventIDs: ["intent-flash-partitions"],
+        completedIntentEventIDs: ["intent-enter-loader-mode"]))
+    XCTAssertThrowsError(
+      try AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: "2026-08-04T15:00:00Z",
+        externalIntentEventIDs: ["intent-flash-partitions"],
+        confirmedNotExecutedIntentEventIDs: ["intent-flash-partitions"],
+        completedIntentEventIDs: ["intent-flash-partitions"]))
+
+    var historical = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(terminal)) as? [String: Any])
+    historical.removeValue(forKey: "completedIntentEventIds")
+    let decoded = try JSONDecoder().decode(
+      AgentAuthorityUsageTerminal.self,
+      from: JSONSerialization.data(withJSONObject: historical))
+    XCTAssertEqual(decoded.completedIntentEventIDs, [])
+  }
+
   func testTerminalPinsConfirmedNotExecutedIntentsAndDecodesHistoricalAbsence() throws {
     let terminal = try AgentAuthorityUsageTerminal(
       status: .failed, closedAt: "2026-08-03T12:01:12Z",
