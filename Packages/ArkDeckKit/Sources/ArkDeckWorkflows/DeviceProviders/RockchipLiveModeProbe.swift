@@ -62,13 +62,19 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   private let rockchipResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
 
+  /// `toolWorkingDirectory` is the same prepared product-owned directory the
+  /// per-action host spawns in. `ld` writes the tool's implicit log exactly
+  /// like a destructive command does, so a probe that spawned in the caller's
+  /// cwd would put back the contamination the flash lane just removed.
   package init(
     hdcResolver: any RuntimeExecutableResolving,
-    rockchipResolver: any RuntimeExecutableResolving
+    rockchipResolver: any RuntimeExecutableResolving,
+    toolWorkingDirectory: URL
   ) {
     self.init(
       hdcResolver: hdcResolver, rockchipResolver: rockchipResolver,
-      runner: FoundationRockchipRuntimeCommandRunner())
+      runner: FoundationRockchipRuntimeCommandRunner(
+        workingDirectory: toolWorkingDirectory))
   }
 
   init(

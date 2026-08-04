@@ -62,7 +62,8 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
     // Real fault: the pre-remediation composition wiring — the read-only E0
     // discovery profile injected behind the production-declared tool.
     let defectiveAdapter = RockchipDeviceDiscoveryAdapter(
-      profile: .pinnedReadOnlyDiscovery, executor: executor)
+      profile: .pinnedReadOnlyDiscovery, executor: executor,
+      workingDirectory: FileManager.default.temporaryDirectory)
     let tool = productionDeclaredTool()
 
     do {
@@ -132,6 +133,63 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
       XCTAssertEqual(
         reason, "Rockchip tool config must be an empty owner-only regular file")
     }
+  }
+
+  /// The prepared directory must be one the Process port will bind a child
+  /// to, or the whole flash lane prepares cleanly and then refuses every spawn
+  /// as `workingDirectoryUnavailable`. A state root reached through a symlink
+  /// is the case that gets that wrong if the returned path is left unresolved.
+  func testPreparedToolRuntimeIsBindableWhenTheStateRootIsReachedThroughASymlink()
+    throws
+  {
+    let physical = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-rockchip-symlinked-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let link = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-rockchip-link-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer {
+      try? FileManager.default.removeItem(at: link)
+      try? FileManager.default.removeItem(at: physical)
+    }
+    try FileManager.default.createDirectory(at: physical, withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: physical)
+
+    let runtime = try RockchipProductToolRuntimeDirectory.prepare(root: link)
+
+    XCTAssertEqual(
+      runtime,
+      physical.appending(
+        path: RockchipProductToolRuntimeDirectory.directoryName,
+        directoryHint: .isDirectory).standardizedFileURL,
+      "the prepared directory must resolve to the one under the link's target")
+    // The exact gate `ProcessExecutor` applies before a launch.
+    XCTAssertEqual(runtime.resolvingSymlinksInPath().standardizedFileURL.path, runtime.path)
+  }
+
+  /// A daemon started with `--state-dir /tmp/...` has a state root whose real
+  /// spelling is `/private/tmp/...`. Foundation strips that `/private` only
+  /// while standardizing a path that already exists, so composing the
+  /// containment check against the not-yet-created child refused every such
+  /// root and took the whole flash lane down with it.
+  func testPreparedToolRuntimeAcceptsAStateRootSpelledUnderPrivate() throws {
+    let root = URL(fileURLWithPath: "/private/tmp", isDirectory: true).appending(
+      path: "arkdeck-rockchip-private-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let runtime = try RockchipProductToolRuntimeDirectory.prepare(root: root)
+
+    // Same directory as the caller's own spelling of it, proven by content
+    // rather than by comparing two path spellings.
+    let marker = runtime.appending(path: "marker", directoryHint: .notDirectory)
+    try Data("bound\n".utf8).write(to: marker)
+    XCTAssertEqual(
+      try Data(
+        contentsOf: root.appending(
+          path: RockchipProductToolRuntimeDirectory.directoryName, directoryHint: .isDirectory
+        ).appending(path: "marker", directoryHint: .notDirectory)),
+      Data("bound\n".utf8))
+    // The exact gate `ProcessExecutor` applies before a launch.
+    XCTAssertEqual(runtime.resolvingSymlinksInPath().standardizedFileURL.path, runtime.path)
   }
 
   // MARK: - Helpers
