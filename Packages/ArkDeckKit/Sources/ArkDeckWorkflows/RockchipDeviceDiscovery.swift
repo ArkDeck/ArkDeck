@@ -626,18 +626,21 @@ final class RockchipExecutableBookmarkAccess {
 public actor RockchipDeviceDiscoveryAdapter {
   private let profile: RockchipDiscoveryIntegrationProfile
   private let executor: FoundationProcessExecutor
-  private let workingDirectory: URL?
-
-  public init() {
-    profile = .pinnedReadOnlyDiscovery
-    executor = FoundationProcessExecutor()
-    workingDirectory = nil
-  }
+  /// Product-owned current directory for the `ld` child, prepared by
+  /// `RockchipProductToolRuntimeDirectory`.
+  ///
+  /// Not optional, and with no default, for the same reason
+  /// `FoundationRockchipRuntimeCommandRunner` has none: the tool resolves
+  /// `config.ini` and `log/` relative to its current directory on macOS, so a
+  /// composition that omits one writes into whichever directory the caller was
+  /// started from. `ld` is read-only on the device but writes that log exactly
+  /// like a destructive command does.
+  private let workingDirectory: URL
 
   init(
     profile: RockchipDiscoveryIntegrationProfile,
     executor: FoundationProcessExecutor = FoundationProcessExecutor(),
-    workingDirectory: URL? = nil
+    workingDirectory: URL
   ) {
     self.profile = profile
     self.executor = executor

@@ -357,7 +357,10 @@ final class RockchipToolBookmarkContractTests: XCTestCase {
     XCTAssertEqual(deniedCounter.startCount, 1)
 
     let e0Profile = RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery
-    let e0Adapter = RockchipDeviceDiscoveryAdapter(profile: e0Profile)
+    // These legs reject before any spawn, so the bound directory is only the
+    // one the adapter now requires, not part of what they assert.
+    let e0Adapter = RockchipDeviceDiscoveryAdapter(
+      profile: e0Profile, workingDirectory: FileManager.default.temporaryDirectory)
     let ordinaryClaimingE0 = RockchipSelectedDiscoveryTool(
       executableURL: executable,
       pathSource: .installedOrdinaryBookmark,
@@ -374,7 +377,8 @@ final class RockchipToolBookmarkContractTests: XCTestCase {
     }
 
     let productionProfile = RockchipDiscoveryIntegrationProfile.pinnedProduction
-    let productionAdapter = RockchipDeviceDiscoveryAdapter(profile: productionProfile)
+    let productionAdapter = RockchipDeviceDiscoveryAdapter(
+      profile: productionProfile, workingDirectory: FileManager.default.temporaryDirectory)
     let scopedClaimingProduction = RockchipSelectedDiscoveryTool(
       executableURL: executable,
       pathSource: .userSelectedSecurityScopedBookmark,

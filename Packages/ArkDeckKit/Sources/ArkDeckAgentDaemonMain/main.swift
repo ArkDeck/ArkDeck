@@ -232,22 +232,40 @@ Task.detached {
         executableSHA256: executableSHA))
     let rockchipResolver = BundledRockchipExecutableResolver()
     let rockchipDispatcher: BundledRockchipRuntimeDispatcher
+    // The RockUSB tool resolves `config.ini` and `log/` relative to its
+    // current directory on macOS, so every child of this lane is spawned in
+    // product-owned state instead of whatever directory the daemon was
+    // started from. Prepared here, once, before any dispatcher exists: the
+    // Process port revalidates the directory at each launch and a missing one
+    // is a refusal, so a failure has to be visible at composition rather than
+    // mid-flash. It stays under the daemon's own state directory, which keeps
+    // a `--state-dir` daemon hermetic exactly like the binding above.
+    var rockchipToolWorkingDirectory: URL?
+    var rockchipToolRuntimeFailure: String?
+    do {
+      rockchipToolWorkingDirectory = try RockchipProductToolRuntimeDirectory.prepare(
+        root: resolvedStateDirectory)
+    } catch {
+      rockchipToolRuntimeFailure = "\(error)"
+    }
     // Facts are measured only where the same per-action tool runtime is
     // composed. Without a descriptor-bound HDC there is no read-only surface
     // to measure the target's mode on, and a mode asserted without one is
     // exactly the fabrication #992 removed — so the port stays record-only.
     var rockchipProber: (any RockchipLiveModeProbing)?
-    if let hdcExecutableResolver {
+    if let hdcExecutableResolver, let toolWorkingDirectory = rockchipToolWorkingDirectory {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
         resolver: rockchipResolver,
         hdcResolver: hdcExecutableResolver,
-        stateDirectory: resolvedStateDirectory)
+        stateDirectory: resolvedStateDirectory,
+        toolWorkingDirectory: toolWorkingDirectory)
       rockchipProber = FoundationRockchipLiveModeProbe(
         hdcResolver: hdcExecutableResolver,
-        rockchipResolver: rockchipResolver)
+        rockchipResolver: rockchipResolver,
+        toolWorkingDirectory: toolWorkingDirectory)
     } else {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
-        resolver: rockchipResolver)
+        resolver: rockchipResolver, unavailableDetail: rockchipToolRuntimeFailure)
     }
     let rockchipProvider = RockchipFlashProviderAdapter(
       factsPort: TargetStoreRockchipRuntimeFactsPort(

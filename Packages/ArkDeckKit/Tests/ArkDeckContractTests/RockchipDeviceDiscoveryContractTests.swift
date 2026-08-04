@@ -313,13 +313,18 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     let executor = FoundationProcessExecutor(
       identityBoundPreSpawnHook: { _ in },
       launchObserver: { _ in launches.increment() })
-    let adapter = RockchipDeviceDiscoveryAdapter(profile: profile, executor: executor)
+    let toolWorkingDirectory = FileManager.default.temporaryDirectory
+    let adapter = RockchipDeviceDiscoveryAdapter(
+      profile: profile, executor: executor, workingDirectory: toolWorkingDirectory)
 
     let acceptedTool = selectedTool(executable: executable, sha256: executableHash)
     let request = try await adapter.processRequest(for: acceptedTool)
     XCTAssertEqual(request.process.executable, executable)
     XCTAssertEqual(request.process.arguments, ["ld"])
     XCTAssertEqual(request.process.environment, [:])
+    // The tool writes `log/` relative to its current directory, so the argv
+    // being closed is only half of "the caller supplies nothing".
+    XCTAssertEqual(request.process.workingDirectory, toolWorkingDirectory)
     XCTAssertEqual(request.process.timeout, 5)
     XCTAssertEqual(request.expectedSHA256, executableHash)
     XCTAssertFalse(request.process.arguments.contains("sudo"))
@@ -342,10 +347,13 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
     XCTAssertEqual(launches.value, 1)
   }
 
-  func testDefaultAdapterUsesOnlyTheCleanReadOnlyDiscoveryIdentity() async throws {
+  func testReadOnlyDiscoveryAdapterUsesOnlyTheCleanReadOnlyDiscoveryIdentity()
+    async throws
+  {
     let executable = URL(fileURLWithPath: "/usr/bin/true")
     let profile = RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery
-    let adapter = RockchipDeviceDiscoveryAdapter()
+    let adapter = RockchipDeviceDiscoveryAdapter(
+      profile: profile, workingDirectory: FileManager.default.temporaryDirectory)
     let selected = RockchipSelectedDiscoveryTool(
       executableURL: executable,
       pathSource: .userSelectedSecurityScopedBookmark,

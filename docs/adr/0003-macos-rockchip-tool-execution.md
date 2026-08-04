@@ -106,6 +106,15 @@ ArkDeck execution success.
   caller environment, PATH lookup, generic command forwarding, sudo, pkexec,
   driver/helper installation, system-rule changes, and group/ACL changes remain
   forbidden.
+- The caller's working directory is not part of the tool's input either. The
+  upstream tool resolves `config.ini` and `log/` next to its own executable
+  through `/proc/<pid>/exe`, which does not exist on macOS, so both degrade to
+  cwd-relative. Every lane that spawns it — engine, admission, preflight and
+  the read-only mode probe — SHALL bind the child to a prepared product-owned
+  `RockchipToolRuntime` directory, so the tool reads a reviewed empty
+  configuration and writes its log into product state rather than into
+  whichever directory the daemon or CLI was started from. A directory that
+  cannot be prepared refuses dispatch; it never falls back to the cwd.
 - The pinned discovery registry continues to describe the current
   user-selected E0 path until a separate approved change introduces a bundled
   component registry and explicitly migrates its consumers. This ADR does not
