@@ -112,7 +112,7 @@ CI 红 = 不能合并;CI 绿 ≠ 批准。授权判断永远来自维护者 revi
 ## 真实硬件与 destructive 操作
 
 - 执行分级(CHG-2026-025,POL-AGENT-002):**E0** 已发布 read-only operation 由默认只读策略在正常 target/tool/timeout/bytes/privacy 准入后可无人值守执行，不需要 Git Task/PR；**E1** deviceMutation 须有匹配的 per-device `RuntimeCapability`；**E2** destructive 须有精确 maintainer-merged `standingAuthorization` 或同一受监督交互会话的精确 `evolutionCampaignConfirmation`。两种 E2 authority 都须逐项匹配计划和目标；campaign 还固定 base/scope/toolchain/预算，最多 16 个串行 attempt、四小时、并发一。
-- 每个 E2 attempt 在首个真实设备 Step 前都 SHALL re-materialize typed plan、校验 authority/candidate/review pins、做 fresh target/binding readback 并 reserve ordinal。只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash` 时，才可自动继续；未知、unsafe、drifted、过期、超限、无 reservation 或非 PASS review 永久零新 dispatch。普通 CI、scheduler/daemon 与无上述 authority 的 Agent 仍只允许 contract、fake、simulated、plan-only 分支。
+- 每个 E2 attempt 在首个真实设备 Step 前都 SHALL re-materialize typed plan、校验 authority/candidate pins、做 fresh target/binding readback 并 reserve ordinal。只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash` 时，才可自动继续；未知、unsafe、drifted、过期、超限或无 reservation 永久零新 dispatch。普通 CI、scheduler/daemon 与无上述 authority 的 Agent 仍只允许 contract、fake、simulated、plan-only 分支。
 - 真实硬件 evidence 必须记录 executor(human 或 agent)、实际 effect/typed Step kinds 和按实际 effect 匹配的 authority reference（Agent E0=`defaultReadOnlyPolicy`、E1=`runtimeCapability`、E2=`standingAuthorization|evolutionCampaignConfirmation`）、设备身份摘要/binding、固件/工具版本、fresh target confirmation、attempt ordinal、执行时间和 Artifact reference/hash。campaign 不得记作 standing authorization；schema-valid evidence 只记录 provenance，不签发 capability 或授权 dispatch。
 - simulation/fake/plan-only 证据必须显式分类，永不计入真实硬件验收。Agent 不得自行创建、修改或批准 standing authorization；其授权与吊销的载体仍是维护者 merge 的 PR，git 历史是授权审计账本。
 

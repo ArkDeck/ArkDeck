@@ -489,15 +489,6 @@ Task.detached {
           + "model=\(decisionGateway.modelDescriptor.modelName)")
       fflush(stdout)
     }
-    // The Evolution promotion gate needs an independent reviewer; absent
-    // configuration the coordinator stops honestly at review time
-    // (`adversarialReviewerUnavailable`) instead of promoting unreviewed.
-    let adversarialReviewer = try HarnessVendorConfiguration.adversarialReviewer(
-      environment: ProcessInfo.processInfo.environment)
-    if let adversarialReviewer {
-      print("harness adversarial reviewer ready: \(adversarialReviewer.reviewerID)")
-      fflush(stdout)
-    }
     let harness = HarnessTaskCoordinator(
       store: harnessStore,
       jobPort: RuntimeJobEngineHarnessPort(engine: engine),
@@ -511,7 +502,6 @@ Task.detached {
           attemptStore: $0.attempts, artifactStore: artifactStore)
       },
       evolutionWorkspacePort: workspaceRepairConfiguration?.evolution,
-      adversarialReviewer: adversarialReviewer,
       nowUTC: utcNow,
       policyGuard: HarnessPolicyGuard(
         availability: RuntimeEngineAvailabilityPort(engine: engine),

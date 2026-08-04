@@ -345,7 +345,6 @@
                   "planDigest",
                   "targetBindingDigest",
                   "candidateDigest",
-                  "reviewDigest",
                   "brokerDigest"
                 ]
               }

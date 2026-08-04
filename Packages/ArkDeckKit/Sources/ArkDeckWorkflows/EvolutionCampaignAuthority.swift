@@ -723,19 +723,21 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
   }
 }
 
-/// Non-Codable, process-local permit.  CLI bytes cannot manufacture it; only
-/// the task-owned builder plus independent reviewer can return one.
+/// Non-Codable, process-local permit. CLI bytes cannot manufacture it; only
+/// the task-owned builder can return one after the fixed candidate checks.
 public final class RockchipEvolutionCampaignAttemptPermit: @unchecked Sendable, Equatable {
   let assertion: RockchipEvolutionCampaignConfirmationAssertion
   let candidate: RockchipEvolutionCandidatePin
-  let review: RockchipEvolutionReviewReceipt
+  /// Legacy receipts remain readable for historical ledgers but new permits
+  /// do not require or mint one.
+  let review: RockchipEvolutionReviewReceipt?
 
   package init(
     assertion: RockchipEvolutionCampaignConfirmationAssertion,
     candidate: RockchipEvolutionCandidatePin,
-    review: RockchipEvolutionReviewReceipt
+    review: RockchipEvolutionReviewReceipt? = nil
   ) throws {
-    try review.validate(candidate: candidate)
+    if let review { try review.validate(candidate: candidate) }
     guard candidate.baseCommitOID == assertion.baseCommitOID,
       candidate.toolchainDigestSHA256 == assertion.candidateToolchainDigestSHA256,
       candidate.changedFiles.count <= assertion.maxChangedFiles,
@@ -743,7 +745,7 @@ public final class RockchipEvolutionCampaignAttemptPermit: @unchecked Sendable, 
       candidate.strategy.operationReference == Self.operationReference(assertion),
       candidate.strategy.archiveDigestSHA256 == assertion.archiveDigestSHA256,
       candidate.strategy.stepSetDigestSHA256 == assertion.stepSetDigestSHA256,
-      review.planDigestSHA256 == assertion.planDigestSHA256,
+      (review == nil || review?.planDigestSHA256 == assertion.planDigestSHA256),
       candidate.changedFiles.allSatisfy(Self.isCandidateSource)
     else { throw RockchipEvolutionCampaignError.candidateRejected("campaignEnvelopeDrift") }
     self.assertion = assertion
@@ -956,7 +958,7 @@ actor RockchipEvolutionCampaignAdmissionService {
         from: reservationDate.addingTimeInterval(120)),
       campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
         candidateDigestSHA256: permit.candidate.digestSHA256,
-        reviewDigestSHA256: permit.review.digestSHA256,
+        reviewDigestSHA256: permit.review?.digestSHA256,
         brokerDigestSHA256: assertion.brokerExecutableDigestSHA256,
         executionTuning: try AgentAuthorityCampaignExecutionTuning(
           loaderDiscoveryTimeoutSeconds: permit.candidate.strategy.loaderDiscoveryTimeoutSeconds,
@@ -974,7 +976,6 @@ actor RockchipEvolutionCampaignAdmissionService {
       _ = try campaignLedger.reserveAttempt(
         campaignID: assertion.campaignID,
         candidateID: permit.candidate.candidateID,
-        reviewID: permit.review.reviewID,
         ordinal: ordinal, reservationID: reservation.reservationID,
         jobID: request.jobID, sessionID: sessionID,
         at: beforeReservation.auditTimestamp)

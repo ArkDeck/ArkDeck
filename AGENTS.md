@@ -92,11 +92,11 @@
   candidate scope/diff/toolchain、有效期和 attempt 上限，硬限制为最多 16 个串行 attempt、
   四小时、并发一；每次均须 fresh readback/reservation。上一 attempt 只有 durable terminal
   且 broker 分类为 `safeToReflash` 时，才可在同一 invocation 自动继续 closed repair/build/
-  test/review/broker Flash。缺失/已消费/过期/漂移 authority、非 PASS review、无 fresh
-  reservation、身份或结果未知、unresolved/unsafe partial、预算耗尽或取消后 intent 都永久
-  fail closed（零新 dispatch）。candidate 仅可在确认的 task-owned isolation 中接触 source
-  build/test；repairer 不得接触 source workspace，reviewer 只可读 immutable artifacts，三者
-  均不得接触设备/Runtime/authority 或改变 argv/operation/partition/plan/archive/step-set/target；
+  test/broker Flash。缺失/已消费/过期/漂移 authority、无 fresh reservation、身份或结果未知、
+  unresolved/unsafe partial、预算耗尽或取消后 intent 都永久 fail closed（零新 dispatch）。
+  candidate 仅可在确认的 task-owned isolation 中接触 source build/test；repairer 不得接触
+  source workspace；两者均不得接触设备/Runtime/authority 或改变
+  argv/operation/partition/plan/archive/step-set/target；
   只有 protected-main broker 可 dispatch。历史 one-shot `chatConfirmation` 和 legacy mode
   仅可 decode/export，新的 admission/reservation/dispatch 必须拒绝。evidence 如实记录
   executor、实际 authority kind/reference、fresh target confirmation、attempt 与时间；

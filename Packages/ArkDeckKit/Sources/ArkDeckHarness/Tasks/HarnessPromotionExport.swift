@@ -35,7 +35,8 @@ package struct HarnessPromotionExportBundle: Equatable, Sendable {
   package let promotion: HarnessPromotionCandidate
   package let candidate: HarnessCandidatePatch
   package let evaluation: HarnessEvaluation
-  package let review: HarnessAdversarialReview
+  /// Historical promotion bundles can include a review. New bundles omit it.
+  package let review: HarnessAdversarialReview?
   package let unifiedDiff: String
   package let files: [HarnessPromotionExportFile]
 }
@@ -70,23 +71,24 @@ package enum HarnessPromotionExport {
       candidate.attemptID == attempt.attemptID,
       candidate.baseRevision == promotion.baseRevision
     else { throw HarnessPromotionExportError.inconsistentFacts("candidatePatch") }
-    guard let review = attempt.review,
-      review.reviewID == promotion.reviewID,
-      review.candidatePatchID == candidate.candidatePatchID,
-      review.result == .pass, review.issues.isEmpty
-    else { throw HarnessPromotionExportError.inconsistentFacts("review") }
+    if let review = attempt.review {
+      guard review.reviewID == promotion.reviewID,
+        review.candidatePatchID == candidate.candidatePatchID,
+        review.result == .pass, review.issues.isEmpty
+      else { throw HarnessPromotionExportError.inconsistentFacts("review") }
+    } else if promotion.reviewID != nil {
+      throw HarnessPromotionExportError.inconsistentFacts("review")
+    }
     guard
       let evaluation = evaluations.first(where: {
         $0.evaluationID == promotion.evaluationID
       }),
-      review.evaluationID == evaluation.evaluationID,
       evaluation.htaskID == snapshot.htaskID,
       evaluation.verdict == .pass
     else { throw HarnessPromotionExportError.inconsistentFacts("evaluation") }
-    // The exact reviewed bytes, exactly as the review leg reads them: the
-    // live repair attempt carries the diff and the candidate metadata names
-    // it by digest. Absence or a mismatch is an integrity stop, never an
-    // export with substitute bytes.
+    // The exact candidate bytes are carried by the live repair attempt and
+    // named by the candidate metadata digest. Absence or a mismatch is an
+    // integrity stop, never an export with substitute bytes.
     guard let unifiedDiff = snapshot.repairAttempt?.proposal.unifiedDiff,
       candidate.namesDiff(unifiedDiff)
     else {
@@ -95,12 +97,12 @@ package enum HarnessPromotionExport {
           + "(sha256 \(candidate.diffDigest)) is not available to export")
     }
 
-    let files = [
+    var files = [
       HarnessPromotionExportFile(
         name: summaryFileName,
         contents: summaryMarkdown(
           snapshot: snapshot, attempt: attempt, promotion: promotion,
-          candidate: candidate, evaluation: evaluation, review: review)),
+          candidate: candidate, evaluation: evaluation, review: attempt.review)),
       HarnessPromotionExportFile(name: patchFileName, contents: unifiedDiff),
       HarnessPromotionExportFile(
         name: promotionFileName, contents: try prettyJSON(promotion)),
@@ -108,7 +110,6 @@ package enum HarnessPromotionExport {
         name: candidateFileName, contents: try prettyJSON(candidate)),
       HarnessPromotionExportFile(
         name: evaluationFileName, contents: try prettyJSON(evaluation)),
-      HarnessPromotionExportFile(name: reviewFileName, contents: try prettyJSON(review)),
       HarnessPromotionExportFile(
         name: manifestFileName,
         contents: try prettyJSON(
@@ -116,9 +117,13 @@ package enum HarnessPromotionExport {
             promotion: promotion, candidate: candidate, attempt: attempt,
             evaluation: evaluation))),
     ]
+    if let review = attempt.review {
+      files.append(HarnessPromotionExportFile(
+        name: reviewFileName, contents: try prettyJSON(review)))
+    }
     return HarnessPromotionExportBundle(
       htaskID: snapshot.htaskID, attemptID: attempt.attemptID, promotion: promotion,
-      candidate: candidate, evaluation: evaluation, review: review,
+      candidate: candidate, evaluation: evaluation, review: attempt.review,
       unifiedDiff: unifiedDiff, files: files)
   }
 
@@ -169,7 +174,7 @@ package enum HarnessPromotionExport {
     promotion: HarnessPromotionCandidate,
     candidate: HarnessCandidatePatch,
     evaluation: HarnessEvaluation,
-    review: HarnessAdversarialReview
+    review: HarnessAdversarialReview?
   ) -> String {
     var lines: [String] = []
     lines.append("# Promotion candidate \(promotion.promotionCandidateID)")
@@ -235,12 +240,14 @@ package enum HarnessPromotionExport {
           + "| \(evidence.verified) |")
     }
     lines.append("")
-    lines.append("## Adversarial review")
-    lines.append("")
-    lines.append(
-      "`\(review.reviewID)` by `\(review.reviewerID)` verdict: "
-        + "**\(review.result.rawValue)** (no issues)")
-    lines.append("")
+    if let review {
+      lines.append("## Historical adversarial review")
+      lines.append("")
+      lines.append(
+        "`\(review.reviewID)` by `\(review.reviewerID)` verdict: "
+          + "**\(review.result.rawValue)** (no issues)")
+      lines.append("")
+    }
     lines.append("## Artifact references")
     lines.append("")
     lines.append(

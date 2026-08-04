@@ -769,7 +769,9 @@ public struct AgentAuthorityCampaignExecutionTuning: Codable, Equatable, Sendabl
 
 public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
   public let candidateDigestSHA256: String
-  public let reviewDigestSHA256: String
+  /// Present only on historical review-bearing campaign records. New
+  /// candidates never mint a review digest.
+  public let reviewDigestSHA256: String?
   public let brokerDigestSHA256: String
   /// The reviewed candidate's bounded timing controls. This is carried by
   /// the reservation rather than request inputs, so a caller cannot tune an
@@ -785,12 +787,13 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
 
   public init(
     candidateDigestSHA256: String,
-    reviewDigestSHA256: String,
+    reviewDigestSHA256: String? = nil,
     brokerDigestSHA256: String,
     executionTuning: AgentAuthorityCampaignExecutionTuning? = nil
   ) throws {
-    guard [candidateDigestSHA256, reviewDigestSHA256, brokerDigestSHA256]
-      .allSatisfy(AuthorizationUsageValidation.isSHA256)
+    guard [candidateDigestSHA256, brokerDigestSHA256]
+      .allSatisfy(AuthorizationUsageValidation.isSHA256),
+      reviewDigestSHA256.map(AuthorizationUsageValidation.isSHA256) ?? true
     else {
       throw AuthorizationUsageLedgerError.invalidRecord(
         "campaign evidence provenance requires canonical digests")
@@ -806,7 +809,7 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
     try self.init(
       candidateDigestSHA256: container.decode(
         String.self, forKey: .candidateDigestSHA256),
-      reviewDigestSHA256: container.decode(String.self, forKey: .reviewDigestSHA256),
+      reviewDigestSHA256: container.decodeIfPresent(String.self, forKey: .reviewDigestSHA256),
       brokerDigestSHA256: container.decode(String.self, forKey: .brokerDigestSHA256),
       executionTuning: try container.decodeIfPresent(
         AgentAuthorityCampaignExecutionTuning.self, forKey: .executionTuning))
