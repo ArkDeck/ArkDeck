@@ -1123,6 +1123,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     let hdc = try resolveHDC()
     let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
     var receipts: [ProviderSubprocessReceipt] = []
+    var lastMalformedReason: String?
     while ContinuousClock.now < deadline {
       let receipt = try await run(
         executable: hdc,
@@ -1155,15 +1156,26 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       case .empty:
         break
       case .malformed(let reason):
-        throw RuntimeDispatchFailure.failed(
-          "HDC target list is malformed: \(reason)")
+        // A DAYU200 crossing a reboot passes through USB enumeration states
+        // in which the hdc server briefly prints a target line outside the
+        // registered 5-column family. On 2026-08-04 the wait after a fully
+        // verified flash+reboot died on one such read — and the device went
+        // on to boot fine, so the single malformed snapshot proved nothing
+        // about the target. One bad read is a moment in time; only a
+        // deadline's worth of them is a verdict. Record it, keep polling,
+        // and let the deadline stay the fail-closed boundary.
+        lastMalformedReason = reason
       }
       try await Task.sleep(for: .seconds(1))
     }
+    let malformedSuffix = lastMalformedReason.map {
+      "; last malformed target list read: \($0)"
+    } ?? ""
     throw RuntimeDispatchFailure.failed(
-      expectedConnected
+      (expectedConnected
         ? "descriptor-bound HDC target did not reconnect before the deadline"
         : "descriptor-bound HDC target did not disconnect before the deadline")
+        + malformedSuffix)
   }
 
   /// What the Loader transition command actually did, in one bounded clause.

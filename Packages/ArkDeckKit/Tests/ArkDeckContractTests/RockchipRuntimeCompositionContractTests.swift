@@ -665,6 +665,71 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(writes, [], "readback must never write")
   }
 
+  private actor PollCounter {
+    private(set) var polls = 0
+    func next() -> Int {
+      polls += 1
+      return polls
+    }
+  }
+
+  /// Serves one malformed `list targets -v` snapshot, then a Connected row —
+  /// the shape a rebooting DAYU200 produced on 2026-08-04, where the device
+  /// went on to boot fine after the single bad read.
+  private struct TransientMalformedListRunner: RockchipRuntimeCommandRunning {
+    let counter: PollCounter
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      guard arguments == ["list", "targets", "-v"] else {
+        throw RuntimeDispatchFailure.failed("unexpected argv \(arguments)")
+      }
+      let stdout =
+        await counter.next() == 1
+        ? "device-1\tUSB\tConnected\n"
+        : "device-1\t\tUSB\tConnected\tlocalhost\n"
+      return ProviderSubprocessReceipt(
+        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0)
+    }
+  }
+
+  func testWaitForHDCReconnectSurvivesATransientMalformedTargetList() async throws {
+    // One malformed snapshot is a moment in USB enumeration, not a verdict
+    // about the target; the deadline is the fail-closed boundary. On
+    // 2026-08-04 a single such read failed the wait after a fully verified
+    // flash and reboot, and the campaign burned while the device booted.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let counter = PollCounter()
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: TransientMalformedListRunner(counter: counter))
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: .waitForHDCReconnect(connectKey: "device-1"),
+      stepID: "wait-for-hdc", toolSHA256: component.sha256)
+
+    let result = try await executor.execute(
+      action: .waitForHDCReconnect(connectKey: "device-1"),
+      descriptor: hostDescriptor(plan),
+      rockchipExecutable: component, actionDirectory: root)
+
+    XCTAssertEqual(result.summary["hdcState"], "connected")
+    let polls = await counter.polls
+    XCTAssertEqual(polls, 2, "the malformed first read must be re-polled, not fatal")
+  }
+
   func testAFailureAfterTheFirstWriteStaysUnresolved() async throws {
     // The mutation control for the rule above: once a write has been spawned
     // the device may have changed, so the same failure must NOT be restated as
