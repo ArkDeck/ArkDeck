@@ -559,6 +559,203 @@ final class EvolutionCampaignContractTests: XCTestCase {
       [.safeToReflash, .succeeded])
   }
 
+  func testCompletedAndProvenAbsentMutationsReconcileSafeAndContinue() async throws {
+    // The 2026-08-04 job that burned campaign ECAMP-8FE52CB8: every mutation
+    // step verified (writes, reboot), then a read-only wait failed and the
+    // attempt was sealed unsafePartial while the device booted the flashed
+    // build. When every dispatched mutation has a proven resolution — its
+    // own verified completion or a proven absence — nothing about the device
+    // is unknown, and the campaign may retry.
+    let root = temporaryDirectory("campaign-completed-mutations")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
+    _ = try ledger.create(assertion)
+    _ = try ledger.appendCandidate(
+      campaignID: assertion.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
+
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: assertion.confirmationDigestSHA256,
+      baseCommitOID: assertion.baseCommitOID,
+      planDigestSHA256: assertion.planDigestSHA256,
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      targetStableIdentitySHA256: assertion.targetStableIdentitySHA256,
+      bindingLineageRootRevision: assertion.bindingLineageRootRevision,
+      confirmedAt: assertion.confirmedAt, validUntil: assertion.validUntil,
+      maximumAttempts: assertion.maxAttempts)
+    let usage = try usageReservation(
+      reference: authorityRef, ordinal: 1, jobID: "job-completed-mutations")
+    _ = try usageLedger.reserve(usage)
+    _ = try usageLedger.close(
+      reservationID: usage.reservationID,
+      terminal: AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: Self.confirmedAt,
+        externalIntentEventIDs: [
+          "intent-enter-loader-mode", "intent-flash-partitions", "intent-reboot-device",
+        ],
+        confirmedNotExecutedIntentEventIDs: ["intent-reboot-device"],
+        completedIntentEventIDs: ["intent-enter-loader-mode", "intent-flash-partitions"]))
+    _ = try ledger.reserveAttempt(
+      campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+      ordinal: 1, reservationID: usage.reservationID,
+      jobID: "job-completed-mutations", sessionID: "session-completed-mutations",
+      at: Self.confirmedAt)
+
+    let flash = SuccessAfterReconciledEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger, usageLedger: usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+    let result = try await host.continueCampaign(
+      campaignID: assertion.campaignID,
+      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      targetLocationSelector: "42")
+
+    XCTAssertEqual(result.attemptOrdinal, 2)
+    XCTAssertEqual(
+      try ledger.load(assertion.campaignID).events
+        .filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.safeToReflash, .succeeded])
+  }
+
+  func testMutationsWithoutAProvenResolutionStayUnsafePartial() async throws {
+    // The mutation control: one dispatched mutation with neither a verified
+    // completion nor a proven absence keeps the strict partial-write reading,
+    // and the campaign stays sealed.
+    let root = temporaryDirectory("campaign-partial-mutations")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
+    _ = try ledger.create(assertion)
+    _ = try ledger.appendCandidate(
+      campaignID: assertion.campaignID, candidate: candidate,
+      at: Self.confirmedAt)
+
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: assertion.confirmationDigestSHA256,
+      baseCommitOID: assertion.baseCommitOID,
+      planDigestSHA256: assertion.planDigestSHA256,
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      targetStableIdentitySHA256: assertion.targetStableIdentitySHA256,
+      bindingLineageRootRevision: assertion.bindingLineageRootRevision,
+      confirmedAt: assertion.confirmedAt, validUntil: assertion.validUntil,
+      maximumAttempts: assertion.maxAttempts)
+    let usage = try usageReservation(
+      reference: authorityRef, ordinal: 1, jobID: "job-partial-mutations")
+    _ = try usageLedger.reserve(usage)
+    _ = try usageLedger.close(
+      reservationID: usage.reservationID,
+      terminal: AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: Self.confirmedAt,
+        externalIntentEventIDs: [
+          "intent-enter-loader-mode", "intent-flash-partitions",
+        ],
+        completedIntentEventIDs: ["intent-enter-loader-mode"]))
+    _ = try ledger.reserveAttempt(
+      campaignID: assertion.campaignID, candidateID: candidate.candidateID,
+      ordinal: 1, reservationID: usage.reservationID,
+      jobID: "job-partial-mutations", sessionID: "session-partial-mutations",
+      at: Self.confirmedAt)
+
+    let flash = SuccessAfterReconciledEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger, usageLedger: usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+    do {
+      _ = try await host.continueCampaign(
+        campaignID: assertion.campaignID,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42")
+      XCTFail("an unresolved mutation must keep the campaign sealed")
+    } catch {}
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertTrue(document.isTerminal)
+    XCTAssertEqual(
+      document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.unsafePartial])
+    let dispatches = await flash.dispatchCount()
+    XCTAssertEqual(dispatches, 0, "a sealed campaign must not dispatch")
+  }
+
+  func testDaemonRefusedSubmissionSettlesRetrySafeAndSurfaces() async throws {
+    // The 2026-08-04 shape that burned campaign ECAMP-CF1406F8: the daemon
+    // (restarted without its HDC path) rejected job.submit, no job was ever
+    // created, and the attempt tombstoned as outcomeUnknown — sealing the
+    // campaign over a host configuration fault. An authored daemon rejection
+    // dispatched nothing: the attempt settles retry-safe, the refusal
+    // surfaces to the operator, and the same campaign continues once the
+    // daemon is fixed.
+    let root = temporaryDirectory("campaign-refused-submission")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let ledger = try RockchipEvolutionCampaignLedger(root: root.appending(path: "campaign"))
+    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
+    let assertion = try makeAssertion(maxAttempts: 3)
+    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
+    _ = try ledger.create(assertion)
+
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: assertion.confirmationDigestSHA256,
+      baseCommitOID: assertion.baseCommitOID,
+      planDigestSHA256: assertion.planDigestSHA256,
+      archiveDigestSHA256: assertion.archiveDigestSHA256,
+      stepSetDigestSHA256: assertion.stepSetDigestSHA256,
+      targetStableIdentitySHA256: assertion.targetStableIdentitySHA256,
+      bindingLineageRootRevision: assertion.bindingLineageRootRevision,
+      confirmedAt: assertion.confirmedAt, validUntil: assertion.validUntil,
+      maximumAttempts: assertion.maxAttempts)
+    let usage = try usageReservation(
+      reference: authorityRef, ordinal: 1, jobID: "job-refused-submission")
+    let campaignID = assertion.campaignID
+    let confirmedAt = Self.confirmedAt
+    let flash = RefusalAfterReserveEvolutionFlash {
+      _ = try usageLedger.reserve(usage)
+      let current = try ledger.load(campaignID)
+      guard let candidateID = current.events.compactMap(\.candidate).last?.candidateID
+      else { throw RockchipEvolutionCampaignError.campaignStopped("noCandidate") }
+      _ = try ledger.reserveAttempt(
+        campaignID: campaignID, candidateID: candidateID,
+        ordinal: 1, reservationID: usage.reservationID,
+        jobID: "job-refused-submission", sessionID: "session-refused-submission",
+        at: confirmedAt)
+    }
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: ledger, usageLedger: usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(),
+      flash: flash, nowUTC: { Self.confirmedAt })
+    do {
+      _ = try await host.continueCampaign(
+        campaignID: assertion.campaignID,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42")
+      XCTFail("a refused submission must surface to the operator")
+    } catch let error as RockchipFlashExecutionError {
+      guard case .submissionRefused = error else {
+        return XCTFail("expected submissionRefused, got \(error)")
+      }
+    }
+    let document = try ledger.load(assertion.campaignID)
+    XCTAssertFalse(document.isTerminal, "a refused submission must not seal the campaign")
+    XCTAssertEqual(
+      document.events.filter { $0.kind == .attemptTerminal }.map(\.disposition),
+      [.safeToReflash])
+    let closed = try usageLedger.load().reservations.first {
+      $0.reservationID == usage.reservationID
+    }
+    XCTAssertEqual(closed?.terminal?.status, .failed)
+    XCTAssertEqual(closed?.terminal?.externalIntentEventIDs, [])
+  }
+
   func testLedgerRejectsUnknownFieldsAndUnresolvedAttemptBecomesTerminalBeforeDispatch()
     async throws
   {
@@ -2061,6 +2258,26 @@ private actor SuccessAfterReconciledEvolutionFlash: RockchipEvolutionFlashDispat
   }
 
   func dispatchCount() -> Int { count }
+}
+
+/// Reserves the attempt exactly the way the production admitter would, then
+/// answers the way a daemon whose submission layer said no does: a typed
+/// refusal, no job, no terminal.
+private struct RefusalAfterReserveEvolutionFlash: RockchipEvolutionFlashDispatching {
+  let reserve: @Sendable () throws -> Void
+
+  init(reserve: @escaping @Sendable () throws -> Void) {
+    self.reserve = reserve
+  }
+
+  func execute(
+    _ request: RockchipFlashExecutionRequest,
+    admitted: RockchipEvolutionCampaignAdmittedAttempt?
+  ) async throws -> RockchipFlashExecutionResult {
+    try reserve()
+    throw RockchipFlashExecutionError.submissionRefused(
+      detail: "the runtime rejected the submission: flash.dayu200@1 is runtime unavailable")
+  }
 }
 
 private struct FixedEvolutionTargetReadback: RockchipEvolutionTargetReadbackReading {

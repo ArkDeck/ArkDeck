@@ -219,6 +219,36 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     }
   }
 
+  func testADaemonAuthoredRejectionAtSubmitIsTypedAsSubmissionRefused() async throws {
+    // Distinct from a dropped socket: the daemon itself answered "rejected",
+    // so no job exists and nothing was dispatched. The campaign layer settles
+    // this retry-safe instead of sealing the campaign as unknown (the
+    // 2026-08-04 ECAMP-CF1406F8 shape).
+    let gateway = EngineLaneRuntimeGateway(
+      importFlashBundle: { _, _, _ in "lease-contract" },
+      bindingRevision: { _ in 7 },
+      submitAndRun: { _ in
+        throw EngineLaneSubmissionRefusal(
+          detail:
+            "the runtime rejected the submission: flash.dayu200@1 is runtime unavailable")
+      })
+    let dispatcher = EngineLaneEvolutionFlashDispatcher(
+      runtimeTargetID: "TGT-DAYU200-70035", admitter: nil, gateway: gateway)
+    let request = try RockchipFlashExecutionRequest(
+      evolutionCampaignAttempt: try Self.permit(), archiveURL: Self.archiveURL,
+      targetLocationSelector: "42")
+
+    do {
+      _ = try await dispatcher.execute(request, admitted: Self.admitted())
+      XCTFail("an authored daemon rejection must surface as submissionRefused")
+    } catch let error as RockchipFlashExecutionError {
+      guard case .submissionRefused(let detail) = error else {
+        return XCTFail("expected submissionRefused, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("runtime unavailable"), detail)
+    }
+  }
+
   func testAnAdmittedAttemptThatNamesNoPublishedProfileNeverDispatches()
     async throws
   {
