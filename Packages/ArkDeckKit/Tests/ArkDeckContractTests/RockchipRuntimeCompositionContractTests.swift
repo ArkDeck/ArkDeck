@@ -129,7 +129,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         stdout = "const.ohos.fullname = \(buildVersion)\n"
       case let value where value.count >= 3 && value.suffix(3) == ["shell", "hilog", "-x"]:
         stdout = "post-flash hilog\n"
-      case let value where value.first == "wl":
+      case let value where value.first == "wl" || value.first == "wlx":
         stdout = "Write LBA from file (100%)\n"
       default:
         stdout = ""
@@ -444,6 +444,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   private struct MediumRunner: RockchipRuntimeCommandRunning {
     let log: WriteAttemptLog
     var backupSectorIsErased = false
+    var primarySectorIsErased = false
     var firstWriteFails = false
 
     func run(
@@ -463,16 +464,18 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         guard arguments.count == 4, let begin = Int64(arguments[1]),
           let count = Int64(arguments[2])
         else { throw RuntimeDispatchFailure.failed("unexpected rl argv") }
+        let erased =
+          (backupSectorIsErased && begin != 1) || primarySectorIsErased
         let payload =
-          (backupSectorIsErased && begin != 1)
+          erased
           ? Data(repeating: 0xCC, count: Int(count) * 512)
           : ScriptedCommandRunner.sectors(begin: begin, count: count)
         FileManager.default.createFile(atPath: arguments[3], contents: payload)
         stdout = "Read LBA from device (100%)\n"
-      case "wl":
+      case "wl", "wlx":
         await log.note(arguments)
         if firstWriteFails {
-          throw RuntimeDispatchFailure.failed("wl refused by the fixture")
+          throw RuntimeDispatchFailure.failed("write refused by the fixture")
         }
         stdout = "Write LBA from file (100%)\n"
       default:
@@ -535,10 +538,44 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   }
 
   func testAMediumRefusalBeforeTheFirstWriteIsConfirmedNotExecuted() async throws {
+    // A medium with no GPT at LBA 1 gives the name-addressed write nothing to
+    // resolve against, so the flash refuses — and because it refuses before
+    // any write is spawned, the campaign must be able to retry after the
+    // medium is fixed instead of being sealed as a possible partial write.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let log = WriteAttemptLog()
+    let executor = flashExecutor(
+      runner: MediumRunner(log: log, primarySectorIsErased: true), identity: identity)
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let bundle = flashBundle()
+    let plan = try rockchipPlan(
+      action: .flashPartitions(bundle), stepID: "flash-partitions",
+      toolSHA256: component.sha256)
+
+    do {
+      _ = try await executor.execute(
+        action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
+        rockchipExecutable: component, actionDirectory: root)
+      XCTFail("a medium with no GPT must refuse the flash")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted(let detail) = failure else {
+        return XCTFail("expected confirmedNotExecuted, got \(failure)")
+      }
+      XCTAssertTrue(detail.contains("no GPT header at LBA 1"), detail)
+    }
+    let writes = await log.writes
+    XCTAssertEqual(writes, [], "the probe must refuse before any write")
+  }
+
+  func testAWindowedReadDomainStillFlashesByNameAndSaysSo() async throws {
     // The 2026-08-04 device: the backup GPT sector the primary names does not
-    // read back. The probe correctly refuses — and because it refuses before
-    // any `wl`, the campaign must be able to retry after the medium is fixed
-    // instead of being sealed as a possible partial write.
+    // read back, yet a full name-addressed flash through this same loader
+    // landed and booted that evening. A short READ window must therefore not
+    // refuse the write path — it is recorded, the nine writes go through
+    // `wlx`, and the boot-side step carries the verification.
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let identity = String(repeating: "a", count: 64)
@@ -552,23 +589,84 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       action: .flashPartitions(bundle), stepID: "flash-partitions",
       toolSHA256: component.sha256)
 
-    do {
-      _ = try await executor.execute(
-        action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
-        rockchipExecutable: component, actionDirectory: root)
-      XCTFail("an unreachable medium must refuse the flash")
-    } catch let failure as RuntimeDispatchFailure {
-      guard case .confirmedNotExecuted(let detail) = failure else {
-        return XCTFail("expected confirmedNotExecuted, got \(failure)")
-      }
-      XCTAssertTrue(detail.contains("addressable medium ends before sector"), detail)
-    }
+    let result = try await executor.execute(
+      action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
+      rockchipExecutable: component, actionDirectory: root)
+
+    XCTAssertEqual(result.summary["addressableMedium"], "lba-read-window-only")
+    XCTAssertNotNil(result.summary["readDomainDetail"])
     let writes = await log.writes
-    XCTAssertEqual(writes, [], "the probe must refuse before any wl")
+    XCTAssertEqual(
+      writes.count, RockchipFlashProfile.dayu200.mappedPartitions.count)
+    for (write, mapping) in zip(writes, RockchipFlashProfile.dayu200.mappedPartitions) {
+      XCTAssertTrue(
+        write.hasPrefix("wlx \(mapping.partitionName) "),
+        "expected a name-addressed write for \(mapping.partitionName), got \(write)")
+    }
+  }
+
+  func testAFullReadDomainFlashesByNameAndRecordsTheReachableBackup() async throws {
+    // The healthy shape: the backup GPT reads back self-consistently, the
+    // writes are still name-addressed, and the summary says the whole table
+    // was reachable.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let log = WriteAttemptLog()
+    let executor = flashExecutor(
+      runner: MediumRunner(log: log), identity: identity)
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let bundle = flashBundle()
+    let plan = try rockchipPlan(
+      action: .flashPartitions(bundle), stepID: "flash-partitions",
+      toolSHA256: component.sha256)
+
+    let result = try await executor.execute(
+      action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
+      rockchipExecutable: component, actionDirectory: root)
+
+    XCTAssertEqual(result.summary["addressableMedium"], "backup-gpt-reachable")
+    XCTAssertNil(result.summary["readDomainDetail"])
+    let writes = await log.writes
+    XCTAssertEqual(
+      writes.count, RockchipFlashProfile.dayu200.mappedPartitions.count)
+    XCTAssertTrue(
+      writes.allSatisfy { $0.hasPrefix("wlx ") },
+      "every write must be name-addressed: \(writes)")
+  }
+
+  func testAWindowedReadDomainSkipsReadbackAndNamesTheAuthority() async throws {
+    // Readback hashing through a blind read path once condemned a flash that
+    // had in fact landed and booted. On a windowed domain the step must not
+    // hash filler — it records what it skipped and leaves the verdict to the
+    // boot-side build verification.
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let log = WriteAttemptLog()
+    let executor = flashExecutor(
+      runner: MediumRunner(log: log, backupSectorIsErased: true), identity: identity)
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let bundle = flashBundle()
+    let plan = try rockchipPlan(
+      action: .verifyFlashReadback(bundle), stepID: "verify-flash-readback",
+      toolSHA256: component.sha256)
+
+    let result = try await executor.execute(
+      action: .verifyFlashReadback(bundle), descriptor: hostDescriptor(plan),
+      rockchipExecutable: component, actionDirectory: root)
+
+    XCTAssertEqual(result.summary["readback"], "skipped-lba-read-window")
+    XCTAssertEqual(result.summary["partitionHashesVerified"], "0")
+    XCTAssertNotNil(result.summary["readDomainDetail"])
+    let writes = await log.writes
+    XCTAssertEqual(writes, [], "readback must never write")
   }
 
   func testAFailureAfterTheFirstWriteStaysUnresolved() async throws {
-    // The mutation control for the rule above: once a `wl` has been spawned
+    // The mutation control for the rule above: once a write has been spawned
     // the device may have changed, so the same failure must NOT be restated as
     // confirmed-not-executed.
     let root = try temporaryDirectory()
@@ -593,7 +691,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       guard case .failed(let detail) = failure else {
         return XCTFail("a post-write failure must stay unresolved, got \(failure)")
       }
-      XCTAssertTrue(detail.contains("wl refused by the fixture"), detail)
+      XCTAssertTrue(detail.contains("write refused by the fixture"), detail)
     }
     let writes = await log.writes
     XCTAssertEqual(writes.count, 1, "exactly the first write was dispatched")
@@ -1994,12 +2092,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertTrue(invocations.contains { $0.arguments == ["ld"] })
     XCTAssertTrue(invocations.contains { $0.arguments == ["ppt"] })
     XCTAssertTrue(invocations.contains { $0.arguments == ["rd"] })
-    let writes = invocations.filter { $0.arguments.first == "wl" }
-    // Written by exact sector, in mapped order: `wlx <name>` let the tool pick
-    // the address and truncated a 64 MiB image to 12 MiB while reporting
-    // success, so the address is now stated from the pinned table.
+    let writes = invocations.filter { $0.arguments.first == "wlx" }
+    // Written by partition name, in mapped order. Name-addressed writes are
+    // the only path with clean real-device evidence (booted flashes on
+    // 2026-07-21 and 2026-08-04); the truncation once attributed to `wlx`
+    // was an `rl` read-window artifact. The name still has to resolve to the
+    // pinned sector, which the span check below keeps honest.
     let mapped = RockchipFlashProfile.dayu200.mappedPartitions
-    XCTAssertEqual(writes.map { $0.arguments[1] }, mapped.map { String($0.offsetSectors) })
+    XCTAssertEqual(writes.map { $0.arguments[1] }, mapped.map(\.partitionName))
     for mapping in mapped {
       XCTAssertEqual(
         RockchipPinnedPartitionTable.span(for: mapping.partitionName)?.first,

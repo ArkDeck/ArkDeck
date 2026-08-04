@@ -678,11 +678,14 @@ public struct RockchipRockUSBFlashProvider: Sendable {
         "Read the current partition table with `sudo rkdeveloptool ppt` and compare it row by "
           + "row against the FA-001 §2 baseline (15 rows).",
         "Re-write the 9 mapped partitions with "
-          + "`sudo rkdeveloptool wl <beginSec> <image>` in Profile write order from a "
-          + "validated archive, using the FA-001 §2 first sector you just compared. "
-          + "The `wlx <name>` route CHG-2026-016 attempt #5 verified was observed on "
-          + "2026-08-04 to write only the leading 12 MiB of a 64 MiB image and still "
-          + "report success, so it is no longer the recovery route.",
+          + "`sudo rkdeveloptool wlx <name> <image>` in Profile write order from a "
+          + "validated archive. This is the CHG-2026-016 route verified on real "
+          + "hardware on 2026-07-21 and again on 2026-08-04 (flash landed and "
+          + "booted). The earlier report that `wlx` truncated a 64 MiB image came "
+          + "from an `rl` readback later shown to return uniform filler for every "
+          + "sector past this loader's read window regardless of what is on the "
+          + "medium — do not use `rl` to judge a write there; the booted system is "
+          + "the authority.",
         "Reset with `sudo rkdeveloptool rd` and confirm the device boots and reconnects.",
       ],
       disclosures: [

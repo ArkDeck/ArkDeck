@@ -292,6 +292,10 @@ public struct RockchipFlashProfile: Sendable {
       ],
       catalogReference: "dayu200@1",
       firmwareVersion: "legacy-pinned-build",
+      // `const.product.model` baked into the DAYU200 daily images is "ohos",
+      // not the board's marketing name (verified in the .33 and .35 system
+      // images and on the booted device on 2026-08-04).
+      runtimeProductModel: "ohos",
       runtimeBuildVersion: "OpenHarmony-7.0.0.33"
     )
   }()
@@ -381,7 +385,14 @@ public struct RockchipFlashProfile: Sendable {
       prerequisites: dayu200.prerequisites,
       catalogReference: "dayu200@2",
       firmwareVersion: "OpenHarmony-7.0.0.35-20260728_180253",
-      runtimeBuildVersion: "OpenHarmony-7.0.0.35-20260728_180253"
+      // The daily archive's *name* says 7.0.0.35, but the params baked into
+      // its system.img — and therefore what the booted device answers — say
+      // 7.0.0.36 (`const.ohos.fullname=OpenHarmony-7.0.0.36`, confirmed on
+      // the flashed device on 2026-08-04). Post-flash verification compares
+      // against the booted answer, so this pin must carry the embedded value,
+      // never one inferred from the archive name.
+      runtimeProductModel: "ohos",
+      runtimeBuildVersion: "OpenHarmony-7.0.0.36"
     )
   }()
 
