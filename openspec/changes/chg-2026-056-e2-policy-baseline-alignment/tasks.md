@@ -20,6 +20,8 @@
   - `openspec/contracts/provider-contracts.md`
   - `openspec/contracts/hardware-evidence.schema.json`
   - `openspec/governance/enforcement.md`
+  - `openspec/governance/host-loop-runbook.md`
+  - `openspec/templates/batch-digest.md`
   - `openspec/verification/policy.md`
   - `openspec/verification/acceptance-index.txt`
   - `openspec/verification/acceptance-cases.yaml`
@@ -50,6 +52,9 @@
 ### Deliverables
 
 - Apply the approved deltas to current Core files without weakening the exact E2 envelope.
+- Reconcile the live batch-digest template and host-loop runbook with the no-review policy: a
+  complete digest must not contain an independent-AI-review field or require a separate reviewer
+  session. Preserve normal maintainer PR review/merge and leave `scripts/host_loop/**` untouched.
 - Remove the production adversarial-review invocation from the campaign and workspace-promotion
   paths. A changed candidate must proceed only after its existing fixed isolated build and closed
   strategy-output validation; it must not create a separate reviewer process/session or require a
