@@ -1487,12 +1487,19 @@ private enum AgentAuthorityUsageValidation {
       AgentAuthorityCampaignEvidenceProvenance.CodingKeys.reviewDigestSHA256.rawValue,
     ])
     let terminalKeys = Set(AgentAuthorityUsageTerminal.CodingKeys.allCases.map(\.rawValue))
-    // `confirmedNotExecutedIntentEventIds` was added after schema 1.0.0 had
-    // already persisted terminals in production. The decoder gives its absent
-    // historical value the conservative empty set, so accept exactly that
-    // earlier closed shape too — never an arbitrary partial terminal.
-    let historicalTerminalKeys = terminalKeys.subtracting([
-      AgentAuthorityUsageTerminal.CodingKeys.confirmedNotExecutedIntentEventIDs.rawValue,
+    // Two fields were added after schema 1.0.0 had already persisted
+    // terminals in production: `confirmedNotExecutedIntentEventIds`
+    // (2026-08-03) and `completedIntentEventIds` (2026-08-04). The decoder
+    // gives each absent historical value the conservative empty set, so
+    // accept exactly those earlier closed generations too — never an
+    // arbitrary partial terminal. Forgetting a generation here does not
+    // relax anything; it bricks the daemon on its own ledger at startup
+    // (which is how the 2026-08-04 addition was caught).
+    let preCompletedTerminalKeys = terminalKeys.subtracting([
+      AgentAuthorityUsageTerminal.CodingKeys.completedIntentEventIDs.rawValue
+    ])
+    let historicalTerminalKeys = preCompletedTerminalKeys.subtracting([
+      AgentAuthorityUsageTerminal.CodingKeys.confirmedNotExecutedIntentEventIDs.rawValue
     ])
     for value in reservations {
       guard case .object(let reservation) = value,
@@ -1525,6 +1532,7 @@ private enum AgentAuthorityUsageValidation {
       }
       if case .object(let terminal)? = reservation["terminal"] {
         guard Set(terminal.keys) == terminalKeys
+          || Set(terminal.keys) == preCompletedTerminalKeys
           || Set(terminal.keys) == historicalTerminalKeys
         else {
           throw AuthorizationUsageLedgerError.invalidRecord(

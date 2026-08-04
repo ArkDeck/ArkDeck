@@ -45,6 +45,45 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
     XCTAssertEqual(try ledger.load().reservations.count, 2)
   }
 
+  func testLedgerDocumentsFromEveryTerminalGenerationStillLoad() throws {
+    // The closed-shape validator accepts exactly the persisted generations,
+    // and forgetting one does not relax anything — it bricks the daemon on
+    // its own ledger at startup, which is how the completedIntentEventIds
+    // addition was caught on 2026-08-04: agentd refused to boot over
+    // terminals written the day before.
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let ledger = try AgentAuthorityUsageLedger(root: directory)
+    let reservation = try e1Reservation(ordinal: 1, maximumUses: 3)
+    _ = try ledger.reserve(reservation)
+    _ = try ledger.close(
+      reservationID: reservation.reservationID,
+      terminal: try AgentAuthorityUsageTerminal(
+        status: .failed, closedAt: "2026-08-04T15:30:00Z",
+        externalIntentEventIDs: ["intent-flash-partitions"],
+        completedIntentEventIDs: ["intent-flash-partitions"]))
+
+    let ledgerURL = directory.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    for strippedKeys in [
+      ["completedIntentEventIds"],
+      ["completedIntentEventIds", "confirmedNotExecutedIntentEventIds"],
+    ] {
+      var document = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+      var reservations = try XCTUnwrap(document["reservations"] as? [[String: Any]])
+      for index in reservations.indices {
+        guard var terminal = reservations[index]["terminal"] as? [String: Any] else { continue }
+        for key in strippedKeys { terminal.removeValue(forKey: key) }
+        reservations[index]["terminal"] = terminal
+      }
+      document["reservations"] = reservations
+      try JSONSerialization.data(withJSONObject: document).write(to: ledgerURL)
+      let reloaded = try AgentAuthorityUsageLedger(root: directory).load()
+      let terminal = try XCTUnwrap(reloaded.reservations.first?.terminal)
+      XCTAssertEqual(terminal.completedIntentEventIDs, [String](), "\(strippedKeys)")
+    }
+  }
+
   func testTerminalPinsCompletedIntentsAndDecodesHistoricalAbsence() throws {
     // `completed` must be a subset of the dispatched intents and disjoint
     // from the proven-absent set — an effect cannot be both verified-complete
@@ -114,7 +153,12 @@ final class AuthorizationUsageLedgerContractTests: XCTestCase {
       JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
     var reservations = try XCTUnwrap(document["reservations"] as? [[String: Any]])
     var persistedTerminal = try XCTUnwrap(reservations[0]["terminal"] as? [String: Any])
+    // The generation that predates `confirmedNotExecutedIntentEventIds` also
+    // predates `completedIntentEventIds`; stripping only one would produce a
+    // hybrid shape no build ever persisted, which the closed-shape validator
+    // rightly refuses.
     persistedTerminal.removeValue(forKey: "confirmedNotExecutedIntentEventIds")
+    persistedTerminal.removeValue(forKey: "completedIntentEventIds")
     reservations[0]["terminal"] = persistedTerminal
     document["reservations"] = reservations
     try JSONSerialization.data(withJSONObject: document).write(to: ledgerURL)
