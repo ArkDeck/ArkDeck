@@ -773,7 +773,7 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
   /// candidates never mint a review digest.
   public let reviewDigestSHA256: String?
   public let brokerDigestSHA256: String
-  /// The reviewed candidate's bounded timing controls. This is carried by
+  /// The candidate's bounded timing controls. This is carried by
   /// the reservation rather than request inputs, so a caller cannot tune an
   /// engine-lane attempt after the broker has admitted it.
   public let executionTuning: AgentAuthorityCampaignExecutionTuning?
