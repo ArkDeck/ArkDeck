@@ -48,6 +48,37 @@ case "wl":
   }
   if arguments[1] == "critical_hold" { usleep(400_000) }
   print("Write LBA from file (100%)")
+case "rl":
+  guard arguments.count == 4 else { fail("rl requires begin sector, count and output path") }
+  guard let begin = Int64(arguments[1]), begin >= 0,
+    let count = Int64(arguments[2]), count > 0, count <= 1 << 20
+  else { fail("invalid rl range") }
+  // The medium probe reads the primary header and the backup it names, so the
+  // fake carries the same DAYU200 geometry the pinned table describes.
+  var payload = Data(repeating: 0, count: Int(count) * 512)
+  func writeHeader(at offset: Int, myLBA: Int64, alternateLBA: Int64) {
+    payload.replaceSubrange(offset..<(offset + 8), with: Array("EFI PART".utf8))
+    for (index, value) in [(24, myLBA), (32, alternateLBA), (40, Int64(34)),
+      (48, Int64(61_071_326))]
+    {
+      var raw = UInt64(bitPattern: value)
+      for byte in 0..<8 {
+        payload[offset + index + byte] = UInt8(raw & 0xFF)
+        raw >>= 8
+      }
+    }
+  }
+  if begin <= 1 && begin + count > 1 {
+    writeHeader(at: Int(1 - begin) * 512, myLBA: 1, alternateLBA: 61_071_359)
+  }
+  if begin <= 61_071_359 && begin + count > 61_071_359 {
+    writeHeader(
+      at: Int(61_071_359 - begin) * 512, myLBA: 61_071_359, alternateLBA: 1)
+  }
+  guard FileManager.default.createFile(atPath: arguments[3], contents: payload) else {
+    fail("cannot write rl output", code: 65)
+  }
+  print("Read LBA to file (100%)")
 case "rd":
   guard arguments.count == 1 else { fail("rd takes no arguments") }
   print("Reset Device OK.")

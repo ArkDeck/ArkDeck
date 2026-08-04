@@ -176,10 +176,43 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       outputByteBudget _: Int,
       criticalNonInterruptible: Bool
     ) async throws -> ProviderSubprocessReceipt {
-      await log.run(
+      // The pre-write medium probe reads real sectors, so the script has to
+      // produce them: the primary header and the backup it names, with the
+      // DAYU200 geometry the pinned table describes.
+      if arguments.count == 4, arguments[0] == "rl",
+        let begin = Int64(arguments[1]), let count = Int64(arguments[2])
+      {
+        FileManager.default.createFile(
+          atPath: arguments[3],
+          contents: Self.sectors(begin: begin, count: count))
+      }
+      return await log.run(
         executable: executable,
         arguments: arguments,
         criticalNonInterruptible: criticalNonInterruptible)
+    }
+
+    static func sectors(begin: Int64, count: Int64) -> Data {
+      var payload = Data(repeating: 0, count: Int(count) * 512)
+      func writeHeader(at offset: Int, myLBA: Int64, alternateLBA: Int64) {
+        payload.replaceSubrange(offset..<(offset + 8), with: Array("EFI PART".utf8))
+        for (index, value) in [
+          (24, myLBA), (32, alternateLBA), (40, Int64(34)), (48, Int64(61_071_326)),
+        ] {
+          var raw = UInt64(bitPattern: value)
+          for byte in 0..<8 {
+            payload[offset + index + byte] = UInt8(raw & 0xFF)
+            raw >>= 8
+          }
+        }
+      }
+      if begin <= 1, begin + count > 1 {
+        writeHeader(at: Int(1 - begin) * 512, myLBA: 1, alternateLBA: 61_071_359)
+      }
+      if begin <= 61_071_359, begin + count > 61_071_359 {
+        writeHeader(at: Int(61_071_359 - begin) * 512, myLBA: 61_071_359, alternateLBA: 1)
+      }
+      return payload
     }
   }
 
@@ -396,6 +429,28 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         exitStatus: 0, stdout: Data(provider.utf8), stderr: Data(),
         stdoutTruncated: false, durationSeconds: 0)
     }
+  }
+
+  func testGPTHeaderParseAcceptsOnlyARealHeader() throws {
+    let primary = try XCTUnwrap(
+      RockchipGPTHeader.parse(ScriptedCommandRunner.sectors(begin: 1, count: 1)))
+    XCTAssertEqual(primary.myLBA, 1)
+    XCTAssertEqual(primary.alternateLBA, 61_071_359)
+    XCTAssertEqual(primary.firstUsableLBA, 34)
+    XCTAssertEqual(primary.lastUsableLBA, 61_071_326)
+
+    let backup = try XCTUnwrap(
+      RockchipGPTHeader.parse(
+        ScriptedCommandRunner.sectors(begin: 61_071_359, count: 1)))
+    XCTAssertEqual(backup.myLBA, primary.alternateLBA)
+
+    // A sector past the addressable medium came back as uniform 0xCC on
+    // 2026-08-04 while the read itself reported success. That is the case the
+    // pre-write probe exists for, so it must not parse as a header.
+    XCTAssertNil(RockchipGPTHeader.parse(Data(repeating: 0xCC, count: 512)))
+    XCTAssertNil(RockchipGPTHeader.parse(Data(repeating: 0, count: 512)))
+    XCTAssertNil(RockchipGPTHeader.parse(Data(repeating: 0xFF, count: 512)))
+    XCTAssertNil(RockchipGPTHeader.parse(Data("EFI PART".utf8)))
   }
 
   func testEveryMappedImageFitsInsideItsPinnedPartition() throws {
