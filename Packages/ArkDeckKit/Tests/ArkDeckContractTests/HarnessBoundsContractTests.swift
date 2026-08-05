@@ -168,16 +168,70 @@ final class HarnessBoundsContractTests: XCTestCase {
       maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
     consumed: HarnessConsumedBudget = HarnessConsumedBudget(),
     noProgressRounds: Int = 0,
-    activeJobID: String? = nil
+    activeJobID: String? = nil,
+    evolutionPolicy: HarnessEvolutionPolicy? = nil
   ) -> HarnessTaskSnapshot {
     HarnessTaskSnapshot(
       htaskID: "HTASK-0123456789AB", type: .debugCrash, intakeDescription: nil,
       projectRef: "demo-app", target: HarnessTaskTargetReference(targetID: "TGT-1"),
       goal: HarnessTaskGoal(summary: "goal"), successCriteria: [], budgets: budgets,
       policy: HarnessTaskPolicy(allowedOperations: allowed),
+      evolutionPolicy: evolutionPolicy,
       createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
       status: .running, phase: phase, activeRound: 1, activeJobID: activeJobID,
       consumedBudget: consumed, noProgressRounds: noProgressRounds)
+  }
+
+  /// Where the human step belongs. A task that works in its own isolated copy
+  /// authorizes itself for that copy: nothing leaves it except through a
+  /// promotion a person merges, so a pre-issued grant would put a human in
+  /// front of a scratch directory while the pull request stays the real gate
+  /// — and the grant could not be written until the task had created the
+  /// workspace it names. A task editing a tree a person works in still needs
+  /// one, which is the half of the TASK-HFA-009 flip that was load-bearing.
+  func testAnIsolatedCopyAuthorizesItselfWhileASharedTreeStillNeedsAGrant() async {
+    let permitted: Set<String> = [
+      DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
+      "debug.hap@1", "flash.dayu200@1", "workspace.apply-patch@1",
+    ]
+    let budgets = HarnessTaskBudgets(
+      maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 2)
+    let withoutGrant = HarnessPolicyGuard(
+      availability: StubAvailabilityPort(), capabilities: StubCapabilityPort())
+    let isolation = try? HarnessEvolutionPolicy(
+      baseRevision: String(repeating: "a", count: 64),
+      allowedPaths: ["entry/src/main/ets/**"],
+      allowedOperations: ["workspace.apply-patch@1"])
+    XCTAssertNotNil(isolation)
+
+    let shared = snapshot(allowed: ["workspace.apply-patch@1"], budgets: budgets)
+    XCTAssertFalse(shared.requiresWorkspaceIsolation)
+    let sharedVerdict = await withoutGrant.evaluate(
+      guardInput(shared, operation: "workspace.apply-patch@1", permitted: permitted))
+    XCTAssertEqual(
+      sharedVerdict,
+      .refuse(
+        .authorizationRequired(reference: "workspace.apply-patch@1", effect: "deviceMutation")))
+
+    let isolated = snapshot(
+      allowed: ["workspace.apply-patch@1"], budgets: budgets, evolutionPolicy: isolation)
+    XCTAssertTrue(isolated.requiresWorkspaceIsolation)
+    let isolatedVerdict = await withoutGrant.evaluate(
+      guardInput(isolated, operation: "workspace.apply-patch@1", permitted: permitted))
+    XCTAssertEqual(isolatedVerdict, .allow)
+
+    // Self-authorizing is not unbounded: budget is still a stop for both.
+    let noBudget = snapshot(
+      allowed: ["workspace.apply-patch@1"],
+      budgets: HarnessTaskBudgets(
+        maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
+      evolutionPolicy: isolation)
+    let budgetVerdict = await withoutGrant.evaluate(
+      guardInput(noBudget, operation: "workspace.apply-patch@1", permitted: permitted))
+    XCTAssertEqual(
+      budgetVerdict,
+      .refuse(
+        .authorizationRequired(reference: "workspace.apply-patch@1", effect: "deviceMutation")))
   }
 
   private func guardInput(

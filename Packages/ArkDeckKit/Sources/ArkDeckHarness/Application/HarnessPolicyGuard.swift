@@ -285,6 +285,14 @@ public struct HarnessPolicyGuard: Sendable {
       // TASK-HFA-009 flip set on every `workspace.*` mutation) and still
       // fall through to the standing-grant requirement below.
       if descriptor.defaultPolicyIssuanceEnabled { return nil }
+      // A task that works in its own isolated copy is in the same position:
+      // the runtime issues its own bounded envelope for that copy, and the
+      // only way anything leaves it is a promotion a person merges. Demanding
+      // a pre-issued grant here would put a human in front of a scratch
+      // directory while the pull request — the actual gate — stays where it
+      // is, and the grant could not even be written until the task had
+      // created the workspace it names.
+      if input.snapshot.requiresWorkspaceIsolation { return nil }
       guard let capabilities else {
         return .authorizationRequired(reference: input.operationReference, effect: effect)
       }

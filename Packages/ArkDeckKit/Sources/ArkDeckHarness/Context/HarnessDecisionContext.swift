@@ -732,10 +732,18 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
   }
 
   /// Parse and validate raw model bytes against one context's offer.
+  ///
+  /// The field cap bounds a *prose* field, and the reason it exists is to keep
+  /// an unbounded essay out of a durable record — not to make a real answer
+  /// impossible. 1,024 characters refused a correct patch proposal on device
+  /// because its `expectedObservation` described what a rebuilt, redeployed
+  /// application should show; the diff itself was byte-perfect. 4,096 leaves
+  /// room for an honest one and is still two orders of magnitude below the
+  /// context envelope.
   public static func parse(
     _ data: Data,
     offeredOperations: Set<String>,
-    maximumFieldCharacters: Int = 1024
+    maximumFieldCharacters: Int = 4_096
   ) throws -> HarnessDecisionProposal {
     guard let decoded = try? JSONDecoder().decode(JSONValue.self, from: data),
       case .object(let fields) = decoded

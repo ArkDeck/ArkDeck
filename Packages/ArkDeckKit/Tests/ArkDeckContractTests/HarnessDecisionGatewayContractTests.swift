@@ -306,11 +306,23 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         ]), offeredOperations: offered)
     ) { XCTAssertEqual($0 as? HarnessDecisionRejection, .emptyHypothesis) }
 
-    XCTAssertThrowsError(
+    // The cap keeps an unbounded essay out of a durable record; it is not
+    // meant to make an honest answer impossible. A real explanation of a
+    // crash and its fix runs to a couple of thousand characters — the 1,024
+    // limit refused a byte-perfect patch proposal on device for the length of
+    // its `expectedObservation` alone.
+    XCTAssertNoThrow(
       try HarnessDecisionProposal.parse(
         encodeProposal([
           "kind": .string("noSafeAction"),
           "hypothesis": .string(String(repeating: "a", count: 2048)),
+        ]), offeredOperations: offered))
+
+    XCTAssertThrowsError(
+      try HarnessDecisionProposal.parse(
+        encodeProposal([
+          "kind": .string("noSafeAction"),
+          "hypothesis": .string(String(repeating: "a", count: 4_097)),
         ]), offeredOperations: offered)
     ) { XCTAssertEqual($0 as? HarnessDecisionRejection, .oversizedField("hypothesis")) }
   }

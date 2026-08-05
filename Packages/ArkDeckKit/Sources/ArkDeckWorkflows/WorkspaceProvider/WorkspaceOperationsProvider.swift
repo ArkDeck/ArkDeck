@@ -848,7 +848,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
         root: profile.projectRoot, profileVersion: profile.profileID,
         globs: profile.allowedFileGlobs),
       fileScopesDigest: WorkspaceProviderSupport.sha256(
-        Data(profile.allowedFileGlobs.sorted().joined(separator: "\n").utf8)))
+        Data(profile.allowedFileGlobs.sorted().joined(separator: "\n").utf8)),
+      isolatedTaskCopy: profile.kind == .evolution)
   }
 
   package func action(
