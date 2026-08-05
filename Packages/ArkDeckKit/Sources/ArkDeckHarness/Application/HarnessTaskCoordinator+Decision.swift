@@ -119,7 +119,11 @@ extension HarnessTaskCoordinator {
             round: snapshot.activeRound + 1,
             kind: proposal.kind,
             operationReference: proposal.operationReference,
-            inputs: proposal.inputs,
+            // The step that dispatches is the handler's, typed inputs and all.
+            // A proposal that named the operation and left the inputs alone
+            // gets them from the decision it agreed with, so what reaches the
+            // runtime is byte-identical to the unproposed round.
+            inputs: Self.effectiveInputs(of: proposal, against: deterministic.decision),
             patchProposal: proposal.patchProposal,
             requiredArtifacts: proposal.requiredArtifacts,
             expectedObservation: proposal.expectedObservation,
@@ -193,7 +197,23 @@ extension HarnessTaskCoordinator {
       guard proposed != DebugCrashTaskHandler.applyPatch,
         deterministic.kind == .invokeOperation,
         deterministic.operationReference == proposed,
-        deterministic.inputs == proposal.inputs
+        // Stated inputs must match exactly; *absent* inputs are the correct
+        // answer and take the handler's.
+        //
+        // The typed inputs are not the model's to author - a lease, a preset,
+        // a bundle, a duration and a cleanup policy are all the harness's, and
+        // the envelope instruction says so in as many words ("do not invent
+        // operation inputs or copy context metadata into inputs"). Demanding
+        // that the model echo them back byte-for-byte anyway made the
+        // instruction unfollowable: 23 of 36 rejected proposals across the two
+        // passing GJ-5 runs named the right operation and left inputs empty,
+        // exactly as told, and were refused for it.
+        //
+        // Nothing widens here. An empty-inputs proposal dispatches the
+        // handler's own step verbatim; what the model contributes is the
+        // hypothesis and reason code attached to it, and its standing ability
+        // to answer `noSafeAction` instead.
+        proposal.inputs.isEmpty || deterministic.inputs == proposal.inputs
       else { throw HarnessDecisionRejection.operationNotExpected(proposed) }
       return
     }
@@ -210,6 +230,23 @@ extension HarnessTaskCoordinator {
       throw HarnessDecisionRejection.operationNotExpected(
         proposal.operationReference ?? expected)
     }
+  }
+
+  /// The typed inputs an accepted proposal executes with.
+  ///
+  /// Only an `invokeOperation` that agreed with the handler's operation and
+  /// stated no inputs of its own inherits them; every other shape keeps what
+  /// it carried, which for a patch proposal, a `noSafeAction` or a
+  /// `requestHuman` is nothing.
+  static func effectiveInputs(
+    of proposal: HarnessDecisionProposal,
+    against deterministic: HarnessDecision
+  ) -> [String: JSONValue] {
+    guard proposal.kind == .invokeOperation, proposal.inputs.isEmpty,
+      let proposed = proposal.operationReference,
+      deterministic.operationReference == proposed
+    else { return proposal.inputs }
+    return deterministic.inputs
   }
 
   /// What the round is asking the model for, in the model's own vocabulary.
