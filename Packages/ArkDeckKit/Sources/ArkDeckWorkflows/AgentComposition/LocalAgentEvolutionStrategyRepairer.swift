@@ -1,11 +1,14 @@
-// The Codex-CLI adapter for Rockchip evolution campaign strategy repair.
+// The local agent-CLI adapter for Rockchip evolution campaign strategy repair.
 //
 // Extracted from EvolutionCandidatePipeline.swift: these adapters are the
 // pieces of the campaign pipeline that speak to an LLM, so they live in the
-// composition target (ArkDeckAgentComposition) together with the Codex CLI
+// composition target (ArkDeckAgentComposition) together with the agent CLI
 // transport, keeping ArkDeckWorkflows free of model prompts and of any
 // dependency on the harness plane. Its protocol and the campaign pipeline
 // remain in ArkDeckWorkflows.
+//
+// Which CLI answers is a `HarnessLocalAgentCLIProfile`, so this lane is not
+// tied to any one vendor's binary either.
 
 import ArkDeckCore
 import ArkDeckWorkflows
@@ -16,19 +19,21 @@ import Foundation
 /// normalized failure code and prior closed strategies, then returns timing/mode values that the
 /// isolated candidate executable and merged broker both validate. The first attempt is the
 /// protected-main baseline and never needs a model call.
-public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyRepairing {
+public struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyRepairing {
   public let repairerID: String
   private let executablePath: String
   private let executableSHA256: String
   private let modelName: String
   private let workingDirectory: String
-  private let transport: any HarnessCodexTransport
+  private let profile: HarnessLocalAgentCLIProfile
+  private let transport: any HarnessLocalAgentCLITransport
 
   public init(
+    profile: HarnessLocalAgentCLIProfile,
     executablePath: String,
     modelName: String,
     workingDirectory: String,
-    transport: any HarnessCodexTransport = CodexCLIProcessTransport()
+    transport: any HarnessLocalAgentCLITransport = LocalAgentCLIProcessTransport()
   ) throws {
     let executableURL = URL(fileURLWithPath: executablePath)
       .resolvingSymlinksInPath().standardizedFileURL
@@ -48,9 +53,10 @@ public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyR
       try Data(contentsOf: executableURL))
     self.modelName = modelName
     self.workingDirectory = workingDirectory
+    self.profile = profile
     self.transport = transport
     repairerID =
-      "codex-evolution-strategy-repairer@1:"
+      "\(profile.profileID)-evolution-strategy-repairer@1:"
       + String(
         RockchipEvolutionCampaignConfirmationAssertion.sha256(
           Data("\(executableSHA256)|\(modelName)".utf8)
@@ -90,13 +96,10 @@ public struct CodexRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyR
       prior:\n\(prior)
       """
     let response = try await transport.send(
-      HarnessCodexProcessRequest(
+      HarnessLocalAgentCLIRequest(
         executablePath: executablePath, executableSHA256: executableSHA256,
-        arguments: [
-          "exec", "--ephemeral", "--ignore-user-config", "--ignore-rules",
-          "--sandbox", "read-only", "--skip-git-repo-check", "-C", workingDirectory,
-          "--color", "never", "--model", modelName, prompt,
-        ], workingDirectory: workingDirectory, timeoutSeconds: 300))
+        profile: profile, modelName: modelName, prompt: prompt,
+        workingDirectory: workingDirectory, timeoutSeconds: 300))
     guard let root = try? JSONDecoder().decode(JSONValue.self, from: response),
       case .object(let fields) = root,
       Set(fields.keys) == [

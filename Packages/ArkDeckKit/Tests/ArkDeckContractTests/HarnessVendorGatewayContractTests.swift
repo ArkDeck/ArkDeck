@@ -40,15 +40,15 @@ private actor FailingTransport: HarnessModelTransport {
   }
 }
 
-private actor RecordingCodexTransport: HarnessCodexTransport {
+private actor RecordingCLITransport: HarnessLocalAgentCLITransport {
   private let reply: Data
-  private var seen: [HarnessCodexProcessRequest] = []
+  private var seen: [HarnessLocalAgentCLIRequest] = []
 
   init(reply: String) { self.reply = Data(reply.utf8) }
 
-  var requests: [HarnessCodexProcessRequest] { seen }
+  var requests: [HarnessLocalAgentCLIRequest] { seen }
 
-  func send(_ request: HarnessCodexProcessRequest) async throws -> Data {
+  func send(_ request: HarnessLocalAgentCLIRequest) async throws -> Data {
     seen.append(request)
     return reply
   }
@@ -141,83 +141,148 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     XCTAssertFalse(String(describing: gateway.modelDescriptor).contains(secretKey))
   }
 
-  func testProductionConfigurationSelectsTheIdentityBoundCodexCLIWithoutAnAPIKey() throws {
-    let transport = RecordingCodexTransport(reply: #"{"kind":"noSafeAction"}"#)
-    let codexWorkdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
-    let gateway = try XCTUnwrap(
-      HarnessVendorConfiguration.gateway(
-        environment: [
-          HarnessVendorConfiguration.providerKey: "codex",
-          HarnessVendorConfiguration.modelKey: "gpt-test",
-          HarnessVendorConfiguration.codexPathKey: "/bin/echo",
-          HarnessVendorConfiguration.codexWorkingDirectoryKey: codexWorkdir,
-        ],
-        codexTransport: transport))
-    XCTAssertEqual(gateway.producerID, "codex-cli-gateway@1")
-    XCTAssertEqual(gateway.modelDescriptor.provider, "openai-codex-cli")
+  /// The local-CLI lane is a closed set of profiles, not one vendor. Every
+  /// profile has to be selectable by name, report its own producer identity,
+  /// and refuse the same misconfigurations — otherwise "which CLI" quietly
+  /// becomes "whichever one the code was written against".
+  func testProductionConfigurationSelectsAnyIdentityBoundLocalAgentCLIWithoutAnAPIKey() throws {
+    let transport = RecordingCLITransport(reply: #"{"kind":"noSafeAction"}"#)
+    let workdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    XCTAssertEqual(
+      HarnessLocalAgentCLIProfile.all.map(\.profileID), ["codex", "claude-code"],
+      "the closed profile set is what keeps argv out of the environment")
 
-    XCTAssertThrowsError(
-      try HarnessVendorConfiguration.gateway(
-        environment: [
-          HarnessVendorConfiguration.providerKey: "codex",
-          HarnessVendorConfiguration.modelKey: "gpt-test",
-          HarnessVendorConfiguration.codexPathKey: "/bin/echo",
-        ],
-        codexTransport: transport)
-    ) { error in
-      XCTAssertEqual(
-        error as? HarnessVendorConfigurationError,
-        .missingCodexWorkingDirectory)
-    }
+    for profile in HarnessLocalAgentCLIProfile.all {
+      let gateway = try XCTUnwrap(
+        HarnessVendorConfiguration.gateway(
+          environment: [
+            HarnessVendorConfiguration.providerKey: profile.profileID,
+            HarnessVendorConfiguration.modelKey: "model-test",
+            HarnessVendorConfiguration.cliPathKey: "/bin/echo",
+            HarnessVendorConfiguration.cliWorkingDirectoryKey: workdir,
+          ],
+          cliTransport: transport))
+      XCTAssertEqual(gateway.producerID, "\(profile.profileID)-cli-gateway@1")
+      XCTAssertEqual(gateway.modelDescriptor.provider, profile.providerLabel)
 
-    XCTAssertThrowsError(
-      try HarnessVendorConfiguration.gateway(
-        environment: [
-          HarnessVendorConfiguration.providerKey: "codex",
-          HarnessVendorConfiguration.modelKey: "gpt-test",
-          HarnessVendorConfiguration.codexPathKey: "/bin/echo",
-          HarnessVendorConfiguration.codexWorkingDirectoryKey: codexWorkdir,
-          HarnessVendorConfiguration.apiKeyKey: secretKey,
-        ],
-        codexTransport: transport)
-    ) { error in
-      XCTAssertEqual(
-        error as? HarnessVendorConfigurationError,
-        .unexpectedConfiguration("codexDoesNotAcceptVendorCredentialOrEndpoint"))
+      XCTAssertThrowsError(
+        try HarnessVendorConfiguration.gateway(
+          environment: [
+            HarnessVendorConfiguration.providerKey: profile.profileID,
+            HarnessVendorConfiguration.modelKey: "model-test",
+            HarnessVendorConfiguration.cliPathKey: "/bin/echo",
+          ],
+          cliTransport: transport)
+      ) { error in
+        XCTAssertEqual(
+          error as? HarnessVendorConfigurationError, .missingCLIWorkingDirectory,
+          "\(profile.profileID) must refuse an unnamed working root")
+      }
+
+      XCTAssertThrowsError(
+        try HarnessVendorConfiguration.gateway(
+          environment: [
+            HarnessVendorConfiguration.providerKey: profile.profileID,
+            HarnessVendorConfiguration.modelKey: "model-test",
+            HarnessVendorConfiguration.cliPathKey: "/bin/echo",
+            HarnessVendorConfiguration.cliWorkingDirectoryKey: workdir,
+            HarnessVendorConfiguration.apiKeyKey: secretKey,
+          ],
+          cliTransport: transport)
+      ) { error in
+        XCTAssertEqual(
+          error as? HarnessVendorConfigurationError,
+          .unexpectedConfiguration("localAgentCLIDoesNotAcceptVendorCredentialOrEndpoint"))
+      }
     }
   }
 
-  func testCodexCLIReceivesOnlyTheBoundedContextInAReadOnlyEphemeralInvocation() async throws {
+  /// The retired keys named one CLI. Ignoring them would leave a host that
+  /// still sets them starting with no gateway and looking unconfigured, which
+  /// is the failure that is hardest to see.
+  func testRetiredSingleVendorKeysAreRefusedRatherThanIgnored() throws {
+    let workdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    for retired in HarnessVendorConfiguration.retiredKeys {
+      XCTAssertThrowsError(
+        try HarnessVendorConfiguration.gateway(
+          environment: [
+            HarnessVendorConfiguration.providerKey: "codex",
+            HarnessVendorConfiguration.modelKey: "model-test",
+            HarnessVendorConfiguration.cliPathKey: "/bin/echo",
+            HarnessVendorConfiguration.cliWorkingDirectoryKey: workdir,
+            retired: "/bin/echo",
+          ])
+      ) { error in
+        guard case .unexpectedConfiguration(let detail)? =
+          error as? HarnessVendorConfigurationError
+        else { return XCTFail("\(retired) was not refused") }
+        XCTAssertTrue(detail.hasPrefix(retired), detail)
+        XCTAssertTrue(detail.contains(HarnessVendorConfiguration.cliPathKey), detail)
+      }
+    }
+  }
+
+  func testEveryLocalAgentCLIProfileSendsOnlyTheBoundedContextNonInteractively() async throws {
     let response =
       #"{"kind":"noSafeAction","hypothesis":"bounded","reasonCode":"bounded"}"#
-    let transport = RecordingCodexTransport(reply: response)
-    let codexWorkdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
-    let gateway = try CodexCLIDecisionGateway(
-      executablePath: "/bin/echo", modelName: "gpt-test",
-      workingDirectory: codexWorkdir, transport: transport)
-    let bytes = try await gateway.propose(sampleContext())
-    XCTAssertEqual(String(decoding: bytes, as: UTF8.self), response)
+    let workdir = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let canonical = String(decoding: sampleContext().transmittedBytes, as: UTF8.self)
 
-    let requests = await transport.requests
-    let request = try XCTUnwrap(requests.first)
-    XCTAssertEqual(request.executablePath, "/bin/echo")
-    XCTAssertEqual(request.executableSHA256.count, 64)
-    XCTAssertEqual(request.workingDirectory, codexWorkdir)
-    XCTAssertTrue(request.arguments.contains("--ephemeral"))
-    XCTAssertTrue(request.arguments.contains("--ignore-user-config"))
-    XCTAssertTrue(request.arguments.contains("--ignore-rules"))
-    let sandbox = try XCTUnwrap(request.arguments.firstIndex(of: "--sandbox"))
-    XCTAssertEqual(request.arguments[sandbox + 1], "read-only")
-    let prompt = try XCTUnwrap(request.arguments.last)
-    XCTAssertTrue(
-      prompt.contains(String(decoding: sampleContext().transmittedBytes, as: UTF8.self)))
-    XCTAssertTrue(prompt.contains("Patch fields are top-level fields"))
-    XCTAssertTrue(prompt.contains("For proposePatch, omit operationRef and inputs"))
-    XCTAssertTrue(
-      prompt.contains(
-        "include baseWorkspaceRevision, patchSha256, unifiedDiff, touchedFiles, and "
-          + "expectedChangedSymbols"))
-    XCTAssertFalse(prompt.contains(secretKey))
+    for profile in HarnessLocalAgentCLIProfile.all {
+      let transport = RecordingCLITransport(reply: response)
+      let gateway = try LocalAgentCLIDecisionGateway(
+        profile: profile, executablePath: "/bin/echo", modelName: "model-test",
+        workingDirectory: workdir, transport: transport)
+      let bytes = try await gateway.propose(sampleContext())
+      XCTAssertEqual(String(decoding: bytes, as: UTF8.self), response)
+
+      let requests = await transport.requests
+      let request = try XCTUnwrap(requests.first)
+      XCTAssertEqual(request.executablePath, "/bin/echo")
+      XCTAssertEqual(request.executableSHA256.count, 64)
+      XCTAssertEqual(request.workingDirectory, workdir)
+      XCTAssertEqual(request.profile, profile)
+
+      // The prompt is the only model payload, whichever CLI carries it.
+      XCTAssertTrue(request.prompt.contains(canonical), profile.profileID)
+      XCTAssertTrue(request.prompt.contains("Patch fields are top-level fields"))
+      XCTAssertTrue(request.prompt.contains("For proposePatch, omit operationRef and inputs"))
+      XCTAssertTrue(
+        request.prompt.contains(
+          "include baseWorkspaceRevision, patchSha256, unifiedDiff, touchedFiles, and "
+            + "expectedChangedSymbols"))
+      XCTAssertFalse(request.prompt.contains(secretKey))
+
+      let arguments = profile.arguments(
+        modelName: "model-test", workingDirectory: workdir, prompt: request.prompt,
+        finalMessagePath: profile.responseChannel == .finalMessageFile ? "/tmp/out.json" : nil)
+      XCTAssertEqual(arguments.last, request.prompt, "\(profile.profileID) must pass the prompt")
+      let model = try XCTUnwrap(arguments.firstIndex(of: "--model"))
+      XCTAssertEqual(arguments[model + 1], "model-test")
+
+      switch profile.profileID {
+      case "codex":
+        XCTAssertTrue(arguments.contains("--ephemeral"))
+        XCTAssertTrue(arguments.contains("--ignore-user-config"))
+        XCTAssertTrue(arguments.contains("--ignore-rules"))
+        let sandbox = try XCTUnwrap(arguments.firstIndex(of: "--sandbox"))
+        XCTAssertEqual(arguments[sandbox + 1], "read-only")
+        let output = try XCTUnwrap(arguments.firstIndex(of: "--output-last-message"))
+        XCTAssertEqual(arguments[output + 1], "/tmp/out.json")
+        XCTAssertEqual(profile.inheritedEnvironmentKeys, [])
+      case "claude-code":
+        XCTAssertTrue(arguments.contains("--print"))
+        XCTAssertTrue(arguments.contains("--strict-mcp-config"))
+        let permission = try XCTUnwrap(arguments.firstIndex(of: "--permission-mode"))
+        XCTAssertEqual(arguments[permission + 1], "plan")
+        XCTAssertFalse(arguments.contains("--output-last-message"))
+        // The CLI resolves its stored credential through `USER`; nothing else
+        // is inherited, and no credential value is ever named here.
+        XCTAssertEqual(profile.inheritedEnvironmentKeys, ["USER"])
+      default:
+        XCTFail("unreviewed profile \(profile.profileID) has no invocation contract")
+      }
+    }
   }
 
   func testSharedInstructionDoesNotTellPatchProposalsToSelectAnOperation() {

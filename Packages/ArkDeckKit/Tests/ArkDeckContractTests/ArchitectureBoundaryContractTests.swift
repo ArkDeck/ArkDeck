@@ -174,7 +174,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       let code = try codeWithoutComments(of: file)
       for token in forbiddenTokens {
         if token == "Process(" {
-          // Word-boundary variant: `HarnessCodexProcessRequest(` is a typed
+          // Word-boundary variant: `HarnessLocalAgentCLIRequest(` is a typed
           // request name, `Process(` is a spawn.
           let pattern = "(^|[^A-Za-z0-9_])Process\\("
           XCTAssertNil(
@@ -210,13 +210,13 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
   // MARK: - 5. LLM surface isolation
 
-  /// Model gateways, prompts and the Codex CLI transport belong to the
+  /// Model gateways, prompts and the local agent CLI transport belong to the
   /// harness plane and the composition target only. The runtime engine,
   /// providers, storage and clients must not name them.
   func testLLMSurfaceStaysInHarnessAndComposition() throws {
     let llmTokens = [
-      "HarnessDecisionGateway", "HarnessCodexTransport", "HarnessModelTransport",
-      "HarnessVendorConfiguration", "CodexCLI",
+      "HarnessDecisionGateway", "HarnessLocalAgentCLITransport", "HarnessModelTransport",
+      "HarnessVendorConfiguration", "LocalAgentCLI",
     ]
     let allowedPrefixes = [
       "Sources/ArkDeckHarness/",
