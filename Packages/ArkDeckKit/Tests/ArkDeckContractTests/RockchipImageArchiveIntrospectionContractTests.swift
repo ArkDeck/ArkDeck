@@ -198,6 +198,50 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     XCTAssertEqual(board.conformance(of: build), [])
   }
 
+  /// REQ-FLASH-016's first scenario, on a real build no profile enumerates.
+  ///
+  /// Opt-in via `ARKDECK_DAYU200_UNKNOWN_ARCHIVE`. This is the test that says
+  /// the weekly daily costs nothing: a build the product has never seen must
+  /// derive completely and fit the board, while the pinned per-build lists —
+  /// which this change has not yet removed — are what refuse it.
+  func testAnUnknownBuildDerivesCleanlyAndFitsTheBoard() throws {
+    guard let path = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_UNKNOWN_ARCHIVE"]
+    else {
+      throw XCTSkip("set ARKDECK_DAYU200_UNKNOWN_ARCHIVE to a newer dayu200_img.tar.gz")
+    }
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let summary = try GzipTarArchiveReader.summarize(
+      fileAt: URL(fileURLWithPath: path),
+      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+    let build = try RockchipImageArchiveIntrospection.describe(summary: summary, board: board)
+
+    // Everything a plan needs is present, and it fits the board.
+    XCTAssertEqual(build.members.count, board.members.count)
+    XCTAssertFalse(build.declaredPartitions.isEmpty)
+    XCTAssertFalse(build.runtimeBuildVersion.isEmpty)
+    XCTAssertTrue(
+      build.runtimeBuildVersion.hasPrefix("OpenHarmony-"), build.runtimeBuildVersion)
+    XCTAssertEqual(
+      board.conformance(of: build), [], "an unknown build must still fit the board")
+
+    // And it is a genuinely different build: if these matched, the archive
+    // would be the pinned one and the test would prove nothing.
+    XCTAssertNotEqual(build.archiveSHA256, board.archiveSHA256)
+    XCTAssertNotEqual(build.runtimeBuildVersion, board.runtimeBuildVersion)
+
+    // Recognition is what refuses it — not structure. This is the assertion
+    // the cutover will invert, and until then it is what the weekly daily
+    // costs: a build that fits the board perfectly, refused by a digest list.
+    guard case .blocked(let violations) = board.validate(build.observation()) else {
+      return XCTFail("the pinned per-build lists should still refuse an unknown build")
+    }
+    XCTAssertTrue(
+      violations.allSatisfy {
+        "\($0)".contains("Mismatch") || "\($0)".contains("mismatch")
+      },
+      "every refusal must be a digest or size mismatch, not a structural one: \(violations)")
+  }
+
   /// Conformance is structural. An archive for a build nobody enumerated is
   /// accepted when it fits the board; one that is missing a mapped image, or
   /// declares a partition this board does not know, is not.
