@@ -202,3 +202,29 @@ plan and preview, and engine admission — and each found a pin the previous one
 could not reach. Nothing remains between an unenumerated build and a
 destructive dispatch except the operator's confirmation, which is where it
 belongs.
+
+## Where the sweep stops, and how that is known
+
+Two more surfaces were taken on the 7.0.0.37 daily, and neither hid a pin.
+Recorded because a negative result bounds the claim, and because the next
+session should not spend a window rediscovering it.
+
+**The agent surface.** `arkdeck agent run --operation flash.dayu200@1` refuses
+with `evidenceIncomplete: target/binding/routing/tool facts are absent or
+mismatched`. That is the E2 agent path requiring confirmed device evidence
+before it will materialize a destructive plan, and it is unrelated to the
+archive: the same inputs plan cleanly through `arkdeck job plan`. Refusing for
+that reason is the design working.
+
+**Postflight.** `RockchipRockUSBFlashProvider.assessOutcome` reads only
+`mappedPartitions` — board facts — so `arkdeck flash postflight` carries no
+build pin. Checked by reading rather than by running, because constructing a
+synthetic run observation would prove less than the source does.
+
+That closes the pre-dispatch surface. Every path from an images archive to the
+moment a destructive step would run has now been exercised or read on a build
+the product does not enumerate: CLI import, CLI plan, plan document, campaign
+preview and its preflight, engine admission, agent surface, postflight. What
+remains between an unenumerated firmware daily and a flashed device is the
+operator's confirmation of an exact plan — which is the one gate this change
+never intended to move.
