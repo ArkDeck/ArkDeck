@@ -38,12 +38,29 @@ public protocol HarnessCapabilityPort: Sendable {
   /// harness from creating, drafting or widening a capability, and this can
   /// do none of those. The engine still re-checks scope, revision and
   /// expiry, and refuses a reference that does not fit the plan.
-  func standingCapabilityID(operationReference: String, targetID: String) async -> String?
+  ///
+  /// The binding revision and typed inputs the request will carry are passed
+  /// in because a grant pinned to a *different* revision or to different
+  /// exact inputs can be shown, here and without the device, to be unable to
+  /// authorize this request. Naming one anyway does not merely waste a
+  /// submission: the engine's refusal is an authorization refusal, which
+  /// stops the task for a human — so one stale grant left behind by an
+  /// earlier binding revision would shadow the grant the request would
+  /// otherwise have been issued, permanently.
+  func standingCapabilityID(
+    operationReference: String,
+    targetID: String,
+    expectedBindingRevision: Int?,
+    inputs: [String: JSONValue]
+  ) async -> String?
 }
 
 extension HarnessCapabilityPort {
   public func standingCapabilityID(
-    operationReference: String, targetID: String
+    operationReference: String,
+    targetID: String,
+    expectedBindingRevision: Int?,
+    inputs: [String: JSONValue]
   ) async -> String? { nil }
 }
 
@@ -255,6 +272,19 @@ public struct HarnessPolicyGuard: Sendable {
       guard input.snapshot.budgets.maxE1Mutations > 0 else {
         return .authorizationRequired(reference: input.operationReference, effect: effect)
       }
+      // Where the catalog allows the runtime to issue its own bounded
+      // envelope, a pre-issued grant is not a precondition: the engine still
+      // decides, and it binds that envelope to the exact target identity,
+      // binding revision and typed inputs of the request before consuming it
+      // atomically. Demanding a standing grant here is stricter than the
+      // authority it screens for, and the strictness was not even load-
+      // bearing — it was satisfied by *any* unexpired grant naming the
+      // operation, including one issued for a superseded binding revision.
+      // The operations that must not be self-authorized say so in the
+      // catalog (`defaultPolicyIssuance: disabled`, which is what the
+      // TASK-HFA-009 flip set on every `workspace.*` mutation) and still
+      // fall through to the standing-grant requirement below.
+      if descriptor.defaultPolicyIssuanceEnabled { return nil }
       guard let capabilities else {
         return .authorizationRequired(reference: input.operationReference, effect: effect)
       }

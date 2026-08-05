@@ -86,17 +86,21 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
   private func grant(
     id: String,
     operationID: String = "debug.hap",
-    expiresAtUTC: String = "2026-12-31T00:00:00Z"
+    expiresAtUTC: String = "2026-12-31T00:00:00Z",
+    exactBindingRevision: Int? = nil,
+    inputConstraints: [String: RuntimeCapabilityInputConstraint] = [:]
   ) throws -> RuntimeCapability {
     try RuntimeCapability(
       capabilityID: id,
       targetScope: .stablePhysicalIdentity(sha256: Self.deviceIdentity),
       operationScope: [.init(operationID: operationID, version: 1)],
       effectCeiling: .deviceMutation,
+      inputConstraints: inputConstraints,
       issuedAtUTC: "2026-07-01T00:00:00Z",
       expiresAtUTC: expiresAtUTC,
       maximumUses: 5,
-      issuer: .init(kind: .maintainerMergedPR, reference: "PR#992 revocation contract"))
+      issuer: .init(kind: .maintainerMergedPR, reference: "PR#992 revocation contract"),
+      exactBindingRevision: exactBindingRevision)
   }
 
   /// The runtime's rejection message for a capability refusal, composed the
@@ -136,7 +140,8 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
 
     // Before revocation the grant is the one a request would name.
     var named = await port.standingCapabilityID(
-      operationReference: "debug.hap@1", targetID: "TGT-1")
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+        expectedBindingRevision: nil, inputs: [:])
     XCTAssertEqual(named, "CAP-RT-REVOKE-001")
     var held = await port.hasStandingCapability(
       operationReference: "debug.hap@1", targetID: "TGT-1")
@@ -156,7 +161,8 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
     XCTAssertGreaterThan(status.capability.expiresAtUTC, Self.now)
 
     named = await port.standingCapabilityID(
-      operationReference: "debug.hap@1", targetID: "TGT-1")
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+        expectedBindingRevision: nil, inputs: [:])
     XCTAssertNil(named, "a revoked grant must never be named into a request")
     held = await port.hasStandingCapability(
       operationReference: "debug.hap@1", targetID: "TGT-1")
@@ -175,7 +181,8 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
       capabilityID: "CAP-RT-REVOKE-EARLY", atUTC: Self.now, reason: "superseded")
 
     let named = await port.standingCapabilityID(
-      operationReference: "debug.hap@1", targetID: "TGT-1")
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+        expectedBindingRevision: nil, inputs: [:])
     XCTAssertEqual(named, "CAP-RT-REVOKE-LATE")
     let held = await port.hasStandingCapability(
       operationReference: "debug.hap@1", targetID: "TGT-1")
@@ -190,7 +197,8 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
 
     func assertAgreement(_ label: String) async {
       let named = await port.standingCapabilityID(
-        operationReference: "debug.hap@1", targetID: "TGT-1")
+        operationReference: "debug.hap@1", targetID: "TGT-1",
+        expectedBindingRevision: nil, inputs: [:])
       let held = await port.hasStandingCapability(
         operationReference: "debug.hap@1", targetID: "TGT-1")
       XCTAssertEqual(held, named != nil, "\(label): the two answers diverged")
@@ -212,6 +220,81 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
     try await store.install(
       try grant(id: "CAP-RT-AGREE-OTHER", operationID: "flash.dayu200"))
     await assertAgreement("plus a grant for another operation")
+  }
+
+  // MARK: - 1b. A grant this side can already prove unusable is never named
+
+  /// Found in the GJ-3/GJ-5 window of 2026-08-05, and the same shape as the
+  /// revocation defect above: every grant the device had accumulated before
+  /// the GJ-4 reflash is pinned to binding revision 1, stays installed,
+  /// unexpired and unrevoked, and sorts earliest. The port named one, the
+  /// engine refused it as `authorizationTargetScopeMismatch`, and the task
+  /// stopped for a human — while the very same request naming *no* grant is
+  /// issued a correct revision-2 envelope by default policy. One stale grant
+  /// therefore bricked every harness task on the rebound device.
+  func testAGrantPinnedToAnotherBindingRevisionIsNeverNamed() async throws {
+    let (store, port) = try makePort()
+    try await store.install(
+      try grant(
+        id: "CAP-RT-REV1-EARLY", expiresAtUTC: "2026-09-01T00:00:00Z",
+        exactBindingRevision: 1))
+    try await store.install(
+      try grant(
+        id: "CAP-RT-REV2-LATE", expiresAtUTC: "2026-12-31T00:00:00Z",
+        exactBindingRevision: 2))
+
+    let named = await port.standingCapabilityID(
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+      expectedBindingRevision: 2, inputs: [:])
+    XCTAssertEqual(
+      named, "CAP-RT-REV2-LATE",
+      "the stale revision-1 grant sorts first and must be skipped, not named")
+
+    // With no grant for this revision the answer is "none", which lets the
+    // runtime's default policy issue the right envelope. Naming a grant that
+    // provably cannot authorize is strictly worse than naming nothing.
+    let none = await port.standingCapabilityID(
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+      expectedBindingRevision: 3, inputs: [:])
+    XCTAssertNil(none)
+  }
+
+  func testAGrantWhoseInputConstraintsTheRequestViolatesIsNeverNamed() async throws {
+    let (store, port) = try makePort()
+    try await store.install(
+      try grant(
+        id: "CAP-RT-OLD-LEASE", expiresAtUTC: "2026-09-01T00:00:00Z",
+        inputConstraints: ["bundleName": .exactString("com.example.previous")]))
+    try await store.install(
+      try grant(
+        id: "CAP-RT-THIS-LEASE", expiresAtUTC: "2026-12-31T00:00:00Z",
+        inputConstraints: ["bundleName": .exactString("com.example.waterflowdemo")]))
+
+    let inputs: [String: JSONValue] = ["bundleName": .string("com.example.waterflowdemo")]
+    let named = await port.standingCapabilityID(
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+      expectedBindingRevision: nil, inputs: inputs)
+    XCTAssertEqual(named, "CAP-RT-THIS-LEASE")
+
+    // A constrained input the request does not carry at all is a violation,
+    // not a wildcard.
+    let absent = await port.standingCapabilityID(
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+      expectedBindingRevision: nil, inputs: [:])
+    XCTAssertNil(absent)
+  }
+
+  /// An unpinned grant is unchanged by any of this: the pins are refusals,
+  /// never a new requirement to carry one.
+  func testAnUnpinnedGrantIsStillNamedForAnyRevision() async throws {
+    let (store, port) = try makePort()
+    try await store.install(try grant(id: "CAP-RT-UNPINNED"))
+    for revision in [nil, 1, 2, 7] as [Int?] {
+      let named = await port.standingCapabilityID(
+        operationReference: "debug.hap@1", targetID: "TGT-1",
+        expectedBindingRevision: revision, inputs: [:])
+      XCTAssertEqual(named, "CAP-RT-UNPINNED", "revision \(String(describing: revision))")
+    }
   }
 
   // MARK: - 2. The runtime's reason survives into the task record
