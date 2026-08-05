@@ -560,6 +560,36 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertTrue(encoded.contains(context.targetPseudonym))
   }
 
+  /// The round has to say what it is asking for. Without it the one round
+  /// that matters most — "propose a patch" — is indistinguishable from "pick
+  /// an operation", which is how a model ends up trying to invoke apply-patch
+  /// instead of writing the diff apply-patch needs. Only questions a model is
+  /// allowed to answer are named, so this cannot become a steering channel
+  /// for a deterministic step it may not override.
+  func testOnlyAnAnswerableAskIsNamedInTheContext() {
+    func decision(kind: HarnessDecisionKind, reasonCode: String) -> HarnessDecision {
+      HarnessDecision(
+        decisionID: "dec-1", htaskID: "HTASK-0123456789AB", round: 1, kind: kind,
+        hypothesis: "h", reasonCode: reasonCode, producer: "deterministic",
+        createdAtUTC: "2026-07-31T00:00:00Z")
+    }
+    XCTAssertEqual(
+      HarnessTaskCoordinator.requestedDecision(
+        from: decision(kind: .requestHuman, reasonCode: "patchProposalRequired")),
+      "proposePatch")
+    // Every other human block is a question for a person, not for a model.
+    XCTAssertNil(
+      HarnessTaskCoordinator.requestedDecision(
+        from: decision(kind: .requestHuman, reasonCode: "evidenceIntegrityUnresolved")))
+    // A deterministic operation step is not up for negotiation.
+    XCTAssertNil(
+      HarnessTaskCoordinator.requestedDecision(
+        from: decision(kind: .invokeOperation, reasonCode: "collectDeclaredEvidence")))
+    XCTAssertNil(
+      HarnessTaskCoordinator.requestedDecision(
+        from: decision(kind: .noSafeAction, reasonCode: "patchProposalRequired")))
+  }
+
   func testRevisionAwareExecutionStateIsCanonicalBoundedAndTraceable() throws {
     let baseRevision = String(repeating: "a", count: 64)
     let patchRevision = String(repeating: "b", count: 64)

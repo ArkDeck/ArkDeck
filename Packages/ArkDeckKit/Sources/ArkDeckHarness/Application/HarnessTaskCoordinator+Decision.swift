@@ -87,7 +87,9 @@ extension HarnessTaskCoordinator {
         try? await store.putModelRun(run)
       }
       do {
-        let context = try await assembleContext(snapshot, handler: handler, limits: limits)
+        let context = try await assembleContext(
+          snapshot, handler: handler, limits: limits,
+          requestedDecision: Self.requestedDecision(from: deterministic.decision))
         let violations = HarnessEgressScreen.violations(
           in: context, targetID: snapshot.target.targetID)
         guard violations.isEmpty else {
@@ -203,10 +205,22 @@ extension HarnessTaskCoordinator {
     }
   }
 
+  /// What the round is asking the model for, in the model's own vocabulary.
+  /// Only the questions a model is allowed to answer are named; a
+  /// deterministic step it may not override says nothing, so the context
+  /// cannot become a channel for steering it.
+  static func requestedDecision(from decision: HarnessDecision) -> String? {
+    guard decision.kind == .requestHuman,
+      decision.reasonCode == "patchProposalRequired"
+    else { return nil }
+    return "proposePatch"
+  }
+
   func assembleContext(
     _ snapshot: HarnessTaskSnapshot,
     handler: any HarnessTaskHandler,
-    limits: HarnessDecisionContextLimits
+    limits: HarnessDecisionContextLimits,
+    requestedDecision: String? = nil
   ) async throws -> HarnessDecisionContext {
     let offered = offeredOperations(snapshot, handler: handler)
     let durableAttempts = (try? await store.attempts(snapshot.htaskID)) ?? []
@@ -438,6 +452,7 @@ extension HarnessTaskCoordinator {
       memory: memory,
       artifacts: artifacts,
       sourceFiles: sourceFiles,
+      requestedDecision: requestedDecision,
       elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC) ?? 0,
       memoryQuery: memoryQuery,
       executionState: executionState)

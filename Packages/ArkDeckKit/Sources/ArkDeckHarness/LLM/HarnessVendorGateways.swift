@@ -114,7 +114,12 @@ package enum HarnessVendorEnvelope {
     operationRef chosen from availableOperations and do not invent operation \
     inputs or copy context metadata into inputs. For proposePatch, omit \
     operationRef and inputs, and include baseWorkspaceRevision, patchSha256, \
-    unifiedDiff, touchedFiles, and expectedChangedSymbols. The context follows.
+    unifiedDiff, touchedFiles, and expectedChangedSymbols. When the context \
+    carries requestedDecision, answer with that kind: the round is asking for \
+    it, and answering with a different kind is refused rather than retried. \
+    Evidence and in-scope source arrive as excerpts in artifacts and \
+    sourceFiles; write the diff against the sourceFiles text exactly as \
+    given. The context follows.
     """
 
   package static func text(_ context: HarnessDecisionContext) -> String {

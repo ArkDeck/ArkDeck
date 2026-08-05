@@ -110,6 +110,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
     memory: [HarnessMemoryEntry],
     artifacts: [HarnessContextArtifact],
     sourceFiles: [HarnessContextSourceFile] = [],
+    requestedDecision: String? = nil,
     elapsedSeconds: Int,
     memoryQuery explicitMemoryQuery: HarnessMemoryQuery? = nil,
     executionState: HarnessContextExecutionState = .empty
@@ -218,6 +219,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
       memorySelectionManifest: memorySelection.manifest,
       artifacts: trim(artifacts, to: limits.maxArtifacts, label: "artifacts"),
       sourceFiles: trim(sourceFiles, to: limits.maxSourceFiles, label: "sourceFiles"),
+      requestedDecision: requestedDecision,
       availableOperations: trim(
         availableOperations, to: limits.maxOperations, label: "operations"),
       budget: budget,

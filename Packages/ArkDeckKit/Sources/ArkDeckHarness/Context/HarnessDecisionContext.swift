@@ -234,6 +234,7 @@ extension HarnessDecisionContext {
       memorySelectionManifest: memorySelectionManifest,
       artifacts: artifacts ?? self.artifacts,
       sourceFiles: sourceFiles ?? self.sourceFiles,
+      requestedDecision: requestedDecision,
       availableOperations: availableOperations,
       budget: budget,
       blockers: blockers,
@@ -525,6 +526,12 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public let artifacts: [HarnessContextArtifact]
   /// The files this task is allowed to change, with their current text.
   public let sourceFiles: [HarnessContextSourceFile]
+  /// What this round is actually asking for. Without it a model can only
+  /// infer the question from the phase, and the one round that matters most —
+  /// "propose a patch" — looks indistinguishable from "pick an operation",
+  /// which is how a model ends up trying to invoke apply-patch instead of
+  /// writing the diff apply-patch would need.
+  public let requestedDecision: String?
   public let availableOperations: [String]
   public let budget: HarnessContextBudget
   public let blockers: [String]
@@ -551,6 +558,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     memorySelectionManifest: HarnessMemorySelectionManifest = .empty,
     artifacts: [HarnessContextArtifact],
     sourceFiles: [HarnessContextSourceFile] = [],
+    requestedDecision: String? = nil,
     availableOperations: [String],
     budget: HarnessContextBudget,
     blockers: [String],
@@ -598,6 +606,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     self.memorySelectionManifest = memorySelectionManifest
     self.artifacts = artifacts
     self.sourceFiles = sourceFiles
+    self.requestedDecision = requestedDecision
     self.availableOperations = availableOperations
     self.budget = budget
     self.blockers = blockers

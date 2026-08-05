@@ -31,6 +31,11 @@ public enum HarnessVendorConfiguration {
   public static let endpointKey = "ARKDECK_HARNESS_MODEL_ENDPOINT"
   public static let cliPathKey = "ARKDECK_HARNESS_CLI_PATH"
   public static let cliWorkingDirectoryKey = "ARKDECK_HARNESS_CLI_WORKDIR"
+  /// Seconds a local agent CLI may take for one decision. A CLI that reasons
+  /// over evidence and source is minutes-scale work, not seconds-scale: too
+  /// low and every round is spent as `gatewayUnavailable` while the loop
+  /// silently falls back to the deterministic step.
+  public static let cliTimeoutKey = "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"
 
   /// Keys that named one specific CLI back when only one was supported. They
   /// are refused rather than quietly ignored: a host that still sets them
@@ -56,7 +61,7 @@ public enum HarnessVendorConfiguration {
         "\(retired)IsRetiredUse\(cliPathKey)And\(cliWorkingDirectoryKey)")
     }
     let configuredKeys = [
-      apiKeyKey, modelKey, endpointKey, cliPathKey, cliWorkingDirectoryKey,
+      apiKeyKey, modelKey, endpointKey, cliPathKey, cliWorkingDirectoryKey, cliTimeoutKey,
     ]
     guard let rawProvider = nonempty(environment[providerKey]) else {
       guard !configuredKeys.contains(where: { nonempty(environment[$0]) != nil }) else {
@@ -91,9 +96,18 @@ public enum HarnessVendorConfiguration {
       guard let workingDirectory = nonempty(environment[cliWorkingDirectoryKey]) else {
         throw HarnessVendorConfigurationError.missingCLIWorkingDirectory
       }
+      var timeoutSeconds = 600
+      if let raw = nonempty(environment[cliTimeoutKey]) {
+        guard let value = Int(raw), (1...900).contains(value) else {
+          throw HarnessVendorConfigurationError.unexpectedConfiguration(
+            "\(cliTimeoutKey)MustBeSecondsIn1To900")
+        }
+        timeoutSeconds = value
+      }
       return try LocalAgentCLIDecisionGateway(
         profile: profile, executablePath: path, modelName: model,
-        workingDirectory: workingDirectory, transport: cliTransport)
+        workingDirectory: workingDirectory, timeoutSeconds: timeoutSeconds,
+        transport: cliTransport)
     }
     guard let apiKey = nonempty(environment[apiKeyKey]), apiKey.utf8.count <= 8_192,
       !apiKey.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
