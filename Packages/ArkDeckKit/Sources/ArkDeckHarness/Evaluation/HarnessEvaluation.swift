@@ -102,6 +102,11 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   /// operator allowed the evaluator to measure them", which are different
   /// claims about the same digest.
   public let sensitiveOptIn: Bool
+  /// The job whose artifact store holds these bytes. Recorded so a later
+  /// reader — the decision context, which must show a model the evidence it
+  /// is reasoning about — can address the artifact without guessing which
+  /// round produced it.
+  public let jobID: String?
 
   enum CodingKeys: String, CodingKey {
     case artifactID = "artifactId"
@@ -111,6 +116,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     case verified
     case blocker
     case sensitiveOptIn
+    case jobID = "jobId"
   }
 
   public init(
@@ -120,7 +126,8 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     sha256: String,
     verified: Bool,
     blocker: String? = nil,
-    sensitiveOptIn: Bool = false
+    sensitiveOptIn: Bool = false,
+    jobID: String? = nil
   ) {
     self.artifactID = artifactID
     self.name = name
@@ -129,6 +136,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     self.verified = verified
     self.blocker = blocker
     self.sensitiveOptIn = sensitiveOptIn
+    self.jobID = jobID
   }
 
   /// Records written before the opt-in existed carry no flag; decoding them
@@ -144,6 +152,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
     blocker = try container.decodeIfPresent(String.self, forKey: .blocker)
     sensitiveOptIn =
       try container.decodeIfPresent(Bool.self, forKey: .sensitiveOptIn) ?? false
+    jobID = try container.decodeIfPresent(String.self, forKey: .jobID)
   }
 }
 

@@ -100,6 +100,21 @@ public protocol HarnessRepairPort: Sendable {
     task: HarnessTaskSnapshot
   ) async throws -> String
 
+  /// The current text of the files this task is allowed to change, so a
+  /// model asked for a unified diff can see the lines it must diff against.
+  /// Read-only and scope-bounded: an adapter returns nothing for a path
+  /// outside the task's declared globs rather than reaching for it.
+  ///
+  /// The default returns nothing, so a composition that has not opted into
+  /// source visibility keeps its previous behaviour instead of inheriting a
+  /// capability it never wired.
+  func readableSourceFiles(
+    projectRef: String,
+    task: HarnessTaskSnapshot,
+    maximumFiles: Int,
+    maximumCharactersPerFile: Int
+  ) async throws -> [HarnessContextSourceFile]
+
   func preparePatch(
     _ proposal: HarnessPatchProposal,
     projectRef: String,
@@ -139,6 +154,13 @@ public protocol HarnessRepairPort: Sendable {
 }
 
 extension HarnessRepairPort {
+  public func readableSourceFiles(
+    projectRef: String,
+    task: HarnessTaskSnapshot,
+    maximumFiles: Int,
+    maximumCharactersPerFile: Int
+  ) async throws -> [HarnessContextSourceFile] { [] }
+
   /// Compatibility seam for in-memory/non-production fixtures. The production
   /// workspace adapter overrides this with a live filesystem readback.
   public func currentWorkspaceRevision(

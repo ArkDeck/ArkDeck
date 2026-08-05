@@ -224,7 +224,9 @@ public struct HarnessObservationBuilder: Sendable {
         continue
       }
       evidence.append(
-        record(descriptor, verified: true, blocker: nil, sensitiveOptIn: sensitiveOptIn))
+        record(
+          descriptor, verified: true, blocker: nil, sensitiveOptIn: sensitiveOptIn,
+          jobID: item.jobID))
       verifiedBytes.append(
         HarnessVerifiedArtifact(jobID: item.jobID, descriptor: descriptor, data: data))
     }
@@ -263,12 +265,13 @@ public struct HarnessObservationBuilder: Sendable {
     _ descriptor: HarnessArtifactDescriptor,
     verified: Bool,
     blocker: String?,
-    sensitiveOptIn: Bool = false
+    sensitiveOptIn: Bool = false,
+    jobID: String? = nil
   ) -> HarnessEvidenceRecord {
     HarnessEvidenceRecord(
       artifactID: descriptor.artifactID, name: descriptor.name,
       byteCount: descriptor.byteCount, sha256: descriptor.sha256, verified: verified,
-      blocker: blocker, sensitiveOptIn: sensitiveOptIn)
+      blocker: blocker, sensitiveOptIn: sensitiveOptIn, jobID: jobID)
   }
 
   // MARK: - Measurement
