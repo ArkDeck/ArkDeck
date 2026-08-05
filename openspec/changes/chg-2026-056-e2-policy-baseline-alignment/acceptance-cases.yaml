@@ -1,6 +1,6 @@
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 3
+change_revision: 4
 platform: all
 evidence_classes:
   - contract

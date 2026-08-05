@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 3
+revision: 4
 status: approved
 class: core
 core_change_level: major
@@ -50,6 +50,21 @@ platforms: [macos, windows, linux]
 > `test_worker_cursor.py` 也以 `review_run` 构造 cursor fixture；补入这一个测试文件，
 > 使删除 cursor 字段的测试闭包完整。其余 scope、worker runtime、transport、lease、CI 与
 > Runtime/设备边界均不变。
+>
+> r4（2026-08-05）：一个已发布的 DAYU200 device profile 目前把某一个固件构建整份枚举进产品——
+> 归档的字节数与 SHA-256，加上十七个成员各自的名字、大小与 SHA-256。OpenHarmony 每天出一版，
+> 于是每个新构建都要一个新的 profile 常量、一个新的 `deviceProfile` 枚举值，进而换掉 catalog
+> digest；而 digest 一动，五条 Golden Journey 全部脱离 `REAL_DEVICE_PASS`。这笔代价买到的是
+> 「认得这个构建」，不是字节完整性——后者已经由 Artifact lease 与 exact-plan authority 承担。
+> r4 把 device profile 收窄成**板级**（分区映射、禁写分区、前置条件、成员分类规则），
+> 构建级事实改为在导入时从归档推导（成员摘要、`parameter.txt` 里的分区表、从系统镜像字节中
+> 读出的运行时版本号）。r4 不新增 operation、provider 或 `deviceProfile` 枚举值，不移动 catalog
+> digest，不放宽任何 destructive 准入：exact-plan 确认、lease 字节复核、fail-closed 条件全部不变。
+> 见 `specs/flashing/spec-r4.md`（REQ-FLASH-016/017/018）。
+>
+> r4 的交付分两段，因为「四类 Repo 审批」要求 profile/E2 变更与对应 Golden Journey 同车：
+> 本段落地推导本身，并逐条证明它与它将要替换的手工表等价；**切换**（profile 去掉成员清单、
+> 导入路径改用推导）随 GJ-4 真机窗口交付，因为那一步才改变真实刷机的准入。
 
 ## Why
 
