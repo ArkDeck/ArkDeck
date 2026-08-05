@@ -6,6 +6,60 @@ import Darwin
 import Foundation
 import XCTest
 
+/// Anti-hang bound for the rendezvous waits in this file — semaphores handed
+/// to a background thread, polls for an asynchronously delivered event, and
+/// waits on a real fixture subprocess. It is not a contract bound: the
+/// assertions around each wait decide the outcome, and an expired wait reports
+/// only that the host never got there.
+///
+/// The five seconds this replaced sat inside the noise of a saturated
+/// `swift test --parallel --num-workers 4` run. `testTEST_AC_JOB_008_01_
+/// PlatformInstanceContract` was measured taking 34.007 s under that load and
+/// still timing out (recorded in `flake-storage-rendezvous-2026-08-03.md`);
+/// this is set far above that and still fails a genuine deadlock well inside
+/// one test.
+///
+/// Negative waits — the `.now() + 0.2` ones asserting a caller is *still*
+/// blocked — deliberately do not use this. Host load only reinforces those, so
+/// widening them would just make the suite slower.
+private let runtimePortRendezvousTimeout: TimeInterval = 60
+
+/// Wait for `semaphore` without blocking a cooperative-pool thread: the block
+/// happens on a Dispatch worker while the calling task suspends.
+private func waitForSemaphore(
+  _ semaphore: DispatchSemaphore, timeout: TimeInterval
+) async -> DispatchTimeoutResult {
+  await withCheckedContinuation { continuation in
+    DispatchQueue.global().async {
+      continuation.resume(returning: semaphore.wait(timeout: .now() + timeout))
+    }
+  }
+}
+
+/// Park a fixture double until the test opens its gate.
+///
+/// The four gates in this file used to discard the wait result
+/// (`_ = allow….wait(timeout: .now() + 5)`), which made an expired gate
+/// *silently stop blocking*: the double resumed on its own, the serialization
+/// the test was pinning quietly did not hold, and the failure surfaced as a
+/// baffling `beginCount`/`events` mismatch far from the real cause. An expired
+/// gate is now reported as itself.
+private func awaitFixtureGate(
+  _ semaphore: DispatchSemaphore,
+  _ label: String,
+  timeout: TimeInterval = runtimePortRendezvousTimeout,
+  file: StaticString = #filePath,
+  line: UInt = #line
+) {
+  guard semaphore.wait(timeout: .now() + timeout) == .success else {
+    return XCTFail(
+      "fixture gate \(label) expired after \(timeout)s; the double stopped "
+        + "blocking on its own, so any assertion after this point is measuring the scaffold, "
+        + "not the contract",
+      file: file, line: line)
+  }
+}
+
 final class RuntimePortContractTests: XCTestCase {
   func testTEST_AC_JOB_008_01_PlatformInstanceContract() throws {
     let success = try runTwoProcessVector(activationProductMatches: true)
@@ -143,7 +197,7 @@ final class RuntimePortContractTests: XCTestCase {
         }
       }
     }
-    XCTAssertEqual(group.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(group.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
     XCTAssertTrue(leaseBox.errors.isEmpty)
     XCTAssertEqual(controller.activeLeaseCount, 16)
     XCTAssertEqual(backend.beginCount, 1)
@@ -161,12 +215,24 @@ final class RuntimePortContractTests: XCTestCase {
       XCTFail("throw must escape")
     } catch RuntimePortTestError.expected {}
 
+    // This was the one real wall-clock bet in the file: sleep 50 ms, then hope
+    // `cancel()` lands before a 5 s sleep finishes on its own. A host stall
+    // longer than the inner sleep let the activity complete normally and the
+    // test failed at "cancelled activity must throw" — the cancellation path
+    // was never exercised. Now the activity says when it is running, and only
+    // cancellation ends it; the sleep bound is the anti-hang backstop, so a
+    // cancel that fails to land fails the test instead of hanging forever.
+    let activityEntered = DispatchSemaphore(value: 0)
     let cancellation = Task { [controller] in
       try await controller.withActivity(reason: "cancel") {
-        try await Task.sleep(nanoseconds: 5_000_000_000)
+        activityEntered.signal()
+        try await Task.sleep(
+          nanoseconds: UInt64(runtimePortRendezvousTimeout) * 1_000_000_000)
       }
     }
-    try await Task.sleep(nanoseconds: 50_000_000)
+    let entered = await waitForSemaphore(
+      activityEntered, timeout: runtimePortRendezvousTimeout)
+    XCTAssertEqual(entered, .success, "the cancellable activity must start before it is cancelled")
     cancellation.cancel()
     do {
       try await cancellation.value
@@ -211,7 +277,9 @@ final class RuntimePortContractTests: XCTestCase {
       firstLease.end()
       releaseFinished.signal()
     }
-    XCTAssertEqual(backend.firstEndEntered.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(
+      backend.firstEndEntered.wait(timeout: .now() + runtimePortRendezvousTimeout),
+      .success)
 
     let secondLeaseBox = PowerLeaseBox()
     let acquisitionFinished = DispatchSemaphore(value: 0)
@@ -224,11 +292,16 @@ final class RuntimePortContractTests: XCTestCase {
       }
     }
 
+    // Short on purpose, and deliberately not the anti-hang bound: this asserts
+    // the second begin is still parked behind the in-progress end. Host load
+    // can only keep it parked longer, so widening this would only slow the test.
     XCTAssertEqual(backend.secondBeginEntered.wait(timeout: .now() + 0.2), .timedOut)
     XCTAssertEqual(backend.beginCount, 1)
     backend.allowFirstEnd.signal()
-    XCTAssertEqual(releaseFinished.wait(timeout: .now() + 5), .success)
-    XCTAssertEqual(acquisitionFinished.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(releaseFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
+    XCTAssertEqual(
+      acquisitionFinished.wait(timeout: .now() + runtimePortRendezvousTimeout),
+      .success)
     XCTAssertTrue(secondLeaseBox.errors.isEmpty)
     XCTAssertEqual(backend.beginCount, 2)
     XCTAssertEqual(backend.endCount, 1)
@@ -415,19 +488,23 @@ final class RuntimePortContractTests: XCTestCase {
       observer.handle(.sleep)
       sleepFinished.signal()
     }
-    XCTAssertEqual(sink.sleepRecordEntered.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(
+      sink.sleepRecordEntered.wait(timeout: .now() + runtimePortRendezvousTimeout),
+      .success)
 
     let wakeFinished = DispatchSemaphore(value: 0)
     DispatchQueue.global().async {
       observer.handle(.wake)
       wakeFinished.signal()
     }
+    // Short on purpose, as above: the wake must still be queued behind the
+    // blocked sleep record. Load only reinforces it.
     XCTAssertEqual(wakeFinished.wait(timeout: .now() + 0.2), .timedOut)
     XCTAssertTrue(sink.events.isEmpty)
 
     sink.allowSleepRecord.signal()
-    XCTAssertEqual(sleepFinished.wait(timeout: .now() + 5), .success)
-    XCTAssertEqual(wakeFinished.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(sleepFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
+    XCTAssertEqual(wakeFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
     XCTAssertEqual(sink.events.map(\.kind), [.sleep, .wake])
     XCTAssertEqual(sink.events.last?.sleepEventID, "sleep-concurrent")
     XCTAssertEqual(sink.segmentResetCount, 1)
@@ -450,18 +527,22 @@ final class RuntimePortContractTests: XCTestCase {
         errors.record(error)
       }
     }
-    XCTAssertEqual(source.startEntered.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(
+      source.startEntered.wait(timeout: .now() + runtimePortRendezvousTimeout),
+      .success)
 
     let stopFinished = DispatchSemaphore(value: 0)
     DispatchQueue.global().async {
       observer.stop()
       stopFinished.signal()
     }
+    // Short on purpose, as above: the stop must still be blocked behind the
+    // in-progress start. Load only reinforces it.
     XCTAssertEqual(stopFinished.wait(timeout: .now() + 0.2), .timedOut)
 
     source.allowStart.signal()
-    XCTAssertEqual(startFinished.wait(timeout: .now() + 5), .success)
-    XCTAssertEqual(stopFinished.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(startFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
+    XCTAssertEqual(stopFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
     XCTAssertTrue(errors.errors.isEmpty)
     XCTAssertFalse(source.isRegistered)
     XCTAssertEqual(source.startCount, 1)
@@ -489,7 +570,9 @@ final class RuntimePortContractTests: XCTestCase {
       observer.stop()
       stopFinished.signal()
     }
-    XCTAssertEqual(source.stopEntered.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(
+      source.stopEntered.wait(timeout: .now() + runtimePortRendezvousTimeout),
+      .success)
 
     let errors = LockedErrorBox()
     let startFinished = DispatchSemaphore(value: 0)
@@ -501,11 +584,13 @@ final class RuntimePortContractTests: XCTestCase {
         errors.record(error)
       }
     }
+    // Short on purpose, as above: the start must still be blocked behind the
+    // in-progress stop. Load only reinforces it.
     XCTAssertEqual(startFinished.wait(timeout: .now() + 0.2), .timedOut)
 
     source.allowStop.signal()
-    XCTAssertEqual(stopFinished.wait(timeout: .now() + 5), .success)
-    XCTAssertEqual(startFinished.wait(timeout: .now() + 5), .success)
+    XCTAssertEqual(stopFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
+    XCTAssertEqual(startFinished.wait(timeout: .now() + runtimePortRendezvousTimeout), .success)
     XCTAssertTrue(errors.errors.isEmpty)
     XCTAssertTrue(source.isRegistered)
     XCTAssertEqual(source.startCount, 2)
@@ -514,7 +599,7 @@ final class RuntimePortContractTests: XCTestCase {
     source.emit(.sleep)
     source.emit(.wake)
     XCTAssertTrue(
-      waitUntil(timeout: 5) {
+      waitUntil(timeout: runtimePortRendezvousTimeout) {
         sink.events.count == 2 && sink.segmentResetCount == 1
           && sink.reconnectEvaluationCount == 1 && sink.reconcileRequestCount == 1
       }
@@ -689,7 +774,7 @@ final class RuntimePortContractTests: XCTestCase {
     defer {
       if holder.isRunning { holder.terminate() }
     }
-    try waitForFile(readyFile, process: holder, timeout: 5)
+    try waitForFile(readyFile, process: holder, timeout: runtimePortRendezvousTimeout)
 
     let contender = Process()
     contender.executableURL = fixture
@@ -701,11 +786,11 @@ final class RuntimePortContractTests: XCTestCase {
       "request-1",
     ]
     try contender.run()
-    try waitForExit(contender, timeout: 5)
+    try waitForExit(contender, timeout: runtimePortRendezvousTimeout)
     XCTAssertEqual(contender.terminationStatus, 0)
 
     try Data().write(to: stopFile, options: .atomic)
-    try waitForExit(holder, timeout: 5)
+    try waitForExit(holder, timeout: runtimePortRendezvousTimeout)
     XCTAssertEqual(holder.terminationStatus, 0)
 
     let decoder = JSONDecoder()
@@ -985,7 +1070,7 @@ private final class BlockingEndPowerActivityBackend: PowerActivityBackend, @unch
     lock.unlock()
     if shouldBlock {
       firstEndEntered.signal()
-      _ = allowFirstEnd.wait(timeout: .now() + 5)
+      awaitFixtureGate(allowFirstEnd, "allowFirstEnd")
     }
     lock.lock()
     ends += 1
@@ -1168,7 +1253,7 @@ private final class CoordinatedSleepWakeNotificationSource: SleepWakeNotificatio
     lock.unlock()
     if shouldBlock {
       startEntered.signal()
-      _ = allowStart.wait(timeout: .now() + 5)
+      awaitFixtureGate(allowStart, "allowStart")
     }
     lock.lock()
     self.handler = handler
@@ -1183,7 +1268,7 @@ private final class CoordinatedSleepWakeNotificationSource: SleepWakeNotificatio
     lock.unlock()
     if shouldBlock {
       stopEntered.signal()
-      _ = allowStop.wait(timeout: .now() + 5)
+      awaitFixtureGate(allowStop, "allowStop")
     }
     lock.lock()
     handler = nil
@@ -1310,7 +1395,7 @@ private final class BlockingOrderingLifecycleSink: RuntimeLifecycleSink, @unchec
     lock.unlock()
     if shouldBlock {
       sleepRecordEntered.signal()
-      _ = allowSleepRecord.wait(timeout: .now() + 5)
+      awaitFixtureGate(allowSleepRecord, "allowSleepRecord")
     }
     lock.lock()
     recordedEvents.append(event)
