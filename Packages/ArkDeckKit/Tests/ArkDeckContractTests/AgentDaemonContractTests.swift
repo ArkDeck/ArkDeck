@@ -9,6 +9,51 @@ import CryptoKit
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
+/// Anti-hang bound for the daemon fixtures that hand real work to another
+/// thread and wait for it to arrive somewhere. It is not a contract bound: the
+/// assertions around each wait decide the outcome, and an expired wait reports
+/// only that the host never got there.
+///
+/// The five seconds this replaced sat inside the noise of a saturated
+/// `swift test --parallel --num-workers 4` run. The graceful-drain fixture
+/// takes 0.98 s on an idle host and 2.4–7.1 s under host load, and it failed
+/// on CI as well as in a full local parallel run while passing in isolation.
+/// This is set far above any stall observed there and still fails a genuine
+/// deadlock well inside one test.
+private let daemonRendezvousTimeout: TimeInterval = 60
+
+/// A one-shot gate an `async` dispatcher can park on until a fixture opens it.
+/// Waiting suspends the calling task instead of blocking a cooperative-pool
+/// thread, which an `async` function must never do.
+private final class DispatchGate: @unchecked Sendable {
+  private let mutex = NSLock()
+  private var isOpen = false
+  private var parked: [CheckedContinuation<Void, Never>] = []
+
+  func open() {
+    mutex.lock()
+    guard !isOpen else { return mutex.unlock() }
+    isOpen = true
+    let resumed = parked
+    parked = []
+    mutex.unlock()
+    for continuation in resumed { continuation.resume() }
+  }
+
+  func wait() async {
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      mutex.lock()
+      if isOpen {
+        mutex.unlock()
+        continuation.resume()
+      } else {
+        parked.append(continuation)
+        mutex.unlock()
+      }
+    }
+  }
+}
+
 final class AgentDaemonContractTests: XCTestCase {
   private var stateDirectory: URL!
   private var server: AgentDaemonServer?
@@ -72,13 +117,34 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
-  private final class DelayedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
-    let firstDispatch = DispatchSemaphore(value: 0)
+  /// Holds every dispatch until the fixture releases it, and announces each
+  /// arrival. This replaced a fixed 150 ms sleep per dispatch: the sleep both
+  /// left the "is the request still in flight?" question to a wall-clock bet
+  /// and charged the drain budget ~750 ms of invented latency, one sleep per
+  /// dispatch `observe.device` makes.
+  private final class GatedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
+    let dispatchArrived = DispatchSemaphore(value: 0)
+    private let gate = DispatchGate()
 
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-      firstDispatch.signal()
-      try await Task.sleep(nanoseconds: 150_000_000)
+      dispatchArrived.signal()
+      await gate.wait()
       return try await HappyDispatcher().dispatch(plan)
+    }
+
+    /// Let the parked dispatch — and every later one — through.
+    func release() { gate.open() }
+  }
+
+  /// Wait for `semaphore` without blocking a cooperative-pool thread: the
+  /// block happens on a Dispatch worker while the test task suspends.
+  private func waitForSemaphore(
+    _ semaphore: DispatchSemaphore, timeout: TimeInterval
+  ) async -> DispatchTimeoutResult {
+    await withCheckedContinuation { continuation in
+      DispatchQueue.global().async {
+        continuation.resume(returning: semaphore.wait(timeout: .now() + timeout))
+      }
     }
   }
 
@@ -1347,7 +1413,7 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
   func testGracefulDrainCompletesInFlightJobBeforeReleasingTheDaemonLock() async throws {
-    let dispatcher = DelayedDispatcher()
+    let dispatcher = GatedDispatcher()
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -1372,11 +1438,40 @@ final class AgentDaemonContractTests: XCTestCase {
     let waitingClient = Task.detached { () -> JSONValue? in
       try? client.request(method: "job.run", params: ["jobId": .string(jobID)])
     }
+    // Anti-hang bound, not a contract bound. What this buys is not elapsed
+    // time but a known position: the request is now in flight and parked
+    // inside the dispatcher, and it stays parked until this test releases it,
+    // so the drain below cannot race the job to completion.
+    let arrived = await waitForSemaphore(
+      dispatcher.dispatchArrived, timeout: daemonRendezvousTimeout)
     XCTAssertEqual(
-      dispatcher.firstDispatch.wait(timeout: .now() + 5), .success,
+      arrived, .success,
       "the daemon must observe the in-flight Runtime request before draining")
 
-    server.drainAndStop(deadline: 5)
+    // Drain from another thread so the fixture can observe that it blocks.
+    let drainReturned = DispatchSemaphore(value: 0)
+    DispatchQueue.global().async {
+      server.drainAndStop(deadline: daemonRendezvousTimeout)
+      drainReturned.signal()
+    }
+    // Deliberately short, and deliberately not the anti-hang bound: this is
+    // the invariant. The job cannot reach its terminal state while it is
+    // parked, so a drain that has already returned here released the daemon
+    // lock with an accepted request still in flight. Host load only delays
+    // the drain further, so it can only reinforce this assertion — which is
+    // why the load that broke the old wall-clock budget cannot break this one.
+    let drainedEarly = await waitForSemaphore(drainReturned, timeout: 0.1)
+    XCTAssertEqual(
+      drainedEarly, .timedOut,
+      "the daemon released its lock while the accepted request was still in flight")
+
+    // Release the parked work: from here the drain must return on its own,
+    // and it returns because the request drained, not because a clock expired.
+    dispatcher.release()
+    let drained = await waitForSemaphore(drainReturned, timeout: daemonRendezvousTimeout)
+    XCTAssertEqual(
+      drained, .success,
+      "the drain must return once the in-flight request has crossed its durable boundaries")
     self.server = nil
     guard case .object(let result)? = await waitingClient.value,
       case .string(let state)? = result["state"]
