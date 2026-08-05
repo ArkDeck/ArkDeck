@@ -1156,7 +1156,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(stopped.reservedAttemptCount, 0)
   }
 
-  func testCodexRepairerAcceptsOnlyClosedNewTypedStrategy() async throws {
+  func testLocalAgentRepairerAcceptsOnlyClosedNewTypedStrategy() async throws {
     let root = temporaryDirectory("campaign-repairer")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -1166,9 +1166,9 @@ final class EvolutionCampaignContractTests: XCTestCase {
       """
       {"allowedStartingModes":["hdcNormal","loader"],"loaderDiscoveryTimeoutSeconds":90,"loaderPollIntervalMilliseconds":250,"hdcCommandTimeoutSeconds":45,"readOnlyCommandTimeoutSeconds":30}
       """.utf8)
-    let repairer = try CodexRockchipEvolutionStrategyRepairer(
-      executablePath: "/usr/bin/true", modelName: "contract-model",
-      workingDirectory: root.path, transport: FixedEvolutionCodexTransport(response: response))
+    let repairer = try LocalAgentRockchipEvolutionStrategyRepairer(
+      profile: .codex, executablePath: "/usr/bin/true", modelName: "contract-model",
+      workingDirectory: root.path, transport: FixedEvolutionCLITransport(response: response))
     let strategy = try await repairer.propose(
       assertion: assertion,
       observation: RockchipEvolutionFailureObservation(
@@ -1179,10 +1179,10 @@ final class EvolutionCampaignContractTests: XCTestCase {
     XCTAssertEqual(strategy.hdcCommandTimeoutSeconds, 45)
     XCTAssertEqual(strategy.readOnlyCommandTimeoutSeconds, 30)
 
-    let invalid = try CodexRockchipEvolutionStrategyRepairer(
-      executablePath: "/usr/bin/true", modelName: "contract-model",
+    let invalid = try LocalAgentRockchipEvolutionStrategyRepairer(
+      profile: .codex, executablePath: "/usr/bin/true", modelName: "contract-model",
       workingDirectory: root.path,
-      transport: FixedEvolutionCodexTransport(
+      transport: FixedEvolutionCLITransport(
         response: Data(
           """
           {"allowedStartingModes":["loader"],"loaderDiscoveryTimeoutSeconds":90,"loaderPollIntervalMilliseconds":250,"hdcCommandTimeoutSeconds":45,"readOnlyCommandTimeoutSeconds":30,"argv":["wlx"]}
@@ -1195,14 +1195,19 @@ final class EvolutionCampaignContractTests: XCTestCase {
         priorCandidates: [prior]))
   }
 
-  func testCodexProcessTransportReadsFinalMessageFileInsteadOfNoisyStandardOutput()
-    async throws
-  {
-    let root = temporaryDirectory("codex-final-message")
+  /// Each profile declares where its answer is, and the transport must read
+  /// exactly there. A CLI that interleaves session diagnostics with the
+  /// payload on one stream is why the file channel exists at all; a CLI whose
+  /// print mode emits only the payload is why the stdout channel does.
+  func testEachProfileResponseChannelReadsTheAnswerAndNotTheDiagnostics() async throws {
+    let root = temporaryDirectory("agent-cli-response-channel")
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
-    let executable = root.appending(path: "codex-fixture", directoryHint: .notDirectory)
-    let fixture = """
+    let expected = "{\"result\":\"PASS\",\"issues\":[]}"
+
+    // File channel (codex): stdout is noise, the answer is in the named file.
+    let fileFixture = root.appending(path: "file-channel-fixture", directoryHint: .notDirectory)
+    try """
       #!/bin/sh
       output=''
       while [ "$#" -gt 0 ]; do
@@ -1214,19 +1219,41 @@ final class EvolutionCampaignContractTests: XCTestCase {
         shift
       done
       printf '%s' 'session diagnostic that is not JSON\n'
-      printf '%s' '{"result":"PASS","issues":[]}' > "$output"
-      """
-    try fixture.write(to: executable, atomically: true, encoding: .utf8)
-    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
-    let digest = SHA256.hash(data: try Data(contentsOf: executable))
-      .map { String(format: "%02x", $0) }.joined()
+      printf '%s' '\(expected)' > "$output"
+      """.write(to: fileFixture, atomically: true, encoding: .utf8)
 
-    let response = try await CodexCLIProcessTransport().send(
-      HarnessCodexProcessRequest(
-        executablePath: executable.path, executableSHA256: digest,
-        arguments: ["exec", "return JSON"], workingDirectory: root.path, timeoutSeconds: 10))
+    // Stdout channel (claude-code print mode): the answer is stdout itself,
+    // and no output-file flag is ever passed.
+    let stdoutFixture = root.appending(
+      path: "stdout-channel-fixture", directoryHint: .notDirectory)
+    try """
+      #!/bin/sh
+      for argument in "$@"; do
+        if [ "$argument" = '--output-last-message' ]; then
+          echo 'a stdout-channel profile must not be given an output file' >&2
+          exit 3
+        fi
+      done
+      printf '%s\\n' '\(expected)'
+      """.write(to: stdoutFixture, atomically: true, encoding: .utf8)
 
-    XCTAssertEqual(String(decoding: response, as: UTF8.self), "{\"result\":\"PASS\",\"issues\":[]}")
+    for (profile, executable) in [
+      (HarnessLocalAgentCLIProfile.codex, fileFixture),
+      (HarnessLocalAgentCLIProfile.claudeCode, stdoutFixture),
+    ] {
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o700], ofItemAtPath: executable.path)
+      let digest = SHA256.hash(data: try Data(contentsOf: executable))
+        .map { String(format: "%02x", $0) }.joined()
+      let response = try await LocalAgentCLIProcessTransport().send(
+        HarnessLocalAgentCLIRequest(
+          executablePath: executable.path, executableSHA256: digest, profile: profile,
+          modelName: "contract-model", prompt: "return JSON",
+          workingDirectory: root.path, timeoutSeconds: 10))
+      XCTAssertEqual(
+        String(decoding: response, as: UTF8.self), expected,
+        "\(profile.profileID) read the wrong channel")
+    }
   }
 
   func testCandidateTargetAndSandboxHaveNoRuntimeDeviceNetworkOrRawProcessSurface() throws {
@@ -2093,9 +2120,9 @@ private actor StartingModeMismatchThenSuccessEvolutionFlash: RockchipEvolutionFl
   func dispatchCount() -> Int { count }
 }
 
-private struct FixedEvolutionCodexTransport: HarnessCodexTransport {
+private struct FixedEvolutionCLITransport: HarnessLocalAgentCLITransport {
   let response: Data
-  func send(_: HarnessCodexProcessRequest) async throws -> Data { response }
+  func send(_: HarnessLocalAgentCLIRequest) async throws -> Data { response }
 }
 
 /// Stands in for the engine lane: it cannot reserve inside execute, so it

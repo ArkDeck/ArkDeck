@@ -1,0 +1,319 @@
+// Local agent-CLI decision gateway (CHG-2026-055, TASK-HFA-005).
+//
+// A signed-in ArkDeck host often has a local agent CLI already authenticated
+// but no separately provisioned vendor API key. This adapter lets that host
+// use the same bounded decision context through a direct argv process launch.
+// It is not a shell adapter: the executable is identity-bound, the child is
+// read-only and ephemeral, user rules and configuration are ignored where the
+// CLI can be told to ignore them, and its working root is an explicit
+// empty/operator-owned directory rather than the repaired workspace. The CLI
+// receives only `HarnessVendorEnvelope.text(context)`.
+//
+// Which CLI is a *profile*, not a hard-coded vendor. The profile is the only
+// place a concrete command line exists, the set of profiles is closed, and no
+// argv fragment is ever taken from the environment — so adding a second agent
+// CLI cannot become an operator-supplied raw command surface.
+
+import ArkDeckCore
+import ArkDeckHarness
+import ArkDeckProcess
+import CryptoKit
+import Foundation
+
+/// Where a CLI puts the model's final message. Every agent CLI prints session
+/// diagnostics somewhere; the difference is whether the payload is separable
+/// from them by a file the CLI writes, or because the CLI prints the payload
+/// and nothing else.
+public enum HarnessLocalAgentResponseChannel: String, Sendable, Equatable {
+  /// The CLI writes the final message to a path we pass it, and stdout is
+  /// diagnostics we never read.
+  case finalMessageFile
+  /// The CLI prints the final message on stdout and nothing else.
+  case standardOutput
+}
+
+/// One concrete local agent CLI: how to invoke it for a single bounded,
+/// non-interactive answer, and how to read that answer back.
+public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
+  /// Stable identifier; it names the producer in durable decision records, so
+  /// it may not drift once a record exists.
+  public let profileID: String
+  /// Reported as the model provider in `HarnessModelDescriptor`.
+  public let providerLabel: String
+  public let responseChannel: HarnessLocalAgentResponseChannel
+  /// Parent-environment variables this CLI needs beyond the executor's
+  /// fail-closed base (`PATH`, `HOME`, `TMPDIR`, `LANG`). Names only: the
+  /// value is read from the parent at request time and is never a literal
+  /// here, and a name that is absent in the parent is simply not passed.
+  public let inheritedEnvironmentKeys: [String]
+  private let argumentBuilder:
+    @Sendable (_ modelName: String, _ workingDirectory: String, _ prompt: String,
+      _ finalMessagePath: String?) -> [String]
+
+  init(
+    profileID: String,
+    providerLabel: String,
+    responseChannel: HarnessLocalAgentResponseChannel,
+    inheritedEnvironmentKeys: [String] = [],
+    argumentBuilder: @escaping @Sendable (String, String, String, String?) -> [String]
+  ) {
+    self.profileID = profileID
+    self.providerLabel = providerLabel
+    self.responseChannel = responseChannel
+    self.inheritedEnvironmentKeys = inheritedEnvironmentKeys
+    self.argumentBuilder = argumentBuilder
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool { lhs.profileID == rhs.profileID }
+
+  public func arguments(
+    modelName: String, workingDirectory: String, prompt: String, finalMessagePath: String?
+  ) -> [String] {
+    argumentBuilder(modelName, workingDirectory, prompt, finalMessagePath)
+  }
+
+  /// OpenAI Codex CLI. `codex exec` emits session diagnostics on stdout even
+  /// with `--color never`, so its explicit output file is what keeps those
+  /// diagnostics from becoming JSON input.
+  public static let codex = HarnessLocalAgentCLIProfile(
+    profileID: "codex",
+    providerLabel: "openai-codex-cli",
+    responseChannel: .finalMessageFile
+  ) { model, workingDirectory, prompt, finalMessagePath in
+    var arguments = ["exec"]
+    if let finalMessagePath {
+      arguments += ["--output-last-message", finalMessagePath]
+    }
+    arguments += [
+      "--ephemeral", "--ignore-user-config", "--ignore-rules",
+      "--sandbox", "read-only", "--skip-git-repo-check",
+      "-C", workingDirectory, "--color", "never", "--model", model,
+      prompt,
+    ]
+    return arguments
+  }
+
+  /// Anthropic Claude Code CLI in print mode, which writes the answer and
+  /// nothing else to stdout. `USER` is inherited because the CLI resolves its
+  /// stored credential through it; without it the child reports "Not logged
+  /// in" while every other condition looks healthy.
+  public static let claudeCode = HarnessLocalAgentCLIProfile(
+    profileID: "claude-code",
+    providerLabel: "anthropic-claude-code-cli",
+    responseChannel: .standardOutput,
+    inheritedEnvironmentKeys: ["USER"]
+  ) { model, _, prompt, _ in
+    [
+      "--print", "--model", model, "--output-format", "text",
+      "--strict-mcp-config", "--permission-mode", "plan",
+      prompt,
+    ]
+  }
+
+  /// The closed set. A provider name outside it is a configuration error, not
+  /// an improvised command line.
+  public static let all: [HarnessLocalAgentCLIProfile] = [codex, claudeCode]
+
+  public static func named(_ profileID: String) -> HarnessLocalAgentCLIProfile? {
+    all.first { $0.profileID == profileID.lowercased() }
+  }
+}
+
+public struct HarnessLocalAgentCLIRequest: Sendable, Equatable {
+  public let executablePath: String
+  public let executableSHA256: String
+  public let profile: HarnessLocalAgentCLIProfile
+  public let modelName: String
+  public let prompt: String
+  public let workingDirectory: String
+  public let timeoutSeconds: Int
+
+  public init(
+    executablePath: String,
+    executableSHA256: String,
+    profile: HarnessLocalAgentCLIProfile,
+    modelName: String,
+    prompt: String,
+    workingDirectory: String,
+    timeoutSeconds: Int
+  ) {
+    self.executablePath = executablePath
+    self.executableSHA256 = executableSHA256
+    self.profile = profile
+    self.modelName = modelName
+    self.prompt = prompt
+    self.workingDirectory = workingDirectory
+    self.timeoutSeconds = timeoutSeconds
+  }
+}
+
+public protocol HarnessLocalAgentCLITransport: Sendable {
+  func send(_ request: HarnessLocalAgentCLIRequest) async throws -> Data
+}
+
+public struct LocalAgentCLIProcessTransport: HarnessLocalAgentCLITransport {
+  private let executor: FoundationProcessExecutor
+  private let captureLimit: Int
+  private let parentEnvironment: [String: String]
+
+  public init(
+    executor: FoundationProcessExecutor = FoundationProcessExecutor(),
+    captureLimit: Int = 512 * 1024,
+    parentEnvironment: [String: String] = ProcessInfo.processInfo.environment
+  ) {
+    self.executor = executor
+    self.captureLimit = captureLimit
+    self.parentEnvironment = parentEnvironment
+  }
+
+  public func send(_ request: HarnessLocalAgentCLIRequest) async throws -> Data {
+    let fileManager = FileManager.default
+    let needsFile = request.profile.responseChannel == .finalMessageFile
+    var outputRoot: URL?
+    var outputURL: URL?
+    if needsFile {
+      let root = fileManager.temporaryDirectory.appending(
+        path: "arkdeck-agent-cli-output-\(UUID().uuidString)", directoryHint: .isDirectory)
+      do {
+        try fileManager.createDirectory(
+          at: root, withIntermediateDirectories: false,
+          attributes: [.posixPermissions: 0o700])
+      } catch {
+        throw HarnessDecisionGatewayError.transportFailure("agentCLIOutputDirectoryUnavailable")
+      }
+      outputRoot = root
+      outputURL = root.appending(path: "last-message.json", directoryHint: .notDirectory)
+    }
+    defer { if let outputRoot { try? fileManager.removeItem(at: outputRoot) } }
+
+    var environment = ["NO_COLOR": "1"]
+    for key in request.profile.inheritedEnvironmentKeys {
+      if let value = parentEnvironment[key] { environment[key] = value }
+    }
+    let execution: ProcessIdentityBoundExecutionResult
+    do {
+      execution = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: URL(fileURLWithPath: request.executablePath),
+            arguments: request.profile.arguments(
+              modelName: request.modelName,
+              workingDirectory: request.workingDirectory,
+              prompt: request.prompt,
+              finalMessagePath: outputURL?.path),
+            environment: environment,
+            workingDirectory: URL(fileURLWithPath: request.workingDirectory, isDirectory: true),
+            timeout: TimeInterval(request.timeoutSeconds)),
+          expectedSHA256: request.executableSHA256),
+        captureLimit: captureLimit)
+    } catch {
+      throw HarnessDecisionGatewayError.transportFailure("agentCLIProcessLaunchFailed")
+    }
+    guard execution.execution.termination == .exited(0) else {
+      throw HarnessDecisionGatewayError.transportFailure("agentCLIProcessFailed")
+    }
+
+    let response: Data
+    switch request.profile.responseChannel {
+    case .finalMessageFile:
+      guard let outputURL else {
+        throw HarnessDecisionGatewayError.transportFailure("agentCLIFinalMessageUnavailable")
+      }
+      let size: Int64
+      do {
+        size = (try fileManager.attributesOfItem(atPath: outputURL.path)[.size] as? NSNumber)?
+          .int64Value ?? -1
+      } catch {
+        throw HarnessDecisionGatewayError.transportFailure("agentCLIFinalMessageUnavailable")
+      }
+      guard size >= 0, size <= Int64(captureLimit) else {
+        throw HarnessDecisionGatewayError.transportFailure("agentCLIResponseTruncated")
+      }
+      do {
+        response = try Data(contentsOf: outputURL)
+      } catch {
+        throw HarnessDecisionGatewayError.transportFailure("agentCLIFinalMessageUnavailable")
+      }
+    case .standardOutput:
+      // A capture that hit its limit is not a short answer; it is an answer we
+      // cannot prove we read whole.
+      guard !execution.execution.stdout.wasTruncated else {
+        throw HarnessDecisionGatewayError.transportFailure("agentCLIResponseTruncated")
+      }
+      response = execution.execution.stdout.data
+    }
+    guard !response.isEmpty else {
+      throw HarnessDecisionGatewayError.transportFailure("agentCLIResponseEmpty")
+    }
+    // Whitespace is not semantic JSON content. Everything else remains raw
+    // bytes until `HarnessDecisionProposal.parse` accepts or rejects it.
+    let trimmed = String(decoding: response, as: UTF8.self)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      throw HarnessDecisionGatewayError.transportFailure("agentCLIResponseEmpty")
+    }
+    return Data(trimmed.utf8)
+  }
+}
+
+public struct LocalAgentCLIDecisionGateway: HarnessDecisionGateway {
+  private let executablePath: String
+  private let executableSHA256: String
+  private let profile: HarnessLocalAgentCLIProfile
+  private let modelName: String
+  private let workingDirectory: String
+  private let timeoutSeconds: Int
+  private let transport: any HarnessLocalAgentCLITransport
+
+  public init(
+    profile: HarnessLocalAgentCLIProfile,
+    executablePath: String,
+    modelName: String,
+    workingDirectory: String,
+    timeoutSeconds: Int = 180,
+    transport: any HarnessLocalAgentCLITransport = LocalAgentCLIProcessTransport()
+  ) throws {
+    let executable = URL(fileURLWithPath: executablePath)
+      .resolvingSymlinksInPath().standardizedFileURL.path
+    let workdir = URL(fileURLWithPath: workingDirectory, isDirectory: true)
+      .resolvingSymlinksInPath().standardizedFileURL.path
+    var isDirectory: ObjCBool = false
+    guard executablePath.hasPrefix("/"), executable == executablePath,
+      FileManager.default.isExecutableFile(atPath: executable),
+      let bytes = try? Data(contentsOf: URL(fileURLWithPath: executable)),
+      FileManager.default.fileExists(atPath: workdir, isDirectory: &isDirectory),
+      isDirectory.boolValue,
+      workingDirectory.hasPrefix("/"), workdir == workingDirectory,
+      (1...900).contains(timeoutSeconds)
+    else {
+      throw HarnessVendorConfigurationError.malformedExecutable
+    }
+    self.profile = profile
+    self.executablePath = executable
+    self.executableSHA256 = SHA256.hash(data: bytes)
+      .map { String(format: "%02x", $0) }.joined()
+    self.modelName = modelName
+    self.workingDirectory = workdir
+    self.timeoutSeconds = timeoutSeconds
+    self.transport = transport
+  }
+
+  public var producerID: String { "\(profile.profileID)-cli-gateway@1" }
+
+  public var modelDescriptor: HarnessModelDescriptor {
+    HarnessModelDescriptor(
+      provider: profile.providerLabel, modelName: modelName, adapterVersion: producerID)
+  }
+
+  public func propose(_ context: HarnessDecisionContext) async throws -> Data {
+    try await transport.send(
+      HarnessLocalAgentCLIRequest(
+        executablePath: executablePath,
+        executableSHA256: executableSHA256,
+        profile: profile,
+        modelName: modelName,
+        prompt: HarnessVendorEnvelope.text(context),
+        workingDirectory: workingDirectory,
+        timeoutSeconds: timeoutSeconds))
+  }
+}

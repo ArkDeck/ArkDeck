@@ -637,12 +637,14 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   private static func repairer(
     environment: [String: String], workingDirectory: String
   ) throws -> any RockchipEvolutionStrategyRepairing {
-    guard environment[HarnessVendorConfiguration.providerKey]?.lowercased() == "codex",
-      let path = environment[HarnessVendorConfiguration.codexPathKey],
+    guard let provider = environment[HarnessVendorConfiguration.providerKey]?.lowercased(),
+      let profile = HarnessLocalAgentCLIProfile.named(provider),
+      let path = environment[HarnessVendorConfiguration.cliPathKey],
       let model = environment[HarnessVendorConfiguration.modelKey]
     else { return PublishedRockchipEvolutionStrategyRepairer() }
-    return try CodexRockchipEvolutionStrategyRepairer(
-      executablePath: path, modelName: model, workingDirectory: workingDirectory)
+    return try LocalAgentRockchipEvolutionStrategyRepairer(
+      profile: profile, executablePath: path, modelName: model,
+      workingDirectory: workingDirectory)
   }
 }
 
