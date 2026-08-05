@@ -91,45 +91,39 @@ public enum RockchipImageArchiveIntrospection {
   /// host read without end, not because 4 GiB is meaningful.
   static let maximumMemberBytes: Int64 = 4 * 1024 * 1024 * 1024
 
-  /// Reads an already-extracted archive directory. Extraction is the caller's,
-  /// and stays where the existing import path already does it.
+  /// What a caller must ask the archive reader for so a build can be described
+  /// in the single pass the archive is already making.
+  public static func derivationRequest(board: RockchipFlashProfile) -> GzipTarDerivationRequest {
+    GzipTarDerivationRequest(
+      captureMembers: [RockchipFlashProfile.partitionTableMemberName],
+      captureByteLimit: 1 << 20,
+      scanMember: board.mappedPartitions
+        .first { $0.partitionName == board.runtimeVersionPartitionName }?.imageMemberName,
+      scanKey: runtimeVersionKey)
+  }
+
+  /// Describes the build an archive carries, from the summary of the one pass
+  /// that already streamed it.
+  ///
+  /// Nothing is extracted. This file's neighbour states the rule it follows:
+  /// an unvalidated archive is never handed to an external tool, and it is not
+  /// written out to be read a second time either. Everything below is learned
+  /// from bytes that went past once.
   public static func describe(
-    extractedRoot: URL,
-    archiveSizeBytes: Int64,
-    archiveSHA256: String,
+    summary: GzipTarArchiveSummary,
     board: RockchipFlashProfile
   ) throws -> RockchipImageBuildDescriptor {
-    let names = try memberNames(in: extractedRoot)
-    var members: [RockchipImagesArchiveMember] = []
-    for name in names.sorted() {
-      let url = extractedRoot.appendingPathComponent(name, isDirectory: false)
-      guard
-        let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size]
-          as? NSNumber
-      else {
-        throw RockchipArchiveIntrospectionFailure.memberUnreadable(name)
-      }
-      let sizeBytes = size.int64Value
-      guard sizeBytes <= maximumMemberBytes else {
-        throw RockchipArchiveIntrospectionFailure.oversizedMember(
-          name: name, sizeBytes: sizeBytes)
-      }
-      guard let digest = streamedSHA256(of: url) else {
-        throw RockchipArchiveIntrospectionFailure.memberUnreadable(name)
-      }
-      members.append(
-        RockchipImagesArchiveMember(
-          name: name, sizeBytes: sizeBytes, sha256: digest,
-          classification: board.classification(ofMemberNamed: name)))
+    let members = summary.members.map {
+      RockchipImagesArchiveMember(
+        name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256,
+        classification: board.classification(ofMemberNamed: $0.name))
     }
-
-    let partitionTableName =
-      members.first { $0.classification == .partitionTable }?.name
-    guard let partitionTableName else {
+    guard
+      let tableBytes = summary.capturedMembers[RockchipFlashProfile.partitionTableMemberName]
+    else {
       throw RockchipArchiveIntrospectionFailure.partitionTableMissing
     }
-    let declared = try partitions(
-      inTableAt: extractedRoot.appendingPathComponent(partitionTableName, isDirectory: false))
+    let declared = try partitions(inTable: tableBytes)
 
     let systemImageMember = board.mappedPartitions
       .first { $0.partitionName == board.runtimeVersionPartitionName }?.imageMemberName
@@ -139,28 +133,18 @@ public enum RockchipImageArchiveIntrospection {
       throw RockchipArchiveIntrospectionFailure.systemImageMissing(
         board.runtimeVersionPartitionName)
     }
-    let version = try runtimeBuildVersion(
-      inImageAt: extractedRoot.appendingPathComponent(systemImageMember, isDirectory: false))
+    guard let version = summary.scannedValue, !version.isEmpty else {
+      throw RockchipArchiveIntrospectionFailure.runtimeBuildVersionUnreadable
+    }
 
     return RockchipImageBuildDescriptor(
-      archiveSizeBytes: archiveSizeBytes,
-      archiveSHA256: archiveSHA256,
+      archiveSizeBytes: summary.archiveSizeBytes,
+      archiveSHA256: summary.archiveSHA256,
       members: members,
       declaredPartitions: declared,
       runtimeBuildVersion: version)
   }
 
-  static func memberNames(in root: URL) throws -> [String] {
-    let contents =
-      (try? FileManager.default.contentsOfDirectory(
-        at: root, includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles])) ?? []
-    return contents.compactMap { url in
-      let regular =
-        (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile ?? false
-      return regular ? url.lastPathComponent : nil
-    }
-  }
 
   /// The partition table lives in the archive's `parameter.txt`, on the
   /// `CMDLINE` line, as Rockchip's `mtdparts` list:
@@ -170,8 +154,15 @@ public enum RockchipImageArchiveIntrospection {
   /// A size of `-` means "the rest of the device"; a name may carry a
   /// `:bootable`/`:grow` suffix that is an attribute, not part of the name.
   static func partitions(inTableAt url: URL) throws -> [RockchipDeclaredPartition] {
-    guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+    guard let bytes = try? Data(contentsOf: url) else {
       throw RockchipArchiveIntrospectionFailure.partitionTableUnparsable("unreadable")
+    }
+    return try partitions(inTable: bytes)
+  }
+
+  static func partitions(inTable bytes: Data) throws -> [RockchipDeclaredPartition] {
+    guard let text = String(data: bytes, encoding: .utf8) else {
+      throw RockchipArchiveIntrospectionFailure.partitionTableUnparsable("not UTF-8")
     }
     guard
       let cmdline = text.split(separator: "\n").first(where: {
@@ -237,25 +228,54 @@ public enum RockchipImageArchiveIntrospection {
   /// match that straddles a boundary is still found.
   static let runtimeVersionKey = "const.ohos.fullname="
 
-  static func runtimeBuildVersion(inImageAt url: URL) throws -> String {
-    guard let handle = try? FileHandle(forReadingFrom: url) else {
-      throw RockchipArchiveIntrospectionFailure.runtimeBuildVersionUnreadable
+  /// Finds `key` followed by a printable value run, across an arbitrary number
+  /// of chunks.
+  ///
+  /// Streaming rather than window-at-a-time because the bytes arrive from a
+  /// decompressor that owes nobody a chunk boundary: the property can land
+  /// astride any two chunks, and a scanner that only searched inside one would
+  /// silently report "no version" and leave post-flash verification with
+  /// nothing to compare against.
+  struct StreamingValueScanner {
+    private let key: [UInt8]
+    private var matched = 0
+    private var value: [UInt8] = []
+    private var collecting = false
+
+    init(key: String) {
+      self.key = Array(key.utf8)
     }
-    defer { try? handle.close() }
-    let key = Array(runtimeVersionKey.utf8)
-    let windowBytes = 4 * 1024 * 1024
-    // A value is short; overlapping by key+value bound is enough to never
-    // split a match across two windows.
-    let overlap = key.count + 128
-    var carry: [UInt8] = []
-    while true {
-      guard let chunk = try? handle.read(upToCount: windowBytes), !chunk.isEmpty else { break }
-      var window = carry
-      window.append(contentsOf: chunk)
-      if let value = value(forKey: key, in: window) { return value }
-      carry = window.count > overlap ? Array(window.suffix(overlap)) : window
+
+    /// Returns the value once the run ends, or nil while more input is needed.
+    mutating func consume(_ bytes: UnsafeRawBufferPointer) -> String? {
+      for byte in bytes {
+        if collecting {
+          if isValueByte(byte) {
+            value.append(byte)
+            // A value this long is not a version string; treat the run as
+            // noise rather than growing without bound.
+            if value.count > 256 { collecting = false; value = []; matched = 0 }
+            continue
+          }
+          collecting = false
+          if !value.isEmpty { return String(decoding: value, as: UTF8.self) }
+          matched = 0
+          continue
+        }
+        if byte == key[matched] {
+          matched += 1
+          if matched == key.count {
+            collecting = true
+            value = []
+            matched = 0
+          }
+        } else {
+          // Restart, allowing the mismatched byte to open a new match.
+          matched = byte == key[0] ? 1 : 0
+        }
+      }
+      return nil
     }
-    throw RockchipArchiveIntrospectionFailure.runtimeBuildVersionUnreadable
   }
 
   /// First `key`-prefixed run of printable value bytes in `window`.

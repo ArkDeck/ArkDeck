@@ -123,40 +123,79 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
   /// The value is scanned out of the image because it is the only place that
   /// tells the truth: the 2026-07-28 daily is *named* 7.0.0.35 and its build
   /// log says 7.0.0.35, while the device it produces answers 7.0.0.36.
-  func testTheRuntimeVersionIsReadFromTheImageBytes() throws {
-    let url = root.appendingPathComponent("system.img")
-    var bytes = Data(repeating: 0x00, count: 1_000)
-    bytes.append(Data("const.ohos.fullname=OpenHarmony-7.0.0.36\u{0}".utf8))
-    bytes.append(Data(repeating: 0xFF, count: 1_000))
-    try bytes.write(to: url)
-    XCTAssertEqual(
-      try RockchipImageArchiveIntrospection.runtimeBuildVersion(inImageAt: url),
-      "OpenHarmony-7.0.0.36")
+  func testTheRuntimeVersionIsReadFromTheImageBytes() {
+    var scanner = RockchipImageArchiveIntrospection.StreamingValueScanner(
+      key: RockchipImageArchiveIntrospection.runtimeVersionKey)
+    var bytes = [UInt8](repeating: 0x00, count: 1_000)
+    bytes.append(contentsOf: Array("const.ohos.fullname=OpenHarmony-7.0.0.36".utf8))
+    bytes.append(0x00)
+    let found = bytes.withUnsafeBytes { scanner.consume($0) }
+    XCTAssertEqual(found, "OpenHarmony-7.0.0.36")
   }
 
-  /// The scan streams in windows, so a value that straddles a window boundary
-  /// is the case that would silently read as "no version" and let post-flash
-  /// verification compare against nothing.
-  func testAVersionStraddlingAWindowBoundaryIsStillFound() throws {
-    let url = root.appendingPathComponent("straddling.img")
-    let window = 4 * 1024 * 1024
-    var bytes = Data(repeating: 0x00, count: window - 10)
-    bytes.append(Data("const.ohos.fullname=OpenHarmony-7.0.0.37\u{0}".utf8))
-    try bytes.write(to: url)
-    XCTAssertEqual(
-      try RockchipImageArchiveIntrospection.runtimeBuildVersion(inImageAt: url),
-      "OpenHarmony-7.0.0.37")
-  }
-
-  func testAnImageWithNoVersionFailsClosed() throws {
-    let url = root.appendingPathComponent("versionless.img")
-    try Data(repeating: 0x41, count: 4_096).write(to: url)
-    XCTAssertThrowsError(
-      try RockchipImageArchiveIntrospection.runtimeBuildVersion(inImageAt: url)
-    ) { error in
-      XCTAssertEqual(
-        error as? RockchipArchiveIntrospectionFailure, .runtimeBuildVersionUnreadable)
+  /// The decompressor owes nobody a chunk boundary, so the property can land
+  /// astride any two chunks. A scanner that only searched inside one chunk
+  /// would report "no version" and leave post-flash verification comparing
+  /// against nothing — which reads as a passing flash.
+  func testAVersionSplitAcrossEveryChunkBoundaryIsStillFound() {
+    let payload = Array("const.ohos.fullname=OpenHarmony-7.0.0.37".utf8) + [0x00]
+    for split in 1..<payload.count {
+      var scanner = RockchipImageArchiveIntrospection.StreamingValueScanner(
+        key: RockchipImageArchiveIntrospection.runtimeVersionKey)
+      let head = Array(payload[..<split])
+      let tail = Array(payload[split...])
+      var found = head.withUnsafeBytes { scanner.consume($0) }
+      if found == nil { found = tail.withUnsafeBytes { scanner.consume($0) } }
+      XCTAssertEqual(found, "OpenHarmony-7.0.0.37", "split at \(split)")
     }
+  }
+
+  func testAnImageWithNoVersionYieldsNothing() {
+    var scanner = RockchipImageArchiveIntrospection.StreamingValueScanner(
+      key: RockchipImageArchiveIntrospection.runtimeVersionKey)
+    let bytes = [UInt8](repeating: 0x41, count: 4_096)
+    XCTAssertNil(bytes.withUnsafeBytes { scanner.consume($0) })
+  }
+
+  /// A near-miss must not consume the real match that follows it: the key
+  /// appears in prose inside these images as well as in the property table.
+  func testAPartialKeyDoesNotSwallowTheRealMatch() {
+    var scanner = RockchipImageArchiveIntrospection.StreamingValueScanner(
+      key: RockchipImageArchiveIntrospection.runtimeVersionKey)
+    var bytes = Array("const.ohos.full".utf8)
+    bytes.append(contentsOf: Array("const.ohos.fullname=OpenHarmony-7.0.0.38 ".utf8))
+    XCTAssertEqual(bytes.withUnsafeBytes { scanner.consume($0) }, "OpenHarmony-7.0.0.38")
+  }
+
+  /// The whole claim, end to end, on the archive the pinned profile was
+  /// written from: streaming it once must derive exactly what a person typed.
+  ///
+  /// Opt-in because the archive is 730 MB and not in the repository. Point
+  /// `ARKDECK_DAYU200_ARCHIVE` at a `dayu200_img.tar.gz` to run it; the run
+  /// that this change was merged on is recorded in the evidence file.
+  func testTheRealArchiveDerivesExactlyWhatThePinnedProfileStates() throws {
+    guard let path = ProcessInfo.processInfo.environment["ARKDECK_DAYU200_ARCHIVE"] else {
+      throw XCTSkip("set ARKDECK_DAYU200_ARCHIVE to a dayu200_img.tar.gz to run this")
+    }
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let summary = try GzipTarArchiveReader.summarize(
+      fileAt: URL(fileURLWithPath: path),
+      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+    let build = try RockchipImageArchiveIntrospection.describe(summary: summary, board: board)
+
+    XCTAssertEqual(build.archiveSizeBytes, board.archiveSizeBytes)
+    XCTAssertEqual(build.archiveSHA256, board.archiveSHA256)
+    XCTAssertEqual(build.runtimeBuildVersion, board.runtimeBuildVersion)
+
+    let derived = Dictionary(uniqueKeysWithValues: build.members.map { ($0.name, $0) })
+    XCTAssertEqual(Set(derived.keys), Set(board.members.map(\.name)))
+    for pinned in board.members {
+      let member = try XCTUnwrap(derived[pinned.name], pinned.name)
+      XCTAssertEqual(member.sizeBytes, pinned.sizeBytes, pinned.name)
+      XCTAssertEqual(member.sha256, pinned.sha256.lowercased(), pinned.name)
+      XCTAssertEqual(member.classification, pinned.classification, pinned.name)
+    }
+    XCTAssertEqual(board.conformance(of: build), [])
   }
 
   /// Conformance is structural. An archive for a build nobody enumerated is

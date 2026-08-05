@@ -27,6 +27,25 @@ public struct GzipTarArchiveSummary: Equatable, Sendable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [GzipTarMemberSummary]
+  /// Bytes of the members the caller asked to capture, bounded by the request.
+  /// Empty unless a derivation was requested.
+  public let capturedMembers: [String: Data]
+  /// The value found by the requested key scan, if any.
+  public let scannedValue: String?
+
+  public init(
+    archiveSizeBytes: Int64,
+    archiveSHA256: String,
+    members: [GzipTarMemberSummary],
+    capturedMembers: [String: Data] = [:],
+    scannedValue: String? = nil
+  ) {
+    self.archiveSizeBytes = archiveSizeBytes
+    self.archiveSHA256 = archiveSHA256
+    self.members = members
+    self.capturedMembers = capturedMembers
+    self.scannedValue = scannedValue
+  }
 
   public func archiveObservation() -> RockchipImagesArchiveObservation {
     RockchipImagesArchiveObservation(
@@ -38,13 +57,46 @@ public struct GzipTarArchiveSummary: Equatable, Sendable {
   }
 }
 
+/// What a caller wants derived while the archive streams past.
+///
+/// Deriving here rather than after extraction is deliberate and matches this
+/// file's opening rule: an unvalidated archive is never handed to an external
+/// tool, and it is never written out to disk to be read again. The bytes go
+/// past once, and everything that has to be known about them is learned on
+/// that pass.
+public struct GzipTarDerivationRequest: Equatable, Sendable {
+  /// Members whose bytes are kept. Intended for small metadata members such as
+  /// the partition table; a member larger than `captureByteLimit` is not kept
+  /// and its absence is the caller's to notice.
+  public let captureMembers: Set<String>
+  public let captureByteLimit: Int
+  /// Member scanned for `scanKey` followed by a printable value run.
+  public let scanMember: String?
+  public let scanKey: String
+
+  public init(
+    captureMembers: Set<String>,
+    captureByteLimit: Int = 1 << 20,
+    scanMember: String? = nil,
+    scanKey: String = ""
+  ) {
+    self.captureMembers = captureMembers
+    self.captureByteLimit = captureByteLimit
+    self.scanMember = scanMember
+    self.scanKey = scanKey
+  }
+}
+
 public enum GzipTarArchiveReader {
   static let chunkSizeBytes = 1 << 20
   /// Any sane gzip header (fixed part plus optional name/comment/extra) fits well within
   /// this bound; exceeding it is treated as corruption rather than buffered indefinitely.
   static let maximumGzipHeaderBytes = 1 << 16
 
-  public static func summarize(fileAt url: URL) throws -> GzipTarArchiveSummary {
+  public static func summarize(
+    fileAt url: URL,
+    derivation: GzipTarDerivationRequest? = nil
+  ) throws -> GzipTarArchiveSummary {
     let fileHandle: FileHandle
     do {
       fileHandle = try FileHandle(forReadingFrom: url)
@@ -58,7 +110,7 @@ public enum GzipTarArchiveReader {
     var headerPending = Data()
     var headerConsumed = false
     let decompressor = try RawDeflateDecompressor()
-    var tar = TarStreamSummarizer()
+    var tar = TarStreamSummarizer(derivation: derivation)
 
     while true {
       let chunk = (try? fileHandle.read(upToCount: chunkSizeBytes)) ?? nil
@@ -95,7 +147,8 @@ public enum GzipTarArchiveReader {
     let members = try tar.finish()
     let archiveSHA256 = archiveHasher.finalize().map { String(format: "%02x", $0) }.joined()
     return GzipTarArchiveSummary(
-      archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256, members: members)
+      archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256, members: members,
+      capturedMembers: tar.capturedMembers, scannedValue: tar.scannedValue)
   }
 
   /// Returns the total gzip header length once enough bytes are buffered, nil when more
@@ -229,6 +282,17 @@ private struct TarStreamSummarizer {
   private var members: [GzipTarMemberSummary] = []
   private var zeroBlockCount = 0
 
+  private let derivation: GzipTarDerivationRequest?
+  private var capturing: Data?
+  private var capturingOverflowed = false
+  private var scanner: RockchipImageArchiveIntrospection.StreamingValueScanner?
+  private(set) var capturedMembers: [String: Data] = [:]
+  private(set) var scannedValue: String?
+
+  init(derivation: GzipTarDerivationRequest? = nil) {
+    self.derivation = derivation
+  }
+
   mutating func consume(_ input: UnsafeRawBufferPointer) throws {
     var offset = 0
     while offset < input.count {
@@ -246,8 +310,18 @@ private struct TarStreamSummarizer {
       case .memberContent, .skipContent:
         let take = Int(min(remainingBytes, Int64(input.count - offset)))
         if state == .memberContent && take > 0 {
-          memberHasher.update(
-            bufferPointer: UnsafeRawBufferPointer(rebasing: input[offset..<offset + take]))
+          let slice = UnsafeRawBufferPointer(rebasing: input[offset..<offset + take])
+          memberHasher.update(bufferPointer: slice)
+          if capturing != nil {
+            if capturing!.count + take <= (derivation?.captureByteLimit ?? 0) {
+              capturing!.append(contentsOf: slice)
+            } else {
+              capturingOverflowed = true
+            }
+          }
+          if scanner != nil, scannedValue == nil {
+            scannedValue = scanner!.consume(slice)
+          }
         }
         offset += take
         remainingBytes -= Int64(take)
@@ -323,6 +397,7 @@ private struct TarStreamSummarizer {
       memberName = name
       memberSizeBytes = size
       memberHasher = SHA256()
+      beginDerivation(for: name)
       remainingBytes = size
       paddingAfterContent = padding
       if remainingBytes == 0 {
@@ -345,6 +420,23 @@ private struct TarStreamSummarizer {
         name: memberName,
         sizeBytes: memberSizeBytes,
         sha256: memberHasher.finalize().map { String(format: "%02x", $0) }.joined()))
+    // A member that overran the capture bound is not recorded at all: half a
+    // partition table would parse into half a plan.
+    if let captured = capturing, !capturingOverflowed {
+      capturedMembers[memberName] = captured
+    }
+    capturing = nil
+    capturingOverflowed = false
+    scanner = nil
+  }
+
+  /// Called when a member's header has been read, before its bytes arrive.
+  private mutating func beginDerivation(for name: String) {
+    guard let derivation else { return }
+    if derivation.captureMembers.contains(name) { capturing = Data() }
+    if let scanMember = derivation.scanMember, scanMember == name, !derivation.scanKey.isEmpty {
+      scanner = RockchipImageArchiveIntrospection.StreamingValueScanner(key: derivation.scanKey)
+    }
   }
 
   private static func nulTerminatedString(_ bytes: ArraySlice<UInt8>) -> String {
