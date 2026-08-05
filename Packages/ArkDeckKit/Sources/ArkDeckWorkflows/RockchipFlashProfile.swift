@@ -538,3 +538,74 @@ extension RockchipFlashProfile {
     return violations.isEmpty ? .valid : .blocked(violations)
   }
 }
+
+// MARK: - Board-scoped classification (CHG-2026-056 r4, TASK-E2B-001)
+
+extension RockchipFlashProfile {
+  /// The loader is named by the vendor's own convention, not by this board.
+  public static let loaderMemberName = "MiniLoaderAll.bin"
+  /// Rockchip's partition table always travels as this file.
+  public static let partitionTableMemberName = "parameter.txt"
+  /// The partition whose image carries the value the booted device reports as
+  /// its build version.
+  public var runtimeVersionPartitionName: String { "system" }
+
+  /// What an archive member is, decided from board facts and the member's
+  /// name alone.
+  ///
+  /// This is a *rule*, not a table, and that is the whole point: a new daily
+  /// build ships the same seventeen names, so nothing about it needs to be
+  /// enumerated in advance. `RockchipFlashProfileContractTests` asserts the
+  /// rule reproduces the hand-authored classification of every member of both
+  /// published profiles exactly, so it cannot drift into a guess.
+  public func classification(ofMemberNamed name: String)
+    -> RockchipArchiveMemberClassification
+  {
+    if name == Self.partitionTableMemberName { return .partitionTable }
+    if name == Self.loaderMemberName { return .loaderMaskromBranchOnly }
+    if mappedPartitions.contains(where: { $0.imageMemberName == name }) {
+      return .mappedPartitionImage
+    }
+    // An image whose name resolves to a partition this board forbids writing
+    // is an orphan: it ships in the archive and must never reach the device.
+    if name.hasSuffix(".img"),
+      membershiplessPartitionsWriteForbidden.contains(Self.partitionName(fromImageMember: name))
+    {
+      return .orphanImageWriteForbidden
+    }
+    return .nonPartitionMetadata
+  }
+
+  /// `chip_prod.img` names the `chip-prod` partition. The archive spells the
+  /// separator with an underscore and the partition table with a hyphen.
+  static func partitionName(fromImageMember name: String) -> String {
+    String(name.dropLast(4)).replacingOccurrences(of: "_", with: "-")
+  }
+
+  /// Does an archive the product has never seen fit this board?
+  ///
+  /// Structural, not by digest: every partition this board maps must have an
+  /// image, and every partition the archive's own table declares must be one
+  /// this board knows. Byte integrity is the Artifact lease's and the
+  /// exact-plan authority's (REQ-FLASH-017), not this function's.
+  public func conformance(of build: RockchipImageBuildDescriptor) -> [String] {
+    var violations: [String] = []
+    let memberNames = Set(build.members.map(\.name))
+    for mapped in mappedPartitions where !memberNames.contains(mapped.imageMemberName) {
+      violations.append("mappedPartitionImageMissing:\(mapped.partitionName)")
+    }
+    let declaredNames = Set(build.declaredPartitions.map(\.name))
+    let knownNames = Set(mappedPartitions.map(\.partitionName))
+      .union(membershiplessPartitionsWriteForbidden)
+    for declared in declaredNames.subtracting(knownNames).sorted() {
+      violations.append("undeclaredPartitionInTable:\(declared)")
+    }
+    for mapped in mappedPartitions where !declaredNames.contains(mapped.partitionName) {
+      violations.append("mappedPartitionAbsentFromTable:\(mapped.partitionName)")
+    }
+    if build.runtimeBuildVersion.isEmpty {
+      violations.append("runtimeBuildVersionUnreadable")
+    }
+    return violations
+  }
+}

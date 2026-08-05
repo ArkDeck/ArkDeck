@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-056-e2-policy-baseline-alignment@r3
+> Change:CHG-2026-056-e2-policy-baseline-alignment@r4
 > Baseline: `CORE-3.0.0` -> proposed `CORE-4.0.0`
 > This plan does not claim a real device run.
 
