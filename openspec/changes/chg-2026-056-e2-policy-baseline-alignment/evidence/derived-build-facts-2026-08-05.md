@@ -161,3 +161,44 @@ image says so, not because anyone typed it.
 The preflight reads the archive through a probe seam, like every other
 observation it makes, so its contract tests still prove every branch with no
 spawn, no device and no 730 MB file.
+
+## And the engine path, which the CLI path did not cover
+
+Exercising `arkdeck flash preview` found the preflight pin. Exercising the
+*engine* — `arkdeck job plan` with the imported 7.0.0.37 lease, which is the
+path an agent takes rather than an operator — found the next thing:
+
+```
+rejected(invalidInput, "typed plan preflight failed before authorization:
+  unsupportedAction(\"post-flash verification has no declared build version
+  for the resolved bundle\")")
+```
+
+The derived version had been threaded into one of the engine's nine
+`ProviderExecutionContext` constructions. The other eight were missed, and
+1325 contract tests did not notice, because the provider-level tests supply
+the context themselves and never ask where it came from.
+
+Threading one fact into nine call sites by hand fails, so what guards it now
+is not more threading:
+`testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion`
+reads `RuntimeJobEngine.swift` and requires every construction that resolves
+an input artifact to carry the version derived from it. It failed on first run
+and named a construction the manual pass had still missed — the reconciliation
+readback — which is the whole argument for writing it.
+
+After that, the engine materializes the full plan for a build the product has
+never seen:
+
+```
+operationReference: flash.dayu200@1      providerID: rockchip
+catalogDigest: e2f8eb65…                 executionMode: planOnly
+materializedPlanDigest: b0ef4367ceaceee85c6b249986c02fad6404b8cefe8ed7bc4f1ac2b1081d8fc2
+dispatchDisposition: notDispatched
+```
+
+Three paths have now been exercised on the 7.0.0.37 daily — CLI import, CLI
+plan and preview, and engine admission — and each found a pin the previous one
+could not reach. Nothing remains between an unenumerated build and a
+destructive dispatch except the operator's confirmation, which is where it
+belongs.
