@@ -9,11 +9,16 @@
 
 ### Requirement: REQ-FLASH-016 Board profiles are board-scoped; build facts are derived
 
-A published DAYU200 device profile SHALL describe the **board** and nothing else: its partition
-map, its write-forbidden partitions, its prerequisites, and the rules that classify an archive
-member as a mapped partition image, an orphan image, the loader, the partition table or
-non-partition metadata. A device profile SHALL NOT enumerate the size or digest of any particular
-firmware build.
+A published DAYU200 device profile SHALL be selected as a **board**: its partition map, its
+write-forbidden partitions, its prerequisites, and the rules that classify an archive member as a
+mapped partition image, an orphan image, the loader, the partition table or non-partition
+metadata. Every published reference SHALL describe the same board; naming one reference rather
+than another SHALL NOT change any board fact.
+
+No admission decision SHALL depend on a firmware build being enumerated in the product. A profile
+carries per-build fields, but they SHALL be populated from the archive under authorization before
+use, and the compiled-in values SHALL NOT be consulted by any path that admits, plans, stages,
+dispatches or verifies a flash.
 
 The facts of a particular build SHALL be derived from the archive under authorization, at import,
 and recorded on the resulting Artifact lease:
@@ -29,8 +34,12 @@ while the value baked into its `system.img` — and therefore the value the boot
 is `OpenHarmony-7.0.0.36`.
 
 An import SHALL fail closed when the archive does not conform to the board profile: a mapped
-partition with no member, a member naming a partition the board forbids, a partition table that
-does not parse, or a system image from which no runtime build version can be read.
+partition with no member, a partition table that does not parse or that declares a partition the
+board does not know, or a system image from which no runtime build version can be read.
+
+Before an upload begins, a declared byte count and digest SHALL be checked for **shape** — a
+positive, bounded size and a lowercase 64-character SHA-256 — and SHALL NOT be checked for
+membership in any set of known builds. The archive itself is judged on commit, against its bytes.
 
 #### Scenario: A firmware build the product has never seen is importable
 
@@ -72,8 +81,21 @@ Post-flash verification SHALL compare the device's reported build version agains
 build version **derived from the image the plan wrote**, not against a version constant carried
 by the device profile.
 
+That version SHALL reach the verification step as a fact the Runtime resolved, alongside the
+Artifact lease it resolved it from. Materializing a step SHALL remain a pure function of its
+typed inputs and that context: no step materializer may open the image archive. Deriving the
+version while materializing would make the plan depend on I/O, and deriving it from the staged
+images is not available either — staging is scoped to the flash action and released before
+verification runs.
+
 #### Scenario: Verification uses the derived version
 
 - **GIVEN** a completed write plan whose system image declares `OpenHarmony-7.0.0.36`
 - **WHEN** post-flash verification reads the device's `const.ohos.fullname`
 - **THEN** it passes only if the device answers that same value
+
+#### Scenario: Every published step materializes without reading a file
+
+- **GIVEN** the typed inputs and resolved context of a flash job
+- **WHEN** each published step of `flash.dayu200@1` is materialized
+- **THEN** every step materializes, and none of them opens the image archive
