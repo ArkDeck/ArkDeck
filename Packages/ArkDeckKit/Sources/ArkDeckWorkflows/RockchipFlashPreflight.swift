@@ -101,6 +101,11 @@ public struct RockchipFlashPreflightProbes: Sendable {
   public var rockUSBAliveness: @Sendable () async -> RockchipFlashToolAliveness
   public var hdcAliveness: @Sendable () async -> RockchipFlashToolAliveness
   public var archiveIdentity: @Sendable (URL) throws -> RockchipFlashArchiveIdentity
+  /// The build the archive describes, read from its bytes. A seam like every
+  /// other observation here: the preflight decides what the answer means, and
+  /// a contract test substitutes the answer without a 730 MB file.
+  public var archiveBuild:
+    @Sendable (URL, RockchipFlashProfile) throws -> RockchipImageBuildDescriptor
   /// The stable identity the durable binding names — what the target readback
   /// must match. Kept separate from the readback so the identity comparison
   /// stays in the preflight, where it is visible and testable.
@@ -120,6 +125,9 @@ public struct RockchipFlashPreflightProbes: Sendable {
     rockUSBAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
     hdcAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
     archiveIdentity: @escaping @Sendable (URL) throws -> RockchipFlashArchiveIdentity,
+    archiveBuild: (
+      @Sendable (URL, RockchipFlashProfile) throws -> RockchipImageBuildDescriptor
+    )? = nil,
     boundTargetIdentitySHA256: @escaping @Sendable () throws -> String,
     boundTargetHDCNormalAlias:
       @escaping @Sendable () throws -> (identitySHA256: String, usbTopology: String)? =
@@ -129,6 +137,14 @@ public struct RockchipFlashPreflightProbes: Sendable {
     self.rockUSBAliveness = rockUSBAliveness
     self.hdcAliveness = hdcAliveness
     self.archiveIdentity = archiveIdentity
+    self.archiveBuild =
+      archiveBuild
+      ?? { url, board in
+        let summary = try GzipTarArchiveReader.summarize(
+          fileAt: url,
+          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+        return try RockchipImageArchiveIntrospection.describe(summary: summary, board: board)
+      }
     self.boundTargetIdentitySHA256 = boundTargetIdentitySHA256
     self.boundTargetHDCNormalAlias = boundTargetHDCNormalAlias
     self.targetReadback = targetReadback
@@ -211,22 +227,38 @@ public struct RockchipFlashPreflight: Sendable {
         summary: "the images archive could not be measured: \(error)",
         remediation: ["point --images at the readable archive this campaign pins"])
     }
-    guard
-      let profile = RockchipFlashProfile.profile(
-        archiveSHA256: identity.sha256, byteCount: identity.byteCount)
+    // Whether this archive can be flashed on this board is decided by reading
+    // it, not by recognising its digest. Matching against the builds compiled
+    // into the product refused a firmware daily published after the last
+    // release — measured with `7.0.0.37` on 2026-08-05, which fits the board
+    // with no structural violation.
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let build: RockchipImageBuildDescriptor
+    do {
+      build = try probes.archiveBuild(archiveURL, board)
+      _ = try board.forBuild(build)
+    } catch {
+      return RockchipFlashPreflightFinding(
+        check: .archiveIntegrity, passed: false,
+        summary: "archive does not read as a usable \(board.catalogReference) images "
+          + "bundle: \(error)",
+        remediation: [
+          "point --images at a DAYU200 images archive whose partition table and "
+            + "member set fit this board"
+        ])
+    }
+    guard build.archiveSHA256 == identity.sha256,
+      build.archiveSizeBytes == Int64(identity.byteCount)
     else {
       return RockchipFlashPreflightFinding(
         check: .archiveIntegrity, passed: false,
-        summary: "archive sha256 \(identity.sha256) (\(identity.byteCount) bytes) "
-          + "matches no published DAYU200 profile pin",
-        remediation: [
-          "re-download or re-export the published images archive; the flash "
-            + "profile pin is the authority and it is not editable here"
-        ])
+        summary: "archive bytes changed while they were being measured",
+        remediation: ["re-run the preflight against a stable copy of the archive"])
     }
     return RockchipFlashPreflightFinding(
       check: .archiveIntegrity, passed: true,
-      summary: "archive sha256 matches \(profile.catalogReference)")
+      summary: "archive fits \(board.catalogReference) and declares "
+        + "\(build.runtimeBuildVersion)")
   }
 
   private func targetPresence() -> RockchipFlashPreflightFinding {
