@@ -182,7 +182,7 @@ public enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
     }
   }
 
-  func permits(_ value: JSONValue) -> Bool {
+  public func permits(_ value: JSONValue) -> Bool {
     switch (self, value) {
     case (.exactString(let expected), .string(let actual)):
       return expected == actual

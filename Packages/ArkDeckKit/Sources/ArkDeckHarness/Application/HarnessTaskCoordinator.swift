@@ -2830,7 +2830,10 @@ public actor HarnessTaskCoordinator {
       if let descriptor, descriptor.minimumEffect >= .deviceMutation,
         let capabilityID = await policyGuard.capabilityPort?.standingCapabilityID(
           operationReference: intent.operationReference,
-          targetID: intent.targetID) ?? nil
+          targetID: intent.targetID,
+          expectedBindingRevision: descriptor.binding == WorkflowBindingRequirement.none
+            ? nil : intent.expectedBindingRevision,
+          inputs: decision.inputs) ?? nil
       {
         authorizationReference = RuntimeCapabilityReference(capabilityID: capabilityID)
       }

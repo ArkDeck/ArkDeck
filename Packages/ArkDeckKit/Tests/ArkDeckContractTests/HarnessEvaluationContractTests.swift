@@ -994,16 +994,16 @@ final class HarnessEvaluationContractTests: XCTestCase {
     jobs.finish("JOB-3")
 
     let evaluated = try await coordinator.reconcile(task.htaskID)
+    // `debug.hap@1` is a catalog operation the runtime may authorize under its
+    // own bounded default policy, so a composition without a maintainer-issued
+    // grant no longer stops here: the fixture deployment is dispatched and the
+    // engine decides. (It previously stopped for a human, which is what let a
+    // superseded grant masquerade as this gate being satisfied.)
+    XCTAssertEqual(evaluated.action, .dispatched)
+    XCTAssertEqual(evaluated.snapshot.phase, .reproducing)
     XCTAssertEqual(
-      evaluated.action, .stoppedForHuman,
-      "this test composition has no E1 authorization port, so the fixture stops at its gate")
-    XCTAssertEqual(evaluated.snapshot.phase, .collecting)
-    XCTAssertEqual(
-      DebugCrashTaskHandler().plan(
-        for: evaluated.snapshot, decisionID: "dec-after-analysis",
-        nowUTC: "2026-07-30T00:00:00Z").decision.operationReference,
-      DebugCrashTaskHandler.deployHAP,
-      "the analyzed baseline must return to collecting and select the fixture deployment")
+      jobs.submittedOperations.last, DebugCrashTaskHandler.deployHAP,
+      "the analyzed baseline must select and dispatch the fixture deployment")
     XCTAssertEqual(
       evaluated.snapshot.observed.measurements[HarnessObservationBuilder.watermarkMetric],
       .string(""))

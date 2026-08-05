@@ -350,7 +350,10 @@ private struct JourneyCapabilityGrant: HarnessCapabilityPort {
     Self.covered.contains(operationReference)
   }
 
-  func standingCapabilityID(operationReference: String, targetID: String) async -> String? {
+  func standingCapabilityID(
+    operationReference: String, targetID: String,
+    expectedBindingRevision: Int?, inputs: [String: JSONValue]
+  ) async -> String? {
     Self.covered.contains(operationReference) ? "CAP-RT-WORKSPACE-FIXTURE" : nil
   }
 }

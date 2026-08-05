@@ -94,7 +94,10 @@ private struct IssuedWorkspaceGrant: HarnessCapabilityPort {
     covered.contains(operationReference)
   }
 
-  func standingCapabilityID(operationReference: String, targetID: String) async -> String? {
+  func standingCapabilityID(
+    operationReference: String, targetID: String,
+    expectedBindingRevision: Int?, inputs: [String: JSONValue]
+  ) async -> String? {
     covered.contains(operationReference) ? "CAP-RT-WORKSPACE-FIXTURE" : nil
   }
 }

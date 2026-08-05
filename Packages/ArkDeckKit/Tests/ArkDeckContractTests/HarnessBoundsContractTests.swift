@@ -577,35 +577,82 @@ final class HarnessBoundsContractTests: XCTestCase {
         "flash.dayu200@1"))
   }
 
-  func testDeviceMutationNeedsBudgetAndAnExistingCapability() async {
+  /// An E1 step always needs mutation budget. Whether it also needs a grant a
+  /// maintainer already issued is decided by the catalog, not by the harness:
+  /// an operation the runtime may authorize under its own bounded default
+  /// policy goes to the engine, and an operation whose catalog entry disables
+  /// that issuance — which is what the TASK-HFA-009 flip set on every
+  /// `workspace.*` mutation — still may not proceed without a standing grant.
+  ///
+  /// The earlier form of this test required a standing grant for *every* E1
+  /// operation. That was stricter than the authority it screens for and it
+  /// was not load-bearing: the port answered "held" for any unexpired grant
+  /// naming the operation, including one issued against a superseded binding
+  /// revision, which is how one stale grant left by a reflash could both
+  /// satisfy this gate and be refused by the engine moments later.
+  func testDeviceMutationAlwaysNeedsBudgetAndNeedsAGrantWhereTheCatalogSaysSo() async {
     let availability = StubAvailabilityPort()
     let withoutCapability = HarnessPolicyGuard(
       availability: availability, capabilities: StubCapabilityPort())
+
+    // No budget for mutations at all — refused for either kind of operation.
+    let permitted: Set<String> = [
+      DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
+      "debug.hap@1", "flash.dayu200@1", "workspace.apply-patch@1",
+    ]
+    for operation in ["debug.hap@1", "workspace.apply-patch@1"] {
+      let noBudget = await withoutCapability.evaluate(
+        guardInput(
+          snapshot(allowed: [operation]), operation: operation, permitted: permitted))
+      XCTAssertEqual(
+        noBudget,
+        .refuse(.authorizationRequired(reference: operation, effect: "deviceMutation")),
+        "\(operation) must not proceed without mutation budget")
+    }
+
+    // Default policy issuance disabled (workspace mutations): budget is not
+    // enough, a maintainer-issued grant is still required.
+    let workspaceAllowed = snapshot(
+      allowed: ["workspace.apply-patch@1"],
+      budgets: HarnessTaskBudgets(
+        maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 2))
+    XCTAssertFalse(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.apply-patch@1")!
+        .defaultPolicyIssuanceEnabled,
+      "the workspace flip is what this half of the gate protects")
+    let workspaceWithoutGrant = await withoutCapability.evaluate(
+      guardInput(
+        workspaceAllowed, operation: "workspace.apply-patch@1", permitted: permitted))
+    XCTAssertEqual(
+      workspaceWithoutGrant,
+      .refuse(.authorizationRequired(reference: "workspace.apply-patch@1", effect: "deviceMutation")))
+    let workspaceHeld = HarnessPolicyGuard(
+      availability: availability,
+      capabilities: StubCapabilityPort(held: ["workspace.apply-patch@1"]))
+    let workspaceWithGrant = await workspaceHeld.evaluate(
+      guardInput(
+        workspaceAllowed, operation: "workspace.apply-patch@1", permitted: permitted))
+    XCTAssertEqual(workspaceWithGrant, .allow)
+
+    // Default policy issuance enabled (device debug): with budget, the guard
+    // steps aside and the engine's admission is the authority — it binds its
+    // envelope to the exact identity, binding revision and inputs before
+    // consuming it.
     let e1Allowed = snapshot(
       allowed: ["debug.hap@1"],
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 2))
-
-    // No budget for mutations at all.
-    let noBudget = await withoutCapability.evaluate(
-      guardInput(snapshot(allowed: ["debug.hap@1"]), operation: "debug.hap@1"))
-    XCTAssertEqual(
-      noBudget,
-      .refuse(.authorizationRequired(reference: "debug.hap@1", effect: "deviceMutation")))
-
-    // Budget, but no capability the maintainer issued.
-    let noCapability = await withoutCapability.evaluate(
+    XCTAssertTrue(
+      RuntimeOperationCatalog.descriptor(reference: "debug.hap@1")!
+        .defaultPolicyIssuanceEnabled)
+    let issuableWithoutGrant = await withoutCapability.evaluate(
       guardInput(e1Allowed, operation: "debug.hap@1"))
-    XCTAssertEqual(
-      noCapability,
-      .refuse(.authorizationRequired(reference: "debug.hap@1", effect: "deviceMutation")))
-
-    // Budget and an existing capability: the guard steps aside and lets the
-    // engine's admission be the authority.
+    XCTAssertEqual(issuableWithoutGrant, .allow)
     let held = HarnessPolicyGuard(
       availability: availability, capabilities: StubCapabilityPort(held: ["debug.hap@1"]))
-    let allowed = await held.evaluate(guardInput(e1Allowed, operation: "debug.hap@1"))
-    XCTAssertEqual(allowed, .allow)
+    let issuableWithGrant = await held.evaluate(
+      guardInput(e1Allowed, operation: "debug.hap@1"))
+    XCTAssertEqual(issuableWithGrant, .allow)
   }
 
   func testAnUnavailableOperationIsRefusedBeforeAuthorizationIsConsulted() async {

@@ -49,14 +49,18 @@ public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
   /// dispatches a request naming a grant that cannot authorize it.
   public func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
     await standingCapabilityID(
-      operationReference: operationReference, targetID: targetID) != nil
+      operationReference: operationReference, targetID: targetID,
+      expectedBindingRevision: nil, inputs: [:]) != nil
   }
 
   /// The selected grant's id, so a request can name it. Selection is
   /// deterministic — first by expiry, then by id — so two wakes on the same
   /// installed set choose the same grant and a replay stays identical.
   public func standingCapabilityID(
-    operationReference: String, targetID: String
+    operationReference: String,
+    targetID: String,
+    expectedBindingRevision: Int?,
+    inputs: [String: JSONValue]
   ) async -> String? {
     let installed: [RuntimeCapabilityStatus]
     do {
@@ -74,15 +78,45 @@ public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
         // it. Naming one leaves the engine to refuse it correctly while the
         // task only ever learns that *some* authorization was missing.
         guard case .active = status.capability.revocation else { return false }
-        return status.remainingUses > 0 && status.lineageAllowsNewExecution
-          && status.capability.expiresAtUTC > now
-          && status.capability.effectCeiling >= WorkflowEffect.deviceMutation
-          && status.capability.operationScope.contains { $0.reference == operationReference }
+        guard status.remainingUses > 0, status.lineageAllowsNewExecution,
+          status.capability.expiresAtUTC > now,
+          status.capability.effectCeiling >= WorkflowEffect.deviceMutation,
+          status.capability.operationScope.contains(where: { $0.reference == operationReference })
+        else { return false }
+        return Self.canAuthorize(
+          status.capability, expectedBindingRevision: expectedBindingRevision, inputs: inputs)
       }
       .sorted {
         ($0.capability.expiresAtUTC, $0.capability.capabilityID)
           < ($1.capability.expiresAtUTC, $1.capability.capabilityID)
       }
       .first?.capability.capabilityID
+  }
+
+  /// The pins this side can decide without the device: a grant pinned to a
+  /// different binding revision, to a different exact input envelope, or to
+  /// an input constraint this request violates cannot authorize the request,
+  /// and the engine will say so as an *authorization* refusal — which stops
+  /// the task for a human. A reflash leaves grants from the previous binding
+  /// revision installed and unexpired, so without this the earliest-expiring
+  /// stale grant is named forever and every task on the rebound device stops
+  /// before its first mutation.
+  ///
+  /// Target identity stays out: a capability is scoped by stable physical
+  /// identity digest while the harness holds only a target id, so the engine
+  /// remains the authority for that one.
+  private static func canAuthorize(
+    _ capability: RuntimeCapability,
+    expectedBindingRevision: Int?,
+    inputs: [String: JSONValue]
+  ) -> Bool {
+    if let pinned = capability.exactBindingRevision, pinned != expectedBindingRevision {
+      return false
+    }
+    if let exactInputs = capability.exactInputs, exactInputs != inputs { return false }
+    for (key, constraint) in capability.inputConstraints {
+      guard let value = inputs[key], constraint.permits(value) else { return false }
+    }
+    return true
   }
 }
