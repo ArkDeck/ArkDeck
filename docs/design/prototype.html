@@ -1,4 +1,4 @@
-<title>ArkDeck 交互原型 v0.1</title>
+<title>ArkDeck 交互原型 v0.2</title>
 <style>
 :root{
   --ground:#F5F6F8; --panel:#FFFFFF; --panel2:#EDEFF2; --ink:#23272E; --ink2:#5A6270;
@@ -96,7 +96,7 @@ tr.sel-row{background:var(--sel)}
 .banner header{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--danger)}
 .ritem{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .ritem .ri{flex:1}.ritem .ri b{font-size:13px}.ritem .ri p{font-size:12px;color:var(--ink2);margin-top:2px}
-.ritem .ra{display:flex;gap:8px;flex-none;align-items:center}
+.ritem .ra{display:flex;gap:8px;flex-none;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .radio{display:flex;flex-direction:column;gap:6px}
 .radio label{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
 .radio input{margin-top:3px;accent-color:var(--accent)}
@@ -104,14 +104,16 @@ tr.sel-row{background:var(--sel)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .seg button{border:none;background:var(--panel);padding:6px 16px;font-size:13px;cursor:pointer;color:var(--ink)}
 .seg button.on{background:var(--accent);color:#fff;font-weight:600}
+.seg.mini button{padding:3px 10px;font-size:11.5px}
 .drawer{flex:none;border-top:1px solid var(--line);background:var(--panel2)}
 .drawer .bar{display:flex;align-items:center;gap:12px;padding:8px 16px;cursor:pointer;font-size:12.5px}
-.drawer .bar .st{flex:1;color:var(--ink2)}
+.drawer .bar .st{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .drawer .body{max-height:0;overflow:hidden;transition:max-height .25s ease}
-.drawer.open .body{max-height:240px;overflow-y:auto}
-@media (prefers-reduced-motion:reduce){.drawer .body{transition:none}.pulse{animation:none}}
+.drawer.open .body{max-height:280px;overflow-y:auto}
+@media (prefers-reduced-motion:reduce){.drawer .body{transition:none}.pulse{animation:none}
+  .ibar::after{animation:none;left:0;width:100%;opacity:.35}}
 .job{display:flex;flex-direction:column;gap:8px;padding:10px 16px;border-top:1px solid var(--line)}
-.job .jh{display:flex;align-items:center;gap:10px}
+.job .jh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .job .jh b{font-size:13px}
 .phases{display:flex;gap:4px;flex-wrap:wrap;font-size:11px}
 .ph{padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--ink2)}
@@ -119,26 +121,46 @@ tr.sel-row{background:var(--sel)}
 .ph.run{border-color:var(--accent);color:var(--accent);font-weight:600}
 .pulse{animation:pu 1.2s ease-in-out infinite}
 @keyframes pu{50%{opacity:.45}}
+.ibar{height:3px;border-radius:2px;background:var(--accent-weak);overflow:hidden;position:relative;
+  flex:1;min-width:60px;max-width:200px;align-self:center}
+.ibar::after{content:"";position:absolute;left:-40%;width:40%;top:0;bottom:0;background:var(--accent);
+  border-radius:2px;animation:ib 1.4s linear infinite}
+@keyframes ib{to{left:100%}}
 .logtail{font-family:var(--mono);font-size:11px;color:var(--ink2);background:var(--panel);
-  border:1px solid var(--line);border-radius:6px;padding:6px 10px;max-height:64px;overflow-y:auto;white-space:pre-wrap}
+  border:1px solid var(--line);border-radius:6px;padding:6px 10px;max-height:110px;overflow-y:auto;white-space:pre-wrap}
+.stream{max-height:220px;color:var(--ink)}
+.rebind{border:1px solid var(--accent);background:var(--accent-weak);border-radius:8px;padding:8px 12px;
+  font-size:12.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:relative}
+.inp{padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px}
+.inp.mono{font-family:var(--mono);font-size:12px}
+.inp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select.inp{cursor:pointer}
+.livetag{font-size:9.5px;border:1px solid var(--accent);color:var(--accent);border-radius:4px;padding:0 4px;vertical-align:middle}
 .modal-bg{position:fixed;inset:0;background:rgba(15,18,22,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
   max-width:560px;width:100%;padding:20px 22px;display:flex;flex-direction:column;gap:14px;max-height:86vh;overflow-y:auto}
-.modal h3{font-size:16px;display:flex;gap:8px;align-items:center}
+.modal h3{font-size:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .modal.dangerm h3{color:var(--danger)}
 .impact{border:1px solid var(--danger);background:var(--danger-weak);border-radius:8px;padding:10px 12px;font-size:12.5px;display:flex;flex-direction:column;gap:6px}
 .impact ul{margin-left:18px}
 .checks label{display:flex;gap:8px;font-size:13px;align-items:flex-start;cursor:pointer;margin-bottom:6px}
 .checks input{margin-top:3px;accent-color:var(--danger)}
+.checks.safe input{accent-color:var(--accent)}
 .mfoot{display:flex;justify-content:flex-end;gap:10px}
-.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.filters .fl{font-size:11px;color:var(--ink2);margin-right:2px}
 .filters button{font-size:11.5px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:3px 11px;cursor:pointer;color:var(--ink2)}
 .filters button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-weak);font-weight:600}
+.tagpick{display:flex;gap:6px;flex-wrap:wrap}
+.tagpick button{font-size:11.5px;font-family:var(--mono);border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:3px 10px;cursor:pointer;color:var(--ink2)}
+.tagpick button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-weak);font-weight:600}
+.tagpick button:disabled{opacity:.4;cursor:not-allowed;border-style:dashed}
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
 .tabs button{border:none;background:none;padding:7px 16px;font-size:13px;cursor:pointer;color:var(--ink2);border-bottom:2px solid transparent}
 .tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
 .hint{font-size:12px;color:var(--ink2)}
-.warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start;position:relative}
+.okbox{border:1px solid var(--ok);color:var(--ok);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
 .effect{font-size:10.5px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:1px 6px;border:1px solid}
 .effect.host{color:var(--ink2);border-color:var(--line)}
 .effect.read{color:var(--ok);border-color:var(--ok)}
@@ -156,7 +178,7 @@ tr.sel-row{background:var(--sel)}
 .empty{color:var(--ink2);font-size:12.5px;font-style:italic}
 </style>
 
-<p class="note"><b>ArkDeck macOS 交互原型 v0.1</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span> 同版本。工具栏「AC 标注」可叠加显示每个元素对应的规格验收编号;主题跟随系统/查看器切换。原型数据为演示假数据,不连接任何设备。</p>
+<p class="note"><b>ArkDeck macOS 交互原型 v0.2</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>(draft v0.2)同版本。相对 v0.1 补全了规格已定义的全部交互路径:任务完成落入 History、断连 rebind 确认、日志实时流与暂停、Trace 自定义 tag、UI Dump recipe 联动、History 多维过滤与导出预览、诊断包预览勾选等;所有危险动作走统一确认模态,不再有占位弹窗。工具栏「AC 标注」可叠加显示每个元素对应的规格验收编号;主题跟随系统/查看器切换。原型数据为演示假数据,不连接任何设备。</p>
 
 <div class="window" id="win">
   <div class="titlebar">
@@ -171,7 +193,7 @@ tr.sel-row{background:var(--sel)}
       <div>
         <div class="sec">设备</div>
         <div id="devlist"></div>
-        <button class="addlink" onclick="alert('设计意图:TCP/UART 目标只能由用户显式添加,不扫描网络;断线后按 §5.1 重新确认。(REQ-DEV-004/005)')">＋ 添加 TCP / UART 目标…</button>
+        <button class="addlink" onclick="addTargetModal()">＋ 添加 TCP / UART 目标…</button>
       </div>
       <div>
         <div class="sec">功能</div>
@@ -183,7 +205,8 @@ tr.sel-row{background:var(--sel)}
       <div class="drawer" id="drawer">
         <div class="bar" onclick="toggleDrawer()">
           <span id="drawerArrow">▸</span><b>任务</b>
-          <span class="st" id="drawerSt">没有运行中的任务</span>
+          <span class="st" id="drawerSt" style="flex:1">没有运行中的任务</span>
+          <span class="ibar" id="drawerIbar" style="display:none"></span>
           <span class="ac">AC-UX-001-01</span>
         </div>
         <div class="body" id="drawerBody"></div>
@@ -199,11 +222,27 @@ tr.sel-row{background:var(--sel)}
 const S = {
   nav:"overview", device:"rk3568", acMode:false, drawerOpen:false,
   recovery:{archived:false},
-  auth:{phase:"idle"},           // idle|polling|denied|ready
-  dump:{policy:"none", ran:false},
-  trace:{running:null},
-  flashMode:"execute", flashdConfirmed:false, flashJob:null, planSaved:false,
-  debugTab:"logs", histFilter:"all", histSel:null,
+  auth:{phase:"idle", left:0, t:null},        // idle|polling|denied|ready
+  permDemo:false,
+  dump:{policy:"none", ran:false, running:false, recipe:"elementTree", win:12, comp:"33"},
+  trace:{running:false, done:false, mode:"preset", preset:0, dur:15,
+         tags:new Set(["ace","app","ability","graphic","ohos","sched","freq","sync"])},
+  lg:{on:false, paused:false, pend:0, shard:11.8, piece:3, lvl:"W", tag:"", timer:null, ms:12400,
+      lines:[
+        {t:"11:02:11.482",lv:"W",tag:"ArkUI",m:"[list_layout] measure retry, node 88"},
+        {t:"11:02:11.490",lv:"W",tag:"ArkUI",m:"[render] flush delayed 22ms"},
+        {t:"11:02:12.013",lv:"E",tag:"AbilityMS",m:"connect timeout, bundle=com.example.settings"},
+        {t:"11:02:12.400",lv:"W",tag:"ArkUI",m:"[list_layout] measure retry, node 91"}
+      ]},
+  apps:[
+    {pkg:"com.example.settings", ver:"1.2.0", running:true,  pid:2841},
+    {pkg:"com.demo.gallery",     ver:"0.9.1", running:false, pid:0}
+  ],
+  fwd:[{l:"tcp:9222", r:"tcp:9222"}],
+  cmd:{val:"bm dump -a", hist:[]},
+  flashMode:"execute", flashdConfirmed:false, flashJob:null, planSaved:false, lastFlash:null,
+  debugTab:"logs", hf:{st:"all", mode:"all", dev:"all"}, histSel:null, histSeq:1,
+  hdcSel:"deveco",
   jobs:[], jobSeq:1
 };
 const DEVICES=[
@@ -213,58 +252,121 @@ const DEVICES=[
 const NAV=[["overview","◎","Overview"],["flash","⚡","Flash"],["debug","🐞","Debug"],
   ["dump","🌲","UI Dump"],["trace","📈","Trace"],["history","🗂","History"],["settings","⚙","Settings"]];
 const HIST=[
-  {id:"S-0712-01", st:"succeeded", mode:"execute", dev:"rk3568-dev", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
-  {id:"S-0712-02", st:"planned",   mode:"planOnly", dev:"rk3568-dev", what:"Flash · rk3568-5.0-full(3 分区)", when:"07-12 15:40"},
-  {id:"S-0712-03", st:"simulated", mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景", when:"07-12 16:11"},
-  {id:"S-0711-04", st:"interrupted", mode:"execute", dev:"rk3568-dev", what:"Flash · system 分区(outcomeUnknown)", when:"07-11 23:47"},
-  {id:"S-0711-05", st:"failed",    mode:"execute", dev:"rk3568-dev", what:"UI Dump · elementTree(设备离线)", when:"07-11 20:15"}
+  {id:"S-0713-06", st:"cancelled",   mode:"execute",   dev:"rk3568-dev", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
+  {id:"S-0712-01", st:"succeeded",   mode:"execute",   dev:"rk3568-dev", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
+  {id:"S-0712-02", st:"planned",     mode:"planOnly",  dev:"rk3568-dev", what:"Flash · rk3568-5.0-full(3 分区)", when:"07-12 15:40"},
+  {id:"S-0712-03", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景(reconcile 一致)", when:"07-12 16:11"},
+  {id:"S-0711-04", st:"interrupted", mode:"execute",   dev:"rk3568-dev", what:"Flash · system 分区(outcomeUnknown)", when:"07-11 23:47"},
+  {id:"S-0711-05", st:"failed",      mode:"execute",   dev:"rk3568-dev", what:"UI Dump · elementTree(设备离线)", when:"07-11 20:15"}
 ];
 const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span class="chip danger">✕ 失败</span>',
-  planned:'<span class="chip planned">◇ PLANNED</span>',simulated:'<span class="chip sim">▤ SIMULATED</span>',
+  planned:'<span class="chip planned">◇ PLANNED</span>',cancelled:'<span class="chip dim">⊘ 已取消</span>',
   interrupted:'<span class="chip warn">⚠ 已中断 · 结果未知</span>'};
+function modeBadge(m,fx){return m==="planOnly"?'<span class="chip planned">◇ PLANNED</span>'
+  :m==="simulated"?'<span class="chip sim">▤ SIMULATED'+(fx?" · "+fx:"")+'</span>':"";}
 
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
-function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function toggleAC(){S.acMode=!S.acMode;$("win").classList.toggle("acmode",S.acMode);$("acToggle").classList.toggle("on",S.acMode);}
 function toggleDrawer(){S.drawerOpen=!S.drawerOpen;$("drawer").classList.toggle("open",S.drawerOpen);$("drawerArrow").textContent=S.drawerOpen?"▾":"▸";}
+function openDrawer(){if(!S.drawerOpen)toggleDrawer();}
 function go(nav){S.nav=nav;render();}
 function pickDevice(id){S.device=id;S.nav=(DEVICES.find(d=>d.id===id).state==="unauthorized")?"auth":S.nav==="auth"?"overview":S.nav;render();}
-
-/* ---------- jobs (drawer) ---------- */
-function addJob(j){j.id="J"+(S.jobSeq++);S.jobs.push(j);S.drawerOpen=true;$("drawer").classList.add("open");$("drawerArrow").textContent="▾";renderDrawer();return j;}
-function advanceJob(j){
-  if(j.cancelled&&j.phaseIdx<j.safeBoundary){j.log.push("— 已请求取消:等待安全边界 —");}
-  if(j.cancelled&&j.phaseIdx>=j.safeBoundary){j.state="cancelled";j.log.push("在安全边界停止;补偿动作已执行,参数已恢复。");renderDrawer();renderPageIf(["trace"]);return;}
-  j.phaseIdx++;
-  if(j.phaseIdx>=j.phases.length){j.state=j.terminal||"succeeded";j.log.push("完成:raw 产物 hash 已写入 manifest。");renderDrawer();renderPageIf(["trace","flash"]);return;}
-  j.log.push("→ "+j.phases[j.phaseIdx]);
-  renderDrawer();renderPageIf(["trace","flash"]);
-  j.timer=setTimeout(()=>advanceJob(j),j.tick);
-}
-function cancelJob(id){const j=S.jobs.find(x=>x.id===id);if(!j||j.state!=="running")return;
-  j.cancelled=true;j.log.push("用户请求取消(策略:atSafeBoundary)");renderDrawer();}
-function renderDrawer(){
-  const running=S.jobs.filter(j=>j.state==="running").length;
-  $("drawerSt").textContent=running?`${running} 个运行中 · ${S.jobs.length} 个本次会话任务`:S.jobs.length?`${S.jobs.length} 个任务(无运行中)`:"没有运行中的任务";
-  $("drawerBody").innerHTML=S.jobs.slice().reverse().map(j=>{
-    const chips={running:'<span class="chip warn pulse">运行中</span>',succeeded:'<span class="chip ok">✓ 成功</span>',
-      cancelled:'<span class="chip dim">已取消</span>',planned:'<span class="chip planned">◇ PLANNED</span>'}[j.state]||"";
-    const badge=j.mode==="planOnly"?'<span class="chip planned">◇ PLANNED</span>':j.mode==="simulated"?'<span class="chip sim">▤ SIMULATED · fixture-a3</span>':"";
-    return `<div class="job">
-      <div class="jh"><b>${esc(j.title)}</b>${badge}${j.state==="running"?"":chips}
-        <span style="flex:1"></span>
-        ${j.state==="running"?`<button class="btn" onclick="cancelJob('${j.id}')" ${j.cancelled?"disabled":""}>${j.cancelled?"等待安全边界…":"取消(在安全边界)"}</button>`:""}
-      </div>
-      <div class="phases">${j.phases.map((p,i)=>`<span class="ph ${i<j.phaseIdx?"done":i===j.phaseIdx&&j.state==="running"?"run pulse":""}">${p}</span>`).join("")}</div>
-      <div class="logtail">${j.log.slice(-4).map(esc).join("\n")}</div>
-    </div>`;}).join("")||'<div class="job empty">本次会话尚无任务。</div>';
-}
-function renderPageIf(navs){if(navs.includes(S.nav))renderPage();}
+function ckGate(btnId,need){const c=document.querySelectorAll("#modalHost .checks input:checked").length;const b=$(btnId);if(b)b.disabled=c<need;}
+function doneBtn(el,label){el.textContent=label;el.disabled=true;}
 
 /* ---------- modals ---------- */
 function closeModal(){$("modalHost").innerHTML="";}
-function modal(html){$("modalHost").innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()">${html}</div>`;}
+function modal(html){$("modalHost").innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()">'+html+'</div>';
+  const c=$("modalHost").querySelector(".mfoot .btn");if(c)c.focus();}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+
+/* ---------- jobs ---------- */
+function addJob(j){j.id="J"+(S.jobSeq++);j.cancelled=false;S.jobs.push(j);openDrawer();renderDrawer();return j;}
+function startJob(j){j.timer=setTimeout(()=>advanceJob(j),j.tick);return j;}
+function advanceJob(j){
+  if(j.state!=="running")return;
+  if(j.cancelled&&j.phaseIdx<j.safeBoundary){j.log.push("— 已请求取消:等待安全边界 —");}
+  if(j.cancelled&&j.phaseIdx>=j.safeBoundary){finishJob(j,"cancelled","在安全边界停止;补偿动作已执行,参数已恢复。");return;}
+  j.phaseIdx++;
+  if(j.phaseIdx>=j.phases.length){finishJob(j,"succeeded",j.doneMsg||"完成:raw 产物 hash 已写入 manifest。");return;}
+  const ph=j.phases[j.phaseIdx];
+  j.log.push("→ "+ph);
+  if(j.pauseAt===ph){j.awaiting=true;j.log.push("检测到断连后回连:等待用户 rebind 确认(不静默续刷)。");
+    renderDrawer();renderPageIf(j.pages||[]);return;}
+  renderDrawer();renderPageIf(j.pages||[]);
+  j.timer=setTimeout(()=>advanceJob(j),j.tick);
+}
+function finishJob(j,state,msg){
+  j.state=state;j.log.push(msg);
+  histFromJob(j);
+  if(j.onDone)j.onDone(state);
+  renderDrawer();renderPage();
+}
+function cancelJob(id){const j=S.jobs.find(x=>x.id===id);if(!j||j.state!=="running"||j.awaiting)return;
+  j.cancelled=true;j.log.push("用户请求取消(策略:atSafeBoundary)");renderDrawer();}
+function rebindOk(id){const j=S.jobs.find(x=>x.id===id);if(!j||!j.awaiting)return;j.awaiting=false;
+  j.log.push("用户确认 rebind:同一 serial · binding revision 3→4;继续执行。");
+  j.timer=setTimeout(()=>advanceJob(j),j.tick);renderDrawer();}
+function rebindAbort(id){const j=S.jobs.find(x=>x.id===id);if(!j||!j.awaiting)return;j.awaiting=false;
+  finishJob(j,"cancelled","用户中止 rebind:剩余步骤不执行;该结论写入审计。");}
+function histFromJob(j){
+  HIST.unshift({id:"S-live-0"+(S.histSeq++),
+    st:j.mode==="planOnly"?"planned":j.state,
+    mode:j.mode,dev:j.dev||"rk3568-dev",what:j.title,when:"刚刚",live:true});
+}
+function renderDrawer(){
+  const running=S.jobs.filter(j=>j.state==="running");
+  let st;
+  if(running.length){
+    const top=running.slice().sort((a,b)=>(b.risk||1)-(a.risk||1))[0];
+    st=running.length+" 个运行中 — "+top.title+":"+(top.awaiting?"等待 rebind 确认":top.phases[top.phaseIdx])
+      +"("+Math.min(top.phaseIdx+1,top.phases.length)+"/"+top.phases.length+")";
+  } else st=S.jobs.length?S.jobs.length+" 个任务(无运行中)":"没有运行中的任务";
+  $("drawerSt").textContent=st;
+  $("drawerIbar").style.display=running.length?"block":"none";
+  $("drawerBody").innerHTML=S.jobs.slice().reverse().map(j=>{
+    const chips={succeeded:'<span class="chip ok">✓ 成功</span>',cancelled:'<span class="chip dim">⊘ 已取消</span>',
+      planned:'<span class="chip planned">◇ PLANNED</span>'}[j.state]||"";
+    const badge=modeBadge(j.mode,j.mode==="simulated"?"fixture-a3":"");
+    const run=j.state==="running";
+    return `<div class="job">
+      <div class="jh"><b>${esc(j.title)}</b>${badge}${run?'<span class="chip warn pulse">运行中</span>':chips}
+        <span style="flex:1"></span>
+        ${run&&!j.awaiting?`<button class="btn" onclick="cancelJob('${j.id}')" ${j.cancelled?"disabled":""}>${j.cancelled?"等待安全边界…":"取消(在安全边界)"}</button>`:""}
+      </div>
+      <div class="phases">${j.phases.map((p,i)=>`<span class="ph ${i<j.phaseIdx?"done":i===j.phaseIdx&&run?"run pulse":""}">${p}</span>`).join("")}</div>
+      ${j.awaiting?`<div class="rebind" data-acin><span class="ac">AC-FLASH-010-01</span>
+        <b>设备回连,需确认后继续</b><span class="mono">同一 serial · binding revision 3→4 · updater 阶段与 plan 一致</span>
+        <span style="flex:1"></span>
+        <button class="btn pri" onclick="rebindOk('${j.id}')">确认同一设备,继续</button>
+        <button class="btn" onclick="rebindAbort('${j.id}')">中止</button></div>`:""}
+      <div class="logtail">${j.log.slice(-200).map(esc).join("\n")}</div>
+    </div>`;}).join("")||'<div class="job empty">本次会话尚无任务。</div>';
+  $("drawerBody").querySelectorAll(".logtail").forEach(b=>{b.scrollTop=b.scrollHeight;});
+}
+function renderPageIf(navs){if(navs.includes(S.nav))renderPage();}
+
+/* ---------- sidebar: add target ---------- */
+function addTargetModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>添加 TCP / UART 目标 <span class="acin">REQ-DEV-004/005</span></h3>
+    <p class="hint">ArkDeck 不扫描网络,目标只能由你显式添加;断线后需按规格 §5.1 重新确认身份,不做静默重绑。</p>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select class="inp" id="tgtType"><option>TCP</option><option>UART</option></select>
+      <input class="inp mono" id="tgtAddr" placeholder="192.168.1.30:8710 或 /dev/tty.usbserial-1420" style="flex:1">
+    </div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="addTarget()">添加目标</button></div>
+  </div>`);
+}
+function addTarget(){
+  const v=$("tgtAddr").value.trim()||"192.168.1.30:8710";
+  const tp=$("tgtType").value;
+  DEVICES.push({id:"t"+(S.jobSeq++)+""+DEVICES.length,name:v,tp,state:"off",build:"未连接 — 等待首次确认",key:"—"});
+  closeModal();renderDevs();
+}
 
 /* ---------- recovery banner ---------- */
 function recoveryHTML(){
@@ -276,7 +378,7 @@ function recoveryHTML(){
         <p>上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。设备最后处于 updater 模式。<br>
         Provider 未声明 restartSafe —— <b>不提供自动续跑</b>,请按 RecoveryGuide 人工确认设备状态。</p></div>
       <div class="ra">
-        <button class="btn" onclick="alert('打开 Provider RecoveryGuide(演示):检查设备是否停在 updater;确认 system 分区状态;必要时使用厂商恢复工具。')">恢复指引</button>
+        <button class="btn" onclick="recoveryGuideModal()">恢复指引</button>
         <button class="btn" disabled title="Provider 未声明 restartSafe,最后一步结果不明">从安全边界继续</button>
         <button class="btn danger" onclick="archiveModal()">结束恢复并归档…</button>
       </div>
@@ -288,19 +390,32 @@ function recoveryHTML(){
     </div>
   </div>`;
 }
+function recoveryGuideModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>RecoveryGuide — Flash · flashPartition(system)</h3>
+    <p class="hint">该指引由 Provider 随 step 声明,ArkDeck 原样呈现,不代替你判断设备状态。</p>
+    <ol style="margin-left:20px;font-size:13px;display:flex;flex-direction:column;gap:6px">
+      <li>确认设备当前停留模式:屏幕显示 updater 界面,或 <span class="mono">hdc list targets</span> 报告 updater;</li>
+      <li>若设备可正常开机进系统:核对当前 build 与预期,判断 system 分区是否已完整写入;</li>
+      <li>若设备无法启动:使用厂商恢复工具(线刷包)恢复 system 分区;</li>
+      <li>完成人工确认后,回到本 Banner 选择「结束恢复并归档」。</li>
+    </ol>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">关闭</button></div>
+  </div>`);
+}
 function archiveModal(){
   modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
     <h3>⚠ 结束恢复并归档为「已中断」?</h3>
     <div class="impact"><b>该动作只停止 ArkDeck 的跟踪。它不会:</b>
       <ul><li>证明设备已经恢复正常</li><li>停止可能仍在设备上运行的远端任务</li><li>回滚已修改的 persist.* 参数或清理远端文件</li></ul>
       归档后该 Session 永久保留 <b>outcomeUnknown</b> 与 needsAttention 标记;与其冲突的新任务将被 preflight 阻断。</div>
-    <div class="checks"><label><input type="checkbox" id="ck1" onchange="$('goArch').disabled=!this.checked"> 我已阅读恢复指引,并自行确认过设备状态</label></div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()" autofocus>取消</button>
+    <div class="checks"><label><input type="checkbox" onchange="ckGate('goArch',1)"> 我已阅读恢复指引,并自行确认过设备状态</label></div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn danger" id="goArch" disabled onclick="S.recovery.archived=true;closeModal();render()">归档为已中断</button></div>
   </div>`);
 }
 
-/* ---------- pages ---------- */
+/* ---------- Overview ---------- */
 function pOverview(){
   return recoveryHTML()+`
   <h1>Overview <span class="acin">REQ-UX-002</span></h1>
@@ -330,14 +445,66 @@ function pOverview(){
         <tr><td>hidumper</td><td><span class="chip ok">可用</span></td><td class="mono">-w/-element/-lastpage 已确认</td></tr>
         <tr><td>hitrace</td><td><span class="chip ok">可用</span></td><td class="mono">tag×11 · buffer ≤ 307200</td></tr>
         <tr><td>bytrace</td><td><span class="chip dim">不存在</span></td><td></td></tr>
-        <tr><td>flashd</td><td><span class="chip warn">无法确认</span></td><td><button class="btn" onclick="alert('查看原始探测输出(演示)。未知 help 不猜测语义。')">查看 raw</button></td></tr>
+        <tr><td>flashd</td><td><span class="chip warn">无法确认</span></td><td><button class="btn" onclick="rawProbeModal()">查看 raw</button></td></tr>
       </table></div>
     </div>
     <div class="card" data-acin><span class="ac">AC-UX-007-01</span>
       <h2>设备访问诊断</h2>
-      <p class="hint">未发现 permissionDenied / driverUnavailable。若出现,将区别于 offline/unauthorized 展示,并给出由谁执行的最小权限修复步骤;ArkDeck 不会自动提权或写系统规则。</p>
+      ${S.permDemo?`
+      <div class="tablewrap"><table>
+        <tr><th>问题</th><th>与 offline/unauthorized 的区别</th><th>修复责任方</th></tr>
+        <tr><td><span class="chip danger">permissionDenied</span></td>
+          <td class="hint">系统拒绝访问 USB 设备节点;设备本身在线</td>
+          <td class="hint">你:在系统设置 → 隐私与安全性中允许 ArkDeck 访问 USB 配件</td></tr>
+        <tr><td><span class="chip danger">driverUnavailable</span></td>
+          <td class="hint">缺少内核驱动 / DriverKit 扩展未加载</td>
+          <td class="hint">管理员:安装并批准厂商驱动;ArkDeck 不自动提权、不写系统规则</td></tr>
+      </table></div>
+      <button class="btn" style="align-self:flex-start" onclick="S.permDemo=false;renderPage()">关闭样式预览</button>`
+      :`<p class="hint">当前未发现 permissionDenied / driverUnavailable。若出现,将区别于 offline/unauthorized 展示,并给出由谁执行的最小权限修复步骤;ArkDeck 不会自动提权或写系统规则。</p>
+      <button class="btn" style="align-self:flex-start" onclick="S.permDemo=true;renderPage()">预览该状态的展示样式</button>`}
     </div>
   </div>`;
+}
+function rawProbeModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>flashd 能力探测 — 原始输出</h3>
+    <div class="logtail" style="max-height:180px">$ hdc -t 150100469… shell flashd --help
+/system/bin/sh: flashd: inaccessible or not found
+exit 127
+
+$ hdc -t 150100469… shell "ls /bin/flashd 2>/dev/null; ls /system/bin/flashd 2>/dev/null"
+(空输出)
+exit 0</div>
+    <p class="hint">正常模式下探测不到 flashd 属预期(flashd 仅在 updater 模式提供)。ArkDeck 不从缺失推断「不存在」,也不猜测未知 help 的语义——能力标记为「无法确认」,直到升级模式实测。</p>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">关闭</button></div>
+  </div>`);
+}
+
+/* ---------- Auth ---------- */
+function fmtLeft(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+function startAuthPoll(){
+  S.auth.phase="polling";S.auth.left=180;
+  clearInterval(S.auth.t);
+  S.auth.t=setInterval(()=>{S.auth.left--;const el=$("authcd");if(el)el.textContent=fmtLeft(S.auth.left);
+    if(S.auth.left<=0){clearInterval(S.auth.t);S.auth.phase="denied";renderPage();}},1000);
+  setTimeout(()=>{if(S.auth.phase==="polling"){clearInterval(S.auth.t);
+    S.auth.phase="ready";DEVICES[1].state="ready";DEVICES[1].name="ohos-tablet";DEVICES[1].build="OpenHarmony 5.0.0.46";
+    renderDevs();renderPage();}},2600);
+  renderPage();
+}
+function simDeny(){clearInterval(S.auth.t);S.auth.phase="denied";renderPage();}
+function restartSrvModal(){
+  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
+    <h3>⚠ 重启共享 HDC server?</h3>
+    <div class="impact"><b>影响范围</b><ul>
+      <li>该 server 由 DevEco Studio 启动(ownership: external),重启将断开其与<b>所有已连接设备</b>的会话</li>
+      <li>其他工具正在进行的传输/调试会失败</li>
+      <li>ArkDeck 从不静默执行此操作</li></ul></div>
+    <div class="checks"><label><input type="checkbox" onchange="ckGate('goSrv',1)"> 我了解会影响 DevEco 与其他设备会话</label></div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn danger" id="goSrv" disabled onclick="closeModal();S.auth.phase='idle';renderPage()">重启共享 HDC server</button></div>
+  </div>`);
 }
 function pAuth(){
   const ph=S.auth.phase;
@@ -350,14 +517,29 @@ function pAuth(){
       <li>在设备弹出的「是否信任此计算机?」中选择 <b>信任</b> 或 <b>始终信任</b>;</li>
       <li>ArkDeck 将自动检测授权结果(有界轮询,不反复弹通知)。</li>
     </ol>
-    ${ph==="polling"?'<div class="chip warn pulse">等待设备端确认… 02:47</div>':""}
-    ${ph==="denied"?'<div class="warnbox">⚠ 授权被拒绝或弹窗超时(E000003)。请检查设备调试开关后重试。若选择重启 HDC server,将影响 DevEco 与所有已连接设备,需要你显式确认——ArkDeck 不会静默执行。</div>':""}
-    ${ph==="ready"?'<div class="chip ok">✓ 已授权,设备 Ready</div>':""}
-    <div style="display:flex;gap:10px">
-      <button class="btn pri" onclick="S.auth.phase='polling';renderPage();setTimeout(()=>{if(S.auth.phase==='polling'){S.auth.phase='ready';DEVICES[1].state='ready';DEVICES[1].name='ohos-tablet';renderDevs();renderPage();}},2600)" ${ph==="polling"?"disabled":""}>开始等待授权</button>
-      <button class="btn" onclick="S.auth.phase='denied';renderPage()">模拟:用户拒绝(E000003)</button>
+    ${ph==="polling"?'<div class="chip warn pulse">等待设备端确认… <span id="authcd">'+fmtLeft(S.auth.left)+'</span></div>':""}
+    ${ph==="denied"?'<div class="warnbox">⚠ 授权被拒绝或弹窗超时(E000003)。请检查设备的 USB 调试开关后重试。若重试无效,可重启共享 HDC server——这会影响 DevEco 与所有已连接设备,需要你显式确认。</div>':""}
+    ${ph==="ready"?'<div class="okbox">✓ 已授权,设备 Ready——列表与 Overview 已更新。</div>':""}
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn pri" onclick="startAuthPoll()" ${ph==="polling"?"disabled":""}>${ph==="denied"?"重试:开始等待授权":"开始等待授权"}</button>
+      ${ph==="denied"?'<button class="btn danger" onclick="restartSrvModal()">重启共享 HDC server…</button>'
+                     :'<button class="btn" onclick="simDeny()">模拟:用户拒绝(E000003)</button>'}
     </div>
   </div>`;
+}
+
+/* ---------- UI Dump ---------- */
+const RECIPES={
+  elementTree:{label:"elementTree",cmd:(w,c)=>`-w ${w} -element -c`},
+  nodeSummary:{label:"nodeSummary",cmd:(w,c)=>`-w ${w} -default`},
+  fullDefaultTree:{label:"fullDefaultTree",cmd:(w,c)=>`-w ${w} -default -all`},
+  componentDetail:{label:"componentDetail",cmd:(w,c)=>`-w ${w} -element -lastpage ${c}`}
+};
+function dumpCmd(){return RECIPES[S.dump.recipe].cmd(S.dump.win,S.dump.comp||"<compId>");}
+function pickWin(id){S.dump.win=id;renderPage();}
+function setComp(el){
+  S.dump.comp=el.value.replace(/[^0-9]/g,"");el.value=S.dump.comp;
+  const c=$("dumpcmd");if(c)c.textContent=dumpCmd();
 }
 function pDump(){
   const d=S.dump;
@@ -367,39 +549,45 @@ function pDump(){
   <div class="two">
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card" data-acin><span class="ac">AC-DUMP-001-01</span>
-        <h2>窗口清单 <button class="btn" style="margin-left:auto" onclick="alert('重新执行 hidumper -s WindowManagerService -a -a(演示)。解析失败时保留 raw 输出并允许安全手输 ID。')">刷新</button></h2>
+        <h2>窗口清单 <button class="btn" style="margin-left:auto" onclick="renderPage()">刷新</button></h2>
         <div class="tablewrap"><table>
           <tr><th>windowId</th><th>名称</th><th>焦点</th></tr>
-          <tr class="sel-row"><td class="mono">12</td><td>com.example.settings / MainAbility</td><td>●</td></tr>
-          <tr><td class="mono">8</td><td>com.ohos.launcher</td><td></td></tr>
+          <tr class="${d.win===12?"sel-row":""}" style="cursor:pointer" onclick="pickWin(12)"><td class="mono">12</td><td>com.example.settings / MainAbility</td><td>●</td></tr>
+          <tr class="${d.win===8?"sel-row":""}" style="cursor:pointer" onclick="pickWin(8)"><td class="mono">8</td><td>com.ohos.launcher</td><td></td></tr>
         </table></div>
+        <p class="hint">来源:<span class="mono">hidumper -s WindowManagerService -a -a</span>。解析失败时保留 raw 输出并允许安全手输 windowId。</p>
       </div>
       <div class="card" data-acin><span class="ac">AC-DUMP-003-01</span>
-        <h2>Recipe</h2>
+        <h2>Recipe <span class="mono" id="dumpcmd" style="margin-left:auto;color:var(--accent)">${dumpCmd()}</span></h2>
         <div class="radio">
-          <label><input type="radio" name="rc" checked> elementTree — <span class="mono">-w 12 -element -c</span></label>
-          <label><input type="radio" name="rc"> nodeSummary — <span class="mono">-w 12 -default</span></label>
-          <label><input type="radio" name="rc"> fullDefaultTree — <span class="mono">-w 12 -default -all</span></label>
-          <label><input type="radio" name="rc"> componentDetail — <span class="mono">-w 12 -element -lastpage &lt;compId&gt;</span></label>
+          <label><input type="radio" name="rc" ${d.recipe==="elementTree"?"checked":""} onchange="S.dump.recipe='elementTree';renderPage()"> elementTree — <span class="mono">-w &lt;w&gt; -element -c</span></label>
+          <label><input type="radio" name="rc" ${d.recipe==="nodeSummary"?"checked":""} onchange="S.dump.recipe='nodeSummary';renderPage()"> nodeSummary — <span class="mono">-w &lt;w&gt; -default</span></label>
+          <label><input type="radio" name="rc" ${d.recipe==="fullDefaultTree"?"checked":""} onchange="S.dump.recipe='fullDefaultTree';renderPage()"> fullDefaultTree — <span class="mono">-w &lt;w&gt; -default -all</span></label>
+          <label><input type="radio" name="rc" ${d.recipe==="componentDetail"?"checked":""} onchange="S.dump.recipe='componentDetail';renderPage()"> componentDetail — <span class="mono">-w &lt;w&gt; -element -lastpage &lt;compId&gt;</span></label>
         </div>
+        ${d.recipe==="componentDetail"?`
+        <div style="display:flex;gap:8px;align-items:center;font-size:12.5px">
+          <span class="hint">compId(安全手输,只接受数字):</span>
+          <input class="inp mono" style="width:100px" value="${esc(d.comp)}" oninput="setComp(this)">
+        </div>`:""}
       </div>
       <div class="card" data-acin><span class="ac">AC-DUMP-004-01</span>
         <h2>Debug 参数策略</h2>
         <div class="radio">
-          <label><input type="radio" name="pp" checked onchange="S.dump.policy='none'"> 不改变参数<span class="rd">— 以设备当前状态采集</span></label>
-          <label><input type="radio" name="pp" onchange="S.dump.policy='temp'"> 临时开启,结束后恢复<span class="rd">— 仅当原值可读且可写回时可选</span></label>
-          <label><input type="radio" name="pp" onchange="S.dump.policy='keep'"> 保持开启<span class="rd">— 需要二次确认,状态栏持续提醒</span></label>
+          <label><input type="radio" name="pp" ${d.policy==="none"?"checked":""} onchange="S.dump.policy='none'"> 不改变参数<span class="rd">— 以设备当前状态采集</span></label>
+          <label><input type="radio" name="pp" ${d.policy==="temp"?"checked":""} onchange="S.dump.policy='temp'"> 临时开启,结束后恢复<span class="rd">— 仅当原值可读且可写回时可选</span></label>
+          <label><input type="radio" name="pp" ${d.policy==="keep"?"checked":""} onchange="S.dump.policy='keep'"> 保持开启<span class="rd">— 需要二次确认,状态栏持续提醒</span></label>
         </div>
-        <button class="btn pri" style="align-self:flex-start" onclick="runDump()">采集</button>
+        <button class="btn pri" style="align-self:flex-start" onclick="runDump()" ${d.running?"disabled":""}>${d.running?"采集中…":"采集"}</button>
       </div>
     </div>
     <div class="card" data-acin><span class="ac">AC-DUMP-005-01</span>
       <h2>产物</h2>
       ${d.ran?`<div class="tablewrap"><table>
         <tr><th>Artifact</th><th>来源</th><th>SHA-256</th></tr>
-        <tr><td class="mono">stdout.elementtree.txt</td><td>stdout</td><td class="mono">7d1a…90ff</td></tr>
+        <tr><td class="mono">stdout.${d.recipe.toLowerCase()}.txt</td><td>stdout</td><td class="mono">7d1a…90ff</td></tr>
         <tr><td class="mono">sidecar.arkui.dump</td><td>remote sidecar</td><td class="mono">e33b…12c0</td></tr>
-        <tr><td class="mono">merged.elementtree.json</td><td>derived(可重建)</td><td class="mono">a1f4…77b3</td></tr>
+        <tr><td class="mono">merged.${d.recipe.toLowerCase()}.json</td><td>derived(可重建)</td><td class="mono">a1f4…77b3</td></tr>
       </table></div>
       <p class="hint">⚠ Dump 可能包含页面文本/包名/标识符,按敏感数据处理;导出前将提示。raw 永不原地修改。</p>`
       :'<p class="empty">尚未采集。产物将按 stdout / remote sidecar / merged 派生分行列出并标注来源。</p>'}
@@ -407,39 +595,73 @@ function pDump(){
   </div>`;
 }
 function runDump(){
+  if(S.dump.running)return;
   if(S.dump.policy==="keep"){
-    modal(`<div class="modal dangerm" role="dialog"><h3>⚠ 保持 Debug 参数开启?</h3>
+    modal(`<div class="modal dangerm" role="dialog" aria-modal="true"><h3>⚠ 保持 Debug 参数开启?</h3>
       <div class="impact">persist.ace.debug.enabled 等参数将<b>持久</b>保留在设备上,可能影响性能与后续测量;设备状态栏将持续显示提醒,且该变更计入审计。</div>
       <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn danger" onclick="closeModal();doDump()">确认保持开启</button></div></div>`);
   } else doDump();
 }
 function doDump(){
-  const j=addJob({title:"UI Dump · elementTree · rk3568-dev",mode:"execute",state:"running",
-    phases:["Preflight","WindowInventory","SnapshotParam","Capture","Sidecars","Receive","Validate","RestoreParam","Complete"],
-    phaseIdx:0,safeBoundary:3,tick:420,log:["→ Preflight"],cancelled:false});
-  j.timer=setTimeout(()=>advanceJob(j),j.tick);
-  const t=setInterval(()=>{if(j.state!=="running"){clearInterval(t);S.dump.ran=true;renderPageIf(["dump"]);}},300);
+  S.dump.running=true;
+  const pol=S.dump.policy;
+  const phases=pol==="none"
+    ?["Preflight","WindowInventory","Capture","Sidecars","Receive","Validate","Complete"]
+    :pol==="temp"
+    ?["Preflight","WindowInventory","SnapshotParam","Capture","Sidecars","Receive","Validate","RestoreParam","Complete"]
+    :["Preflight","WindowInventory","SnapshotParam","Capture","Sidecars","Receive","Validate","Complete"];
+  startJob(addJob({title:"UI Dump · "+RECIPES[S.dump.recipe].label+" · w"+S.dump.win+" · rk3568-dev",
+    mode:"execute",dev:"rk3568-dev",risk:pol==="none"?1:2,state:"running",
+    phases,phaseIdx:0,safeBoundary:Math.min(3,phases.length-1),tick:420,log:["→ Preflight"],pages:["dump"],
+    onDone:st=>{S.dump.running=false;if(st==="succeeded")S.dump.ran=true;renderPageIf(["dump"]);}}));
+  renderPage();
 }
+
+/* ---------- Trace ---------- */
+const TRACE_TAGS_OK=["ace","app","ability","graphic","ohos","sched","freq","sync","binder","disk","workq"];
+const TRACE_TAGS_NO=["distributeddata","mmc"];
+const PRESETS=[
+  {name:"ArkUI 深度", tags:["ace","app","ability","graphic","ohos","sched","freq","sync"]},
+  {name:"附件兼容 / 全景", tags:TRACE_TAGS_OK, warnBuf:true},
+  {name:"渲染 / 动画", tags:["graphic","ace","app","sched","freq","sync"]}
+];
+function pickPreset(i){S.trace.preset=i;S.trace.tags=new Set(PRESETS[i].tags);renderPage();}
+function toggleTag(t){const g=S.trace.tags;if(g.has(t)){if(g.size>1)g.delete(t);}else g.add(t);renderPage();}
+function traceTitle(){return S.trace.mode==="preset"?PRESETS[S.trace.preset].name:"自定义("+S.trace.tags.size+" tags)";}
 function pTrace(){
-  const r=S.trace.running;
+  const t=S.trace;
   return recoveryHTML()+`
   <h1>Trace <span class="acin">REQ-TRACE-*</span></h1>
   <div class="two">
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">
-        <h2>Preset</h2>
+        <h2>抓取配置
+          <span class="seg mini" style="margin-left:auto">
+            <button class="${t.mode==="preset"?"on":""}" onclick="S.trace.mode='preset';pickPreset(S.trace.preset)">Preset</button>
+            <button class="${t.mode==="custom"?"on":""}" onclick="S.trace.mode='custom';renderPage()">自定义 tag</button>
+          </span></h2>
+        ${t.mode==="preset"?`
         <div class="tablewrap"><table>
           <tr><th></th><th>Preset</th><th>tags</th></tr>
-          <tr class="sel-row"><td>●</td><td>ArkUI 深度</td><td class="mono">ace app ability graphic ohos sched freq sync</td></tr>
-          <tr><td></td><td>附件兼容 / 全景</td><td class="mono">sched freq ace app binder disk ohos graphic sync workq ability</td></tr>
-          <tr><td></td><td>渲染 / 动画</td><td class="mono">graphic ace app sched freq sync</td></tr>
-        </table></div>
-        <div style="display:flex;gap:14px;align-items:center;font-size:13px">
-          <span>duration <b>15s</b></span><span>buffer <b>307200</b></span>
+          ${PRESETS.map((p,i)=>`<tr class="${t.preset===i?"sel-row":""}" style="cursor:pointer" onclick="pickPreset(${i})">
+            <td>${t.preset===i?"●":""}</td><td>${p.name}</td><td class="mono">${p.tags.join(" ")}</td></tr>`).join("")}
+        </table></div>`
+        :`
+        <p class="hint">仅设备已确认支持的 tag 可选(能力探测 tag×11);未确认的 tag 禁用并标注原因,不猜测。</p>
+        <div class="tagpick">
+          ${TRACE_TAGS_OK.map(x=>`<button class="${t.tags.has(x)?"on":""}" onclick="toggleTag('${x}')">${x}</button>`).join("")}
+          ${TRACE_TAGS_NO.map(x=>`<button disabled title="设备未报告支持该 tag">${x}</button>`).join("")}
+        </div>
+        <p class="hint">已选 ${t.tags.size} 个 tag。</p>`}
+        <div style="display:flex;gap:14px;align-items:center;font-size:13px;flex-wrap:wrap">
+          <span>duration
+            <span class="seg mini">${[10,15,30].map(d=>`<button class="${t.dur===d?"on":""}" onclick="S.trace.dur=${d};renderPage()">${d}s</button>`).join("")}</span>
+          </span>
+          <span>buffer <b>307200</b></span>
           <span class="chip dim">工具:hitrace(设备已确认)</span>
         </div>
-        <div class="warnbox" data-acin>⚠ 附件兼容 preset 的 buffer 327680 超出该设备建议值,已按能力探测收敛到 307200。<span class="ac">buffer 资源警告</span></div>
+        ${t.mode==="preset"&&PRESETS[t.preset].warnBuf?`<div class="warnbox" data-acin>⚠ 附件兼容 preset 的 buffer 327680 超出该设备建议值,已按能力探测收敛到 307200。<span class="ac">buffer 资源警告</span></div>`:""}
       </div>
       <div class="card" data-acin><span class="ac">参数 diff · AC-TRACE(param)</span>
         <h2>Debug 参数快照(before → desired)</h2>
@@ -450,68 +672,218 @@ function pTrace(){
         </table></div>
         <p class="hint">missing/unreadable 原值不承诺自动恢复:只允许「不改变」或显式确认的持久变更。本组合需要设备重启,预计断开 → 回连同一设备。</p>
       </div>
-      <button class="btn pri" style="align-self:flex-start" onclick="startTrace()" ${r?"disabled":""}>应用参数并开始抓取</button>
+      <button class="btn pri" style="align-self:flex-start" onclick="startTrace()" ${t.running?"disabled":""}>${t.running?"抓取中…":"应用参数并开始抓取("+traceTitle()+" · "+t.dur+"s)"}</button>
     </div>
     <div class="card" data-acin><span class="ac">indeterminate 进度</span>
       <h2>抓取状态</h2>
-      ${r?`<p class="hint">阶段进度见底部任务抽屉——设备端无可靠字节总量,<b>不显示百分比</b>,只显示阶段与不定进度。</p>`
-        :`<p class="empty">未在抓取。完成后产物:<span class="mono">*.raw.ftrace</span>(不可变)/ <span class="mono">*.filtered.ftrace</span>(派生)/ <span class="mono">capture.log</span> / <span class="mono">manifest.json</span>。</p>`}
+      ${t.running?`<div style="display:flex;align-items:center;gap:10px"><span class="chip warn pulse">抓取中</span><span class="ibar"></span></div>
+        <p class="hint">设备端无可靠字节总量,<b>不显示百分比</b>——只显示阶段(见底部任务抽屉)与不定进度。</p>`
+      :t.done?`<div class="tablewrap"><table>
+          <tr><th>Artifact</th><th>角色</th><th>SHA-256</th></tr>
+          <tr><td class="mono">arkui-deep.raw.ftrace</td><td>raw(不可变)</td><td class="mono">3f9a…b1c7</td></tr>
+          <tr><td class="mono">arkui-deep.filtered.ftrace</td><td>derived(可重建)</td><td class="mono">c822…04de</td></tr>
+          <tr><td class="mono">capture.log</td><td>log</td><td class="mono">910b…77aa</td></tr>
+          <tr><td class="mono">manifest.json</td><td>manifest</td><td class="mono">e0a1…88f2</td></tr>
+        </table></div>
+        <p class="hint">✓ 参数已按快照恢复;raw hash 已写入 manifest。</p>`
+      :`<p class="empty">未在抓取。完成后产物:<span class="mono">*.raw.ftrace</span>(不可变)/ <span class="mono">*.filtered.ftrace</span>(派生)/ <span class="mono">capture.log</span> / <span class="mono">manifest.json</span>。</p>`}
     </div>
   </div>`;
 }
 function startTrace(){
-  S.trace.running=true;
-  const j=addJob({title:"Trace · ArkUI 深度 15s · rk3568-dev",mode:"execute",state:"running",
+  if(S.trace.running)return;
+  S.trace.running=true;S.trace.done=false;
+  startJob(addJob({title:"Trace · "+traceTitle()+" "+S.trace.dur+"s · rk3568-dev",
+    mode:"execute",dev:"rk3568-dev",risk:2,state:"running",
     phases:["Preflight","SnapshotParams","Configure","Reboot","WaitReconnect","Capturing","Receiving","Validating","Restore","Complete"],
-    phaseIdx:0,safeBoundary:5,tick:600,log:["→ Preflight"],cancelled:false});
-  j.timer=setTimeout(()=>advanceJob(j),j.tick);
-  const t=setInterval(()=>{if(j.state!=="running"){clearInterval(t);S.trace.running=null;renderPageIf(["trace"]);}},300);
+    phaseIdx:0,safeBoundary:5,tick:600,log:["→ Preflight"],pages:["trace"],
+    onDone:st=>{S.trace.running=false;S.trace.done=(st==="succeeded");renderPageIf(["trace"]);}}));
+  renderPage();
+}
+
+/* ---------- Debug ---------- */
+const LOGPOOL=[
+  ["I","ArkUI","[pipeline] vsync frame scheduled"],
+  ["W","ArkUI","[list_layout] measure retry, node 94"],
+  ["I","RenderService","flush composition, 1 surface dirty"],
+  ["W","ArkUI","[render] flush delayed 18ms"],
+  ["E","AbilityMS","connect timeout, bundle=com.example.settings"],
+  ["I","Hiview","cpu usage snapshot written"],
+  ["W","Multimodal","touch dispatch queue depth 3"],
+  ["I","WindowManager","focus window unchanged (12)"]
+];
+const LVORD={D:0,I:1,W:2,E:3};
+function logText(){
+  const q=S.lg.tag.trim().toLowerCase();
+  const rows=S.lg.lines.filter(l=>LVORD[l.lv]>=LVORD[S.lg.lvl]&&(!q||l.tag.toLowerCase().includes(q)))
+    .slice(-200).map(l=>"07-13 "+l.t+" "+l.lv+" "+l.tag+": "+l.m);
+  return rows.join("\n")||"(当前过滤条件下没有日志)";
+}
+function updateLogDom(){
+  const el=$("logstream");if(el){el.textContent=logText();el.scrollTop=el.scrollHeight;}
+  const sc=$("shardchip");if(sc)sc.textContent="host 轮转: 片 #"+S.lg.piece+" · "+S.lg.shard.toFixed(1)+"MB/64MB · 配额 1GB";
+}
+function setLogTag(el){S.lg.tag=el.value;updateLogDom();}
+function startLogs(){
+  if(S.lg.on)return;S.lg.on=true;
+  S.lg.timer=setInterval(()=>{
+    const p=LOGPOOL[Math.floor(Math.random()*LOGPOOL.length)];
+    S.lg.ms+=137+Math.floor(Math.random()*420);
+    const sec=Math.floor(S.lg.ms/1000);
+    const t="11:"+String(2+Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")+"."+String(S.lg.ms%1000).padStart(3,"0");
+    S.lg.lines.push({t,lv:p[0],tag:p[1],m:p[2]});
+    if(S.lg.lines.length>400)S.lg.lines.shift();
+    S.lg.shard+=0.05;if(S.lg.shard>=64){S.lg.shard=0;S.lg.piece++;}
+    if(S.lg.paused){S.lg.pend++;const pc=$("pendchip");if(pc)pc.textContent="界面已暂停 · "+S.lg.pend+" 行待补";}
+    else if(S.nav==="debug"&&S.debugTab==="logs")updateLogDom();
+  },650);
+  renderPage();
+}
+function stopLogs(){if(!S.lg.on)return;clearInterval(S.lg.timer);S.lg.on=false;S.lg.paused=false;S.lg.pend=0;renderPage();}
+function togglePauseLogs(){S.lg.paused=!S.lg.paused;if(!S.lg.paused)S.lg.pend=0;renderPage();}
+function clearBufModal(){
+  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
+    <h3>⚠ 清空设备日志 buffer?</h3>
+    <div class="impact"><span class="mono">hilog -r</span> 是<b>全局且不可恢复</b>的设备端操作,会影响其他工具的采集;普通开始/停止绝不自动清空。该操作计入审计。</div>
+    <div class="checks"><label><input type="checkbox" onchange="ckGate('goClr',1)"> 我了解这会清空所有工具可见的设备日志</label></div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn danger" id="goClr" disabled onclick="doClearBuf()">清空设备 buffer</button></div>
+  </div>`);
+}
+function doClearBuf(){
+  closeModal();
+  S.lg.lines=[{t:"11:04:00.000",lv:"I",tag:"audit",m:"hilog -r executed (user-confirmed); device-side buffer cleared"}];
+  renderPage();
+}
+function toggleApp(i){const a=S.apps[i];a.running=!a.running;a.pid=a.running?2000+Math.floor(Math.random()*3000):0;renderPage();}
+function uninstallModal(i){
+  const a=S.apps[i];
+  modal(`<div class="modal dangerm" role="dialog" aria-modal="true">
+    <h3>⚠ 卸载 ${esc(a.pkg)}</h3>
+    <div class="impact"><b>影响范围</b><ul>
+      <li>设备:rk3568-dev · serial 150100469…</li>
+      <li>应用本体与其数据将从设备移除(deviceMutation,计入审计)</li>
+      <li>ArkDeck 不保留该应用数据的副本</li></ul></div>
+    <div class="checks"><label><input type="checkbox" onchange="ckGate('goUn',1)"> 我确认卸载 ${esc(a.pkg)} 及其数据</label></div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn danger" id="goUn" disabled onclick="closeModal();S.apps.splice(${i},1);renderPage()">卸载 ${esc(a.pkg)}</button></div>
+  </div>`);
+}
+function installModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>安装 HAP</h3>
+    <dl class="kv">
+      <dt>文件</dt><dd>~/Downloads/todo-demo.hap · 4.2MB</dd>
+      <dt>包名 / 版本</dt><dd>com.sample.todo · 0.3.0</dd>
+      <dt>签名</dt><dd>证书链完整 · profile 含本设备 <span class="chip ok">✓</span></dd>
+    </dl>
+    <p class="hint">安装是 deviceMutation:进入任务抽屉,按阶段推进,可在安全边界取消。</p>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="closeModal();doInstall()">安装到 rk3568-dev</button></div>
+  </div>`);
+}
+function doInstall(){
+  startJob(addJob({title:"安装 HAP · todo-demo.hap · rk3568-dev",mode:"execute",dev:"rk3568-dev",risk:2,state:"running",
+    phases:["Preflight","Transfer","Install","Verify","Complete"],phaseIdx:0,safeBoundary:1,tick:450,
+    log:["→ Preflight"],pages:["debug"],
+    onDone:st=>{if(st==="succeeded"&&!S.apps.some(a=>a.pkg==="com.sample.todo"))
+      S.apps.push({pkg:"com.sample.todo",ver:"0.3.0",running:false,pid:0});renderPageIf(["debug"]);}}));
+}
+function fwdModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>新建端口转发</h3>
+    <p class="hint">forward:本机端口 → 设备端口(hdc fport)。</p>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="hint">本机 tcp:</span><input class="inp mono" id="fl" value="9223" style="width:90px">
+      <span class="hint">→ 设备 tcp:</span><input class="inp mono" id="fr" value="9223" style="width:90px">
+    </div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="addFwd()">添加转发</button></div>
+  </div>`);
+}
+function addFwd(){
+  const l=($("fl").value.trim()||"9223").replace(/[^0-9]/g,""),r=($("fr").value.trim()||"9223").replace(/[^0-9]/g,"");
+  S.fwd.push({l:"tcp:"+l,r:"tcp:"+r});closeModal();renderPage();
+}
+function delFwd(i){S.fwd.splice(i,1);renderPage();}
+const CMDS={
+  "bm dump -a":{out:"com.example.settings\ncom.demo.gallery\ncom.ohos.launcher",ms:812},
+  "param get persist.ace.debug.enabled":{out:"0",ms:104},
+  "hidumper -s WindowManagerService -a -a":{out:"WindowName  DisplayId  Pid   WinId  Type\nsettings0   0          2841  12     APP\nlauncher    0          1203  8      LAUNCHER",ms:436},
+  "uptime":{out:" 11:02:33 up 2 days,  3:14,  load average: 1.02, 0.88, 0.79",ms:96}
+};
+function setCmd(el){S.cmd.val=el.value;}
+function runCmd(){
+  const c=S.cmd.val.trim();if(!c)return;
+  const t=CMDS[c];
+  S.cmd.hist.unshift({c,exit:t?0:127,ms:t?t.ms:120,
+    out:t?t.out:"(原型仅内置模板输出;真实实现原样回显 stdout/stderr)"});
+  if(S.cmd.hist.length>5)S.cmd.hist.pop();
   renderPage();
 }
 function pDebug(){
   const tb=S.debugTab;
   const tabs=[["logs","Logs"],["apps","Apps"],["net","Network"],["cmd","Commands"]];
   let body="";
-  if(tb==="logs")body=`
+  if(tb==="logs"){
+    const g=S.lg;
+    body=`
     <div class="card" data-acin><span class="ac">host 分片轮转</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button class="btn pri">开始采集</button><button class="btn">暂停界面</button>
-        <span class="chip dim">过滤: level ≥ W · tag=ArkUI</span>
-        <span class="chip dim">host 轮转: 64MB/片 · 配额 1GB</span>
+        ${g.on?'<button class="btn" onclick="stopLogs()">停止采集</button>'
+              :'<button class="btn pri" onclick="startLogs()">开始采集</button>'}
+        <button class="btn" onclick="togglePauseLogs()" ${g.on?"":"disabled"}>${g.paused?"恢复界面":"暂停界面"}</button>
+        <span class="hint">level ≥</span>
+        <span class="seg mini">${["I","W","E"].map(x=>`<button class="${g.lvl===x?"on":""}" onclick="S.lg.lvl='${x}';renderPage()">${x}</button>`).join("")}</span>
+        <input class="inp mono" style="width:110px" placeholder="tag 过滤" value="${esc(g.tag)}" oninput="setLogTag(this)">
+        <span class="chip dim" id="shardchip">host 轮转: 片 #${g.piece} · ${g.shard.toFixed(1)}MB/64MB · 配额 1GB</span>
         <span style="flex:1"></span>
-        <button class="btn danger" onclick="modal('<div class=\\'modal dangerm\\'><h3>⚠ 清空设备日志 buffer?</h3><div class=\\'impact\\'>hilog -r 是<b>全局且不可恢复</b>的设备端操作,会影响其他工具的采集;普通开始/停止绝不自动清空。该操作计入审计。</div><div class=\\'mfoot\\'><button class=\\'btn\\' onclick=\\'closeModal()\\'>取消</button><button class=\\'btn danger\\' onclick=\\'closeModal()\\'>清空设备 buffer</button></div></div>')">清空设备 buffer…</button>
+        <button class="btn danger" onclick="clearBufModal()">清空设备 buffer…</button>
       </div>
-      <div class="logtail" style="max-height:190px">07-13 11:02:11.482 W ArkUI: [list_layout] measure retry, node 88
-07-13 11:02:11.490 W ArkUI: [render] flush delayed 22ms
-07-13 11:02:12.013 E AbilityMS: connect timeout, bundle=com.example.settings
-07-13 11:02:12.400 W ArkUI: [list_layout] measure retry, node 91</div>
+      ${g.paused?'<span class="chip warn" id="pendchip">界面已暂停 · '+g.pend+' 行待补</span>':""}
+      <div class="logtail stream" id="logstream">${esc(logText())}</div>
+      <p class="hint">${g.on?"采集中:设备端持续拉流,host 侧按 64MB/片轮转,不清设备 buffer。":"未在采集。开始/停止只影响 host 侧拉流,绝不清空设备 buffer。"}</p>
     </div>`;
-  if(tb==="apps")body=`<div class="card"><div class="tablewrap"><table>
-      <tr><th>包名</th><th>版本</th><th>状态</th><th></th></tr>
-      <tr><td class="mono">com.example.settings</td><td>1.2.0</td><td><span class="chip ok">运行中 · pid 2841</span></td>
-      <td><button class="btn">停止</button> <button class="btn">启动 Ability</button></td></tr>
-      <tr><td class="mono">com.demo.gallery</td><td>0.9.1</td><td><span class="chip dim">未运行</span></td>
-      <td><button class="btn">启动 Ability</button> <button class="btn danger">卸载…</button></td></tr>
-    </table></div><div style="display:flex;gap:8px"><button class="btn pri">安装 HAP…</button></div></div>`;
-  if(tb==="net")body=`<div class="card"><div class="tablewrap"><table>
-      <tr><th>类型</th><th>本机</th><th>设备</th><th></th></tr>
-      <tr><td>forward</td><td class="mono">tcp:9222</td><td class="mono">tcp:9222</td><td><button class="btn">删除</button></td></tr>
-    </table></div><button class="btn pri" style="align-self:flex-start">新建转发…</button></div>`;
+  }
+  if(tb==="apps")body=`<div class="card">
+      <div class="tablewrap"><table>
+        <tr><th>包名</th><th>版本</th><th>状态</th><th></th></tr>
+        ${S.apps.map((a,i)=>`<tr><td class="mono">${esc(a.pkg)}</td><td>${esc(a.ver)}</td>
+          <td>${a.running?'<span class="chip ok">运行中 · pid '+a.pid+'</span>':'<span class="chip dim">未运行</span>'}</td>
+          <td>${a.running?`<button class="btn" onclick="toggleApp(${i})">停止</button>`
+                        :`<button class="btn" onclick="toggleApp(${i})">启动 Ability</button> <button class="btn danger" onclick="uninstallModal(${i})">卸载…</button>`}</td></tr>`).join("")}
+      </table></div>
+      <div style="display:flex;gap:8px"><button class="btn pri" onclick="installModal()">安装 HAP…</button></div></div>`;
+  if(tb==="net")body=`<div class="card">
+      <div class="tablewrap"><table>
+        <tr><th>类型</th><th>本机</th><th>设备</th><th></th></tr>
+        ${S.fwd.map((f,i)=>`<tr><td>forward</td><td class="mono">${esc(f.l)}</td><td class="mono">${esc(f.r)}</td>
+          <td><button class="btn" onclick="delFwd(${i})">删除</button></td></tr>`).join("")||'<tr><td colspan="4" class="empty">无转发规则</td></tr>'}
+      </table></div>
+      <button class="btn pri" style="align-self:flex-start" onclick="fwdModal()">新建转发…</button></div>`;
   if(tb==="cmd")body=`<div class="card" data-acin><span class="ac">一次性命令 ≠ 终端</span>
-      <div style="display:flex;gap:8px"><input style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font-family:var(--mono);font-size:12px" value="bm dump -a" readonly><button class="btn pri">执行</button></div>
-      <div class="logtail">$ hdc -t 150100469… shell bm dump -a
-exit 0 · 812ms
-com.example.settings
-com.demo.gallery …</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select class="inp mono" onchange="S.cmd.val=this.value;renderPage()">
+          ${Object.keys(CMDS).map(c=>`<option ${S.cmd.val===c?"selected":""}>${esc(c)}</option>`).join("")}
+        </select>
+        <input class="inp mono" style="flex:1;min-width:220px" value="${esc(S.cmd.val)}" oninput="setCmd(this)">
+        <button class="btn pri" onclick="runCmd()">执行</button>
+      </div>
+      ${S.cmd.hist.map(h=>`<div class="logtail">$ hdc -t 150100469… shell ${esc(h.c)}
+exit ${h.exit} · ${h.ms}ms
+${esc(h.out)}</div>`).join("")||'<p class="empty">尚未执行命令。执行后显示精确命令、退出码与耗时。</p>'}
       <p class="hint">显示精确命令、退出码与耗时;完整交互终端(PTY)排入 v1.x,本面板不假装是终端。</p></div>`;
   return recoveryHTML()+`
   <h1>Debug 工作台 <span class="acin">REQ-DEBUG-*</span></h1>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="${tb===k?"on":""}" onclick="S.debugTab='${k}';renderPage()">${l}</button>`).join("")}</div>
   ${body}`;
 }
+
+/* ---------- Flash ---------- */
 function pFlash(){
   const m=S.flashMode, ok=S.flashdConfirmed;
-  const modeBadge=m==="planOnly"?'<span class="chip planned">◇ PLANNED — 不派发 deviceMutation/destructive</span>':m==="simulated"?'<span class="chip sim">▤ SIMULATED · fixture-a3 — 不接触真实设备</span>':"";
+  const modeB=m==="planOnly"?'<span class="chip planned">◇ PLANNED — 不派发 deviceMutation/destructive</span>'
+    :m==="simulated"?'<span class="chip sim">▤ SIMULATED · fixture-a3 — 不接触真实设备</span>':"";
   const planRows=[
     ["1","enterUpdater","—","mut","deviceMutation"],
     ["2","flashPartition","boot · boot.img · 64MB","destr","destructive"],
@@ -528,7 +900,7 @@ function pFlash(){
         <button class="${m==="execute"?"on":""}" onclick="S.flashMode='execute';renderPage()">Execute</button>
         <button class="${m==="planOnly"?"on":""}" onclick="S.flashMode='planOnly';renderPage()">Plan only</button>
         <button class="${m==="simulated"?"on":""}" onclick="S.flashMode='simulated';renderPage()">Simulated</button>
-      </span>${modeBadge}
+      </span>${modeB}
     </div>
   </div>
   <div class="two">
@@ -551,6 +923,14 @@ function pFlash(){
           <tr><td>稳定供电</td><td><span class="chip ok">satisfied</span></td><td></td></tr>
         </table></div>
       </div>
+      ${S.lastFlash?`<div class="card" data-acin><span class="ac">postflight verify</span>
+        <h2>上次执行 · Postflight</h2>
+        <dl class="kv">
+          <dt>设备回报 build</dt><dd>${esc(S.lastFlash.build)} <span class="chip ok">= 镜像期望 ✓</span></dd>
+          <dt>设备身份</dt><dd>同一 serial · binding revision 3→${S.lastFlash.rev}</dd>
+          <dt>manifest</dt><dd>9 steps 全部 executed · SHA e0a1…88f2</dd>
+        </dl>
+      </div>`:""}
     </div>
     <div class="card" data-acin><span class="ac">AC-FLASH-005-01 · effect 分级</span>
       <h2>Exact Plan</h2>
@@ -558,12 +938,14 @@ function pFlash(){
         <tr><th>#</th><th>step</th><th>参数摘要</th><th>effect</th><th></th></tr>${planRows}
       </table></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        ${m==="execute"?`<button class="btn danger" onclick="flashConfirm()" ${ok?"":"disabled"} ${ok?"":'title="required prerequisite flashd 为 unknown,临界步骤前阻断"'}>刷写 rk3568-dev(2 个分区)…</button>
+        ${m==="execute"?`<button class="btn danger" onclick="flashConfirm()" ${ok&&!S.flashJob?"":"disabled"} ${ok?"":'title="required prerequisite flashd 为 unknown,临界步骤前阻断"'}>刷写 rk3568-dev(2 个分区)…</button>
           ${ok?"":'<span class="hint">⚠ flashd unknown → 执行分支被阻断(不能刷到一半才发现)</span>'}`:""}
-        ${m==="planOnly"?`<button class="btn pri" onclick="runPlanOnly()">生成完整计划(零设备写入)</button>${S.planSaved?'<span class="chip planned">◇ planned · plan artifact 已持久化</span>':""}`:""}
-        ${m==="simulated"?`<button class="btn pri" onclick="runSim()">运行模拟场景(断连注入)</button>`:""}
+        ${m==="planOnly"?`<button class="btn pri" onclick="runPlanOnly()">生成完整计划(零设备写入)</button>
+          ${S.planSaved?'<button class="btn" onclick="planModal()">查看 plan artifact</button><span class="chip planned">◇ planned · 已持久化</span>':""}`:""}
+        ${m==="simulated"?'<button class="btn pri" onclick="runSim()">运行模拟场景(断连注入)</button>':""}
       </div>
-      ${m==="execute"&&S.flashJob?`<div class="warnbox">⚠ 正在写入分区 —— <b>临界区不可中断</b>:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。</div>`:""}
+      ${m==="execute"&&S.flashJob?`<div class="warnbox" data-acin><span class="ac">AC-FLASH-009-01</span>⚠ 正在写入分区 —— <b>临界区不可中断</b>:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。</div>`:""}
+      ${m==="simulated"?'<p class="hint">fixture-a3 会在 flash boot 后注入断连:预期走「WaitReconnect → Rebind 确认」而不是静默续刷(AC-FLASH-010-01),回连后由你确认同一设备再继续。</p>':""}
     </div>
   </div>`;
 }
@@ -575,83 +957,184 @@ function flashConfirm(){
       <li>写入:boot(64MB)、system(2.1GB)——将覆盖现有系统</li>
       <li>失败可能导致设备无法启动,需使用厂商恢复工具;ArkDeck 不保证可自动恢复</li></ul></div>
     <div class="checks">
-      <label><input type="checkbox" onchange="fck()"> 我确认目标设备与镜像匹配(rk3568 · OpenHarmony 5.0)</label>
-      <label><input type="checkbox" onchange="fck()"> 我已确认稳定供电与厂商恢复路径可用</label>
+      <label><input type="checkbox" onchange="ckGate('goFlash',2)"> 我确认目标设备与镜像匹配(rk3568 · OpenHarmony 5.0)</label>
+      <label><input type="checkbox" onchange="ckGate('goFlash',2)"> 我已确认稳定供电与厂商恢复路径可用</label>
     </div>
-    <div class="mfoot"><button class="btn" onclick="closeModal()" autofocus>取消</button>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
       <button class="btn danger" id="goFlash" disabled onclick="closeModal();runFlash()">刷写 rk3568-dev 的 2 个分区</button></div>
   </div>`);
-  window.fck=()=>{const c=document.querySelectorAll(".checks input:checked").length;$("goFlash").disabled=c<2;};
 }
 function runFlash(){
-  const j=addJob({title:"Flash · rk3568-5.0-full · rk3568-dev",mode:"execute",state:"running",
+  S.flashJob=startJob(addJob({title:"Flash · rk3568-5.0-full · rk3568-dev",mode:"execute",dev:"rk3568-dev",risk:3,state:"running",
     phases:["Preflight","EnterUpdater","Re-identify","flash boot","flash system","Verify","Reboot","Postflight","Complete"],
-    phaseIdx:0,safeBoundary:5,tick:700,log:["→ Preflight","已获取 CriticalActivityLease(idle sleep 保持)"],cancelled:false});
-  S.flashJob=j;j.timer=setTimeout(()=>advanceJob(j),j.tick);
-  const t=setInterval(()=>{if(j.state!=="running"){clearInterval(t);S.flashJob=null;renderPageIf(["flash"]);}},300);
+    phaseIdx:0,safeBoundary:5,tick:700,log:["→ Preflight","已获取 CriticalActivityLease(idle sleep 保持)"],pages:["flash"],
+    doneMsg:"完成:postflight 校验通过,设备回报 build 与镜像期望一致。",
+    onDone:st=>{S.flashJob=null;
+      if(st==="succeeded"){S.lastFlash={build:"OpenHarmony 5.0.0.96",rev:4};
+        DEVICES[0].build="OpenHarmony 5.0.0.96";renderDevs();}
+      renderPageIf(["flash"]);}}));
   renderPage();
 }
 function runPlanOnly(){
   S.planSaved=true;
-  addJob({title:"Flash(plan-only)· rk3568-5.0-full",mode:"planOnly",state:"planned",
-    phases:["Preflight","Validate","makePlan","Persist plan","planned"],phaseIdx:5,safeBoundary:0,tick:0,
-    log:["完整计划含 2 个 destructive 步骤,全部 notExecuted(planned);mutation dispatch = 0。"],cancelled:false});
-  renderPage();
+  const j={id:"J"+(S.jobSeq++),title:"Flash(plan-only)· rk3568-5.0-full",mode:"planOnly",dev:"rk3568-dev",risk:1,state:"planned",
+    phases:["Preflight","Validate","makePlan","Persist plan"],phaseIdx:4,safeBoundary:0,tick:0,cancelled:false,
+    log:["完整计划含 2 个 destructive 步骤,全部 notExecuted(planned);mutation dispatch = 0。"]};
+  S.jobs.push(j);histFromJob(j);openDrawer();renderDrawer();renderPage();
+}
+function planModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>plan artifact — rk3568-5.0-full <span class="chip planned">◇ PLANNED</span></h3>
+    <div class="logtail" style="max-height:240px">{
+  "schema": "flash-plan/1.0",
+  "profile": "rk3568-5.0-full",
+  "device": {"serial": "150100469…", "bindingRevision": 3},
+  "steps": [
+    {"n":1,"step":"enterUpdater","effect":"deviceMutation","status":"notExecuted(planned)"},
+    {"n":2,"step":"flashPartition","target":"boot","sha256":"c9d2…41aa",
+     "effect":"destructive","status":"notExecuted(planned)"},
+    {"n":3,"step":"flashPartition","target":"system","sha256":"8b07…9e35",
+     "effect":"destructive","status":"notExecuted(planned)"},
+    {"n":4,"step":"reboot+waitReconnect","effect":"deviceMutation","status":"notExecuted(planned)"},
+    {"n":5,"step":"postflightVerify","effect":"readOnly","status":"notExecuted(planned)"}
+  ],
+  "mutationDispatch": 0
+}</div>
+    <p class="hint">plan artifact 已持久化到 Session;PLANNED 标识在历史与导出中永久保留(AC-UX-006-01)。</p>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">关闭</button></div>
+  </div>`);
 }
 function runSim(){
-  const j=addJob({title:"Flash(simulated)· fixture-a3 断连注入",mode:"simulated",state:"running",
-    phases:["Preflight","EnterUpdater","flash boot","注入断连","reconcile","Complete"],
-    phaseIdx:0,safeBoundary:2,tick:550,log:["→ Preflight(合成设备,无真实 connectKey)"],cancelled:false});
-  j.timer=setTimeout(()=>advanceJob(j),j.tick);
+  startJob(addJob({title:"Flash(simulated)· fixture-a3 断连注入",mode:"simulated",dev:"SIM-fixture-a3",risk:3,state:"running",
+    phases:["Preflight","EnterUpdater","flash boot","注入断连","WaitReconnect","Rebind 确认","reconcile","Complete"],
+    pauseAt:"Rebind 确认",phaseIdx:0,safeBoundary:2,tick:520,
+    log:["→ Preflight(合成设备,无真实 connectKey)"],pages:["flash"],
+    doneMsg:"完成:reconcile 与注入脚本一致;SIMULATED 标识永久保留。"}));
+}
+
+/* ---------- History ---------- */
+function histDetail(h){
+  const isTrace=h.what.startsWith("Trace"),isDump=h.what.includes("Dump"),isFlash=h.what.startsWith("Flash")||h.what.startsWith("安装");
+  let art="";
+  if(isTrace)art=`<tr><td class="mono">raw.ftrace</td><td>raw / device</td><td class="mono">3f9a…b1c7</td></tr>
+    <tr><td class="mono">filtered.ftrace</td><td>derived / host</td><td class="mono">c822…04de</td></tr>
+    <tr><td class="mono">capture.log</td><td>log / host</td><td class="mono">910b…77aa</td></tr>`;
+  else if(isDump)art=`<tr><td class="mono">stdout.elementtree.txt</td><td>raw / stdout</td><td class="mono">7d1a…90ff</td></tr>
+    <tr><td class="mono">sidecar.arkui.dump</td><td>raw / device</td><td class="mono">e33b…12c0</td></tr>
+    <tr><td class="mono">merged.elementtree.json</td><td>derived / host</td><td class="mono">a1f4…77b3</td></tr>`;
+  else if(isFlash)art=h.mode==="planOnly"
+    ?'<tr><td class="mono">plan.json</td><td>plan / host</td><td class="mono">b7c3…e901</td></tr>'
+    :`<tr><td class="mono">plan.json</td><td>plan / host</td><td class="mono">b7c3…e901</td></tr>
+      <tr><td class="mono">flash.log</td><td>log / host</td><td class="mono">44d0…a2c8</td></tr>`;
+  const params=(isTrace||isDump)?`
+    <h2 style="margin-top:4px">参数 before / after</h2>
+    <div class="tablewrap"><table>
+      <tr><th>参数</th><th>before</th><th>after</th><th></th></tr>
+      <tr><td class="mono">persist.ace.trace.build.enabled</td><td class="mono">false</td><td class="mono">false</td><td><span class="chip ok">已恢复</span></td></tr>
+      <tr><td class="mono">persist.rosen.animationtrace.enabled</td><td class="mono">missing</td><td class="mono">missing</td><td><span class="chip dim">未改变</span></td></tr>
+    </table></div>`:"";
+  return `<dl class="kv">
+      <dt>状态</dt><dd>${STCHIP[h.st]||""} ${modeBadge(h.mode,h.mode==="simulated"?"fixture-a3":"")}</dd>
+      <dt>executionMode</dt><dd>${h.mode}</dd>
+      <dt>设备</dt><dd>${esc(h.dev)} · binding rev 3</dd>
+      <dt>manifest</dt><dd class="mono">schema 1.0 · 9 steps · SHA e0a1…88f2</dd>
+      ${h.st==="interrupted"?'<dt>审计</dt><dd>outcomeUnknown @ flashPartition(system) · needsAttention · 未执行补偿:restoreParam×2</dd>':""}
+      ${h.st==="cancelled"?'<dt>审计</dt><dd>用户取消 @ 安全边界;补偿动作已执行,参数已恢复</dd>':""}
+    </dl>
+    ${params}
+    <h2 style="margin-top:4px">Artifact(role / origin / hash)</h2>
+    <div class="tablewrap"><table><tr><th>文件</th><th>role / origin</th><th>SHA-256</th></tr>${art||'<tr><td colspan="3" class="empty">无产物(planned 会话仅含 plan artifact)</td></tr>'}</table></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="doneBtn(this,'已在访达中显示(演示)')">在访达中显示</button>
+      <button class="btn" onclick="exportModal('${h.id}')">导出…</button>
+    </div>`;
+}
+function exportModal(id){
+  const h=HIST.find(x=>x.id===id);
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>导出 Session — <span class="mono">${esc(id)}</span> ${h?modeBadge(h.mode,"fixture-a3"):""}</h3>
+    <div class="warnbox">⚠ 产物可能包含页面文本、包名与设备标识符,按敏感数据处理;导出内容由你逐项确认。</div>
+    <div class="checks safe">
+      <label><input type="checkbox" checked> manifest 与审计记录</label>
+      <label><input type="checkbox" checked> 派生产物(filtered / merged)</label>
+      <label><input type="checkbox"> raw 产物(可能含敏感内容)</label>
+      <label><input type="checkbox" checked> connectKey 脱敏(推荐保持开启)</label>
+    </div>
+    <p class="hint">planned / simulated 标识在导出包中永久保留(AC-UX-006-01)。</p>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="doneBtn(this,'✓ 已导出(演示):~/Downloads/${esc(id)}.arkdeck.zip')">导出 Session 包</button></div>
+  </div>`);
 }
 function pHistory(){
-  const f=S.histFilter;
-  const rows=HIST.filter(h=>f==="all"||h.st===f);
+  const f=S.hf;
+  const devs=["all"].concat([...new Set(HIST.map(h=>h.dev))]);
+  const rows=HIST.filter(h=>(f.st==="all"||h.st===f.st)&&(f.mode==="all"||h.mode===f.mode)&&(f.dev==="all"||h.dev===f.dev));
   const sel=HIST.find(h=>h.id===S.histSel);
   return recoveryHTML()+`
   <h1>History <span class="acin">REQ-UX-004</span></h1>
-  <div class="filters" data-acin><span class="ac">AC-UX-004-01</span>
-    ${[["all","全部"],["succeeded","成功"],["failed","失败"],["planned","planned"],["simulated","simulated"],["interrupted","已中断"]]
-      .map(([k,l])=>`<button class="${f===k?"on":""}" onclick="S.histFilter='${k}';renderPage()">${l}</button>`).join("")}
+  <div class="card" data-acin style="gap:8px"><span class="ac">AC-UX-004-01</span>
+    <div class="filters"><span class="fl">状态</span>
+      ${[["all","全部"],["succeeded","成功"],["failed","失败"],["cancelled","已取消"],["planned","planned"],["interrupted","已中断"]]
+        .map(([k,l])=>`<button class="${f.st===k?"on":""}" onclick="S.hf.st='${k}';renderPage()">${l}</button>`).join("")}
+    </div>
+    <div class="filters"><span class="fl">模式</span>
+      ${[["all","全部"],["execute","execute"],["planOnly","plan-only"],["simulated","simulated"]]
+        .map(([k,l])=>`<button class="${f.mode===k?"on":""}" onclick="S.hf.mode='${k}';renderPage()">${l}</button>`).join("")}
+      <span class="fl" style="margin-left:10px">设备</span>
+      ${devs.map(d=>`<button class="${f.dev===d?"on":""}" onclick="S.hf.dev='${d}';renderPage()">${d==="all"?"全部":esc(d)}</button>`).join("")}
+    </div>
   </div>
   <div class="two">
     <div class="card"><div class="tablewrap"><table>
       <tr><th>Session</th><th>状态</th><th>设备</th><th>内容</th><th>时间</th></tr>
       ${rows.map(h=>`<tr class="${S.histSel===h.id?"sel-row":""}" style="cursor:pointer" onclick="S.histSel='${h.id}';renderPage()">
-        <td class="mono">${h.id}</td><td>${STCHIP[h.st]}</td><td class="mono">${esc(h.dev)}</td><td>${esc(h.what)}</td><td class="mono">${h.when}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">无匹配项</td></tr>'}
+        <td class="mono">${h.id}${h.live?' <span class="livetag">本会话</span>':""}</td>
+        <td>${STCHIP[h.st]||""}${h.mode!=="execute"&&h.st!=="planned"?" "+modeBadge(h.mode,""):""}</td>
+        <td class="mono">${esc(h.dev)}</td><td>${esc(h.what)}</td><td class="mono">${h.when}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">无匹配项</td></tr>'}
     </table></div></div>
-    <div class="card">
+    <div class="card" data-acin><span class="ac">AC-UX-006-01</span>
       <h2>Session 详情</h2>
-      ${sel?`<dl class="kv">
-        <dt>状态</dt><dd>${STCHIP[sel.st]}</dd>
-        <dt>executionMode</dt><dd>${sel.mode}${sel.st==="simulated"?" · fixture-a3":""}</dd>
-        <dt>设备</dt><dd>${esc(sel.dev)} · binding rev 3</dd>
-        <dt>manifest</dt><dd class="mono">schema 1.0 · 9 steps · SHA e0a1…88f2</dd>
-        ${sel.st==="interrupted"?'<dt>审计</dt><dd>outcomeUnknown @ flashPartition(system) · needsAttention · 未执行补偿:restoreParam×2</dd>':""}
-      </dl>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn">在访达中显示</button>
-        <button class="btn" onclick="alert('导出前提示:产物可能含页面文本/包名/标识符;connectKey 可脱敏。(演示)')">导出…</button>
-      </div>`:'<p class="empty">选择左侧 Session 查看 manifest、Artifact 与审计详情。planned/simulated 标识在历史与导出中永久保留。</p>'}
+      ${sel?histDetail(sel):'<p class="empty">选择左侧 Session 查看 manifest、参数 before/after、Artifact 与审计详情。planned/simulated 标识在历史与导出中永久保留。</p>'}
     </div>
   </div>`;
 }
+
+/* ---------- Settings ---------- */
 function pSettings(){
+  const runningJobs=S.jobs.some(j=>j.state==="running");
   return `
   <h1>Settings</h1>
   <div class="grid2">
     <div class="card"><h2>HDC 工具</h2>
       <div class="radio">
-        <label><input type="radio" name="hdc" checked> DevEco SDK — <span class="mono">…/toolchains/hdc · 3.1.0e</span></label>
-        <label><input type="radio" name="hdc"> 手动选择… <span class="rd">(切换不影响运行中的 Job:工具在 Job 创建时固化)</span></label>
-      </div></div>
+        <label><input type="radio" name="hdc" ${S.hdcSel==="deveco"?"checked":""} onchange="S.hdcSel='deveco';renderPage()"> DevEco SDK — <span class="mono">…/toolchains/hdc · 3.1.0e</span></label>
+        <label><input type="radio" name="hdc" ${S.hdcSel==="manual"?"checked":""} onchange="S.hdcSel='manual';renderPage()"> 手动选择 — <span class="mono">/usr/local/bin/hdc · 3.0.0b</span><span class="rd">(SHA-256 已计算 · 能力需重新探测)</span></label>
+      </div>
+      ${runningJobs?'<div class="warnbox">⚠ 有任务正在运行:切换不影响运行中的 Job——工具在 Job 创建时固化,仅新任务使用新选择。</div>'
+                   :'<p class="hint">切换不影响运行中的 Job:工具在 Job 创建时固化。</p>'}
+    </div>
     <div class="card"><h2>输出与保留</h2>
       <dl class="kv"><dt>输出根目录</dt><dd>~/Library/Application Support/ArkDeck</dd>
-      <dt>历史配额</dt><dd>20GB · 保留 90 天 · pinned 除外</dd></dl></div>
+      <dt>历史配额</dt><dd>20GB · 保留 90 天 · pinned 除外</dd>
+      <dt>当前占用</dt><dd>6.4GB · 42 个 Session · 3 pinned</dd></dl></div>
     <div class="card" data-acin><span class="ac">AC-DIAG-002-01</span><h2>诊断</h2>
       <p class="hint">诊断包由你主动导出,默认<b>不含</b>设备 raw 产物,导出前可预览勾选;无自动上传。</p>
-      <button class="btn" style="align-self:flex-start">导出诊断包…</button></div>
+      <button class="btn" style="align-self:flex-start" onclick="diagModal()">导出诊断包…</button></div>
   </div>`;
+}
+function diagModal(){
+  modal(`<div class="modal" role="dialog" aria-modal="true">
+    <h3>导出诊断包 <span class="acin">AC-DIAG-002-01</span></h3>
+    <p class="hint">逐项勾选导出内容;默认不含设备 raw 产物。该包只保存到本机,无自动上传。</p>
+    <div class="checks safe">
+      <label><input type="checkbox" checked> ArkDeck 应用日志(近 7 天)</label>
+      <label><input type="checkbox" checked> 工具链探测记录(hdc 版本/hash/endpoint)</label>
+      <label><input type="checkbox" checked> 设备清单(connectKey 已脱敏)</label>
+      <label><input type="checkbox"> 设备 raw 产物(默认不含,可能包含敏感内容)</label>
+    </div>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn pri" onclick="doneBtn(this,'✓ 已导出(演示):~/Downloads/arkdeck-diag-0713.zip')">导出诊断包</button></div>
+  </div>`);
 }
 
 /* ---------- render ---------- */
@@ -667,7 +1150,8 @@ function renderDevs(){
 function renderNav(){
   $("nav").innerHTML=NAV.map(([k,ic,l])=>`<button class="${S.nav===k?"on":""}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join("");
 }
-function renderPage(){$("page").innerHTML=PAGES[S.nav]();}
+function renderPage(){$("page").innerHTML=PAGES[S.nav]();
+  const ls=$("logstream");if(ls)ls.scrollTop=ls.scrollHeight;}
 function render(){renderDevs();renderNav();renderPage();renderDrawer();}
 render();
 </script>

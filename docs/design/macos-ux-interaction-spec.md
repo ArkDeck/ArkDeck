@@ -1,6 +1,6 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.1（design input，非 normative）  
+> Status：draft v0.2（design input，非 normative；v0.2 = 原型补全本文档已定义的全部交互路径，行为定义无变化）  
 > 交互原型：`docs/design/prototype.html`（可点击,与本文档同版本演进）  
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md` 及各 capability spec——本文档只定义 HOW(布局/组件/流转),行为冲突时以 spec 为准  
 > Promotion 规则：本目录是**草稿区**(非 protected,可自由迭代);被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/` 并由该 change 的 design.md hash-pin。设计过程中发现的**行为级**缺口必须走 behavior delta,不得只画进稿子。
