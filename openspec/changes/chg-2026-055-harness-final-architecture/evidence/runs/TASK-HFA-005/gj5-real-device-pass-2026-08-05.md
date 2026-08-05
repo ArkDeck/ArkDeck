@@ -8,6 +8,10 @@ patched build to the same device, and verified the fix across five clean
 captures. Twenty-one rounds, twenty-five minutes, no human input after the
 submission — no grant issued mid-run, no resume, no manual step of any kind.
 
+Confirmed by a second independent run, `HTASK-57AC733BE4E5`: same terminal
+state, same round and mutation counts, the same two-line change reached
+through its own decision. Details below.
+
 This supersedes `gj5-current-digest-2026-08-05.md`, which recorded the same
 journey as `IMPLEMENTING` on this digest because it had no decision producer.
 The r2 window (`run-r2.md`) remains the historical pass on digest `44b6728d…`;
@@ -92,6 +96,36 @@ the patch above.
 
 Crash ledger watermark advanced `20170806…` across the window with
 `matchingCrashCount = 0` on every verification sample.
+
+## Second run, independently submitted
+
+`HTASK-57AC733BE4E5`, same command, same digest, same device, nothing carried
+over: a fresh isolated copy, a fresh decision, a fresh attempt id.
+
+| | first | second |
+|---|---|---|
+| Task | `HTASK-D637AF325AB3` | `HTASK-57AC733BE4E5` |
+| Terminal | `succeeded` / `promotionCandidateReady` | `succeeded` / `promotionCandidateReady` |
+| Rounds | 21 | 21 |
+| E1 mutations | 6 | 6 |
+| Model calls | 20 | 20 |
+| Wall clock | 1528s | 1802s |
+| Attempt | `ATTEMPT-650BA685CD53041A` | `ATTEMPT-BC57967A6BA6A560` |
+| Candidate | `candidate-02109b7708f076a8784f6428` | `candidate-4a23999eb4f774b2f9287be6` |
+| Model reason code | `selfInflictedDebugProbeArmed` | `crashProbeArmed` |
+| Criteria | 3/3 pass, 5 samples each | 3/3 pass, 5 samples each |
+
+Both runs reached the same two-line change to the same file through
+independent decisions — the reason codes differ because the model named its
+own each time. The second run's patch digest is
+`4340353577e899c7be659afd34f07c177a2c9d4b5bceb30a11eb2cbd4e3955ee`, the same
+diff content the first proposed.
+
+The source tree was untouched throughout: `WaterFlowLayoutDemo` still reads
+`export const ENABLED: boolean = true;` and still hashes to
+`084dddd2b8626fd7f82e05b4fea639366a44c30791d153a117b22950bc459c24`. Both
+repairs happened in their own copies and neither reached it, which is the
+isolation invariant holding under a real repair rather than in a test.
 
 ## Promotion
 
