@@ -101,6 +101,21 @@ hilog: 11045 I A00000/ArkDeckGJ3: marker=arkdeck-gj3-candidate-v2
 
 `outcomeUnknown=false`, `outstandingResidueCount=0`.
 
+## Diagnostics against the deployed library — `job-8ed816b7095ed77b7a4d903713d167b8`
+
+The chain's "collect crash / HiLog / dump / trace" leg is expressed by
+`capture.diagnostics@1` scoped to the application now running the published
+library, so it is recorded separately rather than claimed from the deployment
+job:
+
+```text
+application-liveness.json  state HEALTHY, processState RUNNING, pidObserved true,
+                           reasonCode targetProcessRunning, targetBindingRevision 2
+hilog.txt                  856,146 bytes of real device log
+ui-dump.json               live WindowManagerService window inventory
+crash-index.txt            honestly `missing` — not selected by the request inputs
+```
+
 ## Failure and rollback chain — `job-ad7b0bca8c005bfc63ac51380c1cb8a0`, `failed`
 
 The last two legs of the GJ-3 chain (automatic rollback on failure, then
@@ -139,8 +154,8 @@ staging residue: none
 
 **GJ-3 is `REAL_DEVICE_PASS` on the current catalog digest**, full scope: the
 forward chain (verify → hash → staging → remote hash → backup → atomic publish
-→ restart → loader verification in the live process maps → cleanup) and the
-failure chain (publish → start refused → automatic rollback → compensation
-cleanup → re-verified restored state), each with zero residue and no unknown
-outcome. The 2026-07-30 record on digest `1ee1c1a6…` remains history; this one
+→ restart → loader verification in the live process maps → diagnostics against
+the deployed library → cleanup) and the failure chain (publish → start refused
+→ automatic rollback → compensation cleanup → re-verified restored state), each
+with zero residue and no unknown outcome. The 2026-07-30 record on digest `1ee1c1a6…` remains history; this one
 stands on `e2f8eb65…`.
