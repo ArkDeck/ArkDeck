@@ -648,7 +648,13 @@ public struct RuntimeControlPlaneHandler: Sendable {
             bindingSnapshot: ArtifactBindingSnapshot(
               targetID: currentTarget.targetID,
               bindingRevision: currentTarget.bindingRevision,
-              stableIdentitySHA256: currentTarget.stablePhysicalIdentitySHA256),
+              // A HAP is consumed by the HDC provider, whose identity is the
+              // connect-key derivation — after a Loader-mode flash the store's
+              // stablePhysicalIdentitySHA256 carries the campaign identity and
+              // a lease bound to it can never match a debug.hap
+              // materialization (GJ-2 re-run, 2026-08-05).
+              stableIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
+                connectKey: currentTarget.connectKey)),
             contents: completed.contents))
         let lease = try await artifactStore.leaseReference(
           jobID: metadata.jobID, artifactID: metadata.artifactID)
@@ -930,8 +936,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
             bindingSnapshot: ArtifactBindingSnapshot(
               targetID: currentTarget.targetID,
               bindingRevision: currentTarget.bindingRevision,
-              stableIdentitySHA256:
-                currentTarget.stablePhysicalIdentitySHA256),
+              // Consumed by the HDC provider: bind the lease to the
+              // connect-key derivation, like import-hap above. Only the flash
+              // bundle stays on the store identity — its consumer is the
+              // Rockchip provider, whose identity is that field.
+              stableIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
+                connectKey: currentTarget.connectKey)),
             contents: completed.contents))
         let lease = try await artifactStore.leaseReference(
           jobID: metadata.jobID, artifactID: metadata.artifactID)
