@@ -196,7 +196,11 @@ public struct HarnessPatchProposal: Equatable, Sendable, Codable {
   private static func paths(in diff: String) throws -> [String] {
     var found = Set<String>()
     var sectionPath: String?
-    var readingHeaders = false
+    // A plain unified diff opens with its header pair, so headers are in
+    // scope until the first hunk. Inside a hunk `--- `/`+++ ` are content
+    // lines, and reading them as headers is how a patch that merely *quotes*
+    // a header gets rejected.
+    var readingHeaders = true
     for line in diff.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
       if line.hasPrefix("GIT binary patch") || line.hasPrefix("Binary files ")
         || line.hasPrefix("rename from ") || line.hasPrefix("rename to ")
@@ -218,16 +222,26 @@ public struct HarnessPatchProposal: Equatable, Sendable, Codable {
         found.insert(new)
       } else if line.hasPrefix("@@ ") {
         readingHeaders = false
-      } else if readingHeaders && (line.hasPrefix("--- ") || line.hasPrefix("+++ ")) {
-        guard let sectionPath else {
-          throw HarnessPatchProposalError.unsafePatch("unifiedHeaderWithoutDiffHeader")
-        }
+      } else if readingHeaders, line.hasPrefix("--- ") || line.hasPrefix("+++ ") {
         let raw = String(line.dropFirst(4)).split(separator: "\t").first.map(String.init) ?? ""
-        if raw != "/dev/null" {
-          let prefix = line.hasPrefix("--- ") ? "a/" : "b/"
-          guard let path = normalized(raw, prefix: prefix), path == sectionPath else {
+        let prefix = line.hasPrefix("--- ") ? "a/" : "b/"
+        // A plain unified diff carries its path here and nowhere else. It is
+        // what `unifiedDiff` asks for and what `git apply` and `patch` both
+        // take, so requiring git's extended `diff --git` header refused a
+        // well-formed patch for its dialect (observed on device, 2026-08-05).
+        // The path is held to exactly the same checks either way, and once a
+        // `diff --git` header has named the file the two must still agree.
+        if raw == "/dev/null" { continue }
+        guard let path = normalized(raw, prefix: prefix) else {
+          throw HarnessPatchProposalError.unsafePatch("unifiedHeaderPath")
+        }
+        if let sectionPath {
+          guard path == sectionPath else {
             throw HarnessPatchProposalError.unsafePatch("unifiedHeaderPath")
           }
+        } else {
+          sectionPath = path
+          found.insert(path)
         }
       }
     }

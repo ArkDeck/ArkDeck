@@ -254,6 +254,31 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     }
   }
 
+  /// Prose is screened for command *shapes*, not for punctuation. A model
+  /// explaining the `if (!ENABLED)` guard it is about to change writes a
+  /// backtick, and refusing that refuses the explanation — which is recorded,
+  /// never executed. Inputs keep the full list, because inputs are what an
+  /// executor consumes.
+  func testProseMayQuoteCodeWhileInputsStillRefuseEveryFragment() throws {
+    let quoting = #"{"kind":"noSafeAction","hypothesis":"the `if (!ENABLED)` guard returns early","reasonCode":"quoted"}"#
+    let proposal = try HarnessDecisionProposal.parse(
+      Data(quoting.utf8), offeredOperations: offered)
+    XCTAssertEqual(proposal.kind, .noSafeAction)
+
+    // A command shape in prose is still refused.
+    for hostile in ["run sh -c cleanup", "read /data/local/tmp/x", "value $(whoami)"] {
+      let body = #"{"kind":"noSafeAction","hypothesis":"\#(hostile)","reasonCode":"r"}"#
+      XCTAssertThrowsError(
+        try HarnessDecisionProposal.parse(Data(body.utf8), offeredOperations: offered),
+        "prose smuggled: \(hostile)")
+    }
+
+    // Inputs are unchanged: even a bare backtick is refused there.
+    let viaInputs = #"{"kind":"invokeOperation","operationRef":"observe.device@1","inputs":{"note":"`x`"},"hypothesis":"h","reasonCode":"r"}"#
+    XCTAssertThrowsError(
+      try HarnessDecisionProposal.parse(Data(viaInputs.utf8), offeredOperations: offered))
+  }
+
   func testAnOperationOutsideTheOfferIsRefused() {
     XCTAssertThrowsError(
       try HarnessDecisionProposal.parse(

@@ -838,7 +838,9 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
 
     // Raw-surface screening applies to inputs *and* to every string the
     // proposal carries: a shell fragment smuggled through `hypothesis` is
-    // still a shell fragment in the durable record.
+    // still a shell fragment in the durable record. Prose is screened for
+    // command *shapes* rather than for punctuation, because an explanation
+    // that quotes the guard it is changing is an explanation.
     if let refusal = HarnessRawSurfaceScreen.screen(inputs) {
       throw HarnessDecisionRejection.rawCommandSurface(refusal.reasonCode)
     }
@@ -847,7 +849,7 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
       "requiredArtifacts": .array(requiredArtifacts.map(JSONValue.string)),
       "expectedObservation": expectedObservation.map(JSONValue.string) ?? .null,
     ]
-    if let offending = HarnessRawSurfaceScreen.screen(strategyStrings) {
+    if let offending = HarnessRawSurfaceScreen.screenProse(strategyStrings) {
       throw HarnessDecisionRejection.rawCommandSurface(offending.reasonCode)
     }
 
