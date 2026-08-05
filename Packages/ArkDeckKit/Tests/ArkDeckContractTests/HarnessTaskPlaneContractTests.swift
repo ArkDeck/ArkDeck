@@ -38,6 +38,37 @@ private enum PortBehaviour: Equatable {
   case reject(String)
 }
 
+/// Materializes the isolated copy without touching a filesystem: these tests
+/// are about which operations a submission may carry, not about the copy.
+private struct IsolationWorkspacePort: HarnessEvolutionWorkspacePort {
+  func prepareWorkspace(
+    htaskID: String, sourceProjectRef: String,
+    policy: HarnessEvolutionPolicy, createdAtUTC: String
+  ) async throws -> HarnessEvolutionWorkspace {
+    HarnessEvolutionWorkspace(
+      workspaceID: "evo-isolation-1", htaskID: htaskID,
+      sourceProjectRef: sourceProjectRef,
+      projectRef: "evolution-\(sourceProjectRef)",
+      baseRevision: policy.baseRevision,
+      allowedPathsDigest: String(repeating: "d", count: 64),
+      createdAtUTC: createdAtUTC)
+  }
+
+  func prepareAttemptDirectory(
+    workspace: HarnessEvolutionWorkspace, attemptID: String,
+    ordinal: Int, createdAtUTC: String
+  ) async throws {}
+
+  struct SweepUnsupported: Error {}
+  func sweepTerminalWorkspaces(
+    tasks: [HarnessEvolutionWorkspaceGCTaskReference],
+    retention: HarnessEvolutionWorkspaceRetention,
+    nowUTC: String
+  ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
+    throw SweepUnsupported()
+  }
+}
+
 private final class RecordingJobPort: HarnessRuntimeJobPort, @unchecked Sendable {
   private let lock = NSLock()
   private var effects: [String: String] = [:]
@@ -908,15 +939,17 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     }
     XCTAssertEqual(submittedBudgets["maxE1Mutations"], .integer(7))
     XCTAssertEqual(submittedBudgets["maxModelCalls"], .integer(4))
+    // This submission names no workspace policy, so it gets no isolated copy
+    // and therefore carries no workspace mutation: source repair exists only
+    // where there is a task-owned tree to perform it in. The paired positive
+    // case is `testWorkspaceMutationsExistOnlyWhereAnIsolatedCopyDoes`, which
+    // supplies the copy and sees the repair operations arrive with it.
     XCTAssertEqual(
       field(submitted, "allowedOperations"),
       .array([
         .string("analyzer.extract-crash-signature@1"),
         .string("capture.diagnostics@1"), .string("debug.hap@1"),
-        .string("observe.device@1"), .string("workspace.apply-patch@1"),
-        .string("workspace.build-openharmony@1"),
-        .string("workspace.create-checkpoint@1"), .string("workspace.revert-patch@1"),
-        .string("workspace.run-tests@1"),
+        .string("observe.device@1"),
       ]))
 
     let reconciled = try await call("task.reconcile", ["htaskId": .string(taskID)])
@@ -1075,6 +1108,106 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertFalse(malformedMemoryRevision.ok)
     XCTAssertEqual(
       malformedMemoryRevision.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+  }
+
+  /// Every workspace change a task can make happens in a copy the task owns.
+  ///
+  /// The alternative was a task holding source-repair operations with nowhere
+  /// isolated to run them: it reached for the maintainer's own tree, and the
+  /// runtime correctly refused to self-authorize that, so the loop stopped for
+  /// a grant that could not be written until the task had already moved the
+  /// revision it would have to name. There is one human step in this product
+  /// and it is merging the promotion.
+  func testWorkspaceMutationsExistOnlyWhereAnIsolatedCopyDoes() async throws {
+    let port = RecordingJobPort()
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: port,
+      evolutionWorkspacePort: IsolationWorkspacePort(),
+      nowUTC: { "2026-07-30T00:00:00Z" })
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: rootURL.appendingPathComponent("isolation-capabilities", isDirectory: true))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: rootURL.appendingPathComponent("isolation-engine", isDirectory: true)),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: NeverDispatchingPort(reason: "submission validation must not dispatch"),
+      capabilityStore: capabilityStore, artifactStore: nil,
+      nowUTC: { "2026-07-30T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilityStore, providerIDs: [],
+      nowUTC: { "2026-07-30T00:00:00Z" }, harnessCoordinator: coordinator)
+    func submit(_ fields: [String: JSONValue]) async -> AgentWireProtocol.Response {
+      await handler.handleFrame(
+        try! JSONEncoder().encode(
+          AgentWireProtocol.Request(id: UUID().uuidString, method: "task.submit", params: fields)))
+    }
+    func allowedOperations(of response: AgentWireProtocol.Response) async throws -> [String] {
+      guard case .object(let result)? = response.result,
+        case .string(let htaskID)? = result["htaskId"]
+      else {
+        XCTFail("submission did not return a task id")
+        return []
+      }
+      let status = await handler.handleFrame(
+        try JSONEncoder().encode(
+          AgentWireProtocol.Request(
+            id: UUID().uuidString, method: "task.status",
+            params: ["htaskId": .string(htaskID)])))
+      guard case .object(let fields)? = status.result,
+        case .array(let operations)? = fields["allowedOperations"]
+      else { return [] }
+      return operations.compactMap {
+        if case .string(let reference) = $0 { return reference }
+        return nil
+      }
+    }
+    let base: [String: JSONValue] = [
+      "targetId": .string("TGT-958780b2ffb7"), "goal": .string("repair crash"),
+    ]
+    let revision = String(repeating: "a", count: 64)
+
+    // Without a declared workspace policy the task is an evidence loop. The
+    // repair operations are not merely unauthorized - they are not in the
+    // task's allow-set at all, so no round can propose one.
+    let evidenceOnly = await submit(base)
+    XCTAssertTrue(evidenceOnly.ok, evidenceOnly.error?.message ?? "-")
+    let evidenceOperations = try await allowedOperations(of: evidenceOnly)
+    XCTAssertFalse(evidenceOperations.isEmpty)
+    XCTAssertEqual(
+      evidenceOperations.filter(HarnessTaskMethodService.isWorkspaceMutation), [],
+      "an evidence-only task must not carry workspace mutations")
+    XCTAssertTrue(evidenceOperations.contains(DebugCrashTaskHandler.captureDiagnostics))
+
+    // Declaring the policy is what supplies the isolated copy, and the repair
+    // operations arrive with it.
+    let repairing = await submit(
+      base.merging([
+        "projectRef": .string("demo-app"),
+        "baseWorkspaceRevision": .string(revision),
+        "workspaceAllowedPaths": .array([.string("entry/src/main/ets/**")]),
+      ]) { _, new in new })
+    XCTAssertTrue(repairing.ok, repairing.error?.message ?? "-")
+    let repairOperations = try await allowedOperations(of: repairing)
+    XCTAssertTrue(repairOperations.contains(DebugCrashTaskHandler.applyPatch))
+    XCTAssertTrue(repairOperations.contains(DebugCrashTaskHandler.createCheckpoint))
+
+    // Asking for a repair operation by name while declining the copy it runs
+    // in is refused at submission - the only moment the caller can still fix
+    // it - rather than mid-run in front of a maintainer.
+    let unisolated = await submit(
+      base.merging([
+        "projectRef": .string("demo-app"),
+        "allowedOperations": .array([
+          .string(DebugCrashTaskHandler.observeDevice),
+          .string(DebugCrashTaskHandler.applyPatch),
+        ]),
+      ]) { _, new in new })
+    XCTAssertFalse(unisolated.ok)
+    XCTAssertEqual(unisolated.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+    XCTAssertTrue(
+      (unisolated.error?.message ?? "").contains("workspaceIsolationRequired"),
+      unisolated.error?.message ?? "-")
   }
 
   func testTaskMethodsFailClosedWhenTheHarnessIsNotConfigured() async throws {

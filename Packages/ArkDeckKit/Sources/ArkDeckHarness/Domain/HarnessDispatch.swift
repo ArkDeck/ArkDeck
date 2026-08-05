@@ -464,6 +464,9 @@ public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case duplicateCriterionID(String)
   case evolutionProjectRequired
   case malformedEvolutionPolicy(String)
+  /// A task may mutate a workspace only from inside a task-owned isolated
+  /// copy. Names the mutating operations it asked for without one.
+  case workspaceIsolationRequired([String])
 }
 
 /// Typed submission input. Natural language is admitted only as

@@ -791,15 +791,22 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
       throw HarnessDecisionRejection.oversizedField("hypothesis")
     }
 
+    // `reasonCode` is a durable label, not a decision. It has to stay
+    // identifier-shaped, because it enters failure fingerprints and prose
+    // would splinter one recurring failure into a new fingerprint every round.
+    //
+    // But a label that arrives as a sentence is a reason to drop the *label*,
+    // not the proposal behind it: rejecting the whole decision threw away a
+    // sound patch because its name had a space in it, and the loop then
+    // spent a round rediscovering the same patch. Keep the invariant, name
+    // the field's default, continue.
     var reasonCode = "modelProposal"
-    if case .string(let declared)? = fields["reasonCode"] {
-      guard declared.count <= 128,
-        declared.allSatisfy({
-          $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_")
-        })
-      else {
-        throw HarnessDecisionRejection.oversizedField("reasonCode")
-      }
+    if case .string(let declared)? = fields["reasonCode"],
+      declared.count <= 128,
+      declared.allSatisfy({
+        $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_")
+      })
+    {
       reasonCode = declared
     }
 
