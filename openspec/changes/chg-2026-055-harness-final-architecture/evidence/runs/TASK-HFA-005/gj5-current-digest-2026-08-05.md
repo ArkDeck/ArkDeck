@@ -1,5 +1,11 @@
 # GJ-5 Bounded AI Debug Loop — current-digest run and the two defects it found (2026-08-05)
 
+> **Superseded on the status question.** GJ-5 reached `REAL_DEVICE_PASS` on
+> this digest later the same day — see
+> `gj5-real-device-pass-2026-08-05.md`. The status section below states
+> `IMPLEMENTING`, which was true when it was written and is not now. The two
+> defects and their fixes are unchanged and still current.
+
 ## Scope and target
 
 - Baseline: `main@a672df83` plus the two fixes described below
