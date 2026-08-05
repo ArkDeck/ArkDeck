@@ -425,7 +425,27 @@ public enum HarnessRawSurfaceScreen {
     "$(", "`",
   ]
 
+  /// Fragments that carry no command semantics on their own and are ordinary
+  /// punctuation in an explanation. A model describing the `if (!ENABLED)`
+  /// guard it is about to change writes a backtick; a table writes a pipe.
+  /// Refusing those refuses the explanation, not a shell, and an explanation
+  /// is never executed — it is recorded. Everything that *is* command-shaped
+  /// (`sh -c`, `$(`, `&&`, a device path) still applies to prose.
+  static let proseExemptFragments: Set<String> = ["`", "|"]
+
   public static func screen(_ inputs: [String: JSONValue]) -> HarnessGuardRefusal? {
+    screen(inputs, fragments: forbiddenValueFragments)
+  }
+
+  /// Screening for strings a proposal carries as explanation rather than as
+  /// execution input.
+  public static func screenProse(_ values: [String: JSONValue]) -> HarnessGuardRefusal? {
+    screen(values, fragments: forbiddenValueFragments.filter { !proseExemptFragments.contains($0) })
+  }
+
+  private static func screen(
+    _ inputs: [String: JSONValue], fragments: [String]
+  ) -> HarnessGuardRefusal? {
     for key in inputs.keys {
       if forbiddenKeys.contains(key.lowercased()) {
         return .rawCommandSurface(field: key)
@@ -434,7 +454,7 @@ public enum HarnessRawSurfaceScreen {
     for (key, value) in inputs {
       guard let text = stringValue(value) else { continue }
       let lowered = text.lowercased()
-      for fragment in forbiddenValueFragments where lowered.contains(fragment) {
+      for fragment in fragments where lowered.contains(fragment) {
         return .rawCommandSurface(field: "\(key)=\(fragment)")
       }
     }

@@ -798,6 +798,45 @@ final class HarnessRepairContractTests: XCTestCase {
       unifiedDiff: diff, touchedFiles: [path], expectedChangedSymbols: ["value"])
   }
 
+  /// `unifiedDiff` is what the contract asks for, and a plain unified diff is
+  /// what `git apply` and `patch` both take. Requiring git's extended
+  /// `diff --git` header refused a well-formed patch for its dialect while
+  /// adding no safety: the path is held to the same checks either way.
+  func testAPlainUnifiedDiffIsAcceptedWithTheSamePathChecks() throws {
+    let plain = """
+      --- a/entry/src/main/ets/crashprobe/CrashProbe.ets
+      +++ b/entry/src/main/ets/crashprobe/CrashProbe.ets
+      @@ -22 +22 @@
+      -export const ENABLED: boolean = true;
+      +export const ENABLED: boolean = false;
+      """
+    let proposal = try makeProposal(
+      diff: plain, files: ["entry/src/main/ets/crashprobe/CrashProbe.ets"])
+    XCTAssertEqual(proposal.touchedFiles, ["entry/src/main/ets/crashprobe/CrashProbe.ets"])
+
+    // Every escape the git-headed form refuses, the plain form refuses too.
+    for escape in ["../outside.ets", "/etc/passwd"] {
+      let hostile = """
+        --- a/\(escape)
+        +++ b/\(escape)
+        @@ -1 +1 @@
+        -a
+        +b
+        """
+      XCTAssertThrowsError(
+        try makeProposal(diff: hostile, files: [escape]), "escaped via \(escape)")
+    }
+    // A header pair that disagrees with itself is still refused.
+    let mismatched = """
+      --- a/entry/src/main/ets/A.ets
+      +++ b/entry/src/main/ets/B.ets
+      @@ -1 +1 @@
+      -a
+      +b
+      """
+    XCTAssertThrowsError(try makeProposal(diff: mismatched, files: ["entry/src/main/ets/A.ets"]))
+  }
+
   private func makeProposal(diff: String, files: [String]) throws -> HarnessPatchProposal {
     let digest = SHA256.hash(data: Data(diff.utf8))
       .map { String(format: "%02x", $0) }.joined()
