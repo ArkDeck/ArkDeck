@@ -420,6 +420,146 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertTrue(context.trimmed.contains("operations:kept1of9"))
   }
 
+  // MARK: - Excerpts: what the model may now read, and what it still may not
+
+  private func excerptSnapshot() -> HarnessTaskSnapshot {
+    HarnessTaskSnapshot(
+      htaskID: "HTASK-0123456789AB", type: .debugCrash, intakeDescription: nil,
+      projectRef: "demo-app", target: HarnessTaskTargetReference(targetID: "TGT-1"),
+      goal: HarnessTaskGoal(summary: "repair the crash"),
+      successCriteria: [],
+      budgets: HarnessTaskBudgets(
+        maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024, maxE1Mutations: 1),
+      policy: HarnessTaskPolicy(allowedOperations: Array(offered)),
+      createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
+      status: .running, phase: .analyzing, activeRound: 3)
+  }
+
+  /// Self-debugging is the point: a model asked for a unified diff has to see
+  /// the lines, and a model asked to judge a crash has to see the fault block.
+  /// Both arrive bounded, and a bounded excerpt says so.
+  func testEvidenceAndInScopeSourceReachTheModelAsBoundedExcerpts() throws {
+    let limits = HarnessDecisionContextLimits(maxExcerptCharacters: 64, maxSourceFiles: 2)
+    let longLog = String(repeating: "x", count: 200) + "FAULT-TAIL"
+    let context = try HarnessDecisionContextAssembler(limits: limits).assemble(
+      snapshot: excerptSnapshot(),
+      availableOperations: Array(offered).sorted(),
+      evaluation: nil,
+      attempts: [], failures: [], memory: [],
+      artifacts: [
+        HarnessContextArtifact(
+          artifactID: "ART-1", name: "hilog.txt", byteCount: longLog.utf8.count,
+          sha256Prefix: "abc123abc123", verified: true,
+          excerpt: String(longLog.suffix(64)), excerptTruncated: true),
+        HarnessContextArtifact(
+          artifactID: "ART-2", name: "crash-index.txt", byteCount: 12,
+          sha256Prefix: "def456def456", verified: false),
+      ],
+      sourceFiles: [
+        HarnessContextSourceFile(
+          path: "entry/src/main/ets/CrashProbe.ets", byteCount: 40,
+          sha256Prefix: "0f0f0f0f0f0f", excerpt: "export const ENABLED: boolean = true;")
+      ],
+      elapsedSeconds: 5)
+
+    let log = try XCTUnwrap(context.artifacts.first { $0.name == "hilog.txt" })
+    XCTAssertEqual(log.excerpt?.count, 64)
+    XCTAssertTrue(log.excerptTruncated, "a shortened excerpt must say it was shortened")
+    XCTAssertTrue(
+      log.excerpt?.hasSuffix("FAULT-TAIL") ?? false,
+      "the tail is what a crash reader needs, not the oldest boot noise")
+    // Identity survives alongside content: the model can still tell "the same
+    // artifact as last round" without relying on the text.
+    XCTAssertEqual(log.byteCount, longLog.utf8.count)
+    XCTAssertEqual(log.sha256Prefix, "abc123abc123")
+
+    let unverified = try XCTUnwrap(context.artifacts.first { $0.name == "crash-index.txt" })
+    XCTAssertNil(
+      unverified.excerpt,
+      "an artifact this run was not allowed to read carries no text at all")
+
+    XCTAssertEqual(context.sourceFiles.count, 1)
+    XCTAssertEqual(
+      context.sourceFiles.first?.excerpt, "export const ENABLED: boolean = true;")
+  }
+
+  /// Excerpts are the only part of a context that grows with the work, so they
+  /// give way first — and the context says what it lost. What it must never do
+  /// is change the facts it asserts about an artifact while shedding text.
+  func testOversizedContextShedsExcerptsBeforeRefusingAndRecordsIt() throws {
+    let big = String(repeating: "s", count: 4_000)
+    let artifacts = (1...4).map { index in
+      HarnessContextArtifact(
+        artifactID: "ART-\(index)", name: "hilog-\(index).txt", byteCount: big.utf8.count,
+        sha256Prefix: "digest\(index)0000", verified: true, excerpt: big)
+    }
+    let sourceFiles = (1...4).map { index in
+      HarnessContextSourceFile(
+        path: "entry/src/main/ets/File\(index).ets", byteCount: big.utf8.count,
+        sha256Prefix: "source\(index)0000", excerpt: big)
+    }
+    let snapshot = excerptSnapshot()
+
+    // Room for the evidence text but not for the source text as well.
+    let sourceShed = try HarnessDecisionContextAssembler(
+      limits: HarnessDecisionContextLimits(maxEncodedBytes: 24 * 1024)
+    ).assemble(
+      snapshot: snapshot, availableOperations: [], evaluation: nil,
+      attempts: [], failures: [], memory: [], artifacts: artifacts,
+      sourceFiles: sourceFiles, elapsedSeconds: 5)
+    XCTAssertTrue(sourceShed.sourceFiles.isEmpty)
+    XCTAssertTrue(sourceShed.trimmed.contains { $0.hasPrefix("sourceFiles:droppedForSize") })
+    XCTAssertTrue(sourceShed.artifacts.allSatisfy { $0.excerpt != nil })
+
+    // Room for neither: the evidence text goes too, and every artifact keeps
+    // its identity, size and digest exactly as before.
+    let bothShed = try HarnessDecisionContextAssembler(
+      limits: HarnessDecisionContextLimits(maxEncodedBytes: 8 * 1024)
+    ).assemble(
+      snapshot: snapshot, availableOperations: [], evaluation: nil,
+      attempts: [], failures: [], memory: [], artifacts: artifacts,
+      sourceFiles: sourceFiles, elapsedSeconds: 5)
+    XCTAssertTrue(bothShed.sourceFiles.isEmpty)
+    XCTAssertTrue(bothShed.artifacts.allSatisfy { $0.excerpt == nil })
+    XCTAssertTrue(bothShed.trimmed.contains("artifactExcerpts:droppedForSize"))
+    XCTAssertEqual(
+      bothShed.artifacts.map(\.sha256Prefix), artifacts.map(\.sha256Prefix),
+      "shedding text must not change what the context says an artifact is")
+    XCTAssertEqual(bothShed.artifacts.map(\.byteCount), artifacts.map(\.byteCount))
+
+    // A context that still cannot fit is refused, not silently emptied.
+    XCTAssertThrowsError(
+      try HarnessDecisionContextAssembler(
+        limits: HarnessDecisionContextLimits(maxEncodedBytes: 256)
+      ).assemble(
+        snapshot: snapshot, availableOperations: [], evaluation: nil,
+        attempts: [], failures: [], memory: [], artifacts: artifacts,
+        sourceFiles: sourceFiles, elapsedSeconds: 5))
+  }
+
+  /// Widening what the model may read must not widen what it may identify.
+  func testExcerptsDoNotCarryDeviceIdentity() throws {
+    let context = try HarnessDecisionContextAssembler().assemble(
+      snapshot: excerptSnapshot(),
+      availableOperations: [], evaluation: nil, attempts: [], failures: [], memory: [],
+      artifacts: [
+        HarnessContextArtifact(
+          artifactID: "ART-1", name: "hilog.txt", byteCount: 8, sha256Prefix: "aaaaaaaaaaaa",
+          verified: true, excerpt: "a log line")
+      ],
+      sourceFiles: [
+        HarnessContextSourceFile(
+          path: "entry/src/main/ets/A.ets", byteCount: 4, sha256Prefix: "bbbbbbbbbbbb",
+          excerpt: "let a = 1")
+      ],
+      elapsedSeconds: 5)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoded = String(decoding: try encoder.encode(context), as: UTF8.self)
+    XCTAssertFalse(encoded.contains("TGT-1"), "the target still travels as a pseudonym")
+    XCTAssertTrue(encoded.contains(context.targetPseudonym))
+  }
+
   func testRevisionAwareExecutionStateIsCanonicalBoundedAndTraceable() throws {
     let baseRevision = String(repeating: "a", count: 64)
     let patchRevision = String(repeating: "b", count: 64)

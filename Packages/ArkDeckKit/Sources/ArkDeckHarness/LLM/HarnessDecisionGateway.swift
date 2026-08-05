@@ -109,6 +109,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
     failures: [HarnessContextFailure],
     memory: [HarnessMemoryEntry],
     artifacts: [HarnessContextArtifact],
+    sourceFiles: [HarnessContextSourceFile] = [],
     elapsedSeconds: Int,
     memoryQuery explicitMemoryQuery: HarnessMemoryQuery? = nil,
     executionState: HarnessContextExecutionState = .empty
@@ -216,6 +217,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
         current: currentEvaluationFacts + verifiedMemoryFacts),
       memorySelectionManifest: memorySelection.manifest,
       artifacts: trim(artifacts, to: limits.maxArtifacts, label: "artifacts"),
+      sourceFiles: trim(sourceFiles, to: limits.maxSourceFiles, label: "sourceFiles"),
       availableOperations: trim(
         availableOperations, to: limits.maxOperations, label: "operations"),
       budget: budget,
@@ -227,14 +229,34 @@ public struct HarnessDecisionContextAssembler: Sendable {
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let encoded = (try? encoder.encode(context)) ?? Data()
-    guard encoded.count <= limits.maxEncodedBytes else {
+    func encodedSize(_ value: HarnessDecisionContext) -> Int {
+      ((try? encoder.encode(value)) ?? Data()).count
+    }
+    var sized = context
+    // Excerpts are the only part of a context that can grow without bound
+    // with the work itself, so they are what gives way first: drop the source
+    // text, then the evidence text, and only then refuse. Dropping is
+    // recorded, because a model reasoning from a context that silently lost
+    // the file it was asked to patch would be reasoning about nothing.
+    if encodedSize(sized) > limits.maxEncodedBytes, !sized.sourceFiles.isEmpty {
+      trimmed.append("sourceFiles:droppedForSize\(sized.sourceFiles.count)")
+      sized = sized.replacing(sourceFiles: [], trimmed: trimmed)
+    }
+    if encodedSize(sized) > limits.maxEncodedBytes,
+      sized.artifacts.contains(where: { $0.excerpt != nil })
+    {
+      trimmed.append("artifactExcerpts:droppedForSize")
+      sized = sized.replacing(
+        artifacts: sized.artifacts.map { $0.withoutExcerpt() }, trimmed: trimmed)
+    }
+    let encoded = encodedSize(sized)
+    guard encoded <= limits.maxEncodedBytes else {
       // Refuse rather than send a context the policy did not size for. The
       // caller falls back to the deterministic strategy, which needs none.
       throw HarnessDecisionGatewayError.contextTooLarge(
-        bytes: encoded.count, limit: limits.maxEncodedBytes)
+        bytes: encoded, limit: limits.maxEncodedBytes)
     }
-    return context
+    return sized
   }
 }
 

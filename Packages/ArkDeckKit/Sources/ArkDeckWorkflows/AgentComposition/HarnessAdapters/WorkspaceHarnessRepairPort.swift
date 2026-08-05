@@ -52,6 +52,41 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     return WorkspaceProviderSupport.revision(current)
   }
 
+  /// The files this task may change, with their current text. Scope is the
+  /// intersection the workspace already enforces: the profile's globs and the
+  /// task's declared allowed paths. Nothing outside that is opened, so the
+  /// model sees exactly the surface it is permitted to propose against.
+  public func readableSourceFiles(
+    projectRef: String,
+    task: HarnessTaskSnapshot,
+    maximumFiles: Int,
+    maximumCharactersPerFile: Int
+  ) async throws -> [HarnessContextSourceFile] {
+    guard maximumFiles > 0, maximumCharactersPerFile > 0,
+      let profile = profileRegistry.profile(for: projectRef)
+    else { return [] }
+    let declared = task.evolutionPolicy?.allowedPaths ?? []
+    let requested = declared.isEmpty ? profile.allowedFileGlobs : declared
+    let paths = try WorkspaceProviderSupport.files(
+      root: profile.projectRoot, profileGlobs: profile.allowedFileGlobs,
+      requestGlobs: requested)
+    var files: [HarnessContextSourceFile] = []
+    for path in paths.sorted().prefix(maximumFiles) {
+      guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+        let text = String(data: data, encoding: .utf8)
+      else { continue }
+      let truncated = text.count > maximumCharactersPerFile
+      files.append(
+        HarnessContextSourceFile(
+          path: String(path.dropFirst(profile.projectRoot.count).drop(while: { $0 == "/" })),
+          byteCount: data.count,
+          sha256Prefix: String(WorkspaceProviderSupport.sha256(data).prefix(12)),
+          excerpt: truncated ? String(text.prefix(maximumCharactersPerFile)) : text,
+          excerptTruncated: truncated))
+    }
+    return files
+  }
+
   public func preparePatch(
     _ proposal: HarnessPatchProposal,
     projectRef: String,

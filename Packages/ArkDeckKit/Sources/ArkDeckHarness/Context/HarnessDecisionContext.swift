@@ -5,10 +5,14 @@
 // influence what the harness does next, so both directions are narrowed:
 //
 //   * outbound - the context is assembled from declared fields with hard
-//     counts and a byte ceiling. No raw artifact bytes, no connect key, no
-//     device serial, no stable identity digest. The target travels as a
-//     pseudonym, because a model needs to know "the same device as last
-//     round", never which device it is;
+//     counts and a byte ceiling. No connect key, no device serial, no stable
+//     identity digest. The target travels as a pseudonym, because a model
+//     needs to know "the same device as last round", never which device it
+//     is. Evidence and in-scope source travel as bounded excerpts: a model
+//     that must judge a crash or write a unified diff cannot do either from a
+//     digest prefix, and self-debugging is the point. Every excerpt is
+//     per-item bounded, says when it was truncated, and is gated by the same
+//     operator opt-ins that already govern egress and sensitive evidence;
 //   * inbound - a proposal is decoded with a closed key set and may carry
 //     only a next step. It cannot carry a task or job state, a retry count,
 //     an authorization result or a success claim: those keys are rejected
@@ -29,6 +33,13 @@ public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
   public let maxArtifacts: Int
   public let maxOperations: Int
   public let maxSummaryCharacters: Int
+  /// Per-excerpt ceiling for evidence and source text. A model that must
+  /// write a unified diff needs the actual lines; a model that must read a
+  /// crash needs the fault block. Both are bounded per item so one large
+  /// artifact cannot crowd out everything else.
+  public let maxExcerptCharacters: Int
+  /// How many source files may be excerpted into one context.
+  public let maxSourceFiles: Int
   /// Ceiling on the encoded context. Exceeding it trims, and the trim is
   /// recorded in the context itself - a silently shortened context is a
   /// context nobody can reason about afterwards.
@@ -45,7 +56,9 @@ public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
     // proposal before the model could see it while the overall 32 KiB
     // envelope still had ample room.
     maxSummaryCharacters: Int = 2_048,
-    maxEncodedBytes: Int = 32 * 1024
+    maxExcerptCharacters: Int = 24_000,
+    maxSourceFiles: Int = 12,
+    maxEncodedBytes: Int = 512 * 1024
   ) {
     self.maxAttempts = maxAttempts
     self.maxFailures = maxFailures
@@ -53,6 +66,8 @@ public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
     self.maxArtifacts = maxArtifacts
     self.maxOperations = maxOperations
     self.maxSummaryCharacters = maxSummaryCharacters
+    self.maxExcerptCharacters = maxExcerptCharacters
+    self.maxSourceFiles = maxSourceFiles
     self.maxEncodedBytes = maxEncodedBytes
   }
 
@@ -115,14 +130,23 @@ public struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
   }
 }
 
-/// An artifact as a model may see it: identity, size, digest prefix and
-/// whether it verified. Never content.
+/// An artifact as a model may see it: identity, size, digest prefix, whether
+/// it verified, and — when the operator has opted this project into egress and
+/// allowed the artifact to be measured — a bounded excerpt of its text.
+///
+/// The excerpt exists because self-debugging is the point: a model asked to
+/// judge a crash or to write a unified diff cannot do either from a digest
+/// prefix. It stays bounded and stays honest: `excerptTruncated` says when the
+/// artifact is longer than what is shown, and an artifact the operator has not
+/// allowed carries no excerpt at all rather than a redacted-looking one.
 public struct HarnessContextArtifact: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
   public let byteCount: Int
   public let sha256Prefix: String
   public let verified: Bool
+  public let excerpt: String?
+  public let excerptTruncated: Bool
 
   enum CodingKeys: String, CodingKey {
     case artifactID = "artifactId"
@@ -130,16 +154,125 @@ public struct HarnessContextArtifact: Equatable, Sendable, Codable {
     case byteCount
     case sha256Prefix
     case verified
+    case excerpt
+    case excerptTruncated
   }
 
   public init(
-    artifactID: String, name: String, byteCount: Int, sha256Prefix: String, verified: Bool
+    artifactID: String, name: String, byteCount: Int, sha256Prefix: String, verified: Bool,
+    excerpt: String? = nil, excerptTruncated: Bool = false
   ) {
     self.artifactID = artifactID
     self.name = name
     self.byteCount = byteCount
     self.sha256Prefix = sha256Prefix
     self.verified = verified
+    self.excerpt = excerpt
+    self.excerptTruncated = excerptTruncated
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    artifactID = try container.decode(String.self, forKey: .artifactID)
+    name = try container.decode(String.self, forKey: .name)
+    byteCount = try container.decode(Int.self, forKey: .byteCount)
+    sha256Prefix = try container.decode(String.self, forKey: .sha256Prefix)
+    verified = try container.decode(Bool.self, forKey: .verified)
+    // Contexts recorded before excerpts existed decode unchanged.
+    excerpt = try container.decodeIfPresent(String.self, forKey: .excerpt)
+    excerptTruncated =
+      try container.decodeIfPresent(Bool.self, forKey: .excerptTruncated) ?? false
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(artifactID, forKey: .artifactID)
+    try container.encode(name, forKey: .name)
+    try container.encode(byteCount, forKey: .byteCount)
+    try container.encode(sha256Prefix, forKey: .sha256Prefix)
+    try container.encode(verified, forKey: .verified)
+    try container.encodeIfPresent(excerpt, forKey: .excerpt)
+    if excerptTruncated { try container.encode(true, forKey: .excerptTruncated) }
+  }
+
+  /// Drops the excerpt while keeping identity, size and digest. Trimming a
+  /// context shrinks what the model sees; it must never change what the
+  /// context says an artifact *is*.
+  public func withoutExcerpt() -> Self {
+    HarnessContextArtifact(
+      artifactID: artifactID, name: name, byteCount: byteCount,
+      sha256Prefix: sha256Prefix, verified: verified)
+  }
+}
+
+extension HarnessDecisionContext {
+  /// Rebuilds this context with lighter excerpts. Only the excerpt-bearing
+  /// fields and the trim ledger may change; every fact the context asserts
+  /// about the task stays identical.
+  func replacing(
+    artifacts: [HarnessContextArtifact]? = nil,
+    sourceFiles: [HarnessContextSourceFile]? = nil,
+    trimmed: [String]
+  ) -> HarnessDecisionContext {
+    HarnessDecisionContext(
+      targetPseudonym: targetPseudonym,
+      taskType: taskType,
+      status: status,
+      phase: phase,
+      round: round,
+      currentTaskStateVersion: currentTaskStateVersion,
+      goalSummary: goalSummary,
+      desiredState: desiredState,
+      observedMeasurements: observedMeasurements,
+      observedSamples: observedSamples,
+      latestVerdict: latestVerdict,
+      criterionResults: criterionResults,
+      recentAttempts: recentAttempts,
+      unresolvedFailures: unresolvedFailures,
+      relevantMemory: relevantMemory,
+      confirmedFacts: confirmedFacts,
+      memorySelectionManifest: memorySelectionManifest,
+      artifacts: artifacts ?? self.artifacts,
+      sourceFiles: sourceFiles ?? self.sourceFiles,
+      availableOperations: availableOperations,
+      budget: budget,
+      blockers: blockers,
+      trimmed: trimmed,
+      waitReason: waitReason,
+      conditions: conditions,
+      executionState: HarnessContextExecutionState(
+        activeAttempt: nil,
+        currentWorkspaceRevision: currentWorkspaceRevision,
+        currentDeployedArtifactDigest: currentDeployedArtifactDigest,
+        currentDeviceBindingRevision: currentDeviceBindingRevision,
+        disprovedHypotheses: disprovedHypotheses,
+        unavailableOperations: unavailableOperationsAndReasons,
+        authorizedOperationReferences: authorizedOperationRefs,
+        currentCapabilityEffectCeiling: currentCapabilityEffectCeiling,
+        allowedFileScopes: allowedFileScopes,
+        derivedArtifactSummaries: derivedArtifactSummaries))
+  }
+}
+
+/// A file the task is allowed to change, as the model may see it. Without
+/// this a `proposePatch` is impossible in principle: a unified diff needs the
+/// exact lines it is diffing against.
+public struct HarnessContextSourceFile: Equatable, Sendable, Codable {
+  public let path: String
+  public let byteCount: Int
+  public let sha256Prefix: String
+  public let excerpt: String
+  public let excerptTruncated: Bool
+
+  public init(
+    path: String, byteCount: Int, sha256Prefix: String, excerpt: String,
+    excerptTruncated: Bool = false
+  ) {
+    self.path = path
+    self.byteCount = byteCount
+    self.sha256Prefix = sha256Prefix
+    self.excerpt = excerpt
+    self.excerptTruncated = excerptTruncated
   }
 }
 
@@ -390,6 +523,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public let confirmedFacts: HarnessContextConfirmedFacts
   public let memorySelectionManifest: HarnessMemorySelectionManifest
   public let artifacts: [HarnessContextArtifact]
+  /// The files this task is allowed to change, with their current text.
+  public let sourceFiles: [HarnessContextSourceFile]
   public let availableOperations: [String]
   public let budget: HarnessContextBudget
   public let blockers: [String]
@@ -415,6 +550,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     confirmedFacts: HarnessContextConfirmedFacts = .init(),
     memorySelectionManifest: HarnessMemorySelectionManifest = .empty,
     artifacts: [HarnessContextArtifact],
+    sourceFiles: [HarnessContextSourceFile] = [],
     availableOperations: [String],
     budget: HarnessContextBudget,
     blockers: [String],
@@ -461,6 +597,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
     self.confirmedFacts = confirmedFacts
     self.memorySelectionManifest = memorySelectionManifest
     self.artifacts = artifacts
+    self.sourceFiles = sourceFiles
     self.availableOperations = availableOperations
     self.budget = budget
     self.blockers = blockers

@@ -357,12 +357,53 @@ extension HarnessTaskCoordinator {
       allowedFileScopes: snapshot.evolutionPolicy?.allowedPaths
         ?? snapshot.repairAttempt?.proposal.touchedFiles ?? [],
       derivedArtifactSummaries: derivedArtifactSummaries)
-    let artifacts = (evaluation?.evidence ?? []).map { record in
-      HarnessContextArtifact(
+    // Evidence text the model may actually reason about. An artifact is
+    // excerpted only when it verified and the operator either did not mark it
+    // sensitive or named it in this run's opt-in — the same gate the
+    // evaluator answers to. Everything else keeps its identity-only shape
+    // rather than arriving as a blank that looks like an empty file.
+    var artifacts: [HarnessContextArtifact] = []
+    for record in evaluation?.evidence ?? [] {
+      let identityOnly = HarnessContextArtifact(
         artifactID: record.artifactID, name: record.name, byteCount: record.byteCount,
-        // A digest prefix identifies an artifact across rounds without
-        // shipping its contents.
+        // A digest prefix identifies an artifact across rounds.
         sha256Prefix: String(record.sha256.prefix(12)), verified: record.verified)
+      // `verified` is the gate, and it is not a weak one: the observation
+      // builder refuses to verify a sensitive artifact no operator named,
+      // recording it with an `artifactSensitiveNotOptedIn` blocker instead.
+      // So a verified record is already one this run is allowed to read, and
+      // re-testing the opt-in here would be a second copy of that rule.
+      // Whether a model is called at all is the egress policy's decision,
+      // taken before this context is ever assembled.
+      guard let artifactPort, record.verified, let jobID = record.jobID else {
+        artifacts.append(identityOnly)
+        continue
+      }
+      let budget = limits.maxExcerptCharacters
+      guard
+        let data = try? await artifactPort.read(
+          jobID: jobID, artifactID: record.artifactID, maximumBytes: budget * 4),
+        let text = String(data: data, encoding: .utf8)
+      else {
+        artifacts.append(identityOnly)
+        continue
+      }
+      // The tail is what a crash log's reader needs: the newest fault block,
+      // not the oldest boot noise.
+      let truncated = text.count > budget
+      artifacts.append(
+        HarnessContextArtifact(
+          artifactID: record.artifactID, name: record.name, byteCount: record.byteCount,
+          sha256Prefix: String(record.sha256.prefix(12)), verified: record.verified,
+          excerpt: truncated ? String(text.suffix(budget)) : text,
+          excerptTruncated: truncated))
+    }
+    var sourceFiles: [HarnessContextSourceFile] = []
+    if let repairPort, let projectRef = snapshot.executionProjectRef {
+      sourceFiles =
+        (try? await repairPort.readableSourceFiles(
+          projectRef: projectRef, task: snapshot, maximumFiles: limits.maxSourceFiles,
+          maximumCharactersPerFile: limits.maxExcerptCharacters)) ?? []
     }
     func desiredText(_ key: String) -> String? {
       guard case .string(let value)? = snapshot.goal.desiredState[key] else { return nil }
@@ -396,6 +437,7 @@ extension HarnessTaskCoordinator {
       failures: failures,
       memory: memory,
       artifacts: artifacts,
+      sourceFiles: sourceFiles,
       elapsedSeconds: elapsedSeconds(since: snapshot.createdAtUTC) ?? 0,
       memoryQuery: memoryQuery,
       executionState: executionState)

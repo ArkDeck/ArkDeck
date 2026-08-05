@@ -1645,7 +1645,7 @@ package enum WorkspaceProviderSupport {
     return path.range(of: pattern, options: .regularExpression) != nil
   }
 
-  static func files(
+  package static func files(
     root: String, profileGlobs: [String], requestGlobs: [String]
   ) throws -> [String] {
     guard !requestGlobs.isEmpty, requestGlobs.count <= 64,
