@@ -3889,7 +3889,8 @@ public actor RuntimeJobEngine {
       inputs: request.inputs,
       workspaceIdentitySHA256: workspace.identitySHA256,
       workspaceRevision: workspace.revision,
-      workspaceFileScopesDigest: workspace.fileScopesDigest)
+      workspaceFileScopesDigest: workspace.fileScopesDigest,
+      workspaceIsIsolatedTaskCopy: workspace.isolatedTaskCopy)
   }
 
   /// Performs every pure authorization check at submit, after the complete
@@ -3953,14 +3954,27 @@ public actor RuntimeJobEngine {
       authorization = supplied
     } else if effect == .deviceMutation,
       policy == .standingCapability,
-      descriptor.defaultPolicyIssuanceEnabled,
-      // Automatic issuance is a *device* policy. A workspace mutation must
-      // carry a grant a maintainer issued against this tree, this revision and
-      // these writable scopes (CHG-2026-055 TASK-HFA-009 r2, HTP-INV-6): a
-      // runtime that mints its own workspace capability is a gate authorizing
-      // itself. Without this clause the path below would try, and would only
-      // fail because the device identity it needs happens to be empty.
-      query.workspaceIdentitySHA256 == nil
+      // Two automatic lanes, and the line between them is who owns the thing
+      // being changed.
+      //
+      // A device is shared and physical: the catalog decides per operation
+      // whether the runtime may issue for it at all.
+      //
+      // A workspace that is a *task-owned isolated copy* is neither. Nothing
+      // in it reaches the repository except through a promotion a person
+      // merges, so requiring a separately issued grant per copy adds a human
+      // step that guards a scratch directory while the real gate — the pull
+      // request — stays exactly where it was. Worse, the grant has to name a
+      // workspace that does not exist until the task creates it, so the step
+      // can only ever happen mid-run, and a task that is resubmitted needs
+      // another one.
+      //
+      // A workspace a person works in is still off limits: that one keeps
+      // requiring a grant issued against this tree, this revision and these
+      // writable scopes (CHG-2026-055 TASK-HFA-009 r2, HTP-INV-6).
+      (query.workspaceIdentitySHA256 == nil
+        ? descriptor.defaultPolicyIssuanceEnabled
+        : query.workspaceIsIsolatedTaskCopy)
     {
       authorization = try await automaticE1Capability(
         descriptor: descriptor, query: query)
@@ -4171,11 +4185,23 @@ public actor RuntimeJobEngine {
       }
 
       let capability: RuntimeCapability
+      // The envelope is scoped to whatever this plan actually addresses. A
+      // workspace plan carries no device identity, so scoping it by one would
+      // pin the empty string and match nothing.
+      let targetScope: RuntimeCapabilityTargetScope
+      if let workspaceIdentity = query.workspaceIdentitySHA256 {
+        targetScope = .workspaceIdentity(
+          sha256: workspaceIdentity,
+          expectedWorkspaceRevision: query.workspaceRevision ?? "",
+          allowedFileScopesDigest: query.workspaceFileScopesDigest ?? "")
+      } else {
+        targetScope = .stablePhysicalIdentity(
+          sha256: query.targetStableIdentitySHA256 ?? "")
+      }
       do {
         capability = try RuntimeCapability(
           capabilityID: capabilityID,
-          targetScope: .stablePhysicalIdentity(
-            sha256: query.targetStableIdentitySHA256 ?? ""),
+          targetScope: targetScope,
           operationScope: [
             RuntimeCapabilityOperationScope(
               operationID: descriptor.id, version: descriptor.version)
@@ -4336,7 +4362,8 @@ public actor RuntimeJobEngine {
         inputs: runtime.record.request.inputs,
         workspaceIdentitySHA256: workspace.identitySHA256,
         workspaceRevision: workspace.revision,
-        workspaceFileScopesDigest: workspace.fileScopesDigest)
+        workspaceFileScopesDigest: workspace.fileScopesDigest,
+        workspaceIsIsolatedTaskCopy: workspace.isolatedTaskCopy)
     }
     do {
       if let deviceLineage {

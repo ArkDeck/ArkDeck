@@ -179,11 +179,21 @@ public struct WorkspaceAuthorizationFacts: Sendable, Equatable {
   public let identitySHA256: String
   public let revision: String
   public let fileScopesDigest: String
+  /// True when this workspace is a task-owned isolated copy rather than a
+  /// tree a person works in. It is the difference between "the agent edits
+  /// its own scratch copy, and anything reaching the repository still goes
+  /// through a pull request" and "the agent edits your checkout", which is
+  /// why authorization treats the two differently.
+  public let isolatedTaskCopy: Bool
 
-  public init(identitySHA256: String, revision: String, fileScopesDigest: String) {
+  public init(
+    identitySHA256: String, revision: String, fileScopesDigest: String,
+    isolatedTaskCopy: Bool = false
+  ) {
     self.identitySHA256 = identitySHA256
     self.revision = revision
     self.fileScopesDigest = fileScopesDigest
+    self.isolatedTaskCopy = isolatedTaskCopy
   }
 }
 

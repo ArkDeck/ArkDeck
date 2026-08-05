@@ -290,6 +290,10 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   public let workspaceIdentitySHA256: String?
   public let workspaceRevision: String?
   public let workspaceFileScopesDigest: String?
+  /// Whether that workspace is a task-owned isolated copy. It decides who may
+  /// authorize a change to it, not what the change may be: the scope, the
+  /// revision and the exact inputs are pinned identically either way.
+  public let workspaceIsIsolatedTaskCopy: Bool
 
   public init(
     operationID: String,
@@ -301,7 +305,8 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     inputs: [String: JSONValue],
     workspaceIdentitySHA256: String? = nil,
     workspaceRevision: String? = nil,
-    workspaceFileScopesDigest: String? = nil
+    workspaceFileScopesDigest: String? = nil,
+    workspaceIsIsolatedTaskCopy: Bool = false
   ) {
     self.operationID = operationID
     self.operationVersion = operationVersion
@@ -313,6 +318,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     self.workspaceIdentitySHA256 = workspaceIdentitySHA256
     self.workspaceRevision = workspaceRevision
     self.workspaceFileScopesDigest = workspaceFileScopesDigest
+    self.workspaceIsIsolatedTaskCopy = workspaceIsIsolatedTaskCopy
   }
 }
 
