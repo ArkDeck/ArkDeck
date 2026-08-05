@@ -430,6 +430,23 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       rockUSBAliveness: { rockUSB },
       hdcAliveness: { hdc },
       archiveIdentity: { _ in resolvedArchive },
+      // Reading the archive is a probe like every other observation here, so
+      // these tests keep proving every branch with zero spawn, zero device and
+      // no 730 MB file. The fixture describes a build that fits the board.
+      archiveBuild: { _, board in
+        RockchipImageBuildDescriptor(
+          archiveSizeBytes: resolvedArchive.byteCount == 0
+            ? board.archiveSizeBytes : Int64(resolvedArchive.byteCount),
+          archiveSHA256: resolvedArchive.sha256,
+          members: board.members,
+          declaredPartitions: board.mappedPartitions.map {
+            RockchipDeclaredPartition(
+              name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
+          } + board.membershiplessPartitionsWriteForbidden.map {
+            RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+          },
+          runtimeBuildVersion: board.runtimeBuildVersion)
+      },
       boundTargetIdentitySHA256: { boundIdentity },
       boundTargetHDCNormalAlias: { hdcNormalAlias },
       targetReadback: { resolvedReadback })
@@ -476,13 +493,56 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
         .isEmpty)
   }
 
-  func testPreflightRefusesAnArchiveThatMatchesNoPublishedProfilePin() async throws {
-    let receipt = await RockchipFlashPreflight(
+  /// Preflight refuses an archive that does not fit the board — not one whose
+  /// digest it has never seen.
+  ///
+  /// It used to look the digest up among the builds compiled into the product,
+  /// which refused a firmware daily published after the last release while it
+  /// fitted the board perfectly. A build nobody enumerated now passes, and the
+  /// finding names the version it declares.
+  func testPreflightRefusesAnArchiveThatDoesNotFitTheBoardAndAdmitsOneItHasNeverSeen()
+    async throws
+  {
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let unknownDigest = String(repeating: "f", count: 64)
+
+    // Never seen, fits the board: admitted, and the finding says which build.
+    let admitted = await RockchipFlashPreflight(
       probes: preflightProbes(
-        archive: RockchipFlashArchiveIdentity(
-          sha256: String(repeating: "f", count: 64), byteCount: 1_234))
+        archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
     ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
-    XCTAssertEqual(receipt.failedChecks, [.archiveIntegrity])
+    XCTAssertEqual(admitted.failedChecks, [])
+    XCTAssertTrue(
+      admitted.findings.contains {
+        $0.check == .archiveIntegrity && $0.summary.contains(board.runtimeBuildVersion)
+      }, admitted.findings.map(\.summary).joined(separator: " | "))
+
+    // Structurally wrong: an image the board maps is absent.
+    var probes = preflightProbes(
+      archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
+    probes.archiveBuild = { _, board in
+      RockchipImageBuildDescriptor(
+        archiveSizeBytes: 1_234, archiveSHA256: unknownDigest,
+        members: board.members.filter { $0.name != "system.img" },
+        declaredPartitions: board.mappedPartitions.map {
+          RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
+        } + board.membershiplessPartitionsWriteForbidden.map {
+          RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+        },
+        runtimeBuildVersion: board.runtimeBuildVersion)
+    }
+    let refused = await RockchipFlashPreflight(probes: probes)
+      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertEqual(refused.failedChecks, [.archiveIntegrity])
+
+    // Unreadable as an images archive at all: also refused.
+    struct Unreadable: Error {}
+    var broken = preflightProbes(
+      archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
+    broken.archiveBuild = { _, _ in throw Unreadable() }
+    let unreadable = await RockchipFlashPreflight(probes: broken)
+      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    XCTAssertEqual(unreadable.failedChecks, [.archiveIntegrity])
   }
 
   func testPreflightRefusesEveryTargetReadbackThatIsNotTheBoundRegisteredTarget() async throws {

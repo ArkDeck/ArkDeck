@@ -113,3 +113,51 @@ Nine sites across five layers, found by following the failure the maintainer's a
 
 The first one is worth naming separately because it is not even a safety check: the archive has to
 be renamed by hand before the product will look at it.
+
+## An eighth site, found by running the preview rather than by reading code
+
+The sweep that removed the per-build pins followed the failure an import
+produced and mapped nine sites. It missed one, because nothing on the import
+or plan path touches it: `RockchipFlashPreflight.archiveIntegrity`, which the
+bounded campaign preview runs before it will produce a confirmation digest.
+
+Running `arkdeck flash preview` against the `7.0.0.37` archive found it in one
+command:
+
+```
+[ok]  rockUSBToolAliveness: rkdeveloptool ld ran and exited 0
+[RED] hdcToolAliveness: no HDC executable is configured (set ARKDECK_HDC_PATH)
+[RED] archiveIntegrity: archive sha256 8aad39a0… (730766386 bytes) matches no
+      published DAYU200 profile pin
+[ok]  targetPresence: bound target readable in hdcNormal mode …
+```
+
+The lesson is the one this change keeps relearning: a pin is found by
+exercising the path, not by grepping for the constant. Nine were found by
+importing; the tenth would have been found in the device window, in front of
+an operator, which is the worst place to find it.
+
+After the fix, with `ARKDECK_HDC_PATH` set, the whole pre-flash chain answers
+on a build the product has never seen:
+
+```
+[ok] rockUSBToolAliveness    [ok] hdcToolAliveness
+[ok] archiveIntegrity: archive fits dayu200@2 and declares OpenHarmony-7.0.0.37
+[ok] targetPresence: … via its confirmed hdc-normal alias 958780b2ffb7
+
+campaign: ECAMP-F113EF1B51B0E239DBE8FDD1
+confirmation digest: f113ef1b51b0e239dbe8fdd1b13e419a83d7a3718debbaa973888b513f330f48
+plan: 0bdbdb2cc850de7bba277a20d400ef6436302d2baa00d0fcd7e4368f14cce6d5
+archive: 8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a
+data impact: ERASE-USERDATA
+device mutation dispatch: 0
+```
+
+Nothing was written. The device is attached and reports `OpenHarmony-7.0.0.36`,
+so flashing this archive would be a real version change and a real test of the
+derived post-flash verification — that step now expects `7.0.0.37` because the
+image says so, not because anyone typed it.
+
+The preflight reads the archive through a probe seam, like every other
+observation it makes, so its contract tests still prove every branch with no
+spawn, no device and no 730 MB file.
