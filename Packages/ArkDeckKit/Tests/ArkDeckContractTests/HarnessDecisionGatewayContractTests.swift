@@ -1055,6 +1055,37 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         error as? HarnessDecisionRejection,
         .operationNotExpected(DebugCrashTaskHandler.analyzeCrashLedger))
     }
+
+    // Agreeing with the operation and leaving its inputs alone is the answer
+    // the envelope instruction asks for, so it is accepted — and it executes
+    // the handler's own step, byte for byte.
+    let agreeingAnalyzer = HarnessDecisionProposal(
+      kind: .invokeOperation,
+      operationReference: DebugCrashTaskHandler.analyzeCrashLedger,
+      inputs: [:],
+      hypothesis: "analyze", reasonCode: "analyze", confidence: nil)
+    XCTAssertNoThrow(
+      try HarnessTaskCoordinator.validateModelProposal(
+        agreeingAnalyzer, against: exactAnalyzer))
+    XCTAssertEqual(
+      HarnessTaskCoordinator.effectiveInputs(of: agreeingAnalyzer, against: exactAnalyzer),
+      exactAnalyzer.inputs,
+      "an agreeing proposal must dispatch the handler's typed inputs, not none")
+
+    // The allowance is agreement, not a blank cheque: empty inputs do not let
+    // a proposal name a different operation and inherit that one's lease.
+    let emptyButDifferent = HarnessDecisionProposal(
+      kind: .invokeOperation, operationReference: DebugCrashTaskHandler.deployHAP,
+      inputs: [:], hypothesis: "deploy", reasonCode: "deploy", confidence: nil)
+    XCTAssertThrowsError(
+      try HarnessTaskCoordinator.validateModelProposal(
+        emptyButDifferent, against: exactAnalyzer))
+    XCTAssertEqual(
+      HarnessTaskCoordinator.effectiveInputs(of: emptyButDifferent, against: exactAnalyzer), [:])
+
+    // And nothing is donated to a shape that carries no operation at all.
+    XCTAssertEqual(
+      HarnessTaskCoordinator.effectiveInputs(of: prematureStop, against: exactAnalyzer), [:])
   }
 
   func testConclusionsFollowTheStepNotTheProducer() async throws {
