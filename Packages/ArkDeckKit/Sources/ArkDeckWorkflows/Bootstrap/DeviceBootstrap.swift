@@ -172,8 +172,33 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       }) {
         return (existing, false)
       }
+      // Identity alone is not enough to recognise an already-adopted device.
+      //
+      // A Flash lineage advance keeps the durable target ID and the HDC
+      // connect key while replacing the identity with the Loader-derived one.
+      // The next time the daemon observes that device through HDC it derives
+      // the *normal-mode* identity, finds no record carrying it, and used to
+      // append a second record — whose derived ID collides with the first,
+      // because the ID is a prefix of the identity the device was adopted
+      // under. Bootstrap then refuses both with `ambiguous completed target
+      // binding lineage`, and the daemon will not start until someone edits
+      // the store by hand. Observed on 2026-08-05 after the 08-04 reflash.
+      //
+      // Same durable ID and same connect key is the same physical device seen
+      // through another provider's address face, which is exactly what the
+      // lineage advance documents. Return what is already adopted.
+      let derivedID = "TGT-\(stableIdentitySHA256.prefix(12))"
+      if let sameDevice = document.targets.first(where: { $0.targetID == derivedID }) {
+        guard sameDevice.connectKey == connectKey else {
+          // Same ID, different address: a genuine ambiguity a person must see,
+          // not something to resolve by guessing which one was meant.
+          throw BootstrapError.storeFailure(
+            "adopted target \(derivedID) is bound to another connect key")
+        }
+        return (sameDevice, false)
+      }
       let record = RuntimeTargetRecord(
-        targetID: "TGT-\(stableIdentitySHA256.prefix(12))",
+        targetID: derivedID,
         stablePhysicalIdentitySHA256: stableIdentitySHA256,
         bindingRevision: 1,
         connectKey: connectKey,

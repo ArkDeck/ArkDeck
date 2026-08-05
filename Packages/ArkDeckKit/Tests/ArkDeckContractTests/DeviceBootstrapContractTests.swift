@@ -165,6 +165,71 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(try reopened.list().count, 1)
   }
 
+  /// Re-observing a flashed device through another provider face must not
+  /// adopt it twice.
+  ///
+  /// Found on 2026-08-05, after the 08-04 reflash. A lineage advance keeps the
+  /// durable target ID and the connect key while replacing the identity with
+  /// the Loader-derived one. The next daemon start observed the same device
+  /// through HDC, derived the *normal-mode* identity, found no record carrying
+  /// it, and appended a second record — whose derived ID is a prefix of that
+  /// identity and therefore collided with the first. Bootstrap then refused
+  /// both with `ambiguous completed target binding lineage`, and the daemon
+  /// would not start at all until the store was edited by hand.
+  ///
+  /// So this is not a tidiness test: without it a flash eventually bricks the
+  /// host it was run from.
+  func testReobservingAFlashedDeviceThroughAnotherFaceDoesNotAdoptItTwice() throws {
+    // The normal-mode identity is what the durable ID is derived from, and the
+    // Loader-mode identity is what the advance writes.
+    let normalModeIdentity = String(repeating: "a", count: 64)
+    let loaderModeIdentity = String(repeating: "b", count: 64)
+    let connectKey = "150100424a544434520325874bbf4900"
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let adopted = try store.adopt(
+      stableIdentitySHA256: normalModeIdentity, connectKey: connectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-07-29T00:00:00Z").record
+    let flashed = try store.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: normalModeIdentity, previousRevision: 1,
+        currentStableIdentitySHA256: loaderModeIdentity, currentRevision: 2)
+    ).record
+    XCTAssertEqual(flashed.targetID, adopted.targetID)
+    XCTAssertEqual(flashed.stablePhysicalIdentitySHA256, loaderModeIdentity)
+
+    // The HDC face derives the normal-mode identity again on the next start.
+    let readopted = try store.adopt(
+      stableIdentitySHA256: normalModeIdentity, connectKey: connectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-05T14:54:49Z")
+    XCTAssertFalse(readopted.created, "a flashed device must not be adopted a second time")
+    XCTAssertEqual(readopted.record, flashed)
+    XCTAssertEqual(try store.list().count, 1)
+
+    // And the store still opens, which is the failure this prevents.
+    let reopened = try RuntimeTargetStore(directoryURL: directory)
+    XCTAssertEqual(try reopened.list().count, 1)
+    XCTAssertEqual(try reopened.find(targetID: adopted.targetID), flashed)
+  }
+
+  /// The same durable ID at a different address is a real ambiguity, and is
+  /// refused rather than resolved by guessing which device was meant.
+  func testTheSameDurableIDAtAnotherConnectKeyIsRefused() throws {
+    let identity = String(repeating: "a", count: 64)
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    _ = try store.adopt(
+      stableIdentitySHA256: identity, connectKey: "address-one",
+      toolVersion: "3.2.0f", nowUTC: "2026-07-29T00:00:00Z")
+    _ = try store.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: identity, previousRevision: 1,
+        currentStableIdentitySHA256: String(repeating: "b", count: 64), currentRevision: 2))
+    XCTAssertThrowsError(
+      try store.adopt(
+        stableIdentitySHA256: identity, connectKey: "address-two",
+        toolVersion: "3.2.0f", nowUTC: "2026-08-05T00:00:00Z"))
+    XCTAssertEqual(try store.list().count, 1)
+  }
+
   func testTargetStoreAdvancesOneExactBindingLineageEdgeIdempotently() throws {
     let previousIdentity = String(repeating: "a", count: 64)
     let currentIdentity = String(repeating: "b", count: 64)
