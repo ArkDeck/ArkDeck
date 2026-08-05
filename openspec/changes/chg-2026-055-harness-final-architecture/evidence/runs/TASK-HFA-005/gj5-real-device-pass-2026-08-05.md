@@ -222,3 +222,36 @@ analysis each — and the run finished at round 21 of 30. A task with a smaller
 and the failure will read as `budgetExhausted(rounds)` with a correct patch
 already deployed. Nothing is wrong there; it is worth knowing before reading
 such a record as a repair failure.
+
+## Fourth run: a regression check after the flash work
+
+Removing the per-build flash pins took six changes to code the debug loop also
+runs through — `RuntimeJobEngine`'s execution contexts, `ProviderExecutionContext`
+itself, the provider adapters. The catalog digest never moved, so this file's
+`REAL_DEVICE_PASS` claim stayed nominally valid the whole time; that is not the
+same as it still being true.
+
+`HTASK-8A978017360D`, on `main@17d47de4`:
+
+| | runs 1–3 | run 4 |
+|---|---|---|
+| Terminal | `succeeded` / `promotionCandidateReady` | same |
+| Rounds / E1 / model calls | 21 / 6 / 20 | 21 / 6 / 20 |
+| Criteria | 3/3 pass, 5 samples each | 3/3 pass, 5 samples each |
+| Model acceptance | 16/20 | 14/20 |
+
+Unchanged in every dimension the journey is judged on. The two extra refusals
+are the model reaching for `apply-patch` before the handler offers it, which
+is the offered set doing its job.
+
+Worth stating plainly: this run is also how the target-store adoption defect
+was found. The daemon would not start for it —
+`storeFailure("ambiguous completed target binding lineage")` — because the
+08-04 reflash and a later ordinary restart had adopted the same device twice
+under one durable ID. That is a flash bricking the host it ran from, on a
+plain restart, and nothing in 1326 contract tests or three passing GJ-5 runs
+had touched it. It was fixed before this run could proceed.
+
+The lesson is the same one the flash sweep kept teaching, in a different
+place: re-running a journey after changing what it runs through is not
+ceremony. This one found a defect that no amount of reading would have.
