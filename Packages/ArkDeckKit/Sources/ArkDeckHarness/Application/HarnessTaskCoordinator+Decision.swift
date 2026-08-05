@@ -71,7 +71,10 @@ extension HarnessTaskCoordinator {
       let modelRunID = modelRunIDFactory()
       var contextDigest = ""
       var contextBytes = 0
-      func record(_ outcome: HarnessModelRunOutcome, responseBytes: Int = 0) async {
+      func record(
+        _ outcome: HarnessModelRunOutcome, responseBytes: Int = 0,
+        rejectedResponse: Data? = nil
+      ) async {
         let run = HarnessModelRun(
           modelRunID: modelRunID,
           htaskID: snapshot.htaskID,
@@ -81,6 +84,9 @@ extension HarnessTaskCoordinator {
           contextDigest: contextDigest,
           contextBytes: contextBytes,
           responseBytes: responseBytes,
+          rejectedResponseExcerpt: rejectedResponse.map {
+            String(String(decoding: $0, as: UTF8.self).prefix(4_096))
+          },
           outcome: outcome,
           startedAtUTC: startedAtUTC,
           finishedAtUTC: nowUTC())
@@ -136,7 +142,8 @@ extension HarnessTaskCoordinator {
             rejection: nil)
         } catch let rejection as HarnessDecisionRejection {
           await record(
-            .rejected(reasonCode: rejection.reasonCode), responseBytes: bytes.count)
+            .rejected(reasonCode: rejection.reasonCode), responseBytes: bytes.count,
+            rejectedResponse: bytes)
           return PlannedProposal(
             step: deterministic, producer: deterministic.decision.producer,
             modelCallsSpent: 1,

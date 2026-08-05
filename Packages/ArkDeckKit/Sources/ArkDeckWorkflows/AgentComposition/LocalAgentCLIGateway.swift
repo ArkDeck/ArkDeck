@@ -97,6 +97,13 @@ public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// nothing else to stdout. `USER` is inherited because the CLI resolves its
   /// stored credential through it; without it the child reports "Not logged
   /// in" while every other condition looks healthy.
+  ///
+  /// Deliberately no `--permission-mode`: print mode has nobody to answer a
+  /// permission prompt, so the default already denies every tool, while
+  /// `plan` made the CLI read a request for one JSON decision as an attempt
+  /// to route around its own approval gate and answer with prose about that
+  /// instead of the decision (observed on device, 2026-08-05). The harness
+  /// wants pure text-in/text-out reasoning here, not an agent with tools.
   public static let claudeCode = HarnessLocalAgentCLIProfile(
     profileID: "claude-code",
     providerLabel: "anthropic-claude-code-cli",
@@ -105,7 +112,7 @@ public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   ) { model, _, prompt, _ in
     [
       "--print", "--model", model, "--output-format", "text",
-      "--strict-mcp-config", "--permission-mode", "plan",
+      "--strict-mcp-config",
       prompt,
     ]
   }
@@ -245,14 +252,39 @@ public struct LocalAgentCLIProcessTransport: HarnessLocalAgentCLITransport {
     guard !response.isEmpty else {
       throw HarnessDecisionGatewayError.transportFailure("agentCLIResponseEmpty")
     }
-    // Whitespace is not semantic JSON content. Everything else remains raw
-    // bytes until `HarnessDecisionProposal.parse` accepts or rejects it.
-    let trimmed = String(decoding: response, as: UTF8.self)
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    // Whitespace and a Markdown code fence are presentation, not content: a
+    // CLI that wraps its answer in ```json has still answered, and refusing
+    // it burns a round on formatting (observed on device, 2026-08-05).
+    // Unwrapping stops there — the closed key set, the forbidden fields and
+    // every value check remain `HarnessDecisionProposal.parse`'s to make on
+    // the bytes inside.
+    let trimmed = Self.unfenced(String(decoding: response, as: UTF8.self))
     guard !trimmed.isEmpty else {
       throw HarnessDecisionGatewayError.transportFailure("agentCLIResponseEmpty")
     }
     return Data(trimmed.utf8)
+  }
+}
+
+extension LocalAgentCLIProcessTransport {
+  /// Strips one surrounding Markdown code fence, with or without a language
+  /// tag. Text that is not fenced is returned trimmed and otherwise
+  /// untouched, and a fence that does not close is left alone rather than
+  /// half-removed.
+  static func unfenced(_ text: String) -> String {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.hasPrefix("```"), trimmed.hasSuffix("```"), trimmed.count > 6 else {
+      return trimmed
+    }
+    var body = trimmed.dropFirst(3).dropLast(3)
+    // A language tag runs to the end of the opening line.
+    if let newline = body.firstIndex(of: "\n") {
+      let tag = body[body.startIndex..<newline]
+      if tag.allSatisfy({ $0.isLetter || $0.isNumber }) {
+        body = body[body.index(after: newline)...]
+      }
+    }
+    return body.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }
 
