@@ -1705,23 +1705,43 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(artifacts.isEmpty)
   }
 
-  func testProductionFlashImportPolicyPinsBothPublishedDAYU200Archives() {
+  /// The production policy recognises no build in advance.
+  ///
+  /// It used to hold one candidate per published archive, matched by digest
+  /// *before the file was read*. A firmware daily published after the last
+  /// release therefore could not be imported at all — measured on 2026-08-05
+  /// with `7.0.0.37`, which fitted the board with no structural violation and
+  /// was refused by nineteen hash mismatches against a build eight days older.
+  ///
+  /// What replaced it is not "no checking": the archive is decompressed,
+  /// hashed, its partition table parsed and its runtime version read, and it
+  /// must fit the board. That work happens on commit, against the bytes, which
+  /// is why nothing is pinned here.
+  func testProductionFlashImportPolicyRecognisesNoBuildInAdvance() throws {
     let candidates = FlashBundleImportPolicy.production.candidates
-    XCTAssertEqual(candidates.count, 2)
-    XCTAssertEqual(
-      Set(candidates.map(\.expectedByteCount)),
-      Set(RockchipFlashProfile.supportedDAYU200Profiles.map { Int($0.archiveSizeBytes) }))
-    XCTAssertEqual(
-      Set(candidates.map(\.expectedSHA256)),
-      Set(RockchipFlashProfile.supportedDAYU200Profiles.map(\.archiveSHA256)))
-    let v2 = RockchipFlashProfile.dayu200OpenHarmony70035
+    XCTAssertEqual(candidates.count, 1)
+    XCTAssertNil(candidates[0].expectedByteCount)
+    XCTAssertNil(candidates[0].expectedSHA256)
+
+    // Any well-formed declaration is admissible, including the two builds that
+    // used to be the only ones, and including one nobody has seen.
+    for profile in RockchipFlashProfile.supportedDAYU200Profiles {
+      XCTAssertNotNil(
+        FlashBundleImportPolicy.production.candidate(
+          byteCount: Int(profile.archiveSizeBytes), sha256: profile.archiveSHA256))
+    }
     XCTAssertNotNil(
       FlashBundleImportPolicy.production.candidate(
-        byteCount: Int(v2.archiveSizeBytes), sha256: v2.archiveSHA256))
-    XCTAssertNil(
-      FlashBundleImportPolicy.production.candidate(
-        byteCount: Int(v2.archiveSizeBytes),
-        sha256: String(repeating: "0", count: 64)))
+        byteCount: 730_766_386,
+        sha256: "8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a"))
+
+    // And the judgement really is deferred to reading: a file that is not an
+    // images archive is refused by the candidate's own validation.
+    try FileManager.default.createDirectory(
+      at: stateDirectory, withIntermediateDirectories: true)
+    let notAnArchive = stateDirectory.appendingPathComponent("not-an-archive.tar.gz")
+    try Data(repeating: 0x41, count: 4_096).write(to: notAnArchive)
+    XCTAssertThrowsError(try candidates[0].validate(notAnArchive))
   }
 
   func testChunkedFlashBundleImportPublishesATargetBoundFileLease() async throws {
@@ -1825,7 +1845,16 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: resolved.fileURL), bytes)
   }
 
-  func testProductionFlashBundleImportRejectsUnpinnedFactsBeforeUpload() async throws {
+  /// Where the judgement moved to.
+  ///
+  /// A declaration used to be matched against the archives the product
+  /// enumerated, so an unrecognised build was refused before a byte was
+  /// uploaded. Now a *malformed* declaration is still refused there — it can
+  /// be judged without reading anything — while a well-formed one for a build
+  /// nobody has seen is accepted and judged on commit, against its bytes.
+  func testProductionFlashBundleImportRejectsMalformedFactsButNotUnknownBuilds()
+    async throws
+  {
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent(
         "targets-flash-negative", isDirectory: true))
@@ -1842,17 +1871,41 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, _) = try makeStack(
       targetStore: targetStore, artifactStore: artifactStore)
 
-    let response = try await request(
-      handler, method: "artifact.importFlashBundle.begin",
-      params: [
-        "targetId": .string(target.targetID),
-        "name": .string("images.tar.gz"),
-        "byteCount": .integer(1),
-        "sha256": .string(String(repeating: "0", count: 64)),
-      ])
-    XCTAssertFalse(response.ok)
-    XCTAssertEqual(response.error?.code, "invalidParams")
-    XCTAssertTrue((response.error?.message ?? "").contains("pinned DAYU200"))
+    func begin(byteCount: Int64, sha256: String, name: String = "images.tar.gz") async throws
+      -> AgentWireProtocol.Response
+    {
+      try await request(
+        handler, method: "artifact.importFlashBundle.begin",
+        params: [
+          "targetId": .string(target.targetID),
+          "name": .string(name),
+          "byteCount": .integer(byteCount),
+          "sha256": .string(sha256),
+        ])
+    }
+    let digest = String(repeating: "0", count: 64)
+
+    // Refused before the upload, on facts alone.
+    for malformed in [Int64(0), Int64(-1)] {
+      let response = try await begin(byteCount: malformed, sha256: digest)
+      XCTAssertFalse(response.ok, "byteCount \(malformed)")
+      XCTAssertEqual(response.error?.code, "invalidParams")
+    }
+    let oversized = try await begin(byteCount: 64 * 1_024 * 1_024 * 1_024, sha256: digest)
+    XCTAssertFalse(oversized.ok)
+    XCTAssertEqual(oversized.error?.code, "invalidParams")
+
+    let malformedDigest = try await begin(byteCount: 730_766_386, sha256: "not-a-digest")
+    XCTAssertFalse(malformedDigest.ok)
+    XCTAssertEqual(malformedDigest.error?.code, "invalidParams")
+
+    // A build the product has never seen is not malformed. It is admitted to
+    // upload and judged when its bytes arrive — the 7.0.0.37 daily's own
+    // declared facts, which no published profile enumerates.
+    let unknownBuild = try await begin(
+      byteCount: 730_766_386,
+      sha256: "8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a")
+    XCTAssertTrue(unknownBuild.ok, unknownBuild.error?.message ?? "-")
   }
 
   func testNativeLibraryImportValidatesELFAndPublishesBoundLease() async throws {

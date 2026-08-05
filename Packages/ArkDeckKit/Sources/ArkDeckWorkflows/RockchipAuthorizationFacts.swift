@@ -50,16 +50,32 @@ package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
   package init() {}
 
   package func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
-    let summary = try GzipTarArchiveReader.summarize(fileAt: archiveURL)
-    return try makeValidatedExecutePlan(summary: summary)
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let summary = try GzipTarArchiveReader.summarize(
+      fileAt: archiveURL,
+      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+    return try makeValidatedExecutePlan(summary: summary, board: board)
   }
 
-  func makeValidatedExecutePlan(summary: GzipTarArchiveSummary) throws -> RockchipFlashPlan {
-    guard
-      let profile = RockchipFlashProfile.profile(
-        archiveSHA256: summary.archiveSHA256, byteCount: Int(summary.archiveSizeBytes))
-    else { throw RockchipAuthorizationFactError.archiveValidationFailed }
+  /// The plan is built for the archive in hand. It used to be built only for
+  /// an archive the product already enumerated, which meant a firmware daily
+  /// published after the last release could not be planned at all.
+  func makeValidatedExecutePlan(
+    summary: GzipTarArchiveSummary,
+    board: RockchipFlashProfile = .dayu200OpenHarmony70035
+  ) throws -> RockchipFlashPlan {
+    let profile: RockchipFlashProfile
+    do {
+      profile = try board.forBuild(
+        RockchipImageArchiveIntrospection.describe(summary: summary, board: board))
+    } catch {
+      throw RockchipAuthorizationFactError.archiveValidationFailed
+    }
     let provider = RockchipRockUSBFlashProvider(profile: profile)
+    // Now a tautology-free check: the profile was just built from this
+    // summary, so what this asserts is that the archive is internally
+    // consistent — every member the derivation recorded is still the member
+    // the observation reports.
     let verdict = provider.profile.validate(summary.archiveObservation())
     guard verdict == .valid else { throw RockchipAuthorizationFactError.archiveValidationFailed }
     return try provider.makePlan(mode: .execute, archiveValidation: verdict)

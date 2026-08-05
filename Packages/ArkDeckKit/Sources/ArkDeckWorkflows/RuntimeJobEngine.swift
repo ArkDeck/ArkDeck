@@ -1365,7 +1365,9 @@ public actor RuntimeJobEngine {
         nowUTC: nowUTC(),
         resolvedInputArtifact: resolvedArtifact,
         additionalInputArtifacts: additionalArtifacts,
-        campaignExecutionTuning: campaignExecutionTuning)
+        campaignExecutionTuning: campaignExecutionTuning,
+        expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
+          for: descriptor, artifact: resolvedArtifact))
       let action: TypedProviderAction
       do {
         action = try provider.action(
@@ -3237,9 +3239,12 @@ public actor RuntimeJobEngine {
         throw RuntimeDispatchFailure.failed(
           "flash host verification cannot resolve its typed imageBundleLease")
       }
+      let board = RockchipFlashProfile.dayu200OpenHarmony70035
       let summary: GzipTarArchiveSummary
       do {
-        summary = try GzipTarArchiveReader.summarize(fileAt: resolved.fileURL)
+        summary = try GzipTarArchiveReader.summarize(
+          fileAt: resolved.fileURL,
+          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
       } catch {
         throw RuntimeDispatchFailure.failed(
           "flash host verification cannot read the leased archive: \(error)")
@@ -3252,23 +3257,28 @@ public actor RuntimeJobEngine {
       }
       guard case .string(let profileReference)? =
         jobs[jobID]?.record.request.inputs["deviceProfile"],
-        let profile = RockchipFlashProfile.profile(reference: profileReference)
+        RockchipFlashProfile.board(reference: profileReference) != nil
       else {
         throw RuntimeDispatchFailure.failed(
-          "flash request has no published versioned DAYU200 profile")
+          "flash request names no published DAYU200 board profile")
       }
-      switch profile.validate(summary.archiveObservation()) {
-      case .valid:
+      // The bytes were just proven to be the leased ones. What remains is
+      // whether they are a usable images archive for this board — read, not
+      // recognised. The timeline records the build that was admitted, which is
+      // now a fact about the archive rather than a name from a list.
+      do {
+        let build = try RockchipImageArchiveIntrospection.describe(
+          summary: summary, board: board)
+        _ = try board.forBuild(build)
         appendTimeline(
           jobID: jobID,
           entry:
-            "\(step.stepID) profile=\(profile.catalogReference) "
+            "\(step.stepID) profile=\(profileReference) build=\(build.runtimeBuildVersion) "
             + "sha256=\(summary.archiveSHA256)")
         return
-      case .blocked(let violations):
+      } catch {
         throw RuntimeDispatchFailure.failed(
-          "flash bundle violates the pinned DAYU200 profile: "
-            + violations.map(\.description).joined(separator: "; "))
+          "flash bundle is not a usable DAYU200 images archive: \(error)")
       }
     }
     guard descriptor.reference == "deploy.native-library.app-owned@1" else {
@@ -5392,4 +5402,28 @@ public actor RuntimeJobEngine {
       declaredBindingRequirement: step.binding,
       arguments: arguments)
   }
+
+  /// The build version the image bundle for this job declares, or nil when the
+  /// job does not carry one.
+  ///
+  /// Read here, where the Runtime already resolves leases from disk, so that a
+  /// step materializer stays a pure function of its typed inputs. One pass
+  /// over the archive per job; a flash campaign runs for minutes and this
+  /// costs about eleven seconds.
+  private func declaredRuntimeBuildVersion(
+    for descriptor: CatalogOperationDescriptor,
+    artifact: ProviderResolvedInputArtifact?
+  ) -> String? {
+    guard descriptor.reference == "flash.dayu200@1", let artifact else { return nil }
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    guard
+      let summary = try? GzipTarArchiveReader.summarize(
+        fileAt: artifact.fileURL,
+        derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board)),
+      let build = try? RockchipImageArchiveIntrospection.describe(
+        summary: summary, board: board)
+    else { return nil }
+    return build.runtimeBuildVersion
+  }
+
 }

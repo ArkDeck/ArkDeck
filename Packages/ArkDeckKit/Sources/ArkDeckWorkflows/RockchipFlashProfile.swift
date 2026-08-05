@@ -609,3 +609,62 @@ extension RockchipFlashProfile {
     return violations
   }
 }
+
+// MARK: - Instantiating a board profile for the build in hand (CHG-2026-056 r4)
+
+extension RockchipFlashProfile {
+  /// This board, carrying the facts of one particular archive.
+  ///
+  /// The per-build fields stay where they were — every downstream site that
+  /// records a plan digest, stages an archive or verifies a flashed device
+  /// reads them exactly as before. What changed is where they come from: the
+  /// archive that was actually imported and confirmed, rather than a constant
+  /// somebody typed in when that week's daily came out.
+  ///
+  /// This is the whole cutover in one function. The comparisons downstream are
+  /// unchanged and still fail closed; they now mean "these are the bytes this
+  /// plan was built for" instead of "this is a build we shipped knowledge of".
+  public func forBuild(_ build: RockchipImageBuildDescriptor) throws -> RockchipFlashProfile {
+    let violations = conformance(of: build)
+    guard violations.isEmpty else {
+      throw DeviceProviderError.unsupportedAction(
+        "flash bundle does not fit \(catalogReference): "
+          + violations.joined(separator: "; "))
+    }
+    return try RockchipFlashProfile(
+      archiveSizeBytes: build.archiveSizeBytes,
+      archiveSHA256: build.archiveSHA256,
+      members: build.members,
+      mappedPartitions: mappedPartitions,
+      membershiplessPartitionsWriteForbidden: membershiplessPartitionsWriteForbidden,
+      prerequisites: prerequisites,
+      catalogReference: catalogReference,
+      firmwareVersion: build.runtimeBuildVersion,
+      runtimeProductModel: runtimeProductModel,
+      runtimeBuildVersion: build.runtimeBuildVersion)
+  }
+
+  /// Reads an images archive and returns this board carrying its facts.
+  ///
+  /// One pass: decompress, hash, capture the partition table, scan the system
+  /// image for the version. Nothing is extracted and nothing is compared
+  /// against a list of builds.
+  public func forArchive(at url: URL) throws -> RockchipFlashProfile {
+    let summary = try GzipTarArchiveReader.summarize(
+      fileAt: url,
+      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: self))
+    return try forBuild(
+      RockchipImageArchiveIntrospection.describe(summary: summary, board: self))
+  }
+
+  /// The board every published DAYU200 reference resolves to.
+  ///
+  /// `dayu200@1` and `dayu200@2` are kept as published input values because
+  /// removing one would move the catalog digest and drop every Golden Journey
+  /// out of `REAL_DEVICE_PASS`. They already described the same board: the
+  /// second reused the first's mapped partitions, forbidden partitions and
+  /// prerequisites verbatim, and differed only in which build it enumerated.
+  public static func board(reference: String) -> RockchipFlashProfile? {
+    supportedDAYU200Profiles.first { $0.catalogReference == reference }
+  }
+}

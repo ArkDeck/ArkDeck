@@ -594,11 +594,9 @@ enum RuntimeCLI {
     }
     let targetID = arguments[targetIndex + 1]
     let url = URL(fileURLWithPath: arguments[fileIndex + 1]).standardizedFileURL
-    guard url.lastPathComponent == "images.tar.gz" else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "flash bundle file must have the exact basename images.tar.gz")
-    }
+    // The vendor publishes `version-Daily_Version-OpenHarmony_7.0.0.37-…-\
+    // dayu200_img.tar.gz`. Requiring a rename before the product would look at
+    // the file was never a safety check — the archive is judged by reading it.
     let profileReference: String
     if let profileIndex = arguments.firstIndex(of: "--device-profile"),
       profileIndex + 1 < arguments.count
@@ -660,22 +658,25 @@ enum RuntimeCLI {
     var before = stat()
     guard fstat(descriptor, &before) == 0,
       before.st_mode & S_IFMT == S_IFREG,
-      before.st_size == profile.archiveSizeBytes
+      before.st_size > 0
     else {
       throw CLIError(
         exitCode: EX_DATAERR,
-        message:
-          "flash bundle must be the pinned DAYU200 regular archive of "
-          + "\(profile.archiveSizeBytes) bytes")
+        message: "flash bundle must be a non-empty regular file")
     }
+    // What the daemon is told the upload will be. It reads the archive itself
+    // and refuses one that does not arrive as declared, or does not fit the
+    // board; the CLI states facts about the file it holds, and pins nothing.
+    let declaredByteCount = Int64(before.st_size)
+    let declaredSHA256 = try Self.streamedDigest(ofDescriptor: descriptor)
 
     let begin = try client.request(
       method: "artifact.importFlashBundle.begin",
       params: [
         "targetId": .string(targetID),
         "name": .string("images.tar.gz"),
-        "byteCount": .integer(profile.archiveSizeBytes),
-        "sha256": .string(profile.archiveSHA256),
+        "byteCount": .integer(declaredByteCount),
+        "sha256": .string(declaredSHA256),
       ])
     guard case .object(let beginFields) = begin,
       case .string(let uploadID)? = beginFields["uploadId"],
@@ -729,8 +730,8 @@ enum RuntimeCLI {
     var after = stat()
     let digest =
       hasher.finalize().map { String(format: "%02x", $0) }.joined()
-    guard offset == Int(profile.archiveSizeBytes),
-      digest == profile.archiveSHA256,
+    guard offset == Int(declaredByteCount),
+      digest == declaredSHA256,
       fstat(descriptor, &after) == 0,
       after.st_dev == before.st_dev,
       after.st_ino == before.st_ino,
@@ -1402,4 +1403,29 @@ enum RuntimeCLI {
       $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0))
     }
   }
+
+  /// SHA-256 of an already-open file, read from the start and leaving the
+  /// descriptor where it began. The upload re-reads the same descriptor and
+  /// re-hashes as it goes, so a file that changes underneath is still caught
+  /// by the identity and mtime checks after the last chunk.
+  static func streamedDigest(ofDescriptor descriptor: Int32) throws -> String {
+    guard lseek(descriptor, 0, SEEK_SET) == 0 else {
+      throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")
+    }
+    var hasher = SHA256()
+    var buffer = [UInt8](repeating: 0, count: 1 << 20)
+    while true {
+      let read = buffer.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress, $0.count) }
+      if read == 0 { break }
+      guard read > 0 else {
+        throw CLIError(exitCode: EX_IOERR, message: "cannot read flash bundle file")
+      }
+      buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[0..<read])) }
+    }
+    guard lseek(descriptor, 0, SEEK_SET) == 0 else {
+      throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")
+    }
+    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+  }
+
 }

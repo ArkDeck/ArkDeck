@@ -22,10 +22,9 @@ enum FlashBundleArtifactImportError: Error, Equatable, CustomStringConvertible {
     case .invalidName:
       return "flash bundle name must be images.tar.gz"
     case .invalidByteCount:
-      return
-        "flash bundle byteCount must equal a pinned DAYU200 profile archive size"
+      return "flash bundle byteCount must be a positive byte count"
     case .invalidSHA256:
-      return "flash bundle sha256 must equal the pinned DAYU200 archive digest"
+      return "flash bundle sha256 must be a lowercase SHA-256 digest"
     case .unknownUpload:
       return "unknown flash bundle import upload"
     case .expiredUpload:
@@ -39,7 +38,7 @@ enum FlashBundleArtifactImportError: Error, Equatable, CustomStringConvertible {
     case .incompleteUpload(let expected, let actual):
       return "flash bundle import is incomplete: expected \(expected), got \(actual)"
     case .invalidBundle(let detail):
-      return "flash bundle does not match the pinned DAYU200 profile: \(detail)"
+      return "flash bundle is not a usable DAYU200 images archive: \(detail)"
     case .ioFailure(let detail):
       return "flash bundle import I/O failed: \(detail)"
     }
@@ -53,8 +52,12 @@ struct FlashBundleImportValidation: Sendable, Equatable {
 
 struct FlashBundleImportPolicy: Sendable {
   struct Candidate: Sendable {
-    let expectedByteCount: Int
-    let expectedSHA256: String
+    /// Left nil by the production policy: an archive is judged by reading it,
+    /// not by being recognised before it is read. Tests still pin exact
+    /// expectations, and a candidate that states them keeps being matched on
+    /// them.
+    let expectedByteCount: Int?
+    let expectedSHA256: String?
     let validate: @Sendable (URL) throws -> FlashBundleImportValidation
   }
 
@@ -80,34 +83,47 @@ struct FlashBundleImportPolicy: Sendable {
 
   func candidate(byteCount: Int, sha256: String) -> Candidate? {
     candidates.first {
-      $0.expectedByteCount == byteCount && $0.expectedSHA256 == sha256
+      ($0.expectedByteCount ?? byteCount) == byteCount
+        && ($0.expectedSHA256 ?? sha256) == sha256
     }
   }
 
+  /// Accepts any archive that reads as a DAYU200 images bundle.
+  ///
+  /// It used to accept only the two builds enumerated in the product, matched
+  /// by digest before anything was read. A daily published after the last
+  /// release was refused with nineteen hash mismatches while fitting the board
+  /// perfectly — measured against the 7.0.0.37 build on 2026-08-05.
+  ///
+  /// What replaces that is not "no checking". The archive is decompressed and
+  /// hashed here, its partition table is parsed, its runtime version is read
+  /// out of the system image, and it must fit this board structurally: every
+  /// mapped partition has an image, the table declares nothing unknown. What
+  /// is gone is the requirement that somebody had already met this build.
   static let production: FlashBundleImportPolicy = {
-    FlashBundleImportPolicy(
-      candidates: RockchipFlashProfile.supportedDAYU200Profiles.map { profile in
-        Candidate(
-          expectedByteCount: Int(profile.archiveSizeBytes),
-          expectedSHA256: profile.archiveSHA256
-        ) { url in
-          let summary: GzipTarArchiveSummary
-          do {
-            summary = try GzipTarArchiveReader.summarize(fileAt: url)
-          } catch {
-            throw FlashBundleArtifactImportError.invalidBundle("\(error)")
-          }
-          switch profile.validate(summary.archiveObservation()) {
-          case .valid:
-            return FlashBundleImportValidation(
-              byteCount: Int(summary.archiveSizeBytes),
-              sha256: summary.archiveSHA256)
-          case .blocked(let violations):
-            throw FlashBundleArtifactImportError.invalidBundle(
-              violations.map(\.description).joined(separator: "; "))
-          }
+    FlashBundleImportPolicy(candidates: [
+      Candidate(expectedByteCount: nil, expectedSHA256: nil) { url in
+        let board = RockchipFlashProfile.dayu200OpenHarmony70035
+        let summary: GzipTarArchiveSummary
+        do {
+          summary = try GzipTarArchiveReader.summarize(
+            fileAt: url,
+            derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+        } catch {
+          throw FlashBundleArtifactImportError.invalidBundle("\(error)")
         }
-      })
+        do {
+          let build = try RockchipImageArchiveIntrospection.describe(
+            summary: summary, board: board)
+          _ = try board.forBuild(build)
+          return FlashBundleImportValidation(
+            byteCount: Int(summary.archiveSizeBytes),
+            sha256: summary.archiveSHA256)
+        } catch {
+          throw FlashBundleArtifactImportError.invalidBundle("\(error)")
+        }
+      }
+    ])
   }()
 }
 
@@ -117,6 +133,10 @@ struct FlashBundleImportPolicy: Sendable {
 /// side; a caller cannot nominate a daemon-local path.
 actor FlashBundleArtifactImportCoordinator {
   static let maximumChunkBytes = 2 * 1_024 * 1_024
+  /// Upper bound on a declared upload. Not a pin: the DAYU200 dailies run
+  /// ~730 MB and this only stops a declaration that could never be an images
+  /// archive from reserving staging space.
+  static let maximumBundleBytes = 8 * 1_024 * 1_024 * 1_024
   private static let lifetimeSeconds: TimeInterval = 30 * 60
 
   struct Completed: Sendable {
@@ -201,8 +221,22 @@ actor FlashBundleArtifactImportCoordinator {
     guard name == "images.tar.gz" else {
       throw FlashBundleArtifactImportError.invalidName
     }
-    guard policy.candidates.contains(where: { $0.expectedByteCount == byteCount }) else {
+    // A declared size is admissible when it is a plausible upload; the
+    // archive itself is judged on commit, by being read. Matching the
+    // declaration against a list of known builds is what refused a firmware
+    // daily published after the last release.
+    guard byteCount > 0, byteCount <= FlashBundleArtifactImportCoordinator.maximumBundleBytes
+    else {
       throw FlashBundleArtifactImportError.invalidByteCount
+    }
+    // Shape, not membership. Matching the declaration against a list of known
+    // builds is what refused a firmware daily published after the last
+    // release; a digest that is not a digest is still refusable here, without
+    // reading anything.
+    guard sha256.count == 64,
+      sha256.allSatisfy({ $0.isHexDigit && ($0.isNumber || $0.isLowercase) })
+    else {
+      throw FlashBundleArtifactImportError.invalidSHA256
     }
     guard let candidate = policy.candidate(byteCount: byteCount, sha256: sha256) else {
       throw FlashBundleArtifactImportError.invalidSHA256

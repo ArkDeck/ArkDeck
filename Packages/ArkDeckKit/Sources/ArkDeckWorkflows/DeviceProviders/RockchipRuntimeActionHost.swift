@@ -569,12 +569,23 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
     enterLoaderReadbackTimeoutSeconds: Int = 45,
     stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
-      guard
-        let profile = RockchipFlashProfile.profile(
-          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount)
+      // Read the bundle in hand rather than looking it up by digest. A build
+      // the product has never seen is not the same thing as an unusable one:
+      // what matters is that it fits the board and that these are the bytes
+      // the plan was built for, and `forArchive` decides the first while the
+      // stager still checks the second.
+      let profile: RockchipFlashProfile
+      do {
+        profile = try RockchipFlashProfile.dayu200OpenHarmony70035.forArchive(at: bundle.fileURL)
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "RockUSB staging bundle does not fit the DAYU200 board: \(error)")
+      }
+      guard profile.archiveSHA256 == bundle.sha256,
+        profile.archiveSizeBytes == Int64(bundle.byteCount)
       else {
         throw RuntimeDispatchFailure.failed(
-          "RockUSB staging received an unpublished DAYU200 bundle")
+          "RockUSB staging bundle drifted from its lease")
       }
       let staged = try RockchipFlashExecutionStager.stage(
         archiveURL: bundle.fileURL,
