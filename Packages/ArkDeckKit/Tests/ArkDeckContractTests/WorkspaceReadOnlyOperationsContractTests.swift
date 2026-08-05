@@ -244,13 +244,19 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     let archiveProvider = makeProvider(archiveProfile)
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "workspace.create-checkpoint@1"))
-    let snapshots = try WorkspaceProviderSupport.snapshots(
-      relativePaths: ["Sources/App.txt"], root: archiveProfile.projectRoot)
+    // The stated revision is the profile-scoped workspace revision - the one
+    // digest the authorization facts, the issued capability's scope and
+    // `apply-patch` all speak. A digest of only `checkpointFilePaths` is not
+    // it, and demanding that narrower one made this leg unreachable for the
+    // only caller that has ever sent it.
     let action = try archiveProvider.action(
       for: descriptor.steps[0], operation: descriptor,
       inputs: [
         "projectRef": .string("TestProject"),
-        "expectedWorkspaceRevision": .string(WorkspaceProviderSupport.revision(snapshots)),
+        "expectedWorkspaceRevision": .string(
+          try WorkspaceProviderSupport.workspaceRevision(
+            root: archiveProfile.projectRoot, profileVersion: archiveProfile.profileID,
+            globs: archiveProfile.allowedFileGlobs)),
         "checkpointFilePaths": .array([.string("Sources/App.txt")]),
       ], context: context())
     guard case .workspace(.createArchiveCheckpoint(let checkpoint)) = action

@@ -422,6 +422,42 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
       HarnessTaskCoordinator.semanticCode(from: "request too large"), "rejected")
   }
 
+  /// Found in the GJ-5 window, and the same shape of mistake as the one this
+  /// file opens with: the engine refused a *stale workspace revision*, and the
+  /// harness reported an authorization block. Nothing was wrong with any
+  /// grant, so the maintainer it stopped for had nothing to approve.
+  ///
+  /// The cause was a prose heuristic — the engine's own preflight message says
+  /// it failed "before authorization", and the word alone was enough. The
+  /// engine states a typed code in the same error, so that code decides.
+  func testTheEngineSTypedRejectionCodeOutranksTheProse() {
+    // Built from the engine's own error, exactly as the production adapter
+    // stringifies it, so a change to that interpolation fails here.
+    let conflict =
+      "typed plan preflight failed before authorization: "
+      + "unsupportedAction(\"workspace.revisionConflict:084dddd2b862!=1c0352994e4a\")"
+    let preflight = "\(RuntimeJobEngineError.rejected(.invalidInput, conflict))"
+    XCTAssertTrue(preflight.contains("authorization"), preflight)
+    XCTAssertEqual(HarnessTaskCoordinator.semanticCode(from: preflight), "invalidInput")
+
+    // A real authorization refusal keeps its family, because the runtime's own
+    // spelling of the code is what the approval path tests for.
+    let denial = "effect deviceMutation requires an explicit runtime capability"
+    let refusal = "\(RuntimeJobEngineError.rejected(.authorizationRequired, denial))"
+    XCTAssertEqual(HarnessTaskCoordinator.semanticCode(from: refusal), "authorizationRequired")
+    XCTAssertTrue(HarnessTaskCoordinator.semanticCode(from: refusal).hasPrefix("authorization"))
+
+    // Every published code survives the round trip, so a code added later is
+    // reported as itself rather than as whatever word its message happens to
+    // contain.
+    for code in RuntimeOperationErrorCode.allCases {
+      XCTAssertEqual(
+        HarnessTaskCoordinator.semanticCode(
+          from: "\(RuntimeJobEngineError.rejected(code, "detail"))"),
+        code.rawValue)
+    }
+  }
+
   /// The runtime and harness planes are deliberately decoupled and cannot
   /// share a constant, so the marker is written twice. This is what keeps the
   /// two copies from drifting apart in silence.

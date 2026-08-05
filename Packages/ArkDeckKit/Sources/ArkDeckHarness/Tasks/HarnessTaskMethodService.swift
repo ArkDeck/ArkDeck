@@ -341,11 +341,29 @@ package struct HarnessTaskMethodService: Sendable {
         return nil
       }
     }
+    // Declaring any of these is what asks for source repair, and it is also
+    // what supplies the isolated copy the repair runs in.
+    let declaresWorkspacePolicy =
+      params?["workspaceAllowedPaths"] != nil || params?["workspaceAllowedOperations"] != nil
+      || params?["maxAttempts"] != nil || params?["maxChangedFiles"] != nil
+      || params?["maxDiffLines"] != nil
     // Omitted means "the closed set this task type already permits", never
     // "everything": the type's handler owns that set.
+    //
+    // Minus the workspace mutations, unless the caller declared the workspace
+    // policy that gives the task a copy of its own to make them in. Inheriting
+    // them by default put source repair in the default allow-set with nowhere
+    // isolated to perform it, so the loop reached for the maintainer's own
+    // tree and stopped for a grant no one could usefully issue.
+    let typeDefault = HarnessTaskCoordinator.defaultPolicy(for: type)
     let policy =
       allowedOperations.isEmpty
-      ? HarnessTaskCoordinator.defaultPolicy(for: type)
+      ? HarnessTaskPolicy(
+        allowedOperations: declaresWorkspacePolicy
+          ? typeDefault.allowedOperations
+          : typeDefault.allowedOperations.filter {
+            !Self.isWorkspaceMutation($0)
+          })
       : HarnessTaskPolicy(allowedOperations: allowedOperations)
 
     let defaults = defaultBudgets
@@ -449,10 +467,7 @@ package struct HarnessTaskMethodService: Sendable {
       throw HarnessTaskSubmissionError.malformedEvolutionPolicy(obsolete)
     }
     let evolutionPolicy: HarnessEvolutionPolicy?
-    if params?["workspaceAllowedPaths"] != nil || params?["workspaceAllowedOperations"] != nil
-      || params?["maxAttempts"] != nil || params?["maxChangedFiles"] != nil
-      || params?["maxDiffLines"] != nil
-    {
+    if declaresWorkspacePolicy {
       guard text("projectRef") != nil else {
         throw HarnessTaskSubmissionError.evolutionProjectRequired
       }
@@ -496,6 +511,21 @@ package struct HarnessTaskMethodService: Sendable {
     } else {
       evolutionPolicy = nil
     }
+    // A task that may change a workspace runs in a copy it owns, always.
+    //
+    // Isolation is what lets the runtime issue its own bounded envelope for
+    // the change: nothing leaves the copy except through a promotion a person
+    // merges, so the pull request is the gate and no separate grant is needed.
+    // Without it the same task walks into a maintainer-issued grant it cannot
+    // actually obtain - the grant has to name a workspace revision the task is
+    // about to move, so it can only be written mid-run, and a resubmission
+    // needs another one. That is a stop for a human in the middle of an
+    // autonomous loop, and refusing the submission says so at the only moment
+    // the caller can still fix it.
+    let mutatingWorkspaceOperations = Self.workspaceMutations(in: policy.allowedOperations)
+    if evolutionPolicy == nil, !mutatingWorkspaceOperations.isEmpty {
+      throw HarnessTaskSubmissionError.workspaceIsolationRequired(mutatingWorkspaceOperations)
+    }
     return HarnessTaskSubmission(
       type: type,
       intakeDescription: text("intake"),
@@ -506,6 +536,20 @@ package struct HarnessTaskMethodService: Sendable {
       budgets: budgets,
       policy: policy,
       evolutionPolicy: evolutionPolicy)
+  }
+
+  /// Whether a published operation cannot avoid changing a workspace. Read
+  /// from the catalog rather than a hand-kept list, so a `workspace.*`
+  /// mutation added later is covered the day it is published.
+  static func isWorkspaceMutation(_ reference: String) -> Bool {
+    guard let descriptor = RuntimeOperationCatalog.descriptor(reference: reference) else {
+      return false
+    }
+    return descriptor.provider == .workspace && descriptor.minimumEffect >= .deviceMutation
+  }
+
+  static func workspaceMutations(in operations: [String]) -> [String] {
+    operations.filter(isWorkspaceMutation).sorted()
   }
 
   private static func isWireIdentifier(_ value: String) -> Bool {

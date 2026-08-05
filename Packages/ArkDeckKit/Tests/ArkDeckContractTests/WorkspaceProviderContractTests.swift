@@ -935,18 +935,45 @@ final class WorkspaceProviderContractTests: XCTestCase {
       artifactStore: artifactStore,
       nowUTC: { "2026-07-31T00:00:00Z" })
     let relativePath = "Sources/App.txt"
-    let snapshots = try WorkspaceProviderSupport.snapshots(
-      relativePaths: [relativePath], root: checkpointProfile.projectRoot)
+    // The revision a checkpoint states is the profile-scoped workspace
+    // revision - the same digest the authorization facts, the issued
+    // capability's scope and `apply-patch` speak. It is deliberately *not* a
+    // digest of only `checkpointFilePaths`: no caller can compute that one,
+    // and demanding it refused every checkpoint the repair route ever sent.
     let request = try operationRequest(
       id: "workspace.create-checkpoint",
       inputs: [
         "projectRef": .string(checkpointProfile.projectRef),
         "expectedWorkspaceRevision": .string(
-          WorkspaceProviderSupport.revision(snapshots)),
+          try WorkspaceProviderSupport.workspaceRevision(
+            root: checkpointProfile.projectRoot,
+            profileVersion: checkpointProfile.profileID,
+            globs: checkpointProfile.allowedFileGlobs)),
         "checkpointFilePaths": .array([.string(relativePath)]),
       ],
       requestID: "request-runtime-checkpoint",
       idempotencyKey: "idempotency-runtime-checkpoint")
+
+    // ...and the narrow file-set digest is refused, so the two meanings cannot
+    // quietly swap back.
+    let narrowSnapshots = try WorkspaceProviderSupport.snapshots(
+      relativePaths: [relativePath], root: checkpointProfile.projectRoot)
+    let narrow = try operationRequest(
+      id: "workspace.create-checkpoint",
+      inputs: [
+        "projectRef": .string(checkpointProfile.projectRef),
+        "expectedWorkspaceRevision": .string(
+          WorkspaceProviderSupport.revision(narrowSnapshots)),
+        "checkpointFilePaths": .array([.string(relativePath)]),
+      ],
+      requestID: "request-runtime-checkpoint-narrow",
+      idempotencyKey: "idempotency-runtime-checkpoint-narrow")
+    do {
+      _ = try await engine.submit(try JSONEncoder().encode(narrow))
+      XCTFail("the narrow file-set digest must not authorize a checkpoint")
+    } catch {
+      XCTAssertTrue("\(error)".contains("workspace.revisionConflict"), "\(error)")
+    }
 
     let acceptance = try await engine.submit(try JSONEncoder().encode(request))
     let status = try await engine.run(jobID: acceptance.jobID)

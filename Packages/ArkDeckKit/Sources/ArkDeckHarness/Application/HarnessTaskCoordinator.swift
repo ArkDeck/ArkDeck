@@ -2426,6 +2426,16 @@ public actor HarnessTaskCoordinator {
     // describes none of them: each needs a different maintainer action, and
     // the task retries into the same wall until a human reads runtime logs.
     if let denial = capabilityDenialCode(in: message) { return denial }
+    // The engine states its own typed rejection code, so reading it is not a
+    // heuristic and outranks every guess below.
+    //
+    // The guesses could only ever see that a word appeared *somewhere* in a
+    // sentence, and the engine's own preflight failure reads "typed plan
+    // preflight failed before authorization: ...". So a rejected *input* -
+    // a stale revision, a path outside the declared scopes - was reported as
+    // an authorization block and stopped the task for a maintainer who had
+    // nothing to approve and no grant that could have helped.
+    if let typed = runtimeRejectionCode(in: message) { return typed }
     let lowered = message.lowercased()
     if lowered.contains("has not been adopted") { return "targetNotAdopted" }
     if lowered.contains("runtime unavailable") || lowered.contains("unavailable") {
@@ -2436,6 +2446,23 @@ public actor HarnessTaskCoordinator {
     }
     if lowered.contains("binding") { return "bindingMismatch" }
     return "rejected"
+  }
+
+  /// The engine's own `RuntimeOperationErrorCode`, read from the rejection it
+  /// threw. `RuntimeJobEngineError.rejected` interpolates as
+  /// `rejected(ArkDeckRuntime.RuntimeOperationErrorCode.<case>, "<message>")`,
+  /// so the case name is present verbatim and needs no interpretation.
+  ///
+  /// `authorizationRequired` is one of those cases, which is what keeps a real
+  /// authorization refusal on the approval path: the family test below is
+  /// `hasPrefix("authorization")` and the runtime's own spelling satisfies it.
+  static func runtimeRejectionCode(in message: String) -> String? {
+    guard let marker = message.range(of: "RuntimeOperationErrorCode.") else { return nil }
+    let token = message[marker.upperBound...].prefix(while: {
+      $0.isASCII && ($0.isLetter || $0.isNumber)
+    })
+    guard (1...48).contains(token.count) else { return nil }
+    return String(token)
   }
 
   /// The runtime's typed capability denial in this file's vocabulary. The

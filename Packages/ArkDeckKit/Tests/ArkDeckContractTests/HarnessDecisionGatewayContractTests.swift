@@ -167,6 +167,35 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(proposal.confidence, 0.6)
   }
 
+  /// `reasonCode` is a label on a decision, not the decision. A model that
+  /// writes it as a sentence loses the label and keeps the proposal.
+  ///
+  /// It stays identifier-shaped in the record because failure fingerprints
+  /// are built from it: prose there would mint a new fingerprint every round
+  /// and failure memory would never recognise a repeat. What changed is the
+  /// cost of getting it wrong - throwing away a sound patch over a space in
+  /// its name spent a whole round rediscovering the same patch.
+  func testAProseReasonCodeCostsTheLabelAndNotTheProposal() throws {
+    for prose in [
+      "flip the CrashProbe ENABLED flag to false",
+      "repair/crash probe",
+      String(repeating: "z", count: 129),
+    ] {
+      let proposal = try HarnessDecisionProposal.parse(
+        encodeProposal([
+          "kind": .string("invokeOperation"),
+          "operationRef": .string(DebugCrashTaskHandler.captureDiagnostics),
+          "hypothesis": .string("Collect one more bounded sample."),
+          "reasonCode": .string(prose),
+        ]),
+        offeredOperations: offered)
+      XCTAssertEqual(proposal.kind, .invokeOperation)
+      XCTAssertEqual(
+        proposal.reasonCode, "modelProposal",
+        "prose must degrade to the default label, not enter the record: \(prose)")
+    }
+  }
+
   func testStateRetryAndSuccessFieldsAreRejectedNotIgnored() {
     // Each of these is a decision the harness or the runtime owns. Ignoring
     // them would let a model believe it had decided; rejecting says otherwise.

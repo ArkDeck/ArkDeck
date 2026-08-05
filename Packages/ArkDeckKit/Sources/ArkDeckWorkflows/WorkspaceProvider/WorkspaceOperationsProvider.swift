@@ -886,23 +886,23 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     // which tree it decided against gets that statement enforced: if the tree
     // moved between the decision and this materialization, the change is
     // refused rather than applied to a workspace nobody looked at.
+    //
+    // One workspace revision, computed one way, everywhere. `create-checkpoint`
+    // used to compare against a digest of just `checkpointFilePaths`, which no
+    // caller can produce: the harness states the revision it planned against,
+    // and that is the profile-scoped workspace revision the authorization
+    // facts, the issued capability's scope and `apply-patch` all speak. The two
+    // digests could only agree by accident, so the checkpoint leg refused every
+    // request that reached it and the repair route could never get past it.
+    //
+    // Comparing the profile-scoped revision is also the stricter of the two:
+    // the checkpoint's own paths must already lie inside the profile globs, so
+    // this sees every change the narrow digest saw, plus drift elsewhere in the
+    // declared scope that the narrow digest was blind to.
     if case .string(let declared)? = inputs["expectedWorkspaceRevision"] {
-      let actual: String
-      if operation.reference == "workspace.create-checkpoint@1",
-        inputs["checkpointFilePaths"] != nil
-      {
-        let paths = try stringArray("checkpointFilePaths", in: inputs)
-        try WorkspaceProviderSupport.validate(
-          relativePaths: paths, root: profile.projectRoot,
-          profileGlobs: profile.allowedFileGlobs, requestGlobs: paths)
-        actual = WorkspaceProviderSupport.revision(
-          try WorkspaceProviderSupport.snapshots(
-            relativePaths: paths, root: profile.projectRoot))
-      } else {
-        actual = try WorkspaceProviderSupport.workspaceRevision(
-          root: profile.projectRoot, profileVersion: profile.profileID,
-          globs: profile.allowedFileGlobs)
-      }
+      let actual = try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: profile.allowedFileGlobs)
       guard actual == declared else {
         throw DeviceProviderError.unsupportedAction(
           "workspace.revisionConflict:\(declared.prefix(12))!=\(actual.prefix(12))")
