@@ -233,7 +233,13 @@ final class DeviceProviderContractTests: XCTestCase {
         toolVersion: flashContext.toolVersion,
         toolSHA256: flashContext.toolSHA256,
         nowUTC: flashContext.nowUTC,
-        resolvedInputArtifact: flashContext.resolvedInputArtifact)
+        resolvedInputArtifact: flashContext.resolvedInputArtifact,
+        // The version the resolved bundle declares is a fact the Runtime reads
+        // when it resolves the lease, and post-flash verification is
+        // materialized against it. Supplying it here is what lets every step
+        // materialize without touching a file — which is the property this
+        // test exists to hold.
+        expectedRuntimeBuildVersion: "OpenHarmony-7.0.0.36")
       let action = try provider.action(
         for: step, operation: descriptor, inputs: inputs, context: stepContext)
       XCTAssertEqual(action.effect, step.effect, step.stepID)

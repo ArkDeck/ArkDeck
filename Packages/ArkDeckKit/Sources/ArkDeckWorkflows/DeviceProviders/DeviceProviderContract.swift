@@ -1394,6 +1394,15 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   /// Present only when the Runtime re-read an admitted campaign reservation
   /// and found its broker-recorded bounded tuning controls.
   public let campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning?
+  /// The build version declared by the image bundle this job will write, read
+  /// from the bundle's system image when the Runtime resolved it.
+  ///
+  /// It travels on the context because deciding what a device must report
+  /// after a flash is a fact about bytes, and reading bytes is the Runtime's
+  /// job. A step materializer that opened a 730 MB archive to answer this
+  /// would make materialization depend on I/O, which is what it stopped doing
+  /// when the per-build pins were removed (CHG-2026-056 r4).
+  public let expectedRuntimeBuildVersion: String?
 
   public init(
     jobID: String,
@@ -1407,7 +1416,8 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     nowUTC: String,
     resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
     additionalInputArtifacts: [ProviderResolvedInputArtifact] = [],
-    campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning? = nil
+    campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning? = nil,
+    expectedRuntimeBuildVersion: String? = nil
   ) {
     self.jobID = jobID
     self.stepID = stepID
@@ -1421,6 +1431,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     self.resolvedInputArtifact = resolvedInputArtifact
     self.additionalInputArtifacts = additionalInputArtifacts
     self.campaignExecutionTuning = campaignExecutionTuning
+    self.expectedRuntimeBuildVersion = expectedRuntimeBuildVersion
   }
 }
 

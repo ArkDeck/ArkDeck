@@ -848,8 +848,21 @@ struct ArkDeckCommandLine {
       throw CLIError(exitCode: EX_USAGE, message: "missing --images <images.tar.gz>")
     }
     print("validating \(imagesPath) (streaming SHA-256; this can take a while)…")
-    let summary = try GzipTarArchiveReader.summarize(fileAt: URL(fileURLWithPath: imagesPath))
-    let profile = try selectedProfile(options: options)
+    let board = try selectedProfile(options: options)
+    let summary = try GzipTarArchiveReader.summarize(
+      fileAt: URL(fileURLWithPath: imagesPath),
+      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+    // The plan is built for the archive in hand. Anything the board cannot
+    // make a complete plan for is refused here, by name; a build nobody had
+    // enumerated yet is not one of those things.
+    let profile: RockchipFlashProfile
+    do {
+      profile = try board.forBuild(
+        RockchipImageArchiveIntrospection.describe(summary: summary, board: board))
+    } catch {
+      throw CLIError(exitCode: 2, message: "archive does not fit \(board.catalogReference): \(error)")
+    }
+    print("build: \(profile.runtimeBuildVersion)")
     let provider = RockchipRockUSBFlashProvider(profile: profile)
     let verdict = provider.profile.validate(summary.archiveObservation())
     if case .blocked(let violations) = verdict {
@@ -865,7 +878,7 @@ struct ArkDeckCommandLine {
 
   static func selectedProfile(options: CLIOptions) throws -> RockchipFlashProfile {
     let profileReference = options.value("--device-profile") ?? "dayu200@1"
-    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
+    guard let profile = RockchipFlashProfile.board(reference: profileReference) else {
       throw CLIError(
         exitCode: EX_USAGE,
         message: "unsupported DAYU200 device profile \(profileReference)")
@@ -873,16 +886,17 @@ struct ArkDeckCommandLine {
     return profile
   }
 
+  /// The board profile carrying the facts the plan was built with. The plan
+  /// records the archive it was materialized against, so the pins travel with
+  /// the plan instead of having to be found in a list of known builds.
   static func publishedProfile(for plan: RockchipFlashPlan) throws -> RockchipFlashProfile {
-    guard
-      let profile = RockchipFlashProfile.profile(
-        archiveSHA256: plan.archiveSHA256, byteCount: Int(plan.archiveSizeBytes))
-    else {
-      throw CLIError(
-        exitCode: EX_DATAERR,
-        message: "execute plan has no exact published DAYU200 profile")
-    }
-    return profile
+    // Board facts only, which is all its consumers read — the provider's step
+    // set and the authorization gate. Both published references describe the
+    // same board: `dayu200@2` already reused `dayu200@1`'s mapped partitions,
+    // forbidden partitions and prerequisites verbatim, and differed only in
+    // which build it enumerated. The build's own facts travel on the plan.
+    _ = plan
+    return .dayu200OpenHarmony70035
   }
 
   static func bindingState(_ options: CLIOptions) -> RockchipDeviceBindingState {
@@ -939,14 +953,12 @@ struct ArkDeckCommandLine {
   }
 
   static func writePlanDocument(_ plan: RockchipFlashPlan, options: CLIOptions) throws {
-    guard
-      let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
-        $0.archiveSHA256 == plan.archiveSHA256
-      })
-    else {
-      throw CLIError(exitCode: EX_DATAERR, message: "plan has no published DAYU200 profile")
-    }
-    let document = RockchipRockUSBFlashProvider(profile: profile).planDocument(for: plan)
+    // The document describes the plan, and the plan already carries the
+    // archive it was built for. Finding a profile whose compiled-in digest
+    // equals the plan's is how a build published after the last release ended
+    // up with a complete plan it could not write down.
+    let document = RockchipRockUSBFlashProvider(profile: .dayu200OpenHarmony70035)
+      .planDocument(for: plan)
     let url = outputURL(options, fileName: "arkdeck-flash-plan.json")
     try document.canonicalData().write(to: url, options: .atomic)
     print("plan document: \(url.path)")

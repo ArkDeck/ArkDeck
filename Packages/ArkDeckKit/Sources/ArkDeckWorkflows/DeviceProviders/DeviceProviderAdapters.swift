@@ -2754,18 +2754,27 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       return .rockchip(.waitForHDCReconnect(connectKey: connectKey))
     case ("rebind-and-verify-build", .probeDevice):
       let bundle = try flashBundle(inputs: inputs, context: context)
-      guard
-        let profile = RockchipFlashProfile.profile(
-          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount)
+      // The version to expect is the one baked into the system image this plan
+      // wrote, read from that image — not a constant carried by the profile.
+      // The archive's own name cannot be used and neither can its build log:
+      // the 2026-07-28 daily is named 7.0.0.35 and its log says 7.0.0.35,
+      // while the device it produces answers 7.0.0.36.
+      // What the device must report is what the system image this plan wrote
+      // declares. The Runtime read it when it resolved the bundle, because
+      // reading bytes is its job and materializing a step is not the place to
+      // open a 730 MB archive.
+      guard let expectedBuildVersion = context.expectedRuntimeBuildVersion,
+        !expectedBuildVersion.isEmpty
       else {
         throw DeviceProviderError.unsupportedAction(
-          "post-flash verification requires an exact published profile")
+          "post-flash verification has no declared build version for the resolved bundle")
       }
+      _ = bundle
       return .rockchip(
         .verifyBuild(
           connectKey: connectKey,
-          expectedProductModel: profile.runtimeProductModel,
-          expectedBuildVersion: profile.runtimeBuildVersion))
+          expectedProductModel: RockchipFlashProfile.dayu200OpenHarmony70035.runtimeProductModel,
+          expectedBuildVersion: expectedBuildVersion))
     case ("capture-post-flash-diagnostics", .captureRemoteStdout):
       return .rockchip(.capturePostFlashDiagnostics(
         connectKey: connectKey,
@@ -2958,13 +2967,14 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       throw DeviceProviderError.unsupportedAction(
         "partitionPlan must exactly match the pinned DAYU200 order")
     }
-    guard let artifact = context.resolvedInputArtifact,
-      artifact.sha256 == profile.archiveSHA256,
-      artifact.byteCount == Int(profile.archiveSizeBytes)
-    else {
+    guard let artifact = context.resolvedInputArtifact else {
       throw DeviceProviderError.unsupportedAction(
-        "flash requires the engine-resolved pinned DAYU200 image bundle")
+        "flash requires an engine-resolved image bundle")
     }
+    // Whether the archive fits the board was decided at admission, which
+    // derived it from these same leased bytes after proving they had not
+    // drifted. Re-reading 730 MB while materializing each step would buy
+    // nothing and would make materialization depend on I/O.
     return RockchipRuntimeFlashBundle(
       artifactLeaseID: artifactLeaseID,
       artifactID: artifact.artifactID,

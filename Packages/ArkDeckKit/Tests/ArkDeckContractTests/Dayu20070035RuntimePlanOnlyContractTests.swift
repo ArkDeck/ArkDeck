@@ -135,7 +135,13 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       ["dayu200@1", "dayu200@2"])
   }
 
-  func testProviderSelectsV2PinsAndRejectsPartitionOrArchiveCrossVersionDrift() throws {
+  /// Partition order is still the board's and is still enforced. What no
+  /// longer refuses a bundle is naming the other published `deviceProfile`
+  /// value: both describe the same board — `dayu200@2` always reused
+  /// `dayu200@1`'s mapped partitions, forbidden partitions and prerequisites
+  /// verbatim — and they differed only in which firmware build each
+  /// enumerated, which is no longer a profile's business.
+  func testProviderEnforcesPartitionOrderAndTreatsBothReferencesAsOneBoard() throws {
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
@@ -173,46 +179,103 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       try provider.action(
         for: step, operation: descriptor, inputs: reordered, context: context))
 
-    var wrongVersion = inputs
-    wrongVersion["deviceProfile"] = .string("dayu200@1")
+    var otherReference = inputs
+    otherReference["deviceProfile"] = .string("dayu200@1")
+    guard
+      case .rockchip(.flashPartitions(let sameBundle)) = try provider.action(
+        for: step, operation: descriptor, inputs: otherReference, context: context)
+    else {
+      return XCTFail("both published references describe the same board")
+    }
+    XCTAssertEqual(sameBundle.partitionNames, bundle.partitionNames)
+    XCTAssertEqual(sameBundle.sha256, bundle.sha256)
+
+    // An unpublished reference is still refused: the catalog enumerates which
+    // boards exist, and that has not changed.
+    var unknownReference = inputs
+    unknownReference["deviceProfile"] = .string("dayu200@99")
     XCTAssertThrowsError(
       try provider.action(
-        for: step, operation: descriptor, inputs: wrongVersion, context: context))
+        for: step, operation: descriptor, inputs: unknownReference, context: context))
   }
 
-  func testAuthorizedExecutePlanFactsSelectV2FromExactArchiveAndRejectDrift() throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
-    let summary = GzipTarArchiveSummary(
+  /// A summary as a real read produces one: member digests, the captured
+  /// partition table and the version scanned out of the system image.
+  private func summary(
+    for profile: RockchipFlashProfile,
+    archiveSHA256: String? = nil,
+    members: [GzipTarMemberSummary]? = nil,
+    partitionTable: String? = nil,
+    version: String? = "OpenHarmony-7.0.0.36"
+  ) -> GzipTarArchiveSummary {
+    let table =
+      partitionTable
+      ?? ("CMDLINE:mtdparts=rk29xxnand:"
+        + profile.mappedPartitions.map { "0x1@0x\($0.offsetSectors)(\($0.partitionName))" }
+        .joined(separator: ",")
+        + ","
+        + profile.membershiplessPartitionsWriteForbidden.map { "0x1@0x1(\($0))" }
+        .joined(separator: ","))
+    return GzipTarArchiveSummary(
       archiveSizeBytes: profile.archiveSizeBytes,
-      archiveSHA256: profile.archiveSHA256,
-      members: profile.members.map {
-        GzipTarMemberSummary(name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256)
-      })
+      archiveSHA256: archiveSHA256 ?? profile.archiveSHA256,
+      members: members
+        ?? profile.members.map {
+          GzipTarMemberSummary(name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256)
+        },
+      capturedMembers: [
+        RockchipFlashProfile.partitionTableMemberName: Data(table.utf8)
+      ],
+      scannedValue: version)
+  }
+
+  /// The fact port plans for the archive it is given.
+  ///
+  /// It used to select a profile by matching the archive's digest against the
+  /// builds compiled into the product, so a firmware daily published after the
+  /// last release could not be planned at all. "Drift" now means the archive
+  /// does not fit the board — a missing image, an unknown partition, an
+  /// unreadable version — not that nobody had met it before.
+  func testAuthorizedExecutePlanFactsPlanForWhateverFitsTheBoard() throws {
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     let port = RockchipProductExecutePlanFactPort()
-    let plan = try port.makeValidatedExecutePlan(summary: summary)
+
+    let plan = try port.makeValidatedExecutePlan(summary: summary(for: profile))
     let expected = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .execute, archiveValidation: .valid)
     XCTAssertEqual(plan, expected)
     XCTAssertEqual(plan.archiveSHA256, profile.archiveSHA256)
 
-    let unknownArchive = GzipTarArchiveSummary(
-      archiveSizeBytes: summary.archiveSizeBytes,
-      archiveSHA256: String(repeating: "0", count: 64),
-      members: summary.members)
-    XCTAssertThrowsError(try port.makeValidatedExecutePlan(summary: unknownArchive)) { error in
+    // A build nobody enumerated plans, and its plan records its own digest.
+    let unknownDigest = String(repeating: "0", count: 64)
+    let unknownPlan = try port.makeValidatedExecutePlan(
+      summary: summary(for: profile, archiveSHA256: unknownDigest))
+    XCTAssertEqual(unknownPlan.archiveSHA256, unknownDigest)
+    XCTAssertEqual(unknownPlan.steps.count, plan.steps.count)
+
+    // Structural drift still fails closed: an image the board maps is absent.
+    let missingImage = profile.members.filter { $0.name != "system.img" }
+      .map { GzipTarMemberSummary(name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256) }
+    XCTAssertThrowsError(
+      try port.makeValidatedExecutePlan(summary: summary(for: profile, members: missingImage))
+    ) { error in
       XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
     }
 
-    var driftedMembers = summary.members
-    driftedMembers[0] = GzipTarMemberSummary(
-      name: driftedMembers[0].name,
-      sizeBytes: driftedMembers[0].sizeBytes,
-      sha256: String(repeating: "f", count: 64))
-    let memberDrift = GzipTarArchiveSummary(
-      archiveSizeBytes: summary.archiveSizeBytes,
-      archiveSHA256: summary.archiveSHA256,
-      members: driftedMembers)
-    XCTAssertThrowsError(try port.makeValidatedExecutePlan(summary: memberDrift)) { error in
+    // So does an archive whose system image declares no version, which would
+    // otherwise leave post-flash verification with nothing to compare against.
+    XCTAssertThrowsError(
+      try port.makeValidatedExecutePlan(summary: summary(for: profile, version: nil))
+    ) { error in
+      XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
+    }
+
+    // And a partition table naming something this board does not know.
+    XCTAssertThrowsError(
+      try port.makeValidatedExecutePlan(
+        summary: summary(
+          for: profile, partitionTable: "CMDLINE:mtdparts=rk29xxnand:0x1@0x1(vendor-secrets)"))
+    ) { error in
       XCTAssertEqual(error as? RockchipAuthorizationFactError, .archiveValidationFailed)
     }
   }
