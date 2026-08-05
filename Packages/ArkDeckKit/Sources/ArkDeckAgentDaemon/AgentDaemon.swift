@@ -1614,7 +1614,6 @@ public final class AgentDaemonServer: @unchecked Sendable {
         guard !line.isEmpty else { continue }
         beginRequest()
         let response = await handler.handleLine(line)
-        finishRequest()
         var written = 0
         let total = response.count
         let sent: Bool = response.withUnsafeBytes { raw in
@@ -1626,6 +1625,20 @@ public final class AgentDaemonServer: @unchecked Sendable {
           }
           return true
         }
+        // Handing the response to the socket is part of serving the request,
+        // so the count drops only after the bytes are out. Reporting the
+        // request finished before the write let `drainAndStop` observe an
+        // idle daemon and `shutdown(SHUT_RDWR)` the connection in the gap:
+        // the write then failed with EPIPE and a caller whose job had already
+        // crossed every durable boundary read "connection closed before
+        // response", unable to tell whether its request ran. The gap is a few
+        // instructions wide, so it needs only one unlucky preemption — a
+        // 200 us probe there fails the drain contract test on an idle host.
+        // A client that is alive but not reading can now hold the drain until
+        // its deadline instead; that is what the deadline is for, and the
+        // vanished-client case the shutdown below exists for is unaffected
+        // (its connection is idle between requests, never mid-response).
+        finishRequest()
         if !sent { return }
       }
       scannedByteCount = buffer.count
