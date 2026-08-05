@@ -1,0 +1,588 @@
+From bd4f029b4636603d20e7473707262c57765f1d38 Mon Sep 17 00:00:00 2001
+From: fuhanfeng <michael.fhf@gmail.com>
+Date: Wed, 5 Aug 2026 20:45:58 +0800
+Subject: [PATCH] wip(TASK-E2B-001): source flash pins from the archive in
+ hand, not from constants
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Incomplete — see the session report. Import and plan work end to end for an
+arbitrary build (7.0.0.37 verified on device-less paths); 10 tests still pin
+the removed behaviour and post-flash verification now needs I/O at
+materialization time, which is a real regression to fix before this ships.
+---
+ .../FlashBundleArtifactImport.swift           | 85 ++++++++++++-------
+ .../Sources/ArkDeckCLI/ArkDeckCLIMain.swift   | 52 +++++++-----
+ .../ArkDeckCLI/ArkDeckRuntimeCommands.swift   | 52 +++++++++---
+ .../DeviceProviderAdapters.swift              | 28 +++---
+ .../RockchipRuntimeActionHost.swift           | 19 ++++-
+ .../RockchipAuthorizationFacts.swift          | 30 +++++--
+ .../RockchipFlashProfile.swift                | 59 +++++++++++++
+ .../ArkDeckWorkflows/RuntimeJobEngine.swift   | 26 ++++--
+ 8 files changed, 258 insertions(+), 93 deletions(-)
+
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/FlashBundleArtifactImport.swift b/Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/FlashBundleArtifactImport.swift
+index f15050f5..fd410025 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/FlashBundleArtifactImport.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/FlashBundleArtifactImport.swift
+@@ -22,10 +22,9 @@ enum FlashBundleArtifactImportError: Error, Equatable, CustomStringConvertible {
+     case .invalidName:
+       return "flash bundle name must be images.tar.gz"
+     case .invalidByteCount:
+-      return
+-        "flash bundle byteCount must equal a pinned DAYU200 profile archive size"
++      return "flash bundle byteCount must be a positive byte count"
+     case .invalidSHA256:
+-      return "flash bundle sha256 must equal the pinned DAYU200 archive digest"
++      return "flash bundle sha256 must be a lowercase SHA-256 digest"
+     case .unknownUpload:
+       return "unknown flash bundle import upload"
+     case .expiredUpload:
+@@ -39,7 +38,7 @@ enum FlashBundleArtifactImportError: Error, Equatable, CustomStringConvertible {
+     case .incompleteUpload(let expected, let actual):
+       return "flash bundle import is incomplete: expected \(expected), got \(actual)"
+     case .invalidBundle(let detail):
+-      return "flash bundle does not match the pinned DAYU200 profile: \(detail)"
++      return "flash bundle is not a usable DAYU200 images archive: \(detail)"
+     case .ioFailure(let detail):
+       return "flash bundle import I/O failed: \(detail)"
+     }
+@@ -53,8 +52,12 @@ struct FlashBundleImportValidation: Sendable, Equatable {
+ 
+ struct FlashBundleImportPolicy: Sendable {
+   struct Candidate: Sendable {
+-    let expectedByteCount: Int
+-    let expectedSHA256: String
++    /// Left nil by the production policy: an archive is judged by reading it,
++    /// not by being recognised before it is read. Tests still pin exact
++    /// expectations, and a candidate that states them keeps being matched on
++    /// them.
++    let expectedByteCount: Int?
++    let expectedSHA256: String?
+     let validate: @Sendable (URL) throws -> FlashBundleImportValidation
+   }
+ 
+@@ -80,34 +83,47 @@ struct FlashBundleImportPolicy: Sendable {
+ 
+   func candidate(byteCount: Int, sha256: String) -> Candidate? {
+     candidates.first {
+-      $0.expectedByteCount == byteCount && $0.expectedSHA256 == sha256
++      ($0.expectedByteCount ?? byteCount) == byteCount
++        && ($0.expectedSHA256 ?? sha256) == sha256
+     }
+   }
+ 
++  /// Accepts any archive that reads as a DAYU200 images bundle.
++  ///
++  /// It used to accept only the two builds enumerated in the product, matched
++  /// by digest before anything was read. A daily published after the last
++  /// release was refused with nineteen hash mismatches while fitting the board
++  /// perfectly — measured against the 7.0.0.37 build on 2026-08-05.
++  ///
++  /// What replaces that is not "no checking". The archive is decompressed and
++  /// hashed here, its partition table is parsed, its runtime version is read
++  /// out of the system image, and it must fit this board structurally: every
++  /// mapped partition has an image, the table declares nothing unknown. What
++  /// is gone is the requirement that somebody had already met this build.
+   static let production: FlashBundleImportPolicy = {
+-    FlashBundleImportPolicy(
+-      candidates: RockchipFlashProfile.supportedDAYU200Profiles.map { profile in
+-        Candidate(
+-          expectedByteCount: Int(profile.archiveSizeBytes),
+-          expectedSHA256: profile.archiveSHA256
+-        ) { url in
+-          let summary: GzipTarArchiveSummary
+-          do {
+-            summary = try GzipTarArchiveReader.summarize(fileAt: url)
+-          } catch {
+-            throw FlashBundleArtifactImportError.invalidBundle("\(error)")
+-          }
+-          switch profile.validate(summary.archiveObservation()) {
+-          case .valid:
+-            return FlashBundleImportValidation(
+-              byteCount: Int(summary.archiveSizeBytes),
+-              sha256: summary.archiveSHA256)
+-          case .blocked(let violations):
+-            throw FlashBundleArtifactImportError.invalidBundle(
+-              violations.map(\.description).joined(separator: "; "))
+-          }
++    FlashBundleImportPolicy(candidates: [
++      Candidate(expectedByteCount: nil, expectedSHA256: nil) { url in
++        let board = RockchipFlashProfile.dayu200OpenHarmony70035
++        let summary: GzipTarArchiveSummary
++        do {
++          summary = try GzipTarArchiveReader.summarize(
++            fileAt: url,
++            derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
++        } catch {
++          throw FlashBundleArtifactImportError.invalidBundle("\(error)")
+         }
+-      })
++        do {
++          let build = try RockchipImageArchiveIntrospection.describe(
++            summary: summary, board: board)
++          _ = try board.forBuild(build)
++          return FlashBundleImportValidation(
++            byteCount: Int(summary.archiveSizeBytes),
++            sha256: summary.archiveSHA256)
++        } catch {
++          throw FlashBundleArtifactImportError.invalidBundle("\(error)")
++        }
++      }
++    ])
+   }()
+ }
+ 
+@@ -117,6 +133,10 @@ struct FlashBundleImportPolicy: Sendable {
+ /// side; a caller cannot nominate a daemon-local path.
+ actor FlashBundleArtifactImportCoordinator {
+   static let maximumChunkBytes = 2 * 1_024 * 1_024
++  /// Upper bound on a declared upload. Not a pin: the DAYU200 dailies run
++  /// ~730 MB and this only stops a declaration that could never be an images
++  /// archive from reserving staging space.
++  static let maximumBundleBytes = 8 * 1_024 * 1_024 * 1_024
+   private static let lifetimeSeconds: TimeInterval = 30 * 60
+ 
+   struct Completed: Sendable {
+@@ -201,7 +221,12 @@ actor FlashBundleArtifactImportCoordinator {
+     guard name == "images.tar.gz" else {
+       throw FlashBundleArtifactImportError.invalidName
+     }
+-    guard policy.candidates.contains(where: { $0.expectedByteCount == byteCount }) else {
++    // A declared size is admissible when it is a plausible upload; the
++    // archive itself is judged on commit, by being read. Matching the
++    // declaration against a list of known builds is what refused a firmware
++    // daily published after the last release.
++    guard byteCount > 0, byteCount <= FlashBundleArtifactImportCoordinator.maximumBundleBytes
++    else {
+       throw FlashBundleArtifactImportError.invalidByteCount
+     }
+     guard let candidate = policy.candidate(byteCount: byteCount, sha256: sha256) else {
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift b/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift
+index b2c850b6..26a0faec 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift
+@@ -848,8 +848,21 @@ struct ArkDeckCommandLine {
+       throw CLIError(exitCode: EX_USAGE, message: "missing --images <images.tar.gz>")
+     }
+     print("validating \(imagesPath) (streaming SHA-256; this can take a while)…")
+-    let summary = try GzipTarArchiveReader.summarize(fileAt: URL(fileURLWithPath: imagesPath))
+-    let profile = try selectedProfile(options: options)
++    let board = try selectedProfile(options: options)
++    let summary = try GzipTarArchiveReader.summarize(
++      fileAt: URL(fileURLWithPath: imagesPath),
++      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
++    // The plan is built for the archive in hand. Anything the board cannot
++    // make a complete plan for is refused here, by name; a build nobody had
++    // enumerated yet is not one of those things.
++    let profile: RockchipFlashProfile
++    do {
++      profile = try board.forBuild(
++        RockchipImageArchiveIntrospection.describe(summary: summary, board: board))
++    } catch {
++      throw CLIError(exitCode: 2, message: "archive does not fit \(board.catalogReference): \(error)")
++    }
++    print("build: \(profile.runtimeBuildVersion)")
+     let provider = RockchipRockUSBFlashProvider(profile: profile)
+     let verdict = provider.profile.validate(summary.archiveObservation())
+     if case .blocked(let violations) = verdict {
+@@ -865,7 +878,7 @@ struct ArkDeckCommandLine {
+ 
+   static func selectedProfile(options: CLIOptions) throws -> RockchipFlashProfile {
+     let profileReference = options.value("--device-profile") ?? "dayu200@1"
+-    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
++    guard let profile = RockchipFlashProfile.board(reference: profileReference) else {
+       throw CLIError(
+         exitCode: EX_USAGE,
+         message: "unsupported DAYU200 device profile \(profileReference)")
+@@ -873,16 +886,17 @@ struct ArkDeckCommandLine {
+     return profile
+   }
+ 
++  /// The board profile carrying the facts the plan was built with. The plan
++  /// records the archive it was materialized against, so the pins travel with
++  /// the plan instead of having to be found in a list of known builds.
+   static func publishedProfile(for plan: RockchipFlashPlan) throws -> RockchipFlashProfile {
+-    guard
+-      let profile = RockchipFlashProfile.profile(
+-        archiveSHA256: plan.archiveSHA256, byteCount: Int(plan.archiveSizeBytes))
+-    else {
+-      throw CLIError(
+-        exitCode: EX_DATAERR,
+-        message: "execute plan has no exact published DAYU200 profile")
+-    }
+-    return profile
++    // Board facts only, which is all its consumers read — the provider's step
++    // set and the authorization gate. Both published references describe the
++    // same board: `dayu200@2` already reused `dayu200@1`'s mapped partitions,
++    // forbidden partitions and prerequisites verbatim, and differed only in
++    // which build it enumerated. The build's own facts travel on the plan.
++    _ = plan
++    return .dayu200OpenHarmony70035
+   }
+ 
+   static func bindingState(_ options: CLIOptions) -> RockchipDeviceBindingState {
+@@ -939,14 +953,12 @@ struct ArkDeckCommandLine {
+   }
+ 
+   static func writePlanDocument(_ plan: RockchipFlashPlan, options: CLIOptions) throws {
+-    guard
+-      let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
+-        $0.archiveSHA256 == plan.archiveSHA256
+-      })
+-    else {
+-      throw CLIError(exitCode: EX_DATAERR, message: "plan has no published DAYU200 profile")
+-    }
+-    let document = RockchipRockUSBFlashProvider(profile: profile).planDocument(for: plan)
++    // The document describes the plan, and the plan already carries the
++    // archive it was built for. Finding a profile whose compiled-in digest
++    // equals the plan's is how a build published after the last release ended
++    // up with a complete plan it could not write down.
++    let document = RockchipRockUSBFlashProvider(profile: .dayu200OpenHarmony70035)
++      .planDocument(for: plan)
+     let url = outputURL(options, fileName: "arkdeck-flash-plan.json")
+     try document.canonicalData().write(to: url, options: .atomic)
+     print("plan document: \(url.path)")
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift b/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift
+index e339e892..ad5b3d2a 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift
+@@ -594,11 +594,9 @@ enum RuntimeCLI {
+     }
+     let targetID = arguments[targetIndex + 1]
+     let url = URL(fileURLWithPath: arguments[fileIndex + 1]).standardizedFileURL
+-    guard url.lastPathComponent == "images.tar.gz" else {
+-      throw CLIError(
+-        exitCode: EX_USAGE,
+-        message: "flash bundle file must have the exact basename images.tar.gz")
+-    }
++    // The vendor publishes `version-Daily_Version-OpenHarmony_7.0.0.37-…-\
++    // dayu200_img.tar.gz`. Requiring a rename before the product would look at
++    // the file was never a safety check — the archive is judged by reading it.
+     let profileReference: String
+     if let profileIndex = arguments.firstIndex(of: "--device-profile"),
+       profileIndex + 1 < arguments.count
+@@ -660,22 +658,25 @@ enum RuntimeCLI {
+     var before = stat()
+     guard fstat(descriptor, &before) == 0,
+       before.st_mode & S_IFMT == S_IFREG,
+-      before.st_size == profile.archiveSizeBytes
++      before.st_size > 0
+     else {
+       throw CLIError(
+         exitCode: EX_DATAERR,
+-        message:
+-          "flash bundle must be the pinned DAYU200 regular archive of "
+-          + "\(profile.archiveSizeBytes) bytes")
++        message: "flash bundle must be a non-empty regular file")
+     }
++    // What the daemon is told the upload will be. It reads the archive itself
++    // and refuses one that does not arrive as declared, or does not fit the
++    // board; the CLI states facts about the file it holds, and pins nothing.
++    let declaredByteCount = Int64(before.st_size)
++    let declaredSHA256 = try Self.streamedDigest(ofDescriptor: descriptor)
+ 
+     let begin = try client.request(
+       method: "artifact.importFlashBundle.begin",
+       params: [
+         "targetId": .string(targetID),
+         "name": .string("images.tar.gz"),
+-        "byteCount": .integer(profile.archiveSizeBytes),
+-        "sha256": .string(profile.archiveSHA256),
++        "byteCount": .integer(declaredByteCount),
++        "sha256": .string(declaredSHA256),
+       ])
+     guard case .object(let beginFields) = begin,
+       case .string(let uploadID)? = beginFields["uploadId"],
+@@ -729,8 +730,8 @@ enum RuntimeCLI {
+     var after = stat()
+     let digest =
+       hasher.finalize().map { String(format: "%02x", $0) }.joined()
+-    guard offset == Int(profile.archiveSizeBytes),
+-      digest == profile.archiveSHA256,
++    guard offset == Int(declaredByteCount),
++      digest == declaredSHA256,
+       fstat(descriptor, &after) == 0,
+       after.st_dev == before.st_dev,
+       after.st_ino == before.st_ino,
+@@ -1402,4 +1403,29 @@ enum RuntimeCLI {
+       $0.isASCII && ($0.isLetter || $0.isNumber || "._-".contains($0))
+     }
+   }
++
++  /// SHA-256 of an already-open file, read from the start and leaving the
++  /// descriptor where it began. The upload re-reads the same descriptor and
++  /// re-hashes as it goes, so a file that changes underneath is still caught
++  /// by the identity and mtime checks after the last chunk.
++  static func streamedDigest(ofDescriptor descriptor: Int32) throws -> String {
++    guard lseek(descriptor, 0, SEEK_SET) == 0 else {
++      throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")
++    }
++    var hasher = SHA256()
++    var buffer = [UInt8](repeating: 0, count: 1 << 20)
++    while true {
++      let read = buffer.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress, $0.count) }
++      if read == 0 { break }
++      guard read > 0 else {
++        throw CLIError(exitCode: EX_IOERR, message: "cannot read flash bundle file")
++      }
++      buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[0..<read])) }
++    }
++    guard lseek(descriptor, 0, SEEK_SET) == 0 else {
++      throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")
++    }
++    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
++  }
++
+ }
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift
+index 5d6f13c7..648d8353 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift
+@@ -2754,12 +2754,19 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
+       return .rockchip(.waitForHDCReconnect(connectKey: connectKey))
+     case ("rebind-and-verify-build", .probeDevice):
+       let bundle = try flashBundle(inputs: inputs, context: context)
+-      guard
+-        let profile = RockchipFlashProfile.profile(
+-          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount)
+-      else {
++      // The version to expect is the one baked into the system image this plan
++      // wrote, read from that image — not a constant carried by the profile.
++      // The archive's own name cannot be used and neither can its build log:
++      // the 2026-07-28 daily is named 7.0.0.35 and its log says 7.0.0.35,
++      // while the device it produces answers 7.0.0.36.
++      // One read, once, at the only step whose answer depends on it: what the
++      // device must report is what the system image this plan wrote declares.
++      let profile: RockchipFlashProfile
++      do {
++        profile = try RockchipFlashProfile.dayu200OpenHarmony70035.forArchive(at: bundle.fileURL)
++      } catch {
+         throw DeviceProviderError.unsupportedAction(
+-          "post-flash verification requires an exact published profile")
++          "post-flash verification cannot read the flashed build: \(error)")
+       }
+       return .rockchip(
+         .verifyBuild(
+@@ -2958,13 +2965,14 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
+       throw DeviceProviderError.unsupportedAction(
+         "partitionPlan must exactly match the pinned DAYU200 order")
+     }
+-    guard let artifact = context.resolvedInputArtifact,
+-      artifact.sha256 == profile.archiveSHA256,
+-      artifact.byteCount == Int(profile.archiveSizeBytes)
+-    else {
++    guard let artifact = context.resolvedInputArtifact else {
+       throw DeviceProviderError.unsupportedAction(
+-        "flash requires the engine-resolved pinned DAYU200 image bundle")
++        "flash requires an engine-resolved image bundle")
+     }
++    // Whether the archive fits the board was decided at admission, which
++    // derived it from these same leased bytes after proving they had not
++    // drifted. Re-reading 730 MB while materializing each step would buy
++    // nothing and would make materialization depend on I/O.
+     return RockchipRuntimeFlashBundle(
+       artifactLeaseID: artifactLeaseID,
+       artifactID: artifact.artifactID,
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeActionHost.swift b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeActionHost.swift
+index d3aaede6..2a828b25 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeActionHost.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeActionHost.swift
+@@ -569,12 +569,23 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
+     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
+     enterLoaderReadbackTimeoutSeconds: Int = 45,
+     stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
+-      guard
+-        let profile = RockchipFlashProfile.profile(
+-          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount)
++      // Read the bundle in hand rather than looking it up by digest. A build
++      // the product has never seen is not the same thing as an unusable one:
++      // what matters is that it fits the board and that these are the bytes
++      // the plan was built for, and `forArchive` decides the first while the
++      // stager still checks the second.
++      let profile: RockchipFlashProfile
++      do {
++        profile = try RockchipFlashProfile.dayu200OpenHarmony70035.forArchive(at: bundle.fileURL)
++      } catch {
++        throw RuntimeDispatchFailure.failed(
++          "RockUSB staging bundle does not fit the DAYU200 board: \(error)")
++      }
++      guard profile.archiveSHA256 == bundle.sha256,
++        profile.archiveSizeBytes == Int64(bundle.byteCount)
+       else {
+         throw RuntimeDispatchFailure.failed(
+-          "RockUSB staging received an unpublished DAYU200 bundle")
++          "RockUSB staging bundle drifted from its lease")
+       }
+       let staged = try RockchipFlashExecutionStager.stage(
+         archiveURL: bundle.fileURL,
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift
+index cd146959..a7e893de 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift
+@@ -50,16 +50,32 @@ package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
+   package init() {}
+ 
+   package func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
+-    let summary = try GzipTarArchiveReader.summarize(fileAt: archiveURL)
+-    return try makeValidatedExecutePlan(summary: summary)
++    let board = RockchipFlashProfile.dayu200OpenHarmony70035
++    let summary = try GzipTarArchiveReader.summarize(
++      fileAt: archiveURL,
++      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
++    return try makeValidatedExecutePlan(summary: summary, board: board)
+   }
+ 
+-  func makeValidatedExecutePlan(summary: GzipTarArchiveSummary) throws -> RockchipFlashPlan {
+-    guard
+-      let profile = RockchipFlashProfile.profile(
+-        archiveSHA256: summary.archiveSHA256, byteCount: Int(summary.archiveSizeBytes))
+-    else { throw RockchipAuthorizationFactError.archiveValidationFailed }
++  /// The plan is built for the archive in hand. It used to be built only for
++  /// an archive the product already enumerated, which meant a firmware daily
++  /// published after the last release could not be planned at all.
++  func makeValidatedExecutePlan(
++    summary: GzipTarArchiveSummary,
++    board: RockchipFlashProfile = .dayu200OpenHarmony70035
++  ) throws -> RockchipFlashPlan {
++    let profile: RockchipFlashProfile
++    do {
++      profile = try board.forBuild(
++        RockchipImageArchiveIntrospection.describe(summary: summary, board: board))
++    } catch {
++      throw RockchipAuthorizationFactError.archiveValidationFailed
++    }
+     let provider = RockchipRockUSBFlashProvider(profile: profile)
++    // Now a tautology-free check: the profile was just built from this
++    // summary, so what this asserts is that the archive is internally
++    // consistent — every member the derivation recorded is still the member
++    // the observation reports.
+     let verdict = provider.profile.validate(summary.archiveObservation())
+     guard verdict == .valid else { throw RockchipAuthorizationFactError.archiveValidationFailed }
+     return try provider.makePlan(mode: .execute, archiveValidation: verdict)
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift
+index c8d7fd0e..16df1692 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift
+@@ -609,3 +609,62 @@ extension RockchipFlashProfile {
+     return violations
+   }
+ }
++
++// MARK: - Instantiating a board profile for the build in hand (CHG-2026-056 r4)
++
++extension RockchipFlashProfile {
++  /// This board, carrying the facts of one particular archive.
++  ///
++  /// The per-build fields stay where they were — every downstream site that
++  /// records a plan digest, stages an archive or verifies a flashed device
++  /// reads them exactly as before. What changed is where they come from: the
++  /// archive that was actually imported and confirmed, rather than a constant
++  /// somebody typed in when that week's daily came out.
++  ///
++  /// This is the whole cutover in one function. The comparisons downstream are
++  /// unchanged and still fail closed; they now mean "these are the bytes this
++  /// plan was built for" instead of "this is a build we shipped knowledge of".
++  public func forBuild(_ build: RockchipImageBuildDescriptor) throws -> RockchipFlashProfile {
++    let violations = conformance(of: build)
++    guard violations.isEmpty else {
++      throw DeviceProviderError.unsupportedAction(
++        "flash bundle does not fit \(catalogReference): "
++          + violations.joined(separator: "; "))
++    }
++    return try RockchipFlashProfile(
++      archiveSizeBytes: build.archiveSizeBytes,
++      archiveSHA256: build.archiveSHA256,
++      members: build.members,
++      mappedPartitions: mappedPartitions,
++      membershiplessPartitionsWriteForbidden: membershiplessPartitionsWriteForbidden,
++      prerequisites: prerequisites,
++      catalogReference: catalogReference,
++      firmwareVersion: build.runtimeBuildVersion,
++      runtimeProductModel: runtimeProductModel,
++      runtimeBuildVersion: build.runtimeBuildVersion)
++  }
++
++  /// Reads an images archive and returns this board carrying its facts.
++  ///
++  /// One pass: decompress, hash, capture the partition table, scan the system
++  /// image for the version. Nothing is extracted and nothing is compared
++  /// against a list of builds.
++  public func forArchive(at url: URL) throws -> RockchipFlashProfile {
++    let summary = try GzipTarArchiveReader.summarize(
++      fileAt: url,
++      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: self))
++    return try forBuild(
++      RockchipImageArchiveIntrospection.describe(summary: summary, board: self))
++  }
++
++  /// The board every published DAYU200 reference resolves to.
++  ///
++  /// `dayu200@1` and `dayu200@2` are kept as published input values because
++  /// removing one would move the catalog digest and drop every Golden Journey
++  /// out of `REAL_DEVICE_PASS`. They already described the same board: the
++  /// second reused the first's mapped partitions, forbidden partitions and
++  /// prerequisites verbatim, and differed only in which build it enumerated.
++  public static func board(reference: String) -> RockchipFlashProfile? {
++    supportedDAYU200Profiles.first { $0.catalogReference == reference }
++  }
++}
+diff --git a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift
+index 7767a347..5c974ded 100644
+--- a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift
+@@ -3237,9 +3237,12 @@ public actor RuntimeJobEngine {
+         throw RuntimeDispatchFailure.failed(
+           "flash host verification cannot resolve its typed imageBundleLease")
+       }
++      let board = RockchipFlashProfile.dayu200OpenHarmony70035
+       let summary: GzipTarArchiveSummary
+       do {
+-        summary = try GzipTarArchiveReader.summarize(fileAt: resolved.fileURL)
++        summary = try GzipTarArchiveReader.summarize(
++          fileAt: resolved.fileURL,
++          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+       } catch {
+         throw RuntimeDispatchFailure.failed(
+           "flash host verification cannot read the leased archive: \(error)")
+@@ -3252,23 +3255,28 @@ public actor RuntimeJobEngine {
+       }
+       guard case .string(let profileReference)? =
+         jobs[jobID]?.record.request.inputs["deviceProfile"],
+-        let profile = RockchipFlashProfile.profile(reference: profileReference)
++        RockchipFlashProfile.board(reference: profileReference) != nil
+       else {
+         throw RuntimeDispatchFailure.failed(
+-          "flash request has no published versioned DAYU200 profile")
++          "flash request names no published DAYU200 board profile")
+       }
+-      switch profile.validate(summary.archiveObservation()) {
+-      case .valid:
++      // The bytes were just proven to be the leased ones. What remains is
++      // whether they are a usable images archive for this board — read, not
++      // recognised. The timeline records the build that was admitted, which is
++      // now a fact about the archive rather than a name from a list.
++      do {
++        let build = try RockchipImageArchiveIntrospection.describe(
++          summary: summary, board: board)
++        _ = try board.forBuild(build)
+         appendTimeline(
+           jobID: jobID,
+           entry:
+-            "\(step.stepID) profile=\(profile.catalogReference) "
++            "\(step.stepID) profile=\(profileReference) build=\(build.runtimeBuildVersion) "
+             + "sha256=\(summary.archiveSHA256)")
+         return
+-      case .blocked(let violations):
++      } catch {
+         throw RuntimeDispatchFailure.failed(
+-          "flash bundle violates the pinned DAYU200 profile: "
+-            + violations.map(\.description).joined(separator: "; "))
++          "flash bundle is not a usable DAYU200 images archive: \(error)")
+       }
+     }
+     guard descriptor.reference == "deploy.native-library.app-owned@1" else {
+-- 
+2.55.0
+
