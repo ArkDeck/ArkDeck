@@ -167,6 +167,53 @@ Two host facts that are easy to get wrong and cost a window each:
 `--workspace-allowed-paths` is what supplies the isolated copy, without which
 the repair operations are not in the task's allow-set at all.
 
+## Third run: what the model was actually contributing (#1091)
+
+The first two passes hid a number worth reading. Across their 40 model calls,
+**4 answers were accepted**. The loop converged because the deterministic
+handler drove every round; the model was, in effect, along for the ride.
+
+36 refusals, and 23 of them were the same shape — the model named the exact
+operation the handler had chosen and left `inputs` empty, which is what the
+envelope instruction tells it to do ("do not invent operation inputs or copy
+context metadata into inputs"). The validator then required the proposal's
+inputs to equal the handler's, and the handler's are never empty. The
+instruction could not be followed. #1091 made absent inputs mean agreement.
+
+`HTASK-95C045C0ADD9`, first run on `main@84f41bfe`:
+
+| | runs 1–2 (pre-fix) | run 3 (post-fix) |
+|---|---|---|
+| Model calls | 40 | 20 |
+| Accepted | 4 (10%) | **16 (80%)** |
+| `operationNotExpected` | 23 | 1 |
+| Rounds / E1 / wall clock | 21 / 6 / 1528s, 21 / 6 / 1802s | 21 / 6 / 1493s |
+| Criteria | 3/3 pass, 5 samples | 3/3 pass, 5 samples |
+
+The journey is unchanged — same rounds, same mutations, same verdict — which
+is the point: an accepted agreement dispatches the handler's step byte for
+byte. What changed is that the durable record now carries the model's own
+reading of each step. The dispatch log reads
+`staleDeploymentPredatesLatestPatch`, `reverifyPostPatchStaleSample`,
+`insufficientVerificationSamples` where it used to read the handler's generic
+`collectAdditionalSample`.
+
+### The four remaining refusals are correct
+
+- `operationNotOffered:workspace.apply-patch@1` ×3 — the model reaching for
+  the patch before the handler has evidence to justify one. The offered set
+  is the answer, and it did not include it yet.
+- `operationNotExpected:analyzer.extract-crash-signature@1` ×1 — the model
+  answered `requestHuman`: it suspected the device was running a stale build
+  and wanted a person to confirm before verifying further. That step is one
+  the handler orchestrates, so a model may not manufacture a human stop on
+  it. It was overruled, the analysis ran, and verification proceeded to a
+  pass — the suspicion was wrong.
+
+Neither is a defect, and neither is worth another window. A model that
+disagrees about *when* to patch is refused by the offered set; a model that
+wants to stop the loop on an orchestrated step is refused by design.
+
 ## Sample-taking note
 
 The five verification captures cost ten rounds — a capture and a derived
