@@ -839,14 +839,22 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
     } else if fields["requiredArtifacts"] != nil {
       throw HarnessDecisionRejection.oversizedField("requiredArtifacts")
     }
+    // Same treatment as `reasonCode`, and for the same reason: this is a
+    // label on the strategy record, not the decision. It stays bounded and
+    // control-character free because it enters the durable strategy identity,
+    // but a sentence that ran past the bound now costs the label rather than
+    // the patch it was attached to. The consumption site already has a
+    // default for an absent expectation.
+    //
+    // A non-string is still a refusal: that is a caller sending the wrong
+    // shape, not a caller being wordy.
     var expectedObservation: String?
     if case .string(let value)? = fields["expectedObservation"] {
-      guard !value.isEmpty, value.utf8.count <= 256,
+      if !value.isEmpty, value.utf8.count <= 256,
         !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
-      else {
-        throw HarnessDecisionRejection.oversizedField("expectedObservation")
+      {
+        expectedObservation = value
       }
-      expectedObservation = value
     } else if fields["expectedObservation"] != nil {
       throw HarnessDecisionRejection.oversizedField("expectedObservation")
     }

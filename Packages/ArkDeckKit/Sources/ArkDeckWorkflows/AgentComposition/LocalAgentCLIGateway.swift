@@ -273,6 +273,7 @@ extension LocalAgentCLIProcessTransport {
   /// half-removed.
   static func unfenced(_ text: String) -> String {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let fenced = lastFencedObject(in: trimmed) { return fenced }
     guard trimmed.hasPrefix("```"), trimmed.hasSuffix("```"), trimmed.count > 6 else {
       return trimmed
     }
@@ -285,6 +286,41 @@ extension LocalAgentCLIProcessTransport {
       }
     }
     return body.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  /// The last fenced block that holds a JSON object, or nil.
+  ///
+  /// A CLI agent narrates. It says what it checked, shows the diff, and then
+  /// states its answer in a ```json block - and a correct, complete patch
+  /// proposal was thrown away as malformed because two sentences preceded it
+  /// (observed on device, 2026-08-05). Reaching past the narration is the
+  /// same judgement the surrounding fence-stripping already makes: this is
+  /// presentation, and the answer is the object.
+  ///
+  /// Last, not first, because an agent that shows its work puts the answer at
+  /// the end - an earlier block is a draft or an illustration. Nothing here
+  /// interprets the bytes: the closed key set, the forbidden fields, the
+  /// offered-operation check and the raw-surface screen are all still
+  /// `HarnessDecisionProposal.parse`'s to apply to whatever comes out.
+  static func lastFencedObject(in text: String) -> String? {
+    var blocks: [String] = []
+    var remainder = Substring(text)
+    while let open = remainder.range(of: "```") {
+      var body = remainder[open.upperBound...]
+      // A language tag runs to the end of the opening line.
+      if let newline = body.firstIndex(of: "\n") {
+        let tag = body[body.startIndex..<newline]
+        if tag.allSatisfy({ $0.isLetter || $0.isNumber }) {
+          body = body[body.index(after: newline)...]
+        }
+      }
+      guard let close = body.range(of: "```") else { break }
+      blocks.append(
+        String(body[body.startIndex..<close.lowerBound])
+          .trimmingCharacters(in: .whitespacesAndNewlines))
+      remainder = body[close.upperBound...]
+    }
+    return blocks.last { $0.hasPrefix("{") && $0.hasSuffix("}") }
   }
 }
 

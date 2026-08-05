@@ -304,6 +304,42 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced("``"), "``")
   }
 
+  /// A CLI agent narrates: it says what it checked, shows the diff, then
+  /// states its answer in a fenced block. A complete and correct patch
+  /// proposal was discarded as malformed because two sentences preceded it
+  /// (observed on device, 2026-08-05), and the round after it stopped the
+  /// task for a human who had exactly that patch sitting in the record.
+  func testTheAnswerIsFoundWhenTheAgentNarratesBeforeIt() {
+    let object = #"{"kind":"proposePatch","hypothesis":"h"}"#
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced(
+        "Good, the diff is confirmed correct.\n\nNow producing the JSON:\n\n```json\n\(object)\n```"
+      ),
+      object)
+    // Trailing narration too, and a language tag that is absent.
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced("Here it is:\n```\n\(object)\n```\nThat is my answer."),
+      object)
+
+    // An agent that shows its work puts the answer last; an earlier block is
+    // a draft or an illustration.
+    let draft = #"{"kind":"noSafeAction","hypothesis":"draft"}"#
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced(
+        "First attempt:\n```json\n\(draft)\n```\nOn reflection:\n```json\n\(object)\n```"),
+      object)
+
+    // A fenced block that is not an object is not an answer: a shown diff or
+    // a shell transcript must not be handed to the parser as one.
+    let diff = "--- a/A.ets\n+++ b/A.ets\n@@ -1 +1 @@\n-old\n+new"
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced(
+        "The change:\n```diff\n\(diff)\n```\nand the decision:\n```json\n\(object)\n```"),
+      object)
+    let onlyDiff = "The change:\n```diff\n\(diff)\n```"
+    XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced(onlyDiff), onlyDiff)
+  }
+
   /// Print mode has nobody to answer a permission prompt, so the default
   /// already denies every tool. `plan` additionally made the CLI read a
   /// request for one JSON decision as an attempt to route around its own

@@ -196,6 +196,33 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     }
   }
 
+  /// `expectedObservation` is the same kind of field and gets the same
+  /// treatment: an over-long expectation costs the label, not the decision.
+  /// A wrong *shape* is still refused — that is a caller sending the wrong
+  /// type, not a caller being wordy.
+  func testAnOverlongExpectedObservationCostsTheLabelAndNotTheProposal() throws {
+    let proposal = try HarnessDecisionProposal.parse(
+      encodeProposal([
+        "kind": .string("invokeOperation"),
+        "operationRef": .string(DebugCrashTaskHandler.captureDiagnostics),
+        "hypothesis": .string("Collect one more bounded sample."),
+        "expectedObservation": .string(String(repeating: "o", count: 257)),
+      ]),
+      offeredOperations: offered)
+    XCTAssertEqual(proposal.kind, .invokeOperation)
+    XCTAssertNil(proposal.expectedObservation)
+
+    XCTAssertThrowsError(
+      try HarnessDecisionProposal.parse(
+        encodeProposal([
+          "kind": .string("invokeOperation"),
+          "operationRef": .string(DebugCrashTaskHandler.captureDiagnostics),
+          "hypothesis": .string("Collect one more bounded sample."),
+          "expectedObservation": .integer(7),
+        ]),
+        offeredOperations: offered))
+  }
+
   func testStateRetryAndSuccessFieldsAreRejectedNotIgnored() {
     // Each of these is a decision the harness or the runtime owns. Ignoring
     // them would let a model believe it had decided; rejecting says otherwise.
