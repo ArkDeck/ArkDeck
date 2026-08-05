@@ -1,17 +1,15 @@
 # Handover — removing the per-build flash pins (2026-08-05)
 
-Unfinished work. The code is `handover-remove-build-pins.patch`, next to this
-file — 8 files, +258/-93, applies to `main@af19ac97`:
+> **Closed.** §2 and all five tests in §3 landed together with the patch;
+> the suite is green at 1323 tests. This file stays as the record of why the
+> per-build pins went and what each restated test now says. The patch beside
+> it is the state as handed over, superseded by what was merged.
 
-```
-git checkout -b flash-remove-build-pins af19ac97
-git am openspec/changes/chg-2026-056-e2-policy-baseline-alignment/handover-remove-build-pins.patch
-```
-
-It is carried as a patch rather than a branch on purpose. It changes an E2
-admission boundary and five contract tests still fail; a half-finished
-destructive-operation boundary should not sit on a branch where it could be
-merged. The patch is inert until someone deliberately applies it.
+The work was handed over mid-way as `handover-remove-build-pins.patch` — 8
+files, +258/-93 against `main@af19ac97` — carried as a patch rather than a
+branch because it changed an E2 admission boundary with five contract tests
+still failing, and a half-finished destructive-operation boundary should not
+sit somewhere it could be merged.
 
 Read this before touching `RockchipFlashProfile` — the design question is
 settled and the remaining work is mechanical except for one real defect,
@@ -75,7 +73,17 @@ their *source* changed. `RockchipFlashProfile.board(reference:)` replaces
 The catalog is untouched: `dayu200@1` and `dayu200@2` both remain published
 input values, so the digest does not move and no Golden Journey loses its pass.
 
-## 2. The one real defect to fix first
+## 2. The one real defect to fix first — fixed
+
+**Resolved.** The version now travels on `ProviderExecutionContext` as
+`expectedRuntimeBuildVersion`, read by the Runtime when it resolves the flash
+lease — where reading bytes is already the job — and consumed by the verify
+step's materializer as a recorded fact. Materialization touches no file. The
+fix is *not* the sketch below, which routed it through the stager: staging
+lives inside the flash action and is released before the verify step, so the
+staged images are gone by then. Recorded because it looks right and is not.
+
+The original statement of the defect follows.
 
 **Post-flash verification now reads the archive while materializing a step.**
 
@@ -103,7 +111,15 @@ it to what the device answers. Sketch:
 Do not solve this by adding a field to `RockchipFlashPlan`: that changes
 `planDigestSHA256`, which several tests and the campaign confirmation pin.
 
-## 3. The five failing tests, and what each should say instead
+## 3. The five failing tests — all restated
+
+All five now pass. Four were restated as described below; the fifth passes
+because §2 landed. One gap surfaced while restating: nothing validated the
+*shape* of a declared SHA-256 once candidate matching stopped doing it
+incidentally, so the begin frame now checks it is 64 lowercase hex characters
+— refusable without reading anything, unlike membership in a list of builds.
+
+The intended restatements follow, and are what was written.
 
 None of these should be deleted. Each pinned a real invariant; the invariant
 changed, so the statement changes with it.
