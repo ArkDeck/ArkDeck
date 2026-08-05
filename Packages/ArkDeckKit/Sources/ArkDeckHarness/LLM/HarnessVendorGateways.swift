@@ -119,7 +119,9 @@ package enum HarnessVendorEnvelope {
     it, and answering with a different kind is refused rather than retried. \
     Evidence and in-scope source arrive as excerpts in artifacts and \
     sourceFiles; write the diff against the sourceFiles text exactly as \
-    given. The context follows.
+    given. unifiedDiff is a JSON string, so every newline in it must be the \
+    two characters backslash-n, never a real line break: a diff with real \
+    line breaks is not JSON and is refused unparsed. The context follows.
     """
 
   package static func text(_ context: HarnessDecisionContext) -> String {

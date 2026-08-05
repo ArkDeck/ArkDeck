@@ -590,6 +590,44 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         from: decision(kind: .noSafeAction, reasonCode: "patchProposalRequired")))
   }
 
+  /// A refusal that keeps only a byte count leaves the next reader inferring
+  /// the shape of a response nobody kept — which is exactly what happened to
+  /// a `malformedJson` on the real device. A refusal keeps a bounded copy; an
+  /// accepted response does not, because it already survives as the Decision
+  /// it became.
+  func testOnlyARefusedResponseIsKeptForDiagnosis() {
+    func run(_ outcome: HarnessModelRunOutcome, excerpt: String?) -> HarnessModelRun {
+      HarnessModelRun(
+        modelRunID: "MRUN-1", htaskID: "HTASK-0123456789AB", round: 1,
+        descriptor: HarnessModelDescriptor(provider: "test"),
+        observedStateVersion: 1, contextDigest: "d", contextBytes: 10,
+        responseBytes: 20, rejectedResponseExcerpt: excerpt, outcome: outcome,
+        startedAtUTC: "2026-07-31T00:00:00Z", finishedAtUTC: "2026-07-31T00:00:01Z")
+    }
+    XCTAssertEqual(
+      run(.rejected(reasonCode: "malformedJson"), excerpt: "{not json").rejectedResponseExcerpt,
+      "{not json")
+    XCTAssertEqual(
+      run(.transportFailed(reasonCode: "timeout"), excerpt: "partial").rejectedResponseExcerpt,
+      "partial")
+    XCTAssertNil(
+      run(.accepted(decisionID: "dec-1"), excerpt: "should not be kept")
+        .rejectedResponseExcerpt,
+      "an accepted response is already the Decision; keeping a second copy is duplication")
+
+    // Round-trips, and a record written before the field existed still decodes.
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+    let refused = run(.rejected(reasonCode: "malformedJson"), excerpt: "{not json")
+    XCTAssertEqual(
+      try? decoder.decode(HarnessModelRun.self, from: try encoder.encode(refused)), refused)
+    XCTAssertNil(
+      (try? decoder.decode(
+        HarnessModelRun.self,
+        from: try encoder.encode(run(.accepted(decisionID: "d"), excerpt: nil))))?
+        .rejectedResponseExcerpt)
+  }
+
   func testRevisionAwareExecutionStateIsCanonicalBoundedAndTraceable() throws {
     let baseRevision = String(repeating: "a", count: 64)
     let patchRevision = String(repeating: "b", count: 64)

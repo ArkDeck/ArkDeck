@@ -273,8 +273,11 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
       case "claude-code":
         XCTAssertTrue(arguments.contains("--print"))
         XCTAssertTrue(arguments.contains("--strict-mcp-config"))
-        let permission = try XCTUnwrap(arguments.firstIndex(of: "--permission-mode"))
-        XCTAssertEqual(arguments[permission + 1], "plan")
+        // No permission mode: print mode cannot answer a permission prompt,
+        // so the default already denies every tool. See
+        // testTheClaudeCodeProfileAsksForReasoningNotAnAgentWithTools for why
+        // naming `plan` here was actively harmful.
+        XCTAssertFalse(arguments.contains("--permission-mode"))
         XCTAssertFalse(arguments.contains("--output-last-message"))
         // The CLI resolves its stored credential through `USER`; nothing else
         // is inherited, and no credential value is ever named here.
@@ -283,6 +286,36 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
         XCTFail("unreviewed profile \(profile.profileID) has no invocation contract")
       }
     }
+  }
+
+  /// A fence is presentation. Refusing a fenced answer burns a round on
+  /// formatting, so one surrounding fence is unwrapped — and nothing else is:
+  /// the closed key set and every value check stay with the strict parser.
+  func testOneSurroundingCodeFenceIsPresentationNotContent() {
+    let object = #"{"kind":"noSafeAction"}"#
+    XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced("```json\n\(object)\n```"), object)
+    XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced("```\n\(object)\n```"), object)
+    XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced("  \(object)  "), object)
+    // An unterminated fence is not a fence; half-removing it would corrupt
+    // bytes the parser is entitled to judge as they were returned.
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced("```json\n\(object)"), "```json\n\(object)")
+    // A fence-looking prefix inside the payload is left where it is.
+    XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced("``"), "``")
+  }
+
+  /// Print mode has nobody to answer a permission prompt, so the default
+  /// already denies every tool. `plan` additionally made the CLI read a
+  /// request for one JSON decision as an attempt to route around its own
+  /// approval gate, and answer with prose about that instead.
+  func testTheClaudeCodeProfileAsksForReasoningNotAnAgentWithTools() {
+    let arguments = HarnessLocalAgentCLIProfile.claudeCode.arguments(
+      modelName: "sonnet", workingDirectory: "/tmp", prompt: "p", finalMessagePath: nil)
+    XCTAssertTrue(arguments.contains("--print"))
+    XCTAssertTrue(arguments.contains("--strict-mcp-config"))
+    XCTAssertFalse(arguments.contains("--permission-mode"))
+    XCTAssertFalse(arguments.contains("--dangerously-skip-permissions"))
+    XCTAssertFalse(arguments.contains("--allow-dangerously-skip-permissions"))
   }
 
   func testSharedInstructionDoesNotTellPatchProposalsToSelectAnOperation() {

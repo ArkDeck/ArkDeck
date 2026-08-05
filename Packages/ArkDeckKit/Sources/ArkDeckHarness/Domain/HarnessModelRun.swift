@@ -80,6 +80,11 @@ public struct HarnessModelRun: Equatable, Sendable, Codable {
   public let contextDigest: String
   public let contextBytes: Int
   public let responseBytes: Int
+  /// A bounded copy of a *refused* response. Only refusals carry it, and only
+  /// so the next reader can see what was actually returned: a bare
+  /// `malformedJson` with a byte count leaves a maintainer inferring the shape
+  /// of a response nobody kept.
+  public let rejectedResponseExcerpt: String?
   public let outcome: HarnessModelRunOutcome
   public let startedAtUTC: String
   public let finishedAtUTC: String
@@ -95,6 +100,7 @@ public struct HarnessModelRun: Equatable, Sendable, Codable {
     case contextDigest
     case contextBytes
     case responseBytes
+    case rejectedResponseExcerpt
     case outcome
     case startedAtUTC = "startedAtUtc"
     case finishedAtUTC = "finishedAtUtc"
@@ -109,6 +115,7 @@ public struct HarnessModelRun: Equatable, Sendable, Codable {
     contextDigest: String,
     contextBytes: Int,
     responseBytes: Int,
+    rejectedResponseExcerpt: String? = nil,
     outcome: HarnessModelRunOutcome,
     startedAtUTC: String,
     finishedAtUTC: String
@@ -123,6 +130,12 @@ public struct HarnessModelRun: Equatable, Sendable, Codable {
     self.contextDigest = contextDigest
     self.contextBytes = contextBytes
     self.responseBytes = responseBytes
+    // Only a refusal keeps a copy: an accepted response already survives as
+    // the Decision it became.
+    self.rejectedResponseExcerpt = {
+      if case .accepted = outcome { return nil }
+      return rejectedResponseExcerpt
+    }()
     self.outcome = outcome
     self.startedAtUTC = startedAtUTC
     self.finishedAtUTC = finishedAtUTC
