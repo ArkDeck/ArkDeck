@@ -28,6 +28,69 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     try? FileManager.default.removeItem(at: root)
   }
 
+  /// Every published DAYU200 reference must describe the same board.
+  ///
+  /// Load-bearing since the per-build pins went. `publishedProfile(for:)` now
+  /// returns one board for any plan, and the adapters name one board when they
+  /// need board facts — both on the strength of this being true. It has always
+  /// been true by construction (`dayu200@2` reuses `dayu200@1`'s mapped
+  /// partitions, forbidden partitions and prerequisites verbatim), and the
+  /// day someone gives a reference its own partition map, those call sites
+  /// start silently answering for the wrong board. This is what stops that
+  /// being silent.
+  func testEveryPublishedReferenceDescribesTheSameBoard() throws {
+    let profiles = RockchipFlashProfile.supportedDAYU200Profiles
+    let first = try XCTUnwrap(profiles.first)
+    for profile in profiles.dropFirst() {
+      XCTAssertEqual(
+        profile.mappedPartitions, first.mappedPartitions, profile.catalogReference)
+      XCTAssertEqual(
+        profile.membershiplessPartitionsWriteForbidden,
+        first.membershiplessPartitionsWriteForbidden, profile.catalogReference)
+      XCTAssertEqual(profile.prerequisites, first.prerequisites, profile.catalogReference)
+      XCTAssertEqual(
+        profile.runtimeProductModel, first.runtimeProductModel, profile.catalogReference)
+      XCTAssertEqual(
+        profile.runtimeVersionPartitionName, first.runtimeVersionPartitionName,
+        profile.catalogReference)
+    }
+  }
+
+  /// The per-build fields a board constant still carries are a template, not
+  /// an answer: `forBuild` replaces every one of them with what the archive
+  /// says. If it ever stopped, a plan would record a digest belonging to some
+  /// other build.
+  func testForBuildReplacesEveryPerBuildFieldOfTheBoardConstant() throws {
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let members = board.members.map {
+      RockchipImagesArchiveMember(
+        name: $0.name, sizeBytes: $0.sizeBytes + 1,
+        sha256: String(repeating: "c", count: 64),
+        classification: $0.classification)
+    }
+    let build = RockchipImageBuildDescriptor(
+      archiveSizeBytes: 1_234,
+      archiveSHA256: String(repeating: "a", count: 64),
+      members: members,
+      declaredPartitions: board.mappedPartitions.map {
+        RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
+      } + board.membershiplessPartitionsWriteForbidden.map {
+        RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+      },
+      runtimeBuildVersion: "OpenHarmony-9.9.9.9")
+    let derived = try board.forBuild(build)
+
+    XCTAssertEqual(derived.archiveSizeBytes, 1_234)
+    XCTAssertEqual(derived.archiveSHA256, String(repeating: "a", count: 64))
+    XCTAssertEqual(derived.runtimeBuildVersion, "OpenHarmony-9.9.9.9")
+    XCTAssertEqual(derived.firmwareVersion, "OpenHarmony-9.9.9.9")
+    XCTAssertEqual(derived.members.map(\.sha256), members.map(\.sha256))
+    XCTAssertNotEqual(derived.archiveSHA256, board.archiveSHA256)
+    // Board facts survive untouched.
+    XCTAssertEqual(derived.mappedPartitions, board.mappedPartitions)
+    XCTAssertEqual(derived.catalogReference, board.catalogReference)
+  }
+
   /// The rule replaces a table that a person wrote by hand, twice. If it does
   /// not reproduce both of them exactly, it is not the same knowledge.
   func testTheClassificationRuleReproducesEveryHandAuthoredMember() {
