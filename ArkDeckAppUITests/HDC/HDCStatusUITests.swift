@@ -6,6 +6,7 @@ final class HDCStatusUITests: XCTestCase {
   // TEST-AC-HDC-001-02 / toolchainDiagnosticsContract
   func testDiagnosticsShowEveryToolchainFieldAndExplicitUnverifiedState() {
     let app = launch(arguments: [])
+    expandAdvancedDiagnostics(app)
 
     XCTAssertTrue(app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5))
     assertDisplayedValue(app.staticTexts["hdc.toolchain.path"], equals: "/Applications/DevEco/hdc")
@@ -92,6 +93,18 @@ final class HDCStatusUITests: XCTestCase {
   func testImpactPreviewShowsHostWideScopeConfirmationRequirementAndCriticalGate() {
     let app = launch(arguments: ["--ui-test-hdc-impact-preview", "--ui-test-hdc-critical-gate"])
 
+    // The critical gate stays on the page itself, before any review sheet opens.
+    assertDisplayedValue(
+      app.staticTexts["hdc.lifecycle.criticalGate"],
+      equals:
+        "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary.")
+
+    // A preview is requested explicitly; the impact review is a sheet, not an
+    // inline block that could be mistaken for a confirmed state.
+    let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
+    XCTAssertTrue(request.waitForExistence(timeout: 5))
+    request.click()
+
     XCTAssertTrue(app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistence(timeout: 5))
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.impactPreview"], equals: "Server recovery impact preview")
@@ -114,17 +127,42 @@ final class HDCStatusUITests: XCTestCase {
       app.staticTexts["hdc.lifecycle.confirmationRequired"],
       equals:
         "This preview requires an exact-generation user confirmation before recovery can dispatch.")
-    assertDisplayedValue(
-      app.staticTexts["hdc.lifecycle.criticalGate"],
-      equals:
-        "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary.")
+
+    // The confirmation names the exact generation it confirms, and cancelling
+    // it is the default. Confirming closes the review without dispatching.
+    XCTAssertTrue(app.buttons["hdc.lifecycle.cancelImpactPreview"].exists)
     let confirmation = app.buttons["hdc.lifecycle.confirmImpactPreview"]
     XCTAssertTrue(confirmation.exists)
-    confirmation.tap()
+    XCTAssertEqual(confirmation.label, "Confirm Generation 7")
+    confirmation.click()
+
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.confirmed"],
       equals: "Recovery impact confirmed for generation 7. Dispatch remains separately gated.")
     XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
+    XCTAssertFalse(
+      app.staticTexts["hdc.lifecycle.impactPreview"].exists,
+      "confirming must close the review sheet")
+  }
+
+  // DONE-05: cancelling the review is a zero-dispatch, zero-confirmation exit,
+  // and Esc reaches the same cancel path.
+  func testCancellingTheImpactReviewLeavesNoConfirmationAndNoDispatch() {
+    let app = launch(arguments: ["--ui-test-hdc-impact-preview"])
+
+    let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
+    XCTAssertTrue(request.waitForExistence(timeout: 5))
+    request.click()
+    XCTAssertTrue(app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistence(timeout: 5))
+
+    app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+
+    XCTAssertTrue(
+      app.staticTexts["hdc.lifecycle.impactPreview"].waitForNonExistence(timeout: 5),
+      "Esc must close the review sheet")
+    XCTAssertFalse(app.staticTexts["hdc.lifecycle.confirmed"].exists)
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
+    XCTAssertTrue(app.buttons["hdc.lifecycle.requestImpactPreview"].exists)
   }
 
   // TEST-AC-HDC-003-01 / productionSessionCompositionUI
@@ -138,16 +176,17 @@ final class HDCStatusUITests: XCTestCase {
         "/usr/bin/true",
       ],
       fixture: false)
+    expandAdvancedDiagnostics(app)
 
     let configuredPath = app.staticTexts["hdc.toolchain.path"]
-    assertDisplayedValue(configuredPath, equals: "/usr/bin/true")
+    assertDisplayedValue(configuredPath, equals: "/usr/bin/true", timeout: 15)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
       equals: "No recovery impact preview has been requested",
       timeout: 15)
     let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
     XCTAssertTrue(request.exists)
-    request.tap()
+    request.click()
     // participant 门已由 App-root registry 的空-完备 inventory 满足;剩余阻断
     // 只能来自 server-identity/endpoint 前置(/usr/bin/true 非 pinned 3.2.0d)。
     assertDisplayedValue(
@@ -157,6 +196,9 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertFalse(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"].exists,
       "the inventory-unavailable wording must be gone from the production launch path")
+    XCTAssertFalse(
+      app.staticTexts["hdc.lifecycle.impactPreview"].exists,
+      "a request that cannot produce an impact must not open a review sheet")
   }
 
   // M1-006 safety gate: a non-pinned fake cannot be executed merely because
@@ -168,6 +210,7 @@ final class HDCStatusUITests: XCTestCase {
         "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path",
         fakeExecutable.path,
       ], fixture: false)
+    expandAdvancedDiagnostics(app)
 
     assertDisplayedValue(
       app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
@@ -207,11 +250,13 @@ final class HDCStatusUITests: XCTestCase {
     pathField.typeKey(.return, modifierFlags: [])
     app.typeKey(.return, modifierFlags: [])
 
+    expandAdvancedDiagnostics(app)
     assertDisplayedValue(
       app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
     app.terminate()
 
     let reopened = launch(arguments: [], fixture: false)
+    expandAdvancedDiagnostics(reopened)
     assertDisplayedValue(
       reopened.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
   }
@@ -220,6 +265,7 @@ final class HDCStatusUITests: XCTestCase {
   // accessible static text and renders the exact fixture presentation.
   func testOBSAPP1_ObservationSummaryFieldsAreAccessibleStaticText() {
     let app = launch(arguments: [])
+    expandAdvancedDiagnostics(app)
     let expectedEvents =
       "2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567"
 
@@ -292,7 +338,7 @@ final class HDCStatusUITests: XCTestCase {
       .filter { $0.hasPrefix("import ArkDeck") }
 
     XCTAssertEqual(Set(productImports), ["import ArkDeckWorkflows"])
-    for forbidden in [
+    let forbiddenCapabilities = [
       "ArkDeckOpenHarmony",
       "HDCDeviceObservationSnapshot",
       "HDCDeviceObservationSource",
@@ -305,9 +351,23 @@ final class HDCStatusUITests: XCTestCase {
       "2026-07-28T00:00:00.000Z",
       "2026-07-28T00:00:01.000Z",
       "redacted-device-0123456789abcdef01234567",
-    ] {
+    ]
+    for forbidden in forbiddenCapabilities {
       XCTAssertFalse(
         source.contains(forbidden), "App source contains forbidden capability: \(forbidden)")
+    }
+
+    // The unavailable workspace is a new production view on the same
+    // boundary: it may not acquire a capability this one is denied, and it
+    // owns no model or fixture at all.
+    for relativePath in ["ArkDeckApp/Features/Shared/UnavailableFeatureView.swift"] {
+      let shellSource = try String(
+        contentsOf: repositoryRoot().appending(path: relativePath), encoding: .utf8)
+      for forbidden in forbiddenCapabilities {
+        XCTAssertFalse(
+          shellSource.contains(forbidden),
+          "\(relativePath) contains forbidden capability: \(forbidden)")
+      }
     }
 
     let fields = [
@@ -414,10 +474,32 @@ final class HDCStatusUITests: XCTestCase {
     }
     XCTAssertTrue(
       app.windows.firstMatch.waitForExistence(timeout: 5), "ArkDeck must create a test window")
+    // The absolute path now lives in the collapsed Advanced Diagnostics
+    // section, so readiness is anchored on a field the Overview always shows.
     XCTAssertTrue(
-      app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 15),
+      app.staticTexts["hdc.endpoint"].waitForExistence(timeout: 15),
       "ArkDeck must render an accessible HDC diagnostics root before assertions")
     return app
+  }
+
+  /// Advanced Diagnostics is collapsed by default. Expanding it is a user
+  /// action, not a fixture: the same raw values stay behind the same
+  /// identifiers once the section is open.
+  private func expandAdvancedDiagnostics(
+    _ app: XCUIApplication,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let toggle = app.buttons["overview.advanced.toggle"]
+    XCTAssertTrue(
+      toggle.waitForExistence(timeout: 15),
+      "Overview must expose the Advanced Diagnostics disclosure", file: file, line: line)
+    guard !app.staticTexts["hdc.toolchain.path"].exists else { return }
+    toggle.click()
+    XCTAssertTrue(
+      app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5),
+      "expanding Advanced Diagnostics must reveal the raw toolchain facts",
+      file: file, line: line)
   }
 
   private func displayedText(for element: XCUIElement) -> String {

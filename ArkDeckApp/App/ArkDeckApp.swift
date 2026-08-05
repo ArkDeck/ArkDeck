@@ -3,6 +3,28 @@ import ArkDeckWorkflows
 import Combine
 import SwiftUI
 
+@main
+struct ArkDeckApp: App {
+  @StateObject private var hdcDiagnostics = HDCStatusViewModel(
+    provider: HDCApplicationDiagnosticsFacade.make())
+  @StateObject private var autoUpdate = AutoUpdateViewModel()
+
+  var body: some Scene {
+    WindowGroup {
+      AppShellView(hdcDiagnostics: hdcDiagnostics, autoUpdate: autoUpdate)
+        .task {
+          hdcDiagnostics.refresh()
+          autoUpdate.startup()
+        }
+    }
+    Settings {
+      AutoUpdateSettingsView(model: autoUpdate)
+        .frame(width: 520)
+        .padding(24)
+    }
+  }
+}
+
 /// Shell navigation is presentation vocabulary owned by the App target; the
 /// domain package deliberately knows nothing about it.
 private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable, Sendable {
@@ -29,82 +51,108 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   var systemImageName: String {
     switch self {
     case .overview: "rectangle.grid.2x2"
-    case .flash: "bolt.fill"
+    case .flash: "bolt"
     case .debug: "ladybug"
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
     case .history: "clock.arrow.circlepath"
     }
   }
+
+  var accessibilityIdentifier: String { "app.navigation.\(rawValue)" }
 }
 
-@main
-struct ArkDeckApp: App {
-  @StateObject private var hdcDiagnostics = HDCStatusViewModel(
-    provider: HDCApplicationDiagnosticsFacade.make())
-  @StateObject private var autoUpdate = AutoUpdateViewModel()
-
-  var body: some Scene {
-    WindowGroup {
-      AppShellView(hdcDiagnostics: hdcDiagnostics, autoUpdate: autoUpdate)
-        .task {
-          hdcDiagnostics.refresh()
-          autoUpdate.startup()
-        }
-    }
-    Settings {
-      AutoUpdateSettingsView(model: autoUpdate)
-        .frame(width: 520)
-        .padding(24)
-    }
-  }
-}
-
+/// Native window shell: system split view, unified toolbar, and one workspace
+/// per navigation item. Only Overview has a production Runtime surface today;
+/// every other item routes to an explicit unavailable workspace rather than
+/// re-rendering the same diagnostics under a different title.
 private struct AppShellView: View {
-  @State private var selection: ArkDeckNavigationItem? = .overview
+  @SceneStorage("app.shell.selection")
+  private var storedSelection = ArkDeckNavigationItem.overview.rawValue
   @ObservedObject var hdcDiagnostics: HDCStatusViewModel
   @ObservedObject var autoUpdate: AutoUpdateViewModel
 
+  private var selectedItem: ArkDeckNavigationItem {
+    ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
+  }
+
+  private var selection: Binding<ArkDeckNavigationItem?> {
+    Binding(
+      get: { selectedItem },
+      set: { storedSelection = ($0 ?? .overview).rawValue })
+  }
+
   var body: some View {
     NavigationSplitView {
-      List(ArkDeckNavigationItem.allCases, selection: $selection) { item in
-        Label {
-          Text(LocalizedStringKey(item.localizationKey))
-        } icon: {
-          Image(systemName: item.systemImageName)
+      List(selection: selection) {
+        Section("app.navigation.section.device") {
+          navigationRow(.overview)
+        }
+        Section("app.navigation.section.workflows") {
+          navigationRow(.flash)
+          navigationRow(.debug)
+          navigationRow(.uiDump)
+          navigationRow(.trace)
+        }
+        Section("app.navigation.section.records") {
+          navigationRow(.history)
         }
       }
+      .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
       .navigationTitle("app.shell.title")
     } detail: {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
-          Text(
-            LocalizedStringKey(
-              selection?.localizationKey ?? ArkDeckNavigationItem.overview.localizationKey)
-          )
-          .font(.largeTitle)
-          Text("app.shell.status")
-            .font(.headline)
-          Text("app.shell.nonDestructiveNote")
-            .foregroundStyle(.secondary)
-          HDCStatusView(
-            presentation: hdcDiagnostics.presentation,
-            onRefresh: hdcDiagnostics.refresh,
-            isRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
-            onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
-            onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
-            onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
-            onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
-            configurationError: hdcDiagnostics.configurationError)
-          Divider()
-          AutoUpdateSettingsView(model: autoUpdate)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(32)
-      }
-      .navigationTitle("app.shell.title")
+      detail
+        .navigationTitle(Text(LocalizedStringKey(selectedItem.localizationKey)))
+        .toolbar { updateAttentionToolbarItem }
     }
-    .frame(minWidth: 860, minHeight: 560)
+    .frame(minWidth: 900, idealWidth: 1180, minHeight: 600, idealHeight: 760)
+  }
+
+  @ViewBuilder
+  private var detail: some View {
+    switch selectedItem {
+    case .overview:
+      HDCStatusView(
+        presentation: hdcDiagnostics.presentation,
+        onRefresh: hdcDiagnostics.refresh,
+        isRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
+        onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
+        onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
+        onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
+        onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
+        configurationError: hdcDiagnostics.configurationError)
+    case .flash, .debug, .uiDump, .trace, .history:
+      UnavailableFeatureView(
+        titleKey: selectedItem.localizationKey,
+        systemImageName: selectedItem.systemImageName)
+    }
+  }
+
+  /// Only update states the user has to act on reach the main window; the
+  /// complete update flow stays in the system Settings scene.
+  @ToolbarContentBuilder
+  private var updateAttentionToolbarItem: some ToolbarContent {
+    if let attention = autoUpdate.attention {
+      ToolbarItem(placement: .automatic) {
+        SettingsLink {
+          Label(
+            LocalizedStringKey(attention.localizationKey),
+            systemImage: attention.systemImageName)
+          .labelStyle(.titleAndIcon)
+        }
+        .accessibilityIdentifier("app.toolbar.updateAttention")
+      }
+    }
+  }
+
+  private func navigationRow(_ item: ArkDeckNavigationItem) -> some View {
+    Label {
+      Text(LocalizedStringKey(item.localizationKey))
+    } icon: {
+      Image(systemName: item.systemImageName)
+    }
+    .accessibilityIdentifier(item.accessibilityIdentifier)
+    .tag(item)
   }
 }
 
@@ -119,20 +167,26 @@ private struct AutoUpdateSettingsView: View {
         "update.automaticChecks",
         isOn: Binding(
           get: { model.automaticChecksEnabled },
-          set: { enabled in model.setAutomaticChecksEnabled(enabled) }))
+          set: { enabled in model.setAutomaticChecksEnabled(enabled) })
+      )
+      .accessibilityIdentifier("update.automaticChecks")
       Text("update.privacyDisclosure")
         .font(.caption)
         .foregroundStyle(.secondary)
       HStack {
         Button("update.checkNow", action: model.checkManually)
+          .accessibilityIdentifier("update.checkNow")
           .disabled(model.isBusy || !model.canCheck)
         Button("update.download", action: model.download)
+          .accessibilityIdentifier("update.download")
           .disabled(model.isBusy || !model.canDownload)
         Button("update.reveal", action: model.reveal)
+          .accessibilityIdentifier("update.reveal")
           .disabled(model.isBusy || !model.canReveal)
       }
       Text(LocalizedStringKey(model.statusKey))
         .font(.headline)
+        .accessibilityIdentifier("update.status")
       if let releaseNotesSummary = model.releaseNotesSummary {
         Text(releaseNotesSummary)
           .textSelection(.enabled)
@@ -153,6 +207,31 @@ private final class AutoUpdateViewModel: ObservableObject {
   @Published private(set) var canCheck = true
   @Published private(set) var canDownload = false
   @Published private(set) var canReveal = false
+  /// Only states the user has to act on reach the main window. Idle and
+  /// up-to-date results stay in the Settings scene.
+  @Published private(set) var attention: Attention?
+
+  enum Attention: String, Sendable {
+    case available
+    case awaitingConsent
+    case failed
+
+    var localizationKey: String {
+      switch self {
+      case .available: "update.toolbar.available"
+      case .awaitingConsent: "update.toolbar.awaitingConsent"
+      case .failed: "update.toolbar.failed"
+      }
+    }
+
+    var systemImageName: String {
+      switch self {
+      case .available: "arrow.down.circle"
+      case .awaitingConsent: "hand.raised"
+      case .failed: "exclamationmark.triangle"
+      }
+    }
+  }
 
   private let service: AutoUpdateService?
   private let identity = AutoUpdateApplicationFacade.currentProductIdentity()
@@ -245,6 +324,7 @@ private final class AutoUpdateViewModel: ObservableObject {
     canDownload = false
     canReveal = false
     releaseNotesSummary = nil
+    attention = nil
     switch state {
     case .idle:
       statusKey = "update.status.idle"
@@ -256,6 +336,7 @@ private final class AutoUpdateViewModel: ObservableObject {
       statusKey = "update.status.available"
       releaseNotesSummary = feed.payload.releaseNotesSummary
       canDownload = true
+      attention = .available
     case .noUpdate:
       statusKey = "update.status.current"
     case .downloading:
@@ -271,11 +352,13 @@ private final class AutoUpdateViewModel: ObservableObject {
       releaseNotesSummary = feed.payload.releaseNotesSummary
       canCheck = false
       canReveal = true
+      attention = .awaitingConsent
     case .handedOff:
       statusKey = "update.status.handedOff"
       canCheck = false
     case .failed:
       statusKey = "update.status.failed"
+      attention = .failed
     case .cancelled:
       statusKey = "update.status.cancelled"
     }
