@@ -3045,7 +3045,11 @@ public actor RuntimeJobEngine {
           toolVersion: context.toolVersion,
           toolSHA256: context.toolSHA256,
           nowUTC: context.nowUTC,
-          resolvedInputArtifact: context.resolvedInputArtifact)
+          resolvedInputArtifact: context.resolvedInputArtifact,
+          // A reconciliation readback derives from the same context it is
+          // recovering, so it inherits the same resolved facts rather than
+          // re-deriving any of them.
+          expectedRuntimeBuildVersion: context.expectedRuntimeBuildVersion)
         guard
           let readback = try provider.reconciliationReadback(
             intent: reference, context: readbackContext)
@@ -3616,7 +3620,9 @@ public actor RuntimeJobEngine {
           toolVersion: facts?.toolVersion,
           toolSHA256: facts?.toolSHA256,
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
-          additionalInputArtifacts: additionalResolved)
+          additionalInputArtifacts: additionalResolved,
+          expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
+            for: descriptor, artifact: resolved))
         let action = try provider.action(
           for: step, operation: descriptor, inputs: request.inputs,
           context: context)
@@ -3709,7 +3715,9 @@ public actor RuntimeJobEngine {
           expectedIdentitySHA256: facts.deviceIdentitySHA256,
           toolVersion: facts.toolVersion,
           toolSHA256: facts.toolSHA256,
-          nowUTC: nowUTC(), resolvedInputArtifact: resolved)
+          nowUTC: nowUTC(), resolvedInputArtifact: resolved,
+          expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
+            for: descriptor, artifact: resolved))
         let publishAction = try provider.action(
           for: publishStep, operation: descriptor, inputs: request.inputs,
           context: context)

@@ -399,6 +399,39 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     return files.sorted { $0.path < $1.path }
   }
 
+  /// Every execution context the engine builds around a resolved input
+  /// artifact must also carry the build version derived from it.
+  ///
+  /// This is a source-shape test on purpose. The fact was threaded into one of
+  /// nine `ProviderExecutionContext` constructions by hand, and the eight that
+  /// were missed did not surface in 1325 contract tests — they surfaced when a
+  /// real flash plan was materialized through the engine and post-flash
+  /// verification had nothing to compare against. Threading a fact into N call
+  /// sites by hand fails at N > 1; what catches it is asking the source
+  /// whether any site was left behind.
+  func testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion() throws {
+    let engine = packageRoot()
+      .appendingPathComponent("Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
+    let code = try String(contentsOf: engine)
+    // Each construction runs to its closing paren before the next statement;
+    // splitting on the constructor name is enough to isolate them.
+    let constructions = code.components(separatedBy: "ProviderExecutionContext(").dropFirst()
+    var checked = 0
+    for construction in constructions {
+      guard let end = construction.range(of: ")\n") else { continue }
+      let body = String(construction[construction.startIndex..<end.upperBound])
+      guard body.contains("resolvedInputArtifact:"),
+        !body.contains("resolvedInputArtifact: nil")
+      else { continue }
+      checked += 1
+      XCTAssertTrue(
+        body.contains("expectedRuntimeBuildVersion:"),
+        "an execution context resolves an input artifact but does not carry the build "
+          + "version derived from it:\n\(body)")
+    }
+    XCTAssertGreaterThan(checked, 1, "no artifact-resolving contexts found — layout drifted")
+  }
+
   private func arkdeckImports(of file: URL) throws -> Set<String> {
     let code = try String(contentsOf: file)
     var result: Set<String> = []
