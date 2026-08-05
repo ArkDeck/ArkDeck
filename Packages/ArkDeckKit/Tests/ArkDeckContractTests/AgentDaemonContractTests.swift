@@ -1511,7 +1511,15 @@ final class AgentDaemonContractTests: XCTestCase {
       jobID: jobID, artifactID: artifactID)
     XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
     XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
-    XCTAssertEqual(metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity)
+    // The lease binds the HDC (connect-key) identity, not the store identity:
+    // after a Loader-mode flash the store field carries the campaign identity
+    // and a lease bound to it can never match a debug.hap materialization.
+    XCTAssertEqual(
+      metadata.bindingSnapshot.stableIdentitySHA256,
+      HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey))
+    XCTAssertNotEqual(
+      metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity,
+      "the store identity must not leak into an HDC-consumed lease")
     XCTAssertEqual(metadata.mediaType, "application/vnd.openharmony.hap")
     let resolution = try await artifactStore.resolveLease(lease)
     XCTAssertEqual(resolution.sha256, digest)
@@ -1529,7 +1537,10 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(inspectFields["targetId"], .string(target.targetID))
     XCTAssertEqual(
       inspectFields["bindingRevision"], .integer(Int64(target.bindingRevision)))
-    XCTAssertEqual(inspectFields["stableIdentitySha256"], .string(stableIdentity))
+    XCTAssertEqual(
+      inspectFields["stableIdentitySha256"],
+      .string(
+        HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey)))
   }
 
   func testHAPImportRejectsUnknownTargetAndInvalidContainerWithoutPublication() async throws {
@@ -1811,8 +1822,11 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(metadata.mediaType, "application/x-elf")
     XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
     XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
+    // Consumed by the HDC provider: the lease binds the connect-key identity,
+    // like the HAP import above.
     XCTAssertEqual(
-      metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity)
+      metadata.bindingSnapshot.stableIdentitySHA256,
+      HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey))
 
     let invalid = Data(repeating: 0x41, count: 128)
     let invalidDigest = NativeLibraryTestFixture.sha256(invalid)
