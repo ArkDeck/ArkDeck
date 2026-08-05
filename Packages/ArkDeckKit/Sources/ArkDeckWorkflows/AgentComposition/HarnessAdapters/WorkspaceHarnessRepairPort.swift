@@ -153,6 +153,12 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
         // Exact paths narrow the ProjectProfile globs; the provider parses the
         // diff again and requires every touched path to match both sets.
         "allowedFileGlobs": .array(proposal.touchedFiles.map(JSONValue.string)),
+        // The tree this patch was decided against, which the provider needs
+        // twice on an isolated copy: to refuse the patch if the copy moved
+        // since, and to record the preimage revision a revert restores to.
+        // Omitting it left `apply-patch` unable to materialize at all there -
+        // and an isolated copy is the only place a repair now runs.
+        "expectedWorkspaceRevision": .string(revision),
       ],
       artifactLease: lease,
       artifactID: metadata.artifactID)

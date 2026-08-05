@@ -669,6 +669,62 @@ final class HarnessRepairContractTests: XCTestCase {
     XCTAssertTrue(events.contains { $0.reasonCode == "baselineCrashFixtureDeployed" })
   }
 
+  /// The inputs `preparePatch` produces have to be the inputs the workspace
+  /// provider consumes, and on an isolated copy the provider requires the
+  /// stated workspace revision - it refuses a patch whose tree moved, and it
+  /// records the preimage revision a revert restores to.
+  ///
+  /// The producer never sent it, so `workspace.apply-patch@1` could not even
+  /// materialize on a copy. Nothing caught it because the two sides were only
+  /// ever tested apart, and a copy is now the only place a repair runs.
+  func testPreparedPatchInputsCarryTheRevisionAnIsolatedCopyRequires() async throws {
+    let workspace = rootURL.appendingPathComponent("evolution-workspace", isDirectory: true)
+    let sources = workspace.appendingPathComponent("Sources", isDirectory: true)
+    try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
+    try Data("let value = 0\n".utf8).write(to: sources.appendingPathComponent("A.swift"))
+
+    let preset = try WorkspaceCommandPreset(
+      presetID: "fixture",
+      executable: try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/true"),
+      fixedArguments: [], timeoutSeconds: 10)
+    let copy = try WorkspaceProjectProfile(
+      profileID: "workspace-host@1", projectRef: "evolution-demo-app",
+      projectRoot: workspace.path, allowedFileGlobs: ["Sources/**"],
+      inspectionPreset: preset, patchPreset: preset,
+      buildPresets: [:], testPresets: [:], symbolPresets: [:],
+      kind: .evolution)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: rootURL.appendingPathComponent("evolution-artifacts", isDirectory: true),
+      nowUTC: { "2026-07-31T01:00:00Z" })
+    let port = WorkspaceHarnessRepairPort(
+      profile: copy,
+      attemptStore: try WorkspacePatchAttemptStore(
+        rootURL: rootURL.appendingPathComponent("evolution-attempts", isDirectory: true)),
+      artifactStore: artifactStore)
+
+    // An isolated copy states the profile-scoped workspace revision, not a
+    // digest of the touched files: it is the same one the checkpoint, the
+    // authorization facts and the issued capability's scope speak.
+    let revision = try WorkspaceProviderSupport.workspaceRevision(
+      root: workspace.path, profileVersion: copy.profileID, globs: copy.allowedFileGlobs)
+    let patch = try proposal(path: "Sources/A.swift", base: revision)
+    let prepared = try await port.preparePatch(
+      patch, projectRef: copy.projectRef,
+      task: makeSnapshot(
+        phase: .patching, activeJobID: nil, repair: HarnessRepairAttempt(proposal: patch)),
+      decisionID: "dec-evolution")
+
+    XCTAssertEqual(prepared.inputs["expectedWorkspaceRevision"], JSONValue.string(revision))
+    // Every input the catalog marks required for the operation is present, so
+    // this cannot pass while the request is still unable to be admitted.
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: DebugCrashTaskHandler.applyPatch))
+    for field in descriptor.inputs where field.isRequired {
+      XCTAssertNotNil(
+        prepared.inputs[field.name], "prepared apply is missing required input \(field.name)")
+    }
+  }
+
   func testWorkspacePatchIsHostOnlyAndBuiltHAPInheritsTheAdmittedDeviceBinding()
     async throws
   {
