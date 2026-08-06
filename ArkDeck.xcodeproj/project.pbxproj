@@ -12,7 +12,9 @@
 		A10000000000000000000012 /* ArkDeckCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000091 /* ArkDeckCore */; };
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
 		A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002F /* UnavailableFeatureView.swift */; };
+		A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* RuntimeHistoryView.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
+		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
 		A10000000000000000000017 /* rkdeveloptool in Embed Rockchip Component */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* rkdeveloptool */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -39,7 +41,9 @@
 		A1000000000000000000002C /* source-distribution-manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json; sourceTree = SOURCE_ROOT; };
 		A1000000000000000000002D /* RockchipComponent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RockchipComponent.entitlements; sourceTree = "<group>"; };
 		A1000000000000000000002F /* UnavailableFeatureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnavailableFeatureView.swift; sourceTree = "<group>"; };
+		A1000000000000000000003E /* RuntimeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeHistoryView.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
+		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +84,7 @@
 				A10000000000000000000034 /* Resources */,
 				A10000000000000000000035 /* Features */,
 				A10000000000000000000039 /* Shared Features */,
+				A1000000000000000000003F /* History Feature */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 				A1000000000000000000002D /* RockchipComponent.entitlements */,
 			);
@@ -127,6 +132,14 @@
 			path = ArkDeckAppUITests/HDC;
 			sourceTree = "<group>";
 		};
+		A1000000000000000000003F /* History Feature */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000003E /* RuntimeHistoryView.swift */,
+			);
+			path = Features/History;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000039 /* Shared Features */ = {
 			isa = PBXGroup;
 			children = (
@@ -139,6 +152,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000038 /* AppShellUITests.swift */,
+				A100000000000000000000A1 /* KeyboardInputSourcePin.swift */,
 			);
 			path = ArkDeckAppUITests/AppShell;
 			sourceTree = "<group>";
@@ -286,6 +300,7 @@
 				A10000000000000000000010 /* ArkDeckApp.swift in Sources */,
 				A10000000000000000000013 /* HDCStatusView.swift in Sources */,
 				A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */,
+				A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +309,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000001F /* AppShellUITests.swift in Sources */,
+				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

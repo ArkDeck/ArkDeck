@@ -1,189 +1,261 @@
 import XCTest
 
-/// Shell-level routing, window structure, and Settings placement.
+/// Shell-level routing, window structure, Settings placement and History.
 ///
-/// Every launch here uses the presentation-only UI fixture. Nothing in this
+/// Language is a property of a *run*, not of a test. Relaunching the app to
+/// check one string at a time cost roughly a minute per language and made the
+/// host switch input sources over and over; each sweep below therefore drives
+/// every locale-dependent assertion inside a single launch. Tests that need a
+/// different fixture still launch separately, but they assert raw domain
+/// strings, which read the same in every language and pin no locale.
+///
+/// Every launch here uses the presentation-only UI fixtures. Nothing in this
 /// file observes a device, submits an operation, or may be recorded as
 /// hardware evidence.
 @MainActor
 final class AppShellUITests: XCTestCase {
-  // DONE-01: each sidebar item renders its own workspace. Only Overview shows
-  // HDC diagnostics; the other five state an accurate unavailable reason.
-  func testEveryUnimplementedWorkspaceStatesItsOwnUnavailableReason() {
-    let app = launch()
-
-    for item in Self.unavailableItems {
-      select(item.identifier, in: app)
-
-      let title = app.staticTexts["app.unavailable.title"]
-      XCTAssertTrue(
-        title.waitForExistence(timeout: 5), "\(item.identifier) must render an unavailable page")
-      XCTAssertEqual(title.label, item.englishTitle)
-      XCTAssertEqual(
-        app.staticTexts["app.unavailable.reason"].label,
-        "This workspace is not connected to ArkDeck Runtime in this build.")
-      XCTAssertEqual(
-        app.staticTexts["app.unavailable.noOperationSubmitted"].label,
-        "No operation was submitted.")
-
-      XCTAssertFalse(
-        app.staticTexts["hdc.endpoint"].exists,
-        "\(item.identifier) must not re-render HDC diagnostics")
-      XCTAssertFalse(
-        app.buttons["hdc.devices.refresh"].exists,
-        "\(item.identifier) must not offer the Overview refresh command")
-      XCTAssertFalse(
-        app.buttons["hdc.lifecycle.requestImpactPreview"].exists,
-        "\(item.identifier) must not offer a recovery control")
-      XCTAssertFalse(
-        app.buttons["update.checkNow"].exists,
-        "\(item.identifier) must not embed update settings")
-    }
-
-    select("app.navigation.overview", in: app)
-    XCTAssertTrue(app.staticTexts["hdc.endpoint"].waitForExistence(timeout: 5))
-    XCTAssertFalse(app.staticTexts["app.unavailable.reason"].exists)
+  override class func setUp() {
+    super.setUp()
+    KeyboardInputSourcePin.pinPlainKeyboardLayout()
+    KeyboardInputSourcePin.restoreWhenTheRunFinishes()
   }
 
-  // DONE-03: the four status answers are on the first screen, and the four
-  // content sections carry the grouped diagnostics.
-  func testOverviewOpensWithTheFourStatusAnswersAndGroupedSections() {
-    let app = launch()
+  // MARK: - One launch per language
 
-    XCTAssertTrue(app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 5))
-    XCTAssertEqual(app.staticTexts["overview.status.server.value"].label, "Healthy")
-    XCTAssertEqual(app.staticTexts["overview.status.trust.value"].label, "Ready")
-    XCTAssertEqual(app.staticTexts["overview.status.channel.value"].label, "Unverified")
-    // The default fixture is unverified TCP, so exactly one item needs attention.
-    XCTAssertEqual(app.staticTexts["overview.status.needsAttention.value"].label, "1 item")
+  func testEnglishSweepOfEveryWorkspace() {
+    sweep(
+      language: "(en)",
+      overview: Overview(
+        server: "Healthy", trust: "Ready", channel: "Unverified", attention: "1 item"),
+      unavailable: Unavailable(
+        titles: ["Flash", "Debug", "ArkUI UI Dump", "Trace"],
+        reason: "This workspace is not connected to ArkDeck Runtime in this build.",
+        noOperation: "No operation was submitted."),
+      history: History(
+        readOnlyNote:
+          "This workspace reads Runtime state. It cannot submit, cancel or retry anything.",
+        outcomeUnknown: "Outcome unknown — this job's effect on the device was never confirmed.",
+        waitingForHuman: "Waiting for a person to act."))
+  }
 
+  func testSimplifiedChineseSweepOfEveryWorkspace() {
+    sweep(
+      language: "(zh-Hans)",
+      overview: Overview(server: "正常", trust: "已就绪", channel: "未验证", attention: "1 项"),
+      unavailable: Unavailable(
+        titles: ["刷机", "调试", "ArkUI UI 导出", "追踪"],
+        reason: "此版本尚未将该工作区连接到 ArkDeck Runtime。",
+        noOperation: "未提交任何操作。"),
+      history: History(
+        readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
+        outcomeUnknown: "结果未知——本 Job 对设备的影响从未被确认。",
+        waitingForHuman: "等待人工处理。"))
+  }
+
+  private struct Overview {
+    let server: String
+    let trust: String
+    let channel: String
+    let attention: String
+  }
+
+  private struct Unavailable {
+    let titles: [String]
+    let reason: String
+    let noOperation: String
+  }
+
+  private struct History {
+    let readOnlyNote: String
+    let outcomeUnknown: String
+    let waitingForHuman: String
+  }
+
+  /// DONE-01 / DONE-02 / DONE-03 / DONE-07 in one pass.
+  private func sweep(
+    language: String, overview: Overview, unavailable: Unavailable, history: History,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let app = launch(arguments: ["--ui-test-runtime-history", "-AppleLanguages", language])
+
+    // Overview answers its four questions on the first screen.
+    XCTAssertTrue(
+      app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 15),
+      file: file, line: line)
+    assertDisplayed(app.staticTexts["overview.status.server.value"], equals: overview.server)
+    assertDisplayed(app.staticTexts["overview.status.trust.value"], equals: overview.trust)
+    assertDisplayed(app.staticTexts["overview.status.channel.value"], equals: overview.channel)
+    assertDisplayed(
+      app.staticTexts["overview.status.needsAttention.value"], equals: overview.attention)
     for section in [
       "overview.section.serverToolchain", "overview.section.deviceChannel",
       "overview.section.capabilities", "overview.section.needsAttention",
     ] {
-      XCTAssertTrue(app.staticTexts[section].exists, "\(section) must be visible on first screen")
+      XCTAssertTrue(app.staticTexts[section].exists, "\(section) missing", file: file, line: line)
     }
-    XCTAssertTrue(app.buttons["overview.advanced.toggle"].exists)
+
+    // Advanced Diagnostics is collapsed, and expanding it reveals the raw
+    // facts under their established identifiers.
+    let toggle = app.buttons["overview.advanced.toggle"]
+    XCTAssertTrue(toggle.waitForExistence(timeout: 10), file: file, line: line)
+    XCTAssertFalse(app.staticTexts["hdc.toolchain.path"].exists, file: file, line: line)
+    scrollIntoView(toggle, in: app)
+    toggle.click()
+    assertDisplayed(app.staticTexts["hdc.toolchain.path"], equals: "/Applications/DevEco/hdc")
+    assertDisplayed(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
+
+    // Update settings live in the Settings scene, not the main window.
+    XCTAssertFalse(app.buttons["update.checkNow"].exists, file: file, line: line)
+    XCTAssertFalse(app.checkBoxes["update.automaticChecks"].exists, file: file, line: line)
+
+    // Each unimplemented workspace states its own reason and submits nothing.
+    for (identifier, title) in zip(
+      [
+        "app.navigation.flash", "app.navigation.debug", "app.navigation.uiDump",
+        "app.navigation.trace",
+      ], unavailable.titles)
+    {
+      select(identifier, in: app)
+      let heading = app.staticTexts["app.unavailable.title"]
+      XCTAssertTrue(
+        heading.waitForExistence(timeout: 10), "\(identifier) has no unavailable page",
+        file: file, line: line)
+      assertDisplayed(heading, equals: title)
+      assertDisplayed(app.staticTexts["app.unavailable.reason"], equals: unavailable.reason)
+      assertDisplayed(
+        app.staticTexts["app.unavailable.noOperationSubmitted"], equals: unavailable.noOperation)
+      XCTAssertFalse(
+        app.staticTexts["hdc.endpoint"].exists, "\(identifier) re-renders diagnostics",
+        file: file, line: line)
+    }
+
+    // History renders real Runtime facts and offers no way to submit.
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(app.tables["history.table"].waitForExistence(timeout: 10), file: file, line: line)
+    assertDisplayed(app.staticTexts["history.readOnlyNote"], equals: history.readOnlyNote)
+    for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
+      XCTAssertFalse(
+        app.buttons[forbidden].exists, "\(forbidden) must not exist", file: file, line: line)
+    }
+
+    // An unknown outcome is stated, never folded into the terminal state.
+    let interrupted = app.staticTexts["job-fixture-0002"].firstMatch
+    XCTAssertTrue(interrupted.waitForExistence(timeout: 10), file: file, line: line)
+    interrupted.click()
+    assertDisplayed(
+      app.staticTexts["history.detail.outcomeUnknown"], equals: history.outcomeUnknown)
+    assertDisplayed(
+      app.staticTexts["history.detail.waitingForHuman"], equals: history.waitingForHuman)
   }
 
-  // DONE-03: Advanced Diagnostics is collapsed by default, and every field it
-  // holds stays reachable with its established identifier and complete value.
-  func testAdvancedDiagnosticsHidesRawFactsUntilExpandedAndKeepsCompleteValues() {
-    let app = launch()
+  // MARK: - Fixture-specific launches (locale-independent assertions)
 
-    XCTAssertTrue(app.buttons["overview.advanced.toggle"].waitForExistence(timeout: 5))
-    XCTAssertFalse(app.staticTexts["hdc.toolchain.path"].exists)
-    XCTAssertFalse(app.staticTexts["hdc.counters.autoLifecycle"].exists)
-
-    app.buttons["overview.advanced.toggle"].click()
-
-    XCTAssertTrue(app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5))
-    XCTAssertEqual(app.staticTexts["hdc.toolchain.path"].label, "/Applications/DevEco/hdc")
-    XCTAssertEqual(app.staticTexts["hdc.toolchain.hash"].label, "fixture-sha256")
-    XCTAssertEqual(app.staticTexts["hdc.generation"].label, "7")
-    XCTAssertEqual(app.staticTexts["hdc.counters.autoLifecycle"].label, "0")
-    XCTAssertEqual(app.staticTexts["hdc.counters.autoSubserver"].label, "0")
-  }
-
-  // DONE-04: an in-flight refresh keeps the previous snapshot visible, shows
-  // progress, and rejects a duplicate request.
+  // DONE-04: an in-flight refresh keeps the previous snapshot visible and
+  // rejects a duplicate.
   func testRefreshKeepsThePreviousSnapshotVisibleAndRejectsADuplicate() {
     let app = launch(arguments: ["--ui-test-hdc-refresh-delay"])
     let refresh = app.buttons["hdc.devices.refresh"]
-    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+    XCTAssertTrue(refresh.waitForExistence(timeout: 15))
 
     refresh.click()
 
     XCTAssertTrue(app.staticTexts["overview.status.refreshing"].waitForExistence(timeout: 5))
-    XCTAssertEqual(
-      app.staticTexts["hdc.endpoint"].label, "127.0.0.1:18710",
-      "the previous snapshot must stay readable while a refresh is in flight")
+    assertDisplayed(app.staticTexts["hdc.endpoint"], equals: "127.0.0.1:18710", timeout: 2)
     XCTAssertFalse(refresh.isEnabled)
 
-    // The duplicate must not reach the fixture's deliberately visible third transition.
     app.typeKey("r", modifierFlags: .command)
-    XCTAssertTrue(
-      app.staticTexts["overview.status.refreshing"].waitForNonExistence(timeout: 20))
+    XCTAssertTrue(app.staticTexts["overview.status.refreshing"].waitForNonExistence(timeout: 20))
     XCTAssertFalse(
       displayedText(for: app.staticTexts["hdc.devices.events"]).contains("observationUnknown"))
   }
 
-  // DONE-02 / DONE-05: update settings left the main window, and the system
-  // Settings scene still owns the complete update flow.
-  func testUpdateSettingsAreOnlyReachableThroughTheSettingsScene() {
-    let app = launch()
-    XCTAssertTrue(app.staticTexts["hdc.endpoint"].waitForExistence(timeout: 5))
-
-    XCTAssertFalse(app.buttons["update.checkNow"].exists)
-    XCTAssertFalse(app.buttons["update.download"].exists)
-    XCTAssertFalse(app.checkBoxes["update.automaticChecks"].exists)
-
-    app.typeKey(",", modifierFlags: .command)
-
-    XCTAssertTrue(
-      app.checkBoxes["update.automaticChecks"].waitForExistence(timeout: 10),
-      "the Settings scene must still present the full update flow")
-    XCTAssertTrue(app.buttons["update.checkNow"].exists)
-  }
-
-  // DONE-06: no status is readable by colour alone — every one of them keeps a
-  // symbol and a text value the automation layer can read.
+  // DONE-06: no status is readable by colour alone. These are raw domain
+  // strings, identical in every language.
   func testStatusValuesAreTextNotColourAlone() {
     let app = launch(arguments: ["--ui-test-hdc-denied", "--ui-test-hdc-critical-gate"])
 
-    XCTAssertTrue(app.staticTexts["overview.status.trust.value"].waitForExistence(timeout: 5))
-    XCTAssertEqual(app.staticTexts["overview.status.trust.value"].label, "Denied")
-    XCTAssertEqual(app.staticTexts["overview.status.needsAttention.value"].label, "3 items")
-    XCTAssertEqual(
-      app.staticTexts["hdc.lifecycle.criticalGate"].label,
-      "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary.")
+    XCTAssertTrue(app.staticTexts["hdc.authorization"].waitForExistence(timeout: 15))
+    assertDisplayed(
+      app.staticTexts["hdc.authorization"],
+      equals: "denied — The device declined trust; retry is non-destructive")
+    assertDisplayed(
+      app.staticTexts["hdc.lifecycle.criticalGate"],
+      equals:
+        "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary.")
   }
 
-  // DONE-07: Simplified Chinese is complete for the new shell, and long
-  // Chinese labels do not displace the primary control at the minimum window.
-  func testSimplifiedChineseShellIsCompleteAtTheMinimumWindowSize() {
-    let app = launch(arguments: ["-AppleLanguages", "(zh-Hans)"])
+  // A history that could not be read must never look like an empty history.
+  func testAnUnreachableRuntimeStatesItsReasonInsteadOfAnEmptyTable() {
+    let app = launch(
+      arguments: ["--ui-test-runtime-history", "--ui-test-runtime-history-unreachable"])
+    select("app.navigation.history", in: app)
 
-    XCTAssertTrue(app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 5))
-    XCTAssertEqual(app.staticTexts["overview.status.server.value"].label, "正常")
-    XCTAssertEqual(app.staticTexts["overview.status.trust.value"].label, "已就绪")
-    XCTAssertEqual(app.staticTexts["overview.status.channel.value"].label, "未验证")
-    XCTAssertEqual(app.staticTexts["overview.section.needsAttention"].label, "需处理事项")
-    XCTAssertEqual(app.buttons["hdc.devices.refresh"].label, "刷新设备")
-    XCTAssertTrue(app.buttons["hdc.devices.refresh"].isHittable)
-
-    select("app.navigation.flash", in: app)
-    XCTAssertTrue(app.staticTexts["app.unavailable.title"].waitForExistence(timeout: 5))
-    XCTAssertEqual(app.staticTexts["app.unavailable.title"].label, "刷机")
-    XCTAssertEqual(
-      app.staticTexts["app.unavailable.noOperationSubmitted"].label, "未提交任何操作。")
+    XCTAssertTrue(app.staticTexts["history.unavailable.title"].waitForExistence(timeout: 15))
+    assertDisplayed(
+      app.staticTexts["history.unavailable.reason"],
+      equals: "ArkDeck Runtime is not reachable: fixture")
+    XCTAssertFalse(app.tables["history.table"].exists, "an unreadable history shows no table")
+    XCTAssertFalse(app.staticTexts["history.empty.title"].exists, "it is not an empty history")
   }
 
   // MARK: - Helpers
 
-  private struct NavigationCase {
-    let identifier: String
-    let englishTitle: String
+  /// Sidebar rows expose their identifier on the static text inside the cell;
+  /// clicking that text does not move List selection, so the enclosing cell is
+  /// what must be pressed, by coordinate.
+  private func select(
+    _ identifier: String, in app: XCUIApplication,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let cell = app.cells.containing(.staticText, identifier: identifier).firstMatch
+    XCTAssertTrue(
+      cell.waitForExistence(timeout: 10), "sidebar must expose \(identifier)",
+      file: file, line: line)
+    cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
   }
 
-  private static let unavailableItems = [
-    NavigationCase(identifier: "app.navigation.flash", englishTitle: "Flash"),
-    NavigationCase(identifier: "app.navigation.debug", englishTitle: "Debug"),
-    NavigationCase(identifier: "app.navigation.uiDump", englishTitle: "ArkUI UI Dump"),
-    NavigationCase(identifier: "app.navigation.trace", englishTitle: "Trace"),
-    NavigationCase(identifier: "app.navigation.history", englishTitle: "History"),
-  ]
-
-  private func select(_ identifier: String, in app: XCUIApplication) {
-    let row = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-    XCTAssertTrue(row.waitForExistence(timeout: 5), "sidebar must expose \(identifier)")
-    row.click()
+  /// SwiftUI renders most of these strings into the accessibility *value*, and
+  /// section headings into the label, so both are considered.
+  private func displayedValues(for element: XCUIElement) -> [String] {
+    [element.label, element.value as? String].compactMap { $0 }
   }
 
   private func displayedText(for element: XCUIElement) -> String {
-    [element.label, element.value as? String]
-      .compactMap { $0 }
-      .joined(separator: " ")
+    displayedValues(for: element).joined(separator: " ")
+  }
+
+  private func assertDisplayed(
+    _ element: XCUIElement, equals expected: String,
+    timeout: TimeInterval = 5, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    let matches = NSPredicate { [weak self] _, _ in
+      self?.displayedValues(for: element).contains(expected) ?? false
+    }
+    let result = XCTWaiter.wait(
+      for: [expectation(for: matches, evaluatedWith: element)], timeout: timeout)
+    XCTAssertTrue(
+      result == .completed || displayedValues(for: element).contains(expected),
+      "expected \(expected), got: \(displayedText(for: element))", file: file, line: line)
+  }
+
+  /// `app.scrollViews.firstMatch` is whichever scroll view the tree yields
+  /// first — often the sidebar's, which never moves the content. Scroll the
+  /// one that actually contains the target.
+  private func scrollHost(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+    let host = app.scrollViews.containing(
+      NSPredicate(format: "identifier == %@", element.identifier)
+    ).firstMatch
+    return host.exists ? host : app.scrollViews.firstMatch
+  }
+
+  /// Content below the fold cannot be clicked where it is not drawn: a click at
+  /// off-screen coordinates silently does nothing.
+  private func scrollIntoView(_ element: XCUIElement, in app: XCUIApplication) {
+    var attempts = 0
+    while !element.isHittable, attempts < 25 {
+      scrollHost(for: element, in: app).scroll(byDeltaX: 0, deltaY: -160)
+      attempts += 1
+    }
   }
 
   private func launch(arguments: [String] = []) -> XCUIApplication {

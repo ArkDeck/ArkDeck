@@ -1,14 +1,68 @@
 import AppKit
 import XCTest
 
+/// HDC diagnostics, lifecycle safety and device observation.
+///
+/// Every fault injection used to cost its own launch, so a run relaunched the
+/// app once per test. The fixture now re-reads its state on each refresh, so
+/// one launched instance walks every fault below; language is a property of a
+/// run rather than of a test, so there is one sweep per language and no other
+/// fixture launch. What still launches separately does so for a reason that is
+/// stated where it happens.
 @MainActor
 final class HDCStatusUITests: XCTestCase {
-  // TEST-AC-HDC-001-02 / toolchainDiagnosticsContract
-  func testDiagnosticsShowEveryToolchainFieldAndExplicitUnverifiedState() {
-    let app = launch(arguments: [])
-    expandAdvancedDiagnostics(app)
+  override class func setUp() {
+    super.setUp()
+    KeyboardInputSourcePin.pinPlainKeyboardLayout()
+    KeyboardInputSourcePin.restoreWhenTheRunFinishes()
+  }
 
-    XCTAssertTrue(app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5))
+  // MARK: - One fixture launch per language
+
+  /// TEST-AC-HDC-001-02 toolchainDiagnosticsContract, TEST-AC-HDC-007-02
+  /// authorizationFaultInjection, TEST-AC-HDC-008-01 securityStateContract,
+  /// TEST-AC-HDC-003-01 / 010-01 / 010-02 lifecycle contracts, and
+  /// OBS-APPFACE-001 AP1/AP2 — all against one launched instance.
+  func testSimplifiedChineseFixtureSweep() {
+    let app = launchSweep(language: "(zh-Hans)")
+    walkEveryDiagnosticState(app)
+    // HOR-UI-001: Simplified Chinese is complete and the keyboard path reaches
+    // the same App callback as the button.
+    let refresh = app.buttons["hdc.devices.refresh"]
+    XCTAssertEqual(refresh.label, "刷新设备")
+    XCTAssertTrue(refresh.isEnabled)
+    app.typeKey("r", modifierFlags: .command)
+    assertDisplayedValue(
+      app.staticTexts["hdc.devices.events"], equals: appearedAndDisappearedFixtureEvents,
+      timeout: 15)
+  }
+
+  func testEnglishFixtureSweep() {
+    let app = launchSweep(language: "(en)")
+    walkEveryDiagnosticState(app)
+    // HOR-UI-001: the English control is visible through the real App wiring.
+    let refresh = app.buttons["hdc.devices.refresh"]
+    XCTAssertEqual(refresh.label, "Refresh Devices")
+    XCTAssertTrue(refresh.isEnabled)
+    // The confirmation names the exact generation it confirms.
+    enterImpactReview(app)
+    let confirmation = app.buttons["hdc.lifecycle.confirmImpactPreview"]
+    XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+    XCTAssertEqual(confirmation.label, "Confirm Generation 7")
+    confirmation.click()
+    assertDisplayedValue(
+      app.staticTexts["hdc.lifecycle.confirmed"],
+      equals: "Recovery impact confirmed for generation 7. Dispatch remains separately gated.")
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
+  }
+
+  /// Every assertion here reads a raw domain string, which is identical in
+  /// every language, so both sweeps run the same walk.
+  private func walkEveryDiagnosticState(
+    _ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    // --- default state: complete toolchain diagnostics -------------------
+    expandAdvancedDiagnostics(app)
     assertDisplayedValue(app.staticTexts["hdc.toolchain.path"], equals: "/Applications/DevEco/hdc")
     assertDisplayedValue(app.staticTexts["hdc.toolchain.source"], equals: "devecoSDK")
     assertDisplayedValue(app.staticTexts["hdc.toolchain.hash"], equals: "fixture-sha256")
@@ -16,96 +70,75 @@ final class HDCStatusUITests: XCTestCase {
     assertDisplayedValue(app.staticTexts["hdc.toolchain.clientVersion"], equals: "3.2.0d")
     assertDisplayedValue(app.staticTexts["hdc.toolchain.serverVersion"], equals: "3.2.0d")
     assertDisplayedValue(
-      app.staticTexts["hdc.toolchain.daemonVersion"], equals: "unknown (not exposed by checkserver)"
-    )
+      app.staticTexts["hdc.toolchain.daemonVersion"],
+      equals: "unknown (not exposed by checkserver)")
     assertDisplayedValue(app.staticTexts["hdc.endpoint"], equals: "127.0.0.1:18710")
     assertDisplayedValue(app.staticTexts["hdc.health"], equals: "healthy")
     assertDisplayedValue(app.staticTexts["hdc.generation"], equals: "7")
     assertDisplayedValue(app.staticTexts["hdc.ownership"], equals: "external")
     assertDisplayedValue(app.staticTexts["hdc.authorization"], equals: "ready")
+    // OBS-APPFACE-001 / AP1: the observation summary is stable static text.
+    assertDisplayedValue(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
+    assertDisplayedValue(app.staticTexts["hdc.counters.autoSubserver"], equals: "0")
+    assertDisplayedValue(app.staticTexts["hdc.endpoint.source"], equals: "unknown")
+    assertDisplayedValue(app.staticTexts["hdc.ownership.basis"], equals: "unavailable")
+
+    // TEST-AC-HDC-008-01: authorized TCP still warns, subserver stays read-only.
     assertDisplayedValue(
       app.staticTexts["hdc.channelProtection"], equals: "unverified; assumed unprotected")
     assertDisplayedValue(
       app.staticTexts["hdc.tcp.warning"],
       equals: "Channel protection is unverified. Use TCP only on a trusted, isolated network.")
-    XCTAssertTrue(app.buttons["hdc.lifecycle.requestImpactPreview"].exists)
+    assertDisplayedValue(app.staticTexts["hdc.subserver"], equals: "unsupported")
+    XCTAssertFalse(app.buttons["hdc.subserver.spawn"].exists, file: file, line: line)
+    XCTAssertFalse(app.buttons["hdc.subserver.killall"].exists, file: file, line: line)
+    XCTAssertTrue(app.buttons["hdc.lifecycle.requestImpactPreview"].exists, file: file, line: line)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.previewRequirement"],
       equals:
         "Server recovery is host-wide: it requires an impact preview, an exact-generation user confirmation, and a dispatch-time recheck."
     )
-  }
 
-  // OPENHARMONY-HDC-READONLY-PROBES@1.0.0 unsupported key-family disposition.
-  func testUnsupportedKeyAccessRemainsADiagnosticWithoutLifecycleControl() {
-    let app = launch(arguments: ["--ui-test-hdc-key-access-denied"])
+    // OBS-APPFACE-001 / AP2: events keep source order, shape and redaction.
+    let events =
+      displayedValues(for: app.staticTexts["hdc.devices.events"])
+      .first(where: { $0.contains(" appeared ") })
+      ?? displayedText(for: app.staticTexts["hdc.devices.events"])
+    XCTAssertEqual(occurrenceCount(of: "redacted-device-0123456789abcdef01234567", in: events), 1)
+    XCTAssertFalse(events.contains("connectKey"), file: file, line: line)
+    XCTAssertFalse(events.contains("Optional("), file: file, line: line)
+    XCTAssertFalse(events.contains("internal reason"), file: file, line: line)
 
-    XCTAssertTrue(app.staticTexts["hdc.authorization"].waitForExistence(timeout: 5))
-    assertDisplayedValue(
-      app.staticTexts["hdc.authorization"],
-      equals:
-        "unavailable — key access diagnostics unsupported without a user-approved locator")
-    assertDisplayedValue(
-      app.staticTexts["hdc.keyAccessError"],
-      equals: "Key access diagnostics are unsupported; no key path was read or modified."
-    )
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-  }
-
-  // TEST-AC-HDC-007-02 / authorizationFaultInjection
-  func testDeniedAuthorizationOffersOnlyTheExplicitNonDestructiveRetryPath() {
-    let app = launch(arguments: ["--ui-test-hdc-denied"])
+    // --- denied -----------------------------------------------------------
+    applyFixtureState(["--ui-test-hdc-denied"], in: app)
     assertDisplayedValue(
       app.staticTexts["hdc.authorization"],
       equals: "denied — The device declined trust; retry is non-destructive")
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-  }
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists, file: file, line: line)
 
-  // TEST-AC-HDC-007-02 / authorizationFaultInjection
-  func testTimedOutAuthorizationOffersOnlyTheExplicitNonDestructiveRetryPath() {
-    let app = launch(arguments: ["--ui-test-hdc-timed-out"])
+    // --- timed out --------------------------------------------------------
+    applyFixtureState(["--ui-test-hdc-timed-out"], in: app)
     assertDisplayedValue(
       app.staticTexts["hdc.authorization"], equals: "timed out — retry is non-destructive")
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-  }
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists, file: file, line: line)
 
-  // TEST-AC-HDC-008-01 / securityStateContract plus the registered
-  // unsupported subserver-family disposition (not AC-HDC-009 capability evidence).
-  func testAuthorizedTCPStillShowsUnverifiedProtectionWarningAndReadOnlySubserver() {
-    let app = launch(arguments: [])
-
-    assertDisplayedValue(app.staticTexts["hdc.authorization"], equals: "ready")
+    // --- unsupported key access ------------------------------------------
+    applyFixtureState(["--ui-test-hdc-key-access-denied"], in: app)
     assertDisplayedValue(
-      app.staticTexts["hdc.channelProtection"], equals: "unverified; assumed unprotected")
+      app.staticTexts["hdc.authorization"],
+      equals: "unavailable — key access diagnostics unsupported without a user-approved locator")
     assertDisplayedValue(
-      app.staticTexts["hdc.tcp.warning"],
-      equals: "Channel protection is unverified. Use TCP only on a trusted, isolated network.")
-    assertDisplayedValue(
-      app.staticTexts["hdc.subserver"],
-      equals: "unsupported")
-    XCTAssertFalse(app.buttons["hdc.subserver.spawn"].exists)
-    XCTAssertFalse(app.buttons["hdc.subserver.killall"].exists)
-  }
+      app.staticTexts["hdc.keyAccessError"],
+      equals: "Key access diagnostics are unsupported; no key path was read or modified.")
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists, file: file, line: line)
 
-  // TEST-AC-HDC-003-01 / lifecycleCallCounter,
-  // TEST-AC-HDC-010-01 / lifecycleCriticalGateContract,
-  // TEST-AC-HDC-010-02 / lifecycleAuditContract
-  func testImpactPreviewShowsHostWideScopeConfirmationRequirementAndCriticalGate() {
-    let app = launch(arguments: ["--ui-test-hdc-impact-preview", "--ui-test-hdc-critical-gate"])
-
-    // The critical gate stays on the page itself, before any review sheet opens.
+    // --- critical gate + host-wide impact review --------------------------
+    applyFixtureState(["--ui-test-hdc-critical-gate"], in: app)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.criticalGate"],
       equals:
         "Blocked by Job job-hdc, Step flash-system. Wait for the flash checkpoint safe boundary.")
-
-    // A preview is requested explicitly; the impact review is a sheet, not an
-    // inline block that could be mistaken for a confirmed state.
-    let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
-    XCTAssertTrue(request.waitForExistence(timeout: 5))
-    request.click()
-
-    XCTAssertTrue(app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistence(timeout: 5))
+    enterImpactReview(app)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.impactPreview"], equals: "Server recovery impact preview")
     assertDisplayedValue(
@@ -128,70 +161,68 @@ final class HDCStatusUITests: XCTestCase {
       equals:
         "This preview requires an exact-generation user confirmation before recovery can dispatch.")
 
-    // The confirmation names the exact generation it confirms, and cancelling
-    // it is the default. Confirming closes the review without dispatching.
-    XCTAssertTrue(app.buttons["hdc.lifecycle.cancelImpactPreview"].exists)
-    let confirmation = app.buttons["hdc.lifecycle.confirmImpactPreview"]
-    XCTAssertTrue(confirmation.exists)
-    XCTAssertEqual(confirmation.label, "Confirm Generation 7")
-    confirmation.click()
-
-    assertDisplayedValue(
-      app.staticTexts["hdc.lifecycle.confirmed"],
-      equals: "Recovery impact confirmed for generation 7. Dispatch remains separately gated.")
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-    XCTAssertFalse(
-      app.staticTexts["hdc.lifecycle.impactPreview"].exists,
-      "confirming must close the review sheet")
-  }
-
-  // DONE-05: cancelling the review is a zero-dispatch, zero-confirmation exit,
-  // and Esc reaches the same cancel path.
-  func testCancellingTheImpactReviewLeavesNoConfirmationAndNoDispatch() {
-    let app = launch(arguments: ["--ui-test-hdc-impact-preview"])
-
-    let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
-    XCTAssertTrue(request.waitForExistence(timeout: 5))
-    request.click()
-    XCTAssertTrue(app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistence(timeout: 5))
-
+    // Cancelling is a zero-dispatch, zero-confirmation exit, and Esc reaches it.
+    XCTAssertTrue(app.buttons["hdc.lifecycle.cancelImpactPreview"].exists, file: file, line: line)
     app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
-
     XCTAssertTrue(
       app.staticTexts["hdc.lifecycle.impactPreview"].waitForNonExistence(timeout: 5),
-      "Esc must close the review sheet")
-    XCTAssertFalse(app.staticTexts["hdc.lifecycle.confirmed"].exists)
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-    XCTAssertTrue(app.buttons["hdc.lifecycle.requestImpactPreview"].exists)
+      "Esc must close the review sheet", file: file, line: line)
+    XCTAssertFalse(app.staticTexts["hdc.lifecycle.confirmed"].exists, file: file, line: line)
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists, file: file, line: line)
+
+    // Back to the clean state so the next assertions start from a known place.
+    applyFixtureState([], in: app)
+    assertDisplayedValue(app.staticTexts["hdc.authorization"], equals: "ready")
   }
 
-  // TEST-AC-HDC-003-01 / productionSessionCompositionUI
-  // TASK-PI-001 / TEST-PI-HDC-INVENTORY-002:registry-fed 空-完备 inventory 满足
-  // participant 门,unavailable 理由收敛为 server-identity/endpoint 前置。
-  func testNormalLaunchUsesDurableSessionDiagnosticsWithRegistryFedInventory() {
+  // MARK: - Launches that stay separate, and why
+
+  /// HOR-BOUNDED-001. This one cannot join a sweep: the fixture's delay fires
+  /// on the *second* refresh of an instance, which a sweep has long passed.
+  func testHORBOUNDED1_InFlightDuplicateIsRejectedWithoutThirdTransition() {
+    let app = launch(arguments: ["--ui-test-hdc-refresh-delay"])
+    let refresh = app.buttons["hdc.devices.refresh"]
+    let chooser = app.buttons["hdc.toolchain.chooseExecutable"]
+    XCTAssertTrue(refresh.waitForExistence(timeout: 15))
+    XCTAssertTrue(chooser.exists)
+
+    refresh.click()
+
+    XCTAssertFalse(refresh.isEnabled)
+    XCTAssertFalse(chooser.isEnabled)
+    app.typeKey("r", modifierFlags: .command)
+    assertDisplayedValue(
+      app.staticTexts["hdc.devices.events"], equals: appearedAndDisappearedFixtureEvents,
+      timeout: 15)
+    assertEnabled(refresh, equals: true)
+    assertEnabled(chooser, equals: true)
+    let events = displayedText(for: app.staticTexts["hdc.devices.events"])
+    XCTAssertFalse(events.contains("observationUnknown"))
+    XCTAssertFalse(events.contains("2026-07-28T00:00:02.000Z"))
+  }
+
+  /// TEST-AC-HDC-003-01 productionSessionCompositionUI, TASK-PI-001, and
+  /// OBS-APPFACE-001 / AP3. These need the *production* composition, which no
+  /// fixture instance can become, so they launch on their own.
+  func testProductionLaunchUsesDurableSessionDiagnosticsAndNoFixtureValues() {
     let app = launch(
       arguments: [
-        "--ui-test-reset-hdc-selection",
-        "--arkdeck-hdc-user-configured-path",
-        "/usr/bin/true",
+        "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path", "/usr/bin/true",
       ],
       fixture: false)
     expandAdvancedDiagnostics(app)
-
-    let configuredPath = app.staticTexts["hdc.toolchain.path"]
-    assertDisplayedValue(configuredPath, equals: "/usr/bin/true", timeout: 15)
+    assertDisplayedValue(app.staticTexts["hdc.toolchain.path"], equals: "/usr/bin/true", timeout: 15)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
-      equals: "No recovery impact preview has been requested",
-      timeout: 15)
+      equals: "No recovery impact preview has been requested", timeout: 15)
+
     let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
     XCTAssertTrue(request.exists)
     request.click()
     // participant 门已由 App-root registry 的空-完备 inventory 满足;剩余阻断
     // 只能来自 server-identity/endpoint 前置(/usr/bin/true 非 pinned 3.2.0d)。
     assertDisplayedValue(
-      app.staticTexts["hdc.lifecycle.recoveryBlocked"],
-      equals: "impactCannotBeReliablyDetermined",
+      app.staticTexts["hdc.lifecycle.recoveryBlocked"], equals: "impactCannotBeReliablyDetermined",
       timeout: 5)
     XCTAssertFalse(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"].exists,
@@ -199,16 +230,24 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertFalse(
       app.staticTexts["hdc.lifecycle.impactPreview"].exists,
       "a request that cannot produce an impact must not open a review sheet")
+
+    // AP3: the production path renders its own fail-closed presentation and
+    // cannot inherit the deterministic fixture events.
+    let events = displayedText(for: app.staticTexts["hdc.devices.events"])
+    XCTAssertFalse(events.contains("2026-07-28T00:00:00.000Z"))
+    XCTAssertFalse(events.contains("2026-07-28T00:00:01.000Z"))
+    XCTAssertFalse(events.contains("redacted-device-0123456789abcdef01234567"))
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
   }
 
-  // M1-006 safety gate: a non-pinned fake cannot be executed merely because
-  // it was explicitly selected. The commandless registry precondition wins.
+  /// M1-006 safety gate. A different production selection, so a different
+  /// launch: a non-pinned fake must not become executable merely by being
+  /// chosen.
   func testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe() {
     let fakeExecutable = repositoryFakeHDCExecutable()
     let app = launch(
       arguments: [
-        "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path",
-        fakeExecutable.path,
+        "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path", fakeExecutable.path,
       ], fixture: false)
     expandAdvancedDiagnostics(app)
 
@@ -220,7 +259,8 @@ final class HDCStatusUITests: XCTestCase {
       timeout: 15)
   }
 
-  // PORT-FILE-ACCESS-001 / signed Sandbox picker and bookmark reopen.
+  /// PORT-FILE-ACCESS-001. The relaunch *is* the assertion — the bookmark has
+  /// to survive it — so this one deliberately launches twice.
   func testUserPickerPersistsBookmarkAcrossRelaunch() throws {
     let pickerExecutable = pickerFakeHDCExecutable()
     let fakeExecutable = pickerExecutable.resolvingSymlinksInPath().standardizedFileURL
@@ -234,8 +274,8 @@ final class HDCStatusUITests: XCTestCase {
 
     let app = launch(arguments: ["--ui-test-reset-hdc-selection"], fixture: false)
     let choose = app.buttons["hdc.toolchain.chooseExecutable"]
-    XCTAssertTrue(choose.waitForExistence(timeout: 5))
-    choose.tap()
+    XCTAssertTrue(choose.waitForExistence(timeout: 15))
+    choose.click()
 
     let openPanel = app.sheets.firstMatch
     XCTAssertTrue(openPanel.waitForExistence(timeout: 5), "Open panel must become interactive")
@@ -261,74 +301,7 @@ final class HDCStatusUITests: XCTestCase {
       reopened.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
   }
 
-  // OBS-APPFACE-001 / AP1: the complete observation summary is stable,
-  // accessible static text and renders the exact fixture presentation.
-  func testOBSAPP1_ObservationSummaryFieldsAreAccessibleStaticText() {
-    let app = launch(arguments: [])
-    expandAdvancedDiagnostics(app)
-    let expectedEvents =
-      "2026-07-28T00:00:00.000Z appeared redacted-device-0123456789abcdef01234567"
-
-    assertDisplayedValue(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
-    assertDisplayedValue(app.staticTexts["hdc.counters.autoSubserver"], equals: "0")
-    assertDisplayedValue(app.staticTexts["hdc.endpoint.source"], equals: "unknown")
-    assertDisplayedValue(app.staticTexts["hdc.ownership.basis"], equals: "unavailable")
-    assertDisplayedValue(app.staticTexts["hdc.devices.events"], equals: expectedEvents)
-  }
-
-  // OBS-APPFACE-001 / AP2: public device events preserve source order and
-  // expose only timestamps, closed kinds, and redacted identifiers.
-  func testOBSAPP2_DeviceEventsPreserveOrderShapeAndRedaction() {
-    let app = launch(arguments: [])
-    app.buttons["hdc.devices.refresh"].tap()
-    let events =
-      displayedValues(for: app.staticTexts["hdc.devices.events"])
-      .first(where: { $0.contains(" appeared ") })
-      ?? displayedText(for: app.staticTexts["hdc.devices.events"])
-    let appeared = "2026-07-28T00:00:00.000Z appeared"
-    let disappeared = "2026-07-28T00:00:01.000Z disappeared"
-    let identifier = "redacted-device-0123456789abcdef01234567"
-
-    guard let appearedRange = events.range(of: appeared),
-      let disappearedRange = events.range(of: disappeared)
-    else {
-      XCTFail("Device events must contain both exact UTC fractional RFC 3339 transitions")
-      return
-    }
-    XCTAssertLessThan(appearedRange.lowerBound, disappearedRange.lowerBound)
-    XCTAssertEqual(occurrenceCount(of: identifier, in: events), 2)
-    XCTAssertNotNil(
-      events.range(
-        of:
-          #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z appeared redacted-device-[0-9a-f]{24} \| \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z disappeared redacted-device-[0-9a-f]{24}$"#,
-        options: .regularExpression))
-    XCTAssertFalse(events.contains("connectKey"))
-    XCTAssertFalse(events.contains("Optional("))
-    XCTAssertFalse(events.contains("internal reason"))
-  }
-
-  // OBS-APPFACE-001 / AP3: production launch renders its own fail-closed
-  // presentation and cannot inherit the deterministic UI fixture events.
-  func testOBSAPP3_ProductionLaunchContainsNoFixtureObservationValues() {
-    let app = launch(
-      arguments: [
-        "--ui-test-reset-hdc-selection",
-        "--arkdeck-hdc-user-configured-path",
-        "/usr/bin/true",
-      ],
-      fixture: false)
-    let eventsElement = app.staticTexts["hdc.devices.events"]
-    XCTAssertTrue(eventsElement.waitForExistence(timeout: 15))
-    let events = displayedText(for: eventsElement)
-
-    XCTAssertFalse(events.contains("2026-07-28T00:00:00.000Z"))
-    XCTAssertFalse(events.contains("2026-07-28T00:00:01.000Z"))
-    XCTAssertFalse(events.contains("redacted-device-0123456789abcdef01234567"))
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-  }
-
-  // OBS-APPFACE-001 / AP4: the App consumes presentation-only values and
-  // cannot import or construct the underlying observation/process boundary.
+  // OBS-APPFACE-001 / AP4: a source audit, so it launches nothing at all.
   func testOBSAPP4_AppSourceKeepsPresentationOnlyPackageBoundary() throws {
     let sourceURL = repositoryRoot()
       .appending(path: "ArkDeckApp/Features/HDC/HDCStatusView.swift")
@@ -383,73 +356,56 @@ final class HDCStatusUITests: XCTestCase {
     }
   }
 
-  // HOR-UI-001: the English control is visible through the real App wiring
-  // and one user action advances the deterministic presentation.
-  func testHORUI1_EnglishRefreshIsAccessibleAndAdvancesPresentation() {
-    let app = launch(arguments: ["-AppleLanguages", "(en)"])
-    let refresh = app.buttons["hdc.devices.refresh"]
-    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
-    XCTAssertEqual(refresh.label, "Refresh Devices")
-    XCTAssertTrue(refresh.isEnabled)
-    assertDisplayedValue(
-      app.staticTexts["hdc.devices.events"],
-      equals: appearedFixtureEvent)
+  // MARK: - Sweep helpers
 
-    refresh.tap()
-
-    assertDisplayedValue(
-      app.staticTexts["hdc.devices.events"],
-      equals: appearedAndDisappearedFixtureEvents)
+  private var fixtureStateFileURL: URL {
+    FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-ui-fixture-state-\(ProcessInfo.processInfo.processIdentifier).txt")
   }
 
-  // HOR-UI-001: Simplified Chinese is complete and the keyboard shortcut
-  // reaches the same App callback.
-  func testHORUI2_SimplifiedChineseKeyboardRefreshAdvancesPresentation() {
-    let app = launch(arguments: ["-AppleLanguages", "(zh-Hans)"])
-    let refresh = app.buttons["hdc.devices.refresh"]
-    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
-    XCTAssertEqual(refresh.label, "刷新设备")
-    XCTAssertTrue(refresh.isEnabled)
-
-    app.typeKey("r", modifierFlags: .command)
-
-    assertDisplayedValue(
-      app.staticTexts["hdc.devices.events"],
-      equals: appearedAndDisappearedFixtureEvents)
+  private func launchSweep(language: String) -> XCUIApplication {
+    try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    return launch(
+      arguments: [
+        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+      ])
   }
 
-  // HOR-BOUNDED-001: admission is synchronous, both executable reselection
-  // and refresh are disabled in flight, and a duplicate shortcut never
-  // reaches the fixture's deliberately visible third transition.
-  func testHORBOUNDED1_InFlightDuplicateIsRejectedWithoutThirdTransition() {
-    let app = launch(arguments: ["--ui-test-hdc-refresh-delay"])
+  /// Moves the launched fixture to a new state and makes the App re-read it.
+  /// The file replaces the previous state rather than adding to it, so a state
+  /// can assert the absence of a fault an earlier one set.
+  private func applyFixtureState(
+    _ faults: [String], in app: XCUIApplication,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    do {
+      try faults.joined(separator: "\n").write(
+        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    } catch {
+      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
+      return
+    }
     let refresh = app.buttons["hdc.devices.refresh"]
-    let chooser = app.buttons["hdc.toolchain.chooseExecutable"]
-    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
-    XCTAssertTrue(chooser.exists)
-
-    refresh.tap()
-
-    XCTAssertFalse(refresh.isEnabled)
-    XCTAssertFalse(chooser.isEnabled)
-    app.typeKey("r", modifierFlags: .command)
-    assertDisplayedValue(
-      app.staticTexts["hdc.devices.events"],
-      equals: appearedAndDisappearedFixtureEvents,
-      timeout: 15)
-    assertEnabled(refresh, equals: true)
-    assertEnabled(chooser, equals: true)
-    Thread.sleep(forTimeInterval: 1)
-    let events = displayedText(for: app.staticTexts["hdc.devices.events"])
-    XCTAssertFalse(events.contains("observationUnknown"))
-    XCTAssertFalse(events.contains("2026-07-28T00:00:02.000Z"))
+    XCTAssertTrue(refresh.waitForExistence(timeout: 10), file: file, line: line)
+    assertEnabled(refresh, equals: true, file: file, line: line)
+    refresh.click()
   }
+
+  private func enterImpactReview(_ app: XCUIApplication) {
+    let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
+    guard request.waitForExistence(timeout: 5) else { return }
+    request.click()
+    _ = app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistence(timeout: 5)
+  }
+
+  // MARK: - Helpers
 
   private func launch(arguments: [String], fixture: Bool = true) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning {
       app.terminate()
     }
+    // Deliberately no blanket language override: the sweeps pass their own.
     app.launchArguments =
       [
         "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
@@ -457,8 +413,7 @@ final class HDCStatusUITests: XCTestCase {
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
     if !fixture,
-      let configuredPathIndex = arguments.firstIndex(
-        of: "--arkdeck-hdc-user-configured-path"),
+      let configuredPathIndex = arguments.firstIndex(of: "--arkdeck-hdc-user-configured-path"),
       arguments.indices.contains(configuredPathIndex + 1)
     {
       app.launchEnvironment["ARKDECK_HDC_USER_CONFIGURED_PATH"] = arguments[configuredPathIndex + 1]
@@ -466,10 +421,6 @@ final class HDCStatusUITests: XCTestCase {
     app.launch()
     app.activate()
     if !app.windows.firstMatch.waitForExistence(timeout: 2) {
-      // A fresh macOS launch can restore an intentionally empty window set
-      // even with state restoration disabled. Exercise the standard
-      // WindowGroup command instead of treating that OS state as an HDC
-      // composition failure.
       app.typeKey("n", modifierFlags: .command)
     }
     XCTAssertTrue(
@@ -486,15 +437,23 @@ final class HDCStatusUITests: XCTestCase {
   /// action, not a fixture: the same raw values stay behind the same
   /// identifiers once the section is open.
   private func expandAdvancedDiagnostics(
-    _ app: XCUIApplication,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    _ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line
   ) {
     let toggle = app.buttons["overview.advanced.toggle"]
     XCTAssertTrue(
       toggle.waitForExistence(timeout: 15),
       "Overview must expose the Advanced Diagnostics disclosure", file: file, line: line)
     guard !app.staticTexts["hdc.toolchain.path"].exists else { return }
+    // The section sits below the fold, and a click at off-screen coordinates
+    // silently does nothing, so bring it into view before pressing it.
+    var scrolls = 0
+    while !toggle.isHittable, scrolls < 25 {
+      scrollHost(for: toggle, in: app).scroll(byDeltaX: 0, deltaY: -160)
+      scrolls += 1
+    }
+    XCTAssertTrue(
+      toggle.isHittable, "the Advanced Diagnostics disclosure never became clickable",
+      file: file, line: line)
     toggle.click()
     XCTAssertTrue(
       app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5),
@@ -502,10 +461,23 @@ final class HDCStatusUITests: XCTestCase {
       file: file, line: line)
   }
 
+  /// `app.scrollViews.firstMatch` is whichever scroll view the tree yields
+  /// first — often the sidebar's, which never moves the content.
+  private func scrollHost(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+    let host = app.scrollViews.containing(
+      NSPredicate(format: "identifier == %@", element.identifier)
+    ).firstMatch
+    return host.exists ? host : app.scrollViews.firstMatch
+  }
+
   private func displayedText(for element: XCUIElement) -> String {
     [element.label, element.value as? String]
       .compactMap { $0 }
       .joined(separator: " ")
+  }
+
+  private func displayedValues(for element: XCUIElement) -> [String] {
+    [element.label, element.value as? String].compactMap { $0 }
   }
 
   private func assertDisplayedValue(
@@ -525,10 +497,6 @@ final class HDCStatusUITests: XCTestCase {
       result == .completed || finalValues.contains(expectedText),
       "Expected exact displayed value \(expectedText), got: \(displayedText(for: element))",
       file: file, line: line)
-  }
-
-  private func displayedValues(for element: XCUIElement) -> [String] {
-    [element.label, element.value as? String].compactMap { $0 }
   }
 
   private var appearedFixtureEvent: String {
