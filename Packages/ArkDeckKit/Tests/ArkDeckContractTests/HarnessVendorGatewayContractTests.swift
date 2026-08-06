@@ -304,6 +304,69 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced("``"), "``")
   }
 
+  /// The same narration without the fence.
+  ///
+  /// `HTASK-7C12960C4B6E` round 7, on device: the producer stated its answer
+  /// as bare JSON on the line after a sentence, and a complete, correct patch
+  /// proposal — right base revision, right diff, right hash — was discarded as
+  /// `malformedJson`. That was the one round where a proposal was possible,
+  /// so the task stopped for a human holding the very patch it needed. The
+  /// fenced variant of this was fixed on 2026-08-05; this is the unfenced one.
+  func testTheAnswerIsFoundWhenNarrationPrecedesBareJSON() {
+    let object = #"{"kind":"proposePatch","hypothesis":"h"}"#
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced(
+        "Good, matches standard sha256 hex length. Now composing the final "
+          + "JSON answer.\n\n\(object)"),
+      object)
+
+    // A unified diff travels inside a JSON string, and it contains braces and
+    // escaped quotes. A scanner that counted those would cut the answer in
+    // half — which is worse than refusing it, because the halves may still
+    // parse.
+    // The braces must be *unbalanced* inside the string for this to
+    // discriminate: a diff that closes every brace it opens would be
+    // extracted correctly even by a scanner that ignored strings entirely,
+    // and such a case proves nothing. A lone `}` is what a real hunk removing
+    // a closing brace looks like, and it is what cuts the answer in half.
+    let withDiff =
+      #"{"kind":"proposePatch","unifiedDiff":"@@ -3 +3 @@\#n-  }\#n+  })\#n"}"#
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced("Here it is:\n\n\(withDiff)"), withDiff)
+
+    // And an escaped quote must not end the string early. Discriminating
+    // again requires care: the brace has to sit *between* the escaped quotes,
+    // so that mishandling the escape puts it outside the string and closes
+    // the object early. A brace after them stays inside either way and proves
+    // nothing.
+    // Built with ordinary escapes rather than a raw string: getting JSON's
+    // `\"` out of `#"…"#` needs `\#\"`, and writing `\#\#"` instead silently
+    // produces a different byte sequence that tests something else.
+    let withEscapedQuote =
+      "{\"kind\":\"proposePatch\",\"hypothesis\":\"it prints \\\"}\\\" on exit\",\"x\":\"y\"}"
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced("Answer:\n\n\(withEscapedQuote)"),
+      withEscapedQuote)
+
+    // Last, not first: an agent that shows its work puts the answer at the
+    // end, and an earlier object is a draft or an illustration.
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced(
+        "First I considered {\"kind\":\"noSafeAction\"} but rejected it.\n\n\(object)"),
+      object)
+
+    // An unterminated object is left alone rather than half-taken, the same
+    // way an unclosed fence is.
+    let truncated = "Composing:\n\n{\"kind\":\"proposePatch\""
+    XCTAssertEqual(LocalAgentCLIProcessTransport.unfenced(truncated), truncated)
+
+    // Text with no object at all is returned untouched for the parser to
+    // refuse on its own terms.
+    XCTAssertEqual(
+      LocalAgentCLIProcessTransport.unfenced("I could not determine a fix."),
+      "I could not determine a fix.")
+  }
+
   /// A CLI agent narrates: it says what it checked, shows the diff, then
   /// states its answer in a fenced block. A complete and correct patch
   /// proposal was discarded as malformed because two sentences preceded it
