@@ -64,11 +64,24 @@ struct RuntimeHistoryView: View {
         Text("history.empty.description")
       }
     } else {
-      HSplitView {
-        jobTable
-          .frame(minWidth: 420)
-        detail
-          .frame(minWidth: 280)
+      // The split has to be given the workspace's measured size. Left to size
+      // itself it takes its content's ideal instead: a two-row table and an
+      // empty detail placeholder produced an 83pt-tall, 1205pt-wide split
+      // centred in a 648×600 workspace — the table's rows drew outside its own
+      // scroll view, where a click reaches nothing, and the detail pane hung
+      // off the right of the window. Neither `maxWidth: .infinity` nor an
+      // explicit `idealWidth` moved it; only a measured width does.
+      GeometryReader { workspace in
+        HSplitView {
+          // Minimums, not ideals: an ideal width is ignored here, and the two
+          // minimums have to fit the narrowest workspace the shell can make —
+          // a 900pt window minus a 300pt sidebar.
+          jobTable
+            .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+          detail
+            .frame(minWidth: 240, maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: workspace.size.width, height: workspace.size.height)
       }
     }
   }

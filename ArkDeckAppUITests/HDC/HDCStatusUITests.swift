@@ -271,15 +271,14 @@ final class HDCStatusUITests: XCTestCase {
   /// PORT-FILE-ACCESS-001. The relaunch *is* the assertion — the bookmark has
   /// to survive it — so this one deliberately launches twice.
   func testUserPickerPersistsBookmarkAcrossRelaunch() throws {
-    let pickerExecutable = pickerFakeHDCExecutable()
+    XCTAssertTrue(
+      FileManager.default.isExecutableFile(atPath: repositoryFakeHDCExecutable().path),
+      "swift test must build the repository fake before the signed UI gate")
+    let pickerExecutable = try stagedPickerExecutable()
     let fakeExecutable = pickerExecutable.resolvingSymlinksInPath().standardizedFileURL
-    let repositoryFake = repositoryFakeHDCExecutable()
     XCTAssertTrue(
       FileManager.default.isExecutableFile(atPath: fakeExecutable.path),
-      "swift test must build the repository fake before the signed UI gate")
-    XCTAssertEqual(
-      try Data(contentsOf: pickerExecutable), try Data(contentsOf: repositoryFake),
-      "the visible picker fixture must be byte-identical to the repository fake")
+      "staging the picker fixture must keep it executable")
 
     let app = launch(arguments: ["--ui-test-reset-hdc-selection"], fixture: false)
     let choose = app.buttons["hdc.toolchain.chooseExecutable"]
@@ -297,7 +296,14 @@ final class HDCStatusUITests: XCTestCase {
       pathField.typeKey("v", modifierFlags: [.command])
     }
     pathField.typeKey(.return, modifierFlags: [])
-    app.typeKey(.return, modifierFlags: [])
+    // Go to Folder resolves asynchronously, so a Return sent straight after it
+    // lands before the panel has a selection and is simply dropped. Press the
+    // panel's own Open button, once it reports that it has something to open —
+    // which also says, in one assertion, whether the panel accepted the path.
+    let openButton = openPanel.buttons["OKButton"]
+    XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Open panel must expose its Open button")
+    assertEnabled(openButton, equals: true, timeout: 10)
+    openButton.click()
 
     // The open panel has to be gone before anything below the fold can be
     // clicked: while it is up the disclosure is present and on screen but has
@@ -462,6 +468,8 @@ final class HDCStatusUITests: XCTestCase {
     guard !app.staticTexts["hdc.toolchain.path"].exists else { return }
     // The section sits below the fold, and a click at off-screen coordinates
     // silently does nothing, so bring it into view before pressing it.
+    // Three passes reach it and it is hittable there, 24pt above the scroll
+    // view's bottom, which is where the section's own padding stops it.
     var scrolls = 0
     while !toggle.isHittable, scrolls < 25 {
       scrollEverything(in: app)
@@ -546,19 +554,36 @@ final class HDCStatusUITests: XCTestCase {
     return haystack.components(separatedBy: needle).count - 1
   }
 
-  private func pickerFakeHDCExecutable() -> URL {
+  /// The picker is driven through the system open panel's Go to Folder, and
+  /// that will not commit a selection inside `Packages/ArkDeckKit/.build`: the
+  /// panel navigates there and leaves its Open button disabled, so the panel
+  /// never closes and every later step of the test is measured against a
+  /// window that still has a sheet over it. Until now the test avoided that by
+  /// preferring a hard link an operator had created at the repository root by
+  /// hand, and silently fell back to the `.build` path when that link was
+  /// absent — which it is in any fresh clone or worktree.
+  ///
+  /// A copy, not a link. Granting the App access through the picker leaves
+  /// `com.apple.quarantine` on the chosen file, and a hard link carries that
+  /// onto the repository fake's own inode, where it stops every contract test
+  /// that spawns the fake — Gatekeeper refuses to launch it and the failures
+  /// read as process timeouts. A copy takes the quarantine on a throwaway
+  /// inode that teardown deletes.
+  private func stagedPickerExecutable() throws -> URL {
     if let explicit = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_EXECUTABLE"] {
       return URL(fileURLWithPath: explicit).standardizedFileURL
     }
-    let root = repositoryRoot()
-    let visibleHardLink = root.appending(path: "ArkDeckFakeHDCFixture-M1-006")
-    if FileManager.default.fileExists(atPath: visibleHardLink.path) {
-      return visibleHardLink
+    let source = repositoryFakeHDCExecutable()
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-picker-fixture-\(ProcessInfo.processInfo.processIdentifier)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let staged = directory.appending(path: source.lastPathComponent)
+    if FileManager.default.fileExists(atPath: staged.path) {
+      try FileManager.default.removeItem(at: staged)
     }
-    return
-      root
-      .appending(path: "Packages/ArkDeckKit/.build/debug/ArkDeckFakeHDCFixture")
-      .standardizedFileURL
+    try FileManager.default.copyItem(at: source, to: staged)
+    addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+    return staged.standardizedFileURL
   }
 
   private func repositoryRoot() -> URL {
