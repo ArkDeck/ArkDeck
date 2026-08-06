@@ -36,7 +36,9 @@ final class AppShellUITests: XCTestCase {
         readOnlyNote:
           "This workspace reads Runtime state. It cannot submit, cancel or retry anything.",
         outcomeUnknown: "Outcome unknown — this job's effect on the device was never confirmed.",
-        waitingForHuman: "Waiting for a person to act."))
+        waitingForHuman: "Waiting for a person to act.",
+        emptyTitle: "No Runtime Jobs Yet",
+        emptyDescription: "ArkDeck Runtime has recorded no jobs on this host."))
   }
 
   func testSimplifiedChineseSweepOfEveryWorkspace() {
@@ -50,7 +52,9 @@ final class AppShellUITests: XCTestCase {
       history: History(
         readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
         outcomeUnknown: "结果未知——本 Job 对设备的影响从未被确认。",
-        waitingForHuman: "等待人工处理。"))
+        waitingForHuman: "等待人工处理。",
+        emptyTitle: "尚无 Runtime Job",
+        emptyDescription: "ArkDeck Runtime 在本机尚未记录任何 Job。"))
   }
 
   private struct Overview {
@@ -70,6 +74,16 @@ final class AppShellUITests: XCTestCase {
     let readOnlyNote: String
     let outcomeUnknown: String
     let waitingForHuman: String
+    let emptyTitle: String
+    let emptyDescription: String
+  }
+
+  /// The history fixture reads its state from this file for the same reason
+  /// the HDC one does: a sweep has to walk more than one Runtime state without
+  /// spending another launch on it.
+  private var fixtureStateFileURL: URL {
+    let name = "arkdeck-appshell-fixture-state-\(ProcessInfo.processInfo.processIdentifier).txt"
+    return FileManager.default.temporaryDirectory.appending(path: name)
   }
 
   /// DONE-01 / DONE-02 / DONE-03 / DONE-07 in one pass.
@@ -77,7 +91,12 @@ final class AppShellUITests: XCTestCase {
     language: String, overview: Overview, unavailable: Unavailable, history: History,
     file: StaticString = #filePath, line: UInt = #line
   ) {
-    let app = launch(arguments: ["--ui-test-runtime-history", "-AppleLanguages", language])
+    try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-fixture-state", fixtureStateFileURL.path,
+        "-AppleLanguages", language,
+      ])
 
     // The window opens at the size the App declares, not at its 900x600
     // floor. A root view's ideal size does not size a WindowGroup, so before
@@ -164,6 +183,37 @@ final class AppShellUITests: XCTestCase {
       app.staticTexts["history.detail.outcomeUnknown"], equals: history.outcomeUnknown)
     assertDisplayed(
       app.staticTexts["history.detail.waitingForHuman"], equals: history.waitingForHuman)
+
+    // A Runtime that is reachable and has run nothing is its own presentation.
+    // The domain has always kept it apart from a history it could not read,
+    // but nothing rendered it until now, so this branch of the workspace —
+    // the one a new install opens on — had never been seen.
+    do {
+      try "--ui-test-runtime-history-empty".write(
+        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    } catch {
+      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
+      return
+    }
+    app.buttons["history.refresh"].click()
+    let emptyTitle = app.staticTexts["history.empty.title"]
+    XCTAssertTrue(emptyTitle.waitForExistence(timeout: 10), file: file, line: line)
+    assertDisplayed(emptyTitle, equals: history.emptyTitle)
+    assertDisplayed(app.staticTexts["history.empty.description"], equals: history.emptyDescription)
+    // It is neither a history that could not be read nor a table with no rows,
+    // and it still offers nothing to submit.
+    XCTAssertFalse(
+      app.staticTexts["history.unavailable.title"].exists,
+      "an empty history is not an unreadable one", file: file, line: line)
+    XCTAssertFalse(
+      element("history.table", in: app).exists, "an empty history shows no table",
+      file: file, line: line)
+    XCTAssertFalse(
+      app.staticTexts["history.readOnlyNote"].exists, file: file, line: line)
+    for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
+      XCTAssertFalse(
+        app.buttons[forbidden].exists, "\(forbidden) must not exist", file: file, line: line)
+    }
   }
 
   // MARK: - Fixture-specific launches (locale-independent assertions)

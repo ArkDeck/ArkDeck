@@ -226,16 +226,26 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     }
   }
 
-  private var unreachable: Bool {
+  private func fixtureRequests(_ flag: String) -> Bool {
     if let stateFileURL, let text = try? String(contentsOf: stateFileURL, encoding: .utf8) {
-      return text.contains("--ui-test-runtime-history-unreachable")
+      return text.contains(flag)
     }
-    return launchArguments.contains("--ui-test-runtime-history-unreachable")
+    return launchArguments.contains(flag)
   }
+
+  private var unreachable: Bool { fixtureRequests("--ui-test-runtime-history-unreachable") }
+
+  /// A reachable Runtime that has run nothing yet. This is what a new install
+  /// shows, and it is a different presentation from an unreadable history —
+  /// the domain already keeps them apart, but nothing rendered the empty one.
+  private var empty: Bool { fixtureRequests("--ui-test-runtime-history-empty") }
 
   func refreshHistory() async -> RuntimeHistoryPresentation {
     guard !unreachable else {
       return .unavailable("ArkDeck Runtime is not reachable: fixture")
+    }
+    guard !empty else {
+      return RuntimeHistoryPresentation(availability: .available, jobs: [])
     }
     return RuntimeHistoryPresentation(
       availability: .available,
