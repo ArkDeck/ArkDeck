@@ -21,8 +21,27 @@ blue accent (`#006EDB` / `#58A6FF`), translucent `rgba()` separators, and a diff
 value for *every* semantic color. Caught only because the pre-commit rebase pulled the
 newer docs in. Realigning cost one token rewrite plus one driver run.
 
-So before touching anything: `git fetch && git log origin/main -- docs/design/`, then
-diff `src/tokens.css` against the spec's §2 table and the prototype's `:root` block.
+**This is now enforced mechanically** — `docs/design/arkdeck-ds/scripts/check-tokens.mjs`
+runs first in `npm run build` (which is `cfg.buildCmd`, so every sync goes through it)
+and is fail-closed: on drift the build exits 1 and never writes `dist/`, so the
+converter stops at `[NO_DIST]` instead of shipping stale tokens. Verified by injecting
+each drift kind. It catches five things:
+
+1. any mapped token whose value differs from the prototype's;
+2. a docs version bump (`ALIGNED_VERSION` in the script pins v0.3 — bump it only after
+   re-reading §2 and §1, which is the acknowledgement step that was missing the first time);
+3. a token added to the prototype that this package neither mirrors nor explicitly declines;
+4. a token this package re-themes in dark that the prototype doesn't, or vice versa
+   (otherwise a dropped dark override silently keeps its light value);
+5. the spec's §2 table naming a hex no prototype token carries — i.e. the two docs
+   drifting apart from *each other*.
+
+It lives inside the package rather than in `scripts/` or `.github/` because both of those
+are governance-sensitive paths (see the `.gitignore` note below): touching them demands a
+single active task covering the whole diff, and none covers this one.
+
+Run it alone with `npm run check:tokens`. Before touching anything, still start with
+`git fetch && git log origin/main -- docs/design/`.
 
 **The spec's normative position is that the shipping SwiftUI/AppKit app uses *system
 semantic* colors** (`windowBackgroundColor`, `Color.accentColor`, system green/orange/red)
