@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-055-harness-final-architecture
-revision: 2
+revision: 3
 status: approved # 携 approved 落地:维护者 review + merge 本 PR 即批准(enforcement 批准语义);merge 前任务不开工。范围过大时在 review 中要求削减并在同一 change 内修订,不新建 change。
 class: capability
 core_change_level: none
@@ -23,6 +23,45 @@ platforms: [macos]
 > 交付同车。本 change 不产生 readiness/verification/archive 后续载体:任务随各自实现 PR
 > 直接翻 done,verification 结论写入同一实现 PR,归档冻结(§20)。
 
+
+
+## r3(2026-08-06):为人停下,就必须在人的队列里留下一条
+
+### 为什么现在做
+
+GJ-5 的主失败模式停在 `patchProposalRequired`(`HTASK-7C12960C4B6E`,7.0.0.34),
+任务转入 `humanRequired` —— 而 `arkdeck task humanActions` 返回 **0 条**。
+同一台机器上,analyzer 缺失那次阻塞(`environmentUnavailable`,`HTASK-C458F21E8B9C`)
+返回 **1 条**,带 `actionId`、`block`、`resumePhase`、`resumeStatus`。
+
+读代码,两条通往 `humanRequired` 的路径对此意见不一致:
+
+- `HarnessTaskCoordinator+Bounds.swift` 的 `recordBlock`:`putHumanAction` + 转移,**写记录**;
+  guard 类阻塞(authorizationApproval / outcomeUnknown / strategyExhausted /
+  evidenceIntegrity / environmentUnavailable)走这条。
+- `HarnessTaskCoordinator.swift` 的 `.requestHuman` 分支:`closeAttempt` + 转移,
+  **不写记录**;handler 产出的 `.requestHuman` 决策(如 `patchProposalRequired`)走这条。
+
+信息并非不存在——决策的 hypothesis 落进了 `result.summary`——但它不在**人被告知去看的那个界面**。
+对一个「唯一人工步骤是合 PR」的产品,「为人停下、而人的队列是空的」本身就是一道多出来的人工步骤:
+操作者得先知道去别处翻,才能知道要做什么。
+
+### What(r3 交付面)
+
+1. 通往 `humanRequired` 的**每一条**路径都留下一条人机交接记录,`.requestHuman` 不再例外;
+   记录至少携带:停下的理由、恢复所需的相位/状态、以及可据以行动的证据引用。
+2. `HarnessHumanBlock` 是**封闭且持久化**的词表。若交付需要新增取值,必须同步其封闭形状校验与
+   文档级世代测试;若不新增,则人机交接记录不得依赖该词表来生成。两条路任选其一,
+   但**不得**出现「悄悄写进一个既有取值,让两种不同的停机在台账里长得一样」。
+3. 一条契约断言把两条路径绑在一起:任何使任务进入 `humanRequired` 的转移,
+   都必须同时产生恰好一条人机交接记录。
+
+## Out of scope(r3)
+
+- 改变任何一种停机的**判定**——本修订只管停下之后留不留记录,不放宽也不收紧何时停;
+- 让 agent 代替人去满足人机交接(例如自动提交补丁提案);
+- 改动 `HarnessHumanBlock` 已有取值的语义,或复用一个语义不符的取值来省事;
+- 宣称 GJ-5 的成功率因此改变。
 
 ## r2(2026-08-06):隔离 workspace 必须活过一次 daemon 重启,量不到必须说量不到
 
