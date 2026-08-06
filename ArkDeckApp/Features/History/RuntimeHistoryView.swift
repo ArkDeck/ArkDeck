@@ -62,6 +62,7 @@ struct RuntimeHistoryView: View {
         }
       } description: {
         Text("history.empty.description")
+          .accessibilityIdentifier("history.empty.description")
       }
     } else {
       // The split has to be given the workspace's measured size. Left to size
