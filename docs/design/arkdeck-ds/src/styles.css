@@ -347,7 +347,17 @@
   background: var(--ad-accent-weak);
   overflow: hidden;
   position: relative;
+  /* Block use (its own row): fill the container. */
   width: 100%;
+  /* Flex use (beside text, as in the Job inspector's collapsed bar): take a
+     bounded share and yield the rest. Without this the bar's `width: 100%`
+     becomes its flex-basis, out-competes a `flex: 1` sibling, and squeezes the
+     summary line to zero — the one line AC-UX-001-01 is about, invisible in
+     exactly the state where it matters. Ported from the prototype's `.ibar`,
+     whose flex bounds this rule originally dropped. */
+  flex: 0 1 200px;
+  min-width: 60px;
+  align-self: center;
 }
 .ad-ibar::after {
   content: "";
@@ -592,3 +602,132 @@
 
 .ad-op-list { display: flex; gap: var(--ad-space-2); flex-wrap: wrap; }
 .ad-op-list .ad-chip { font-family: var(--ad-font-mono); font-weight: 500; }
+
+/* ── recovery banner ───────────────────────────────────────────────────── */
+
+.ad-banner {
+  background: color-mix(in srgb, var(--ad-panel-solid) 92%, var(--ad-warn) 8%);
+  border: 1px solid color-mix(in srgb, var(--ad-warn) 55%, var(--ad-line));
+  border-radius: var(--ad-radius-xl);
+  padding: var(--ad-space-4) var(--ad-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-family: var(--ad-font-ui);
+}
+.ad-banner__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-2);
+  font-weight: 650;
+  color: var(--ad-warn);
+  padding: 0 2px 7px;
+}
+/* Drawn in CSS, never in the DOM: decorative, and a leading ⚠ in textContent
+   is read as a caught render error by the preview validator. */
+.ad-banner__head::before { content: "⚠"; font-size: var(--ad-text-md); }
+
+.ad-ritem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ad-space-3);
+  border-top: 1px solid var(--ad-line);
+  padding: var(--ad-space-3) 2px;
+}
+.ad-banner__head + .ad-ritem { border-top: none; }
+.ad-ritem__body { flex: 1; min-width: 0; }
+.ad-ritem__body b { font-size: var(--ad-text-md); }
+.ad-ritem__body p { font-size: var(--ad-text-sm); color: var(--ad-ink-2); margin-top: 2px; }
+.ad-ritem__actions {
+  display: flex;
+  gap: var(--ad-space-2);
+  flex: none;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* humanRequired: the block, the smallest action, and where it resumes */
+.ad-ritem__block {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--ad-space-3);
+  margin-top: var(--ad-space-2);
+  font-size: var(--ad-text-sm);
+}
+.ad-ritem__block dt { color: var(--ad-ink-2); }
+.ad-ritem__block dd { margin: 0; }
+
+/* ── job inspector ─────────────────────────────────────────────────────── */
+
+.ad-drawer {
+  flex: none;
+  border-top: 1px solid var(--ad-line);
+  background: var(--ad-chrome);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  backdrop-filter: blur(24px) saturate(1.25);
+  font-family: var(--ad-font-ui);
+}
+.ad-drawer__bar {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: var(--ad-space-3);
+  padding: 7px var(--ad-space-5);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ad-text-sm);
+  color: var(--ad-ink);
+  background: transparent;
+  border: none;
+  text-align: start;
+}
+.ad-drawer__bar:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: -2px; }
+.ad-drawer__caret { flex: none; color: var(--ad-ink-2); }
+.ad-drawer__status {
+  /* The summary is the bar's content; the progress bar beside it is secondary.
+     A real floor rather than `flex: 1` (basis 0) so that in a narrow window the
+     indeterminate bar gives up its width first — otherwise the summary quietly
+     collapses to nothing while the decoration keeps its full 200px. */
+  flex: 1 1 14ch;
+  min-width: 14ch;
+  color: var(--ad-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ad-drawer__body { max-height: 0; overflow: hidden; }
+.ad-drawer--open .ad-drawer__body { overflow-y: auto; }
+
+.ad-job {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-4) var(--ad-space-5);
+  border-top: 1px solid var(--ad-line);
+  background: color-mix(in srgb, var(--ad-panel-solid) 76%, transparent);
+}
+.ad-job:first-child { border-top: none; }
+.ad-job--empty { color: var(--ad-ink-2); font-size: var(--ad-text-sm); font-style: italic; }
+.ad-job__head { display: flex; align-items: center; gap: var(--ad-space-3); flex-wrap: wrap; }
+.ad-job__head b { font-size: var(--ad-text-md); }
+.ad-job__spacer { flex: 1; }
+.ad-job__critical {
+  font-size: var(--ad-text-sm);
+  color: var(--ad-danger);
+  border-inline-start: 2px solid var(--ad-danger);
+  padding-inline-start: var(--ad-space-2);
+  margin: 0;
+}
+
+.ad-rebind {
+  border: 1px solid var(--ad-accent);
+  background: var(--ad-accent-weak);
+  border-radius: var(--ad-radius-md);
+  padding: var(--ad-space-2) var(--ad-space-4);
+  font-size: var(--ad-text-sm);
+  display: flex;
+  gap: var(--ad-space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}

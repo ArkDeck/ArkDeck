@@ -60,3 +60,15 @@ export type {
   StageTrackProps,
   OperationListProps,
 } from "./components/harness.js";
+
+export { RecoveryBanner } from "./components/recovery.js";
+export type { RecoveryBannerProps, RecoveryItem } from "./components/recovery.js";
+
+export { JobInspector } from "./components/jobs.js";
+export type {
+  JobInspectorProps,
+  Job,
+  JobState,
+  ExecutionMode,
+  RebindPrompt,
+} from "./components/jobs.js";

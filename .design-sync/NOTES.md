@@ -46,9 +46,19 @@ each drift kind. It catches seven things:
    but the roster was not, and six missing components went unnoticed until
    somebody hand-diffed the two prototypes. The check also fails if a mapping
    names a component the package doesn't export, or if the prototype drops a
-   class still mapped. **`KNOWN_GAPS` prints on every run** — currently 8
-   surfaces (Recovery banner, Job inspector, form inputs, Trace tag picker),
-   which is the honest backlog, not a passing grade.
+   class still mapped. **`KNOWN_GAPS` prints on every run** — currently 3
+   surfaces (text input, radio group, Trace tag picker), which is the honest
+   backlog, not a passing grade. The Recovery banner and Job inspector that
+   first populated that list are now built.
+
+   **The component-existence half of rule 7 reads `src/index.ts`, not the built
+   bundle — and it has to.** The first version checked
+   `ds-bundle/components/general/`, which deadlocks the exact workflow the rule
+   exists to support: adding a component means updating the mapping, but the
+   bundle cannot be regenerated until the build passes, and the build runs this
+   check. Hit immediately when RecoveryBanner and JobInspector landed. The
+   package's export list answers "does this component exist" without needing a
+   build at all.
 
 It lives inside the package rather than in `scripts/` or `.github/` because both of those
 are governance-sensitive paths (see the `.gitignore` note below): touching them demands a
@@ -127,6 +137,27 @@ ship real woff2 files via `cfg.extraFonts` instead of extending this list.
   text. **Never lead a preview cell's rendered text with `⚠`**, and keep new
   decorative glyphs in CSS.
 
+## Porting a prototype rule can drop *declarations*, not just names
+
+`check-tokens.mjs` compares token **values**; it has no idea whether a rule kept
+all of the prototype's declarations. Both bugs found so far were exactly that:
+
+- the `settings` glyph kept `fill="var(--panel-solid)"`, an unprefixed name (now
+  caught by rule 6);
+- `.ad-ibar` was ported as `width: 100%` and **silently lost the prototype's
+  `flex: 1; min-width: 60px; max-width: 200px; align-self: center`**. Standalone
+  it looked fine, so it shipped. Put beside text in a flex row — the Job
+  inspector's collapsed bar — that `width: 100%` became its flex-basis, beat the
+  summary's `flex: 1` (basis 0), and squeezed the one line AC-UX-001-01 is about
+  down to **0px**, while the bar itself kept 207px and the row grew to 47px
+  instead of 36. `aria-live` still announced it, so a screen reader got the
+  summary and a sighted user did not.
+
+**When porting a prototype rule, diff the declaration sets, not just the values.**
+`.ad-ibar` now carries `flex: 0 1 200px; min-width: 60px` alongside `width: 100%`,
+so it fills its own row when used alone and yields when used beside text, and
+`.ad-drawer__status` has a `14ch` floor so the decoration gives up width first.
+
 ## Authoring a preview — rules the first pass paid for
 
 - **Text outside an `.ad-*` element renders serif, and that is the preview's fault.**
@@ -171,6 +202,11 @@ ship real woff2 files via `cfg.extraFonts` instead of extending this list.
   it after any viewport change. One `StatusStrip` hint said "折成两列两行(即本图)" and
   became wrong the moment the override made the cell render 4-across. Check every claim
   against the raw shot, not against the component's doc comment.
+- **`JobInspector` wants a `var(--ad-ground)` shell, not a `WindowFrame`.** The
+  window's body has 20px padding, so the drawer floats inside it instead of
+  docking to the bottom edge. Author it at ~840px; narrower and the rebind row
+  breaks 中止 onto its own line. Keep the expanded body short by trimming each
+  job's `log`, not by shrinking `height` — the height is the spec's 220–320.
 - **`BudgetMeters` has an ugly middle width.** Its `repeat(auto-fit, minmax(90px, 1fr))`
   grid is clean at ≥800px (five columns, one shared meter baseline) and at ≤190px (single
   column, tabular numerals aligning down the column — the narrow-inspector case). At

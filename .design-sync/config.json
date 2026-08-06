@@ -17,6 +17,8 @@
     "StatusStrip": { "cardMode": "column", "viewport": "1100x700" },
     "BudgetMeters": { "cardMode": "column" },
     "StageTrack": { "cardMode": "column" },
-    "ToolbarButton": { "cardMode": "column" }
+    "ToolbarButton": { "cardMode": "column" },
+    "JobInspector": { "cardMode": "column" },
+    "RecoveryBanner": { "cardMode": "column" }
   }
 }
