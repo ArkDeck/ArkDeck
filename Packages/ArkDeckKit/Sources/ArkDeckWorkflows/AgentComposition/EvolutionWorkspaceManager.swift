@@ -67,6 +67,66 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
       attributes: [.posixPermissions: 0o700])
   }
 
+  /// Re-registers a workspace this process did not create.
+  ///
+  /// The tree survives on disk; the identity did not, because registration
+  /// only ever happened on the creation path — and a task past its preparation
+  /// phase never calls `prepareWorkspace` again. A daemon restart therefore
+  /// left `evolution-…` references unresolvable while their files sat intact,
+  /// and everything downstream failed naming something else.
+  ///
+  /// Deliberately not `prepareWorkspace`: preparation re-derives the *source*
+  /// revision and refuses when it has moved, which is the right question when
+  /// deciding whether to make a copy and the wrong one when deciding whether a
+  /// copy that already exists is still itself. Adoption asks only the second.
+  public func adoptPersistedWorkspace(
+    _ workspace: HarnessEvolutionWorkspace,
+    policy: HarnessEvolutionPolicy
+  ) async throws {
+    try lock.withLock {
+      guard let source = profiles.profile(for: workspace.sourceProjectRef),
+        source.kind == .primary
+      else {
+        throw EvolutionWorkspaceError.sourceProfileUnavailable(workspace.sourceProjectRef)
+      }
+      let taskRoot = rootURL.appendingPathComponent(
+        workspace.workspaceID, isDirectory: true)
+      let workspaceRoot = taskRoot.appendingPathComponent("workspace", isDirectory: true)
+      let manifestURL = taskRoot.appendingPathComponent("workspace.json")
+      guard FileManager.default.fileExists(atPath: manifestURL.path),
+        let data = try? Data(contentsOf: manifestURL),
+        let stored = try? JSONDecoder().decode(Manifest.self, from: data),
+        stored.workspace == workspace
+      else {
+        // Refused, never rebuilt: the caller already holds this reference, so
+        // registering a tree the manifest does not describe would substitute
+        // one isolated workspace for another underneath it.
+        throw EvolutionWorkspaceError.workspaceManifestConflict
+      }
+      guard FileManager.default.fileExists(atPath: workspaceRoot.path) else {
+        // A swept workspace keeps its manifest for audit. Adoption must not
+        // bring one back to life.
+        if FileManager.default.fileExists(
+          atPath: taskRoot.appendingPathComponent("teardown.json").path)
+        {
+          throw EvolutionWorkspaceError.workspaceAlreadyDestroyed(workspace.workspaceID)
+        }
+        throw EvolutionWorkspaceError.workspaceManifestConflict
+      }
+      guard Self.allowedPathsDigest(policy.allowedPaths) == workspace.allowedPathsDigest
+      else {
+        throw EvolutionWorkspaceError.workspaceManifestConflict
+      }
+      let profile = try Self.derivedProfile(
+        from: source, workspaceRoot: workspaceRoot,
+        projectRef: workspace.projectRef, allowedPaths: policy.allowedPaths)
+      // `register` is itself fail-loud when the reference already resolves to
+      // a different profile, so re-adoption in the same process is a no-op and
+      // a disagreement is an error rather than an overwrite.
+      try profiles.register(profile)
+    }
+  }
+
   public func prepareWorkspace(
     htaskID: String,
     sourceProjectRef: String,
@@ -99,8 +159,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
       let taskRoot = rootURL.appendingPathComponent(workspaceID, isDirectory: true)
       let workspaceRoot = taskRoot.appendingPathComponent("workspace", isDirectory: true)
       let manifestURL = taskRoot.appendingPathComponent("workspace.json")
-      let allowedDigest = WorkspaceProviderSupport.sha256(
-        Data(policy.allowedPaths.sorted().joined(separator: "\n").utf8))
+      let allowedDigest = Self.allowedPathsDigest(policy.allowedPaths)
       let workspace = HarnessEvolutionWorkspace(
         workspaceID: workspaceID, htaskID: htaskID,
         sourceProjectRef: sourceProjectRef, projectRef: projectRef,
@@ -393,6 +452,14 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
     let fractional = ISO8601DateFormatter()
     fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+  }
+
+  /// One definition, shared by creation and adoption: two copies of this
+  /// would drift and adoption would start accepting workspaces whose scope it
+  /// no longer actually matches.
+  static func allowedPathsDigest(_ allowedPaths: [String]) -> String {
+    WorkspaceProviderSupport.sha256(
+      Data(allowedPaths.sorted().joined(separator: "\n").utf8))
   }
 
   private static func derivedProfile(

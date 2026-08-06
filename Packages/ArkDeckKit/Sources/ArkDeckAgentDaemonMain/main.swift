@@ -547,11 +547,18 @@ Task.detached {
       sensitiveEvidenceAllowList: sensitiveEvidence)
     // Recovery resolves dispatch intents whose outcome was lost; it starts
     // no new work, so a restart cannot become a burst of dispatches.
+    // Said at startup, not discovered later: a task whose isolated workspace
+    // this process cannot adopt will fail every workspace decision it makes,
+    // and the failure reads as something else entirely if nobody names it here.
+    let unadopted = try await harness.adoptPersistedEvolutionWorkspaces()
+    for entry in unadopted {
+      print("harness workspace not adopted for \(entry.htaskID): \(entry.reason)")
+    }
     let recoveredTasks = try await harness.recoverTasks()
     if !recoveredTasks.isEmpty {
       print("recovered \(recoveredTasks.count) harness task dispatch intent(s)")
-      fflush(stdout)
     }
+    if !unadopted.isEmpty || !recoveredTasks.isEmpty { fflush(stdout) }
     let handler = RuntimeControlPlaneHandler(
       engine: engine,
       capabilityStore: capabilityStore,

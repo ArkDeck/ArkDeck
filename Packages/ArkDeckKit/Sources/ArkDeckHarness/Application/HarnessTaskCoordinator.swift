@@ -489,7 +489,41 @@ public actor HarnessTaskCoordinator {
   /// nothing else. Recovery does not start new work - that needs an
   /// explicit reconcile, so a restart can never turn into a burst of
   /// unattended dispatches.
+  /// Re-registers the isolated workspaces of tasks this process did not start.
+  ///
+  /// Their trees are on disk but their identities were registered by whichever
+  /// process created them, so without this a restart leaves every
+  /// `evolution-…` reference unresolvable. Covers every non-terminal task with
+  /// a workspace, not only those with unresolved intents: a task parked
+  /// waiting for a human has no intent outstanding and needs its workspace
+  /// back just the same.
+  ///
+  /// Returns what it could not adopt instead of throwing, so one unadoptable
+  /// workspace cannot stop the rest — and so a caller can say it at startup
+  /// rather than let it surface as a stale decision several rounds later.
+  @discardableResult
+  public func adoptPersistedEvolutionWorkspaces() async throws
+    -> [(htaskID: String, reason: String)]
+  {
+    guard let port = evolutionWorkspacePort else { return [] }
+    var unadopted: [(htaskID: String, reason: String)] = []
+    for snapshot in try await store.list() where !snapshot.status.isTerminal {
+      guard let workspace = snapshot.evolutionWorkspace,
+        let policy = snapshot.evolutionPolicy
+      else { continue }
+      do {
+        try await port.adoptPersistedWorkspace(workspace, policy: policy)
+      } catch {
+        unadopted.append((htaskID: snapshot.htaskID, reason: "\(error)"))
+      }
+    }
+    return unadopted
+  }
+
   public func recoverTasks() async throws -> [HarnessTaskSnapshot] {
+    // Before any intent is resolved: resolving one may dispatch a workspace
+    // operation, and that needs the isolated identity already restored.
+    try await adoptPersistedEvolutionWorkspaces()
     var recovered: [HarnessTaskSnapshot] = []
     for snapshot in try await store.list() where !snapshot.status.isTerminal {
       let unresolved = try await store.unresolvedIntents(snapshot.htaskID)
@@ -738,15 +772,31 @@ public actor HarnessTaskCoordinator {
     snapshot: HarnessTaskSnapshot
   ) async -> HarnessDecisionExecutionFacts {
     let attemptID = try? await activeAttempt(snapshot.htaskID)?.attemptID
-    var workspaceRevision: String?
-    if decision.expectedWorkspaceRevision != nil,
-      let repairPort,
-      let projectRef = snapshot.executionProjectRef
-    {
-      let proposal = decision.patchProposal ?? snapshot.repairAttempt?.proposal
-      if let proposal {
-        workspaceRevision = try? await repairPort.currentWorkspaceRevision(
-          relativePaths: proposal.touchedFiles, projectRef: projectRef, task: snapshot)
+    // Every way this can fail to produce a number used to become `nil`, and a
+    // `nil` was then read as "the workspace is at a different revision" — a
+    // claim about a reading that never happened. Each branch now says which
+    // one it is, and only a number that was actually read can contradict the
+    // decision.
+    var workspaceRevision: HarnessWorkspaceRevisionReading = .notRequired
+    if decision.expectedWorkspaceRevision != nil {
+      if repairPort == nil {
+        workspaceRevision = .unmeasurable(reason: "repairPortUnavailable")
+      } else if snapshot.executionProjectRef == nil {
+        workspaceRevision = .unmeasurable(reason: "executionProjectRefUnavailable")
+      } else if let repairPort, let projectRef = snapshot.executionProjectRef {
+        let proposal = decision.patchProposal ?? snapshot.repairAttempt?.proposal
+        if let proposal {
+          do {
+            workspaceRevision = .measured(
+              try await repairPort.currentWorkspaceRevision(
+                relativePaths: proposal.touchedFiles, projectRef: projectRef,
+                task: snapshot))
+          } catch {
+            workspaceRevision = .unmeasurable(reason: "\(error)")
+          }
+        } else {
+          workspaceRevision = .unmeasurable(reason: "noPatchProposalToMeasureAgainst")
+        }
       }
     }
     let run: HarnessModelRun?

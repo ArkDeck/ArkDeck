@@ -665,7 +665,16 @@
 
 ## TASK-HFA-014 — 隔离 workspace 跨重启的身份,与"量不到"的如实上报(r2)
 
-- Status:ready
+- Status:done
+- Done:2026-08-06;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  `HFA-AC-24`、`HFA-AC-25` **均 PASS**(contract 面,本任务声明即为 contract);
+  evidence = `evidence/runs/TASK-HFA-014/run-r2.md`。
+  两条不变量各用"拆掉它"验过会变红:收养回落到源树 → AC-24 红;
+  把"不可测"重新当"变了" → AC-25 红。
+  **AC-25 末条在实现时被更正**:原文要求"不得报 `insufficientEvidenceForPatch`",
+  实测该串不在 Swift 源码任何位置,是决策产出方自己选的理由(`causation: noSafeAction`),
+  产品无闸可修;改为约束喂回去的陈旧理由与启动播报,更正连同实测记在 evidence 与
+  `verification.md` 里
 - Platform:macos
 - Requirements:proposal r2 What 1-3(持久化 evolution workspace 在新进程重新登记且
   与 manifest 一致、revision 求值三态化、有界循环的停机理由指向真正成因)

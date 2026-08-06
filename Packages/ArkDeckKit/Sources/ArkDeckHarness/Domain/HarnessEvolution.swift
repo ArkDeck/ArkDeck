@@ -250,6 +250,16 @@ public protocol HarnessEvolutionWorkspacePort: Sendable {
     createdAtUTC: String
   ) async throws -> HarnessEvolutionWorkspace
 
+  /// Re-registers a workspace this process did not create, so a task whose
+  /// isolated tree outlived the process that made it keeps its identity.
+  /// Refuses rather than rebuilds when the stored manifest disagrees: the
+  /// caller already holds the reference, so quietly pointing it at another
+  /// tree — or at the source — would cancel the isolation without saying so.
+  func adoptPersistedWorkspace(
+    _ workspace: HarnessEvolutionWorkspace,
+    policy: HarnessEvolutionPolicy
+  ) async throws
+
   /// Records a strategy directory under the already isolated task tree.
   /// Runtime operations continue to target the stable task workspace so one
   /// capability subject cannot silently become another between attempts.

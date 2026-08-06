@@ -29,6 +29,102 @@ final class HarnessEvolutionContractTests: XCTestCase {
     roots = []
   }
 
+  /// `HFA-AC-24` — the isolated workspace outlives the process that made it.
+  ///
+  /// Registration happens only on the creation path, so a daemon restart used
+  /// to leave a task's `evolution-…` reference unresolvable while its files sat
+  /// intact on disk. Everything downstream then failed for reasons that named
+  /// something else: on 7.0.0.37 GJ-5 spent three rounds reporting the
+  /// workspace revision had "changed to none" and stopped claiming the
+  /// evidence was insufficient.
+  func testAPersistedEvolutionWorkspaceIsAdoptedByANewProcess() async throws {
+    let sourceRoot = try temporaryDirectory("adopt-source")
+    let stateRoot = try temporaryDirectory("adopt-state")
+    try FileManager.default.createDirectory(
+      at: sourceRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appendingPathComponent("Sources/App.txt"))
+    let profile = try workspaceProfile(root: sourceRoot)
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: ["Sources/**"]),
+      allowedPaths: ["Sources/**"], maxAttempts: 3, maxChangedFiles: 2,
+      maxDiffLines: 20, allowedOperations: ["workspace.build-openharmony@1"])
+    let evolutionRoot = stateRoot.appendingPathComponent("evolution")
+
+    let created = WorkspaceProjectProfileRegistry(profile: profile)
+    let workspace = try await EvolutionWorkspaceManager(
+      rootURL: evolutionRoot, profileRegistry: created
+    ).prepareWorkspace(
+      htaskID: "HTASK-ADOPT-001", sourceProjectRef: profile.projectRef,
+      policy: policy, createdAtUTC: timestamp)
+    let original = try XCTUnwrap(created.profile(for: workspace.projectRef))
+
+    // A new process: the same trees on disk, a registry that has only ever
+    // seen the source profile.
+    let restarted = WorkspaceProjectProfileRegistry(profile: profile)
+    let recovered = try EvolutionWorkspaceManager(
+      rootURL: evolutionRoot, profileRegistry: restarted)
+    XCTAssertNil(
+      restarted.profile(for: workspace.projectRef),
+      "precondition: a fresh registry cannot know a workspace it never created")
+
+    try await recovered.adoptPersistedWorkspace(workspace, policy: policy)
+
+    let adopted = try XCTUnwrap(
+      restarted.profile(for: workspace.projectRef),
+      "a workspace that survived on disk must survive in the registry")
+    XCTAssertEqual(adopted, original, "adoption must reconstruct the same identity")
+    XCTAssertEqual(adopted.kind, .evolution)
+    XCTAssertNotEqual(
+      adopted.projectRoot, profile.projectRoot,
+      "adoption must never fall back to the source tree; that cancels the isolation")
+  }
+
+  /// `HFA-AC-24` — adoption refuses rather than rebuilds.
+  func testAdoptionRefusesAManifestItDoesNotAgreeWith() async throws {
+    let sourceRoot = try temporaryDirectory("adopt-conflict-source")
+    let stateRoot = try temporaryDirectory("adopt-conflict-state")
+    try FileManager.default.createDirectory(
+      at: sourceRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appendingPathComponent("Sources/App.txt"))
+    let profile = try workspaceProfile(root: sourceRoot)
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: ["Sources/**"]),
+      allowedPaths: ["Sources/**"], maxAttempts: 3, maxChangedFiles: 2,
+      maxDiffLines: 20, allowedOperations: ["workspace.build-openharmony@1"])
+    let evolutionRoot = stateRoot.appendingPathComponent("evolution")
+    let created = WorkspaceProjectProfileRegistry(profile: profile)
+    let workspace = try await EvolutionWorkspaceManager(
+      rootURL: evolutionRoot, profileRegistry: created
+    ).prepareWorkspace(
+      htaskID: "HTASK-ADOPT-002", sourceProjectRef: profile.projectRef,
+      policy: policy, createdAtUTC: timestamp)
+
+    let restarted = WorkspaceProjectProfileRegistry(profile: profile)
+    let recovered = try EvolutionWorkspaceManager(
+      rootURL: evolutionRoot, profileRegistry: restarted)
+    // The same workspace identity claiming a base revision the manifest never
+    // recorded. Rebuilding it silently would substitute one isolated tree for
+    // another under a reference the task already holds.
+    let drifted = HarnessEvolutionWorkspace(
+      workspaceID: workspace.workspaceID, htaskID: workspace.htaskID,
+      sourceProjectRef: workspace.sourceProjectRef, projectRef: workspace.projectRef,
+      baseRevision: String(repeating: "9", count: 64),
+      allowedPathsDigest: workspace.allowedPathsDigest,
+      createdAtUTC: workspace.createdAtUTC)
+    do {
+      try await recovered.adoptPersistedWorkspace(drifted, policy: policy)
+      XCTFail("adoption must refuse a workspace the manifest does not describe")
+    } catch {
+      XCTAssertNil(
+        restarted.profile(for: workspace.projectRef),
+        "a refused adoption must leave nothing registered")
+    }
+  }
+
   func testEvolutionWorkspaceIsIsolatedAndExistingRuntimeProviderResolvesIt() async throws {
     let sourceRoot = try temporaryDirectory("evolution-source")
     let stateRoot = try temporaryDirectory("evolution-state")

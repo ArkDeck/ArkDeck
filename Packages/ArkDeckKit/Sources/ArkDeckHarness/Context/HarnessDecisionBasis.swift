@@ -102,9 +102,25 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
 /// else - no failure fingerprint, no no-progress round, no budget beyond
 /// what was already spent. Charging it as a failure would let an operator's
 /// own resolution push a task toward `strategyExhausted`.
+/// What was established about the workspace revision, as three outcomes
+/// rather than one optional.
+///
+/// `nil` used to carry both "the workspace is at some other revision" and
+/// "nothing answered", and the staleness check read the second as the first —
+/// asserting a change that was never observed. They have different causes and
+/// different fixes, so they are different values.
+public enum HarnessWorkspaceRevisionReading: Equatable, Sendable {
+  /// Nothing to establish: this decision pins no workspace revision.
+  case notRequired
+  case measured(String)
+  /// The reading did not happen. The reason is carried so the stop that
+  /// follows can name it instead of blaming the evidence.
+  case unmeasurable(reason: String)
+}
+
 public struct HarnessDecisionExecutionFacts: Equatable, Sendable {
   public let activeAttemptID: String?
-  public let workspaceRevision: String?
+  public let workspaceRevision: HarnessWorkspaceRevisionReading
   public let deployedArtifactDigest: String?
   public let bindingRevision: Int?
   public let modelRunID: String?
@@ -113,7 +129,7 @@ public struct HarnessDecisionExecutionFacts: Equatable, Sendable {
 
   public init(
     activeAttemptID: String? = nil,
-    workspaceRevision: String? = nil,
+    workspaceRevision: HarnessWorkspaceRevisionReading = .notRequired,
     deployedArtifactDigest: String? = nil,
     bindingRevision: Int? = nil,
     modelRunID: String? = nil,
@@ -133,7 +149,11 @@ public struct HarnessDecisionExecutionFacts: Equatable, Sendable {
 public enum HarnessDecisionStaleness: Equatable, Sendable {
   case taskStateChanged(observed: Int, current: Int)
   case attemptChanged(observed: String?, current: String?)
-  case workspaceRevisionChanged(observed: String, current: String?)
+  case workspaceRevisionChanged(observed: String, current: String)
+  /// The revision this decision pins could not be read at all. Not staleness
+  /// in the sense the others are — nothing was observed to have moved — but it
+  /// is equally a reason not to act on the decision.
+  case workspaceRevisionUnmeasurable(observed: String, reason: String)
   case deployedArtifactChanged(observed: String, current: String?)
   case bindingRevisionChanged(observed: Int, current: Int?)
   case contextMismatch
@@ -151,7 +171,9 @@ public enum HarnessDecisionStaleness: Equatable, Sendable {
       return "STALE_DECISION:attemptChanged:\(observed ?? "none")->\(current ?? "none")"
     case .workspaceRevisionChanged(let observed, let current):
       return "STALE_DECISION:workspaceRevisionChanged:\(observed.prefix(12))->"
-        + "\((current ?? "none").prefix(12))"
+        + "\(current.prefix(12))"
+    case .workspaceRevisionUnmeasurable(let observed, let reason):
+      return "STALE_DECISION:workspaceRevisionUnmeasurable:\(observed.prefix(12)):\(reason)"
     case .deployedArtifactChanged(let observed, let current):
       return "STALE_DECISION:deployedArtifactChanged:\(observed.prefix(12))->"
         + "\((current ?? "none").prefix(12))"
@@ -206,11 +228,15 @@ public enum HarnessDecisionFreshness {
       if decision.attemptID != facts.activeAttemptID {
         return .attemptChanged(observed: decision.attemptID, current: facts.activeAttemptID)
       }
-      if let expected = decision.expectedWorkspaceRevision,
-        expected != facts.workspaceRevision
-      {
-        return .workspaceRevisionChanged(
-          observed: expected, current: facts.workspaceRevision)
+      if let expected = decision.expectedWorkspaceRevision {
+        switch facts.workspaceRevision {
+        case .measured(let current) where current != expected:
+          return .workspaceRevisionChanged(observed: expected, current: current)
+        case .unmeasurable(let reason):
+          return .workspaceRevisionUnmeasurable(observed: expected, reason: reason)
+        case .measured, .notRequired:
+          break
+        }
       }
       if let expected = decision.expectedDeployedArtifactDigest,
         expected != facts.deployedArtifactDigest
