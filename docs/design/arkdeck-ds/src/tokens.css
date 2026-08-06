@@ -1,0 +1,144 @@
+/* ArkDeck design tokens — aligned to docs/design/macos-ux-interaction-spec.md v0.3
+   and docs/design/prototype.html v0.3.
+
+   The spec's normative position (v0.3 §2) is that the SHIPPING macOS app uses
+   SwiftUI/AppKit semantic colors (`windowBackgroundColor`, `Color.accentColor`,
+   system green/orange/red) and never hardcodes these hex values. The values
+   below are the spec's own "原型 fallback" column — the web-side stand-in for
+   those semantic roles, which is exactly what this library is. Keep the two in
+   step: when the spec's table moves, move these.
+
+   Semantic state colors (ok / warn / danger) stay independent of --ad-accent:
+   accent means "selected / interactive", never "safe". */
+
+:root {
+  color-scheme: light dark;
+
+  --ad-ground: #f5f5f7;
+  --ad-panel: #ffffff;
+  --ad-panel-solid: #ffffff;
+  --ad-panel-2: rgba(242, 242, 247, 0.82);
+  --ad-ink: #1d1d1f;
+  --ad-ink-2: #6e6e73;
+  --ad-ink-3: #8e8e93;
+  --ad-line: rgba(60, 60, 67, 0.18);
+  --ad-accent: #006edb;
+  --ad-accent-fill: #0065ca;
+  --ad-accent-ink: #ffffff;
+  --ad-accent-weak: rgba(0, 110, 219, 0.12);
+  --ad-accent-sel: rgba(0, 110, 219, 0.12);
+  --ad-ok: #1f7a35;
+  --ad-warn: #8a4b00;
+  --ad-danger: #c10014;
+  --ad-danger-fill: #c10014;
+  --ad-danger-weak: rgba(193, 0, 20, 0.08);
+  --ad-planned: #7047b7;
+  --ad-simulated: #8a4b00;
+  --ad-chrome: rgba(246, 246, 248, 0.82);
+  --ad-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 18px 52px rgba(0, 0, 0, 0.14);
+  --ad-control-shadow: 0 1px 1px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  --ad-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial,
+    "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --ad-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  --ad-radius-sm: 6px;
+  --ad-radius-md: 8px;
+  --ad-radius-lg: 10px;
+  --ad-radius-xl: 12px;
+
+  --ad-space-1: 4px;
+  --ad-space-2: 8px;
+  --ad-space-3: 10px;
+  --ad-space-4: 14px;
+  --ad-space-5: 16px;
+  --ad-space-6: 20px;
+
+  --ad-text-xs: 11px;
+  --ad-text-sm: 12px;
+  --ad-text-md: 13px;
+  --ad-text-lg: 13px;
+  --ad-text-title: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ad-ground: #1c1c1e;
+    --ad-panel: #242426;
+    --ad-panel-solid: #2c2c2e;
+    --ad-panel-2: rgba(44, 44, 46, 0.78);
+    --ad-ink: #f5f5f7;
+    --ad-ink-2: #aeaeb2;
+    --ad-ink-3: #8e8e93;
+    --ad-line: rgba(235, 235, 245, 0.16);
+    --ad-accent: #58a6ff;
+    --ad-accent-fill: #0065ca;
+    --ad-accent-ink: #ffffff;
+    --ad-accent-weak: rgba(88, 166, 255, 0.18);
+    --ad-accent-sel: rgba(88, 166, 255, 0.18);
+    --ad-ok: #4cd964;
+    --ad-warn: #ffb340;
+    --ad-danger: #ff6961;
+    --ad-danger-fill: #c52828;
+    --ad-danger-weak: rgba(255, 105, 97, 0.12);
+    --ad-planned: #c3a6ff;
+    --ad-simulated: #ffb340;
+    --ad-chrome: rgba(36, 36, 38, 0.82);
+    --ad-shadow: 0 1px 2px rgba(0, 0, 0, 0.38), 0 20px 56px rgba(0, 0, 0, 0.45);
+    --ad-control-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ad-ground: #1c1c1e;
+  --ad-panel: #242426;
+  --ad-panel-solid: #2c2c2e;
+  --ad-panel-2: rgba(44, 44, 46, 0.78);
+  --ad-ink: #f5f5f7;
+  --ad-ink-2: #aeaeb2;
+  --ad-ink-3: #8e8e93;
+  --ad-line: rgba(235, 235, 245, 0.16);
+  --ad-accent: #58a6ff;
+  --ad-accent-fill: #0065ca;
+  --ad-accent-ink: #ffffff;
+  --ad-accent-weak: rgba(88, 166, 255, 0.18);
+  --ad-accent-sel: rgba(88, 166, 255, 0.18);
+  --ad-ok: #4cd964;
+  --ad-warn: #ffb340;
+  --ad-danger: #ff6961;
+  --ad-danger-fill: #c52828;
+  --ad-danger-weak: rgba(255, 105, 97, 0.12);
+  --ad-planned: #c3a6ff;
+  --ad-simulated: #ffb340;
+  --ad-chrome: rgba(36, 36, 38, 0.82);
+  --ad-shadow: 0 1px 2px rgba(0, 0, 0, 0.38), 0 20px 56px rgba(0, 0, 0, 0.45);
+  --ad-control-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ad-ground: #f5f5f7;
+  --ad-panel: #ffffff;
+  --ad-panel-solid: #ffffff;
+  --ad-panel-2: rgba(242, 242, 247, 0.82);
+  --ad-ink: #1d1d1f;
+  --ad-ink-2: #6e6e73;
+  --ad-ink-3: #8e8e93;
+  --ad-line: rgba(60, 60, 67, 0.18);
+  --ad-accent: #006edb;
+  --ad-accent-fill: #0065ca;
+  --ad-accent-ink: #ffffff;
+  --ad-accent-weak: rgba(0, 110, 219, 0.12);
+  --ad-accent-sel: rgba(0, 110, 219, 0.12);
+  --ad-ok: #1f7a35;
+  --ad-warn: #8a4b00;
+  --ad-danger: #c10014;
+  --ad-danger-fill: #c10014;
+  --ad-danger-weak: rgba(193, 0, 20, 0.08);
+  --ad-planned: #7047b7;
+  --ad-simulated: #8a4b00;
+  --ad-chrome: rgba(246, 246, 248, 0.82);
+  --ad-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 18px 52px rgba(0, 0, 0, 0.14);
+  --ad-control-shadow: 0 1px 1px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+}

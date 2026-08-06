@@ -1,0 +1,5 @@
+# Machine state, not sync inputs. The durable set beside these — config.json,
+# NOTES.md, conventions.md, previews/ — IS committed.
+.cache/
+learnings/
+node_modules
