@@ -19,6 +19,10 @@
     "StageTrack": { "cardMode": "column" },
     "ToolbarButton": { "cardMode": "column" },
     "JobInspector": { "cardMode": "column" },
-    "RecoveryBanner": { "cardMode": "column" }
+    "RecoveryBanner": { "cardMode": "column" },
+    "Select": { "cardMode": "column" },
+    "RadioGroup": { "cardMode": "column" },
+    "TagPicker": { "cardMode": "column" },
+    "TextField": { "cardMode": "column" }
   }
 }

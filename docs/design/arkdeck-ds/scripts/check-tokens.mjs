@@ -307,6 +307,7 @@ for (const name of dsLight.keys()) {
     "toolbar-btn": "ToolbarButton", acbtn: "ToolbarButton",
     banner: "RecoveryBanner", ritem: "RecoveryBanner",
     drawer: "JobInspector", job: "JobInspector", rebind: "JobInspector",
+    inp: "TextField", radio: "RadioGroup", tagpick: "TagPicker",
   };
 
   /** Never becomes a component. */
@@ -321,11 +322,10 @@ for (const name of dsLight.keys()) {
     pulse: "animation utility", addlink: "a plain text link",
   };
 
-  /** Should be a component; isn't yet. Reported on every run, never silent. */
-  const KNOWN_GAPS = {
-    inp: "text input", radio: "radio group",
-    tagpick: "Trace tag picker",
-  };
+  /** Should be a component; isn't yet. Reported on every run, never silent.
+   *  Empty today — every surface the prototype draws has a component. Put the
+   *  next one here rather than leaving it unclassified, so it stays visible. */
+  const KNOWN_GAPS = {};
 
   // Read what the package *exports*, not what some previous build emitted.
   // Anchoring this to the converter's output deadlocks the one workflow the

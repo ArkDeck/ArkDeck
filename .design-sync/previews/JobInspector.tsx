@@ -160,8 +160,7 @@ export const ExpandedNewestFirst = () => (
     </Dock>
     <Card title="展开态 220–320pt:阶段、日志尾部、以及策略给的取消文案">
       <p style={hint}>
-        阶段序列替代百分比:已过的阶段转绿,当前阶段走 accent,读者看得出还剩几步。已完成的任务
-        全绿且没有 accent —— 那是终态,不是丢了当前步。
+        阶段序列替代百分比:已过的阶段转绿,当前阶段走 accent,读者看得出还剩几步。已完成的任务全绿且没有 accent —— 那是终态,不是丢了当前步。
       </p>
     </Card>
   </div>
@@ -226,8 +225,7 @@ export const ModeBadgesSurvive = () => (
     </Dock>
     <Card title="没有运行中时,折叠条报「2 个任务(无运行中)」">
       <p style={hint}>
-        execute 不带徽标;plan-only 是紫色 ◇ PLANNED,simulated 是橙色 ▤ SIMULATED · fixture-a3。
-        两者都不是「更弱的成功」:plan-only 的 mutation dispatch = 0,simulated 压根没碰真设备。
+        execute 不带徽标;plan-only 是紫色 ◇ PLANNED,simulated 是橙色 ▤ SIMULATED · fixture-a3。两者都不是「更弱的成功」:plan-only 的 mutation dispatch = 0,simulated 压根没碰真设备。
       </p>
       <p style={hint}>
         徽标在标题、列表、History、详情与导出中永久保留,不因为任务成功就摘掉。

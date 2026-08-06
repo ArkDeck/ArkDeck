@@ -731,3 +731,57 @@
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* ── form controls ─────────────────────────────────────────────────────── */
+
+.ad-inp {
+  min-height: 29px;
+  padding: 5px 9px;
+  border: 1px solid var(--ad-line);
+  border-radius: var(--ad-radius-md);
+  background: var(--ad-panel-solid);
+  color: var(--ad-ink);
+  font-family: var(--ad-font-ui);
+  font-size: var(--ad-text-md);
+  box-shadow: var(--ad-control-shadow);
+}
+.ad-inp--mono { font-family: var(--ad-font-mono); font-size: var(--ad-text-sm); }
+.ad-inp:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 1px; }
+.ad-inp:disabled { opacity: 0.45; cursor: not-allowed; }
+select.ad-inp { cursor: pointer; }
+
+.ad-radio { font-family: var(--ad-font-ui); display: flex; flex-direction: column; gap: 6px; }
+.ad-radio label {
+  display: flex;
+  gap: var(--ad-space-2);
+  align-items: flex-start;
+  font-size: var(--ad-text-md);
+  cursor: pointer;
+}
+/* Follows the user's system accent, like every other native radio on the Mac. */
+.ad-radio input { margin-top: 3px; accent-color: var(--ad-accent); }
+.ad-radio input:disabled { cursor: not-allowed; }
+.ad-radio input:disabled + span { opacity: 0.45; }
+.ad-radio__desc { color: var(--ad-ink-2); font-size: var(--ad-text-sm); margin-inline-start: var(--ad-space-1); }
+
+.ad-tagpick { display: flex; gap: 6px; flex-wrap: wrap; }
+.ad-tagpick button {
+  min-height: 26px;
+  font-size: 11.5px;
+  font-family: var(--ad-font-mono);
+  border: 1px solid var(--ad-line);
+  background: var(--ad-panel-solid);
+  border-radius: var(--ad-radius-sm);
+  padding: 3px var(--ad-space-3);
+  cursor: pointer;
+  color: var(--ad-ink-2);
+}
+.ad-tagpick button.ad-tagpick__on {
+  border-color: var(--ad-accent);
+  color: var(--ad-accent);
+  background: var(--ad-accent-weak);
+  font-weight: 600;
+}
+/* Dashed, not hidden: an unconfirmed capability is not an absent one. */
+.ad-tagpick button:disabled { opacity: 0.4; cursor: not-allowed; border-style: dashed; }
+.ad-tagpick button:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 2px; }
