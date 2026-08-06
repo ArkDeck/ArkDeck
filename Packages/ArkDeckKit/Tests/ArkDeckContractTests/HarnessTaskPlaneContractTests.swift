@@ -41,6 +41,11 @@ private enum PortBehaviour: Equatable {
 /// Materializes the isolated copy without touching a filesystem: these tests
 /// are about which operations a submission may carry, not about the copy.
 private struct IsolationWorkspacePort: HarnessEvolutionWorkspacePort {
+  func adoptPersistedWorkspace(
+    _ workspace: HarnessEvolutionWorkspace,
+    policy: HarnessEvolutionPolicy
+  ) async throws {}
+
   func prepareWorkspace(
     htaskID: String, sourceProjectRef: String,
     policy: HarnessEvolutionPolicy, createdAtUTC: String

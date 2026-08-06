@@ -271,6 +271,11 @@ private final class JourneyWorkspacePort: HarnessEvolutionWorkspacePort, @unchec
     lock.withLock { attemptDirectories }
   }
 
+  func adoptPersistedWorkspace(
+    _ workspace: HarnessEvolutionWorkspace,
+    policy: HarnessEvolutionPolicy
+  ) async throws {}
+
   func prepareWorkspace(
     htaskID: String, sourceProjectRef: String,
     policy: HarnessEvolutionPolicy, createdAtUTC: String

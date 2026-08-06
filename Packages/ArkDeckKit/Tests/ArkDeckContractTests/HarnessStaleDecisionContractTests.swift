@@ -529,6 +529,66 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
         observed: "ATTEMPT-000000000001", current: "ATTEMPT-000000000002"))
   }
 
+  /// `HFA-AC-25` — a reading that did not happen is not a reading that differs.
+  ///
+  /// The revision used to arrive as an optional, and `nil` meant both "the
+  /// workspace moved" and "nothing answered". On 7.0.0.37 the second happened
+  /// three rounds running — the isolated workspace's reference had become
+  /// unresolvable after a restart — and every one was reported as
+  /// `workspaceRevisionChanged:…->none`, an assertion about an observation
+  /// that was never made. The loop then stopped blaming the evidence.
+  func testAnUnreadableWorkspaceRevisionIsNotReportedAsAChangedOne() {
+    let expected = String(repeating: "1", count: 64)
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.applyPatch])
+    let envelope = decision(
+      basis: planned, operation: DebugCrashTaskHandler.applyPatch,
+      workspaceRevision: expected)
+    let facts = HarnessDecisionExecutionFacts(
+      activeAttemptID: "ATTEMPT-000000000001",
+      workspaceRevision: .unmeasurable(reason: "projectProfileMismatch"))
+
+    let staleness = HarnessDecisionFreshness.staleness(
+      of: envelope, against: planned, executionFacts: facts)
+    XCTAssertEqual(
+      staleness,
+      .workspaceRevisionUnmeasurable(
+        observed: expected, reason: "projectProfileMismatch"))
+    let reason = try? XCTUnwrap(staleness?.reasonCode)
+    XCTAssertEqual(
+      reason?.contains("workspaceRevisionChanged"), false,
+      "an unread revision must not be reported as a changed one: \(reason ?? "nil")")
+    XCTAssertEqual(
+      reason?.contains("projectProfileMismatch"), true,
+      "the stop must name what failed to answer: \(reason ?? "nil")")
+  }
+
+  /// `HFA-AC-25` — and the floor is unmoved: a revision that really changed is
+  /// still stale. Three-valuing it only pulls "unreadable" out of "changed";
+  /// it must never turn "changed" into "unchanged".
+  func testAMeasuredMatchingRevisionIsFreshAndAMeasuredDifferentOneIsNot() {
+    let expected = String(repeating: "1", count: 64)
+    let planned = HarnessDecisionBasis(
+      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.applyPatch])
+    let envelope = decision(
+      basis: planned, operation: DebugCrashTaskHandler.applyPatch,
+      workspaceRevision: expected)
+    XCTAssertNil(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001",
+          workspaceRevision: .measured(expected))))
+    XCTAssertEqual(
+      HarnessDecisionFreshness.staleness(
+        of: envelope, against: planned,
+        executionFacts: HarnessDecisionExecutionFacts(
+          activeAttemptID: "ATTEMPT-000000000001",
+          workspaceRevision: .measured(String(repeating: "2", count: 64)))),
+      .workspaceRevisionChanged(
+        observed: expected, current: String(repeating: "2", count: 64)))
+  }
+
   func testOldPatchAndBuildWorkspaceRevisionsAreIndependentlyStale() {
     let old = String(repeating: "1", count: 64)
     let current = String(repeating: "2", count: 64)
@@ -538,7 +598,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       let envelope = decision(
         basis: planned, operation: operation, workspaceRevision: old)
       let facts = HarnessDecisionExecutionFacts(
-        activeAttemptID: "ATTEMPT-000000000001", workspaceRevision: current)
+        activeAttemptID: "ATTEMPT-000000000001", workspaceRevision: .measured(current))
       XCTAssertEqual(
         HarnessDecisionFreshness.staleness(
           of: envelope, against: planned, executionFacts: facts),
@@ -604,12 +664,12 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       HarnessDecisionFreshness.staleness(
         of: envelope, against: planned,
         executionFacts: HarnessDecisionExecutionFacts(
-          activeAttemptID: "ATTEMPT-000000000001", workspaceRevision: revision)))
+          activeAttemptID: "ATTEMPT-000000000001", workspaceRevision: .measured(revision))))
     XCTAssertEqual(
       HarnessDecisionFreshness.staleness(
         of: envelope, against: planned,
         executionFacts: HarnessDecisionExecutionFacts(
-          activeAttemptID: "ATTEMPT-000000000002", workspaceRevision: revision)),
+          activeAttemptID: "ATTEMPT-000000000002", workspaceRevision: .measured(revision))),
       .attemptChanged(
         observed: "ATTEMPT-000000000001", current: "ATTEMPT-000000000002"))
   }
