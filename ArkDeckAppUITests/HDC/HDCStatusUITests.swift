@@ -449,7 +449,11 @@ final class HDCStatusUITests: XCTestCase {
     app.launchArguments =
       [
         "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
-      ] + (fixture ? ["--ui-test-hdc-diagnostics"] : []) + arguments
+      ]
+      // A fixture launch declares its update state too, so the App does not
+      // build the real updater and check for updates to decide what to show.
+      + (fixture ? ["--ui-test-hdc-diagnostics", "--ui-test-auto-update-idle"] : [])
+      + arguments
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
     if !fixture,

@@ -248,13 +248,29 @@ private final class AutoUpdateViewModel: ObservableObject {
   private let service: AutoUpdateService?
   private let identity = AutoUpdateApplicationFacade.currentProductIdentity()
   private var started = false
+  /// UI automation drives a declared state instead of the real updater, which
+  /// is neither deterministic nor free of network effects. It is only the
+  /// state: the mapping below is the product's own, so a test reads what the
+  /// App really renders rather than a second copy of the rules.
+  private let usesFixture: Bool
 
   init() {
+    usesFixture = AutoUpdateUIFixture.isSelected()
+    guard !usesFixture else {
+      service = nil
+      return
+    }
     service = try? AutoUpdateApplicationFacade.make()
     if service == nil { statusKey = "update.status.unavailable" }
   }
 
   func startup() {
+    if usesFixture {
+      guard !started else { return }
+      started = true
+      Task { await synchronize() }
+      return
+    }
     guard !started, let service else { return }
     started = true
     Task {
@@ -287,6 +303,12 @@ private final class AutoUpdateViewModel: ObservableObject {
   }
 
   func checkManually() {
+    // Under the fixture a check re-reads the declared state, so one launched
+    // instance walks every state through the App's real check path.
+    if usesFixture {
+      Task { await synchronize() }
+      return
+    }
     guard let service else { return }
     isBusy = true
     statusKey = "update.status.checking"
@@ -329,8 +351,15 @@ private final class AutoUpdateViewModel: ObservableObject {
   }
 
   private func synchronize() async {
-    guard let service else { return }
-    let state = await service.state
+    let state: AutoUpdateState
+    if usesFixture {
+      guard let declared = AutoUpdateUIFixture.state() else { return }
+      state = declared
+    } else if let service {
+      state = await service.state
+    } else {
+      return
+    }
     isBusy = false
     canCheck = true
     canDownload = false

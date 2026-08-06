@@ -330,6 +330,102 @@ final class AppShellUITests: XCTestCase {
   }
 
 
+  /// The Settings scene, which nothing had ever opened.
+  ///
+  /// The update surface was the only one in the App with no fixture, so this
+  /// scene had never been drawn by a test and the suite ran the real updater
+  /// to decide what it would have shown. The fixture supplies only the domain
+  /// state; the mapping to a status, an enabled button and a toolbar item is
+  /// the App's own, so what is asserted here is the product's real behaviour.
+  ///
+  /// One launch walks every state through the App's own check path. The status
+  /// strings are English because the state, not the language, is what had no
+  /// coverage; the shell sweeps carry the per-language obligation.
+  func testEverySettingsUpdateStateRendersAndOnlyItsOwnAction() throws {
+    try? "--ui-test-auto-update-idle".write(
+      to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-auto-update-idle",
+        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", "(en)",
+      ])
+    XCTAssertTrue(app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 15))
+
+    app.typeKey(",", modifierFlags: .command)
+    XCTAssertTrue(
+      app.staticTexts["update.status"].waitForExistence(timeout: 10),
+      "Command-comma must open the Settings scene")
+    // The controls the main window must not carry are the ones this scene owns.
+    // A checkbox reports its state as a number, not as text, so it is read as
+    // one rather than through the string helper the rest of this file uses.
+    let automaticChecks = app.checkBoxes["update.automaticChecks"]
+    XCTAssertTrue(automaticChecks.exists)
+    XCTAssertEqual(
+      (automaticChecks.value as? NSNumber)?.intValue, 1, "automatic checks default to on")
+
+    // Idle, available, failed, then awaiting-consent last: it is the one state
+    // that disables Check Now, so it cannot be walked out of.
+    for state in [
+      UpdateState(
+        flag: "--ui-test-auto-update-idle",
+        status: "Ready to check for updates.",
+        enabled: ["update.checkNow"], attention: nil),
+      UpdateState(
+        flag: "--ui-test-auto-update-available",
+        status: "An update is available. Download requires your action.",
+        enabled: ["update.checkNow", "update.download"], attention: "Update Available"),
+      UpdateState(
+        flag: "--ui-test-auto-update-failed",
+        status: "Update verification failed. Nothing was installed or replaced.",
+        enabled: ["update.checkNow"], attention: "Update Failed"),
+      UpdateState(
+        flag: "--ui-test-auto-update-awaiting-consent",
+        status: "The DMG passed signature and Team verification. Confirm once more to reveal it.",
+        enabled: ["update.reveal"], attention: "Update Awaiting Confirmation"),
+    ] {
+      assertUpdateState(state, in: app)
+    }
+  }
+
+  private struct UpdateState {
+    let flag: String
+    let status: String
+    /// Exactly which of the three actions this state offers. Naming only the
+    /// enabled ones would pass for a scene that enabled all of them.
+    let enabled: [String]
+    let attention: String?
+  }
+
+  private func assertUpdateState(
+    _ state: UpdateState, in app: XCUIApplication,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    do {
+      try state.flag.write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    } catch {
+      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
+      return
+    }
+    app.buttons["update.checkNow"].click()
+    assertDisplayed(app.staticTexts["update.status"], equals: state.status, timeout: 10)
+    for action in ["update.checkNow", "update.download", "update.reveal"] {
+      XCTAssertEqual(
+        app.buttons[action].isEnabled, state.enabled.contains(action),
+        "\(action) under \(state.flag)", file: file, line: line)
+    }
+    // Only a state the user has to act on reaches the main window's toolbar.
+    let toolbar = app.buttons["app.toolbar.updateAttention"]
+    if let attention = state.attention {
+      XCTAssertTrue(
+        toolbar.waitForExistence(timeout: 5), "\(state.flag) must raise attention",
+        file: file, line: line)
+      XCTAssertEqual(toolbar.label, attention, file: file, line: line)
+    } else {
+      XCTAssertFalse(
+        toolbar.exists, "an idle update must not reach the toolbar", file: file, line: line)
+    }
+  }
+
   /// SwiftUI's Table lands in the NSTableView family, which XCUITest does not
   /// expose under `app.tables` here — the sidebar List surfaces as an outline
   /// for the same reason. Ask by identifier and let the type be whatever it is.
@@ -410,6 +506,11 @@ final class AppShellUITests: XCTestCase {
       [
         "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
         "--ui-test-hdc-diagnostics",
+        // Without this the App builds the real updater and decides what to
+        // show by checking for updates, which is neither deterministic nor
+        // free of network effects. A test that wants a different update state
+        // passes its own argument; this only makes the default one declared.
+        "--ui-test-auto-update-idle",
       ] + arguments
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"

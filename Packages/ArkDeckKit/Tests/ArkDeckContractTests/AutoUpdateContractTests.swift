@@ -9,6 +9,29 @@ import XCTest
 final class AutoUpdateContractTests: XCTestCase {
   private let now = ISO8601DateFormatter().date(from: "2026-07-24T00:00:00Z")!
 
+  /// The UI fixture exists so the Settings scene can be rendered by a test
+  /// without the real updater deciding what it shows. The property that
+  /// matters is the boundary: a launch that does not ask for it gets nothing,
+  /// so no production run can render a declared update state.
+  func testTheUpdateUIFixtureIsUnreachableWithoutItsOwnArgument() {
+    XCTAssertFalse(AutoUpdateUIFixture.isSelected(arguments: []))
+    XCTAssertNil(AutoUpdateUIFixture.state(arguments: []))
+    XCTAssertFalse(
+      AutoUpdateUIFixture.isSelected(arguments: [
+        "/Applications/ArkDeck.app", "--ui-test-hdc-diagnostics", "--ui-test-runtime-history",
+      ]),
+      "another surface's fixture must not select this one")
+    XCTAssertNil(
+      AutoUpdateUIFixture.state(arguments: ["--arkdeck-hdc-user-configured-path", "/usr/bin/true"]))
+
+    XCTAssertEqual(AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update-idle"]), .idle)
+    XCTAssertEqual(
+      AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update-failed"]), .failed(.feed))
+    // An argument in the family but with no state of its own still selects the
+    // fixture, so a launch can never fall back to the real updater by typo.
+    XCTAssertEqual(AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update"]), .idle)
+  }
+
   func testTEST_AU_CONTRACT_001_productionTrustPinAndValidFeed() throws {
     let trust = try UpdateFeedTrust.production
     XCTAssertEqual(trust.keyID, "arkdeck-update-2026-07-b949b102")
