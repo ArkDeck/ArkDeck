@@ -43,3 +43,20 @@ export type {
   CalloutTone,
   DangerConfirmDialogProps,
 } from "./components/feedback.js";
+
+export { Symbol, ToolbarButton, StatusStrip } from "./components/shell.js";
+export type {
+  SymbolProps,
+  SymbolName,
+  ToolbarButtonProps,
+  StatusStripProps,
+  StatusCell,
+} from "./components/shell.js";
+
+export { BudgetMeters, StageTrack, OperationList } from "./components/harness.js";
+export type {
+  BudgetMetersProps,
+  Budget,
+  StageTrackProps,
+  OperationListProps,
+} from "./components/harness.js";

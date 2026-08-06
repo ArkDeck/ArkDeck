@@ -12,9 +12,18 @@
 // paths, and touching them requires one active task whose Allowed paths cover
 // the whole diff. See .design-sync/NOTES.md.
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+/** Every .tsx/.css under a directory, recursively. */
+function srcFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) return srcFiles(p);
+    return /\.(tsx?|css)$/.test(e.name) ? [p] : [];
+  });
+}
 
 // Bump ONLY after re-reading the docs and confirming this package still
 // expresses them. This is the deliberate acknowledgement step: a docs version
@@ -227,6 +236,37 @@ for (const name of dsLight.keys()) {
       `tokens.css defines --${name}, which has no prototype counterpart.\n` +
         `      Map it in MAPPING, or record it in DS_ONLY with the reason it is ours alone.`,
     );
+  }
+}
+
+// ---- 5. every var() in the source must resolve ----------------------------
+// Porting markup from the prototype carries its *unprefixed* token names along
+// with it (`var(--panel-solid)`), and an unresolvable var() does not error —
+// the property silently falls back, so the component renders subtly wrong and
+// nothing anywhere complains. Caught once in a ported SVG glyph.
+{
+  const files = srcFiles(join(pkgRoot, "src")).map((f) => [f, readFileSync(f, "utf8")]);
+
+  // Resolvable = a palette token, or a component-local custom property set
+  // somewhere in src/ — a CSS declaration, or a quoted key in a style object
+  // (a component may set one in TSX and read it back in CSS, as StatusStrip
+  // does for its column count, so this set has to be collected across files).
+  const resolvable = new Set(dsLight.keys());
+  for (const [file, text] of files) {
+    const pattern = file.endsWith(".css") ? /--([a-z0-9-]+)\s*:/gi : /["']--([a-z0-9-]+)["']/gi;
+    for (const [, name] of text.matchAll(pattern)) resolvable.add(name.toLowerCase());
+  }
+
+  for (const [file, text] of files) {
+    for (const [, name] of text.matchAll(/var\(\s*--([a-z0-9-]+)/gi)) {
+      const token = name.toLowerCase();
+      if (resolvable.has(token)) continue;
+      fail(
+        `${file.slice(pkgRoot.length + 1)} references var(--${token}), which nothing defines — ` +
+          `an unresolvable var() falls back silently instead of erroring` +
+          (resolvable.has(`ad-${token}`) ? `. Did you mean --ad-${token}?` : ""),
+      );
+    }
   }
 }
 

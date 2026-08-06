@@ -25,7 +25,7 @@ newer docs in. Realigning cost one token rewrite plus one driver run.
 runs first in `npm run build` (which is `cfg.buildCmd`, so every sync goes through it)
 and is fail-closed: on drift the build exits 1 and never writes `dist/`, so the
 converter stops at `[NO_DIST]` instead of shipping stale tokens. Verified by injecting
-each drift kind. It catches five things:
+each drift kind. It catches six things:
 
 1. any mapped token whose value differs from the prototype's;
 2. a docs version bump (`ALIGNED_VERSION` in the script pins v0.3 — bump it only after
@@ -34,7 +34,11 @@ each drift kind. It catches five things:
 4. a token this package re-themes in dark that the prototype doesn't, or vice versa
    (otherwise a dropped dark override silently keeps its light value);
 5. the spec's §2 table naming a hex no prototype token carries — i.e. the two docs
-   drifting apart from *each other*.
+   drifting apart from *each other*;
+6. any `var(--…)` anywhere in `src/` that nothing defines. Porting prototype markup
+   carries its *unprefixed* names along (`var(--panel-solid)` vs this package's
+   `--ad-panel-solid`), and an unresolvable `var()` never errors — it falls back
+   silently, so the component renders subtly wrong and nothing complains.
 
 It lives inside the package rather than in `scripts/` or `.github/` because both of those
 are governance-sensitive paths (see the `.gitignore` note below): touching them demands a
@@ -147,6 +151,37 @@ ship real woff2 files via `cfg.extraFonts` instead of extending this list.
   cell can only be graded on the 0.45-opacity rendering; verify the reason string in
   the `.tsx`.
 
+- **The 900px capture viewport sits inside one DS breakpoint.** `.ad-summary-strip` folds
+  to two columns at ≤980px (faithfully copied from the prototype), so at the default
+  viewport a `StatusStrip` cell can only ever show the folded form — a *viewport* media
+  query, which no wrapper width can defeat. That is why `overrides.StatusStrip` carries
+  `viewport: "1100x700"`. Before authoring, grep `styles.css` for `@media` and check
+  whether your component changes shape at ≤980px; only that one does today.
+- **Never write preview prose describing something the sheet cannot show** — and re-read
+  it after any viewport change. One `StatusStrip` hint said "折成两列两行(即本图)" and
+  became wrong the moment the override made the cell render 4-across. Check every claim
+  against the raw shot, not against the component's doc comment.
+- **`BudgetMeters` has an ugly middle width.** Its `repeat(auto-fit, minmax(90px, 1fr))`
+  grid is clean at ≥800px (five columns, one shared meter baseline) and at ≤190px (single
+  column, tabular numerals aligning down the column — the narrow-inspector case). At
+  ~700px two labels wrap and the meters land on staggered baselines. Author at one end,
+  never the middle.
+- **Port the prototype's `warnbox` as `<Callout tone="warn" icon={<Symbol name="warning"
+  small />}>`.** Passing `icon` suppresses the `::before` glyph, and an inline `<svg>`
+  contributes nothing to `textContent`, so the cell's text still starts with prose —
+  faithful to the prototype *and* safe against the leading-`⚠` validator, which
+  `icon="⚠"` would trip.
+- **`Symbol` needs a host to be gradeable.** A 16px stroke glyph on the sheet's white is
+  nearly invisible. Show it inside `NavItem` (active row → accent), `ToolbarButton` on a
+  `var(--ad-chrome)` bar, or a toned `Callout`; one cell with all three proves
+  `stroke: currentColor` end to end.
+- **After porting prototype SVG or CSS verbatim, check for unprefixed token names.** The
+  `settings` glyph shipped `fill="var(--panel-solid)"` — the *prototype's* name; this
+  package defines `--ad-panel-solid`. An unresolvable `var()` does not error, it silently
+  falls back, so the glyph rendered as solid dots instead of white knock-outs and nothing
+  complained. `check-tokens.mjs` now fails on any `var()` in `src/` that nothing defines,
+  with a "did you mean `--ad-…`" hint.
+
 ## Prototype facts previews depend on (check these when `prototype.html` changes)
 
 - Debug tab values are `logs / apps / net / cmd` — **`net`, not `network`**; only the
@@ -164,6 +199,8 @@ ship real woff2 files via `cfg.extraFonts` instead of extending this list.
 
 ## Config decisions
 
+- `package-capture.mjs` needs `--out <dir>`; a positional bundle path is rejected with a
+  `usage:` message that reads like a missing build.
 - `overrides.DataTable = {"cardMode": "column"}` — the default card is a
   `minmax(320px, 1fr)` grid and the 4- and 5-column plan/History tables are only
   readable end-to-end at ≥700px. Nothing breaks without it (`.ad-table__wrap` scrolls
