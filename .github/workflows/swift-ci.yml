@@ -24,9 +24,21 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      # Do not make the required Swift gate depend on marketplace action
+      # metadata being available. A full fetch of the pushed ref preserves the
+      # before-SHA path decision, and the read-back pins the exact tested head.
+      - name: Checkout exact revision with runner Git
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Determine Swift-relevant diff
         id: paths

@@ -18,19 +18,37 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      ARKDECK_SDD_DEPS: ${{ runner.temp }}/arkdeck-sdd-deps
+      PYTHONPATH: ${{ runner.temp }}/arkdeck-sdd-deps
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
+      # Keep the required guard runnable when the Actions service cannot
+      # resolve marketplace action metadata. The repository is public, the ref
+      # and SHA arrive as data through the environment, and the read-back keeps
+      # the checkout exact without granting another permission.
+      - name: Checkout exact revision with runner Git
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth=1 origin \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Install dependencies
-        run: python -m pip install -r scripts/requirements-sdd.txt
+        run: >-
+          python3 -m pip install
+          --disable-pip-version-check
+          --target "$ARKDECK_SDD_DEPS"
+          -r scripts/requirements-sdd.txt
 
       - name: SDD consistency check
         env:
-          ARKDECK_PYTHON: python
+          ARKDECK_PYTHON: python3
         run: ./scripts/check-sdd.sh
 
       # These two suites had no workflow running them at all, so the properties
@@ -39,11 +57,11 @@ jobs:
       # whatever its module-level `unittest.main()` has collected so far, which
       # has twice been less than the whole file.
       - name: SDD checker contract tests
-        run: python scripts/test_check_sdd.py
+        run: python3 scripts/test_check_sdd.py
 
       - name: host-loop contract suite
         working-directory: scripts
-        run: python -m unittest discover -s host_loop -t .
+        run: python3 -m unittest discover -s host_loop -t .
 
   # @arkdeck/ds encodes the design language defined by docs/design/*. Nothing
   # generates it, so the two drift by hand — and once already did, silently: the
@@ -58,11 +76,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact revision with runner Git
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth=1 origin \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Runner Node version
+        run: node --version
 
       - name: "@arkdeck/ds tokens match docs/design"
         run: node docs/design/arkdeck-ds/scripts/check-tokens.mjs
@@ -72,18 +100,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
+      - name: Checkout exact revision and main with runner Git
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: PR allowed-paths contract tests
-        run: python scripts/test_check_pr_paths.py
+        run: python3 scripts/test_check_pr_paths.py
 
       - name: Check PR diff against declared task
         # Read untrusted title/body/head-ref from GitHub's JSON event file inside
         # Python. Never interpolate those fields into the host shell.
-        run: python scripts/check_pr_paths.py --repo-root "$GITHUB_WORKSPACE" --event "$GITHUB_EVENT_PATH"
+        run: python3 scripts/check_pr_paths.py --repo-root "$GITHUB_WORKSPACE" --event "$GITHUB_EVENT_PATH"
