@@ -14,5 +14,21 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- The daemon's Unix socket is unreachable from this container: the App
+	     Sandbox classifies AF_UNIX connect() as its own operation, so neither
+	     network.client nor any file entitlement reaches it (measured against a
+	     live daemon, both denied with EPERM). A launchd-vended Mach service is
+	     the only transport a sandboxed client can reach, and it needs this
+	     exception even when the service name carries the Team ID prefix (also
+	     measured: denied without it, allowed with it).
+
+	     The name below must stay identical to ArkDeckAgentXPC.machServiceName
+	     and to the LaunchAgent MachServices key. The service it names forwards
+	     only the read-only control-plane allowlist, so this entitlement grants
+	     the App no way to submit, execute, cancel or import anything. -->
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>com.arkdeck.agentd</string>
+	</array>
 </dict>
 </plist>

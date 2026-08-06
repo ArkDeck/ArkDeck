@@ -648,9 +648,10 @@ final class AutoUpdateContractTests: XCTestCase {
     let repository = repoRoot
     let entitlementData = try Data(
       contentsOf: repository.appending(path: "ArkDeckApp/ArkDeckApp.entitlements"))
-    let entitlements = try XCTUnwrap(
+    let entitlementPlist = try XCTUnwrap(
       try PropertyListSerialization.propertyList(from: entitlementData, format: nil)
-        as? [String: Bool])
+        as? [String: Any])
+    let entitlements = entitlementPlist.compactMapValues { $0 as? Bool }
     XCTAssertEqual(
       Set(entitlements.keys),
       [
@@ -662,6 +663,21 @@ final class AutoUpdateContractTests: XCTestCase {
         "com.apple.security.network.client",
       ])
     XCTAssertTrue(entitlements.values.allSatisfy { $0 })
+
+    // The App holds exactly one non-boolean entitlement. The App Sandbox
+    // classifies AF_UNIX connect() as its own operation, so the daemon's Unix
+    // socket is unreachable from this container under every file entitlement
+    // (measured); a mach-lookup exception naming a launchd-vended service is
+    // the only transport that works. It is pinned to that one service, so
+    // granting a second one cannot pass as a value edit, and the whole set
+    // stays closed so a new privilege cannot arrive unnoticed.
+    let machLookupKey = "com.apple.security.temporary-exception.mach-lookup.global-name"
+    XCTAssertEqual(
+      entitlementPlist[machLookupKey] as? [String], ["com.arkdeck.agentd"],
+      "the mach-lookup exception must name exactly the daemon's read-only XPC door")
+    XCTAssertEqual(
+      Set(entitlementPlist.keys), Set(entitlements.keys).union([machLookupKey]),
+      "the App's entitlement set is closed; adding one is a privilege decision")
 
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
