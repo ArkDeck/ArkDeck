@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 /// Shell-level routing, window structure, Settings placement and History.
@@ -77,6 +78,20 @@ final class AppShellUITests: XCTestCase {
     file: StaticString = #filePath, line: UInt = #line
   ) {
     let app = launch(arguments: ["--ui-test-runtime-history", "-AppleLanguages", language])
+
+    // The window opens at the size the App declares, not at its 900x600
+    // floor. A root view's ideal size does not size a WindowGroup, so before
+    // `.defaultSize` every workspace opened at its tightest — History's table
+    // was 340pt wide with all three of its columns truncated. A display too
+    // small for the declared size clamps the window, so only the exact check
+    // is conditional; opening at the floor is a failure on any display.
+    let windowFrame = app.windows.firstMatch.frame
+    XCTAssertGreaterThan(
+      windowFrame.width, 900, "the window opened at its minimum", file: file, line: line)
+    if let visible = NSScreen.main?.visibleFrame, visible.width >= 1180, visible.height >= 760 {
+      XCTAssertEqual(windowFrame.width, 1180, accuracy: 1, file: file, line: line)
+      XCTAssertEqual(windowFrame.height, 760, accuracy: 1, file: file, line: line)
+    }
 
     // Overview answers its four questions on the first screen.
     XCTAssertTrue(

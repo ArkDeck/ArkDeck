@@ -22,6 +22,7 @@ struct ArkDeckApp: App {
         runtimeHistory.refresh()
       }
     }
+    .defaultSize(width: 1180, height: 760)
     Settings {
       AutoUpdateSettingsView(model: autoUpdate)
         .frame(width: 520)
@@ -111,7 +112,7 @@ private struct AppShellView: View {
         .navigationTitle(Text(LocalizedStringKey(selectedItem.localizationKey)))
         .toolbar { updateAttentionToolbarItem }
     }
-    .frame(minWidth: 900, idealWidth: 1180, minHeight: 600, idealHeight: 760)
+    .frame(minWidth: 900, minHeight: 600)
   }
 
   @ViewBuilder
