@@ -301,26 +301,48 @@ enum HDCApplicationDiagnosticsSessionScope {
 /// Workflows facade. It has no process or lifecycle execution capability.
 private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProviding {
   nonisolated let lifecycleDispatchIsProductionComposed = false
-  private let keyAccessDenied: Bool
-  private let denied: Bool
-  private let timedOut: Bool
-  private let criticalGate: Bool
-  private let delayedRefresh: Bool
+  private let launchArguments: [String]
+  /// Optional file the UI test rewrites between assertions. Re-reading it on
+  /// every refresh lets one launched instance walk every fixture state, which
+  /// is what keeps a suite run down to two launches instead of one per fault.
+  /// It is reachable only from this actor, and this actor exists only when
+  /// `--ui-test-hdc-diagnostics` selected the fixture, so no production
+  /// composition can read or be steered by it.
+  private let stateFileURL: URL?
   private var recovery: HDCLifecycleRecoveryPresentation
   private var refreshCallCount = 0
   private var latestCompletedRefreshCallCount = 0
 
   init(arguments: [String]) {
-    keyAccessDenied = arguments.contains("--ui-test-hdc-key-access-denied")
-    denied = arguments.contains("--ui-test-hdc-denied")
-    timedOut = arguments.contains("--ui-test-hdc-timed-out")
-    criticalGate = arguments.contains("--ui-test-hdc-critical-gate")
-    delayedRefresh = arguments.contains("--ui-test-hdc-refresh-delay")
+    launchArguments = arguments
+    if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
+      arguments.indices.contains(index + 1)
+    {
+      stateFileURL = URL(fileURLWithPath: arguments[index + 1])
+    } else {
+      stateFileURL = nil
+    }
     recovery =
       arguments.contains("--ui-test-hdc-impact-preview")
       ? .preview(Self.fixturePreview())
       : .unavailable(reason: "No recovery impact preview has been requested")
   }
+
+  /// Launch arguments are the floor; the state file, when present and
+  /// readable, replaces them wholesale so a test can move to a state that
+  /// asserts the *absence* of a fault it previously set.
+  private func activeFaults() -> Set<String> {
+    if let stateFileURL, let text = try? String(contentsOf: stateFileURL, encoding: .utf8) {
+      return Set(text.split(separator: "\n").map(String.init).filter { !$0.isEmpty })
+    }
+    return Set(launchArguments.filter { $0.hasPrefix("--ui-test-hdc-") })
+  }
+
+  private var keyAccessDenied: Bool { activeFaults().contains("--ui-test-hdc-key-access-denied") }
+  private var denied: Bool { activeFaults().contains("--ui-test-hdc-denied") }
+  private var timedOut: Bool { activeFaults().contains("--ui-test-hdc-timed-out") }
+  private var criticalGate: Bool { activeFaults().contains("--ui-test-hdc-critical-gate") }
+  private var delayedRefresh: Bool { activeFaults().contains("--ui-test-hdc-refresh-delay") }
 
   func refresh() async -> HDCDiagnosticsPresentation {
     refreshCallCount += 1

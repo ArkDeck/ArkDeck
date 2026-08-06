@@ -1,642 +1,1990 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "app.navigation.debug" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Debug" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "调试" } }
-      }
-    },
-    "app.navigation.flash" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Flash" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷机" } }
-      }
-    },
-    "app.navigation.history" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "History" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "历史" } }
-      }
-    },
-    "app.navigation.overview" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Overview" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "概览" } }
-      }
-    },
-    "app.navigation.section.device" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Device" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设备" } }
-      }
-    },
-    "app.navigation.section.records" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Records" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "记录" } }
-      }
-    },
-    "app.navigation.section.workflows" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Workflows" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "工作流" } }
-      }
-    },
-    "app.navigation.trace" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Trace" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "追踪" } }
-      }
-    },
-    "app.navigation.uiDump" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "ArkUI UI Dump" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ArkUI UI 导出" } }
-      }
-    },
-    "app.shell.title" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck" } }
-      }
-    },
-    "app.unavailable.noOperationSubmitted" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No operation was submitted." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未提交任何操作。" } }
-      }
-    },
-    "app.unavailable.reason" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "This workspace is not connected to ArkDeck Runtime in this build." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此版本尚未将该工作区连接到 ArkDeck Runtime。" } }
-      }
-    },
-    "overview.action.chooseExecutable" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose HDC…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择 HDC…" } }
-      }
-    },
-    "hdc.devices.refresh" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh Devices" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新设备" } }
-      }
-    },
-    "overview.attention.channel" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Channel protection is unverified" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通道保护未验证" } }
-      }
-    },
-    "overview.attention.clear" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Nothing needs attention in the current diagnostics." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前诊断中没有需要处理的事项。" } }
-      }
-    },
-    "overview.attention.configuration" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "HDC selection could not be retained" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法保留 HDC 选择" } }
-      }
-    },
-    "overview.attention.criticalGate" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recovery is held by a critical step" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复被关键步骤阻断" } }
-      }
-    },
-    "overview.attention.keyAccess" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key access diagnostics are unavailable" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "密钥访问诊断不可用" } }
-      }
-    },
-    "overview.attention.nextStep.chooseExecutable" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose an HDC executable this app can still open, then refresh the overview." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请选择一个本应用仍可打开的 HDC 可执行文件，然后刷新概览。" } }
-      }
-    },
-    "overview.attention.nextStep.criticalGate" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Wait for the named step to reach its safe boundary. ArkDeck does not stop it for you." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请等待上述步骤到达安全边界；ArkDeck 不会代你中止它。" } }
-      }
-    },
-    "overview.attention.nextStep.isolatedNetwork" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use this endpoint only on a trusted, isolated network." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅在受信任的隔离网络中使用该端点。" } }
-      }
-    },
-    "overview.attention.nextStep.keyAccess" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No key path was read or modified. Device trust has to be resolved on the device itself." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未读取或修改任何密钥路径；设备信任需要在设备端解决。" } }
-      }
-    },
-    "overview.attention.nextStep.refresh" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unlock and trust the device, then refresh the overview to re-read the current state." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请解锁并在设备上确认信任，然后刷新概览以重新读取当前状态。" } }
-      }
-    },
-    "overview.attention.trust" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Device trust is not ready" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设备信任未就绪" } }
-      }
-    },
-    "overview.channel.encryptedVerified" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Encrypted, verified" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已加密并验证" } }
-      }
-    },
-    "overview.channel.unverified" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unverified" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未验证" } }
-      }
-    },
-    "overview.field.authorization" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Authorization" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "授权" } }
-      }
-    },
-    "overview.field.autoLifecycleDispatches" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic lifecycle dispatches" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动生命周期调度次数" } }
-      }
-    },
-    "overview.field.autoSubserverDispatches" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic subserver dispatches" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动子服务器调度次数" } }
-      }
-    },
-    "overview.field.channelProtection" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Channel protection" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通道保护" } }
-      }
-    },
-    "overview.field.clientVersion" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Client version" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "客户端版本" } }
-      }
-    },
-    "overview.field.daemonVersion" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Daemon version" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "守护进程版本" } }
-      }
-    },
-    "overview.field.deviceEvents" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recent device events" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "近期设备事件" } }
-      }
-    },
-    "overview.field.endpoint" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Endpoint" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "端点" } }
-      }
-    },
-    "overview.field.endpointSource" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Endpoint source" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "端点来源" } }
-      }
-    },
-    "overview.field.generation" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server generation" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器代次" } }
-      }
-    },
-    "overview.field.hash" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hash" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "哈希" } }
-      }
-    },
-    "overview.field.lifecycleAvailability" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server recovery" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器恢复" } }
-      }
-    },
-    "overview.field.ownership" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ownership" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "归属" } }
-      }
-    },
-    "overview.field.ownershipBasis" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ownership basis" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "归属判定依据" } }
-      }
-    },
-    "overview.field.path" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Absolute path" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "绝对路径" } }
-      }
-    },
-    "overview.field.platformTrust" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Platform trust" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "平台信任" } }
-      }
-    },
-    "overview.field.serverHealth" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server health" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器健康状态" } }
-      }
-    },
-    "overview.field.serverVersion" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server version" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器版本" } }
-      }
-    },
-    "overview.field.source" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "HDC source" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "HDC 来源" } }
-      }
-    },
-    "overview.field.subserver" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Subserver capability" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "子服务器能力" } }
-      }
-    },
-    "overview.impact.action" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Action" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "动作" } }
-      }
-    },
-    "overview.impact.devices" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Affected devices" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "受影响设备" } }
-      }
-    },
-    "overview.impact.endpoint" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Endpoint" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "端点" } }
-      }
-    },
-    "overview.impact.generation" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server generation" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器代次" } }
-      }
-    },
-    "overview.impact.interruption" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Expected interruption" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "预期中断" } }
-      }
-    },
-    "overview.impact.jobs" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Affected Jobs" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "受影响 Job" } }
-      }
-    },
-    "overview.impact.otherClients" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Other HDC clients" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "其他 HDC 客户端" } }
-      }
-    },
-    "overview.impact.ownership" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ownership" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "归属" } }
-      }
-    },
-    "overview.impact.recoveryPath" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recovery path" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复路径" } }
-      }
-    },
-    "overview.recovery.cancel" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消" } }
-      }
-    },
-    "overview.recovery.confirmGeneration" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirm Generation %lld" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "确认第 %lld 代服务器" } }
-      }
-    },
-    "overview.recovery.dispatch" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Run Confirmed HDC Recovery" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "执行已确认的 HDC 恢复" } }
-      }
-    },
-    "overview.recovery.previewImpact" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preview Server Recovery Impact" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "预览服务器恢复影响" } }
-      }
-    },
-    "overview.recovery.sheetTitle" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Review HDC Server Recovery Impact" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "查看 HDC 服务器恢复影响" } }
-      }
-    },
-    "overview.section.advanced" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Advanced Diagnostics" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "高级诊断" } }
-      }
-    },
-    "overview.section.capabilities" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Capabilities" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "能力" } }
-      }
-    },
-    "overview.section.deviceChannel" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Selected Device & Channel" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "所选设备与通道" } }
-      }
-    },
-    "overview.section.needsAttention" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Needs Attention" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需处理事项" } }
-      }
-    },
-    "overview.section.serverToolchain" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server & Toolchain" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器与工具链" } }
-      }
-    },
-    "overview.serverHealth.healthy" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Healthy" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正常" } }
-      }
-    },
-    "overview.serverHealth.unavailable" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unavailable" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不可用" } }
-      }
-    },
-    "overview.serverHealth.unknown" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知" } }
-      }
-    },
-    "overview.status.channel" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Channel" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通道" } }
-      }
-    },
-    "overview.status.needsAttention" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Needs Attention" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需处理事项" } }
-      }
-    },
-    "overview.status.needsAttention.none" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "None" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无" } }
-      }
-    },
-    "overview.status.needsAttention.one" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "1 item" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "1 项" } }
-      }
-    },
-    "overview.status.needsAttention.other" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld items" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%lld 项" } }
-      }
-    },
-    "overview.status.refreshing" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refreshing…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在刷新……" } }
-      }
-    },
-    "overview.status.server" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Server" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务器" } }
-      }
-    },
-    "overview.status.trust" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Device Trust" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设备信任" } }
-      }
-    },
-    "overview.trust.cancelled" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancelled" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已取消" } }
-      }
-    },
-    "overview.trust.denied" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Denied" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已拒绝" } }
-      }
-    },
-    "overview.trust.keyAccessDenied" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key access denied" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "密钥访问被拒绝" } }
-      }
-    },
-    "overview.trust.ready" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已就绪" } }
-      }
-    },
-    "overview.trust.timedOut" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Timed out" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已超时" } }
-      }
-    },
-    "overview.trust.unavailable" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unavailable" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不可用" } }
-      }
-    },
-    "overview.trust.waiting" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting for trust" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "等待信任" } }
-      }
-    },
-    "update.automaticChecks" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check automatically when ArkDeck starts (at most once every 24 hours)" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck 启动时自动检查（每 24 小时最多一次）" } }
-      }
-    },
-    "update.checkNow" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check Now" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "立即检查" } }
-      }
-    },
-    "update.download" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Download Update" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载更新" } }
-      }
-    },
-    "update.manualInstallDisclosure" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck only downloads and verifies the DMG. After a separate confirmation it reveals the file in Finder. You must mount the DMG and replace the app manually; ArkDeck does not install, replace itself, update on quit, or claim automatic rollback." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ArkDeck 只下载并验证 DMG。再次确认后仅在 Finder 中显示文件；你需要手动挂载 DMG 并替换应用。ArkDeck 不会安装、自替换、退出时更新，也不承诺自动回滚。" } }
-      }
-    },
-    "update.privacyDisclosure" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update checks send only the ArkDeck version, macOS version, and CPU architecture. No device ID, user path, locale, telemetry, cookies, or credentials are sent." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新检查只发送 ArkDeck 版本、macOS 版本和 CPU 架构；不会发送设备标识、用户路径、区域设置、遥测、Cookie 或凭据。" } }
-      }
-    },
-    "update.reveal" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirm and Reveal Verified DMG" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "确认并显示已验证的 DMG" } }
-      }
-    },
-    "update.status.automaticCheckIncomplete" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The last automatic update check did not complete. Use Check Now to retry." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次自动更新检查未完成。可点“立即检查”重试。" } }
-      }
-    },
-    "update.status.available" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "An update is available. Download requires your action." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有可用更新，需要你手动开始下载。" } }
-      }
-    },
-    "update.status.awaitingConsent" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The DMG passed signature and Team verification. Confirm once more to reveal it." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "DMG 已通过签名与 Team 验证。请再次确认后在 Finder 中显示。" } }
-      }
-    },
-    "update.status.cancelled" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update operation cancelled." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新操作已取消。" } }
-      }
-    },
-    "update.status.checking" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Checking for updates…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在检查更新……" } }
-      }
-    },
-    "update.status.current" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No newer verified update is available." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前没有已验证的较新版本。" } }
-      }
-    },
-    "update.status.downloading" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Downloading the signed artifact…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在下载签名产物……" } }
-      }
-    },
-    "update.status.failed" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update verification failed. Nothing was installed or replaced." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新验证失败，未安装或替换任何内容。" } }
-      }
-    },
-    "update.status.handedOff" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verified DMG revealed in Finder. Continue manually." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已在 Finder 中显示验证过的 DMG，请手动继续。" } }
-      }
-    },
-    "update.status.idle" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready to check for updates." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可以检查更新。" } }
-      }
-    },
-    "update.status.unavailable" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The updater could not be initialized." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新器无法初始化。" } }
-      }
-    },
-    "update.status.verifying" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verifying the DMG signature and Team identity…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在验证 DMG 签名与 Team 身份……" } }
-      }
-    },
-    "update.title" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Software Update" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "软件更新" } }
-      }
-    },
-    "update.toolbar.available" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update Available" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新可用" } }
-      }
-    },
-    "update.toolbar.awaitingConsent" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update Awaiting Confirmation" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新等待确认" } }
-      }
-    },
-    "update.toolbar.failed" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update Failed" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新失败" } }
+  "sourceLanguage": "en",
+  "strings": {
+    "app.navigation.debug": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debug"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调试"
+          }
+        }
+      }
+    },
+    "app.navigation.flash": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷机"
+          }
+        }
+      }
+    },
+    "app.navigation.history": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历史"
+          }
+        }
+      }
+    },
+    "app.navigation.overview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "概览"
+          }
+        }
+      }
+    },
+    "app.navigation.section.device": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备"
+          }
+        }
+      }
+    },
+    "app.navigation.section.records": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Records"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "记录"
+          }
+        }
+      }
+    },
+    "app.navigation.section.workflows": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workflows"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作流"
+          }
+        }
+      }
+    },
+    "app.navigation.trace": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追踪"
+          }
+        }
+      }
+    },
+    "app.navigation.uiDump": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkUI UI Dump"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkUI UI 导出"
+          }
+        }
+      }
+    },
+    "app.shell.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck"
+          }
+        }
+      }
+    },
+    "app.unavailable.noOperationSubmitted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No operation was submitted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未提交任何操作。"
+          }
+        }
+      }
+    },
+    "app.unavailable.reason": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This workspace is not connected to ArkDeck Runtime in this build."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此版本尚未将该工作区连接到 ArkDeck Runtime。"
+          }
+        }
+      }
+    },
+    "hdc.devices.refresh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Devices"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新设备"
+          }
+        }
+      }
+    },
+    "history.action.refresh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新历史"
+          }
+        }
+      }
+    },
+    "history.column.job": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Job"
+          }
+        }
+      }
+    },
+    "history.column.operation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作"
+          }
+        }
+      }
+    },
+    "history.column.state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "history.detail.job": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Job"
+          }
+        }
+      }
+    },
+    "history.detail.operation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Operation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作"
+          }
+        }
+      }
+    },
+    "history.detail.outcomeUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outcome unknown — this job's effect on the device was never confirmed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结果未知——本 Job 对设备的影响从未被确认。"
+          }
+        }
+      }
+    },
+    "history.detail.residue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld outstanding residue items."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 %lld 项未清理残留。"
+          }
+        }
+      }
+    },
+    "history.detail.select": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a job to see its detail."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一个 Job 以查看详情。"
+          }
+        }
+      }
+    },
+    "history.detail.state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "history.detail.target": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "history.detail.timeline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timeline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间线"
+          }
+        }
+      }
+    },
+    "history.detail.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Job Detail"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Job 详情"
+          }
+        }
+      }
+    },
+    "history.detail.waitingForHuman": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for a person to act."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待人工处理。"
+          }
+        }
+      }
+    },
+    "history.empty.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck Runtime has recorded no jobs on this host."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck Runtime 在本机尚未记录任何 Job。"
+          }
+        }
+      }
+    },
+    "history.empty.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Runtime Jobs Yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无 Runtime Job"
+          }
+        }
+      }
+    },
+    "history.readOnlyNote": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This workspace reads Runtime state. It cannot submit, cancel or retry anything."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。"
+          }
+        }
+      }
+    },
+    "history.unavailable.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime History Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 Runtime 历史"
+          }
+        }
+      }
+    },
+    "overview.action.chooseExecutable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose HDC…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择 HDC…"
+          }
+        }
+      }
+    },
+    "overview.attention.channel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Channel protection is unverified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通道保护未验证"
+          }
+        }
+      }
+    },
+    "overview.attention.clear": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing needs attention in the current diagnostics."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前诊断中没有需要处理的事项。"
+          }
+        }
+      }
+    },
+    "overview.attention.configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HDC selection could not be retained"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保留 HDC 选择"
+          }
+        }
+      }
+    },
+    "overview.attention.criticalGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery is held by a critical step"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复被关键步骤阻断"
+          }
+        }
+      }
+    },
+    "overview.attention.keyAccess": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key access diagnostics are unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密钥访问诊断不可用"
+          }
+        }
+      }
+    },
+    "overview.attention.nextStep.chooseExecutable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose an HDC executable this app can still open, then refresh the overview."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一个本应用仍可打开的 HDC 可执行文件，然后刷新概览。"
+          }
+        }
+      }
+    },
+    "overview.attention.nextStep.criticalGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the named step to reach its safe boundary. ArkDeck does not stop it for you."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请等待上述步骤到达安全边界；ArkDeck 不会代你中止它。"
+          }
+        }
+      }
+    },
+    "overview.attention.nextStep.isolatedNetwork": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this endpoint only on a trusted, isolated network."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在受信任的隔离网络中使用该端点。"
+          }
+        }
+      }
+    },
+    "overview.attention.nextStep.keyAccess": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No key path was read or modified. Device trust has to be resolved on the device itself."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未读取或修改任何密钥路径；设备信任需要在设备端解决。"
+          }
+        }
+      }
+    },
+    "overview.attention.nextStep.refresh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock and trust the device, then refresh the overview to re-read the current state."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请解锁并在设备上确认信任，然后刷新概览以重新读取当前状态。"
+          }
+        }
+      }
+    },
+    "overview.attention.trust": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device trust is not ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备信任未就绪"
+          }
+        }
+      }
+    },
+    "overview.channel.encryptedVerified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encrypted, verified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已加密并验证"
+          }
+        }
+      }
+    },
+    "overview.channel.unverified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unverified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未验证"
+          }
+        }
+      }
+    },
+    "overview.field.authorization": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorization"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "授权"
+          }
+        }
+      }
+    },
+    "overview.field.autoLifecycleDispatches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic lifecycle dispatches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动生命周期调度次数"
+          }
+        }
+      }
+    },
+    "overview.field.autoSubserverDispatches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic subserver dispatches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动子服务器调度次数"
+          }
+        }
+      }
+    },
+    "overview.field.channelProtection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Channel protection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通道保护"
+          }
+        }
+      }
+    },
+    "overview.field.clientVersion": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "客户端版本"
+          }
+        }
+      }
+    },
+    "overview.field.daemonVersion": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daemon version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "守护进程版本"
+          }
+        }
+      }
+    },
+    "overview.field.deviceEvents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent device events"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期设备事件"
+          }
+        }
+      }
+    },
+    "overview.field.endpoint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endpoint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端点"
+          }
+        }
+      }
+    },
+    "overview.field.endpointSource": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endpoint source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端点来源"
+          }
+        }
+      }
+    },
+    "overview.field.generation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server generation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器代次"
+          }
+        }
+      }
+    },
+    "overview.field.hash": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "哈希"
+          }
+        }
+      }
+    },
+    "overview.field.lifecycleAvailability": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server recovery"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器恢复"
+          }
+        }
+      }
+    },
+    "overview.field.ownership": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ownership"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "归属"
+          }
+        }
+      }
+    },
+    "overview.field.ownershipBasis": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ownership basis"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "归属判定依据"
+          }
+        }
+      }
+    },
+    "overview.field.path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Absolute path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "绝对路径"
+          }
+        }
+      }
+    },
+    "overview.field.platformTrust": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Platform trust"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平台信任"
+          }
+        }
+      }
+    },
+    "overview.field.serverHealth": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server health"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器健康状态"
+          }
+        }
+      }
+    },
+    "overview.field.serverVersion": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器版本"
+          }
+        }
+      }
+    },
+    "overview.field.source": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HDC source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HDC 来源"
+          }
+        }
+      }
+    },
+    "overview.field.subserver": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subserver capability"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "子服务器能力"
+          }
+        }
+      }
+    },
+    "overview.impact.action": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Action"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动作"
+          }
+        }
+      }
+    },
+    "overview.impact.devices": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affected devices"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受影响设备"
+          }
+        }
+      }
+    },
+    "overview.impact.endpoint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endpoint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端点"
+          }
+        }
+      }
+    },
+    "overview.impact.generation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server generation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器代次"
+          }
+        }
+      }
+    },
+    "overview.impact.interruption": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expected interruption"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预期中断"
+          }
+        }
+      }
+    },
+    "overview.impact.jobs": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affected Jobs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受影响 Job"
+          }
+        }
+      }
+    },
+    "overview.impact.otherClients": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other HDC clients"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他 HDC 客户端"
+          }
+        }
+      }
+    },
+    "overview.impact.ownership": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ownership"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "归属"
+          }
+        }
+      }
+    },
+    "overview.impact.recoveryPath": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复路径"
+          }
+        }
+      }
+    },
+    "overview.recovery.cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "overview.recovery.confirmGeneration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm Generation %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认第 %lld 代服务器"
+          }
+        }
+      }
+    },
+    "overview.recovery.dispatch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run Confirmed HDC Recovery"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行已确认的 HDC 恢复"
+          }
+        }
+      }
+    },
+    "overview.recovery.previewImpact": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview Server Recovery Impact"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览服务器恢复影响"
+          }
+        }
+      }
+    },
+    "overview.recovery.sheetTitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review HDC Server Recovery Impact"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看 HDC 服务器恢复影响"
+          }
+        }
+      }
+    },
+    "overview.section.advanced": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced Diagnostics"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级诊断"
+          }
+        }
+      }
+    },
+    "overview.section.capabilities": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capabilities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "能力"
+          }
+        }
+      }
+    },
+    "overview.section.deviceChannel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected Device & Channel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选设备与通道"
+          }
+        }
+      }
+    },
+    "overview.section.needsAttention": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs Attention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需处理事项"
+          }
+        }
+      }
+    },
+    "overview.section.serverToolchain": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server & Toolchain"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器与工具链"
+          }
+        }
+      }
+    },
+    "overview.serverHealth.healthy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Healthy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正常"
+          }
+        }
+      }
+    },
+    "overview.serverHealth.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "overview.serverHealth.unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知"
+          }
+        }
+      }
+    },
+    "overview.status.channel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Channel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通道"
+          }
+        }
+      }
+    },
+    "overview.status.needsAttention": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs Attention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需处理事项"
+          }
+        }
+      }
+    },
+    "overview.status.needsAttention.none": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无"
+          }
+        }
+      }
+    },
+    "overview.status.needsAttention.one": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 item"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 项"
+          }
+        }
+      }
+    },
+    "overview.status.needsAttention.other": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld items"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项"
+          }
+        }
+      }
+    },
+    "overview.status.refreshing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在刷新……"
+          }
+        }
+      }
+    },
+    "overview.status.server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Server"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器"
+          }
+        }
+      }
+    },
+    "overview.status.trust": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device Trust"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备信任"
+          }
+        }
+      }
+    },
+    "overview.trust.cancelled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消"
+          }
+        }
+      }
+    },
+    "overview.trust.denied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拒绝"
+          }
+        }
+      }
+    },
+    "overview.trust.keyAccessDenied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key access denied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密钥访问被拒绝"
+          }
+        }
+      }
+    },
+    "overview.trust.ready": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已就绪"
+          }
+        }
+      }
+    },
+    "overview.trust.timedOut": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timed out"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已超时"
+          }
+        }
+      }
+    },
+    "overview.trust.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "overview.trust.waiting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for trust"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待信任"
+          }
+        }
+      }
+    },
+    "update.automaticChecks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check automatically when ArkDeck starts (at most once every 24 hours)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck 启动时自动检查（每 24 小时最多一次）"
+          }
+        }
+      }
+    },
+    "update.checkNow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即检查"
+          }
+        }
+      }
+    },
+    "update.download": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download Update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载更新"
+          }
+        }
+      }
+    },
+    "update.manualInstallDisclosure": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck only downloads and verifies the DMG. After a separate confirmation it reveals the file in Finder. You must mount the DMG and replace the app manually; ArkDeck does not install, replace itself, update on quit, or claim automatic rollback."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ArkDeck 只下载并验证 DMG。再次确认后仅在 Finder 中显示文件；你需要手动挂载 DMG 并替换应用。ArkDeck 不会安装、自替换、退出时更新，也不承诺自动回滚。"
+          }
+        }
+      }
+    },
+    "update.privacyDisclosure": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update checks send only the ArkDeck version, macOS version, and CPU architecture. No device ID, user path, locale, telemetry, cookies, or credentials are sent."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新检查只发送 ArkDeck 版本、macOS 版本和 CPU 架构；不会发送设备标识、用户路径、区域设置、遥测、Cookie 或凭据。"
+          }
+        }
+      }
+    },
+    "update.reveal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm and Reveal Verified DMG"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认并显示已验证的 DMG"
+          }
+        }
+      }
+    },
+    "update.status.automaticCheckIncomplete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The last automatic update check did not complete. Use Check Now to retry."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次自动更新检查未完成。可点“立即检查”重试。"
+          }
+        }
+      }
+    },
+    "update.status.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An update is available. Download requires your action."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有可用更新，需要你手动开始下载。"
+          }
+        }
+      }
+    },
+    "update.status.awaitingConsent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The DMG passed signature and Team verification. Confirm once more to reveal it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DMG 已通过签名与 Team 验证。请再次确认后在 Finder 中显示。"
+          }
+        }
+      }
+    },
+    "update.status.cancelled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update operation cancelled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新操作已取消。"
+          }
+        }
+      }
+    },
+    "update.status.checking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking for updates…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查更新……"
+          }
+        }
+      }
+    },
+    "update.status.current": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No newer verified update is available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前没有已验证的较新版本。"
+          }
+        }
+      }
+    },
+    "update.status.downloading": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading the signed artifact…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在下载签名产物……"
+          }
+        }
+      }
+    },
+    "update.status.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update verification failed. Nothing was installed or replaced."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新验证失败，未安装或替换任何内容。"
+          }
+        }
+      }
+    },
+    "update.status.handedOff": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verified DMG revealed in Finder. Continue manually."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在 Finder 中显示验证过的 DMG，请手动继续。"
+          }
+        }
+      }
+    },
+    "update.status.idle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to check for updates."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以检查更新。"
+          }
+        }
+      }
+    },
+    "update.status.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The updater could not be initialized."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新器无法初始化。"
+          }
+        }
+      }
+    },
+    "update.status.verifying": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifying the DMG signature and Team identity…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在验证 DMG 签名与 Team 身份……"
+          }
+        }
+      }
+    },
+    "update.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Software Update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "软件更新"
+          }
+        }
+      }
+    },
+    "update.toolbar.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新可用"
+          }
+        }
+      }
+    },
+    "update.toolbar.awaitingConsent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Awaiting Confirmation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新等待确认"
+          }
+        }
+      }
+    },
+    "update.toolbar.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新失败"
+          }
+        }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

@@ -8,14 +8,19 @@ struct ArkDeckApp: App {
   @StateObject private var hdcDiagnostics = HDCStatusViewModel(
     provider: HDCApplicationDiagnosticsFacade.make())
   @StateObject private var autoUpdate = AutoUpdateViewModel()
+  @StateObject private var runtimeHistory = RuntimeHistoryViewModel(
+    provider: RuntimeHistoryApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
-      AppShellView(hdcDiagnostics: hdcDiagnostics, autoUpdate: autoUpdate)
-        .task {
-          hdcDiagnostics.refresh()
-          autoUpdate.startup()
-        }
+      AppShellView(
+        hdcDiagnostics: hdcDiagnostics, autoUpdate: autoUpdate, runtimeHistory: runtimeHistory
+      )
+      .task {
+        hdcDiagnostics.refresh()
+        autoUpdate.startup()
+        runtimeHistory.refresh()
+      }
     }
     Settings {
       AutoUpdateSettingsView(model: autoUpdate)
@@ -63,14 +68,15 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
 }
 
 /// Native window shell: system split view, unified toolbar, and one workspace
-/// per navigation item. Only Overview has a production Runtime surface today;
-/// every other item routes to an explicit unavailable workspace rather than
-/// re-rendering the same diagnostics under a different title.
+/// per navigation item. Overview and History have production Runtime surfaces;
+/// the rest route to an explicit unavailable workspace rather than re-rendering
+/// another page's data under a different title.
 private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
   @ObservedObject var hdcDiagnostics: HDCStatusViewModel
   @ObservedObject var autoUpdate: AutoUpdateViewModel
+  @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
 
   private var selectedItem: ArkDeckNavigationItem {
     ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
@@ -121,7 +127,12 @@ private struct AppShellView: View {
         onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
         onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
         configurationError: hdcDiagnostics.configurationError)
-    case .flash, .debug, .uiDump, .trace, .history:
+    case .history:
+      RuntimeHistoryView(
+        presentation: runtimeHistory.presentation,
+        isRefreshInFlight: runtimeHistory.isRefreshInFlight,
+        onRefresh: runtimeHistory.refresh)
+    case .flash, .debug, .uiDump, .trace:
       UnavailableFeatureView(
         titleKey: selectedItem.localizationKey,
         systemImageName: selectedItem.systemImageName)
