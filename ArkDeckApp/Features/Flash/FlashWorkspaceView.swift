@@ -25,6 +25,7 @@ enum FlashWorkspaceMode: String, CaseIterable, Hashable {
 struct FlashWorkspaceView: View {
   @ObservedObject var model: FlashWorkspaceViewModel
   @State private var isImporterPresented = false
+  @State private var confirmationContext: FlashConfirmationContext?
 
   var body: some View {
     ScrollView {
@@ -93,6 +94,14 @@ struct FlashWorkspaceView: View {
           model.rejectArchiveSelection()
         }
       case .failure: model.rejectArchiveSelection()
+      }
+    }
+    .sheet(item: $confirmationContext) { context in
+      FlashDestructiveConfirmationSheet(plan: context.plan) { destructivePhrase, userdataPhrase in
+        model.confirm(
+          reviewedPlan: context.plan,
+          destructivePhrase: destructivePhrase,
+          userdataPhrase: userdataPhrase)
       }
     }
   }
@@ -414,11 +423,33 @@ struct FlashWorkspaceView: View {
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("flash.execute.blocker")
-          Button("flash.action.runLocked") {}
+          if let handoff = model.humanHandoff {
+            confirmedHandoff(handoff)
+            Button("flash.action.submitLocked") {}
+              .buttonStyle(.borderedProminent)
+              .tint(.red)
+              .disabled(true)
+              .accessibilityIdentifier("flash.execute.submit")
+            Label("flash.execute.submitLockReason", systemImage: "lock.shield")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          } else {
+            Label(
+              "flash.execute.confirmationRequired",
+              systemImage: "person.crop.circle.badge.exclamationmark")
+              .font(.callout.weight(.semibold))
+              .fixedSize(horizontal: false, vertical: true)
+            Button("flash.action.reviewImpact") {
+              if let plan = model.plan {
+                confirmationContext = FlashConfirmationContext(plan: plan)
+              }
+            }
             .buttonStyle(.borderedProminent)
             .tint(.red)
-            .disabled(true)
-            .accessibilityIdentifier("flash.execute.run")
+            .disabled(!model.canReviewDestructiveImpact)
+            .accessibilityIdentifier("flash.execute.review")
+          }
         case .planOnly:
           Label("flash.planOnly.noSubmission", systemImage: "checkmark.shield")
             .font(.footnote)
@@ -436,6 +467,42 @@ struct FlashWorkspaceView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
     }
+  }
+
+  private func confirmedHandoff(_ handoff: FlashHumanHandoffPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label("flash.execute.confirmed", systemImage: "checkmark.seal.fill")
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.orange)
+      LabeledContent("flash.confirm.target") {
+        Text("\(handoff.target.id) · r\(handoff.target.bindingRevision)")
+          .font(.body.monospaced())
+      }
+      LabeledContent("flash.execute.confirmedAt") {
+        Text(handoff.confirmedAtUTC).font(.body.monospaced())
+      }
+      LabeledContent("flash.plan.digest") {
+        Text(handoff.planDigestSHA256)
+          .font(.body.monospaced())
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .help(handoff.planDigestSHA256)
+      }
+      LabeledContent("flash.plan.archiveHash") {
+        Text(handoff.archiveSHA256)
+          .font(.body.monospaced())
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .help(handoff.archiveSHA256)
+      }
+      Label("flash.execute.reviewNotAuthority", systemImage: "exclamationmark.shield")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("flash.execute.handoff")
+    }
+    .padding(12)
+    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
   }
 
   private func dataImpactLabel(_ impact: FlashDataImpactPresentation) -> some View {
@@ -471,6 +538,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
   @Published private(set) var plan: FlashExactPlanPresentation?
   @Published private(set) var planFailureCode: FlashPlanFailureCode?
   @Published private(set) var planFailureDetail: String?
+  @Published private(set) var humanHandoff: FlashHumanHandoffPresentation?
   @Published private(set) var isRefreshing = false
   @Published private(set) var isPreparingPlan = false
   @Published private(set) var profileReference =
@@ -492,6 +560,13 @@ final class FlashWorkspaceViewModel: ObservableObject {
       && !isPreparingPlan
   }
 
+  var canReviewDestructiveImpact: Bool {
+    mode == .execute
+      && plan?.mode == .execute
+      && plan?.target == selectedTarget
+      && !isPreparingPlan
+  }
+
   func refresh() {
     guard !isRefreshing else { return }
     isRefreshing = true
@@ -501,9 +576,14 @@ final class FlashWorkspaceViewModel: ObservableObject {
       guard let self else { return }
       defer { self.isRefreshing = false }
       guard !Task.isCancelled else { return }
+      let previousTarget = self.selectedTarget
+      let nextSelectedTargetID = next.targets.contains(where: { $0.id == self.selectedTargetID })
+        ? self.selectedTargetID
+        : next.targets.first?.id ?? ""
+      let nextTarget = next.targets.first { $0.id == nextSelectedTargetID }
       self.workspace = next
-      if !next.targets.contains(where: { $0.id == self.selectedTargetID }) {
-        self.selectedTargetID = next.targets.first?.id ?? ""
+      self.selectedTargetID = nextSelectedTargetID
+      if previousTarget != nextTarget {
         self.invalidatePlan()
       }
     }
@@ -541,6 +621,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
     guard let archiveURL = selectedArchiveURL, canPreparePlan else { return }
     isPreparingPlan = true
     plan = nil
+    humanHandoff = nil
     planFailureCode = nil
     planFailureDetail = nil
     let provider = provider
@@ -572,9 +653,33 @@ final class FlashWorkspaceViewModel: ObservableObject {
     }
   }
 
+  func confirm(
+    reviewedPlan: FlashExactPlanPresentation,
+    destructivePhrase: String,
+    userdataPhrase: String
+  ) -> FlashManualConfirmationResult {
+    let result = FlashManualConfirmationValidator.confirm(
+      currentPlan: plan,
+      reviewedPlan: reviewedPlan,
+      currentTarget: selectedTarget,
+      destructivePhrase: destructivePhrase,
+      userdataPhrase: userdataPhrase,
+      confirmedAtUTC: ISO8601DateFormatter().string(from: Date()))
+    if case .accepted(let handoff) = result {
+      humanHandoff = handoff
+    }
+    return result
+  }
+
   private func invalidatePlan() {
     plan = nil
+    humanHandoff = nil
     planFailureCode = nil
     planFailureDetail = nil
   }
+}
+
+private struct FlashConfirmationContext: Identifiable {
+  let id = UUID()
+  let plan: FlashExactPlanPresentation
 }

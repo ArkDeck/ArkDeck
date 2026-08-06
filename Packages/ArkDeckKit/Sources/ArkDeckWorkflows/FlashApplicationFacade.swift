@@ -147,6 +147,103 @@ public enum FlashPlanPreparationResult: Sendable, Equatable {
   case failed(code: FlashPlanFailureCode, detail: String?)
 }
 
+/// An in-memory record that a human reviewed one exact execute-plan snapshot.
+///
+/// This is deliberately not a Runtime authority, capability, reservation or
+/// Job request. The sandboxed App has no E2 submission transport, so producing
+/// this value always has zero device dispatch and cannot authorize execution.
+public struct FlashHumanHandoffPresentation: Sendable, Equatable {
+  public let confirmedAtUTC: String
+  public let target: FlashTargetPresentation
+  public let profileReference: String
+  public let imageFileName: String
+  public let archiveSHA256: String
+  public let planDigestSHA256: String
+  public let stepSetDigestSHA256: String
+  public let destructiveConfirmationPhrase: String
+  public let deviceMutationDispatchCount: Int
+
+  public init(
+    confirmedAtUTC: String,
+    target: FlashTargetPresentation,
+    profileReference: String,
+    imageFileName: String,
+    archiveSHA256: String,
+    planDigestSHA256: String,
+    stepSetDigestSHA256: String,
+    destructiveConfirmationPhrase: String,
+    deviceMutationDispatchCount: Int
+  ) {
+    self.confirmedAtUTC = confirmedAtUTC
+    self.target = target
+    self.profileReference = profileReference
+    self.imageFileName = imageFileName
+    self.archiveSHA256 = archiveSHA256
+    self.planDigestSHA256 = planDigestSHA256
+    self.stepSetDigestSHA256 = stepSetDigestSHA256
+    self.destructiveConfirmationPhrase = destructiveConfirmationPhrase
+    self.deviceMutationDispatchCount = deviceMutationDispatchCount
+  }
+}
+
+public enum FlashManualConfirmationFailure: String, Sendable, Equatable {
+  case notExecutePlan
+  case missingOrStaleTarget
+  case stalePlan
+  case destructivePhraseMismatch
+  case userdataPhraseMismatch
+}
+
+public enum FlashManualConfirmationResult: Sendable, Equatable {
+  case accepted(FlashHumanHandoffPresentation)
+  case rejected(FlashManualConfirmationFailure)
+}
+
+/// Validates the two human confirmation phrases against an immutable plan
+/// snapshot. It can only produce a presentation-only handoff record.
+public enum FlashManualConfirmationValidator {
+  public static let userdataPhrase = "ERASE-USERDATA"
+
+  public static func destructivePhrase(for plan: FlashExactPlanPresentation) -> String {
+    "FLASH \(plan.planDigestSHA256.prefix(12))"
+  }
+
+  public static func confirm(
+    currentPlan: FlashExactPlanPresentation?,
+    reviewedPlan: FlashExactPlanPresentation,
+    currentTarget: FlashTargetPresentation?,
+    destructivePhrase: String,
+    userdataPhrase: String,
+    confirmedAtUTC: String
+  ) -> FlashManualConfirmationResult {
+    guard reviewedPlan.mode == .execute else { return .rejected(.notExecutePlan) }
+    guard let reviewedTarget = reviewedPlan.target,
+      currentTarget == reviewedTarget
+    else {
+      return .rejected(.missingOrStaleTarget)
+    }
+    guard currentPlan == reviewedPlan else { return .rejected(.stalePlan) }
+    let expectedDestructive = self.destructivePhrase(for: reviewedPlan)
+    guard destructivePhrase == expectedDestructive else {
+      return .rejected(.destructivePhraseMismatch)
+    }
+    guard userdataPhrase == self.userdataPhrase else {
+      return .rejected(.userdataPhraseMismatch)
+    }
+    return .accepted(
+      FlashHumanHandoffPresentation(
+        confirmedAtUTC: confirmedAtUTC,
+        target: reviewedTarget,
+        profileReference: reviewedPlan.profileReference,
+        imageFileName: reviewedPlan.imageFileName,
+        archiveSHA256: reviewedPlan.archiveSHA256,
+        planDigestSHA256: reviewedPlan.planDigestSHA256,
+        stepSetDigestSHA256: reviewedPlan.stepSetDigestSHA256,
+        destructiveConfirmationPhrase: expectedDestructive,
+        deviceMutationDispatchCount: 0))
+  }
+}
+
 public protocol FlashApplicationProviding: Sendable {
   func refreshWorkspace() async -> FlashWorkspacePresentation
   func preparePlan(

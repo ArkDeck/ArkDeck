@@ -221,20 +221,21 @@ final class AppShellUITests: XCTestCase {
       "the disabled preparation action needs a visible recovery instruction",
       file: file, line: line)
 
-    // Execute can be reviewed, but the App has no E2 submit or authority
-    // transport. The locked action and its explanation stay visible, and the
-    // user can return to plan-only without producing a side effect.
+    // Execute can be reviewed only after an exact plan exists, but the App has
+    // no E2 submit or authority transport. The locked boundary and disabled
+    // review action stay visible, and returning to plan-only has no side effect.
     let executeMode = element("flash.mode.execute", in: app)
     XCTAssertTrue(executeMode.exists, file: file, line: line)
     executeMode.click()
     XCTAssertTrue(
       app.staticTexts["flash.execute.blocker"].waitForExistence(timeout: 5),
       file: file, line: line)
-    let lockedRun = app.buttons["flash.execute.run"]
-    XCTAssertTrue(lockedRun.exists, file: file, line: line)
-    XCTAssertFalse(lockedRun.isEnabled, file: file, line: line)
+    let reviewImpact = app.buttons["flash.execute.review"]
+    XCTAssertTrue(reviewImpact.exists, file: file, line: line)
+    XCTAssertFalse(reviewImpact.isEnabled, file: file, line: line)
+    XCTAssertFalse(app.buttons["flash.execute.submit"].exists, file: file, line: line)
     element("flash.mode.planOnly", in: app).click()
-    XCTAssertFalse(app.buttons["flash.execute.run"].exists, file: file, line: line)
+    XCTAssertFalse(app.buttons["flash.execute.review"].exists, file: file, line: line)
 
     // Each remaining unimplemented workspace states its own reason and
     // submits nothing.
