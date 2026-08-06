@@ -32,6 +32,7 @@ struct FlashDestructiveConfirmationSheet: View {
 
         pinnedFacts
         dataImpact
+        FlashPlanDetailsView(plan: plan)
 
         Label("flash.confirm.powerWarning", systemImage: "bolt.trianglebadge.exclamationmark.fill")
           .font(.callout)
@@ -84,6 +85,13 @@ struct FlashDestructiveConfirmationSheet: View {
         LabeledContent("flash.confirm.profile") {
           Text(plan.profileReference).font(.body.monospaced())
         }
+        LabeledContent("flash.plan.toolchain") {
+          Text(plan.toolchainFingerprint)
+            .font(.body.monospaced())
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .help(plan.toolchainFingerprint)
+        }
         LabeledContent("flash.confirm.image") {
           Text(plan.imageFileName)
             .lineLimit(1)
@@ -119,6 +127,7 @@ struct FlashDestructiveConfirmationSheet: View {
         Text(expectedDestructivePhrase)
           .font(.body.monospaced().weight(.semibold))
           .textSelection(.enabled)
+          .accessibilityIdentifier("flash.confirm.expectedDestructivePhrase")
         TextField("flash.confirm.destructivePlaceholder", text: $destructivePhrase)
           .font(.body.monospaced())
           .textFieldStyle(.roundedBorder)

@@ -24,6 +24,10 @@ enum FlashWorkspaceMode: String, CaseIterable, Hashable {
 /// visible locked state until a separately reviewed E2 App transport exists.
 struct FlashWorkspaceView: View {
   @ObservedObject var model: FlashWorkspaceViewModel
+  let runtimeHistory: RuntimeHistoryPresentation
+  let isRuntimeHistoryRefreshing: Bool
+  let onRefreshRuntimeHistory: () -> Void
+  let onOpenHistory: () -> Void
   @State private var isImporterPresented = false
   @State private var confirmationContext: FlashConfirmationContext?
 
@@ -32,6 +36,9 @@ struct FlashWorkspaceView: View {
       VStack(alignment: .leading, spacing: 20) {
         modeStatus
         availabilitySection
+        FlashRuntimeActivityView(
+          presentation: runtimeHistory,
+          onOpenHistory: onOpenHistory)
         ViewThatFits(in: .horizontal) {
           HStack(alignment: .top, spacing: 16) {
             VStack(spacing: 16) {
@@ -76,9 +83,13 @@ struct FlashWorkspaceView: View {
         .accessibilityIdentifier("flash.mode")
         .disabled(model.isPreparingPlan)
 
-        Button("flash.action.refresh") { model.refresh() }
+        Button("flash.action.refresh") {
+          model.refresh()
+          onRefreshRuntimeHistory()
+        }
           .accessibilityIdentifier("flash.refresh")
-          .disabled(model.isRefreshing || model.isPreparingPlan)
+          .disabled(
+            model.isRefreshing || model.isPreparingPlan || isRuntimeHistoryRefreshing)
       }
     }
     .fileImporter(
@@ -259,6 +270,8 @@ struct FlashWorkspaceView: View {
             }
           }
           .accessibilityIdentifier("flash.plan.steps")
+          Divider()
+          FlashPlanDetailsView(plan: plan)
         } else {
           ContentUnavailableView {
             Label("flash.plan.empty", systemImage: "list.number")
@@ -281,6 +294,8 @@ struct FlashWorkspaceView: View {
         ByteCountFormatter.string(fromByteCount: plan.archiveSizeBytes, countStyle: .file))
       summaryRow("flash.plan.archiveHash", plan.archiveSHA256, monospaced: true)
       summaryRow("flash.plan.digest", plan.planDigestSHA256, monospaced: true)
+      summaryRow("flash.plan.stepSetDigest", plan.stepSetDigestSHA256, monospaced: true)
+      summaryRow("flash.plan.toolchain", plan.toolchainFingerprint, monospaced: true)
     }
   }
 
@@ -545,9 +560,19 @@ final class FlashWorkspaceViewModel: ObservableObject {
     FlashApplicationFacade.profileReferences.last ?? "dayu200@1"
 
   private let provider: any FlashApplicationProviding
+  private let preparesUITestPlan: Bool
+  private var didPrepareUITestPlan = false
 
-  init(provider: any FlashApplicationProviding) {
+  init(
+    provider: any FlashApplicationProviding,
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) {
     self.provider = provider
+    preparesUITestPlan = arguments.contains("--ui-test-flash-plan")
+    if preparesUITestPlan {
+      mode = .execute
+      selectedArchiveURL = URL(fileURLWithPath: "/ui-fixture/dayu200-images.tar.gz")
+    }
   }
 
   var selectedTarget: FlashTargetPresentation? {
@@ -585,6 +610,10 @@ final class FlashWorkspaceViewModel: ObservableObject {
       self.selectedTargetID = nextSelectedTargetID
       if previousTarget != nextTarget {
         self.invalidatePlan()
+      }
+      if self.preparesUITestPlan, !self.didPrepareUITestPlan {
+        self.didPrepareUITestPlan = true
+        self.preparePlan()
       }
     }
   }

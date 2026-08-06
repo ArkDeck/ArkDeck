@@ -239,6 +239,8 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
   /// shows, and it is a different presentation from an unreadable history —
   /// the domain already keeps them apart, but nothing rendered the empty one.
   private var empty: Bool { fixtureRequests("--ui-test-runtime-history-empty") }
+  private var flashRunning: Bool { fixtureRequests("--ui-test-runtime-flash-running") }
+  private var flashSucceeded: Bool { fixtureRequests("--ui-test-runtime-flash-succeeded") }
 
   func refreshHistory() async -> RuntimeHistoryPresentation {
     guard !unreachable else {
@@ -246,6 +248,36 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     }
     guard !empty else {
       return RuntimeHistoryPresentation(availability: .available, jobs: [])
+    }
+    if flashRunning {
+      return RuntimeHistoryPresentation(
+        availability: .available,
+        jobs: [
+          RuntimeJobSummaryPresentation(
+            id: "job-fixture-flash-running",
+            operationReference: "flash.dayu200@1",
+            targetID: "target-fixture-dayu200",
+            state: "running",
+            waitingForHuman: false,
+            outcomeUnknown: false,
+            outstandingResidueCount: 0,
+            timeline: ["queued", "preflight", "running"])
+        ])
+    }
+    if flashSucceeded {
+      return RuntimeHistoryPresentation(
+        availability: .available,
+        jobs: [
+          RuntimeJobSummaryPresentation(
+            id: "job-fixture-flash-succeeded",
+            operationReference: "flash.dayu200@1",
+            targetID: "target-fixture-dayu200",
+            state: "succeeded",
+            waitingForHuman: false,
+            outcomeUnknown: false,
+            outstandingResidueCount: 0,
+            timeline: ["queued", "preflight", "running", "waitingForDevice", "succeeded"])
+        ])
     }
     return RuntimeHistoryPresentation(
       availability: .available,

@@ -37,6 +37,13 @@ final class AppShellUITests: XCTestCase {
         emptyPlan: "No exact plan yet",
         prepareAction: "Prepare exact plan",
         imageBlocker: "Choose an image bundle before preparing a plan.",
+        runtimeState: "Interrupted",
+        runtimeResult:
+          "Device effect is unknown. Do not treat this Job as finished or start another flash.",
+        runtimeRecovery:
+          "The device effect is unknown. Keep the current device state unchanged when possible. "
+          + "Do not start another flash until the outstanding step has been reconciled through "
+          + "an approved Runtime path.",
         noSubmission:
           "Plan only: every deviceMutation and destructive step remains "
           + "notExecuted(planned). No operation was submitted."),
@@ -69,6 +76,11 @@ final class AppShellUITests: XCTestCase {
         emptyPlan: "尚未生成精确计划",
         prepareAction: "生成精确计划",
         imageBlocker: "请先选择镜像包，再生成计划。",
+        runtimeState: "已中断",
+        runtimeResult: "设备影响未知。不要把此 Job 视为完成，也不要开始下一次刷机。",
+        runtimeRecovery:
+          "设备影响未知。条件允许时请保持设备当前状态；在通过已批准的 Runtime 路径核对未决步骤前，"
+          + "不要开始下一次刷机。",
         noSubmission:
           "仅计划：所有 deviceMutation 与 destructive 步骤均保持 notExecuted(planned)，"
           + "未提交任何操作。"),
@@ -108,6 +120,9 @@ final class AppShellUITests: XCTestCase {
     let emptyPlan: String
     let prepareAction: String
     let imageBlocker: String
+    let runtimeState: String
+    let runtimeResult: String
+    let runtimeRecovery: String
     let noSubmission: String
   }
 
@@ -213,6 +228,14 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(element("flash.target", in: app), equals: flash.target)
     assertDisplayed(element("flash.plan.empty", in: app), equals: flash.emptyPlan)
     assertDisplayed(element("flash.plan.prepare", in: app), equals: flash.prepareAction)
+    assertDisplayed(app.staticTexts["flash.runtime.jobID"], equals: "job-fixture-0002")
+    assertDisplayed(app.staticTexts["flash.runtime.state"], equals: flash.runtimeState)
+    assertDisplayed(element("flash.runtime.result", in: app), equals: flash.runtimeResult)
+    assertDisplayed(
+      app.staticTexts["flash.runtime.recovery.guidance"],
+      equals: flash.runtimeRecovery)
+    XCTAssertTrue(element("flash.runtime.attention", in: app).exists, file: file, line: line)
+    XCTAssertTrue(app.buttons["flash.runtime.openHistory"].exists, file: file, line: line)
     assertDisplayed(
       app.staticTexts.matching(identifier: "flash.noOperationSubmitted").firstMatch,
       equals: flash.noSubmission)
@@ -341,6 +364,12 @@ final class AppShellUITests: XCTestCase {
       XCTAssertFalse(
         app.buttons[forbidden].exists, "\(forbidden) must not exist", file: file, line: line)
     }
+
+    select("app.navigation.flash", in: app)
+    XCTAssertTrue(
+      app.staticTexts["flash.runtime.empty"].waitForExistence(timeout: 10),
+      "Flash must distinguish a reachable empty Runtime history",
+      file: file, line: line)
   }
 
   // MARK: - Fixture-specific launches (locale-independent assertions)
@@ -382,7 +411,9 @@ final class AppShellUITests: XCTestCase {
   // A history that could not be read must never look like an empty history.
   func testAnUnreachableRuntimeStatesItsReasonInsteadOfAnEmptyTable() {
     let app = launch(
-      arguments: ["--ui-test-runtime-history", "--ui-test-runtime-history-unreachable"])
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-runtime-history-unreachable", "--ui-test-flash",
+      ])
     select("app.navigation.history", in: app)
 
     XCTAssertTrue(app.staticTexts["history.unavailable.title"].waitForExistence(timeout: 15))
@@ -392,6 +423,102 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(
       element("history.table", in: app).exists, "an unreadable history shows no table")
     XCTAssertFalse(app.staticTexts["history.empty.title"].exists, "it is not an empty history")
+
+    select("app.navigation.flash", in: app)
+    XCTAssertTrue(app.staticTexts["flash.runtime.unavailable"].waitForExistence(timeout: 10))
+    XCTAssertFalse(app.staticTexts["flash.runtime.empty"].exists)
+  }
+
+  // The exact-plan fixture is presentation-only: it bypasses the system file
+  // picker so UI automation can walk every review state, but its provider has
+  // no transport and the accepted confirmation still creates no Runtime Job.
+  func testExactFlashPlanConfirmationStaysPresentationOnly() {
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-runtime-history-empty",
+        "--ui-test-flash-plan", "-AppleLanguages", "(en)",
+      ])
+    select("app.navigation.flash", in: app)
+
+    XCTAssertTrue(
+      element("flash.plan.steps", in: app).waitForExistence(timeout: 15),
+      "the fixture must materialize an exact execute plan")
+
+    let partitions = element("flash.plan.partitions.disclosure", in: app)
+    XCTAssertTrue(partitions.exists)
+    scrollIntoView(partitions, in: app)
+    partitions.click()
+    XCTAssertTrue(
+      element("flash.plan.partition.system", in: app).waitForExistence(timeout: 5),
+      "mapped partition details must be inspectable")
+    partitions.click()
+
+    let prerequisites = element("flash.plan.prerequisites.disclosure", in: app)
+    XCTAssertTrue(prerequisites.exists)
+    scrollIntoView(prerequisites, in: app)
+    prerequisites.click()
+    XCTAssertTrue(app.staticTexts["Runtime check pending"].waitForExistence(timeout: 5))
+    prerequisites.click()
+
+    let review = app.buttons["flash.execute.review"]
+    XCTAssertTrue(review.exists)
+    XCTAssertTrue(review.isEnabled)
+    scrollIntoView(review, in: app)
+    review.click()
+
+    XCTAssertTrue(element("flash.confirm.sheet", in: app).waitForExistence(timeout: 10))
+    let expectedPhrase = app.staticTexts["flash.confirm.expectedDestructivePhrase"]
+    XCTAssertTrue(expectedPhrase.waitForExistence(timeout: 5))
+    guard let phrase = displayedValues(for: expectedPhrase).first, phrase.hasPrefix("FLASH ") else {
+      return XCTFail("the confirmation sheet must expose its exact FLASH phrase")
+    }
+
+    let destructiveField = app.textFields["flash.confirm.destructivePhrase"]
+    destructiveField.click()
+    destructiveField.typeText(phrase)
+    let userdataField = app.textFields["flash.confirm.userdataPhrase"]
+    userdataField.click()
+    userdataField.typeText("ERASE-USERDATA")
+
+    let accept = app.buttons["flash.confirm.accept"]
+    scrollIntoView(accept, in: app)
+    accept.click()
+    XCTAssertTrue(
+      element("flash.execute.handoff", in: app).waitForExistence(timeout: 10),
+      "exact phrases must produce the local human-review receipt")
+    let submit = app.buttons["flash.execute.submit"]
+    XCTAssertTrue(submit.exists)
+    XCTAssertFalse(submit.isEnabled)
+    XCTAssertTrue(app.staticTexts["flash.runtime.empty"].exists)
+  }
+
+  func testFlashRuntimeActivityUsesRealStagesAndTerminalResult() throws {
+    try "--ui-test-runtime-flash-running".write(
+      to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    let app = launch(
+      arguments: [
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-fixture-state",
+        fixtureStateFileURL.path, "-AppleLanguages", "(en)",
+      ])
+    select("app.navigation.flash", in: app)
+
+    assertDisplayed(app.staticTexts["flash.runtime.state"], equals: "Running", timeout: 15)
+    assertDisplayed(
+      element("flash.runtime.result", in: app),
+      equals:
+        "Runtime is still processing this Job. Progress is stage-based; no percentage is fabricated.")
+    XCTAssertTrue(element("flash.runtime.progress", in: app).exists)
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
+
+    try "--ui-test-runtime-flash-succeeded".write(
+      to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    app.buttons["flash.refresh"].click()
+    assertDisplayed(app.staticTexts["flash.runtime.state"], equals: "Succeeded", timeout: 10)
+    assertDisplayed(
+      element("flash.runtime.result", in: app),
+      equals: "Runtime reports success after the Flash and postflight checks.")
+    XCTAssertFalse(element("flash.runtime.progress", in: app).exists)
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
   }
 
 

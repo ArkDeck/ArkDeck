@@ -95,6 +95,10 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(presentation.steps.allSatisfy { $0.disposition == .planned })
     XCTAssertTrue(presentation.steps.contains { $0.effect == .destructive })
     XCTAssertEqual(presentation.target, target)
+    XCTAssertEqual(presentation.profileReference, profile.catalogReference)
+    XCTAssertEqual(
+      presentation.toolchainFingerprint,
+      RockchipFlashProfile.pinnedToolchainFingerprint)
     XCTAssertEqual(presentation.archiveSHA256, plan.archiveSHA256)
     XCTAssertEqual(presentation.planDigestSHA256, plan.planDigestSHA256)
     XCTAssertEqual(
@@ -104,6 +108,16 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
         .userDataDestroyed,
         .forbiddenAreasPreserved,
       ])
+    XCTAssertEqual(presentation.partitions.count, profile.mappedPartitions.count)
+    XCTAssertEqual(
+      presentation.partitions.map(\.partitionName),
+      profile.mappedPartitions.map(\.partitionName))
+    XCTAssertEqual(
+      presentation.writeForbiddenMemberNames,
+      profile.writeForbiddenMemberNames.sorted())
+    XCTAssertEqual(
+      Set(presentation.prerequisites.map(\.identifier)),
+      Set(profile.prerequisites.keys))
   }
 
   func testExecutePresentationStaysLockedEvenThoughTheExactPlanCanBeReviewed() throws {
@@ -208,6 +222,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       mode: reviewed.mode,
       target: reviewed.target,
       profileReference: reviewed.profileReference,
+      toolchainFingerprint: reviewed.toolchainFingerprint,
       imageFileName: "different-images.tar.gz",
       runtimeBuildVersion: reviewed.runtimeBuildVersion,
       archiveSizeBytes: reviewed.archiveSizeBytes,
@@ -216,13 +231,17 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       planDigestSHA256: reviewed.planDigestSHA256,
       stepSetDigestSHA256: reviewed.stepSetDigestSHA256,
       steps: reviewed.steps,
-      dataImpact: reviewed.dataImpact)
+      dataImpact: reviewed.dataImpact,
+      partitions: reviewed.partitions,
+      writeForbiddenMemberNames: reviewed.writeForbiddenMemberNames,
+      prerequisites: reviewed.prerequisites)
     XCTAssertEqual(confirm(currentPlan: stale), .rejected(.stalePlan))
 
     let nonExecute = FlashExactPlanPresentation(
       mode: .planOnly,
       target: reviewed.target,
       profileReference: reviewed.profileReference,
+      toolchainFingerprint: reviewed.toolchainFingerprint,
       imageFileName: reviewed.imageFileName,
       runtimeBuildVersion: reviewed.runtimeBuildVersion,
       archiveSizeBytes: reviewed.archiveSizeBytes,
@@ -231,7 +250,10 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       planDigestSHA256: reviewed.planDigestSHA256,
       stepSetDigestSHA256: reviewed.stepSetDigestSHA256,
       steps: reviewed.steps,
-      dataImpact: reviewed.dataImpact)
+      dataImpact: reviewed.dataImpact,
+      partitions: reviewed.partitions,
+      writeForbiddenMemberNames: reviewed.writeForbiddenMemberNames,
+      prerequisites: reviewed.prerequisites)
     XCTAssertEqual(
       FlashManualConfirmationValidator.confirm(
         currentPlan: nonExecute,

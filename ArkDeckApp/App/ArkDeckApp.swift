@@ -141,7 +141,12 @@ private struct AppShellView: View {
         isRefreshInFlight: runtimeHistory.isRefreshInFlight,
         onRefresh: runtimeHistory.refresh)
     case .flash:
-      FlashWorkspaceView(model: flashWorkspace)
+      FlashWorkspaceView(
+        model: flashWorkspace,
+        runtimeHistory: runtimeHistory.presentation,
+        isRuntimeHistoryRefreshing: runtimeHistory.isRefreshInFlight,
+        onRefreshRuntimeHistory: runtimeHistory.refresh,
+        onOpenHistory: { storedSelection = ArkDeckNavigationItem.history.rawValue })
     case .debug, .uiDump, .trace:
       UnavailableFeatureView(
         titleKey: selectedItem.localizationKey,

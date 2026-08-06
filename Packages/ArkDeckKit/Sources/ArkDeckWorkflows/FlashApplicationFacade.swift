@@ -91,10 +91,50 @@ public enum FlashDataImpactPresentation: Sendable, Equatable {
   case forbiddenAreasPreserved
 }
 
+public struct FlashPartitionPresentation: Sendable, Equatable, Identifiable {
+  public let writeOrder: Int
+  public let partitionName: String
+  public let imageMemberName: String
+  public let imageSizeBytes: Int64
+  public let imageSHA256: String
+
+  public var id: String { partitionName }
+
+  public init(
+    writeOrder: Int,
+    partitionName: String,
+    imageMemberName: String,
+    imageSizeBytes: Int64,
+    imageSHA256: String
+  ) {
+    self.writeOrder = writeOrder
+    self.partitionName = partitionName
+    self.imageMemberName = imageMemberName
+    self.imageSizeBytes = imageSizeBytes
+    self.imageSHA256 = imageSHA256
+  }
+}
+
+public struct FlashPrerequisitePresentation: Sendable, Equatable, Identifiable {
+  public let identifier: RockchipPrerequisiteIdentifier
+  public let requirement: RockchipPrerequisiteRequirement
+
+  public var id: RockchipPrerequisiteIdentifier { identifier }
+
+  public init(
+    identifier: RockchipPrerequisiteIdentifier,
+    requirement: RockchipPrerequisiteRequirement
+  ) {
+    self.identifier = identifier
+    self.requirement = requirement
+  }
+}
+
 public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let mode: RockchipFlashExecutionMode
   public let target: FlashTargetPresentation?
   public let profileReference: String
+  public let toolchainFingerprint: String
   public let imageFileName: String
   public let runtimeBuildVersion: String
   public let archiveSizeBytes: Int64
@@ -104,11 +144,15 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let stepSetDigestSHA256: String
   public let steps: [FlashPlanStepPresentation]
   public let dataImpact: [FlashDataImpactPresentation]
+  public let partitions: [FlashPartitionPresentation]
+  public let writeForbiddenMemberNames: [String]
+  public let prerequisites: [FlashPrerequisitePresentation]
 
   public init(
     mode: RockchipFlashExecutionMode,
     target: FlashTargetPresentation?,
     profileReference: String,
+    toolchainFingerprint: String,
     imageFileName: String,
     runtimeBuildVersion: String,
     archiveSizeBytes: Int64,
@@ -117,11 +161,15 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     planDigestSHA256: String,
     stepSetDigestSHA256: String,
     steps: [FlashPlanStepPresentation],
-    dataImpact: [FlashDataImpactPresentation]
+    dataImpact: [FlashDataImpactPresentation],
+    partitions: [FlashPartitionPresentation],
+    writeForbiddenMemberNames: [String],
+    prerequisites: [FlashPrerequisitePresentation]
   ) {
     self.mode = mode
     self.target = target
     self.profileReference = profileReference
+    self.toolchainFingerprint = toolchainFingerprint
     self.imageFileName = imageFileName
     self.runtimeBuildVersion = runtimeBuildVersion
     self.archiveSizeBytes = archiveSizeBytes
@@ -131,6 +179,9 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     self.stepSetDigestSHA256 = stepSetDigestSHA256
     self.steps = steps
     self.dataImpact = dataImpact
+    self.partitions = partitions
+    self.writeForbiddenMemberNames = writeForbiddenMemberNames
+    self.prerequisites = prerequisites
   }
 }
 
@@ -261,7 +312,7 @@ public enum FlashApplicationFacade {
   public static func make(
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any FlashApplicationProviding {
-    if arguments.contains("--ui-test-flash") {
+    if arguments.contains("--ui-test-flash") || arguments.contains("--ui-test-flash-plan") {
       return FlashFixtureApplicationProvider()
     }
     return FlashProductionApplicationProvider()
@@ -493,6 +544,7 @@ enum FlashPlanPresentationBuilder {
       mode: plan.executionMode,
       target: target,
       profileReference: profile.catalogReference,
+      toolchainFingerprint: RockchipFlashProfile.pinnedToolchainFingerprint,
       imageFileName: imageFileName,
       runtimeBuildVersion: profile.runtimeBuildVersion,
       archiveSizeBytes: profile.archiveSizeBytes,
@@ -512,7 +564,24 @@ enum FlashPlanPresentationBuilder {
         .mappedPartitionsOverwritten(count: profile.mappedPartitions.count),
         .userDataDestroyed,
         .forbiddenAreasPreserved,
-      ])
+      ],
+      partitions: profile.mappedPartitions.map { mapped in
+        guard let member = profile.member(named: mapped.imageMemberName) else {
+          preconditionFailure("validated profile is missing mapped member \(mapped.imageMemberName)")
+        }
+        return FlashPartitionPresentation(
+          writeOrder: mapped.writeOrder,
+          partitionName: mapped.partitionName,
+          imageMemberName: mapped.imageMemberName,
+          imageSizeBytes: member.sizeBytes,
+          imageSHA256: member.sha256)
+      },
+      writeForbiddenMemberNames: profile.writeForbiddenMemberNames.sorted(),
+      prerequisites: RockchipPrerequisiteIdentifier.allCases.compactMap { identifier in
+        profile.prerequisites[identifier].map {
+          FlashPrerequisitePresentation(identifier: identifier, requirement: $0)
+        }
+      })
   }
 
   private static func argumentSummary(_ arguments: [String: JSONValue]) -> String {
