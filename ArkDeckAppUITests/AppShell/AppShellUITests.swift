@@ -27,7 +27,9 @@ final class AppShellUITests: XCTestCase {
     sweep(
       language: "(en)",
       overview: Overview(
-        server: "Healthy", trust: "Ready", channel: "Unverified", attention: "1 item"),
+        server: "Healthy", trust: "Ready", channel: "Unverified", attention: "1 item",
+        attentionNone: "None",
+        attentionClear: "Nothing needs attention in the current diagnostics."),
       unavailable: Unavailable(
         titles: ["Flash", "Debug", "ArkUI UI Dump", "Trace"],
         reason: "This workspace is not connected to ArkDeck Runtime in this build.",
@@ -46,7 +48,10 @@ final class AppShellUITests: XCTestCase {
   func testSimplifiedChineseSweepOfEveryWorkspace() {
     sweep(
       language: "(zh-Hans)",
-      overview: Overview(server: "正常", trust: "已就绪", channel: "未验证", attention: "1 项"),
+      overview: Overview(
+        server: "正常", trust: "已就绪", channel: "未验证", attention: "1 项",
+        attentionNone: "无",
+        attentionClear: "当前诊断中没有需要处理的事项。"),
       unavailable: Unavailable(
         titles: ["刷机", "调试", "ArkUI UI 导出", "追踪"],
         reason: "此版本尚未将该工作区连接到 ArkDeck Runtime。",
@@ -66,6 +71,8 @@ final class AppShellUITests: XCTestCase {
     let trust: String
     let channel: String
     let attention: String
+    let attentionNone: String
+    let attentionClear: String
   }
 
   private struct Unavailable {
@@ -133,6 +140,23 @@ final class AppShellUITests: XCTestCase {
     ] {
       XCTAssertTrue(app.staticTexts[section].exists, "\(section) missing", file: file, line: line)
     }
+
+    // A workspace that has nothing to report has to say so, not go blank. The
+    // default fixture always carries the unprotected-TCP warning, so this
+    // branch was unreachable until the fixture gained a verified channel.
+    do {
+      try "--ui-test-hdc-channel-verified".write(
+        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    } catch {
+      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
+      return
+    }
+    app.buttons["hdc.devices.refresh"].click()
+    let attentionClear = app.staticTexts["overview.attention.clear"]
+    XCTAssertTrue(attentionClear.waitForExistence(timeout: 10), file: file, line: line)
+    assertDisplayed(attentionClear, equals: overview.attentionClear)
+    assertDisplayed(
+      app.staticTexts["overview.status.needsAttention.value"], equals: overview.attentionNone)
 
     // Advanced Diagnostics is collapsed, and expanding it reveals the raw
     // facts under their established identifiers.

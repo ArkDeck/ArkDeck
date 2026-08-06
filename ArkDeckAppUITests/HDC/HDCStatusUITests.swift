@@ -179,9 +179,27 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertFalse(app.staticTexts["hdc.lifecycle.confirmed"].exists, file: file, line: line)
     XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists, file: file, line: line)
 
+    // --- verified channel: the one state with nothing to act on -----------
+    // Every other fixture state carries at least the unprotected-TCP warning,
+    // so the Overview's "nothing needs attention" branch was unreachable and
+    // had never been drawn. Its wording is locale-dependent and belongs to the
+    // shell sweeps; what is asserted here is that the state exists at all and
+    // that the warning it replaces is gone.
+    applyFixtureState(["--ui-test-hdc-channel-verified"], in: app)
+    assertDisplayedValue(
+      app.staticTexts["hdc.channelProtection"],
+      equals: "encrypted verified (fixture-v1, UI fixture)")
+    XCTAssertTrue(
+      app.staticTexts["overview.attention.clear"].waitForExistence(timeout: 5),
+      "a verified channel leaves nothing needing attention", file: file, line: line)
+    XCTAssertFalse(app.staticTexts["hdc.tcp.warning"].exists, file: file, line: line)
+
     // Back to the clean state so the next assertions start from a known place.
     applyFixtureState([], in: app)
     assertDisplayedValue(app.staticTexts["hdc.authorization"], equals: "ready")
+    assertDisplayedValue(
+      app.staticTexts["hdc.channelProtection"], equals: "unverified; assumed unprotected")
+    XCTAssertFalse(app.staticTexts["overview.attention.clear"].exists, file: file, line: line)
   }
 
   // MARK: - Launches that stay separate, and why
