@@ -12,6 +12,8 @@ struct ArkDeckApp: App {
     provider: RuntimeHistoryApplicationFacade.make())
   @StateObject private var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
+  @StateObject private var traceWorkspace = TraceWorkspaceViewModel(
+    provider: TraceApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
@@ -19,13 +21,15 @@ struct ArkDeckApp: App {
         hdcDiagnostics: hdcDiagnostics,
         autoUpdate: autoUpdate,
         runtimeHistory: runtimeHistory,
-        flashWorkspace: flashWorkspace
+        flashWorkspace: flashWorkspace,
+        traceWorkspace: traceWorkspace
       )
       .task {
         hdcDiagnostics.refresh()
         autoUpdate.startup()
         runtimeHistory.refresh()
         flashWorkspace.refresh()
+        traceWorkspace.refresh()
       }
     }
     .defaultSize(width: 1180, height: 760)
@@ -85,6 +89,7 @@ private struct AppShellView: View {
   @ObservedObject var autoUpdate: AutoUpdateViewModel
   @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
   @ObservedObject var flashWorkspace: FlashWorkspaceViewModel
+  @ObservedObject var traceWorkspace: TraceWorkspaceViewModel
 
   private var selectedItem: ArkDeckNavigationItem {
     ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
@@ -147,7 +152,9 @@ private struct AppShellView: View {
         isRuntimeHistoryRefreshing: runtimeHistory.isRefreshInFlight,
         onRefreshRuntimeHistory: runtimeHistory.refresh,
         onOpenHistory: { storedSelection = ArkDeckNavigationItem.history.rawValue })
-    case .debug, .uiDump, .trace:
+    case .trace:
+      TraceWorkspaceView(model: traceWorkspace)
+    case .debug, .uiDump:
       UnavailableFeatureView(
         titleKey: selectedItem.localizationKey,
         systemImageName: selectedItem.systemImageName)
@@ -163,7 +170,8 @@ private struct AppShellView: View {
         SettingsLink {
           Label(
             LocalizedStringKey(attention.localizationKey),
-            systemImage: attention.systemImageName)
+            systemImage: attention.systemImageName
+          )
           .labelStyle(.titleAndIcon)
         }
         .accessibilityIdentifier("app.toolbar.updateAttention")
