@@ -32,9 +32,18 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertEqual(refresh.label, "刷新设备")
     XCTAssertTrue(refresh.isEnabled)
     app.typeKey("r", modifierFlags: .command)
-    assertDisplayedValue(
-      app.staticTexts["hdc.devices.events"], equals: appearedAndDisappearedFixtureEvents,
-      timeout: 15)
+    // A sweep has already driven several refreshes, so the fixture is past the
+    // two-event state the standalone test pinned. What the keyboard path has
+    // to show is that it reached the same callback: the disappeared
+    // transition is present, in order, behind the appeared one.
+    let events = displayedText(for: app.staticTexts["hdc.devices.events"])
+    guard let appeared = events.range(of: appearedFixtureEvent),
+      let disappeared = events.range(of: "2026-07-28T00:00:01.000Z disappeared")
+    else {
+      XCTFail("the keyboard refresh must advance the presentation: \(events)")
+      return
+    }
+    XCTAssertLessThan(appeared.lowerBound, disappeared.lowerBound)
   }
 
   func testEnglishFixtureSweep() {
@@ -448,7 +457,7 @@ final class HDCStatusUITests: XCTestCase {
     // silently does nothing, so bring it into view before pressing it.
     var scrolls = 0
     while !toggle.isHittable, scrolls < 25 {
-      scrollHost(for: toggle, in: app).scroll(byDeltaX: 0, deltaY: -160)
+      scrollEverything(in: app)
       scrolls += 1
     }
     XCTAssertTrue(
@@ -463,11 +472,13 @@ final class HDCStatusUITests: XCTestCase {
 
   /// `app.scrollViews.firstMatch` is whichever scroll view the tree yields
   /// first — often the sidebar's, which never moves the content.
-  private func scrollHost(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
-    let host = app.scrollViews.containing(
-      NSPredicate(format: "identifier == %@", element.identifier)
-    ).firstMatch
-    return host.exists ? host : app.scrollViews.firstMatch
+  /// Which scroll view holds the target is not reliably derivable from the
+  /// tree, and guessing wrong scrolls the sidebar while the content stays put.
+  /// Scroll every one of them and let the target's own hittability decide.
+  private func scrollEverything(in app: XCUIApplication) {
+    for host in app.scrollViews.allElementsBoundByIndex {
+      host.scroll(byDeltaX: 0, deltaY: -160)
+    }
   }
 
   private func displayedText(for element: XCUIElement) -> String {

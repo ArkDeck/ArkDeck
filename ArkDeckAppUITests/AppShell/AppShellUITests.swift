@@ -207,7 +207,9 @@ final class AppShellUITests: XCTestCase {
     _ identifier: String, in app: XCUIApplication,
     file: StaticString = #filePath, line: UInt = #line
   ) {
-    let cell = app.cells.containing(.staticText, identifier: identifier).firstMatch
+    // The sidebar is an outline; `app.cells` also matches History's table rows,
+    // so the query has to say which list it means.
+    let cell = app.outlines.cells.containing(.staticText, identifier: identifier).firstMatch
     XCTAssertTrue(
       cell.waitForExistence(timeout: 10), "sidebar must expose \(identifier)",
       file: file, line: line)
@@ -241,11 +243,13 @@ final class AppShellUITests: XCTestCase {
   /// `app.scrollViews.firstMatch` is whichever scroll view the tree yields
   /// first — often the sidebar's, which never moves the content. Scroll the
   /// one that actually contains the target.
-  private func scrollHost(for element: XCUIElement, in app: XCUIApplication) -> XCUIElement {
-    let host = app.scrollViews.containing(
-      NSPredicate(format: "identifier == %@", element.identifier)
-    ).firstMatch
-    return host.exists ? host : app.scrollViews.firstMatch
+  /// Which scroll view holds the target is not reliably derivable from the
+  /// tree, and guessing wrong scrolls the sidebar while the content stays put.
+  /// Scroll every one of them and let the target's own hittability decide.
+  private func scrollEverything(in app: XCUIApplication) {
+    for host in app.scrollViews.allElementsBoundByIndex {
+      host.scroll(byDeltaX: 0, deltaY: -160)
+    }
   }
 
   /// Content below the fold cannot be clicked where it is not drawn: a click at
@@ -253,7 +257,7 @@ final class AppShellUITests: XCTestCase {
   private func scrollIntoView(_ element: XCUIElement, in app: XCUIApplication) {
     var attempts = 0
     while !element.isHittable, attempts < 25 {
-      scrollHost(for: element, in: app).scroll(byDeltaX: 0, deltaY: -160)
+      scrollEverything(in: app)
       attempts += 1
     }
   }
