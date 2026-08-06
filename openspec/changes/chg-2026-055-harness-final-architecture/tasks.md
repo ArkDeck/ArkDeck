@@ -699,3 +699,29 @@
   三态化只允许把"不可测"从"变了"里摘出去,不允许把"变了"变成"没变";
   ②重新登记必须与磁盘 manifest 逐项一致,冲突 fail-loud —— 回落到源 workspace
   等于悄悄取消隔离,是本任务最危险的错法;③已销毁的 workspace 不得复活)
+
+## TASK-HFA-015 — 为人停下就必须在人的队列里留下一条(r3)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r3 What 1-3(每条通往 `humanRequired` 的路径都留记录、
+  封闭词表要么正确扩展要么不被依赖、一条契约断言把两条路径绑在一起)
+- Acceptance:change-local `HFA-AC-26`、`HFA-AC-27`,登记于 `verification.md`
+- Depends on:TASK-HFA-014(done);r3 proposal 合入即 approved
+- Hardware required:no。两条 AC 都能在 contract 面构造(两条路径各走一次);
+  真机上的表现已由 `HTASK-7C12960C4B6E`(0 条)与 `HTASK-C458F21E8B9C`(1 条)记录在案,
+  **不得**用真机记录替代 AC
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `openspec/changes/chg-2026-055-harness-final-architecture/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/contracts/**`
+  - `Catalog/**`、`scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeckApp/**`、`ArkDeck.xcodeproj/**`
+  - 其他 change 目录
+- Risk:medium(动的是持久化的人机交接台账。三层约束:①**判定不变**——本任务只管停下之后
+  留不留记录,不改何时停;②若扩 `HarnessHumanBlock`,封闭形状校验与世代测试必须同 PR,
+  旧台账逐字回读不变;③**不得**复用一个语义不符的既有取值省事——那会让两种不同的停机
+  在台账里长得一样,是本任务最想避免的错法)

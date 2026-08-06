@@ -1,6 +1,6 @@
 # Verification — CHG-2026-055
 
-> Change:CHG-2026-055-harness-final-architecture@r2
+> Change:CHG-2026-055-harness-final-architecture@r3
 
 Status:in_progress # r1(2026-07-31):TASK-HFA-001/002/008 已 done,
 HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
@@ -487,3 +487,18 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
 > 经 `causation: noSafeAction` 上报(`HTASK-C458F21E8B9C` 末条事件)。产品无法禁止
 > 产出方选哪个词。产品能管的是**喂回去的是不是实话**,所以本条改为对陈旧理由与启动
 > 播报的约束。这是把断言改准,不是放宽:原文要求的那件事,代码里没有对应的闸可修。
+
+## HFA-AC-26 为人停下必留一条交接记录(TASK-HFA-015)
+
+- 构造:分别经 guard 类阻塞与 handler 的 `.requestHuman` 决策进入 `humanRequired`;
+- **两条路径都必须**产生恰好一条人机交接记录,且记录里的理由与该次停机的 reasonCode 一致;
+- 记录至少可读出:停下的理由、恢复所需相位/状态、可据以行动的证据引用;
+- 反证:把 `.requestHuman` 分支的记录写入去掉,断言必须变红——
+  「停下了但队列是空的」不得再次成为可通过的状态。
+
+## HFA-AC-27 封闭词表要么正确扩展,要么不被依赖(TASK-HFA-015)
+
+- 若 `HarnessHumanBlock` 新增取值:其封闭形状校验与文档级世代测试同 PR 更新,
+  且旧台账逐字回读不变(先例:动 terminal CodingKeys 未同步校验曾使 agentd 被自己的台账 brick);
+- 若不新增:人机交接记录的生成不得依赖该词表,并断言两种不同停机在台账里**不会长得一样**;
+- 无论走哪条,`patchProposalRequired` 与 `environmentUnavailable` 的记录必须可区分。
