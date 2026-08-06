@@ -1,0 +1,18 @@
+{
+  "projectId": "060c8968-dabc-4946-8291-f140165e5274",
+  "shape": "package",
+  "pkg": "@arkdeck/ds",
+  "globalName": "ArkDeckDS",
+  "buildCmd": "npm run build",
+  "cssEntry": "dist/styles.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "runtimeFontPrefixes": ["SF Pro", "SF Mono", "Hiragino", "PingFang", "Helvetica Neue"],
+  "overrides": {
+    "DataTable": { "cardMode": "column" },
+    "DangerConfirmDialog": { "cardMode": "column" },
+    "EffectBadge": { "cardMode": "column" },
+    "IndeterminateBar": { "cardMode": "column" },
+    "Tabs": { "cardMode": "column" },
+    "WindowFrame": { "cardMode": "column" }
+  }
+}
