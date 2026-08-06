@@ -45,6 +45,28 @@ jobs:
         working-directory: scripts
         run: python -m unittest discover -s host_loop -t .
 
+  # @arkdeck/ds encodes the design language defined by docs/design/*. Nothing
+  # generates it, so the two drift by hand — and once already did, silently: the
+  # library shipped v0.2's palette while main had moved to v0.3, and it surfaced
+  # only because a rebase happened to pull the newer docs in. The check also
+  # runs first in that package's `npm run build`, but a build is not something a
+  # commit has to pass through, so it belongs here too.
+  #
+  # No install step on purpose: the script imports only node: builtins, which
+  # keeps this job dependency-free and a couple of seconds long.
+  ds-tokens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "@arkdeck/ds tokens match docs/design"
+        run: node docs/design/arkdeck-ds/scripts/check-tokens.mjs
+
   allowed-paths:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
