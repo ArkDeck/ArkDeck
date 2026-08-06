@@ -12,6 +12,8 @@ struct ArkDeckApp: App {
     provider: RuntimeHistoryApplicationFacade.make())
   @StateObject private var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
+  @StateObject private var settingsWorkspace = SettingsWorkspaceViewModel(
+    provider: SettingsApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
@@ -30,9 +32,16 @@ struct ArkDeckApp: App {
     }
     .defaultSize(width: 1180, height: 760)
     Settings {
-      AutoUpdateSettingsView(model: autoUpdate)
-        .frame(width: 520)
-        .padding(24)
+      SettingsRootView(
+        model: settingsWorkspace,
+        hdcPresentation: hdcDiagnostics.presentation,
+        isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
+        hdcConfigurationError: hdcDiagnostics.configurationError,
+        onHDCRefresh: { hdcDiagnostics.refresh() },
+        onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
+      ) {
+        AutoUpdateSettingsView(model: autoUpdate)
+      }
     }
   }
 }
@@ -163,7 +172,8 @@ private struct AppShellView: View {
         SettingsLink {
           Label(
             LocalizedStringKey(attention.localizationKey),
-            systemImage: attention.systemImageName)
+            systemImage: attention.systemImageName
+          )
           .labelStyle(.titleAndIcon)
         }
         .accessibilityIdentifier("app.toolbar.updateAttention")
