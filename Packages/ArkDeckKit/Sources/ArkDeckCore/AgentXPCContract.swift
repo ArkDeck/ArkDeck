@@ -34,6 +34,7 @@ public enum ArkDeckAgentXPC {
     "job.list",
     "job.list-page",
     "job.status",
+    "operation.list",
     "target.list",
   ]
 

@@ -30,8 +30,18 @@ final class AppShellUITests: XCTestCase {
         server: "Healthy", trust: "Ready", channel: "Unverified", attention: "1 item",
         attentionNone: "None",
         attentionClear: "Nothing needs attention in the current diagnostics."),
+      flash: Flash(
+        availability: "AVAILABLE — Runtime can materialize flash.dayu200@1",
+        modeBadge: "PLANNED — no deviceMutation or destructive dispatch",
+        target: "target-fixture-dayu200",
+        emptyPlan: "No exact plan yet",
+        prepareAction: "Prepare exact plan",
+        imageBlocker: "Choose an image bundle before preparing a plan.",
+        noSubmission:
+          "Plan only: every deviceMutation and destructive step remains "
+          + "notExecuted(planned). No operation was submitted."),
       unavailable: Unavailable(
-        titles: ["Flash", "Debug", "ArkUI UI Dump", "Trace"],
+        titles: ["Debug", "ArkUI UI Dump", "Trace"],
         reason: "This workspace is not connected to ArkDeck Runtime in this build.",
         noOperation: "No operation was submitted."),
       history: History(
@@ -52,8 +62,18 @@ final class AppShellUITests: XCTestCase {
         server: "正常", trust: "已就绪", channel: "未验证", attention: "1 项",
         attentionNone: "无",
         attentionClear: "当前诊断中没有需要处理的事项。"),
+      flash: Flash(
+        availability: "AVAILABLE — Runtime 可生成 flash.dayu200@1 计划",
+        modeBadge: "PLANNED — 不派发 deviceMutation 或 destructive 步骤",
+        target: "target-fixture-dayu200",
+        emptyPlan: "尚未生成精确计划",
+        prepareAction: "生成精确计划",
+        imageBlocker: "请先选择镜像包，再生成计划。",
+        noSubmission:
+          "仅计划：所有 deviceMutation 与 destructive 步骤均保持 notExecuted(planned)，"
+          + "未提交任何操作。"),
       unavailable: Unavailable(
-        titles: ["刷机", "调试", "ArkUI UI 导出", "追踪"],
+        titles: ["调试", "ArkUI UI 导出", "追踪"],
         reason: "此版本尚未将该工作区连接到 ArkDeck Runtime。",
         noOperation: "未提交任何操作。"),
       history: History(
@@ -81,6 +101,16 @@ final class AppShellUITests: XCTestCase {
     let noOperation: String
   }
 
+  private struct Flash {
+    let availability: String
+    let modeBadge: String
+    let target: String
+    let emptyPlan: String
+    let prepareAction: String
+    let imageBlocker: String
+    let noSubmission: String
+  }
+
   private struct History {
     let readOnlyNote: String
     let outcomeUnknown: String
@@ -101,13 +131,14 @@ final class AppShellUITests: XCTestCase {
 
   /// DONE-01 / DONE-02 / DONE-03 / DONE-07 in one pass.
   private func sweep(
-    language: String, overview: Overview, unavailable: Unavailable, history: History,
+    language: String, overview: Overview, flash: Flash, unavailable: Unavailable, history: History,
     file: StaticString = #filePath, line: UInt = #line
   ) {
     try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
     let app = launch(
       arguments: [
-        "--ui-test-runtime-history", "--ui-test-fixture-state", fixtureStateFileURL.path,
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-fixture-state",
+        fixtureStateFileURL.path,
         "-AppleLanguages", language,
       ])
 
@@ -172,11 +203,44 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(app.buttons["update.checkNow"].exists, file: file, line: line)
     XCTAssertFalse(app.checkBoxes["update.automaticChecks"].exists, file: file, line: line)
 
-    // Each unimplemented workspace states its own reason and submits nothing.
+    // Flash is a real production planning workspace. Its fixture provides only
+    // the same immutable Runtime facts the production XPC reader consumes; it
+    // has no submit/run/authorization surface and cannot touch a device.
+    select("app.navigation.flash", in: app)
+    assertDisplayed(
+      app.staticTexts["flash.availability.status"], equals: flash.availability)
+    assertDisplayed(app.staticTexts["flash.mode.badge"], equals: flash.modeBadge)
+    assertDisplayed(element("flash.target", in: app), equals: flash.target)
+    assertDisplayed(element("flash.plan.empty", in: app), equals: flash.emptyPlan)
+    assertDisplayed(element("flash.plan.prepare", in: app), equals: flash.prepareAction)
+    assertDisplayed(
+      app.staticTexts.matching(identifier: "flash.noOperationSubmitted").firstMatch,
+      equals: flash.noSubmission)
+    XCTAssertTrue(
+      app.staticTexts[flash.imageBlocker].exists,
+      "the disabled preparation action needs a visible recovery instruction",
+      file: file, line: line)
+
+    // Execute can be reviewed, but the App has no E2 submit or authority
+    // transport. The locked action and its explanation stay visible, and the
+    // user can return to plan-only without producing a side effect.
+    let executeMode = element("flash.mode.execute", in: app)
+    XCTAssertTrue(executeMode.exists, file: file, line: line)
+    executeMode.click()
+    XCTAssertTrue(
+      app.staticTexts["flash.execute.blocker"].waitForExistence(timeout: 5),
+      file: file, line: line)
+    let lockedRun = app.buttons["flash.execute.run"]
+    XCTAssertTrue(lockedRun.exists, file: file, line: line)
+    XCTAssertFalse(lockedRun.isEnabled, file: file, line: line)
+    element("flash.mode.planOnly", in: app).click()
+    XCTAssertFalse(app.buttons["flash.execute.run"].exists, file: file, line: line)
+
+    // Each remaining unimplemented workspace states its own reason and
+    // submits nothing.
     for (identifier, title) in zip(
       [
-        "app.navigation.flash", "app.navigation.debug", "app.navigation.uiDump",
-        "app.navigation.trace",
+        "app.navigation.debug", "app.navigation.uiDump", "app.navigation.trace",
       ], unavailable.titles)
     {
       select(identifier, in: app)

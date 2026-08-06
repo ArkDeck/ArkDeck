@@ -10,16 +10,22 @@ struct ArkDeckApp: App {
   @StateObject private var autoUpdate = AutoUpdateViewModel()
   @StateObject private var runtimeHistory = RuntimeHistoryViewModel(
     provider: RuntimeHistoryApplicationFacade.make())
+  @StateObject private var flashWorkspace = FlashWorkspaceViewModel(
+    provider: FlashApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
       AppShellView(
-        hdcDiagnostics: hdcDiagnostics, autoUpdate: autoUpdate, runtimeHistory: runtimeHistory
+        hdcDiagnostics: hdcDiagnostics,
+        autoUpdate: autoUpdate,
+        runtimeHistory: runtimeHistory,
+        flashWorkspace: flashWorkspace
       )
       .task {
         hdcDiagnostics.refresh()
         autoUpdate.startup()
         runtimeHistory.refresh()
+        flashWorkspace.refresh()
       }
     }
     .defaultSize(width: 1180, height: 760)
@@ -78,6 +84,7 @@ private struct AppShellView: View {
   @ObservedObject var hdcDiagnostics: HDCStatusViewModel
   @ObservedObject var autoUpdate: AutoUpdateViewModel
   @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
+  @ObservedObject var flashWorkspace: FlashWorkspaceViewModel
 
   private var selectedItem: ArkDeckNavigationItem {
     ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
@@ -133,7 +140,9 @@ private struct AppShellView: View {
         presentation: runtimeHistory.presentation,
         isRefreshInFlight: runtimeHistory.isRefreshInFlight,
         onRefresh: runtimeHistory.refresh)
-    case .flash, .debug, .uiDump, .trace:
+    case .flash:
+      FlashWorkspaceView(model: flashWorkspace)
+    case .debug, .uiDump, .trace:
       UnavailableFeatureView(
         titleKey: selectedItem.localizationKey,
         systemImageName: selectedItem.systemImageName)

@@ -25,7 +25,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ArkDeckAgentXPC.forwardableReadOnlyMethods,
       [
         "artifact.inspect", "artifact.list", "job.evidence", "job.list",
-        "job.list-page", "job.status", "target.list",
+        "job.list-page", "job.status", "operation.list", "target.list",
       ],
       "widening this set is a device-effect decision, not a refactor")
   }

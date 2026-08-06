@@ -9,10 +9,12 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000010 /* ArkDeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000020 /* ArkDeckApp.swift */; };
 		A10000000000000000000011 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* Localizable.xcstrings */; };
+		A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A4 /* FlashLocalizable.xcstrings */; };
 		A10000000000000000000012 /* ArkDeckCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000091 /* ArkDeckCore */; };
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
 		A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002F /* UnavailableFeatureView.swift */; };
 		A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* RuntimeHistoryView.swift */; };
+		A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* FlashWorkspaceView.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -28,6 +30,7 @@
 /* Begin PBXFileReference section */
 		A10000000000000000000020 /* ArkDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000021 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		A100000000000000000000A4 /* FlashLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = FlashLocalizable.xcstrings; sourceTree = "<group>"; };
 		A10000000000000000000022 /* ArkDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArkDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000023 /* ArkDeckApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArkDeckApp.entitlements; sourceTree = "<group>"; };
 		A10000000000000000000024 /* HDCStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDCStatusView.swift; sourceTree = "<group>"; };
@@ -42,6 +45,7 @@
 		A1000000000000000000002D /* RockchipComponent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RockchipComponent.entitlements; sourceTree = "<group>"; };
 		A1000000000000000000002F /* UnavailableFeatureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnavailableFeatureView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* RuntimeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeHistoryView.swift; sourceTree = "<group>"; };
+		A1000000000000000000003C /* FlashWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashWorkspaceView.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -85,6 +89,7 @@
 				A10000000000000000000035 /* Features */,
 				A10000000000000000000039 /* Shared Features */,
 				A1000000000000000000003F /* History Feature */,
+				A100000000000000000000A2 /* Flash Feature */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 				A1000000000000000000002D /* RockchipComponent.entitlements */,
 			);
@@ -112,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000021 /* Localizable.xcstrings */,
+				A100000000000000000000A4 /* FlashLocalizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -138,6 +144,14 @@
 				A1000000000000000000003E /* RuntimeHistoryView.swift */,
 			);
 			path = Features/History;
+			sourceTree = "<group>";
+		};
+		A100000000000000000000A2 /* Flash Feature */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000003C /* FlashWorkspaceView.swift */,
+			);
+			path = Features/Flash;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000039 /* Shared Features */ = {
@@ -258,6 +272,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000011 /* Localizable.xcstrings in Resources */,
+				A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,6 +316,7 @@
 				A10000000000000000000013 /* HDCStatusView.swift in Sources */,
 				A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */,
 				A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */,
+				A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
