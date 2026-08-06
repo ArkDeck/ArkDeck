@@ -18,6 +18,7 @@
 		A100000000000000000000A5 /* FlashDestructiveConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */; };
 		A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A7 /* FlashPlanDetailsView.swift */; };
 		A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A9 /* FlashRuntimeActivityView.swift */; };
+		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -52,6 +53,7 @@
 		A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashDestructiveConfirmationSheet.swift; sourceTree = "<group>"; };
 		A100000000000000000000A7 /* FlashPlanDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashPlanDetailsView.swift; sourceTree = "<group>"; };
 		A100000000000000000000A9 /* FlashRuntimeActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashRuntimeActivityView.swift; sourceTree = "<group>"; };
+		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -155,6 +157,7 @@
 		A100000000000000000000A2 /* Flash Feature */ = {
 			isa = PBXGroup;
 			children = (
+				C10000000000000000000011 /* FlashLocalization.swift */,
 				A1000000000000000000003C /* FlashWorkspaceView.swift */,
 				A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */,
 				A100000000000000000000A7 /* FlashPlanDetailsView.swift */,
@@ -329,6 +332,7 @@
 				A100000000000000000000A5 /* FlashDestructiveConfirmationSheet.swift in Sources */,
 				A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */,
 				A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */,
+				C10000000000000000000001 /* FlashLocalization.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

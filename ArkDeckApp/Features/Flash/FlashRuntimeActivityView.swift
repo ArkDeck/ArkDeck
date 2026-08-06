@@ -31,7 +31,7 @@ struct FlashRuntimeActivityView: View {
         recoveryBanner(job)
       }
 
-      GroupBox("flash.runtime.title") {
+      GroupBox(flashText("flash.runtime.title")) {
         VStack(alignment: .leading, spacing: 12) {
           switch presentation.availability {
           case .unavailable(let reason):
@@ -52,45 +52,50 @@ struct FlashRuntimeActivityView: View {
 
   private func recoveryBanner(_ job: RuntimeJobSummaryPresentation) -> some View {
     VStack(alignment: .leading, spacing: 10) {
-      Label("flash.runtime.recoveryTitle", systemImage: "exclamationmark.shield.fill")
+      Label(flashText("flash.runtime.recoveryTitle"), systemImage: "exclamationmark.shield.fill")
         .font(.headline)
         .foregroundStyle(job.outcomeUnknown ? .red : .orange)
       Text(
-        LocalizedStringKey(
+        flashText(
           job.outcomeUnknown
             ? "flash.runtime.outcomeUnknownGuidance"
-            : "flash.runtime.waitingForHumanGuidance"))
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("flash.runtime.recovery.guidance")
+            : "flash.runtime.waitingForHumanGuidance")
+      )
+      .fixedSize(horizontal: false, vertical: true)
+      .accessibilityIdentifier("flash.runtime.recovery.guidance")
       HStack(alignment: .firstTextBaseline, spacing: 16) {
-        LabeledContent("flash.runtime.job") {
+        LabeledContent(flashText("flash.runtime.job")) {
           Text(job.id).font(.callout.monospaced())
         }
-        LabeledContent("flash.runtime.target") {
+        LabeledContent(flashText("flash.runtime.target")) {
           Text(job.targetID).font(.callout.monospaced())
         }
       }
-      Button("flash.runtime.openRecord", action: onOpenHistory)
+      Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
         .accessibilityIdentifier("flash.runtime.openHistory")
     }
     .padding(16)
     .background(
       (job.outcomeUnknown ? Color.red : Color.orange).opacity(0.08),
-      in: RoundedRectangle(cornerRadius: 12))
+      in: RoundedRectangle(cornerRadius: 12)
+    )
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.runtime.attention")
   }
 
   private func unavailable(_ reason: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("flash.runtime.unavailable", systemImage: "antenna.radiowaves.left.and.right.slash")
-        .foregroundStyle(.orange)
-        .accessibilityIdentifier("flash.runtime.unavailable")
+      Label(
+        flashText("flash.runtime.unavailable"),
+        systemImage: "antenna.radiowaves.left.and.right.slash"
+      )
+      .foregroundStyle(.orange)
+      .accessibilityIdentifier("flash.runtime.unavailable")
       Text(reason)
         .font(.callout.monospaced())
         .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
-      Text("flash.runtime.unavailableNote")
+      Text(flashText("flash.runtime.unavailableNote"))
         .font(.footnote)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -99,10 +104,10 @@ struct FlashRuntimeActivityView: View {
 
   private var empty: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("flash.runtime.empty", systemImage: "clock")
+      Label(flashText("flash.runtime.empty"), systemImage: "clock")
         .font(.callout.weight(.semibold))
         .accessibilityIdentifier("flash.runtime.empty")
-      Text("flash.runtime.emptyDescription")
+      Text(flashText("flash.runtime.emptyDescription"))
         .font(.footnote)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -122,10 +127,11 @@ struct FlashRuntimeActivityView: View {
           Spacer(minLength: 12)
           Text(
             String(
-              format: String(localized: "flash.runtime.jobCount"),
-              flashJobs.count))
-            .font(.caption)
-            .foregroundStyle(.secondary)
+              format: flashText("flash.runtime.jobCount"),
+              flashJobs.count)
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
         }
         VStack(alignment: .leading, spacing: 8) {
           HStack(spacing: 10) {
@@ -138,10 +144,11 @@ struct FlashRuntimeActivityView: View {
           }
           Text(
             String(
-              format: String(localized: "flash.runtime.jobCount"),
-              flashJobs.count))
-            .font(.caption)
-            .foregroundStyle(.secondary)
+              format: flashText("flash.runtime.jobCount"),
+              flashJobs.count)
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
         }
       }
 
@@ -153,16 +160,17 @@ struct FlashRuntimeActivityView: View {
       if job.outstandingResidueCount > 0 {
         Label(
           String(
-            format: String(localized: "flash.runtime.residue"),
+            format: flashText("flash.runtime.residue"),
             job.outstandingResidueCount),
-          systemImage: "externaldrive.badge.exclamationmark")
-          .foregroundStyle(.orange)
-          .accessibilityIdentifier("flash.runtime.residue")
+          systemImage: "externaldrive.badge.exclamationmark"
+        )
+        .foregroundStyle(.orange)
+        .accessibilityIdentifier("flash.runtime.residue")
       }
 
       if !job.timeline.isEmpty {
         Divider()
-        Text("flash.runtime.timeline")
+        Text(flashText("flash.runtime.timeline"))
           .font(.subheadline.weight(.semibold))
           .accessibilityAddTraits(.isHeader)
         VStack(alignment: .leading, spacing: 8) {
@@ -177,10 +185,10 @@ struct FlashRuntimeActivityView: View {
       resultSummary(job)
       HStack(spacing: 12) {
         if !job.needsAttention {
-          Button("flash.runtime.openRecord", action: onOpenHistory)
+          Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
             .accessibilityIdentifier("flash.runtime.openHistory")
         }
-        Label("flash.runtime.readOnly", systemImage: "eye")
+        Label(flashText("flash.runtime.readOnly"), systemImage: "eye")
           .font(.footnote)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -200,12 +208,12 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func factRow(
-    _ key: LocalizedStringKey,
+    _ key: String,
     _ value: String,
     identifier: String
   ) -> some View {
     GridRow(alignment: .firstTextBaseline) {
-      Text(key).foregroundStyle(.secondary)
+      Text(flashText(key)).foregroundStyle(.secondary)
       Text(value)
         .font(.body.monospaced())
         .textSelection(.enabled)
@@ -231,7 +239,7 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func resultSummary(_ job: RuntimeJobSummaryPresentation) -> some View {
-    Label(resultKey(job), systemImage: resultSymbol(job))
+    Label(flashText(resultKey(job)), systemImage: resultSymbol(job))
       .font(.callout)
       .foregroundStyle(stateColor(job))
       .fixedSize(horizontal: false, vertical: true)
@@ -241,28 +249,31 @@ struct FlashRuntimeActivityView: View {
   private func stateText(_ rawState: String) -> Text {
     guard let state = JobState(rawValue: rawState) else { return Text(rawState) }
     switch state {
-    case .queued: return Text("flash.state.queued")
-    case .preflight: return Text("flash.state.preflight")
-    case .running: return Text("flash.state.running")
-    case .waitingForDevice: return Text("flash.state.waitingForDevice")
-    case .awaitingRebindConfirmation: return Text("flash.state.awaitingRebindConfirmation")
-    case .planning: return Text("flash.state.planning")
-    case .cancelRequested: return Text("flash.state.cancelRequested")
-    case .cancellingAtSafeBoundary: return Text("flash.state.cancellingAtSafeBoundary")
-    case .waitingForRecovery: return Text("flash.state.waitingForRecovery")
-    case .reconciling: return Text("flash.state.reconciling")
-    case .resumeAtConfirmedSafeBoundary: return Text("flash.state.resumeAtConfirmedSafeBoundary")
-    case .userAbandonRequested: return Text("flash.state.userAbandonRequested")
-    case .finalizing: return Text("flash.state.finalizing")
-    case .planned: return Text("flash.state.planned")
-    case .succeeded: return Text("flash.state.succeeded")
-    case .failed: return Text("flash.state.failed")
-    case .cancelled: return Text("flash.state.cancelled")
-    case .interrupted: return Text("flash.state.interrupted")
+    case .queued: return Text(flashText("flash.state.queued"))
+    case .preflight: return Text(flashText("flash.state.preflight"))
+    case .running: return Text(flashText("flash.state.running"))
+    case .waitingForDevice: return Text(flashText("flash.state.waitingForDevice"))
+    case .awaitingRebindConfirmation:
+      return Text(flashText("flash.state.awaitingRebindConfirmation"))
+    case .planning: return Text(flashText("flash.state.planning"))
+    case .cancelRequested: return Text(flashText("flash.state.cancelRequested"))
+    case .cancellingAtSafeBoundary:
+      return Text(flashText("flash.state.cancellingAtSafeBoundary"))
+    case .waitingForRecovery: return Text(flashText("flash.state.waitingForRecovery"))
+    case .reconciling: return Text(flashText("flash.state.reconciling"))
+    case .resumeAtConfirmedSafeBoundary:
+      return Text(flashText("flash.state.resumeAtConfirmedSafeBoundary"))
+    case .userAbandonRequested: return Text(flashText("flash.state.userAbandonRequested"))
+    case .finalizing: return Text(flashText("flash.state.finalizing"))
+    case .planned: return Text(flashText("flash.state.planned"))
+    case .succeeded: return Text(flashText("flash.state.succeeded"))
+    case .failed: return Text(flashText("flash.state.failed"))
+    case .cancelled: return Text(flashText("flash.state.cancelled"))
+    case .interrupted: return Text(flashText("flash.state.interrupted"))
     }
   }
 
-  private func resultKey(_ job: RuntimeJobSummaryPresentation) -> LocalizedStringKey {
+  private func resultKey(_ job: RuntimeJobSummaryPresentation) -> String {
     if job.outcomeUnknown { return "flash.runtime.result.outcomeUnknown" }
     guard let state = JobState(rawValue: job.state) else {
       return "flash.runtime.result.unknown"
