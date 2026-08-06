@@ -61,7 +61,6 @@ struct HDCStatusView: View {
       .frame(maxWidth: .infinity, alignment: .topLeading)
       .padding(24)
     }
-    .accessibilityIdentifier("hdc.diagnostics")
     // The refresh control renders in the window's unified toolbar but is
     // declared here, so it exists — and `⌘R` is live — only while the Overview
     // is the visible workspace.

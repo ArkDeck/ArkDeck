@@ -38,7 +38,9 @@ final class AppShellUITests: XCTestCase {
         outcomeUnknown: "Outcome unknown — this job's effect on the device was never confirmed.",
         waitingForHuman: "Waiting for a person to act.",
         emptyTitle: "No Runtime Jobs Yet",
-        emptyDescription: "ArkDeck Runtime has recorded no jobs on this host."))
+        emptyDescription: "ArkDeck Runtime has recorded no jobs on this host.",
+        selectPrompt: "Select a job to see its detail.",
+        residue: "2 outstanding residue items."))
   }
 
   func testSimplifiedChineseSweepOfEveryWorkspace() {
@@ -54,7 +56,9 @@ final class AppShellUITests: XCTestCase {
         outcomeUnknown: "结果未知——本 Job 对设备的影响从未被确认。",
         waitingForHuman: "等待人工处理。",
         emptyTitle: "尚无 Runtime Job",
-        emptyDescription: "ArkDeck Runtime 在本机尚未记录任何 Job。"))
+        emptyDescription: "ArkDeck Runtime 在本机尚未记录任何 Job。",
+        selectPrompt: "选择一个 Job 以查看详情。",
+        residue: "有 2 项未清理残留。"))
   }
 
   private struct Overview {
@@ -76,6 +80,8 @@ final class AppShellUITests: XCTestCase {
     let waitingForHuman: String
     let emptyTitle: String
     let emptyDescription: String
+    let selectPrompt: String
+    let residue: String
   }
 
   /// The history fixture reads its state from this file for the same reason
@@ -172,6 +178,10 @@ final class AppShellUITests: XCTestCase {
         app.buttons[forbidden].exists, "\(forbidden) must not exist", file: file, line: line)
     }
 
+    // Nothing is selected yet, so the detail pane says so rather than showing
+    // a job.
+    assertDisplayed(app.staticTexts["history.detail.select"], equals: history.selectPrompt)
+
     // An unknown outcome is stated, never folded into the terminal state.
     // The table's own text is not clickable; the row is. Reach it through the
     // per-row state identifier, which is the only identifier the row carries.
@@ -179,10 +189,38 @@ final class AppShellUITests: XCTestCase {
       .containing(.staticText, identifier: "history.row.state.job-fixture-0002").firstMatch
     XCTAssertTrue(interruptedRow.waitForExistence(timeout: 10), file: file, line: line)
     interruptedRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    XCTAssertTrue(
+      app.staticTexts["history.detail.select"].waitForNonExistence(timeout: 5),
+      "a selected job replaces the prompt", file: file, line: line)
     assertDisplayed(
       app.staticTexts["history.detail.outcomeUnknown"], equals: history.outcomeUnknown)
     assertDisplayed(
       app.staticTexts["history.detail.waitingForHuman"], equals: history.waitingForHuman)
+    // Outstanding residue is a fact a reader acts on, and the timeline is
+    // collapsed into one accessibility element with a label it builds itself,
+    // so both are read here rather than assumed to have survived.
+    assertDisplayed(app.staticTexts["history.detail.residue"], equals: history.residue)
+    assertDisplayed(
+      app.staticTexts["history.detail.timeline.entries"],
+      equals: "queued | running | interrupted")
+
+    // The succeeded job is the control: every one of those is conditional on
+    // the job, and on this one none of them may appear. Without it the four
+    // assertions above would also pass if the view rendered them for anything.
+    let succeededRow = app.cells
+      .containing(.staticText, identifier: "history.row.state.job-fixture-0001").firstMatch
+    XCTAssertTrue(succeededRow.waitForExistence(timeout: 10), file: file, line: line)
+    succeededRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+    assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+    assertDisplayed(
+      app.staticTexts["history.detail.timeline.entries"], equals: "queued | running | succeeded")
+    for absent in [
+      "history.detail.residue", "history.detail.outcomeUnknown", "history.detail.waitingForHuman",
+    ] {
+      XCTAssertFalse(
+        app.staticTexts[absent].exists, "\(absent) must not render for a clean job",
+        file: file, line: line)
+    }
 
     // A Runtime that is reachable and has run nothing is its own presentation.
     // The domain has always kept it apart from a history it could not read,
