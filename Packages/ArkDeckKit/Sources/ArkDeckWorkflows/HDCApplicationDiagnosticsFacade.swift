@@ -343,6 +343,10 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
   private var timedOut: Bool { activeFaults().contains("--ui-test-hdc-timed-out") }
   private var criticalGate: Bool { activeFaults().contains("--ui-test-hdc-critical-gate") }
   private var delayedRefresh: Bool { activeFaults().contains("--ui-test-hdc-refresh-delay") }
+  /// Not a fault: the one fixture state in which nothing needs attention. The
+  /// default fixture always carries the unprotected-TCP warning, so the
+  /// Overview's "nothing needs attention" branch could never be reached.
+  private var channelVerified: Bool { activeFaults().contains("--ui-test-hdc-channel-verified") }
 
   func refresh() async -> HDCDiagnosticsPresentation {
     refreshCallCount += 1
@@ -405,9 +409,15 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
       generation: "7",
       ownership: .external,
       authorization: authorization,
-      channelProtection: .unverifiedAssumeUnprotected,
-      tcpUnprotectedWarning:
-        "Channel protection is unverified. Use TCP only on a trusted, isolated network.",
+      channelProtection: channelVerified
+        ? .encryptedVerified(
+          HDCChannelProtectionEvidence(
+            evidenceVersion: "fixture-v1", source: "UI fixture",
+            detail: "Fixture-declared verified channel; no real transport was inspected."))
+        : .unverifiedAssumeUnprotected,
+      tcpUnprotectedWarning: channelVerified
+        ? nil
+        : "Channel protection is unverified. Use TCP only on a trusted, isolated network.",
       keyAccessError: keyAccessDenied
         ? "Key access diagnostics are unsupported; no key path was read or modified." : nil,
       subserverCapability: .unsupported,
