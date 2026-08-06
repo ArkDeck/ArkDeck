@@ -1026,6 +1026,13 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         action: action, context: context,
         commands: [
           (["shell", "ls", "-ln", deployment.targetPath], false, 15),
+          // The backup is a hard link to the file about to be replaced, so it
+          // keeps that file's attestation across the rename. Reading it here
+          // is this side's own measurement of what the replacement must match,
+          // independent of the branch the helper took.
+          ([
+            "shell", helperRemotePath, "verify", deployment.backupPath,
+          ], true, 30),
           ([
             "shell", helperRemotePath, "publish", deployment.stagingPath,
             deployment.targetPath, deployment.rollbackStagingPath,
@@ -1033,7 +1040,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           (["shell", "sha256sum", deployment.targetPath], false, 30),
           ([
             "shell", helperRemotePath, "verify", deployment.targetPath,
-          ], false, 30),
+          ], true, 30),
           (["shell", "ls", "-ln", deployment.targetPath], false, 15),
         ])
     case .stopNativeTarget(let deployment):
@@ -1162,6 +1169,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       commands = [
         (["shell", "sha256sum", deployment.targetPath], true, 30),
+        (["shell", helperRemotePath, "verify", deployment.backupPath], true, 30),
         (["shell", helperRemotePath, "verify", deployment.targetPath], true, 30),
       ]
     case .targetStopped, .targetStarted:
@@ -1175,6 +1183,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       var selected: [([String], Bool, Int)] = [
         (["shell", "sha256sum", deployment.targetPath], true, 30),
+        (["shell", helperRemotePath, "verify", deployment.backupPath], true, 30),
         (["shell", helperRemotePath, "verify", deployment.targetPath], true, 30),
       ]
       if deployment.verificationProfile != .hashOnly {
@@ -1735,37 +1744,75 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       ])
 
     case .publishNativeLibrary(let deployment):
-      guard receipt.subprocesses.count == 5,
-        let originalIdentity = nativeFileIdentity(receipt.subprocesses[0]),
-        let publishedIdentity = nativeFileIdentity(receipt.subprocesses[4]),
-        originalIdentity == publishedIdentity,
-        let publishedCodeSignDigest = codeSignDigest(
-          receipt.subprocesses[1], marker: "ARKDECK_CODE_SIGN_PUBLISHED"),
-        sha256(receipt.subprocesses[2]) == deployment.artifactFacts.sha256,
-        codeSignDigest(
-          receipt.subprocesses[3], marker: "ARKDECK_CODE_SIGN_VERIFIED")
-          == publishedCodeSignDigest
-      else {
+      func publishFailure() -> ProviderSemanticOutcome {
         let diagnostics = receipt.subprocesses.enumerated().map {
           "\($0.offset):\(boundedProcessDiagnostic($0.element))"
         }.joined(separator: ";")
         return .failed(
           code: "nativePublishMismatch",
           detail:
-            "atomic publish did not preserve app-owned mode/uid/gid "
-            + "or read back the leased ELF hash and fs-verity state "
+            "atomic publish did not preserve app-owned mode/uid/gid, read back "
+            + "the leased ELF hash, or leave the published library at least as "
+            + "attested as the one it replaced "
             + "(subprocessCount=\(receipt.subprocesses.count), "
             + "diagnostics=\(diagnostics))")
       }
-      return .verified(summary: [
+      guard receipt.subprocesses.count == 6,
+        let originalIdentity = nativeFileIdentity(receipt.subprocesses[0]),
+        let publishedIdentity = nativeFileIdentity(receipt.subprocesses[5]),
+        originalIdentity == publishedIdentity,
+        sha256(receipt.subprocesses[3]) == deployment.artifactFacts.sha256
+      else {
+        return publishFailure()
+      }
+      // The backup is a hard link to the replaced file, so this reads that
+      // file's attestation even though the rename has already happened.
+      let replacedAttestation = readbackAttestation(receipt.subprocesses[1])
+      let publishedAttestation = readbackAttestation(receipt.subprocesses[4])
+      var summary = [
         "publishedSha256": deployment.artifactFacts.sha256,
         "buildId": deployment.artifactFacts.buildID,
         "targetPath": deployment.targetPath,
-        "fsVerityDigest": publishedCodeSignDigest,
         "mode": originalIdentity.mode,
         "uid": String(originalIdentity.userID),
         "gid": String(originalIdentity.groupID),
-      ])
+      ]
+      switch replacedAttestation {
+      case .unreadable:
+        // Not an answer about the replaced file, so nothing here can say the
+        // replacement matches it.
+        return publishFailure()
+      case .attested:
+        // Unchanged from before: an attested original still demands an
+        // attested replacement, and the helper's own digest must agree with
+        // what the device reads back afterwards.
+        guard
+          let announced = codeSignDigest(
+            receipt.subprocesses[2], marker: "ARKDECK_CODE_SIGN_PUBLISHED"),
+          publishedAttestation == .attested(announced)
+        else {
+          return publishFailure()
+        }
+        summary["fsVerityDigest"] = announced
+        summary["attestation"] = "fsVerity"
+      case .absent:
+        // Stricter here than `attestationAtLeastReplaced` is later, and
+        // deliberately: at this instant the helper is the only thing that
+        // touched the file, so if it reports having enabled nothing and the
+        // device reads back an attestation anyway, something unaccounted for
+        // wrote the library. Later readbacks sit after restarts and cannot
+        // attribute that, so there the rule is only the floor.
+        //
+        // No `fsVerityDigest` key at all rather than an empty or placeholder
+        // one: a record that carries the field is read as having the property.
+        guard publishedWithoutAttestation(receipt.subprocesses[2]),
+          publishedAttestation == .absent
+        else {
+          return publishFailure()
+        }
+        summary["attestation"] = "matchesReplacedFile:none"
+      }
+      return .verified(summary: summary)
 
     case .stopNativeTarget(let deployment):
       guard receipt.subprocesses.count == 4 else {
@@ -2101,19 +2148,20 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["backupSha256": targetHash])
     case .targetMatchesArtifact:
-      guard subprocesses.count == 2,
+      guard subprocesses.count == 3,
         sha256(subprocesses[0]) == deployment.artifactFacts.sha256,
-        let digest = codeSignDigest(
-          subprocesses[1], marker: "ARKDECK_CODE_SIGN_VERIFIED")
+        let attestation = attestationAtLeastReplaced(
+          replaced: subprocesses[1], published: subprocesses[2])
       else {
         return .failed(
           code: "nativeTargetHashMismatch",
-          detail: "published target hash or fs-verity state differs")
+          detail:
+            "published target hash differs, or it is less attested than the "
+            + "library it replaced")
       }
-      return .verified(summary: [
-        "publishedSha256": deployment.artifactFacts.sha256,
-        "fsVerityDigest": digest,
-      ])
+      var summary = ["publishedSha256": deployment.artifactFacts.sha256]
+      summary.merge(attestation) { current, _ in current }
+      return .verified(summary: summary)
     case .targetStopped:
       guard subprocesses.count == 1, processIsAbsent(subprocesses[0]) else {
         return .failed(
@@ -2131,25 +2179,26 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         "running": "true", "processIds": pids.map(String.init).joined(separator: ","),
       ])
     case .targetLoaded:
-      guard !subprocesses.isEmpty,
+      guard subprocesses.count >= 3,
         sha256(subprocesses[0]) == deployment.artifactFacts.sha256,
-        subprocesses.count >= 2,
-        let verityDigest = codeSignDigest(
-          subprocesses[1], marker: "ARKDECK_CODE_SIGN_VERIFIED")
+        let attestation = attestationAtLeastReplaced(
+          replaced: subprocesses[1], published: subprocesses[2])
       else {
         return .failed(
           code: "nativeTargetHashMismatch",
-          detail: "loader verification target hash differs from the leased ELF")
+          detail:
+            "loader verification target hash differs from the leased ELF, or "
+            + "it is less attested than the library it replaced")
       }
       var summary = [
         "publishedSha256": deployment.artifactFacts.sha256,
         "buildId": deployment.artifactFacts.buildID,
         "abi": deployment.artifactFacts.abi.rawValue,
-        "fsVerityDigest": verityDigest,
       ]
+      summary.merge(attestation) { current, _ in current }
       if deployment.verificationProfile != .hashOnly {
-        guard subprocesses.count >= 3,
-          let pids = processIDs(subprocesses[2]), !pids.isEmpty
+        guard subprocesses.count >= 4,
+          let pids = processIDs(subprocesses[3]), !pids.isEmpty
         else {
           return .failed(
             code: "nativeTargetNotRunning",
@@ -2157,9 +2206,9 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         }
         summary["processIds"] = pids.map(String.init).joined(separator: ",")
         if deployment.verificationProfile == .hashProcessAndMaps {
-          guard subprocesses.count == 4,
+          guard subprocesses.count == 5,
             mapsContain(
-              subprocesses[3], targetPath: deployment.loaderVisiblePath,
+              subprocesses[4], targetPath: deployment.loaderVisiblePath,
               pids: pids)
           else {
             return .failed(
@@ -2220,6 +2269,110 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return nil
     }
     return value
+  }
+
+  /// What a `verify` readback established about one file.
+  ///
+  /// Three-way on purpose. "No digest parsed" covers both "the device said
+  /// this file has no fs-verity" and "the readback did not happen" — and only
+  /// the first may license publishing a library with none.
+  private enum ReadbackAttestation: Equatable {
+    case attested(String)
+    /// The device positively answered: the file is there and carries none.
+    case absent
+    /// No answer. A missing file, a truncated readback, an unexpected errno.
+    case unreadable
+  }
+
+  /// `ENODATA` — present, no fs-verity. `EOPNOTSUPP` — this filesystem cannot
+  /// carry it at all. Both are real answers about a file that exists.
+  private static let unattestedErrnoFields: Set<String> = [
+    "errno=61", "errno=95",
+  ]
+
+  private func readbackAttestation(
+    _ receipt: ProviderSubprocessReceipt
+  ) -> ReadbackAttestation {
+    if let digest = codeSignDigest(receipt, marker: "ARKDECK_CODE_SIGN_VERIFIED") {
+      return .attested(digest)
+    }
+    // The errno is the failing call's, because the helper records it at the
+    // point of failure rather than after its cleanup. That is what makes this
+    // distinction available at all: `ENOENT` and `ENODATA` both used to
+    // arrive as "no digest", and reading the first as "this file has no
+    // fs-verity" would let a missing backup authorise an unattested publish.
+    //
+    // Read from either stream, and not gated on the exit status: the helper
+    // writes this to stderr, but HDC delivers a remote command's streams
+    // merged onto stdout and reports its own exit status, not the remote
+    // one. Insisting on stderr and a non-zero exit passes every scripted
+    // test and matches nothing a device actually returns.
+    guard !receipt.stdoutTruncated,
+      let out = String(data: receipt.stdout, encoding: .utf8),
+      let err = String(data: receipt.stderr, encoding: .utf8)
+    else {
+      return .unreadable
+    }
+    let lines = (out + err).split(
+      omittingEmptySubsequences: true, whereSeparator: \.isNewline)
+    guard lines.count == 1 else { return .unreadable }
+    let fields = lines[0].split(whereSeparator: \.isWhitespace)
+    guard fields.count == 4, fields[0] == "ARKDECK_CODE_SIGN_ERROR",
+      fields[1] == "stage=verify", fields[2] == "code=30",
+      Self.unattestedErrnoFields.contains(String(fields[3]))
+    else {
+      return .unreadable
+    }
+    return .absent
+  }
+
+  /// The published library must be at least as attested as the one it
+  /// replaced. Returns the summary fields describing what it actually
+  /// carries, or `nil` when that rule is broken or cannot be established.
+  ///
+  /// `replaced` reads the backup, which is a hard link to the file that was
+  /// replaced and therefore still answers for it. The asymmetry is the point:
+  /// an attested original always demands an attested replacement, while an
+  /// original the platform never attested demands nothing it cannot have.
+  private func attestationAtLeastReplaced(
+    replaced: ProviderSubprocessReceipt,
+    published: ProviderSubprocessReceipt
+  ) -> [String: String]? {
+    let replacedState = readbackAttestation(replaced)
+    guard replacedState != .unreadable else { return nil }
+    switch readbackAttestation(published) {
+    case .attested(let digest):
+      // At or above the floor either way — including when the original
+      // carried none. The rule is a floor, not an equality.
+      return ["fsVerityDigest": digest, "attestation": "fsVerity"]
+    case .absent where replacedState == .absent:
+      return ["attestation": "matchesReplacedFile:none"]
+    case .absent, .unreadable:
+      return nil
+    }
+  }
+
+  /// Whether the helper reported publishing without enabling code signing,
+  /// because the file it replaced carried none either.
+  ///
+  /// Deliberately its own marker rather than an absent
+  /// `ARKDECK_CODE_SIGN_PUBLISHED` line: silence would also be what a helper
+  /// that crashed before printing anything produces, and those must not
+  /// verify the same way.
+  private func publishedWithoutAttestation(
+    _ receipt: ProviderSubprocessReceipt
+  ) -> Bool {
+    guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+      receipt.stderr.isEmpty,
+      let text = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return false
+    }
+    let lines = text.split(
+      omittingEmptySubsequences: true, whereSeparator: \.isNewline)
+    guard lines.count == 1 else { return false }
+    return lines[0].split(whereSeparator: \.isWhitespace)
+      == ["ARKDECK_CODE_SIGN_PUBLISHED_UNATTESTED", "replaced-file-had-none"]
   }
 
   private func codeSignDigest(
