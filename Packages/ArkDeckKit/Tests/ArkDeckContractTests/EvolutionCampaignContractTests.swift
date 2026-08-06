@@ -1731,6 +1731,44 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
   // MARK: campaignStopped detail (TASK-AIN-019)
 
+  /// A campaign that stopped for good and a confirmation that merely lapsed
+  /// need opposite next moves, so `continue` must not answer both with one
+  /// word.
+  ///
+  /// Terminal says: establish what the device is before starting anything new.
+  /// Expired says: nothing about the device changed — preview and confirm
+  /// again. `terminalOrExpired` told a caller neither, so it stopped for a
+  /// human. Measured on the interrupt window of 2026-08-06, where an attempt
+  /// ended `outcomeUnknown` and the refusal named no cause.
+  func testContinueSaysWhetherTheCampaignEndedOrTheConfirmationLapsed() throws {
+    let source = try String(
+      contentsOf: URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appending(path: "Sources/ArkDeckWorkflows/AgentComposition/EvolutionCampaignHost.swift"),
+      encoding: .utf8)
+
+    XCTAssertFalse(
+      source.contains("campaignStopped(\"terminalOrExpired\")"),
+      "the two situations are one reason code again")
+    XCTAssertTrue(
+      source.contains("\"campaignTerminal:\\(disposition"),
+      "a terminal campaign must say which disposition ended it")
+    XCTAssertTrue(
+      source.contains("\"confirmationExpired:\\(document.assertion.validUntil)\""),
+      "an expired confirmation must say when it lapsed")
+    // Separate guards, so neither answer can be reached by the other's
+    // condition.
+    XCTAssertTrue(source.contains("guard !document.isTerminal else {"))
+    XCTAssertTrue(source.contains("guard document.assertion.isValid(at: nowUTC()) else {"))
+    // The neighbours that were already precise stay that way.
+    for existing in ["repeatedSafeNoEffect", "attemptBudgetExhausted"] {
+      XCTAssertTrue(
+        source.contains("campaignStopped(\"\(existing)\")"),
+        "\(existing) lost its own reason code")
+    }
+  }
+
   func testCampaignStoppedCarriesTheUnderlyingErrorAndDecodesWithoutIt() throws {
     let root = temporaryDirectory("campaign-stop-detail")
     defer { try? FileManager.default.removeItem(at: root) }
