@@ -211,7 +211,7 @@ select.inp{cursor:pointer}
 .hint{font-size:12px;color:var(--ink2)}
 .warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start;position:relative}
 .okbox{border:1px solid var(--ok);color:var(--ok);border-radius:8px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
-.effect{font-size:10.5px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:1px 6px;border:1px solid}
+.effect{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:1px 6px;border:1px solid}
 .effect.host{color:var(--ink2);border-color:var(--line)}
 .effect.read{color:var(--ok);border-color:var(--ok)}
 .effect.mut{color:var(--warn);border-color:var(--warn)}
@@ -265,7 +265,7 @@ select.inp{cursor:pointer}
     <symbol id="i-settings" viewBox="0 0 20 20"><path d="M4 5h12M4 10h12M4 15h12"/><circle cx="8" cy="5" r="1.7" fill="var(--panel-solid)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel-solid)"/><circle cx="7" cy="15" r="1.7" fill="var(--panel-solid)"/></symbol>
     <symbol id="i-jobs" viewBox="0 0 20 20"><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8"/></symbol>
     <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></symbol>
-    <symbol id="i-warning" viewBox="0 0 20 20"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></symbol>
+    <symbol id="i-host" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="9" rx="1.5"/><path d="M1.5 16.5h17"/></symbol><symbol id="i-eye" viewBox="0 0 20 20"><path d="M1.8 10S5 4.8 10 4.8 18.2 10 18.2 10 15 15.2 10 15.2 1.8 10 1.8 10Z"/><circle cx="10" cy="10" r="2.4"/></symbol><symbol id="i-pencil" viewBox="0 0 20 20"><path d="M13.6 3.4a1.9 1.9 0 0 1 2.7 2.7L7.2 15.2l-3.6.9.9-3.6z"/></symbol><symbol id="i-warning" viewBox="0 0 20 20"><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z"/><path d="M10 7v4.5M10 14.5h.01"/></symbol>
   </defs>
 </svg>
 
@@ -372,6 +372,9 @@ function modeBadge(m,fx){return m==="planOnly"?'<span class="chip planned">◇ P
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+// Spec §4.4: effect reads as symbol + text, colour only assisting.
+const EFFECT_ICON={host:"host",read:"eye",mut:"pencil",destr:"warning"};
+function effectBadge(cls,label){return `<span class="effect ${cls}">${icon(EFFECT_ICON[cls],true)}${label}</span>`;}
 function icon(name,small=false){return `<svg class="symbol${small?" sm":""}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;}
 function toggleAC(){S.acMode=!S.acMode;$("win").classList.toggle("acmode",S.acMode);$("acToggle").classList.toggle("on",S.acMode);}
 function toggleDrawer(){
@@ -1034,7 +1037,7 @@ function pFlash(){
     ["4","reboot + waitReconnect","binding revision + 强证据","mut","deviceMutation"],
     ["5","postflight verify","版本/设备校验","read","readOnly"]
   ].map(([n,s,a,c,e])=>`<tr><td class="mono">${n}</td><td class="mono">${s}</td><td class="mono">${a}</td>
-    <td><span class="effect ${c}">${e}</span></td><td>${m==="planOnly"?'<span class="chip planned">notExecuted(planned)</span>':""}</td></tr>`).join("");
+    <td>${effectBadge(c,e)}</td><td>${m==="planOnly"?'<span class="chip planned">notExecuted(planned)</span>':""}</td></tr>`).join("");
   return recoveryHTML()+`
   <h1>Flash <span class="acin">REQ-FLASH-*</span></h1>
   <div class="card" data-acin><span class="ac">REQ-UX-006 · AC-FLASH-004-01</span>

@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { Symbol } from "./shell.js";
+import type { SymbolName } from "./shell.js";
 
 export type ChipTone = "ok" | "warn" | "danger" | "dim" | "planned" | "simulated";
 
@@ -81,6 +83,16 @@ export interface EffectBadgeProps {
   className?: string;
 }
 
+/** One glyph per blast radius: a laptop that never leaves the host, an eye that
+ *  only looks, a pencil that writes something recoverable, and the warning
+ *  triangle for overwriting a partition. */
+const EFFECT_GLYPH: Record<Effect, SymbolName> = {
+  hostOnly: "host",
+  readOnly: "eye",
+  deviceMutation: "pencil",
+  destructive: "warning",
+};
+
 /**
  * Effect-class badge for a plan step.
  *
@@ -88,10 +100,15 @@ export interface EffectBadgeProps {
  * the blast radius of a whole plan at a glance: `hostOnly` touches nothing on
  * the device, `readOnly` reads, `deviceMutation` changes recoverable state,
  * `destructive` overwrites partitions.
+ *
+ * The badge renders a glyph *and* the class name, because color is only
+ * assisting here — the pairing is what keeps a plan readable under Increase
+ * Contrast, and to anyone who does not separate these greens and reds.
  */
 export function EffectBadge({ effect, className }: EffectBadgeProps) {
   return (
     <span className={["ad-effect", `ad-effect--${effect}`, className].filter(Boolean).join(" ")}>
+      <Symbol name={EFFECT_GLYPH[effect]} small />
       {effect}
     </span>
   );
