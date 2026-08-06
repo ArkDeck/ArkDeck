@@ -555,13 +555,23 @@ final class HDCStatusUITests: XCTestCase {
   }
 
   /// The picker is driven through the system open panel's Go to Folder, and
-  /// that will not commit a selection inside `Packages/ArkDeckKit/.build`: the
-  /// panel navigates there and leaves its Open button disabled, so the panel
+  /// that will not commit a selection anywhere under this checkout: the panel
+  /// navigates to the file and leaves its Open button disabled, so the panel
   /// never closes and every later step of the test is measured against a
   /// window that still has a sheet over it. Until now the test avoided that by
   /// preferring a hard link an operator had created at the repository root by
-  /// hand, and silently fell back to the `.build` path when that link was
-  /// absent — which it is in any fresh clone or worktree.
+  /// hand, and silently fell back to `Packages/ArkDeckKit/.build` when that
+  /// link was absent — which it is in any fresh clone or worktree.
+  ///
+  /// It is the location and nothing else. The same bytes, reached the same
+  /// way, were measured selectable from the runner's temp and from
+  /// `~/Library/Caches`, and refused from the checkout — with a `.build/debug`
+  /// copy in temp selectable, the checkout's copy refused whether or not the
+  /// path went through that `debug` symlink, and a path of the checkout's own
+  /// depth outside it selectable. So it is neither the dot-prefixed directory
+  /// nor the symlink nor the depth, which is what the earlier wording implied.
+  /// What makes the checkout refuse is not established here; it sits under
+  /// `~/Dropbox`, and a copy outside that tree is taken.
   ///
   /// A copy, not a link. Granting the App access through the picker leaves
   /// `com.apple.quarantine` on the chosen file, and a hard link carries that
