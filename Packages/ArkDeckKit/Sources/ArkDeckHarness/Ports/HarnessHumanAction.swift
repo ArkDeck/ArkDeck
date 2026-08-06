@@ -27,7 +27,12 @@ public enum HarnessHumanActionFactory {
     switch block {
     case .authorizationApproval: return .impactApproval
     case .outcomeUnknown: return .outcomeUnknownDecision
-    case .strategyExhausted, .evidenceIntegrity, .environmentUnavailable: return nil
+    // No typed category is invented for these. The record still exists — it
+    // carries status, reason code and evidence — because a stop with nothing
+    // in the human's queue is worse than a stop with no typed document.
+    case .strategyExhausted, .evidenceIntegrity, .environmentUnavailable,
+      .producerProposalRequired:
+      return nil
     }
   }
 

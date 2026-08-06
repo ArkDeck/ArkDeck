@@ -672,6 +672,23 @@ public actor HarnessTaskCoordinator {
       try await closeAttempt(
         snapshot.htaskID, outcome: .humanRequired,
         reason: step.decision.reasonCode)
+      // The other route into `humanRequired` — `recordBlock` — writes this
+      // first and then transitions. This one used to transition and write
+      // nothing, so a task stopped here left `task humanActions` empty: the
+      // loop was waiting for a person, and the surface that tells a person
+      // what is wanted had nothing in it. The hypothesis did reach
+      // `result.summary`, but that is not where anyone is told to look.
+      try await store.putHumanAction(
+        HarnessHumanActionFactory.make(
+          actionID: actionIDFactory(),
+          snapshot: snapshot,
+          block: .producerProposalRequired,
+          reasonCode: step.decision.reasonCode,
+          round: snapshot.activeRound,
+          jobID: nil,
+          requestID: step.decision.decisionID,
+          evidenceRefs: snapshot.artifactRefs,
+          nowUTC: nowUTC()))
       let blocked = try await commit(
         snapshot,
         transition(

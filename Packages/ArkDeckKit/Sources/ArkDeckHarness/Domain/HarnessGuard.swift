@@ -404,6 +404,13 @@ public enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
   /// adopted target, provider unregistered). A human changes the environment;
   /// no amount of retrying changes it.
   case environmentUnavailable
+  /// The route is intact and the budget is not spent, but the next step is
+  /// something only a producer can supply — a patch proposal the deterministic
+  /// handler cannot invent. Distinct from `strategyExhausted`, which means the
+  /// opposite: nothing is left to try. Recording them as one value would make
+  /// "give me a proposal" and "I have run out" indistinguishable in the
+  /// ledger, which is the state this case exists to prevent.
+  case producerProposalRequired
 }
 
 public enum HarnessGuardVerdict: Equatable, Sendable {
