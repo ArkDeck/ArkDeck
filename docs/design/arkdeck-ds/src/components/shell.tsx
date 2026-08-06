@@ -15,6 +15,9 @@ const GLYPHS: Record<string, React.ReactNode> = {
   "settings": <><path d="M4 5h12M4 10h12M4 15h12" /><circle cx="8" cy="5" r="1.7" fill="var(--ad-panel-solid)" /><circle cx="13" cy="10" r="1.7" fill="var(--ad-panel-solid)" /><circle cx="7" cy="15" r="1.7" fill="var(--ad-panel-solid)" /></>,
   "jobs": <><path d="m3 5 1.5 1.5L7 3.8M9 5h8M3 10l1.5 1.5L7 8.8M9 10h8M3 15l1.5 1.5L7 13.8M9 15h8" /></>,
   "plus": <><path d="M10 3v14M3 10h14" /></>,
+  "host": <><rect x="3" y="4" width="14" height="9" rx="1.5" /><path d="M1.5 16.5h17" /></>,
+  "eye": <><path d="M1.8 10S5 4.8 10 4.8 18.2 10 18.2 10 15 15.2 10 15.2 1.8 10 1.8 10Z" /><circle cx="10" cy="10" r="2.4" /></>,
+  "pencil": <><path d="M13.6 3.4a1.9 1.9 0 0 1 2.7 2.7L7.2 15.2l-3.6.9.9-3.6z" /></>,
   "warning": <><path d="M9 2.8 1.8 16a1.2 1.2 0 0 0 1 1.7h14.4a1.2 1.2 0 0 0 1-1.7L11 2.8a1.2 1.2 0 0 0-2 0Z" /><path d="M10 7v4.5M10 14.5h.01" /></>,
 };
 
