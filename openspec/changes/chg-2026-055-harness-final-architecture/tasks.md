@@ -668,7 +668,10 @@
 - Status:done
 - Done:2026-08-06;随本实现 PR 合入生效(维护者 review + merge 即批准);
   `HFA-AC-24`、`HFA-AC-25` **均 PASS**(contract 面,本任务声明即为 contract);
-  evidence = `evidence/runs/TASK-HFA-014/run-r2.md`。
+  evidence = `evidence/runs/TASK-HFA-014/run-r2.md`;
+  **真机确认(2026-08-06 补记)** = `evidence/runs/TASK-HFA-014/gj5-real-device-pass-2026-08-06.md`
+  —— `HTASK-2717D3B89C57` 在 7.0.0.37 上故意中途重启 daemon 仍走到 succeeded,
+  陈旧事件 0、人工介入 0,GJ-5 = `REAL_DEVICE_PASS`。
   两条不变量各用"拆掉它"验过会变红:收养回落到源树 → AC-24 红;
   把"不可测"重新当"变了" → AC-25 红。
   **AC-25 末条在实现时被更正**:原文要求"不得报 `insufficientEvidenceForPatch`",
