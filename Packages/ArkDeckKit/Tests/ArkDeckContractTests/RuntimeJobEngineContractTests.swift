@@ -207,6 +207,12 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "succeeded")
     XCTAssertFalse(status.outcomeUnknown)
+    XCTAssertEqual(status.executionMode, "execute")
+    XCTAssertEqual(status.sessionID, "session-\(acceptance.jobID)")
+    XCTAssertEqual(status.actualEffect, "readOnly")
+    XCTAssertNotNil(status.createdAtUTC)
+    XCTAssertNotNil(status.startedAtUTC)
+    XCTAssertNotNil(status.finishedAtUTC)
     XCTAssertEqual(dispatcher.dispatchCount, 5, "three evidence preflight steps are dispatched")
     XCTAssertTrue(status.timeline.contains("jobCreated"))
     XCTAssertTrue(status.timeline.contains("queued->preflight"))
@@ -643,6 +649,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertTrue(afterRun?.lineageAllowsNewExecution == true)
     let afterEvidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
     XCTAssertNotNil(afterEvidence.authority?.consumptionFingerprintSHA256)
+    XCTAssertEqual(afterEvidence.inputs?["bundleName"], .string("com.example.demo"))
+    XCTAssertEqual(afterEvidence.inputs?["abilityName"], .string("EntryAbility"))
+    XCTAssertEqual(afterEvidence.inputs?["hapArtifactLease"], .string(lease))
 
     // A different execution ID of the same typed plan reuses the reviewed
     // envelope. Its real Job-owned remote path differs, while the

@@ -30,11 +30,19 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
   public let outcomeUnknown: Bool
   public let outstandingResidueCount: Int
   public let timeline: [String]
+  public let executionMode: String?
+  public let sessionID: String?
+  public let actualEffect: String?
+  public let createdAtUTC: String?
+  public let startedAtUTC: String?
+  public let finishedAtUTC: String?
 
   public init(
     id: String, operationReference: String, targetID: String, state: String,
     waitingForHuman: Bool, outcomeUnknown: Bool, outstandingResidueCount: Int,
-    timeline: [String]
+    timeline: [String], executionMode: String? = nil, sessionID: String? = nil,
+    actualEffect: String? = nil,
+    createdAtUTC: String? = nil, startedAtUTC: String? = nil, finishedAtUTC: String? = nil
   ) {
     self.id = id
     self.operationReference = operationReference
@@ -44,6 +52,12 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     self.outcomeUnknown = outcomeUnknown
     self.outstandingResidueCount = outstandingResidueCount
     self.timeline = timeline
+    self.executionMode = executionMode
+    self.sessionID = sessionID
+    self.actualEffect = actualEffect
+    self.createdAtUTC = createdAtUTC
+    self.startedAtUTC = startedAtUTC
+    self.finishedAtUTC = finishedAtUTC
   }
 
   /// An unknown outcome is never folded into a terminal state: it is the one
@@ -68,10 +82,75 @@ public struct RuntimeHistoryPresentation: Sendable, Equatable {
   }
 }
 
+public enum RuntimeJobDetailSectionAvailability: Sendable, Equatable {
+  case available
+  case unavailable(reason: String)
+}
+
+public struct RuntimeJobParameterPresentation: Sendable, Equatable, Identifiable {
+  public let name: String
+  public let value: String
+  public var id: String { name }
+}
+
+public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
+  public let catalogDigest: String
+  public let bindingRevision: Int?
+  public let providerID: String
+  public let actualEffect: String?
+  public let executionMode: String
+  public let terminalState: String
+  public let startedAtUTC: String?
+  public let firstEvidenceStepAtUTC: String?
+  public let finishedAtUTC: String?
+  public let parameters: [RuntimeJobParameterPresentation]
+  public let parametersWereReported: Bool
+  public let actualStepKinds: [String]
+  public let authorityKind: String?
+  public let authorityReference: String?
+  public let observedModel: String?
+  public let observedFirmware: String?
+  public let observedTransport: String?
+  public let blockers: [String]
+}
+
+public struct RuntimeArtifactPresentation: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let name: String
+  public let role: String?
+  public let mediaType: String
+  public let byteCount: Int64
+  public let sha256: String
+  public let privacy: String
+  public let status: String
+  public let statusDetail: String?
+  public let sourceOperation: String
+  public let createdAtUTC: String
+  public let redactionApplied: Bool
+}
+
+public struct RuntimeJobDetailPresentation: Sendable, Equatable {
+  public let jobID: String
+  public let evidenceAvailability: RuntimeJobDetailSectionAvailability
+  public let evidence: RuntimeJobEvidencePresentation?
+  public let artifactAvailability: RuntimeJobDetailSectionAvailability
+  public let artifacts: [RuntimeArtifactPresentation]
+}
+
 /// Closed App-facing surface. It exposes one read and nothing else: there is
 /// no submit, run, cancel, reconcile, adopt or import method to call.
 public protocol RuntimeHistoryApplicationProviding: Sendable {
   func refreshHistory() async -> RuntimeHistoryPresentation
+}
+
+/// A second closed reader keeps on-demand detail separate from the global
+/// summary refresh. Its single method reads evidence and Artifact metadata;
+/// it cannot read bytes, export files, or mutate a Job.
+public protocol RuntimeJobDetailApplicationProviding: Sendable {
+  func loadJobDetail(
+    jobID: String,
+    operationReference: String
+  ) async -> RuntimeJobDetailPresentation
 }
 
 public enum RuntimeHistoryApplicationFacade {
@@ -85,21 +164,24 @@ public enum RuntimeHistoryApplicationFacade {
   }
 }
 
+public enum RuntimeJobDetailApplicationFacade {
+  public static func make(
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) -> any RuntimeJobDetailApplicationProviding {
+    if arguments.contains("--ui-test-runtime-history") {
+      return RuntimeJobDetailFixtureProvider()
+    }
+    return RuntimeJobDetailXPCProvider()
+  }
+}
+
 /// Production transport. The Unix socket is unreachable from an App Sandbox
 /// container, so this speaks the daemon's Mach service instead; when launchd
 /// is not vending it the connection simply never answers and this reports an
 /// accurate reason rather than pretending the history is empty.
 private actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
   func refreshHistory() async -> RuntimeHistoryPresentation {
-    let frame: Data
-    do {
-      frame = try JSONSerialization.data(
-        withJSONObject: ["v": 1, "id": UUID().uuidString, "method": "job.list"])
-    } catch {
-      return .unavailable("Could not compose a Runtime history request")
-    }
-
-    let response = await Self.send(frame)
+    let response = await RuntimeHistoryXPCReadTransport.request(method: "job.list")
     switch response {
     case .failure(let reason):
       return .unavailable(reason)
@@ -107,13 +189,51 @@ private actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
       return RuntimeHistoryResponseDecoding.presentation(from: data)
     }
   }
+}
 
-  private enum TransportResult {
-    case success(Data)
-    case failure(String)
+private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding {
+  func loadJobDetail(
+    jobID: String,
+    operationReference: String
+  ) async -> RuntimeJobDetailPresentation {
+    async let evidence = RuntimeHistoryXPCReadTransport.request(
+      method: "job.evidence", params: ["jobId": jobID])
+    async let artifacts = RuntimeHistoryXPCReadTransport.request(
+      method: "artifact.list", params: ["jobId": jobID])
+    return await RuntimeJobDetailResponseDecoding.presentation(
+      jobID: jobID,
+      operationReference: operationReference,
+      evidenceResponse: evidence,
+      artifactResponse: artifacts)
+  }
+}
+
+enum RuntimeHistoryTransportResult: Sendable {
+  case success(Data)
+  case failure(String)
+}
+
+private enum RuntimeHistoryXPCReadTransport {
+  static func request(
+    method: String,
+    params: [String: Any]? = nil
+  ) async -> RuntimeHistoryTransportResult {
+    var object: [String: Any] = [
+      "v": 1,
+      "id": UUID().uuidString,
+      "method": method,
+    ]
+    if let params { object["params"] = params }
+    let frame: Data
+    do {
+      frame = try JSONSerialization.data(withJSONObject: object)
+    } catch {
+      return .failure("Could not compose a Runtime read request")
+    }
+    return await send(frame)
   }
 
-  private static func send(_ frame: Data) async -> TransportResult {
+  private static func send(_ frame: Data) async -> RuntimeHistoryTransportResult {
     await withCheckedContinuation { continuation in
       // NSXPCConnection predates Sendable and is safe to message from any
       // thread; the box carries that fact rather than widening the actor.
@@ -126,7 +246,7 @@ private actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
       // Exactly one resume: an interruption and a reply can both arrive, and
       // resuming a continuation twice is a crash, not a recoverable error.
       let answered = OSAllocatedUnfairLock(initialState: false)
-      @Sendable func finish(_ result: TransportResult) {
+      @Sendable func finish(_ result: RuntimeHistoryTransportResult) {
         let alreadyAnswered = answered.withLock { state -> Bool in
           if state { return true }
           state = true
@@ -159,7 +279,6 @@ private actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
       }
     }
   }
-
 }
 
 /// Response decoding, separated from the transport so the contract that
@@ -200,9 +319,288 @@ enum RuntimeHistoryResponseDecoding {
           waitingForHuman: entry["waitingForHuman"] as? Bool ?? false,
           outcomeUnknown: entry["outcomeUnknown"] as? Bool ?? false,
           outstandingResidueCount: entry["outstandingResidueCount"] as? Int ?? 0,
-          timeline: entry["timeline"] as? [String] ?? []))
+          timeline: entry["timeline"] as? [String] ?? [],
+          executionMode: entry["executionMode"] as? String,
+          sessionID: entry["sessionId"] as? String,
+          actualEffect: entry["actualEffect"] as? String,
+          createdAtUTC: entry["createdAtUtc"] as? String,
+          startedAtUTC: entry["startedAtUtc"] as? String,
+          finishedAtUTC: entry["finishedAtUtc"] as? String))
     }
     return RuntimeHistoryPresentation(availability: .available, jobs: jobs)
+  }
+}
+
+enum RuntimeJobDetailResponseDecoding {
+  private enum Section<Value> {
+    case available(Value)
+    case unavailable(String)
+  }
+
+  static func presentation(
+    jobID: String,
+    operationReference: String,
+    evidenceResponse: RuntimeHistoryTransportResult,
+    artifactResponse: RuntimeHistoryTransportResult
+  ) -> RuntimeJobDetailPresentation {
+    let evidence = decodeEvidence(
+      jobID: jobID,
+      operationReference: operationReference,
+      response: evidenceResponse)
+    let artifacts = decodeArtifacts(
+      jobID: jobID,
+      operationReference: operationReference,
+      response: artifactResponse)
+
+    let evidenceAvailability: RuntimeJobDetailSectionAvailability
+    let evidenceValue: RuntimeJobEvidencePresentation?
+    switch evidence {
+    case .available(let value):
+      evidenceAvailability = .available
+      evidenceValue = value
+    case .unavailable(let reason):
+      evidenceAvailability = .unavailable(reason: reason)
+      evidenceValue = nil
+    }
+
+    let artifactAvailability: RuntimeJobDetailSectionAvailability
+    let artifactValues: [RuntimeArtifactPresentation]
+    switch artifacts {
+    case .available(let values):
+      artifactAvailability = .available
+      artifactValues = values
+    case .unavailable(let reason):
+      artifactAvailability = .unavailable(reason: reason)
+      artifactValues = []
+    }
+
+    return RuntimeJobDetailPresentation(
+      jobID: jobID,
+      evidenceAvailability: evidenceAvailability,
+      evidence: evidenceValue,
+      artifactAvailability: artifactAvailability,
+      artifacts: artifactValues)
+  }
+
+  private static func decodeEvidence(
+    jobID: String,
+    operationReference: String,
+    response: RuntimeHistoryTransportResult
+  ) -> Section<RuntimeJobEvidencePresentation> {
+    let envelope: [String: Any]
+    switch response {
+    case .failure(let reason): return .unavailable(reason)
+    case .success(let data):
+      switch resultObject(from: data, label: "Job evidence") {
+      case .available(let value): envelope = value
+      case .unavailable(let reason): return .unavailable(reason)
+      }
+    }
+    guard
+      envelope["jobId"] as? String == jobID,
+      envelope["operationReference"] as? String == operationReference,
+      let catalogDigest = envelope["catalogDigest"] as? String,
+      let providerID = envelope["providerId"] as? String,
+      let executionMode = envelope["executionMode"] as? String,
+      let terminalState = envelope["terminalState"] as? String
+    else {
+      return .unavailable("Job evidence did not match the selected Job")
+    }
+
+    let parameterObject = envelope["parameters"] as? [String: Any]
+    let parameters = (parameterObject ?? [:]).keys.sorted().map { name in
+      RuntimeJobParameterPresentation(
+        name: name,
+        value: displayValue(parameterObject?[name] ?? NSNull()))
+    }
+    let authority = envelope["authority"] as? [String: Any]
+    let observation = envelope["observation"] as? [String: Any]
+    return .available(
+      RuntimeJobEvidencePresentation(
+        catalogDigest: catalogDigest,
+        bindingRevision: envelope["bindingRevision"] as? Int,
+        providerID: providerID,
+        actualEffect: envelope["actualEffect"] as? String,
+        executionMode: executionMode,
+        terminalState: terminalState,
+        startedAtUTC: envelope["startedAtUtc"] as? String,
+        firstEvidenceStepAtUTC: envelope["firstEvidenceStepAtUtc"] as? String,
+        finishedAtUTC: envelope["finishedAtUtc"] as? String,
+        parameters: parameters,
+        parametersWereReported: parameterObject != nil,
+        actualStepKinds: envelope["actualStepKinds"] as? [String] ?? [],
+        authorityKind: authority?["kind"] as? String,
+        authorityReference: authority?["reference"] as? String,
+        observedModel: observation?["model"] as? String,
+        observedFirmware: observation?["firmware"] as? String,
+        observedTransport: observation?["transport"] as? String,
+        blockers: envelope["blockers"] as? [String] ?? []))
+  }
+
+  private static func decodeArtifacts(
+    jobID: String,
+    operationReference: String,
+    response: RuntimeHistoryTransportResult
+  ) -> Section<[RuntimeArtifactPresentation]> {
+    let values: [[String: Any]]
+    switch response {
+    case .failure(let reason): return .unavailable(reason)
+    case .success(let data):
+      switch resultArray(from: data, label: "Artifact metadata") {
+      case .available(let value): values = value
+      case .unavailable(let reason): return .unavailable(reason)
+      }
+    }
+
+    let descriptor = RuntimeOperationCatalog.descriptor(reference: operationReference)
+    var artifacts: [RuntimeArtifactPresentation] = []
+    for value in values {
+      guard
+        value["jobId"] as? String == jobID,
+        let artifactID = value["artifactId"] as? String,
+        let name = value["name"] as? String,
+        let mediaType = value["mediaType"] as? String,
+        let byteCount = int64(value["byteCount"]),
+        let sha256 = value["sha256"] as? String,
+        let privacy = value["privacy"] as? String,
+        let status = value["status"] as? String,
+        let sourceOperation = value["sourceOperation"] as? String,
+        let createdAtUTC = value["createdAtUtc"] as? String,
+        let redactionApplied = value["redactionApplied"] as? Bool
+      else {
+        return .unavailable("Runtime returned incomplete Artifact metadata")
+      }
+      artifacts.append(
+        RuntimeArtifactPresentation(
+          id: artifactID,
+          name: name,
+          role: descriptor?.artifacts.first(where: { $0.name == name })?.role.rawValue,
+          mediaType: mediaType,
+          byteCount: byteCount,
+          sha256: sha256,
+          privacy: privacy,
+          status: status,
+          statusDetail: statusDetail(value["statusDetail"]),
+          sourceOperation: sourceOperation,
+          createdAtUTC: createdAtUTC,
+          redactionApplied: redactionApplied))
+    }
+    return .available(artifacts.sorted { ($0.name, $0.id) < ($1.name, $1.id) })
+  }
+
+  private static func resultObject(
+    from data: Data,
+    label: String
+  ) -> Section<[String: Any]> {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return .unavailable("\(label) response was unreadable")
+    }
+    if let error = object["error"] as? [String: Any] {
+      return .unavailable(daemonReason(error, label: label))
+    }
+    guard object["ok"] as? Bool == true,
+      let result = object["result"] as? [String: Any]
+    else { return .unavailable("\(label) response was incomplete") }
+    return .available(result)
+  }
+
+  private static func resultArray(
+    from data: Data,
+    label: String
+  ) -> Section<[[String: Any]]> {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return .unavailable("\(label) response was unreadable")
+    }
+    if let error = object["error"] as? [String: Any] {
+      return .unavailable(daemonReason(error, label: label))
+    }
+    guard object["ok"] as? Bool == true,
+      let result = object["result"] as? [[String: Any]]
+    else { return .unavailable("\(label) response was incomplete") }
+    return .available(result)
+  }
+
+  private static func daemonReason(_ error: [String: Any], label: String) -> String {
+    let code = error["code"] as? String ?? "unknown"
+    let message = error["message"] as? String ?? "no message"
+    return "\(label) was refused: \(code) — \(message)"
+  }
+
+  private static func displayValue(_ value: Any) -> String {
+    if value is NSNull { return "null" }
+    if let value = value as? String { return value }
+    if let value = value as? Bool { return value ? "true" : "false" }
+    if let value = value as? NSNumber { return value.stringValue }
+    if JSONSerialization.isValidJSONObject(value),
+      let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+      let text = String(data: data, encoding: .utf8)
+    {
+      return text
+    }
+    return String(describing: value)
+  }
+
+  private static func int64(_ value: Any?) -> Int64? {
+    if let value = value as? Int64 { return value }
+    if let value = value as? Int { return Int64(value) }
+    if let value = value as? NSNumber { return value.int64Value }
+    return nil
+  }
+
+  private static func statusDetail(_ value: Any?) -> String? {
+    guard let value, !(value is NSNull) else { return nil }
+    return displayValue(value)
+  }
+}
+
+private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProviding {
+  func loadJobDetail(
+    jobID: String,
+    operationReference: String
+  ) async -> RuntimeJobDetailPresentation {
+    let isFlash = operationReference == "flash.dayu200@1"
+    return RuntimeJobDetailPresentation(
+      jobID: jobID,
+      evidenceAvailability: .available,
+      evidence: RuntimeJobEvidencePresentation(
+        catalogDigest: String(repeating: "a", count: 64),
+        bindingRevision: 1,
+        providerID: isFlash ? "rockchip" : "openharmony-hdc",
+        actualEffect: isFlash ? "destructive" : "readOnly",
+        executionMode: "execute",
+        terminalState: isFlash ? "outcomeUnknown" : "succeeded",
+        startedAtUTC: "2026-08-06T08:00:00Z",
+        firstEvidenceStepAtUTC: "2026-08-06T08:00:01Z",
+        finishedAtUTC: isFlash ? nil : "2026-08-06T08:00:02Z",
+        parameters: [
+          RuntimeJobParameterPresentation(name: "fixture", value: "presentation-only")
+        ],
+        parametersWereReported: true,
+        actualStepKinds: isFlash ? ["flashPartition"] : ["readDeviceFacts"],
+        authorityKind: isFlash ? "evolutionCampaignConfirmation" : "defaultReadOnlyPolicy",
+        authorityReference: "fixture-read-only",
+        observedModel: "DAYU200",
+        observedFirmware: "OpenHarmony fixture",
+        observedTransport: "fixture",
+        blockers: isFlash ? ["outcomeUnknown"] : []),
+      artifactAvailability: .available,
+      artifacts: isFlash
+        ? [
+          RuntimeArtifactPresentation(
+            id: "artifact-fixture-flash-log",
+            name: "flash-report.json",
+            role: "derived",
+            mediaType: "application/json",
+            byteCount: 128,
+            sha256: String(repeating: "b", count: 64),
+            privacy: "standard",
+            status: "published",
+            statusDetail: nil,
+            sourceOperation: operationReference,
+            createdAtUTC: "2026-08-06T08:00:03Z",
+            redactionApplied: true)
+        ]
+        : [])
   }
 }
 
@@ -261,7 +659,12 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             waitingForHuman: false,
             outcomeUnknown: false,
             outstandingResidueCount: 0,
-            timeline: ["queued", "preflight", "running"])
+            timeline: ["queued", "preflight", "running"],
+            executionMode: "execute",
+            sessionID: "session-job-fixture-flash-running",
+            actualEffect: "destructive",
+            createdAtUTC: "2026-08-06T08:00:00Z",
+            startedAtUTC: "2026-08-06T08:00:01Z")
         ])
     }
     if flashSucceeded {
@@ -276,7 +679,13 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             waitingForHuman: false,
             outcomeUnknown: false,
             outstandingResidueCount: 0,
-            timeline: ["queued", "preflight", "running", "waitingForDevice", "succeeded"])
+            timeline: ["queued", "preflight", "running", "waitingForDevice", "succeeded"],
+            executionMode: "execute",
+            sessionID: "session-job-fixture-flash-succeeded",
+            actualEffect: "destructive",
+            createdAtUTC: "2026-08-06T08:00:00Z",
+            startedAtUTC: "2026-08-06T08:00:01Z",
+            finishedAtUTC: "2026-08-06T08:03:00Z")
         ])
     }
     return RuntimeHistoryPresentation(
@@ -284,13 +693,19 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
       jobs: [
         RuntimeJobSummaryPresentation(
           id: "job-fixture-0001",
-          operationReference: "observe.devices@1",
+          operationReference: "observe.device@1",
           targetID: "target-fixture-a",
           state: "succeeded",
           waitingForHuman: false,
           outcomeUnknown: false,
           outstandingResidueCount: 0,
-          timeline: ["queued", "running", "succeeded"]),
+          timeline: ["queued", "running", "succeeded"],
+          executionMode: "execute",
+          sessionID: "session-job-fixture-0001",
+          actualEffect: "readOnly",
+          createdAtUTC: "2026-08-06T07:00:00Z",
+          startedAtUTC: "2026-08-06T07:00:01Z",
+          finishedAtUTC: "2026-08-06T07:00:02Z"),
         RuntimeJobSummaryPresentation(
           id: "job-fixture-0002",
           operationReference: "flash.dayu200@1",
@@ -299,7 +714,13 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           waitingForHuman: true,
           outcomeUnknown: true,
           outstandingResidueCount: 2,
-          timeline: ["queued", "running", "interrupted"]),
+          timeline: ["queued", "running", "interrupted"],
+          executionMode: "execute",
+          sessionID: "session-job-fixture-0002",
+          actualEffect: "destructive",
+          createdAtUTC: "2026-08-06T08:00:00Z",
+          startedAtUTC: "2026-08-06T08:00:01Z",
+          finishedAtUTC: "2026-08-06T08:02:00Z"),
       ])
   }
 }

@@ -1,53 +1,113 @@
+import ArkDeckCore
 import ArkDeckWorkflows
+import Foundation
 import SwiftUI
 
-/// Records workspace: the Runtime job history the daemon reports, read-only.
-///
-/// This view can render a job and nothing else. It holds no client, no socket
-/// and no operation reference it could submit, and the surface it consumes
-/// exposes a single read — so there is no control here that could queue,
-/// cancel or retry anything, by construction rather than by omission.
+private let historyLocalizationTable = "HistoryLocalizable"
+
+private func historyLocalized(_ key: String) -> String {
+  String(localized: String.LocalizationValue(key), table: historyLocalizationTable)
+}
+
+/// Read-only Runtime records workspace. Summary rows come from `job.list`;
+/// evidence and Artifact metadata are loaded only for the selected Job.
 struct RuntimeHistoryView: View {
   let presentation: RuntimeHistoryPresentation
+  let detailsByJobID: [String: RuntimeJobDetailPresentation]
+  let loadingDetailJobIDs: Set<String>
   let isRefreshInFlight: Bool
   let onRefresh: (() -> Void)?
+  let onLoadDetail: ((String, String) -> Void)?
+
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
+  @State private var searchText = ""
+  @State private var statusFilter = HistoryStatusFilter.all
+  @State private var modeFilter = HistoryModeFilter.all
+  @State private var sessionFilter = Self.allSessions
+  @State private var targetFilter = Self.allTargets
+  @State private var timeFilter = HistoryTimeFilter.anyTime
+
+  @AppStorage("history.savedFilter.exists") private var hasSavedFilter = false
+  @AppStorage("history.savedFilter.search") private var savedSearchText = ""
+  @AppStorage("history.savedFilter.status") private var savedStatus = HistoryStatusFilter.all
+    .rawValue
+  @AppStorage("history.savedFilter.mode") private var savedMode = HistoryModeFilter.all.rawValue
+  @AppStorage("history.savedFilter.session") private var savedSession = Self.allSessions
+  @AppStorage("history.savedFilter.target") private var savedTarget = Self.allTargets
+  @AppStorage("history.savedFilter.time") private var savedTime = HistoryTimeFilter.anyTime.rawValue
+
+  private static let allTargets = "__all_targets__"
+  private static let allSessions = "__all_sessions__"
 
   private var selectedJob: RuntimeJobSummaryPresentation? {
     presentation.jobs.first { $0.id == selectedJobID }
+  }
+
+  private var targets: [String] {
+    Array(Set(presentation.jobs.map(\.targetID))).sorted()
+  }
+
+  private var sessions: [String] {
+    Array(Set(presentation.jobs.compactMap(\.sessionID))).sorted()
+  }
+
+  private var filteredJobs: [RuntimeJobSummaryPresentation] {
+    presentation.jobs.filter(matchesFilters).sorted { lhs, rhs in
+      let left = historyDate(lhs)
+      let right = historyDate(rhs)
+      if left != right { return (left ?? .distantPast) > (right ?? .distantPast) }
+      return lhs.id > rhs.id
+    }
   }
 
   var body: some View {
     Group {
       switch presentation.availability {
       case .unavailable(let reason):
-        // A history that could not be read must never look like a history
-        // that is empty, so the reason replaces the table rather than
-        // sitting above an empty one.
-        ContentUnavailableView {
-          Label {
-            Text("history.unavailable.title")
-              .accessibilityIdentifier("history.unavailable.title")
-          } icon: {
-            Image(systemName: "exclamationmark.triangle")
-          }
-        } description: {
-          Text(reason)
-            .accessibilityIdentifier("history.unavailable.reason")
-            .multilineTextAlignment(.center)
-        }
+        unavailable(reason)
       case .available:
         available
       }
     }
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .primaryAction) {
+        savedFilterMenu
         if let onRefresh {
-          Button("history.action.refresh", action: onRefresh)
+          Button(historyLocalized("history.action.refresh"), action: onRefresh)
             .accessibilityIdentifier("history.refresh")
             .disabled(isRefreshInFlight)
         }
       }
+    }
+    .onChange(of: filteredJobs.map(\.id), initial: true) { _, visibleIDs in
+      if let selectedJobID, visibleIDs.contains(selectedJobID) { return }
+      selectedJobID = visibleIDs.first
+    }
+    .onChange(of: selectedJobID, initial: true) { _, jobID in
+      guard let jobID,
+        let job = presentation.jobs.first(where: { $0.id == jobID })
+      else { return }
+      onLoadDetail?(job.id, job.operationReference)
+    }
+  }
+
+  private func unavailable(_ reason: String) -> some View {
+    ContentUnavailableView {
+      Label {
+        Text(historyLocalized("history.unavailable.title"))
+          .accessibilityIdentifier("history.unavailable.title")
+      } icon: {
+        Image(systemName: "exclamationmark.triangle")
+      }
+    } description: {
+      VStack(spacing: 8) {
+        Text(reason)
+          .font(.callout.monospaced())
+          .textSelection(.enabled)
+          .accessibilityIdentifier("history.unavailable.reason")
+        Text(historyLocalized("history.unavailable.guidance"))
+      }
+      .multilineTextAlignment(.center)
     }
   }
 
@@ -56,59 +116,219 @@ struct RuntimeHistoryView: View {
     if presentation.jobs.isEmpty {
       ContentUnavailableView {
         Label {
-          Text("history.empty.title").accessibilityIdentifier("history.empty.title")
+          Text(historyLocalized("history.empty.title"))
+            .accessibilityIdentifier("history.empty.title")
         } icon: {
           Image(systemName: "clock")
         }
       } description: {
-        Text("history.empty.description")
+        Text(historyLocalized("history.empty.description"))
           .accessibilityIdentifier("history.empty.description")
       }
     } else {
-      // The split has to be given the workspace's measured size. Left to size
-      // itself it takes its content's ideal instead: a two-row table and an
-      // empty detail placeholder produced an 83pt-tall, 1205pt-wide split
-      // centred in a 648×600 workspace — the table's rows drew outside its own
-      // scroll view, where a click reaches nothing, and the detail pane hung
-      // off the right of the window. Neither `maxWidth: .infinity` nor an
-      // explicit `idealWidth` moved it; only a measured width does.
       GeometryReader { workspace in
-        HSplitView {
-          // Minimums, not ideals: an ideal width is ignored here, and the two
-          // minimums have to fit the narrowest workspace the shell can make —
-          // a 900pt window minus a 300pt sidebar.
-          jobTable
-            .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
-          detail
-            .frame(minWidth: 240, maxWidth: .infinity, maxHeight: .infinity)
+        if workspace.size.width >= 860 {
+          HSplitView {
+            filterSidebar
+              .frame(minWidth: 190, idealWidth: 210, maxWidth: 240, maxHeight: .infinity)
+            jobTable
+              .frame(minWidth: 360, idealWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
+            detail
+              .frame(minWidth: 320, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
+          }
+          .frame(width: workspace.size.width, height: workspace.size.height)
+        } else {
+          VStack(spacing: 0) {
+            compactFilters
+            Divider()
+            HSplitView {
+              jobTable
+                .frame(minWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+              detail
+                .frame(minWidth: 280, maxWidth: .infinity, maxHeight: .infinity)
+            }
+          }
+          .frame(width: workspace.size.width, height: workspace.size.height)
         }
-        .frame(width: workspace.size.width, height: workspace.size.height)
       }
     }
   }
 
-  private var jobTable: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Table(presentation.jobs, selection: $selectedJobID) {
-        TableColumn("history.column.job") { job in
-          Text(job.id).font(.body.monospaced())
-        }
-        TableColumn("history.column.operation") { job in
-          Text(job.operationReference).font(.body.monospaced())
-        }
-        TableColumn("history.column.state") { job in
-          Label {
-            Text(job.state)
-          } icon: {
-            Image(systemName: job.needsAttention ? "exclamationmark.triangle" : "checkmark.circle")
-              .foregroundStyle(job.needsAttention ? Color.orange : Color.secondary)
-          }
-          .accessibilityIdentifier("history.row.state.\(job.id)")
+  private var filterSidebar: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 16) {
+        Text(historyLocalized("history.filter.title"))
+          .font(.headline)
+          .accessibilityAddTraits(.isHeader)
+        TextField(historyLocalized("history.filter.search"), text: $searchText)
+          .textFieldStyle(.roundedBorder)
+          .accessibilityIdentifier("history.filter.search")
+        filterPickers
+        filterResultSummary
+        Button(historyLocalized("history.filter.reset"), action: resetFilters)
+          .accessibilityIdentifier("history.filter.reset")
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(16)
+    }
+    .background(.quaternary.opacity(0.18))
+  }
+
+  private var compactFilters: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .center, spacing: 12) {
+        TextField(historyLocalized("history.filter.search"), text: $searchText)
+          .textFieldStyle(.roundedBorder)
+          .frame(minWidth: 180)
+        filterPickers
+        filterResultSummary
+      }
+      VStack(alignment: .leading, spacing: 10) {
+        TextField(historyLocalized("history.filter.search"), text: $searchText)
+          .textFieldStyle(.roundedBorder)
+        filterPickers
+        filterResultSummary
+      }
+    }
+    .padding(12)
+  }
+
+  private var filterPickers: some View {
+    Group {
+      Picker(historyLocalized("history.filter.status"), selection: $statusFilter) {
+        ForEach(HistoryStatusFilter.allCases) { filter in
+          Text(historyLocalized(filter.localizationKey)).tag(filter)
         }
       }
-      .accessibilityIdentifier("history.table")
+      Picker(historyLocalized("history.filter.mode"), selection: $modeFilter) {
+        ForEach(HistoryModeFilter.allCases) { filter in
+          Text(historyLocalized(filter.localizationKey)).tag(filter)
+        }
+      }
+      Picker(historyLocalized("history.filter.session"), selection: $sessionFilter) {
+        Text(historyLocalized("history.filter.session.all")).tag(Self.allSessions)
+        ForEach(sessions, id: \.self) { session in
+          Text(session).font(.body.monospaced()).tag(session)
+        }
+      }
+      Picker(historyLocalized("history.filter.device"), selection: $targetFilter) {
+        Text(historyLocalized("history.filter.device.all")).tag(Self.allTargets)
+        ForEach(targets, id: \.self) { target in
+          Text(target).font(.body.monospaced()).tag(target)
+        }
+      }
+      Picker(historyLocalized("history.filter.time"), selection: $timeFilter) {
+        ForEach(HistoryTimeFilter.allCases) { filter in
+          Text(historyLocalized(filter.localizationKey)).tag(filter)
+        }
+      }
+    }
+    .labelsHidden()
+  }
+
+  private var filterResultSummary: some View {
+    Text(
+      String(
+        format: historyLocalized("history.filter.resultCount"),
+        filteredJobs.count,
+        presentation.jobs.count)
+    )
+    .font(.caption)
+    .foregroundStyle(.secondary)
+    .monospacedDigit()
+    .accessibilityIdentifier("history.filter.resultCount")
+  }
+
+  private var savedFilterMenu: some View {
+    Menu(historyLocalized("history.filter.saved")) {
+      Button(historyLocalized("history.filter.save"), action: saveCurrentFilter)
+      if hasSavedFilter {
+        Button(historyLocalized("history.filter.applySaved"), action: applySavedFilter)
+        Button(historyLocalized("history.filter.deleteSaved"), role: .destructive) {
+          hasSavedFilter = false
+        }
+      }
       Divider()
-      Text("history.readOnlyNote")
+      Button(historyLocalized("history.filter.preset.needsAttention")) {
+        resetFilters()
+        statusFilter = .needsAttention
+      }
+      Button(historyLocalized("history.filter.preset.recentFailures")) {
+        resetFilters()
+        statusFilter = .failed
+        timeFilter = .lastWeek
+      }
+    }
+    .accessibilityIdentifier("history.filter.saved")
+  }
+
+  private var jobTable: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if filteredJobs.isEmpty {
+        ContentUnavailableView {
+          Label(
+            historyLocalized("history.filter.empty.title"),
+            systemImage: "line.3.horizontal.decrease.circle")
+        } description: {
+          Text(historyLocalized("history.filter.empty.description"))
+        } actions: {
+          Button(historyLocalized("history.filter.reset"), action: resetFilters)
+        }
+        .accessibilityIdentifier("history.filter.empty")
+      } else {
+        Table(filteredJobs, selection: $selectedJobID) {
+          TableColumn(historyLocalized("history.column.job")) { job in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(job.id)
+                .font(.body.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
+              if let sessionID = job.sessionID {
+                Text(sessionID)
+                  .font(.caption2.monospaced())
+                  .foregroundStyle(.secondary)
+                  .lineLimit(1)
+                  .truncationMode(.middle)
+              }
+            }
+          }
+          .width(min: 110, ideal: 140)
+          TableColumn(historyLocalized("history.column.state")) { job in
+            historyStateLabel(job)
+              .accessibilityIdentifier("history.row.state.\(job.id)")
+          }
+          .width(min: 105, ideal: 125)
+          TableColumn(historyLocalized("history.column.operation")) { job in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(job.operationReference)
+                .font(.body.monospaced())
+                .lineLimit(1)
+              if let mode = job.executionMode, mode != "execute" {
+                Text(mode.uppercased())
+                  .font(.caption2.weight(.semibold))
+                  .foregroundStyle(.purple)
+              }
+            }
+          }
+          .width(min: 160, ideal: 210)
+          TableColumn(historyLocalized("history.column.target")) { job in
+            Text(job.targetID)
+              .font(.body.monospaced())
+              .lineLimit(1)
+              .truncationMode(.middle)
+          }
+          .width(min: 120, ideal: 160)
+          TableColumn(historyLocalized("history.column.time")) { job in
+            Text(formattedDate(historyDate(job)))
+              .font(.callout)
+              .monospacedDigit()
+          }
+          .width(min: 120, ideal: 160)
+        }
+        .accessibilityIdentifier("history.table")
+      }
+      Divider()
+      Text(historyLocalized("history.readOnlyNote"))
         .font(.footnote)
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("history.readOnlyNote")
@@ -120,62 +340,370 @@ struct RuntimeHistoryView: View {
   private var detail: some View {
     if let job = selectedJob {
       ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
-          Text("history.detail.title")
-            .font(.headline)
-            .accessibilityAddTraits(.isHeader)
-          Divider()
-          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            row("history.detail.job", job.id, id: "history.detail.job", monospaced: true)
-            row(
-              "history.detail.operation", job.operationReference,
-              id: "history.detail.operation", monospaced: true)
-            row("history.detail.target", job.targetID, id: "history.detail.target", monospaced: true)
-            row("history.detail.state", job.state, id: "history.detail.state")
-          }
-          // An unknown outcome is the one condition a reader must not mistake
-          // for a finished job, so it is stated rather than implied by state.
-          if job.outcomeUnknown {
-            attention("history.detail.outcomeUnknown", id: "history.detail.outcomeUnknown")
-          }
-          if job.waitingForHuman {
-            attention("history.detail.waitingForHuman", id: "history.detail.waitingForHuman")
-          }
-          if job.outstandingResidueCount > 0 {
-            Text(
-              String(
-                format: String(localized: "history.detail.residue"), job.outstandingResidueCount)
-            )
-            .font(.callout)
-            .accessibilityIdentifier("history.detail.residue")
-          }
-          if !job.timeline.isEmpty {
-            Text("history.detail.timeline")
-              .font(.subheadline.weight(.semibold))
-            VStack(alignment: .leading, spacing: 2) {
-              ForEach(Array(job.timeline.enumerated()), id: \.offset) { _, entry in
-                Text(entry).font(.callout.monospaced())
-              }
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityAddTraits(.isStaticText)
-            .accessibilityLabel(Text(job.timeline.joined(separator: " | ")))
-            .accessibilityIdentifier("history.detail.timeline.entries")
-          }
+        VStack(alignment: .leading, spacing: 18) {
+          detailHeader(job)
+          summarySection(job)
+          timelineSection(job)
+          evidenceSections(job)
+          recoverySection(job)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(16)
       }
+      .accessibilityIdentifier("history.detail")
     } else {
       ContentUnavailableView {
-        Text("history.detail.select").accessibilityIdentifier("history.detail.select")
+        Text(historyLocalized("history.detail.select"))
+          .accessibilityIdentifier("history.detail.select")
       }
     }
   }
 
+  private func detailHeader(_ job: RuntimeJobSummaryPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: 10) {
+        Text(historyLocalized("history.detail.title"))
+          .font(.headline)
+          .accessibilityAddTraits(.isHeader)
+        historyStateLabel(job)
+        Spacer(minLength: 8)
+        if loadingDetailJobIDs.contains(job.id) {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel(historyLocalized("history.detail.loading"))
+        }
+      }
+      if job.outcomeUnknown {
+        attention("history.detail.outcomeUnknown", id: "history.detail.outcomeUnknown")
+      }
+      if job.waitingForHuman {
+        attention("history.detail.waitingForHuman", id: "history.detail.waitingForHuman")
+      }
+    }
+  }
+
+  private func summarySection(_ job: RuntimeJobSummaryPresentation) -> some View {
+    historySection("history.detail.summary") {
+      Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+        row("history.detail.job", job.id, id: "history.detail.job", monospaced: true)
+        row(
+          "history.detail.session", job.sessionID ?? historyLocalized("history.value.notReported"),
+          id: "history.detail.session", monospaced: true)
+        row(
+          "history.detail.operation", job.operationReference,
+          id: "history.detail.operation", monospaced: true)
+        row("history.detail.target", job.targetID, id: "history.detail.target", monospaced: true)
+        row("history.detail.state", localizedState(job.state), id: "history.detail.state")
+        row(
+          "history.detail.outcomeCertainty",
+          historyLocalized(
+            job.outcomeUnknown
+              ? "history.outcome.unknown" : "history.outcome.confirmed"),
+          id: "history.detail.outcomeCertainty")
+        row("history.detail.mode", job.executionMode ?? "—", id: "history.detail.mode")
+        row("history.detail.effect", job.actualEffect ?? "—", id: "history.detail.effect")
+        row("history.detail.created", formattedUTC(job.createdAtUTC), id: "history.detail.created")
+        row("history.detail.started", formattedUTC(job.startedAtUTC), id: "history.detail.started")
+        row(
+          "history.detail.finished", formattedUTC(job.finishedAtUTC), id: "history.detail.finished")
+      }
+      Text(historyLocalized("history.detail.projectionNote"))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if job.outstandingResidueCount > 0 {
+        Label(
+          String(
+            format: historyLocalized("history.detail.residue"),
+            job.outstandingResidueCount),
+          systemImage: "externaldrive.badge.exclamationmark"
+        )
+        .foregroundStyle(.orange)
+        .accessibilityIdentifier("history.detail.residue")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func timelineSection(_ job: RuntimeJobSummaryPresentation) -> some View {
+    if !job.timeline.isEmpty {
+      historySection("history.detail.timeline") {
+        VStack(alignment: .leading, spacing: 7) {
+          ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+              Image(
+                systemName: index == job.timeline.count - 1 ? stateSymbol(job) : "checkmark.circle"
+              )
+              .foregroundStyle(index == job.timeline.count - 1 ? stateColor(job) : .secondary)
+              .accessibilityHidden(true)
+              Text(entry)
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
+            }
+          }
+        }
+        .accessibilityIdentifier("history.detail.timeline.entries")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func evidenceSections(_ job: RuntimeJobSummaryPresentation) -> some View {
+    if let detail = detailsByJobID[job.id] {
+      evidenceSection(detail)
+      parameterSection(detail)
+      artifactSection(detail)
+    } else if !loadingDetailJobIDs.contains(job.id) {
+      historySection("history.detail.evidence") {
+        Label(
+          historyLocalized("history.detail.notLoaded"),
+          systemImage: "exclamationmark.triangle"
+        )
+        .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func evidenceSection(_ detail: RuntimeJobDetailPresentation) -> some View {
+    historySection("history.detail.evidence") {
+      switch detail.evidenceAvailability {
+      case .unavailable(let reason):
+        unavailableSection(reason)
+      case .available:
+        if let evidence = detail.evidence {
+          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+            row(
+              "history.evidence.provider", evidence.providerID, id: "history.evidence.provider",
+              monospaced: true)
+            row(
+              "history.evidence.catalog", evidence.catalogDigest, id: "history.evidence.catalog",
+              monospaced: true)
+            row(
+              "history.evidence.binding", evidence.bindingRevision.map(String.init) ?? "—",
+              id: "history.evidence.binding")
+            row(
+              "history.evidence.authority", evidence.authorityKind ?? "—",
+              id: "history.evidence.authority")
+            row(
+              "history.evidence.authorityReference", evidence.authorityReference ?? "—",
+              id: "history.evidence.authorityReference", monospaced: true)
+            row(
+              "history.evidence.model", evidence.observedModel ?? "—", id: "history.evidence.model")
+            row(
+              "history.evidence.firmware", evidence.observedFirmware ?? "—",
+              id: "history.evidence.firmware")
+            row(
+              "history.evidence.transport", evidence.observedTransport ?? "—",
+              id: "history.evidence.transport")
+            row(
+              "history.evidence.terminalState", localizedState(evidence.terminalState),
+              id: "history.evidence.terminalState")
+            row(
+              "history.evidence.mode", evidence.executionMode,
+              id: "history.evidence.mode")
+            row(
+              "history.evidence.effect", evidence.actualEffect ?? "—",
+              id: "history.evidence.effect")
+            row(
+              "history.evidence.firstEvidence",
+              formattedUTC(evidence.firstEvidenceStepAtUTC),
+              id: "history.evidence.firstEvidence")
+          }
+          if !evidence.actualStepKinds.isEmpty {
+            Text(evidence.actualStepKinds.joined(separator: " · "))
+              .font(.caption.monospaced())
+              .textSelection(.enabled)
+              .accessibilityIdentifier("history.evidence.steps")
+          }
+          ForEach(evidence.blockers, id: \.self) { blocker in
+            Label(blocker, systemImage: "exclamationmark.triangle")
+              .font(.callout.monospaced())
+              .foregroundStyle(.orange)
+          }
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func parameterSection(_ detail: RuntimeJobDetailPresentation) -> some View {
+    historySection("history.detail.parameters") {
+      switch detail.evidenceAvailability {
+      case .unavailable(let reason):
+        unavailableSection(reason)
+      case .available:
+        if let evidence = detail.evidence {
+          if !evidence.parametersWereReported {
+            Text(historyLocalized("history.parameters.unavailable"))
+              .foregroundStyle(.secondary)
+          } else if evidence.parameters.isEmpty {
+            Text(historyLocalized("history.parameters.empty"))
+              .foregroundStyle(.secondary)
+          } else {
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+              ForEach(evidence.parameters) { parameter in
+                GridRow(alignment: .firstTextBaseline) {
+                  Text(parameter.name).font(.callout.monospaced())
+                  Text(parameter.value)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+              }
+            }
+            .accessibilityIdentifier("history.parameters")
+          }
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func artifactSection(_ detail: RuntimeJobDetailPresentation) -> some View {
+    historySection("history.detail.artifacts") {
+      switch detail.artifactAvailability {
+      case .unavailable(let reason):
+        unavailableSection(reason)
+      case .available:
+        if detail.artifacts.isEmpty {
+          Text(historyLocalized("history.artifacts.empty"))
+            .foregroundStyle(.secondary)
+        } else {
+          VStack(alignment: .leading, spacing: 10) {
+            ForEach(detail.artifacts) { artifact in
+              artifactRow(artifact)
+            }
+          }
+          .accessibilityIdentifier("history.artifacts")
+        }
+        Label(historyLocalized("history.artifacts.metadataOnly"), systemImage: "lock.doc")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: 8) {
+          Button(historyLocalized("history.artifacts.showInFinder")) {}
+            .disabled(true)
+          Button(historyLocalized("history.artifacts.export")) {}
+            .disabled(true)
+        }
+        .help(historyLocalized("history.artifacts.metadataOnly"))
+        .accessibilityHint(historyLocalized("history.artifacts.metadataOnly"))
+      }
+    }
+  }
+
+  private func artifactRow(_ artifact: RuntimeArtifactPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+          Text(artifact.name).font(.callout.monospaced().weight(.semibold))
+          Spacer(minLength: 8)
+          artifactStatus(artifact)
+        }
+        VStack(alignment: .leading, spacing: 4) {
+          Text(artifact.name).font(.callout.monospaced().weight(.semibold))
+          artifactStatus(artifact)
+        }
+      }
+      Text(
+        "\(artifact.role ?? "—") · \(artifact.sourceOperation) · "
+          + ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file)
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      Text(artifact.sha256)
+        .font(.caption.monospaced())
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .help(artifact.sha256)
+        .textSelection(.enabled)
+      Text("\(artifact.privacy) · \(artifact.mediaType)")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      if let statusDetail = artifact.statusDetail {
+        Label(statusDetail, systemImage: "exclamationmark.triangle")
+          .font(.caption.monospaced())
+          .foregroundStyle(.orange)
+          .textSelection(.enabled)
+      }
+    }
+    .padding(10)
+    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+    .accessibilityIdentifier("history.artifact.\(artifact.id)")
+  }
+
+  private func artifactStatus(_ artifact: RuntimeArtifactPresentation) -> some View {
+    Label {
+      Text(artifact.status)
+    } icon: {
+      Image(
+        systemName: artifact.status == "published" ? "checkmark.circle" : "exclamationmark.triangle"
+      )
+    }
+    .font(.caption.weight(.semibold))
+    .foregroundStyle(artifact.status == "published" ? .green : .orange)
+  }
+
+  private func recoverySection(_ job: RuntimeJobSummaryPresentation) -> some View {
+    historySection("history.detail.recovery") {
+      if job.outcomeUnknown {
+        Label(
+          historyLocalized("history.recovery.outcomeUnknown"),
+          systemImage: "questionmark.diamond.fill"
+        )
+        .foregroundStyle(.red)
+      } else if job.waitingForHuman {
+        Label(
+          historyLocalized("history.recovery.waitingForHuman"),
+          systemImage: "person.crop.circle.badge.exclamationmark"
+        )
+        .foregroundStyle(.orange)
+      } else if job.outstandingResidueCount > 0 {
+        Label(
+          historyLocalized("history.recovery.residue"),
+          systemImage: "externaldrive.badge.exclamationmark"
+        )
+        .foregroundStyle(.orange)
+      } else {
+        Label(historyLocalized("history.recovery.none"), systemImage: "checkmark.circle")
+          .foregroundStyle(.secondary)
+      }
+      Text(historyLocalized("history.recovery.readOnly"))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private func historySection<Content: View>(
+    _ titleKey: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(historyLocalized(titleKey))
+        .font(.subheadline.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+      content()
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func unavailableSection(_ reason: String) -> some View {
+    Label {
+      Text(reason)
+        .font(.callout.monospaced())
+        .textSelection(.enabled)
+        .fixedSize(horizontal: false, vertical: true)
+    } icon: {
+      Image(systemName: "exclamationmark.triangle")
+    }
+    .foregroundStyle(.orange)
+  }
+
   private func attention(_ titleKey: String, id: String) -> some View {
     Label {
-      Text(LocalizedStringKey(titleKey)).accessibilityIdentifier(id)
+      Text(historyLocalized(titleKey)).accessibilityIdentifier(id)
     } icon: {
       Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
     }
@@ -183,30 +711,222 @@ struct RuntimeHistoryView: View {
   }
 
   private func row(
-    _ titleKey: String, _ value: String, id: String, monospaced: Bool = false
+    _ titleKey: String,
+    _ value: String,
+    id: String,
+    monospaced: Bool = false
   ) -> some View {
     GridRow(alignment: .firstTextBaseline) {
-      Text(LocalizedStringKey(titleKey))
+      Text(historyLocalized(titleKey))
         .foregroundStyle(.secondary)
         .gridColumnAlignment(.leading)
       Text(value)
         .font(monospaced ? .body.monospaced() : .body)
         .accessibilityIdentifier(id)
+        .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private func matchesFilters(_ job: RuntimeJobSummaryPresentation) -> Bool {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if !query.isEmpty,
+      ![
+        job.id, job.sessionID ?? "", job.operationReference, job.targetID, job.state,
+        job.executionMode ?? "",
+      ]
+      .contains(where: { $0.lowercased().contains(query) })
+    {
+      return false
+    }
+    if !statusFilter.matches(job) { return false }
+    if !modeFilter.matches(job.executionMode) { return false }
+    if sessionFilter != Self.allSessions, job.sessionID != sessionFilter { return false }
+    if targetFilter != Self.allTargets, job.targetID != targetFilter { return false }
+    if !timeFilter.matches(historyDate(job)) { return false }
+    return true
+  }
+
+  private func resetFilters() {
+    searchText = ""
+    statusFilter = .all
+    modeFilter = .all
+    sessionFilter = Self.allSessions
+    targetFilter = Self.allTargets
+    timeFilter = .anyTime
+  }
+
+  private func saveCurrentFilter() {
+    savedSearchText = searchText
+    savedStatus = statusFilter.rawValue
+    savedMode = modeFilter.rawValue
+    savedSession = sessionFilter
+    savedTarget = targetFilter
+    savedTime = timeFilter.rawValue
+    hasSavedFilter = true
+  }
+
+  private func applySavedFilter() {
+    searchText = savedSearchText
+    statusFilter = HistoryStatusFilter(rawValue: savedStatus) ?? .all
+    modeFilter = HistoryModeFilter(rawValue: savedMode) ?? .all
+    sessionFilter = sessions.contains(savedSession) ? savedSession : Self.allSessions
+    targetFilter = targets.contains(savedTarget) ? savedTarget : Self.allTargets
+    timeFilter = HistoryTimeFilter(rawValue: savedTime) ?? .anyTime
+  }
+
+  private func historyDate(_ job: RuntimeJobSummaryPresentation) -> Date? {
+    Self.parseUTC(job.finishedAtUTC ?? job.startedAtUTC ?? job.createdAtUTC)
+  }
+
+  private static func parseUTC(_ value: String?) -> Date? {
+    guard let value else { return nil }
+    return ISO8601DateFormatter().date(from: value)
+  }
+
+  private func formattedUTC(_ value: String?) -> String {
+    guard let date = Self.parseUTC(value) else { return value ?? "—" }
+    return formattedDate(date)
+  }
+
+  private func formattedDate(_ date: Date?) -> String {
+    guard let date else { return "—" }
+    return date.formatted(date: .abbreviated, time: .shortened)
+  }
+
+  private func localizedState(_ rawState: String) -> String {
+    guard let state = JobState(rawValue: rawState) else { return rawState }
+    return historyLocalized("history.state.\(state.rawValue)")
+  }
+
+  private func historyStateLabel(_ job: RuntimeJobSummaryPresentation) -> some View {
+    Label {
+      Text(localizedState(job.state))
+    } icon: {
+      Image(systemName: stateSymbol(job)).accessibilityHidden(true)
+    }
+    .foregroundStyle(stateColor(job))
+  }
+
+  private func stateSymbol(_ job: RuntimeJobSummaryPresentation) -> String {
+    if job.outcomeUnknown { return "questionmark.diamond.fill" }
+    guard let state = JobState(rawValue: job.state) else { return "questionmark.circle" }
+    switch state {
+    case .succeeded: return "checkmark.circle.fill"
+    case .failed: return "xmark.octagon.fill"
+    case .cancelled: return "stop.circle"
+    case .interrupted: return "pause.circle"
+    case .waitingForRecovery, .awaitingRebindConfirmation, .userAbandonRequested:
+      return "exclamationmark.triangle.fill"
+    case .planned: return "doc.text.magnifyingglass"
+    default: return "clock.arrow.circlepath"
+    }
+  }
+
+  private func stateColor(_ job: RuntimeJobSummaryPresentation) -> Color {
+    if job.outcomeUnknown { return .red }
+    guard let state = JobState(rawValue: job.state) else { return .secondary }
+    switch state {
+    case .succeeded: return .green
+    case .failed: return .red
+    case .waitingForRecovery, .awaitingRebindConfirmation, .userAbandonRequested,
+      .interrupted:
+      return .orange
+    case .running, .preflight, .planning, .waitingForDevice, .reconciling, .finalizing:
+      return .blue
+    default: return .secondary
     }
   }
 }
 
-/// Bridges the App presentation to the domain-owned Runtime reader. Like the
-/// HDC model it has no transport of its own and no way to submit.
+private enum HistoryStatusFilter: String, CaseIterable, Identifiable {
+  case all
+  case active
+  case needsAttention
+  case succeeded
+  case failed
+  case interrupted
+  case cancelled
+
+  var id: String { rawValue }
+  var localizationKey: String { "history.filter.status.\(rawValue)" }
+
+  func matches(_ job: RuntimeJobSummaryPresentation) -> Bool {
+    switch self {
+    case .all: return true
+    case .active:
+      guard let state = JobState(rawValue: job.state) else { return false }
+      return !state.isTerminal
+    case .needsAttention: return job.needsAttention || job.outstandingResidueCount > 0
+    case .succeeded: return job.state == JobState.succeeded.rawValue
+    case .failed: return job.state == JobState.failed.rawValue
+    case .interrupted: return job.state == JobState.interrupted.rawValue
+    case .cancelled: return job.state == JobState.cancelled.rawValue
+    }
+  }
+}
+
+private enum HistoryModeFilter: String, CaseIterable, Identifiable {
+  case all
+  case execute
+  case planned
+  case simulated
+  case unknown
+
+  var id: String { rawValue }
+  var localizationKey: String { "history.filter.mode.\(rawValue)" }
+
+  func matches(_ mode: String?) -> Bool {
+    switch self {
+    case .all: return true
+    case .execute: return mode == "execute"
+    case .planned: return mode == "planOnly" || mode == "planned"
+    case .simulated: return mode == "simulated"
+    case .unknown: return mode == nil
+    }
+  }
+}
+
+private enum HistoryTimeFilter: String, CaseIterable, Identifiable {
+  case anyTime
+  case lastHour
+  case lastDay
+  case lastWeek
+
+  var id: String { rawValue }
+  var localizationKey: String { "history.filter.time.\(rawValue)" }
+
+  func matches(_ date: Date?) -> Bool {
+    guard self != .anyTime else { return true }
+    guard let date else { return false }
+    let interval: TimeInterval
+    switch self {
+    case .anyTime: return true
+    case .lastHour: interval = 60 * 60
+    case .lastDay: interval = 24 * 60 * 60
+    case .lastWeek: interval = 7 * 24 * 60 * 60
+    }
+    return date >= Date().addingTimeInterval(-interval)
+  }
+}
+
+/// Bridges the App to two read-only domain readers. Detail requests are keyed
+/// by Job ID and ignored if the Job disappears during a concurrent refresh.
 @MainActor
 final class RuntimeHistoryViewModel: ObservableObject {
   @Published private(set) var presentation: RuntimeHistoryPresentation = .loading
+  @Published private(set) var detailsByJobID: [String: RuntimeJobDetailPresentation] = [:]
+  @Published private(set) var loadingDetailJobIDs: Set<String> = []
   @Published private(set) var isRefreshInFlight = false
   private let provider: any RuntimeHistoryApplicationProviding
+  private let detailProvider: any RuntimeJobDetailApplicationProviding
 
-  init(provider: any RuntimeHistoryApplicationProviding) {
+  init(
+    provider: any RuntimeHistoryApplicationProviding,
+    detailProvider: any RuntimeJobDetailApplicationProviding
+  ) {
     self.provider = provider
+    self.detailProvider = detailProvider
   }
 
   func refresh() {
@@ -219,6 +939,27 @@ final class RuntimeHistoryViewModel: ObservableObject {
       defer { self.isRefreshInFlight = false }
       guard !Task.isCancelled else { return }
       self.presentation = next
+      let validJobIDs = Set(next.jobs.map(\.id))
+      self.detailsByJobID = self.detailsByJobID.filter { validJobIDs.contains($0.key) }
+      self.loadingDetailJobIDs.formIntersection(validJobIDs)
+    }
+  }
+
+  func loadDetail(jobID: String, operationReference: String) {
+    guard detailsByJobID[jobID] == nil, loadingDetailJobIDs.insert(jobID).inserted else {
+      return
+    }
+    let detailProvider = detailProvider
+    Task { [weak self] in
+      let detail = await detailProvider.loadJobDetail(
+        jobID: jobID,
+        operationReference: operationReference)
+      guard let self else { return }
+      self.loadingDetailJobIDs.remove(jobID)
+      guard !Task.isCancelled,
+        self.presentation.jobs.contains(where: { $0.id == jobID })
+      else { return }
+      self.detailsByJobID[jobID] = detail
     }
   }
 }

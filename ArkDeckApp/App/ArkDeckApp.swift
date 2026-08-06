@@ -9,7 +9,8 @@ struct ArkDeckApp: App {
     provider: HDCApplicationDiagnosticsFacade.make())
   @StateObject private var autoUpdate = AutoUpdateViewModel()
   @StateObject private var runtimeHistory = RuntimeHistoryViewModel(
-    provider: RuntimeHistoryApplicationFacade.make())
+    provider: RuntimeHistoryApplicationFacade.make(),
+    detailProvider: RuntimeJobDetailApplicationFacade.make())
   @StateObject private var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
 
@@ -138,8 +139,11 @@ private struct AppShellView: View {
     case .history:
       RuntimeHistoryView(
         presentation: runtimeHistory.presentation,
+        detailsByJobID: runtimeHistory.detailsByJobID,
+        loadingDetailJobIDs: runtimeHistory.loadingDetailJobIDs,
         isRefreshInFlight: runtimeHistory.isRefreshInFlight,
-        onRefresh: runtimeHistory.refresh)
+        onRefresh: runtimeHistory.refresh,
+        onLoadDetail: runtimeHistory.loadDetail)
     case .flash:
       FlashWorkspaceView(
         model: flashWorkspace,
