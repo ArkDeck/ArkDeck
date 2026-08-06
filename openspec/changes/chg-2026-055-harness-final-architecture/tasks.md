@@ -702,7 +702,14 @@
 
 ## TASK-HFA-015 — 为人停下就必须在人的队列里留下一条(r3)
 
-- Status:ready
+- Status:done
+- Done:2026-08-06;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  `HFA-AC-26`、`HFA-AC-27` **均 PASS**(contract 面,本任务声明即为 contract)。
+  按 r3 第二条走「正确扩展」:新增 `HarnessHumanBlock.producerProposalRequired`,
+  `category(for:)` 对它返回 nil(不硬凑类别,沿用该词表既有规矩),
+  五个既有 raw value 逐字回读断言在测试内。
+  两条错法各用「拆掉它」验过会红:去掉 `.requestHuman` 分支的记录写入 → 红;
+  借用语义不符的 `strategyExhausted` → 红
 - Platform:macos
 - Requirements:proposal r3 What 1-3(每条通往 `humanRequired` 的路径都留记录、
   封闭词表要么正确扩展要么不被依赖、一条契约断言把两条路径绑在一起)

@@ -764,6 +764,66 @@ final class HarnessBoundsContractTests: XCTestCase {
     XCTAssertEqual(verdict, .refuse(.activeJobConflict("JOB-7")))
   }
 
+  /// `HFA-AC-26` / `HFA-AC-27` — the two routes into `humanRequired` agree
+  /// that a stop leaves something behind, and leave things that can be told
+  /// apart.
+  ///
+  /// Measured before this: `patchProposalRequired` moved a task to
+  /// `humanRequired` and `task humanActions` returned nothing
+  /// (`HTASK-7C12960C4B6E`), while `environmentUnavailable` on the same
+  /// machine returned one record (`HTASK-C458F21E8B9C`). One route wrote the
+  /// record and transitioned; the other only transitioned. A loop waiting for
+  /// a person, with an empty queue for that person, is an extra human step in
+  /// the product whose only human step is meant to be merging a pull request.
+  func testEveryRouteIntoHumanRequiredLeavesOneDistinguishableHandoff() throws {
+    // The vocabulary keeps the two situations apart. Recording "supply me a
+    // proposal" as "I have run out of strategies" would make them one row.
+    XCTAssertNotEqual(
+      HarnessHumanBlock.producerProposalRequired, .strategyExhausted)
+    XCTAssertTrue(HarnessHumanBlock.allCases.contains(.producerProposalRequired))
+    XCTAssertEqual(HarnessHumanBlock.producerProposalRequired.rawValue,
+      "producerProposalRequired")
+
+    // Old ledger rows decode unchanged: extending a persisted closed
+    // vocabulary must not rewrite what is already stored.
+    for stored in [
+      "authorizationApproval", "outcomeUnknown", "strategyExhausted",
+      "evidenceIntegrity", "environmentUnavailable",
+    ] {
+      XCTAssertEqual(
+        try JSONDecoder().decode(
+          HarnessHumanBlock.self, from: Data("\"\(stored)\"".utf8)
+        ).rawValue,
+        stored, "an existing ledger value stopped decoding")
+    }
+
+    // No typed category is invented for it — the record carries reason and
+    // evidence instead, which is the rule this vocabulary already follows.
+    XCTAssertNil(
+      HarnessHumanActionFactory.category(for: .producerProposalRequired),
+      "inventing a category would put an untrue minimum action into an "
+        + "evidence-grade document")
+
+    // And the route that used to write nothing now writes one.
+    let source = try String(
+      contentsOf: URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appending(path: "Sources/ArkDeckHarness/Application/HarnessTaskCoordinator.swift"),
+      encoding: .utf8)
+    let branch = try XCTUnwrap(source.range(of: "case .requestHuman:"))
+    let body = source[branch.lowerBound...]
+    let end = try XCTUnwrap(body.range(of: "case .noSafeAction:"))
+    let requestHuman = String(body[..<end.lowerBound])
+    XCTAssertTrue(
+      requestHuman.contains("store.putHumanAction("),
+      "the requestHuman route transitions to humanRequired without leaving a "
+        + "handoff record again")
+    XCTAssertTrue(
+      requestHuman.contains("block: .producerProposalRequired"),
+      "the handoff must not borrow a case that means something else")
+  }
+
   func testARefusedAdmissionIsRecordedInTaskMemoryWithTheIntentIdentity() async throws {
     let jobs = BoundsJobPort()
     jobs.rejectionMessage = "observe.device@1 is runtime unavailable: provider_not_registered"
