@@ -18,9 +18,6 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      ARKDECK_SDD_DEPS: ${{ runner.temp }}/arkdeck-sdd-deps
-      PYTHONPATH: ${{ runner.temp }}/arkdeck-sdd-deps
     steps:
       # Keep the required guard runnable when the Actions service cannot
       # resolve marketplace action metadata. The repository is public, the ref
@@ -40,11 +37,14 @@ jobs:
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Install dependencies
-        run: >-
-          python3 -m pip install
-          --disable-pip-version-check
-          --target "$ARKDECK_SDD_DEPS"
-          -r scripts/requirements-sdd.txt
+        run: |
+          set -eu
+          python3 -m pip install \
+            --disable-pip-version-check \
+            --target "$RUNNER_TEMP/arkdeck-sdd-deps" \
+            -r scripts/requirements-sdd.txt
+          printf 'PYTHONPATH=%s\n' \
+            "$RUNNER_TEMP/arkdeck-sdd-deps" >> "$GITHUB_ENV"
 
       - name: SDD consistency check
         env:
