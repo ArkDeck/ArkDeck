@@ -305,6 +305,8 @@ for (const name of dsLight.keys()) {
     "summary-strip": "StatusStrip", "summary-cell": "StatusStrip",
     symbol: "Symbol",
     "toolbar-btn": "ToolbarButton", acbtn: "ToolbarButton",
+    banner: "RecoveryBanner", ritem: "RecoveryBanner",
+    drawer: "JobInspector", job: "JobInspector", rebind: "JobInspector",
   };
 
   /** Never becomes a component. */
@@ -321,19 +323,23 @@ for (const name of dsLight.keys()) {
 
   /** Should be a component; isn't yet. Reported on every run, never silent. */
   const KNOWN_GAPS = {
-    banner: "Recovery banner (REQ-UX-003)", ritem: "Recovery banner item",
-    rebind: "Recovery banner — rebind confirmation",
-    drawer: "global Job inspector (AC-UX-001-01)", job: "a row inside the Job inspector",
     inp: "text input", radio: "radio group",
     tagpick: "Trace tag picker",
   };
 
-  let built = new Set();
-  try {
-    built = new Set(readdirSync(join(pkgRoot, "..", "ds-bundle", "components", "general")));
-  } catch {
-    // no bundle on disk (fresh clone, CI) — the mapping's other half still checks
-  }
+  // Read what the package *exports*, not what some previous build emitted.
+  // Anchoring this to the converter's output deadlocks the one workflow the
+  // check exists to support: adding a component means updating the mapping,
+  // but the bundle cannot be regenerated until the build — which runs this
+  // check — passes. src/index.ts answers the question immediately and is the
+  // actual source of truth for the package's surface.
+  const indexTs = readFileSync(join(pkgRoot, "src", "index.ts"), "utf8");
+  const built = new Set(
+    [...indexTs.matchAll(/^export\s*\{([^}]*)\}\s*from/gm)]
+      .flatMap(([, names]) => names.split(","))
+      .map((n) => n.trim().split(/\s+as\s+/).pop())
+      .filter((n) => /^[A-Z]/.test(n ?? "")),
+  );
   const classes = new Set([...prototype.matchAll(/^\.([a-z][a-z0-9_-]*)/gm)].map((m) => m[1]));
 
   for (const cls of classes) {
