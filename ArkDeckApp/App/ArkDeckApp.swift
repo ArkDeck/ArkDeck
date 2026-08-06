@@ -17,6 +17,8 @@ struct ArkDeckApp: App {
     provider: UIDumpApplicationFacade.make())
   @StateObject private var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
+  @StateObject private var traceWorkspace = TraceWorkspaceViewModel(
+    provider: TraceApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
@@ -26,7 +28,8 @@ struct ArkDeckApp: App {
         runtimeHistory: runtimeHistory,
         flashWorkspace: flashWorkspace,
         uiDumpWorkspace: uiDumpWorkspace,
-        debugWorkspace: debugWorkspace
+        debugWorkspace: debugWorkspace,
+        traceWorkspace: traceWorkspace
       )
       .task {
         hdcDiagnostics.refresh()
@@ -35,6 +38,7 @@ struct ArkDeckApp: App {
         flashWorkspace.refresh()
         uiDumpWorkspace.refresh()
         debugWorkspace.refresh()
+        traceWorkspace.refresh()
       }
     }
     .defaultSize(width: 1180, height: 760)
@@ -97,6 +101,7 @@ private struct AppShellView: View {
   @ObservedObject var flashWorkspace: FlashWorkspaceViewModel
   @ObservedObject var uiDumpWorkspace: UIDumpWorkspaceViewModel
   @ObservedObject var debugWorkspace: DebugWorkspaceViewModel
+  @ObservedObject var traceWorkspace: TraceWorkspaceViewModel
 
   private var selectedItem: ArkDeckNavigationItem {
     ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
@@ -212,9 +217,7 @@ private struct AppShellView: View {
     case .uiDump:
       UIDumpWorkspaceView(model: uiDumpWorkspace)
     case .trace:
-      UnavailableFeatureView(
-        titleKey: selectedItem.localizationKey,
-        systemImageName: selectedItem.systemImageName)
+      TraceWorkspaceView(model: traceWorkspace)
     }
   }
 
