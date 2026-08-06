@@ -335,6 +335,42 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
       try HarnessDecisionProposal.parse(Data(viaInputs.utf8), offeredOperations: offered))
   }
 
+  /// "Not this one, try another" and "nothing is actionable this round" are
+  /// different situations, and a producer that cannot tell them apart repeats
+  /// itself until its no-progress budget is gone.
+  ///
+  /// Measured on 7.0.0.34: `proposePatch` was refused every round with
+  /// `operationNotOffered:workspace.apply-patch@1` while the verdict was still
+  /// inconclusive, and the producer proposed it again each time because the
+  /// refusal never said what was on the table instead. That run stopped at
+  /// `patchProposalRequired` with a repair it never got to attempt.
+  func testARefusalSaysWhatIsOfferedInsteadIncludingNothing() {
+    let refusedWithAlternatives = HarnessDecisionRejection.operationNotOffered(
+      "workspace.apply-patch@1", offered: ["capture.diagnostics@1"])
+    XCTAssertEqual(
+      refusedWithAlternatives.reasonCode,
+      "operationNotOffered:workspace.apply-patch@1:offered=capture.diagnostics@1")
+
+    // An empty offer is its own answer, not a missing one: it says the round
+    // has nothing actionable, which no amount of re-proposing will change.
+    let refusedWithNothing = HarnessDecisionRejection.operationNotOffered(
+      "workspace.apply-patch@1", offered: [])
+    XCTAssertEqual(
+      refusedWithNothing.reasonCode,
+      "operationNotOffered:workspace.apply-patch@1:offered=none")
+    XCTAssertNotEqual(refusedWithAlternatives.reasonCode, refusedWithNothing.reasonCode)
+
+    // Order cannot make two identical situations look different, or a ledger
+    // of reason codes stops being comparable across rounds.
+    XCTAssertEqual(
+      HarnessDecisionRejection.operationNotOffered(
+        "x@1", offered: ["b@1", "a@1"]
+      ).reasonCode,
+      HarnessDecisionRejection.operationNotOffered(
+        "x@1", offered: ["a@1", "b@1"]
+      ).reasonCode)
+  }
+
   func testAnOperationOutsideTheOfferIsRefused() {
     XCTAssertThrowsError(
       try HarnessDecisionProposal.parse(
@@ -343,8 +379,16 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
           "hypothesis": .string("reflash it"),
         ]), offeredOperations: offered)
     ) {
-      XCTAssertEqual(
-        $0 as? HarnessDecisionRejection, .operationNotOffered("flash.dayu200@1"))
+      // The refusal names the alternatives as well as the refusal, so a
+      // producer is not left proposing the same unavailable thing every round.
+      guard case .operationNotOffered(let reference, let alternatives)? =
+        $0 as? HarnessDecisionRejection
+      else { return XCTFail("expected operationNotOffered, got \($0)") }
+      XCTAssertEqual(reference, "flash.dayu200@1")
+      XCTAssertEqual(Set(alternatives), offered)
+      XCTAssertTrue(
+        ($0 as? HarnessDecisionRejection)?.reasonCode.contains("offered=") == true,
+        "the reason code must carry what this round does offer")
     }
 
     XCTAssertThrowsError(

@@ -649,7 +649,12 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
   case forbiddenField(String)
   case unknownKind(String)
   case operationRequired
-  case operationNotOffered(String)
+  /// The reference the producer asked for, and what this round actually
+  /// offers. Both, because a rejection that names only the refused thing
+  /// leaves the producer to guess what to ask for next — and on the
+  /// 7.0.0.34 window it guessed the same thing every round until the
+  /// no-progress budget ran out.
+  case operationNotOffered(String, offered: [String] = [])
   case operationNotExpected(String)
   case rawCommandSurface(String)
   case oversizedField(String)
@@ -663,7 +668,11 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
     case .forbiddenField(let field): return "forbiddenField:\(field)"
     case .unknownKind(let kind): return "unknownKind:\(kind)"
     case .operationRequired: return "operationRequired"
-    case .operationNotOffered(let reference): return "operationNotOffered:\(reference)"
+    case .operationNotOffered(let reference, let offered):
+      // An empty offer is its own fact: nothing this round is actionable, which
+      // is not the same as "not this one, try another".
+      let alternatives = offered.isEmpty ? "none" : offered.sorted().joined(separator: ",")
+      return "operationNotOffered:\(reference):offered=\(alternatives)"
     case .operationNotExpected(let reference): return "operationNotExpected:\(reference)"
     case .rawCommandSurface(let field): return "rawCommandSurface:\(field)"
     case .oversizedField(let field): return "oversizedField:\(field)"
@@ -886,7 +895,8 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
       guard offeredOperations.contains(operationReference) else {
         // Not merely "not permitted": the model was told exactly which
         // operations were on the table this round.
-        throw HarnessDecisionRejection.operationNotOffered(operationReference)
+        throw HarnessDecisionRejection.operationNotOffered(
+          operationReference, offered: Array(offeredOperations))
       }
     case .proposePatch:
       if fields["operationRef"] != nil || fields["operationReference"] != nil {
@@ -896,7 +906,8 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
         throw HarnessDecisionRejection.invalidPatch("proposePatchCannotDeclareInputs")
       }
       guard offeredOperations.contains("workspace.apply-patch@1") else {
-        throw HarnessDecisionRejection.operationNotOffered("workspace.apply-patch@1")
+        throw HarnessDecisionRejection.operationNotOffered(
+          "workspace.apply-patch@1", offered: Array(offeredOperations))
       }
       do {
         patchProposal = try HarnessPatchProposal.parse(fields)
