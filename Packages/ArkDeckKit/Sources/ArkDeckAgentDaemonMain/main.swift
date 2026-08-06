@@ -188,6 +188,7 @@ let resolvedStateDirectory = stateDirectory
 let ready = DispatchSemaphore(value: 0)
 nonisolated(unsafe) var startupFailure: (any Error)?
 nonisolated(unsafe) var startedServer: AgentDaemonServer?
+nonisolated(unsafe) var startedXPCListener: AgentXPCListener?
 nonisolated(unsafe) var autoDriveTask: Task<Void, Never>?
 
 // Detached on purpose: the top level is @MainActor-isolated, so a plain
@@ -568,6 +569,17 @@ Task.detached {
     case .started:
       startedServer = server
       print("arkdeck-agentd listening on \(server.socketURL.path)")
+      // Second transport, strictly narrower: read-only frames only, for App
+      // Sandbox clients that cannot reach an AF_UNIX path at all. When this
+      // daemon was not started by launchd there is no Mach service to check
+      // in to, which is the normal CLI and CI configuration; the Unix socket
+      // above is unaffected either way.
+      let xpcListener = AgentXPCListener(handler: handler)
+      xpcListener.activate()
+      startedXPCListener = xpcListener
+      print(
+        "arkdeck-agentd read-only XPC door: \(AgentXPCListener.machServiceName) "
+          + "(active only when launchd vends the Mach service)")
       // Redirected stdout is block-buffered: without this flush an operator
       // tailing the log sees nothing until the daemon exits.
       fflush(stdout)

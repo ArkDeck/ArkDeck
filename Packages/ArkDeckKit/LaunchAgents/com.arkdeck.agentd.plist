@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  User-domain LaunchAgent for arkdeck-agentd.
+
+  A Mach service exists only when launchd vends it: a daemon started straight
+  from a shell has nothing to check in to, so its read-only XPC door stays
+  closed and only the Unix socket serves. That is the correct configuration
+  for CLI, CI and host agents, and nothing here changes it — this file exists
+  for the one client that cannot use the Unix socket, the sandboxed App.
+
+  Install (user domain, no administrator rights, fully reversible):
+
+    cp Packages/ArkDeckKit/LaunchAgents/com.arkdeck.agentd.plist ~/Library/LaunchAgents/
+    # then edit the ProgramArguments path below to the built arkdeck-agentd
+    launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.arkdeck.agentd.plist
+
+  Remove:
+
+    launchctl bootout gui/$UID/com.arkdeck.agentd
+    rm ~/Library/LaunchAgents/com.arkdeck.agentd.plist
+
+  The MachServices key below, ArkDeckAgentXPC.machServiceName, and the App's
+  com.apple.security.temporary-exception.mach-lookup.global-name entitlement
+  must all name the same service. AgentXPCTransportContractTests pins that.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.arkdeck.agentd</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/local/bin/arkdeck-agentd</string>
+	</array>
+	<key>MachServices</key>
+	<dict>
+		<key>com.arkdeck.agentd</key>
+		<true/>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<false/>
+	<key>ProcessType</key>
+	<string>Standard</string>
+</dict>
+</plist>
