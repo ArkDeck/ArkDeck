@@ -519,6 +519,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         ]),
       runner: runner,
       usbProbe: FixedUSBProbe(identity: identity),
+      // Reading the bundle is a seam like `stage`, so these tests keep
+      // proving every branch without a real 730 MB archive. The fixture
+      // answers with the board carrying the bundle's own identity.
+      describeBundle: { _, _ in RockchipFlashProfile.dayu200 },
       stage: { _, _ in
         Dictionary(
           uniqueKeysWithValues: RockchipFlashProfile.dayu200.mappedPartitions.map {
@@ -2093,6 +2097,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         normalIdentity: SHA256.hash(data: Data("device-1".utf8))
           .map { String(format: "%02x", $0) }.joined()),
       readback: VerifiedPartitionReadback(log: readbackLog),
+      // Reading the bundle is a seam like `stage`, so these tests keep
+      // proving every branch without a real 730 MB archive. The fixture
+      // answers with the board carrying the bundle's own identity.
+      describeBundle: { _, _ in RockchipFlashProfile.dayu200 },
       stage: { _, _ in
         Dictionary(
           uniqueKeysWithValues:

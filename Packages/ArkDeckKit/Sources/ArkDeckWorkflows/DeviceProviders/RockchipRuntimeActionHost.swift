@@ -556,6 +556,12 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private let runner: any RockchipRuntimeCommandRunning
   private let usbProbe: any RockchipRuntimeUSBProbing
   private let stage: RockchipRuntimeStaging
+  /// The board carrying the facts of the bundle in hand. A seam like `stage`,
+  /// so composition tests keep proving every branch without a real archive;
+  /// production reads the bytes, which is the only way to know the bundle is
+  /// the one this plan was built for.
+  private let describeBundle:
+    @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
   private let readback: any RockchipRuntimePartitionReadbackVerifying
   private let enterLoaderReadbackTimeoutSeconds: Int
 
@@ -568,6 +574,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
     enterLoaderReadbackTimeoutSeconds: Int = 45,
+    describeBundle: (
+      @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
+    )? = nil,
     stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
       // Read the bundle in hand rather than looking it up by digest. A build
       // the product has never seen is not the same thing as an unusable one:
@@ -610,6 +619,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     self.runner = runner
     self.usbProbe = usbProbe
     self.stage = stage
+    self.describeBundle =
+      describeBundle ?? { board, url in try board.forArchive(at: url) }
     self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
     self.readback =
       readback ?? FoundationRockchipRuntimePartitionReadback(runner: runner)
@@ -782,13 +793,22 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         actionDirectory: actionDirectory)
 
     case .verifyFlashReadback(let bundle):
-      guard
-        let profile = RockchipFlashProfile.profile(
-          archiveSHA256: bundle.sha256, byteCount: bundle.byteCount),
+      // Same as the write step: the board describes the bundle in hand, and
+      // the derived identity must be the one the plan was built for.
+      let readbackBoard = RockchipFlashProfile.dayu200OpenHarmony70035
+      let profile: RockchipFlashProfile
+      do {
+        profile = try describeBundle(readbackBoard, bundle.fileURL)
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "readback bundle does not fit \(readbackBoard.catalogReference): \(error)")
+      }
+      guard profile.archiveSHA256 == bundle.sha256,
+        profile.archiveSizeBytes == Int64(bundle.byteCount),
         bundle.partitionNames == profile.mappedPartitions.map(\.partitionName)
       else {
         throw RuntimeDispatchFailure.failed(
-          "readback action drifted from the pinned DAYU200 bundle/profile")
+          "readback action drifted from the bundle its plan was built for")
       }
       let identity = try exactLoaderIdentity(
         stableIdentitySHA256: descriptor.expectedIdentitySHA256)
@@ -1000,13 +1020,26 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     actionDirectory: URL,
     writeDispatched: inout Bool
   ) async throws -> RockchipRuntimeActionExecutionResult {
-    guard
-      let profile = RockchipFlashProfile.profile(
-        archiveSHA256: bundle.sha256, byteCount: bundle.byteCount),
+    // The board, and the bundle in hand described against it. Looking the
+    // bundle's digest up among the builds compiled into the product turned
+    // away every firmware daily published after the release — and this is the
+    // last step before the first partition write, so it was the last place
+    // that could happen. The bytes are still checked: the stager re-hashes the
+    // archive against this profile before anything reaches the device.
+    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile: RockchipFlashProfile
+    do {
+      profile = try describeBundle(board, bundle.fileURL)
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "flash bundle does not fit \(board.catalogReference): \(error)")
+    }
+    guard profile.archiveSHA256 == bundle.sha256,
+      profile.archiveSizeBytes == Int64(bundle.byteCount),
       bundle.partitionNames == profile.mappedPartitions.map(\.partitionName)
     else {
       throw RuntimeDispatchFailure.failed(
-        "flash action drifted from the pinned DAYU200 bundle/profile")
+        "flash action drifted from the bundle its plan was built for")
     }
     _ = try exactLoaderIdentity(
       stableIdentitySHA256: descriptor.expectedIdentitySHA256)
