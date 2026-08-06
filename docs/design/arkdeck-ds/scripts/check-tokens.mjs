@@ -90,6 +90,7 @@ const DS_ONLY = {
 };
 
 const problems = [];
+let gaps = [];
 const fail = (msg) => problems.push(msg);
 
 /** Canonicalize a CSS value so `rgba(60,60,67,.18)` and
@@ -270,6 +271,98 @@ for (const name of dsLight.keys()) {
   }
 }
 
+// ---- 6. every prototype class is accounted for ----------------------------
+// Token drift is only half of it. When v0.3 landed, the palette was realigned
+// but the component roster was not, and the library went on expressing v0.2's
+// screens in v0.3's colors — caught only by hand-diffing two prototypes, which
+// nothing would have prompted anyone to do. So each of the prototype's
+// top-level classes must be claimed here: by a component, by SCAFFOLDING (it
+// will never be one), or by KNOWN_GAPS (it should be, and isn't yet). A class
+// the prototype grows that nobody has classified fails the build.
+{
+  const CLASS_TO_COMPONENT = {
+    btn: "Button",
+    warnbox: "Callout", okbox: "Callout",
+    card: "Card",
+    chip: "Chip",
+    modal: "DangerConfirmDialog", "modal-bg": "DangerConfirmDialog",
+    impact: "DangerConfirmDialog", checks: "DangerConfirmDialog", mfoot: "DangerConfirmDialog",
+    tablewrap: "DataTable",
+    dev: "DeviceRow", dot: "DeviceRow", tag: "DeviceRow",
+    effect: "EffectBadge",
+    filters: "FilterPills",
+    ibar: "IndeterminateBar",
+    kv: "KeyValueList",
+    logtail: "LogTail", stream: "LogTail",
+    nav: "NavItem",
+    phases: "PhaseTrack", ph: "PhaseTrack",
+    seg: "SegmentedControl",
+    tabs: "Tabs",
+    window: "WindowFrame", titlebar: "WindowFrame", lights: "WindowFrame",
+    "budget-grid": "BudgetMeters", metric: "BudgetMeters", meter: "BudgetMeters",
+    "op-list": "OperationList",
+    "stage-line": "StageTrack", "stage-node": "StageTrack",
+    "summary-strip": "StatusStrip", "summary-cell": "StatusStrip",
+    symbol: "Symbol",
+    "toolbar-btn": "ToolbarButton", acbtn: "ToolbarButton",
+  };
+
+  /** Never becomes a component. */
+  const SCAFFOLDING = {
+    ac: "AC-annotation overlay — spec §5 says the review tool does not ship",
+    acin: "AC-annotation overlay", acmode: "AC-annotation overlay",
+    main: "page scaffolding", content: "page scaffolding", page: "page scaffolding",
+    sidebar: "page scaffolding", two: "layout grid", grid2: "layout grid",
+    sec: "sidebar section heading",
+    hint: "text utility", note: "text utility", empty: "empty-state text utility",
+    mono: "type utility", livetag: "inline marker in a History row",
+    pulse: "animation utility", addlink: "a plain text link",
+  };
+
+  /** Should be a component; isn't yet. Reported on every run, never silent. */
+  const KNOWN_GAPS = {
+    banner: "Recovery banner (REQ-UX-003)", ritem: "Recovery banner item",
+    rebind: "Recovery banner — rebind confirmation",
+    drawer: "global Job inspector (AC-UX-001-01)", job: "a row inside the Job inspector",
+    inp: "text input", radio: "radio group",
+    tagpick: "Trace tag picker",
+  };
+
+  let built = new Set();
+  try {
+    built = new Set(readdirSync(join(pkgRoot, "..", "ds-bundle", "components", "general")));
+  } catch {
+    // no bundle on disk (fresh clone, CI) — the mapping's other half still checks
+  }
+  const classes = new Set([...prototype.matchAll(/^\.([a-z][a-z0-9_-]*)/gm)].map((m) => m[1]));
+
+  for (const cls of classes) {
+    const component = CLASS_TO_COMPONENT[cls];
+    if (component) {
+      // a mapping naming a component nobody built is worse than no mapping
+      if (built.size && !built.has(component)) {
+        fail(`.${cls} maps to a component named ${component}, which this package does not export`);
+      }
+      continue;
+    }
+    if (cls in SCAFFOLDING || cls in KNOWN_GAPS) continue;
+    fail(
+      `the prototype defines .${cls}, which nothing here classifies.\n` +
+        `      Add it to CLASS_TO_COMPONENT (and build the component), to SCAFFOLDING if it will\n` +
+        `      never be one, or to KNOWN_GAPS with what it should become. This check exists because\n` +
+        `      a whole roster of missing components once went unnoticed for exactly this reason.`,
+    );
+  }
+
+  for (const [cls, component] of Object.entries(CLASS_TO_COMPONENT)) {
+    if (!classes.has(cls)) {
+      fail(`.${cls} is mapped to ${component} but the prototype no longer defines it`);
+    }
+  }
+
+  gaps = Object.entries(KNOWN_GAPS).map(([cls, what]) => `.${cls} → ${what}`);
+}
+
 // ---- report ----------------------------------------------------------------
 if (problems.length) {
   console.error(
@@ -284,6 +377,13 @@ if (problems.length) {
 }
 
 console.log(
-  `tokens match the design docs (${ALIGNED_VERSION}): ` +
-    `${Object.keys(MAPPING).length} mapped × 2 themes, ${Object.keys(DS_ONLY).length} DS-only`,
+  `@arkdeck/ds matches the design docs (${ALIGNED_VERSION}): ` +
+    `${Object.keys(MAPPING).length} tokens × 2 themes, ${Object.keys(DS_ONLY).length} DS-only, ` +
+    `every prototype class accounted for`,
 );
+if (gaps.length) {
+  // Printed every run on purpose: a backlog nobody sees is a backlog nobody works.
+  console.log(`\n${gaps.length} prototype surface(s) still without a component:`);
+  for (const g of gaps) console.log(`  · ${g}`);
+  console.log("  (declared in KNOWN_GAPS in this file — build one and move it there once it exists)");
+}

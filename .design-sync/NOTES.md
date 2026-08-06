@@ -25,7 +25,7 @@ newer docs in. Realigning cost one token rewrite plus one driver run.
 runs first in `npm run build` (which is `cfg.buildCmd`, so every sync goes through it)
 and is fail-closed: on drift the build exits 1 and never writes `dist/`, so the
 converter stops at `[NO_DIST]` instead of shipping stale tokens. Verified by injecting
-each drift kind. It catches six things:
+each drift kind. It catches seven things:
 
 1. any mapped token whose value differs from the prototype's;
 2. a docs version bump (`ALIGNED_VERSION` in the script pins v0.3 — bump it only after
@@ -38,7 +38,17 @@ each drift kind. It catches six things:
 6. any `var(--…)` anywhere in `src/` that nothing defines. Porting prototype markup
    carries its *unprefixed* names along (`var(--panel-solid)` vs this package's
    `--ad-panel-solid`), and an unresolvable `var()` never errors — it falls back
-   silently, so the component renders subtly wrong and nothing complains.
+   silently, so the component renders subtly wrong and nothing complains;
+7. **a prototype class nobody has classified.** Every top-level class in
+   `prototype.html` must be claimed by `CLASS_TO_COMPONENT`, by `SCAFFOLDING`
+   (never becomes a component), or by `KNOWN_GAPS` (should be one, isn't yet).
+   This closes the last blind spot: when v0.3 landed, the palette was realigned
+   but the roster was not, and six missing components went unnoticed until
+   somebody hand-diffed the two prototypes. The check also fails if a mapping
+   names a component the package doesn't export, or if the prototype drops a
+   class still mapped. **`KNOWN_GAPS` prints on every run** — currently 8
+   surfaces (Recovery banner, Job inspector, form inputs, Trace tag picker),
+   which is the honest backlog, not a passing grade.
 
 It lives inside the package rather than in `scripts/` or `.github/` because both of those
 are governance-sensitive paths (see the `.gitignore` note below): touching them demands a
