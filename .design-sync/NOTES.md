@@ -184,14 +184,18 @@ ship real woff2 files via `cfg.extraFonts` instead of extending this list.
 
 ```sh
 cd docs/design/arkdeck-ds && npm install && npm run build && cd -
-mkdir -p .ds-sync && cp -r "<skill-base-dir>"/{package-build,package-validate,package-capture,resync}.mjs "<skill-base-dir>"/lib "<skill-base-dir>"/storybook .ds-sync/
-echo '{"name":"ds-sync-deps","private":true}' > .ds-sync/package.json
-(cd .ds-sync && npm i esbuild ts-morph @types/react playwright)   # playwright HERE, not in the DS package
+# Stage the converter under .design-sync/ and build to docs/design/ds-bundle —
+# both are ignored by tracked .gitignore files, and neither can be at the repo
+# root (that .gitignore is governance-sensitive). See those files for why the
+# build output cannot go under .design-sync/ either.
+mkdir -p .design-sync/.ds-sync && cp -r "<skill-base-dir>"/{package-build,package-validate,package-capture,resync}.mjs "<skill-base-dir>"/lib "<skill-base-dir>"/storybook .design-sync/.ds-sync/
+echo '{"name":"ds-sync-deps","private":true}' > .design-sync/.ds-sync/package.json
+(cd .design-sync/.ds-sync && npm i esbuild ts-morph @types/react playwright)   # playwright HERE, not in the DS package
 npx playwright install chromium
 # fetch the project's _ds_sync.json into .design-sync/.cache/remote-sync.json, then:
-node .ds-sync/resync.mjs --config .design-sync/config.json \
+node .design-sync/.ds-sync/resync.mjs --config .design-sync/config.json \
   --node-modules docs/design/arkdeck-ds/node_modules \
-  --entry ./docs/design/arkdeck-ds/dist/index.js --out ./ds-bundle \
+  --entry ./docs/design/arkdeck-ds/dist/index.js --out ./docs/design/ds-bundle \
   --remote .design-sync/.cache/remote-sync.json
 ```
 

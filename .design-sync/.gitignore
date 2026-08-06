@@ -1,5 +1,13 @@
 # Machine state, not sync inputs. The durable set beside these — config.json,
 # NOTES.md, conventions.md, previews/ — IS committed.
+#
+# The staged converter lives here rather than at the repo root specifically so
+# this file can ignore it: the root .gitignore is a governance-sensitive path
+# an agent cannot add entries to, and a nested .gitignore only reaches its own
+# directory downward. Build output canNOT live here — the converter refuses
+# [OUT_UNSAFE] to rm anything under .design-sync/ — so it goes to
+# docs/design/ds-bundle/, ignored by docs/design/.gitignore.
 .cache/
 learnings/
 node_modules
+.ds-sync/

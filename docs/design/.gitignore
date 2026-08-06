@@ -1,0 +1,9 @@
+# design-sync build output (`--out`). Regenerated in full on every run — the
+# converter rm -rf's this directory, so nothing tracked may live inside it,
+# which is why it is ignored from here rather than by a .gitignore of its own.
+#
+# It sits here rather than at the repo root because the root .gitignore is a
+# governance-sensitive path an agent cannot add to, and not under
+# .design-sync/ because the converter refuses [OUT_UNSAFE] to rm anything in
+# that tree (hand-authored previews and notes live there).
+ds-bundle/
