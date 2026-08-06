@@ -29,6 +29,8 @@
 		B10000000000000000000002 /* TraceConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* TraceConfigurationView.swift */; };
 		B10000000000000000000003 /* TraceProgressArtifactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* TraceProgressArtifactsView.swift */; };
 		B10000000000000000000004 /* TraceLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* TraceLocalizable.xcstrings */; };
+		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
+		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -74,6 +76,8 @@
 		B10000000000000000000006 /* TraceConfigurationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceConfigurationView.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* TraceProgressArtifactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceProgressArtifactsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* TraceLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = TraceLocalizable.xcstrings; sourceTree = "<group>"; };
+		A100000000000000000000D2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
+		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -122,6 +126,7 @@
 				A100000000000000000000C4 /* UI Dump Feature */,
 				A100000000000000000000B4 /* Debug Feature */,
 				B10000000000000000000009 /* Trace Feature */,
+				A100000000000000000000D4 /* Settings Feature */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 				A1000000000000000000002D /* RockchipComponent.entitlements */,
 			);
@@ -155,6 +160,7 @@
 				A100000000000000000000B2 /* HistoryLocalizable.xcstrings */,
 				A100000000000000000000B3 /* DebugLocalizable.xcstrings */,
 				B10000000000000000000008 /* TraceLocalizable.xcstrings */,
+				A100000000000000000000D3 /* SettingsLocalizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -226,6 +232,14 @@
 				B10000000000000000000007 /* TraceProgressArtifactsView.swift */,
 			);
 			path = Features/Trace;
+			sourceTree = "<group>";
+		};
+		A100000000000000000000D4 /* Settings Feature */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000000000000D2 /* SettingsRootView.swift */,
+			);
+			path = Features/Settings;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000039 /* Shared Features */ = {
@@ -352,6 +366,7 @@
 				A100000000000000000000B1 /* HistoryLocalizable.xcstrings in Resources */,
 				A100000000000000000000B6 /* DebugLocalizable.xcstrings in Resources */,
 				B10000000000000000000004 /* TraceLocalizable.xcstrings in Resources */,
+				A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,6 +420,7 @@
 				B10000000000000000000001 /* TraceWorkspaceView.swift in Sources */,
 				B10000000000000000000002 /* TraceConfigurationView.swift in Sources */,
 				B10000000000000000000003 /* TraceProgressArtifactsView.swift in Sources */,
+				A100000000000000000000D0 /* SettingsRootView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

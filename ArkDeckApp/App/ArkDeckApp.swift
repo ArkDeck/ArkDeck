@@ -19,6 +19,8 @@ struct ArkDeckApp: App {
     provider: DebugApplicationFacade.make())
   @StateObject private var traceWorkspace = TraceWorkspaceViewModel(
     provider: TraceApplicationFacade.make())
+  @StateObject private var settingsWorkspace = SettingsWorkspaceViewModel(
+    provider: SettingsApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
@@ -43,9 +45,16 @@ struct ArkDeckApp: App {
     }
     .defaultSize(width: 1180, height: 760)
     Settings {
-      AutoUpdateSettingsView(model: autoUpdate)
-        .frame(width: 520)
-        .padding(24)
+      SettingsRootView(
+        model: settingsWorkspace,
+        hdcPresentation: hdcDiagnostics.presentation,
+        isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
+        hdcConfigurationError: hdcDiagnostics.configurationError,
+        onHDCRefresh: { hdcDiagnostics.refresh() },
+        onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
+      ) {
+        AutoUpdateSettingsView(model: autoUpdate)
+      }
     }
   }
 }
