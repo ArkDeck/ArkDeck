@@ -299,6 +299,13 @@ final class HDCStatusUITests: XCTestCase {
     pathField.typeKey(.return, modifierFlags: [])
     app.typeKey(.return, modifierFlags: [])
 
+    // The open panel has to be gone before anything below the fold can be
+    // clicked: while it is up the disclosure is present and on screen but has
+    // no hit point, which reports as "unable to find hit point" rather than as
+    // an occlusion.
+    XCTAssertTrue(
+      app.sheets.firstMatch.waitForNonExistence(timeout: 10),
+      "the open panel must close before the Overview is driven again")
     expandAdvancedDiagnostics(app)
     assertDisplayedValue(
       app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)

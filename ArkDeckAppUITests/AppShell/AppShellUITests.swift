@@ -131,7 +131,7 @@ final class AppShellUITests: XCTestCase {
 
     // History renders real Runtime facts and offers no way to submit.
     select("app.navigation.history", in: app)
-    XCTAssertTrue(app.tables["history.table"].waitForExistence(timeout: 10), file: file, line: line)
+    XCTAssertTrue(element("history.table", in: app).waitForExistence(timeout: 10), file: file, line: line)
     assertDisplayed(app.staticTexts["history.readOnlyNote"], equals: history.readOnlyNote)
     for forbidden in ["history.submit", "history.cancel", "history.retry", "history.run"] {
       XCTAssertFalse(
@@ -139,9 +139,12 @@ final class AppShellUITests: XCTestCase {
     }
 
     // An unknown outcome is stated, never folded into the terminal state.
-    let interrupted = app.staticTexts["job-fixture-0002"].firstMatch
-    XCTAssertTrue(interrupted.waitForExistence(timeout: 10), file: file, line: line)
-    interrupted.click()
+    // The table's own text is not clickable; the row is. Reach it through the
+    // per-row state identifier, which is the only identifier the row carries.
+    let interruptedRow = app.cells
+      .containing(.staticText, identifier: "history.row.state.job-fixture-0002").firstMatch
+    XCTAssertTrue(interruptedRow.waitForExistence(timeout: 10), file: file, line: line)
+    interruptedRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
     assertDisplayed(
       app.staticTexts["history.detail.outcomeUnknown"], equals: history.outcomeUnknown)
     assertDisplayed(
@@ -194,8 +197,17 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(
       app.staticTexts["history.unavailable.reason"],
       equals: "ArkDeck Runtime is not reachable: fixture")
-    XCTAssertFalse(app.tables["history.table"].exists, "an unreadable history shows no table")
+    XCTAssertFalse(
+      element("history.table", in: app).exists, "an unreadable history shows no table")
     XCTAssertFalse(app.staticTexts["history.empty.title"].exists, "it is not an empty history")
+  }
+
+
+  /// SwiftUI's Table lands in the NSTableView family, which XCUITest does not
+  /// expose under `app.tables` here — the sidebar List surfaces as an outline
+  /// for the same reason. Ask by identifier and let the type be whatever it is.
+  private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+    app.descendants(matching: .any).matching(identifier: identifier).firstMatch
   }
 
   // MARK: - Helpers

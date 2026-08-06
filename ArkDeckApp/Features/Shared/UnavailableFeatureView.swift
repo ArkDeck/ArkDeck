@@ -25,6 +25,8 @@ struct UnavailableFeatureView: View {
       }
       .multilineTextAlignment(.center)
     }
-    .accessibilityIdentifier("app.unavailable")
+    // Deliberately no container identifier: ContentUnavailableView propagates
+    // one down onto every child, which silently overwrites the title, reason
+    // and no-operation identifiers with the container's own.
   }
 }
