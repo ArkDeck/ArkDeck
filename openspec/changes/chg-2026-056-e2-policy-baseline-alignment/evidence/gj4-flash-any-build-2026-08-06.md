@@ -111,8 +111,16 @@ Re-run immediately after the flash, on `7.0.0.37`:
   `nativePublishMismatch`. The captured diagnostics decode to
   `ARKDECK_CODE_SIGN_ERROR stage=enable code=22 errno=129` and
   `ARKDECK_CODE_SIGN_ERROR stage=verify code=30 errno=61` (`ENODATA`) — fs-verity is not enabled
-  on the published file. The same library on the same code path passed on `7.0.0.36` hours
-  earlier, so this is a firmware behaviour change, not a regression in this work.
+  on the published file.
+
+  > **Superseded, 2026-08-06.** This section originally read "the same library on the same code
+  > path passed on `7.0.0.36` hours earlier, so this is a firmware behaviour change, not a
+  > regression in this work." The first clause is unverified and the second is false. The device's
+  > trusted-certificate table was compared between `7.0.0.35` and `7.0.0.37`: `.37` **adds** two
+  > rows and removes none, so no tightening occurred, and neither build has ever trusted the
+  > certificate the GJ-3 fixture is signed with. The `errno=129` quoted above was also read after
+  > cleanup and did not come from the failing call. See
+  > [gj3-code-sign-2026-08-06.md](gj3-code-sign-2026-08-06.md) for the measured cause.
 
   The product's conduct here is the right one and worth recording: it did not report success, it
   failed closed at the step that could not be verified, it captured the subprocess diagnostics
