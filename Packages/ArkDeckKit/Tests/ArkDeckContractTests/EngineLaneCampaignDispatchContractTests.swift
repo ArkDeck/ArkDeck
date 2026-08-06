@@ -231,7 +231,10 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
         throw EngineLaneSubmissionRefusal(
           detail:
             "the runtime rejected the submission: flash.dayu200@1 is runtime unavailable")
-      })
+      },
+      // The archive reads fine here; this test is about what the *daemon*
+      // answers at submit, so the dispatch must reach it.
+      describeArchive: { board, _ in board })
     let dispatcher = EngineLaneEvolutionFlashDispatcher(
       runtimeTargetID: "TGT-DAYU200-70035", admitter: nil, gateway: gateway)
     let request = try RockchipFlashExecutionRequest(
@@ -386,6 +389,24 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
             throw AgentClientError.transport("connection closed before response")
           }
           return terminal
+        },
+        // Reading the archive is a seam like the other three, so these tests
+        // still prove every branch with no 730 MB file. The fixture answers
+        // with the board carrying the admitted attempt's own archive digest —
+        // the bytes the attempt was admitted for.
+        describeArchive: { board, _ in
+          try board.forBuild(
+            RockchipImageBuildDescriptor(
+              archiveSizeBytes: board.archiveSizeBytes,
+              archiveSHA256: board.archiveSHA256,
+              members: board.members,
+              declaredPartitions: board.mappedPartitions.map {
+                RockchipDeclaredPartition(
+                  name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
+              } + board.membershiplessPartitionsWriteForbidden.map {
+                RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+              },
+              runtimeBuildVersion: board.runtimeBuildVersion))
         })
     }
   }

@@ -62,15 +62,27 @@ package struct EngineLaneRuntimeGateway: Sendable {
   package var bindingRevision: @Sendable (_ targetID: String) throws -> Int
   /// Submits the request and runs it to a terminal.
   package var submitAndRun: @Sendable (_ requestJSON: String) throws -> EngineLaneJobTerminal
+  /// The board carrying the facts of the archive about to be dispatched.
+  ///
+  /// A seam like the other three, so the dispatcher's contract tests keep
+  /// proving every branch without a 730 MB file. Production reads the archive,
+  /// which is the only way to know the bytes are the ones the attempt was
+  /// admitted for.
+  package var describeArchive:
+    @Sendable (_ board: RockchipFlashProfile, _ archiveURL: URL) throws -> RockchipFlashProfile
 
   package init(
     importFlashBundle: @escaping @Sendable (String, URL, RockchipFlashProfile) throws -> String,
     bindingRevision: @escaping @Sendable (String) throws -> Int,
-    submitAndRun: @escaping @Sendable (String) throws -> EngineLaneJobTerminal
+    submitAndRun: @escaping @Sendable (String) throws -> EngineLaneJobTerminal,
+    describeArchive: (
+      @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
+    )? = nil
   ) {
     self.importFlashBundle = importFlashBundle
     self.bindingRevision = bindingRevision
     self.submitAndRun = submitAndRun
+    self.describeArchive = describeArchive ?? { board, url in try board.forArchive(at: url) }
   }
 }
 
@@ -110,13 +122,30 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
         "the engine lane requires a campaign reservation minted before dispatch")
     }
     guard
-      let profile = RockchipFlashProfile.profile(
-        reference: admitted.deviceProfileReference),
-      profile.archiveSHA256 == admitted.archiveSHA256,
-      profile.mappedPartitions.map(\.partitionName) == admitted.partitionPlan
+      let board = RockchipFlashProfile.board(reference: admitted.deviceProfileReference),
+      board.mappedPartitions.map(\.partitionName) == admitted.partitionPlan
     else {
       throw RockchipFlashExecutionError.admissionRejected(
-        "admitted attempt does not name an exact published DAYU200 profile")
+        "admitted attempt does not name a published DAYU200 board and its partition set")
+    }
+    // The archive about to be dispatched must be the one the attempt was
+    // admitted for. That used to be checked by comparing the admitted digest
+    // against a board constant's — two compiled-in values agreeing with each
+    // other, which said nothing about the bytes in `request.archiveURL` and
+    // refused every build the product did not already enumerate.
+    //
+    // Reading the archive answers the question that was actually being asked,
+    // and yields the profile carrying this build's facts for the import below.
+    let profile: RockchipFlashProfile
+    do {
+      profile = try gateway.describeArchive(board, request.archiveURL)
+    } catch {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "dispatched archive does not fit \(board.catalogReference): \(error)")
+    }
+    guard profile.archiveSHA256 == admitted.archiveSHA256 else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "dispatched archive is not the one this attempt was admitted for")
     }
 
     let lease: String
