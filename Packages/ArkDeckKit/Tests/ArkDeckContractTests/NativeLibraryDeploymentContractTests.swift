@@ -312,6 +312,55 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       try NativeLibraryArtifactValidator.validate(noBuildID, expectedABI: .arm64))
   }
 
+  /// The helper must report the errno of the call that failed, not of the
+  /// cleanup that followed it.
+  ///
+  /// `free`, `close` and `unlink` are all allowed to set errno, and every
+  /// failure path in this helper does one of them before returning. Reading
+  /// `errno` at the reporting site therefore reports the cleanup's value. That
+  /// is not cosmetic: on 2026-08-06 a real kernel refusal of
+  /// `FS_IOC_ENABLE_CODE_SIGN` on OpenHarmony 7.0.0.37 reached a maintainer as
+  /// `errno=129`, a value the ioctl never returned, and the reported errno is
+  /// the only thing that separates "this signature is not trusted" from "this
+  /// kernel does not offer the feature" — two problems with completely
+  /// different fixes.
+  ///
+  /// A source-shape test because the helper is a static arm64 binary that runs
+  /// on the device: nothing in this suite can execute it and read what it
+  /// printed. What can be checked is that no reporting site reads live `errno`.
+  func testTheCodeSignHelperReportsTheFailingCallsErrnoNotTheCleanups() throws {
+    let source = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Tools/OpenHarmonyNativeCodeSignHelper/main.c")
+    let code = try String(contentsOf: source)
+
+    // Every diagnostic prints the captured value.
+    let reports = code.components(separatedBy: "ARKDECK_CODE_SIGN_ERROR").dropFirst()
+    XCTAssertGreaterThan(reports.count, 4, "helper layout drifted")
+    for report in reports {
+      guard let end = report.range(of: ");") else { continue }
+      let call = String(report[report.startIndex..<end.upperBound])
+      XCTAssertTrue(
+        call.contains("captured_errno"),
+        "a diagnostic reports live errno after cleanup has run:\n\(call)")
+    }
+    // And nothing reads live `errno` as a reporting argument anywhere. The
+    // captured reads are removed first, since `captured_errno);` contains
+    // `errno);` as a substring and would mask exactly what this looks for.
+    let withoutCaptured = code.replacingOccurrences(of: "captured_errno", with: "")
+    XCTAssertFalse(
+      withoutCaptured.contains("errno);"),
+      "live errno is still being read at a reporting site")
+    // The capture itself happens before cleanup at the call that matters.
+    XCTAssertTrue(
+      code.contains(
+        """
+        if (ioctl(fd, FS_IOC_ENABLE_CODE_SIGN, &parsed.argument) != 0) {
+        """),
+      "the enable ioctl moved; re-check that its errno is captured first")
+  }
+
   func testBundledCodeSignHelperIsAValidatedStaticArm64Executable() throws {
     let helper = try HDCNativeCodeSignHelperArtifact.bundled()
     let contents = try Data(contentsOf: helper.fileURL)
