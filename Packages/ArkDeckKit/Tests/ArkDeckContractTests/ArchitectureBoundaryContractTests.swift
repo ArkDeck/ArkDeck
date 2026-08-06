@@ -409,6 +409,35 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// verification had nothing to compare against. Threading a fact into N call
   /// sites by hand fails at N > 1; what catches it is asking the source
   /// whether any site was left behind.
+  /// The campaign lane must not resolve a firmware build by recognising its
+  /// digest among the ones compiled into the product.
+  ///
+  /// This was the eleventh and last such pin, and the only one no test could
+  /// have caught: the admitter takes a real `RockchipProductionAdmissionPort`
+  /// with no seam to substitute, so nothing exercises it below a live
+  /// campaign. It was found by running one — the flash was refused with
+  /// `execute plan has no exact published profile` after preview, plan and
+  /// engine admission had all gone green.
+  ///
+  /// A source-shape test is the honest guard here. It cannot prove the lane
+  /// admits a new build; it can prove the lookup that refused one has not come
+  /// back, which is what a future change would most plausibly reintroduce.
+  func testTheCampaignLaneDoesNotSelectAProfileByArchiveDigest() throws {
+    let admitter = packageRoot()
+      .appendingPathComponent("Sources/ArkDeckWorkflows/EvolutionCampaignEngineLaneAdmitter.swift")
+    let code = try String(contentsOf: admitter)
+    XCTAssertFalse(
+      code.contains("$0.archiveSHA256 == admission.plan.archiveSHA256"),
+      "the campaign lane is matching the plan's archive against compiled-in builds again")
+    XCTAssertFalse(
+      code.contains("RockchipFlashProfile.profile(archiveSHA256:"),
+      "the campaign lane is resolving a profile by archive digest again")
+    // The archive the attempt carries is the confirmed plan's, and the
+    // partition set is the board's. Both are what the operator confirmed.
+    XCTAssertTrue(code.contains("archiveSHA256: admission.plan.archiveSHA256"), code)
+    XCTAssertTrue(code.contains("partitionPlan: board.mappedPartitions"), code)
+  }
+
   func testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion() throws {
     let engine = packageRoot()
       .appendingPathComponent("Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
