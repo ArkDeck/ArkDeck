@@ -18,7 +18,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "npm run build:types && npm run build:js && npm run build:css",
+    "build": "npm run check:tokens && npm run build:types && npm run build:js && npm run build:css",
+    "check:tokens": "node scripts/check-tokens.mjs",
     "build:types": "tsc -p tsconfig.json",
     "build:js": "esbuild src/index.ts --bundle --format=esm --jsx=automatic --external:react --external:react-dom --external:react/jsx-runtime --outfile=dist/index.js",
     "build:css": "node scripts/copy-css.mjs"
