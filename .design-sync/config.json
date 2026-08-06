@@ -13,6 +13,10 @@
     "EffectBadge": { "cardMode": "column" },
     "IndeterminateBar": { "cardMode": "column" },
     "Tabs": { "cardMode": "column" },
-    "WindowFrame": { "cardMode": "column" }
+    "WindowFrame": { "cardMode": "column" },
+    "StatusStrip": { "cardMode": "column", "viewport": "1100x700" },
+    "BudgetMeters": { "cardMode": "column" },
+    "StageTrack": { "cardMode": "column" },
+    "ToolbarButton": { "cardMode": "column" }
   }
 }

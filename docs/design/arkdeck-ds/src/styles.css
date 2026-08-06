@@ -446,3 +446,145 @@
 }
 .ad-dialog__checks input { margin-top: 3px; accent-color: var(--ad-danger); }
 .ad-dialog__foot { display: flex; justify-content: flex-end; gap: var(--ad-space-3); }
+
+/* ── shell: toolbar, symbols, status strip ─────────────────────────────── */
+
+/* Chrome, not content: 28px and translucent so it reads as part of the window
+   frame. `color-mix` gives the material look over whatever the titlebar shows. */
+.ad-toolbar-btn {
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ad-space-2);
+  font-family: var(--ad-font-ui);
+  font-size: var(--ad-text-xs);
+  border: 1px solid var(--ad-line);
+  background: color-mix(in srgb, var(--ad-panel-solid) 78%, transparent);
+  color: var(--ad-ink-2);
+  border-radius: var(--ad-radius-sm);
+  padding: 0 9px;
+  cursor: pointer;
+  box-shadow: var(--ad-control-shadow);
+}
+.ad-toolbar-btn:hover:not(:disabled) { color: var(--ad-ink); border-color: var(--ad-accent); }
+.ad-toolbar-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ad-toolbar-btn--icon { width: 28px; padding: 0; }
+.ad-toolbar-btn:focus-visible { outline: 2px solid var(--ad-accent); outline-offset: 2px; }
+
+/* Inherits size and color from its context, so one glyph works in a nav row,
+   a button and a callout without per-use styling. */
+.ad-symbol {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  flex: none;
+}
+.ad-symbol--sm { width: 14px; height: 14px; }
+
+/* Hairline-separated cells: the 1px gap over a --ad-line background is what
+   draws the dividers, so cells stay flush without per-cell borders. */
+.ad-summary-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) repeat(var(--ad-strip-rest, 3), minmax(100px, 0.7fr));
+  gap: 1px;
+  background: var(--ad-line);
+  border: 1px solid var(--ad-line);
+  border-radius: var(--ad-radius-xl);
+  overflow: hidden;
+  box-shadow: var(--ad-control-shadow);
+  font-family: var(--ad-font-ui);
+}
+.ad-summary-cell { background: var(--ad-panel-solid); padding: 11px 13px; min-width: 0; }
+.ad-summary-cell small {
+  display: block;
+  color: var(--ad-ink-2);
+  font-size: 10.5px;
+  margin-bottom: 2px;
+}
+.ad-summary-cell b {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--ad-text-sm);
+}
+@media (max-width: 980px) {
+  .ad-summary-strip { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── harness: budgets, stages, typed operations ────────────────────────── */
+
+.ad-budget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: var(--ad-space-4);
+  font-family: var(--ad-font-ui);
+}
+.ad-metric { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ad-metric__v {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ad-space-2);
+  font-size: var(--ad-text-xs);
+  color: var(--ad-ink-2);
+  /* budgets are read as they tick — keep the digits from shifting */
+  font-variant-numeric: tabular-nums;
+}
+.ad-meter { height: 5px; border-radius: 999px; background: var(--ad-line); overflow: hidden; }
+.ad-meter i { display: block; height: 100%; border-radius: inherit; background: var(--ad-accent); }
+
+.ad-stage-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  overflow-x: auto;
+  padding: 5px 0 2px;
+  font-family: var(--ad-font-ui);
+}
+.ad-stage-node {
+  min-width: 88px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ad-space-2);
+  color: var(--ad-ink-2);
+  font-size: 10.5px;
+  text-align: center;
+}
+.ad-stage-node::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ad-line);
+  background: var(--ad-panel-solid);
+  z-index: 1;
+}
+/* the connector, drawn from each node to the next */
+.ad-stage-node::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  right: -50%;
+  height: 2px;
+  background: var(--ad-line);
+}
+.ad-stage-node:last-child::after { display: none; }
+.ad-stage-node--done::before { background: var(--ad-ok); border-color: var(--ad-ok); }
+.ad-stage-node--now { color: var(--ad-ink); font-weight: 600; }
+.ad-stage-node--now::before {
+  background: var(--ad-accent);
+  border-color: var(--ad-accent);
+  box-shadow: 0 0 0 4px var(--ad-accent-weak);
+}
+
+.ad-op-list { display: flex; gap: var(--ad-space-2); flex-wrap: wrap; }
+.ad-op-list .ad-chip { font-family: var(--ad-font-mono); font-weight: 500; }
