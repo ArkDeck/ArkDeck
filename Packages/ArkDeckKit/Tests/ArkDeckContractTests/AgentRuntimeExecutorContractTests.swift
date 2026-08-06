@@ -215,9 +215,14 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       outcomeUnknown: false,
       startedAtUTC: "2026-08-03T00:00:01Z",
       firstEvidenceStepAtUTC: "2026-08-03T00:00:01Z",
-      finishedAtUTC: "2026-08-03T00:00:02Z")
+      finishedAtUTC: "2026-08-03T00:00:02Z",
+      inputs: ["userdataPolicy": .string("preserve")])
     let encoded = RuntimeControlPlaneHandler.encodeEvidence(
       snapshot: snapshot, artifacts: [], blockers: [])
+    guard case .object(let encodedFields) = encoded,
+      case .object(let parameterFields)? = encodedFields["parameters"]
+    else { return XCTFail("job.evidence must project typed parameters") }
+    XCTAssertEqual(parameterFields["userdataPolicy"], .string("preserve"))
     let bytes = try JSONEncoder().encode(encoded)
     let trusted = try JSONDecoder().decode(RuntimeHardwareEvidenceTrustedFacts.self, from: bytes)
 

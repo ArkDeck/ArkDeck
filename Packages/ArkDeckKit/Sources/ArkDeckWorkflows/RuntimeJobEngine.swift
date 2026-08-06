@@ -79,6 +79,47 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   /// decoding.
   public var outstandingResidueCount: Int?
   public let timeline: [String]
+  /// Read-only History facts. Runtime jobs are execute records today, but the
+  /// optional wire shape preserves honest compatibility with older daemons
+  /// and leaves room for a future persisted simulated mode without guessing.
+  public let executionMode: String?
+  public let sessionID: String?
+  public let actualEffect: String?
+  public let createdAtUTC: String?
+  public let startedAtUTC: String?
+  public let finishedAtUTC: String?
+
+  public init(
+    jobID: String,
+    operationReference: String,
+    targetID: String,
+    state: String,
+    waitingForHuman: Bool,
+    outcomeUnknown: Bool,
+    outstandingResidueCount: Int?,
+    timeline: [String],
+    executionMode: String? = nil,
+    sessionID: String? = nil,
+    actualEffect: String? = nil,
+    createdAtUTC: String? = nil,
+    startedAtUTC: String? = nil,
+    finishedAtUTC: String? = nil
+  ) {
+    self.jobID = jobID
+    self.operationReference = operationReference
+    self.targetID = targetID
+    self.state = state
+    self.waitingForHuman = waitingForHuman
+    self.outcomeUnknown = outcomeUnknown
+    self.outstandingResidueCount = outstandingResidueCount
+    self.timeline = timeline
+    self.executionMode = executionMode
+    self.sessionID = sessionID
+    self.actualEffect = actualEffect
+    self.createdAtUTC = createdAtUTC
+    self.startedAtUTC = startedAtUTC
+    self.finishedAtUTC = finishedAtUTC
+  }
 }
 
 public struct RuntimeJobStatusPage: Sendable, Equatable {
@@ -277,6 +318,10 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let startedAtUTC: String?
   public let firstEvidenceStepAtUTC: String?
   public let finishedAtUTC: String?
+  /// Persisted typed inputs for the read-only History parameter inspector.
+  /// They remain structured JSON values; no executable or argv can be
+  /// reconstructed from this projection.
+  public var inputs: [String: JSONValue]? = nil
 }
 
 public struct RuntimeJobAcceptance: Sendable, Equatable {
@@ -2597,7 +2642,8 @@ public actor RuntimeJobEngine {
       outcomeUnknown: record.outcomeUnknown,
       startedAtUTC: record.startedAtUTC,
       firstEvidenceStepAtUTC: record.firstEvidenceStepAtUTC,
-      finishedAtUTC: record.finishedAtUTC)
+      finishedAtUTC: record.finishedAtUTC,
+      inputs: record.request.inputs)
   }
 
   /// Artifact names omitted by the exact materialized request, including
@@ -4812,7 +4858,13 @@ public actor RuntimeJobEngine {
       waitingForHuman: record.state == "waitingForRecovery",
       outcomeUnknown: record.outcomeUnknown,
       outstandingResidueCount: record.outstandingResidueCount,
-      timeline: record.timeline)
+      timeline: record.timeline,
+      executionMode: "execute",
+      sessionID: record.sessionID,
+      actualEffect: record.actualEffect,
+      createdAtUTC: record.createdAtUTC,
+      startedAtUTC: record.startedAtUTC,
+      finishedAtUTC: record.finishedAtUTC)
   }
 
   private static func fingerprint(of data: Data) -> String {

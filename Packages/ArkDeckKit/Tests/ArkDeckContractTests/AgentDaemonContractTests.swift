@@ -1410,6 +1410,12 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("status must survive restart")
     }
     XCTAssertEqual(recoveredState, "succeeded")
+    XCTAssertEqual(statusFields["executionMode"], .string("execute"))
+    XCTAssertEqual(statusFields["sessionId"], .string("session-\(jobID)"))
+    XCTAssertEqual(statusFields["actualEffect"], .string("readOnly"))
+    XCTAssertNotEqual(statusFields["createdAtUtc"], .null)
+    XCTAssertNotEqual(statusFields["startedAtUtc"], .null)
+    XCTAssertNotEqual(statusFields["finishedAtUtc"], .null)
   }
 
   func testGracefulDrainCompletesInFlightJobBeforeReleasingTheDaemonLock() async throws {

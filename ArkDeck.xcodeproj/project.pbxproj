@@ -10,6 +10,7 @@
 		A10000000000000000000010 /* ArkDeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000020 /* ArkDeckApp.swift */; };
 		A10000000000000000000011 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* Localizable.xcstrings */; };
 		A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A4 /* FlashLocalizable.xcstrings */; };
+		A100000000000000000000B1 /* HistoryLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B2 /* HistoryLocalizable.xcstrings */; };
 		A10000000000000000000012 /* ArkDeckCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000091 /* ArkDeckCore */; };
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
 		A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002F /* UnavailableFeatureView.swift */; };
@@ -34,6 +35,7 @@
 		A10000000000000000000020 /* ArkDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000021 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A100000000000000000000A4 /* FlashLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = FlashLocalizable.xcstrings; sourceTree = "<group>"; };
+		A100000000000000000000B2 /* HistoryLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = HistoryLocalizable.xcstrings; sourceTree = "<group>"; };
 		A10000000000000000000022 /* ArkDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArkDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000023 /* ArkDeckApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArkDeckApp.entitlements; sourceTree = "<group>"; };
 		A10000000000000000000024 /* HDCStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDCStatusView.swift; sourceTree = "<group>"; };
@@ -124,6 +126,7 @@
 			children = (
 				A10000000000000000000021 /* Localizable.xcstrings */,
 				A100000000000000000000A4 /* FlashLocalizable.xcstrings */,
+				A100000000000000000000B2 /* HistoryLocalizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -282,6 +285,7 @@
 			files = (
 				A10000000000000000000011 /* Localizable.xcstrings in Resources */,
 				A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */,
+				A100000000000000000000B1 /* HistoryLocalizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
