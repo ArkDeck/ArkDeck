@@ -306,6 +306,27 @@ static int verify_code_sign(const char *path) {
   return 0;
 }
 
+/// Whether `path` is attested by fs-verity right now.
+///
+/// Publish branches on this answer, and it is measured rather than inferred
+/// from a failed `enable`. Inferring would be the same code with none of the
+/// guarantee: a signature the kernel refuses and a platform that does not
+/// attest this class of file at all would take the same path, and the first
+/// of those must stay a failure.
+static int is_attested(const char *path) {
+  char digest[65];
+  int attested;
+  int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+  if (fd < 0) {
+    // Not "unattested" so much as unreadable; `copy_for_publish` opens the
+    // same path next and fails there with the errno that explains it.
+    return 0;
+  }
+  attested = measure_verity(fd, digest, sizeof(digest)) == 0;
+  close(fd);
+  return attested;
+}
+
 static int copy_for_publish(const char *source_path, const char *target_path,
                             const char *prepared_path) {
   struct stat source_metadata;
@@ -390,19 +411,27 @@ static int publish_code_signed(const char *source_path, const char *target_path,
                                const char *prepared_path) {
   char enabled_digest[65];
   char published_digest[65];
+  // The file being replaced decides how much the replacement must carry. A
+  // platform that does not attest this class of file leaves nothing to enable,
+  // and requiring more of the replacement than the original ever had is what
+  // stopped this operation publishing at all on such a device. Measured before
+  // anything is written, while the target is still the original.
+  const int replaced_is_attested = is_attested(target_path);
   int result = copy_for_publish(source_path, target_path, prepared_path);
   if (result != 0) {
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=prepare code=%d errno=%d\n",
             result, captured_errno);
     return result;
   }
-  result = enable_code_sign_internal(prepared_path, enabled_digest,
-                                     sizeof(enabled_digest));
-  if (result != 0) {
-    fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=enable code=%d errno=%d\n",
-            result, captured_errno);
-    (void)unlink(prepared_path);
-    return result;
+  if (replaced_is_attested) {
+    result = enable_code_sign_internal(prepared_path, enabled_digest,
+                                       sizeof(enabled_digest));
+    if (result != 0) {
+      fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=enable code=%d errno=%d\n",
+              result, captured_errno);
+      (void)unlink(prepared_path);
+      return result;
+    }
   }
   if (rename(prepared_path, target_path) != 0) {
     capture_errno();
@@ -411,6 +440,13 @@ static int publish_code_signed(const char *source_path, const char *target_path,
             result, captured_errno);
     (void)unlink(prepared_path);
     return result;
+  }
+  if (!replaced_is_attested) {
+    // Said rather than left silent: the caller reads this to tell "published
+    // with no attestation because there was none to match" from "published
+    // with fs-verity", and neither is reported as the other.
+    printf("ARKDECK_CODE_SIGN_PUBLISHED_UNATTESTED replaced-file-had-none\n");
+    return 0;
   }
   int target = open(target_path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
   if (target < 0 ||

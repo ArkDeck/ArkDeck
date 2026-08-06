@@ -138,12 +138,28 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     let mode: Mode
     let newHash: String
     let oldHash = String(repeating: "c", count: 64)
+    /// Whether the simulated platform attests app-owned native libraries at
+    /// all. `false` is the DAYU200 / OpenHarmony 7.0.0.37 case: the installer
+    /// leaves these files without fs-verity, so there is none to match.
+    let platformAttests: Bool
+    /// Publish claims fs-verity that the device then cannot read back. The
+    /// replaced file was attested, so this must stay a failure.
+    let downgradeAttestation: Bool
+    /// The backup readback fails with `ENOENT` rather than answering. Nothing
+    /// is then known about what the replaced library carried.
+    let unreadableBackup: Bool
     private let lock = NSLock()
     private var actions: [String] = []
 
-    init(mode: Mode, newHash: String) {
+    init(
+      mode: Mode, newHash: String, platformAttests: Bool = true,
+      downgradeAttestation: Bool = false, unreadableBackup: Bool = false
+    ) {
       self.mode = mode
       self.newHash = newHash
+      self.platformAttests = platformAttests
+      self.downgradeAttestation = downgradeAttestation
+      self.unreadableBackup = unreadableBackup
     }
 
     func actionNames() -> [String] {
@@ -162,6 +178,34 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       }
       func absent(_ path: String = "owned") -> ProviderSubprocessReceipt {
         sub("ls: \(path): No such file or directory\n")
+      }
+      /// A `verify` of a file the platform never attested. The helper writes
+      /// its diagnostic to stderr and exits non-zero, so no digest parses.
+      /// `errno=61` is `ENODATA`: the file is there and carries no fs-verity.
+      /// Modelled the way HDC actually returns it: the helper writes to
+      /// stderr, HDC merges the remote streams onto stdout and reports its
+      /// own exit status. The first version of this fixture put the line on
+      /// stderr with a non-zero exit — green here, and matching nothing a
+      /// device returns.
+      func unattested(errno: Int = 61) -> ProviderSubprocessReceipt {
+        ProviderSubprocessReceipt(
+          exitStatus: 0,
+          stdout: Data(
+            "ARKDECK_CODE_SIGN_ERROR stage=verify code=30 errno=\(errno)\n".utf8),
+          stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01)
+      }
+      func verifyReplaced() -> ProviderSubprocessReceipt {
+        if unreadableBackup {
+          // `ENOENT`. Not an answer about the replaced file at all.
+          return unattested(errno: 2)
+        }
+        return platformAttests
+          ? sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n") : unattested()
+      }
+      func verifyPublished() -> ProviderSubprocessReceipt {
+        if downgradeAttestation { return unattested() }
+        return verifyReplaced()
       }
       func receipt(_ subprocesses: [ProviderSubprocessReceipt]) -> ProviderProcessReceipt {
         ProviderProcessReceipt(
@@ -218,9 +262,12 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         }
         return receipt([
           sub("-rw------- 1 20010050 20010050 16 old\n"),
-          sub("ARKDECK_CODE_SIGN_PUBLISHED sha256:\(oldHash)\n"),
+          verifyReplaced(),
+          platformAttests
+            ? sub("ARKDECK_CODE_SIGN_PUBLISHED sha256:\(oldHash)\n")
+            : sub("ARKDECK_CODE_SIGN_PUBLISHED_UNATTESTED replaced-file-had-none\n"),
           sub("\(newHash)  target\n"),
-          sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+          verifyPublished(),
           sub("-rw------- 1 20010050 20010050 256 target\n"),
         ])
       case .stopNativeTarget:
@@ -231,19 +278,19 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         if mode == .loaderFailure {
           return receipt([
             sub("\(newHash)  target\n"),
-            sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+            verifyReplaced(), verifyPublished(),
             sub(exit: 1),
           ])
         }
         return receipt([
           sub("\(newHash)  target\n"),
-          sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+          verifyReplaced(), verifyPublished(),
           sub("4321\n"),
         ])
       case .inspectNativeLibrary(_, .targetMatchesArtifact):
         return receipt([
           sub("\(newHash)  target\n"),
-          sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(oldHash)\n"),
+          verifyReplaced(), verifyPublished(),
         ])
       case .inspectNativeLibrary(_, .cleanupComplete):
         if mode == .cleanupContinuation {
@@ -443,6 +490,12 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       invocations.map { Array($0.arguments.dropFirst(2)) },
       [
         ["shell", "ls", "-ln", deployment.targetPath],
+        // The backup is a hard link to the file being replaced, so this reads
+        // what the publish must at least match.
+        [
+          "shell", deployment.codeSignHelperRemotePath!, "verify",
+          deployment.backupPath,
+        ],
         [
           "shell", deployment.codeSignHelperRemotePath!, "publish",
           deployment.stagingPath, deployment.targetPath,
@@ -722,6 +775,13 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       Set(success.artifacts.map(\.name)),
       Set(["publish-report.json", "verification-report.json"]))
     XCTAssertFalse(success.dispatcher.actionNames().contains("rollback"))
+    // The attested path is unchanged: it still records the digest it enabled.
+    let attestedPublish = try XCTUnwrap(
+      success.status.timeline.first { $0.hasPrefix("verified atomic-publish") },
+      "timeline: \(success.status.timeline)")
+    XCTAssertTrue(
+      attestedPublish.contains("fsVerityDigest"),
+      "an attested publish must still record its digest: \(attestedPublish)")
 
     let failed = try await runNative(mode: .loaderFailure, suffix: "rollback")
     XCTAssertEqual(failed.status.state, "failed")
@@ -791,9 +851,119 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertTrue(remainingDebt.isEmpty)
   }
 
+
+  /// `DHA-VERITY-001` — the platform attests nothing, and publish still works.
+  ///
+  /// This is the measured DAYU200 / OpenHarmony 7.0.0.37 case. Before this,
+  /// the operation could not publish at all on such a device: it required the
+  /// replacement to carry fs-verity that the file it replaced never had and
+  /// that the platform will not grant.
+  func testPublishSucceedsWhenThePlatformAttestsNoAppOwnedLibrary() async throws {
+    let result = try await runNative(
+      mode: .success, suffix: "unattested", platformAttests: false)
+    XCTAssertEqual(
+      result.status.state, "succeeded",
+      "timeline: \(result.status.timeline)")
+    XCTAssertFalse(result.dispatcher.actionNames().contains("rollback"))
+
+    // The record says what was actually achieved. The timeline carries the
+    // verified summary's keys, and an `fsVerityDigest` key at all would read
+    // as a file carrying fs-verity — so there must not be one, neither an
+    // empty string nor a placeholder.
+    let publish = try XCTUnwrap(
+      result.status.timeline.first { $0.hasPrefix("verified atomic-publish") },
+      "timeline: \(result.status.timeline)")
+    XCTAssertTrue(
+      publish.contains("attestation"),
+      "publish must record the attestation actually achieved: \(publish)")
+    XCTAssertFalse(
+      publish.contains("fsVerityDigest"),
+      "an unattested publish must not carry an fs-verity field at all: \(publish)")
+  }
+
+  /// `DHA-VERITY-002` — the floor still holds in the direction that matters.
+  ///
+  /// The replaced library was attested, so a replacement the device cannot
+  /// read back as attested is a downgrade and must fail, whatever the helper
+  /// announced. Without this the change would read as "verity is optional
+  /// now", which is exactly what it is not.
+  func testAttestedLibraryCannotBeReplacedByAnUnattestedOne() async throws {
+    let result = try await runNative(
+      mode: .success, suffix: "downgrade", platformAttests: true,
+      downgradeAttestation: true)
+    XCTAssertNotEqual(
+      result.status.state, "succeeded",
+      "an attested library must not be replaceable by an unattested one; "
+        + "timeline: \(result.status.timeline)")
+    XCTAssertTrue(
+      result.status.timeline.contains { $0.contains("nativePublishMismatch") },
+      "timeline: \(result.status.timeline)")
+  }
+
+  /// `DHA-VERITY-002` — the branch is chosen by the measurement, in the
+  /// helper as well as here.
+  ///
+  /// A helper that instead tried `enable` and carried on when it failed would
+  /// pass every test above while giving none of the guarantee: a refused
+  /// signature and an absent feature would take the same path. The shape is
+  /// checked at the source, because nothing in this suite can run an arm64
+  /// device binary and observe which branch it took.
+  func testTheCodeSignHelperDecidesByMeasurementNotByAFailedEnable() throws {
+    let source = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Tools/OpenHarmonyNativeCodeSignHelper/main.c")
+    let code = try String(contentsOf: source, encoding: .utf8)
+
+    // The decision is taken from the file being replaced, before anything is
+    // written, and the enable is inside that branch.
+    XCTAssertTrue(
+      code.contains("const int replaced_is_attested = is_attested(target_path);"),
+      "publish no longer measures the file it replaces before writing")
+    let publishStart = try XCTUnwrap(code.range(of: "static int publish_code_signed("))
+    let publishBody = code[publishStart.lowerBound...]
+    let publishEnd = try XCTUnwrap(publishBody.range(of: "\n}\n"))
+    let publish = String(publishBody[..<publishEnd.lowerBound])
+    let enableIndex = try XCTUnwrap(
+      publish.range(of: "enable_code_sign_internal(")).lowerBound
+    let branchIndex = try XCTUnwrap(
+      publish.range(of: "if (replaced_is_attested) {")).lowerBound
+    XCTAssertLessThan(
+      branchIndex, enableIndex,
+      "the enable must sit inside the measured branch, not before it")
+    let renameIndex = try XCTUnwrap(publish.range(of: "rename(")).lowerBound
+    XCTAssertLessThan(
+      enableIndex, renameIndex,
+      "a refused enable must still be unable to reach the rename")
+  }
+
+
+  /// `DHA-VERITY-002` — "no digest came back" is two different facts.
+  ///
+  /// The readback that establishes what the replaced library carried can fail
+  /// because the file has no fs-verity, or because it is not there to read.
+  /// Only the first may license publishing a library with none. They used to
+  /// arrive identically — as an absent digest — and they are told apart now by
+  /// the errno the helper records at the failing call: `ENODATA` is an answer,
+  /// `ENOENT` is not.
+  func testAnUnreadableBackupIsNotTakenAsProofTheOriginalHadNoAttestation()
+    async throws
+  {
+    let result = try await runNative(
+      mode: .success, suffix: "backup-gone", platformAttests: false,
+      unreadableBackup: true)
+    XCTAssertNotEqual(
+      result.status.state, "succeeded",
+      "a backup that cannot be read establishes nothing about the replaced "
+        + "library; timeline: \(result.status.timeline)")
+  }
+
   private func runNative(
     mode: NativeDispatcher.Mode,
-    suffix: String
+    suffix: String,
+    platformAttests: Bool = true,
+    downgradeAttestation: Bool = false,
+    unreadableBackup: Bool = false
   ) async throws -> (
     status: RuntimeJobStatus,
     artifacts: [RuntimeArtifactMetadata],
@@ -825,7 +995,10 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appendingPathComponent(
         "capabilities-\(suffix)", isDirectory: true))
-    let dispatcher = NativeDispatcher(mode: mode, newHash: hash)
+    let dispatcher = NativeDispatcher(
+      mode: mode, newHash: hash, platformAttests: platformAttests,
+      downgradeAttestation: downgradeAttestation,
+      unreadableBackup: unreadableBackup)
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: stateDirectory.appendingPathComponent(

@@ -309,7 +309,15 @@
 
 ## TASK-DHA-006 — 发布判定镜像被替换文件的证明等级(r10)
 
-- Status:ready
+- Status:done
+- Done:2026-08-06;随本实现 PR 合入生效(维护者 review + merge 即批准);
+  `DHA-VERITY-001`..`DHA-VERITY-003` **全部 PASS** —— 真机那条为
+  `job-0ceaecb9fddb3596b564d6ff3549bc55`(DAYU200 / OpenHarmony 7.0.0.37,
+  终态 succeeded,设备读回内容 hash 恰为租约值、属主逐项保持、
+  publish 报告记 `attestation=matchesReplacedFile:none` 且不带 `fsVerityDigest`);
+  evidence = `evidence/runs/TASK-DHA-006/run-r10.md`。
+  **严格分支(原文件带 verity)真机未覆盖** —— 该机上不存在能被证明的文件,
+  这正是本任务的发现本身;严格分支只由 contract 面覆盖,如实记在 evidence 里
 - Platform:macos
 - Requirements:proposal r10 What 1-4(替换前单独测量被替换文件的 fs-verity;
   helper `publish` 按该测量选择分支而非按调用结果;判定重述为"至少同等可证"
