@@ -14,8 +14,7 @@ const col = {
 /** 原型 recoveryHTML() 第一项,逐字照抄。 */
 const FLASH_DETAIL = (
   <>
-    上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。
-    设备最后处于 updater 模式。
+    上次会话在「Flash Steps · flashPartition(system)」写入 intent 后异常退出,未记录 outcome。设备最后处于 updater 模式。
     <br />
     Provider 未声明 restartSafe —— <b>不提供自动续跑</b>,请按 RecoveryGuide 人工确认设备状态。
   </>
@@ -97,12 +96,10 @@ export const OutcomeUnknownNoResume = () => (
     <RecoveryBanner items={[flashUnknown()]} />
     <Card title="规格 §4.2:这里不渲染任何像是可续跑的东西">
       <p style={hint}>
-        intent 已写、outcome 未记 —— 包括 ArkDeck 在内没人知道设备做了什么。所以该 kind 在类型上
-        就没有 resume 回调可传,只有 Provider 的 RecoveryGuide 与显式归档。
+        intent 已写、outcome 未记 —— 包括 ArkDeck 在内没人知道设备做了什么。所以该 kind 在类型上就没有 resume 回调可传,只有 Provider 的 RecoveryGuide 与显式归档。
       </p>
       <p style={hint}>
-        归档按 danger 描边:它只停止 ArkDeck 的跟踪,不会证明设备已恢复正常、不会停止可能仍在设备上
-        运行的远端任务、不会回滚已改的 persist.* 参数。归档后该 Session 永久保留 outcomeUnknown 与
+        归档按 danger 描边:它只停止 ArkDeck 的跟踪,不会证明设备已恢复正常、不会停止可能仍在设备上运行的远端任务、不会回滚已改的 persist.* 参数。归档后该 Session 永久保留 outcomeUnknown 与
         needsAttention 标记,与其冲突的新任务将被 preflight 阻断。
       </p>
     </Card>

@@ -46,10 +46,12 @@ each drift kind. It catches seven things:
    but the roster was not, and six missing components went unnoticed until
    somebody hand-diffed the two prototypes. The check also fails if a mapping
    names a component the package doesn't export, or if the prototype drops a
-   class still mapped. **`KNOWN_GAPS` prints on every run** — currently 3
-   surfaces (text input, radio group, Trace tag picker), which is the honest
-   backlog, not a passing grade. The Recovery banner and Job inspector that
-   first populated that list are now built.
+   class still mapped. **`KNOWN_GAPS` prints on every run** when it has
+   entries — it is **empty today**: every surface the prototype draws has a
+   component. It started at eight (Recovery banner, Job inspector, form
+   controls) and was worked down deliberately. Put the next gap there rather
+   than leaving a class unclassified, so it stays visible instead of becoming
+   the kind of silent hole this rule exists to prevent.
 
    **The component-existence half of rule 7 reads `src/index.ts`, not the built
    bundle — and it has to.** The first version checked
@@ -228,6 +230,31 @@ so it fills its own row when used alone and yields when used beside text, and
   complained. `check-tokens.mjs` now fails on any `var()` in `src/` that nothing defines,
   with a "did you mean `--ad-…`" hint.
 
+- **A JSX line break inside Chinese prose renders as a visible space.** In
+  English the collapse is invisible; after a full-width `,。;:` it is an
+  obvious gap. Put the paragraph in one string expression — `<p>{"…参数,读者…"}</p>`
+  — or break the source line only next to a Latin token, where a space is
+  idiomatic anyway. Detect existing ones by looking for a source line ending in
+  CJK whose next line *continues* with CJK text (a line ending a paragraph is
+  fine).
+- **`<` is not legal JSX text.** The dump recipes carry literal `-w <w> -element
+  -lastpage <compId>`; use a string expression rather than `&lt;`, which makes
+  the placeholder easy to typo.
+- **Always compose the small controls inside a `Card`** — a bare `TextField` or
+  `TagPicker` on the sheet's white cell is a rounded rectangle and nothing else.
+  This also fixes the serif-prose trap for free: `.ad-card`'s `font:` shorthand
+  carries the UI family to every descendant, so only wrappers *outside* an
+  `.ad-*` element need an explicit `fontFamily`.
+- **`.ad-inp` is content-box**, so the prototype's `width: 100px` measures ~120px
+  on the sheet. Don't "correct" a ported width against the screenshot.
+- **A `<select>` shows one option and a `title` shows none.** Author two cells
+  with different selections, and put any string that only exists in a tooltip
+  (`TagPicker`'s `unavailableReason`) into visible prose as well — otherwise it
+  cannot be graded at all.
+- **`TagPicker`'s available/selected/unavailable trio only reads by comparison**,
+  and the 1px dash pattern is below the composite sheet's resolution. Read
+  `_screenshots/review/raw/…png` and crop/upscale to judge it.
+
 ## Prototype facts previews depend on (check these when `prototype.html` changes)
 
 - Debug tab values are `logs / apps / net / cmd` — **`net`, not `network`**; only the
@@ -239,6 +266,11 @@ so it fills its own row when used alone and yields when used beside text, and
   every phase green, no accent. That is the intended state, not a missing current step.
 - `DataTable`'s `mono` is a **column** flag, not a cell flag; the prototype's per-`<td>`
   `class="mono"` had to be reorganized into mono columns.
+- The Trace tag roster is `ace app ability graphic ohos sched freq sync binder
+  disk workq` confirmed, `distributeddata mmc` not confirmed; `toggleTag` keeps
+  a floor of one selected tag. The transport `<select>` is **non-mono** while
+  the command-template one is mono. **`RadioGroup` has no prototype site for a
+  disabled option** — don't invent one.
 - Button labels and disabled `title` reasons are lifted verbatim from the prototype
   because the DS contract says the label *is* the safety mechanism — generic labels are
   actively wrong here, not merely bland.
