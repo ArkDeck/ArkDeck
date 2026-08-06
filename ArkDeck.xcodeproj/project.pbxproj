@@ -18,6 +18,8 @@
 		A100000000000000000000A5 /* FlashDestructiveConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */; };
 		A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A7 /* FlashPlanDetailsView.swift */; };
 		A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A9 /* FlashRuntimeActivityView.swift */; };
+		A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AC /* GlobalJobInspectorView.swift */; };
+		A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AE /* JobsLocalizable.xcstrings */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -52,6 +54,8 @@
 		A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashDestructiveConfirmationSheet.swift; sourceTree = "<group>"; };
 		A100000000000000000000A7 /* FlashPlanDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashPlanDetailsView.swift; sourceTree = "<group>"; };
 		A100000000000000000000A9 /* FlashRuntimeActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashRuntimeActivityView.swift; sourceTree = "<group>"; };
+		A100000000000000000000AC /* GlobalJobInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalJobInspectorView.swift; sourceTree = "<group>"; };
+		A100000000000000000000AE /* JobsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = JobsLocalizable.xcstrings; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -96,6 +100,7 @@
 				A10000000000000000000039 /* Shared Features */,
 				A1000000000000000000003F /* History Feature */,
 				A100000000000000000000A2 /* Flash Feature */,
+				A100000000000000000000AF /* Jobs Feature */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 				A1000000000000000000002D /* RockchipComponent.entitlements */,
 			);
@@ -124,6 +129,7 @@
 			children = (
 				A10000000000000000000021 /* Localizable.xcstrings */,
 				A100000000000000000000A4 /* FlashLocalizable.xcstrings */,
+				A100000000000000000000AE /* JobsLocalizable.xcstrings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -161,6 +167,14 @@
 				A100000000000000000000A9 /* FlashRuntimeActivityView.swift */,
 			);
 			path = Features/Flash;
+			sourceTree = "<group>";
+		};
+		A100000000000000000000AF /* Jobs Feature */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000000000000AC /* GlobalJobInspectorView.swift */,
+			);
+			path = Features/Jobs;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000039 /* Shared Features */ = {
@@ -282,6 +296,7 @@
 			files = (
 				A10000000000000000000011 /* Localizable.xcstrings in Resources */,
 				A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */,
+				A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,6 +344,7 @@
 				A100000000000000000000A5 /* FlashDestructiveConfirmationSheet.swift in Sources */,
 				A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */,
 				A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */,
+				A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

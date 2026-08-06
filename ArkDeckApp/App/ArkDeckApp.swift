@@ -81,6 +81,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
 private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
+  @State private var isJobInspectorExpanded = false
   @ObservedObject var hdcDiagnostics: HDCStatusViewModel
   @ObservedObject var autoUpdate: AutoUpdateViewModel
   @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
@@ -115,11 +116,54 @@ private struct AppShellView: View {
       .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
       .navigationTitle("app.shell.title")
     } detail: {
-      detail
+      jobAwareDetail
         .navigationTitle(Text(LocalizedStringKey(selectedItem.localizationKey)))
         .toolbar { updateAttentionToolbarItem }
     }
     .frame(minWidth: 900, minHeight: 600)
+  }
+
+  @ViewBuilder
+  private var jobAwareDetail: some View {
+    if isJobInspectorExpanded {
+      VSplitView {
+        workspaceWithRecovery
+          .frame(minHeight: 320, maxHeight: .infinity)
+        GlobalJobInspectorView(
+          presentation: runtimeHistory.presentation,
+          isRefreshInFlight: runtimeHistory.isRefreshInFlight,
+          onRefresh: runtimeHistory.refresh,
+          onOpenHistory: openHistory,
+          isExpanded: $isJobInspectorExpanded)
+          .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
+      }
+    } else {
+      VStack(spacing: 0) {
+        workspaceWithRecovery
+        Divider()
+        GlobalJobInspectorView(
+          presentation: runtimeHistory.presentation,
+          isRefreshInFlight: runtimeHistory.isRefreshInFlight,
+          onRefresh: runtimeHistory.refresh,
+          onOpenHistory: openHistory,
+          isExpanded: $isJobInspectorExpanded)
+          .frame(height: 40)
+      }
+    }
+  }
+
+  private var workspaceWithRecovery: some View {
+    VStack(spacing: 0) {
+      GlobalRecoveryBannerView(
+        presentation: runtimeHistory.presentation,
+        onOpenHistory: openHistory)
+      detail
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+
+  private func openHistory() {
+    storedSelection = ArkDeckNavigationItem.history.rawValue
   }
 
   @ViewBuilder
@@ -146,7 +190,7 @@ private struct AppShellView: View {
         runtimeHistory: runtimeHistory.presentation,
         isRuntimeHistoryRefreshing: runtimeHistory.isRefreshInFlight,
         onRefreshRuntimeHistory: runtimeHistory.refresh,
-        onOpenHistory: { storedSelection = ArkDeckNavigationItem.history.rawValue })
+        onOpenHistory: openHistory)
     case .debug, .uiDump, .trace:
       UnavailableFeatureView(
         titleKey: selectedItem.localizationKey,
