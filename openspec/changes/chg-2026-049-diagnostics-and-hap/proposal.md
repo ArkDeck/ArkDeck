@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-049-diagnostics-and-hap
-revision: 9
-status: approved # r2..r8 已交付；r9 仅在维护者 review/merge 本 PR 后生效
+revision: 10
+status: approved # r2..r9 已交付；r10 仅在维护者 review/merge 本 PR 后生效
 class: capability
 core_change_level: none
 owner: lvye
@@ -24,6 +24,44 @@ platforms: [macos]
 > diagnostics HiLog/component-tree pair 在 Catalog、generator、JSON Schema
 > 与 Swift validator 间闭合。r2 记录 fresh pins、草稿迁移约束和依赖复验；
 > 合入 r2 前 `TASK-DHA-001` 仍不得恢复实现。
+
+## r10(2026-08-06):发布判定要求的证明,不能多于平台会给的
+
+### 为什么现在做
+
+`deploy.native-library.app-owned@1` 要求发布后的库带 fs-verity,否则 `atomic-publish`
+以 `nativePublishMismatch` 失败。2026-08-06 在 DAYU200 / OpenHarmony 7.0.0.37 上实测:
+**平台自己不给 app 私有原生库上 fs-verity**——被替换的 `libarkdeck_gj.so` 与它旁边的
+`libc++_shared.so` 都是 `ENODATA`;把 HAP 用设备信任的
+`CN=OpenHarmony Application Release` 身份加 `-signCode 1` 重签(多出 39,515 字节的 code
+sign 数据)重装之后,两者仍然都是 `ENODATA`。
+
+同一天还测掉了"换我们自己去签"这条路:`FS_IOC_ENABLE_CODE_SIGN` 要求签名证书挂在内核
+`.fs-verity` keyring 上,该 keyring 只有三把厂商 key 和一把设备自生成的 `local_key`
+(见 `chg-2026-056` 的 `evidence/gj3-code-sign-2026-08-06.md`)。主机侧任何证书链都够不着:
+证书主题不被信任时内核回 `EKEYREJECTED`,主题被信任之后回 `ENOKEY`。
+
+于是这条已发布的 E1 operation 在这一类设备上永远无法发布——它要求被发布的文件带有一种
+**它所替换的那个文件本身都没有、且平台不会给**的属性。这不是设备的缺陷,是我们判定写错了。
+
+### What(r10 交付面)
+
+1. publish 步骤在替换之前,先把**被替换文件**的 fs-verity 状态作为一条自己的有界 readback
+   量出来;typed action 携带这次测量,判定据此进行。
+2. helper 的 `publish` 镜像该测量:被替换文件有 verity → 照旧 enable 并读回,失败即失败;
+   被替换文件没有 → **不尝试** enable,并在自己的输出里如实说明。分支由测量决定,不由
+   "某次调用碰巧失败了"决定;绝不出现"试一下,失败就算了"。
+3. 判定是**重述**而不是放宽:发布后的文件必须与被替换文件**至少同等可证**、内容 hash 恰为
+   租约值、mode/uid/gid 逐项保持。降级仍然不可能——原文件有 verity 就仍然要求替换件也有,
+   enable 失败仍然到不了 `rename`,活的库仍然不会被替换。
+4. publish 摘要如实记录本次实际达成的证明等级,使产物记录不再暗示一个并不存在的 verity。
+
+## Out of scope(r10)
+
+- 创建、获取或代签任何签名,联系签名服务,或扩大设备信任面;
+- 改动设备的 trusted cert path、`.fs-verity` keyring 或任何 `/system` 内容;
+- 放宽 hash、属主、备份或回滚的任何一条判定,或让 `enable` 失败仍能落到 `rename`;
+- 在本 PR 中连接设备、宣称 GJ-3 `REAL_DEVICE_PASS`,或改动 Catalog 的 effect/authorization。
 
 ## r9(2026-08-01):聊天只触发 exact standing-authorization executor
 

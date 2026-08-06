@@ -5,7 +5,7 @@
 > binding、typed inputs、plan digest、lineage 与 `outcomeUnknown` 门保持。
 > 下文 r2 的人工 capability 步骤是历史计划；E2 不变。
 
-> Change:CHG-2026-049-diagnostics-and-hap@r9
+> Change:CHG-2026-049-diagnostics-and-hap@r10
 > Status:planned
 > Core baseline:CORE-2.1.0 (canonical Core AC not claimed)
 
@@ -32,6 +32,34 @@
 | `DHA-GJ4-PLAN-002` | RuntimeJobEngine.planOnly + job.plan wire contract | 复用生产 materialization 产出 digest/选中步骤；不建 Job、不创建/安装/消费 capability、dispatch=0；错误 plan 同样零副作用 | contract + realInput |
 | `DHA-GJ4-HANDOFF-003` | v2 human handoff + trusted execute profile selection contract | human execute 生成 v2 exact commands 且 dispatch=0；authorized path 只按 archive pins 选择 profile，unknown/member drift 拒绝；executor 在授权消费前拒绝无匹配 profile | contract + realInput |
 | `DHA-GJ4-TRIGGER-004` | versioned Bash trigger source contract + host-only negative execution | wrapper 固定 v2 archive/tool/plan/step-set，chat 需 full digest + AUTH-ID；CI、截断 digest、non-TTY interactive 全部在 host prerequisites 前阻断；唯一执行委托为 typed trusted executor | contract |
+
+| `DHA-VERITY-001` | publish typed-plan + 判定契约,scripted dispatcher 覆盖"原文件有/无 verity"两态 | 被替换文件的 fs-verity 状态在替换前作为自己的有界 readback 量出;发布后文件必须与之**至少同等可证**;原文件有 verity 时缺 verity 的发布仍判失败 | contract |
+| `DHA-VERITY-002` | helper source contract + publish 序列负例 | enable 失败永远到不了 `rename`,活库不被替换;走哪条分支由测量决定,不由"调用是否碰巧成功"决定 | contract |
+| `DHA-VERITY-003` | 真机 DAYU200 / 7.0.0.37 跑 `deploy.native-library.app-owned@1` 并从设备重新测量 | 在平台不给 app 私有库上 verity 的设备上完成发布;摘要如实记录实际达成的证明等级;属主、内容 hash 与回滚判定不变 | realHardware |
+
+## `DHA-VERITY-001`
+
+- publish 序列必须在 helper 动手之前,先对**目标路径**单独跑一次只读测量,并把结果与
+  发布后的测量分开断言;两次测量之间只允许 helper 的 publish;
+- 原文件已带 verity:发布后无 verity、或 digest 与 publish 自报的不一致,一律判失败;
+- 原文件不带 verity:发布仍必须逐项校验 mode/uid/gid 与租约 hash,摘要如实标注本次未取得
+  verity;**不得**把"没有 verity"记成 `fsVerityDigest` 的空串或占位 hash;
+- 判定只读 typed readback,不读 exit code。
+
+## `DHA-VERITY-002`
+
+- helper source contract:`publish` 里 `rename` 只能出现在成功分支之后;任何 enable 失败
+  路径都先 `unlink` prepared 文件再返回,目标路径不被触碰;
+- scripted 负例:enable 失败 → 结果不得 succeeded,备份完好,补偿跑到;
+- 分支选择来自"被替换文件的测量",而不是"enable 返回了什么"——把 enable 改成必然失败,
+  原文件有 verity 的那一态仍然判失败,不得因为失败就改走无 verity 分支。
+
+## `DHA-VERITY-003`
+
+- 真机:当前 digest 上跑通 `deploy.native-library.app-owned@1`,job 终态 succeeded;
+- 从设备重新读:目标路径的内容 hash == 租约 hash;mode/uid/gid 与替换前一致;
+- 摘要里的证明等级与设备实测一致;若设备当天恰好给了 verity,则按 001 的第二条走严格分支;
+- evidence 落 `chg-2026-056` 的 GJ-3 evidence 链,并注明设备固件版本。
 
 ## `DHA-AGENT-001`
 

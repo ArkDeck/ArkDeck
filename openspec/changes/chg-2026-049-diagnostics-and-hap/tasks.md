@@ -306,3 +306,34 @@
 - Risk:low(唯一一条**不升 effect** 的新采集腿:两条命令均只读、实测不改设备状态。
   唯一需要盯的是 `crashLogName` 这个调用方字符串 —— 以 pattern 收窄到条目名,
   不含 `/`、不可为路径或 shell 片段)
+
+## TASK-DHA-006 — 发布判定镜像被替换文件的证明等级(r10)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r10 What 1-4(替换前单独测量被替换文件的 fs-verity;
+  helper `publish` 按该测量选择分支而非按调用结果;判定重述为"至少同等可证"
+  且降级仍不可能;摘要如实记录实际达成的证明等级)
+- Acceptance:change-local `DHA-VERITY-001`..`DHA-VERITY-003`,登记于 `verification.md`
+- Depends on:TASK-DHA-001(done);r10 proposal 合入即 approved
+- Hardware required:**是**。`DHA-VERITY-003` 需要一台 DAYU200 与一枚已签名的
+  候选库;contract 面(001/002)用 scripted dispatcher 全覆盖,不占设备窗口。
+  真机那条**不得**用 contract 结果冒充
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `openspec/changes/chg-2026-049-diagnostics-and-hap/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、
+    `openspec/verification/**`(全局)、`openspec/baselines/**`、
+    `openspec/contracts/**`
+  - `Catalog/**`(本任务不动 effect/authorization/步骤集)
+  - `scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeck.xcodeproj/**`、`ArkDeckApp/**`
+  - 其他 change 目录
+- Risk:high(改一个已发布 E1 operation 的**发布判定**,而且改的是安全属性那一条。
+  三层约束:①原文件带 verity 时的行为逐字节不变,严格分支一条都不许松;
+  ②enable 失败仍然到不了 `rename`,活库永远不被未通过校验的文件替换;
+  ③"没有 verity"必须在摘要里如实可读,不得用空串或占位 hash 混过去。
+  另有一条元约束:分支由**测量**决定,不由"enable 是否碰巧失败"决定——
+  后者等价于"试一下,失败就算了",是本任务最想避免的形状)

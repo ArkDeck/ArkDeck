@@ -1,12 +1,48 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-049-diagnostics-and-hap
-change_revision: 9
+change_revision: 10
 platform: macos
 evidence_classes:
 - contract
 - realHardware
 cases:
+- acceptance_id: DHA-VERITY-001
+  test_id: TEST-DHA-VERITY-001
+  method: >-
+    Contract coverage of the publish action's typed plan and its verification,
+    with a scripted dispatcher for both an attested and an unattested replaced
+    file.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-verity-001
+  minimum_evidence: contract
+  expected_result: >-
+    The replaced file's fs-verity state is measured as its own bounded readback
+    before the replacement, and the published file is required to be at least as
+    attested as it: an attested original still demands an attested replacement,
+    and an unattested original publishes without an enable attempt.
+- acceptance_id: DHA-VERITY-002
+  test_id: TEST-DHA-VERITY-002
+  method: >-
+    Helper source contract plus scripted dispatcher negatives on the publish
+    sequence.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-verity-002
+  minimum_evidence: contract
+  expected_result: >-
+    A failed enable can never reach the rename, so the live library is never
+    replaced by a file whose attestation was refused; the branch is chosen by
+    the measurement rather than by whether the enable happened to succeed.
+- acceptance_id: DHA-VERITY-003
+  test_id: TEST-DHA-VERITY-003
+  method: >-
+    Real DAYU200 run of deploy.native-library.app-owned@1 on OpenHarmony
+    7.0.0.37, with the published file re-measured from the device.
+  expected_source: openspec/changes/chg-2026-049-diagnostics-and-hap/verification.md#dha-verity-003
+  minimum_evidence: realHardware
+  expected_result: >-
+    The operation publishes the leased library on a device whose platform does
+    not attest app-owned native libraries, the summary records the attestation
+    actually achieved rather than implying verity, and ownership, content hash
+    and rollback remain verified.
 - acceptance_id: DHA-GJ4-TRIGGER-004
   test_id: TEST-DHA-GJ4-TRIGGER-004
   method: >-
