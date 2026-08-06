@@ -184,6 +184,20 @@ static int parse_sign_block(int fd, off_t file_size,
   return 0;
 }
 
+/// The errno of the call that actually failed.
+///
+/// Every failure path records it here immediately, because the cleanup that
+/// follows — `free`, `close`, `unlink` — is allowed to set errno, and reading
+/// it at the reporting site reports the cleanup's errno instead of the
+/// failure's. That is not a cosmetic difference: the reported value is the
+/// only thing that distinguishes a refused signature from an unsupported
+/// kernel feature, and a wrong one sends the reader after the wrong cause.
+/// `-1`, not `0`, so a report from a path that recorded nothing is visibly
+/// wrong instead of reading as the success value.
+static int captured_errno = -1;
+
+static void capture_errno(void) { captured_errno = errno; }
+
 static int measure_verity(int fd, char *digest_hex, size_t digest_hex_size) {
   uint8_t storage[sizeof(struct fsverity_digest) + 64];
   struct fsverity_digest *measured = (struct fsverity_digest *)storage;
@@ -192,6 +206,7 @@ static int measure_verity(int fd, char *digest_hex, size_t digest_hex_size) {
   if (ioctl(fd, FS_IOC_MEASURE_VERITY, measured) != 0 ||
       measured->digest_algorithm != FS_VERITY_HASH_ALG_SHA256 ||
       measured->digest_size != 32 || digest_hex_size < 65) {
+    capture_errno();
     return -1;
   }
   for (uint16_t index = 0; index < measured->digest_size; ++index) {
@@ -209,6 +224,7 @@ static int enable_code_sign_internal(const char *path, char *digest,
   int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
   if (fd < 0 || fstat(fd, &metadata) != 0 || !S_ISREG(metadata.st_mode) ||
       metadata.st_size <= 0) {
+    capture_errno();
     if (fd >= 0) {
       close(fd);
     }
@@ -220,16 +236,25 @@ static int enable_code_sign_internal(const char *path, char *digest,
     return 0;
   }
   if (parse_sign_block(fd, metadata.st_size, &parsed) != 0) {
+    capture_errno();
     close(fd);
     return 21;
   }
   if (ioctl(fd, FS_IOC_ENABLE_CODE_SIGN, &parsed.argument) != 0) {
+    // Captured here, before `free` and `close`, because both may set errno.
+    // Reading it at the reporting site instead is how a real kernel refusal
+    // reached a maintainer as `errno=129` — a value the ioctl never returned,
+    // and the one fact needed to tell "this signature is not trusted" from
+    // "this kernel does not offer the feature" (observed on OpenHarmony
+    // 7.0.0.37, 2026-08-06).
+    capture_errno();
     free(parsed.storage);
     close(fd);
     return 22;
   }
   free(parsed.storage);
   if (measure_verity(fd, digest, digest_size) != 0) {
+    capture_errno();
     close(fd);
     return 23;
   }
@@ -242,7 +267,7 @@ static int enable_code_sign(const char *path) {
   int result = enable_code_sign_internal(path, digest, sizeof(digest));
   if (result != 0) {
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=enable code=%d errno=%d\n",
-            result, errno);
+            result, captured_errno);
     return result;
   }
   printf("ARKDECK_CODE_SIGN_ENABLED sha256:%s\n", digest);
@@ -253,13 +278,27 @@ static int verify_code_sign(const char *path) {
   struct stat metadata;
   char digest[65];
   int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-  if (fd < 0 || fstat(fd, &metadata) != 0 || !S_ISREG(metadata.st_mode) ||
-      measure_verity(fd, digest, sizeof(digest)) != 0) {
+  int failed = 0;
+  // Split so each guard records at its own failure. Folded into one condition,
+  // only `measure_verity` recorded anything, and a `verify` of a path that does
+  // not exist reported the never-set sentinel — indistinguishable, to a reader,
+  // from a file that is present and merely lacks verity.
+  if (fd < 0) {
+    capture_errno();
+    failed = 1;
+  } else if (fstat(fd, &metadata) != 0 || !S_ISREG(metadata.st_mode)) {
+    // Before `close`, which is allowed to set errno.
+    capture_errno();
+    failed = 1;
+  } else if (measure_verity(fd, digest, sizeof(digest)) != 0) {
+    failed = 1;  // `measure_verity` records its own.
+  }
+  if (failed) {
     if (fd >= 0) {
       close(fd);
     }
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=verify code=30 errno=%d\n",
-            errno);
+            captured_errno);
     return 30;
   }
   printf("ARKDECK_CODE_SIGN_VERIFIED sha256:%s\n", digest);
@@ -285,12 +324,14 @@ static int copy_for_publish(const char *source_path, const char *target_path,
       source_metadata.st_size < 64 ||
       source_metadata.st_size > (off_t)(64U * 1024U * 1024U +
                                          ARKDECK_MAX_SIGN_BLOCK)) {
+    capture_errno();
     goto cleanup;
   }
   (void)unlink(prepared_path);
   prepared = open(prepared_path,
                   O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
   if (prepared < 0) {
+    capture_errno();
     result = 41;
     goto cleanup;
   }
@@ -300,6 +341,7 @@ static int copy_for_publish(const char *source_path, const char *target_path,
       continue;
     }
     if (count < 0) {
+      capture_errno();
       result = 42;
       goto cleanup;
     }
@@ -322,6 +364,7 @@ static int copy_for_publish(const char *source_path, const char *target_path,
   if (fchown(prepared, target_metadata.st_uid, target_metadata.st_gid) != 0 ||
       fchmod(prepared, target_metadata.st_mode & 07777) != 0 ||
       fsync(prepared) != 0) {
+    capture_errno();
     result = 44;
     goto cleanup;
   }
@@ -350,21 +393,22 @@ static int publish_code_signed(const char *source_path, const char *target_path,
   int result = copy_for_publish(source_path, target_path, prepared_path);
   if (result != 0) {
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=prepare code=%d errno=%d\n",
-            result, errno);
+            result, captured_errno);
     return result;
   }
   result = enable_code_sign_internal(prepared_path, enabled_digest,
                                      sizeof(enabled_digest));
   if (result != 0) {
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=enable code=%d errno=%d\n",
-            result, errno);
+            result, captured_errno);
     (void)unlink(prepared_path);
     return result;
   }
   if (rename(prepared_path, target_path) != 0) {
+    capture_errno();
     result = 45;
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=rename code=%d errno=%d\n",
-            result, errno);
+            result, captured_errno);
     (void)unlink(prepared_path);
     return result;
   }
@@ -372,12 +416,17 @@ static int publish_code_signed(const char *source_path, const char *target_path,
   if (target < 0 ||
       measure_verity(target, published_digest, sizeof(published_digest)) != 0 ||
       strcmp(enabled_digest, published_digest) != 0) {
+    // `measure_verity` captures its own; this covers the `open` and the
+    // digest-comparison branches, which otherwise report a stale value.
+    if (target < 0) {
+      capture_errno();
+    }
     if (target >= 0) {
       close(target);
     }
     result = 46;
     fprintf(stderr, "ARKDECK_CODE_SIGN_ERROR stage=readback code=%d errno=%d\n",
-            result, errno);
+            result, captured_errno);
     return result;
   }
   close(target);

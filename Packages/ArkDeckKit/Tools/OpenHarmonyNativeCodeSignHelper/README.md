@@ -14,7 +14,14 @@ The checked-in arm64 resource is reproducibly built with the OpenHarmony SDK:
   -O2 -g0 -static -Wl,--build-id=sha1,--strip-all \
   -o Sources/ArkDeckWorkflows/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable \
   Tools/OpenHarmonyNativeCodeSignHelper/main.c
+chmod 644 Sources/ArkDeckWorkflows/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable
 ```
+
+The `chmod` is not optional. The linker leaves the file executable, the host
+bundle must carry it as data, and SwiftPM copies the mode through — so skipping
+it turns the resource executable on the host and
+`testBundledCodeSignHelperIsAValidatedStaticArm64Executable` refuses the build.
+The device copy is made executable by the typed send plan, not here.
 
 ArkDeck validates the resource as an arm64 ELF and pins its build ID, SHA-256,
 and byte count into every materialized and persisted deployment action. Static
