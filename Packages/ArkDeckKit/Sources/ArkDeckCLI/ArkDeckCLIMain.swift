@@ -982,9 +982,42 @@ struct ArkDeckCommandLine {
     print("handoff document: \(url.path)")
   }
 
+  /// Where a produced document goes when the caller did not choose.
+  ///
+  /// Not the current directory. The campaign lane requires the repository top
+  /// level as its working directory, and the candidate scope check reads every
+  /// untracked file `git ls-files --others --exclude-standard` reports — so a
+  /// document dropped in the current directory by `flash plan` makes the
+  /// `flash execute` that follows it refuse with `scopeDrift`. Two of this
+  /// product's own requirements, colliding through a default.
+  ///
+  /// The state directory is where ArkDeck's other durable host files already
+  /// live, and both writers print the full path, so the document stays as easy
+  /// to find as it was.
   static func outputURL(_ options: CLIOptions, fileName: String) -> URL {
-    let directory = options.value("--out") ?? FileManager.default.currentDirectoryPath
-    return URL(fileURLWithPath: directory).appendingPathComponent(fileName)
+    if let chosen = options.value("--out") {
+      return URL(fileURLWithPath: chosen).appendingPathComponent(fileName)
+    }
+    return defaultDocumentDirectory().appendingPathComponent(fileName)
+  }
+
+  static func defaultDocumentDirectory() -> URL {
+    let manager = FileManager.default
+    guard
+      let applicationSupport = try? manager.url(
+        for: .applicationSupportDirectory, in: .userDomainMask,
+        appropriateFor: nil, create: true)
+    else {
+      // Nowhere durable to write. The temporary directory is still not the
+      // working tree, which is the property that matters here.
+      return manager.temporaryDirectory
+    }
+    let directory =
+      applicationSupport
+      .appending(path: "ArkDeck", directoryHint: .isDirectory)
+      .appending(path: "FlashDocuments", directoryHint: .isDirectory)
+    try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
   }
 
   static func printUsage() {

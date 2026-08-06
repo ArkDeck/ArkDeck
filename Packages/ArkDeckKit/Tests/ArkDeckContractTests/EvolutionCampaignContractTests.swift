@@ -12,6 +12,47 @@ final class EvolutionCampaignContractTests: XCTestCase {
   private static let validUntil = "2026-08-02T12:00:00Z"
   private static let targetDigest = String(repeating: "a", count: 64)
 
+  /// A document `flash plan` produces must not make the `flash execute` that
+  /// follows it refuse.
+  ///
+  /// The campaign lane requires the repository top level as its working
+  /// directory, and the candidate scope check counts every untracked file
+  /// `git ls-files --others --exclude-standard` reports. Writing the plan
+  /// document into the current directory therefore put a file in the tree that
+  /// is not candidate source, which is `scopeDrift` — two of this product's own
+  /// requirements colliding through a default. Observed on the 7.0.0.34 window,
+  /// where the file had to be deleted by hand between `plan` and `execute`.
+  func testProducedDocumentsDoNotDefaultIntoTheWorkingTree() throws {
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
+      encoding: .utf8)
+
+    // Both documents go through the one resolver, so there is a single place
+    // where this can regress.
+    for document in ["arkdeck-flash-plan.json", "arkdeck-flash-handoff.md"] {
+      XCTAssertTrue(
+        source.contains("outputURL(options, fileName: \"\(document)\")"),
+        "\(document) no longer goes through the shared resolver")
+    }
+    XCTAssertFalse(
+      source.contains("options.value(\"--out\") ?? FileManager.default.currentDirectoryPath"),
+      "the default output directory is the working directory again")
+    XCTAssertTrue(source.contains("static func defaultDocumentDirectory() -> URL"))
+
+    // And the scope check this protects still reads untracked files, so the
+    // reason above has not quietly stopped applying.
+    let pipeline = try String(
+      contentsOf: packageRoot.appending(
+        path: "Sources/ArkDeckWorkflows/EvolutionCandidatePipeline.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(
+      pipeline.contains("\"ls-files\", \"--others\", \"--exclude-standard\", \"-z\""),
+      "the candidate scope check no longer reads untracked files; re-check whether "
+        + "a document in the working tree still causes scopeDrift")
+  }
+
   func testFlashCLIDefaultsToCampaignAndRemovesLegacySelectors() throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
