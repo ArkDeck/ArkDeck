@@ -59,18 +59,19 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
     else {
       throw RockchipEvolutionCampaignError.admissionRejected("fact correlation drift")
     }
-    // The profile is selected by the materialized plan's exact archive
-    // identity, never by a caller field — the same selection the in-process
-    // executor makes, so the engine lane names the same partition set the
-    // campaign was confirmed against.
-    guard
-      let profile = profiles.first(where: {
-        $0.archiveSHA256 == admission.plan.archiveSHA256
-          && $0.archiveSizeBytes == admission.plan.archiveSizeBytes
-      })
-    else {
+    // The partition set comes from the board and the archive identity comes
+    // from the materialized plan — never from a caller field. That is what
+    // this guard protects: the engine lane names the same partitions the
+    // campaign was confirmed against, and the same bytes.
+    //
+    // It used to reach that by looking the plan's archive digest up among the
+    // builds compiled into the product, which made it the eleventh and last
+    // place a firmware daily published after the release was turned away —
+    // found by running a real campaign, after ten earlier ones had been found
+    // the same way.
+    guard let board = profiles.first else {
       throw RockchipEvolutionCampaignError.admissionRejected(
-        "execute plan has no exact published profile")
+        "no published DAYU200 board profile")
     }
     return RockchipEvolutionCampaignAdmittedAttempt(
       campaignID: token.campaignID,
@@ -80,9 +81,12 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
       sessionID: token.sessionID,
       targetStableIdentitySHA256: admission.serialDigestSHA256,
       bindingRevision: admission.bindingRevision,
-      deviceProfileReference: profile.catalogReference,
-      partitionPlan: profile.mappedPartitions.map(\.partitionName),
-      archiveSHA256: profile.archiveSHA256,
+      deviceProfileReference: board.catalogReference,
+      partitionPlan: board.mappedPartitions.map(\.partitionName),
+      // The confirmed plan's archive, not a constant: this is the digest the
+      // operator confirmed, and the engine re-checks it against the leased
+      // bytes before the first write.
+      archiveSHA256: admission.plan.archiveSHA256,
       postFlashVerification: admission.plan.postFlashVerification.rawValue)
   }
 }
