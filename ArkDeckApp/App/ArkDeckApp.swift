@@ -12,6 +12,8 @@ struct ArkDeckApp: App {
     provider: RuntimeHistoryApplicationFacade.make())
   @StateObject private var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
+  @StateObject private var debugWorkspace = DebugWorkspaceViewModel(
+    provider: DebugApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
@@ -19,13 +21,15 @@ struct ArkDeckApp: App {
         hdcDiagnostics: hdcDiagnostics,
         autoUpdate: autoUpdate,
         runtimeHistory: runtimeHistory,
-        flashWorkspace: flashWorkspace
+        flashWorkspace: flashWorkspace,
+        debugWorkspace: debugWorkspace
       )
       .task {
         hdcDiagnostics.refresh()
         autoUpdate.startup()
         runtimeHistory.refresh()
         flashWorkspace.refresh()
+        debugWorkspace.refresh()
       }
     }
     .defaultSize(width: 1180, height: 760)
@@ -75,9 +79,9 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
 }
 
 /// Native window shell: system split view, unified toolbar, and one workspace
-/// per navigation item. Overview and History have production Runtime surfaces;
-/// the rest route to an explicit unavailable workspace rather than re-rendering
-/// another page's data under a different title.
+/// per navigation item. Implemented workspaces consume only their own Runtime
+/// projections; features without an accepted production surface remain
+/// explicit rather than re-rendering another page's data under a new title.
 private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
@@ -85,6 +89,7 @@ private struct AppShellView: View {
   @ObservedObject var autoUpdate: AutoUpdateViewModel
   @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
   @ObservedObject var flashWorkspace: FlashWorkspaceViewModel
+  @ObservedObject var debugWorkspace: DebugWorkspaceViewModel
 
   private var selectedItem: ArkDeckNavigationItem {
     ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
@@ -147,7 +152,11 @@ private struct AppShellView: View {
         isRuntimeHistoryRefreshing: runtimeHistory.isRefreshInFlight,
         onRefreshRuntimeHistory: runtimeHistory.refresh,
         onOpenHistory: { storedSelection = ArkDeckNavigationItem.history.rawValue })
-    case .debug, .uiDump, .trace:
+    case .debug:
+      DebugWorkspaceView(
+        model: debugWorkspace,
+        onOpenHistory: { storedSelection = ArkDeckNavigationItem.history.rawValue })
+    case .uiDump, .trace:
       UnavailableFeatureView(
         titleKey: selectedItem.localizationKey,
         systemImageName: selectedItem.systemImageName)
