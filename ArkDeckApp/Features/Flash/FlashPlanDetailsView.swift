@@ -18,7 +18,7 @@ struct FlashPlanDetailsView: View {
             partitionRow(partition)
           }
           if !plan.writeForbiddenMemberNames.isEmpty {
-            Label("flash.plan.writeForbidden", systemImage: "checkmark.shield.fill")
+            Label(flashText("flash.plan.writeForbidden"), systemImage: "checkmark.shield.fill")
               .font(.callout.weight(.semibold))
             Text(plan.writeForbiddenMemberNames.joined(separator: ", "))
               .font(.caption.monospaced())
@@ -31,16 +31,17 @@ struct FlashPlanDetailsView: View {
       } label: {
         Label(
           String(
-            format: String(localized: "flash.plan.partitionCount"),
+            format: flashText("flash.plan.partitionCount"),
             plan.partitions.count),
-          systemImage: "externaldrive.badge.checkmark")
-          .font(.subheadline.weight(.semibold))
+          systemImage: "externaldrive.badge.checkmark"
+        )
+        .font(.subheadline.weight(.semibold))
       }
       .accessibilityIdentifier("flash.plan.partitions.disclosure")
 
       DisclosureGroup(isExpanded: $arePrerequisitesExpanded) {
         VStack(alignment: .leading, spacing: 8) {
-          Text("flash.plan.prerequisitesNote")
+          Text(flashText("flash.plan.prerequisitesNote"))
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -50,7 +51,7 @@ struct FlashPlanDetailsView: View {
         }
         .padding(.top, 8)
       } label: {
-        Label("flash.plan.prerequisites", systemImage: "checklist")
+        Label(flashText("flash.plan.prerequisites"), systemImage: "checklist")
           .font(.subheadline.weight(.semibold))
       }
       .accessibilityIdentifier("flash.plan.prerequisites.disclosure")
@@ -72,14 +73,15 @@ struct FlashPlanDetailsView: View {
             .font(.callout.monospaced())
         }
       }
-      LabeledContent("flash.plan.imageSize") {
+      LabeledContent(flashText("flash.plan.imageSize")) {
         Text(
           ByteCountFormatter.string(
             fromByteCount: partition.imageSizeBytes,
-            countStyle: .file))
-          .monospacedDigit()
+            countStyle: .file)
+        )
+        .monospacedDigit()
       }
-      LabeledContent("flash.plan.imageHash") {
+      LabeledContent(flashText("flash.plan.imageHash")) {
         Text(partition.imageSHA256)
           .font(.caption.monospaced())
           .lineLimit(1)
@@ -104,14 +106,14 @@ struct FlashPlanDetailsView: View {
         .foregroundStyle(prerequisiteColor(prerequisite.requirement))
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
-        Text(prerequisiteName(prerequisite.identifier))
+        Text(flashText(prerequisiteName(prerequisite.identifier)))
           .font(.callout.weight(.semibold))
-        Text(requirementName(prerequisite.requirement))
+        Text(flashText(requirementName(prerequisite.requirement)))
           .font(.footnote)
           .foregroundStyle(.secondary)
       }
       Spacer(minLength: 8)
-      Text("flash.plan.prerequisitePending")
+      Text(flashText("flash.plan.prerequisitePending"))
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
     }
@@ -121,7 +123,7 @@ struct FlashPlanDetailsView: View {
 
   private func prerequisiteName(
     _ prerequisite: RockchipPrerequisiteIdentifier
-  ) -> LocalizedStringKey {
+  ) -> String {
     switch prerequisite {
     case .loader: "flash.prerequisite.loader"
     case .recoveryPath: "flash.prerequisite.recoveryPath"
@@ -132,7 +134,7 @@ struct FlashPlanDetailsView: View {
 
   private func requirementName(
     _ requirement: RockchipPrerequisiteRequirement
-  ) -> LocalizedStringKey {
+  ) -> String {
     switch requirement {
     case .required: "flash.prerequisite.required"
     case .optional: "flash.prerequisite.optional"

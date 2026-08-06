@@ -23,41 +23,44 @@ struct FlashDestructiveConfirmationSheet: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        Label("flash.confirm.title", systemImage: "exclamationmark.triangle.fill")
+        Label(flashText("flash.confirm.title"), systemImage: "exclamationmark.triangle.fill")
           .font(.title2.bold())
           .foregroundStyle(.red)
 
-        Text("flash.confirm.summary")
+        Text(flashText("flash.confirm.summary"))
           .fixedSize(horizontal: false, vertical: true)
 
         pinnedFacts
         dataImpact
         FlashPlanDetailsView(plan: plan)
 
-        Label("flash.confirm.powerWarning", systemImage: "bolt.trianglebadge.exclamationmark.fill")
-          .font(.callout)
-          .fixedSize(horizontal: false, vertical: true)
+        Label(
+          flashText("flash.confirm.powerWarning"),
+          systemImage: "bolt.trianglebadge.exclamationmark.fill"
+        )
+        .font(.callout)
+        .fixedSize(horizontal: false, vertical: true)
 
         confirmationFields
 
         if let failure {
-          Label(failureKey(failure), systemImage: "xmark.octagon.fill")
+          Label(flashText(failureKey(failure)), systemImage: "xmark.octagon.fill")
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("flash.confirm.error")
         }
 
-        Label("flash.confirm.noJob", systemImage: "lock.shield")
+        Label(flashText("flash.confirm.noJob"), systemImage: "lock.shield")
           .font(.footnote)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
 
         HStack(spacing: 12) {
           Spacer()
-          Button("flash.confirm.cancel") { dismiss() }
+          Button(flashText("flash.confirm.cancel")) { dismiss() }
             .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("flash.confirm.cancel")
-          Button("flash.confirm.accept") { confirm() }
+          Button(flashText("flash.confirm.accept")) { confirm() }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .accessibilityIdentifier("flash.confirm.accept")
@@ -71,28 +74,28 @@ struct FlashDestructiveConfirmationSheet: View {
   }
 
   private var pinnedFacts: some View {
-    GroupBox("flash.confirm.exactPlan") {
+    GroupBox(flashText("flash.confirm.exactPlan")) {
       VStack(alignment: .leading, spacing: 8) {
-        LabeledContent("flash.confirm.target") {
+        LabeledContent(flashText("flash.confirm.target")) {
           if let target = plan.target {
             Text("\(target.id) · r\(target.bindingRevision)")
               .font(.body.monospaced())
           } else {
-            Text("flash.confirm.targetUnavailable")
+            Text(flashText("flash.confirm.targetUnavailable"))
               .foregroundStyle(.red)
           }
         }
-        LabeledContent("flash.confirm.profile") {
+        LabeledContent(flashText("flash.confirm.profile")) {
           Text(plan.profileReference).font(.body.monospaced())
         }
-        LabeledContent("flash.plan.toolchain") {
+        LabeledContent(flashText("flash.plan.toolchain")) {
           Text(plan.toolchainFingerprint)
             .font(.body.monospaced())
             .lineLimit(1)
             .truncationMode(.middle)
             .help(plan.toolchainFingerprint)
         }
-        LabeledContent("flash.confirm.image") {
+        LabeledContent(flashText("flash.confirm.image")) {
           Text(plan.imageFileName)
             .lineLimit(1)
             .truncationMode(.middle)
@@ -108,7 +111,7 @@ struct FlashDestructiveConfirmationSheet: View {
   }
 
   private var dataImpact: some View {
-    GroupBox("flash.impact.title") {
+    GroupBox(flashText("flash.impact.title")) {
       VStack(alignment: .leading, spacing: 8) {
         ForEach(Array(plan.dataImpact.enumerated()), id: \.offset) { _, impact in
           dataImpactLabel(impact)
@@ -122,44 +125,44 @@ struct FlashDestructiveConfirmationSheet: View {
   private var confirmationFields: some View {
     VStack(alignment: .leading, spacing: 16) {
       VStack(alignment: .leading, spacing: 6) {
-        Text("flash.confirm.destructiveLabel")
+        Text(flashText("flash.confirm.destructiveLabel"))
           .font(.subheadline.weight(.semibold))
         Text(expectedDestructivePhrase)
           .font(.body.monospaced().weight(.semibold))
           .textSelection(.enabled)
           .accessibilityIdentifier("flash.confirm.expectedDestructivePhrase")
-        TextField("flash.confirm.destructivePlaceholder", text: $destructivePhrase)
+        TextField(flashText("flash.confirm.destructivePlaceholder"), text: $destructivePhrase)
           .font(.body.monospaced())
           .textFieldStyle(.roundedBorder)
           .focused($focusedField, equals: .destructivePhrase)
-          .accessibilityLabel("flash.confirm.destructiveLabel")
+          .accessibilityLabel(flashText("flash.confirm.destructiveLabel"))
           .accessibilityIdentifier("flash.confirm.destructivePhrase")
-        Text("flash.confirm.destructiveHint")
+        Text(flashText("flash.confirm.destructiveHint"))
           .font(.footnote)
           .foregroundStyle(.secondary)
       }
 
       VStack(alignment: .leading, spacing: 6) {
-        Text("flash.confirm.userdataLabel")
+        Text(flashText("flash.confirm.userdataLabel"))
           .font(.subheadline.weight(.semibold))
         Text(FlashManualConfirmationValidator.userdataPhrase)
           .font(.body.monospaced().weight(.semibold))
           .textSelection(.enabled)
-        TextField("flash.confirm.userdataPlaceholder", text: $userdataPhrase)
+        TextField(flashText("flash.confirm.userdataPlaceholder"), text: $userdataPhrase)
           .font(.body.monospaced())
           .textFieldStyle(.roundedBorder)
           .focused($focusedField, equals: .userdataPhrase)
-          .accessibilityLabel("flash.confirm.userdataLabel")
+          .accessibilityLabel(flashText("flash.confirm.userdataLabel"))
           .accessibilityIdentifier("flash.confirm.userdataPhrase")
-        Text("flash.confirm.userdataHint")
+        Text(flashText("flash.confirm.userdataHint"))
           .font(.footnote)
           .foregroundStyle(.secondary)
       }
     }
   }
 
-  private func digestRow(_ key: LocalizedStringKey, _ value: String) -> some View {
-    LabeledContent(key) {
+  private func digestRow(_ key: String, _ value: String) -> some View {
+    LabeledContent(flashText(key)) {
       Text(value)
         .font(.body.monospaced())
         .lineLimit(1)
@@ -173,12 +176,12 @@ struct FlashDestructiveConfirmationSheet: View {
     switch impact {
     case .mappedPartitionsOverwritten(let count):
       return Label(
-        String(format: String(localized: "flash.impact.partitions"), count),
+        String(format: flashText("flash.impact.partitions"), count),
         systemImage: "externaldrive.badge.exclamationmark")
     case .userDataDestroyed:
-      return Label("flash.impact.userdata", systemImage: "trash.fill")
+      return Label(flashText("flash.impact.userdata"), systemImage: "trash.fill")
     case .forbiddenAreasPreserved:
-      return Label("flash.impact.preserved", systemImage: "checkmark.shield.fill")
+      return Label(flashText("flash.impact.preserved"), systemImage: "checkmark.shield.fill")
     }
   }
 
@@ -200,7 +203,7 @@ struct FlashDestructiveConfirmationSheet: View {
     }
   }
 
-  private func failureKey(_ failure: FlashManualConfirmationFailure) -> LocalizedStringKey {
+  private func failureKey(_ failure: FlashManualConfirmationFailure) -> String {
     switch failure {
     case .notExecutePlan: "flash.confirm.error.notExecutePlan"
     case .missingOrStaleTarget: "flash.confirm.error.missingOrStaleTarget"
