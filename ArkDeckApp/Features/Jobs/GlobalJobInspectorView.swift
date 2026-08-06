@@ -1,6 +1,11 @@
 import ArkDeckCore
 import ArkDeckWorkflows
+import Foundation
 import SwiftUI
+
+private func jobsText(_ key: String) -> String {
+  Bundle.main.localizedString(forKey: key, value: key, table: "JobsLocalizable")
+}
 
 /// Cross-workspace, read-only Runtime status. This surface consumes only the
 /// daemon's `job.list` projection; it has no submit, cancel, retry, resume,
@@ -51,11 +56,13 @@ struct GlobalJobInspectorView: View {
     switch presentation.availability {
     case .unavailable(let reason):
       ContentUnavailableView {
-        Label("jobInspector.unavailable.title", systemImage: "antenna.radiowaves.left.and.right.slash")
+        Label(
+          jobsText("jobInspector.unavailable.title"),
+          systemImage: "antenna.radiowaves.left.and.right.slash")
       } description: {
         VStack(spacing: 6) {
           Text(reason).font(.callout.monospaced())
-          Text("jobInspector.unavailable.guidance")
+          Text(jobsText("jobInspector.unavailable.guidance"))
         }
         .multilineTextAlignment(.center)
       }
@@ -63,9 +70,9 @@ struct GlobalJobInspectorView: View {
     case .available:
       if presentation.jobs.isEmpty {
         ContentUnavailableView {
-          Label("jobInspector.empty.title", systemImage: "clock")
+          Label(jobsText("jobInspector.empty.title"), systemImage: "clock")
         } description: {
-          Text("jobInspector.empty.description")
+          Text(jobsText("jobInspector.empty.description"))
         }
         .accessibilityIdentifier("jobInspector.empty")
       } else {
@@ -88,11 +95,12 @@ struct GlobalJobInspectorView: View {
           if job.outstandingResidueCount > 0 {
             Label(
               String(
-                format: String(localized: "jobInspector.residue.compact"),
+                format: jobsText("jobInspector.residue.compact"),
                 job.outstandingResidueCount),
-              systemImage: "externaldrive.badge.exclamationmark")
-              .font(.caption)
-              .foregroundStyle(.orange)
+              systemImage: "externaldrive.badge.exclamationmark"
+            )
+            .font(.caption)
+            .foregroundStyle(.orange)
           }
         }
         Text(job.operationReference)
@@ -121,10 +129,10 @@ struct GlobalJobInspectorView: View {
             if isActive(job) {
               ProgressView()
                 .controlSize(.small)
-                .accessibilityLabel("jobInspector.progress")
+                .accessibilityLabel(jobsText("jobInspector.progress"))
             }
             Spacer(minLength: 12)
-            Text("jobInspector.readOnly")
+            Text(jobsText("jobInspector.readOnly"))
               .font(.caption)
               .foregroundStyle(.secondary)
           }
@@ -137,30 +145,33 @@ struct GlobalJobInspectorView: View {
 
           if job.needsAttention {
             Label(
-              job.outcomeUnknown
-                ? "jobInspector.result.outcomeUnknown"
-                : "jobInspector.result.waitingForHuman",
+              jobsText(
+                job.outcomeUnknown
+                  ? "jobInspector.result.outcomeUnknown"
+                  : "jobInspector.result.waitingForHuman"),
               systemImage: job.outcomeUnknown
                 ? "questionmark.diamond.fill"
-                : "person.crop.circle.badge.exclamationmark")
-              .foregroundStyle(job.outcomeUnknown ? .red : .orange)
-              .fixedSize(horizontal: false, vertical: true)
-              .accessibilityIdentifier("jobInspector.attention")
+                : "person.crop.circle.badge.exclamationmark"
+            )
+            .foregroundStyle(job.outcomeUnknown ? .red : .orange)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("jobInspector.attention")
           }
 
           if job.outstandingResidueCount > 0 {
             Label(
               String(
-                format: String(localized: "jobInspector.residue"),
+                format: jobsText("jobInspector.residue"),
                 job.outstandingResidueCount),
-              systemImage: "externaldrive.badge.exclamationmark")
-              .foregroundStyle(.orange)
-              .fixedSize(horizontal: false, vertical: true)
+              systemImage: "externaldrive.badge.exclamationmark"
+            )
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
           }
 
           if !job.timeline.isEmpty {
             Divider()
-            Text("jobInspector.timeline")
+            Text(jobsText("jobInspector.timeline"))
               .font(.subheadline.weight(.semibold))
               .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 7) {
@@ -169,10 +180,12 @@ struct GlobalJobInspectorView: View {
                   Image(
                     systemName: index == job.timeline.count - 1
                       ? symbol(for: job)
-                      : "checkmark.circle")
-                    .foregroundStyle(
-                      index == job.timeline.count - 1 ? color(for: job) : .secondary)
-                    .accessibilityHidden(true)
+                      : "checkmark.circle"
+                  )
+                  .foregroundStyle(
+                    index == job.timeline.count - 1 ? color(for: job) : .secondary
+                  )
+                  .accessibilityHidden(true)
                   Text(entry)
                     .font(.callout.monospaced())
                     .textSelection(.enabled)
@@ -187,7 +200,7 @@ struct GlobalJobInspectorView: View {
         .padding(16)
       }
     } else {
-      ContentUnavailableView("jobInspector.select", systemImage: "sidebar.right")
+      ContentUnavailableView(jobsText("jobInspector.select"), systemImage: "sidebar.right")
     }
   }
 
@@ -197,7 +210,8 @@ struct GlobalJobInspectorView: View {
         isExpanded.toggle()
       } label: {
         Label(
-          isExpanded ? "jobInspector.action.hide" : "jobInspector.action.show",
+          jobsText(
+            isExpanded ? "jobInspector.action.hide" : "jobInspector.action.show"),
           systemImage: isExpanded ? "chevron.down" : "chevron.up")
       }
       .keyboardShortcut("j", modifiers: [.command, .shift])
@@ -212,12 +226,12 @@ struct GlobalJobInspectorView: View {
       if isRefreshInFlight {
         ProgressView()
           .controlSize(.small)
-          .accessibilityLabel("jobInspector.refreshing")
+          .accessibilityLabel(jobsText("jobInspector.refreshing"))
       }
-      Button("jobInspector.action.refresh", action: onRefresh)
+      Button(jobsText("jobInspector.action.refresh"), action: onRefresh)
         .disabled(isRefreshInFlight)
         .accessibilityIdentifier("jobInspector.refresh")
-      Button("jobInspector.action.openHistory", action: onOpenHistory)
+      Button(jobsText("jobInspector.action.openHistory"), action: onOpenHistory)
         .accessibilityIdentifier("jobInspector.openHistory")
     }
     .padding(.horizontal, 12)
@@ -228,8 +242,11 @@ struct GlobalJobInspectorView: View {
   private var compactStatus: some View {
     switch presentation.availability {
     case .unavailable:
-      Label("jobInspector.compact.unavailable", systemImage: "antenna.radiowaves.left.and.right.slash")
-        .foregroundStyle(.orange)
+      Label(
+        jobsText("jobInspector.compact.unavailable"),
+        systemImage: "antenna.radiowaves.left.and.right.slash"
+      )
+      .foregroundStyle(.orange)
     case .available:
       if let job = focusedJob {
         HStack(spacing: 8) {
@@ -240,27 +257,28 @@ struct GlobalJobInspectorView: View {
           if activeJobCount > 0 {
             Text(
               String(
-                format: String(localized: "jobInspector.compact.activeCount"),
-                activeJobCount))
-              .font(.caption)
-              .foregroundStyle(.secondary)
+                format: jobsText("jobInspector.compact.activeCount"),
+                activeJobCount)
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
           }
           if isActive(job) {
             ProgressView()
               .controlSize(.mini)
-              .accessibilityLabel("jobInspector.progress")
+              .accessibilityLabel(jobsText("jobInspector.progress"))
           }
         }
       } else {
-        Label("jobInspector.compact.empty", systemImage: "clock")
+        Label(jobsText("jobInspector.compact.empty"), systemImage: "clock")
           .foregroundStyle(.secondary)
       }
     }
   }
 
-  private func factRow(_ key: LocalizedStringKey, _ value: String) -> some View {
+  private func factRow(_ key: String, _ value: String) -> some View {
     GridRow(alignment: .firstTextBaseline) {
-      Text(key).foregroundStyle(.secondary)
+      Text(jobsText(key)).foregroundStyle(.secondary)
       Text(value)
         .font(.body.monospaced())
         .textSelection(.enabled)
@@ -293,7 +311,7 @@ struct GlobalJobInspectorView: View {
 
   private func stateText(_ rawState: String) -> Text {
     guard let state = JobState(rawValue: rawState) else { return Text(rawState) }
-    return Text(LocalizedStringKey("job.state.\(state.rawValue)"))
+    return Text(jobsText("job.state.\(state.rawValue)"))
   }
 
   private func symbol(for job: RuntimeJobSummaryPresentation) -> String {
@@ -347,9 +365,9 @@ struct GlobalRecoveryBannerView: View {
           .foregroundStyle(recoveryColor(job))
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 4) {
-          Text(recoveryTitle(job))
+          Text(jobsText(recoveryTitle(job)))
             .font(.headline)
-          Text(recoveryGuidance(job))
+          Text(jobsText(recoveryGuidance(job)))
             .font(.callout)
             .fixedSize(horizontal: false, vertical: true)
           Text("\(job.id) · \(job.targetID)")
@@ -358,13 +376,14 @@ struct GlobalRecoveryBannerView: View {
             .textSelection(.enabled)
         }
         Spacer(minLength: 12)
-        Button("jobRecovery.action.openHistory", action: onOpenHistory)
+        Button(jobsText("jobRecovery.action.openHistory"), action: onOpenHistory)
           .accessibilityIdentifier("jobRecovery.openHistory")
       }
       .padding(14)
       .background(
         recoveryColor(job).opacity(0.08),
-        in: RoundedRectangle(cornerRadius: 10))
+        in: RoundedRectangle(cornerRadius: 10)
+      )
       .overlay {
         RoundedRectangle(cornerRadius: 10)
           .stroke(recoveryColor(job).opacity(0.35), lineWidth: 1)
@@ -387,7 +406,7 @@ struct GlobalRecoveryBannerView: View {
     }
   }
 
-  private func recoveryTitle(_ job: RuntimeJobSummaryPresentation) -> LocalizedStringKey {
+  private func recoveryTitle(_ job: RuntimeJobSummaryPresentation) -> String {
     if job.outcomeUnknown { return "jobRecovery.outcomeUnknown.title" }
     if job.waitingForHuman { return "jobRecovery.humanRequired.title" }
     guard let state = JobState(rawValue: job.state) else {
@@ -400,7 +419,7 @@ struct GlobalRecoveryBannerView: View {
     }
   }
 
-  private func recoveryGuidance(_ job: RuntimeJobSummaryPresentation) -> LocalizedStringKey {
+  private func recoveryGuidance(_ job: RuntimeJobSummaryPresentation) -> String {
     if job.outcomeUnknown { return "jobRecovery.outcomeUnknown.guidance" }
     if job.waitingForHuman { return "jobRecovery.humanRequired.guidance" }
     guard let state = JobState(rawValue: job.state) else {
