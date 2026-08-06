@@ -192,7 +192,9 @@ static int parse_sign_block(int fd, off_t file_size,
 /// failure's. That is not a cosmetic difference: the reported value is the
 /// only thing that distinguishes a refused signature from an unsupported
 /// kernel feature, and a wrong one sends the reader after the wrong cause.
-static int captured_errno = 0;
+/// `-1`, not `0`, so a report from a path that recorded nothing is visibly
+/// wrong instead of reading as the success value.
+static int captured_errno = -1;
 
 static void capture_errno(void) { captured_errno = errno; }
 
@@ -276,8 +278,22 @@ static int verify_code_sign(const char *path) {
   struct stat metadata;
   char digest[65];
   int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-  if (fd < 0 || fstat(fd, &metadata) != 0 || !S_ISREG(metadata.st_mode) ||
-      measure_verity(fd, digest, sizeof(digest)) != 0) {
+  int failed = 0;
+  // Split so each guard records at its own failure. Folded into one condition,
+  // only `measure_verity` recorded anything, and a `verify` of a path that does
+  // not exist reported the never-set sentinel — indistinguishable, to a reader,
+  // from a file that is present and merely lacks verity.
+  if (fd < 0) {
+    capture_errno();
+    failed = 1;
+  } else if (fstat(fd, &metadata) != 0 || !S_ISREG(metadata.st_mode)) {
+    // Before `close`, which is allowed to set errno.
+    capture_errno();
+    failed = 1;
+  } else if (measure_verity(fd, digest, sizeof(digest)) != 0) {
+    failed = 1;  // `measure_verity` records its own.
+  }
+  if (failed) {
     if (fd >= 0) {
       close(fd);
     }

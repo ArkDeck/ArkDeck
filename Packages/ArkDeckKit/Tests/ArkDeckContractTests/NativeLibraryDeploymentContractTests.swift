@@ -359,6 +359,20 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         if (ioctl(fd, FS_IOC_ENABLE_CODE_SIGN, &parsed.argument) != 0) {
         """),
       "the enable ioctl moved; re-check that its errno is captured first")
+    // A path that records nothing must not be able to print the success value.
+    XCTAssertTrue(
+      code.contains("static int captured_errno = -1;"),
+      "the unset sentinel is 0 again, which reads as a successful call")
+    // `verify` reaches its one report from three guards. Only the last runs
+    // `measure_verity`, which records for itself; the other two must record
+    // for themselves, or a missing file is reported as a file without verity.
+    let verifyStart = try XCTUnwrap(code.range(of: "static int verify_code_sign("))
+    let verifyBody = code[verifyStart.lowerBound...]
+    let verifyEnd = try XCTUnwrap(verifyBody.range(of: "\n}\n"))
+    let verify = String(verifyBody[..<verifyEnd.lowerBound])
+    XCTAssertEqual(
+      verify.components(separatedBy: "capture_errno();").count - 1, 2,
+      "verify's open and stat guards no longer record their own errno")
   }
 
   func testBundledCodeSignHelperIsAValidatedStaticArm64Executable() throws {
