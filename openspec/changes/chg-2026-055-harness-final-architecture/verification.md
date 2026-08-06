@@ -1,6 +1,6 @@
 # Verification — CHG-2026-055
 
-> Change:CHG-2026-055-harness-final-architecture@r1
+> Change:CHG-2026-055-harness-final-architecture@r2
 
 Status:in_progress # r1(2026-07-31):TASK-HFA-001/002/008 已 done,
 HFA-AC-1/2/3/4/5/17 有结论;其余 HFA-AC 仍 `pending`(未开工)。
@@ -463,3 +463,20 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   **未覆盖(如实)**:仓内没有一条断言把「测试数不变」本身钉住(它由本次逐项对照得出,
   不是自动回归);单 `arkdeck-agentd` executable 的拓扑由 `Package.swift` 保证,无独立断言。
   (TASK-HFA-013,合入 `cdabd9ac`)
+
+## HFA-AC-24 隔离 workspace 的身份活过 daemon 重启(TASK-HFA-014)
+
+- 构造:任务建立 evolution workspace 后,**换一个进程**接手同一任务(新 registry 只含源 profile);
+- 该任务的 `executionProjectRef` 必须仍能解析到与磁盘 manifest 一致的派生 profile:
+  projectRoot、profileID、allowedFileGlobs 逐项相同;
+- manifest 与源 profile 冲突时 **fail-loud**(类型化错误),不得静默重建或回落到源 workspace ——
+  回落等于把隔离悄悄取消;
+- 已被销毁(带 teardown 记录)的 workspace 不因此复活。
+
+## HFA-AC-25 量不到与量到了且变了,是两个结论(TASK-HFA-014)
+
+- workspace revision 的求值三态:已测得 / 确证不可测(带类型化原因)/ 与期望不符;
+- 只有第三态产生 `workspaceRevisionChanged`;把"解析不到 projectRef"喂进去,
+  结论必须是可读的不可测原因,**不得**出现 `->none` 这类"变成了空"的表述;
+- 真的变更仍判陈旧:改动一个 allowed 路径下的文件后,陈旧判定照常成立(判定只收紧不放宽);
+- 有界循环在不可测时停在指向该成因的理由上,不得报 `insufficientEvidenceForPatch`。

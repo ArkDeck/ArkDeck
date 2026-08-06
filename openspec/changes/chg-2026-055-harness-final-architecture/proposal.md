@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-055-harness-final-architecture
-revision: 1
+revision: 2
 status: approved # 携 approved 落地:维护者 review + merge 本 PR 即批准(enforcement 批准语义);merge 前任务不开工。范围过大时在 review 中要求削减并在同一 change 内修订,不新建 change。
 class: capability
 core_change_level: none
@@ -22,6 +22,48 @@ platforms: [macos]
 > `AGENTS.md` 控制平面条款,这恰属需要 OpenSpec change + 维护者 PR 审批的四类,且与 GJ-5
 > 交付同车。本 change 不产生 readiness/verification/archive 后续载体:任务随各自实现 PR
 > 直接翻 done,verification 结论写入同一实现 PR,归档冻结(§20)。
+
+
+## r2(2026-08-06):隔离 workspace 必须活过一次 daemon 重启,量不到必须说量不到
+
+### 为什么现在做
+
+GJ-5 在 7.0.0.37 上跑到 round 6 失败,终态理由是 `insufficientEvidenceForPatch`,
+其间连续三次 `STALE_DECISION:workspaceRevisionChanged:084dddd2b862->none`。证据不足是**假的**,
+真因有两条,时间线逐条对得上(`HTASK-C458F21E8B9C`):
+
+1. **隔离 workspace 的身份活不过进程。** evolution workspace 于 12:51:52 建立,
+   `EvolutionWorkspaceManager.prepareWorkspace` 当场把派生 profile 注册进
+   `WorkspaceProjectProfileRegistry`。13:06 daemon 因另一处配置被重启,新进程的 registry
+   只有源 profile;**全仓只有两处 `.register(`,都在 `prepareWorkspace` 内**,
+   而一个已过准备相位的任务再也不会调它。于是 `executionProjectRef`
+   (= `evolution-…`)在新进程里永远解析不到,`WorkspaceHarnessRepairPort`
+   抛 `projectProfileMismatch`。磁盘上的 workspace 完好——单独调
+   `WorkspaceProviderSupport.workspaceRevision` 能正常返回值——丢的只是注册。
+   这发生在一个**以跨重启存活为设计目标**的平面里:同一个 daemon 启动时会打印
+   「recovered N active job(s)」。
+
+2. **「量不到」被报成了「量到了且变了」。** `HarnessTaskCoordinator.executionFacts`
+   用一次 `try?` 求 workspace revision,四种前置不满足与一切抛出**塌缩成同一个 `nil``,
+   陈旧判定随即断言 `workspaceRevisionChanged(observed:current:nil)` ——
+   断言了一次**从未发生过的观测**。第 1 条修好之后,这条仍会把下一个成因藏起来。
+
+### What(r2 交付面)
+
+1. 派生 profile 的注册不再只发生在创建路径:持久化的 evolution workspace 在进程重新
+   接手该任务时被重新登记,身份与磁盘上的 manifest 一致,冲突则 fail-loud 而非静默重建。
+2. workspace revision 的求值区分三态——**已测得**、**确证不可测**(附类型化原因)、
+   **与期望不符**。只有第三态构成 `workspaceRevisionChanged`;第二态是它自己的、
+   可读的停机理由,不冒充证据不足。
+3. 有界循环的失败理由必须指向真正的成因:量不到 workspace revision 时,任务停在
+   一个说明"哪一环没答上来"的理由上,而不是 `insufficientEvidenceForPatch`。
+
+## Out of scope(r2)
+
+- 改变隔离语义、允许路径、晋升条件或任何 workspace 变更的授权面;
+- 放宽陈旧判定——真的变更了仍然必须判陈旧,`try?` 换成的是更严不是更松;
+- 重造 workspace 快照/校验和的算法,或改动 `analyzer.*` 与只读族;
+- 在本 PR 中宣称 GJ-5 在 7.0.0.37 上 `REAL_DEVICE_PASS`。
 
 ## §19 治理循环四问(新增 Proposal 的强制说明)
 

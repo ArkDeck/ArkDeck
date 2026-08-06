@@ -662,3 +662,28 @@
   - 其他 change 目录
 - Risk:medium(纯移动的风险在"顺手改了行为"。缓解:PR 内断言测试数与结论不变,
   行为变更一律拆出;两段留守范式见 MU-2 T06 先例)
+
+## TASK-HFA-014 — 隔离 workspace 跨重启的身份,与"量不到"的如实上报(r2)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r2 What 1-3(持久化 evolution workspace 在新进程重新登记且
+  与 manifest 一致、revision 求值三态化、有界循环的停机理由指向真正成因)
+- Acceptance:change-local `HFA-AC-24`、`HFA-AC-25`,登记于 `verification.md`
+- Depends on:TASK-HFA-005、TASK-HFA-009、TASK-HFA-013(均 done);r2 proposal 合入即 approved
+- Hardware required:no。两条 AC 都能在 contract 面构造(换进程 = 换 registry 实例);
+  真机复跑 GJ-5 是本任务之后的独立验证,**不得**用它替代 AC
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `openspec/changes/chg-2026-055-harness-final-architecture/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/contracts/**`
+  - `Catalog/**`、`scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeckApp/**`、`ArkDeck.xcodeproj/**`
+  - 其他 change 目录
+- Risk:medium(动的是隔离身份的解析与陈旧判定。三层约束:①真的变更仍必须判陈旧,
+  三态化只允许把"不可测"从"变了"里摘出去,不允许把"变了"变成"没变";
+  ②重新登记必须与磁盘 manifest 逐项一致,冲突 fail-loud —— 回落到源 workspace
+  等于悄悄取消隔离,是本任务最危险的错法;③已销毁的 workspace 不得复活)
