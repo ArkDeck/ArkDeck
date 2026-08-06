@@ -249,8 +249,22 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
         failureCode: "campaign.safeToReflash")
     }
     while true {
-      guard !document.isTerminal, document.assertion.isValid(at: nowUTC()) else {
-        throw RockchipEvolutionCampaignError.campaignStopped("terminalOrExpired")
+      // Two situations, and they were one word. A campaign that has stopped
+      // for good and a confirmation that has merely lapsed need opposite next
+      // moves: the first says establish what the device is before starting
+      // anything new, the second says nothing about the device changed —
+      // preview and confirm again. A caller told only `terminalOrExpired`
+      // cannot choose, so it stops for a human. The two guards below already
+      // name themselves exactly; this one was the outlier.
+      guard !document.isTerminal else {
+        let disposition = document.events
+          .last(where: { $0.kind == .attemptTerminal })?.disposition
+        throw RockchipEvolutionCampaignError.campaignStopped(
+          "campaignTerminal:\(disposition.map(String.init(describing:)) ?? "noAttemptTerminal")")
+      }
+      guard document.assertion.isValid(at: nowUTC()) else {
+        throw RockchipEvolutionCampaignError.campaignStopped(
+          "confirmationExpired:\(document.assertion.validUntil)")
       }
       guard !Self.hasRepeatedNoEffectFailure(document) else {
         _ = try? ledger.stop(
