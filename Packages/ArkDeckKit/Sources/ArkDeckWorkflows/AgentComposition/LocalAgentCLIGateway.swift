@@ -274,6 +274,23 @@ extension LocalAgentCLIProcessTransport {
   static func unfenced(_ text: String) -> String {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     if let fenced = lastFencedObject(in: trimmed) { return fenced }
+    // The same narration, without the fence. `lastFencedObject` was added
+    // because an agent says what it checked and then states its answer in a
+    // ```json block; it also sometimes states the answer as bare JSON on the
+    // next line. That variant reached the parser with the sentence still
+    // attached and a complete, correct patch proposal was discarded as
+    // malformed (observed on device, `HTASK-7C12960C4B6E` round 7 — the one
+    // round where a proposal was possible, which is why that run stopped).
+    // Only where no fence is involved at all. Text containing a fence — even
+    // an unterminated one — is governed by the rule directly below, which
+    // deliberately leaves those bytes as returned rather than half-removing a
+    // fence. Reaching into it here would overturn that decision as a side
+    // effect of fixing a different case.
+    if !trimmed.hasPrefix("{"), !trimmed.contains("```"),
+      let bare = lastTopLevelObject(in: trimmed)
+    {
+      return bare
+    }
     guard trimmed.hasPrefix("```"), trimmed.hasSuffix("```"), trimmed.count > 6 else {
       return trimmed
     }
@@ -321,6 +338,57 @@ extension LocalAgentCLIProcessTransport {
       remainder = body[close.upperBound...]
     }
     return blocks.last { $0.hasPrefix("{") && $0.hasSuffix("}") }
+  }
+
+  /// The last balanced top-level `{…}` in unfenced text, or nil.
+  ///
+  /// Last for the same reason `lastFencedObject` takes the last block: an
+  /// agent that shows its work puts the answer at the end.
+  ///
+  /// Braces inside JSON strings do not count, and neither does an escaped
+  /// quote — a unified diff arrives inside one of those strings, so a scanner
+  /// that ignored either would cut the answer in half. Nothing here
+  /// interprets the bytes: the closed key set, the forbidden fields, the
+  /// offered-operation check and the raw-surface screen all remain
+  /// `HarnessDecisionProposal.parse`'s to apply to whatever comes out.
+  static func lastTopLevelObject(in text: String) -> String? {
+    var candidates: [String] = []
+    var start: String.Index?
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for index in text.indices {
+      let character = text[index]
+      if inString {
+        if escaped {
+          escaped = false
+        } else if character == "\\" {
+          escaped = true
+        } else if character == "\"" {
+          inString = false
+        }
+        continue
+      }
+      switch character {
+      case "\"":
+        inString = true
+      case "{":
+        if depth == 0 { start = index }
+        depth += 1
+      case "}":
+        guard depth > 0 else { break }
+        depth -= 1
+        if depth == 0, let opened = start {
+          candidates.append(String(text[opened...index]))
+          start = nil
+        }
+      default:
+        break
+      }
+    }
+    // An unterminated object is left alone rather than half-taken, the same
+    // way an unclosed fence is.
+    return candidates.last
   }
 }
 
