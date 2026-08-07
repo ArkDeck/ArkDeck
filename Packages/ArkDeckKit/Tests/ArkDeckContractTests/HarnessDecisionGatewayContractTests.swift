@@ -1095,9 +1095,25 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
       try HarnessTaskCoordinator.validateModelProposal(
         prematureStop, against: exactAnalyzer)
     ) { error in
+      // The rule is unchanged — a producer may not divert an orchestrated
+      // step, including by escalating to a human. What changed is the answer:
+      // it names what was proposed and which step refused it. Reporting this
+      // as `operationNotExpected:<step>` told a producer that proposed no
+      // operation that its operation was wrong, and it repeated the same
+      // escalation two rounds later (`HTASK-0C535C0E0B87`, rounds 11 and 13).
       XCTAssertEqual(
         error as? HarnessDecisionRejection,
-        .operationNotExpected(DebugCrashTaskHandler.analyzeCrashLedger))
+        .decisionNotYoursDuringOrchestratedStep(
+          proposed: "requestHuman", step: DebugCrashTaskHandler.analyzeCrashLedger))
+      XCTAssertEqual(
+        (error as? HarnessDecisionRejection)?.reasonCode,
+        "decisionNotYoursDuringOrchestratedStep:proposed=requestHuman:"
+          + "step=analyzer.extract-crash-signature@1")
+      // And it must not read as a claim about an operation the producer never
+      // named.
+      XCTAssertFalse(
+        (error as? HarnessDecisionRejection)?.reasonCode
+          .hasPrefix("operationNotExpected") == true)
     }
 
     // Agreeing with the operation and leaving its inputs alone is the answer

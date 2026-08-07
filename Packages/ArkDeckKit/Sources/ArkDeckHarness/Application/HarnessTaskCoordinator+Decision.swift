@@ -227,8 +227,13 @@ extension HarnessTaskCoordinator {
       let expected = deterministic.operationReference,
       orchestrated.contains(expected)
     {
-      throw HarnessDecisionRejection.operationNotExpected(
-        proposal.operationReference ?? expected)
+      // The rule is unchanged: an orchestrated step's sequence belongs to the
+      // deterministic route. Only the answer changed — it now says what was
+      // proposed and which step refused it, instead of naming an operation the
+      // producer may never have mentioned.
+      throw HarnessDecisionRejection.decisionNotYoursDuringOrchestratedStep(
+        proposed: proposal.operationReference ?? proposal.kind.rawValue,
+        step: expected)
     }
   }
 

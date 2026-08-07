@@ -656,6 +656,15 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
   /// no-progress budget ran out.
   case operationNotOffered(String, offered: [String] = [])
   case operationNotExpected(String)
+  /// The handler is mid-way through an orchestrated step and the route is not
+  /// the producer's to change — including by escalating to a human.
+  ///
+  /// Its own case because reporting it as `operationNotExpected` named the
+  /// step the handler wanted, and a producer that proposed no operation was
+  /// told its operation was wrong. It then repeated the same escalation two
+  /// rounds later (`HTASK-0C535C0E0B87`, rounds 11 and 13), which is what a
+  /// refusal that misnames its subject produces.
+  case decisionNotYoursDuringOrchestratedStep(proposed: String, step: String)
   case rawCommandSurface(String)
   case oversizedField(String)
   case emptyHypothesis
@@ -674,6 +683,8 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
       let alternatives = offered.isEmpty ? "none" : offered.sorted().joined(separator: ",")
       return "operationNotOffered:\(reference):offered=\(alternatives)"
     case .operationNotExpected(let reference): return "operationNotExpected:\(reference)"
+    case .decisionNotYoursDuringOrchestratedStep(let proposed, let step):
+      return "decisionNotYoursDuringOrchestratedStep:proposed=\(proposed):step=\(step)"
     case .rawCommandSurface(let field): return "rawCommandSurface:\(field)"
     case .oversizedField(let field): return "oversizedField:\(field)"
     case .emptyHypothesis: return "emptyHypothesis"
