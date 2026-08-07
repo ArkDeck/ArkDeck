@@ -658,6 +658,11 @@ final class FlashWorkspaceViewModel: ObservableObject {
 
   private let provider: any FlashApplicationProviding
   private let preparesUITestPlan: Bool
+  /// The UI-test state file, honored only when the launch already carries the
+  /// Flash fixture arguments: it lets one launched sweep walk the empty
+  /// workspace first and enter the exact-plan flow later, without a relaunch.
+  /// A production launch has no state URL and never reads one.
+  private let uiTestFixtureStateURL: URL?
   private var didPrepareUITestPlan = false
 
   init(
@@ -666,10 +671,25 @@ final class FlashWorkspaceViewModel: ObservableObject {
   ) {
     self.provider = provider
     preparesUITestPlan = arguments.contains("--ui-test-flash-plan")
+    if arguments.contains("--ui-test-flash") || preparesUITestPlan,
+      let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
+      arguments.indices.contains(index + 1)
+    {
+      uiTestFixtureStateURL = URL(fileURLWithPath: arguments[index + 1])
+    } else {
+      uiTestFixtureStateURL = nil
+    }
     if preparesUITestPlan {
       mode = .execute
       selectedArchiveURL = URL(fileURLWithPath: "/ui-fixture/dayu200-images.tar.gz")
     }
+  }
+
+  private var uiTestFixtureStateRequestsPlan: Bool {
+    guard let uiTestFixtureStateURL,
+      let text = try? String(contentsOf: uiTestFixtureStateURL, encoding: .utf8)
+    else { return false }
+    return text.contains("--ui-test-flash-plan")
   }
 
   var selectedTarget: FlashTargetPresentation? {
@@ -721,8 +741,14 @@ final class FlashWorkspaceViewModel: ObservableObject {
       if previousTarget != nextTarget {
         self.invalidatePlan()
       }
-      if self.preparesUITestPlan, !self.didPrepareUITestPlan {
+      if self.preparesUITestPlan || self.uiTestFixtureStateRequestsPlan,
+        !self.didPrepareUITestPlan
+      {
         self.didPrepareUITestPlan = true
+        if self.selectedArchiveURL == nil {
+          self.mode = .execute
+          self.selectedArchiveURL = URL(fileURLWithPath: "/ui-fixture/dayu200-images.tar.gz")
+        }
         self.preparePlan()
       }
     }

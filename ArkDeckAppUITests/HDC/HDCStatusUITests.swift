@@ -318,6 +318,10 @@ final class HDCStatusUITests: XCTestCase {
     // lands before the panel has a selection and is simply dropped. Press the
     // panel's own Open button, once it reports that it has something to open —
     // which also says, in one assertion, whether the panel accepted the path.
+    // Two waits by necessity, not by habit: resolving a control inside the
+    // remote open-panel service costs seconds per query, but the enabled
+    // predicate cannot double as the existence check — isEnabled on an
+    // unresolved element is a query failure, not false.
     let openButton = openPanel.buttons["OKButton"]
     XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Open panel must expose its Open button")
     assertEnabled(openButton, equals: true, timeout: 10)
