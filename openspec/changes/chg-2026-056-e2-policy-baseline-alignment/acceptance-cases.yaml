@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 5
+change_revision: 6
 platform: macos
 evidence_classes:
 - contract

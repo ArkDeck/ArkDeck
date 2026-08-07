@@ -2,8 +2,8 @@
 
 ## TASK-E2B-001 — Remove the E2 authority lane and close GJ-4 through Runtime admission
 
-- Status:blocked (awaiting maintainer approval of `CHG-2026-056@r5`; r1-r4 approval is not
-  sufficient and proposal CI does not authorize implementation or hardware execution)
+- Status:blocked (r5 is present on protected main after maintainer merge; awaiting maintainer
+  review/merge of the r6 path-scope addendum before implementation or hardware execution)
 - Golden Journey:GJ-4
 - Platform:macos; windows/linux contract compatibility only
 - Requirements:`POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-015`, `REQ-FLASH-016`,
@@ -11,7 +11,7 @@
 - Acceptance:`AC-FLASH-007-01`, `AC-FLASH-015-01`, `AC-FLASH-015-02`, `AC-FLASH-015-03`,
   `AC-WF-004-01`, `AC-WF-004-02`, `AC-WF-004-03`, `E2R-CATALOG-001`,
   `E2R-RUNTIME-001`, `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-GJ4-001`
-- Depends on:maintainer changes r5 proposal status to `approved` and merges it to protected `main`
+- Depends on:maintainer reviews and merges the r6 path-scope addendum to protected `main`
 - Production reachability:
   `ArkDeckApp/manual UI driver -> Agent XPC -> protected-main RuntimeJobEngine ->
   RuntimeCapabilityStore -> Rockchip Runtime composition -> typed Provider -> DAYU200`
@@ -23,6 +23,7 @@
   - `Catalog/schema/operation.schema.json`
   - `Catalog/operations/flash.dayu200.v1.json`
   - `Catalog/operations/deploy.native-library.system.v1.json`
+  - `Catalog/profiles/dayu200.v1.json` (notes text only; identity and partition mapping are forbidden)
   - `Catalog/profiles/dayu200.v2.json`
   - `Catalog/generated/effect-authorization-matrix.md`
   - `openspec/constitution.md`
@@ -45,6 +46,7 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeCapability.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogTypes.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/RuntimeOperationModelsV2.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeCapabilityStore.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/AuthorizationUsageLedger.swift`
@@ -65,8 +67,10 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/HarnessAdapters/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentXPCListener.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckHarness/Application/HarnessPolicyGuard.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckHarness/Domain/HarnessEvolution.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
@@ -122,7 +126,8 @@
 
 ### Stop conditions
 
-- Stop before implementation if r5 is not `approved` on protected main.
+- Stop before implementation if r5's adjudication merge or r6's path-scope merge is absent from
+  protected main.
 - Stop and revise this same change if implementation needs a new operation/provider/profile,
   effect downgrade, caller-supplied capability/trusted fact, or any path outside the reviewed
   scope.

@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 5
+revision: 6
 status: proposed
 class: core
 core_change_level: major
@@ -20,9 +20,15 @@ platforms: [macos, windows, linux]
 > 人工授权层；`destructive` 仍是不可降级的设备效果分类，并继续触发最严格的
 > identity、typed-plan、fresh readback、reservation、journal 和 recovery 规则。
 >
-> 本 revision 是尚未批准的 MAJOR Safety 变更。提案分支只包含裁决材料；不得据此
-> 修改生产代码、Catalog、authority 实例或真实设备。维护者如同意，须在合并前把
-> `status` 改为 `approved`；合并受保护 `main` 才构成批准，不另开 approval-only PR。
+> r5 是 MAJOR Safety 裁决；它的提案分支只包含裁决材料，维护者合并到受保护 `main`
+> 构成人类批准。r6 仍只含裁决材料；不得据此修改生产代码、Catalog、authority 实例
+> 或真实设备，只有维护者 review/merge r6 后新增路径才进入已批准范围。
+>
+> r6（2026-08-07）不改变 r5 的任何 Safety、Catalog、Runtime 或硬件语义。实现前的
+> 路径审计发现，r5 已声明的 `ArkDeckApp/manual UI driver -> Agent XPC -> Runtime`
+> 生产链缺少两个 XPC 源文件，CLI surface 清理缺少其实现文件，且 dayu200 v1 profile
+> 留有一处仅文本的 E2 陈述。r6 只把这四个精确文件补入 TASK-E2B-001 Allowed paths；
+> 不允许借此修改 profile identity/partition mapping、扩大 XPC 方法集或新增执行面。
 
 ## Why
 
@@ -170,11 +176,31 @@ Observable behavior:
 
 ## Approval and implementation sequence
 
-1. This PR carries only `CHG-2026-056@r5` adjudication material with `status: proposed`.
-2. Maintainer reviews the explicit loss of per-plan human intent proof. Approval requires changing
-   this file to `status: approved` before merge; r1-r4 approvals and CI green do not count.
-3. Only after the approved revision is present on protected `main` may TASK-E2B-001 implement the
-   deltas, migration, tests and real GJ-4 UI Flash.
+1. `CHG-2026-056@r5` adjudication was merged to protected `main` as PR #1178; that merge is the
+   repository trust root for the explicit loss of per-plan human intent proof.
+2. The r6 PR carries only the exact path-scope addendum below. CI green does not approve it;
+   maintainer review/merge to protected `main` does.
+3. Only after r6 is present on protected `main` may TASK-E2B-001 touch the added files while
+   implementing the already approved r5 deltas, tests and real GJ-4 UI Flash.
 4. Implementation must pass all host gates before any device window. Real Flash then uses only the
    ratified/approved Runtime path and records truthful realHardware evidence.
 5. Change verification/archive and `CORE-4.0.0` ratification remain separate human decisions.
+
+## r6 path-scope addendum
+
+This addendum repairs only the mechanical implementation scope of the already declared production
+path. It does not expand the product or safety decision:
+
+- `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift` and
+  `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentXPCListener.swift` are the existing App XPC
+  allowlist and its enforcement point. The UI cannot reach the protected-main Runtime without a
+  closed allowlist for Flash bundle import plus typed Job submit/run. Capability administration,
+  target adoption, cancel, reconcile and generic mutation remain forbidden.
+- `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift` owns the current
+  caller-facing capability commands. Removing Agent capability administration cannot be truthful
+  while that active surface remains outside the implementation scope.
+- `Catalog/profiles/dayu200.v1.json` changes only the stale prose phrase "E2 capability" to the
+  approved Runtime-admission wording. Its identity, operations, partitions and every other byte
+  remain out of scope.
+
+The r6 adjudication PR contains no production implementation and performs no device operation.
