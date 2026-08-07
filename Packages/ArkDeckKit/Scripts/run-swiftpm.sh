@@ -93,12 +93,6 @@ case $swift_executable in
 esac
 [ -x "$swift_executable" ] || fail "Swift executable is not executable: $swift_executable" 69
 
-workspace_path=$cache_root/workspace
-scratch_path=$cache_root/build
-dependency_cache=$cache_root/dependencies
-lock_path=$cache_root/build.lock
-ignored_paths=$cache_root/ignored-paths
-
 umask 077
 cache_root_created=0
 if [ ! -d "$cache_root" ]; then
@@ -141,8 +135,17 @@ mkdir -p "$workspace_path"
 # files are neither copied nor retained. --checksum + --no-times means a fresh
 # worktree with identical bytes leaves the mirror's inode and mtime untouched,
 # while real edits, additions, and deletions update the mirror before SwiftPM.
+# Git prints repo-relative paths; the leading slash anchors each rsync pattern
+# to the transfer root. Without it a single-segment ignored name (say a
+# root-only `/cache-dir/` in .gitignore) matches at every depth, excluding and
+# then deleting an identically named tracked directory inside the mirror.
 git -C "$repo_root" ls-files --others --ignored --exclude-standard --directory -z \
   > "$ignored_paths"
+if [ -s "$ignored_paths" ]; then
+  /usr/bin/xargs -0 /usr/bin/printf '/%s\0' < "$ignored_paths" \
+    > "$ignored_paths.anchored"
+  mv -f "$ignored_paths.anchored" "$ignored_paths"
+fi
 /usr/bin/rsync -ac --no-times --delete --delete-excluded --from0 \
   --exclude=.git --exclude-from="$ignored_paths" \
   "$repo_root/" "$workspace_path/"
