@@ -49,14 +49,15 @@ final class AgentXPCTransportContractTests: XCTestCase {
         AgentXPCEndpoint.admission(of: frame(method: method)), .direct(method: method),
         "\(method) is on the allowlist and must forward")
     }
-    // device.candidates joined this set as a pure discovery read: it lists
-    // HDC candidates via the bootstrap's enumeration (never `advance`, whose
-    // single-candidate path adopts), so it cannot create or change a binding.
     for method in ArkDeckAgentXPC.gatedFlashJobMethods {
       XCTAssertNil(
         AgentXPCEndpoint.admission(of: frame(method: method)),
         "\(method) needs a typed payload or a UI-owned Job identifier")
     }
+    // device.candidates sits in the read-only set as a pure discovery read:
+    // it lists HDC candidates via the bootstrap's enumeration (never
+    // `advance`, whose single-candidate path adopts), so it cannot create or
+    // change a binding.
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableReadOnlyMethods,
       [

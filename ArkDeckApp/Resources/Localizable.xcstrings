@@ -353,6 +353,70 @@
         }
       }
     },
+    "device.fact.firmware": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed firmware"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "观测固件"
+          }
+        }
+      }
+    },
+    "device.fact.model": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed model"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "观测机型"
+          }
+        }
+      }
+    },
+    "device.fact.observedAt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmed at"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认时间"
+          }
+        }
+      }
+    },
+    "device.fact.observedProvenance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed facts come from the most recent succeeded observe.device@1 job — historical evidence, not the device's live state."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "观测事实来自最近一次成功的 observe.device@1 Job——是历史证据，不是设备此刻的实时状态。"
+          }
+        }
+      }
+    },
     "device.fact.state": {
       "localizations": {
         "en": {
@@ -381,6 +445,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已接管目标"
+          }
+        }
+      }
+    },
+    "device.fact.transport": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed transport"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "观测传输"
           }
         }
       }

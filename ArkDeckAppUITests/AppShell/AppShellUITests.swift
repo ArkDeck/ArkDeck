@@ -228,6 +228,13 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(unauthorizedDevice.waitForExistence(timeout: 10), file: file, line: line)
     XCTAssertTrue(
       element("device.row.150100469346864", in: app).exists, file: file, line: line)
+    // The adopted row names what its last observation recorded — firmware and
+    // transport — as raw domain strings, identical in every language.
+    XCTAssertTrue(
+      displayedText(for: element("device.row.150100469346864", in: app))
+        .contains("OpenHarmony 5.0.0.71"),
+      "the adopted device row must carry its observed firmware",
+      file: file, line: line)
     clickCorrectingNavigationSplitAXOffset(unauthorizedDevice, in: app)
     XCTAssertTrue(
       element("device.trust.steps", in: app).waitForExistence(timeout: 10),
@@ -273,14 +280,14 @@ final class AppShellUITests: XCTestCase {
     // Execute can be reviewed only after an exact plan exists, but the App has
     // no E2 submit or authority transport. The locked boundary and disabled
     // review action stay visible, and returning to plan-only has no side effect.
+    // Execute is a real, Runtime-owned submission surface now. With no plan
+    // prepared the review action renders disabled, and no submit control
+    // exists before a confirmed human handoff.
     let executeMode = element("flash.mode.execute", in: app)
     XCTAssertTrue(executeMode.exists, file: file, line: line)
     executeMode.click()
-    XCTAssertTrue(
-      app.staticTexts["flash.execute.blocker"].waitForExistence(timeout: 5),
-      file: file, line: line)
     let reviewImpact = app.buttons["flash.execute.review"]
-    XCTAssertTrue(reviewImpact.exists, file: file, line: line)
+    XCTAssertTrue(reviewImpact.waitForExistence(timeout: 5), file: file, line: line)
     XCTAssertFalse(reviewImpact.isEnabled, file: file, line: line)
     XCTAssertFalse(app.buttons["flash.execute.submit"].exists, file: file, line: line)
     element("flash.mode.planOnly", in: app).click()
@@ -634,9 +641,13 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("flash.execute.handoff", in: app).waitForExistence(timeout: 10),
       "exact phrases must produce the local human-review receipt")
+    // The handoff arms a real submit action now. This test deliberately stops
+    // at the receipt: the button must exist and be enabled, and remain
+    // unclicked, so the fixture run still submits nothing.
     let submit = app.buttons["flash.execute.submit"]
     XCTAssertTrue(submit.exists)
-    XCTAssertFalse(submit.isEnabled)
+    XCTAssertTrue(submit.isEnabled)
+    XCTAssertFalse(element("flash.execute.terminal", in: app).exists)
     XCTAssertTrue(app.staticTexts["flash.runtime.empty"].exists)
   }
 

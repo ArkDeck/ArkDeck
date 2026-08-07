@@ -174,6 +174,61 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertNil(full.candidates[1].adoptedTargetID)
   }
 
+  // Observed facts join only via a succeeded observe.device@1 job whose
+  // evidence names the same target: identity mismatch, wrong operation and
+  // non-terminal states all decorate nothing.
+  func testObservedFactsJoinRequiresMatchingSucceededObservation() throws {
+    let jobList = Data(
+      #"""
+      {"id":"t","ok":true,"result":[
+        {"jobId":"job-old","operation":"observe.device@1","targetId":"t-1",
+         "state":"succeeded","finishedAtUtc":"2026-08-01T00:00:00Z"},
+        {"jobId":"job-new","operation":"observe.device@1","targetId":"t-1",
+         "state":"succeeded","finishedAtUtc":"2026-08-06T00:00:00Z"},
+        {"jobId":"job-running","operation":"observe.device@1","targetId":"t-1",
+         "state":"running","finishedAtUtc":"2026-08-07T00:00:00Z"},
+        {"jobId":"job-flash","operation":"flash.dayu200@1","targetId":"t-1",
+         "state":"succeeded","finishedAtUtc":"2026-08-07T00:00:00Z"},
+        {"jobId":"job-other","operation":"observe.device@1","targetId":"t-2",
+         "state":"succeeded","finishedAtUtc":"2026-08-05T00:00:00Z"}
+      ]}
+      """#.utf8)
+    let latest = DeviceCandidatesResponseDecoding.latestSucceededObservationJobIDs(
+      jobList, adoptedTargetIDs: ["t-1"])
+    XCTAssertEqual(latest, ["t-1": "job-new"], "newest succeeded observation wins; t-2 is not adopted")
+
+    let evidence = Data(
+      #"""
+      {"id":"t","ok":true,"result":{"jobId":"job-new","observation":{
+        "targetId":"t-1","model":"DAYU200","firmware":"OpenHarmony 5.0.0.71",
+        "transport":"USB","confirmedAtUtc":"2026-08-06T00:00:00Z"}}}
+      """#.utf8)
+    let facts = try XCTUnwrap(
+      DeviceCandidatesResponseDecoding.observedFacts(evidence, targetID: "t-1"))
+    XCTAssertEqual(facts.model, "DAYU200")
+    XCTAssertEqual(facts.firmware, "OpenHarmony 5.0.0.71")
+    XCTAssertEqual(facts.transport, "USB")
+
+    XCTAssertNil(
+      DeviceCandidatesResponseDecoding.observedFacts(evidence, targetID: "t-2"),
+      "evidence observed on one device must never decorate another")
+
+    let base = DeviceListPresentation(
+      availability: .available,
+      candidates: [
+        DeviceCandidatePresentation(
+          connectKey: "abc", state: "Connected", adoptedTargetID: "t-1", bindingRevision: 1),
+        DeviceCandidatePresentation(
+          connectKey: "def", state: "Unauthorized", adoptedTargetID: nil, bindingRevision: nil),
+      ])
+    let decorated = DeviceCandidatesResponseDecoding.decorated(
+      base, observedFactsByTargetID: ["t-1": facts])
+    XCTAssertEqual(decorated.candidates[0].observedFacts, facts)
+    XCTAssertNil(
+      decorated.candidates[1].observedFacts,
+      "an unadopted candidate carries no observation")
+  }
+
   // The facade's provider protocol carries exactly one read and no writes.
   func testApplicationSurfaceCannotNameAWriteMethod() throws {
     let source = try String(

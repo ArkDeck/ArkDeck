@@ -51,11 +51,21 @@ struct DeviceSidebarRow: View {
           .font(.body)
           .lineLimit(1)
           .truncationMode(.middle)
+        // The second line names what was actually observed — firmware and
+        // transport from the last succeeded observation — and falls back to
+        // the connect key when no observation evidence exists yet.
         HStack(spacing: 4) {
           Text(stateText)
             .font(.caption)
             .foregroundStyle(.secondary)
-          if candidate.isAdopted {
+          if let secondary = observedSummary {
+            Text(secondary)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .truncationMode(.middle)
+              .accessibilityIdentifier("device.row.observed.\(candidate.connectKey)")
+          } else if candidate.isAdopted {
             Text(candidate.connectKey)
               .font(.caption.monospaced())
               .foregroundStyle(.secondary)
@@ -71,6 +81,12 @@ struct DeviceSidebarRow: View {
     .accessibilityElement(children: .combine)
     .accessibilityValue(stateText)
     .accessibilityIdentifier("device.row.\(candidate.connectKey)")
+  }
+
+  private var observedSummary: String? {
+    guard let facts = candidate.observedFacts else { return nil }
+    let parts = [facts.firmware, facts.transport].compactMap { $0 }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
   private var stateText: String {
@@ -134,6 +150,15 @@ struct DeviceDetailView: View {
               trustSteps
             }
             factsGrid
+            if candidate.observedFacts != nil {
+              // Provenance, not certification: these fields describe what the
+              // last succeeded observation recorded, not the device's state
+              // this second.
+              Text(deviceString("device.fact.observedProvenance"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 10) {
               Button(deviceString("device.action.recheck"), action: onRecheck)
                 .disabled(isRefreshing)
@@ -249,6 +274,35 @@ struct DeviceDetailView: View {
           Text(deviceString("device.fact.bindingRevision")).foregroundStyle(.secondary)
           Text(String(revision))
             .font(.body.monospacedDigit())
+        }
+      }
+      if let facts = candidate.observedFacts {
+        if let model = facts.model {
+          GridRow(alignment: .firstTextBaseline) {
+            Text(deviceString("device.fact.model")).foregroundStyle(.secondary)
+            Text(model).font(.body.monospaced()).textSelection(.enabled)
+          }
+        }
+        if let firmware = facts.firmware {
+          GridRow(alignment: .firstTextBaseline) {
+            Text(deviceString("device.fact.firmware")).foregroundStyle(.secondary)
+            Text(firmware)
+              .font(.body.monospaced())
+              .textSelection(.enabled)
+              .accessibilityIdentifier("device.fact.firmware")
+          }
+        }
+        if let transport = facts.transport {
+          GridRow(alignment: .firstTextBaseline) {
+            Text(deviceString("device.fact.transport")).foregroundStyle(.secondary)
+            Text(transport).font(.body.monospaced())
+          }
+        }
+        if let confirmedAt = facts.confirmedAtUTC {
+          GridRow(alignment: .firstTextBaseline) {
+            Text(deviceString("device.fact.observedAt")).foregroundStyle(.secondary)
+            Text(confirmedAt).font(.body.monospaced())
+          }
         }
       }
     }
