@@ -50,7 +50,6 @@ final class AppShellUITests: XCTestCase {
       workspaces: Workspaces(
         inspectorShow: "Show job inspector",
         inspectorReadOnly: "Read-only Runtime facts",
-        debugTitle: "Debug Workbench",
         debugPanels: [
           "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
           "Provider invocation disclosure",
@@ -62,6 +61,7 @@ final class AppShellUITests: XCTestCase {
           "This workspace reads Runtime state. It cannot submit, cancel, or retry anything.",
         outcomeUnknown: "Outcome unknown — this Job's effect on the device was never confirmed.",
         waitingForHuman: "Waiting for a person to act.",
+        interruptedRowState: "Interrupted · outcome unknown",
         emptyTitle: "No Runtime Jobs Yet",
         emptyDescription: "ArkDeck Runtime has recorded no Jobs on this host.",
         residue: "2 outstanding residue items."))
@@ -92,7 +92,6 @@ final class AppShellUITests: XCTestCase {
       workspaces: Workspaces(
         inspectorShow: "展开 Job 检查器",
         inspectorReadOnly: "只读 Runtime 事实",
-        debugTitle: "Debug 工作台",
         debugPanels: [
           "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则", "Provider 调用披露",
         ],
@@ -102,6 +101,7 @@ final class AppShellUITests: XCTestCase {
         readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
         outcomeUnknown: "结果未知——此 Job 对设备的影响从未被确认。",
         waitingForHuman: "等待人工处理。",
+        interruptedRowState: "已中断 · 结果未知",
         emptyTitle: "尚无 Runtime Job",
         emptyDescription: "ArkDeck Runtime 在本机尚未记录任何 Job。",
         residue: "有 2 项未清理残留。"))
@@ -119,7 +119,6 @@ final class AppShellUITests: XCTestCase {
   private struct Workspaces {
     let inspectorShow: String
     let inspectorReadOnly: String
-    let debugTitle: String
     let debugPanels: [String]
     let uiDumpUnavailable: String
     let traceUnavailable: String
@@ -142,6 +141,7 @@ final class AppShellUITests: XCTestCase {
     let readOnlyNote: String
     let outcomeUnknown: String
     let waitingForHuman: String
+    let interruptedRowState: String
     let emptyTitle: String
     let emptyDescription: String
     let residue: String
@@ -264,9 +264,11 @@ final class AppShellUITests: XCTestCase {
     // Debug is a complete native workspace with four distinct panels. The
     // production App read channel has no target in this fixture, so every
     // mutation stays disabled while its exact form remains inspectable.
+    // The page title lives in the window toolbar; the content area carries
+    // only the scope line, so that is what proves the workspace rendered.
     select("app.navigation.debug", in: app)
     XCTAssertTrue(
-      app.staticTexts[workspaces.debugTitle].waitForExistence(timeout: 10),
+      element("debug.scope", in: app).waitForExistence(timeout: 10),
       file: file, line: line)
     XCTAssertTrue(element("debug.target", in: app).exists, file: file, line: line)
     XCTAssertTrue(app.buttons["debug.refresh"].exists, file: file, line: line)
@@ -275,6 +277,11 @@ final class AppShellUITests: XCTestCase {
     let debugStart = app.buttons["debug.logs.start"]
     XCTAssertTrue(debugStart.exists, file: file, line: line)
     XCTAssertFalse(debugStart.isEnabled, file: file, line: line)
+    // Pausing is a viewport action that exists only while a capture runs; in
+    // this read-only build nothing captures, so the button stays disabled.
+    let pauseViewport = app.buttons["debug.logs.pauseViewport"]
+    XCTAssertTrue(pauseViewport.exists, file: file, line: line)
+    XCTAssertFalse(pauseViewport.isEnabled, file: file, line: line)
     XCTAssertEqual(workspaces.debugPanels.count, 4, file: file, line: line)
     let debugTabIDs = ["logs", "apps", "network", "commands"]
     for (tabID, panelTitle) in zip(debugTabIDs, workspaces.debugPanels) {
@@ -295,6 +302,13 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(element("uiDump.target.empty", in: app).exists, file: file, line: line)
     XCTAssertTrue(
       element("uiDump.recipe.fullDefaultTree", in: app).exists,
+      file: file, line: line)
+    // elementTree is the default recipe; the section's live echo proves it by
+    // showing its exact hidumper arguments, in any language.
+    XCTAssertTrue(
+      displayedText(for: element("uiDump.recipe.liveArguments", in: app))
+        .contains("-element -c"),
+      "the live argument echo must reflect the default elementTree recipe",
       file: file, line: line)
     XCTAssertTrue(element("uiDump.artifacts.table", in: app).exists, file: file, line: line)
     let uiDumpRun = app.buttons["uiDump.run"]
@@ -321,6 +335,19 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(traceStart.isEnabled, file: file, line: line)
     XCTAssertFalse(app.staticTexts["app.unavailable.title"].exists, file: file, line: line)
 
+    // Custom is another entry to the same request: it arrives carrying the
+    // current preset's tag family instead of an empty selection, and the
+    // members render as individually toggleable chips with a count.
+    element("trace.configuration.mode.custom", in: app).click()
+    XCTAssertTrue(
+      element("trace.custom.count", in: app).waitForExistence(timeout: 5),
+      "custom mode must arrive with the preset's tags selected",
+      file: file, line: line)
+    XCTAssertTrue(
+      element("trace.custom.tag.ace", in: app).exists,
+      "preset members must be visible as toggles", file: file, line: line)
+    element("trace.configuration.mode.preset", in: app).click()
+
     // History renders real Runtime facts and offers no way to submit.
     select("app.navigation.history", in: app)
     XCTAssertTrue(
@@ -342,6 +369,11 @@ final class AppShellUITests: XCTestCase {
     let interruptedRow = app.cells
       .containing(.staticText, identifier: "history.row.state.job-fixture-0002").firstMatch
     XCTAssertTrue(interruptedRow.waitForExistence(timeout: 10), file: file, line: line)
+    // An unknown outcome is part of the row's text, not a detail-only fact:
+    // "已中断" alone would read as a mere variant of failure.
+    assertDisplayed(
+      app.staticTexts["history.row.state.job-fixture-0002"],
+      equals: history.interruptedRowState)
     clickCorrectingNavigationSplitAXOffset(interruptedRow, in: app)
     XCTAssertTrue(
       app.staticTexts["history.detail.select"].waitForNonExistence(timeout: 5),
@@ -539,12 +571,12 @@ final class AppShellUITests: XCTestCase {
       "mapped partition details must be inspectable")
     partitions.click()
 
-    let prerequisites = element("flash.plan.prerequisites.disclosure", in: app)
+    // Prerequisites are a top-level, always-expanded section before the exact
+    // plan — what has to hold is readable without a disclosure click.
+    let prerequisites = element("flash.plan.prerequisitesList", in: app)
     XCTAssertTrue(prerequisites.exists)
     scrollIntoView(prerequisites, in: app)
-    prerequisites.click()
     XCTAssertTrue(app.staticTexts["Runtime check pending"].waitForExistence(timeout: 5))
-    prerequisites.click()
 
     let review = app.buttons["flash.execute.review"]
     XCTAssertTrue(review.exists)

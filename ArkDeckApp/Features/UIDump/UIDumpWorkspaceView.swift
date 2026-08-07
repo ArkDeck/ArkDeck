@@ -255,6 +255,19 @@ struct UIDumpWorkspaceView: View {
 
   private var recipeSelection: some View {
     VStack(alignment: .leading, spacing: 10) {
+      // The section's live echo: the exact hidumper arguments the current
+      // recipe and window id resolve to, updated as either changes.
+      HStack {
+        Spacer(minLength: 12)
+        Text(
+          model.selectedRecipe.displayArguments(
+            windowID: model.manualWindowID, componentID: model.componentID)
+        )
+        .font(.callout.monospaced())
+        .foregroundStyle(Color.accentColor)
+        .textSelection(.enabled)
+        .accessibilityIdentifier("uiDump.recipe.liveArguments")
+      }
       ForEach(UIDumpRecipeCatalog.definitions) { definition in
         recipeRow(definition)
       }
@@ -290,19 +303,41 @@ struct UIDumpWorkspaceView: View {
       policyRow(.temporaryRestore)
       policyRow(.persistentlyEnabled)
 
+      // The second confirmation is an answer, not an acknowledgement gate:
+      // a danger callout stating the cost, then Cancel or an explicit
+      // destructive-styled confirm. No checkbox stands between them.
       if model.debugPolicy == .persistentlyEnabled {
-        Toggle(isOn: persistentConfirmationBinding) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text(string("uiDump.policy.persist.confirm"))
-              .font(.callout.weight(.semibold))
-            Text(string("uiDump.policy.persist.confirmDetail"))
-              .font(.footnote)
-              .foregroundStyle(.secondary)
+        if model.persistentEnableConfirmed {
+          Label(
+            string("uiDump.policy.persist.confirmed"),
+            systemImage: "checkmark.circle.fill"
+          )
+          .font(.callout)
+          .foregroundStyle(.orange)
+          .padding(.leading, 28)
+          .accessibilityIdentifier("uiDump.policy.persist.confirmed")
+        } else {
+          VStack(alignment: .leading, spacing: 10) {
+            notice(
+              string("uiDump.policy.persist.callout"),
+              systemImage: "exclamationmark.triangle.fill",
+              color: .red,
+              identifier: "uiDump.policy.persist.callout")
+            HStack(spacing: 10) {
+              Button(string("uiDump.policy.persist.cancel")) {
+                model.setDebugPolicy(.unchanged)
+              }
+              .accessibilityIdentifier("uiDump.policy.persist.cancel")
+              Button(role: .destructive) {
+                model.setPersistentEnableConfirmed(true)
+              } label: {
+                Text(string("uiDump.policy.persist.confirm"))
+              }
+              .accessibilityIdentifier("uiDump.policy.persist.confirm")
+            }
           }
+          .padding(.leading, 28)
         }
-        .toggleStyle(.checkbox)
-        .accessibilityIdentifier("uiDump.policy.persist.confirm")
-        .padding(.leading, 28)
       }
 
       notice(
@@ -345,6 +380,9 @@ struct UIDumpWorkspaceView: View {
         Text(string("uiDump.artifacts.description"))
           .font(.footnote)
           .foregroundStyle(.secondary)
+        // Size, hash and sensitivity columns wait for real values: a column
+        // of "pending" placeholders reads as data without carrying any.
+        // Sensitivity lives as the full sentence below the table instead.
         Table(artifactExpectations) {
           TableColumn(string("uiDump.artifacts.name")) { artifact in
             Text(artifact.name).font(.callout.monospaced())
@@ -355,18 +393,14 @@ struct UIDumpWorkspaceView: View {
           TableColumn(string("uiDump.artifacts.origin")) { artifact in
             Text(artifact.origin)
           }
-          TableColumn(string("uiDump.artifacts.size")) { artifact in
-            Text(string("uiDump.value.pending")).foregroundStyle(.secondary)
-          }
-          TableColumn(string("uiDump.artifacts.hash")) { artifact in
-            Text(string("uiDump.value.pending")).foregroundStyle(.secondary)
-          }
-          TableColumn(string("uiDump.artifacts.sensitivity")) { artifact in
-            Text(string("uiDump.artifacts.sensitive"))
-          }
         }
         .frame(minHeight: 145)
         .accessibilityIdentifier("uiDump.artifacts.table")
+        Text(string("uiDump.artifacts.sensitivityNote"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("uiDump.artifacts.sensitivityNote")
       }
 
       Divider()
@@ -405,34 +439,16 @@ struct UIDumpWorkspaceView: View {
     }
   }
 
+  // A hard boundary, not a roadmap: one fixed sentence at the page footer.
+  // Greyed rows for Fault/Crash and system snapshots would read as disabled
+  // entries — as if the capabilities existed and were merely switched off.
   private var scopeNote: some View {
-    GroupBox(string("uiDump.scope.title")) {
-      VStack(alignment: .leading, spacing: 8) {
-        scopeRow(
-          string("uiDump.scope.arkui"),
-          status: string("uiDump.scope.mvp"),
-          systemImage: "checkmark.circle.fill",
-          color: .green)
-        scopeRow(
-          string("uiDump.scope.crash"),
-          status: string("uiDump.scope.notMVP"),
-          systemImage: "minus.circle",
-          color: .secondary)
-        scopeRow(
-          string("uiDump.scope.system"),
-          status: string("uiDump.scope.notMVP"),
-          systemImage: "minus.circle",
-          color: .secondary)
-        Divider()
-        Text(string("uiDump.scope.note"))
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
+    Text(string("uiDump.scope.note"))
+      .font(.footnote)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
-    }
-    .accessibilityIdentifier("uiDump.scope.note")
+      .accessibilityIdentifier("uiDump.scope.note")
   }
 
   private var blockers: [String] {
@@ -495,12 +511,6 @@ struct UIDumpWorkspaceView: View {
 
   private var componentIDBinding: Binding<String> {
     Binding(get: { model.componentID }, set: { model.setComponentID($0) })
-  }
-
-  private var persistentConfirmationBinding: Binding<Bool> {
-    Binding(
-      get: { model.persistentEnableConfirmed },
-      set: { model.setPersistentEnableConfirmed($0) })
   }
 
   private var windowIDIsValid: Bool {
@@ -583,23 +593,6 @@ struct UIDumpWorkspaceView: View {
       .foregroundStyle(supported ? .green : .secondary)
       .accessibilityValue(
         supported ? string("uiDump.value.supported") : string("uiDump.value.unavailable"))
-  }
-
-  private func scopeRow(
-    _ title: String,
-    status: String,
-    systemImage: String,
-    color: Color
-  ) -> some View {
-    HStack(spacing: 8) {
-      Image(systemName: systemImage).foregroundStyle(color)
-      Text(title)
-      Spacer(minLength: 12)
-      Text(status)
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(color)
-    }
-    .accessibilityElement(children: .combine)
   }
 
   private func recipeRow(_ definition: UIDumpRecipeDefinition) -> some View {
@@ -754,7 +747,7 @@ final class UIDumpWorkspaceViewModel: ObservableObject {
   @Published private(set) var workspace = UIDumpWorkspacePresentation.loading
   @Published private(set) var selectedTargetID = ""
   @Published private(set) var manualWindowID = ""
-  @Published private(set) var selectedRecipeID = UIDumpRecipeID.nodeSummary
+  @Published private(set) var selectedRecipeID = UIDumpRecipeID.elementTree
   @Published private(set) var componentID = ""
   @Published private(set) var debugPolicy = UIDumpDebugParameterPolicy.unchanged
   @Published private(set) var persistentEnableConfirmed = false

@@ -270,6 +270,13 @@ public enum DebugTypedValueValidator {
         || "._:-".unicodeScalars.contains(scalar)
     }
   }
+
+  /// Bundle and ability names share the conservative character policy: they
+  /// are Catalog-schema identifiers, and nothing that could read as a shell
+  /// fragment may appear in a typed request preview.
+  public static func isSafeTypedIdentifier(_ value: String) -> Bool {
+    isSafeHilogComponent(value)
+  }
 }
 
 public protocol DebugApplicationProviding: Sendable {
@@ -288,6 +295,12 @@ public enum DebugApplicationFacade {
   /// Approved action identifiers are visible for discovery, but none are
   /// represented as independently runnable: no published Runtime operation
   /// currently exposes a generic one-shot-command request.
+  ///
+  /// This is the Commands surface's closed read-only set — exactly the
+  /// `runApprovedRemoteRead` vocabulary that takes no confirmation. Members
+  /// of the mutation vocabulary (`requestRootMode` and the native-library
+  /// actions under `runApprovedRemoteMutation`) are not command templates:
+  /// they require a confirmationId and belong to their own workflows.
   public static let approvedCommandTemplates: [DebugCommandTemplatePresentation] = [
     DebugCommandTemplatePresentation(
       id: "deviceSummary", effect: "readOnly", parameterNames: [],
@@ -309,9 +322,6 @@ public enum DebugApplicationFacade {
       isPublishedByRuntimeOperation: false),
     DebugCommandTemplatePresentation(
       id: "firmwareBuild", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
-    DebugCommandTemplatePresentation(
-      id: "requestRootMode", effect: "deviceMutation", parameterNames: [],
       isPublishedByRuntimeOperation: false),
   ]
 

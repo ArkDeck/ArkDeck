@@ -5,9 +5,10 @@ import XCTest
 
 final class UIDumpApplicationFacadeContractTests: XCTestCase {
   func testCatalogProjectsExactlyFourCanonicalCandidateRecipes() {
+    // elementTree leads: it is the workspace's default selection.
     XCTAssertEqual(
       UIDumpRecipeCatalog.definitions.map(\.id),
-      [.nodeSummary, .elementTree, .fullDefaultTree, .componentDetail])
+      [.elementTree, .nodeSummary, .fullDefaultTree, .componentDetail])
     XCTAssertEqual(
       UIDumpRecipeCatalog.definition(.nodeSummary).displayArguments(
         windowID: "42", componentID: nil),
@@ -187,6 +188,9 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
     let object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
     let strings = try XCTUnwrap(object["strings"] as? [String: Any])
+    // The scope boundary is one fixed sentence at the page footer; the old
+    // per-row scope labels (arkui/crash/system/notMVP) were retired with the
+    // greyed rows that read as disabled entries.
     let requiredKeys = [
       "uiDump.recipe.nodeSummary.name",
       "uiDump.recipe.elementTree.name",
@@ -195,10 +199,9 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       "uiDump.policy.unchanged.name",
       "uiDump.policy.temporaryRestore.name",
       "uiDump.policy.persistentlyEnabled.name",
-      "uiDump.scope.arkui",
-      "uiDump.scope.crash",
-      "uiDump.scope.system",
-      "uiDump.scope.notMVP",
+      "uiDump.policy.persist.callout",
+      "uiDump.policy.persist.confirm",
+      "uiDump.artifacts.sensitivityNote",
       "uiDump.scope.note",
     ]
 

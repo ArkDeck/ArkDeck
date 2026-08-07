@@ -303,10 +303,8 @@ struct RuntimeHistoryView: View {
               Text(job.operationReference)
                 .font(.body.monospaced())
                 .lineLimit(1)
-              if let mode = job.executionMode, mode != "execute" {
-                Text(mode.uppercased())
-                  .font(.caption2.weight(.semibold))
-                  .foregroundStyle(.purple)
+              if let badge = historyExecutionModeBadge(job.executionMode) {
+                badge
               }
             }
           }
@@ -400,7 +398,19 @@ struct RuntimeHistoryView: View {
             job.outcomeUnknown
               ? "history.outcome.unknown" : "history.outcome.confirmed"),
           id: "history.detail.outcomeCertainty")
-        row("history.detail.mode", job.executionMode ?? "—", id: "history.detail.mode")
+        GridRow(alignment: .firstTextBaseline) {
+          Text(historyLocalized("history.detail.mode"))
+            .foregroundStyle(.secondary)
+            .gridColumnAlignment(.trailing)
+          HStack(spacing: 6) {
+            Text(job.executionMode ?? "—")
+              .accessibilityIdentifier("history.detail.mode")
+            if let badge = historyExecutionModeBadge(job.executionMode) {
+              badge
+            }
+          }
+          .gridColumnAlignment(.leading)
+        }
         row("history.detail.effect", job.actualEffect ?? "—", id: "history.detail.effect")
         row("history.detail.created", formattedUTC(job.createdAtUTC), id: "history.detail.created")
         row("history.detail.started", formattedUTC(job.startedAtUTC), id: "history.detail.started")
@@ -452,7 +462,7 @@ struct RuntimeHistoryView: View {
     if let detail = detailsByJobID[job.id] {
       evidenceSection(detail)
       parameterSection(detail)
-      artifactSection(detail)
+      artifactSection(detail, job: job)
     } else if !loadingDetailJobIDs.contains(job.id) {
       historySection("history.detail.evidence") {
         Label(
@@ -560,15 +570,24 @@ struct RuntimeHistoryView: View {
   }
 
   @ViewBuilder
-  private func artifactSection(_ detail: RuntimeJobDetailPresentation) -> some View {
+  private func artifactSection(
+    _ detail: RuntimeJobDetailPresentation, job: RuntimeJobSummaryPresentation
+  ) -> some View {
     historySection("history.detail.artifacts") {
       switch detail.artifactAvailability {
       case .unavailable(let reason):
         unavailableSection(reason)
       case .available:
         if detail.artifacts.isEmpty {
-          Text(historyLocalized("history.artifacts.empty"))
-            .foregroundStyle(.secondary)
+          // A planned job legitimately carries no captured artifacts — that
+          // emptiness is the mode's meaning, not a load failure.
+          Text(
+            historyLocalized(
+              job.executionMode == JobExecutionMode.planOnly.rawValue
+                ? "history.artifacts.emptyPlanned" : "history.artifacts.empty")
+          )
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("history.artifacts.empty")
         } else {
           VStack(alignment: .leading, spacing: 10) {
             ForEach(detail.artifacts) { artifact in
@@ -799,9 +818,19 @@ struct RuntimeHistoryView: View {
     return historyLocalized("history.state.\(state.rawValue)")
   }
 
+  private func historyExecutionModeBadge(_ mode: String?) -> RuntimeExecutionModeBadge? {
+    RuntimeExecutionModeBadge(mode)
+  }
+
+  // "· 结果未知" carries the whole weight of an unknown outcome: interrupted
+  // with an unknown outcome is not a red variant of failed — failure is a
+  // known result, unknown is the absence of one.
   private func historyStateLabel(_ job: RuntimeJobSummaryPresentation) -> some View {
     Label {
-      Text(localizedState(job.state))
+      Text(
+        job.outcomeUnknown
+          ? localizedState(job.state) + historyLocalized("history.state.outcomeUnknownSuffix")
+          : localizedState(job.state))
     } icon: {
       Image(systemName: stateSymbol(job)).accessibilityHidden(true)
     }
@@ -824,7 +853,9 @@ struct RuntimeHistoryView: View {
   }
 
   private func stateColor(_ job: RuntimeJobSummaryPresentation) -> Color {
-    if job.outcomeUnknown { return .red }
+    // Unknown is warn, not danger: red is reserved for a *known* failure,
+    // and painting unknown the same hue erases exactly that distinction.
+    if job.outcomeUnknown { return .orange }
     guard let state = JobState(rawValue: job.state) else { return .secondary }
     switch state {
     case .succeeded: return .green
@@ -929,6 +960,16 @@ final class RuntimeHistoryViewModel: ObservableObject {
     self.detailProvider = detailProvider
   }
 
+  /// Whether any listed job is still in a non-terminal state. Settings uses
+  /// this to escalate its "switching affects only new Jobs" sentence while
+  /// it is actually true of something.
+  var hasActiveJobs: Bool {
+    presentation.jobs.contains { job in
+      guard let state = JobState(rawValue: job.state) else { return false }
+      return !state.isTerminal
+    }
+  }
+
   func refresh() {
     guard !isRefreshInFlight else { return }
     isRefreshInFlight = true
@@ -961,5 +1002,49 @@ final class RuntimeHistoryViewModel: ObservableObject {
       else { return }
       self.detailsByJobID[jobID] = detail
     }
+  }
+}
+
+/// A permanent outline marker for a job's execution mode, shared by History
+/// and the job inspector: PLANNED wears a purple outline, SIMULATED an
+/// orange dashed outline — the same vocabulary as the Flash mode badge, so
+/// the same job reads the same everywhere. Execute renders no badge at all;
+/// an unrecognized mode falls back to neutral uppercase text rather than
+/// guessing a color semantics for it.
+struct RuntimeExecutionModeBadge: View {
+  private let text: String
+  private let color: Color
+  private let dashed: Bool
+
+  init?(_ mode: String?) {
+    switch mode {
+    case nil, JobExecutionMode.execute.rawValue:
+      return nil
+    case JobExecutionMode.planOnly.rawValue:
+      text = "PLANNED"
+      color = .purple
+      dashed = false
+    case "simulated":
+      text = "SIMULATED"
+      color = .orange
+      dashed = true
+    case let other?:
+      text = other.uppercased()
+      color = .secondary
+      dashed = false
+    }
+  }
+
+  var body: some View {
+    Text(text)
+      .font(.caption2.weight(.semibold))
+      .foregroundStyle(color)
+      .padding(.horizontal, 5)
+      .padding(.vertical, 1)
+      .overlay {
+        RoundedRectangle(cornerRadius: 4)
+          .stroke(color, style: StrokeStyle(lineWidth: 1, dash: dashed ? [3, 2] : []))
+      }
+      .accessibilityLabel(text)
   }
 }

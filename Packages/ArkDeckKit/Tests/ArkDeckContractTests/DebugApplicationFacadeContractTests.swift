@@ -106,15 +106,28 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     }
   }
 
-  func testApprovedTemplatesAreDiscoveryOnlyAndRootStaysDistinct() throws {
+  func testTypedIdentifierValidatorGatesBundleAndAbilityNames() throws {
+    for accepted in ["com.example.app", "EntryAbility", "com.demo.gallery2"] {
+      XCTAssertTrue(DebugTypedValueValidator.isSafeTypedIdentifier(accepted))
+    }
+    for rejected in ["", "com.example; rm -rf /", "$(id)", "a b", "app | tee"] {
+      XCTAssertFalse(DebugTypedValueValidator.isSafeTypedIdentifier(rejected))
+    }
+  }
+
+  func testApprovedTemplatesAreDiscoveryOnlyAndReadOnly() throws {
     XCTAssertFalse(DebugApplicationFacade.approvedCommandTemplates.isEmpty)
     XCTAssertTrue(
       DebugApplicationFacade.approvedCommandTemplates.allSatisfy {
         !$0.isPublishedByRuntimeOperation
       })
-    XCTAssertEqual(
-      DebugApplicationFacade.approvedCommandTemplates.first { $0.id == "requestRootMode" }?.effect,
-      "deviceMutation")
+    // The Commands surface's template set is closed and read-only: members of
+    // the mutation vocabulary (requestRootMode, native-library actions) take
+    // a confirmationId and must never appear as one-shot command templates.
+    XCTAssertTrue(
+      DebugApplicationFacade.approvedCommandTemplates.allSatisfy { $0.effect == "readOnly" })
+    XCTAssertFalse(
+      DebugApplicationFacade.approvedCommandTemplates.contains { $0.id == "requestRootMode" })
   }
 
   func testApplicationSurfaceCannotNameAWriteMethod() throws {

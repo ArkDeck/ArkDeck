@@ -27,35 +27,9 @@ struct TraceProgressArtifactsView: View {
           }
         }
 
-        LazyVGrid(
-          columns: [GridItem(.adaptive(minimum: 170), spacing: 8)],
-          spacing: 8
-        ) {
-          ForEach(Array(TraceWorkflowStage.allCases.enumerated()), id: \.offset) {
-            index, stage in
-            HStack(spacing: 8) {
-              Text(String(index + 1))
-                .font(.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 22, height: 22)
-                .background(.quaternary, in: Circle())
-              VStack(alignment: .leading, spacing: 1) {
-                Text(traceString("trace.stage.\(stage.rawValue)"))
-                  .font(.callout.weight(.medium))
-                Text(traceString("trace.value.notStarted"))
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-              Spacer(minLength: 4)
-            }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
-            .accessibilityElement(children: .combine)
-          }
-        }
-        .accessibilityIdentifier("trace.progress.stages")
-
+        // The stage-by-stage track belongs to the job inspector, which renders
+        // a running job's real timeline; a static copy here would only ever
+        // show "not started" and read as one more thing to check.
         traceNotice(
           traceString("trace.progress.honestRule"),
           systemImage: "hourglass",
@@ -86,33 +60,33 @@ struct TraceProgressArtifactsView: View {
           .font(.footnote)
           .foregroundStyle(.secondary)
 
-        LazyVGrid(
-          columns: [GridItem(.adaptive(minimum: 210), spacing: 10)],
-          spacing: 10
-        ) {
-          artifactCard(
-            title: traceString("trace.artifacts.raw"),
+        VStack(alignment: .leading, spacing: 0) {
+          artifactRow(
             file: "trace.htrace",
+            role: traceString("trace.artifacts.role.raw"),
             detail: traceString("trace.artifacts.rawDetail"),
             state: model.workspace.operation.supportsRawTraceArtifact
               ? .publishedContract : .missingContract)
-          artifactCard(
-            title: traceString("trace.artifacts.filtered"),
+          Divider()
+          artifactRow(
             file: "trace-filtered.htrace",
+            role: traceString("trace.artifacts.role.derived"),
             detail: model.filtersCreateFileAsset
               ? traceString("trace.artifacts.filteredRequested")
               : traceString("trace.artifacts.filteredDetail"),
             state: model.workspace.operation.supportsFilteredTraceArtifact
               ? .publishedContract : .missingContract)
-          artifactCard(
-            title: traceString("trace.artifacts.log"),
+          Divider()
+          artifactRow(
             file: "capture.log",
+            role: traceString("trace.artifacts.role.log"),
             detail: traceString("trace.artifacts.logDetail"),
             state: model.workspace.operation.supportsCaptureLogArtifact
               ? .publishedContract : .missingContract)
-          artifactCard(
-            title: traceString("trace.artifacts.manifest"),
+          Divider()
+          artifactRow(
             file: "artifact-index.json + capture-summary.json",
+            role: traceString("trace.artifacts.role.manifest"),
             detail: traceString("trace.artifacts.manifestDetail"),
             state: .partialContract)
         }
@@ -146,37 +120,35 @@ struct TraceProgressArtifactsView: View {
     return String(format: traceString("trace.progress.cancelDetail"), policy)
   }
 
-  private func artifactCard(
-    title: String,
+  /// One artifact per row: file, role, contract status. Roles differ on
+  /// purpose — raw is immutable, filtered is a rebuildable derivation — so
+  /// the four never merge into one "output" line.
+  private func artifactRow(
     file: String,
+    role: String,
     detail: String,
     state: TraceArtifactContractState
   ) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(alignment: .firstTextBaseline) {
-        Label(title, systemImage: state.systemImage)
-          .font(.callout.weight(.semibold))
-          .foregroundStyle(state.color)
-        Spacer(minLength: 8)
-        Text(state.label)
-          .font(.caption2.weight(.semibold))
-          .foregroundStyle(state.color)
-      }
+    HStack(alignment: .firstTextBaseline, spacing: 12) {
       Text(file)
         .font(.caption.monospaced())
         .textSelection(.enabled)
-      Text(detail)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 200, alignment: .leading)
+      Text(role)
+        .font(.caption.weight(.semibold))
+        .frame(minWidth: 130, alignment: .leading)
+      VStack(alignment: .leading, spacing: 2) {
+        Label(state.label, systemImage: state.systemImage)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(state.color)
+        Text(detail)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(10)
-    .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-    .background(state.color.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
-    .overlay {
-      RoundedRectangle(cornerRadius: 9)
-        .stroke(state.color.opacity(0.24), lineWidth: 1)
-    }
+    .padding(.vertical, 8)
     .accessibilityElement(children: .combine)
   }
 }

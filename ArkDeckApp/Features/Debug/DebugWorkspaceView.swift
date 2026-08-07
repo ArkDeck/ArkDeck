@@ -95,15 +95,13 @@ struct DebugWorkspaceView: View {
     .padding(.vertical, 14)
   }
 
+  // The page title lives in the window toolbar; repeating it here would give
+  // the detail two perceivable main headings. Only the scope line stays.
   private var titleAndScope: some View {
-    VStack(alignment: .leading, spacing: 3) {
-      Text(DebugL10n.text("debug.title"))
-        .font(.title2.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-      Text(DebugL10n.text("debug.scope"))
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-    }
+    Text(DebugL10n.text("debug.scope"))
+      .font(.footnote)
+      .foregroundStyle(.secondary)
+      .accessibilityIdentifier("debug.scope")
   }
 
   private var targetPicker: some View {
@@ -231,7 +229,7 @@ private struct DebugLogsWorkspace: View {
   let relatedJobs: [DebugJobPresentation]
 
   @State private var durationSeconds = 30
-  @State private var minimumLevel = "Info"
+  @State private var minimumLevel = "Warn"
   @State private var domain = ""
   @State private var tag = ""
   @State private var pid = ""
@@ -295,10 +293,22 @@ private struct DebugLogsWorkspace: View {
             Stepper(
               DebugL10n.format("debug.logs.duration", durationSeconds),
               value: $durationSeconds, in: 1...600)
-            Picker(DebugL10n.text("debug.logs.level"), selection: $minimumLevel) {
-              ForEach(["Debug", "Info", "Warn", "Error", "Fatal"], id: \.self) { level in
-                Text(level).tag(level)
+            // Three closed steps, defaulting to Warn: the viewport's default
+            // reading is "what needs attention", not the full Info firehose.
+            LabeledContent(DebugL10n.text("debug.logs.level")) {
+              Picker(DebugL10n.text("debug.logs.level"), selection: $minimumLevel) {
+                Text(verbatim: "I").tag("Info")
+                  .accessibilityLabel("Info")
+                Text(verbatim: "W").tag("Warn")
+                  .accessibilityLabel("Warn")
+                Text(verbatim: "E").tag("Error")
+                  .accessibilityLabel("Error")
               }
+              .pickerStyle(.segmented)
+              .labelsHidden()
+              .controlSize(.small)
+              .frame(maxWidth: 140)
+              .accessibilityIdentifier("debug.logs.level")
             }
             typedField("debug.logs.domain", text: $domain, prompt: "0xD003900")
             typedField("debug.logs.tag", text: $tag, prompt: "ArkUI")
@@ -356,8 +366,18 @@ private struct DebugLogsWorkspace: View {
         DebugCard(title: DebugL10n.text("debug.logs.live.title"), symbol: "text.alignleft") {
           VStack(alignment: .leading, spacing: 10) {
             HStack {
-              Toggle(DebugL10n.text("debug.logs.pause"), isOn: $isViewportPaused)
-                .toggleStyle(.switch)
+              // Pausing freezes the viewport, never the host capture, and only
+              // an active capture has a viewport to pause — so the button is
+              // disabled while nothing is being captured, which in this
+              // read-only build is always.
+              Button(
+                DebugL10n.text(isViewportPaused ? "debug.logs.resume" : "debug.logs.pause")
+              ) {
+                isViewportPaused.toggle()
+              }
+              .disabled(true)
+              .help(DebugL10n.text("debug.logs.pause.requiresCapture"))
+              .accessibilityIdentifier("debug.logs.pauseViewport")
               Spacer()
               Label(
                 DebugL10n.text("debug.logs.viewport.bounded"),
@@ -451,12 +471,11 @@ private struct DebugLogsWorkspace: View {
       VStack(alignment: .leading, spacing: 10) {
         Text(DebugL10n.text("debug.logs.destructive.scope"))
           .font(.callout)
+        // Exactly one destructive buffer action exists in the design
+        // vocabulary. Inventing siblings (resize, flush) would present device
+        // mutations no published operation defines.
         Menu(DebugL10n.text("debug.logs.destructive.menu")) {
           Button(DebugL10n.text("debug.logs.destructive.clear")) {}
-            .disabled(true)
-          Button(DebugL10n.text("debug.logs.destructive.resize")) {}
-            .disabled(true)
-          Button(DebugL10n.text("debug.logs.destructive.flush")) {}
             .disabled(true)
         }
         .disabled(true)
@@ -550,6 +569,18 @@ private struct DebugAppsWorkspace: View {
           TextField(
             DebugL10n.text("debug.apps.ability"), text: $abilityName,
             prompt: Text("EntryAbility"))
+          // The note below promises schema validation; these two fields are
+          // the argv-adjacent inputs on this tab, so the gate is applied
+          // here, not deferred to a future submit path.
+          if let invalid = invalidIdentityFieldNames {
+            Label(
+              DebugL10n.format("debug.typed.invalidIdentifier", invalid),
+              systemImage: "exclamationmark.circle"
+            )
+            .font(.footnote)
+            .foregroundStyle(.red)
+            .accessibilityIdentifier("debug.apps.identity.invalid")
+          }
           Text(DebugL10n.text("debug.apps.identity.note"))
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -661,6 +692,16 @@ private struct DebugAppsWorkspace: View {
         }
       }
     }
+  }
+
+  private var invalidIdentityFieldNames: String? {
+    let invalid = [
+      (DebugL10n.text("debug.apps.bundle"), bundleName),
+      (DebugL10n.text("debug.apps.ability"), abilityName),
+    ]
+    .filter { !$0.1.isEmpty && !DebugTypedValueValidator.isSafeTypedIdentifier($0.1) }
+    .map(\.0)
+    return invalid.isEmpty ? nil : invalid.joined(separator: ", ")
   }
 
   private func handleHAPSelection(_ result: Result<[URL], Error>) {
@@ -821,23 +862,38 @@ private struct DebugCommandsWorkspace: View {
 
   var body: some View {
     GeometryReader { geometry in
-      HSplitView {
-        List {
-          ForEach(DebugApplicationFacade.approvedCommandTemplates, id: \.id) { template in
-            Button {
-              selectedTemplateID = template.id
-            } label: {
-              DebugCommandTemplateRow(template: template)
+      VStack(spacing: 0) {
+        // The whole tab's contract, stated before any template is chosen: a
+        // closed template set with schema-defined inputs, and the argv below
+        // is provider lowering echoed read-only, never an input.
+        Label(
+          DebugL10n.text("debug.commands.calloutTyped"),
+          systemImage: "exclamationmark.shield"
+        )
+        .font(.callout)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.08))
+        .accessibilityIdentifier("debug.commands.typedOnly")
+        Divider()
+        HSplitView {
+          List {
+            ForEach(DebugApplicationFacade.approvedCommandTemplates, id: \.id) { template in
+              Button {
+                selectedTemplateID = template.id
+              } label: {
+                DebugCommandTemplateRow(template: template)
+              }
+              .buttonStyle(.plain)
+              .listRowBackground(
+                selectedTemplateID == template.id ? Color.accentColor.opacity(0.14) : Color.clear)
             }
-            .buttonStyle(.plain)
-            .listRowBackground(
-              selectedTemplateID == template.id ? Color.accentColor.opacity(0.14) : Color.clear)
           }
-        }
-        .frame(minWidth: 240, idealWidth: 280, maxWidth: 330, maxHeight: .infinity)
+          .frame(minWidth: 240, idealWidth: 280, maxWidth: 330, maxHeight: .infinity)
 
-        commandDetail
-          .frame(minWidth: 440, maxWidth: .infinity, maxHeight: .infinity)
+          commandDetail
+            .frame(minWidth: 440, maxWidth: .infinity, maxHeight: .infinity)
+        }
       }
       .frame(width: geometry.size.width, height: geometry.size.height)
     }
@@ -862,6 +918,19 @@ private struct DebugCommandsWorkspace: View {
                   prompt: Text("com.example.app")
                 )
                 .textFieldStyle(.roundedBorder)
+                if !bundleName.isEmpty,
+                  !DebugTypedValueValidator.isSafeTypedIdentifier(bundleName)
+                {
+                  Label(
+                    DebugL10n.format(
+                      "debug.typed.invalidIdentifier",
+                      DebugL10n.text("debug.commands.bundle")),
+                    systemImage: "exclamationmark.circle"
+                  )
+                  .font(.footnote)
+                  .foregroundStyle(.red)
+                  .accessibilityIdentifier("debug.commands.bundle.invalid")
+                }
               } else {
                 Text(DebugL10n.text("debug.commands.noParameters"))
                   .font(.callout)
@@ -907,23 +976,6 @@ private struct DebugCommandsWorkspace: View {
             }
           }
 
-          if template.effect != "readOnly" {
-            DebugCard(
-              title: DebugL10n.text("debug.commands.danger.title"),
-              symbol: "exclamationmark.triangle"
-            ) {
-              VStack(alignment: .leading, spacing: 8) {
-                Text(DebugL10n.text("debug.commands.root.detail"))
-                Label(
-                  DebugL10n.text("debug.commands.root.distinction"),
-                  systemImage: "lock.shield"
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-              }
-            }
-          }
-
           HStack {
             Button(DebugL10n.text("debug.commands.run")) {}
               .buttonStyle(.borderedProminent)
@@ -934,6 +986,11 @@ private struct DebugCommandsWorkspace: View {
               .foregroundStyle(.secondary)
           }
           DebugBlockedReason(text: DebugL10n.text("debug.blocked.commandOperation"))
+          Text(DebugL10n.text("debug.commands.footerNoFreeText"))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("debug.commands.footer")
         } else {
           ContentUnavailableView(DebugL10n.text("debug.commands.select"), systemImage: "terminal")
         }

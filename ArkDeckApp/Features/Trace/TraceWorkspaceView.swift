@@ -225,7 +225,7 @@ struct TraceWorkspaceView: View {
 
         HStack {
           Spacer()
-          Button(traceString("trace.action.start")) {}
+          Button(startActionTitle) {}
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("trace.start")
             .disabled(true)
@@ -239,6 +239,17 @@ struct TraceWorkspaceView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
     }
+  }
+
+  /// The button admits what it would do: a run that mutates parameters says
+  /// so before capturing, and the configuration name and duration ride along
+  /// so the reader can match them against the left column before acting.
+  private var startActionTitle: String {
+    let key =
+      model.parameterMode == .unchanged
+      ? "trace.action.startNamed" : "trace.action.applyAndStartNamed"
+    return String(
+      format: traceString(key), model.configurationTitle, model.durationText)
   }
 
   private var reviewBlockers: [String] {
@@ -264,7 +275,12 @@ struct TraceWorkspaceView: View {
     if !model.workspace.operation.exposesAdapterCapabilityFacts {
       values.append(traceString("trace.blocker.adapter"))
     }
-    if !model.requestedTags.isEmpty {
+    // Two distinct failures share this list: an empty request (a capture
+    // always carries at least one tag) and a non-empty one whose members no
+    // probe has classified yet. Neither implies the other.
+    if model.requestedTags.isEmpty {
+      values.append(traceString("trace.blocker.noTags"))
+    } else {
       values.append(traceString("trace.blocker.tags"))
     }
     if !model.workspace.operation.exposesParameterSnapshotFacts {
@@ -293,7 +309,7 @@ final class TraceWorkspaceViewModel: ObservableObject {
   @Published private(set) var configurationMode = TraceConfigurationMode.preset
   @Published private(set) var selectedPresetID = TracePresetID.arkuiDeep
   @Published private(set) var customTags: Set<String> = []
-  @Published private(set) var durationText = "10"
+  @Published private(set) var durationText = "15"
   @Published private(set) var bufferText = "8192"
   @Published private(set) var parameterMode = TraceParameterUISelection.unchanged
   @Published private(set) var persistentChangeConfirmed = false
@@ -385,9 +401,24 @@ final class TraceWorkspaceViewModel: ObservableObject {
     resetTargetScopedReview()
   }
 
+  /// Custom is another entry to the same request, not a second run mode: it
+  /// starts from the current preset's tag set instead of an empty selection.
   func setConfigurationMode(_ mode: TraceConfigurationMode) {
     configurationMode = mode
-    if mode == .custom { customTags.removeAll() }
+    if mode == .custom { customTags = Set(selectedPreset.logicalTags) }
+  }
+
+  /// A capture always carries at least one tag, so the last member of the
+  /// custom selection cannot be toggled off. Tags outside the preset's
+  /// logical family have no probe-backed vocabulary and are rejected.
+  func toggleCustomTag(_ tag: String) {
+    guard configurationMode == .custom, selectedPreset.logicalTags.contains(tag) else { return }
+    if customTags.contains(tag) {
+      guard customTags.count > 1 else { return }
+      customTags.remove(tag)
+    } else {
+      customTags.insert(tag)
+    }
   }
 
   func setPreset(_ preset: TracePresetID) {
@@ -401,10 +432,6 @@ final class TraceWorkspaceViewModel: ObservableObject {
 
   func setDurationText(_ value: String) {
     durationText = value
-  }
-
-  func setBufferText(_ value: String) {
-    bufferText = value
   }
 
   func setParameterMode(_ mode: TraceParameterUISelection) {
@@ -427,7 +454,7 @@ final class TraceWorkspaceViewModel: ObservableObject {
   }
 
   private func resetTargetScopedReview() {
-    customTags.removeAll()
+    customTags = configurationMode == .custom ? Set(selectedPreset.logicalTags) : []
     parameterMode = .unchanged
     persistentChangeConfirmed = false
   }
