@@ -3231,8 +3231,11 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-018 — 用户监督式一次性 chat-confirmed E2 authority
 
-- Status:ready（仅在维护者 review/merge CHG-2026-025 r7 amendment 后生效；合入前为
-  blocked，代码、设备 dispatch 与授权实例均为 0）
+- Status:blocked（**2026-08-07 退役：本任务不再实现**。状态词表封闭为
+  ready/in-progress/done/blocked,没有 retired 一词;`blocked` 是「不再推进」在词表内唯一
+  诚实的表达,`done` 会谎称有交付。退役经维护者在本 PR 之外明确指示,理由为实测四条,
+  见下「Retirement audit」）
+- Historical Status:ready（r7 amendment 合入后生效;superseded by the 2026-08-07 retirement）
 - Platform:macos
 - Requirements:POL-AGENT-002(MODIFIED)、REQ-FLASH-015(MODIFIED)、
   POL-WORKFLOW-001、POL-RECOVERY-001、POL-TARGET-001
@@ -3287,7 +3290,35 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   用户聊天确认中执行并如实记录）
 - Decision-Grade:D2
 
-### Deliverables
+### Retirement audit（2026-08-07）
+
+本任务的前提已被**本 change 自己的后续修订**作废。四条实测:
+
+1. **`chatConfirmation` 已被显式降为历史只读授权。**
+   `AuthorizationUsageLedger.reserve` 直接拒绝任何以它为 authority 的新 reservation
+   （`"chatConfirmation is historical read-only authority"`），且有合约测试对钉。
+   本任务的核心交付物——「一次性 durable consumption」——在产品里已无法发生。
+2. **CLI 没有任何 chat 入口。** 本任务 Production reachability 写的是
+   `run-dayu200-70035-authorized-flash.sh --chat-trigger` →
+   `arkdeck flash execute --chat-confirmed-plan-sha256`；两者在 CLI 源码中零命中。
+3. **Allowed paths 里的文件半数已被 T25/W3 删除**：`AuthorizationAdmission.swift`、
+   `AgentDeviceOperations/TrustedDeviceOperationHost.swift`、
+   `Scripts/run-dayu200-70035-authorized-flash.sh`，以及点名的
+   `RockchipFlashExecutionContractTests.swift`、
+   `Dayu20070035AuthorizedFlashWrapperContractTests.swift`、
+   `AuthorizationAdmissionContractTests.swift`。
+4. **TASK-AIN-019 r9 的交付记录已写明**：旧 chat flags 全拒绝，历史 chat bytes 可读但
+   新 reserve 与 device dispatch=0。
+
+因此按原文实现等于把产品刚刚拆除的「弱化 E2 authority provenance」路径（Risk:destructive、
+Decision-Grade:D2）重新装回，与 CHG-2026-025 自 r9 起的方向相反。**不实现，退役。**
+本任务生命周期内代码、设备 dispatch 与授权实例始终为 0，退役不改变这一事实。
+
+用户监督式确认的现行承载者是 bounded Evolution campaign confirmation
+（TASK-AIN-019/020，`evolutionCampaignConfirmation`），它带 exact plan/target pins 与
+durable 序数预算，而不是无密码学 provenance 的会话断言。
+
+### Deliverables（历史，superseded by the retirement above）
 
 - `AGENTS.md` 与 r7 approved delta 同步：聊天确认本身可成为一次性 E2 authority，不再
   要求额外 `AUTH-ID`，但不放宽 exact plan/target、fail-closed 与 recovery 不重放；
