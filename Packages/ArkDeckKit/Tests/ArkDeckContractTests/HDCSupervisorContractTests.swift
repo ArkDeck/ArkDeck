@@ -340,6 +340,33 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertNotNil(
       explicitRequest.securityScopedBookmarks[executable.standardizedFileURL.path],
       "override precedence must not erase the persisted security-scoped capability")
+
+    // The environment leg of the same override, and the fact that makes it
+    // usable off the App: a process that is not sandboxed needs no bookmark, so
+    // an absolute path alone yields a verifiable candidate.
+    //
+    // TASK-AIN-010P readiness r2 called the absence of this configuration a
+    // blocker caused by stale preference residue. It is neither — the residue
+    // is inert (the row above pins that), and this route was always available.
+    // Only the launch-argument leg was covered; the key an operator or daemon
+    // would actually set was not.
+    let environmentRequest = HDCApplicationDiagnosticsConfiguration.discoveryRequest(
+      userDefaults: try XCTUnwrap(UserDefaults(suiteName: "\(suiteName).empty")),
+      arguments: [],
+      environment: [
+        HDCApplicationDiagnosticsConfiguration.userConfiguredPathEnvironmentKey:
+          explicitExecutable.path
+      ])
+    XCTAssertEqual(
+      environmentRequest.userConfiguredPaths, [explicitExecutable.standardizedFileURL],
+      "the environment override must configure discovery with no bookmark and no App run")
+    XCTAssertTrue(environmentRequest.securityScopedBookmarks.isEmpty)
+    let environmentCandidate = try XCTUnwrap(
+      HDCExternalFirstDiscovery.discover(environmentRequest).candidates.first,
+      "an absolute path alone must be discoverable outside the sandboxed App")
+    XCTAssertEqual(environmentCandidate.path, explicitExecutable.standardizedFileURL)
+    XCTAssertNil(environmentCandidate.securityScopedBookmark)
+    XCTAssertTrue(HDCCandidateIdentityVerifier.matches(environmentCandidate))
   }
 
   // TEST-AC-HDC-001-01 / toolchainContract

@@ -2761,13 +2761,15 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   exact 3.2.0f existing server/listener 现已存在且为 DevEco toolchain hdc 的既有
   commandless 进程；durable target 亦已由 `CHG-2026-048` bootstrap 建立
   (`TGT-958780b2ffb7`，binding revision 2，2026-07-31 adopted)，r1 的鸡生蛋死锁在产品侧
-  已解。**剩一条硬阻塞**：`ArkDeck.HDC.userConfiguredPaths` 仍指向一个不存在的路径,
-  查清其真身是 UI-test runner 容器里的 per-run 临时 fixture——测试装置写进了产品的真实
-  preferences 域并留下悬垂指针,故 production discovery 仍选不到真候选;另有 build/firmware
-  confirmation 只能在 readiness 窗口内经 registered `list targets -v` 固定,blocked 态禁止
-  运行。任务不转 ready、不运行 HDC/device;记录 =
-  `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md` 与
-  `evidence/runs/TASK-AIN-010P/readiness-blocked-r2.md`）
+  已解。**r2 曾把第三条记为「偏好残留导致 production selection 阻塞」,r3 实测推翻**:
+  持久化的路径字符串不是授权(既有合约测试早已钉住),死 bookmark 会被丢弃并回写清理,
+  故残留是惰性的;真实情况是 discovery 为 explicit-only 而该 host 三处显式来源皆未配置,
+  且产品自带免 picker 的 `ARKDECK_HDC_USER_CONFIGURED_PATH` / `--arkdeck-hdc-user-configured-path`
+  覆盖(非沙箱进程无需 bookmark),经本窗口新增测试行实测可选到哈希命中 3.2.0f 的真候选。
+  **故只剩一条**:build/firmware confirmation 只能在 readiness 窗口内经 registered
+  `list targets -v` 固定,blocked 态禁止运行。任务不转 ready、不运行 HDC/device;记录 =
+  `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md`、`readiness-blocked-r2.md`
+  （production-selection 一条已由 r3 更正）与 `readiness-blocked-r3.md`）
 - Historical Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由
   #760 implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
   之后仍须 fresh D1 readiness。proposal 不批准 exact argv/设备 tuple，不构成
