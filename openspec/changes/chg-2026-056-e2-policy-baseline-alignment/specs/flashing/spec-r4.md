@@ -1,6 +1,6 @@
-# Flashing Specification Delta — r4
+# Flashing Specification Delta — r4 retained under r5
 
-> Change: `CHG-2026-056-e2-policy-baseline-alignment` (r4)
+> Change: `CHG-2026-056-e2-policy-baseline-alignment` (r5 retains r4 requirements)
 > Target: `openspec/specs/flashing/spec.md`
 > Baseline: `CORE-3.0.0`
 > Proposed baseline: `CORE-4.0.0`
@@ -16,11 +16,11 @@ metadata. Every published reference SHALL describe the same board; naming one re
 than another SHALL NOT change any board fact.
 
 No admission decision SHALL depend on a firmware build being enumerated in the product. A profile
-carries per-build fields, but they SHALL be populated from the archive under authorization before
+carries per-build fields, but they SHALL be populated from the archive under Runtime-controlled import before
 use, and the compiled-in values SHALL NOT be consulted by any path that admits, plans, stages,
 dispatches or verifies a flash.
 
-The facts of a particular build SHALL be derived from the archive under authorization, at import,
+The facts of a particular build SHALL be derived from the archive under Runtime control, at import,
 and recorded on the resulting Artifact lease:
 
 - the archive's byte count and SHA-256, and each member's name, byte count and SHA-256;
@@ -48,30 +48,30 @@ membership in any set of known builds. The archive itself is judged on commit, a
 - **THEN** its member digests, partition table and runtime build version are derived and recorded
   on the lease, and no code change is required to accept it
 
-#### Scenario: A non-conforming archive is refused before any authority exists
+#### Scenario: A non-conforming archive is refused before any admission artifact exists
 
 - **GIVEN** an archive whose partition table omits a partition the board maps
 - **WHEN** it is imported
-- **THEN** the import fails closed with the exact missing partition named, and no lease, plan or
-  authority is created
+- **THEN** the import fails closed with the exact missing partition named, and no lease, plan,
+  RuntimeCapability or reservation is created
 
 ### Requirement: REQ-FLASH-017 Byte integrity is carried by the lease, not by product knowledge
 
-The guarantee that a destructive Step writes exactly the confirmed bytes SHALL rest on the
-Artifact lease and the exact-plan authority, not on the product having shipped the digest in
-advance. Before the first destructive Step the runtime SHALL re-verify that the leased archive's
-byte count and SHA-256 still match what the plan was materialized against, and SHALL refuse
-otherwise.
+The guarantee that a destructive Step writes exactly the admitted bytes SHALL rest on the
+Artifact lease and the exact plan/archive binding in the Runtime-owned capability, not on the
+product having shipped the digest in advance. Before the first destructive Step the runtime SHALL
+re-verify that the leased archive's byte count and SHA-256 still match what the plan was
+materialized against, and SHALL refuse otherwise.
 
-Removing per-build enumeration from the device profile SHALL NOT weaken this: the operator
-confirms the digest of an exact plan derived from the archive in front of them, and the runtime
-re-checks that digest at the last safe boundary. A digest allowlist compiled into the product
-protects only builds already listed and refuses every other build outright, which is recognition,
-not integrity.
+Removing per-build enumeration from the device profile SHALL NOT weaken this: Runtime binds the
+digest of the exact plan derived from the archive and re-checks it at the last safe boundary. An
+interactive UI displays that digest in its acknowledgement; a headless Agent does not require a
+UI confirmation. A digest allowlist compiled into the product protects only builds already listed
+and refuses every other build outright, which is recognition, not integrity.
 
 #### Scenario: Drifted bytes are refused at the last safe boundary
 
-- **GIVEN** a confirmed exact plan over an imported archive
+- **GIVEN** a materialized exact plan over an imported archive
 - **WHEN** the leased bytes no longer hash to what the plan was materialized against
 - **THEN** destructive dispatch is 0 and the Job records the drift
 

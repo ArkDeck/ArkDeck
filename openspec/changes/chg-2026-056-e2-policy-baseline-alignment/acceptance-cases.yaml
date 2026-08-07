@@ -1,7 +1,71 @@
+---
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 4
-platform: all
+change_revision: 5
+platform: macos
 evidence_classes:
-  - contract
-cases: []
+- contract
+- realHardware
+cases:
+- acceptance_id: E2R-CATALOG-001
+  test_id: TEST-E2R-CATALOG-001
+  method: >-
+    Cross-file policy audit plus Catalog schema, generator unit and zero-drift
+    checks over every published destructive operation.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    New writers and admission paths contain no E2, standing authorization or
+    campaign requirement; flash.dayu200@1 and deploy.native-library.system@1
+    remain destructive with unchanged typed Steps and use the unified
+    RuntimeCapability policy.
+- acceptance_id: E2R-RUNTIME-001
+  test_id: TEST-E2R-RUNTIME-001
+  method: >-
+    Fake-provider end-to-end Agent request through production Runtime composition
+    with no authority, campaign or chat fields.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Protected-main Runtime completely materializes the published plan, derives
+    trusted facts, generates and reserves its exact RuntimeCapability, dispatches
+    only the declared fake typed Steps and persists truthful intent/outcome and
+    capability lineage without caller administration.
+- acceptance_id: E2R-NEGATIVE-001
+  test_id: TEST-E2R-NEGATIVE-001
+  method: >-
+    Fault matrix over caller forgery, target/binding/input/plan/archive/artifact/
+    tool drift, reservation lineage, crash, cancellation, unknown/unsafe outcome,
+    expiry and attempt/concurrency budgets.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#negative-and-recovery-tests
+  minimum_evidence: contract
+  expected_result: >-
+    Every missing, forged, drifted, unknown, unresolved, unsafe, expired or
+    over-budget case has zero new external dispatch and a durable blocker; no
+    restart, UI click, chat text or evidence record can retry or replay it.
+- acceptance_id: E2R-COMPAT-001
+  test_id: TEST-E2R-COMPAT-001
+  method: >-
+    Versioned legacy authority/evidence decoder fixtures plus new-admission,
+    migration and V5-writer negative tests.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Historical V1-V4 standing/campaign/chat records remain immutable and
+    decodable/exportable, while none can mint RuntimeCapability, reserve, admit,
+    dispatch, migrate into V5 or be emitted by a new writer.
+- acceptance_id: E2R-GJ4-001
+  test_id: TEST-E2R-GJ4-001
+  method: >-
+    Explicit standalone UI-driver execution through the production signed App and
+    protected-main Runtime against one real bound DAYU200 using the supplied
+    OpenHarmony 7.0.0.35 archive, followed by Job/Session/Artifact and device
+    version postflight review.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: realHardware
+  expected_result: >-
+    The real typed Flash completes without standing authorization, campaign or
+    per-attempt chat confirmation; postflight proves the flashed build, V5
+    evidence records the actual Agent executor, RuntimeCapability use and exact
+    target/plan/Artifact correlation, and the driver remains outside all default
+    Swift/Xcode/UI test discovery.

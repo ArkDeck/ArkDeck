@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 4
-status: approved
+revision: 5
+status: proposed
 class: core
 core_change_level: major
 owner: lvye
@@ -9,194 +9,172 @@ core_baseline: CORE-3.0.0
 platforms: [macos, windows, linux]
 ---
 
-# 将有界 E2 campaign 提升为 Core 正本
+# 移除独立 E2 授权层，统一为 Runtime 安全准入
 
-> r2（2026-08-03）：r1 已由维护者通过 #1014 审查并合入，但 `AGENTS.md` 仍把
-> Runtime Agent 的允许路径分散在“禁令”长段、旧 ready-task 措辞与 Repo-plane
-> `host_loop` 隔离说明之间。r2 增加 `agents-delta.md`：明确已发布 typed operation
-> 的 Runtime Agent 是可执行主体，E0 不需要 Git Task/PR，E1/E2 分别消费 Runtime
-> capability / exact E2 authority；同时保留 host_loop 的 Repo-plane 隔离。r2 不把
-> 无 authority、身份不明、unknown outcome 或 raw-shell destructive dispatch 变为可执行，
-> 也不在本 PR 创建 authority 或接触设备。
+> r1-r4 已分别落地 bounded campaign、Runtime Agent 规则、独立对抗评审门移除和
+> DAYU200 构建事实推导。它们的维护者审批不授权本次 r5。
 >
-> r3（2026-08-04）：维护者取消「未合入 candidate 必须先拉起独立 AI 对抗 review，
-> 才能进入设备验证/dispatch」的运行时限制。candidate 仍须在 task-owned isolation
-> 内完成固定构建和封闭策略输出校验；exact E2 authority、allowed paths/diff budget、
-> immutable candidate pin、fresh target/binding readback、durable reservation、typed-only
-> dispatch、outcome/recovery 与所有 fail-closed 条件均不变。该修订不把任何 review
-> 结论、CI 结果或 candidate 自述变成 authority，也不允许 candidate 接触设备、Runtime
-> 或 authority；它只移除每次候选修改都会新建独立 review 会话的前置门，也移除
-> workspace promotion 在既有 evaluation 通过后再强制创建的同类运行时会话。
+> r5（2026-08-07）响应产品闭环中的直接阻塞：每次真实 Flash 都要先创建或确认
+> `standingAuthorization` / `evolutionCampaignConfirmation`，使 AI 修复—构建—UI
+> 复验循环依赖一次新的安全载体和精确聊天确认。r5 请求删除独立 E2 执行等级及其
+> 人工授权层；`destructive` 仍是不可降级的设备效果分类，并继续触发最严格的
+> identity、typed-plan、fresh readback、reservation、journal 和 recovery 规则。
 >
-> scope correction（2026-08-04）：#1031 合入后，实施审计确认现有任务的 Runtime
-> 路径清单遗漏了三处仅负责历史 review-bearing evidence 解码/投影的既有代码。补入
-> `AuthorizationUsageLedger`、`HardwareEvidenceProjector` 与 `AgentDaemon` 的精确文件
-> 路径，使新 campaign 可以不写 review digest，同时旧记录仍可 decode/export；不扩大
-> authority、provider、operation、设备或 dispatch 范围。
->
-> scope correction（2026-08-04，batch 文档）：合入后的复核发现 batch digest 模板与
-> host-loop runbook 仍把独立 AI exact-head review 写成入队前提，和本 change 已合入的
-> enforcement 规则相互矛盾。补入两处精确文档路径，只删除该前提和对应必填字段；不修改
-> `scripts/host_loop/**`、CI、正常的维护者 PR review/merge 或任何 Runtime/设备边界。
->
-> scope correction（2026-08-04，host-loop reviewer cleanup）：复核确认
-> `scripts/host_loop/reviewer.py` 没有被当前 host-loop entry point、CI 或产品 Runtime
-> 导入；其仅余离线契约测试和 cursor 中从未写入的 `review_run` cache 字段。补入该模块、
-> 测试与精确消费方路径，以删除废弃 reviewer adapter、三门 queue 逻辑和历史 cache 字段。
-> 不修改 worker/transport/lease 行为、GitHub 路由、CI workflow、维护者 review/merge 或
-> 任何 Runtime/设备边界。
->
-> scope amendment（2026-08-04，worker cursor test）：实施前的全量字段引用扫描确认
-> `test_worker_cursor.py` 也以 `review_run` 构造 cursor fixture；补入这一个测试文件，
-> 使删除 cursor 字段的测试闭包完整。其余 scope、worker runtime、transport、lease、CI 与
-> Runtime/设备边界均不变。
->
-> r4（2026-08-05）：一个已发布的 DAYU200 device profile 目前把某一个固件构建整份枚举进产品——
-> 归档的字节数与 SHA-256，加上十七个成员各自的名字、大小与 SHA-256。OpenHarmony 每天出一版，
-> 于是每个新构建都要一个新的 profile 常量、一个新的 `deviceProfile` 枚举值，进而换掉 catalog
-> digest；而 digest 一动，五条 Golden Journey 全部脱离 `REAL_DEVICE_PASS`。这笔代价买到的是
-> 「认得这个构建」，不是字节完整性——后者已经由 Artifact lease 与 exact-plan authority 承担。
-> r4 把 device profile 收窄成**板级**（分区映射、禁写分区、前置条件、成员分类规则），
-> 构建级事实改为在导入时从归档推导（成员摘要、`parameter.txt` 里的分区表、从系统镜像字节中
-> 读出的运行时版本号）。r4 不新增 operation、provider 或 `deviceProfile` 枚举值，不移动 catalog
-> digest，不放宽任何 destructive 准入：exact-plan 确认、lease 字节复核、fail-closed 条件全部不变。
-> 见 `specs/flashing/spec-r4.md`（REQ-FLASH-016/017/018）。
->
-> r4 的交付分两段，因为「四类 Repo 审批」要求 profile/E2 变更与对应 Golden Journey 同车：
-> 本段落地推导本身，并逐条证明它与它将要替换的手工表等价；**切换**（profile 去掉成员清单、
-> 导入路径改用推导）随 GJ-4 真机窗口交付，因为那一步才改变真实刷机的准入。
+> 本 revision 是尚未批准的 MAJOR Safety 变更。提案分支只包含裁决材料；不得据此
+> 修改生产代码、Catalog、authority 实例或真实设备。维护者如同意，须在合并前把
+> `status` 改为 `approved`；合并受保护 `main` 才构成批准，不另开 approval-only PR。
 
 ## Why
 
-`AGENTS.md` 与已获维护者批准的
-`CHG-2026-025-ai-native-unattended-device-ops@r15` 已定义两个唯一的 Agent E2
-authority：逐项 pin 的 merged standing authorization，或同一受监督交互会话中的
-bounded evolution campaign confirmation。后者固定 exact plan/target/data impact、
-protected-main base、候选修改范围、toolchain、有效期和 attempt 上限；每一轮都由
-protected-main broker 重新 materialize plan、读取 target、reserve ordinal，并在不确定
-时 fail closed。
+现行 `POL-AGENT-002` 把真实 `destructive` dispatch 绑定到两个精确 E2 authority。
+这能证明一轮执行获得了特定的人类授权，但它与 Runtime 已经执行的安全校验高度耦合：
+同一 plan/archive/target/binding、fresh readback、candidate pin、attempt reservation、
+durable intent/outcome 和 unsafe-terminal 停止条件同时存在于 authority 与执行内核。
 
-当前 ratified `openspec/constitution.md` 的 `POL-AGENT-002` 与
-`REQ-FLASH-015` 仍是 human-only 文本。它们会在不显式叠加 CHG-2026-025 scoped delta
-的阅读或实现路径中拒绝已经发布的 campaign，且 current provider/evidence contract
-无法完整表达其 provenance。这是一个安全边界冲突：既可能造成错误的零 dispatch，也会
-诱导实现者以低优先级文本或代码绕过正本。
+对 GJ-4 来说，authority 载体已成为产品循环本身的前置物。一次 UI 缺陷修复可能需要
+重新构建、重新 materialize plan 和再次刷机；任一代码或计划 digest 变化都会使旧 campaign
+失效，即使目标设备、归档和 typed operation 未改变。结果是 AI 自动化把大部分时间花在
+重建授权上下文，而不是发现并修复产品问题。
 
-本 change 不创造新的自由裁量权。它只将已经获批并已经由 production code 实现的 bounded
-E2 envelope 提升为下一 Core baseline 的单一事实源，使 Constitution、Flash workflow、
-workflow evidence 和 provider contract 使用同一准入规则。
+r5 选择把“是否允许已发布操作执行”交回受保护主干 Runtime 的封闭策略：调用方只表达
+typed execute intent，Runtime 根据已发布 Catalog 和自己读取的可信事实生成并消费短期
+`RuntimeCapability`。调用方、candidate、repairer 和聊天文本都不能提供或扩大这个
+capability。这样删除 per-campaign / per-PR 的人工许可，同时保留防止错设备、错字节、
+不确定结果重放和任意命令注入的机械边界。
+
+这是明确的风险接受，而不是无风险重构：批准后，一个能够向本地 Runtime 提交已发布
+`destructive` operation 的 Agent，不再需要人类为该 plan 单独确认，即可能执行会擦除
+userdata 的合法请求。维护者必须在“减少自动化阻塞”和“失去逐次人工 intent 证明”之间
+作出裁决；CI 绿色或本提案作者的判断不能替代该裁决。
+
+## Requested decision
+
+维护者被请求批准以下不可拆分的语义：
+
+1. 删除 E2 作为独立执行等级及 `standingAuthorization` /
+   `evolutionCampaignConfirmation` 作为新 destructive dispatch authority 的资格。
+2. 保留 `WorkflowEffect.destructive`，不得把 Flash、system partition replacement、erase、
+   format 或其他破坏性 Step 降级为 `deviceMutation`/`readOnly`。
+3. 对 `deviceMutation` 与 `destructive` 统一使用 Runtime-owned `RuntimeCapability`；
+   destructive capability 由受保护主干 Runtime 在完整 plan-only materialization 后按
+   Catalog 确定性生成，不由 caller、Agent、candidate 或聊天消息签发。
+4. destructive capability 仍逐项 pin operation/version、stable target identity、binding
+   revision、exact typed inputs、plan/archive/artifact digest、有效期和使用预算，并在每轮
+   首个外部效果前 fresh readback + durable reservation。
+5. 自动化 invocation 保持最多 16 个串行 attempts、四小时、并发一；只有前一 attempt
+   durable terminal 且完整 readback 分类为 `safeToReflash` 才可继续。unknown、unresolved、
+   unsafe partial、identity drift、取消后的 intent 或预算耗尽永久停止。
+6. 历史 E2 authority/evidence 只可 decode/export，不迁移成 RuntimeCapability，不可为新
+   dispatch 提供许可。当前会话曾确认但未消费的 campaign 不被本 change 消费、转换或引用。
+
+若维护者拒绝，现行 E2 规则完整保留；GJ-4 真实 Flash 仍须另一个当时有效、逐项匹配的
+E2 authority。本 revision 不允许以“提案已存在”作为绕过理由。
 
 ## What changes
 
 In scope:
 
-- `POL-AGENT-002` 从“Agent 永不执行真实 destructive workflow”替换为“只有精确 E2
-  authority 才能执行”的规则。唯一有效 authority 是 merged standing authorization 和
-  bounded evolution campaign confirmation；普通 CI、后台 daemon/scheduler 和无 authority
-  的 Agent 继续为零 dispatch。
-- `REQ-FLASH-015` 及其 Scenario 同步这一准入边界，新增有效 authority 的 Agent happy
-  path，同时将缺失/漂移/过期/超限、outcomeUnknown、非 safe terminal 和 readback 不确定
-  保持为零 dispatch。
-- Candidate 的固定构建/策略输出校验和 immutable candidate pin 继续是 dispatch 前提；
-  独立 AI adversarial review 不再是 candidate 进入设备验证、reservation 或 dispatch 的
-  必要条件，也不再为每次 candidate 修改拉起一个运行时会话。正常的 PR/维护者审查不受
-  此变更影响。
-- workspace-backed Harness 的既有 evaluation 已通过时，直接走既有 promotion/normal PR
-  路径；不再为 promotion 再调用 adversarial reviewer。此处不改变评估标准、构建、测试、
-  设备验证或维护者的正常 PR review。
-- current workflow、provider 和 hardware-evidence contract 能表达
-  `evolutionCampaignConfirmation`，并要求 evidence 如实记录 authority kind/reference、
-  fresh target confirmation、attempt ordinal 和 terminal disposition。Schema validity 仍不
-  mint authority，事后 evidence 仍不得追认 dispatch。
-- enforcement 与 verification policy 统一到同一 E0/E1/E2 词汇和 campaign 限制。
-- `AGENTS.md` 的候选同步移除对有效 Runtime Agent 的人类代执行、Git task/PR 或
-  legacy execution-mode 依赖：已发布 operation 的 E0 可按默认只读策略运行，E1/E2
-  由对应 typed authority 准入。`host_loop` 保持 Repo Agent Plane，不能代替 Runtime
-  dispatch；它的禁令不是 Runtime Agent 的授权规则。
-- archive/ratification 时创建 `CORE-4.0.0`，将 macOS 标为
-  `needsReverification`，Windows/Linux 标为 `deferred`；不产生支持或真机通过声明。
+- 完整替换 `POL-AGENT-002`、`REQ-FLASH-007`、`REQ-FLASH-015` 和 `REQ-WF-004`
+  的 E2/confirmation 语义；交互 UI 保留 acknowledgement，headless Runtime 不依赖 UI。
+- `AGENTS.md`、governance 和 verification policy 不再把 E0/E1/E2 当作授权阶梯；
+  read-only 保持默认只读策略，所有真实设备 mutation/destructive 统一走
+  RuntimeCapability，D0/D1/D2 决策等级不变。
+- Catalog 的 `oneShotExactPlan` 不再是 destructive operation 的新写入策略；现有已发布
+  `flash.dayu200@1` 与 `deploy.native-library.system@1` 改用统一 RuntimeCapability 策略。
+  这是已发布 operation 的破坏性授权修改，和本 E2 Safety 变更由同一 change 承载。
+- `RuntimeCapability` 允许 protected-main `runtimeDefaultPolicy` 为 destructive plan
+  生成 exact、短期、受限 capability；Agent-facing API 仍无 install/revoke/admin surface。
+- 新硬件 evidence schema 只为 Agent 写入 `defaultReadOnlyPolicy` 或
+  `runtimeCapability`；V4 的 `standingAuthorization` / `evolutionCampaignConfirmation`
+  保持历史解码，不进入新 writer 或 admission。
+- UI 可以继续展示 userdata impact 和非阻塞性的确认/提示，但该 UI 文本或点击不构成
+  Runtime authority，也不是 headless Agent dispatch 的前置条件。
+- 实现与本次真实 DAYU200 GJ-4 UI Flash 同车；独立 UI driver 保持手工真机验证工具，
+  不注册到默认 UI tests 或任何常规测试套件。
+- r4 的板级 profile 与构建事实推导保持不变并继续属于 `CORE-4.0.0` candidate。
 
 Observable behavior:
 
-- Before: current Constitution/Flash contract 要求人类亲手执行真实 destructive Step，
-  即使受监督用户已确认 exact campaign、broker 已完成所有 fresh checks，也必须
-  `policyBlocked`。
-- After: Agent 仅在 exact E2 authority 及全部 admission pins 仍一致时，才可由
-  protected-main broker dispatch 已发布的 typed destructive Step；任何 authority 或事实
-  缺失/漂移仍为 `policyBlocked`，外部 process/device dispatch 计数为 0。
-- After r3: 完成固定 candidate build 与封闭策略输出校验后，campaign 直接进入既有
-  fresh-readback/reservation/broker 验证链；不再等待或创建独立 adversarial-review session。
+- Before: Agent 的 exact typed request、可信设备事实和完整 plan 全部一致，仍会因缺少或
+  漂移 E2 authority 而 `policyBlocked`。
+- After: protected-main Runtime 可从这些可信事实自动 materialize/consume
+  RuntimeCapability 并 dispatch 已发布 typed destructive Step；不询问 standing/campaign、
+  Git task、PR、AUTH-ID、legacy mode 或每轮聊天确认。
+- Unchanged: target/plan/artifact/freshness/reservation 任一不确定时 dispatch 为 0；未知或
+  unsafe 外部结果不能 retry/replay；candidate/repairer 不能接触设备、Runtime、authority
+  或 raw command surface。
 
 ## Out of scope
 
-- 不增加 Operation、Provider、integration/device profile、raw-shell/HDC/RockUSB command
-  surface，亦不改变任何 Catalog step、partition、argv、target binding 或 recovery action。
-- 不创建、修改、批准或消费 standing authorization/campaign confirmation，不连接真实设备，
-  不执行 Flash、erase、format、unlock、update 或其他 device mutation。
-- 不把 fake、simulation、plan-only、CI green 或本 PR 的 review 记为 realHardware evidence；
-  不提前把任一 Golden Journey 标为 `REAL_DEVICE_PASS`。
-- 不允许 agent 伪造用户确认、让 candidate/repairer 接触设备或 authority，或对
-  unknown/unsafe partial outcome 自动重放。
+- 不删除或降低 `destructive` effect，不新增 generic shell/HDC/RockUSB Step，不改变任一
+  partition、argv、刷写顺序、Artifact lease、device profile 或 Provider transport。
+- 不让 caller 自报 capability、target fact、plan digest、artifact digest 或 outcome 成为
+  trusted fact；不开放 capability administration 给 Agent。
+- 不在 proposal PR 运行 HDC、RockUSB、Flash、erase、format、unlock 或任何真实设备命令，
+  不创建、修改、吊销、迁移或消费任何 authority/capability 实例。
+- 不把 contract/fake/simulation/plan-only 或维护者批准本提案记为 `REAL_DEVICE_PASS`。
+- 不自动恢复 unknown/unresolved/unsafe partial，不把 UI acknowledgement 伪装为执行授权。
 
 ## Scope
 
-- Modified policies: `POL-AGENT-002`.
-- Modified requirements: `REQ-FLASH-015`, `REQ-WF-004`.
-- Modified/added acceptance: `AC-FLASH-015-01`, `AC-FLASH-015-02`,
-  `AC-FLASH-015-03`, `AC-WF-004-03`.
-- Modified contracts: `provider-contracts.md` and
-  `hardware-evidence.schema.json` (3.0.0 -> 4.0.0).
-- Batch navigation docs: remove their stale independent-AI-review prerequisite while preserving
-  maintainer review/merge semantics.
-- Host-loop cleanup: remove only the unreachable reviewer module, its offline-only contracts and
-  the unused cursor field; worker and transport behavior remain unchanged.
-- Core baseline bump: required. `CORE-4.0.0` is the candidate because this
-  changes a ratified Safety policy, execution authorization boundary, contract
-  enum, and the pass/fail result of a real destructive Agent request.
+- Modified policy: `POL-AGENT-002`.
+- Modified requirements: `REQ-FLASH-007`, `REQ-FLASH-015`, `REQ-WF-004`; pending r4
+  `REQ-FLASH-016`/`REQ-FLASH-017` wording is synchronized to Runtime-owned admission while
+  `REQ-FLASH-018` remains unchanged.
+- Modified acceptance: `AC-FLASH-007-01`, `AC-FLASH-015-01`, `AC-FLASH-015-02`,
+  `AC-FLASH-015-03`, `AC-WF-004-01`, `AC-WF-004-02`, `AC-WF-004-03`.
+- Change-local acceptance: `E2R-CATALOG-001`, `E2R-RUNTIME-001`,
+  `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-GJ4-001`.
+- Modified published operations: `flash.dayu200@1`,
+  `deploy.native-library.system@1` authorization policy only; operation IDs, versions, inputs,
+  Steps, effect and provider remain unchanged.
+- Modified contracts: Catalog authorization vocabulary/generator,
+  `provider-contracts.md`, RuntimeCapability model/store and hardware evidence
+  schema `4.0.0 -> 5.0.0`.
+- Core baseline bump: still required. `CORE-4.0.0` remains the unratified candidate because
+  current baseline is `CORE-3.0.0`; r5 replaces the pending r1-r4 E2 semantics before
+  ratification rather than creating a second baseline candidate.
 
 ## Platform impact
 
-| Platform | Disposition after ratification | Reason |
+| Platform | Disposition after implementation | Reason |
 | --- | --- | --- |
-| macOS | `needsReverification` | The current Runtime campaign implementation is here; contract/fake tests do not establish hardware support. |
-| Windows | `deferred` | Future port must implement the identical E2 gate and cannot claim support first. |
-| Linux | `deferred` | Future port must implement the identical E2 gate and cannot claim support first. |
+| macOS | `needsReverification` until GJ-4 real-device pass | Production Runtime and DAYU200 Flash are implemented here; host-only checks cannot accept the relaxed authority boundary. |
+| Windows | `deferred` | Future port must use identical Runtime-owned destructive admission and recovery semantics. |
+| Linux | `deferred` | Future port must use identical Runtime-owned destructive admission and recovery semantics. |
 
 ## Safety, privacy, compatibility, and rollback
 
-- **Authority is exact and bounded.** A standing authorization pins target identity/binding,
-  firmware, transport, HDC, Provider, plan/step set, recovery path, validity and attempt use.
-  A campaign additionally pins the protected-main base, candidate paths/diff budget and
-  build target/toolchain. Campaigns are hard-limited to 16 serial attempts, four hours and
-  one concurrent attempt.
-- **Fail closed.** Prior to every real destructive Step the broker recalculates the typed
-  plan and performs fresh target/binding readback. A missing, consumed, expired, mismatched
-  or out-of-budget authority; missing or drifted candidate pin; non-terminal predecessor; absent reservation;
-  topology drift; unknown outcome; or unsafe partial write stops permanently with zero new
-  dispatch.
-- **Candidate isolation, not a runtime review session.** A candidate may build and validate its
-  closed strategy only in its task-owned isolated workspace, constrained to the confirmed
-  allowed paths and diff budget. The repairer receives no workspace source. Neither candidate
-  nor repairer has network, USB/HDC/RockUSB, Runtime or authority capability. They can only
-  propose a closed strategy; only the merged broker can reserve and dispatch the published typed
-  plan. No actor can enlarge argv, operation,
-  partition, plan, archive, step set, target or authority.
-- **Evidence honesty and privacy.** Evidence records the real executor and authority kind;
-  campaign confirmation is never represented as standing authorization. Device identifiers
-  remain redacted/digested and raw artifacts stay local/immutable. Evidence records provenance
-  only and can never grant E2 authority retrospectively.
-- **Compatibility.** Historical one-shot `chatConfirmation` and legacy
-  `normal|evolution` bytes remain decoder/export-only. New reserve/admission/dispatch through
-  those surfaces fails closed. Human execution remains an allowed path.
-- **Rollback.** Reverting the ratified baseline returns new requests to policyBlocked; it
-  never replays an existing intent or erases the durable journal/evidence history.
+- **Removed guarantee:** a destructive Agent request no longer carries a separately reviewable
+  human approval for that exact plan. This is the intended automation gain and the primary risk.
+- **Retained typed boundary:** only a protected-main broker can dispatch an operation/version
+  already published in Catalog. Unknown operation/Step remains destructive/unsupported; raw shell
+  and caller-supplied argv remain structurally unreachable.
+- **Retained identity/byte boundary:** stable identity, binding revision, exact inputs, plan,
+  archive and artifact digests come from trusted Runtime materialization and fresh readback.
+  Mismatch or uncertainty is a blocker, never a best-effort match.
+- **Retained outcome boundary:** intent precedes effect; outcome is durable; cancellation stops at a
+  safe boundary; unknown/unresolved/unsafe partial never triggers a new dispatch. A 16-attempt,
+  four-hour, single-concurrency budget remains a Runtime safety budget, not a user authority.
+- **Retained isolation:** candidate and repairer remain unable to reach source+device together.
+  Only protected-main Runtime owns transport and capability mint/consume.
+- **Evidence honesty/privacy:** V5 evidence records actual executor, `runtimeCapability` reference,
+  plan/target/reservation correlation and Artifact hashes. Device identifiers stay digested and
+  raw artifacts remain local/immutable. Evidence never mints capability.
+- **Compatibility:** V1-V4 bytes and historical standing/campaign records remain immutable and
+  decode/export-only. Active E2 records are not upgraded. New writers emit V5; new admission
+  rejects legacy authority kinds.
+- **Rollback:** reverting the implementation restores the exact E2 gate for new requests. Any
+  RuntimeCapability issued under r5 must be rejected by the old E2 path; durable intents/outcomes
+  remain available for recovery and are never replayed by rollback.
 
 ## Approval and implementation sequence
 
-This proposal is a D1 Core/Safety decision. It intentionally remains `proposed` until a human
-maintainer explicitly approves the r3 policy scope; earlier r1/r2 review/merge did not authorize
-removal of the independent-review admission condition. After approval, the sole task below may
-synchronize the current Core files and remove the runtime review invocation while running the
-listed host-only checks. A separate human review is required for change verification/archive and
-baseline ratification. No merge grants an authority instance; each real attempt still needs its
-own valid standing authorization or in-session campaign confirmation.
+1. This PR carries only `CHG-2026-056@r5` adjudication material with `status: proposed`.
+2. Maintainer reviews the explicit loss of per-plan human intent proof. Approval requires changing
+   this file to `status: approved` before merge; r1-r4 approvals and CI green do not count.
+3. Only after the approved revision is present on protected `main` may TASK-E2B-001 implement the
+   deltas, migration, tests and real GJ-4 UI Flash.
+4. Implementation must pass all host gates before any device window. Real Flash then uses only the
+   ratified/approved Runtime path and records truthful realHardware evidence.
+5. Change verification/archive and `CORE-4.0.0` ratification remain separate human decisions.
