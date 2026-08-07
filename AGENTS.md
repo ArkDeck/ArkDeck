@@ -56,13 +56,27 @@
   catalog 所定义)的 typed operation,维护 runtime job/session/artifact。
   **已发布 operation 的每次执行只产生 runtime job 记录,不产生 Git task、
   不开 PR、不要求 `changeId`/`taskId`、ready task、readiness packet 或人工
-  重述 typed plan**。`hostOnly`/`readOnly` 由 bounded 默认只读策略准入;
+  重述或批准 typed plan**。执行与机械证明的恢复不需要 AUTH-ID、legacy mode、UI
+  acknowledgement 或人工确认。`hostOnly`/`readOnly` 由 bounded 默认只读策略准入;
   `deviceMutation`/`destructive` 只消费与 operation/version、target/binding、inputs、plan
   和 applicable Artifact facts 精确匹配的 Runtime-owned `RuntimeCapability`。对于
   destructive request,只有 protected-main Runtime 可在完整 plan materialization 后根据
-  published Catalog policy 与 trusted facts 生成该短期 capability;caller/Agent/candidate/
-  repairer 不得 install、revoke、forge 或 widen。历史 `standingAuthorization` 与
-  `evolutionCampaignConfirmation` 只可 decode/export,不得准入、reserve 或 dispatch 新 operation。
+  published Catalog policy 与 trusted facts 生成、reserve 和 consume 该短期 capability;
+  caller/Agent/candidate/repairer 不得 install、revoke、forge 或 widen。每个 use 的首个外部
+  effect 前 Runtime 必须重新 materialize plan、验证 Artifact lease、读取 fresh target/
+  binding/tool facts 并 durable reserve。closed invocation 最多十六个串行 destructive
+  epochs、四小时、并发一。
+
+  unknown destructive intent 永不重发。若 protected-main Runtime 能保守界定所有 possible
+  effects，且 reviewed Provider contract 为 exact operation/profile 声明一个完全覆盖它们的
+  distinct complete-overwrite plan，则 fresh facts MAY 产生
+  `safeToSupersedeByCompleteOverwrite` 并自动执行恢复。成功须 durable 写
+  `SupersedingRecoveryEpoch`，保留原 unknown outcome，只释放已证明的 target lane。已有
+  后续 Flash history 仅可由完整 identity、coverage、outcome 与 postflight proof 建立关联。
+  identity 不确定、effect 无法界定/覆盖、trusted fact 漂移、Provider 未声明、取消、过期或
+  预算耗尽必须零新 dispatch，报告不可 override 的 blocker，不得请求用户提供无法补足证明
+  的批准。历史 `standingAuthorization` 与 `evolutionCampaignConfirmation` 只可
+  decode/export,不得准入、reserve 或 dispatch 新 operation 或 recovery。
 - 风险分级 D0/D1/D2(决策维度,见 enforcement"决策分级")与
   `WorkflowEffect`(设备效果维度)正交;Runtime Plane 的日常 readOnly 与已准入 deviceMutation 执行
   不构成 D* 决策点。
@@ -85,23 +99,34 @@
 ## Agent 禁令
 
 - 不得为让实现或测试通过而修改 accepted Core requirement、Safety invariant 或 Acceptance Scenario;此类变化必须走 change proposal 并由人类批准合并。
-- Device Agent Runtime Plane MAY 执行已发布 Catalog 的 typed operation。执行不需要 Git
-  task/PR、AUTH-ID、legacy mode 或人工重述 typed plan。`hostOnly`/`readOnly` 使用 bounded
-  默认只读策略;`deviceMutation`/`destructive` 使用 Runtime-owned `RuntimeCapability`。
-  destructive Runtime 必须先完整 materialize 已发布 typed plan,验证 Artifact lease,读取 fresh
-  target/binding facts,再生成并 durable reserve 与 operation/version、target/binding、exact
-  inputs、plan/archive/artifact/tool 完全一致的短期 capability。Agent-facing surface 不得暴露
-  capability install/revoke/admin,caller/Agent/candidate/repairer 不得创建、提供、修改或扩大
-  trusted facts、capability、reservation/outcome record 或 hardware evidence。自动化 invocation
-  最多 16 个串行 attempts、四小时、并发一;只有前一 attempt 已 durable terminal 且基于完整
-  outcome/readback 分类为 `safeToReflash` 才可继续。缺失、漂移、unknown identity/outcome、
-  unresolved intent、unsafe partial、取消后 intent 或预算耗尽都永久 fail closed（零新 dispatch）。
-  candidate 仅可在 task-owned isolation 内 build/test;repairer 不得接触 source workspace;两者
-  均不得接触 device transport、Runtime、raw shell 或 capability admin。历史
+- Device Agent Runtime Plane MAY 执行已发布 Catalog 的 typed operation。执行与机械证明的
+  recovery 不需要 Git task/PR、AUTH-ID、legacy mode、UI acknowledgement 或人工重述/批准
+  typed plan。`hostOnly`/`readOnly` 使用 bounded 默认只读策略;`deviceMutation`/`destructive`
+  使用 Runtime-owned `RuntimeCapability`。destructive Runtime 必须先完整 materialize 已发布
+  typed plan,验证 Artifact lease,读取 fresh target/binding/tool facts,再生成并 durable reserve
+  与 operation/version、target/binding、exact inputs、plan/archive/artifact/tool 完全一致的短期
+  capability。Agent-facing surface 不得暴露 capability install/revoke/admin,caller/Agent/
+  candidate/repairer 不得创建、提供、修改或扩大 trusted facts、capability、reservation/
+  outcome/supersession record、uncertain-effect set、Provider coverage declaration 或 hardware
+  evidence。自动化 invocation 最多 16 个串行 destructive epochs、四小时、并发一;普通继续
+  只有前一 attempt 已 durable terminal 且分类为 `safeToReflash` 才可运行。
+
+  unknown destructive intent 永不 replay。只有 Runtime 从 durable facts 保守界定全部 possible
+  effects，并用 exact published Provider complete-overwrite contract、fresh same-target facts、
+  immutable Artifact、完整 coverage/verification 和 budget 机械证明
+  `safeToSupersedeByCompleteOverwrite` 时，才可启动 distinct recovery。恢复使用新的
+  capability/reservation/intent；全部 effect 与 reboot/rebind/postflight confirmed 后才能写
+  `SupersedingRecoveryEpoch`。原 outcome 保持 unknown，原 Job 不得投影为 succeeded。已有
+  后续 Flash 也只能由完整 durable proof 建立 relation。缺失/漂移、unknown identity、无法
+  界定或覆盖的 effect、Provider 未声明、取消、过期或预算耗尽都 fail closed（零新 dispatch）
+  并报告不可由确认绕过的 blocker；不得把 replay 改名为 recovery，或把 success string 当
+  coverage proof。candidate 仅可在 task-owned isolation 内 build/test;repairer 不得接触 source
+  workspace;两者均不得接触 device transport、Runtime、raw shell 或 capability admin，亦不得
+  改变 operation/partition/plan/archive/step set/target/coverage proof。历史
   `standingAuthorization`、`evolutionCampaignConfirmation`、one-shot `chatConfirmation` 与
   legacy mode 仅可 decode/export,不得迁移为 RuntimeCapability,新的 admission/reservation/
-  dispatch 必须拒绝。UI 对 userdata impact 的 acknowledgement 只是 UX,不是 authority,也不是
-  headless Agent 的前置条件。
+  dispatch 必须拒绝。UI acknowledgement 仅传达 userdata impact，不是 authority，也不是
+  headless Agent、ordinary continuation 或 eligible recovery 的前置条件。
 - 不得把 simulation、fake、plan-only 结果记为真实设备或硬件验收;evidence 必须如实分类。
 - 不得在设备身份、外部副作用结果或 destructive step 状态不确定时猜测继续(fail closed)。
 - 不得使用 host shell 字符串拼接外部命令。

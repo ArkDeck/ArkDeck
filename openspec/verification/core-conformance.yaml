@@ -79,11 +79,11 @@ shared_inputs:
       version: 1.0.0
   contracts:
     - path: openspec/contracts/provider-contracts.md
-      version: 1.0.0
+      version: 3.0.0
     - path: openspec/contracts/workflow-step.schema.json
       version: 1.0.0
     - path: openspec/contracts/hardware-evidence.schema.json
-      version: 3.0.0
+      version: 6.0.0
     - path: openspec/contracts/workflow-step-registry.yaml
       version: 1.0.0
     - path: openspec/contracts/manifest.schema.json
@@ -130,7 +130,9 @@ evidence_policy:
     Any real-device support statement additionally requires a matching, unexpired
     hardware-evidence record for device, firmware, HDC, transport, privilege and
     Provider, produced by a human or Agent executor with effect-matched authority
-    provenance and trusted Runtime facts (see governance/enforcement.md).
+    provenance and trusted Runtime facts. Superseding recovery additionally requires
+    V6 uncertain-effect, coverage, typed outcome, postflight and resulting-target-epoch
+    lineage (see governance/enforcement.md).
 
 safety_coverage:
   - invariants: [POL-HDC-001]

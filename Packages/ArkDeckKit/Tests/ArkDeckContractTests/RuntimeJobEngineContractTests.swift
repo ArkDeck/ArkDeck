@@ -781,7 +781,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "waitingForRecovery")
     XCTAssertTrue(status.outcomeUnknown)
-    XCTAssertTrue(status.waitingForHuman)
+    XCTAssertFalse(
+      status.waitingForHuman,
+      "an unknown outcome is a machine-classified recovery blocker, not an approval question"
+    )
     let dispatchesAtPark = dispatcher.dispatchCount
 
     // No automatic replay: status queries do not redispatch.

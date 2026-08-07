@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "31c7d7013b837750ea6c93aedd77eea342d9c4669135beaf1c20a6f0b8ffadb9"
+  public static let catalogDigest = "d64ebd04e9865ae8e6a0eb6aa5810b4b2dd5ed90f241b457a9c8eec9333c7a95"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -355,7 +355,12 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "post-flash-facts.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "post-flash-hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default)
       ],
-      profiles: ["dayu200@1", "dayu200@2"]
+      profiles: ["dayu200@1", "dayu200@2"],
+      completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor(
+        contractVersion: "1.0.0",
+        profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200@1", coveredEffects: ["partition:uboot", "partition:boot_linux", "partition:system", "partition:vendor", "partition:userdata", "partition:resource", "partition:ramdisk", "partition:misc", "partition:parameter"]), CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200@2", coveredEffects: ["partition:uboot", "partition:resource", "partition:boot_linux", "partition:ramdisk", "partition:system", "partition:vendor", "partition:updater", "partition:chip_ckm", "partition:userdata"])],
+        overwriteStepID: "flash-partitions",
+        verificationStepIDs: ["verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build"])
     ),
     CatalogOperationDescriptor(
       id: "observe.device",

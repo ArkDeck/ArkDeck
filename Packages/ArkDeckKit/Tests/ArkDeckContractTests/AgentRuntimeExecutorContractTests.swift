@@ -216,6 +216,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       startedAtUTC: "2026-08-03T00:00:01Z",
       firstEvidenceStepAtUTC: "2026-08-03T00:00:01Z",
       finishedAtUTC: "2026-08-03T00:00:02Z",
+      recoveryEpoch: nil,
       inputs: ["userdataPolicy": .string("preserve")])
     let encoded = RuntimeControlPlaneHandler.encodeEvidence(
       snapshot: snapshot, artifacts: [], blockers: [])

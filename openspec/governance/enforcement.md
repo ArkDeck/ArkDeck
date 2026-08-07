@@ -1,6 +1,6 @@
 # Governance Enforcement
 
-> Version:3.0.0(git-native;3.0.0 = CHG-2026-056 r5 removes the E2 authority lane and makes mutation/destructive admission Runtime-owned,2026-08-07;2.2.0 = CHG-2026-046 control-plane split,2026-07-29)
+> Version:4.0.0(git-native;4.0.0 = CHG-2026-056 r7 adds autonomous proven complete-overwrite recovery,2026-08-08;3.0.0 = r5 removes the E2 authority lane,2026-08-07)
 > Status:current
 > 取代 V1 密码学治理链;背景与事故记录见 `openspec/planning/postmortem-2026-07-governance.md`。
 >
@@ -47,6 +47,10 @@
   `deviceMutation/destructive` 使用 Runtime-owned `RuntimeCapability`。destructive
   capability 只能由 protected-main Runtime 在完整 typed plan materialization、Artifact
   lease 校验和 fresh trusted-fact readback 后确定性生成;Agent/caller 不得提供或管理。
+  已发布 operation 的执行与机械证明的恢复不要求 standing/campaign/Git/AUTH-ID/legacy/UI/
+  chat authority。只有 protected-main Runtime 可从 published policy 与 trusted facts 导出
+  `safeToReflash` 或 `safeToSupersedeByCompleteOverwrite`；caller、Agent、evidence 与人类文本
+  均不能提供这些分类。
   未来改变 destructive 自动化准入仍属于上述四类 Repo-plane 安全变更,必须经
   OpenSpec + 维护者 PR review/merge。
 - 两平面的分界由 catalog 承载:operation 的 effect/授权/步骤/预算只在
@@ -118,16 +122,25 @@ CI 红 = 不能合并;CI 绿 ≠ 批准。授权判断永远来自维护者 revi
   或 evidence 均不得提供 trusted facts、创建/安装/吊销 capability 或绕过 broker。
 - 每个真实 destructive attempt 在首个外部 Step 前 SHALL re-materialize 已发布 typed plan、
   验证 exact target/binding/inputs/plan/archive/Artifact/provider/tool facts、fresh readback 与
-  durable reservation/use ordinal。closed invocation 最多 16 个串行 attempts、四小时、并发一；
+  durable reservation/use ordinal。closed invocation 最多 16 个串行 destructive epochs、四小时、并发一；
   只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash` 才可继续。
-  unknown identity/outcome、unresolved intent、unsafe partial、drift、取消后的 intent、过期或
-  预算耗尽永久产生零新 dispatch。
+  unknown destructive intent 永不重放或改写 outcome。Runtime 只有在能保守界定全部 possible
+  effects，并以 reviewed exact Provider contract、fresh same-target facts、immutable Artifact、
+  全覆盖 mapping、逐项 verification 与 budget 完整证明时，才可分类
+  `safeToSupersedeByCompleteOverwrite`，为 distinct recovery 生成新的 capability/reservation/
+  intent。只有 confirmed writes 加 reboot/rebind/postflight 才可写 durable
+  `SupersedingRecoveryEpoch` 并释放 target lane；原 outcome 保持 unknown。已有后续 real Flash
+  history 也只能从完整 identity、ordering、coverage、outcome 和 postflight facts 零 dispatch
+  地建立 relation。missing proof、unknown identity、incomplete coverage、drift、取消或预算耗尽
+  均产生零新 dispatch 与不可 override 的诊断，用户确认不得替代证明。
 - 真实硬件 evidence 必须记录 executor、实际 effect/typed Step kinds、read-only 的
   `defaultReadOnlyPolicy` 或 mutation/destructive 的 `runtimeCapability` reference，以及 exact
   plan/target/reservation/Artifact correlation、设备身份摘要/binding、固件/工具版本、fresh
-  target confirmation、执行时间与 terminal/recovery disposition。历史
-  `standingAuthorization`/`evolutionCampaignConfirmation` 仅可 decode/export，不得写入 V5、
-  准入新执行或迁移为 capability；schema-valid evidence 只记录 provenance。
+  target confirmation、执行时间与 terminal/recovery disposition。recovery evidence 还须记录
+  uncertain-effect/coverage digests、actual typed effects、supersession links、postflight 与
+  resulting target epoch。历史 `standingAuthorization`/`evolutionCampaignConfirmation` 仅可
+  decode/export，不得写入新 evidence、准入新执行/恢复或迁移为 capability；schema-valid
+  evidence 只记录 provenance，不 mint capability、coverage 或 recovery classification。
 - simulation/fake/plan-only 证据必须显式分类，永不计入真实硬件验收。
 
 ## Baseline

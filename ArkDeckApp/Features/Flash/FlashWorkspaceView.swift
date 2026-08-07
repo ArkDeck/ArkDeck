@@ -514,12 +514,13 @@ struct FlashWorkspaceView: View {
               .disabled(!model.canSubmit)
               .accessibilityIdentifier("flash.execute.submit")
             if let submission = model.submission {
+              let successful = submission.state == "succeeded" || submission.state == "recovered"
               Label(
                 String(format: flashText("flash.execute.terminal"), submission.state),
-                systemImage: submission.state == "succeeded"
+                systemImage: successful
                   ? "checkmark.circle.fill" : "xmark.octagon.fill"
               )
-              .foregroundStyle(submission.state == "succeeded" ? .green : .red)
+              .foregroundStyle(successful ? .green : .red)
               .accessibilityIdentifier("flash.execute.terminal")
               Text(submission.jobID)
                 .font(.caption.monospaced())

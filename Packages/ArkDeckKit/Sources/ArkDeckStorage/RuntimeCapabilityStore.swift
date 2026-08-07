@@ -628,7 +628,7 @@ public actor RuntimeCapabilityStore {
           detail: "a complete materialized plan digest is required"))
     }
     if let unresolved = record.consumptions.first(where: {
-      $0.currentOutcome != .confirmed
+      $0.currentOutcome != .confirmed && $0.currentOutcome != .safeToReflash
     }) {
       throw RuntimeCapabilityStoreError.lineageBlocked(
         "previous use \(unresolved.ordinal) is \(unresolved.currentOutcome.rawValue); "

@@ -4,6 +4,10 @@ public enum JobExecutionMode: String, CaseIterable, Codable, Sendable {
 }
 
 public enum JobState: String, CaseIterable, Codable, Sendable {
+  /// Version 1.0.0 remains the frozen agent-device-operation enum. Recovery
+  /// dispositions are emitted only by the versioned recovery journal writer.
+  public static let schemaVersion = "2.0.0"
+
   case queued
   case preflight
   case running
@@ -14,18 +18,20 @@ public enum JobState: String, CaseIterable, Codable, Sendable {
   case cancellingAtSafeBoundary
   case waitingForRecovery
   case reconciling
+  case recoveringByCompleteOverwrite
   case resumeAtConfirmedSafeBoundary
   case userAbandonRequested
   case finalizing
   case planned
   case succeeded
+  case recovered
   case failed
   case cancelled
   case interrupted
 
   public var isTerminal: Bool {
     switch self {
-    case .planned, .succeeded, .failed, .cancelled, .interrupted:
+    case .planned, .succeeded, .recovered, .failed, .cancelled, .interrupted:
       true
     default:
       false
@@ -134,6 +140,7 @@ public enum JobEvent: Equatable, Sendable {
   case cancellationAcknowledged
   case safeBoundaryReached
   case recoveryRequested
+  case completeOverwriteRecoveryStarted
   case recoveryEvaluated(RecoveryDecision)
   case resumeMarkerEvaluated(
     evidence: ResumeMarkerDecisionEvidence,
@@ -324,12 +331,13 @@ public struct JobStateMachine: Sendable {
       return try transition(to: .waitingForDevice)
     case .workflowCompleted:
       guard
-        (mode == .execute && state == .running)
+        (mode == .execute
+          && (state == .running || state == .recoveringByCompleteOverwrite))
           || (mode == .planOnly && state == .planning)
       else {
         try rejectTransition(
           to: .finalizing,
-          detail: "workflow completion is valid only from running or planning"
+          detail: "workflow completion is valid only from running, recovery, or planning"
         )
       }
       if let activeStep {
@@ -339,7 +347,9 @@ public struct JobStateMachine: Sendable {
         )
       }
       let outcome = try transition(to: .finalizing)
-      pendingFinalization = .success
+      pendingFinalization =
+        state == .finalizing && outcome.transition.from == .recoveringByCompleteOverwrite
+        ? .recoverySuccess : .success
       return outcome
     case .confirmedFailure(let failure):
       if state == .resumeAtConfirmedSafeBoundary {
@@ -386,6 +396,8 @@ public struct JobStateMachine: Sendable {
       )
     case .recoveryRequested:
       return try transition(to: .reconciling)
+    case .completeOverwriteRecoveryStarted:
+      return try transition(to: .recoveringByCompleteOverwrite)
     case .recoveryEvaluated(let decision):
       switch decision {
       case .resume(let evidence) where evidence.permitsResume:
@@ -444,8 +456,14 @@ public struct JobStateMachine: Sendable {
       switch (mode, pendingFinalization) {
       case (.execute, .success):
         return try transition(to: .succeeded)
+      case (.execute, .recoverySuccess):
+        return try transition(to: .recovered)
       case (.planOnly, .success):
         return try transition(to: .planned)
+      case (.planOnly, .recoverySuccess):
+        try rejectTransition(
+          to: .recovered,
+          detail: "plan-only execution cannot publish a recovered target epoch")
       case (_, .failure):
         return try transition(to: .failed)
       }
@@ -497,7 +515,8 @@ public struct JobStateMachine: Sendable {
     switch (mode, state) {
     case (.execute, .preflight):
       step.effect <= .readOnly
-    case (.execute, .running), (.planOnly, .preflight), (.planOnly, .planning):
+    case (.execute, .running), (.execute, .recoveringByCompleteOverwrite),
+      (.planOnly, .preflight), (.planOnly, .planning):
       true
     case (_, .finalizing):
       step.kind == .finalizeSession
@@ -547,7 +566,10 @@ public struct JobStateMachine: Sendable {
     case (.planOnly, .preflight):
       [.planning, .cancelRequested, .finalizing]
     case (.execute, .running):
-      [.waitingForDevice, .cancelRequested, .finalizing, .waitingForRecovery]
+      [
+        .waitingForDevice, .cancelRequested, .finalizing, .waitingForRecovery,
+        .recoveringByCompleteOverwrite,
+      ]
     case (.execute, .waitingForDevice):
       [.running, .awaitingRebindConfirmation, .cancelRequested, .finalizing, .waitingForRecovery]
     case (.execute, .awaitingRebindConfirmation):
@@ -562,10 +584,21 @@ public struct JobStateMachine: Sendable {
       [.cancelled, .finalizing, .waitingForRecovery]
     case (.planOnly, .cancellingAtSafeBoundary):
       [.cancelled]
-    case (_, .waitingForRecovery):
+    case (.execute, .waitingForRecovery):
+      [.reconciling, .recoveringByCompleteOverwrite, .userAbandonRequested]
+    case (.planOnly, .waitingForRecovery):
       [.reconciling, .userAbandonRequested]
-    case (_, .reconciling):
+    case (.execute, .reconciling):
+      [
+        .resumeAtConfirmedSafeBoundary, .recoveringByCompleteOverwrite,
+        .finalizing, .waitingForRecovery,
+      ]
+    case (.planOnly, .reconciling):
       [.resumeAtConfirmedSafeBoundary, .finalizing, .waitingForRecovery]
+    case (.execute, .recoveringByCompleteOverwrite):
+      [.cancelRequested, .finalizing, .waitingForRecovery]
+    case (.planOnly, .recoveringByCompleteOverwrite):
+      []
     case (.execute, .resumeAtConfirmedSafeBoundary):
       [.running, .finalizing, .waitingForRecovery]
     case (.planOnly, .resumeAtConfirmedSafeBoundary):
@@ -573,10 +606,11 @@ public struct JobStateMachine: Sendable {
     case (_, .userAbandonRequested):
       [.interrupted, .waitingForRecovery]
     case (.execute, .finalizing):
-      [.succeeded, .failed]
+      [.succeeded, .recovered, .failed]
     case (.planOnly, .finalizing):
       [.planned, .failed]
-    case (_, .planned), (_, .succeeded), (_, .failed), (_, .cancelled), (_, .interrupted):
+    case (_, .planned), (_, .succeeded), (_, .recovered), (_, .failed), (_, .cancelled),
+      (_, .interrupted):
       []
     case (.planOnly, .running),
       (.planOnly, .waitingForDevice),
@@ -708,6 +742,7 @@ public struct JobStateMachine: Sendable {
 
   private enum PendingFinalization: Sendable {
     case success
+    case recoverySuccess
     case failure
   }
 }

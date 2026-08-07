@@ -1008,7 +1008,7 @@ private func validateAuthorizationCorrelation(
 ) throws {
   // v1 remains a byte-for-byte compatible historical reader. Its authorization limitation is
   // enforced by the locked v1 Manifest contract; later schemas add journal-level correlation.
-  if event.schemaVersion == JournalEvent.schemaVersion { return }
+  if JournalEvent.usesLegacyAuthorizationSemantics(event.schemaVersion) { return }
   if JournalEvent.usesAgentAuthorityUnion(event.schemaVersion) {
     if effect == .hostOnly {
       guard executionAuthority != "authorizedAgent",
@@ -1088,7 +1088,8 @@ extension JobState {
   fileprivate var permitsJournalIntent: Bool {
     switch self {
     case .queued, .waitingForRecovery, .reconciling, .resumeAtConfirmedSafeBoundary,
-      .userAbandonRequested, .planned, .succeeded, .failed, .cancelled, .interrupted:
+      .userAbandonRequested, .planned, .succeeded, .recovered, .failed, .cancelled,
+      .interrupted:
       false
     default:
       true

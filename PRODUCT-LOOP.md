@@ -846,11 +846,21 @@ CLEANUP_REQUIRED
 
 - `COMPLETED`:继续后续 Step;
 - `NOT_EXECUTED`:重新经过安全 Admission 后才允许执行;
-- `STILL_UNKNOWN`:停止并请求人工决策;
-- `PARTIALLY_COMPLETED`:执行已声明补偿或专用恢复;
+- `STILL_UNKNOWN`:自动评估已发布的 complete-overwrite supersession contract;
+- `PARTIALLY_COMPLETED`:执行已声明补偿，或自动评估 complete-overwrite supersession contract;
 - `CLEANUP_REQUIRED`:生成并消费 cleanup debt。
 
-`outcomeUnknown` 永远不得自动重发原始副作用。
+当 readback 为 `STILL_UNKNOWN` 或 `PARTIALLY_COMPLETED` 时，protected-main Runtime SHALL
+自动检查：是否能从 durable operation/profile/plan facts 保守界定每个 possible effect，且
+已发布 Provider contract 的 distinct complete-overwrite recovery 是否完整覆盖它们。只有
+fresh identity/binding/topology、immutable Artifact、coverage、verification 和 budget 全部
+成立时，Runtime MAY 分类 `safeToSupersedeByCompleteOverwrite` 并在无人工决策提示的情况
+下运行恢复。成功 SHALL 写 durable `SupersedingRecoveryEpoch`；原始 outcome 保持 unknown，
+当前 target lane 才变为 known。
+
+如果证明不完整，新 dispatch 为 0，产品报告精确且不可 override 的安全 blocker。它 SHALL
+NOT 请求用户批准缺失的证明。`outcomeUnknown` 永远不得自动重发原始副作用，但 Runtime 可
+通过 reviewed、完整覆盖且可逐项验证的独立恢复恢复 target 的已知状态。
 
 ---
 

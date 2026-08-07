@@ -1,6 +1,6 @@
 # Provider and Adapter Contracts
 
-> Version：2.0.0
+> Version：3.0.0
 > Status：in baseline CORE-4.0.0（ratification 状态见 `openspec/baselines/CORE-4.0.0.yaml`）
 > Baseline：CORE-4.0.0
 
@@ -99,8 +99,8 @@ Rules:
 - A real `deviceMutation` or `destructive` Provider dispatch requires a matching Runtime-owned
   `RuntimeCapability` validated and durably reserved by the trusted host before the first external
   Step. No E2 classification, standing authorization, campaign confirmation, Git carrier, AUTH-ID,
-  legacy mode or per-attempt user message is required. A human and an Agent execute through the
-  same Provider safety gate; UI acknowledgement may communicate data impact but is not authority.
+  legacy mode, UI acknowledgement or per-attempt user message is required. A human and an Agent
+  execute through the same Provider safety gate.
 - For `destructive`, only protected-main Runtime MAY generate the capability after complete
   materialization of an operation already published in Catalog. It SHALL bind operation/version,
   stable target identity/binding, exact typed inputs, ordered plan/Step-set digest, archive/Artifact
@@ -109,12 +109,36 @@ Rules:
   modify or widen it.
 - Immediately before dispatch the trusted host SHALL re-materialize the plan, verify Artifact
   leases, perform fresh target/binding/tool readback and durably reserve the use. A closed
-  automation invocation is limited to 16 serial attempts in four hours with concurrency one. Each
-  later use requires a prior durable `safeToReflash` terminal based on complete outcome/readback.
-  Unknown, unresolved or unsafe partial outcome, identity/topology drift, cancellation after
-  intent, missing/drifted facts, expiry or exhausted budget stops permanently with zero new dispatch.
+  automation invocation is limited to sixteen serial destructive epochs in four hours with
+  concurrency one. Ordinary continuation requires a prior durable `safeToReflash` terminal.
+
+Complete-overwrite supersession rules:
+
+- A Provider MAY declare `completeOverwriteSupersessionSafe` only for an exact published operation/
+  profile version. The declaration is code-reviewed policy, not a runtime caller flag, and SHALL
+  define the closed set of partitions, boot metadata, userdata effects, device modes and other
+  mutable state; a conservative durable-intent mapping to `uncertainEffectSet`; a typed plan that
+  fully overwrites/resets/closes each effect; required stable identity/binding/topology/loader/
+  power/Artifact/tool facts; per-effect verification and final reboot/rebind/runtime-build
+  postflight; and every state that cannot be covered.
+- Protected-main Runtime MAY derive `safeToSupersedeByCompleteOverwrite` only when the union of all
+  outstanding uncertain-effect sets on the target lane is finite and one exact recovery plan covers
+  it. Optional/conditional effects remain in the union unless durable evidence proves they did not
+  occur. Any omitted, protected, partially writable or unverifiable effect makes recovery ineligible.
+- Recovery SHALL use a new RuntimeCapability, reservation and intent. It SHALL NOT reuse or rewrite
+  old capability/reservation/intent/outcome. Only confirmed per-effect outcomes plus reboot/rebind/
+  postflight success may write a `SupersedingRecoveryEpoch`. If recovery becomes unknown, its
+  possible effects join the union before another fresh proof and budget evaluation.
+- A later Flash already in durable history MAY be linked without new Provider dispatch only when
+  exact same-target identity, temporal ordering, full coverage, per-effect outcomes and postflight
+  are present and semantically valid. A terminal state or process exit code alone is insufficient.
+- Unknown identity, unbounded effect set, incomplete coverage, undeclared Provider support,
+  target/binding/topology/Artifact/tool drift, pending cancellation, expiry or budget exhaustion
+  stops with zero new dispatch. The product reports a non-overridable missing-proof blocker;
+  UI/chat confirmation cannot authorize replay or recovery.
 - Candidate and repairer cannot provide executable/argv, operation, partition, plan, archive, Step
-  set, target, Provider selection or capability fields and have no device transport. Historical
+  set, target, Provider selection, coverage declaration or capability fields and have no device
+  transport. Historical
   `standingAuthorization`, `evolutionCampaignConfirmation` and one-shot `chatConfirmation` remain
   decode/export-only. They cannot reserve/admit/dispatch or be migrated into RuntimeCapability.
   Evidence records provenance only and never authorizes a Provider call.

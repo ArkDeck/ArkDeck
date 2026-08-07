@@ -65,3 +65,37 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
       ["catalogID", "actionID"])
   }
 }
+
+final class CompleteOverwriteRecoveryCatalogContractTests: XCTestCase {
+  func testDAYU200ProfilesPublishExactClosedRecoveryCoverage() throws {
+    let operation = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    let recovery = try XCTUnwrap(operation.completeOverwriteRecovery)
+    XCTAssertEqual(recovery.contractVersion, "1.0.0")
+    XCTAssertEqual(recovery.overwriteStepID, "flash-partitions")
+    XCTAssertEqual(
+      recovery.verificationStepIDs,
+      [
+        "verify-flash-readback", "reboot-device", "wait-for-hdc",
+        "rebind-and-verify-build",
+      ])
+    XCTAssertEqual(
+      recovery.profile(reference: "dayu200@1")?.coveredEffects,
+      [
+        "partition:uboot", "partition:boot_linux", "partition:system",
+        "partition:vendor", "partition:userdata", "partition:resource",
+        "partition:ramdisk", "partition:misc", "partition:parameter",
+      ])
+    XCTAssertEqual(
+      recovery.profile(reference: "dayu200@2")?.coveredEffects,
+      [
+        "partition:uboot", "partition:resource", "partition:boot_linux",
+        "partition:ramdisk", "partition:system", "partition:vendor",
+        "partition:updater", "partition:chip_ckm", "partition:userdata",
+      ])
+    XCTAssertNil(recovery.profile(reference: "dayu200@3"))
+    XCTAssertEqual(
+      operation.steps.first(where: { $0.stepID == recovery.overwriteStepID })?.effect,
+      .destructive)
+  }
+}

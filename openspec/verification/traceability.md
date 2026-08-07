@@ -38,15 +38,15 @@
 | REQ-HDC-008 | authorized 与 encrypted 状态独立；无 evidence 安全降级 |
 | REQ-DEV-002/003/004/005/006 | binding revision journal + USB/TCP/UART rebind contract tests |
 | REQ-WF-002 | Core minimum effect 不可被 Profile 降低 |
-| REQ-WF-004 | trusted Runtime facts + actual-effect/default-policy-or-RuntimeCapability parity；missing/stale/mismatch publication = 0；schema/projector device dispatch = 0 |
-| REQ-JOB-002/003/006/007 | crash-window fault injection、critical cancellation、abandon durable ordering |
+| REQ-WF-004 | trusted Runtime facts + actual-effect/default-policy-or-RuntimeCapability parity；V6 uncertain-effect/coverage/supersession/postflight lineage；missing/stale/mismatch publication = 0；schema/projector device dispatch = 0 |
+| REQ-JOB-001/002/003/006/007 | distinct `recoveringByCompleteOverwrite → recovered` state/terminal；crash-window fault injection、unknown intent replay = 0、critical cancellation、abandon durable ordering |
 | REQ-ART-002 | raw hash invariance |
 | REQ-STO-002/003/004/005 | headroom、同卷 heavy admission、external ENOSPC、crash/replug |
 | REQ-FLASH-005 | full plan + device mutation dispatch = 0 |
 | REQ-FLASH-006 | no real connectKey/process + simulated evidence classification |
 | REQ-FLASH-008/009/010/012/013 | critical process/power/rebind/postflight/recovery evidence |
 | REQ-FLASH-014 | exact real hardware matrix evidence |
-| REQ-FLASH-015 | caller capability/trusted-fact injection、target/plan/archive/Artifact/tool/reservation drift 或 unsafe/unknown predecessor 的 destructive dispatch = 0；protected-main Runtime only 可生成/消费 exact capability；最多 16 次串行、四小时、并发一，后续仅 `safeToReflash` |
+| REQ-FLASH-015 | caller capability/trusted-fact/recovery-proof injection、target/plan/archive/Artifact/tool/reservation/coverage drift 的 destructive dispatch = 0；unknown intent replay = 0；protected-main Runtime only 可生成/消费 exact capability，并仅以完整 same-target/effect/coverage/postflight proof 分类 `safeToSupersedeByCompleteOverwrite`；最多 16 个串行 destructive epochs、四小时、并发一 |
 | REQ-FLASH-016/017/018 | 未知但符合 board 的 build 可导入；不符合 archive 或 leased-byte drift 的 dispatch = 0；postflight 只比较从实际 system image 派生的 build version，Step materialization 零 archive I/O |
 | REQ-UX-007 | permissionDenied/offline/unauthorized separation；sudo/driver/udev/group/ACL mutation call counter = 0 |
 

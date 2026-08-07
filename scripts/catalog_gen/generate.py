@@ -96,7 +96,7 @@ TOP_LEVEL_REQUIRED = (
     "artifacts",
     "profiles",
 )
-TOP_LEVEL_OPTIONAL = ("defaultPolicyIssuance",)
+TOP_LEVEL_OPTIONAL = ("defaultPolicyIssuance", "completeOverwriteRecovery")
 STEP_REQUIRED = ("stepID", "kind", "effect", "cancellation", "binding", "compensation")
 STEP_OPTIONAL = ("actionRef", "optional", "notes")
 FIELD_REQUIRED = ("type", "required")
@@ -490,6 +490,79 @@ def validate_operation(
     ):
         raise CatalogError(f"{where}.profiles: must be a non-empty unique list")
 
+    recovery = doc.get("completeOverwriteRecovery")
+    if recovery is not None:
+        recovery_required = (
+            "contractVersion", "profiles",
+            "overwriteStepID", "verificationStepIDs",
+        )
+        if not isinstance(recovery, dict):
+            raise CatalogError(f"{where}.completeOverwriteRecovery: must be an object")
+        _require_keys(recovery, recovery_required, (), f"{where}.completeOverwriteRecovery")
+        if doc["effect"]["minimum"] != "destructive" or doc["provider"] != "rockchip":
+            raise CatalogError(
+                f"{where}.completeOverwriteRecovery: only a destructive rockchip operation may declare coverage"
+            )
+        if recovery["contractVersion"] != "1.0.0":
+            raise CatalogError(
+                f"{where}.completeOverwriteRecovery.contractVersion: unsupported version"
+            )
+        recovery_profiles = recovery["profiles"]
+        if (
+            not isinstance(recovery_profiles, list)
+            or not recovery_profiles
+            or not all(isinstance(item, dict) for item in recovery_profiles)
+        ):
+            raise CatalogError(
+                f"{where}.completeOverwriteRecovery.profiles: must be a non-empty list of exact profile coverage objects"
+            )
+        recovery_references = []
+        for index, item in enumerate(recovery_profiles):
+            profile_where = f"{where}.completeOverwriteRecovery.profiles[{index}]"
+            _require_keys(item, ("reference", "coveredEffects"), (), profile_where)
+            reference = item["reference"]
+            effects = item["coveredEffects"]
+            if not isinstance(reference, str) or reference not in profiles:
+                raise CatalogError(
+                    f"{profile_where}.reference: must name one operation profile"
+                )
+            if (
+                not isinstance(effects, list)
+                or not effects
+                or len(effects) > 32
+                or len(set(effects)) != len(effects)
+                or not all(
+                    isinstance(effect, str)
+                    and effect.startswith("partition:")
+                    and effect.removeprefix("partition:").replace("_", "").isalnum()
+                    for effect in effects
+                )
+            ):
+                raise CatalogError(
+                    f"{profile_where}.coveredEffects: must be 1..32 unique typed partition effects"
+                )
+            recovery_references.append(reference)
+        if len(set(recovery_references)) != len(recovery_references):
+            raise CatalogError(
+                f"{where}.completeOverwriteRecovery.profiles: references must be unique"
+            )
+        overwrite_step = recovery["overwriteStepID"]
+        verification_steps = recovery["verificationStepIDs"]
+        if overwrite_step not in step_ids:
+            raise CatalogError(
+                f"{where}.completeOverwriteRecovery.overwriteStepID: unknown step"
+            )
+        if (
+            not isinstance(verification_steps, list)
+            or not verification_steps
+            or len(set(verification_steps)) != len(verification_steps)
+            or not set(verification_steps).issubset(set(step_ids))
+            or overwrite_step in verification_steps
+        ):
+            raise CatalogError(
+                f"{where}.completeOverwriteRecovery.verificationStepIDs: must be unique known post-write steps"
+            )
+
 
 def validate_profile(doc, where: str) -> None:
     required = ("schemaVersion", "id", "version", "provider", "title", "constraints", "supportedOperations")
@@ -679,7 +752,30 @@ def generate_swift(operations: list[dict], digest: str) -> str:
         artifacts = ",\n        ".join(_swift_artifact(a) for a in doc["artifacts"])
         lines.append(f"      artifacts: [\n        {artifacts}\n      ],")
         profiles = ", ".join(_swift_string(p) for p in doc["profiles"])
-        lines.append(f"      profiles: [{profiles}]")
+        recovery = doc.get("completeOverwriteRecovery")
+        if recovery is None:
+            lines.append(f"      profiles: [{profiles}]")
+        else:
+            recovery_profiles = ", ".join(
+                "CatalogCompleteOverwriteRecoveryProfileDescriptor("
+                f"reference: {_swift_string(profile['reference'])}, coveredEffects: ["
+                + ", ".join(_swift_string(value) for value in profile["coveredEffects"])
+                + "])"
+                for profile in recovery["profiles"]
+            )
+            verification_steps = ", ".join(
+                _swift_string(value) for value in recovery["verificationStepIDs"]
+            )
+            lines.append(f"      profiles: [{profiles}],")
+            lines.append("      completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor(")
+            lines.append(
+                f"        contractVersion: {_swift_string(recovery['contractVersion'])},"
+            )
+            lines.append(f"        profiles: [{recovery_profiles}],")
+            lines.append(
+                f"        overwriteStepID: {_swift_string(recovery['overwriteStepID'])},"
+            )
+            lines.append(f"        verificationStepIDs: [{verification_steps}])")
         lines.append("    ),")
     lines.append("  ]")
     lines.append("}")
