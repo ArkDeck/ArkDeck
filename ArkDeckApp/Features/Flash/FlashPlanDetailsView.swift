@@ -2,13 +2,13 @@ import ArkDeckWorkflows
 import Foundation
 import SwiftUI
 
-/// Progressive disclosure for the parts of an exact plan that are too large
-/// for the summary: every mapped image and every profile prerequisite.
+/// Progressive disclosure for the part of an exact plan that is too large
+/// for the summary: every mapped image. Prerequisites are not here — they
+/// render as their own always-visible section before the plan.
 struct FlashPlanDetailsView: View {
   let plan: FlashExactPlanPresentation
 
   @State private var arePartitionsExpanded = false
-  @State private var arePrerequisitesExpanded = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -45,34 +45,6 @@ struct FlashPlanDetailsView: View {
               .foregroundStyle(.secondary)
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        .padding(.top, 8)
-      }
-
-      Button {
-        arePrerequisitesExpanded.toggle()
-      } label: {
-        HStack(spacing: 6) {
-          Image(systemName: arePrerequisitesExpanded ? "chevron.down" : "chevron.right")
-            .imageScale(.small)
-            .accessibilityHidden(true)
-          Label(flashText("flash.plan.prerequisites"), systemImage: "checklist")
-            .font(.subheadline.weight(.semibold))
-        }
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("flash.plan.prerequisites.disclosure")
-
-      if arePrerequisitesExpanded {
-        VStack(alignment: .leading, spacing: 8) {
-          Text(flashText("flash.plan.prerequisitesNote"))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-          ForEach(plan.prerequisites) { prerequisite in
-            prerequisiteRow(prerequisite)
           }
         }
         .padding(.top, 8)
@@ -120,6 +92,24 @@ struct FlashPlanDetailsView: View {
   private func partitionIdentity(_ partition: FlashPartitionPresentation) -> some View {
     Text("\(partition.writeOrder). \(partition.partitionName)")
       .font(.callout.monospaced().weight(.semibold))
+  }
+
+}
+
+/// The profile's prerequisites, always expanded: what has to hold before the
+/// plan is worth reading. Requirement level is the only fact the read facade
+/// carries — satisfied/unknown verdicts stay honest as "pending" until a
+/// Runtime check result reaches the App.
+struct FlashPrerequisitesList: View {
+  let prerequisites: [FlashPrerequisitePresentation]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(prerequisites) { prerequisite in
+        prerequisiteRow(prerequisite)
+      }
+    }
+    .accessibilityIdentifier("flash.plan.prerequisitesList")
   }
 
   private func prerequisiteRow(_ prerequisite: FlashPrerequisitePresentation) -> some View {

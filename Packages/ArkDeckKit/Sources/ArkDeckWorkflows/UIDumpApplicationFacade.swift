@@ -42,12 +42,14 @@ public struct UIDumpRecipeDefinition: Sendable, Equatable, Identifiable {
 }
 
 public enum UIDumpRecipeCatalog {
+  /// elementTree leads: it is the default selection and the first option a
+  /// reader compares against the echoed hidumper arguments.
   public static let definitions: [UIDumpRecipeDefinition] = [
-    UIDumpRecipeDefinition(
-      id: .nodeSummary, candidateArguments: ["-w", "{windowId}", "-default"]),
     UIDumpRecipeDefinition(
       id: .elementTree,
       candidateArguments: ["-w", "{windowId}", "-element", "-c"]),
+    UIDumpRecipeDefinition(
+      id: .nodeSummary, candidateArguments: ["-w", "{windowId}", "-default"]),
     UIDumpRecipeDefinition(
       id: .fullDefaultTree,
       candidateArguments: ["-w", "{windowId}", "-default", "-all"]),

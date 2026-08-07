@@ -54,7 +54,7 @@ struct FlashRuntimeActivityView: View {
     VStack(alignment: .leading, spacing: 10) {
       Label(flashText("flash.runtime.recoveryTitle"), systemImage: "exclamationmark.shield.fill")
         .font(.headline)
-        .foregroundStyle(job.outcomeUnknown ? .red : .orange)
+        .foregroundStyle(.orange)
       Text(
         flashText(
           job.outcomeUnknown
@@ -76,7 +76,7 @@ struct FlashRuntimeActivityView: View {
     }
     .padding(16)
     .background(
-      (job.outcomeUnknown ? Color.red : Color.orange).opacity(0.08),
+      Color.orange.opacity(0.08),
       in: RoundedRectangle(cornerRadius: 12)
     )
     .accessibilityElement(children: .contain)
@@ -321,7 +321,8 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func stateColor(_ job: RuntimeJobSummaryPresentation) -> Color {
-    if job.outcomeUnknown { return .red }
+    // Unknown is warn, not danger: red stays reserved for known failure.
+    if job.outcomeUnknown { return .orange }
     guard let state = JobState(rawValue: job.state) else { return .secondary }
     switch state {
     case .succeeded: return .green

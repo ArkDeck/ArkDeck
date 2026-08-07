@@ -8,6 +8,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
   let hdcPresentation: HDCDiagnosticsPresentation
   let isHDCRefreshInFlight: Bool
   let hdcConfigurationError: String?
+  let hasActiveRuntimeJobs: Bool
   let onHDCRefresh: () -> Void
   let onSelectHDC: (URL) -> Void
   let updatesContent: UpdatesContent
@@ -17,6 +18,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
     hdcPresentation: HDCDiagnosticsPresentation,
     isHDCRefreshInFlight: Bool,
     hdcConfigurationError: String?,
+    hasActiveRuntimeJobs: Bool,
     onHDCRefresh: @escaping () -> Void,
     onSelectHDC: @escaping (URL) -> Void,
     @ViewBuilder updatesContent: () -> UpdatesContent
@@ -25,6 +27,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
     self.hdcPresentation = hdcPresentation
     self.isHDCRefreshInFlight = isHDCRefreshInFlight
     self.hdcConfigurationError = hdcConfigurationError
+    self.hasActiveRuntimeJobs = hasActiveRuntimeJobs
     self.onHDCRefresh = onHDCRefresh
     self.onSelectHDC = onSelectHDC
     self.updatesContent = updatesContent()
@@ -40,6 +43,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
         presentation: hdcPresentation,
         isRefreshInFlight: isHDCRefreshInFlight,
         configurationError: hdcConfigurationError,
+        hasActiveRuntimeJobs: hasActiveRuntimeJobs,
         onRefresh: onHDCRefresh,
         onSelectExecutable: onSelectHDC
       )
@@ -107,6 +111,7 @@ private struct ToolchainsSettingsPane: View {
   let presentation: HDCDiagnosticsPresentation
   let isRefreshInFlight: Bool
   let configurationError: String?
+  let hasActiveRuntimeJobs: Bool
   let onRefresh: () -> Void
   let onSelectExecutable: (URL) -> Void
   @State private var isSelectingExecutable = false
@@ -165,10 +170,29 @@ private struct ToolchainsSettingsPane: View {
               .disabled(isRefreshInFlight)
             Spacer()
           }
-          Text(settingsText("settings.toolchains.futureJobs"))
+          // The pane's main fact: a running Job keeps the toolchain pinned at
+          // its creation; switching is never retroactive. While Jobs are
+          // actually running the sentence escalates to a warn callout,
+          // because that is the moment it can be misread.
+          if hasActiveRuntimeJobs {
+            Label {
+              Text(settingsText("settings.toolchains.futureJobsActive"))
+                .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+              Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            }
             .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityIdentifier("settings.toolchains.activeJobsCallout")
+          } else {
+            Text(settingsText("settings.toolchains.futureJobs"))
+              .font(.callout)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
         }
       }
       if let error = importerError

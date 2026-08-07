@@ -20,8 +20,10 @@ struct TraceConfigurationView: View {
         Picker(traceString("trace.configuration.mode"), selection: modeBinding) {
           Text(traceString("trace.configuration.preset"))
             .tag(TraceConfigurationMode.preset)
+            .accessibilityIdentifier("trace.configuration.mode.preset")
           Text(traceString("trace.configuration.custom"))
             .tag(TraceConfigurationMode.custom)
+            .accessibilityIdentifier("trace.configuration.mode.custom")
         }
         .pickerStyle(.segmented)
         .frame(maxWidth: 280)
@@ -31,17 +33,14 @@ struct TraceConfigurationView: View {
           VStack(alignment: .leading, spacing: 6) {
             Text(traceString("trace.preset.label"))
               .font(.subheadline.weight(.semibold))
-            Picker(traceString("trace.preset.label"), selection: presetBinding) {
+            VStack(alignment: .leading, spacing: 6) {
               ForEach(
                 TracePresetCatalog.definitions.filter { $0.id != .custom },
                 id: \.id.rawValue
               ) { preset in
-                Text(traceString("trace.preset.\(preset.id.rawValue)"))
-                  .tag(preset.id.rawValue)
+                presetRow(preset)
               }
             }
-            .labelsHidden()
-            .frame(maxWidth: 420, alignment: .leading)
             .accessibilityIdentifier("trace.preset.picker")
             Text(traceString("trace.preset.logicalNote"))
               .font(.footnote)
@@ -84,17 +83,95 @@ struct TraceConfigurationView: View {
     VStack(alignment: .leading, spacing: 8) {
       Text(traceString("trace.custom.title"))
         .font(.subheadline.weight(.semibold))
-      if model.confirmedTags.isEmpty {
+      if model.selectedPreset.logicalTags.isEmpty {
         traceNotice(
           traceString("trace.custom.empty"),
           systemImage: "tag.slash",
           color: .secondary,
           identifier: "trace.custom.empty")
+      } else {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+          ForEach(model.selectedPreset.logicalTags, id: \.self) { tag in
+            customTagToggle(tag)
+          }
+        }
+        Text(String(format: traceString("trace.custom.count"), model.customTags.count))
+          .font(.footnote.monospacedDigit())
+          .foregroundStyle(.secondary)
+          .accessibilityIdentifier("trace.custom.count")
       }
       Text(traceString("trace.custom.noFreeText"))
         .font(.footnote)
         .foregroundStyle(.secondary)
     }
+  }
+
+  /// The vocabulary is the current preset's logical family; a member can be
+  /// trimmed and restored, and the last selected member refuses to toggle off
+  /// because a capture always carries one tag.
+  private func customTagToggle(_ tag: String) -> some View {
+    let selected = model.customTags.contains(tag)
+    let isLastSelected = selected && model.customTags.count == 1
+    return Button {
+      model.toggleCustomTag(tag)
+    } label: {
+      Label(tag, systemImage: selected ? "checkmark.circle.fill" : "circle")
+        .font(.callout.monospaced())
+        .foregroundStyle(selected ? Color.primary : Color.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+          selected
+            ? AnyShapeStyle(Color.accentColor.opacity(0.14))
+            : AnyShapeStyle(.quaternary.opacity(0.5)),
+          in: Capsule())
+        .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .help(isLastSelected ? traceString("trace.custom.minimumOne") : "")
+    .accessibilityValue(
+      selected ? traceString("trace.value.selected") : traceString("trace.value.notSelected"))
+    .accessibilityIdentifier("trace.custom.tag.\(tag)")
+  }
+
+  /// A preset row carries its own tag family in monospace: choosing a preset
+  /// is choosing that request, so the reader matches name and members before
+  /// the review section, not in a tooltip afterwards.
+  private func presetRow(_ preset: TracePresetDefinition) -> some View {
+    let selected =
+      model.configurationMode == .preset && model.selectedPresetID == preset.id
+    return Button {
+      model.setPreset(preset.id)
+    } label: {
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+          .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(traceString("trace.preset.\(preset.id.rawValue)"))
+            .font(.callout.weight(.semibold))
+          Text(preset.logicalTags.joined(separator: " "))
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        Spacer(minLength: 8)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(8)
+      .background(selected ? Color.accentColor.opacity(0.08) : Color.clear)
+      .overlay {
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(
+            selected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityValue(
+      selected ? traceString("trace.value.selected") : traceString("trace.value.notSelected"))
+    .accessibilityIdentifier("trace.preset.option.\(preset.id.rawValue)")
   }
 
   private var requestedTagDiff: some View {
@@ -165,11 +242,15 @@ struct TraceConfigurationView: View {
       Text(traceString("trace.bounds.duration"))
         .font(.subheadline.weight(.semibold))
       HStack(spacing: 6) {
-        TextField(traceString("trace.bounds.duration"), text: durationBinding)
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 120)
-          .accessibilityIdentifier("trace.duration")
-        Text(traceString("trace.bounds.seconds")).foregroundStyle(.secondary)
+        Picker(traceString("trace.bounds.duration"), selection: durationBinding) {
+          ForEach(TraceConfigurationView.durationChoicesSeconds, id: \.self) { seconds in
+            Text("\(seconds) s").tag(String(seconds))
+          }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 200)
+        .accessibilityIdentifier("trace.duration")
       }
       Text(validationMessage(model.durationValidation))
         .font(.footnote)
@@ -177,22 +258,30 @@ struct TraceConfigurationView: View {
         .accessibilityIdentifier("trace.duration.validation")
     }
 
+    // The buffer is a fact the capability probe converges, not a value a
+    // person types; the request preview stays read-only so no affordance
+    // suggests re-trying a larger buffer against the device.
     VStack(alignment: .leading, spacing: 5) {
       Text(traceString("trace.bounds.buffer"))
         .font(.subheadline.weight(.semibold))
       HStack(spacing: 6) {
-        TextField(traceString("trace.bounds.buffer"), text: bufferBinding)
-          .textFieldStyle(.roundedBorder)
-          .frame(width: 120)
+        Text(model.bufferText)
+          .font(.body.monospacedDigit().weight(.semibold))
           .accessibilityIdentifier("trace.buffer")
         Text("KB").foregroundStyle(.secondary)
       }
-      Text(validationMessage(model.bufferValidation))
+      Text(traceString("trace.bounds.bufferConverged"))
         .font(.footnote)
-        .foregroundStyle(model.bufferIsValid ? Color.secondary : Color.red)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("trace.buffer.validation")
     }
   }
+
+  /// The three closed duration steps the design vocabulary offers. A step
+  /// outside the catalog range still fails validation below, so a narrowed
+  /// range cannot be bypassed by the segmented control.
+  static let durationChoicesSeconds = [10, 15, 30]
 
   private var parameterSnapshots: some View {
     GroupBox(traceString("trace.parameters.title")) {
@@ -314,12 +403,6 @@ struct TraceConfigurationView: View {
     Binding(
       get: { model.durationText },
       set: { model.setDurationText($0) })
-  }
-
-  private var bufferBinding: Binding<String> {
-    Binding(
-      get: { model.bufferText },
-      set: { model.setBufferText($0) })
   }
 
   private var persistentConfirmationBinding: Binding<Bool> {

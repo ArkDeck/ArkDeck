@@ -157,7 +157,12 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(
       workspace.contains(
         "String.LocalizationValue(key), table: \"TraceLocalizable\""))
-    XCTAssertTrue(workspace.contains("Button(traceString(\"trace.action.start\")) {}"))
+    // The start button names its configuration and duration, and admits a
+    // parameter-mutating run applies parameters first; the action closure
+    // stays empty and the control stays disabled.
+    XCTAssertTrue(workspace.contains("Button(startActionTitle) {}"))
+    XCTAssertTrue(workspace.contains("trace.action.startNamed"))
+    XCTAssertTrue(workspace.contains("trace.action.applyAndStartNamed"))
     XCTAssertTrue(workspace.contains(".disabled(true)"))
     XCTAssertTrue(configuration.contains("TracePresetCatalog.definitions"))
     XCTAssertTrue(configuration.contains("TraceDebugParameterCatalog.definitions"))

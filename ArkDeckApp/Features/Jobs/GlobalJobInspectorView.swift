@@ -104,9 +104,14 @@ struct GlobalJobInspectorView: View {
             .foregroundStyle(.orange)
           }
         }
-        Text(job.operationReference)
-          .font(.callout.monospaced())
-          .lineLimit(1)
+        HStack(spacing: 6) {
+          Text(job.operationReference)
+            .font(.callout.monospaced())
+            .lineLimit(1)
+          if let badge = RuntimeExecutionModeBadge(job.executionMode) {
+            badge
+          }
+        }
         Text(job.targetID)
           .font(.caption.monospaced())
           .foregroundStyle(.secondary)
@@ -142,6 +147,12 @@ struct GlobalJobInspectorView: View {
             factRow("jobInspector.fact.job", job.id)
             factRow("jobInspector.fact.operation", job.operationReference)
             factRow("jobInspector.fact.target", job.targetID)
+            if let badge = RuntimeExecutionModeBadge(job.executionMode) {
+              GridRow(alignment: .firstTextBaseline) {
+                Text(jobsText("jobInspector.fact.mode")).foregroundStyle(.secondary)
+                badge
+              }
+            }
           }
 
           if job.needsAttention {
@@ -154,7 +165,7 @@ struct GlobalJobInspectorView: View {
                 ? "questionmark.diamond.fill"
                 : "person.crop.circle.badge.exclamationmark"
             )
-            .foregroundStyle(job.outcomeUnknown ? .red : .orange)
+            .foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("jobInspector.attention")
           }
@@ -265,6 +276,14 @@ struct GlobalJobInspectorView: View {
             .foregroundStyle(.secondary)
           }
           if isActive(job) {
+            // Elapsed since the job started — host wall clock, ticking. The
+            // spinner alone says "busy"; the timer says "for how long".
+            if let started = startedDate(job) {
+              Text(started, style: .timer)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(jobsText("jobInspector.elapsed"))
+            }
             ProgressView()
               .controlSize(.mini)
               .accessibilityLabel(jobsText("jobInspector.progress"))
@@ -275,6 +294,11 @@ struct GlobalJobInspectorView: View {
           .foregroundStyle(.secondary)
       }
     }
+  }
+
+  private func startedDate(_ job: RuntimeJobSummaryPresentation) -> Date? {
+    guard let startedAtUTC = job.startedAtUTC else { return nil }
+    return ISO8601DateFormatter().date(from: startedAtUTC)
   }
 
   private func factRow(_ key: String, _ value: String) -> some View {
@@ -331,7 +355,8 @@ struct GlobalJobInspectorView: View {
   }
 
   private func color(for job: RuntimeJobSummaryPresentation) -> Color {
-    if job.outcomeUnknown { return .red }
+    // Unknown is warn, not danger: red stays reserved for known failure.
+    if job.outcomeUnknown { return .orange }
     guard let state = JobState(rawValue: job.state) else { return .secondary }
     switch state {
     case .succeeded: return .green
@@ -348,52 +373,71 @@ struct GlobalJobInspectorView: View {
 
 /// Recovery guidance is kept above the workspace so it remains visible after
 /// navigation. The only action opens the read-only History workspace.
+///
+/// This is a banner *family*: every outstanding item renders, ordered by
+/// severity. Showing only the most severe one would hide a second,
+/// different-kind item behind the first until it clears.
 struct GlobalRecoveryBannerView: View {
   let presentation: RuntimeHistoryPresentation
   let onOpenHistory: () -> Void
 
-  private var recoveryJob: RuntimeJobSummaryPresentation? {
-    presentation.jobs.first(where: \.outcomeUnknown)
-      ?? presentation.jobs.first(where: \.waitingForHuman)
-      ?? presentation.jobs.first(where: requiresRecoveryGuidance)
+  private var recoveryJobs: [RuntimeJobSummaryPresentation] {
+    presentation.jobs
+      .filter { $0.outcomeUnknown || $0.waitingForHuman || requiresRecoveryGuidance($0) }
+      .sorted { severity($0) < severity($1) }
+  }
+
+  private func severity(_ job: RuntimeJobSummaryPresentation) -> Int {
+    if job.outcomeUnknown { return 0 }
+    if job.waitingForHuman { return 1 }
+    return 2
   }
 
   var body: some View {
-    if let job = recoveryJob {
-      HStack(alignment: .top, spacing: 12) {
-        Image(systemName: recoverySymbol(job))
-          .font(.title3)
-          .foregroundStyle(recoveryColor(job))
-          .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 4) {
-          Text(jobsText(recoveryTitle(job)))
-            .font(.headline)
-          Text(jobsText(recoveryGuidance(job)))
-            .font(.callout)
-            .fixedSize(horizontal: false, vertical: true)
-          Text("\(job.id) · \(job.targetID)")
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
-            .textSelection(.enabled)
+    let jobs = recoveryJobs
+    if !jobs.isEmpty {
+      VStack(spacing: 8) {
+        ForEach(jobs) { job in
+          banner(job)
         }
-        Spacer(minLength: 12)
-        Button(jobsText("jobRecovery.action.openHistory"), action: onOpenHistory)
-          .accessibilityIdentifier("jobRecovery.openHistory")
-      }
-      .padding(14)
-      .background(
-        recoveryColor(job).opacity(0.08),
-        in: RoundedRectangle(cornerRadius: 10)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: 10)
-          .stroke(recoveryColor(job).opacity(0.35), lineWidth: 1)
       }
       .padding(.horizontal, 20)
       .padding(.top, 12)
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier("jobRecovery.banner")
     }
+  }
+
+  private func banner(_ job: RuntimeJobSummaryPresentation) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: recoverySymbol(job))
+        .font(.title3)
+        .foregroundStyle(recoveryColor(job))
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(jobsText(recoveryTitle(job)))
+          .font(.headline)
+        Text(jobsText(recoveryGuidance(job)))
+          .font(.callout)
+          .fixedSize(horizontal: false, vertical: true)
+        Text("\(job.id) · \(job.targetID)")
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+      }
+      Spacer(minLength: 12)
+      Button(jobsText("jobRecovery.action.openHistory"), action: onOpenHistory)
+        .accessibilityIdentifier("jobRecovery.openHistory")
+    }
+    .padding(14)
+    .background(
+      recoveryColor(job).opacity(0.08),
+      in: RoundedRectangle(cornerRadius: 10)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 10)
+        .stroke(recoveryColor(job).opacity(0.35), lineWidth: 1)
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("jobRecovery.banner")
   }
 
   private func requiresRecoveryGuidance(_ job: RuntimeJobSummaryPresentation) -> Bool {
@@ -433,11 +477,24 @@ struct GlobalRecoveryBannerView: View {
     }
   }
 
+  // Four kinds, four symbols: the kind must be readable without color —
+  // in Increase Contrast and grayscale the symbol is the only differentiator.
   private func recoverySymbol(_ job: RuntimeJobSummaryPresentation) -> String {
-    job.outcomeUnknown ? "questionmark.diamond.fill" : "exclamationmark.shield.fill"
+    if job.outcomeUnknown { return "questionmark.diamond.fill" }
+    if job.waitingForHuman { return "person.crop.circle.badge.exclamationmark" }
+    guard let state = JobState(rawValue: job.state) else {
+      return "exclamationmark.shield.fill"
+    }
+    switch state {
+    case .resumeAtConfirmedSafeBoundary: return "arrow.clockwise.circle"
+    case .userAbandonRequested: return "archivebox"
+    default: return "hourglass.circle"
+    }
   }
 
   private func recoveryColor(_ job: RuntimeJobSummaryPresentation) -> Color {
-    job.outcomeUnknown ? .red : .orange
+    // outcomeUnknown is warn (the system warning tone), not danger: red
+    // claims a known failure, and unknown is precisely not that.
+    .orange
   }
 }

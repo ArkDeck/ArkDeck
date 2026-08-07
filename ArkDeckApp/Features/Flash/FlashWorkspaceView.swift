@@ -31,6 +31,7 @@ struct FlashWorkspaceView: View {
   @State private var isImporterPresented = false
   @State private var confirmationPlan: FlashExactPlanPresentation?
   @State private var isConfirmationPresented = false
+  @FocusState private var isReviewActionFocused: Bool
 
   var body: some View {
     ScrollView {
@@ -40,10 +41,15 @@ struct FlashWorkspaceView: View {
         FlashRuntimeActivityView(
           presentation: runtimeHistory,
           onOpenHistory: onOpenHistory)
+        // Reading order matches the spec: Availability → Profile & Image Set
+        // → Prerequisites → Exact Plan → Review & Run. Prerequisites are a
+        // top-level section before the plan — what has to hold comes before
+        // the steps that assume it, never folded inside them.
         ViewThatFits(in: .horizontal) {
           HStack(alignment: .top, spacing: 16) {
             VStack(spacing: 16) {
               profileAndImageSection
+              prerequisitesSection
               targetSection
             }
             .frame(minWidth: 260, maxWidth: 330)
@@ -57,6 +63,7 @@ struct FlashWorkspaceView: View {
 
           VStack(spacing: 16) {
             profileAndImageSection
+            prerequisitesSection
             targetSection
             exactPlanSection
             reviewSection
@@ -110,7 +117,12 @@ struct FlashWorkspaceView: View {
     }
     .sheet(
       isPresented: $isConfirmationPresented,
-      onDismiss: { confirmationPlan = nil }
+      onDismiss: {
+        confirmationPlan = nil
+        // Focus returns to the trigger, so a keyboard user lands where the
+        // sheet was opened from instead of at the window's first responder.
+        isReviewActionFocused = true
+      }
     ) {
       if let confirmationPlan {
         FlashDestructiveConfirmationSheet(plan: confirmationPlan) {
@@ -128,22 +140,42 @@ struct FlashWorkspaceView: View {
     Binding(get: { model.mode }, set: { model.setMode($0) })
   }
 
+  // Execute deliberately has no badge: the absence is the statement that
+  // this is real. Plan-only wears a purple outline, simulated an orange
+  // dashed outline — outline, not filled, so neither reads as a state color.
   @ViewBuilder
   private var modeStatus: some View {
     switch model.mode {
     case .execute:
       EmptyView()
     case .planOnly:
-      Label(flashText("flash.mode.planOnly.badge"), systemImage: "doc.text.magnifyingglass")
-        .font(.callout.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .accessibilityIdentifier("flash.mode.badge")
+      modeBadge(
+        flashText("flash.mode.planOnly.badge"),
+        systemImage: "doc.text.magnifyingglass",
+        color: .purple,
+        dashed: false)
     case .simulated:
-      Label(flashText("flash.mode.simulated.badge"), systemImage: "testtube.2")
-        .font(.callout.weight(.semibold))
-        .foregroundStyle(.purple)
-        .accessibilityIdentifier("flash.mode.badge")
+      modeBadge(
+        flashText("flash.mode.simulated.badge"),
+        systemImage: "testtube.2",
+        color: .orange,
+        dashed: true)
     }
+  }
+
+  private func modeBadge(
+    _ text: String, systemImage: String, color: Color, dashed: Bool
+  ) -> some View {
+    Label(text, systemImage: systemImage)
+      .font(.callout.weight(.semibold))
+      .foregroundStyle(color)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 5)
+      .overlay {
+        RoundedRectangle(cornerRadius: 7)
+          .stroke(color, style: StrokeStyle(lineWidth: 1, dash: dashed ? [4, 3] : []))
+      }
+      .accessibilityIdentifier("flash.mode.badge")
   }
 
   private var availabilitySection: some View {
@@ -256,6 +288,28 @@ struct FlashWorkspaceView: View {
 
   private var targetBinding: Binding<String> {
     Binding(get: { model.selectedTargetID }, set: { model.setTargetID($0) })
+  }
+
+  private var prerequisitesSection: some View {
+    GroupBox(flashText("flash.plan.prerequisites")) {
+      VStack(alignment: .leading, spacing: 8) {
+        if let plan = model.plan {
+          Text(flashText("flash.plan.prerequisitesNote"))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          FlashPrerequisitesList(prerequisites: plan.prerequisites)
+        } else {
+          Text(flashText("flash.plan.prerequisitesAwaitPlan"))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, 4)
+    }
+    .accessibilityIdentifier("flash.plan.prerequisitesSection")
   }
 
   private var exactPlanSection: some View {
@@ -472,6 +526,7 @@ struct FlashWorkspaceView: View {
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .disabled(!model.canReviewDestructiveImpact)
+            .focused($isReviewActionFocused)
             .accessibilityIdentifier("flash.execute.review")
             .accessibilityValue(
               isConfirmationPresented ? flashText("flash.confirm.title") : "")
@@ -520,6 +575,13 @@ struct FlashWorkspaceView: View {
           .lineLimit(1)
           .truncationMode(.middle)
           .help(handoff.archiveSHA256)
+      }
+      // The dispatch counter is the receipt that reviewing wrote nothing to
+      // the device: it must read 0 here, and showing it is the point.
+      LabeledContent(flashText("flash.execute.mutationDispatch")) {
+        Text(String(handoff.deviceMutationDispatchCount))
+          .font(.body.monospacedDigit())
+          .accessibilityIdentifier("flash.execute.mutationDispatchCount")
       }
       Label(flashText("flash.execute.reviewNotAuthority"), systemImage: "exclamationmark.shield")
         .font(.footnote)

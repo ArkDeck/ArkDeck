@@ -12,6 +12,7 @@ struct FlashDestructiveConfirmationSheet: View {
   @FocusState private var focusedField: Field?
 
   private enum Field: Hashable {
+    case cancel
     case destructivePhrase
     case userdataPhrase
   }
@@ -59,8 +60,9 @@ struct FlashDestructiveConfirmationSheet: View {
           Spacer()
           Button(flashText("flash.confirm.cancel")) { dismiss() }
             .keyboardShortcut(.cancelAction)
+            .focused($focusedField, equals: .cancel)
             .accessibilityIdentifier("flash.confirm.cancel")
-          Button(flashText("flash.confirm.accept")) { confirm() }
+          Button(acceptTitle) { confirm() }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .accessibilityIdentifier("flash.confirm.accept")
@@ -73,7 +75,18 @@ struct FlashDestructiveConfirmationSheet: View {
       minHeight: 480, idealHeight: 560, maxHeight: 640)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.confirm.sheet")
-    .onAppear { focusedField = .destructivePhrase }
+    // Default focus rests on Cancel: nothing about opening a destructive
+    // sheet may pre-position the user one keystroke closer to confirming.
+    .onAppear { focusedField = .cancel }
+  }
+
+  /// The primary button names the complete action — target and partition
+  /// count — never a bare "OK"/"确定".
+  private var acceptTitle: String {
+    guard let target = plan.target else { return flashText("flash.confirm.accept") }
+    return String(
+      format: flashText("flash.confirm.acceptNamed"),
+      target.id, plan.partitions.count)
   }
 
   private var pinnedFacts: some View {
@@ -119,6 +132,14 @@ struct FlashDestructiveConfirmationSheet: View {
         ForEach(Array(plan.dataImpact.enumerated()), id: \.offset) { _, impact in
           dataImpactLabel(impact)
         }
+        // The recovery path belongs on the sheet itself: what failure can
+        // cost and what the way back is, stated before the phrases are typed.
+        Label(
+          flashText("flash.confirm.recoveryPath"),
+          systemImage: "arrow.uturn.backward.circle"
+        )
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("flash.confirm.recoveryPath")
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)

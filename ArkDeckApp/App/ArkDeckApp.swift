@@ -50,6 +50,7 @@ struct ArkDeckApp: App {
         hdcPresentation: hdcDiagnostics.presentation,
         isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
         hdcConfigurationError: hdcDiagnostics.configurationError,
+        hasActiveRuntimeJobs: runtimeHistory.hasActiveJobs,
         onHDCRefresh: { hdcDiagnostics.refresh() },
         onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
       ) {
@@ -241,7 +242,9 @@ private struct AppShellView: View {
   }
 
   /// Only update states the user has to act on reach the main window; the
-  /// complete update flow stays in the system Settings scene.
+  /// complete update flow stays in the system Settings scene. The plain
+  /// icon-only Settings entry is always present — Settings is a scene, not a
+  /// sidebar destination, so the toolbar is its one discoverable door.
   @ToolbarContentBuilder
   private var updateAttentionToolbarItem: some ToolbarContent {
     if let attention = autoUpdate.attention {
@@ -254,6 +257,15 @@ private struct AppShellView: View {
           .labelStyle(.titleAndIcon)
         }
         .accessibilityIdentifier("app.toolbar.updateAttention")
+      }
+    } else {
+      ToolbarItem(placement: .automatic) {
+        SettingsLink {
+          Label("app.toolbar.openSettings", systemImage: "gearshape")
+            .labelStyle(.iconOnly)
+        }
+        .help(Text("app.toolbar.openSettings"))
+        .accessibilityIdentifier("app.toolbar.openSettings")
       }
     }
   }

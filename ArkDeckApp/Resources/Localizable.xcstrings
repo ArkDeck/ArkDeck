@@ -161,6 +161,22 @@
         }
       }
     },
+    "app.toolbar.openSettings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置"
+          }
+        }
+      }
+    },
     "app.unavailable.noOperationSubmitted": {
       "localizations": {
         "en": {
