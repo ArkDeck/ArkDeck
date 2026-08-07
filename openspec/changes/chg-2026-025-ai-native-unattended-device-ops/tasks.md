@@ -2770,10 +2770,18 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   套件起步、无 bookmark、三处显式来源仅覆盖一条,discover 出恰一个候选、零 issue,且其
   sha256 由测试内重读文件核对并通过身份校验。**故只剩一条**:build/firmware confirmation
   只能在 readiness 窗口内经 registered `list targets -v` 固定,blocked 态禁止运行。
+  **但 readiness 已不是下一步**:本任务 Production reachability 与 seam gate 点名的
+  `TrustedDeviceOperationHost` 在 Sources 里已零文件——它随 #966「delete the dead v1
+  device-operation plane」整个平面被删除,`AgentDeviceOperations/` 现仅剩 `NativeDeployment`
+  (存储侧 `HostStorageCoordinator`/`SessionLayout`/`SessionArtifactStore` 三者仍在)。
+  即交付路径建立在一个已被宣告死亡并移除的平面上,这不是 readiness 能 pin 掉的,
+  须先经 scope revision 决定 E0 registration 重新落在哪条执行平面。
+  另已顺带更正本任务六处过期的 evidence 版本 pin(V3→current V4:产品只发 4.0.0,
+  3.0.0 已是 legacyV3 历史解码标签,照原文 pin 会在窗口内撞上一个造不出来的实例)。
   任务不转 ready、不运行 HDC/device;记录 =
   `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md`、`readiness-blocked-r2.md`
-  （production-selection 一条已由 r3 更正）、`readiness-blocked-r3.md` 与
-  `gate-b-measured-closed-2026-08-07.md`）
+  （production-selection 一条已由 r3 更正）、`readiness-blocked-r3.md`、
+  `gate-b-measured-closed-2026-08-07.md` 与 `window-prerequisites-2026-08-07.md`）
 - Historical Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由
   #760 implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
   之后仍须 fresh D1 readiness。proposal 不批准 exact argv/设备 tuple，不构成
@@ -2813,8 +2821,8 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
   - `scripts/m0b_capture/**`、`scripts/trace_capture/**`、`scripts/ud_capture/**`
-  - current hardware-evidence V2、change-local V3 schema bytes 与任何 authorization/
-    capability instance
+  - current hardware-evidence schema bytes（写作时为 V2,现为 **V4**;禁的是 contract 正本
+    本身,与版本号无关）与任何 authorization/capability instance
   - integration registry/resource/profile/lock、hardware matrix、其他 change tasks/evidence
 - Risk:medium（真实设备 E0 + privacy-sensitive live logs；零 mutation/destructive）
 - Hardware required:yes（readiness-pinned OpenHarmony device/HDC；人工只允许接线/
@@ -2851,7 +2859,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - **Storage/host seam gate:implementable but insufficient。**现有
   `TrustedDeviceOperationHost`、`HostStorageCoordinator`、`SessionLayout` 与
   `SessionArtifactStore` 可由 allowed new directories 组合；r6 后必须消费
-  CHG-2026-051 archived current V3，而不再借用本 change draft。这些 host-only seam
+  CHG-2026-051 archived 的 current 契约(彼时 V3,**现为 V4**),而不再借用本 change draft。这些 host-only seam
   不能制造缺失的 production candidate、existing server、durable binding 或 build fact。
 - **Candidate command review:not authority。**后继 readiness 可审的候选固定面为
   `hilogHelp = -t <binding-key> shell hilog --help`、
@@ -2868,7 +2876,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   firmware/build 的 closed E0 readback/provenance。人工仍只负责 OS picker/permission、
   接线/供电、解锁/信任与歧义 identity 确认。该 revision、必要 bootstrap task 与配置/
   硬件到位后，010P 再走新的 D1 readiness 固定 exact argv、budgets、storage layout、
-  V3 instance 与 privacy allowlist。
+  **current(V4)** evidence instance 与 privacy allowlist。
 
 ### Deliverables
 
@@ -2881,7 +2889,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 - plan effect ceiling 固定 readOnly；出现 remote write/cleanup、set/clear/resize/
   persist、send/install/uninstall、reboot、lifecycle/subserver 或 unknown step 时
   whole-plan reject，process/device dispatch=0。
-- Agent-executed、current V3 schema-valid 的 `realHardwareE0ReadOnly`
+- Agent-executed、**current(V4)** schema-valid 的 `realHardwareE0ReadOnly`
   evidence：`executor.kind=agent`、E0 default-read-only authority reference、machine target
   confirmation、pre/post facts、人工 boundary、exact typed command transcript、
   stdout/stderr counts/hashes/result 与全部 effect counters。
@@ -2894,7 +2902,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 ### Verification
 
 - `AIN-E0-CAPTURE-001` → typed contract/fault suite + Agent real-device run +
-  V3 schema/privacy/effect audit → 人工 device command=0；八个 typed probe 全由 Agent
+  **current(V4)** schema/privacy/effect audit → 人工 device command=0；八个 typed probe 全由 Agent
   执行或诚实返回 unsupported/partial；E1/E2/server lifecycle dispatch=0。
 - caller target/argv/fact/receipt/support 注入、stale/ambiguous binding、wrong candidate/
   hash/endpoint、server/device drift、timeout/cancel/truncation/invalid UTF-8、ENOSPC/
@@ -2905,7 +2913,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 ### Notes / handoff
 
 - readiness 必须固定 exact device/build/HDC tuple、八个 typed argv、每步与总 budgets、
-  HostStorageCoordinator layout、V3 evidence instance、human boundary 和 privacy
+  HostStorageCoordinator layout、**current(V4)** evidence instance、human boundary 和 privacy
   allowlist；缺任一项即保持 blocked。
 - implementation/evidence 与 `ready→done` 分离。done 只证明 accepted capture
   provenance 存在；随后仍须独立 integration change 登记/adopt exact family。
