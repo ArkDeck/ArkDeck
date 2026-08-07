@@ -12,7 +12,27 @@ struct FlashPlanDetailsView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      DisclosureGroup(isExpanded: $arePartitionsExpanded) {
+      Button {
+        arePartitionsExpanded.toggle()
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: arePartitionsExpanded ? "chevron.down" : "chevron.right")
+            .imageScale(.small)
+            .accessibilityHidden(true)
+          Label(
+            String(
+              format: flashText("flash.plan.partitionCount"),
+              plan.partitions.count),
+            systemImage: "externaldrive.badge.checkmark"
+          )
+          .font(.subheadline.weight(.semibold))
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("flash.plan.partitions.disclosure")
+
+      if arePartitionsExpanded {
         VStack(alignment: .leading, spacing: 8) {
           ForEach(plan.partitions) { partition in
             partitionRow(partition)
@@ -28,18 +48,24 @@ struct FlashPlanDetailsView: View {
           }
         }
         .padding(.top, 8)
-      } label: {
-        Label(
-          String(
-            format: flashText("flash.plan.partitionCount"),
-            plan.partitions.count),
-          systemImage: "externaldrive.badge.checkmark"
-        )
-        .font(.subheadline.weight(.semibold))
       }
-      .accessibilityIdentifier("flash.plan.partitions.disclosure")
 
-      DisclosureGroup(isExpanded: $arePrerequisitesExpanded) {
+      Button {
+        arePrerequisitesExpanded.toggle()
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: arePrerequisitesExpanded ? "chevron.down" : "chevron.right")
+            .imageScale(.small)
+            .accessibilityHidden(true)
+          Label(flashText("flash.plan.prerequisites"), systemImage: "checklist")
+            .font(.subheadline.weight(.semibold))
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("flash.plan.prerequisites.disclosure")
+
+      if arePrerequisitesExpanded {
         VStack(alignment: .leading, spacing: 8) {
           Text(flashText("flash.plan.prerequisitesNote"))
             .font(.footnote)
@@ -50,11 +76,7 @@ struct FlashPlanDetailsView: View {
           }
         }
         .padding(.top, 8)
-      } label: {
-        Label(flashText("flash.plan.prerequisites"), systemImage: "checklist")
-          .font(.subheadline.weight(.semibold))
       }
-      .accessibilityIdentifier("flash.plan.prerequisites.disclosure")
     }
   }
 

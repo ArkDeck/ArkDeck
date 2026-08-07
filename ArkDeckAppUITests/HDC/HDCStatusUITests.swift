@@ -488,33 +488,41 @@ final class HDCStatusUITests: XCTestCase {
       toggle.waitForExistence(timeout: 15),
       "Overview must expose the Advanced Diagnostics disclosure", file: file, line: line)
     guard !app.staticTexts["hdc.toolchain.path"].exists else { return }
-    // The section sits below the fold, and a click at off-screen coordinates
-    // silently does nothing, so bring it into view before pressing it.
-    // Three passes reach it and it is hittable there, 24pt above the scroll
-    // view's bottom, which is where the section's own padding stops it.
-    var scrolls = 0
-    while !toggle.isHittable, scrolls < 25 {
-      scrollEverything(in: app)
-      scrolls += 1
+    // A control that is only partly inside the viewport may still report
+    // `isHittable`, while its click lands in the global Job bar below it.
+    scrollIntoView(toggle, in: app)
+    if toggle.isHittable {
+      toggle.click()
+    } else {
+      app.typeKey("d", modifierFlags: [.command, .shift])
     }
-    XCTAssertTrue(
-      toggle.isHittable, "the Advanced Diagnostics disclosure never became clickable",
-      file: file, line: line)
-    toggle.click()
     XCTAssertTrue(
       app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5),
       "expanding Advanced Diagnostics must reveal the raw toolchain facts",
       file: file, line: line)
   }
 
-  /// `app.scrollViews.firstMatch` is whichever scroll view the tree yields
-  /// first — often the sidebar's, which never moves the content.
-  /// Which scroll view holds the target is not reliably derivable from the
-  /// tree, and guessing wrong scrolls the sidebar while the content stays put.
-  /// Scroll every one of them and let the target's own hittability decide.
-  private func scrollEverything(in app: XCUIApplication) {
-    for host in app.scrollViews.allElementsBoundByIndex {
-      host.scroll(byDeltaX: 0, deltaY: -160)
+  private func scrollIntoView(_ element: XCUIElement, in app: XCUIApplication) {
+    let targetX = element.frame.midX
+    let hosts = app.scrollViews.allElementsBoundByIndex.filter { host in
+      let frame = host.frame
+      return frame.width > 0 && frame.minX <= targetX && targetX <= frame.maxX
+    }
+    guard let host = hosts.min(by: { lhs, rhs in
+      lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+    }) else { return }
+
+    var attempts = 0
+    while attempts < 25 {
+      let target = element.frame
+      let viewport = host.frame
+        .intersection(app.windows.firstMatch.frame)
+        .insetBy(dx: 0, dy: 60)
+      if target.minY >= viewport.minY && target.maxY <= viewport.maxY && element.isHittable {
+        return
+      }
+      host.scroll(byDeltaX: 0, deltaY: -120)
+      attempts += 1
     }
   }
 

@@ -123,27 +123,47 @@ private struct AppShellView: View {
   }
 
   var body: some View {
-    NavigationSplitView {
-      List(selection: selection) {
-        Section("app.navigation.section.device") {
-          navigationRow(.overview)
+    VStack(spacing: 0) {
+      NavigationSplitView {
+        List(selection: selection) {
+          Section("app.navigation.section.device") {
+            navigationRow(.overview)
+          }
+          Section("app.navigation.section.workflows") {
+            navigationRow(.flash)
+            navigationRow(.debug)
+            navigationRow(.uiDump)
+            navigationRow(.trace)
+          }
+          Section("app.navigation.section.records") {
+            navigationRow(.history)
+          }
         }
-        Section("app.navigation.section.workflows") {
-          navigationRow(.flash)
-          navigationRow(.debug)
-          navigationRow(.uiDump)
-          navigationRow(.trace)
+        .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
+        .navigationTitle("app.shell.title")
+      } detail: {
+        GeometryReader { geometry in
+          jobAwareDetail
+            .frame(
+              width: geometry.size.width, height: geometry.size.height,
+              alignment: .topLeading)
         }
-        Section("app.navigation.section.records") {
-          navigationRow(.history)
-        }
-      }
-      .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 300)
-      .navigationTitle("app.shell.title")
-    } detail: {
-      jobAwareDetail
         .navigationTitle(Text(LocalizedStringKey(selectedItem.localizationKey)))
         .toolbar { updateAttentionToolbarItem }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      if !isJobInspectorExpanded {
+        Divider()
+        GlobalJobInspectorView(
+          presentation: runtimeHistory.presentation,
+          isRefreshInFlight: runtimeHistory.isRefreshInFlight,
+          onRefresh: runtimeHistory.refresh,
+          onOpenHistory: openHistory,
+          isExpanded: $isJobInspectorExpanded)
+          .frame(height: 40)
+          .background(.bar)
+      }
     }
     .frame(minWidth: 900, minHeight: 600)
   }
@@ -163,17 +183,7 @@ private struct AppShellView: View {
           .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
       }
     } else {
-      VStack(spacing: 0) {
-        workspaceWithRecovery
-        Divider()
-        GlobalJobInspectorView(
-          presentation: runtimeHistory.presentation,
-          isRefreshInFlight: runtimeHistory.isRefreshInFlight,
-          onRefresh: runtimeHistory.refresh,
-          onOpenHistory: openHistory,
-          isExpanded: $isJobInspectorExpanded)
-          .frame(height: 40)
-      }
+      workspaceWithRecovery
     }
   }
 
