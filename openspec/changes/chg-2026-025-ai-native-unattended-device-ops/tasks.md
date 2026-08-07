@@ -2757,7 +2757,11 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-010P — Agent E0 registration capture for OpenHarmony probes
 
-- Status:blocked（2026-08-07 fresh r2 readiness 复测：三条 r1 阻塞里两条已自行解除——
+- Status:blocked（**2026-08-07 退役：本任务不再实现**，理由见下「Retirement audit」。
+  与 TASK-AIN-018 同一形态:状态词表封闭为 ready/in-progress/done/blocked,没有 retired
+  一词;`blocked` 是「不再推进」在词表内唯一诚实的表达,`done` 会谎称有交付。
+  以下 r1/r2/r3 与 gate B 记录保留为历史测量,不再是待办门。）
+- Historical Status:blocked（2026-08-07 fresh r2 readiness 复测：三条 r1 阻塞里两条已自行解除——
   exact 3.2.0f existing server/listener 现已存在且为 DevEco toolchain hdc 的既有
   commandless 进程；durable target 亦已由 `CHG-2026-048` bootstrap 建立
   (`TGT-958780b2ffb7`，binding revision 2，2026-07-31 adopted)，r1 的鸡生蛋死锁在产品侧
@@ -2878,7 +2882,41 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   硬件到位后，010P 再走新的 D1 readiness 固定 exact argv、budgets、storage layout、
   **current(V4)** evidence instance 与 privacy allowlist。
 
-### Deliverables
+### Retirement audit（2026-08-07）
+
+四条实测,合起来是「载体没了、产出已有」:
+
+1. **交付载体已被删除。** 本任务 Production reachability 与 seam gate 点名的
+   `TrustedDeviceOperationHost` 在 `Sources/` 里零文件——随 #966
+   「delete the dead v1 device-operation plane」整个平面移除,`AgentDeviceOperations/`
+   现仅剩 `NativeDeployment`。存储侧 `HostStorageCoordinator`/`SessionLayout`/
+   `SessionArtifactStore` 仍在,没了的是 host/admission 那一半。
+2. **照原样做会重建第二条执行栈。** 本任务要造独立包可执行 `ArkDeckE0ProbeRegistrar`
+   去驱动设备,而 T25 刚以 -4,700 行拆掉 stack B、把执行收敛到 engine 一处
+   （TASK-AIN-019 r17:「`flash.dayu200@1` 自此只有 engine 一处执行」）。
+   新造一个设备驱动入口与该方向直接相反。
+3. **采集面已在产线运行。** `captureHilog`/`captureUIDump`/`captureTrace` 均已在生产
+   provider adapter 里 lower,实际经 `shell` 调用 `hidumper` 与 `hitrace`,并由已通过的
+   Golden Journey 反复执行。本任务要建立的「这些 probe 能不能用」的答案,已由发货路径
+   经验性地回答,且比 `--help` 清单更强。
+4. **头号产出已经存在。** 本任务的交付定义是「供后继 independent integration change
+   消费的 provenance bundle」。`openspec/integrations/openharmony/trace-probes/1.0.0/`
+   已注册在案,含 `hitrace-help`/`hitrace-tags`/`bytrace-help`/`bytrace-tags` 的逐字节
+   golden fixtures,golden 资源名为 `tr001-…-dayu200-oh7`——由 **TASK-TR-001**(#282)
+   在同型板子上采集并注册,连 bytrace 一并覆盖。
+
+**退役会失去什么(如实):** 目前只有 `trace-probes` 一个族被正式注册,**hilog 与
+hidumper 没有注册族**。若该正式注册仍有治理价值,它应当是 engine 平面上的一个独立
+integration change,而不是复活一个已删除的平面。
+
+**连带事项:** `TASK-AIN-011` 的 `Depends on` 仍点着本任务,且其 Production reachability
+同样点名已删除的 `TrustedDeviceOperationHost`;两者需由独立 scope revision 改指,本 PR
+不动 011。
+
+本任务生命周期内 process/HDC/device dispatch 始终为 0,退役不改变这一事实;
+`AIN-E0-CAPTURE-001` 从未运行(r1 已如实记为 NOT RUN),退役后亦不会运行。
+
+### Deliverables（历史，superseded by the retirement above）
 
 - reusable `ArkDeckE0ProbeRegistrar` package executable 与 closed production-fact session；
   no shell/PATH fallback，无 raw argv/target/receipt/classification 注入口。
