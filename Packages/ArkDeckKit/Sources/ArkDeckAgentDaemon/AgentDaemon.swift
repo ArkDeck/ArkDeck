@@ -1221,6 +1221,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "outcomeUnknown": .bool(status.outcomeUnknown),
       "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
       "timeline": .array(status.timeline.map(JSONValue.string)),
+      "executionMode": status.executionMode.map(JSONValue.string) ?? .null,
+      "sessionId": status.sessionID.map(JSONValue.string) ?? .null,
+      "actualEffect": status.actualEffect.map(JSONValue.string) ?? .null,
+      "createdAtUtc": status.createdAtUTC.map(JSONValue.string) ?? .null,
+      "startedAtUtc": status.startedAtUTC.map(JSONValue.string) ?? .null,
+      "finishedAtUtc": status.finishedAtUTC.map(JSONValue.string) ?? .null,
     ])
   }
 
@@ -1311,6 +1317,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "startedAtUtc": optionalString(snapshot.startedAtUTC),
       "firstEvidenceStepAtUtc": optionalString(snapshot.firstEvidenceStepAtUTC),
       "finishedAtUtc": optionalString(snapshot.finishedAtUTC),
+      "parameters": .object(snapshot.inputs ?? [:]),
       "artifacts": .array(
         artifacts.map { artifact in
           .object([
