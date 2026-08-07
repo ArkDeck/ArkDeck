@@ -23,7 +23,7 @@
 
 ## 权威顺序
 
-1. Constitution 的 Safety invariants 与 POL-*(设备安全边界、E0/E1/E2 授权、
+1. Constitution 的 Safety invariants 与 POL-*(typed effect 准入、设备身份、
    fail-closed、typed-only、隐私;任何低层文件——包括 `PRODUCT-LOOP.md`——不得
    解释为放宽本层)
 2. `PRODUCT-LOOP.md`(执行优先级与工作方式)
@@ -51,17 +51,20 @@
   integration/device profile 与安全策略。载体是 OpenSpec change + PR,信任根
   不变(维护者 review/merge)。**恰以下四类变化需要 OpenSpec/PR 审批**:
   新 operation 或对已发布 operation 的破坏性修改;新 provider;新
-  integration/device profile;E2 安全策略变化。
+  integration/device profile;destructive 自动化准入安全策略变化。
 - **Device Agent Runtime Plane(设备运行面)**:执行已发布(已合入 main 的
   catalog 所定义)的 typed operation,维护 runtime job/session/artifact。
   **已发布 operation 的每次执行只产生 runtime job 记录,不产生 Git task、
   不开 PR、不要求 `changeId`/`taskId`、ready task、readiness packet 或人工
-  重述 typed plan**。E0/readOnly 由默认只读策略在 target/tool/timeout/bytes/privacy
-  准入后执行;E1/deviceMutation 只消费逐设备匹配的 `RuntimeCapability`;E2/destructive
-  只消费精确的 `standingAuthorization` 或同一受监督交互会话的
-  `evolutionCampaignConfirmation`(见 `POL-AGENT-002`)，而非 Git 载体或 legacy mode。
-- 风险分级 D0/D1/D2(决策维度,见 enforcement"决策分级")与执行分级
-  E0/E1/E2(设备效果维度)正交;Runtime Plane 的日常 E0 与已授权 E1 执行
+  重述 typed plan**。`hostOnly`/`readOnly` 由 bounded 默认只读策略准入;
+  `deviceMutation`/`destructive` 只消费与 operation/version、target/binding、inputs、plan
+  和 applicable Artifact facts 精确匹配的 Runtime-owned `RuntimeCapability`。对于
+  destructive request,只有 protected-main Runtime 可在完整 plan materialization 后根据
+  published Catalog policy 与 trusted facts 生成该短期 capability;caller/Agent/candidate/
+  repairer 不得 install、revoke、forge 或 widen。历史 `standingAuthorization` 与
+  `evolutionCampaignConfirmation` 只可 decode/export,不得准入、reserve 或 dispatch 新 operation。
+- 风险分级 D0/D1/D2(决策维度,见 enforcement"决策分级")与
+  `WorkflowEffect`(设备效果维度)正交;Runtime Plane 的日常 readOnly 与已准入 deviceMutation 执行
   不构成 D* 决策点。
 - `scripts/host_loop` 属 Repo Plane:仅领取仓库开发任务;其既有硬件门
   (`Hardware required` 任务拒领、仅 D0 可派发)即设备执行禁令的机械承载,
@@ -82,26 +85,23 @@
 ## Agent 禁令
 
 - 不得为让实现或测试通过而修改 accepted Core requirement、Safety invariant 或 Acceptance Scenario;此类变化必须走 change proposal 并由人类批准合并。
-- Device Agent Runtime Plane MAY 执行已发布 Catalog 的 typed operation。E0/readOnly
-  不需要 Git task/PR；E1/deviceMutation 须有匹配的 per-device `RuntimeCapability`；真实
-  destructive E2 只能持有与本次计划/目标逐项精确一致的 `standingAuthorization`，或同一
-  受监督交互会话中的 `evolutionCampaignConfirmation`(POL-AGENT-002)。有效 campaign
-  本身即 authority，不需要额外人工 handoff、`AUTH-ID`、legacy `chatConfirmation`、
-  `normal|evolution` 选择、Git 载体或每次 attempt 的新用户消息。campaign 固定 exact
-  plan/archive/step-set、脱敏 target/binding、userdata impact、protected-main base、
-  candidate scope/diff/toolchain、有效期和 attempt 上限，硬限制为最多 16 个串行 attempt、
-  四小时、并发一；每次均须 fresh readback/reservation。上一 attempt 只有 durable terminal
-  且 broker 分类为 `safeToReflash` 时，才可在同一 invocation 自动继续 closed repair/build/
-  test/broker Flash。缺失/已消费/过期/漂移 authority、无 fresh reservation、身份或结果未知、
-  unresolved/unsafe partial、预算耗尽或取消后 intent 都永久 fail closed（零新 dispatch）。
-  candidate 仅可在确认的 task-owned isolation 中接触 source build/test；repairer 不得接触
-  source workspace；两者均不得接触设备/Runtime/authority 或改变
-  argv/operation/partition/plan/archive/step-set/target；
-  只有 protected-main broker 可 dispatch。历史 one-shot `chatConfirmation` 和 legacy mode
-  仅可 decode/export，新的 admission/reservation/dispatch 必须拒绝。evidence 如实记录
-  executor、实际 authority kind/reference、fresh target confirmation、attempt 与时间；
-  campaign 不得记作 standing authorization。Agent 不得伪造确认，亦不得创建、修改、
-  批准或吊销 standing authorization。
+- Device Agent Runtime Plane MAY 执行已发布 Catalog 的 typed operation。执行不需要 Git
+  task/PR、AUTH-ID、legacy mode 或人工重述 typed plan。`hostOnly`/`readOnly` 使用 bounded
+  默认只读策略;`deviceMutation`/`destructive` 使用 Runtime-owned `RuntimeCapability`。
+  destructive Runtime 必须先完整 materialize 已发布 typed plan,验证 Artifact lease,读取 fresh
+  target/binding facts,再生成并 durable reserve 与 operation/version、target/binding、exact
+  inputs、plan/archive/artifact/tool 完全一致的短期 capability。Agent-facing surface 不得暴露
+  capability install/revoke/admin,caller/Agent/candidate/repairer 不得创建、提供、修改或扩大
+  trusted facts、capability、reservation/outcome record 或 hardware evidence。自动化 invocation
+  最多 16 个串行 attempts、四小时、并发一;只有前一 attempt 已 durable terminal 且基于完整
+  outcome/readback 分类为 `safeToReflash` 才可继续。缺失、漂移、unknown identity/outcome、
+  unresolved intent、unsafe partial、取消后 intent 或预算耗尽都永久 fail closed（零新 dispatch）。
+  candidate 仅可在 task-owned isolation 内 build/test;repairer 不得接触 source workspace;两者
+  均不得接触 device transport、Runtime、raw shell 或 capability admin。历史
+  `standingAuthorization`、`evolutionCampaignConfirmation`、one-shot `chatConfirmation` 与
+  legacy mode 仅可 decode/export,不得迁移为 RuntimeCapability,新的 admission/reservation/
+  dispatch 必须拒绝。UI 对 userdata impact 的 acknowledgement 只是 UX,不是 authority,也不是
+  headless Agent 的前置条件。
 - 不得把 simulation、fake、plan-only 结果记为真实设备或硬件验收;evidence 必须如实分类。
 - 不得在设备身份、外部副作用结果或 destructive step 状态不确定时猜测继续(fail closed)。
 - 不得使用 host shell 字符串拼接外部命令。
@@ -153,12 +153,12 @@
   hash、脱敏设备标识)随交付 PR 正文或 run 记录如实提交;simulation/fake 不得记为真实
   设备结果。
 - **治理载体适用范围(恰四类 + 安全条件)**:仅新 operation 或对已发布 operation 的
-  破坏性修改、新 provider、新 integration/device profile、E2 安全策略变化仍走 OpenSpec
+  破坏性修改、新 provider、新 integration/device profile、destructive 自动化准入安全策略变化仍走 OpenSpec
   change + PR 审批,且与对应 Golden Journey 交付同车;此外仅 `PRODUCT-LOOP.md` §3 所列
   安全条件允许优先治理工作,处理方式仍是 Runtime 安全代码优先。change 级 `verified`
   翻转与 archive 独立 PR、批次协作(digest 队列、D1/D2 门序)与设备窗口约定,仅在上述
   安全内核治理范围内保留;**历史 change 的批量归档整理冻结**(§20)。D2 窗口授权仍须
-  独立载体(其本身是 D2 决策),E2 授权语义不变。
+  独立载体(其本身是 D2 决策),Runtime-owned destructive safety gate 语义不变。
 - **新任务强制自检**(§17 五问 + §5 重复搜索):创建任何新任务前先搜索现有 Backlog、
   打开 PR、最近提交、`Catalog/operations/`、DeviceProviders、旧 OpenSpec Task 与既有
   测试;能并入现有任务的不得新建;判断重复以产品结果为准,不以任务名称为准。

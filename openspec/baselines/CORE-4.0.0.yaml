@@ -1,0 +1,28 @@
+# Candidate Core baseline record. Ratification remains a separate human decision;
+# merging implementation does not make this record ratified.
+baseline: CORE-4.0.0
+status: candidate
+supersedes: CORE-3.0.0
+change: CHG-2026-056-e2-policy-baseline-alignment
+core_change_level: major
+scope: >-
+  Inherits unchanged CORE-3.0.0 scope and applies approved CHG-2026-056 r4/r5:
+  DAYU200 board-scoped archive fact derivation (REQ-FLASH-016/017/018),
+  Runtime-owned mutation/destructive capability admission (POL-AGENT-002,
+  REQ-FLASH-007/015), provider-contracts 2.0.0, hardware-evidence 5.0.0,
+  and the 120 canonical acceptance scenarios registered by
+  CORE-CONFORMANCE-4.0.0.
+change_rule: >-
+  This candidate has no ratification authority. A maintainer-approved ratification
+  PR must set status to ratified and update openspec/config.yaml before CORE-4.0.0
+  becomes the current baseline; later semantic changes then require a new delta and
+  version.
+platform_disposition: >-
+  macOS is needsReverification until the contract suite and real DAYU200 GJ-4 Flash
+  pass. Windows and Linux remain deferred/not started and gain no support claim.
+notes: >-
+  Runtime preserves destructive effects and typed-only, identity, durability,
+  Artifact, privacy and unknown-outcome safety boundaries while removing the
+  per-run standing/campaign authority lane. Historical authority/evidence V1-V4 is
+  decode/export-only; new evidence uses V5 defaultReadOnlyPolicy/runtimeCapability
+  provenance with exact correlation.

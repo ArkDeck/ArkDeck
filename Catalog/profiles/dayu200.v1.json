@@ -18,7 +18,7 @@
       "misc",
       "parameter"
     ],
-    "notes": "Flash plans must draw partitions from partitionVocabulary; the E2 capability pins the exact plan digest and every image hash. Mode transitions (loader/maskrom/HDC) are modeled as expected transitions with rebind evidence."
+    "notes": "Flash plans must draw partitions from partitionVocabulary; Runtime admission pins the exact plan digest and every image hash. Mode transitions (loader/maskrom/HDC) are modeled as expected transitions with rebind evidence."
   },
   "supportedOperations": [
     "observe.device@1",

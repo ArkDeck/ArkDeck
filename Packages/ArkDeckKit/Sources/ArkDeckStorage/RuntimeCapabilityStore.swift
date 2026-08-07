@@ -38,6 +38,9 @@ public enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
   /// The owning Job reached a known terminal outcome. Success is not
   /// required; certainty is.
   case confirmed
+  /// Complete provider outcome/readback proves no mutation occurred. This is
+  /// the only failed terminal that may open the next bounded destructive use.
+  case safeToReflash
   /// Dispatch may have happened and dedicated readback has not resolved it.
   case outcomeUnknown
   /// A v1 ledger entry had no outcome field. It remains queryable but can
@@ -382,9 +385,9 @@ public actor RuntimeCapabilityStore {
     terminalState: String,
     atUTC: String
   ) throws {
-    guard outcome == .confirmed || outcome == .outcomeUnknown else {
+    guard outcome == .confirmed || outcome == .safeToReflash || outcome == .outcomeUnknown else {
       throw RuntimeCapabilityStoreError.outcomeConflict(
-        "only confirmed or outcomeUnknown may be recorded")
+        "only confirmed, safeToReflash or outcomeUnknown may be recorded")
     }
     guard !jobID.isEmpty, jobID.count <= 160 else {
       throw RuntimeCapabilityStoreError.outcomeConflict("malformed outcome Job ID")
@@ -487,7 +490,9 @@ public actor RuntimeCapabilityStore {
   private static func status(of record: StoredRecord) -> RuntimeCapabilityStatus {
     let lineage = record.consumptions.map(Self.lineageEntry)
     let blocker: String?
-    if let unresolved = lineage.first(where: { $0.outcome != .confirmed }) {
+    if let unresolved = lineage.first(where: {
+      $0.outcome != .confirmed && $0.outcome != .safeToReflash
+    }) {
       blocker = "use \(unresolved.ordinal) is \(unresolved.outcome.rawValue)"
     } else if record.remainingUses == 0 {
       blocker = "maximumUses exhausted"

@@ -1,8 +1,8 @@
 # Provider and Adapter Contracts
 
-> Version：1.0.0  
-> Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）  
-> Baseline：CORE-2.0.0
+> Version：2.0.0
+> Status：in baseline CORE-4.0.0（ratification 状态见 `openspec/baselines/CORE-4.0.0.yaml`）
+> Baseline：CORE-4.0.0
 
 ## Typed Step
 
@@ -96,26 +96,28 @@ Rules:
 - Simulated Provider never receives a real binding or process executor.
 - Success requires semantic output validation and postflight, not exit code alone.
 - RecoveryGuide is guidance, not a claim that automatic recovery is possible.
-- A destructive dispatch requires durable `executionAuthority` validated by the trusted host
-  before the first real-device Step. `standardAgent` and ordinary CI always refuse real
-  destructive Steps. A human operator MAY personally execute an exact confirmed plan. An
-  autonomous Agent MAY dispatch only with either `standingAuthorization` from a
-  maintainer-merged PR, exactly matching device identity/binding revision, firmware, transport,
-  HDC, Provider, plan/Step set, recovery path, validity and use limit; or an unconsumed
-  same-session `evolutionCampaignConfirmation`, matching exact plan/target/data impact,
-  protected-main base, candidate allowed paths/diff budget, build target/toolchain, validity and
-  attempt budget. The trusted host SHALL re-materialize the typed plan, perform fresh
-  target/binding readback and durably reserve the attempt immediately before dispatch.
-  Campaign dispatch is limited to 16 serial attempts in four hours, concurrency one; every
-  later attempt needs a new reservation and a prior durable `safeToReflash` terminal based on
-  complete outcome/readback. Unknown, unresolved or unsafe partial outcomes, identity/topology
-  drift, expired/consumed authority, or missing pins stop permanently with zero
-  new dispatch. Candidate and repairer cannot supply authority, executable/argv,
-  operation, partition, plan, archive, Step set or target and have no device transport.
-  A Profile, CLI argument, Task payload, imported Manifest, evidence record or post-hoc chat
-  text cannot promote `standardAgent`, mint/expand either E2 authority or retroactively
-  authorize dispatch. Historical one-shot `chatConfirmation` is decode/export-only; a valid
-  evidence record records provenance only and never authorizes a Provider call.
+- A real `deviceMutation` or `destructive` Provider dispatch requires a matching Runtime-owned
+  `RuntimeCapability` validated and durably reserved by the trusted host before the first external
+  Step. No E2 classification, standing authorization, campaign confirmation, Git carrier, AUTH-ID,
+  legacy mode or per-attempt user message is required. A human and an Agent execute through the
+  same Provider safety gate; UI acknowledgement may communicate data impact but is not authority.
+- For `destructive`, only protected-main Runtime MAY generate the capability after complete
+  materialization of an operation already published in Catalog. It SHALL bind operation/version,
+  stable target identity/binding, exact typed inputs, ordered plan/Step-set digest, archive/Artifact
+  lease and content digest, provider/tool facts, expiry and use lineage. Caller, Agent, candidate,
+  repairer, Profile, CLI input, Manifest, evidence or chat text cannot supply, mint, install, revoke,
+  modify or widen it.
+- Immediately before dispatch the trusted host SHALL re-materialize the plan, verify Artifact
+  leases, perform fresh target/binding/tool readback and durably reserve the use. A closed
+  automation invocation is limited to 16 serial attempts in four hours with concurrency one. Each
+  later use requires a prior durable `safeToReflash` terminal based on complete outcome/readback.
+  Unknown, unresolved or unsafe partial outcome, identity/topology drift, cancellation after
+  intent, missing/drifted facts, expiry or exhausted budget stops permanently with zero new dispatch.
+- Candidate and repairer cannot provide executable/argv, operation, partition, plan, archive, Step
+  set, target, Provider selection or capability fields and have no device transport. Historical
+  `standingAuthorization`, `evolutionCampaignConfirmation` and one-shot `chatConfirmation` remain
+  decode/export-only. They cannot reserve/admit/dispatch or be migrated into RuntimeCapability.
+  Evidence records provenance only and never authorizes a Provider call.
 
 ## Platform ports
 

@@ -197,9 +197,9 @@ private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding 
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
     async let evidence = RuntimeHistoryXPCReadTransport.request(
-      method: "job.evidence", params: ["jobId": jobID])
+      method: "job.evidence", params: ["jobId": .string(jobID)])
     async let artifacts = RuntimeHistoryXPCReadTransport.request(
-      method: "artifact.list", params: ["jobId": jobID])
+      method: "artifact.list", params: ["jobId": .string(jobID)])
     return await RuntimeJobDetailResponseDecoding.presentation(
       jobID: jobID,
       operationReference: operationReference,
@@ -216,17 +216,11 @@ enum RuntimeHistoryTransportResult: Sendable {
 private enum RuntimeHistoryXPCReadTransport {
   static func request(
     method: String,
-    params: [String: Any]? = nil
+    params: [String: JSONValue]? = nil
   ) async -> RuntimeHistoryTransportResult {
-    var object: [String: Any] = [
-      "v": 1,
-      "id": UUID().uuidString,
-      "method": method,
-    ]
-    if let params { object["params"] = params }
     let frame: Data
     do {
-      frame = try JSONSerialization.data(withJSONObject: object)
+      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
     } catch {
       return .failure("Could not compose a Runtime read request")
     }
@@ -577,7 +571,7 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
         ],
         parametersWereReported: true,
         actualStepKinds: isFlash ? ["flashPartition"] : ["readDeviceFacts"],
-        authorityKind: isFlash ? "evolutionCampaignConfirmation" : "defaultReadOnlyPolicy",
+        authorityKind: isFlash ? "runtimeCapability" : "defaultReadOnlyPolicy",
         authorityReference: "fixture-read-only",
         observedModel: "DAYU200",
         observedFirmware: "OpenHarmony fixture",

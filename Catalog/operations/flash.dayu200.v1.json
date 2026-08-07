@@ -2,10 +2,11 @@
   "schemaVersion": "1.0.0",
   "id": "flash.dayu200",
   "version": 1,
-  "title": "Flash a bound DAYU200 (RK3568) from a trusted image bundle with rebind and post-flash verification (E2)",
+  "title": "Flash a bound DAYU200 (RK3568) from a trusted image bundle with rebind and post-flash verification",
   "provider": "rockchip",
   "effect": { "minimum": "destructive", "permitted": ["destructive"] },
-  "authorization": { "destructive": "oneShotExactPlan" },
+  "authorization": { "destructive": "runtimeCapability" },
+  "defaultPolicyIssuance": "enabled",
   "binding": "confirmedDevice",
   "concurrencyKey": "device-exclusive",
   "inputs": {
@@ -13,7 +14,7 @@
       "imageBundleLease": {
         "type": "artifactLease",
         "required": true,
-        "description": "Trusted image bundle; every image hash is pinned by the one-shot capability."
+        "description": "Trusted image bundle; every image hash is pinned by the Runtime-owned capability."
       },
       "deviceProfile": {
         "type": "string",
@@ -25,7 +26,7 @@
         "required": true,
         "maxItems": 16,
         "maxLength": 32,
-        "description": "Ordered partition names from the profile's closed vocabulary; the capability pins the exact plan digest."
+        "description": "Ordered partition names from the profile's closed vocabulary; the Runtime capability pins the exact plan digest."
       },
       "postFlashVerification": {
         "type": "string",

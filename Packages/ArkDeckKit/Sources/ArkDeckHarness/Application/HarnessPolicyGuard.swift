@@ -8,8 +8,8 @@
 //   2. task type allow-set  - the closed operation set for this task
 //   3. runtime availability - never consume anything for an unavailable plan
 //   4. raw command surface  - typed inputs only, no argv/shell/remote path
-//   5. effect ceiling       - E2 is never automated; E1 needs authorization
-//   6. authorization        - an existing maintainer-issued capability only
+//   5. effect ceiling       - this workspace harness never reaches destructive effects
+//   6. authorization        - Runtime admission owns any permitted mutation capability
 //   7. failure memory       - the same failure twice forces a new strategy
 //   8. progress             - rounds that changed nothing end the loop
 //   9. active job           - one effectful job per task
@@ -248,7 +248,7 @@ public struct HarnessPolicyGuard: Sendable {
     // would be a second copy of the selection rule, free to drift - and
     // guessing the ceiling instead is worse than useless: `capture.diagnostics@1`
     // permits deviceMutation on its remote-trace path, so authorising by the
-    // ceiling would refuse the ordinary E0 capture that GJ-1 exists to run.
+    // ceiling would refuse the ordinary read-only capture that GJ-1 exists to run.
     //
     // So the guard screens on what it can know without duplicating anything:
     // an operation that *cannot* avoid mutating (its minimum effect already
@@ -259,7 +259,7 @@ public struct HarnessPolicyGuard: Sendable {
     if descriptor.permittedEffects.contains(.destructive)
       || descriptor.minimumEffect == .destructive
     {
-      // E2 is never automated, with or without a budget or a capability.
+      // The repository/workspace harness never automates destructive device effects.
       return .destructiveEffectNeverAutomated(reference: input.operationReference)
     }
     switch descriptor.minimumEffect {

@@ -18,7 +18,7 @@
       "chip_ckm",
       "userdata"
     ],
-    "notes": "OpenHarmony 7.0.0.35 archive and all 17 members are pinned in RockchipFlashProfile. The plan writes exactly uboot, resource, boot_linux, ramdisk, system, vendor, updater, chip_ckm and userdata in offset order; chip_prod/sys_prod and all memberless partitions remain write-forbidden. E2 authorization still pins the exact Runtime plan digest."
+    "notes": "OpenHarmony 7.0.0.35 archive and all 17 members are pinned in RockchipFlashProfile. The plan writes exactly uboot, resource, boot_linux, ramdisk, system, vendor, updater, chip_ckm and userdata in offset order; chip_prod/sys_prod and all memberless partitions remain write-forbidden. Runtime admission pins the exact plan, target, binding and Artifact facts."
   },
   "supportedOperations": [
     "flash.dayu200@1"

@@ -7,12 +7,9 @@ import Foundation
 
 // TASK-RF-002. `arkdeck flash` — the product face of the RockUSB Provider.
 //
-// The human execute branch still ends at a handoff. Agent execution is the bounded Evolution
-// campaign, and it runs on the runtime job lane. The standing-authorization route no longer
-// executes in this process (T25): its runtime equivalent is a maintainer-issued exact-plan
-// capability, and `flash execute --authorization-id` now prints that path instead.
-// Migration guards: the obsolete executorUnavailable branch must not be restored below this
-// host, and no flash subcommand may regain an in-process execution stack.
+// Real Flash execution is submitted by the App or the generic typed Runtime Job API.
+// Historical campaign and standing-authority records remain status/export inputs only;
+// this CLI exposes no authority writer, capability administration, or second execution stack.
 
 @main
 struct ArkDeckCommandLine {
@@ -73,11 +70,17 @@ struct ArkDeckCommandLine {
     case "plan":
       try runPlan(Array(arguments.dropFirst()))
     case "preview":
-      try await runCampaignPreview(Array(arguments.dropFirst()))
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "historical campaign preview is retired; Runtime owns Flash admission")
     case "execute":
-      try await runExecute(Array(arguments.dropFirst()))
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "use the ArkDeck Flash UI or submit flash.dayu200@1 through the typed Job API")
     case "continue":
-      try await runCampaignContinue(Array(arguments.dropFirst()))
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "historical campaign continuation is retired and cannot dispatch")
     case "status":
       try runCampaignStatus(Array(arguments.dropFirst()))
     case "postflight":
@@ -93,14 +96,13 @@ struct ArkDeckCommandLine {
 
   /// Host-side recovery report for interrupted flash sessions. Read-only and
   /// zero device dispatch: it decodes session journals and the campaign usage
-  /// ledger and prints what is still unresolved.
+  /// ledger and prints what is still unresolved. Legacy records never admit
+  /// or dispatch a new operation.
   ///
   /// It no longer writes terminals. `--mode close` existed to close orphaned
-  /// standing-authorization reservations; that lane and its ledger were retired
-  /// (T25/W3), and every remaining unresolved item is drained by
-  /// `arkdeck flash continue`, whose own reconciliation closes the campaign
-  /// reservation. A close verb that can no longer close anything would report
-  /// work it never did, so it is gone rather than kept as a no-op.
+  /// standing-authorization reservations; that lane and its ledger are
+  /// decode/export-only. A close verb that can no longer close anything would
+  /// report work it never did, so it is gone rather than kept as a no-op.
   /// Exit 4 while anything stays unresolved, so scripts still observe the debt.
   static func runFlashReconcile(_ arguments: [String]) throws {
     let options = try CLIOptions(arguments)
@@ -135,7 +137,7 @@ struct ArkDeckCommandLine {
         + "reservedAt=\(orphan.reservedAt)")
     print("  no session directory accounts for this open reservation")
     if let campaignID = orphan.campaignID {
-      print("  next: arkdeck flash continue … (campaign \(campaignID))")
+      print("  historical campaign: \(campaignID) (decode/export only)")
     }
   }
 
@@ -173,8 +175,7 @@ struct ArkDeckCommandLine {
     case .openAgentReservation(let reservationID):
       print("  authority: campaign reservation=\(reservationID) (open)")
       if let campaignID = finding.campaignID {
-        print("  next: arkdeck flash continue … (campaign \(campaignID)) or")
-        print("        arkdeck flash status --campaign-id \(campaignID)")
+        print("  inspect: arkdeck flash status --campaign-id \(campaignID)")
       }
     case .closed(let reservationID):
       print("  authority: reservation=\(reservationID) (closed)")
@@ -1029,16 +1030,6 @@ struct ArkDeckCommandLine {
         arkdeck flash install-binding
         arkdeck flash plan --images <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
-        arkdeck flash preview --images <images.tar.gz> [--max-attempts <1...16>] \
-      [--max-changed-files <n>] [--max-diff-lines <n>] [--validity-seconds <1...14400>]
-        arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --operator <name> [--device-profile <dayu200@1|dayu200@2>] [--out <dir>]
-        arkdeck flash execute --images <images.tar.gz> --target-location-id <usb-location> \
-      --campaign-confirmation-digest-sha256 <SHA256> --runtime-target <adopted-target-id> \
-      [--socket <path>]
-        arkdeck flash continue --images <images.tar.gz> \
-      --target-location-id <usb-location> --campaign-id <ECAMP-id> \
-      --runtime-target <adopted-target-id> [--socket <path>]
         arkdeck flash status --campaign-id <ECAMP-id>
         arkdeck flash postflight --observation <observation.json> \
       [--device-profile <dayu200@1|dayu200@2>]
@@ -1060,9 +1051,6 @@ struct ArkDeckCommandLine {
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list [--json]
         arkdeck capability inspect --capability <id> [--json]
-        arkdeck capability draft --target <id> --operation <id@version> --inputs-file <inputs.json> --output-directory <dir> [--validity-seconds <n>] [--maximum-uses <1...32>] [--execution-id <id>] [--json]
-        arkdeck capability install --file <cap.json> [--json]
-        arkdeck capability revoke --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
       [--device-profile <dayu200@1|dayu200@2>] [--json]

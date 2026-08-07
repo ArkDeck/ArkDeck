@@ -141,7 +141,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
 
   // MARK: - Engine lane (real-input gated, same gate as the plan-only tests)
 
-  func testCampaignReservationAdmitsConsumesAndClosesWithTheJobTerminal() async throws {
+  func testCampaignReservationRemainsDecodableButCannotAdmitNewFlash() async throws {
     guard let archivePath = ProcessInfo.processInfo.environment[Self.archiveEnvironmentKey]
     else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
@@ -234,7 +234,9 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       "postFlashVerification": .string("basic"),
     ]
 
-    // 1. Unknown reservation: refused at admission, before any dispatch.
+    // Both unknown and historically valid campaign references are refused by
+    // the same new-use boundary. The Runtime must not inspect them far enough
+    // to turn a legacy record into current authority.
     do {
       let acceptance = try await engine.submit(
         encoded(
@@ -248,125 +250,32 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         return XCTFail("unexpected rejection shape: \(error)")
       }
       XCTAssertEqual(code, .authorizationRequired, detail)
-      XCTAssertTrue(detail.contains("does not exist"), detail)
+      XCTAssertTrue(detail.contains("decode/export-only"), detail)
     }
     var dispatched = await dispatchLog.snapshot()
     XCTAssertTrue(dispatched.isEmpty)
 
-    // 2. The open reservation admits the submit; the engine verifies the
-    //    pins at the moment before the first mutation, the dispatcher
-    //    refuses before any spawn, and the job's confirmed failure closes
-    //    the reservation with the journaled mutating intent.
-    let acceptance = try await engine.submit(
-      encoded(
-        try flashRequest(
-          requestID: "campaign-positive", inputs: inputs,
-          reservationID: reservationID)))
-    let status = try await engine.run(jobID: acceptance.jobID)
-    XCTAssertEqual(status.state, "failed")
-    XCTAssertFalse(status.outcomeUnknown)
-    XCTAssertTrue(
-      status.timeline.contains { $0.contains("flash intent confirmed by campaign reservation") },
-      "\(status.timeline)")
-    XCTAssertTrue(
-      status.timeline.contains("campaign reservation verified before first mutation"),
-      "\(status.timeline)")
-    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
-    XCTAssertEqual(evidence.authority?.kind, .evolutionCampaignConfirmation)
-    XCTAssertEqual(evidence.authority?.campaignCorrelation?.campaignID, "ECAMP-FFFFFFFFFFFFFFFFFFFFFFFF")
-    XCTAssertEqual(evidence.authority?.campaignCorrelation?.attemptID, reservationID)
-    XCTAssertEqual(evidence.authority?.campaignCorrelation?.attemptOrdinal, 1)
-    XCTAssertEqual(
-      evidence.authority?.campaignCorrelation?.planDigestSHA256,
-      evidence.authority?.consumptionFingerprintSHA256)
-    XCTAssertEqual(
-      evidence.authority?.campaignCorrelation?.targetBindingDigestSHA256,
-      Self.targetIdentity)
-    XCTAssertEqual(
-      evidence.authority?.campaignCorrelation?.candidateDigestSHA256,
-      String(repeating: "c", count: 64))
-    XCTAssertEqual(
-      evidence.authority?.campaignCorrelation?.reviewDigestSHA256,
-      String(repeating: "d", count: 64))
-    XCTAssertEqual(
-      evidence.authority?.campaignCorrelation?.brokerDigestSHA256,
-      String(repeating: "e", count: 64))
-    dispatched = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatched.count, 1, "\(dispatched)")
-
-    let closed = try XCTUnwrap(
-      usageLedger.load().reservations.first { $0.reservationID == reservationID })
-    let terminal = try XCTUnwrap(closed.terminal, "the job terminal must close the reservation")
-    XCTAssertEqual(terminal.status, .failed)
-    XCTAssertEqual(
-      terminal.externalIntentEventIDs.count, 1,
-      "exactly the journaled mutating intent: \(terminal.externalIntentEventIDs)")
-
-    // 3. A terminal reservation admits nothing further.
     do {
-      let again = try await engine.submit(
+      let acceptance = try await engine.submit(
         encoded(
           try flashRequest(
-            requestID: "campaign-reuse", inputs: inputs,
+            requestID: "campaign-historical", inputs: inputs,
             reservationID: reservationID)))
-      _ = try await engine.run(jobID: again.jobID)
-      XCTFail("a terminal campaign reservation must be refused")
+      _ = try await engine.run(jobID: acceptance.jobID)
+      XCTFail("a historical campaign reservation must not admit a new Flash")
     } catch let error as RuntimeJobEngineError {
       guard case .rejected(let code, let detail) = error else {
         return XCTFail("unexpected rejection shape: \(error)")
       }
       XCTAssertEqual(code, .authorizationRequired, detail)
-      XCTAssertTrue(detail.contains("already terminal"), detail)
+      XCTAssertTrue(detail.contains("decode/export-only"), detail)
     }
     dispatched = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatched.count, 1, "no second dispatch")
+    XCTAssertTrue(dispatched.isEmpty, "legacy authority must never reach dispatch")
 
-    // 4. A reservation pinning a different device identity never admits.
-    let foreignRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
-      campaignDigestSHA256: String(repeating: "e", count: 64),
-      baseCommitOID: String(repeating: "a", count: 40),
-      planDigestSHA256: String(repeating: "b", count: 64),
-      archiveDigestSHA256: profile.archiveSHA256,
-      stepSetDigestSHA256: String(repeating: "d", count: 64),
-      targetStableIdentitySHA256: String(repeating: "9", count: 64),
-      bindingLineageRootRevision: 1,
-      confirmedAt: "2026-07-31T23:00:00Z",
-      validUntil: "2026-08-01T03:00:00Z",
-      maximumAttempts: 8)
-    let foreignID = try AgentAuthorityUsageReservation.canonicalReservationID(
-      authorizationRef: foreignRef, jobID: "job-campaign-2",
-      operationDigestSHA256: operationDigest,
-      targetDigestSHA256: String(repeating: "9", count: 64))
-    _ = try usageLedger.reserve(
-      AgentAuthorityUsageReservation(
-        reservationID: foreignID, authorizationRef: foreignRef, ordinal: 1,
-        maximumUses: 8, maximumConcurrentJobs: 1, jobID: "job-campaign-2",
-        operationDigestSHA256: operationDigest,
-        targetDigestSHA256: String(repeating: "9", count: 64),
-        reservedAt: "2026-07-31T23:30:00Z",
-        forwardLeaseExpiresAt: "2026-08-01T02:00:00Z",
-        compensationLeaseExpiresAt: "2026-08-01T02:30:00Z",
-        terminal: nil))
-    do {
-      let mismatched = try await engine.submit(
-        encoded(
-          try flashRequest(
-            requestID: "campaign-foreign", inputs: inputs,
-            reservationID: foreignID)))
-      _ = try await engine.run(jobID: mismatched.jobID)
-      XCTFail("an identity-mismatched campaign reservation must be refused")
-    } catch let error as RuntimeJobEngineError {
-      guard case .rejected(let code, let detail) = error else {
-        return XCTFail("unexpected rejection shape: \(error)")
-      }
-      XCTAssertEqual(code, .authorizationRequired, detail)
-      XCTAssertTrue(detail.contains("different stable device identity"), detail)
-    }
-    dispatched = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatched.count, 1)
-    let untouchedForeign = try XCTUnwrap(
-      usageLedger.load().reservations.first { $0.reservationID == foreignID })
-    XCTAssertNil(untouchedForeign.terminal, "a refused admission must not close anything")
+    let untouched = try XCTUnwrap(
+      usageLedger.load().reservations.first { $0.reservationID == reservationID })
+    XCTAssertNil(untouched.terminal, "decode/export compatibility must not consume legacy state")
   }
 
   // MARK: - Fixtures

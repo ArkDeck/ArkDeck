@@ -1,15 +1,15 @@
-suite: CORE-CONFORMANCE-3.0.0
-status: accepted  # 随 CHG-2026-051 archive PR ratify CORE-3.0.0 生效;单一事实源为 openspec/baselines/CORE-3.0.0.yaml
-core_baseline: CORE-3.0.0
+suite: CORE-CONFORMANCE-4.0.0
+status: candidate  # current ratified suite remains CORE-CONFORMANCE-3.0.0
+core_baseline: CORE-4.0.0
 
 acceptance_index:
   path: openspec/verification/acceptance-index.txt
-  count: 115
+  count: 120
   selector: all-current-core-acceptance-ids
 
 acceptance_cases:
   path: openspec/verification/acceptance-cases.yaml
-  count: 115
+  count: 120
   expected_result: normative-scenario-then-and-clauses
 
 applicability:
@@ -244,15 +244,23 @@ safety_coverage:
       - REQ-FLASH-012
       - REQ-FLASH-013
       - REQ-FLASH-014
+      - REQ-FLASH-016
+      - REQ-FLASH-017
+      - REQ-FLASH-018
       - REQ-UX-007
     normal:
       - AC-FLASH-002-01
       - AC-FLASH-003-01
       - AC-FLASH-007-01
       - AC-FLASH-014-01
+      - AC-FLASH-016-01
+      - AC-FLASH-018-01
+      - AC-FLASH-018-02
     refusal_or_failure:
       - AC-FLASH-008-01
       - AC-FLASH-012-01
+      - AC-FLASH-016-02
+      - AC-FLASH-017-01
       - AC-UX-007-01
     recovery_or_restart:
       - AC-FLASH-009-01
@@ -284,6 +292,4 @@ safety_coverage:
       - AC-FLASH-015-01
       - AC-FLASH-015-02
     recovery_or_restart:
-      not_applicable_reason: >-
-        The exact E2 gate either admits one bounded typed attempt or blocks before
-        a new destructive Step; unknown outcomes remain governed by POL-RECOVERY-001.
+      - AC-FLASH-015-02

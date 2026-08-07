@@ -1520,52 +1520,41 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
   }
 
-  // MARK: preflight sits before every confirmation phrase (TASK-AIN-019)
+  // MARK: historical campaign CLI is decode/export only (TASK-AIN-019)
 
-  func testFlashPreviewRefusesOnARedPreflightBeforeMintingAConfirmation() throws {
-    // An unreadable archive is always red, so this asserts the ordering
-    // without depending on whether this host has a board or a tool.
+  func testFlashPreviewIsRetiredBeforeReadingTheArchiveOrMintingAConfirmation() throws {
+    // The retired writer must refuse without consulting the host, a device, or
+    // the archive. Runtime owns new destructive admission through typed Jobs.
     let result = try runCLI([
       "flash", "preview", "--images", "/tmp/arkdeck-ain019-absent-images.tar.gz",
     ])
-    XCTAssertEqual(result.status, 4, result.output)
-    XCTAssertTrue(result.output.contains("flash preflight"), result.output)
-    XCTAssertTrue(result.output.contains("archiveIntegrity"), result.output)
-    XCTAssertTrue(
-      result.output.contains("device mutation dispatch: 0"), result.output)
-    // No confirmation digest, so no campaign was spent on a host problem.
+    XCTAssertEqual(result.status, 64, result.output)
+    XCTAssertTrue(result.output.contains("historical campaign preview is retired"), result.output)
+    XCTAssertTrue(result.output.contains("Runtime owns Flash admission"), result.output)
+    XCTAssertFalse(result.output.contains("flash preflight"), result.output)
     XCTAssertFalse(result.output.contains("confirmation digest:"), result.output)
     XCTAssertFalse(
       result.output.contains("确认本次 Evolution Flash campaign"), result.output)
   }
 
-  func testEveryConfirmationPhraseSitsBehindThePreflightGate() throws {
+  func testActiveFlashCLICannotReachHistoricalCampaignWriters() throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
       encoding: .utf8)
-    // Four call sites, each strictly before the thing it guards. A preflight
-    // printed after the prompt is a report, not a gate.
-    for (gate, guarded) in [
-      ("try await requireGreenPreflight(imagesPath: images)\n    let preview",
-        "确认本次 Evolution Flash campaign"),
-      ("try await requireGreenPreflight(imagesPath: imagesPath)",
-        "executeConfirmedCampaign("),
-      ("try await requireGreenPreflight(imagesPath: options.value(\"--images\") ?? \"\")",
-        "let confirmationPhrase = \"FLASH "),
-      ("try await requireGreenPreflight(imagesPath: images)\n    let result",
-        "continueCampaign("),
-    ] {
-      guard let gateRange = source.range(of: gate),
-        let guardedRange = source.range(of: guarded)
-      else {
-        XCTFail("missing preflight gate \(gate) or its guarded phrase \(guarded)")
-        continue
-      }
-      XCTAssertLessThan(
-        gateRange.lowerBound, guardedRange.lowerBound,
-        "preflight must run before \(guarded)")
+    let runFlashStart = try XCTUnwrap(
+      source.range(of: "static func runFlash(_ arguments: [String]) async throws"))
+    let reconcileStart = try XCTUnwrap(
+      source.range(of: "// MARK: reconcile", range: runFlashStart.upperBound..<source.endIndex))
+    let activeFlashSurface = source[runFlashStart.lowerBound..<reconcileStart.lowerBound]
+
+    XCTAssertTrue(activeFlashSurface.contains("historical campaign preview is retired"))
+    XCTAssertTrue(activeFlashSurface.contains("historical campaign continuation is retired"))
+    for retiredWriter in ["runCampaignPreview(", "runExecute(", "runCampaignContinue("] {
+      XCTAssertFalse(
+        activeFlashSurface.contains(retiredWriter),
+        "the active flash CLI must not call legacy writer \(retiredWriter)")
     }
   }
 

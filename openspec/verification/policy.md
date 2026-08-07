@@ -1,7 +1,7 @@
 # Verification and Agent Execution Policy
 
-> Version:2.0.0
-> Baseline:CORE-2.0.0(ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`)
+> Version:3.0.0
+> Baseline:CORE-3.0.0 + approved CHG-2026-056 r5 delta
 >
 > **适用范围收窄(2026-07-30,产品闭环优先阶段)**:Verification layers、Core
 > property invariants 与真实性要求(simulation/fake 不证明硬件支持、destructive
@@ -21,7 +21,14 @@
 6. **Real platform tests**:clean-host、Sandbox/SmartScreen、签名、安装、更新和辅助技术。
 7. **Real hardware matrix**:精确设备、固件、HDC、transport、权限和 Provider。
 
-低层测试不能替代高层证据。Simulation/fake 只能证明 orchestration，不证明硬件支持。真实设备 destructive 操作只有精确 E2 authority 才可执行：维护者经 merged PR 的 `standingAuthorization`，或同一受监督交互会话的精确 `evolutionCampaignConfirmation`。每次 attempt 均由 broker 校验 plan/target/authority/candidate pin、固定构建、封闭策略输出校验、reservation/budget，并在任一漂移或未知状态 fail closed；普通 CI、scheduler/daemon 和无 authority 的 Agent 零 destructive dispatch（见 `governance/enforcement.md`）。
+低层测试不能替代高层证据。Simulation/fake 只能证明 orchestration，不证明硬件支持。
+真实设备 `deviceMutation/destructive` 只能经 protected-main Runtime 的封闭 typed admission
+执行：Runtime 在完整 materialize plan、验证 Artifact lease、取得 fresh target/binding/tool
+facts 后生成并 durable reserve exact `RuntimeCapability`。Caller/Agent/UI/聊天/evidence 不得
+提供 capability 或 trusted facts。任一 identity/outcome/intent/partial-write/plan/Artifact/
+reservation 漂移或未知状态 fail closed；后续 destructive attempt 仅允许
+`safeToReflash` predecessor，最多 16 次串行、四小时、并发一（见
+`governance/enforcement.md`）。
 
 ## Core property invariants
 
@@ -90,7 +97,7 @@ openspec/changes/<change>/evidence/
 ```
 
 - run 记录轻量但如实:执行了什么、结果如何、哪些 AC 通过/失败、simulation 还是真实环境。
-- 真实硬件 evidence 按 `contracts/hardware-evidence.schema.json` 记录 executor、与实际 effect 匹配的 authority provenance、设备身份/binding、固件、目标确认时间、typed step 与 Artifact hash；schema validation 不授予执行权限。
+- 真实硬件 evidence 按 `contracts/hardware-evidence.schema.json` 记录 executor、与实际 effect 匹配的 default policy/RuntimeCapability provenance、exact plan/target/reservation/Artifact correlation、设备身份/binding、固件、目标确认时间、typed step 与 terminal/recovery disposition；schema validation 不授予执行权限。
 - raw 证据不改写;派生物注明来源。
 
 ## Stop conditions

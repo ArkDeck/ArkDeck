@@ -18,8 +18,30 @@ import Foundation
 /// `MachServices` key; all three must agree or the lookup fails closed.
 public enum ArkDeckAgentXPC {
   public static let machServiceName = "com.arkdeck.agentd"
+  /// The App's XPC door forwards the daemon's existing wire frame;
+  /// keeping the version here prevents App clients from inventing a legacy
+  /// key that passes the XPC allowlist but fails daemon decoding.
+  public static let wireProtocolVersion = "1.0.0"
 
-  /// The exact set of control-plane methods this transport will forward.
+  /// Builds the single versioned request shape accepted by the daemon. Method
+  /// admission remains in `AgentXPCEndpoint`; this only prevents App facades
+  /// from drifting onto an obsolete or caller-shaped wire envelope.
+  public static func requestFrame(
+    method: String,
+    params: [String: JSONValue]? = nil,
+    requestID: String = UUID().uuidString
+  ) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(
+      RequestFrame(
+        protocolVersion: wireProtocolVersion,
+        id: requestID,
+        method: method,
+        params: params))
+  }
+
+  /// The exact read-only control-plane methods this transport will forward.
   ///
   /// This is an allowlist, not a denylist: a method that is absent — whether
   /// it is a mutation, a typo, or a method added to the daemon after this
@@ -47,12 +69,42 @@ public enum ArkDeckAgentXPC {
     "target.list",
   ]
 
+  /// Bundle ingestion is the stateless effectful part of the closed Flash
+  /// workflow. Unlike the generic job method names below, each entry is
+  /// intrinsically scoped to a Flash bundle.
+  public static let forwardableFlashBundleMethods: Set<String> = [
+    "artifact.importFlashBundle.abort",
+    "artifact.importFlashBundle.append",
+    "artifact.importFlashBundle.begin",
+    "artifact.importFlashBundle.commit",
+  ]
+
+  /// These names are generic in the daemon protocol. The XPC endpoint must
+  /// additionally prove an exact `flash.dayu200@1` UI request and bind the
+  /// returned Job identifier before forwarding either one.
+  public static let gatedFlashJobMethods: Set<String> = [
+    "job.run",
+    "job.submit",
+  ]
+
+  public static let forwardableMethods =
+    forwardableReadOnlyMethods
+    .union(forwardableFlashBundleMethods)
+    .union(gatedFlashJobMethods)
+
   /// Reason codes returned to the client instead of a forwarded response.
   /// They are stable strings so the App can present an accurate cause rather
   /// than a generic failure.
   public enum RefusalReason: String, Sendable {
     case malformedRequestFrame
-    case methodNotReadOnly
+    case methodNotAllowlisted
+  }
+
+  private struct RequestFrame: Encodable {
+    let protocolVersion: String
+    let id: String
+    let method: String
+    let params: [String: JSONValue]?
   }
 }
 

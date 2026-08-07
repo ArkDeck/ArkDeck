@@ -152,22 +152,20 @@ final class RuntimeCapabilityTests: XCTestCase {
   }
 
   func testDestructiveRequiresExactPlanDigestSingleUseAndStableTarget() throws {
-    XCTAssertThrowsError(
+    XCTAssertNoThrow(
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
         operationScope: [.init(operationID: "flash.dayu200", version: 1)],
         effectCeiling: .destructive,
+        exactInputs: [:],
+        exactArtifactFacts: ["artifactSha256": String(repeating: "a", count: 64)],
         issuedAtUTC: "2026-07-01T00:00:00Z",
         expiresAtUTC: "2026-08-01T00:00:00Z",
         maximumUses: 1,
         issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test"),
         exactPlanDigest: String(repeating: "b", count: 64))
-    ) { error in
-      XCTAssertEqual(
-        error as? RuntimeCapabilityValidationError,
-        .destructiveRequiresMaintainerIssuer)
-    }
+    )
     XCTAssertThrowsError(
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",

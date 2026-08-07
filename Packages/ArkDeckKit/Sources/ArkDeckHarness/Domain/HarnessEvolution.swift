@@ -27,7 +27,7 @@ public enum HarnessEvolutionPolicyError: Error, Equatable, Sendable {
 }
 
 /// The exploration envelope.  It narrows an existing task policy; it is not
-/// a RuntimeCapability and can never authorize an E1/E2 effect by itself.
+/// a RuntimeCapability and can never authorize a device effect by itself.
 public struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
   public let baseRevision: String
   public let allowedPaths: [String]

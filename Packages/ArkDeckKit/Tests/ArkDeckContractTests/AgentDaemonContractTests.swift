@@ -288,7 +288,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(reasons.isEmpty)
   }
 
-  func testCapabilityDraftPreviewsPlanAndProducesStandingE1Envelope() async throws {
+  func testPlanPreviewRemainsReadOnlyAndCapabilityAdministrationIsNotAgentFacing() async throws {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -347,107 +347,21 @@ final class AgentDaemonContractTests: XCTestCase {
         "validitySeconds": .integer(3_600),
         "maximumUses": .integer(3),
       ])
-    XCTAssertTrue(drafted.ok, drafted.error?.message ?? "-")
-    guard case .object(let draft)? = drafted.result,
-      case .object(let capabilityFields)? = draft["capability"],
-      case .string(let capabilityID)? = capabilityFields["capabilityID"],
-      case .string(let planDigest)? = draft["materializedPlanDigest"],
-      case .string(let requestFingerprint)? = draft["requestFingerprintSHA256"]
-    else {
-      return XCTFail("capability.draft must return the exact review payload")
+    XCTAssertFalse(drafted.ok)
+    XCTAssertEqual(drafted.error?.code, "rejected")
+    XCTAssertTrue((drafted.error?.message ?? "").contains("not an Agent-facing API"))
+
+    for method in ["capability.install", "capability.revoke"] {
+      let rejected = try await request(handler, method: method, params: [:])
+      XCTAssertFalse(rejected.ok, method)
+      XCTAssertEqual(rejected.error?.code, "rejected", method)
+      XCTAssertTrue(
+        (rejected.error?.message ?? "").contains("not an Agent-facing API"), method)
     }
-    XCTAssertTrue(capabilityID.hasPrefix("CAP-RT-AUTO-"))
-    XCTAssertEqual(planDigest.count, 64)
-    XCTAssertEqual(requestFingerprint.count, 64)
-    XCTAssertEqual(draft["bindingRevision"], .integer(7))
-    XCTAssertNil(
-      capabilityFields["exactPlanDigest"],
-      "E1 draft must not turn each implementation-level plan change into a new approval")
-    XCTAssertEqual(capabilityFields["exactBindingRevision"], .integer(7))
-    XCTAssertEqual(capabilityFields["maximumUses"], .integer(3))
-    XCTAssertEqual(
-      draft["stableIdentitySHA256"],
-      .string("83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"))
-    let jobsAfterDraft = await engine.listJobs()
-    XCTAssertTrue(jobsAfterDraft.isEmpty, "drafting must not admit a Job")
-
-    let capabilityData = try encoder.encode(JSONValue.object(capabilityFields))
-    let capabilityJSON = try XCTUnwrap(String(data: capabilityData, encoding: .utf8))
-    let pendingInstall = try await request(
-      handler, method: "capability.install",
-      params: ["capabilityJson": .string(capabilityJSON)])
-    XCTAssertFalse(pendingInstall.ok)
-    XCTAssertEqual(pendingInstall.error?.code, "invalidParams")
-    XCTAssertTrue(
-      (pendingInstall.error?.message ?? "").contains("maintainer-merged PR"))
-
-    let pending = try JSONDecoder().decode(RuntimeCapability.self, from: capabilityData)
-    let approved = try RuntimeCapability(
-      capabilityID: pending.capabilityID,
-      targetScope: pending.targetScope,
-      operationScope: pending.operationScope,
-      effectCeiling: pending.effectCeiling,
-      inputConstraints: pending.inputConstraints,
-      issuedAtUTC: pending.issuedAtUTC,
-      expiresAtUTC: pending.expiresAtUTC,
-      maximumUses: pending.maximumUses,
-      issuer: RuntimeCapabilityIssuer(kind: .maintainerMergedPR, reference: "PR#830"),
-      exactPlanDigest: pending.exactPlanDigest,
-      exactBindingRevision: pending.exactBindingRevision,
-      revocation: pending.revocation)
-    let approvedData = try encoder.encode(approved)
-    let approvedJSON = try XCTUnwrap(String(data: approvedData, encoding: .utf8))
-    let installed = try await request(
-      handler, method: "capability.install",
-      params: ["capabilityJson": .string(approvedJSON)])
-    XCTAssertTrue(installed.ok, installed.error?.message ?? "-")
     let statuses = try await request(handler, method: "capability.list")
-    guard case .array(let values)? = statuses.result,
-      case .object(let status)? = values.first
-    else {
-      return XCTFail("approved capability must become listable")
-    }
-    XCTAssertEqual(status["capabilityId"], .string(capabilityID))
-    XCTAssertEqual(status["maximumUses"], .integer(3))
-    XCTAssertEqual(status["remainingUses"], .integer(3))
-    XCTAssertEqual(status["lineageAllowsNewExecution"], .bool(true))
-    let inspected = try await request(
-      handler, method: "capability.inspect",
-      params: ["capabilityId": .string(capabilityID)])
-    guard case .object(let inspectedFields)? = inspected.result,
-      case .array(let inspectedLineage)? = inspectedFields["lineage"]
-    else {
-      return XCTFail("capability.inspect must return the durable envelope and lineage")
-    }
-    XCTAssertEqual(inspectedFields["remainingUses"], .integer(3))
-    XCTAssertTrue(inspectedLineage.isEmpty)
-
-    // The Agent surface intentionally omits fields that decode to request
-    // defaults. Its semantically identical request still materializes and
-    // durably binds the exact plan shown as the draft preview.
-    let agentShapedRequest = JSONValue.object([
-      "documentType": .string("runtime-operation-request"),
-      "schemaVersion": .string("2.0.0"),
-      "requestId": .string(operationRequest.requestID),
-      "idempotencyKey": .string(operationRequest.idempotencyKey),
-      "target": .object([
-        "targetId": .string("TGT-001"),
-        "expectedBindingRevision": .integer(7),
-      ]),
-      "operation": .object([
-        "id": .string("debug.hap"),
-        "version": .integer(1),
-      ]),
-      "inputs": .object(operationRequest.inputs),
-      "authorization": .object(["capabilityId": .string(capabilityID)]),
-    ])
-    let accepted = try await engine.submit(encoder.encode(agentShapedRequest))
-    let recordData = try Data(
-      contentsOf: stateDirectory.appendingPathComponent(
-        "engine/jobs/\(accepted.jobID)/job-record.json"))
-    let record = try JSONDecoder().decode(RuntimeJobRecord.self, from: recordData)
-    XCTAssertEqual(record.materializedPlanDigest, planDigest)
-    XCTAssertEqual(record.materializedBindingRevision, 7)
+    XCTAssertEqual(statuses.result, .array([]))
+    let jobsAfterRejections = await engine.listJobs()
+    XCTAssertTrue(jobsAfterRejections.isEmpty)
   }
 
   /// MU-3 (CHG-2026-048) implemented adoption; this composition still

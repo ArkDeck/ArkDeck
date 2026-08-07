@@ -31,10 +31,18 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
     }
     XCTAssertFalse(cliSource.contains("-" + "-unattended-context"))
     XCTAssertFalse(cliSource.contains("-" + "-authorization <"))
-    XCTAssertTrue(cliSource.contains("--authorization-id"))
-    let unavailable = try XCTUnwrap(cliSource.range(of: "executorUnavailable"))
-    let planRead = try XCTUnwrap(cliSource.range(of: "let plan = try validateAndPlan"))
-    XCTAssertLessThan(unavailable.lowerBound, planRead.lowerBound)
+    let runFlashStart = try XCTUnwrap(
+      cliSource.range(of: "static func runFlash(_ arguments: [String]) async throws"))
+    let reconcileStart = try XCTUnwrap(
+      cliSource.range(of: "// MARK: reconcile", range: runFlashStart.upperBound..<cliSource.endIndex))
+    let activeFlashSurface = cliSource[runFlashStart.lowerBound..<reconcileStart.lowerBound]
+    XCTAssertFalse(activeFlashSurface.contains("--authorization-id"))
+    XCTAssertTrue(activeFlashSurface.contains("historical campaign preview is retired"))
+    XCTAssertTrue(activeFlashSurface.contains("Runtime owns Flash admission"))
+    XCTAssertTrue(activeFlashSurface.contains("historical campaign continuation is retired"))
+    XCTAssertFalse(activeFlashSurface.contains("runCampaignPreview("))
+    XCTAssertFalse(activeFlashSurface.contains("runExecute("))
+    XCTAssertFalse(activeFlashSurface.contains("runCampaignContinue("))
     // `authorizeUnattended` was the standing lane's internal bridge; it went
     // with that lane (T25/W3). The guard that replaces it: nothing may bring
     // an unattended standing execution back into this process.

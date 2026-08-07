@@ -92,8 +92,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "\(operation.reference): authorization keys must cover permitted effects")
       if let policy = operation.authorization[.destructive] {
         XCTAssertEqual(
-          policy, .oneShotExactPlan,
-          "\(operation.reference): destructive must be one-shot exact-plan")
+          policy, .runtimeCapability,
+          "\(operation.reference): destructive must use Runtime-owned capability admission")
       }
       for (effect, policy) in operation.authorization where policy == .defaultReadOnly {
         XCTAssertLessThanOrEqual(
@@ -103,14 +103,15 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     }
   }
 
-  func testE2OperationsArePinned() throws {
+  func testDestructiveOperationsRemainPinnedAndRuntimeIssuable() throws {
     let system = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(id: "deploy.native-library.system", version: 1))
     XCTAssertEqual(system.permittedEffects, [.destructive])
-    XCTAssertFalse(system.defaultPolicyIssuanceEnabled)
+    XCTAssertTrue(system.defaultPolicyIssuanceEnabled)
     let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(id: "flash.dayu200", version: 1))
     XCTAssertEqual(flash.permittedEffects, [.destructive])
     XCTAssertEqual(flash.provider, .rockchip)
+    XCTAssertTrue(flash.defaultPolicyIssuanceEnabled)
     XCTAssertTrue(flash.steps.contains { $0.kind == .flashPartition })
   }
 
