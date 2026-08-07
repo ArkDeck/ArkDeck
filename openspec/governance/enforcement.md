@@ -1,13 +1,13 @@
 # Governance Enforcement
 
-> Version:2.2.0(git-native;2.2.0 = CHG-2026-046 ADDED"控制平面分离"节、MODIFIED"批准语义"的 PR 载体规则为垂直交付单元形态,2026-07-29;2.1.0 = CHG-2026-027 TASK-BAP-001 于"批准语义"节 ADDED 决策分级与批次审批协议两小节,2026-07-22)
+> Version:3.0.0(git-native;3.0.0 = CHG-2026-056 r5 removes the E2 authority lane and makes mutation/destructive admission Runtime-owned,2026-08-07;2.2.0 = CHG-2026-046 control-plane split,2026-07-29)
 > Status:current
 > 取代 V1 密码学治理链;背景与事故记录见 `openspec/planning/postmortem-2026-07-governance.md`。
 >
 > **适用范围收窄(2026-07-30,产品闭环优先阶段)**:本文件的信任模型与「合并进
 > main = 人类批准」语义全局有效;其余流程条款(决策分级、批次审批协议、change 级
 > `verified`/archive 独立载体、验证确认与实现分离)仅适用于安全内核治理——恰四类
-> Repo 审批(新 operation/破坏性修改、新 provider、新 profile、E2 安全策略)与
+> Repo 审批(新 operation/破坏性修改、新 provider、新 profile、destructive 自动化安全策略)与
 > `PRODUCT-LOOP.md` §3 安全条件触发的治理工作。日常产品交付按仓库根
 > `PRODUCT-LOOP.md` 执行:一个问题一个垂直产品 PR,不再产生 readiness/status/
 > verified/archive-only 载体;与本文件冲突时以 `PRODUCT-LOOP.md` 为准
@@ -37,18 +37,18 @@
 - **Repo Agent Plane**:代码、契约、`Catalog/`、provider、profile 与安全策略
   的一切变更,载体是 OpenSpec change + PR,信任根与批准语义不变。**恰四类
   变化需要 OpenSpec/PR 审批**:新 operation 或对已发布 operation 的破坏性
-  修改;新 provider;新 integration/device profile;E2 安全策略变化。
+  修改;新 provider;新 integration/device profile;destructive 自动化安全策略变化。
 - **Device Agent Runtime Plane**:执行已合入 main 的 catalog 所定义的 typed
   operation。**已发布 operation 的每次执行只生成 runtime job 记录(job/
   session/artifact),不生成 Git task、不开 PR**;runtime 请求不携带也不
   要求 `changeId`/`taskId`/PR OID/主干 commit OID,仓库溯源只作为已发布
   operation bundle 的可选构建来源信息存在。
-- 运行时授权凭据是 **Runtime Capability**(CHG-2026-046 T03):E0 由默认
-  只读策略允许(仍受 target/timeout/bytes/privacy 约束);E1 需 scope/
-  期限/次数受限的 standing capability;E2 需绑定精确 plan digest 与
-  artifact hash 的一次性 capability。**E2 capability 与既有 standing
-  authorization 的信任根相同**:创建/修改/吊销的唯一载体仍是维护者 merge
-  的 PR,本节不弱化"真实硬件与 destructive 操作"节的任何规则。
+- 运行时准入按 effect 语义执行:`hostOnly/readOnly` 使用有界默认只读策略;
+  `deviceMutation/destructive` 使用 Runtime-owned `RuntimeCapability`。destructive
+  capability 只能由 protected-main Runtime 在完整 typed plan materialization、Artifact
+  lease 校验和 fresh trusted-fact readback 后确定性生成;Agent/caller 不得提供或管理。
+  未来改变 destructive 自动化准入仍属于上述四类 Repo-plane 安全变更,必须经
+  OpenSpec + 维护者 PR review/merge。
 - 两平面的分界由 catalog 承载:operation 的 effect/授权/步骤/预算只在
   catalog 中定义一份,发布(merge)后 Runtime Plane 照 catalog 执行;
   catalog 之外不存在可执行的 operation。
@@ -57,7 +57,7 @@
 
 对每个待维护者合并的决策点分级(CHG-2026-027)。分级只决定该项在批次审批中的
 组织方式,**不改变"每个 PR 都需维护者 review/merge"这一事实**;D* 作用于
-PR/决策维度,与执行分级 E0/E1/E2(设备维度,CHG-2026-025)正交。分级记录在
+PR/决策维度,与设备 effect(`hostOnly/readOnly/deviceMutation/destructive`)正交。分级记录在
 批次 digest 与 PR 注记中,不引入仓内状态字段。
 
 - **D0 — 机器可判定状态推进**,同时满足三条件:(a) 结论由 main 已合入状态 +
@@ -71,8 +71,8 @@ PR/决策维度,与执行分级 E0/E1/E2(设备维度,CHG-2026-025)正交。分�
   (首次风险接受 + pins 锁定 + 窗口/边界确认)、DEC-* 产品决策、ADR、Core
   delta 与 baseline ratification、proposal revision(r2+)、机制冻结例外、
   postmortem 定性。
-- **D2 — 物理与授权**:设备窗口执行安排、standing authorization 的创建/修改/
-  吊销、E1 per-device capability evidence 的接受、凭据与权限配置变更。D2 项
+- **D2 — 物理与权限**:设备窗口执行安排、凭据与权限配置变更。Runtime-owned
+  capability 不形成独立的人类授权载体;物理设备窗口仍是 D2。D2 项
   通常伴随维护者仓外动作,digest 须写明该动作。
 
 ### 批次审批协议
@@ -112,10 +112,23 @@ CI 红 = 不能合并;CI 绿 ≠ 批准。授权判断永远来自维护者 revi
 
 ## 真实硬件与 destructive 操作
 
-- 执行分级(CHG-2026-025,POL-AGENT-002):**E0** 已发布 read-only operation 由默认只读策略在正常 target/tool/timeout/bytes/privacy 准入后可无人值守执行，不需要 Git Task/PR；**E1** deviceMutation 须有匹配的 per-device `RuntimeCapability`；**E2** destructive 须有精确 maintainer-merged `standingAuthorization` 或同一受监督交互会话的精确 `evolutionCampaignConfirmation`。两种 E2 authority 都须逐项匹配计划和目标；campaign 还固定 base/scope/toolchain/预算，最多 16 个串行 attempt、四小时、并发一。
-- 每个 E2 attempt 在首个真实设备 Step 前都 SHALL re-materialize typed plan、校验 authority/candidate pins、做 fresh target/binding readback 并 reserve ordinal。只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash` 时，才可自动继续；未知、unsafe、drifted、过期、超限或无 reservation 永久零新 dispatch。普通 CI、scheduler/daemon 与无上述 authority 的 Agent 仍只允许 contract、fake、simulated、plan-only 分支。
-- 真实硬件 evidence 必须记录 executor(human 或 agent)、实际 effect/typed Step kinds 和按实际 effect 匹配的 authority reference（Agent E0=`defaultReadOnlyPolicy`、E1=`runtimeCapability`、E2=`standingAuthorization|evolutionCampaignConfirmation`）、设备身份摘要/binding、固件/工具版本、fresh target confirmation、attempt ordinal、执行时间和 Artifact reference/hash。campaign 不得记作 standing authorization；schema-valid evidence 只记录 provenance，不签发 capability 或授权 dispatch。
-- simulation/fake/plan-only 证据必须显式分类，永不计入真实硬件验收。Agent 不得自行创建、修改或批准 standing authorization；其授权与吊销的载体仍是维护者 merge 的 PR，git 历史是授权审计账本。
+- 已发布 `hostOnly/readOnly` operation 由有界默认只读策略准入；
+  `deviceMutation/destructive` 由匹配的 Runtime-owned `RuntimeCapability` 准入。
+  destructive effect 不得降级；caller、Agent、candidate、repairer、UI、聊天文本、Manifest
+  或 evidence 均不得提供 trusted facts、创建/安装/吊销 capability 或绕过 broker。
+- 每个真实 destructive attempt 在首个外部 Step 前 SHALL re-materialize 已发布 typed plan、
+  验证 exact target/binding/inputs/plan/archive/Artifact/provider/tool facts、fresh readback 与
+  durable reservation/use ordinal。closed invocation 最多 16 个串行 attempts、四小时、并发一；
+  只有前一 attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash` 才可继续。
+  unknown identity/outcome、unresolved intent、unsafe partial、drift、取消后的 intent、过期或
+  预算耗尽永久产生零新 dispatch。
+- 真实硬件 evidence 必须记录 executor、实际 effect/typed Step kinds、read-only 的
+  `defaultReadOnlyPolicy` 或 mutation/destructive 的 `runtimeCapability` reference，以及 exact
+  plan/target/reservation/Artifact correlation、设备身份摘要/binding、固件/工具版本、fresh
+  target confirmation、执行时间与 terminal/recovery disposition。历史
+  `standingAuthorization`/`evolutionCampaignConfirmation` 仅可 decode/export，不得写入 V5、
+  准入新执行或迁移为 capability；schema-valid evidence 只记录 provenance。
+- simulation/fake/plan-only 证据必须显式分类，永不计入真实硬件验收。
 
 ## Baseline
 

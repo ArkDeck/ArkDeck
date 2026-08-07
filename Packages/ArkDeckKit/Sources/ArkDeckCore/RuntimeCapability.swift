@@ -3,14 +3,14 @@
 // Replaces per-task (changeId/taskId) authorization for the Device Agent
 // Runtime Plane. A capability is a durable, revocable, scope/expiry/use
 // bounded credential:
-//   E0 needs no capability (default read-only policy, still bounded);
-//   E1 uses a runtime-owned standing capability (deviceMutation ceiling);
-//   E2 needs a one-shot capability pinned to an exact plan digest.
+//   read-only needs no capability (default read-only policy, still bounded);
+//   mutation/destructive execution uses a Runtime-owned capability;
+//   destructive capabilities are single-use and pin an exact plan digest.
 // Every check in this file fails closed: an uncertain or missing condition
-// is a denial, never a pass. Published Catalog policy may issue E1
-// capabilities automatically after complete plan materialization. The only
-// carrier for creating/modifying/revoking a destructive-ceiling capability
-// remains a maintainer-merged PR.
+// is a denial, never a pass. Published Catalog policy may issue mutation or
+// destructive capabilities automatically after complete plan materialization.
+// Callers can neither create nor install the capability consumed by the
+// protected Runtime.
 
 public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case malformedCapabilityID(String)
@@ -23,6 +23,7 @@ public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case destructiveRequiresSingleUse
   case destructiveRequiresMaintainerIssuer
   case runtimePolicyRequiresExactInputs
+  case runtimePolicyRequiresExactArtifactFacts
   case exactPlanDigestOnlyForDestructive
   case malformedPlanDigest(String)
   case malformedBindingRevision(Int)
@@ -214,12 +215,11 @@ public enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
 
 public struct RuntimeCapabilityIssuer: Equatable, Sendable, Codable {
   public enum Kind: String, Codable, Sendable {
-    /// An optional externally supplied capability accepted through a
-    /// maintainer-merged PR (git history is the audit ledger).
+    /// Historical externally supplied capability. It remains decodable, but
+    /// new Runtime-owned admission rejects it.
     case maintainerMergedPR
-    /// An E1 capability deterministically issued by the production runtime
-    /// from a published Catalog policy after target and plan materialization.
-    /// This kind is never legal for a destructive ceiling.
+    /// A capability deterministically issued by the production runtime from a
+    /// published Catalog policy after target and plan materialization.
     case runtimeDefaultPolicy
   }
 
@@ -284,6 +284,9 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   public let targetBindingRevision: Int?
   public let planDigest: String?
   public let inputs: [String: JSONValue]
+  /// Runtime-resolved Artifact IDs and content digests. Caller lease strings
+  /// alone are not trusted enough for a destructive envelope.
+  public let artifactFacts: [String: String]
   /// Workspace facts, present only for a host-bound workspace plan. A device
   /// query leaves them absent, so a workspace-scoped capability fails closed
   /// against it instead of matching by omission.
@@ -303,6 +306,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     targetBindingRevision: Int?,
     planDigest: String?,
     inputs: [String: JSONValue],
+    artifactFacts: [String: String] = [:],
     workspaceIdentitySHA256: String? = nil,
     workspaceRevision: String? = nil,
     workspaceFileScopesDigest: String? = nil,
@@ -315,6 +319,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     self.targetBindingRevision = targetBindingRevision
     self.planDigest = planDigest
     self.inputs = inputs
+    self.artifactFacts = artifactFacts
     self.workspaceIdentitySHA256 = workspaceIdentitySHA256
     self.workspaceRevision = workspaceRevision
     self.workspaceFileScopesDigest = workspaceFileScopesDigest
@@ -331,6 +336,10 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
   /// Exact typed-input map for a runtime-issued E1 envelope. This also binds
   /// optional-field absence, which per-field constraints cannot express.
   public let exactInputs: [String: JSONValue]?
+  /// Exact Runtime-resolved Artifact identity/content pins. Optional for
+  /// historical and non-artifact capabilities; required for a newly issued
+  /// destructive Runtime policy capability.
+  public let exactArtifactFacts: [String: String]?
   public let issuedAtUTC: String
   public let expiresAtUTC: String
   public let maximumUses: Int
@@ -346,6 +355,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     effectCeiling: WorkflowEffect,
     inputConstraints: [String: RuntimeCapabilityInputConstraint] = [:],
     exactInputs: [String: JSONValue]? = nil,
+    exactArtifactFacts: [String: String]? = nil,
     issuedAtUTC: String,
     expiresAtUTC: String,
     maximumUses: Int,
@@ -360,6 +370,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     self.effectCeiling = effectCeiling
     self.inputConstraints = inputConstraints
     self.exactInputs = exactInputs
+    self.exactArtifactFacts = exactArtifactFacts
     self.issuedAtUTC = issuedAtUTC
     self.expiresAtUTC = expiresAtUTC
     self.maximumUses = maximumUses
@@ -381,6 +392,8 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       [String: RuntimeCapabilityInputConstraint].self, forKey: .inputConstraints)
     self.exactInputs = try container.decodeIfPresent(
       [String: JSONValue].self, forKey: .exactInputs)
+    self.exactArtifactFacts = try container.decodeIfPresent(
+      [String: String].self, forKey: .exactArtifactFacts)
     self.issuedAtUTC = try container.decode(String.self, forKey: .issuedAtUTC)
     self.expiresAtUTC = try container.decode(String.self, forKey: .expiresAtUTC)
     self.maximumUses = try container.decode(Int.self, forKey: .maximumUses)
@@ -458,7 +471,11 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       throw RuntimeCapabilityValidationError.malformedStableIdentity(sha256)
     }
     if effectCeiling == .destructive {
-      guard issuer.kind == .maintainerMergedPR else {
+      // Historical maintainer-issued envelopes remain decodable. New
+      // destructive admission accepts only the runtimeDefaultPolicy issuer;
+      // that new-use rule is enforced by RuntimeJobEngine, not by the value
+      // decoder, so old bytes retain decode/export compatibility.
+      guard issuer.kind == .runtimeDefaultPolicy || issuer.kind == .maintainerMergedPR else {
         throw RuntimeCapabilityValidationError.destructiveRequiresMaintainerIssuer
       }
       guard case .stablePhysicalIdentity = targetScope else {
@@ -473,6 +490,18 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     }
     if issuer.kind == .runtimeDefaultPolicy, exactInputs == nil {
       throw RuntimeCapabilityValidationError.runtimePolicyRequiresExactInputs
+    }
+    if effectCeiling == .destructive, issuer.kind == .runtimeDefaultPolicy,
+      exactArtifactFacts?.isEmpty != false
+    {
+      throw RuntimeCapabilityValidationError.runtimePolicyRequiresExactArtifactFacts
+    }
+    if let exactArtifactFacts,
+      exactArtifactFacts.contains(where: { key, value in
+        key.isEmpty || value.isEmpty || key.count > 80 || value.count > 256
+      })
+    {
+      throw RuntimeCapabilityValidationError.runtimePolicyRequiresExactArtifactFacts
     }
     if let digest = exactPlanDigest, !Self.isHexDigest(digest) {
       throw RuntimeCapabilityValidationError.malformedPlanDigest(digest)
@@ -626,6 +655,12 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
         .init(
           reason: .inputConstraintViolated,
           detail: "typed inputs differ from the runtime-issued envelope"))
+    }
+    if let exactArtifactFacts, query.artifactFacts != exactArtifactFacts {
+      return .failure(
+        .init(
+          reason: .inputConstraintViolated,
+          detail: "Runtime-resolved Artifact identity or content digest differs"))
     }
     for (key, constraint) in inputConstraints {
       guard let value = query.inputs[key] else {

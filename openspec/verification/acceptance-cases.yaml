@@ -1,5 +1,5 @@
-registry: CORE-ACCEPTANCE-CASES-3.0.0
-status: accepted  # 随 CORE-3.0.0 ratification
+registry: CORE-ACCEPTANCE-CASES-4.0.0
+status: candidate  # current ratified registry remains CORE-3.0.0 until human ratification
 expected_result_rule: >-
   expected_source identifies the normative Scenario block; all GIVEN/WHEN/THEN/AND
   clauses in that block are the binary expected result and may not be restated or
@@ -67,8 +67,13 @@ cases:
   - { acceptance_id: AC-FLASH-013-01, test_id: TEST-AC-FLASH-013-01, method: recoveryFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-013-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-014-01, test_id: TEST-AC-FLASH-014-01, method: realHardwareMatrix, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-014-01, minimum_evidence: realHardware, hardware_capability: flash }
   - { acceptance_id: AC-FLASH-015-01, test_id: TEST-AC-FLASH-015-01, method: agentExecutionPolicyContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-01, minimum_evidence: contract }
-  - { acceptance_id: AC-FLASH-015-02, test_id: TEST-AC-FLASH-015-02, method: labAuthorizationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-02, minimum_evidence: contract }
-  - { acceptance_id: AC-FLASH-015-03, test_id: TEST-AC-FLASH-015-03, method: boundedE2BrokerContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-03, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-015-02, test_id: TEST-AC-FLASH-015-02, method: safeReflashLineageContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-02, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-015-03, test_id: TEST-AC-FLASH-015-03, method: runtimeOwnedCapabilityContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-03, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-016-01, test_id: TEST-AC-FLASH-016-01, method: unknownBuildImportContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-016-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-016-02, test_id: TEST-AC-FLASH-016-02, method: archiveDerivationFailureContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-016-02, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-017-01, test_id: TEST-AC-FLASH-017-01, method: artifactLeaseDriftContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-017-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-018-01, test_id: TEST-AC-FLASH-018-01, method: derivedVersionPostflightContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-018-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-018-02, test_id: TEST-AC-FLASH-018-02, method: pureStepMaterializationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-018-02, minimum_evidence: contract }
 
   - { acceptance_id: AC-HDC-001-01, test_id: TEST-AC-HDC-001-01, method: toolchainContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-01, minimum_evidence: contract }
   - { acceptance_id: AC-HDC-001-02, test_id: TEST-AC-HDC-001-02, method: toolchainDiagnosticsContract, expected_source: openspec/specs/toolchain-hdc-server/spec.md#AC-HDC-001-02, minimum_evidence: platform }

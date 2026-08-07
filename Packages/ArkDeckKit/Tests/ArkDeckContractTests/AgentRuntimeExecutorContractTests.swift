@@ -159,7 +159,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertNotNil(receipt.jobID)
     XCTAssertTrue(receipt.targetID?.hasPrefix("TGT-") == true)
     XCTAssertEqual(receipt.authorityReference, "default-read-only-policy")
-    XCTAssertEqual(receipt.actualEffect, .E0)
+    XCTAssertEqual(receipt.actualEffect, .readOnly)
     XCTAssertNotNil(receipt.evidenceObservation)
     XCTAssertFalse(receipt.catalogDigest.isEmpty)
     XCTAssertTrue(receipt.humanActions.isEmpty, "nothing physical was needed here")
@@ -170,13 +170,13 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         evidenceID: "EVD-AHE-RUNNER-001",
         acceptanceIDs: ["AC-WF-004-01"]))
     else {
-      return XCTFail("complete daemon-owned receipt must project to V4")
+      return XCTFail("complete daemon-owned receipt must project to V5")
     }
     XCTAssertEqual(evidence.runtime.jobId, receipt.jobID)
     XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)
   }
 
-  func testDaemonPreservesCampaignV4CorrelationInTrustedEvidence() throws {
+  func testDaemonPreservesHistoricalCampaignCorrelationForDecodeOnlyExport() throws {
     let digest = String(repeating: "a", count: 64)
     let currentCorrelation = RuntimeCampaignEvidenceCorrelation(
       campaignID: "ECAMP-0123456789ABCDEF01234567",

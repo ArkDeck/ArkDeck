@@ -1,7 +1,8 @@
 # Flashing Specification
 
-> Version：1.0.0  
-> Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`）  
+> Version：2.0.0
+> Status：candidate CORE-4.0.0（current ratified baseline remains CORE-3.0.0）
+> Baseline：CORE-4.0.0 candidate
 > MVP：one verified HDC/flashd provider  
 > Applicability：all platforms
 
@@ -81,15 +82,24 @@ Simulated Provider SHALL 使用合成设备/fixture 和可配置 delay/failure/d
 - THEN evidence 类型为 simulated
 - AND hardware support matrix 不新增 verified 记录
 
-### Requirement: REQ-FLASH-007 Destructive confirmation
+### Requirement: REQ-FLASH-007 Interactive destructive acknowledgement
 
-Execute 分支 SHALL 在显示 exact plan 后要求危险确认；erase、format、unlock 或 downgrade SHALL 使用更强确认。确认 SHALL 包含设备、镜像、Provider、分区和数据影响。
+交互式 UI 的 execute 分支 SHALL 在显示 exact plan 后要求用户确认危险影响；erase、format、
+unlock、downgrade 或 userdata wipe SHALL 使用更强文案。acknowledgement SHALL 包含设备、
+镜像、Provider、分区和数据影响，且用户拒绝时 SHALL 在 Runtime request 前停止。
 
-#### Scenario: AC-FLASH-007-01 用户取消确认
+该 UI acknowledgement 是 UX boundary，不是 E2、standing authorization、campaign
+confirmation 或 RuntimeCapability，且 SHALL NOT 产生 authority/capability bytes。
+Headless Agent/Runtime execute 不展示或等待 UI acknowledgement；它只受
+`REQ-FLASH-015` 的 Runtime-owned safety admission 约束。交互式 UI 点击确认后也 SHALL
+通过同一 Runtime gate，不得因 human presence 放宽 target/plan/Artifact/recovery 规则。
 
-- GIVEN exact plan 已生成
-- WHEN用户拒绝 destructive confirmation
-- THEN任何 updater/flash/erase 调用数为 0
+#### Scenario: AC-FLASH-007-01 User cancels interactive acknowledgement
+
+- GIVEN 交互式 UI 已显示 exact plan、target、partition 与 userdata impact
+- WHEN 用户拒绝 destructive acknowledgement
+- THEN UI 不提交 Runtime execute request，updater/flash/erase 调用数为 0
+- AND 不创建 authority、RuntimeCapability、reservation 或 realHardware evidence
 
 ### Requirement: REQ-FLASH-008 Critical writes are not force-killed
 
@@ -166,57 +176,135 @@ MVP SHALL 至少在一个明确设备型号、固件、HDC 版本和 Provider �
 - THEN support matrix 记录精确组合与证据日期
 - AND simulation/fake 不可替代
 
-### Requirement: REQ-FLASH-015 Agent and ordinary CI destructive boundary
+### Requirement: REQ-FLASH-015 Runtime-owned destructive Flash admission
 
-自主 Agent MAY dispatch 含 `destructive` Step 的真实 Flash workflow，当且仅当 trusted host
-已验证精确 E2 authority：匹配 pending plan/target 的 maintainer-merged
-`standingAuthorization`，或同一受监督交互 Agent 会话中未消费的
-`evolutionCampaignConfirmation`。standing authorization SHALL pin target identity/binding
-revision、firmware、transport、HDC、Provider、plan/Step set、recovery path、validity 和 use
-limit。campaign 还 SHALL pin protected-main base、candidate allowed paths/diff budget、build
-target/toolchain、exact plan/target/data impact、validity 和 `maxAttempts`；最多 16 个串行
-attempts、四小时、并发一。
+自主 Agent MAY 请求执行含 `destructive` Step 的真实 Flash workflow，且 SHALL NOT 需要
+E2、`standingAuthorization`、`evolutionCampaignConfirmation`、Git Task/PR、AUTH-ID、
+legacy mode 或每轮聊天确认。`destructive` effect 保持不变；任何实现不得把 Flash Step
+降级为 `deviceMutation` 或 `readOnly` 以通过准入。
 
-每个真实 destructive Step 前，protected-main broker SHALL re-materialize 已发布 typed plan、
-验证全部 authority 和 candidate pins、取得 fresh target/binding readback 并 durable
-reserve ordinal。任一缺失、过期、已消费、漂移、超预算、无 fresh
-reservation、非 terminal predecessor、身份/拓扑不确定、`outcomeUnknown`、unresolved intent
-或 unsafe partial write SHALL fail closed：destructive dispatch 为 0，Job 记录精确 blocker/
-terminal disposition。candidate、repairer 不得访问设备 transport 或 authority，且
-不得扩展 argv、operation、partition、plan、archive、step set 或 target。只有 broker 可
-dispatch；它只有在上一 attempt durable terminal 且完整 outcome/readback 分类为
-`safeToReflash` 时 MAY 在同一 invocation 继续。任何 uncertain/unsafe outcome 不得 replay。
+只有 protected-main Runtime MAY 在完整 materialize 已发布 `flash.dayu200@1` typed plan
+后，基于已发布 Catalog policy 和 Runtime-owned trusted facts 生成、持久化并消费
+`RuntimeCapability`。capability SHALL 精确绑定 operation/version、stable target identity、
+binding revision、exact typed inputs、ordered Step set、plan digest、archive/Artifact lease 与
+content digest、provider/tool facts、有效期和使用预算。Caller、Agent、candidate、repairer、
+Manifest、evidence 或 UI confirmation SHALL NOT 创建、提供、修改或扩大 capability。
 
-普通 CI、daemon/scheduler 和无上述 exact E2 authority 的 Agent SHALL 保持在 contract、fake、
-simulated 或 plan-only 分支。legacy one-shot `chatConfirmation` 只可 decode/export，不能
-reserve、admit 或 dispatch。evidence SHALL 记录真实 executor、authority kind/reference、fresh
-target confirmation、attempt ordinal 和 recovery/terminal disposition；campaign 不得记作
-standing authorization。evidence 或事后聊天消息不得追溯授权 dispatch。
+每个真实 destructive attempt 的首个外部 Step 前，Runtime SHALL 重新 materialize plan，
+验证 Artifact leases，取得 fresh target/binding/tool readback，并 durable reserve capability
+use/ordinal。任一 operation/profile/target/binding/input/plan/archive/artifact/tool/freshness/
+reservation 缺失、未知或漂移，或存在 non-terminal predecessor、`outcomeUnknown`、unresolved
+intent 或 unsafe partial write，SHALL fail closed：destructive dispatch 为 0，Job 持久记录
+具体 blocker/terminal disposition。
 
-#### Scenario: AC-FLASH-015-01 Missing E2 authority blocks real Flash
+一个 closed automation invocation 最多 16 个串行 attempts、四小时、并发一。只有前一
+attempt durable terminal 且完整 outcome/readback 分类为 `safeToReflash`，Runtime 才 MAY
+reserve 下一轮。success、unknown、unresolved、unsafe partial、identity/topology drift、
+repair rejection、取消后的 destructive intent、过期或预算耗尽 SHALL 永久关闭 invocation；
+不得自动 retry、replay 或 recovery。
 
-- GIVEN 一个 Agent 或 CI 有真实 device binding 和含 `flashPartition` 的 execute plan，
-  但没有匹配 standing authorization 或同会话未消费 campaign confirmation
-- WHEN trusted host 校验 execution gate
-- THEN destructive dispatch 数为 0，Job 为 `policyBlocked` 并记录缺失 authority 原因
-- AND run 不得发布 realHardware evidence
+Candidate 与 repairer SHALL NOT 访问设备 transport、Runtime 或 capability admin，且不得
+扩展 executable/argv、operation、partition、plan、archive、Step set 或 target。只有
+protected-main broker 可 dispatch 已发布 typed Steps。UI MAY 展示 userdata impact 或确认，
+但该点击不是 Runtime authority，也不是 headless Agent execution 的前置条件。
 
-#### Scenario: AC-FLASH-015-02 E2 drift or unsafe predecessor blocks the next attempt
+新 evidence SHALL 记录真实 executor、`runtimeCapability` reference、fresh target
+confirmation、reservation/use ordinal、plan/archive/Artifact correlation、actual typed Steps
+与 terminal/recovery disposition。历史 `standingAuthorization`、
+`evolutionCampaignConfirmation` 和 one-shot `chatConfirmation` 仅可 decode/export，不能
+reserve、admit、dispatch 或迁移为 RuntimeCapability；evidence 不得追溯授权任何 Step。
 
-- GIVEN 一个 pending Agent Flash 有 authority，但任一 target/binding、firmware、transport、
-  HDC、Provider、plan/Step set、base/scope/toolchain/budget、candidate pin、reservation、
-  freshness、predecessor terminal state 或 readback 缺失、变化、过期、已消费、unsafe 或 unknown
-- WHEN broker 在首个真实 device Step 前校验 attempt
-- THEN destructive dispatch 数为 0，Job 记录具体 blocker 或 terminal stop
-- AND 后续 run record、hardware evidence 或聊天消息不能追溯授权
+#### Scenario: AC-FLASH-015-01 Untrusted Runtime facts block real Flash
 
-#### Scenario: AC-FLASH-015-03 Exact E2 authority permits bounded Agent dispatch
+- GIVEN Agent 提交已发布真实 Flash execute request，但 target/binding、typed inputs、plan、
+  archive/Artifact、provider/tool、freshness 或 Runtime-generated capability 任一缺失、未知、
+  caller supplied 或不匹配
+- WHEN protected-main Runtime 在首个真实 device Step 前校验 admission
+- THEN destructive dispatch 数为 0，Job 为 `policyBlocked` 或对应 durable blocker
+- AND UI confirmation、聊天文本、connected USB、evidence 或 legacy authority 不能使其通过
 
-- GIVEN Agent 有匹配 maintainer-merged standing authorization 或同会话未消费 campaign
-  confirmation，且 broker 已 re-materialize 已发布 plan、完成 candidate 的固定构建和封闭策略输出校验、取得
-  fresh target/binding readback 并在 16-attempt/four-hour/single-concurrency 预算内 reserve ordinal
+#### Scenario: AC-FLASH-015-02 Unsafe predecessor blocks the next attempt
+
+- GIVEN 一个 automated Flash invocation 已有先前 attempt，但其 intent/outcome/readback
+  非 durable terminal `safeToReflash`，或存在 unknown、unresolved、unsafe partial、identity
+  drift、cancellation-after-intent、expiry 或 exhausted budget
+- WHEN Runtime 尝试 reserve 或 dispatch 下一 attempt
+- THEN 新 destructive dispatch 数为 0，invocation 持久记录永久 terminal stop
+- AND 后续 run、UI 点击、hardware evidence 或重启不能自动 retry/replay/recover
+
+#### Scenario: AC-FLASH-015-03 Runtime policy permits bounded Agent Flash without legacy authority
+
+- GIVEN Agent 提交已发布 Flash execute request，protected-main Runtime 已完整 materialize
+  plan，从 trusted facts 生成 exact RuntimeCapability，验证 Artifact leases，取得 fresh
+  target/binding/tool readback，并在 16-attempt/four-hour/single-concurrency 预算内 durable
+  reserve 当前 use
 - WHEN broker dispatches execute plan
-- THEN 仅声明的 typed destructive Steps 运行，并持久写入 intent/outcome
-- AND realHardware evidence 记录 `executor.kind=agent`、实际 authority kind/reference、fresh
-  target confirmation、attempt ordinal 和 terminal/recovery disposition
-- AND success 或任何 unsafe/unknown/drift/expiry/budget terminal condition 永久关闭 campaign
+- THEN 不要求 standing authorization、campaign confirmation、Git carrier 或 per-attempt user
+  message，且只有声明的 typed destructive Steps 运行并写入 durable intent/outcome
+- AND realHardware evidence 记录 `executor.kind=agent`、`runtimeCapability` reference、exact
+  plan/target/Artifact correlation、use ordinal 和 terminal/recovery disposition
+
+### Requirement: REQ-FLASH-016 Board profiles are board-scoped; build facts are derived
+
+A published DAYU200 device profile SHALL select a board: its partition map, write-forbidden
+partitions, prerequisites, and archive-member classification rules. Every published reference
+for that board SHALL describe the same board facts.
+
+No admission decision SHALL depend on a firmware build being enumerated in the product.
+Per-build facts SHALL be derived under Runtime control during Artifact import and recorded on the
+lease: archive and member byte counts/SHA-256 digests, the partition table parsed from the
+archive's `parameter.txt`, and the runtime build version read from the system image that will be
+written. The build version SHALL NOT be inferred from the archive filename or build log.
+
+Import SHALL fail closed when a mapped partition lacks a member, the partition table is invalid
+or declares an unknown partition, or the system image yields no runtime build version. Before an
+upload begins, declared size and digest are validated only for positive bounded size and canonical
+lowercase SHA-256 shape; membership in a compiled set of known builds SHALL NOT be required.
+
+#### Scenario: AC-FLASH-016-01 An unseen firmware build is importable
+
+- GIVEN a conforming DAYU200 archive for a build no published profile enumerates
+- WHEN Runtime imports it against the DAYU200 board profile
+- THEN member digests, partition table and runtime build version are derived and recorded on the lease
+- AND no product code change or build allowlist entry is required
+
+#### Scenario: AC-FLASH-016-02 A non-conforming archive creates no admission artifact
+
+- GIVEN an archive whose partition table omits a mapped partition
+- WHEN Runtime imports it
+- THEN import fails closed with the missing partition identified
+- AND no lease, plan, RuntimeCapability or reservation is created
+
+### Requirement: REQ-FLASH-017 Byte integrity is carried by the lease
+
+The guarantee that a destructive Step writes exactly the admitted bytes SHALL rest on the
+Artifact lease and the exact plan/archive binding in the Runtime-owned capability, not on a
+compiled build digest. Immediately before the first destructive Step, Runtime SHALL re-verify
+that the leased archive byte count and SHA-256 match the materialized plan and SHALL refuse drift.
+
+#### Scenario: AC-FLASH-017-01 Drifted bytes are refused at the last safe boundary
+
+- GIVEN a materialized exact plan over an imported archive
+- WHEN the leased bytes no longer match the materialized size or SHA-256
+- THEN destructive dispatch is 0
+- AND the Job durably records Artifact drift
+
+### Requirement: REQ-FLASH-018 Post-flash verification compares against the flashed image
+
+Post-flash verification SHALL compare the device-reported build version with the runtime build
+version derived from the system image the plan wrote, not a device-profile constant. That fact
+SHALL reach verification in Runtime-resolved context alongside its Artifact lease. Step
+materialization SHALL remain pure over typed inputs and resolved context and SHALL NOT open the
+archive.
+
+#### Scenario: AC-FLASH-018-01 Verification uses the derived version
+
+- GIVEN a completed write plan whose system image declares `OpenHarmony-7.0.0.36`
+- WHEN post-flash verification reads the device build version
+- THEN it passes only if the device answers that exact derived value
+
+#### Scenario: AC-FLASH-018-02 Step materialization performs no archive I/O
+
+- GIVEN typed inputs and resolved context for a Flash Job
+- WHEN each published step of `flash.dayu200@1` is materialized
+- THEN every step materializes without opening the image archive

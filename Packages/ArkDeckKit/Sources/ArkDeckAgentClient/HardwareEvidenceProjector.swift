@@ -2,17 +2,18 @@ import ArkDeckCore
 import Foundation
 
 public enum RuntimeHardwareEvidenceEffectLevel: String, Codable, Sendable {
-  case E0
-  case E1
-  case E2
+  case hostOnly
+  case readOnly
+  case deviceMutation
+  case destructive
 }
 
 public enum RuntimeHardwareEvidenceAuthorityKind: String, Codable, Sendable {
   case defaultReadOnlyPolicy
   case runtimeCapability
   case standingAuthorization
-  /// Bounded E2 campaign evidence. This is provenance only; decoding it can
-  /// never mint an authority or reach a device dispatcher.
+  /// Historical campaign evidence. This is decode/export provenance only and
+  /// can never mint a Runtime capability or reach a device dispatcher.
   case evolutionCampaignConfirmation
 }
 
@@ -22,6 +23,10 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let admittedAtUTC: String
   public let validUntilUTC: String?
   public let consumptionFingerprintSHA256: String?
+  public let reservationID: String?
+  public let useOrdinal: Int?
+  public let stepSetDigest: String?
+  public let artifactDigest: String?
   /// All campaign fields are daemon-owned durable correlation facts. They are
   /// optional only so older read-only snapshots remain decodable; a campaign
   /// record with any one missing is never published as hardware evidence.
@@ -34,12 +39,54 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let reviewDigest: String?
   public let brokerDigest: String?
 
+  public init(
+    kind: RuntimeHardwareEvidenceAuthorityKind,
+    reference: String,
+    admittedAtUTC: String,
+    validUntilUTC: String?,
+    consumptionFingerprintSHA256: String?,
+    reservationID: String? = nil,
+    useOrdinal: Int? = nil,
+    stepSetDigest: String? = nil,
+    artifactDigest: String? = nil,
+    campaignID: String? = nil,
+    attemptID: String? = nil,
+    attemptOrdinal: Int? = nil,
+    planDigest: String? = nil,
+    targetBindingDigest: String? = nil,
+    candidateDigest: String? = nil,
+    reviewDigest: String? = nil,
+    brokerDigest: String? = nil
+  ) {
+    self.kind = kind
+    self.reference = reference
+    self.admittedAtUTC = admittedAtUTC
+    self.validUntilUTC = validUntilUTC
+    self.consumptionFingerprintSHA256 = consumptionFingerprintSHA256
+    self.reservationID = reservationID
+    self.useOrdinal = useOrdinal
+    self.stepSetDigest = stepSetDigest
+    self.artifactDigest = artifactDigest
+    self.campaignID = campaignID
+    self.attemptID = attemptID
+    self.attemptOrdinal = attemptOrdinal
+    self.planDigest = planDigest
+    self.targetBindingDigest = targetBindingDigest
+    self.candidateDigest = candidateDigest
+    self.reviewDigest = reviewDigest
+    self.brokerDigest = brokerDigest
+  }
+
   enum CodingKeys: String, CodingKey {
     case kind
     case reference
     case admittedAtUTC = "admittedAtUtc"
     case validUntilUTC = "validUntilUtc"
     case consumptionFingerprintSHA256 = "consumptionFingerprintSha256"
+    case reservationID = "reservationId"
+    case useOrdinal
+    case stepSetDigest
+    case artifactDigest
     case campaignID = "campaignId"
     case attemptID = "attemptId"
     case attemptOrdinal
@@ -199,11 +246,11 @@ public struct HardwareEvidenceIncomplete: Sendable, Equatable {
 }
 
 public enum HardwareEvidenceProjectionResult: Sendable, Equatable {
-  case published(HardwareEvidenceV4Record)
+  case published(HardwareEvidenceV5Record)
   case evidenceIncomplete(HardwareEvidenceIncomplete)
 }
 
-public struct HardwareEvidenceV4Record: Codable, Sendable, Equatable {
+public struct HardwareEvidenceV5Record: Codable, Sendable, Equatable {
   public let schemaVersion: String
   public let evidenceId: String
   public let executor: Executor
@@ -231,14 +278,12 @@ public struct HardwareEvidenceV4Record: Codable, Sendable, Equatable {
   public struct Authority: Codable, Sendable, Equatable {
     public let kind: RuntimeHardwareEvidenceAuthorityKind
     public let reference: String
-    public let campaignId: String?
-    public let attemptId: String?
-    public let attemptOrdinal: Int?
+    public let reservationId: String?
+    public let useOrdinal: Int?
     public let planDigest: String?
+    public let stepSetDigest: String?
     public let targetBindingDigest: String?
-    public let candidateDigest: String?
-    public let reviewDigest: String?
-    public let brokerDigest: String?
+    public let artifactDigest: String?
   }
 
   public struct Runtime: Codable, Sendable, Equatable {
@@ -366,13 +411,10 @@ public enum HardwareEvidenceProjector {
     let authority = receipt.authority
     let authorityMatchesEffect: Bool
     switch effect {
-    case .E0:
+    case .hostOnly, .readOnly:
       authorityMatchesEffect = authority?.kind == .defaultReadOnlyPolicy
-    case .E1:
+    case .deviceMutation, .destructive:
       authorityMatchesEffect = authority?.kind == .runtimeCapability
-    case .E2:
-      authorityMatchesEffect = authority?.kind == .standingAuthorization
-        || authority?.kind == .evolutionCampaignConfirmation
     }
     if receipt.executor == .agent {
       if !authorityMatchesEffect || authority?.reference.isEmpty != false {
@@ -398,21 +440,25 @@ public enum HardwareEvidenceProjector {
       {
         reasons.append("capability consumption fingerprint is absent or malformed")
       }
-      if authority.kind == .evolutionCampaignConfirmation {
+      if authority.kind == .standingAuthorization
+        || authority.kind == .evolutionCampaignConfirmation
+      {
+        reasons.append("legacy authority kind cannot be emitted as V5 evidence")
+      }
+      if effect == .destructive, authority.kind == .runtimeCapability {
         guard
-          nonempty(authority.campaignID) != nil,
-          nonempty(authority.attemptID) != nil,
-          let attemptOrdinal = authority.attemptOrdinal,
-          attemptOrdinal >= 1,
+          nonempty(authority.reservationID) != nil,
+          let useOrdinal = authority.useOrdinal,
+          useOrdinal >= 1,
           let planDigest = authority.planDigest,
+          let stepSetDigest = authority.stepSetDigest,
           let targetBindingDigest = authority.targetBindingDigest,
-          let candidateDigest = authority.candidateDigest,
-          let brokerDigest = authority.brokerDigest,
-          [planDigest, targetBindingDigest, candidateDigest, brokerDigest]
+          let artifactDigest = authority.artifactDigest,
+          [planDigest, stepSetDigest, targetBindingDigest, artifactDigest]
             .allSatisfy(validSHA256),
-          authority.consumptionFingerprintSHA256 == planDigest
+          receipt.artifacts.contains(where: { $0.sha256 == artifactDigest })
         else {
-          reasons.append("campaign authority correlation is absent, malformed, or drifted")
+          reasons.append("Runtime capability correlation is absent, malformed, or drifted")
           return incomplete(reasons)
         }
       }
@@ -485,43 +531,41 @@ public enum HardwareEvidenceProjector {
     }
 
     guard reasons.isEmpty, let terminal else { return incomplete(reasons) }
-    let record = HardwareEvidenceV4Record(
-      schemaVersion: "4.0.0",
+    let record = HardwareEvidenceV5Record(
+      schemaVersion: "5.0.0",
       evidenceId: claims.evidenceID,
-      executor: HardwareEvidenceV4Record.Executor(
+      executor: HardwareEvidenceV5Record.Executor(
         kind: receipt.executor,
         id: receipt.executorID,
         authority: authority.map {
-          HardwareEvidenceV4Record.Authority(
+          HardwareEvidenceV5Record.Authority(
             kind: $0.kind,
             reference: $0.reference,
-            campaignId: $0.campaignID,
-            attemptId: $0.attemptID,
-            attemptOrdinal: $0.attemptOrdinal,
+            reservationId: $0.reservationID,
+            useOrdinal: $0.useOrdinal,
             planDigest: $0.planDigest,
+            stepSetDigest: $0.stepSetDigest,
             targetBindingDigest: $0.targetBindingDigest,
-            candidateDigest: $0.candidateDigest,
-            reviewDigest: $0.reviewDigest,
-            brokerDigest: $0.brokerDigest)
+            artifactDigest: $0.artifactDigest)
         }),
-      runtime: HardwareEvidenceV4Record.Runtime(
+      runtime: HardwareEvidenceV5Record.Runtime(
         operationReference: receipt.operationReference,
         jobId: jobID,
         catalogDigest: receipt.catalogDigest,
         terminalState: terminal,
         startedAt: started,
         finishedAt: finished),
-      targetConfirmation: HardwareEvidenceV4Record.TargetConfirmation(
+      targetConfirmation: HardwareEvidenceV5Record.TargetConfirmation(
         confirmedDeviceIdentitySHA256: identity,
         bindingRevision: bindingRevision,
         confirmedAt: confirmed,
         method: observation.confirmationMethod),
-      device: HardwareEvidenceV4Record.Device(
+      device: HardwareEvidenceV5Record.Device(
         model: model,
         serialSHA256: identity,
         firmware: firmware,
         bindingRevision: bindingRevision),
-      toolchain: HardwareEvidenceV4Record.Toolchain(
+      toolchain: HardwareEvidenceV5Record.Toolchain(
         hdcVersion: observation.toolVersion,
         hdcSHA256: observation.toolSHA256),
       transport: transport,
@@ -532,7 +576,7 @@ public enum HardwareEvidenceProjector {
       executedAt: finished,
       validUntil: claims.validUntilUTC,
       artifacts: receipt.artifacts.map {
-        HardwareEvidenceV4Record.Artifact(
+        HardwareEvidenceV5Record.Artifact(
           reference: $0.reference, sha256: $0.sha256, note: nil)
       },
       deviations: nil,
@@ -611,13 +655,14 @@ public enum HardwareEvidenceProjector {
   }
 }
 
-/// Read-only compatibility discriminator. Historical V2/V3 bytes are returned
-/// untouched; the V4 writer never attempts to migrate or re-encode them.
+/// Read-only compatibility discriminator. Historical V2-V4 bytes are returned
+/// untouched; the V5 writer never attempts to migrate or re-encode them.
 public enum HardwareEvidenceDocumentReader {
   public enum Version: String, Sendable, Equatable {
     case legacyV2 = "2.0.0"
     case legacyV3 = "3.0.0"
-    case currentV4 = "4.0.0"
+    case legacyV4 = "4.0.0"
+    case currentV5 = "5.0.0"
   }
 
   public static func version(of data: Data) -> Version? {

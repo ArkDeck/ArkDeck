@@ -225,7 +225,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing capability subcommand (list|inspect|draft|install|revoke)")
+        message: "missing capability subcommand (list|inspect)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -243,130 +243,10 @@ enum RuntimeCLI {
           method: "capability.inspect",
           params: ["capabilityId": .string(rest[index + 1])]),
         json: json)
-    case "draft":
-      guard let targetIndex = rest.firstIndex(of: "--target"),
-        targetIndex + 1 < rest.count,
-        let operationIndex = rest.firstIndex(of: "--operation"),
-        operationIndex + 1 < rest.count,
-        let outputIndex = rest.firstIndex(of: "--output-directory"),
-        outputIndex + 1 < rest.count
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "capability draft requires --target <id> --operation <id@version> "
-            + "--output-directory <path>")
-      }
-      let operationParts = rest[operationIndex + 1].split(separator: "@")
-      guard operationParts.count == 2, let operationVersion = Int(operationParts[1]) else {
-        throw CLIError(exitCode: EX_USAGE, message: "operation must be <id>@<version>")
-      }
-      var inputs: [String: JSONValue] = [:]
-      if let index = rest.firstIndex(of: "--inputs-file"), index + 1 < rest.count {
-        let url = URL(fileURLWithPath: rest[index + 1])
-        guard let data = try? Data(contentsOf: url),
-          let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data)
-        else {
-          throw CLIError(exitCode: EX_USAGE, message: "cannot read typed inputs from \(url.path)")
-        }
-        inputs = decoded
-      }
-      let executionID: String
-      if let index = rest.firstIndex(of: "--execution-id"), index + 1 < rest.count {
-        executionID = rest[index + 1]
-      } else {
-        executionID = UUID().uuidString.lowercased()
-      }
-      let validitySeconds: Int
-      if let index = rest.firstIndex(of: "--validity-seconds"), index + 1 < rest.count {
-        guard let parsed = Int(rest[index + 1]) else {
-          throw CLIError(exitCode: EX_USAGE, message: "validity-seconds must be an integer")
-        }
-        validitySeconds = parsed
-      } else {
-        validitySeconds = 3_600
-      }
-      let maximumUses: Int
-      if let index = rest.firstIndex(of: "--maximum-uses"), index + 1 < rest.count {
-        guard let parsed = Int(rest[index + 1]), (1...32).contains(parsed) else {
-          throw CLIError(
-            exitCode: EX_USAGE, message: "maximum-uses must be an integer between 1 and 32")
-        }
-        maximumUses = parsed
-      } else {
-        maximumUses = 1
-      }
-      let request = try RuntimeOperationRequest(
-        requestID: "agent-request-\(executionID)",
-        idempotencyKey: "agent-execution-\(executionID)",
-        target: try RuntimeOperationRequest.capabilityDraftTarget(
-          targetID: rest[targetIndex + 1],
-          operationID: String(operationParts[0]),
-          version: operationVersion,
-          currentDeviceBindingRevision: {
-            try bindingRevision(targetID: rest[targetIndex + 1], client: client)
-          }),
-        operation: RuntimeOperationReference(
-          id: String(operationParts[0]), version: operationVersion),
-        inputs: inputs)
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      let requestData = try encoder.encode(request)
-      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
-        throw CLIError(exitCode: EX_SOFTWARE, message: "cannot encode capability draft request")
-      }
-      let draft = try client.request(
-        method: "capability.draft",
-        params: [
-          "requestJson": .string(requestJSON),
-          "validitySeconds": .integer(Int64(validitySeconds)),
-          "maximumUses": .integer(Int64(maximumUses)),
-        ])
-      guard case .object(var draftFields) = draft,
-        case .object(let capabilityFields)? = draftFields["capability"],
-        case .string(let capabilityID)? = capabilityFields["capabilityID"]
-      else {
-        throw AgentClientError.malformedResponse(
-          "capability.draft returned no capability document")
-      }
-      let outputDirectory = URL(
-        fileURLWithPath: rest[outputIndex + 1], isDirectory: true
-      ).standardizedFileURL
-      try FileManager.default.createDirectory(
-        at: outputDirectory, withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700])
-      let outputURL = outputDirectory.appendingPathComponent("\(capabilityID).json")
-      guard !FileManager.default.fileExists(atPath: outputURL.path) else {
-        throw CLIError(
-          exitCode: EX_CANTCREAT,
-          message: "refusing to overwrite existing capability draft \(outputURL.path)")
-      }
-      let capabilityData = try encoder.encode(JSONValue.object(capabilityFields))
-      try capabilityData.write(to: outputURL, options: [.atomic])
-      draftFields["draftFile"] = .string(outputURL.path)
-      draftFields["executionID"] = .string(executionID)
-      emit(.object(draftFields), json: json)
-    case "install":
-      guard let index = rest.firstIndex(of: "--file"), index + 1 < rest.count else {
-        throw CLIError(exitCode: EX_USAGE, message: "capability install requires --file <path>")
-      }
-      let url = URL(fileURLWithPath: rest[index + 1])
-      guard let document = try? String(contentsOf: url, encoding: .utf8) else {
-        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
-      }
-      emit(
-        try client.request(
-          method: "capability.install", params: ["capabilityJson": .string(document)]),
-        json: json)
-    case "revoke":
-      guard let index = rest.firstIndex(of: "--capability"), index + 1 < rest.count else {
-        throw CLIError(
-          exitCode: EX_USAGE, message: "capability revoke requires --capability <id>")
-      }
-      emit(
-        try client.request(
-          method: "capability.revoke", params: ["capabilityId": .string(rest[index + 1])]),
-        json: json)
+    case "draft", "install", "revoke":
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "capability administration is Runtime-owned and is not Agent-facing")
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported capability subcommand")
     }

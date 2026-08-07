@@ -22,7 +22,7 @@ public enum CatalogProvider: String, CaseIterable, Codable, Sendable {
 public enum RuntimeOperationAuthorizationPolicy: String, CaseIterable, Codable, Sendable {
   case defaultReadOnly
   case standingCapability
-  case oneShotExactPlan
+  case runtimeCapability
 }
 
 public enum CatalogConcurrencyKey: String, CaseIterable, Codable, Sendable {

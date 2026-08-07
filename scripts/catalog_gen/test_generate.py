@@ -95,9 +95,9 @@ class RealCatalogTests(unittest.TestCase):
         for op_id in ("deploy.native-library.system", "flash.dayu200"):
             doc = next(op for op in operations if op["id"] == op_id)
             self.assertEqual(doc["effect"]["permitted"], ["destructive"], op_id)
-            self.assertEqual(doc["authorization"], {"destructive": "oneShotExactPlan"}, op_id)
+            self.assertEqual(doc["authorization"], {"destructive": "runtimeCapability"}, op_id)
         system = next(op for op in operations if op["id"] == "deploy.native-library.system")
-        self.assertEqual(system.get("defaultPolicyIssuance"), "disabled")
+        self.assertEqual(system.get("defaultPolicyIssuance"), "enabled")
 
     def test_every_stdout_step_has_an_exact_registered_action(self):
         operations, _ = _real_operations()
@@ -244,7 +244,7 @@ class ValidatorNegativeTests(unittest.TestCase):
             "readOnly": "defaultReadOnly",
             "destructive": "standingCapability",
         }
-        self._assert_rejected(doc, "oneShotExactPlan")
+        self._assert_rejected(doc, "runtimeCapability")
 
     def test_default_read_only_cannot_gate_mutation(self):
         doc = _first_operation()
@@ -456,7 +456,7 @@ class SchemaVocabularyLockstepTests(unittest.TestCase):
         )
         self.assertEqual(
             self.schema["properties"]["authorization"]["properties"]["destructive"]["const"],
-            "oneShotExactPlan",
+            "runtimeCapability",
         )
 
     def test_schema_has_no_executable_surface(self):

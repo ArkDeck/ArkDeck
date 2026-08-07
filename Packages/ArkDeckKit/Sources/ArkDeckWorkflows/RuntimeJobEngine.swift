@@ -45,7 +45,7 @@ public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
 
 /// A fully materialized Runtime preview. It is deliberately not a Job or a
 /// capability document: producing it performs no admission, authorization
-/// consumption or provider dispatch, including for E2 operations.
+/// consumption or provider dispatch, including for destructive operations.
 public struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
   public let executionMode: String
   public let operationReference: String
@@ -130,11 +130,11 @@ public struct RuntimeJobStatusPage: Sendable, Equatable {
 public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case defaultReadOnlyPolicy
   case runtimeCapability
+  /// Historical evidence only. New Runtime admission never produces this
+  /// kind, but old Job records remain decodable and exportable.
   case standingAuthorization
-  /// Bounded-campaign E2 authority: the request carried an open usage
-  /// reservation minted by the campaign admission service, and the engine
-  /// re-verified its embedded confirmation pins (POL-AGENT-002 second
-  /// branch — this kind is never a standing authorization).
+  /// Historical campaign evidence only. New Runtime admission rejects the
+  /// corresponding reservation before any Job or dispatch is created.
   case evolutionCampaignConfirmation
 }
 
@@ -189,6 +189,30 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
   }
 }
 
+/// Durable correlation for a Runtime-owned capability use. Optional on the
+/// admission envelope only so pre-V5 Job records remain decodable.
+public struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable {
+  public let reservationID: String
+  public let useOrdinal: Int
+  public let planDigestSHA256: String
+  public let stepSetDigestSHA256: String
+  public let targetBindingDigestSHA256: String
+  public let artifactSHA256: String?
+
+  public init(
+    reservationID: String, useOrdinal: Int, planDigestSHA256: String,
+    stepSetDigestSHA256: String, targetBindingDigestSHA256: String,
+    artifactSHA256: String?
+  ) {
+    self.reservationID = reservationID
+    self.useOrdinal = useOrdinal
+    self.planDigestSHA256 = planDigestSHA256
+    self.stepSetDigestSHA256 = stepSetDigestSHA256
+    self.targetBindingDigestSHA256 = targetBindingDigestSHA256
+    self.artifactSHA256 = artifactSHA256
+  }
+}
+
 /// The admission decision actually consumed by this job. This record is
 /// audit provenance only: reading or projecting it cannot mint an
 /// authority or reach the dispatch port.
@@ -201,6 +225,7 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   /// Optional only for old persisted jobs. New campaign admissions fill this
   /// exclusively from the protected broker reservation.
   public let campaignCorrelation: RuntimeCampaignEvidenceCorrelation?
+  public let runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation?
 
   public init(
     kind: RuntimeEvidenceAuthorityKind,
@@ -208,7 +233,8 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
     admittedAtUTC: String,
     validUntilUTC: String?,
     consumptionFingerprintSHA256: String?,
-    campaignCorrelation: RuntimeCampaignEvidenceCorrelation? = nil
+    campaignCorrelation: RuntimeCampaignEvidenceCorrelation? = nil,
+    runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation? = nil
   ) {
     self.kind = kind
     self.reference = reference
@@ -216,6 +242,7 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
     self.validUntilUTC = validUntilUTC
     self.consumptionFingerprintSHA256 = consumptionFingerprintSHA256
     self.campaignCorrelation = campaignCorrelation
+    self.runtimeCapabilityCorrelation = runtimeCapabilityCorrelation
   }
 }
 
@@ -553,6 +580,7 @@ public actor RuntimeJobEngine {
     let stableTargetIdentitySHA256: String?
     let bindingRevision: Int?
     let planDigest: String
+    let artifactFacts: [String: String]
   }
 
   private struct PreparedAuthorization: Sendable {
@@ -702,7 +730,7 @@ public actor RuntimeJobEngine {
 
   /// Materializes the exact typed plan through the same provider, target
   /// facts and Artifact lease path used by admission, then stops. This is the
-  /// E2-safe inspection surface: no capability may be supplied, no Job is
+  /// Effect-safe inspection surface: no capability may be supplied, no Job is
   /// admitted, and no dispatcher method is called.
   public func planOnly(_ requestData: Data) async throws -> RuntimePlanOnlyPreview {
     let request: RuntimeOperationRequest
@@ -763,20 +791,11 @@ public actor RuntimeJobEngine {
       dispatchDisposition: "notDispatched")
   }
 
-  /// Produces a reviewable authorization envelope without installing a
-  /// capability, admitting a Job or dispatching a provider action. Provider
-  /// availability, target facts, Artifact leases and every selected typed
-  /// plan step must materialize before a draft is returned.
-  ///
-  /// E1 deviceMutation drafts are standing envelopes: the current plan
-  /// digest is returned as a preview, and each later admission binds its
-  /// own exact materialized digest in the durable lineage. E2 destructive
-  /// drafts are exact-plan, single-use envelopes: the materialized plan
-  /// digest is pinned into `exactPlanDigest` and the target must resolve to
-  /// a stable physical identity. Either way the draft carries no authority:
-  /// its issuer reference is a placeholder that the install gate refuses
-  /// until a maintainer-merged PR reference replaces it (the trust root for
-  /// E2 issuance is unchanged).
+  /// Legacy repository-plane drafting for operations that still declare an
+  /// external standing policy. AgentDaemon and CLI do not expose it. Any
+  /// operation declaring Runtime-owned admission is rejected before target,
+  /// Artifact or provider materialization; protected Runtime creates that
+  /// capability only inside normal Job admission.
   public func draftCapability(
     _ requestData: Data,
     issuedAtUTC: String,
@@ -803,7 +822,13 @@ public actor RuntimeJobEngine {
     guard effect == .deviceMutation || effect == .destructive else {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
-        "capability drafting is limited to E1 deviceMutation and E2 destructive operations")
+        "capability drafting is limited to mutation operations with an external standing policy")
+    }
+    guard descriptor.authorization[effect] != .runtimeCapability else {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "\(descriptor.reference) uses Runtime-owned capability admission; external drafting "
+          + "is unavailable")
     }
     guard (1...32).contains(maximumUses) else {
       throw RuntimeJobEngineError.rejected(
@@ -1147,10 +1172,19 @@ public actor RuntimeJobEngine {
           state: JobState.waitingForRecovery.rawValue)
         return statusAndReleaseTerminalRuntime(current.record)
       case .confirmedNotExecuted(let reason),
-        .confirmedNotExecutedWithDiagnostic(let reason, _),
-        .failed(let reason):
+        .confirmedNotExecutedWithDiagnostic(let reason, _):
         // The state graph routes every terminal outcome through
         // finalizing: a job always gets its wrap-up phase, success or not.
+        try transition(&current, from: .running, to: .finalizing, reason: reason)
+        try transition(&current, from: .finalizing, to: .failed, reason: reason)
+        current.record.finishedAtUTC = nowUTC()
+        try persistRuntimeRecord(current.record)
+        jobs[jobID] = current
+        try await recordCapabilityOutcome(
+          for: current.record, outcome: .safeToReflash,
+          state: JobState.failed.rawValue)
+        return statusAndReleaseTerminalRuntime(current.record)
+      case .failed(let reason):
         try transition(&current, from: .running, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
@@ -1260,47 +1294,28 @@ public actor RuntimeJobEngine {
         appendTimeline(jobID: jobID, entry: "host-step \(step.stepID)")
         continue
       case .requestConfirmation:
-        // The confirmation step used to be a silent no-op. For a
-        // destructive plan it is now the in-plan witness that the E2
-        // authority doctrine held: the exact-plan capability (or campaign
-        // reservation) IS the human confirmation — issued out-of-band by a
-        // maintainer merged PR or a bounded campaign assertion — so the
-        // step asserts that authority context instead of inventing a
-        // second interactive gate (ADR-0004; PRODUCT-LOOP §14 zero-human
-        // budget for authorized runs). Reaching it without that context is
-        // an engine invariant break: fail closed.
+        // This legacy-named Catalog step is now an in-plan witness that the
+        // protected Runtime generated an exact destructive capability. UI
+        // acknowledgement is UX only; no human/campaign authority is read.
         guard let record = jobs[jobID]?.record else {
           throw RuntimeDispatchFailure.failed("confirm step lost its job record")
         }
         let confirmEffect = Self.effectiveEffect(
           descriptor: descriptor, inputs: record.request.inputs)
         if confirmEffect == .destructive {
-          // Consumption happens just before the first mutating step, which
-          // is later than this one — so the witness here is the validated,
-          // not-yet-consumed authority whose pins name this very plan.
-          if let reference = record.request.authorization {
-            guard
-              let capabilityStatus = try await capabilityStore.inspect(
-                capabilityID: reference.capabilityID),
-              capabilityStatus.capability.effectCeiling == WorkflowEffect.destructive,
-              capabilityStatus.capability.exactPlanDigest == record.materializedPlanDigest
-            else {
-              throw RuntimeDispatchFailure.failed(
-                "confirm step could not re-verify the exact-plan E2 authority")
-            }
-            appendTimeline(
-              jobID: jobID,
-              entry:
-                "flash intent confirmed by exact-plan capability \(reference.capabilityID)")
-          } else if let campaign = record.request.campaignReservation {
-            appendTimeline(
-              jobID: jobID,
-              entry:
-                "flash intent confirmed by campaign reservation \(campaign.reservationID)")
-          } else {
+          guard let reference = record.request.authorization,
+            let capabilityStatus = try await capabilityStore.inspect(
+              capabilityID: reference.capabilityID),
+            capabilityStatus.capability.issuer.kind == .runtimeDefaultPolicy,
+            capabilityStatus.capability.effectCeiling == WorkflowEffect.destructive,
+            capabilityStatus.capability.exactPlanDigest == record.materializedPlanDigest
+          else {
             throw RuntimeDispatchFailure.failed(
-              "confirm step reached without an E2 authority reference")
+              "destructive intent step has no matching Runtime-owned capability")
           }
+          appendTimeline(
+            jobID: jobID,
+            entry: "destructive intent bound to Runtime capability \(reference.capabilityID)")
         } else {
           appendTimeline(jobID: jobID, entry: "host-step \(step.stepID)")
         }
@@ -3261,7 +3276,7 @@ public actor RuntimeJobEngine {
     switch outcome {
     case .confirmedNotExecuted:
       try await recordCapabilityOutcome(
-        for: runtime.record, outcome: .confirmed,
+        for: runtime.record, outcome: .safeToReflash,
         state: JobState.failed.rawValue)
     case .stillUnknown:
       try await recordCapabilityOutcome(
@@ -3846,7 +3861,14 @@ public actor RuntimeJobEngine {
       return MaterializedAdmission(
         stableTargetIdentitySHA256: stableIdentity,
         bindingRevision: bindingRevision,
-        planDigest: RuntimeJobRecord.sha256Hex(encoded))
+        planDigest: RuntimeJobRecord.sha256Hex(encoded),
+        artifactFacts: resolved.map {
+          [
+            "artifactId": $0.artifactID,
+            "artifactSha256": $0.sha256,
+            "artifactByteCount": String($0.byteCount),
+          ]
+        } ?? [:])
     } catch let error as RuntimeJobEngineError {
       throw error
     } catch {
@@ -3936,7 +3958,8 @@ public actor RuntimeJobEngine {
         targetStableIdentitySHA256: identity,
         targetBindingRevision: bindingRevision,
         planDigest: materialized.planDigest,
-        inputs: request.inputs)
+        inputs: request.inputs,
+        artifactFacts: materialized.artifactFacts)
     }
 
     // A workspace mutation above read-only has no device to name. The
@@ -3959,6 +3982,7 @@ public actor RuntimeJobEngine {
       targetBindingRevision: nil,
       planDigest: materialized.planDigest,
       inputs: request.inputs,
+      artifactFacts: materialized.artifactFacts,
       workspaceIdentitySHA256: workspace.identitySHA256,
       workspaceRevision: workspace.revision,
       workspaceFileScopesDigest: workspace.fileScopesDigest,
@@ -3966,9 +3990,9 @@ public actor RuntimeJobEngine {
   }
 
   /// Performs every pure authorization check at submit, after the complete
-  /// typed plan has materialized. Published E1 operations with default policy
-  /// issuance enabled receive a deterministic runtime-owned capability when
-  /// the caller supplies none. E1/E2 uses are deliberately not consumed here:
+  /// typed plan has materialized. Published mutation/destructive operations
+  /// with Runtime issuance enabled receive a deterministic Runtime-owned
+  /// capability. Mutation uses are deliberately not consumed here:
   /// the job's descriptor-bound preflight must first execute through the
   /// durable write-ahead journal. Consumption happens at the last safe
   /// boundary immediately before the first mutation dispatch.
@@ -4012,17 +4036,27 @@ public actor RuntimeJobEngine {
       request: request, descriptor: descriptor,
       effect: effect, materialized: materialized)
 
-    if let campaign = request.campaignReservation {
-      try validateCampaignReservation(
-        campaign, effect: effect, descriptor: descriptor, query: query,
-        admittedAtUTC: admittedAt)
-      // Evidence is recorded at consume time, mirroring the capability lane:
-      // admission validates, the moment before the first mutation binds.
-      return PreparedAuthorization(reference: nil, evidence: nil)
+    if request.campaignReservation != nil {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "legacy campaign reservations are decode/export-only and cannot admit a new execution")
     }
 
     let authorization: RuntimeCapabilityReference
-    if let supplied = request.authorization {
+    if policy == .runtimeCapability {
+      guard request.authorization == nil else {
+        throw RuntimeJobEngineError.rejected(
+          .authorizationRequired,
+          "caller-supplied capabilities cannot admit a Runtime-owned policy")
+      }
+      guard descriptor.defaultPolicyIssuanceEnabled else {
+        throw RuntimeJobEngineError.rejected(
+          .authorizationRequired,
+          "catalog disabled Runtime capability issuance for \(descriptor.reference)")
+      }
+      authorization = try await automaticRuntimeCapability(
+        descriptor: descriptor, query: query)
+    } else if let supplied = request.authorization {
       authorization = supplied
     } else if effect == .deviceMutation,
       policy == .standingCapability,
@@ -4048,7 +4082,7 @@ public actor RuntimeJobEngine {
         ? descriptor.defaultPolicyIssuanceEnabled
         : query.workspaceIsIsolatedTaskCopy)
     {
-      authorization = try await automaticE1Capability(
+      authorization = try await automaticRuntimeCapability(
         descriptor: descriptor, query: query)
     } else {
       throw RuntimeJobEngineError.rejected(
@@ -4203,19 +4237,21 @@ public actor RuntimeJobEngine {
     return reservation.campaignEvidenceProvenance?.executionTuning
   }
 
-  /// Resolves the published E1 policy into a durable capability envelope.
+  /// Resolves the published Runtime policy into a durable capability envelope.
   /// The identifier is stable for the catalog, operation, target, binding and
   /// typed inputs, so daemon restart preserves lineage and an outcomeUnknown
   /// use blocks later automatic execution of the same mutation scope.
-  private func automaticE1Capability(
+  private func automaticRuntimeCapability(
     descriptor: CatalogOperationDescriptor,
     query: RuntimeCapabilityAuthorizationQuery
   ) async throws -> RuntimeCapabilityReference {
     let issuedAtUTC = nowUTC()
-    guard let expiresAtUTC = Self.automaticE1Expiry(issuedAtUTC: issuedAtUTC) else {
+    guard let expiresAtUTC = Self.automaticCapabilityExpiry(
+      issuedAtUTC: issuedAtUTC, effect: query.effect)
+    else {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
-        "automatic E1 policy cannot verify the runtime clock")
+        "automatic Runtime policy cannot verify the runtime clock")
     }
     do {
       try await validateNoUnresolvedMutationLineage(
@@ -4226,7 +4262,7 @@ public actor RuntimeJobEngine {
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
-        "automatic E1 target lineage is blocked: \(error)")
+        "automatic Runtime target lineage is blocked: \(error)")
     }
     let scopeFingerprint = Self.authorizationScopeFingerprint(of: query)
     let policyFingerprint =
@@ -4235,14 +4271,66 @@ public actor RuntimeJobEngine {
       )
       .uppercased()
 
-    // A generation carries 10,000 confirmed uses. Exhausted generations roll
-    // forward automatically; unresolved lineage never rolls forward.
+    // Destructive envelopes are one-shot. A failed use advances only when
+    // provider outcome/readback durably classified it safeToReflash. Known
+    // unsafe failure and unknown lineage return the exhausted envelope so the
+    // normal store validation fails closed. Success starts a later invocation;
+    // a safe continuation stays within sixteen serial uses and four hours.
+    var destructiveAttemptCount = 0
+    var destructiveInvocationStartedAt: Date?
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    let admittedDate = formatter.date(from: issuedAtUTC)
     for generation in 1...100_000 {
       let capabilityID =
         "CAP-RT-POLICY-\(policyFingerprint.prefix(40))-G\(generation)"
       if let existing = try await capabilityStore.inspect(
         capabilityID: capabilityID)
       {
+        if query.effect == .destructive {
+          if existing.remainingUses > 0,
+            existing.capability.expiresAtUTC > issuedAtUTC,
+            existing.lineageAllowsNewExecution
+          {
+            return RuntimeCapabilityReference(capabilityID: capabilityID)
+          }
+          guard let terminal = existing.lineage.last?.outcomeHistory.last else {
+            // An unused expired generation may roll to a fresh short-lived
+            // envelope. It has no intent and therefore no replay ambiguity.
+            continue
+          }
+          switch terminal.outcome {
+          case .pending, .outcomeUnknown, .legacyUnverified:
+            return RuntimeCapabilityReference(capabilityID: capabilityID)
+          case .confirmed:
+            guard terminal.terminalState == JobState.succeeded.rawValue else {
+              return RuntimeCapabilityReference(capabilityID: capabilityID)
+            }
+            destructiveAttemptCount = 0
+            destructiveInvocationStartedAt = nil
+            continue
+          case .safeToReflash:
+            let generationStart = formatter.date(
+              from: existing.capability.issuedAtUTC)
+            if destructiveInvocationStartedAt == nil {
+              destructiveInvocationStartedAt = generationStart
+            }
+            if let admittedDate, let invocationStart = destructiveInvocationStartedAt,
+              admittedDate.timeIntervalSince(invocationStart) > 4 * 60 * 60
+            {
+              // The prior invocation is durably closed by expiry. A fresh
+              // request starts a new bounded window and will re-read all facts.
+              destructiveAttemptCount = 0
+              destructiveInvocationStartedAt = nil
+              continue
+            }
+            destructiveAttemptCount += 1
+            guard destructiveAttemptCount < 16 else {
+              return RuntimeCapabilityReference(capabilityID: capabilityID)
+            }
+            continue
+          }
+        }
         let renewable =
           existing.lineageAllowsNewExecution
           && {
@@ -4278,35 +4366,36 @@ public actor RuntimeJobEngine {
             RuntimeCapabilityOperationScope(
               operationID: descriptor.id, version: descriptor.version)
           ],
-          effectCeiling: .deviceMutation,
+          effectCeiling: query.effect,
           inputConstraints: Self.exactCapabilityConstraints(for: query.inputs),
           exactInputs: query.inputs,
+          exactArtifactFacts: query.effect == .destructive ? query.artifactFacts : nil,
           issuedAtUTC: issuedAtUTC,
           expiresAtUTC: expiresAtUTC,
-          maximumUses: 10_000,
+          maximumUses: query.effect == .destructive ? 1 : 10_000,
           issuer: RuntimeCapabilityIssuer(
             kind: .runtimeDefaultPolicy,
             reference:
               "catalog:\(RuntimeOperationCatalog.catalogDigest):\(descriptor.reference)"),
-          exactPlanDigest: nil,
+          exactPlanDigest: query.effect == .destructive ? query.planDigest : nil,
           exactBindingRevision: query.targetBindingRevision)
       } catch {
         throw RuntimeJobEngineError.rejected(
           .authorizationRequired,
-          "automatic E1 policy could not create a bounded capability: \(error)")
+          "automatic Runtime policy could not create a bounded capability: \(error)")
       }
       do {
         try await capabilityStore.install(capability)
       } catch let error as RuntimeCapabilityStoreError {
         throw RuntimeJobEngineError.rejected(
           .authorizationRequired,
-          "automatic E1 capability could not become durable: \(error)")
+          "automatic Runtime capability could not become durable: \(error)")
       }
       return RuntimeCapabilityReference(capabilityID: capabilityID)
     }
     throw RuntimeJobEngineError.rejected(
       .authorizationRequired,
-      "automatic E1 capability generations are exhausted")
+      "automatic Runtime capability generations are exhausted")
   }
 
   /// Prevents a caller from bypassing an unknown mutation by changing typed
@@ -4324,6 +4413,7 @@ public actor RuntimeJobEngine {
       where entry.targetStableIdentitySHA256 == stableIdentitySHA256
         && entry.bindingRevision == bindingRevision
         && entry.outcome != .confirmed
+        && entry.outcome != .safeToReflash
       {
         if entry.outcome == .pending,
           entry.reservationID == reservationID,
@@ -4348,19 +4438,8 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed("job disappeared before capability consumption")
     }
     if let evidence = runtime.record.admissionEvidence {
-      if evidence.kind == .evolutionCampaignConfirmation {
-        guard
-          evidence.reference == runtime.record.request.campaignReservation?.reservationID
-        else {
-          throw RuntimeDispatchFailure.failed(
-            "authorizationRequired: persisted campaign evidence does not match the mutation")
-        }
-        return
-      }
       guard
-        evidence.kind == (effect == .destructive
-          ? RuntimeEvidenceAuthorityKind.standingAuthorization
-          : RuntimeEvidenceAuthorityKind.runtimeCapability),
+        evidence.kind == .runtimeCapability,
         evidence.reference == runtime.record.request.authorization?.capabilityID
       else {
         throw RuntimeDispatchFailure.failed(
@@ -4368,11 +4447,9 @@ public actor RuntimeJobEngine {
       }
       return
     }
-    if let campaign = runtime.record.request.campaignReservation {
-      try await verifyCampaignReservationBeforeMutation(
-        campaign, runtime: &runtime, jobID: jobID, descriptor: descriptor,
-        effect: effect, validatedFacts: validatedFacts)
-      return
+    if runtime.record.request.campaignReservation != nil {
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: legacy campaign records cannot dispatch a new mutation")
     }
     guard let authorization = runtime.record.request.authorization else {
       throw RuntimeDispatchFailure.failed(
@@ -4384,6 +4461,14 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: materialized plan or verified target binding is absent or drifted")
     }
+    let resolvedArtifact = try await resolvedInputArtifact(jobID: jobID)
+    let artifactFacts: [String: String] = resolvedArtifact.map {
+      [
+        "artifactId": $0.artifactID,
+        "artifactSha256": $0.sha256,
+        "artifactByteCount": String($0.byteCount),
+      ]
+    } ?? [:]
     // The subject is re-established here, at the moment of the effect, not
     // trusted from admission. A device mutation re-proves identity and
     // binding; a workspace mutation re-reads the tree, so a workspace that
@@ -4415,7 +4500,8 @@ public actor RuntimeJobEngine {
         targetStableIdentitySHA256: stableIdentity,
         targetBindingRevision: bindingRevision,
         planDigest: planDigest,
-        inputs: runtime.record.request.inputs)
+        inputs: runtime.record.request.inputs,
+        artifactFacts: artifactFacts)
     } else {
       guard let provider = providers.provider(id: descriptor.provider.rawValue),
         let workspace = try provider.workspaceAuthorizationFacts(
@@ -4432,6 +4518,7 @@ public actor RuntimeJobEngine {
         targetBindingRevision: nil,
         planDigest: planDigest,
         inputs: runtime.record.request.inputs,
+        artifactFacts: artifactFacts,
         workspaceIdentitySHA256: workspace.identitySHA256,
         workspaceRevision: workspace.revision,
         workspaceFileScopesDigest: workspace.fileScopesDigest,
@@ -4460,12 +4547,25 @@ public actor RuntimeJobEngine {
         jobID: jobID,
         query: query,
         nowUTC: nowUTC())
+      let targetBindingDigest = RuntimeJobRecord.sha256Hex(
+        Data(
+          "\(query.targetStableIdentitySHA256 ?? "-")\n"
+            .appending("\(query.targetBindingRevision.map(String.init) ?? "-")").utf8))
+      let correlation = RuntimeCapabilityEvidenceCorrelation(
+        reservationID: consumption.reservationID,
+        useOrdinal: consumption.ordinal,
+        planDigestSHA256: planDigest,
+        stepSetDigestSHA256: Self.stepSetDigest(
+          descriptor: descriptor, inputs: runtime.record.request.inputs),
+        targetBindingDigestSHA256: targetBindingDigest,
+        artifactSHA256: artifactFacts["artifactSha256"])
       runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
-        kind: effect == .destructive ? .standingAuthorization : .runtimeCapability,
+        kind: .runtimeCapability,
         reference: authorization.capabilityID,
         admittedAtUTC: consumption.consumedAtUTC,
         validUntilUTC: status.capability.expiresAtUTC,
-        consumptionFingerprintSHA256: consumption.queryFingerprintSHA256)
+        consumptionFingerprintSHA256: consumption.queryFingerprintSHA256,
+        runtimeCapabilityCorrelation: correlation)
       runtime.record.timeline.append(
         "capability consumed before first mutation")
       // Keep the consumed evidence in the actor snapshot before the disk
@@ -4587,6 +4687,8 @@ public actor RuntimeJobEngine {
     switch outcome {
     case .confirmed:
       status = state == JobState.succeeded.rawValue ? .succeeded : .failed
+    case .safeToReflash:
+      status = .failed
     case .outcomeUnknown:
       status = .outcomeUnknown
     case .pending, .legacyUnverified:
@@ -4914,6 +5016,7 @@ public actor RuntimeJobEngine {
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
+      "planDigest=\(query.planDigest ?? "-")",
     ]
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -4924,17 +5027,36 @@ public actor RuntimeJobEngine {
       preconditionFailure("validated runtime inputs must encode canonically")
     }
     components.append("inputs=\(text)")
+    for (key, value) in query.artifactFacts.sorted(by: { $0.key < $1.key }) {
+      components.append("artifact.\(key)=\(value)")
+    }
     return RuntimeJobRecord.sha256Hex(
       Data(components.joined(separator: "\n").utf8))
   }
 
-  private static func automaticE1Expiry(issuedAtUTC: String) -> String? {
+  private static func stepSetDigest(
+    descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue]
+  ) -> String {
+    let lines = descriptor.steps
+      .filter { stepIsRequested($0, descriptor: descriptor, inputs: inputs) }
+      .map {
+        "\($0.stepID)|\($0.kind.rawValue)|\($0.effect.rawValue)|"
+          + "\($0.cancellation.rawValue)|\($0.binding.rawValue)"
+      }
+    return RuntimeJobRecord.sha256Hex(Data(lines.joined(separator: "\n").utf8))
+  }
+
+  private static func automaticCapabilityExpiry(
+    issuedAtUTC: String,
+    effect: WorkflowEffect
+  ) -> String? {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
     formatter.timeZone = TimeZone(secondsFromGMT: 0)
     guard let issued = formatter.date(from: issuedAtUTC) else { return nil }
-    return formatter.string(
-      from: issued.addingTimeInterval(30 * 24 * 60 * 60))
+    let lifetime: TimeInterval = effect == .destructive ? 4 * 60 * 60 : 30 * 24 * 60 * 60
+    return formatter.string(from: issued.addingTimeInterval(lifetime))
   }
 
   private static func stableJobID(

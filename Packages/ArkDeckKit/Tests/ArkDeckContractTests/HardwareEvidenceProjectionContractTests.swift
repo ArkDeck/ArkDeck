@@ -7,32 +7,29 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
   private let toolDigest = String(repeating: "a", count: 64)
   private let catalogDigest = String(repeating: "c", count: 64)
   private let artifactDigest = String(repeating: "d", count: 64)
-  private let campaignPlanDigest = String(repeating: "f", count: 64)
+  private let runtimePlanDigest = String(repeating: "f", count: 64)
 
   private func authority(
     _ kind: RuntimeHardwareEvidenceAuthorityKind,
     validUntilUTC: String? = "2026-07-30T00:00:00Z",
     consumptionFingerprintSHA256: String? = nil,
-    campaignID: String? = nil
+    reservationID: String? = "reservation-evidence-001"
   ) -> RuntimeHardwareEvidenceAuthority {
-    let isCampaign = kind == .evolutionCampaignConfirmation
-    let planDigest = isCampaign ? campaignPlanDigest : nil
+    let isRuntime = kind == .runtimeCapability
     return RuntimeHardwareEvidenceAuthority(
       kind: kind,
       reference: kind == .defaultReadOnlyPolicy ? "default-read-only-policy"
-        : (isCampaign ? "RES-EVIDENCE-001" : "CAP-RT-EVIDENCE-001"),
+        : "CAP-RT-EVIDENCE-001",
       admittedAtUTC: "2026-07-29T00:00:00Z",
       validUntilUTC: kind == .defaultReadOnlyPolicy ? nil : validUntilUTC,
       consumptionFingerprintSHA256: kind == .defaultReadOnlyPolicy ? nil
-        : (consumptionFingerprintSHA256 ?? planDigest ?? String(repeating: "e", count: 64)),
-      campaignID: isCampaign ? (campaignID ?? "ECAMP-EVIDENCE-001") : nil,
-      attemptID: isCampaign ? "ATTEMPT-EVIDENCE-001" : nil,
-      attemptOrdinal: isCampaign ? 1 : nil,
-      planDigest: planDigest,
-      targetBindingDigest: isCampaign ? String(repeating: "e", count: 64) : nil,
-      candidateDigest: isCampaign ? String(repeating: "a", count: 64) : nil,
-      reviewDigest: isCampaign ? String(repeating: "b", count: 64) : nil,
-      brokerDigest: isCampaign ? String(repeating: "c", count: 64) : nil)
+        : (consumptionFingerprintSHA256 ?? String(repeating: "e", count: 64)),
+      reservationID: isRuntime ? reservationID : nil,
+      useOrdinal: isRuntime ? 1 : nil,
+      stepSetDigest: isRuntime ? String(repeating: "a", count: 64) : nil,
+      artifactDigest: isRuntime ? artifactDigest : nil,
+      planDigest: isRuntime ? runtimePlanDigest : nil,
+      targetBindingDigest: isRuntime ? String(repeating: "e", count: 64) : nil)
   }
 
   private func receipt(
@@ -41,12 +38,12 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     jobID: String? = "job-evidence",
     targetID: String? = "TGT-EVIDENCE-01",
     providerID: String = "hdc",
-    effect: RuntimeHardwareEvidenceEffectLevel = .E0,
+    effect: RuntimeHardwareEvidenceEffectLevel = .readOnly,
     authorityKind: RuntimeHardwareEvidenceAuthorityKind = .defaultReadOnlyPolicy,
     includeAuthority: Bool = true,
     authorityValidUntilUTC: String? = "2026-07-30T00:00:00Z",
     authorityFingerprintSHA256: String? = nil,
-    authorityCampaignID: String? = nil,
+    authorityReservationID: String? = "reservation-evidence-001",
     confirmedAtUTC: String? = "2026-07-29T00:00:02Z",
     observedTargetID: String? = "TGT-EVIDENCE-01",
     observedBinding: Int? = 7,
@@ -107,7 +104,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
           authorityKind,
           validUntilUTC: authorityValidUntilUTC,
           consumptionFingerprintSHA256: authorityFingerprintSHA256,
-          campaignID: authorityCampaignID)
+          reservationID: authorityReservationID)
         : nil,
       stepKinds: [
         "probeHostTool", "probeHDCServer", "probeDevice", "runApprovedRemoteRead",
@@ -131,15 +128,15 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       notes: "contract fixture; no hardware dispatch")
   }
 
-  func testAgentE0ProjectsCanonicalV4AndRoundTrips() throws {
+  func testAgentReadOnlyProjectsCanonicalV5AndRoundTrips() throws {
     let result = HardwareEvidenceProjector.project(receipt: receipt(), claims: claims())
     guard case .published(let record) = result else {
-      return XCTFail("complete Agent E0 facts must publish: \(result)")
+      return XCTFail("complete Agent read-only facts must publish: \(result)")
     }
-    XCTAssertEqual(record.schemaVersion, "4.0.0")
+    XCTAssertEqual(record.schemaVersion, "5.0.0")
     XCTAssertEqual(record.executor.kind, .agent)
     XCTAssertEqual(record.executor.authority?.kind, .defaultReadOnlyPolicy)
-    XCTAssertEqual(record.effectLevel, .E0)
+    XCTAssertEqual(record.effectLevel, .readOnly)
     XCTAssertEqual(record.targetConfirmation.confirmedDeviceIdentitySHA256, identity)
     XCTAssertEqual(record.device.serialSHA256, identity)
     XCTAssertEqual(record.device.firmware, "OpenHarmony-4.1-release")
@@ -149,7 +146,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let encoded = try encoder.encode(record)
-    XCTAssertEqual(try JSONDecoder().decode(HardwareEvidenceV4Record.self, from: encoded), record)
+    XCTAssertEqual(try JSONDecoder().decode(HardwareEvidenceV5Record.self, from: encoded), record)
     let text = String(decoding: encoded, as: UTF8.self)
     XCTAssertFalse(text.contains("150100424A544E4600"), "raw serial must never be encoded")
     XCTAssertFalse(text.contains("connectKey"), "addressing data must never be encoded")
@@ -166,14 +163,14 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       receipt(providerID: ""),
       receipt(includeAuthority: false),
       receipt(
-        effect: .E1, authorityKind: .runtimeCapability,
+        effect: .deviceMutation, authorityKind: .runtimeCapability,
         authorityValidUntilUTC: "2026-07-28T00:00:00Z"),
       receipt(
-        effect: .E1, authorityKind: .runtimeCapability,
+        effect: .deviceMutation, authorityKind: .runtimeCapability,
         authorityFingerprintSHA256: "not-a-digest"),
       receipt(
-        effect: .E2, authorityKind: .evolutionCampaignConfirmation,
-        authorityCampaignID: ""),
+        effect: .destructive, authorityKind: .runtimeCapability,
+        authorityReservationID: ""),
       receipt(confirmedAtUTC: "2026-07-28T23:59:59Z"),
       receipt(observedTargetID: "TGT-OTHER"),
       receipt(observedBinding: 8),
@@ -197,10 +194,10 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     let positive: [
       (RuntimeHardwareEvidenceEffectLevel, RuntimeHardwareEvidenceAuthorityKind)
     ] = [
-      (.E0, .defaultReadOnlyPolicy),
-      (.E1, .runtimeCapability),
-      (.E2, .standingAuthorization),
-      (.E2, .evolutionCampaignConfirmation),
+      (.hostOnly, .defaultReadOnlyPolicy),
+      (.readOnly, .defaultReadOnlyPolicy),
+      (.deviceMutation, .runtimeCapability),
+      (.destructive, .runtimeCapability),
     ]
     for (effect, kind) in positive {
       guard case .published = HardwareEvidenceProjector.project(
@@ -212,9 +209,10 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     let mismatches: [
       (RuntimeHardwareEvidenceEffectLevel, RuntimeHardwareEvidenceAuthorityKind)
     ] = [
-      (.E0, .runtimeCapability),
-      (.E1, .defaultReadOnlyPolicy),
-      (.E2, .runtimeCapability),
+      (.readOnly, .runtimeCapability),
+      (.deviceMutation, .defaultReadOnlyPolicy),
+      (.destructive, .standingAuthorization),
+      (.destructive, .evolutionCampaignConfirmation),
     ]
     for (effect, kind) in mismatches {
       guard case .evidenceIncomplete(let blocker) = HardwareEvidenceProjector.project(
@@ -226,35 +224,33 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     }
   }
 
-  func testCampaignV4AuthorityRetainsDurableCorrelationAndFailsClosedOnDigestDrift() {
+  func testDestructiveV5RetainsRuntimeUseCorrelationAndRejectsLegacyAuthority() {
     guard case .published(let record) = HardwareEvidenceProjector.project(
-      receipt: receipt(effect: .E2, authorityKind: .evolutionCampaignConfirmation),
+      receipt: receipt(effect: .destructive, authorityKind: .runtimeCapability),
       claims: claims())
     else {
-      return XCTFail("complete campaign correlation must project V4 evidence")
+      return XCTFail("complete Runtime correlation must project V5 evidence")
     }
     let authority = record.executor.authority
-    XCTAssertEqual(authority?.kind, .evolutionCampaignConfirmation)
-    XCTAssertEqual(authority?.campaignId, "ECAMP-EVIDENCE-001")
-    XCTAssertEqual(authority?.attemptId, "ATTEMPT-EVIDENCE-001")
-    XCTAssertEqual(authority?.attemptOrdinal, 1)
-    XCTAssertEqual(authority?.planDigest, campaignPlanDigest)
+    XCTAssertEqual(authority?.kind, .runtimeCapability)
+    XCTAssertEqual(authority?.reservationId, "reservation-evidence-001")
+    XCTAssertEqual(authority?.useOrdinal, 1)
+    XCTAssertEqual(authority?.planDigest, runtimePlanDigest)
+    XCTAssertEqual(authority?.stepSetDigest, String(repeating: "a", count: 64))
     XCTAssertEqual(authority?.targetBindingDigest, String(repeating: "e", count: 64))
-    XCTAssertEqual(authority?.candidateDigest, String(repeating: "a", count: 64))
-    XCTAssertEqual(authority?.reviewDigest, String(repeating: "b", count: 64))
-    XCTAssertEqual(authority?.brokerDigest, String(repeating: "c", count: 64))
+    XCTAssertEqual(authority?.artifactDigest, artifactDigest)
 
-    let drifted = HardwareEvidenceProjector.project(
+    let legacy = HardwareEvidenceProjector.project(
       receipt: receipt(
-        effect: .E2, authorityKind: .evolutionCampaignConfirmation,
-        authorityFingerprintSHA256: String(repeating: "e", count: 64)),
+        effect: .destructive, authorityKind: .evolutionCampaignConfirmation),
       claims: claims())
-    guard case .evidenceIncomplete(let incomplete) = drifted else {
-      return XCTFail("campaign plan/fingerprint drift must not publish")
+    guard case .evidenceIncomplete(let incomplete) = legacy else {
+      return XCTFail("legacy campaign authority must not publish V5")
     }
     XCTAssertEqual(incomplete.publicationCount, 0)
-    XCTAssertTrue(incomplete.reasons.contains(
-      "campaign authority correlation is absent, malformed, or drifted"))
+    XCTAssertTrue(
+      incomplete.reasons.contains("actual effect and admission authority do not match")
+        || incomplete.reasons.contains("legacy authority kind cannot be emitted as V5 evidence"))
   }
 
   func testHumanRecordDoesNotForgeAgentAuthority() {
@@ -281,7 +277,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     dispatchCount += 0
   }
 
-  func testClaimAcceptanceIDValidationMatchesTheV4SchemaPattern() {
+  func testClaimAcceptanceIDValidationMatchesTheV5SchemaPattern() {
     let malformed = HardwareEvidenceClaimMetadata(
       evidenceID: "EVD-AHE-CLAIM-NEGATIVE",
       acceptanceIDs: ["A-"])
@@ -300,16 +296,18 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       {"schemaVersion":"2.0.0","operator":"lvye","opaqueHistoricalBytes":"unchanged"}
       """.utf8)
     let v3 = Data("{\"schemaVersion\":\"3.0.0\"}".utf8)
-    guard case .published(let v4Record) = HardwareEvidenceProjector.project(
+    let v4 = Data("{\"schemaVersion\":\"4.0.0\",\"opaqueHistoricalBytes\":\"unchanged\"}".utf8)
+    guard case .published(let v5Record) = HardwareEvidenceProjector.project(
       receipt: receipt(), claims: claims())
     else {
-      return XCTFail("complete V4 fixture must publish")
+      return XCTFail("complete V5 fixture must publish")
     }
-    let v4 = try JSONEncoder().encode(v4Record)
+    let v5 = try JSONEncoder().encode(v5Record)
 
     XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v2), .legacyV2)
     XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v3), .legacyV3)
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v4), .currentV4)
+    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v4), .legacyV4)
+    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v5), .currentV5)
     XCTAssertEqual(v2, Data(
       """
       {"schemaVersion":"2.0.0","operator":"lvye","opaqueHistoricalBytes":"unchanged"}

@@ -49,7 +49,7 @@ GENERATED_MATRIX_PATH = CATALOG_DIR / "generated" / "effect-authorization-matrix
 EFFECTS = ("hostOnly", "readOnly", "deviceMutation", "destructive")
 CANCELLATIONS = ("immediate", "atSafeBoundary", "criticalNonInterruptible")
 BINDINGS = ("none", "confirmedDevice")
-AUTHORIZATION_POLICIES = ("defaultReadOnly", "standingCapability", "oneShotExactPlan")
+AUTHORIZATION_POLICIES = ("defaultReadOnly", "standingCapability", "runtimeCapability")
 PROVIDERS = ("hdc", "rockchip", "workspace", "analyzer")
 CONCURRENCY_KEYS = ("device-exclusive", "device-shared-readonly", "host-exclusive")
 COMPENSATIONS = ("none", "bestEffortCleanup", "rollbackPublished")
@@ -389,8 +389,8 @@ def validate_operation(
             f"{where}.authorization: keys must cover exactly the permitted "
             f"effects; got {sorted(authorization)} for permitted {sorted(permitted)}"
         )
-    if "destructive" in authorization and authorization["destructive"] != "oneShotExactPlan":
-        raise CatalogError(f"{where}: destructive effect requires oneShotExactPlan authorization")
+    if "destructive" in authorization and authorization["destructive"] != "runtimeCapability":
+        raise CatalogError(f"{where}: destructive effect requires runtimeCapability authorization")
     for auth_effect, policy in authorization.items():
         if policy == "defaultReadOnly" and _rank(auth_effect, EFFECTS) > _rank("readOnly", EFFECTS):
             raise CatalogError(

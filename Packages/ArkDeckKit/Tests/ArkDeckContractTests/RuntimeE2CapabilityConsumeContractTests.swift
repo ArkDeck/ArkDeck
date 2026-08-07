@@ -6,21 +6,10 @@ import XCTest
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
-/// Drives the engine-lane E2 consume path end to end for the first time:
-/// an installed exact-plan destructive capability admits a real-archive
-/// flash submit, is consumed exactly once before the first mutation, and
-/// the refusing dispatcher proves the job reached — and only reached — the
-/// dispatch boundary. Until now this chain was inferred from store-level
-/// tests; nothing had ever driven `submit → admission → consume` through
-/// `RuntimeJobEngine` for a destructive operation.
-///
-/// The capability document is constructed exactly as the maintainer flow
-/// produces it (the draft shape with the placeholder issuer reference
-/// replaced by a merged-PR reference) and installed through the same store
-/// API the daemon uses. No device, no real process: the dispatcher records
-/// and refuses, so a consumed-but-refused job terminates `failed` with a
-/// confirmed outcome — burning the single use is the intended
-/// intent-before-effect behavior, not a defect.
+/// Drives the Runtime-owned destructive capability path end to end. No device
+/// or real process is used: the dispatcher records the first mutation and
+/// refuses before spawning it. Historical caller-installed capabilities stay
+/// decodable/exportable but cannot admit a new Flash.
 final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
   private static let archiveEnvironmentKey = "ARKDECK_DAYU200_70035_IMAGE"
   private static let targetIdentity = String(repeating: "a", count: 64)
@@ -64,7 +53,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
     }
   }
 
-  func testInstalledExactPlanCapabilityAdmitsConsumesOnceAndNeverSpawns() async throws {
+  func testRuntimeIssuesExactPlanCapabilityAndCallerCapabilityCannotAdmit() async throws {
     guard let archivePath = ProcessInfo.processInfo.environment[Self.archiveEnvironmentKey]
     else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
@@ -113,95 +102,78 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
 
     let inputs = flashInputs(lease: lease, profile: profile)
 
-    // The exact plan digest comes from the engine's own materialization,
-    // the same digest a capability draft would pin.
+    // The exact plan digest comes from the engine's own materialization.
     let preview = try await engine.planOnly(
-      encoded(try flashRequest(requestID: "e2-consume-plan", inputs: inputs)))
+      encoded(try flashRequest(requestID: "runtime-capability-plan", inputs: inputs)))
     XCTAssertEqual(preview.materializedPlanDigest.count, 64)
 
-    // 1. Destructive without a capability: refused at authorization, before
-    //    any dispatch.
+    // A historical maintainer capability remains installable for
+    // decode/export compatibility, but callers cannot select it for a new
+    // Runtime-owned destructive execution.
+    let historical = try RuntimeCapability(
+      capabilityID: "CAP-RT-LEGACY-DESTRUCTIVE-970",
+      targetScope: .stablePhysicalIdentity(sha256: Self.targetIdentity),
+      operationScope: [
+        RuntimeCapabilityOperationScope(operationID: "flash.dayu200", version: 1)
+      ],
+      effectCeiling: .destructive,
+      inputConstraints: exactStringConstraints(from: inputs),
+      issuedAtUTC: "2026-08-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T02:00:00Z",
+      maximumUses: 1,
+      issuer: RuntimeCapabilityIssuer(
+        kind: .maintainerMergedPR, reference: "PR#970 legacy export fixture"),
+      exactPlanDigest: preview.materializedPlanDigest,
+      exactBindingRevision: 7)
+    try await capabilityStore.install(historical)
     do {
       let acceptance = try await engine.submit(
-        encoded(try flashRequest(requestID: "e2-consume-noauth", inputs: inputs)))
+        encoded(
+          try flashRequest(
+            requestID: "runtime-capability-caller-supplied", inputs: inputs,
+            capabilityID: historical.capabilityID)))
       _ = try await engine.run(jobID: acceptance.jobID)
-      XCTFail("a destructive submit without a capability must be refused")
+      XCTFail("a caller-supplied destructive capability must be refused")
     } catch let error as RuntimeJobEngineError {
       guard case .rejected(let code, let detail) = error else {
         return XCTFail("unexpected rejection shape: \(error)")
       }
       XCTAssertEqual(code, .authorizationRequired, detail)
+      XCTAssertTrue(detail.contains("caller-supplied"), detail)
     }
     var dispatched = await dispatchLog.snapshot()
     XCTAssertTrue(dispatched.isEmpty, "refusal must precede any dispatch")
+    let historicalInspection = try await capabilityStore.inspect(
+      capabilityID: historical.capabilityID)
+    let historicalStatus = try XCTUnwrap(historicalInspection)
+    XCTAssertEqual(historicalStatus.consumptionCount, 0)
 
-    // 2. A wrong-plan capability: installable (it is a valid document), but
-    //    it must never admit this request's materialized plan, and it must
-    //    never be consumed.
-    let wrongPlan = try RuntimeCapability(
-      capabilityID: "CAP-RT-E2-WRONGPLAN-970",
-      targetScope: .stablePhysicalIdentity(sha256: Self.targetIdentity),
-      operationScope: [
-        RuntimeCapabilityOperationScope(operationID: "flash.dayu200", version: 1)
-      ],
-      effectCeiling: .destructive,
-      inputConstraints: exactStringConstraints(from: inputs),
-      issuedAtUTC: "2026-08-01T00:00:00Z",
-      expiresAtUTC: "2026-08-01T02:00:00Z",
-      maximumUses: 1,
-      issuer: RuntimeCapabilityIssuer(
-        kind: .maintainerMergedPR, reference: "PR#970 wrong-plan negative"),
-      exactPlanDigest: String(repeating: "f", count: 64),
-      exactBindingRevision: 7)
-    try await capabilityStore.install(wrongPlan)
-    do {
-      let acceptance = try await engine.submit(
-        encoded(
-          try flashRequest(
-            requestID: "e2-consume-wrongplan", inputs: inputs,
-            capabilityID: wrongPlan.capabilityID)))
-      _ = try await engine.run(jobID: acceptance.jobID)
-      XCTFail("a wrong-plan capability must never admit this request")
-    } catch {
-      // Refusal may surface at submit or at run depending on where the
-      // digest is compared; either way nothing may dispatch or consume.
-    }
-    dispatched = await dispatchLog.snapshot()
-    XCTAssertTrue(dispatched.isEmpty)
-    let wrongInspection = try await capabilityStore.inspect(
-      capabilityID: wrongPlan.capabilityID)
-    let wrongStatus = try XCTUnwrap(wrongInspection)
-    XCTAssertEqual(wrongStatus.consumptionCount, 0)
-    XCTAssertEqual(wrongStatus.remainingUses, 1)
-
-    // 3. The maintainer-shaped capability: the draft envelope with the
-    //    placeholder reference replaced by a merged-PR reference.
-    let capability = try RuntimeCapability(
-      capabilityID: "CAP-RT-E2-CONSUME-970",
-      targetScope: .stablePhysicalIdentity(sha256: Self.targetIdentity),
-      operationScope: [
-        RuntimeCapabilityOperationScope(operationID: "flash.dayu200", version: 1)
-      ],
-      effectCeiling: .destructive,
-      inputConstraints: exactStringConstraints(from: inputs),
-      issuedAtUTC: "2026-08-01T00:00:00Z",
-      expiresAtUTC: "2026-08-01T02:00:00Z",
-      maximumUses: 1,
-      issuer: RuntimeCapabilityIssuer(
-        kind: .maintainerMergedPR, reference: "PR#970 e2 exact-plan consume e2e"),
-      exactPlanDigest: preview.materializedPlanDigest,
-      exactBindingRevision: 7)
-    try await capabilityStore.install(capability)
-
+    // No caller authority is supplied. The Runtime materializes the plan,
+    // issues a short-lived exact capability, persists it and binds it into
+    // the admitted request before any mutation can run.
     let acceptance = try await engine.submit(
       encoded(
-        try flashRequest(
-          requestID: "e2-consume-positive", inputs: inputs,
-          capabilityID: capability.capabilityID)))
+        try flashRequest(requestID: "runtime-capability-positive", inputs: inputs)))
+    let capabilityStatuses = try await capabilityStore.list()
+    let issued = try XCTUnwrap(
+      capabilityStatuses.first {
+        $0.capability.issuer.kind == .runtimeDefaultPolicy
+      })
+    XCTAssertEqual(issued.capability.effectCeiling, .destructive)
+    XCTAssertEqual(issued.capability.maximumUses, 1)
+    XCTAssertEqual(issued.capability.exactPlanDigest, preview.materializedPlanDigest)
+    XCTAssertEqual(issued.capability.exactBindingRevision, 7)
+    XCTAssertEqual(issued.capability.exactInputs, inputs)
+    XCTAssertEqual(issued.capability.exactArtifactFacts?["artifactSha256"], profile.archiveSHA256)
+    XCTAssertEqual(
+      issued.capability.exactArtifactFacts?["artifactByteCount"],
+      String(profile.archiveSizeBytes))
+    XCTAssertEqual(issued.consumptionCount, 0)
+
     let status = try await engine.run(jobID: acceptance.jobID)
 
-    // The dispatcher refused before any spawn, so the job terminates failed
-    // with a confirmed outcome — never outcomeUnknown, never a human gate.
+    // The dispatcher refuses before spawn. The Runtime nevertheless burns the
+    // one-shot intent before crossing the first mutation boundary.
     XCTAssertEqual(status.state, "failed")
     XCTAssertFalse(status.outcomeUnknown)
     XCTAssertFalse(status.waitingForHuman)
@@ -209,44 +181,35 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
       status.timeline.contains("capability consumed before first mutation"),
       "\(status.timeline)")
 
-    // Exactly one dispatch attempt was made, and it carried a mutating
-    // effect: the E2 gate genuinely opened.
     dispatched = await dispatchLog.snapshot()
     XCTAssertEqual(dispatched.count, 1, "\(dispatched)")
     let dispatchedEffect = try XCTUnwrap(
       dispatched.first.flatMap { WorkflowEffect(rawValue: $0) })
     XCTAssertGreaterThanOrEqual(dispatchedEffect, .deviceMutation)
 
-    // The single use is burned with a confirmed terminal outcome recorded
-    // in the lineage. Intent-before-effect: a refused dispatch still
-    // consumed the authority.
     let consumedInspection = try await capabilityStore.inspect(
-      capabilityID: capability.capabilityID)
+      capabilityID: issued.capability.capabilityID)
     let consumed = try XCTUnwrap(consumedInspection)
     XCTAssertEqual(consumed.consumptionCount, 1)
     XCTAssertEqual(consumed.remainingUses, 0)
     XCTAssertEqual(consumed.lineage.count, 1)
 
-    // 4. The consumed capability admits nothing further: a second submit is
-    //    refused without another dispatch.
+    // A generic failed dispatch is not a complete safeToReflash readback.
+    // Changing request/idempotency IDs must not roll to a new capability.
     do {
-      let second = try await engine.submit(
+      let retried = try await engine.submit(
         encoded(
-          try flashRequest(
-            requestID: "e2-consume-second", inputs: inputs,
-            capabilityID: capability.capabilityID)))
-      _ = try await engine.run(jobID: second.jobID)
-      XCTFail("a consumed single-use capability must not admit a second run")
-    } catch {
-      // Refused at submit or run; the assertions below are the contract.
+          try flashRequest(requestID: "runtime-capability-unsafe-retry", inputs: inputs)))
+      _ = try await engine.run(jobID: retried.jobID)
+      XCTFail("an unsafe predecessor must permanently block a new dispatch")
+    } catch let error as RuntimeJobEngineError {
+      guard case .rejected(let code, _) = error else {
+        return XCTFail("unexpected unsafe-retry rejection: \(error)")
+      }
+      XCTAssertEqual(code, .authorizationRequired)
     }
-    dispatched = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatched.count, 1, "no second dispatch: \(dispatched)")
-    let finalInspection = try await capabilityStore.inspect(
-      capabilityID: capability.capabilityID)
-    let final = try XCTUnwrap(finalInspection)
-    XCTAssertEqual(final.consumptionCount, 1)
-    XCTAssertEqual(final.remainingUses, 0)
+    let finalDispatches = await dispatchLog.snapshot()
+    XCTAssertEqual(finalDispatches.count, 1)
   }
 
   // MARK: - Fixtures

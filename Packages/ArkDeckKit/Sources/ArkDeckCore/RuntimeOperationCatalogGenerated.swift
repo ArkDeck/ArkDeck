@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "e2f8eb6592aaeeec37c63a01708db2325b38c798b0f8272228ba0fccc2cfd0aa"
+  public static let catalogDigest = "31c7d7013b837750ea6c93aedd77eea342d9c4669135beaf1c20a6f0b8ffadb9"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -267,12 +267,12 @@ extension RuntimeOperationCatalog {
     CatalogOperationDescriptor(
       id: "deploy.native-library.system",
       version: 1,
-      title: "Replace a system/vendor partition native library under one-shot exact-plan authorization (E2)",
+      title: "Replace a system/vendor partition native library through Runtime-owned exact-plan admission",
       provider: .hdc,
       minimumEffect: .destructive,
       permittedEffects: [.destructive],
-      authorization: [.destructive: .oneShotExactPlan],
-      defaultPolicyIssuanceEnabled: false,
+      authorization: [.destructive: .runtimeCapability],
+      defaultPolicyIssuanceEnabled: true,
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
@@ -313,11 +313,11 @@ extension RuntimeOperationCatalog {
     CatalogOperationDescriptor(
       id: "flash.dayu200",
       version: 1,
-      title: "Flash a bound DAYU200 (RK3568) from a trusted image bundle with rebind and post-flash verification (E2)",
+      title: "Flash a bound DAYU200 (RK3568) from a trusted image bundle with rebind and post-flash verification",
       provider: .rockchip,
       minimumEffect: .destructive,
       permittedEffects: [.destructive],
-      authorization: [.destructive: .oneShotExactPlan],
+      authorization: [.destructive: .runtimeCapability],
       defaultPolicyIssuanceEnabled: true,
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,

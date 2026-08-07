@@ -341,7 +341,9 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     }
     let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
-    let summary = try GzipTarArchiveReader.summarize(fileAt: archiveURL)
+    let summary = try GzipTarArchiveReader.summarize(
+      fileAt: archiveURL,
+      derivation: RockchipImageArchiveIntrospection.derivationRequest(board: profile))
     XCTAssertEqual(profile.validate(summary.archiveObservation()), .valid)
     let executePlan = try RockchipProductExecutePlanFactPort().makeValidatedExecutePlan(
       summary: summary)
@@ -423,12 +425,15 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
 
     var wrongVersion = flashInputs(lease: lease, profile: profile)
     wrongVersion["deviceProfile"] = .string("dayu200@1")
-    await XCTAssertThrowsErrorAsync(
-      try await engine.planOnly(
-        encoded(
-          try flashRequest(
-            requestID: "real-plan-only-cross-version", lease: lease,
-            inputs: wrongVersion))))
+    let crossReferencePreview = try await engine.planOnly(
+      encoded(
+        try flashRequest(
+          requestID: "real-plan-only-cross-reference", lease: lease,
+          inputs: wrongVersion)))
+    XCTAssertEqual(crossReferencePreview.inputs["deviceProfile"], .string("dayu200@1"))
+    XCTAssertEqual(
+      crossReferencePreview.steps.map(\.stepID), preview.steps.map(\.stepID),
+      "both published references select the same DAYU200 board")
     let negativeDispatchCount = await dispatchLog.snapshot()
     let negativeJobs = await engine.listJobs()
     let negativeCapabilities = try await capabilityStore.list()
@@ -436,44 +441,26 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     XCTAssertTrue(negativeJobs.isEmpty)
     XCTAssertTrue(negativeCapabilities.isEmpty)
 
-    // E2 exact-plan capability draft against the same real archive: the
-    // envelope pins the materialized plan digest and the stable physical
-    // identity, single-use, with the uninstallable placeholder issuer. The
-    // draft is a reviewable document, never authority: nothing is installed,
-    // admitted or dispatched by producing it.
-    let draft = try await engine.draftCapability(
-      encoded(
-        try flashRequest(
-          requestID: "real-plan-only-e2-draft", lease: lease,
-          inputs: flashInputs(lease: lease, profile: profile))),
-      issuedAtUTC: "2026-08-01T00:00:00Z",
-      expiresAtUTC: "2026-08-01T01:00:00Z",
-      issuerReference: "PENDING-MAINTAINER-PR",
-      maximumUses: 1)
-    XCTAssertEqual(draft.capability.effectCeiling, .destructive)
-    XCTAssertEqual(draft.capability.exactPlanDigest, preview.materializedPlanDigest)
-    XCTAssertEqual(draft.materializedPlanDigest, preview.materializedPlanDigest)
-    guard case .stablePhysicalIdentity(let pinnedIdentity) = draft.capability.targetScope
-    else {
-      return XCTFail("a destructive draft must pin a stable physical identity")
+    do {
+      _ = try await engine.draftCapability(
+        encoded(
+          try flashRequest(
+            requestID: "real-plan-only-external-draft", lease: lease,
+            inputs: flashInputs(lease: lease, profile: profile))),
+        issuedAtUTC: "2026-08-01T00:00:00Z",
+        expiresAtUTC: "2026-08-01T01:00:00Z",
+        issuerReference: "PENDING-MAINTAINER-PR",
+        maximumUses: 1)
+      XCTFail("Runtime-owned destructive admission must reject external drafting")
+    } catch let RuntimeJobEngineError.rejected(_, detail) {
+      XCTAssertTrue(detail.contains("Runtime-owned capability admission"), detail)
     }
-    XCTAssertEqual(pinnedIdentity, Self.targetIdentity)
-    XCTAssertEqual(draft.capability.maximumUses, 1)
-    XCTAssertEqual(draft.capability.exactBindingRevision, 7)
-    XCTAssertEqual(draft.capability.issuer.kind, .maintainerMergedPR)
-    XCTAssertEqual(draft.capability.issuer.reference, "PENDING-MAINTAINER-PR")
-    XCTAssertEqual(draft.operationReference, "flash.dayu200@1")
-    // The document must survive its own wire round-trip through the same
-    // validating decoder the install path uses.
-    let roundTripped = try JSONDecoder().decode(
-      RuntimeCapability.self, from: JSONEncoder().encode(draft.capability))
-    XCTAssertEqual(roundTripped, draft.capability)
     let draftDispatchCount = await dispatchLog.snapshot()
     let draftJobs = await engine.listJobs()
     let draftCapabilities = try await capabilityStore.list()
     XCTAssertEqual(draftDispatchCount, 0)
     XCTAssertTrue(draftJobs.isEmpty)
-    XCTAssertTrue(draftCapabilities.isEmpty, "drafting must never install")
+    XCTAssertTrue(draftCapabilities.isEmpty, "rejected drafting must never install")
   }
 
   func testDestructiveDraftEnvelopeIsRefusedMultiUseBeforeAnyMaterialization() async throws {
@@ -521,10 +508,10 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       guard case .rejected(_, let detail) = error else {
         return XCTFail("unexpected rejection shape: \(error)")
       }
-      XCTAssertTrue(detail.contains("single-use"), detail)
+      XCTAssertTrue(detail.contains("Runtime-owned capability admission"), detail)
       XCTAssertFalse(
         detail.contains("lease"),
-        "the envelope rule must fire before lease materialization: \(detail)")
+        "the Runtime-owned policy rule must fire before lease materialization: \(detail)")
     }
     let dispatched = await dispatchLog.snapshot()
     XCTAssertEqual(dispatched, 0)

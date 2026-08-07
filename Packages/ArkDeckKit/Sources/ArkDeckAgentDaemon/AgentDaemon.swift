@@ -17,7 +17,7 @@ import Foundation
 // MARK: - Wire protocol (v1)
 
 public enum AgentWireProtocol {
-  public static let version = "1.0.0"
+  public static let version = ArkDeckAgentXPC.wireProtocolVersion
   public static let requiredMajor = 1
 
   public struct Request: Codable, Sendable {
@@ -246,93 +246,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
-    case "capability.draft":
-      guard case .string(let requestJson)? = request.params?["requestJson"] else {
-        return failure(id: request.id, code: .invalidParams, message: "requestJson is required")
-      }
-      let validitySeconds: Int
-      if case .integer(let raw)? = request.params?["validitySeconds"],
-        let exact = Int(exactly: raw)
-      {
-        validitySeconds = exact
-      } else {
-        validitySeconds = 3_600
-      }
-      guard (300...86_400).contains(validitySeconds) else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "validitySeconds must be between 300 and 86400")
-      }
-      let maximumUses: Int
-      if case .integer(let raw)? = request.params?["maximumUses"],
-        let exact = Int(exactly: raw)
-      {
-        maximumUses = exact
-      } else {
-        maximumUses = 1
-      }
-      guard (1...32).contains(maximumUses) else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "maximumUses must be between 1 and 32")
-      }
-      let issuedAt = nowUTC()
-      guard let expiresAt = Self.addingUTCSeconds(validitySeconds, to: issuedAt) else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "daemon clock cannot produce a fixed-format UTC capability window")
-      }
-      do {
-        let draft = try await engine.draftCapability(
-          Data(requestJson.utf8),
-          issuedAtUTC: issuedAt,
-          expiresAtUTC: expiresAt,
-          issuerReference: "PENDING-MAINTAINER-PR",
-          maximumUses: maximumUses)
-        let encoded = try JSONEncoder().encode(draft)
-        let json = try JSONDecoder().decode(JSONValue.self, from: encoded)
-        return success(id: request.id, result: json)
-      } catch let error as RuntimeJobEngineError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "capability.install":
-      guard case .string(let json)? = request.params?["capabilityJson"] else {
-        return failure(id: request.id, code: .invalidParams, message: "capabilityJson is required")
-      }
-      do {
-        let capability = try JSONDecoder().decode(
-          RuntimeCapability.self, from: Data(json.utf8))
-        guard Self.isMergedPRIssuerReference(capability.issuer.reference) else {
-          return failure(
-            id: request.id, code: .invalidParams,
-            message:
-              "capability draft is not installable until issuer.reference names "
-              + "a maintainer-merged PR")
-        }
-        try await capabilityStore.install(capability)
-        return success(id: request.id, result: .object(["installed": .bool(true)]))
-      } catch let error as RuntimeCapabilityStoreError {
-        return failure(id: request.id, code: .conflict, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .invalidParams, message: "invalid capability: \(error)")
-      }
-
-    case "capability.revoke":
-      guard case .string(let capabilityID)? = request.params?["capabilityId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "capabilityId is required")
-      }
-      do {
-        try await capabilityStore.revoke(
-          capabilityID: capabilityID, atUTC: nowUTC(), reason: "revoked via control plane")
-        return success(id: request.id, result: .object(["revoked": .bool(true)]))
-      } catch let error as RuntimeCapabilityStoreError {
-        return failure(id: request.id, code: .notFound, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+    case "capability.draft", "capability.install", "capability.revoke":
+      return failure(
+        id: request.id, code: .rejected,
+        message:
+          "RuntimeCapability administration is not an Agent-facing API; "
+          + "the protected Runtime generates and consumes policy capabilities")
 
     case "job.plan":
       guard case .string(let requestJson)? = request.params?["requestJson"] else {
@@ -1272,12 +1191,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     func optionalInteger(_ value: Int?) -> JSONValue {
       value.map { .integer(Int64($0)) } ?? .null
     }
-    let effectLevel: String?
-    switch snapshot.actualEffect {
-    case "hostOnly", "readOnly": effectLevel = "E0"
-    case "deviceMutation": effectLevel = "E1"
-    case "destructive": effectLevel = "E2"
-    default: effectLevel = nil
+    let effectLevel = snapshot.actualEffect.flatMap {
+      ["hostOnly", "readOnly", "deviceMutation", "destructive"].contains($0) ? $0 : nil
     }
     let authority: JSONValue
     if let value = snapshot.authority {
@@ -1300,6 +1215,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
           fields["reviewDigest"] = .string(reviewDigest)
         }
         fields["brokerDigest"] = .string(campaign.brokerDigestSHA256)
+      }
+      if let runtime = value.runtimeCapabilityCorrelation {
+        fields["reservationId"] = .string(runtime.reservationID)
+        fields["useOrdinal"] = .integer(Int64(runtime.useOrdinal))
+        fields["planDigest"] = .string(runtime.planDigestSHA256)
+        fields["stepSetDigest"] = .string(runtime.stepSetDigestSHA256)
+        fields["targetBindingDigest"] = .string(runtime.targetBindingDigestSHA256)
+        fields["artifactDigest"] = optionalString(runtime.artifactSHA256)
       }
       authority = .object(fields)
     } else {

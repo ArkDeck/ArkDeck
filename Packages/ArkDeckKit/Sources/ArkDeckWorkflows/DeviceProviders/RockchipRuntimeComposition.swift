@@ -3,7 +3,7 @@
 // The bundled component is not a PATH/user-selected executable. It is the
 // exact nested binary from the reviewed 1.0.0 release tuple. Runtime binds the
 // signed bytes it will actually execute into target facts, the materialized
-// plan and the E2 capability query. The historical external-tool pin remains
+// plan and the Runtime capability query. The historical external-tool pin remains
 // separate and cannot authorize this product-owned execution route.
 
 import CryptoKit

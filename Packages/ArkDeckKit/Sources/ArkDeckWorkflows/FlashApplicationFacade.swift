@@ -1,13 +1,13 @@
-// App-facing Flash planning over Runtime's read-only XPC door.
+// App-facing Flash planning and typed execution over Runtime's XPC door.
 //
 // The production provider reads operation availability and adopted target
-// facts from the daemon, then materializes an exact Rockchip plan in-process
-// from a user-selected archive. It cannot submit, run, import or authorize a
-// job: the XPC transport refuses every such method before it reaches Runtime.
-// This keeps the first production Flash workspace useful without turning a UI
-// wiring defect into an E2 dispatch path.
+// facts from the daemon, materializes an exact Rockchip plan in-process from a
+// user-selected archive, imports that archive, and submits the published
+// `flash.dayu200@1` typed operation. Runtime owns capability creation and all
+// target/plan/artifact admission; the App cannot supply or administer one.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 import os
 
@@ -198,11 +198,30 @@ public enum FlashPlanPreparationResult: Sendable, Equatable {
   case failed(code: FlashPlanFailureCode, detail: String?)
 }
 
+public struct FlashSubmissionPresentation: Sendable, Equatable {
+  public let jobID: String
+  public let state: String
+  public let outcomeUnknown: Bool
+  public let timeline: [String]
+
+  public init(jobID: String, state: String, outcomeUnknown: Bool, timeline: [String]) {
+    self.jobID = jobID
+    self.state = state
+    self.outcomeUnknown = outcomeUnknown
+    self.timeline = timeline
+  }
+}
+
+public enum FlashSubmissionResult: Sendable, Equatable {
+  case completed(FlashSubmissionPresentation)
+  case failed(String)
+}
+
 /// An in-memory record that a human reviewed one exact execute-plan snapshot.
 ///
 /// This is deliberately not a Runtime authority, capability, reservation or
-/// Job request. The sandboxed App has no E2 submission transport, so producing
-/// this value always has zero device dispatch and cannot authorize execution.
+/// Job request. Producing this value always has zero device dispatch; the
+/// separate submit action still enters the full Runtime admission gate.
 public struct FlashHumanHandoffPresentation: Sendable, Equatable {
   public let confirmedAtUTC: String
   public let target: FlashTargetPresentation
@@ -303,6 +322,10 @@ public protocol FlashApplicationProviding: Sendable {
     mode: RockchipFlashExecutionMode,
     target: FlashTargetPresentation?
   ) async -> FlashPlanPreparationResult
+  func submit(
+    archiveURL: URL,
+    plan: FlashExactPlanPresentation
+  ) async -> FlashSubmissionResult
 }
 
 public enum FlashApplicationFacade {
@@ -321,8 +344,8 @@ public enum FlashApplicationFacade {
 
 private actor FlashProductionApplicationProvider: FlashApplicationProviding {
   func refreshWorkspace() async -> FlashWorkspacePresentation {
-    async let operations = FlashXPCReadTransport.request(method: "operation.list")
-    async let targets = FlashXPCReadTransport.request(method: "target.list")
+    async let operations = FlashXPCTransport.request(method: "operation.list")
+    async let targets = FlashXPCTransport.request(method: "target.list")
     return FlashWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets)
@@ -345,6 +368,129 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         mode: mode,
         target: target)
     }.value
+  }
+
+  func submit(
+    archiveURL: URL,
+    plan: FlashExactPlanPresentation
+  ) async -> FlashSubmissionResult {
+    guard plan.mode == .execute, let target = plan.target else {
+      return .failed("Only a bound execute plan can be submitted")
+    }
+    let gainedScope = archiveURL.startAccessingSecurityScopedResource()
+    defer {
+      if gainedScope { archiveURL.stopAccessingSecurityScopedResource() }
+    }
+    do {
+      let begin = try await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "artifact.importFlashBundle.begin",
+          params: [
+            "targetId": .string(target.id),
+            "name": .string(archiveURL.lastPathComponent),
+            "byteCount": .integer(plan.archiveSizeBytes),
+            "sha256": .string(plan.archiveSHA256),
+          ]))
+      guard let uploadID = begin["uploadId"] as? String,
+        let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
+        maximumChunkBytes > 0
+      else {
+        return .failed("Runtime returned incomplete Flash import facts")
+      }
+      do {
+        let handle = try FileHandle(forReadingFrom: archiveURL)
+        defer { try? handle.close() }
+        var offset = 0
+        while true {
+          guard !Task.isCancelled else { throw CancellationError() }
+          let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
+          if chunk.isEmpty { break }
+          let appended = try await FlashXPCResponseDecoding.resultObject(
+            await FlashXPCTransport.request(
+              method: "artifact.importFlashBundle.append",
+              params: [
+                "uploadId": .string(uploadID),
+                "offset": .integer(Int64(offset)),
+                "base64": .string(chunk.base64EncodedString()),
+              ]))
+          guard let nextOffset = appended["nextOffset"] as? Int,
+            nextOffset == offset + chunk.count
+          else {
+            throw FlashResponseFailure(message: "Runtime Flash import offset drifted")
+          }
+          offset = nextOffset
+        }
+        guard Int64(offset) == plan.archiveSizeBytes else {
+          throw FlashResponseFailure(message: "Selected archive changed while it was imported")
+        }
+      } catch {
+        _ = await FlashXPCTransport.request(
+          method: "artifact.importFlashBundle.abort",
+          params: ["uploadId": .string(uploadID)])
+        throw error
+      }
+
+      let imported = try await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "artifact.importFlashBundle.commit",
+          params: ["uploadId": .string(uploadID)]))
+      guard let lease = imported["lease"] as? String,
+        imported["targetId"] as? String == target.id,
+        imported["bindingRevision"] as? Int == target.bindingRevision,
+        imported["sha256"] as? String == plan.archiveSHA256
+      else {
+        return .failed("Runtime import facts no longer match the reviewed target and archive")
+      }
+
+      let nonce = UUID().uuidString.lowercased()
+      let request = try RuntimeOperationRequest(
+        requestID: "flash-ui-\(nonce)",
+        idempotencyKey: "flash-ui-\(nonce)",
+        target: DurableTargetReference(
+          targetID: target.id,
+          expectedBindingRevision: target.bindingRevision),
+        operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+        inputs: [
+          "imageBundleLease": .string(lease),
+          "deviceProfile": .string(plan.profileReference),
+          "partitionPlan": .array(
+            plan.partitions.sorted { $0.writeOrder < $1.writeOrder }
+              .map { .string($0.partitionName) }),
+          "postFlashVerification": .string("full"),
+        ],
+        requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.FlashWorkspace"))
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let requestData = try encoder.encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed Flash request")
+      }
+      let submitted = try await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
+      guard let jobID = submitted["jobId"] as? String else {
+        return .failed("Runtime accepted Flash without returning a Job ID")
+      }
+      let terminal = try await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "job.run", params: ["jobId": .string(jobID)]))
+      guard let returnedJobID = terminal["jobId"] as? String,
+        returnedJobID == jobID,
+        let state = terminal["state"] as? String,
+        let outcomeUnknown = terminal["outcomeUnknown"] as? Bool,
+        let timeline = terminal["timeline"] as? [String]
+      else {
+        return .failed("Runtime returned an incomplete terminal Flash status")
+      }
+      return .completed(
+        FlashSubmissionPresentation(
+          jobID: jobID, state: state, outcomeUnknown: outcomeUnknown, timeline: timeline))
+    } catch let failure as FlashResponseFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
   }
 }
 
@@ -383,6 +529,16 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
     } catch {
       return .failed(code: .planMaterializationFailed, detail: String(describing: error))
     }
+  }
+
+  func submit(
+    archiveURL _: URL,
+    plan _: FlashExactPlanPresentation
+  ) async -> FlashSubmissionResult {
+    .completed(
+      FlashSubmissionPresentation(
+        jobID: "job-ui-fixture-flash", state: "succeeded", outcomeUnknown: false,
+        timeline: ["jobCreated", "finalized"]))
   }
 }
 
@@ -480,6 +636,32 @@ private struct FlashResponseFailure: Error {
   let message: String
 }
 
+private enum FlashXPCResponseDecoding {
+  static func resultObject(
+    _ response: Result<Data, FlashXPCReadFailure>
+  ) async throws -> [String: Any] {
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure(let failure): throw FlashResponseFailure(message: failure.message)
+    }
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw FlashResponseFailure(message: "Runtime returned an unreadable response")
+    }
+    if let error = object["error"] as? [String: Any] {
+      let code = error["code"] as? String ?? "unknown"
+      let message = error["message"] as? String ?? "no message"
+      throw FlashResponseFailure(message: "Runtime refused the request: \(code) — \(message)")
+    }
+    guard object["ok"] as? Bool == true,
+      let result = object["result"] as? [String: Any]
+    else {
+      throw FlashResponseFailure(message: "Runtime returned no result object")
+    }
+    return result
+  }
+}
+
 enum FlashPlanPresentationBuilder {
   static func prepare(
     archiveURL: URL,
@@ -503,10 +685,10 @@ enum FlashPlanPresentationBuilder {
             name: $0.name, sizeBytes: $0.sizeBytes, sha256: $0.sha256)
         })
       let provider = RockchipRockUSBFlashProvider(profile: profile)
-      let plan = try provider.makePlan(
+      let plan = try materializePlan(
+        provider: provider,
         mode: mode,
-        archiveValidation: profile.validate(observation),
-        planNonce: "app-preview")
+        archiveValidation: profile.validate(observation))
       return .ready(
         presentation(
           plan: plan,
@@ -525,6 +707,25 @@ enum FlashPlanPresentationBuilder {
       return .failed(code: .unsupportedBundle, detail: String(describing: failure))
     } catch {
       return .failed(code: .planMaterializationFailed, detail: String(describing: error))
+    }
+  }
+
+  /// Execute review must materialize the same canonical plan used by the
+  /// protected campaign path. Preview-only modes retain a separate nonce so
+  /// their step identities cannot be mistaken for executable facts.
+  static func materializePlan(
+    provider: RockchipRockUSBFlashProvider,
+    mode: RockchipFlashExecutionMode,
+    archiveValidation: RockchipArchiveValidationVerdict
+  ) throws -> RockchipFlashPlan {
+    switch mode {
+    case .execute:
+      return try provider.makePlan(mode: mode, archiveValidation: archiveValidation)
+    case .planOnly, .simulated:
+      return try provider.makePlan(
+        mode: mode,
+        archiveValidation: archiveValidation,
+        planNonce: "app-preview")
     }
   }
 
@@ -620,12 +821,14 @@ enum FlashXPCReadFailure: Error, Sendable, Equatable {
   }
 }
 
-private enum FlashXPCReadTransport {
-  static func request(method: String) async -> Result<Data, FlashXPCReadFailure> {
+private enum FlashXPCTransport {
+  static func request(
+    method: String,
+    params: [String: JSONValue]? = nil
+  ) async -> Result<Data, FlashXPCReadFailure> {
     let frame: Data
     do {
-      frame = try JSONSerialization.data(
-        withJSONObject: ["v": 1, "id": UUID().uuidString, "method": method])
+      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
     } catch {
       return .failure(.transport("Could not compose a Runtime request"))
     }

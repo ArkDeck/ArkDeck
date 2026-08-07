@@ -20,8 +20,8 @@ enum FlashWorkspaceMode: String, CaseIterable, Hashable {
 ///
 /// The App can read Runtime availability and target facts, and it can ask the
 /// bundled provider to materialize an exact plan from a user-selected archive.
-/// It deliberately has no submit/run/authorization client. Execute remains a
-/// visible locked state until a separately reviewed E2 App transport exists.
+/// Runtime owns destructive admission; the UI only submits the reviewed typed
+/// request and never carries or administers a capability.
 struct FlashWorkspaceView: View {
   @ObservedObject var model: FlashWorkspaceViewModel
   let runtimeHistory: RuntimeHistoryPresentation
@@ -495,21 +495,42 @@ struct FlashWorkspaceView: View {
         switch model.mode {
         case .execute:
           Divider()
-          Label(flashText("flash.execute.locked"), systemImage: "lock.fill")
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("flash.execute.blocker")
           if let handoff = model.humanHandoff {
             confirmedHandoff(handoff)
-            Button(flashText("flash.action.submitLocked")) {}
+            Button {
+              model.submit()
+            } label: {
+              if model.isSubmitting {
+                HStack(spacing: 8) {
+                  ProgressView().controlSize(.small)
+                  Text(flashText("flash.action.submitting"))
+                }
+              } else {
+                Text(flashText("flash.action.submit"))
+              }
+            }
               .buttonStyle(.borderedProminent)
               .tint(.red)
-              .disabled(true)
+              .disabled(!model.canSubmit)
               .accessibilityIdentifier("flash.execute.submit")
-            Label(flashText("flash.execute.submitLockReason"), systemImage: "lock.shield")
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
+            if let submission = model.submission {
+              Label(
+                String(format: flashText("flash.execute.terminal"), submission.state),
+                systemImage: submission.state == "succeeded"
+                  ? "checkmark.circle.fill" : "xmark.octagon.fill"
+              )
+              .foregroundStyle(submission.state == "succeeded" ? .green : .red)
+              .accessibilityIdentifier("flash.execute.terminal")
+              Text(submission.jobID)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+                .accessibilityIdentifier("flash.execute.jobId")
+            } else if let failure = model.submissionFailure {
+              Label(failure, systemImage: "xmark.octagon.fill")
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("flash.execute.failure")
+            }
           } else {
             Label(
               flashText("flash.execute.confirmationRequired"),
@@ -627,8 +648,11 @@ final class FlashWorkspaceViewModel: ObservableObject {
   @Published private(set) var planFailureCode: FlashPlanFailureCode?
   @Published private(set) var planFailureDetail: String?
   @Published private(set) var humanHandoff: FlashHumanHandoffPresentation?
+  @Published private(set) var submission: FlashSubmissionPresentation?
+  @Published private(set) var submissionFailure: String?
   @Published private(set) var isRefreshing = false
   @Published private(set) var isPreparingPlan = false
+  @Published private(set) var isSubmitting = false
   @Published private(set) var profileReference =
     FlashApplicationFacade.profileReferences.last ?? "dayu200@1"
 
@@ -663,6 +687,18 @@ final class FlashWorkspaceViewModel: ObservableObject {
       && plan?.mode == .execute
       && plan?.target == selectedTarget
       && !isPreparingPlan
+  }
+
+  var canSubmit: Bool {
+    guard mode == .execute, !isSubmitting,
+      let archive = selectedArchiveURL,
+      let plan,
+      let handoff = humanHandoff
+    else { return false }
+    return !archive.path.isEmpty
+      && plan.target == selectedTarget
+      && handoff.planDigestSHA256 == plan.planDigestSHA256
+      && handoff.archiveSHA256 == plan.archiveSHA256
   }
 
   func refresh() {
@@ -725,6 +761,8 @@ final class FlashWorkspaceViewModel: ObservableObject {
     isPreparingPlan = true
     plan = nil
     humanHandoff = nil
+    submission = nil
+    submissionFailure = nil
     planFailureCode = nil
     planFailureDetail = nil
     let provider = provider
@@ -774,9 +812,34 @@ final class FlashWorkspaceViewModel: ObservableObject {
     return result
   }
 
+  func submit() {
+    guard canSubmit, let archiveURL = selectedArchiveURL, let plan else { return }
+    isSubmitting = true
+    submission = nil
+    submissionFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let result = await provider.submit(archiveURL: archiveURL, plan: plan)
+      guard let self else { return }
+      defer { self.isSubmitting = false }
+      guard self.selectedArchiveURL == archiveURL,
+        self.plan == plan,
+        !Task.isCancelled
+      else { return }
+      switch result {
+      case .completed(let terminal):
+        self.submission = terminal
+      case .failed(let detail):
+        self.submissionFailure = detail
+      }
+    }
+  }
+
   private func invalidatePlan() {
     plan = nil
     humanHandoff = nil
+    submission = nil
+    submissionFailure = nil
     planFailureCode = nil
     planFailureDetail = nil
   }

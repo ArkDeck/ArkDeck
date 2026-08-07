@@ -89,7 +89,7 @@
           "$ref": "#/$defs/authorizationPolicy"
         },
         "destructive": {
-          "const": "oneShotExactPlan"
+          "const": "runtimeCapability"
         }
       }
     },
@@ -232,7 +232,7 @@
       "enum": [
         "defaultReadOnly",
         "standingCapability",
-        "oneShotExactPlan"
+        "runtimeCapability"
       ]
     },
     "cancellation": {

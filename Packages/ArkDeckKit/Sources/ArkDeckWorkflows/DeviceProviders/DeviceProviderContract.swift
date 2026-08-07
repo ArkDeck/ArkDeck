@@ -115,7 +115,7 @@ public struct RockchipRuntimeFlashBundle: Sendable, Equatable {
 }
 
 /// Closed actions for the published DAYU200 runtime plan. Authorization is
-/// deliberately absent: the Runtime consumes the E2 capability immediately
+/// deliberately absent: the Runtime consumes its exact capability immediately
 /// before the first mutation and the Provider cannot request a second,
 /// legacy authorization token.
 public enum RockchipProviderAction: Sendable, Equatable {

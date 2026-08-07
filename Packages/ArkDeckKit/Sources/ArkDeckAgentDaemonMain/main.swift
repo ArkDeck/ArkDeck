@@ -455,9 +455,8 @@ Task.detached {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: utcNow)
-    // Campaign-lane E2 authority: the same owner-only AuthorizationUsage
-    // directory the campaign admission service reserves in — file plus flock
-    // makes the ledger safe across the CLI and daemon processes.
+    // Historical authority records remain mounted read-only for versioned
+    // decode/export. New admission never reserves or consumes this ledger.
     let usageRoot = try FileManager.default.url(
       for: .applicationSupportDirectory, in: .userDomainMask,
       appropriateFor: nil, create: true

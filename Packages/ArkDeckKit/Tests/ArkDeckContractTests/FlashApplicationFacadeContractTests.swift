@@ -120,7 +120,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       Set(profile.prerequisites.keys))
   }
 
-  func testExecutePresentationStaysLockedEvenThoughTheExactPlanCanBeReviewed() throws {
+  func testExecutePresentationRemainsReviewOnlyUntilRuntimeSubmission() throws {
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .execute, archiveValidation: .valid, planNonce: "ui-test")
@@ -132,6 +132,40 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
 
     XCTAssertFalse(presentation.steps.isEmpty)
     XCTAssertTrue(presentation.steps.allSatisfy { $0.disposition == .executionLocked })
+  }
+
+  func testExecuteReviewUsesTheRuntimeCanonicalPlan() throws {
+    let provider = RockchipRockUSBFlashProvider(
+      profile: RockchipFlashProfile.dayu200OpenHarmony70035)
+    let reviewedPlan = try FlashPlanPresentationBuilder.materializePlan(
+      provider: provider,
+      mode: .execute,
+      archiveValidation: .valid)
+    let campaignPlan = try provider.makePlan(
+      mode: .execute,
+      archiveValidation: .valid)
+
+    XCTAssertEqual(reviewedPlan.planDigestSHA256, campaignPlan.planDigestSHA256)
+    XCTAssertEqual(reviewedPlan.stepSetDigestSHA256, campaignPlan.stepSetDigestSHA256)
+    XCTAssertEqual(reviewedPlan.steps.map(\.id), campaignPlan.steps.map(\.id))
+  }
+
+  func testPreviewModesCannotReuseExecutableStepIdentities() throws {
+    let provider = RockchipRockUSBFlashProvider(
+      profile: RockchipFlashProfile.dayu200OpenHarmony70035)
+    let executePlan = try FlashPlanPresentationBuilder.materializePlan(
+      provider: provider,
+      mode: .execute,
+      archiveValidation: .valid)
+
+    for mode in [RockchipFlashExecutionMode.planOnly, .simulated] {
+      let preview = try FlashPlanPresentationBuilder.materializePlan(
+        provider: provider,
+        mode: mode,
+        archiveValidation: .valid)
+      XCTAssertNotEqual(preview.stepSetDigestSHA256, executePlan.stepSetDigestSHA256)
+      XCTAssertNotEqual(preview.steps.map(\.id), executePlan.steps.map(\.id))
+    }
   }
 
   func testExactDoubleConfirmationProducesOnlyAZeroDispatchHumanHandoff() throws {

@@ -242,11 +242,12 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       XCTFail("a host-only operation is gated by the default read-only policy")
     } catch let error as RuntimeJobEngineError {
       guard case .rejected(_, let detail) = error else { return XCTFail("\(error)") }
-      // Refused earlier and more precisely than the host-only guard would:
-      // drafting is limited to E1 device mutations. The guard inside
-      // `draftCapability` remains the backstop if that ever widens.
+      // Refused by the external-administration boundary: only a mutation with
+      // an external standing policy could ever be drafted by this legacy API.
+      // Runtime-owned destructive admission and default-read-only operations
+      // have no caller-facing capability writer.
       XCTAssertTrue(
-        detail.contains("deviceMutation") || detail.contains("host-only"), detail)
+        detail.contains("mutation operations with an external standing policy"), detail)
     }
   }
 
