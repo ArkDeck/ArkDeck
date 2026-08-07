@@ -1,56 +1,58 @@
 # AGENTS.md Delta
 
-> Change: `CHG-2026-056-e2-policy-baseline-alignment`
+> Change: `CHG-2026-056-e2-policy-baseline-alignment@r5`
 > Target: `AGENTS.md`
-> Applies only after this Core/Safety scope is explicitly approved and the implementation task is
-> reviewed; it does not alter the instructions of the unmerged proposal branch.
+> Applies only after this Core/Safety revision is explicitly approved and merged.
 
-## MODIFIED Runtime Agent execution rule
+## MODIFIED Authority order and governance carrier
 
-The Device Agent Runtime Plane is the only Agent path that executes a published Catalog
-operation. It creates Runtime Job/Session/Artifact records and SHALL NOT require a Git Task,
-change ID, PR, readiness packet or a human to retype the typed plan before it can run.
+The highest authority SHALL describe the device boundary as typed effect admission, device
+identity, fail-closed recovery and privacy, not as E0/E1/E2 authorization tiers. Future changes to
+destructive automation admission remain one of the four changes that require OpenSpec + maintainer
+PR review; removing the E2 name does not remove that governance carrier.
 
-- **E0/readOnly:** a Runtime Agent MAY execute a published read-only operation under the default
-  read-only policy after normal target, tool, timeout, byte-limit and privacy admission. A Git
-  task/PR is not an execution authority and is not a prerequisite.
-- **E1/deviceMutation:** a Runtime Agent MAY execute only with a matching per-device
-  `RuntimeCapability`; scope, target/binding, validity, use count and compensation semantics are
-  checked immediately before the first mutation.
-- **E2/destructive:** a Runtime Agent MAY execute only with an exact
-  `standingAuthorization` or same-session `evolutionCampaignConfirmation`, as defined by the
-  modified `POL-AGENT-002` and `REQ-FLASH-015`. A valid bounded campaign is an execution
-  authority; it SHALL NOT require an extra human handoff, `AUTH-ID`, legacy chat confirmation,
-  normal/evolution mode selection, Git Task or per-attempt user message.
+## MODIFIED Device Agent Runtime Plane
 
-The execution gate SHALL re-materialize the published typed plan and read fresh target/binding
-facts immediately before each external effect. Missing, consumed, expired or drifted authority;
-unknown identity/outcome; a missing fresh reservation; an unsafe/non-terminal predecessor; or a
-candidate/budget violation SHALL fail closed with zero new dispatch. A valid immutable candidate
-pin follows its fixed isolated build and closed strategy-output validation; independent
-adversarial review is not an E2 admission requirement and a candidate change SHALL NOT launch a
-runtime review session. A Runtime Agent SHALL
-not execute raw shell/HDC/RockUSB strings or an undeclared operation, and SHALL not forge user
-confirmation, authority provenance or evidence.
+The Device Agent Runtime Plane executes only operations published on protected `main` and creates
+Runtime Job/Session/Artifact records. Execution never requires a Git Task, change ID, PR,
+readiness packet, AUTH-ID, legacy mode or a human to retype the plan.
 
-`scripts/host_loop` remains a Repo Agent Plane worker. Its ban on device Runtime jobs does not
-limit the Device Agent Runtime Plane; it prevents a repository-development dispatcher from
-becoming an untracked device executor. Candidate and repairer remain isolated from device
-transport and authority, while the protected-main broker remains the only component that can
-dispatch an E2 plan.
+- `hostOnly` / `readOnly` use the bounded default read-only policy.
+- `deviceMutation` / `destructive` use a Runtime-owned `RuntimeCapability` matching the exact
+  operation/version, target/binding, inputs, plan and applicable Artifact facts.
+- For a destructive request, only protected-main Runtime may deterministically mint that short-
+  lived capability after complete plan materialization from published Catalog policy and trusted
+  facts. Caller/Agent/candidate/repairer cannot install, revoke, forge or widen it.
+- `standingAuthorization` and `evolutionCampaignConfirmation` are legacy decode/export kinds and
+  cannot admit, reserve or dispatch a new operation.
+
+The Runtime gate SHALL re-materialize the published typed plan, verify Artifact leases, read fresh
+target/binding facts and reserve each use immediately before the first external effect. A closed
+automation invocation remains limited to 16 serial attempts, four hours and concurrency one;
+continuation requires a prior durable `safeToReflash` terminal. Missing/drifted facts, unknown
+identity/outcome, unsafe partial state, unresolved intent, cancellation after intent or exhausted
+budget SHALL fail closed with zero new dispatch.
+
+Candidate and repairer remain isolated from device transport, Runtime and capability admin. A
+Runtime Agent SHALL NOT execute raw shell/HDC/RockUSB strings, undeclared operations or caller-
+supplied argv. UI acknowledgement may communicate userdata impact but is not execution authority
+and is not required for headless Agent execution.
+
+## MODIFIED Agent prohibition
+
+Agents SHALL NOT create or alter trusted target facts, RuntimeCapability records, durable
+reservation/outcome records or hardware evidence to make a destructive request pass. Historical
+E2 authority bytes SHALL NOT be migrated into RuntimeCapability. Simulation, fake and plan-only
+results SHALL NOT be represented as real hardware.
+
+`scripts/host_loop` remains Repo Agent Plane only and SHALL NOT execute device Runtime jobs. Its
+device ban does not prevent the separately composed protected-main Device Runtime from executing a
+request that passes the Runtime-owned gate.
 
 ## REMOVED Ambiguities
 
-- Do not describe a Runtime Agent E0 operation as requiring an approved change's ready task.
-- Do not describe a valid campaign as requiring a second human handoff, `AUTH-ID`, legacy
-  `chatConfirmation`, `normal|evolution` selection or a Git carrier.
-- Do not use "autonomous Agent never executes" or "human-only destructive evidence" for a
-  Runtime Agent that passed the exact E2 gate.
-- Do not interpret the `host_loop` device ban as a prohibition on a separately admitted Runtime
-  Agent Job.
-
-## Unchanged safety boundaries
-
-This delta does not authorize an Agent with no E2 authority, permit mutable/unknown plan or
-target facts, replay an unknown destructive outcome, grant candidate/repairer device access, or
-relax typed-only, identity, durability, privacy or truthful-evidence requirements.
+- Do not state that real destructive Agent execution requires E2, standing authorization,
+  campaign confirmation, per-attempt user text or a maintainer PR carrying an authority instance.
+- Do not lower `destructive` to another effect to obtain RuntimeCapability admission.
+- Do not interpret a UI click, evidence record, connected USB target or schema-valid request as a
+  trusted fact or capability.
