@@ -2765,11 +2765,15 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   持久化的路径字符串不是授权(既有合约测试早已钉住),死 bookmark 会被丢弃并回写清理,
   故残留是惰性的;真实情况是 discovery 为 explicit-only 而该 host 三处显式来源皆未配置,
   且产品自带免 picker 的 `ARKDECK_HDC_USER_CONFIGURED_PATH` / `--arkdeck-hdc-user-configured-path`
-  覆盖(非沙箱进程无需 bookmark),经本窗口新增测试行实测可选到哈希命中 3.2.0f 的真候选。
-  **故只剩一条**:build/firmware confirmation 只能在 readiness 窗口内经 registered
-  `list targets -v` 固定,blocked 态禁止运行。任务不转 ready、不运行 HDC/device;记录 =
+  覆盖(非沙箱进程无需 bookmark)。**gate B 已由实测收口**:r3 的「覆盖会选出真候选」原是
+  机制(fixture)与哈希两次测量拼出的推断,现由一条真输入门测试在同一次运行里合上——空偏好
+  套件起步、无 bookmark、三处显式来源仅覆盖一条,discover 出恰一个候选、零 issue,且其
+  sha256 由测试内重读文件核对并通过身份校验。**故只剩一条**:build/firmware confirmation
+  只能在 readiness 窗口内经 registered `list targets -v` 固定,blocked 态禁止运行。
+  任务不转 ready、不运行 HDC/device;记录 =
   `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md`、`readiness-blocked-r2.md`
-  （production-selection 一条已由 r3 更正）与 `readiness-blocked-r3.md`）
+  （production-selection 一条已由 r3 更正）、`readiness-blocked-r3.md` 与
+  `gate-b-measured-closed-2026-08-07.md`）
 - Historical Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由
   #760 implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
   之后仍须 fresh D1 readiness。proposal 不批准 exact argv/设备 tuple，不构成

@@ -369,6 +369,62 @@ final class HDCSupervisorContractTests: XCTestCase {
     XCTAssertTrue(HDCCandidateIdentityVerifier.matches(environmentCandidate))
   }
 
+  /// The same override, measured end to end against a real toolchain instead of
+  /// a copied fixture (TASK-AIN-010P gate B).
+  ///
+  /// The row above proves the mechanism; it does not prove that pointing the
+  /// override at a real HDC yields the candidate an audit would then pin. Those
+  /// were two separate measurements joined by an inference, and this change
+  /// window has already been wrong twice for exactly that reason — so they are
+  /// joined here instead.
+  ///
+  /// Gated on the product's own override key, which is also the input: set it to
+  /// an absolute HDC path and the test runs against that executable. Discovery
+  /// executes nothing, so no server can be started, adopted or contacted.
+  func testConfiguredOverrideSelectsTheRealToolchainWithoutABookmark() throws {
+    guard
+      let configured = ProcessInfo.processInfo.environment[
+        HDCApplicationDiagnosticsConfiguration.userConfiguredPathEnvironmentKey]
+    else {
+      throw XCTSkip(
+        "set \(HDCApplicationDiagnosticsConfiguration.userConfiguredPathEnvironmentKey) "
+          + "to a real HDC executable to measure gate B")
+    }
+    let expected = URL(fileURLWithPath: configured)
+      .resolvingSymlinksInPath().standardizedFileURL
+    let suiteName = "ArkDeck.HDC.GateB.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    // Nothing persisted, no bookmark, no App run: exactly the state a package
+    // executable starts from.
+    let request = HDCApplicationDiagnosticsConfiguration.discoveryRequest(
+      userDefaults: defaults, arguments: [],
+      environment: [
+        HDCApplicationDiagnosticsConfiguration.userConfiguredPathEnvironmentKey: configured
+      ])
+    XCTAssertEqual(request.userConfiguredPaths, [expected])
+    XCTAssertTrue(request.securityScopedBookmarks.isEmpty)
+    XCTAssertTrue(request.devecoSDKPaths.isEmpty)
+    XCTAssertTrue(request.openHarmonySDKPaths.isEmpty)
+
+    let report = HDCExternalFirstDiscovery.discover(request)
+    XCTAssertEqual(report.issues, [], "a real executable must raise no discovery issue")
+    XCTAssertEqual(report.candidates.count, 1, "\(report.candidates.map(\.path))")
+    let candidate = try XCTUnwrap(report.candidates.first)
+    XCTAssertEqual(candidate.path, expected)
+    XCTAssertEqual(candidate.source, .userConfigured)
+    XCTAssertNil(candidate.securityScopedBookmark)
+
+    // The identity the candidate carries is the file's own, re-read here rather
+    // than trusted from the report — the whole point of joining the two
+    // measurements.
+    let onDisk = SHA256.hash(data: try Data(contentsOf: expected))
+      .map { String(format: "%02x", $0) }.joined()
+    XCTAssertEqual(candidate.sha256, onDisk)
+    XCTAssertTrue(HDCCandidateIdentityVerifier.matches(candidate))
+  }
+
   // TEST-AC-HDC-001-01 / toolchainContract
   func testTEST_AC_HDC_001_01_SnapshotRemainsAValueWhenSelectionChanges() throws {
     let candidate = fixtureCandidate()
