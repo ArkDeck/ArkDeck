@@ -40,6 +40,20 @@ public enum HDCApplicationDiagnosticsFacade {
     }
     return HDCFixtureApplicationDiagnostics(arguments: arguments)
   }
+
+  /// Contract tests exercise the UI fixture's delayed-refresh branch with a
+  /// virtual wait. The App still receives the process-isolated implementation
+  /// above, while tests avoid turning a state assertion into a ten-second
+  /// wall-clock assertion.
+  package static func makeFixtureForTesting(
+    arguments: [String],
+    delayedRefreshWait: @escaping @Sendable () async -> Void
+  ) -> any HDCApplicationDiagnosticsProviding {
+    precondition(arguments.contains("--ui-test-hdc-diagnostics"))
+    return HDCFixtureApplicationDiagnostics(
+      arguments: arguments,
+      delayedRefreshWaitOverride: delayedRefreshWait)
+  }
 }
 
 private struct HDCDeviceObservationSessionKey: Sendable, Equatable {
@@ -309,12 +323,17 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
   /// `--ui-test-hdc-diagnostics` selected the fixture, so no production
   /// composition can read or be steered by it.
   private let stateFileURL: URL?
+  private let delayedRefreshWaitOverride: (@Sendable () async -> Void)?
   private var recovery: HDCLifecycleRecoveryPresentation
   private var refreshCallCount = 0
   private var latestCompletedRefreshCallCount = 0
 
-  init(arguments: [String]) {
+  init(
+    arguments: [String],
+    delayedRefreshWaitOverride: (@Sendable () async -> Void)? = nil
+  ) {
     launchArguments = arguments
+    self.delayedRefreshWaitOverride = delayedRefreshWaitOverride
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
@@ -352,10 +371,32 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
     refreshCallCount += 1
     let acceptedCall = refreshCallCount
     if delayedRefresh, acceptedCall == 2 {
-      try? await Task.sleep(for: .seconds(10))
+      await waitForDelayedRefreshRelease()
     }
     latestCompletedRefreshCallCount = max(latestCompletedRefreshCallCount, acceptedCall)
     return presentation()
+  }
+
+  /// UI automation controls an in-flight refresh by keeping the delay token
+  /// in its existing fixture-state file, then removing it after asserting the
+  /// disabled controls and previous snapshot. This replaces a fixed sleep
+  /// with a deterministic rendezvous and retains a bounded fallback for old
+  /// callers that do not provide a state file.
+  private func waitForDelayedRefreshRelease() async {
+    if let delayedRefreshWaitOverride {
+      await delayedRefreshWaitOverride()
+      return
+    }
+    guard stateFileURL != nil else {
+      try? await Task.sleep(for: .seconds(10))
+      return
+    }
+
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(10))
+    while delayedRefresh, clock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(10))
+    }
   }
 
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {

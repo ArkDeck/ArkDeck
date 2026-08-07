@@ -560,9 +560,12 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
   }
 
   func testHOR1_DelayedFixtureMakesEveryAcceptedRefreshObservable() async {
-    let fixture = HDCApplicationDiagnosticsFacade.make(arguments: [
-      "ArkDeck", "--ui-test-hdc-diagnostics", "--ui-test-hdc-refresh-delay",
-    ])
+    let delay = FixtureDelaySpy()
+    let fixture = HDCApplicationDiagnosticsFacade.makeFixtureForTesting(
+      arguments: [
+        "ArkDeck", "--ui-test-hdc-diagnostics", "--ui-test-hdc-refresh-delay",
+      ],
+      delayedRefreshWait: { await delay.wait() })
     let first = await fixture.refresh()
     let second = await fixture.refresh()
     let third = await fixture.refresh()
@@ -575,6 +578,8 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
       "a duplicate that reaches the fixture is a visible third transition")
     XCTAssertEqual(second.automaticLifecycleDispatchCount, 0)
     XCTAssertEqual(second.automaticSubserverDispatchCount, 0)
+    let delayInvocationCount = await delay.invocationCount
+    XCTAssertEqual(delayInvocationCount, 1)
   }
 
   func testHOR2_AppWiringHasSynchronousSingleCallAdmissionAndNoQueue() throws {
@@ -937,6 +942,14 @@ private actor ObservationGate {
     let current = waiters
     waiters.removeAll()
     current.forEach { $0.resume() }
+  }
+}
+
+private actor FixtureDelaySpy {
+  private(set) var invocationCount = 0
+
+  func wait() {
+    invocationCount += 1
   }
 }
 
