@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r16
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r17
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -222,3 +222,29 @@
 - `unsafePartial` 的判定逐字不变——本条只允许把「已证明无副作用」从 `outcomeUnknown` 里摘出去,
   不允许把「未知的部分副作用」摘出去;
 - reconciliation 的分类结果必须能读出依据(有无 terminal、intent 集合、读回是否被调用及结论)。
+
+### AIN-RECON-001/002 结果(r17,2026-08-07)
+
+决定:两半都做——读回收窄到引擎写的 `outcomeUnknown`(产线可达),崩溃面如实降级。
+论证见 `docs/adr/0009-campaign-unknown-outcome-authority.md`。
+
+- [x] AIN-RECON-001 引擎半 —— `testTheEngineWritesTheUnknownTerminalTheReadbackConsumes`:
+  真实 `RuntimeJobEngine` 跑 `flash.dayu200@1`,首个 mutating dispatch 子进程结果不可观测,
+  引擎自己落下 `.outcomeUnknown` terminal 且 intent 集合非空(journal 来的,不是缺席);
+  `classify` 判定该形状恰为唯一进入读回的那条。**真输入门**
+  `ARKDECK_DAYU200_70035_IMAGE`(磁盘归档,非设备),本地 7.0.0.35 实跑 PASS,设备 dispatch=0。
+- [x] AIN-RECON-001 campaign 半 —— `testBothReadbackConclusionsAreReachedAndTheBasisSaysWhich`:
+  同一 terminal 形状下读回正反两种结论各一,basis 分别记 `readback=settled` / `readback=refused`。无门。
+- [x] AIN-RECON-001 降级半 —— `testNoDurableTerminalIsAnAbsenceAndNeverReachesTheReadback`:
+  崩溃尝试 disposition 仍为 `outcomeUnknown`,basis 为 `noDurableTerminal`,
+  **读设备 0 次**(readback 本可 settle 却未被调用),usage reservation 仍被关闭且集合为空。无门。
+- [x] AIN-RECON-002 —— `testProofOfNoEffectOutranksTheTerminalStatus`:证据次序高于状态;
+  `unsafePartial` 逐字不变(单独一行对钉);缺席不是证明(两向各一)。
+  变异对照:关掉该规则即打红。无门。
+  活缺陷修复的对钉在 `RuntimeJobEngineContractTests.testOutcomeUnknownParksAndReconcileClears`:
+  和解产出的确认未执行结论必须带 `semanticCode`;改回 nil 即打红。无门。
+- [x] `testAnUnknownTerminalCannotCarryTheProofItWouldNeed`:记录 AIN-RECON-002 字面场景
+  造不出来的原因(ledger 拒绝 `outcomeUnknown` 携带非空 confirmedNotExecuted),
+  免得第三次被重新推导。无门。
+- [x] 分类依据可读:`attemptTerminal` 的 basis 在上述各例中逐条断言。
+- [x] 全量 `swift test`:1400 tests,0 failures,12 skipped。

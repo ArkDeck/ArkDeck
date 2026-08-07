@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 16
+revision: 17
 status: approved # r1 经 #281 正式批准；r2-r14 已合入；r15 由维护者 review/merge 显式恢复 approved scoped-delta 状态
 class: core
 core_change_level: major
@@ -529,6 +529,62 @@ else if terminal.status == .outcomeUnknown {
 - 把「没有证据」当成「证明了没有副作用」——本修订要的是让**已有的**强证据别被短路,不是造新证据;
 - 改动 `isLoaderTransitionOnly` 的排除面(写过分区的尝试仍然、也应当到不了读回);
 - 在实现 PR 中连接设备或宣称 GJ-4 相关状态改变。
+
+## r17(2026-08-07):定案——读回收窄到它唯一的写入者,崩溃面如实降级
+
+r16 要一个决定。这是决定,记在 `docs/adr/0009-campaign-unknown-outcome-authority.md`,
+两半都做、各自用在它成立的地方:
+
+1. **读回保留,收窄到引擎写的 `outcomeUnknown`。** 那是唯一「job 还活着、intent 集合有
+   journal 支撑」的写入者,而且产线可达——`DescriptorBoundProcessDispatcher` 在子进程
+   结果不可观测时就抛 `outcomeUnknown`,不需要设备崩溃。这不是空闸。
+2. **崩溃(无 durable terminal)不是读回的适用面,并停止被当成恢复能力。**
+3. **证据的次序高于状态**,判定抽成 `classify` 并由测试钉住次序本身。
+4. **已经存在的证明不得被丢弃。**
+5. **分类依据可读**:`attemptTerminal` 带上 basis。
+
+### 三处与 r16 叙述不同的实测事实
+
+r16 是按现场推断写的,逐条读代码后有三处要更正——都指向同一个方向,只是层次更深:
+
+- **不是「引擎失败不落 terminal」。** 引擎失败**会**落 terminal(`.failed`,intent 集合
+  齐全)。真正的结构原因是:`reconcileUnresolved` 在同一次调用里写自己的 unknown
+  terminal *并且* `closeAttempt`,此后 `activeReservation` 为 nil,下一次 `continue`
+  在第一道 guard 就返回——**它自己写的那条 terminal 永远不会被自己重读**。所以
+  `status == .outcomeUnknown` 分支只可能看见引擎写的 terminal。三个窗口都杀了写入者,
+  于是三次都落在「无 terminal」分支。方向与 r16 一致,机制不同。
+- **不是「`else if` 短路了 `confirmedNotExecuted`」。** `AgentAuthorityUsageTerminal`
+  在 `status != .failed` 时**拒绝**携带非空 `confirmedNotExecutedIntentEventIDs`
+  (`AuthorizationUsageLedger.swift:709`,且有测试对钉)。`outcomeUnknown` 的 terminal
+  根本装不下这条证据;单改分支次序不改变任何行为。短路从来不是约束点,这条不变量才是。
+- **真正在丢证据的是另一处,而且是活的缺陷。** `finishReconcile` 的
+  `.confirmedNotExecuted` 分支 journal 出的 stepOutcome **不带** `semanticCode`,而
+  `mutationIntentEvidence` 只认这个 code。于是:专用读回证明了破坏性步骤从未执行 →
+  usage terminal 不记 → campaign 判定看不见 → 照旧烧成 `unsafePartial`。产品把自己
+  拥有的最强证据扔了。这条修了,并有变异对照。
+
+### 为什么崩溃面是「降级」而不是「暂时没做」
+
+两条承重理由,都是实测:
+
+- 和解自写的 terminal 在同一次调用里就被封存,分支按构造不可重读(上文第一条);
+- 分类器唯一的输入 `actualStepKinds` 是一个**滞后于持久事实的投影**:它在
+  `persistRuntimeRecord`(写前置 intent 之前)之后才追加进内存记录。进程在「前置
+  intent 已持久、下一次 persist 之前」死亡,磁盘上的 `actualStepKinds` 就不含那条
+  已持久的破坏性 intent——正是崩溃的落点。今天无害(无 terminal ⇒ 不查读回);
+  一旦让崩溃走读回,它立刻是一个把「未知的部分副作用」判成安全的正确性洞。
+
+所以崩溃尝试保持 `outcomeUnknown`,停给人;变的只是记录不再暗示有一条跑过的恢复路径。
+这条 persist 次序**没有**顺手改:它今天无害,且正是本决策的承重理由,在派发热路径上
+顺手重排会把一条论据换成一处未经论证的改动。要让崩溃走读回,先修它,再重新论证。
+
+### Out of scope(r17,与 r16 一致且未放宽)
+
+- `unsafePartial` 逐字不变;只把「已证明无副作用」从 `outcomeUnknown` 摘出去;
+- 不解除上文那条 ledger 不变量——引擎产不出该形状,解除只会造出一个没有写入者的空闸,
+  正是本修订拒绝的东西换了个位置;
+- 不动 `isLoaderTransitionOnly` 的排除面;
+- 实现 PR 不连接设备,不宣称 GJ-4 相关状态改变。
 
 ## r1 approval and flow history
 

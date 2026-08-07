@@ -3186,7 +3186,15 @@ public actor RuntimeJobEngine {
             attempt: 1,
             correlatesToIntentEventID: intentEventID,
             result: "failed",
-            outcomeCertainty: .confirmed))
+            outcomeCertainty: .confirmed,
+            // The semantic code is what makes this a *proof* rather than just
+            // a failure: `mutationIntentEvidence` recognizes a proven
+            // non-execution by this code alone. Without it the dedicated
+            // readback established that a destructive step never ran, the
+            // usage terminal did not say so, and the campaign burned as
+            // `unsafePartial` anyway — the product throwing away the strongest
+            // evidence it owns (TASK-AIN-020).
+            semanticCode: Self.confirmedNotExecutedSemanticCode))
         runtime.nextSequence += 1
       }
       // An unknown action is never resent automatically, even when it was
