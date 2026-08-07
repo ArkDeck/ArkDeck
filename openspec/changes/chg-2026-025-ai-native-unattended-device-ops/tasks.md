@@ -2757,12 +2757,17 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-010P — Agent E0 registration capture for OpenHarmony probes
 
-- Status:blocked（2026-07-29 fresh r1 readiness：r5 已由 #763 exact-head review
-  后合入，但当前 host 没有可由 production resolver 解引用的 durable HDC binding，
-  ArkDeck 的 HDC 配置仍指向已不存在的旧 fake fixture，且 exact 3.2.0f existing
-  server/listener 不存在；因此 device/build tuple、binding revision 与 machine target
-  confirmation 无法固定。任务不转 ready、不运行 HDC/device；记录 =
-  `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md`）
+- Status:blocked（2026-08-07 fresh r2 readiness 复测：三条 r1 阻塞里两条已自行解除——
+  exact 3.2.0f existing server/listener 现已存在且为 DevEco toolchain hdc 的既有
+  commandless 进程；durable target 亦已由 `CHG-2026-048` bootstrap 建立
+  (`TGT-958780b2ffb7`，binding revision 2，2026-07-31 adopted)，r1 的鸡生蛋死锁在产品侧
+  已解。**剩一条硬阻塞**：`ArkDeck.HDC.userConfiguredPaths` 仍指向一个不存在的路径,
+  查清其真身是 UI-test runner 容器里的 per-run 临时 fixture——测试装置写进了产品的真实
+  preferences 域并留下悬垂指针,故 production discovery 仍选不到真候选;另有 build/firmware
+  confirmation 只能在 readiness 窗口内经 registered `list targets -v` 固定,blocked 态禁止
+  运行。任务不转 ready、不运行 HDC/device;记录 =
+  `evidence/runs/TASK-AIN-010P/readiness-blocked-r1.md` 与
+  `evidence/runs/TASK-AIN-010P/readiness-blocked-r2.md`）
 - Historical Status:blocked（r5 scope proposal；CHG-2026-043 TASK-HSO-002 已由
   #760 implementation + #761 done 合入，但仅在维护者 review/merge r5 后建立本任务，
   之后仍须 fresh D1 readiness。proposal 不批准 exact argv/设备 tuple，不构成
