@@ -87,7 +87,7 @@ public enum DeviceListApplicationFacade {
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any DeviceListApplicationProviding {
     if arguments.contains("--ui-test-devices") {
-      return DeviceListFixtureApplicationProvider()
+      return DeviceListFixtureApplicationProvider(arguments: arguments)
     }
     return DeviceListProductionApplicationProvider()
   }
@@ -252,8 +252,30 @@ enum DeviceCandidatesResponseDecoding {
 
 /// Presentation values only: one adopted ready device and one candidate that
 /// still needs the on-device trust prompt, so UI automation can walk both
-/// sidebar states and the authorization detail without any device.
+/// sidebar states and the authorization detail without any device. The same
+/// state file the other fixtures read lets one launched sweep flip the
+/// unauthorized candidate to Connected — the transition a real device makes
+/// when its owner accepts the trust prompt.
 private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProviding {
+  private let stateFileURL: URL?
+
+  init(arguments: [String] = ProcessInfo.processInfo.arguments) {
+    if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
+      arguments.indices.contains(index + 1)
+    {
+      stateFileURL = URL(fileURLWithPath: arguments[index + 1])
+    } else {
+      stateFileURL = nil
+    }
+  }
+
+  private var secondCandidateAuthorized: Bool {
+    guard let stateFileURL,
+      let text = try? String(contentsOf: stateFileURL, encoding: .utf8)
+    else { return false }
+    return text.contains("--ui-test-device-authorized")
+  }
+
   func refreshCandidates() async -> DeviceListPresentation {
     DeviceListPresentation(
       availability: .available,
@@ -270,7 +292,7 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
             confirmedAtUTC: "2026-08-07T00:00:00Z")),
         DeviceCandidatePresentation(
           connectKey: "7f2c091a445e21",
-          state: "Unauthorized",
+          state: secondCandidateAuthorized ? "Connected" : "Unauthorized",
           adoptedTargetID: nil,
           bindingRevision: nil),
       ])
