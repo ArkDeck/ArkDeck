@@ -29,7 +29,8 @@ struct FlashWorkspaceView: View {
   let onRefreshRuntimeHistory: () -> Void
   let onOpenHistory: () -> Void
   @State private var isImporterPresented = false
-  @State private var confirmationContext: FlashConfirmationContext?
+  @State private var confirmationPlan: FlashExactPlanPresentation?
+  @State private var isConfirmationPresented = false
 
   var body: some View {
     ScrollView {
@@ -107,12 +108,18 @@ struct FlashWorkspaceView: View {
       case .failure: model.rejectArchiveSelection()
       }
     }
-    .sheet(item: $confirmationContext) { context in
-      FlashDestructiveConfirmationSheet(plan: context.plan) { destructivePhrase, userdataPhrase in
-        model.confirm(
-          reviewedPlan: context.plan,
-          destructivePhrase: destructivePhrase,
-          userdataPhrase: userdataPhrase)
+    .sheet(
+      isPresented: $isConfirmationPresented,
+      onDismiss: { confirmationPlan = nil }
+    ) {
+      if let confirmationPlan {
+        FlashDestructiveConfirmationSheet(plan: confirmationPlan) {
+          destructivePhrase, userdataPhrase in
+          model.confirm(
+            reviewedPlan: confirmationPlan,
+            destructivePhrase: destructivePhrase,
+            userdataPhrase: userdataPhrase)
+        }
       }
     }
   }
@@ -458,13 +465,16 @@ struct FlashWorkspaceView: View {
             .fixedSize(horizontal: false, vertical: true)
             Button(flashText("flash.action.reviewImpact")) {
               if let plan = model.plan {
-                confirmationContext = FlashConfirmationContext(plan: plan)
+                confirmationPlan = plan
+                isConfirmationPresented = true
               }
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)
             .disabled(!model.canReviewDestructiveImpact)
             .accessibilityIdentifier("flash.execute.review")
+            .accessibilityValue(
+              isConfirmationPresented ? flashText("flash.confirm.title") : "")
           }
         case .planOnly:
           Label(flashText("flash.planOnly.noSubmission"), systemImage: "checkmark.shield")
@@ -708,9 +718,4 @@ final class FlashWorkspaceViewModel: ObservableObject {
     planFailureCode = nil
     planFailureDetail = nil
   }
-}
-
-private struct FlashConfirmationContext: Identifiable {
-  let id = UUID()
-  let plan: FlashExactPlanPresentation
 }

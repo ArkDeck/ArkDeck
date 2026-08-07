@@ -68,7 +68,10 @@ struct FlashDestructiveConfirmationSheet: View {
       }
       .padding(24)
     }
-    .frame(minWidth: 560, idealWidth: 640, maxWidth: 720, minHeight: 640)
+    .frame(
+      minWidth: 560, idealWidth: 640, maxWidth: 720,
+      minHeight: 480, idealHeight: 560, maxHeight: 640)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.confirm.sheet")
     .onAppear { focusedField = .destructivePhrase }
   }

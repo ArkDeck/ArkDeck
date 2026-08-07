@@ -48,6 +48,7 @@ struct GlobalJobInspectorView: View {
       compactBar
     }
     .background(.bar)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobInspector")
   }
 

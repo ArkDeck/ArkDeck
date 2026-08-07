@@ -166,7 +166,9 @@ struct DebugWorkspaceView: View {
   private var tabPicker: some View {
     Picker(DebugL10n.text("debug.tabs.label"), selection: $storedTab) {
       ForEach(DebugWorkspaceTab.allCases, id: \.self) { tab in
-        Label(tab.title, systemImage: tab.symbol).tag(tab.rawValue)
+        Label(tab.title, systemImage: tab.symbol)
+          .accessibilityIdentifier("debug.tab.\(tab.rawValue)")
+          .tag(tab.rawValue)
       }
     }
     .pickerStyle(.segmented)
