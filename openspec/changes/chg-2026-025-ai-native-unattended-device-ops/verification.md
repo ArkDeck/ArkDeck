@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-025-ai-native-unattended-device-ops@r15
+> Change:CHG-2026-025-ai-native-unattended-device-ops@r16
 > Status:planned # 结论经维护者在 PR 中确认
 > Revision review:2026-07-22 已逐项对照 r2 security-remediation、TASK-AIN-005/006/
 > 008/007 与 AIN-004 stop gate;本计划不复用 superseded #296 readiness/authorization。
@@ -205,3 +205,20 @@
   compensation 与 outcomeUnknown evidence 全部可复查
 - [ ] 活跃任务与 runbook 中非 allowlisted human-only seam 为 0；历史
   controlledHumanCapture/golden bytes 未改写
+
+## AIN-RECON-001 和解读回要么可达,要么不再冒充一道闸(TASK-AIN-020)
+
+- 构造一个引擎侧无法确证结果的尝试,断言 usage terminal 由**引擎**落下且 intent 集合齐全;
+  据此 `settlesUnknownLoaderTransition` 被真正调用(正反两种结论各一);
+- 若交付选择「承认不可达」:必须在代码与文档中同时降级其定位,并断言
+  `reconcileUnresolved` 不再声称有一条从未执行过的恢复路径;
+- 无论走哪条,**不得**保留「留着闸、文档当能力、产线永不执行」的现状。
+
+## AIN-RECON-002 更强的证据不得被短路(TASK-AIN-020)
+
+- `status == outcomeUnknown` 且每条已派发变更均 `confirmedNotExecuted` 时,
+  该证据必须被查阅并得出 `safeToReflash`;
+- 反证:把该分支去掉,断言必须变红;
+- `unsafePartial` 的判定逐字不变——本条只允许把「已证明无副作用」从 `outcomeUnknown` 里摘出去,
+  不允许把「未知的部分副作用」摘出去;
+- reconciliation 的分类结果必须能读出依据(有无 terminal、intent 集合、读回是否被调用及结论)。

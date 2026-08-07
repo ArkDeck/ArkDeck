@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-025-ai-native-unattended-device-ops
-revision: 15
+revision: 16
 status: approved # r1 经 #281 正式批准；r2-r14 已合入；r15 由维护者 review/merge 显式恢复 approved scoped-delta 状态
 class: core
 core_change_level: major
@@ -479,6 +479,56 @@ Observable behavior before/after:
 - r5 不在本 change 登记/修改 OpenHarmony integration profile、lock、registry/
   resource 或 production HDC semantic family；010P 的 raw/provenance 不能在后继
   integration review 前授予 AIN-011 dispatch authority。
+
+
+## r16(2026-08-07):无法到达的和解读回,要么可达,要么别假装它是一道闸
+
+### 为什么现在做
+
+`settlesUnknownLoaderTransition` 是 `outcomeUnknown` 尝试**唯一**的和解出路:
+
+```swift
+else if terminal.status == .outcomeUnknown {
+  disposition = settlesUnknownLoaderTransition(...) ? .safeToReflash : .outcomeUnknown
+}
+```
+
+它有完整的契约覆盖(正向 settle + 六条负向 + 分类器自身),但**连续三个真机窗口、两种不同的打断方式,一次都没有被调用过**。
+
+2026-08-07 的窗口把原因查清楚了。台账里那条 terminal 是 **reconciliation 自己写的**
+(`closedAt` 与 `attemptTerminal` 事件同一秒),三个 intent 集合全空:
+
+```json
+{"status":"outcomeUnknown","externalIntentEventIds":[],
+ "confirmedNotExecutedIntentEventIds":[],"completedIntentEventIds":[]}
+```
+
+也就是说:**引擎的 job 失败并不给 usage reservation 落下 terminal**。`reconcileUnresolved`
+于是每次都走「无 terminal」分支——那条分支自己把状态记为 `outcomeUnknown` 并关掉预留,
+从不调用读回。两次打断(杀 daemon、杀子工具)结果相同,因为原因是结构性的,不是时机问题。
+
+顺带,这次被打断的尝试里产品**明确记录了 `confirmed not executed flash-partitions`**——
+一个分区都没写。而这条比读回更强的无副作用证据,在 `status == outcomeUnknown` 时
+**根本不会被查阅**:上面那个 `else if` 短路了,后面基于
+`confirmedNotExecutedIntentEventIds` 的判定分支永远轮不到。
+
+### What(r16 交付面)
+
+1. 定案:`outcomeUnknown` 的 usage terminal 由**谁**写、在**什么**条件下写。
+   要么让引擎在无法确证结果时落下带完整 intent 集合的 terminal(读回随之可达),
+   要么如实承认这条读回在当前产线路径上不可达,并把它降为它实际扮演的角色。
+   **不接受第三种**:留着一道从未、且无法被执行的闸,却在文档里当作恢复能力。
+2. `status == outcomeUnknown` 时,若每一条已派发的变更都**确认未执行**,该证据必须被查阅——
+   它比读回更强,却被短路掉了。
+3. reconciliation 走了哪条分支必须可读:分类结果要带上依据(有无 terminal、
+   intent 集合是否齐全、读回是否被调用及其结论),而不是只留一个 disposition。
+
+## Out of scope(r16)
+
+- 放宽任何一条 disposition 的判定——`unsafePartial` 仍然是 `unsafePartial`;
+- 把「没有证据」当成「证明了没有副作用」——本修订要的是让**已有的**强证据别被短路,不是造新证据;
+- 改动 `isLoaderTransitionOnly` 的排除面(写过分区的尝试仍然、也应当到不了读回);
+- 在实现 PR 中连接设备或宣称 GJ-4 相关状态改变。
 
 ## r1 approval and flow history
 

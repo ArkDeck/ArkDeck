@@ -3589,3 +3589,32 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   Packages/ArkDeckKit` 又把测试进程的 cwd 设为该包目录，落点即 `Packages/ArkDeckKit/log/`。
   该声明不改变任何 operation/provider/authority，不触及设备 dispatch；`.gitignore`
   兜底与"给 runner 定 cwd"的根因修复各自独立提交。
+
+## TASK-AIN-020 — 和解读回的可达性,与被短路的更强证据(r16)
+
+- Status:ready
+- Platform:macos
+- Requirements:proposal r16 What 1-3(定案 `outcomeUnknown` terminal 的书写者与条件、
+  `confirmedNotExecuted` 全覆盖时该证据必须被查阅、分类结果带依据可读)
+- Acceptance:change-local `AIN-RECON-001`、`AIN-RECON-002`,登记于 `verification.md`
+- Depends on:TASK-AIN-019(in-progress);r16 proposal 合入即 approved
+- Hardware required:no。两条 AC 都能在 contract 面构造;真机侧的现状已由
+  `chg-2026-056/evidence/reconciliation-readback-premise-2026-08-07.md` 与本窗口记录在案,
+  **不得**用真机记录替代 AC
+- Allowed paths:
+  - `Packages/ArkDeckKit/**`
+  - `openspec/changes/chg-2026-025-ai-native-unattended-device-ops/**`
+  - `docs/adr/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/verification/**`、
+    `openspec/baselines/**`、`openspec/contracts/**`
+  - `Catalog/**`、`scripts/**`、`.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、
+    `ArkDeckApp/**`、`ArkDeck.xcodeproj/**`
+  - 其他 change 目录
+- Risk:high(动的是**破坏性操作的恢复判定**。三层约束:
+  ①`unsafePartial` 的判定逐字不变——只许把「已证明无副作用」从 `outcomeUnknown` 里摘出去,
+  绝不许把「未知的部分副作用」也摘出去;
+  ②「没有证据」永远不等于「证明了没有副作用」——本任务只让**已有的**强证据别被短路,不造新证据;
+  ③`isLoaderTransitionOnly` 的排除面不动,写过分区的尝试仍然到不了读回。
+  另有一条元约束:如果结论是「这条读回在产线不可达」,那就如实降级它,
+  **不许**留着一道从未也无法被执行的闸继续在文档里充当恢复能力)
