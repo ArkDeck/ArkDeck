@@ -3592,7 +3592,7 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
 
 ## TASK-AIN-020 — 和解读回的可达性,与被短路的更强证据(r16)
 
-- Status:ready
+- Status:done(r17 交付;决定记于 `docs/adr/0009-campaign-unknown-outcome-authority.md`)
 - Platform:macos
 - Requirements:proposal r16 What 1-3(定案 `outcomeUnknown` terminal 的书写者与条件、
   `confirmedNotExecuted` 全覆盖时该证据必须被查阅、分类结果带依据可读)
@@ -3618,3 +3618,43 @@ E0 为 agent 可无人值守操作,亦可维护者一行执行),取当前 durabl
   ③`isLoaderTransitionOnly` 的排除面不动,写过分区的尝试仍然到不了读回。
   另有一条元约束:如果结论是「这条读回在产线不可达」,那就如实降级它,
   **不许**留着一道从未也无法被执行的闸继续在文档里充当恢复能力)
+
+### r17 交付记录
+
+决定:**两半都做,各自用在它成立的地方**——读回保留并收窄到引擎写的
+`outcomeUnknown`(该写入者产线可达),崩溃面如实降级为「缺席,非测量」。
+完整论证与「不做什么、为什么」见 `docs/adr/0009-campaign-unknown-outcome-authority.md`;
+与 r16 叙述不同的三处实测事实见 proposal r17。
+
+- **判定规则抽出为 `RockchipEvolutionCampaignHost.classify`,证据次序高于状态。**
+  「每条已派发变更都被证明未执行」排在状态判断之上;`unsafePartial` 逐字不变。
+  `classify` 取它判定所依据的四个事实(status + 三个 intent 集合)而非取 terminal
+  类型——因为 ledger 拒绝构造其中一个形状,只有这样才能对钉**规则次序**本身。
+  变异对照:关掉该条规则,`testProofOfNoEffectOutranksTheTerminalStatus` 打红。
+- **`finishReconcile` 的确认未执行结论带上 semantic code(活缺陷修复)。**
+  专用读回证明破坏性步骤从未执行后,该 stepOutcome 此前不带 `semanticCode`,而
+  `mutationIntentEvidence` 只认这个 code,于是证明到不了 usage terminal,campaign
+  照旧烧成 `unsafePartial`。这是 AIN-RECON-002 意图落地的那处,方向严格是
+  「把**已证明无副作用**摘出去」。变异对照:改回 `semanticCode: nil`,
+  `RuntimeJobEngineContractTests.testOutcomeUnknownParksAndReconcileClears` 打红。
+- **分类依据可读。** `attemptTerminal` 事件启用可选 `detail`,记录读到的 terminal
+  状态、intent 集合算术、命中规则、读回是否被调用及其结论(如
+  `terminal=outcomeUnknown dispatched=1 … rule=loaderTransitionReadback readback=refused`,
+  崩溃面为 `noDurableTerminal`)。沿用 `campaignStopped` 既有的 sanitize + 500 字节界;
+  r17 之前的 campaign 文档原样解码;`candidatePrepared`/`attemptReserved` 仍拒收 detail。
+- **降级写进代码而非只写文档。** `settlesUnknownLoaderTransition` 的文档注释明确它
+  settles 引擎写的 unknown、且**不**救崩溃尝试,并列出两条承重理由(同调用封存不可重读;
+  `actualStepKinds` 是滞后于持久 intent 的投影,崩溃恰落在该窗口)。
+  `reconcileUnresolved` 的无 terminal 分支注明它写的是一次缺席。
+- **AC 测试(`EvolutionCampaignContractTests` +4,`RuntimeJobEngineContractTests` +1 段)。**
+  AIN-RECON-001 引擎半用**真实引擎**产出 terminal 而非手工种入,并断言
+  `classify` 判它为唯一能到读回的形状;campaign 半钉两种结论与 basis;
+  另有一例钉崩溃面 0 次读设备。AIN-RECON-002 钉规则次序 + `unsafePartial` 不变 +
+  ledger 不变量(为什么字面场景造不出来)。
+- **一处 AC 无法无门构造,如实说明。** `validateCampaignReservation` 只准
+  `flash.dayu200@1` 带 campaign reservation,该 operation 的 host 步骤要读真实
+  DAYU200 images 归档,故 AIN-RECON-001 的引擎半与仓内所有 campaign-lane 引擎测试同门
+  (`ARKDECK_DAYU200_70035_IMAGE`)。**该门是磁盘上的归档,不是设备**;本地以
+  7.0.0.35 真镜像实跑通过(229s,主要是 731MB 哈希),设备 dispatch=0。
+  其余四例全部无门。
+- 全量 `swift test`:1400 tests,0 failures,12 skipped(既有真机/真输入门)。

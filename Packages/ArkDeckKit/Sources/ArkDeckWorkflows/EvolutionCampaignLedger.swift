@@ -168,14 +168,20 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
         detail == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("attemptReservedShape") }
     case .attemptTerminal:
+      // `detail` carries the classification basis: which evidence reconciliation
+      // read and which rule fired. A disposition on its own cannot be audited —
+      // `outcomeUnknown` is written both by an engine that measured an unknown
+      // outcome and by reconciliation that found no terminal at all, and those
+      // are opposite facts (TASK-AIN-020). Optional: attempts closed before
+      // r17 decode unchanged.
       guard candidate == nil, review == nil, let ordinal, ordinal > 0,
         reservationID == nil, let jobID, Self.isIdentifier(jobID),
-        let sessionID, Self.isIdentifier(sessionID), disposition != nil, reasonCode == nil,
-        detail == nil
+        let sessionID, Self.isIdentifier(sessionID), disposition != nil, reasonCode == nil
       else { throw RockchipEvolutionCampaignError.persistenceRejected("attemptTerminalShape") }
     case .campaignStopped:
-      // `detail` is optional here and nowhere else: a stop is the only event
-      // whose cause lives outside the campaign's own closed vocabulary.
+      // `detail` is optional here and on `attemptTerminal`, and nowhere else: a
+      // stop is the only other event whose cause lives outside the campaign's
+      // own closed vocabulary.
       guard candidate == nil, review == nil, ordinal == nil, reservationID == nil,
         jobID == nil, sessionID == nil, disposition == nil,
         destructiveIntentEventIDs.isEmpty, let reasonCode, Self.isReason(reasonCode)
@@ -495,6 +501,7 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
     sessionID: String,
     disposition: RockchipEvolutionAttemptDisposition,
     destructiveIntentEventIDs: [String],
+    basis: String? = nil,
     at: String
   ) throws -> RockchipEvolutionCampaignDocument {
     try mutate(campaignID) { document in
@@ -504,7 +511,8 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
       let event = try RockchipEvolutionCampaignEvent(
         sequence: document.events.count + 1, kind: .attemptTerminal, at: at,
         ordinal: ordinal, jobID: jobID, sessionID: sessionID,
-        disposition: disposition, destructiveIntentEventIDs: destructiveIntentEventIDs)
+        disposition: disposition, destructiveIntentEventIDs: destructiveIntentEventIDs,
+        detail: basis.flatMap(RockchipEvolutionCampaignEvent.sanitizedDetail))
       return try RockchipEvolutionCampaignDocument(
         assertion: document.assertion, events: document.events + [event])
     }

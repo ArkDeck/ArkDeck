@@ -792,6 +792,28 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let reconciled = try await engine.reconcile(jobID: acceptance.jobID)
     XCTAssertFalse(reconciled.outcomeUnknown)
     XCTAssertEqual(dispatcher.dispatchCount, dispatchesAtPark, "reconcile never redispatches")
+
+    // The proof reconciliation just established must be *recognizable* as one.
+    // `mutationIntentEvidence` identifies a proven non-execution by this
+    // semantic code alone, and until r17 the reconciled outcome was written
+    // without it: the readback established that a step never ran, the campaign
+    // usage terminal did not say so, and a campaign burned as `unsafePartial`
+    // with the disproof sitting in its own journal (TASK-AIN-020).
+    //
+    // Pinned here on the read-only route because it is the one that needs no
+    // real archive; the branch is shared with the mutating route, which is
+    // where the consequence lands.
+    let replay = try DurableJournalRecovery.inspect(
+      url: stateDirectory.appendingPathComponent("jobs", isDirectory: true)
+        .appendingPathComponent(acceptance.jobID, isDirectory: true)
+        .appendingPathComponent("journal.jsonl"))
+    let reconciledOutcome = try XCTUnwrap(
+      replay.events.last { $0.kind == .stepOutcome && $0.eventID.hasPrefix("reconciled-outcome-") },
+      "reconciliation must journal its own correlated outcome")
+    XCTAssertEqual(reconciledOutcome.payload["result"], .string("failed"))
+    XCTAssertEqual(
+      reconciledOutcome.payload["semanticCode"], .string("confirmedNotExecuted"),
+      "a proven non-execution that is not labelled as one is evidence nothing can read")
   }
 
   // MARK: - Cancel

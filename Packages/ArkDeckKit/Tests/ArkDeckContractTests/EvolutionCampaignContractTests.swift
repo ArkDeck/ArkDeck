@@ -2,7 +2,9 @@ import CryptoKit
 import Foundation
 import XCTest
 
+@testable import ArkDeckCore
 @testable import ArkDeckHarness
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckAgentComposition
 @testable import ArkDeckWorkflows
@@ -1729,6 +1731,317 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
   }
 
+  // MARK: reconciliation reachability and basis (TASK-AIN-020, r17)
+
+  /// AIN-RECON-001, engine half. The readback's input is an `outcomeUnknown`
+  /// usage terminal written by the **engine** — a job that survived, could not
+  /// observe its own outcome, and journaled its intents. Three device windows
+  /// never reached the readback because every one of them killed that writer,
+  /// leaving no durable terminal at all, so nothing had ever proved this
+  /// terminal is producible rather than only seedable.
+  ///
+  /// Real-input gated, and unavoidably so: `validateCampaignReservation`
+  /// admits a campaign reservation for `flash.dayu200@1` and nothing else, and
+  /// that operation's host steps read a genuine DAYU200 images archive. No
+  /// device is involved — the first mutating dispatch never spawns.
+  func testTheEngineWritesTheUnknownTerminalTheReadbackConsumes() async throws {
+    guard let archivePath = ProcessInfo.processInfo.environment[Self.archiveEnvironmentKey]
+    else {
+      throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
+    }
+    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let root = temporaryDirectory("engine-written-unknown")
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: root.appending(path: "artifacts"), nowUTC: { Self.confirmedAt })
+    let archive = try await artifactStore.publishFile(
+      RuntimeArtifactFilePublicationRequest(
+        jobID: "job-input-archive", sessionID: "session-input-archive",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-70035", bindingRevision: 7,
+          stableIdentitySHA256: Self.engineDeviceIdentity),
+        sourceFileURL: URL(fileURLWithPath: archivePath).standardizedFileURL,
+        expectedByteCount: Int(profile.archiveSizeBytes),
+        expectedSHA256: profile.archiveSHA256))
+    let lease = try await artifactStore.leaseReference(
+      jobID: archive.jobID, artifactID: archive.artifactID)
+
+    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
+    let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
+      campaignDigestSHA256: digest("f"),
+      baseCommitOID: String(repeating: "a", count: 40),
+      planDigestSHA256: digest("b"),
+      archiveDigestSHA256: profile.archiveSHA256,
+      stepSetDigestSHA256: digest("d"),
+      targetStableIdentitySHA256: Self.engineDeviceIdentity,
+      bindingLineageRootRevision: 7,
+      confirmedAt: "2026-08-02T07:00:00Z", validUntil: "2026-08-02T11:00:00Z",
+      maximumAttempts: 8)
+    let operationDigest = digest("1")
+    let reservationID = try AgentAuthorityUsageReservation.canonicalReservationID(
+      authorizationRef: authorityRef, jobID: "job-engine-unknown",
+      operationDigestSHA256: operationDigest,
+      targetDigestSHA256: Self.engineDeviceIdentity)
+    _ = try usageLedger.reserve(
+      AgentAuthorityUsageReservation(
+        reservationID: reservationID, authorizationRef: authorityRef, ordinal: 1,
+        maximumUses: 8, maximumConcurrentJobs: 1, jobID: "job-engine-unknown",
+        operationDigestSHA256: operationDigest,
+        targetDigestSHA256: Self.engineDeviceIdentity,
+        reservedAt: "2026-08-02T07:30:00Z",
+        forwardLeaseExpiresAt: "2026-08-02T10:00:00Z",
+        compensationLeaseExpiresAt: "2026-08-02T10:30:00Z",
+        campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
+          candidateDigestSHA256: digest("c"), brokerDigestSHA256: digest("e"),
+          executionTuning: try AgentAuthorityCampaignExecutionTuning(
+            loaderDiscoveryTimeoutSeconds: 90,
+            loaderPollIntervalMilliseconds: 250,
+            hdcCommandTimeoutSeconds: 7,
+            readOnlyCommandTimeoutSeconds: 9)),
+        terminal: nil))
+
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: root.appending(path: "engine")),
+      providers: DeviceProviderRegistry(providers: [
+        RockchipFlashProviderAdapter(
+          factsPort: UnknownOutcomeFlashFactsPort(), availability: .available)
+      ]),
+      dispatcher: LosesTheChildOnFirstMutationDispatcher(),
+      capabilityStore: try RuntimeCapabilityStore(
+        directoryURL: root.appending(path: "capabilities")),
+      artifactStore: artifactStore,
+      agentUsageLedger: usageLedger,
+      nowUTC: { Self.confirmedAt })
+
+    let request = try RuntimeOperationRequest(
+      requestID: "req-campaign-unknown", idempotencyKey: "idem-campaign-unknown",
+      target: DurableTargetReference(
+        targetID: "TGT-DAYU200-70035", expectedBindingRevision: 7),
+      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      inputs: [
+        "imageBundleLease": .string(lease),
+        "deviceProfile": .string(profile.catalogReference),
+        "partitionPlan": .array(profile.mappedPartitions.map { .string($0.partitionName) }),
+        "postFlashVerification": .string("basic"),
+      ],
+      campaignReservation: RuntimeCampaignReservationReference(reservationID: reservationID))
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let acceptance = try await engine.submit(try encoder.encode(request))
+    let parked = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertTrue(parked.outcomeUnknown, "\(parked.timeline)")
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+
+    // The half that was missing in every device window: a terminal, written by
+    // the engine, carrying the intents it journaled rather than an absence.
+    let engineTerminal = try XCTUnwrap(
+      usageLedger.load().reservations.first { $0.reservationID == reservationID }?.terminal,
+      "an engine that survives its own unknown outcome must close the reservation")
+    XCTAssertEqual(engineTerminal.status, .outcomeUnknown)
+    XCTAssertFalse(
+      engineTerminal.externalIntentEventIDs.isEmpty,
+      "the intent sets must be the journaled ones, not an absence")
+    XCTAssertEqual(
+      RockchipEvolutionCampaignHost.classify(terminal: engineTerminal),
+      .requiresLoaderTransitionReadback(
+        basis: "terminal=outcomeUnknown dispatched=1 confirmedNotExecuted=0 completed=0 "
+          + "rule=loaderTransitionReadback"),
+      "this is the one terminal shape that reaches the readback")
+  }
+
+  /// AIN-RECON-001, campaign half: both conclusions the readback can draw from
+  /// the terminal the engine writes, and a record that says which one it drew.
+  func testBothReadbackConclusionsAreReachedAndTheBasisSaysWhich() async throws {
+    for (label, readback, expected, expectedBasis) in [
+      (
+        "settled",
+        RockchipEvolutionTargetReadback(
+          stableIdentitySHA256: Self.targetDigest, registeredMode: .hdcNormal,
+          usbTopology: "42"),
+        RockchipEvolutionAttemptDisposition.safeToReflash, "readback=settled"
+      ),
+      (
+        "refused", .absent, RockchipEvolutionAttemptDisposition.outcomeUnknown,
+        "readback=refused"
+      ),
+    ] {
+      let context = try makeUnknownLoaderAttempt(label: "basis-\(label)")
+      defer { try? FileManager.default.removeItem(at: context.root) }
+      let host = try RockchipEvolutionCampaignHost(
+        ledger: context.ledger, usageLedger: context.usageLedger,
+        repairer: FixedEvolutionRepairer(strategy: context.candidate.strategy),
+        builder: StrategyEchoEvolutionBuilder(),
+        flash: CountingEvolutionFlash(),
+        targetReadback: FixedEvolutionTargetReadback(readback: readback),
+        attemptIntents: FixedEvolutionAttemptIntents(kinds: ["enterUpdater"]),
+        nowUTC: { Self.confirmedAt })
+      await ain019AssertThrowsAsync(
+        try await host.continueCampaign(
+          campaignID: context.assertion.campaignID,
+          archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+          targetLocationSelector: "42"))
+      let closed = try XCTUnwrap(
+        try context.ledger.load(context.assertion.campaignID).events
+          .first { $0.kind == .attemptTerminal })
+      XCTAssertEqual(closed.disposition, expected, label)
+      // The branch reconciliation took is readable, not inferred: it names the
+      // terminal it read, the intent arithmetic, the rule, and the readback's
+      // own answer.
+      let basis = try XCTUnwrap(closed.detail, label)
+      XCTAssertTrue(basis.contains("terminal=outcomeUnknown"), basis)
+      XCTAssertTrue(basis.contains("rule=loaderTransitionReadback"), basis)
+      XCTAssertTrue(basis.contains(expectedBasis), basis)
+    }
+  }
+
+  /// AIN-RECON-001, the other half. A crashed attempt leaves no durable
+  /// terminal, and that is an absence rather than a measurement: it never
+  /// consults the readback, and the record says so instead of implying a
+  /// recovery path that did not run.
+  func testNoDurableTerminalIsAnAbsenceAndNeverReachesTheReadback() async throws {
+    let context = try makeUnknownLoaderAttempt(label: "no-terminal")
+    defer { try? FileManager.default.removeItem(at: context.root) }
+    // Erase the seeded terminal: this is a reservation whose writer died.
+    try stripTerminal(from: context.usageLedger, reservationID: context.reservationID)
+
+    // The readback would settle if it were consulted — every other leg of the
+    // proof is present. It must still not be consulted.
+    let readback = CountingEvolutionTargetReadback(
+      readback: RockchipEvolutionTargetReadback(
+        stableIdentitySHA256: Self.targetDigest, registeredMode: .hdcNormal,
+        usbTopology: "42"))
+    let host = try RockchipEvolutionCampaignHost(
+      ledger: context.ledger, usageLedger: context.usageLedger,
+      repairer: FixedEvolutionRepairer(strategy: context.candidate.strategy),
+      builder: StrategyEchoEvolutionBuilder(),
+      flash: CountingEvolutionFlash(),
+      targetReadback: readback,
+      attemptIntents: FixedEvolutionAttemptIntents(kinds: ["enterUpdater"]),
+      nowUTC: { Self.confirmedAt })
+    await ain019AssertThrowsAsync(
+      try await host.continueCampaign(
+        campaignID: context.assertion.campaignID,
+        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        targetLocationSelector: "42"))
+
+    let closed = try XCTUnwrap(
+      try context.ledger.load(context.assertion.campaignID).events
+        .first { $0.kind == .attemptTerminal })
+    XCTAssertEqual(closed.disposition, .outcomeUnknown)
+    XCTAssertEqual(closed.detail, "noDurableTerminal")
+    XCTAssertEqual(
+      readback.readCount, 0,
+      "a crashed attempt is an absence; nothing may read the device on its behalf")
+    // The reservation is still closed, or the target stays blocked forever —
+    // with empty sets, because nothing measured anything.
+    let terminal = try XCTUnwrap(
+      context.usageLedger.load().reservations
+        .first { $0.reservationID == context.reservationID }?.terminal)
+    XCTAssertEqual(terminal.status, .outcomeUnknown)
+    XCTAssertEqual(terminal.externalIntentEventIDs, [])
+  }
+
+  /// AIN-RECON-002. Proof of no effect outranks the terminal's status. Until
+  /// r17 the status was tested first, so the intent-set rules beneath it could
+  /// not be reached for `outcomeUnknown` at all.
+  ///
+  /// Tested on the classifier rather than through the ledger for a reason the
+  /// row below states outright: the ledger currently refuses to hold this
+  /// shape, so a ledger-level test could only assert that it is impossible —
+  /// which would leave the rule order itself untested and free to regress.
+  func testProofOfNoEffectOutranksTheTerminalStatus() throws {
+    let proven = try AgentAuthorityUsageTerminal(
+      status: .failed, closedAt: Self.confirmedAt,
+      externalIntentEventIDs: ["intent-enter-loader-mode", "intent-reboot-device"],
+      confirmedNotExecutedIntentEventIDs: [
+        "intent-enter-loader-mode", "intent-reboot-device",
+      ])
+    XCTAssertEqual(
+      RockchipEvolutionCampaignHost.classify(terminal: proven),
+      .decided(
+        .safeToReflash,
+        basis: "terminal=failed dispatched=2 confirmedNotExecuted=2 completed=0 "
+          + "rule=everyDispatchedMutationConfirmedNotExecuted"))
+
+    // The same evidence must win under `outcomeUnknown` too — the rule is
+    // ordered above the status, so it cannot be short-circuited again if the
+    // ledger invariant below ever moves. Delete that rule and this row falls
+    // through to the readback branch instead.
+    XCTAssertEqual(
+      RockchipEvolutionCampaignHost.classify(
+        status: .outcomeUnknown,
+        dispatched: ["intent-enter-loader-mode"],
+        confirmedNotExecuted: ["intent-enter-loader-mode"],
+        completed: []),
+      .decided(
+        .safeToReflash,
+        basis: "terminal=outcomeUnknown dispatched=1 confirmedNotExecuted=1 completed=0 "
+          + "rule=everyDispatchedMutationConfirmedNotExecuted"))
+
+    // An absence is not a proof, in either direction. No terminal stays
+    // unknown; an unknown terminal with nothing proven still goes to the
+    // readback rather than to a disposition.
+    XCTAssertEqual(
+      RockchipEvolutionCampaignHost.classify(terminal: nil),
+      .decided(.outcomeUnknown, basis: "noDurableTerminal"))
+    XCTAssertEqual(
+      RockchipEvolutionCampaignHost.classify(
+        terminal: try AgentAuthorityUsageTerminal(
+          status: .outcomeUnknown, closedAt: Self.confirmedAt,
+          externalIntentEventIDs: ["intent-enter-loader-mode"])),
+      .requiresLoaderTransitionReadback(
+        basis: "terminal=outcomeUnknown dispatched=1 confirmedNotExecuted=0 completed=0 "
+          + "rule=loaderTransitionReadback"))
+
+    // `unsafePartial` is unchanged, word for word: one dispatched mutation with
+    // no proven resolution is still an unknown partial effect, and no
+    // reordering above may reach it.
+    XCTAssertEqual(
+      RockchipEvolutionCampaignHost.classify(
+        terminal: try AgentAuthorityUsageTerminal(
+          status: .failed, closedAt: Self.confirmedAt,
+          externalIntentEventIDs: ["intent-flash-partitions", "intent-reboot-device"],
+          confirmedNotExecutedIntentEventIDs: ["intent-reboot-device"])),
+      .decided(
+        .unsafePartial,
+        basis: "terminal=failed dispatched=2 confirmedNotExecuted=1 completed=0 "
+          + "rule=unresolvedDispatchedMutations"))
+  }
+
+  /// Why the literal AIN-RECON-002 scenario cannot be built through the ledger,
+  /// recorded rather than left to be rediscovered.
+  ///
+  /// `AgentAuthorityUsageTerminal` refuses a non-empty proven-absent set unless
+  /// the status is `.failed`, so an `outcomeUnknown` terminal cannot carry the
+  /// proof at all. The `else if` ordering was never the binding constraint —
+  /// this invariant is. Both facts are pinned so the next reader does not have
+  /// to re-derive which one holds.
+  func testAnUnknownTerminalCannotCarryTheProofItWouldNeed() throws {
+    XCTAssertThrowsError(
+      try AgentAuthorityUsageTerminal(
+        status: .outcomeUnknown, closedAt: Self.confirmedAt,
+        externalIntentEventIDs: ["intent-enter-loader-mode"],
+        confirmedNotExecutedIntentEventIDs: ["intent-enter-loader-mode"]))
+    // And the engine cannot produce that shape either: a step proven not to
+    // have executed ends its job, so the job's status is `failed` and never
+    // `outcomeUnknown`.
+    let source = try String(
+      contentsOf: URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(
+      source.contains("status = state == JobState.succeeded.rawValue ? .succeeded : .failed"),
+      "a confirmed outcome still closes the reservation as succeeded or failed")
+  }
+
   // MARK: campaignStopped detail (TASK-AIN-019)
 
   /// A campaign that stopped for good and a confirmation that merely lapsed
@@ -1797,12 +2110,31 @@ final class EvolutionCampaignContractTests: XCTestCase {
       try RockchipEvolutionCampaignEvent(
         sequence: 1, kind: .campaignStopped, at: Self.confirmedAt,
         reasonCode: "admissionOrTargetDrift", detail: overlong))
-    // `detail` belongs to a stop and to nothing else.
+    // `detail` belongs to the two events whose cause lives outside the
+    // campaign's closed vocabulary: a stop, and — since r17 — an attempt
+    // terminal, which carries the basis reconciliation classified it on
+    // (TASK-AIN-020). The same bound applies.
+    XCTAssertNoThrow(
+      try RockchipEvolutionCampaignEvent(
+        sequence: 1, kind: .attemptTerminal, at: Self.confirmedAt, ordinal: 1,
+        jobID: "job-1", sessionID: "session-1", disposition: .safeToReflash,
+        detail: "noDurableTerminal"))
     XCTAssertThrowsError(
       try RockchipEvolutionCampaignEvent(
         sequence: 1, kind: .attemptTerminal, at: Self.confirmedAt, ordinal: 1,
         jobID: "job-1", sessionID: "session-1", disposition: .safeToReflash,
-        detail: "not here"))
+        detail: overlong))
+    // And to nothing else.
+    for kind in [
+      RockchipEvolutionCampaignEventKind.candidatePrepared, .attemptReserved,
+    ] {
+      XCTAssertThrowsError(
+        try RockchipEvolutionCampaignEvent(
+          sequence: 1, kind: kind, at: Self.confirmedAt, ordinal: 1,
+          reservationID: kind == .attemptReserved ? "reservation-1" : nil,
+          jobID: "job-1", sessionID: "session-1", detail: "not here"),
+        "\(kind)")
+    }
   }
 
   func testCampaignDocumentsWrittenBeforeDetailStillDecode() throws {
@@ -1937,6 +2269,57 @@ final class EvolutionCampaignContractTests: XCTestCase {
     return try JSONDecoder().decode(
       RockchipEvolutionReviewReceipt.self,
       from: JSONSerialization.data(withJSONObject: json))
+  }
+
+  /// The device identity the engine-lane fixture re-proves at consume time.
+  /// Distinct from `targetDigest`, which is what the *campaign* pins: the
+  /// engine's gate and the campaign's readback check different subjects, and
+  /// collapsing them into one constant would hide that.
+  private static let engineDeviceIdentity =
+    "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+
+  /// The same real-input gate every campaign-lane engine test uses. It names a
+  /// published archive on disk, not a device.
+  private static let archiveEnvironmentKey = "ARKDECK_DAYU200_70035_IMAGE"
+
+  /// A fresh campaign whose open attempt is bound to a usage reservation
+  /// already carrying `terminal` — the shape some other writer produced.
+  private func makeAttemptBoundTo(
+    terminal: AgentAuthorityUsageTerminal, label: String
+  ) throws -> UnknownLoaderAttempt {
+    let context = try makeUnknownLoaderAttempt(label: label)
+    try rewriteTerminal(
+      in: context.usageLedger, reservationID: context.reservationID,
+      to: JSONSerialization.jsonObject(with: try JSONEncoder().encode(terminal))
+        as? [String: Any])
+    return context
+  }
+
+  private func stripTerminal(
+    from ledger: AgentAuthorityUsageLedger, reservationID: String
+  ) throws {
+    try rewriteTerminal(in: ledger, reservationID: reservationID, to: nil)
+  }
+
+  /// The ledger is append-only and write-once by design, so a test that needs
+  /// a reservation in a state its API cannot reach edits the document behind
+  /// it. Reserved for exactly that: expressing "the writer died before it
+  /// closed anything", which no legitimate caller can perform.
+  private func rewriteTerminal(
+    in ledger: AgentAuthorityUsageLedger, reservationID: String, to terminal: [String: Any]?
+  ) throws {
+    let url = ledger.root.appending(path: AgentAuthorityUsageLedger.ledgerFileName)
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any])
+    var reservations = try XCTUnwrap(document["reservations"] as? [[String: Any]])
+    let index = try XCTUnwrap(
+      reservations.firstIndex { $0["reservationId"] as? String == reservationID })
+    // Explicit null, never a removed key: the ledger's closed-shape validator
+    // requires the exact reservation key set, and an open reservation is
+    // `"terminal": null` on disk.
+    reservations[index]["terminal"] = terminal ?? NSNull()
+    document["reservations"] = reservations
+    try JSONSerialization.data(withJSONObject: document).write(to: url)
   }
 
   private func usageReservation(
@@ -2396,6 +2779,62 @@ private struct FixedEvolutionAttemptIntents: RockchipEvolutionAttemptIntentReadi
   let kinds: [String]
 
   func journaledStepKinds(jobID _: String) throws -> [String] { kinds }
+}
+
+/// Counts reads, so a test can assert the device was *not* consulted. A
+/// readback that would have settled but was never called is the only way to
+/// tell "the path refused" apart from "the path never ran" (TASK-AIN-020).
+private final class CountingEvolutionTargetReadback: RockchipEvolutionTargetReadbackReading,
+  @unchecked Sendable
+{
+  private let lock = NSLock()
+  private var reads = 0
+  private let value: RockchipEvolutionTargetReadback
+
+  init(readback: RockchipEvolutionTargetReadback) { value = readback }
+
+  func readDurableTarget() throws -> RockchipEvolutionTargetReadback {
+    lock.withLock { reads += 1 }
+    return value
+  }
+
+  var readCount: Int { lock.withLock { reads } }
+}
+
+/// Facts for the engine-lane fixture: the identity the campaign reservation
+/// pins, re-proved at consume time.
+private struct UnknownOutcomeFlashFactsPort: RockchipRuntimeFactsPort {
+  func currentFacts(targetID: String) async throws -> ProviderFacts {
+    ProviderFacts(
+      providerID: "rockchip",
+      toolVersion: BundledRockchipComponent.reportedVersion,
+      toolSHA256: String(repeating: "c", count: 64),
+      serverFacts: [:], targetID: targetID, bindingRevision: 7,
+      deviceIdentitySHA256:
+        "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+      executionConnectKey: "sealed-campaign-unknown-connect-key",
+      deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
+      buildFingerprint: "preflight-only", transport: "sealed-fixture",
+      profileID: "dayu200@2", collectedAtUTC: "2026-08-02T08:00:00Z")
+  }
+}
+
+/// Loses the child process on the first device mutation — the production shape
+/// of an unobservable dispatch (`DescriptorBoundProcessDispatcher` raises the
+/// same failure when the executor throws anything but an identity refusal).
+/// It is what makes a job's own outcome unknown while the engine survives to
+/// record it, which is the terminal the readback consumes.
+private struct LosesTheChildOnFirstMutationDispatcher: RuntimeProcessDispatching {
+  func unavailableReason(providerID _: String) -> String? { nil }
+
+  func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+    guard plan.action.effect < .deviceMutation else {
+      throw RuntimeDispatchFailure.outcomeUnknown("dispatcher lost the child process")
+    }
+    return ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.01)
+  }
 }
 
 private struct FixedEvolutionClock: RockchipAdmissionClock {

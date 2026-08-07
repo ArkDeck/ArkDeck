@@ -108,7 +108,23 @@ public enum RockchipEvolutionCampaignPlanning {
   }
 }
 
+/// What reconciliation concluded about one attempt, and why.
+///
+/// The `basis` exists because a disposition on its own cannot be audited.
+/// `outcomeUnknown` has two writers that mean opposite things — an engine that
+/// measured an unknown outcome and carried complete intent sets, and
+/// reconciliation that found no terminal at all and knows nothing — and until
+/// r17 the campaign document recorded the same word for both (TASK-AIN-020).
+public enum RockchipEvolutionAttemptClassification: Equatable, Sendable {
+  case decided(RockchipEvolutionAttemptDisposition, basis: String)
+  /// Only an engine-written `outcomeUnknown` reaches here. The readback is
+  /// applied by the host, which owns the ports it needs.
+  case requiresLoaderTransitionReadback(basis: String)
+}
+
 public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
+  public typealias AttemptClassification = RockchipEvolutionAttemptClassification
+
   /// A `safeToReflash` terminal proves no external effect occurred, but it
   /// does not make an unbounded sequence of materially identical proposals
   /// useful. Three consecutive no-effect attempts are enough to distinguish
@@ -414,62 +430,121 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       $0.reservationID == reservationID
     }
     let disposition: RockchipEvolutionAttemptDisposition
-    let intents: [String]
-    if let terminal = usage?.terminal {
-      intents = terminal.externalIntentEventIDs
-      if terminal.status == .succeeded {
-        disposition = .succeeded
-      } else if terminal.status == .outcomeUnknown {
-        disposition =
-          settlesUnknownLoaderTransition(document: document, jobID: jobID)
-          ? .safeToReflash : .outcomeUnknown
-      } else if terminal.externalIntentEventIDs.isEmpty
-        || Set(terminal.confirmedNotExecutedIntentEventIDs)
-          == Set(terminal.externalIntentEventIDs)
-      {
-        disposition = .safeToReflash
-      } else if Set(terminal.confirmedNotExecutedIntentEventIDs)
-        .union(terminal.completedIntentEventIDs)
-        == Set(terminal.externalIntentEventIDs)
-      {
-        // Every dispatched mutation has a proven resolution: either its
-        // exact readback proved it never happened, or its own provider
-        // verification proved it completed. There is no unknown partial
-        // effect on the device — which is precisely what `safeToReflash`
-        // asserts. The 2026-08-04 shape this settles: nine verified writes,
-        // a verified reboot, and then a failure in a read-only wait; the
-        // device had booted the flashed build, and the campaign burned as
-        // `unsafePartial` anyway.
-        disposition = .safeToReflash
-      } else {
-        disposition = .unsafePartial
-      }
-    } else {
-      // A durable campaign reservation without a matching durable terminal is
-      // unknown even if the current process happens to remember an error.
-      intents = []
-      disposition = .outcomeUnknown
+    let basis: String
+    switch Self.classify(terminal: usage?.terminal) {
+    case .decided(let decided, let why):
+      disposition = decided
+      basis = why
+    case .requiresLoaderTransitionReadback(let why):
+      let settled = settlesUnknownLoaderTransition(document: document, jobID: jobID)
+      disposition = settled ? .safeToReflash : .outcomeUnknown
+      basis = "\(why) readback=\(settled ? "settled" : "refused")"
+    }
+    let intents = usage?.terminal?.externalIntentEventIDs ?? []
+    if let usage, usage.terminal == nil {
       // Close the usage reservation too, or the target stays blocked
       // forever: the ledger admits one open reservation per target, and a
       // crashed attempt's reservation had no other closer (regression C3).
       // `outcomeUnknown` mirrors the attempt tombstone below.
-      if usage != nil {
-        do {
-          _ = try usageLedger.close(
-            reservationID: reservationID,
-            terminal: AgentAuthorityUsageTerminal(
-              status: .outcomeUnknown, closedAt: nowUTC(),
-              externalIntentEventIDs: []))
-        } catch AuthorizationUsageLedgerError.reservationConflict {
-          // Raced the dying process's own close; whoever wrote a terminal
-          // won, and the re-read on the next continue sees it.
-        }
+      //
+      // This terminal is an absence, not a measurement, and the empty intent
+      // sets say so: nothing read the device, and nothing may later mistake
+      // them for "no mutation was dispatched" (TASK-AIN-020).
+      do {
+        _ = try usageLedger.close(
+          reservationID: reservationID,
+          terminal: AgentAuthorityUsageTerminal(
+            status: .outcomeUnknown, closedAt: nowUTC(),
+            externalIntentEventIDs: []))
+      } catch AuthorizationUsageLedgerError.reservationConflict {
+        // Raced the dying process's own close; whoever wrote a terminal
+        // won, and the re-read on the next continue sees it.
       }
     }
     return try ledger.closeAttempt(
       campaignID: document.campaignID, ordinal: ordinal,
       jobID: jobID, sessionID: sessionID, disposition: disposition,
-      destructiveIntentEventIDs: intents, at: nowUTC())
+      destructiveIntentEventIDs: intents, basis: basis, at: nowUTC())
+  }
+
+  /// Which rule decides an attempt, and on what evidence.
+  ///
+  /// Split out of `reconcileUnresolved` because the order of these rules is a
+  /// property worth stating rather than an accident of an `if`/`else if`
+  /// chain: **evidence outranks status**. Until r17 the `outcomeUnknown`
+  /// status was tested first, so the intent-set rules below it could never be
+  /// reached for that status at all.
+  ///
+  /// Be precise about what that reordering does and does not buy.
+  /// `AgentAuthorityUsageTerminal` refuses a non-empty
+  /// `confirmedNotExecutedIntentEventIDs` unless the status is `.failed`, so an
+  /// `outcomeUnknown` terminal cannot carry that proof today — the short
+  /// circuit was never the binding constraint, that ledger invariant is. The
+  /// order is corrected anyway, so a status can never again outrank a proof,
+  /// and pinned by a test rather than left to be rediscovered a third time.
+  ///
+  /// The rule that actually stopped dropping evidence is one layer down: the
+  /// dedicated reconciliation readback now journals its no-effect proof with
+  /// the semantic code `mutationIntentEvidence` recognizes, so a proven
+  /// non-execution reaches `confirmedNotExecutedIntentEventIDs` instead of
+  /// leaving the campaign to burn as `unsafePartial`.
+  static func classify(terminal: AgentAuthorityUsageTerminal?) -> AttemptClassification {
+    guard let terminal else {
+      // A durable campaign reservation without a matching durable terminal is
+      // unknown even if the current process happens to remember an error, and
+      // it is *not* a readback case: see `settlesUnknownLoaderTransition`.
+      return .decided(.outcomeUnknown, basis: "noDurableTerminal")
+    }
+    return classify(
+      status: terminal.status,
+      dispatched: Set(terminal.externalIntentEventIDs),
+      confirmedNotExecuted: Set(terminal.confirmedNotExecutedIntentEventIDs),
+      completed: Set(terminal.completedIntentEventIDs))
+  }
+
+  /// The rules over the four facts they decide on, rather than over the type
+  /// that carries them. The ledger refuses some combinations — a non-empty
+  /// proven-absent set outside a `.failed` terminal, for one — so taking the
+  /// facts directly is the only way to test the *order* of these rules against
+  /// a shape the ledger will not build. An untestable rule order is how the
+  /// status came to outrank the evidence in the first place.
+  static func classify(
+    status: AuthorizationUsageTerminalStatus,
+    dispatched: Set<String>,
+    confirmedNotExecuted: Set<String>,
+    completed: Set<String>
+  ) -> AttemptClassification {
+    let counts =
+      "terminal=\(status.rawValue) dispatched=\(dispatched.count) "
+      + "confirmedNotExecuted=\(confirmedNotExecuted.count) completed=\(completed.count)"
+    if status == .succeeded {
+      return .decided(.succeeded, basis: "\(counts) rule=terminalSucceeded")
+    }
+    if !dispatched.isEmpty, confirmedNotExecuted == dispatched {
+      // The strongest evidence the product can hold: every mutation it
+      // dispatched has an exact readback proving it never happened. Tested
+      // before the status, because no status outranks a proof of no effect.
+      return .decided(
+        .safeToReflash, basis: "\(counts) rule=everyDispatchedMutationConfirmedNotExecuted")
+    }
+    if status == .outcomeUnknown {
+      return .requiresLoaderTransitionReadback(basis: "\(counts) rule=loaderTransitionReadback")
+    }
+    if dispatched.isEmpty {
+      return .decided(.safeToReflash, basis: "\(counts) rule=noMutationDispatched")
+    }
+    if confirmedNotExecuted.union(completed) == dispatched {
+      // Every dispatched mutation has a proven resolution: either its
+      // exact readback proved it never happened, or its own provider
+      // verification proved it completed. There is no unknown partial
+      // effect on the device — which is precisely what `safeToReflash`
+      // asserts. The 2026-08-04 shape this settles: nine verified writes,
+      // a verified reboot, and then a failure in a read-only wait; the
+      // device had booted the flashed build, and the campaign burned as
+      // `unsafePartial` anyway.
+      return .decided(.safeToReflash, basis: "\(counts) rule=everyDispatchedMutationResolved")
+    }
+    return .decided(.unsafePartial, basis: "\(counts) rule=unresolvedDispatchedMutations")
   }
 
   /// TASK-AIN-019 r11 approved exactly one way out of a failed Loader
@@ -493,6 +568,34 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
   /// (they are append-only), and no new terminal vocabulary is invented — the
   /// proof is "no external effect happened", which is what `safeToReflash`
   /// already means for the `confirmedNotExecuted` intents beside it.
+  ///
+  /// ## What this settles, and what it deliberately does not (TASK-AIN-020)
+  ///
+  /// It settles an **engine-written** `outcomeUnknown` — a job that survived,
+  /// measured that it could not observe its own outcome, and journaled complete
+  /// intent sets. That is production-reachable: an unobservable dispatch, or a
+  /// provider whose verification returns unknown for a step with no paired
+  /// readback.
+  ///
+  /// It does **not** settle a crashed attempt, and cannot be made to without
+  /// changing two other things first. Three device windows interrupted a flash
+  /// by killing the writer, so all three left no durable terminal at all and
+  /// took the `noDurableTerminal` path, which never reaches here. That is
+  /// structural, not a matter of timing:
+  ///
+  /// * reconciliation writes its own unknown terminal and closes the attempt in
+  ///   the same pass, so the terminal it wrote is never re-read — after it,
+  ///   `document.activeReservation` is nil and `reconcileUnresolved` returns at
+  ///   its first guard;
+  /// * the classifier's only input is `actualStepKinds`, a runtime-record
+  ///   projection persisted *before* the write-ahead intent gate makes an
+  ///   intent durable. A process death between the two leaves a durable
+  ///   destructive intent that the projection does not name — exactly the
+  ///   window a crash lands in. Harmless while the crash path never consults
+  ///   the readback; a correctness hole the moment it does.
+  ///
+  /// So a crashed attempt stays `outcomeUnknown`, and this is not documented as
+  /// recovering it.
   private func settlesUnknownLoaderTransition(
     document: RockchipEvolutionCampaignDocument,
     jobID: String
