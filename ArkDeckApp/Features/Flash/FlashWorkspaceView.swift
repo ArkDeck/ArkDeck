@@ -67,14 +67,14 @@ struct FlashWorkspaceView: View {
     }
     .toolbar {
       ToolbarItemGroup(placement: .primaryAction) {
-        Picker("flash.mode.label", selection: modeBinding) {
-          Text("flash.mode.execute")
+        Picker(flashText("flash.mode.label"), selection: modeBinding) {
+          Text(flashText("flash.mode.execute"))
             .tag(FlashWorkspaceMode.execute)
             .accessibilityIdentifier("flash.mode.execute")
-          Text("flash.mode.planOnly")
+          Text(flashText("flash.mode.planOnly"))
             .tag(FlashWorkspaceMode.planOnly)
             .accessibilityIdentifier("flash.mode.planOnly")
-          Text("flash.mode.simulated")
+          Text(flashText("flash.mode.simulated"))
             .tag(FlashWorkspaceMode.simulated)
             .accessibilityIdentifier("flash.mode.simulated")
         }
@@ -83,13 +83,13 @@ struct FlashWorkspaceView: View {
         .accessibilityIdentifier("flash.mode")
         .disabled(model.isPreparingPlan)
 
-        Button("flash.action.refresh") {
+        Button(flashText("flash.action.refresh")) {
           model.refresh()
           onRefreshRuntimeHistory()
         }
-          .accessibilityIdentifier("flash.refresh")
-          .disabled(
-            model.isRefreshing || model.isPreparingPlan || isRuntimeHistoryRefreshing)
+        .accessibilityIdentifier("flash.refresh")
+        .disabled(
+          model.isRefreshing || model.isPreparingPlan || isRuntimeHistoryRefreshing)
       }
     }
     .fileImporter(
@@ -127,12 +127,12 @@ struct FlashWorkspaceView: View {
     case .execute:
       EmptyView()
     case .planOnly:
-      Label("flash.mode.planOnly.badge", systemImage: "doc.text.magnifyingglass")
+      Label(flashText("flash.mode.planOnly.badge"), systemImage: "doc.text.magnifyingglass")
         .font(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
         .accessibilityIdentifier("flash.mode.badge")
     case .simulated:
-      Label("flash.mode.simulated.badge", systemImage: "testtube.2")
+      Label(flashText("flash.mode.simulated.badge"), systemImage: "testtube.2")
         .font(.callout.weight(.semibold))
         .foregroundStyle(.purple)
         .accessibilityIdentifier("flash.mode.badge")
@@ -140,18 +140,18 @@ struct FlashWorkspaceView: View {
   }
 
   private var availabilitySection: some View {
-    GroupBox("flash.availability.title") {
+    GroupBox(flashText("flash.availability.title")) {
       VStack(alignment: .leading, spacing: 8) {
         switch model.workspace.availability {
         case .checking:
-          Label("flash.availability.checking", systemImage: "hourglass")
+          Label(flashText("flash.availability.checking"), systemImage: "hourglass")
             .accessibilityIdentifier("flash.availability.status")
         case .available:
-          Label("flash.availability.available", systemImage: "checkmark.circle.fill")
+          Label(flashText("flash.availability.available"), systemImage: "checkmark.circle.fill")
             .foregroundStyle(.green)
             .accessibilityIdentifier("flash.availability.status")
         case .unavailable(let reasons):
-          Label("flash.availability.unavailable", systemImage: "xmark.octagon.fill")
+          Label(flashText("flash.availability.unavailable"), systemImage: "xmark.octagon.fill")
             .foregroundStyle(.red)
             .accessibilityIdentifier("flash.availability.status")
           ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
@@ -161,7 +161,7 @@ struct FlashWorkspaceView: View {
               .fixedSize(horizontal: false, vertical: true)
           }
         }
-        Text("flash.availability.scope")
+        Text(flashText("flash.availability.scope"))
           .font(.footnote)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -172,9 +172,9 @@ struct FlashWorkspaceView: View {
   }
 
   private var profileAndImageSection: some View {
-    GroupBox("flash.profileImage.title") {
+    GroupBox(flashText("flash.profileImage.title")) {
       VStack(alignment: .leading, spacing: 12) {
-        Picker("flash.profile.label", selection: profileBinding) {
+        Picker(flashText("flash.profile.label"), selection: profileBinding) {
           ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
             Text(reference).tag(reference)
           }
@@ -182,16 +182,16 @@ struct FlashWorkspaceView: View {
         .accessibilityIdentifier("flash.profile")
         .disabled(model.isPreparingPlan)
 
-        LabeledContent("flash.image.label") {
-          Text(model.selectedArchiveURL?.lastPathComponent ?? String(localized: "flash.image.none"))
+        LabeledContent(flashText("flash.image.label")) {
+          Text(model.selectedArchiveURL?.lastPathComponent ?? flashText("flash.image.none"))
             .lineLimit(2)
             .truncationMode(.middle)
             .accessibilityIdentifier("flash.image.value")
         }
-        Button("flash.image.choose") { isImporterPresented = true }
+        Button(flashText("flash.image.choose")) { isImporterPresented = true }
           .accessibilityIdentifier("flash.image.choose")
           .disabled(model.isPreparingPlan)
-        Text("flash.image.hint")
+        Text(flashText("flash.image.hint"))
           .font(.footnote)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -206,10 +206,10 @@ struct FlashWorkspaceView: View {
   }
 
   private var targetSection: some View {
-    GroupBox("flash.target.title") {
+    GroupBox(flashText("flash.target.title")) {
       VStack(alignment: .leading, spacing: 10) {
         if model.workspace.targets.isEmpty {
-          Label("flash.target.none", systemImage: "externaldrive.badge.questionmark")
+          Label(flashText("flash.target.none"), systemImage: "externaldrive.badge.questionmark")
             .accessibilityIdentifier("flash.target.empty")
           if let failure = model.workspace.targetLoadFailure {
             Text(failure)
@@ -217,11 +217,11 @@ struct FlashWorkspaceView: View {
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
           }
-          Text("flash.target.guidance")
+          Text(flashText("flash.target.guidance"))
             .font(.footnote)
             .foregroundStyle(.secondary)
         } else {
-          Picker("flash.target.label", selection: targetBinding) {
+          Picker(flashText("flash.target.label"), selection: targetBinding) {
             ForEach(model.workspace.targets) { target in
               Text(target.id).tag(target.id)
             }
@@ -229,12 +229,12 @@ struct FlashWorkspaceView: View {
           .accessibilityIdentifier("flash.target")
           .disabled(model.isPreparingPlan)
           if let target = model.selectedTarget {
-            LabeledContent("flash.target.binding") {
+            LabeledContent(flashText("flash.target.binding")) {
               Text(target.bindingRevision, format: .number)
                 .monospacedDigit()
                 .accessibilityIdentifier("flash.target.binding")
             }
-            LabeledContent("flash.target.toolVersion") {
+            LabeledContent(flashText("flash.target.toolVersion")) {
               Text(target.toolVersion)
                 .font(.body.monospaced())
                 .accessibilityIdentifier("flash.target.toolVersion")
@@ -252,13 +252,13 @@ struct FlashWorkspaceView: View {
   }
 
   private var exactPlanSection: some View {
-    GroupBox("flash.plan.title") {
+    GroupBox(flashText("flash.plan.title")) {
       VStack(alignment: .leading, spacing: 12) {
         if model.isPreparingPlan {
           HStack(spacing: 10) {
             ProgressView()
               .controlSize(.small)
-            Text("flash.plan.preparing")
+            Text(flashText("flash.plan.preparing"))
           }
           .accessibilityIdentifier("flash.plan.preparing")
         } else if let plan = model.plan {
@@ -274,9 +274,9 @@ struct FlashWorkspaceView: View {
           FlashPlanDetailsView(plan: plan)
         } else {
           ContentUnavailableView {
-            Label("flash.plan.empty", systemImage: "list.number")
+            Label(flashText("flash.plan.empty"), systemImage: "list.number")
           } description: {
-            Text("flash.plan.emptyDescription")
+            Text(flashText("flash.plan.emptyDescription"))
           }
           .accessibilityIdentifier("flash.plan.empty")
         }
@@ -303,7 +303,7 @@ struct FlashWorkspaceView: View {
     _ key: String, _ value: String, monospaced: Bool = false
   ) -> some View {
     GridRow(alignment: .firstTextBaseline) {
-      Text(LocalizedStringKey(key)).foregroundStyle(.secondary)
+      Text(flashText(key)).foregroundStyle(.secondary)
       Text(value)
         .font(monospaced ? .body.monospaced() : .body)
         .lineLimit(1)
@@ -348,7 +348,7 @@ struct FlashWorkspaceView: View {
   }
 
   private func effectLabel(_ effect: FlashPlanEffect) -> some View {
-    let key: LocalizedStringKey
+    let key: String
     let symbol: String
     let color: Color
     switch effect {
@@ -369,28 +369,28 @@ struct FlashWorkspaceView: View {
       symbol = "exclamationmark.triangle.fill"
       color = .red
     }
-    return Label(key, systemImage: symbol)
+    return Label(flashText(key), systemImage: symbol)
       .font(.caption.weight(.semibold))
       .foregroundStyle(color)
   }
 
   private func dispositionLabel(_ disposition: FlashPlanStepDisposition) -> some View {
-    let key: LocalizedStringKey
+    let key: String
     switch disposition {
     case .planned: key = "flash.disposition.planned"
     case .simulatedPreview: key = "flash.disposition.simulatedPreview"
     case .executionLocked: key = "flash.disposition.executionLocked"
     }
-    return Text(key)
+    return Text(flashText(key))
       .font(.caption.weight(.semibold))
       .foregroundStyle(.secondary)
   }
 
   private var reviewSection: some View {
-    GroupBox("flash.review.title") {
+    GroupBox(flashText("flash.review.title")) {
       VStack(alignment: .leading, spacing: 12) {
         if let errorCode = model.planFailureCode {
-          Label(planFailureKey(errorCode), systemImage: "xmark.octagon.fill")
+          Label(flashText(planFailureKey(errorCode)), systemImage: "xmark.octagon.fill")
             .foregroundStyle(.red)
             .accessibilityIdentifier("flash.plan.error")
           if let detail = model.planFailureDetail {
@@ -403,7 +403,7 @@ struct FlashWorkspaceView: View {
 
         Button(action: { model.preparePlan() }) {
           Text(
-            LocalizedStringKey(
+            flashText(
               model.plan == nil
                 ? "flash.action.preparePlan"
                 : "flash.action.preparePlanAgain"))
@@ -413,18 +413,18 @@ struct FlashWorkspaceView: View {
         .disabled(!model.canPreparePlan)
 
         if model.selectedArchiveURL == nil {
-          Text("flash.review.selectImageBlocker")
+          Text(flashText("flash.review.selectImageBlocker"))
             .font(.callout)
             .foregroundStyle(.secondary)
         } else if model.mode != .simulated && model.selectedTarget == nil {
-          Text("flash.review.selectTargetBlocker")
+          Text(flashText("flash.review.selectTargetBlocker"))
             .font(.callout)
             .foregroundStyle(.secondary)
         }
 
         if let plan = model.plan {
           Divider()
-          Text("flash.impact.title")
+          Text(flashText("flash.impact.title"))
             .font(.subheadline.weight(.semibold))
           ForEach(Array(plan.dataImpact.enumerated()), id: \.offset) { _, impact in
             dataImpactLabel(impact)
@@ -434,28 +434,29 @@ struct FlashWorkspaceView: View {
         switch model.mode {
         case .execute:
           Divider()
-          Label("flash.execute.locked", systemImage: "lock.fill")
+          Label(flashText("flash.execute.locked"), systemImage: "lock.fill")
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("flash.execute.blocker")
           if let handoff = model.humanHandoff {
             confirmedHandoff(handoff)
-            Button("flash.action.submitLocked") {}
+            Button(flashText("flash.action.submitLocked")) {}
               .buttonStyle(.borderedProminent)
               .tint(.red)
               .disabled(true)
               .accessibilityIdentifier("flash.execute.submit")
-            Label("flash.execute.submitLockReason", systemImage: "lock.shield")
+            Label(flashText("flash.execute.submitLockReason"), systemImage: "lock.shield")
               .font(.footnote)
               .foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
           } else {
             Label(
-              "flash.execute.confirmationRequired",
-              systemImage: "person.crop.circle.badge.exclamationmark")
-              .font(.callout.weight(.semibold))
-              .fixedSize(horizontal: false, vertical: true)
-            Button("flash.action.reviewImpact") {
+              flashText("flash.execute.confirmationRequired"),
+              systemImage: "person.crop.circle.badge.exclamationmark"
+            )
+            .font(.callout.weight(.semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            Button(flashText("flash.action.reviewImpact")) {
               if let plan = model.plan {
                 confirmationContext = FlashConfirmationContext(plan: plan)
               }
@@ -466,13 +467,13 @@ struct FlashWorkspaceView: View {
             .accessibilityIdentifier("flash.execute.review")
           }
         case .planOnly:
-          Label("flash.planOnly.noSubmission", systemImage: "checkmark.shield")
+          Label(flashText("flash.planOnly.noSubmission"), systemImage: "checkmark.shield")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("flash.noOperationSubmitted")
         case .simulated:
-          Label("flash.simulated.previewOnly", systemImage: "testtube.2")
+          Label(flashText("flash.simulated.previewOnly"), systemImage: "testtube.2")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -486,31 +487,31 @@ struct FlashWorkspaceView: View {
 
   private func confirmedHandoff(_ handoff: FlashHumanHandoffPresentation) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("flash.execute.confirmed", systemImage: "checkmark.seal.fill")
+      Label(flashText("flash.execute.confirmed"), systemImage: "checkmark.seal.fill")
         .font(.callout.weight(.semibold))
         .foregroundStyle(.orange)
-      LabeledContent("flash.confirm.target") {
+      LabeledContent(flashText("flash.confirm.target")) {
         Text("\(handoff.target.id) · r\(handoff.target.bindingRevision)")
           .font(.body.monospaced())
       }
-      LabeledContent("flash.execute.confirmedAt") {
+      LabeledContent(flashText("flash.execute.confirmedAt")) {
         Text(handoff.confirmedAtUTC).font(.body.monospaced())
       }
-      LabeledContent("flash.plan.digest") {
+      LabeledContent(flashText("flash.plan.digest")) {
         Text(handoff.planDigestSHA256)
           .font(.body.monospaced())
           .lineLimit(1)
           .truncationMode(.middle)
           .help(handoff.planDigestSHA256)
       }
-      LabeledContent("flash.plan.archiveHash") {
+      LabeledContent(flashText("flash.plan.archiveHash")) {
         Text(handoff.archiveSHA256)
           .font(.body.monospaced())
           .lineLimit(1)
           .truncationMode(.middle)
           .help(handoff.archiveSHA256)
       }
-      Label("flash.execute.reviewNotAuthority", systemImage: "exclamationmark.shield")
+      Label(flashText("flash.execute.reviewNotAuthority"), systemImage: "exclamationmark.shield")
         .font(.footnote)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -524,16 +525,16 @@ struct FlashWorkspaceView: View {
     switch impact {
     case .mappedPartitionsOverwritten(let count):
       return Label(
-        String(format: String(localized: "flash.impact.partitions"), count),
+        String(format: flashText("flash.impact.partitions"), count),
         systemImage: "externaldrive.badge.exclamationmark")
     case .userDataDestroyed:
-      return Label("flash.impact.userdata", systemImage: "trash.fill")
+      return Label(flashText("flash.impact.userdata"), systemImage: "trash.fill")
     case .forbiddenAreasPreserved:
-      return Label("flash.impact.preserved", systemImage: "checkmark.shield.fill")
+      return Label(flashText("flash.impact.preserved"), systemImage: "checkmark.shield.fill")
     }
   }
 
-  private func planFailureKey(_ code: FlashPlanFailureCode) -> LocalizedStringKey {
+  private func planFailureKey(_ code: FlashPlanFailureCode) -> String {
     switch code {
     case .fileAccessDenied: "flash.error.fileAccess"
     case .unreadableArchive: "flash.error.unreadable"
@@ -602,7 +603,8 @@ final class FlashWorkspaceViewModel: ObservableObject {
       defer { self.isRefreshing = false }
       guard !Task.isCancelled else { return }
       let previousTarget = self.selectedTarget
-      let nextSelectedTargetID = next.targets.contains(where: { $0.id == self.selectedTargetID })
+      let nextSelectedTargetID =
+        next.targets.contains(where: { $0.id == self.selectedTargetID })
         ? self.selectedTargetID
         : next.targets.first?.id ?? ""
       let nextTarget = next.targets.first { $0.id == nextSelectedTargetID }

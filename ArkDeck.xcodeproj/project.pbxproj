@@ -31,6 +31,7 @@
 		B10000000000000000000004 /* TraceLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* TraceLocalizable.xcstrings */; };
 		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
+		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -78,6 +79,7 @@
 		B10000000000000000000008 /* TraceLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = TraceLocalizable.xcstrings; sourceTree = "<group>"; };
 		A100000000000000000000D2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
+		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -192,6 +194,7 @@
 		A100000000000000000000A2 /* Flash Feature */ = {
 			isa = PBXGroup;
 			children = (
+				C10000000000000000000011 /* FlashLocalization.swift */,
 				A1000000000000000000003C /* FlashWorkspaceView.swift */,
 				A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */,
 				A100000000000000000000A7 /* FlashPlanDetailsView.swift */,
@@ -421,6 +424,7 @@
 				B10000000000000000000002 /* TraceConfigurationView.swift in Sources */,
 				B10000000000000000000003 /* TraceProgressArtifactsView.swift in Sources */,
 				A100000000000000000000D0 /* SettingsRootView.swift in Sources */,
+				C10000000000000000000001 /* FlashLocalization.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
