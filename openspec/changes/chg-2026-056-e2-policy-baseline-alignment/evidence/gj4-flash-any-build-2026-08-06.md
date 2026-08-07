@@ -98,6 +98,13 @@ of which are only reached when an attempt fails part-way through. If a future wi
 attempt break mid-flight, those paths get their first real exercise — and on the record of this
 change, that is where a fifteenth pin would show up if one exists.
 
+> **Superseded for the readback (2026-08-07).** A mid-flight break cannot reach the
+> reconciliation readback, by construction — reconciliation seals its own answer in the same
+> pass, so only an *engine-written* `outcomeUnknown` ever reaches it. The paragraph above is why
+> the 2026-08-06 interrupt was attempted; it would not have worked. See
+> `reconciliation-readback-production-reach-2026-08-07.md`. `flash continue` itself was executed
+> later the same day (`flash-continue-first-execution-2026-08-06.md`).
+
 ## The other journeys on the new firmware
 
 Re-run immediately after the flash, on `7.0.0.37`:

@@ -70,3 +70,12 @@ around.
 Contract coverage: complete, both directions, including the exclusion that makes a destructive
 interrupt pointless. Production reach: still none, now with a known construction and a known
 blocker rather than an open-ended risk.
+
+> **Updated later the same day.** Both halves of that last sentence moved. The construction is
+> no longer only known — a real `RuntimeJobEngine` now produces the terminal in a contract test —
+> and the blocker named above (the sandbox refusing `~/Downloads`) did not hold: the pinned
+> 7.0.0.35 archive was read directly. What this document could not yet say is *why* the
+> daemon-kill route fails: reconciliation seals its own answer in the same pass, so no interrupt
+> of any kind reaches the readback. See
+> `reconciliation-readback-production-reach-2026-08-07.md` and
+> `docs/adr/0009-campaign-unknown-outcome-authority.md`.
