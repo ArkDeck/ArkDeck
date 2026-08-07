@@ -7,6 +7,8 @@ name: Swift CI
 # 路径感知:diff 同时未触碰 Swift 面(Packages/**、Package.*)和本 workflow 时秒级 success;
 # workflow 自身变更必须跑全量,确保新的编译/测试参数经过同一 exact-head 验证;
 # diff 基准不可得时 fail closed = 跑全量(宁多跑不漏跑)。
+# SwiftPM build cache 是 best-effort:仅 protected main 写入,agent 分支只恢复;
+# cache action/服务失败时继续执行冷构建,不得把 required gate 变成 cache 可用性门。
 
 on:
   push:
@@ -86,13 +88,36 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: swift test (ArkDeckKit full suite, 4 workers)
+      - name: Restore trusted SwiftPM build cache
+        id: swift-build-cache
+        if: steps.paths.outputs.swift == 'true'
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0, Node 24
+        with:
+          path: Packages/ArkDeckKit/.build
+          key: arkdeck-swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            arkdeck-swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+
+      - name: swift test (ArkDeckKit full suite, 8 workers)
         if: steps.paths.outputs.swift == 'true'
         run: >-
           swift test
           --package-path Packages/ArkDeckKit
           --parallel
-          --num-workers 4
+          --num-workers 8
+
+      - name: Save trusted SwiftPM build cache
+        if: >-
+          success() &&
+          steps.paths.outputs.swift == 'true' &&
+          github.ref == 'refs/heads/main' &&
+          steps.swift-build-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0, Node 24
+        with:
+          path: Packages/ArkDeckKit/.build
+          key: arkdeck-swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
 
       - name: Job summary
         if: always()
@@ -101,7 +126,8 @@ jobs:
             echo "### Swift CI"
             echo "- Path decision: \`${{ steps.paths.outputs.reason }}\`"
             if [ "${{ steps.paths.outputs.swift }}" = "true" ]; then
-              echo "- Ran the full ArkDeckKit test suite with 4 test workers."
+              echo "- Ran the full ArkDeckKit test suite with 8 test workers."
+              echo "- SwiftPM .build cache is best-effort; only protected main writes it, and cache failure falls back to a cold build."
             else
               echo "- Skipped swift test: diff touches neither Swift surface (Packages/**, Package.*) nor this workflow."
             fi
