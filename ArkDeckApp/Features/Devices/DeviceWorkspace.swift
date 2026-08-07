@@ -5,18 +5,47 @@ import SwiftUI
 /// Sidebar device rows and the authorization guidance detail.
 ///
 /// Everything here reads the `device.candidates` discovery projection. The
-/// App can list candidates and re-read their state; it cannot adopt, poll on
-/// a timer it does not have, or restart anything from this surface — retry is
-/// a plain re-read, and adoption is named as the CLI act it is.
+/// App can list candidates and re-read their state; it cannot adopt or
+/// restart anything from this surface, and adoption is named as the CLI act
+/// it is. The bounded authorization wait below is an App-owned deadline over
+/// repeated reads of that same projection — which is why its countdown is
+/// real: the clock being counted down is this view model's own.
 @MainActor
 final class DeviceListViewModel: ObservableObject {
+  /// One device's bounded trust wait. `polling` carries the App-owned
+  /// deadline the countdown renders; `windowClosed` is the honest terminal:
+  /// the wait window ended without the device reporting Connected — whether
+  /// the prompt was declined or simply never answered, the tool does not say.
+  enum AuthorizationWait: Equatable {
+    case idle
+    case polling(connectKey: String, deadline: Date)
+    case windowClosed(connectKey: String)
+  }
+
   @Published private(set) var presentation = DeviceListPresentation.loading
   @Published private(set) var isRefreshing = false
+  @Published private(set) var authorizationWait = AuthorizationWait.idle
 
   private let provider: any DeviceListApplicationProviding
+  private let waitWindow: TimeInterval
+  private let probeInterval: TimeInterval
+  private var waitTask: Task<Void, Never>?
 
-  init(provider: any DeviceListApplicationProviding) {
+  init(
+    provider: any DeviceListApplicationProviding,
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) {
     self.provider = provider
+    // UI automation shrinks the window so a sweep can watch it close without
+    // spending three real minutes; the product default matches the design's
+    // bounded 180-second wait.
+    if arguments.contains("--ui-test-device-poll-fast") {
+      waitWindow = 6
+      probeInterval = 1
+    } else {
+      waitWindow = 180
+      probeInterval = 5
+    }
   }
 
   func refresh() {
@@ -34,6 +63,53 @@ final class DeviceListViewModel: ObservableObject {
 
   func candidate(forConnectKey connectKey: String) -> DeviceCandidatePresentation? {
     presentation.candidates.first { $0.connectKey == connectKey }
+  }
+
+  /// Starts (or restarts) the bounded wait for one device's trust prompt:
+  /// re-read the candidate list on a fixed interval until the device reports
+  /// Connected or the App-owned window ends. Zero device effect — every probe
+  /// is the same read the Re-check button performs.
+  func beginAuthorizationWait(forConnectKey connectKey: String) {
+    waitTask?.cancel()
+    let deadline = Date().addingTimeInterval(waitWindow)
+    authorizationWait = .polling(connectKey: connectKey, deadline: deadline)
+    let provider = provider
+    let interval = probeInterval
+    waitTask = Task { [weak self] in
+      while !Task.isCancelled {
+        let next = await provider.refreshCandidates()
+        guard let self, !Task.isCancelled else { return }
+        self.presentation = next
+        guard case .polling(let waited, let waitDeadline) = self.authorizationWait,
+          waited == connectKey
+        else { return }
+        if self.candidate(forConnectKey: connectKey)?.isAuthorized == true {
+          self.authorizationWait = .idle
+          return
+        }
+        if Date() >= waitDeadline {
+          self.authorizationWait = .windowClosed(connectKey: connectKey)
+          return
+        }
+        try? await Task.sleep(for: .seconds(interval))
+      }
+    }
+  }
+
+  /// Leaving the device (or the surface) ends its wait without a verdict:
+  /// an abandoned window must not later report itself as closed.
+  func cancelAuthorizationWait() {
+    waitTask?.cancel()
+    waitTask = nil
+    authorizationWait = .idle
+  }
+
+  func authorizationWaitState(forConnectKey connectKey: String) -> AuthorizationWait {
+    switch authorizationWait {
+    case .polling(let waited, _) where waited == connectKey: return authorizationWait
+    case .windowClosed(let waited) where waited == connectKey: return authorizationWait
+    default: return .idle
+    }
   }
 }
 
@@ -123,13 +199,16 @@ struct DeviceSidebarRow: View {
 }
 
 /// The detail a device row opens. For an unauthorized device this is the
-/// three-step trust guidance; for a ready one, its adoption facts. It is not
-/// a navigation destination — the sidebar's workflow items stay unselected
-/// while a device row is chosen.
+/// three-step trust guidance plus the bounded wait; for a ready one, its
+/// adoption facts. It is not a navigation destination — the sidebar's
+/// workflow items stay unselected while a device row is chosen.
 struct DeviceDetailView: View {
   let candidate: DeviceCandidatePresentation
   let isRefreshing: Bool
+  let waitState: DeviceListViewModel.AuthorizationWait
   let onRecheck: () -> Void
+  let onBeginWait: () -> Void
+  let onOpenOverview: () -> Void
 
   var body: some View {
     ScrollView {
@@ -148,6 +227,7 @@ struct DeviceDetailView: View {
             stateBlock
             if candidate.state == "Unauthorized" {
               trustSteps
+              authorizationWaitBlock
             }
             factsGrid
             if candidate.observedFacts != nil {
@@ -159,16 +239,7 @@ struct DeviceDetailView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 10) {
-              Button(deviceString("device.action.recheck"), action: onRecheck)
-                .disabled(isRefreshing)
-                .accessibilityIdentifier("device.action.recheck")
-              if isRefreshing {
-                ProgressView().controlSize(.small)
-              }
-            }
-            // Retry is a plain, zero-cost re-read. There is no countdown here
-            // because the App holds no bounded-wait deadline to count.
+            actionRow
             Text(deviceString("device.detail.recheckNote"))
               .font(.footnote)
               .foregroundStyle(.secondary)
@@ -224,6 +295,78 @@ struct DeviceDetailView: View {
         color: .secondary,
         identifier: "device.trust.unknownState")
     }
+  }
+
+  /// The bounded wait's own strip. Polling shows a real countdown — the
+  /// deadline is the view model's, so the clock is honest — and the closed
+  /// window states what is known: no authorization arrived inside it. Neither
+  /// declined nor timed-out is claimed; the tool reports only Unauthorized.
+  @ViewBuilder
+  private var authorizationWaitBlock: some View {
+    switch waitState {
+    case .idle:
+      EmptyView()
+    case .polling(_, let deadline):
+      Label {
+        HStack(spacing: 6) {
+          Text(deviceString("device.wait.polling"))
+          Text(timerInterval: Date.now...deadline, countsDown: true)
+            .font(.callout.monospacedDigit().weight(.semibold))
+        }
+      } icon: {
+        ProgressView().controlSize(.small)
+      }
+      .font(.callout)
+      .padding(10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+      .accessibilityIdentifier("device.wait.polling")
+    case .windowClosed:
+      VStack(alignment: .leading, spacing: 10) {
+        deviceNotice(
+          deviceString("device.wait.windowClosed"),
+          systemImage: "exclamationmark.triangle.fill",
+          color: .orange,
+          identifier: "device.wait.windowClosed")
+        // Restarting the shared HDC server is never the default fix: it is a
+        // separate, explicitly confirmed flow that lives on Overview, and it
+        // affects DevEco and every connected device. This button only leads
+        // there; nothing restarts from this page.
+        Button(deviceString("device.wait.openOverviewRecovery"), action: onOpenOverview)
+          .accessibilityIdentifier("device.wait.openOverviewRecovery")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var actionRow: some View {
+    HStack(spacing: 10) {
+      if candidate.state == "Unauthorized" {
+        Button(
+          {
+            if case .windowClosed = waitState {
+              return deviceString("device.action.retryWait")
+            }
+            return deviceString("device.action.beginWait")
+          }(),
+          action: onBeginWait
+        )
+        .buttonStyle(.borderedProminent)
+        .disabled(isPolling)
+        .accessibilityIdentifier("device.action.beginWait")
+      }
+      Button(deviceString("device.action.recheck"), action: onRecheck)
+        .disabled(isRefreshing || isPolling)
+        .accessibilityIdentifier("device.action.recheck")
+      if isRefreshing {
+        ProgressView().controlSize(.small)
+      }
+    }
+  }
+
+  private var isPolling: Bool {
+    if case .polling = waitState { return true }
+    return false
   }
 
   private var trustSteps: some View {

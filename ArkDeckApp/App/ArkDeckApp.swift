@@ -202,6 +202,18 @@ private struct AppShellView: View {
       }
     }
     .frame(minWidth: 900, minHeight: 600)
+    // Leaving the device whose trust window is being waited on ends that wait
+    // without a verdict: an abandoned window must not later claim it closed.
+    .onChange(of: storedSelection) { _, newValue in
+      let waitedKey: String?
+      switch deviceList.authorizationWait {
+      case .idle: waitedKey = nil
+      case .polling(let key, _), .windowClosed(let key): waitedKey = key
+      }
+      guard let waitedKey else { return }
+      if case .device(waitedKey) = ShellSelection(storageValue: newValue) { return }
+      deviceList.cancelAuthorizationWait()
+    }
   }
 
   @ViewBuilder
@@ -278,7 +290,13 @@ private struct AppShellView: View {
         DeviceDetailView(
           candidate: candidate,
           isRefreshing: deviceList.isRefreshing,
-          onRecheck: deviceList.refresh)
+          waitState: deviceList.authorizationWaitState(forConnectKey: connectKey),
+          onRecheck: deviceList.refresh,
+          onBeginWait: { deviceList.beginAuthorizationWait(forConnectKey: connectKey) },
+          onOpenOverview: {
+            deviceList.cancelAuthorizationWait()
+            storedSelection = ShellSelection.navigation(.overview).storageValue
+          })
       } else {
         // The chosen device left the candidate list (unplugged, or the list
         // was re-read). Say so; do not render stale facts as current.

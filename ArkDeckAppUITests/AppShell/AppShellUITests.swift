@@ -182,6 +182,7 @@ final class AppShellUITests: XCTestCase {
     let app = launch(
       arguments: [
         "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "--ui-test-device-poll-fast",
         "--ui-test-fixture-state",
         fixtureStateFileURL.path,
         "-AppleLanguages", language,
@@ -264,6 +265,35 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(
       app.buttons["device.action.adopt"].exists,
       "the App must not offer adoption", file: file, line: line)
+
+    // The bounded trust wait, walked to both verdicts under the shrunken
+    // test window. First the honest close: the window ends with the device
+    // still Unauthorized, the countdown strip goes away, and the secondary
+    // action leads to Overview's recovery flow instead of restarting
+    // anything from here. Then the success: a retried wait sees the fixture
+    // flip to Connected and the wait dissolves without a verdict banner.
+    let beginWait = app.buttons["device.action.beginWait"]
+    XCTAssertTrue(beginWait.waitForExistence(timeout: 5), file: file, line: line)
+    beginWait.click()
+    XCTAssertTrue(
+      element("device.wait.polling", in: app).waitForExistence(timeout: 5),
+      "starting the wait must show the countdown strip", file: file, line: line)
+    XCTAssertFalse(beginWait.isEnabled, "polling disables the start action", file: file, line: line)
+    XCTAssertTrue(
+      element("device.wait.windowClosed", in: app).waitForExistence(timeout: 15),
+      "an unanswered window must close honestly", file: file, line: line)
+    XCTAssertTrue(
+      app.buttons["device.wait.openOverviewRecovery"].exists,
+      "the closed window offers the Overview recovery path, not a restart here",
+      file: file, line: line)
+    XCTAssertTrue(beginWait.isEnabled, file: file, line: line)
+    writeFixtureState("--ui-test-device-authorized", in: app, file: file, line: line)
+    beginWait.click()
+    XCTAssertTrue(
+      element("device.trust.ready", in: app).waitForExistence(timeout: 10),
+      "an authorized device ends the wait as ready", file: file, line: line)
+    XCTAssertFalse(element("device.wait.windowClosed", in: app).exists, file: file, line: line)
+    writeFixtureState("", in: app, file: file, line: line)
     select("app.navigation.overview", in: app)
     XCTAssertTrue(
       app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 10),

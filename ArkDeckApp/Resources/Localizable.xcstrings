@@ -257,6 +257,22 @@
         }
       }
     },
+    "device.action.beginWait": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start waiting for authorization"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始等待授权"
+          }
+        }
+      }
+    },
     "device.action.recheck": {
       "localizations": {
         "en": {
@@ -269,6 +285,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新检测"
+          }
+        }
+      }
+    },
+    "device.action.retryWait": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry: start waiting for authorization"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试：开始等待授权"
           }
         }
       }
@@ -294,13 +326,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Re-checking is a plain read of the current candidate list; it sends nothing to the device and can be repeated freely."
+            "value": "Waiting and re-checking are plain reads of the current candidate list; they send nothing to the device and can be repeated freely."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重新检测只是重新读取当前候选列表；不向设备发送任何内容，可随时重复。"
+            "value": "等待与重新检测都只是重新读取当前候选列表；不向设备发送任何内容，可随时重复。"
           }
         }
       }
@@ -614,13 +646,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Then use Re-check: ArkDeck reads the device's current authorization state."
+            "value": "ArkDeck detects the authorization result automatically: a bounded wait re-reads the device state, with no repeated notifications."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "完成后点击「重新检测」——ArkDeck 读取设备当前的授权状态。"
+            "value": "ArkDeck 将自动检测授权结果：有界等待重复读取设备状态，不反复弹通知。"
           }
         }
       }
@@ -669,6 +701,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "设备报告未授权：尚未信任本机。"
+          }
+        }
+      }
+    },
+    "device.wait.openOverviewRecovery": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Overview to restart the shared HDC server…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前往 Overview 重启共享 HDC server…"
+          }
+        }
+      }
+    },
+    "device.wait.polling": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for on-device confirmation…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待设备端确认…"
+          }
+        }
+      }
+    },
+    "device.wait.windowClosed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No authorization arrived inside the wait window. Check the device's USB debugging switch, then retry. If retrying does not help, restarting the shared HDC server is a separate, explicitly confirmed step — it affects DevEco and every connected device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待窗口内未获得授权。请检查设备的 USB 调试开关后重试。若重试无效，重启共享 HDC server 是独立且需显式确认的一步——会影响 DevEco 与所有已连接设备。"
           }
         }
       }
