@@ -310,6 +310,52 @@ class RunSwiftPMTests(unittest.TestCase):
         self.assertEqual(mirror_source.read_text(encoding="utf-8"), "public let value = 2\n")
         self.assertEqual(second_source.stat().st_mtime, 1_900_000_000)
 
+    def test_root_level_ignored_name_keeps_nested_tracked_twin(self) -> None:
+        temporary = self.enterContext(tempfile.TemporaryDirectory())
+        temporary_path = Path(temporary)
+        root = temporary_path / "repo"
+        script, _ = self.make_runner_repo(
+            root, "public let value = 1\n", 1_700_000_000
+        )
+        # Git anchors `/cache-dir/` to the repo root, so only the root-level
+        # directory is ignored; the identically named tracked directory under
+        # Sources/ must survive in the mirror. An unanchored rsync exclude
+        # pattern would match both and delete the tracked twin.
+        (root / ".gitignore").write_text("/cache-dir/\n", encoding="utf-8")
+        (root / "cache-dir").mkdir()
+        (root / "cache-dir/junk.txt").write_text("local only\n", encoding="utf-8")
+        nested = root / "Packages/ArkDeckKit/Sources/cache-dir/Nested.swift"
+        nested.parent.mkdir(parents=True)
+        nested.write_text("public let nested = 1\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(root), "add", ".gitignore", "Packages"], check=True
+        )
+        cache_root = temporary_path / "cache"
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "ARKDECK_SWIFTPM_CACHE_ROOT": str(cache_root),
+                "ARKDECK_SWIFT_EXECUTABLE": str(self.make_fake_swift(temporary_path)),
+            }
+        )
+
+        result = subprocess.run(
+            ["/bin/sh", str(script), "build"],
+            text=True,
+            capture_output=True,
+            env=environment,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((cache_root / "workspace/cache-dir").exists())
+        self.assertTrue(
+            (
+                cache_root
+                / "workspace/Packages/ArkDeckKit/Sources/cache-dir/Nested.swift"
+            ).is_file()
+        )
+
     def test_symlink_cache_layout_is_migrated_to_a_source_mirror(self) -> None:
         temporary = self.enterContext(tempfile.TemporaryDirectory())
         temporary_path = Path(temporary)
