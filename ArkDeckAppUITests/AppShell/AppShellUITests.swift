@@ -163,7 +163,8 @@ final class AppShellUITests: XCTestCase {
     try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
     let app = launch(
       arguments: [
-        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-fixture-state",
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "--ui-test-fixture-state",
         fixtureStateFileURL.path,
         "-AppleLanguages", language,
       ])
@@ -218,6 +219,30 @@ final class AppShellUITests: XCTestCase {
     // Update settings live in the Settings scene, not the main window.
     XCTAssertFalse(app.buttons["update.checkNow"].exists, file: file, line: line)
     XCTAssertFalse(app.checkBoxes["update.automaticChecks"].exists, file: file, line: line)
+
+    // The sidebar lists real device candidates: one adopted ready device and
+    // one that still needs the on-device trust prompt. Choosing the
+    // unauthorized row opens its authorization guidance — a detail, not a
+    // workspace — and re-checking is an enabled, plain read.
+    let unauthorizedDevice = element("device.row.7f2c091a445e21", in: app)
+    XCTAssertTrue(unauthorizedDevice.waitForExistence(timeout: 10), file: file, line: line)
+    XCTAssertTrue(
+      element("device.row.150100469346864", in: app).exists, file: file, line: line)
+    clickCorrectingNavigationSplitAXOffset(unauthorizedDevice, in: app)
+    XCTAssertTrue(
+      element("device.trust.steps", in: app).waitForExistence(timeout: 10),
+      "the unauthorized device must show its trust steps", file: file, line: line)
+    assertDisplayed(app.staticTexts["device.fact.state"], equals: "Unauthorized")
+    let recheck = app.buttons["device.action.recheck"]
+    XCTAssertTrue(recheck.exists, file: file, line: line)
+    XCTAssertTrue(recheck.isEnabled, file: file, line: line)
+    XCTAssertFalse(
+      app.buttons["device.action.adopt"].exists,
+      "the App must not offer adoption", file: file, line: line)
+    select("app.navigation.overview", in: app)
+    XCTAssertTrue(
+      app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 10),
+      "leaving the device detail returns to a workspace", file: file, line: line)
 
     // Flash is a real production planning workspace. Its fixture provides only
     // the same immutable Runtime facts the production XPC reader consumes; it

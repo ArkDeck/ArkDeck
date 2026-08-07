@@ -1,6 +1,54 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "app.devices.gone": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device No Longer Listed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备已不在候选列表"
+          }
+        }
+      }
+    },
+    "app.devices.goneDetail": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device left the candidate list — it may be unplugged. Re-check from another row, or reconnect it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该设备已离开候选列表——可能已拔出。可从其他行重新检测，或重新连接设备。"
+          }
+        }
+      }
+    },
+    "app.devices.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device list unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备列表不可用"
+          }
+        }
+      }
+    },
     "app.navigation.debug": {
       "localizations": {
         "en": {
@@ -205,6 +253,342 @@
           "stringUnit": {
             "state": "translated",
             "value": "此版本尚未将该工作区连接到 ArkDeck Runtime。"
+          }
+        }
+      }
+    },
+    "device.action.recheck": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Re-check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新检测"
+          }
+        }
+      }
+    },
+    "device.detail.adoptViaCLI": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adoption (durable binding) is performed from the CLI: arkdeck device adopt. This App does not submit adoption."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接管（建立持久绑定）由 CLI 执行：arkdeck device adopt。本 App 不提交接管操作。"
+          }
+        }
+      }
+    },
+    "device.detail.recheckNote": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Re-checking is a plain read of the current candidate list; it sends nothing to the device and can be repeated freely."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新检测只是重新读取当前候选列表；不向设备发送任何内容，可随时重复。"
+          }
+        }
+      }
+    },
+    "device.detail.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device authorization — %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备授权 — %@"
+          }
+        }
+      }
+    },
+    "device.fact.bindingRevision": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Binding revision"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Binding revision"
+          }
+        }
+      }
+    },
+    "device.fact.connectKey": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect key"
+          }
+        }
+      }
+    },
+    "device.fact.state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported state"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报告状态"
+          }
+        }
+      }
+    },
+    "device.fact.target": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adopted target"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已接管目标"
+          }
+        }
+      }
+    },
+    "device.state.authorizedUnadopted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorized · not adopted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已授权 · 未接管"
+          }
+        }
+      }
+    },
+    "device.state.needsTrust": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs trust"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要信任"
+          }
+        }
+      }
+    },
+    "device.state.offline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "离线"
+          }
+        }
+      }
+    },
+    "device.state.ready": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "就绪"
+          }
+        }
+      }
+    },
+    "device.trust.authorizedUnadopted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorized. The device is not adopted as a durable target yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已授权。该设备尚未被接管为持久目标。"
+          }
+        }
+      }
+    },
+    "device.trust.offline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The device reports Offline. Check the USB connection, then re-check."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备报告离线。请检查 USB 连接后重新检测。"
+          }
+        }
+      }
+    },
+    "device.trust.ready": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorized and adopted — this device is ready."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已授权且已接管——设备就绪。"
+          }
+        }
+      }
+    },
+    "device.trust.step1": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock the device screen."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解锁设备屏幕；"
+          }
+        }
+      }
+    },
+    "device.trust.step2": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the device's \"Trust this computer?\" prompt, choose Trust or Always Trust."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在设备弹出的「是否信任此计算机？」中选择 信任 或 始终信任；"
+          }
+        }
+      }
+    },
+    "device.trust.step3": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Then use Re-check: ArkDeck reads the device's current authorization state."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成后点击「重新检测」——ArkDeck 读取设备当前的授权状态。"
+          }
+        }
+      }
+    },
+    "device.trust.stepsTitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在设备上"
+          }
+        }
+      }
+    },
+    "device.trust.unknownState": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tool reports an unrecognized state: %@. Shown as-is, not interpreted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具报告了未识别的状态：%@。按原文展示，不做解读。"
+          }
+        }
+      }
+    },
+    "device.trust.waiting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The device reports Unauthorized: it has not trusted this computer yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备报告未授权：尚未信任本机。"
           }
         }
       }

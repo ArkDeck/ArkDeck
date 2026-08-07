@@ -21,11 +21,14 @@ final class AgentXPCTransportContractTests: XCTestCase {
         AgentXPCEndpoint.readOnlyMethod(of: frame(method: method)), method,
         "\(method) is on the allowlist and must forward")
     }
+    // device.candidates joined this set as a pure discovery read: it lists
+    // HDC candidates via the bootstrap's enumeration (never `advance`, whose
+    // single-candidate path adopts), so it cannot create or change a binding.
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableReadOnlyMethods,
       [
-        "artifact.inspect", "artifact.list", "job.evidence", "job.list",
-        "job.list-page", "job.status", "operation.list", "target.list",
+        "artifact.inspect", "artifact.list", "device.candidates", "job.evidence",
+        "job.list", "job.list-page", "job.status", "operation.list", "target.list",
       ],
       "widening this set is a device-effect decision, not a refactor")
   }
