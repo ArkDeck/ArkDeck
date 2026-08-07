@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-056-e2-policy-baseline-alignment@r5
+> Change:CHG-2026-056-e2-policy-baseline-alignment@r6
 > Status:planned
 > Baseline:`CORE-3.0.0` -> proposed `CORE-4.0.0`
 > Proposal phase executes zero real device/authority/capability action.
@@ -70,7 +70,8 @@ platform limitation or elapsed device window may silently weaken the retained sa
 
 ## Result gate
 
-- [ ] r5 has been explicitly approved on protected `main` before implementation begins.
+- [x] r5 adjudication is present on protected `main` through maintainer-merged PR #1178.
+- [ ] r6 exact path-scope addendum is present on protected `main` before implementation begins.
 - [ ] All canonical and change-local contract acceptance passes.
 - [ ] All host gates pass at the exact implementation head.
 - [ ] Real DAYU200 UI Flash and postflight pass with truthful V5 evidence.
