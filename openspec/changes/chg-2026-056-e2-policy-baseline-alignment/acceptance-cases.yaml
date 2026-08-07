@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 6
+change_revision: 7
 platform: macos
 evidence_classes:
 - contract
@@ -35,37 +35,84 @@ cases:
   test_id: TEST-E2R-NEGATIVE-001
   method: >-
     Fault matrix over caller forgery, target/binding/input/plan/archive/artifact/
-    tool drift, reservation lineage, crash, cancellation, unknown/unsafe outcome,
+    tool drift, reservation lineage, crash, cancellation, missing recovery proof,
     expiry and attempt/concurrency budgets.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#negative-and-recovery-tests
   minimum_evidence: contract
   expected_result: >-
-    Every missing, forged, drifted, unknown, unresolved, unsafe, expired or
+    Every missing, forged, drifted, unbounded, incompletely covered, expired or
     over-budget case has zero new external dispatch and a durable blocker; no
-    restart, UI click, chat text or evidence record can retry or replay it.
+    restart, UI click, chat text or evidence record can replay or override it.
 - acceptance_id: E2R-COMPAT-001
   test_id: TEST-E2R-COMPAT-001
   method: >-
     Versioned legacy authority/evidence decoder fixtures plus new-admission,
-    migration and V5-writer negative tests.
+    migration plus V5-read/V6-writer negative tests.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
   minimum_evidence: contract
   expected_result: >-
     Historical V1-V4 standing/campaign/chat records remain immutable and
     decodable/exportable, while none can mint RuntimeCapability, reserve, admit,
-    dispatch, migrate into V5 or be emitted by a new writer.
+    dispatch, migrate into V6 or be emitted by a new writer.
+- acceptance_id: E2R-RECOVERY-001
+  test_id: TEST-E2R-RECOVERY-001
+  method: >-
+    Fake-provider target-lane fixture with a durable destructive outcomeUnknown,
+    known physical identity, exact effect universe and reviewed complete-overwrite
+    coverage; execute autonomous recovery through production Runtime composition.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Runtime never replays or rewrites the old intent, mints a distinct capability
+    and reservation, dispatches only the complete recovery plan without a human
+    prompt, and releases the lane only after all effects and postflight are confirmed.
+- acceptance_id: E2R-RECOVERY-NEGATIVE-001
+  test_id: TEST-E2R-RECOVERY-NEGATIVE-001
+  method: >-
+    Pairwise fault matrix over physical identity, binding/topology, effect-set
+    closure, omitted/protected partitions, coverage declaration, Artifact/tool
+    drift, caller-supplied proof, cancellation, expiry and total epoch budget.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#negative-and-recovery-tests
+  minimum_evidence: contract
+  expected_result: >-
+    Each incomplete or untrusted proof dispatches zero original and recovery
+    effects, persists the exact blocker and exposes no UI/chat approval path.
+- acceptance_id: E2R-HISTORY-001
+  test_id: TEST-E2R-HISTORY-001
+  method: >-
+    Versioned immutable journal fixtures pair old unknown intents with later Flash
+    histories that vary identity, ordering, partition coverage, outcomes and
+    reboot/rebind/runtime-build postflight.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Only the fixture with complete same-target coverage and postflight appends a
+    supersession relation with zero device dispatch; old bytes remain identical
+    and every incomplete fixture remains blocked.
+- acceptance_id: E2R-NOQUESTION-001
+  test_id: TEST-E2R-NOQUESTION-001
+  method: >-
+    Agent/UI surface audit and fake Runtime flows for initial Flash, ordinary
+    safeToReflash continuation, eligible complete-overwrite recovery and an
+    ineligible recovery blocker.
+  expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
+  minimum_evidence: contract
+  expected_result: >-
+    Eligible paths run without standing/campaign/UI/chat/human-action input;
+    the ineligible path reports a non-overridable diagnostic rather than asking
+    a user to authorize absent device-state proof.
 - acceptance_id: E2R-GJ4-001
   test_id: TEST-E2R-GJ4-001
   method: >-
     Explicit standalone UI-driver execution through the production signed App and
     protected-main Runtime against one real bound DAYU200 using the supplied
     OpenHarmony 7.0.0.35 archive, followed by Job/Session/Artifact and device
-    version postflight review.
+    version postflight and supersession-lineage review.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
   minimum_evidence: realHardware
   expected_result: >-
     The real typed Flash completes without standing authorization, campaign or
-    per-attempt chat confirmation; postflight proves the flashed build, V5
-    evidence records the actual Agent executor, RuntimeCapability use and exact
-    target/plan/Artifact correlation, and the driver remains outside all default
-    Swift/Xcode/UI test discovery.
+    per-attempt chat or outcome-decision confirmation; postflight proves the
+    flashed build, V6 evidence records the actual Agent executor, RuntimeCapability,
+    exact target/plan/Artifact and applicable recovery lineage, and the driver
+    remains outside all default Swift/Xcode/UI test discovery.
