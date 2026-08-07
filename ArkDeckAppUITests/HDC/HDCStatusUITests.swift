@@ -5,10 +5,10 @@ import XCTest
 ///
 /// Every fault injection used to cost its own launch, so a run relaunched the
 /// app once per test. The fixture now re-reads its state on each refresh, so
-/// one launched instance walks every fault below; language is a property of a
-/// run rather than of a test, so there is one sweep per language and no other
-/// fixture launch. What still launches separately does so for a reason that is
-/// stated where it happens.
+/// one launched instance walks every fault below. The fault values are raw
+/// domain strings, so the behavior matrix runs once; the AppShell localization
+/// sweep covers the second-language control. What still launches separately
+/// does so for a reason that is stated where it happens.
 @MainActor
 final class HDCStatusUITests: XCTestCase {
   override class func setUp() {
@@ -17,34 +17,14 @@ final class HDCStatusUITests: XCTestCase {
     KeyboardInputSourcePin.restoreWhenTheRunFinishes()
   }
 
-  // MARK: - One fixture launch per language
+  // MARK: - One full diagnostic fixture sweep
 
   /// TEST-AC-HDC-001-02 toolchainDiagnosticsContract, TEST-AC-HDC-007-02
   /// authorizationFaultInjection, TEST-AC-HDC-008-01 securityStateContract,
   /// TEST-AC-HDC-003-01 / 010-01 / 010-02 lifecycle contracts, and
-  /// OBS-APPFACE-001 AP1/AP2 — all against one launched instance.
-  func testSimplifiedChineseFixtureSweep() {
-    let app = launchSweep(language: "(zh-Hans)")
-    walkEveryDiagnosticState(app)
-    // HOR-UI-001: Simplified Chinese is complete and the keyboard path reaches
-    // the same App callback as the button.
-    let refresh = app.buttons["hdc.devices.refresh"]
-    XCTAssertEqual(refresh.label, "刷新设备")
-    XCTAssertTrue(refresh.isEnabled)
-    app.typeKey("r", modifierFlags: .command)
-    // A sweep has already driven several refreshes, so the fixture is past the
-    // two-event state the standalone test pinned. What the keyboard path has
-    // to show is that it reached the same callback: the disappeared
-    // transition is present, in order, behind the appeared one.
-    let events = displayedText(for: app.staticTexts["hdc.devices.events"])
-    guard let appeared = events.range(of: appearedFixtureEvent),
-      let disappeared = events.range(of: "2026-07-28T00:00:01.000Z disappeared")
-    else {
-      XCTFail("the keyboard refresh must advance the presentation: \(events)")
-      return
-    }
-    XCTAssertLessThan(appeared.lowerBound, disappeared.lowerBound)
-  }
+  /// OBS-APPFACE-001 AP1/AP2 — all against one launched instance. These
+  /// assertions are raw domain values and therefore run once; AppShell's
+  /// localized sweep covers the Chinese refresh label and keyboard route.
 
   func testEnglishFixtureSweep() {
     let app = launchSweep(language: "(en)")
@@ -56,7 +36,7 @@ final class HDCStatusUITests: XCTestCase {
     // The confirmation names the exact generation it confirms.
     enterImpactReview(app)
     let confirmation = app.buttons["hdc.lifecycle.confirmImpactPreview"]
-    XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+    XCTAssertTrue(confirmation.waitForExistenceFast(timeout: 5))
     XCTAssertEqual(confirmation.label, "Confirm Generation 7")
     confirmation.click()
     assertDisplayedValue(
@@ -66,7 +46,7 @@ final class HDCStatusUITests: XCTestCase {
   }
 
   /// Every assertion here reads a raw domain string, which is identical in
-  /// every language, so both sweeps run the same walk.
+  /// every language, so one sweep owns the complete behavior matrix.
   private func walkEveryDiagnosticState(
     _ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line
   ) {
@@ -174,7 +154,7 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertTrue(app.buttons["hdc.lifecycle.cancelImpactPreview"].exists, file: file, line: line)
     app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
     XCTAssertTrue(
-      app.staticTexts["hdc.lifecycle.impactPreview"].waitForNonExistence(timeout: 5),
+      app.staticTexts["hdc.lifecycle.impactPreview"].waitForNonExistenceFast(timeout: 5),
       "Esc must close the review sheet", file: file, line: line)
     XCTAssertFalse(app.staticTexts["hdc.lifecycle.confirmed"].exists, file: file, line: line)
     XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists, file: file, line: line)
@@ -190,7 +170,7 @@ final class HDCStatusUITests: XCTestCase {
       app.staticTexts["hdc.channelProtection"],
       equals: "encrypted verified (fixture-v1, UI fixture)")
     XCTAssertTrue(
-      app.staticTexts["overview.attention.clear"].waitForExistence(timeout: 5),
+      app.staticTexts["overview.attention.clear"].waitForExistenceFast(timeout: 5),
       "a verified channel leaves nothing needing attention", file: file, line: line)
     XCTAssertFalse(app.staticTexts["hdc.tcp.warning"].exists, file: file, line: line)
 
@@ -207,20 +187,27 @@ final class HDCStatusUITests: XCTestCase {
   /// HOR-BOUNDED-001. This one cannot join a sweep: the fixture's delay fires
   /// on the *second* refresh of an instance, which a sweep has long passed.
   func testHORBOUNDED1_InFlightDuplicateIsRejectedWithoutThirdTransition() {
-    let app = launch(arguments: ["--ui-test-hdc-refresh-delay"])
+    guard writeFixtureState(["--ui-test-hdc-refresh-delay"]) else { return }
+    defer { try? FileManager.default.removeItem(at: fixtureStateFileURL) }
+    let app = launch(arguments: ["--ui-test-fixture-state", fixtureStateFileURL.path])
     let refresh = app.buttons["hdc.devices.refresh"]
     let chooser = app.buttons["hdc.toolchain.chooseExecutable"]
-    XCTAssertTrue(refresh.waitForExistence(timeout: 15))
+    XCTAssertTrue(refresh.waitForExistenceFast(timeout: 15))
     XCTAssertTrue(chooser.exists)
 
     refresh.click()
 
+    XCTAssertTrue(app.staticTexts["overview.status.refreshing"].waitForExistenceFast(timeout: 5))
+    assertDisplayedValue(app.staticTexts["hdc.endpoint"], equals: "127.0.0.1:18710", timeout: 2)
     XCTAssertFalse(refresh.isEnabled)
     XCTAssertFalse(chooser.isEnabled)
     app.typeKey("r", modifierFlags: .command)
+    guard writeFixtureState([]) else { return }
     assertDisplayedValue(
       app.staticTexts["hdc.devices.events"], equals: appearedAndDisappearedFixtureEvents,
       timeout: 15)
+    XCTAssertTrue(
+      app.staticTexts["overview.status.refreshing"].waitForNonExistenceFast(timeout: 5))
     assertEnabled(refresh, equals: true)
     assertEnabled(chooser, equals: true)
     let events = displayedText(for: app.staticTexts["hdc.devices.events"])
@@ -300,14 +287,14 @@ final class HDCStatusUITests: XCTestCase {
 
     let app = launch(arguments: ["--ui-test-reset-hdc-selection"], fixture: false)
     let choose = app.buttons["hdc.toolchain.chooseExecutable"]
-    XCTAssertTrue(choose.waitForExistence(timeout: 15))
+    XCTAssertTrue(choose.waitForExistenceFast(timeout: 15))
     choose.click()
 
     let openPanel = app.sheets.firstMatch
-    XCTAssertTrue(openPanel.waitForExistence(timeout: 5), "Open panel must become interactive")
+    XCTAssertTrue(openPanel.waitForExistenceFast(timeout: 5), "Open panel must become interactive")
     app.typeKey("g", modifierFlags: [.command, .shift])
     let pathField = openPanel.textFields.firstMatch
-    XCTAssertTrue(pathField.waitForExistence(timeout: 5), "Open panel must expose Go to Folder")
+    XCTAssertTrue(pathField.waitForExistenceFast(timeout: 5), "Open panel must expose Go to Folder")
     pathField.click()
     pathField.typeKey("a", modifierFlags: [.command])
     try withTemporaryGeneralPasteboardString(pickerExecutable.path) {
@@ -323,7 +310,7 @@ final class HDCStatusUITests: XCTestCase {
     // predicate cannot double as the existence check — isEnabled on an
     // unresolved element is a query failure, not false.
     let openButton = openPanel.buttons["OKButton"]
-    XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Open panel must expose its Open button")
+    XCTAssertTrue(openButton.waitForExistenceFast(timeout: 5), "Open panel must expose its Open button")
     assertEnabled(openButton, equals: true, timeout: 10)
     openButton.click()
 
@@ -332,7 +319,7 @@ final class HDCStatusUITests: XCTestCase {
     // no hit point, which reports as "unable to find hit point" rather than as
     // an occlusion.
     XCTAssertTrue(
-      app.sheets.firstMatch.waitForNonExistence(timeout: 10),
+      app.sheets.firstMatch.waitForNonExistenceFast(timeout: 10),
       "the open panel must close before the Overview is driven again")
     expandAdvancedDiagnostics(app)
     assertDisplayedValue(
@@ -422,24 +409,33 @@ final class HDCStatusUITests: XCTestCase {
     _ faults: [String], in app: XCUIApplication,
     file: StaticString = #filePath, line: UInt = #line
   ) {
-    do {
-      try faults.joined(separator: "\n").write(
-        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
-    } catch {
-      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
-      return
-    }
+    guard writeFixtureState(faults, file: file, line: line) else { return }
     let refresh = app.buttons["hdc.devices.refresh"]
-    XCTAssertTrue(refresh.waitForExistence(timeout: 10), file: file, line: line)
+    XCTAssertTrue(refresh.waitForExistenceFast(timeout: 10), file: file, line: line)
     assertEnabled(refresh, equals: true, file: file, line: line)
     refresh.click()
   }
 
+  @discardableResult
+  private func writeFixtureState(
+    _ faults: [String],
+    file: StaticString = #filePath, line: UInt = #line
+  ) -> Bool {
+    do {
+      try faults.joined(separator: "\n").write(
+        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      return true
+    } catch {
+      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
+      return false
+    }
+  }
+
   private func enterImpactReview(_ app: XCUIApplication) {
     let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
-    guard request.waitForExistence(timeout: 5) else { return }
+    guard request.waitForExistenceFast(timeout: 5) else { return }
     request.click()
-    _ = app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistence(timeout: 5)
+    _ = app.staticTexts["hdc.lifecycle.impactPreview"].waitForExistenceFast(timeout: 5)
   }
 
   // MARK: - Helpers
@@ -468,15 +464,15 @@ final class HDCStatusUITests: XCTestCase {
     }
     app.launch()
     app.activate()
-    if !app.windows.firstMatch.waitForExistence(timeout: 2) {
+    if !app.windows.firstMatch.waitForExistenceFast(timeout: 2) {
       app.typeKey("n", modifierFlags: .command)
     }
     XCTAssertTrue(
-      app.windows.firstMatch.waitForExistence(timeout: 5), "ArkDeck must create a test window")
+      app.windows.firstMatch.waitForExistenceFast(timeout: 5), "ArkDeck must create a test window")
     // The absolute path now lives in the collapsed Advanced Diagnostics
     // section, so readiness is anchored on a field the Overview always shows.
     XCTAssertTrue(
-      app.staticTexts["hdc.endpoint"].waitForExistence(timeout: 15),
+      app.staticTexts["hdc.endpoint"].waitForExistenceFast(timeout: 15),
       "ArkDeck must render an accessible HDC diagnostics root before assertions")
     return app
   }
@@ -489,45 +485,17 @@ final class HDCStatusUITests: XCTestCase {
   ) {
     let toggle = app.buttons["overview.advanced.toggle"]
     XCTAssertTrue(
-      toggle.waitForExistence(timeout: 15),
+      toggle.waitForExistenceFast(timeout: 15),
       "Overview must expose the Advanced Diagnostics disclosure", file: file, line: line)
     guard !app.staticTexts["hdc.toolchain.path"].exists else { return }
-    // A control that is only partly inside the viewport may still report
-    // `isHittable`, while its click lands in the global Job bar below it.
-    scrollIntoView(toggle, in: app)
-    if toggle.isHittable {
-      toggle.click()
-    } else {
-      app.typeKey("d", modifierFlags: [.command, .shift])
-    }
+    // NavigationSplitView accessibility geometry is unreliable on macOS 26;
+    // the product's public shortcut reaches the same action without spending
+    // up to 25 AppKit scroll/idle cycles or risking a click on the Job bar.
+    app.typeKey("d", modifierFlags: [.command, .shift])
     XCTAssertTrue(
-      app.staticTexts["hdc.toolchain.path"].waitForExistence(timeout: 5),
+      app.staticTexts["hdc.toolchain.path"].waitForExistenceFast(timeout: 5),
       "expanding Advanced Diagnostics must reveal the raw toolchain facts",
       file: file, line: line)
-  }
-
-  private func scrollIntoView(_ element: XCUIElement, in app: XCUIApplication) {
-    let targetX = element.frame.midX
-    let hosts = app.scrollViews.allElementsBoundByIndex.filter { host in
-      let frame = host.frame
-      return frame.width > 0 && frame.minX <= targetX && targetX <= frame.maxX
-    }
-    guard let host = hosts.min(by: { lhs, rhs in
-      lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
-    }) else { return }
-
-    var attempts = 0
-    while attempts < 25 {
-      let target = element.frame
-      let viewport = host.frame
-        .intersection(app.windows.firstMatch.frame)
-        .insetBy(dx: 0, dy: 60)
-      if target.minY >= viewport.minY && target.maxY <= viewport.maxY && element.isHittable {
-        return
-      }
-      host.scroll(byDeltaX: 0, deltaY: -120)
-      attempts += 1
-    }
   }
 
   private func displayedText(for element: XCUIElement) -> String {
@@ -547,6 +515,7 @@ final class HDCStatusUITests: XCTestCase {
     file: StaticString = #filePath,
     line: UInt = #line
   ) {
+    if displayedValues(for: element).contains(expectedText) { return }
     let displayedValue = NSPredicate { [weak self] _, _ in
       self?.displayedValues(for: element).contains(expectedText) ?? false
     }
@@ -576,6 +545,7 @@ final class HDCStatusUITests: XCTestCase {
     file: StaticString = #filePath,
     line: UInt = #line
   ) {
+    if element.isEnabled == expected { return }
     let predicate = NSPredicate { _, _ in element.isEnabled == expected }
     let expectation = expectation(for: predicate, evaluatedWith: element)
     let result = XCTWaiter.wait(for: [expectation], timeout: timeout)

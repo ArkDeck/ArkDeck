@@ -1,6 +1,19 @@
 import Carbon.HIToolbox
 import XCTest
 
+extension XCUIElement {
+  /// XCTest waits poll on a coarse cadence. Most UI assertions inspect state
+  /// that is already stable, so avoid spending the first polling interval
+  /// when the current accessibility snapshot already answers the question.
+  func waitForExistenceFast(timeout: TimeInterval) -> Bool {
+    exists || waitForExistence(timeout: timeout)
+  }
+
+  func waitForNonExistenceFast(timeout: TimeInterval) -> Bool {
+    !exists || waitForNonExistence(timeout: timeout)
+  }
+}
+
 /// Pins a plain keyboard layout for the duration of a UI test run.
 ///
 /// The runner has to synthesize keyboard events — `⌘R`, `Esc`, `⌘,` are the
