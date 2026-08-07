@@ -27,9 +27,18 @@ public enum ArkDeckAgentXPC {
   /// Runtime state and none of them can queue, execute, cancel, adopt or
   /// import anything, so a sandboxed client of this transport cannot produce
   /// a device effect at any level.
+  ///
+  /// `device.candidates` is the discovery read behind the App's device list:
+  /// it enumerates HDC device candidates with their raw connection state and
+  /// joins already-adopted targets by connect key. It calls the bootstrap's
+  /// candidate read only — never `advance`, whose single-candidate path
+  /// adopts — so listing candidates over this transport cannot create,
+  /// select or change a binding. Adoption itself stays on `target.adopt`,
+  /// which remains refused here.
   public static let forwardableReadOnlyMethods: Set<String> = [
     "artifact.inspect",
     "artifact.list",
+    "device.candidates",
     "job.evidence",
     "job.list",
     "job.list-page",

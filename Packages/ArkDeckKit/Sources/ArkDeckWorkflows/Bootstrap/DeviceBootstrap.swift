@@ -356,6 +356,15 @@ public actor DeviceBootstrapMachine {
     self.nowUTC = nowUTC
   }
 
+  /// Lists the current device candidates and nothing else: no selection, no
+  /// trust wait, no adoption, no phase change. This is the discovery read the
+  /// App's device list consumes — unlike `advance`, which adopts outright
+  /// when exactly one Connected candidate is present, this method is
+  /// deliberately incapable of producing a binding.
+  public func enumerateCandidates() async throws -> [BootstrapCandidate] {
+    try await observation.listCandidates()
+  }
+
   /// Runs the bootstrap to its next decision point. `selectedConnectKey`
   /// resolves a prior needsSelection; re-running after physical trust
   /// resumes automatically. Every path is observation-only.

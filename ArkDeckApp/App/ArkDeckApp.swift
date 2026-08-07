@@ -21,6 +21,8 @@ struct ArkDeckApp: App {
     provider: TraceApplicationFacade.make())
   @StateObject private var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
+  @StateObject private var deviceList = DeviceListViewModel(
+    provider: DeviceListApplicationFacade.make())
 
   var body: some Scene {
     WindowGroup {
@@ -31,7 +33,8 @@ struct ArkDeckApp: App {
         flashWorkspace: flashWorkspace,
         uiDumpWorkspace: uiDumpWorkspace,
         debugWorkspace: debugWorkspace,
-        traceWorkspace: traceWorkspace
+        traceWorkspace: traceWorkspace,
+        deviceList: deviceList
       )
       .task {
         hdcDiagnostics.refresh()
@@ -41,6 +44,7 @@ struct ArkDeckApp: App {
         uiDumpWorkspace.refresh()
         debugWorkspace.refresh()
         traceWorkspace.refresh()
+        deviceList.refresh()
       }
     }
     .defaultSize(width: 1180, height: 760)
@@ -97,6 +101,30 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   var accessibilityIdentifier: String { "app.navigation.\(rawValue)" }
 }
 
+/// A sidebar choice: one of the fixed workspaces, or a device row. A device
+/// row is not a navigation destination — choosing it leaves every workspace
+/// item unselected while its authorization detail is shown.
+private enum ShellSelection: Hashable {
+  case navigation(ArkDeckNavigationItem)
+  case device(connectKey: String)
+
+  /// Stable scene-storage encoding; unknown values fall back to Overview.
+  var storageValue: String {
+    switch self {
+    case .navigation(let item): return item.rawValue
+    case .device(let connectKey): return "device:\(connectKey)"
+    }
+  }
+
+  init(storageValue: String) {
+    if storageValue.hasPrefix("device:") {
+      self = .device(connectKey: String(storageValue.dropFirst("device:".count)))
+    } else {
+      self = .navigation(ArkDeckNavigationItem(rawValue: storageValue) ?? .overview)
+    }
+  }
+}
+
 /// Native window shell: system split view, unified toolbar, and one workspace
 /// per navigation item. Implemented workspaces consume only their own Runtime
 /// projections; features without an accepted production surface remain
@@ -112,15 +140,21 @@ private struct AppShellView: View {
   @ObservedObject var uiDumpWorkspace: UIDumpWorkspaceViewModel
   @ObservedObject var debugWorkspace: DebugWorkspaceViewModel
   @ObservedObject var traceWorkspace: TraceWorkspaceViewModel
+  @ObservedObject var deviceList: DeviceListViewModel
 
-  private var selectedItem: ArkDeckNavigationItem {
-    ArkDeckNavigationItem(rawValue: storedSelection) ?? .overview
+  private var shellSelection: ShellSelection {
+    ShellSelection(storageValue: storedSelection)
   }
 
-  private var selection: Binding<ArkDeckNavigationItem?> {
+  private var selectedItem: ArkDeckNavigationItem {
+    if case .navigation(let item) = shellSelection { return item }
+    return .overview
+  }
+
+  private var selection: Binding<ShellSelection?> {
     Binding(
-      get: { selectedItem },
-      set: { storedSelection = ($0 ?? .overview).rawValue })
+      get: { shellSelection },
+      set: { storedSelection = ($0 ?? .navigation(.overview)).storageValue })
   }
 
   var body: some View {
@@ -129,6 +163,7 @@ private struct AppShellView: View {
         List(selection: selection) {
           Section("app.navigation.section.device") {
             navigationRow(.overview)
+            deviceRows
           }
           Section("app.navigation.section.workflows") {
             navigationRow(.flash)
@@ -149,7 +184,7 @@ private struct AppShellView: View {
               width: geometry.size.width, height: geometry.size.height,
               alignment: .topLeading)
         }
-        .navigationTitle(Text(LocalizedStringKey(selectedItem.localizationKey)))
+        .navigationTitle(detailTitle)
         .toolbar { updateAttentionToolbarItem }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -199,11 +234,72 @@ private struct AppShellView: View {
   }
 
   private func openHistory() {
-    storedSelection = ArkDeckNavigationItem.history.rawValue
+    storedSelection = ShellSelection.navigation(.history).storageValue
+  }
+
+  private var detailTitle: Text {
+    if case .device(let connectKey) = shellSelection {
+      let candidate = deviceList.candidate(forConnectKey: connectKey)
+      return Text(candidate?.adoptedTargetID ?? connectKey)
+    }
+    return Text(LocalizedStringKey(selectedItem.localizationKey))
+  }
+
+  /// Device rows live under the same Devices section as Overview. The list
+  /// states its own failure and stays silent only when there is genuinely
+  /// nothing: an unreadable candidate list is never shown as an empty one.
+  @ViewBuilder
+  private var deviceRows: some View {
+    switch deviceList.presentation.availability {
+    case .checking:
+      EmptyView()
+    case .unavailable:
+      Label {
+        Text("app.devices.unavailable")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      } icon: {
+        Image(systemName: "antenna.radiowaves.left.and.right.slash")
+          .foregroundStyle(.secondary)
+      }
+      .accessibilityIdentifier("app.devices.unavailable")
+    case .available:
+      ForEach(deviceList.presentation.candidates) { candidate in
+        DeviceSidebarRow(candidate: candidate)
+          .tag(ShellSelection.device(connectKey: candidate.connectKey))
+      }
+    }
   }
 
   @ViewBuilder
   private var detail: some View {
+    if case .device(let connectKey) = shellSelection {
+      if let candidate = deviceList.candidate(forConnectKey: connectKey) {
+        DeviceDetailView(
+          candidate: candidate,
+          isRefreshing: deviceList.isRefreshing,
+          onRecheck: deviceList.refresh)
+      } else {
+        // The chosen device left the candidate list (unplugged, or the list
+        // was re-read). Say so; do not render stale facts as current.
+        ContentUnavailableView {
+          Label {
+            Text("app.devices.gone")
+              .accessibilityIdentifier("app.devices.gone")
+          } icon: {
+            Image(systemName: "cable.connector.slash")
+          }
+        } description: {
+          Text("app.devices.goneDetail")
+        }
+      }
+    } else {
+      workspaceDetail
+    }
+  }
+
+  @ViewBuilder
+  private var workspaceDetail: some View {
     switch selectedItem {
     case .overview:
       HDCStatusView(
@@ -277,7 +373,7 @@ private struct AppShellView: View {
       Image(systemName: item.systemImageName)
     }
     .accessibilityIdentifier(item.accessibilityIdentifier)
-    .tag(item)
+    .tag(ShellSelection.navigation(item))
   }
 }
 

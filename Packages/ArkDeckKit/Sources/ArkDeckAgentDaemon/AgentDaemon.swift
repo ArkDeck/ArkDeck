@@ -1114,6 +1114,37 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
+    case "device.candidates":
+      // Read-only discovery: the one enumeration the App's device list needs.
+      // It calls the bootstrap's candidate read directly — never `advance`,
+      // which adopts when a single Connected candidate is present — so this
+      // method cannot create, change or select a binding. Adopted targets are
+      // joined by connect key so a caller can tell a ready adopted device
+      // from a candidate that still needs physical trust.
+      guard let bootstrap else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "bootstrap is not configured in this composition")
+      }
+      do {
+        let candidates = try await bootstrap.enumerateCandidates()
+        let adopted = (try? targetStore?.list()) ?? []
+        return success(
+          id: request.id,
+          result: .array(
+            candidates.map { candidate in
+              let record = adopted.first { $0.connectKey == candidate.connectKey }
+              return .object([
+                "connectKey": .string(candidate.connectKey),
+                "state": .string(candidate.state),
+                "adoptedTargetId": record.map { .string($0.targetID) } ?? .null,
+                "bindingRevision": record.map { .integer(Int64($0.bindingRevision)) } ?? .null,
+              ])
+            }))
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
     case "target.adopt":
       guard let bootstrap else {
         return failure(
