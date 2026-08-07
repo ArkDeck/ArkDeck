@@ -46,7 +46,14 @@ final class AppShellUITests: XCTestCase {
           + "an approved Runtime path.",
         noSubmission:
           "Plan only: every deviceMutation and destructive step remains "
-          + "notExecuted(planned). No operation was submitted."),
+          + "notExecuted(planned). No operation was submitted.",
+        runtimeRunningState: "Running",
+        runtimeRunningResult:
+          "Runtime is still processing this Job. Progress is stage-based; "
+          + "no percentage is fabricated.",
+        runtimeSucceededState: "Succeeded",
+        runtimeSucceededResult:
+          "Runtime reports success after the Flash and postflight checks."),
       workspaces: Workspaces(
         inspectorShow: "Show job inspector",
         inspectorReadOnly: "Read-only Runtime facts",
@@ -55,7 +62,8 @@ final class AppShellUITests: XCTestCase {
           "Provider invocation disclosure",
         ],
         uiDumpUnavailable: "Runtime operation is unavailable",
-        traceUnavailable: "Diagnostics operation is unavailable"),
+        traceUnavailable: "Diagnostics operation is unavailable",
+        settingsPanes: ["General", "Toolchains", "Storage", "Updates", "Diagnostics"]),
       history: History(
         readOnlyNote:
           "This workspace reads Runtime state. It cannot submit, cancel, or retry anything.",
@@ -88,7 +96,11 @@ final class AppShellUITests: XCTestCase {
           + "不要开始下一次刷机。",
         noSubmission:
           "仅计划：所有 deviceMutation 与 destructive 步骤均保持 notExecuted(planned)，"
-          + "未提交任何操作。"),
+          + "未提交任何操作。",
+        runtimeRunningState: "正在执行",
+        runtimeRunningResult: "Runtime 仍在处理此 Job。进度按真实阶段展示，不生成虚假百分比。",
+        runtimeSucceededState: "成功",
+        runtimeSucceededResult: "Runtime 报告刷机及 postflight 检查成功。"),
       workspaces: Workspaces(
         inspectorShow: "展开 Job 检查器",
         inspectorReadOnly: "只读 Runtime 事实",
@@ -96,7 +108,8 @@ final class AppShellUITests: XCTestCase {
           "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则", "Provider 调用披露",
         ],
         uiDumpUnavailable: "Runtime 操作不可用",
-        traceUnavailable: "诊断操作不可用"),
+        traceUnavailable: "诊断操作不可用",
+        settingsPanes: ["通用", "工具链", "存储", "更新", "诊断"]),
       history: History(
         readOnlyNote: "此工作区只读取 Runtime 状态，不能提交、取消或重试任何操作。",
         outcomeUnknown: "结果未知——此 Job 对设备的影响从未被确认。",
@@ -122,6 +135,7 @@ final class AppShellUITests: XCTestCase {
     let debugPanels: [String]
     let uiDumpUnavailable: String
     let traceUnavailable: String
+    let settingsPanes: [String]
   }
 
   private struct Flash {
@@ -135,6 +149,10 @@ final class AppShellUITests: XCTestCase {
     let runtimeResult: String
     let runtimeRecovery: String
     let noSubmission: String
+    let runtimeRunningState: String
+    let runtimeRunningResult: String
+    let runtimeSucceededState: String
+    let runtimeSucceededResult: String
   }
 
   private struct History {
@@ -473,6 +491,57 @@ final class AppShellUITests: XCTestCase {
       "Flash must distinguish a reachable empty Runtime history",
       file: file, line: line)
 
+    // Runtime activity is stage-based and terminal states carry their own
+    // sentences. Walked here through the same state file instead of a
+    // separate launch: running first, then succeeded.
+    writeFixtureState("--ui-test-runtime-flash-running", in: app, file: file, line: line)
+    app.buttons["flash.refresh"].click()
+    assertDisplayed(
+      app.staticTexts["flash.runtime.state"], equals: flash.runtimeRunningState, timeout: 10)
+    assertDisplayed(
+      element("flash.runtime.result", in: app), equals: flash.runtimeRunningResult)
+    XCTAssertTrue(element("flash.runtime.progress", in: app).exists, file: file, line: line)
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists, file: file, line: line)
+    writeFixtureState("--ui-test-runtime-flash-succeeded", in: app, file: file, line: line)
+    app.buttons["flash.refresh"].click()
+    assertDisplayed(
+      app.staticTexts["flash.runtime.state"], equals: flash.runtimeSucceededState, timeout: 10)
+    assertDisplayed(
+      element("flash.runtime.result", in: app), equals: flash.runtimeSucceededResult)
+    XCTAssertFalse(element("flash.runtime.progress", in: app).exists, file: file, line: line)
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists, file: file, line: line)
+
+    // A history that could not be read must never look like an empty history,
+    // and Flash states the same unavailability instead of a false empty.
+    // The reason is the fixture's raw string, identical in every language.
+    writeFixtureState(
+      "--ui-test-runtime-history-unreachable", in: app, file: file, line: line)
+    app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      app.staticTexts["flash.runtime.unavailable"].waitForExistence(timeout: 10),
+      file: file, line: line)
+    XCTAssertFalse(app.staticTexts["flash.runtime.empty"].exists, file: file, line: line)
+    select("app.navigation.history", in: app)
+    XCTAssertTrue(
+      app.staticTexts["history.unavailable.title"].waitForExistence(timeout: 10),
+      file: file, line: line)
+    assertDisplayed(
+      app.staticTexts["history.unavailable.reason"],
+      equals: "ArkDeck Runtime is not reachable: fixture")
+    XCTAssertFalse(
+      element("history.table", in: app).exists, "an unreadable history shows no table",
+      file: file, line: line)
+    XCTAssertFalse(
+      app.staticTexts["history.empty.title"].exists, "it is not an empty history",
+      file: file, line: line)
+
+    // The exact-plan review and its destructive confirmation assert English
+    // strings; the flow itself is language-independent, so one language
+    // carries it.
+    if language == "(en)" {
+      walkExactFlashPlanConfirmation(in: app, file: file, line: line)
+    }
+
     do {
       try "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
     } catch {
@@ -520,6 +589,160 @@ final class AppShellUITests: XCTestCase {
     app.typeKey("d", modifierFlags: [.command, .shift])
     assertDisplayed(app.staticTexts["hdc.toolchain.path"], equals: "/Applications/DevEco/hdc")
     assertDisplayed(app.staticTexts["hdc.counters.autoLifecycle"], equals: "0")
+
+    // The Settings scene is its own window, so it comes after every sidebar
+    // interaction. Both languages verify the five panes and the safe controls;
+    // the update state machine asserts English status strings, so English
+    // carries that walk.
+    app.typeKey(",", modifierFlags: .command)
+    for pane in workspaces.settingsPanes {
+      XCTAssertTrue(
+        app.buttons[pane].waitForExistence(timeout: 10),
+        "Settings must expose the \(pane) pane", file: file, line: line)
+    }
+    app.buttons[workspaces.settingsPanes[1]].click()
+    XCTAssertTrue(
+      app.buttons["settings.toolchains.choose"].waitForExistence(timeout: 10),
+      file: file, line: line)
+    XCTAssertTrue(app.buttons["settings.toolchains.refresh"].exists, file: file, line: line)
+    app.buttons[workspaces.settingsPanes[2]].click()
+    for identifier in [
+      "settings.storage.chooseRoot", "settings.storage.quota", "settings.storage.margin",
+      "settings.storage.retention", "settings.storage.save",
+    ] {
+      XCTAssertTrue(
+        element(identifier, in: app).waitForExistence(timeout: 10),
+        "\(identifier) missing", file: file, line: line)
+    }
+    app.buttons[workspaces.settingsPanes[4]].click()
+    XCTAssertTrue(
+      app.buttons["settings.diagnostics.preview"].waitForExistence(timeout: 10),
+      file: file, line: line)
+    XCTAssertFalse(app.buttons["settings.diagnostics.export"].exists, file: file, line: line)
+    app.buttons[workspaces.settingsPanes[3]].click()
+    XCTAssertTrue(
+      app.staticTexts["update.status"].waitForExistence(timeout: 10),
+      "the Updates pane must render its status", file: file, line: line)
+    if language == "(en)" {
+      // The controls the main window must not carry are the ones this scene
+      // owns; a checkbox reports its state as a number, not text.
+      let automaticChecks = app.checkBoxes["update.automaticChecks"]
+      XCTAssertTrue(automaticChecks.exists, file: file, line: line)
+      XCTAssertEqual(
+        (automaticChecks.value as? NSNumber)?.intValue, 1,
+        "automatic checks default to on", file: file, line: line)
+      // Idle, available, failed, then awaiting-consent last: it is the one
+      // state that disables Check Now, so it cannot be walked out of.
+      for state in [
+        UpdateState(
+          flag: "--ui-test-auto-update-idle",
+          status: "Ready to check for updates.",
+          enabled: ["update.checkNow"], attention: nil),
+        UpdateState(
+          flag: "--ui-test-auto-update-available",
+          status: "An update is available. Download requires your action.",
+          enabled: ["update.checkNow", "update.download"], attention: "Update Available"),
+        UpdateState(
+          flag: "--ui-test-auto-update-failed",
+          status: "Update verification failed. Nothing was installed or replaced.",
+          enabled: ["update.checkNow"], attention: "Update Failed"),
+        UpdateState(
+          flag: "--ui-test-auto-update-awaiting-consent",
+          status: "The DMG passed signature and Team verification. Confirm once more to reveal it.",
+          enabled: ["update.reveal"], attention: "Update Awaiting Confirmation"),
+      ] {
+        assertUpdateState(state, in: app)
+      }
+    }
+  }
+
+  /// The exact-plan fixture is presentation-only: it bypasses the system file
+  /// picker so this flow can walk every review state inside the sweep's
+  /// launch, and the accepted confirmation arms — but never clicks — the
+  /// submit action, so the fixture run still submits nothing.
+  private func walkExactFlashPlanConfirmation(
+    in app: XCUIApplication, file: StaticString, line: UInt
+  ) {
+    writeFixtureState("--ui-test-flash-plan", in: app, file: file, line: line)
+    select("app.navigation.flash", in: app)
+    app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      element("flash.plan.steps", in: app).waitForExistence(timeout: 15),
+      "the fixture must materialize an exact execute plan", file: file, line: line)
+
+    let partitions = element("flash.plan.partitions.disclosure", in: app)
+    XCTAssertTrue(partitions.exists, file: file, line: line)
+    scrollIntoView(partitions, in: app)
+    partitions.click()
+    XCTAssertTrue(
+      element("flash.plan.partition.system", in: app).waitForExistence(timeout: 5),
+      "mapped partition details must be inspectable", file: file, line: line)
+    partitions.click()
+
+    // Prerequisites are a top-level, always-expanded section before the exact
+    // plan — what has to hold is readable without a disclosure click.
+    let prerequisites = element("flash.plan.prerequisitesList", in: app)
+    XCTAssertTrue(prerequisites.exists, file: file, line: line)
+    scrollIntoView(prerequisites, in: app)
+    XCTAssertTrue(
+      app.staticTexts["Runtime check pending"].waitForExistence(timeout: 5),
+      file: file, line: line)
+
+    let review = app.buttons["flash.execute.review"]
+    XCTAssertTrue(review.exists, file: file, line: line)
+    XCTAssertTrue(review.isEnabled, file: file, line: line)
+    scrollIntoView(review, in: app)
+    review.click()
+    guard displayedValues(for: review).contains("Confirm this exact Flash plan") else {
+      return XCTFail(
+        "review action state: \(String(describing: review.value))", file: file, line: line)
+    }
+
+    let confirmationSheet = element("flash.confirm.sheet", in: app)
+    XCTAssertTrue(confirmationSheet.waitForExistence(timeout: 10), file: file, line: line)
+    let expectedPhrase = app.staticTexts["flash.confirm.expectedDestructivePhrase"]
+    XCTAssertTrue(expectedPhrase.waitForExistence(timeout: 5), file: file, line: line)
+    guard
+      let phrase = displayedValues(for: expectedPhrase).first(where: { $0.hasPrefix("FLASH ") })
+    else {
+      return XCTFail(
+        "the confirmation sheet must expose its exact FLASH phrase", file: file, line: line)
+    }
+
+    paste(phrase, into: app.textFields["flash.confirm.destructivePhrase"], in: app)
+    paste("ERASE-USERDATA", into: app.textFields["flash.confirm.userdataPhrase"], in: app)
+
+    let accept = app.buttons["flash.confirm.accept"]
+    scrollIntoView(accept, in: app)
+    accept.click()
+    XCTAssertTrue(
+      element("flash.execute.handoff", in: app).waitForExistence(timeout: 10),
+      "exact phrases must produce the local human-review receipt", file: file, line: line)
+    let submit = app.buttons["flash.execute.submit"]
+    XCTAssertTrue(submit.exists, file: file, line: line)
+    XCTAssertTrue(submit.isEnabled, file: file, line: line)
+    XCTAssertFalse(element("flash.execute.terminal", in: app).exists, file: file, line: line)
+  }
+
+  private func writeFixtureState(
+    _ token: String, in app: XCUIApplication,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    do {
+      try token.write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    } catch {
+      XCTFail("cannot write the fixture state: \(error)", file: file, line: line)
+    }
+  }
+
+  /// Pasting replaces per-character key synthesis: the assertion is about the
+  /// phrase-matching logic, not the keyboard input path, and a paste spends
+  /// two events where typing spends one per character.
+  private func paste(_ text: String, into field: XCUIElement, in app: XCUIApplication) {
+    field.click()
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    app.typeKey("v", modifierFlags: .command)
   }
 
   // MARK: - Fixture-specific launches (locale-independent assertions)
@@ -559,128 +782,9 @@ final class AppShellUITests: XCTestCase {
   }
 
   // A history that could not be read must never look like an empty history.
-  func testAnUnreachableRuntimeStatesItsReasonInsteadOfAnEmptyTable() {
-    let app = launch(
-      arguments: [
-        "--ui-test-runtime-history", "--ui-test-runtime-history-unreachable", "--ui-test-flash",
-      ])
-    select("app.navigation.history", in: app)
-
-    XCTAssertTrue(app.staticTexts["history.unavailable.title"].waitForExistence(timeout: 15))
-    assertDisplayed(
-      app.staticTexts["history.unavailable.reason"],
-      equals: "ArkDeck Runtime is not reachable: fixture")
-    XCTAssertFalse(
-      element("history.table", in: app).exists, "an unreadable history shows no table")
-    XCTAssertFalse(app.staticTexts["history.empty.title"].exists, "it is not an empty history")
-
-    select("app.navigation.flash", in: app)
-    XCTAssertTrue(app.staticTexts["flash.runtime.unavailable"].waitForExistence(timeout: 10))
-    XCTAssertFalse(app.staticTexts["flash.runtime.empty"].exists)
-  }
-
   // The exact-plan fixture is presentation-only: it bypasses the system file
   // picker so UI automation can walk every review state, but its provider has
   // no transport and the accepted confirmation still creates no Runtime Job.
-  func testExactFlashPlanConfirmationStaysPresentationOnly() {
-    let app = launch(
-      arguments: [
-        "--ui-test-runtime-history", "--ui-test-runtime-history-empty",
-        "--ui-test-flash-plan", "-AppleLanguages", "(en)",
-      ])
-    select("app.navigation.flash", in: app)
-
-    XCTAssertTrue(
-      element("flash.plan.steps", in: app).waitForExistence(timeout: 15),
-      "the fixture must materialize an exact execute plan")
-
-    let partitions = element("flash.plan.partitions.disclosure", in: app)
-    XCTAssertTrue(partitions.exists)
-    scrollIntoView(partitions, in: app)
-    partitions.click()
-    XCTAssertTrue(
-      element("flash.plan.partition.system", in: app).waitForExistence(timeout: 5),
-      "mapped partition details must be inspectable")
-    partitions.click()
-
-    // Prerequisites are a top-level, always-expanded section before the exact
-    // plan — what has to hold is readable without a disclosure click.
-    let prerequisites = element("flash.plan.prerequisitesList", in: app)
-    XCTAssertTrue(prerequisites.exists)
-    scrollIntoView(prerequisites, in: app)
-    XCTAssertTrue(app.staticTexts["Runtime check pending"].waitForExistence(timeout: 5))
-
-    let review = app.buttons["flash.execute.review"]
-    XCTAssertTrue(review.exists)
-    XCTAssertTrue(review.isEnabled)
-    scrollIntoView(review, in: app)
-    review.click()
-    guard displayedValues(for: review).contains("Confirm this exact Flash plan") else {
-      return XCTFail("review action state: \(String(describing: review.value))")
-    }
-
-    let confirmationSheet = element("flash.confirm.sheet", in: app)
-    XCTAssertTrue(confirmationSheet.waitForExistence(timeout: 10))
-    let expectedPhrase = app.staticTexts["flash.confirm.expectedDestructivePhrase"]
-    XCTAssertTrue(expectedPhrase.waitForExistence(timeout: 5))
-    guard let phrase = displayedValues(for: expectedPhrase).first(where: { $0.hasPrefix("FLASH ") })
-    else {
-      return XCTFail("the confirmation sheet must expose its exact FLASH phrase")
-    }
-
-    let destructiveField = app.textFields["flash.confirm.destructivePhrase"]
-    destructiveField.click()
-    destructiveField.typeText(phrase)
-    let userdataField = app.textFields["flash.confirm.userdataPhrase"]
-    userdataField.click()
-    userdataField.typeText("ERASE-USERDATA")
-
-    let accept = app.buttons["flash.confirm.accept"]
-    scrollIntoView(accept, in: app)
-    accept.click()
-    XCTAssertTrue(
-      element("flash.execute.handoff", in: app).waitForExistence(timeout: 10),
-      "exact phrases must produce the local human-review receipt")
-    // The handoff arms a real submit action now. This test deliberately stops
-    // at the receipt: the button must exist and be enabled, and remain
-    // unclicked, so the fixture run still submits nothing.
-    let submit = app.buttons["flash.execute.submit"]
-    XCTAssertTrue(submit.exists)
-    XCTAssertTrue(submit.isEnabled)
-    XCTAssertFalse(element("flash.execute.terminal", in: app).exists)
-    XCTAssertTrue(app.staticTexts["flash.runtime.empty"].exists)
-  }
-
-  func testFlashRuntimeActivityUsesRealStagesAndTerminalResult() throws {
-    try "--ui-test-runtime-flash-running".write(
-      to: fixtureStateFileURL, atomically: true, encoding: .utf8)
-    let app = launch(
-      arguments: [
-        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-fixture-state",
-        fixtureStateFileURL.path, "-AppleLanguages", "(en)",
-      ])
-    select("app.navigation.flash", in: app)
-
-    assertDisplayed(app.staticTexts["flash.runtime.state"], equals: "Running", timeout: 15)
-    assertDisplayed(
-      element("flash.runtime.result", in: app),
-      equals:
-        "Runtime is still processing this Job. Progress is stage-based; no percentage is fabricated."
-    )
-    XCTAssertTrue(element("flash.runtime.progress", in: app).exists)
-    XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
-
-    try "--ui-test-runtime-flash-succeeded".write(
-      to: fixtureStateFileURL, atomically: true, encoding: .utf8)
-    app.buttons["flash.refresh"].click()
-    assertDisplayed(app.staticTexts["flash.runtime.state"], equals: "Succeeded", timeout: 10)
-    assertDisplayed(
-      element("flash.runtime.result", in: app),
-      equals: "Runtime reports success after the Flash and postflight checks.")
-    XCTAssertFalse(element("flash.runtime.progress", in: app).exists)
-    XCTAssertFalse(element("flash.runtime.attention", in: app).exists)
-  }
-
   /// The Settings scene, which nothing had ever opened.
   ///
   /// The update surface was the only one in the App with no fixture, so this
@@ -692,92 +796,8 @@ final class AppShellUITests: XCTestCase {
   /// One launch walks every state through the App's own check path. The status
   /// strings are English because the state, not the language, is what had no
   /// coverage; the shell sweeps carry the per-language obligation.
-  func testEverySettingsUpdateStateRendersAndOnlyItsOwnAction() throws {
-    try? "--ui-test-auto-update-idle".write(
-      to: fixtureStateFileURL, atomically: true, encoding: .utf8)
-    let app = launch(
-      arguments: [
-        "--ui-test-runtime-history", "--ui-test-auto-update-idle",
-        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", "(en)",
-      ])
-    XCTAssertTrue(app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 15))
-
-    app.typeKey(",", modifierFlags: .command)
-    let updatesTab = app.buttons["Updates"]
-    XCTAssertTrue(
-      updatesTab.waitForExistence(timeout: 10),
-      "Command-comma must open the Settings scene")
-    updatesTab.click()
-    XCTAssertTrue(
-      app.staticTexts["update.status"].waitForExistence(timeout: 10),
-      "the Updates pane must render its status")
-    // The controls the main window must not carry are the ones this scene owns.
-    // A checkbox reports its state as a number, not as text, so it is read as
-    // one rather than through the string helper the rest of this file uses.
-    let automaticChecks = app.checkBoxes["update.automaticChecks"]
-    XCTAssertTrue(automaticChecks.exists)
-    XCTAssertEqual(
-      (automaticChecks.value as? NSNumber)?.intValue, 1, "automatic checks default to on")
-
-    // Idle, available, failed, then awaiting-consent last: it is the one state
-    // that disables Check Now, so it cannot be walked out of.
-    for state in [
-      UpdateState(
-        flag: "--ui-test-auto-update-idle",
-        status: "Ready to check for updates.",
-        enabled: ["update.checkNow"], attention: nil),
-      UpdateState(
-        flag: "--ui-test-auto-update-available",
-        status: "An update is available. Download requires your action.",
-        enabled: ["update.checkNow", "update.download"], attention: "Update Available"),
-      UpdateState(
-        flag: "--ui-test-auto-update-failed",
-        status: "Update verification failed. Nothing was installed or replaced.",
-        enabled: ["update.checkNow"], attention: "Update Failed"),
-      UpdateState(
-        flag: "--ui-test-auto-update-awaiting-consent",
-        status: "The DMG passed signature and Team verification. Confirm once more to reveal it.",
-        enabled: ["update.reveal"], attention: "Update Awaiting Confirmation"),
-    ] {
-      assertUpdateState(state, in: app)
-    }
-  }
-
   /// Every Settings module pane is reachable in the system Settings scene.
   /// This test deliberately avoids file panels, policy writes and exports.
-  func testSettingsHasAllFiveNativePanesAndSafeControls() {
-    let app = launch(arguments: ["-AppleLanguages", "(en)"])
-    XCTAssertTrue(app.staticTexts["overview.status.server.value"].waitForExistence(timeout: 15))
-
-    app.typeKey(",", modifierFlags: .command)
-    for title in ["General", "Toolchains", "Storage", "Updates", "Diagnostics"] {
-      XCTAssertTrue(
-        app.buttons[title].waitForExistence(timeout: 10),
-        "Settings must expose the \(title) pane")
-    }
-
-    app.buttons["Toolchains"].click()
-    XCTAssertTrue(app.buttons["settings.toolchains.choose"].waitForExistence(timeout: 10))
-    XCTAssertTrue(app.buttons["settings.toolchains.refresh"].exists)
-
-    app.buttons["Storage"].click()
-    for identifier in [
-      "settings.storage.chooseRoot", "settings.storage.quota", "settings.storage.margin",
-      "settings.storage.retention", "settings.storage.save",
-    ] {
-      XCTAssertTrue(
-        element(identifier, in: app).waitForExistence(timeout: 10),
-        "\(identifier) missing")
-    }
-
-    app.buttons["Updates"].click()
-    XCTAssertTrue(app.staticTexts["update.status"].waitForExistence(timeout: 10))
-
-    app.buttons["Diagnostics"].click()
-    XCTAssertTrue(app.buttons["settings.diagnostics.preview"].waitForExistence(timeout: 10))
-    XCTAssertFalse(app.buttons["settings.diagnostics.export"].exists)
-  }
-
   private struct UpdateState {
     let flag: String
     let status: String
@@ -956,8 +976,10 @@ final class AppShellUITests: XCTestCase {
       lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
     }) else { return }
 
+    // Large steps: every scroll spends a full idle-wait + snapshot round
+    // trip, so fewer, bigger deltas are what make this affordable.
     var attempts = 0
-    while attempts < 25 {
+    while attempts < 12 {
       let target = element.frame
       let viewport = host.frame
         .intersection(app.windows.firstMatch.frame)
@@ -965,7 +987,8 @@ final class AppShellUITests: XCTestCase {
       if target.minY >= viewport.minY && target.maxY <= viewport.maxY && element.isHittable {
         return
       }
-      host.scroll(byDeltaX: 0, deltaY: -120)
+      let overshoot = target.maxY - viewport.maxY
+      host.scroll(byDeltaX: 0, deltaY: overshoot > 0 ? -max(160, min(overshoot, 600)) : 160)
       attempts += 1
     }
   }
