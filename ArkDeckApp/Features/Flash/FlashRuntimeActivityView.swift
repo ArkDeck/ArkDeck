@@ -16,11 +16,13 @@ struct FlashRuntimeActivityView: View {
   /// Unknown effects and human stops outrank recency. Hiding either behind a
   /// later success would make the page unsafe on a shared target bench.
   private var focusedJob: RuntimeJobSummaryPresentation? {
-    flashJobs.first(where: \.outcomeUnknown)
+    flashJobs.first(where: {
+      $0.outcomeUnknown && $0.supersededByRecoveryEpochID == nil
+    })
       ?? flashJobs.first(where: \.waitingForHuman)
       ?? flashJobs.first(where: { job in
         guard let state = JobState(rawValue: job.state) else { return false }
-        return !state.isTerminal
+        return !state.isTerminal && job.supersededByRecoveryEpochID == nil
       })
       ?? flashJobs.first
   }
@@ -261,12 +263,15 @@ struct FlashRuntimeActivityView: View {
       return Text(flashText("flash.state.cancellingAtSafeBoundary"))
     case .waitingForRecovery: return Text(flashText("flash.state.waitingForRecovery"))
     case .reconciling: return Text(flashText("flash.state.reconciling"))
+    case .recoveringByCompleteOverwrite:
+      return Text(flashText("flash.state.recoveringByCompleteOverwrite"))
     case .resumeAtConfirmedSafeBoundary:
       return Text(flashText("flash.state.resumeAtConfirmedSafeBoundary"))
     case .userAbandonRequested: return Text(flashText("flash.state.userAbandonRequested"))
     case .finalizing: return Text(flashText("flash.state.finalizing"))
     case .planned: return Text(flashText("flash.state.planned"))
     case .succeeded: return Text(flashText("flash.state.succeeded"))
+    case .recovered: return Text(flashText("flash.state.recovered"))
     case .failed: return Text(flashText("flash.state.failed"))
     case .cancelled: return Text(flashText("flash.state.cancelled"))
     case .interrupted: return Text(flashText("flash.state.interrupted"))
@@ -274,12 +279,15 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func resultKey(_ job: RuntimeJobSummaryPresentation) -> String {
+    if job.supersededByRecoveryEpochID != nil {
+      return "flash.runtime.result.supersededByRecovery"
+    }
     if job.outcomeUnknown { return "flash.runtime.result.outcomeUnknown" }
     guard let state = JobState(rawValue: job.state) else {
       return "flash.runtime.result.unknown"
     }
     switch state {
-    case .succeeded: return "flash.runtime.result.succeeded"
+    case .succeeded, .recovered: return "flash.runtime.result.succeeded"
     case .planned: return "flash.runtime.result.planned"
     case .failed: return "flash.runtime.result.failed"
     case .cancelled: return "flash.runtime.result.cancelled"
@@ -291,10 +299,11 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func resultSymbol(_ job: RuntimeJobSummaryPresentation) -> String {
+    if job.supersededByRecoveryEpochID != nil { return "checkmark.shield.fill" }
     if job.outcomeUnknown { return "questionmark.diamond.fill" }
     guard let state = JobState(rawValue: job.state) else { return "questionmark.circle" }
     switch state {
-    case .succeeded: return "checkmark.circle.fill"
+    case .succeeded, .recovered: return "checkmark.circle.fill"
     case .planned: return "doc.text.magnifyingglass"
     case .failed: return "xmark.octagon.fill"
     case .cancelled: return "stop.circle"
@@ -306,10 +315,11 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func stateSymbol(_ job: RuntimeJobSummaryPresentation) -> String {
+    if job.supersededByRecoveryEpochID != nil { return "checkmark.shield.fill" }
     if job.outcomeUnknown { return "questionmark.diamond.fill" }
     guard let state = JobState(rawValue: job.state) else { return "questionmark.circle" }
     switch state {
-    case .succeeded: return "checkmark.circle.fill"
+    case .succeeded, .recovered: return "checkmark.circle.fill"
     case .failed: return "xmark.octagon.fill"
     case .cancelled: return "stop.circle"
     case .interrupted: return "pause.circle"
@@ -321,16 +331,18 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func stateColor(_ job: RuntimeJobSummaryPresentation) -> Color {
+    if job.supersededByRecoveryEpochID != nil { return .green }
     // Unknown is warn, not danger: red stays reserved for known failure.
     if job.outcomeUnknown { return .orange }
     guard let state = JobState(rawValue: job.state) else { return .secondary }
     switch state {
-    case .succeeded: return .green
+    case .succeeded, .recovered: return .green
     case .failed: return .red
     case .waitingForRecovery, .awaitingRebindConfirmation, .userAbandonRequested,
       .interrupted:
       return .orange
-    case .running, .preflight, .planning, .waitingForDevice, .reconciling, .finalizing:
+    case .running, .preflight, .planning, .waitingForDevice, .reconciling,
+      .recoveringByCompleteOverwrite, .finalizing:
       return .blue
     default: return .secondary
     }
@@ -340,7 +352,8 @@ struct FlashRuntimeActivityView: View {
     guard let state = JobState(rawValue: rawState) else { return false }
     switch state {
     case .queued, .preflight, .running, .waitingForDevice, .planning, .cancelRequested,
-      .cancellingAtSafeBoundary, .reconciling, .resumeAtConfirmedSafeBoundary, .finalizing:
+      .cancellingAtSafeBoundary, .reconciling, .recoveringByCompleteOverwrite,
+      .resumeAtConfirmedSafeBoundary, .finalizing:
       return true
     default:
       return false

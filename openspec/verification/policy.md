@@ -1,7 +1,7 @@
 # Verification and Agent Execution Policy
 
-> Version:3.0.0
-> Baseline:CORE-3.0.0 + approved CHG-2026-056 r5 delta
+> Version:4.0.0
+> Baseline:CORE-3.0.0 + approved CHG-2026-056 r7 delta; candidate CORE-4.0.0
 >
 > **适用范围收窄(2026-07-30,产品闭环优先阶段)**:Verification layers、Core
 > property invariants 与真实性要求(simulation/fake 不证明硬件支持、destructive
@@ -25,10 +25,14 @@
 真实设备 `deviceMutation/destructive` 只能经 protected-main Runtime 的封闭 typed admission
 执行：Runtime 在完整 materialize plan、验证 Artifact lease、取得 fresh target/binding/tool
 facts 后生成并 durable reserve exact `RuntimeCapability`。Caller/Agent/UI/聊天/evidence 不得
-提供 capability 或 trusted facts。任一 identity/outcome/intent/partial-write/plan/Artifact/
-reservation 漂移或未知状态 fail closed；后续 destructive attempt 仅允许
-`safeToReflash` predecessor，最多 16 次串行、四小时、并发一（见
-`governance/enforcement.md`）。
+提供 capability、trusted facts 或 recovery classification。普通后续 destructive attempt 仅
+允许 `safeToReflash` predecessor。unknown intent 永不 replay；只有 Runtime 机械证明 exact
+Provider complete-overwrite plan 覆盖所有 conservative possible effects，且 fresh same-target、
+immutable Artifact、逐项 verification 与 budget 成立时，才可自动执行 distinct recovery。
+只有 confirmed effects 与 reboot/rebind/postflight 可发布 `SupersedingRecoveryEpoch`；原 outcome
+保持 unknown。identity/effect/coverage/outcome/intent/plan/Artifact/reservation 任一缺失或漂移
+都 fail closed 且不提供 approval override。总预算最多 16 个串行 destructive epochs、四小时、
+并发一（见 `governance/enforcement.md`）。
 
 ## Core property invariants
 
@@ -38,7 +42,8 @@ reservation 漂移或未知状态 fail closed；后续 destructive attempt 仅�
 - external/unknown HDC server 自动 kill 调用数恒为 0;
 - 身份确认和 binding revision durable 前 device mutation dispatch 为 0;
 - TCP/UART 断线后不存在自动 rebind 路径;
-- outcomeUnknown destructive step 不自动重放;
+- outcomeUnknown destructive step 不自动重放，只有完整证明的 distinct complete-overwrite
+  recovery 可建立 superseding target epoch;
 - plan-only mutation/destructive dispatch 为 0;
 - simulated Provider 不接收真实 binding/process executor;
 - journal/schema encode/decode round-trip;
@@ -97,7 +102,7 @@ openspec/changes/<change>/evidence/
 ```
 
 - run 记录轻量但如实:执行了什么、结果如何、哪些 AC 通过/失败、simulation 还是真实环境。
-- 真实硬件 evidence 按 `contracts/hardware-evidence.schema.json` 记录 executor、与实际 effect 匹配的 default policy/RuntimeCapability provenance、exact plan/target/reservation/Artifact correlation、设备身份/binding、固件、目标确认时间、typed step 与 terminal/recovery disposition；schema validation 不授予执行权限。
+- 真实硬件 evidence 按 `contracts/hardware-evidence.schema.json` 记录 executor、与实际 effect 匹配的 default policy/RuntimeCapability provenance、exact plan/target/reservation/Artifact correlation、设备身份/binding、固件、目标确认时间、typed step 与 terminal/recovery disposition；superseding recovery 还记录 uncertain-effect/coverage digests、covered intents、actual typed effects、postflight、resulting target epoch 与 immutable old-outcome semantics；schema validation 不授予执行权限。
 - raw 证据不改写;派生物注明来源。
 
 ## Stop conditions
@@ -107,7 +112,8 @@ openspec/changes/<change>/evidence/
 - 需要改变 Core/AC/安全默认值;
 - 两个权威规格冲突;
 - 设备或 server ownership 无法确认;
-- destructive outcomeUnknown;
+- destructive outcomeUnknown 且 Runtime 无法用 reviewed complete-overwrite contract、fresh
+  same-target facts 与完整 coverage/verification 机械证明 distinct recovery;
 - 需要未授权的新权限、联网、签名或外部系统变更;
 - 必需硬件/fixture/工具缺失;
 - 验证无法二值化或证据不可复查。

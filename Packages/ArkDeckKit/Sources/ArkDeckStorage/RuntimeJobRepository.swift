@@ -184,7 +184,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
       SELECT job_id, idempotency_key, request_hash, state, created_at_utc,
              updated_at_utc, version, initial_record_json
       FROM runtime_job
-      WHERE state NOT IN ('planned', 'succeeded', 'failed', 'cancelled', 'interrupted')
+      WHERE state NOT IN ('planned', 'succeeded', 'recovered', 'failed', 'cancelled', 'interrupted')
       ORDER BY created_at_utc, job_id
       """
     ).map(persistedJob)

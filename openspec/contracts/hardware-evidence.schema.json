@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "arkdeck://contracts/hardware-evidence/5.0.0",
-  "title": "ArkDeck real-hardware evidence record (V5, CHG-2026-056 r5)",
-  "description": "Records real-hardware evidence produced by a human or autonomous agent. Schema validity records provenance but never grants or widens RuntimeCapability.",
+  "$id": "arkdeck://contracts/hardware-evidence/6.0.0",
+  "title": "ArkDeck real-hardware evidence record (V6, CHG-2026-056 r7)",
+  "description": "Records real-hardware evidence and truthful complete-overwrite recovery lineage. Schema validity records provenance but never grants or widens RuntimeCapability or recovery coverage.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,7 +21,7 @@
     "artifacts"
   ],
   "properties": {
-    "schemaVersion": { "const": "5.0.0" },
+    "schemaVersion": { "const": "6.0.0" },
     "evidenceId": { "type": "string", "pattern": "^EVD-[A-Z0-9._-]+$" },
     "executor": {
       "type": "object",
@@ -73,6 +73,7 @@
         "terminalState": {
           "enum": [
             "succeeded",
+            "recovered",
             "partial",
             "failed",
             "cancelled",
@@ -181,6 +182,171 @@
           "note": { "type": "string" }
         }
       }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "epochId",
+        "source",
+        "coveredIntents",
+        "uncertainEffectSetDigest",
+        "coverageContractVersion",
+        "coveredEffectSetDigest",
+        "recoveryJobId",
+        "recoveryIntentEventId",
+        "operationReference",
+        "profileReference",
+        "planDigest",
+        "artifactDigest",
+        "providerExecutableDigest",
+        "target",
+        "confirmedStepIds",
+        "postflight",
+        "resultingTargetEpochDigest",
+        "originalOutcomesRemainUnknown",
+        "originalJobsSucceeded"
+      ],
+      "properties": {
+        "disposition": { "const": "supersedingRecoveryEpoch" },
+        "epochId": {
+          "type": "string",
+          "pattern": "^recovery-epoch-[0-9a-f]{32}$"
+        },
+        "source": {
+          "enum": ["historicalRecognition", "distinctRecoveryExecution"]
+        },
+        "coveredIntents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "jobId",
+              "intentEventId",
+              "operationReference",
+              "profileReference",
+              "possibleEffects"
+            ],
+            "properties": {
+              "jobId": { "type": "string", "minLength": 1 },
+              "intentEventId": { "type": "string", "minLength": 1 },
+              "operationReference": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$"
+              },
+              "profileReference": { "type": "string", "minLength": 1 },
+              "possibleEffects": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "uncertainEffectSetDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "coverageContractVersion": { "type": "string", "minLength": 1 },
+        "coveredEffectSetDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "recoveryJobId": { "type": "string", "minLength": 1 },
+        "recoveryIntentEventId": { "type": "string", "minLength": 1 },
+        "operationReference": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$"
+        },
+        "profileReference": { "type": "string", "minLength": 1 },
+        "planDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "artifactDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "providerExecutableDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stableIdentitySHA256",
+            "bindingRevision",
+            "confirmationMethod",
+            "confirmedAt"
+          ],
+          "properties": {
+            "stableIdentitySHA256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bindingRevision": { "type": "integer", "minimum": 1 },
+            "confirmationMethod": { "const": "machineReadback" },
+            "confirmedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "capability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "reservationId", "useOrdinal"],
+          "properties": {
+            "reference": { "type": "string", "minLength": 1 },
+            "reservationId": { "type": "string", "minLength": 1 },
+            "useOrdinal": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "confirmedStepIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "postflight": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "flashReadbackConfirmed",
+            "rebootConfirmed",
+            "rebindConfirmed",
+            "runtimeBuildConfirmed"
+          ],
+          "properties": {
+            "flashReadbackConfirmed": { "const": true },
+            "rebootConfirmed": { "const": true },
+            "rebindConfirmed": { "const": true },
+            "runtimeBuildConfirmed": { "const": true }
+          }
+        },
+        "resultingTargetEpochDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "originalOutcomesRemainUnknown": { "const": true },
+        "originalJobsSucceeded": { "const": false }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": { "const": "distinctRecoveryExecution" }
+            },
+            "required": ["source"]
+          },
+          "then": { "required": ["capability"] }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": { "const": "historicalRecognition" }
+            },
+            "required": ["source"]
+          },
+          "then": { "not": { "required": ["capability"] } }
+        }
+      ]
     },
     "deviations": {
       "type": "array",
@@ -305,6 +471,36 @@
               }
             }
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "runtime": {
+            "properties": { "terminalState": { "const": "recovered" } },
+            "required": ["terminalState"]
+          }
+        },
+        "required": ["runtime"]
+      },
+      "then": {
+        "required": ["recovery"],
+        "properties": {
+          "recovery": {
+            "properties": {
+              "source": { "const": "distinctRecoveryExecution" }
+            },
+            "required": ["source"]
+          }
+        }
+      }
+    },
+    {
+      "if": { "required": ["recovery"] },
+      "then": {
+        "properties": {
+          "effectLevel": { "const": "destructive" }
         }
       }
     }

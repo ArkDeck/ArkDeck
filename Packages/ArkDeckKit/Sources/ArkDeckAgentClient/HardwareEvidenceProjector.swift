@@ -1,4 +1,5 @@
 import ArkDeckCore
+import CryptoKit
 import Foundation
 
 public enum RuntimeHardwareEvidenceEffectLevel: String, Codable, Sendable {
@@ -38,6 +39,10 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let candidateDigest: String?
   public let reviewDigest: String?
   public let brokerDigest: String?
+  /// Complete-overwrite lineage returned by the daemon with the consumed
+  /// authority. Keeping it in an existing receipt field preserves the
+  /// one-shot Agent runner's stable wire/storage shape.
+  public let recoveryEpoch: RuntimeHardwareEvidenceRecoveryEpoch?
 
   public init(
     kind: RuntimeHardwareEvidenceAuthorityKind,
@@ -56,7 +61,8 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     targetBindingDigest: String? = nil,
     candidateDigest: String? = nil,
     reviewDigest: String? = nil,
-    brokerDigest: String? = nil
+    brokerDigest: String? = nil,
+    recoveryEpoch: RuntimeHardwareEvidenceRecoveryEpoch? = nil
   ) {
     self.kind = kind
     self.reference = reference
@@ -75,6 +81,7 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     self.candidateDigest = candidateDigest
     self.reviewDigest = reviewDigest
     self.brokerDigest = brokerDigest
+    self.recoveryEpoch = recoveryEpoch
   }
 
   enum CodingKeys: String, CodingKey {
@@ -95,6 +102,13 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     case candidateDigest
     case reviewDigest
     case brokerDigest
+    case recoveryEpoch
+  }
+}
+
+extension RuntimeAgentExecutionReceipt {
+  var recoveryEpoch: RuntimeHardwareEvidenceRecoveryEpoch? {
+    authority?.recoveryEpoch
   }
 }
 
@@ -176,6 +190,68 @@ public struct RuntimeHardwareEvidenceArtifact: Codable, Sendable, Equatable {
   }
 }
 
+public struct RuntimeHardwareEvidenceRecoveryEpoch: Codable, Sendable, Equatable {
+  public struct CoveredIntent: Codable, Sendable, Equatable {
+    public let jobID: String
+    public let intentEventID: String
+    public let operationReference: String
+    public let profileReference: String
+    public let observedAtUTC: String
+    public let possibleEffects: [String]
+
+    enum CodingKeys: String, CodingKey {
+      case jobID = "jobId"
+      case intentEventID = "intentEventId"
+      case operationReference
+      case profileReference
+      case observedAtUTC = "observedAtUtc"
+      case possibleEffects
+    }
+  }
+
+  public let epochID: String
+  public let source: String
+  public let stableTargetIdentitySHA256: String
+  public let bindingRevision: Int
+  public let coveredIntents: [CoveredIntent]
+  public let uncertainEffectSetSHA256: String
+  public let coverageContractVersion: String
+  public let coveredEffectSetSHA256: String
+  public let recoveryJobID: String
+  public let recoveryIntentEventID: String
+  public let operationReference: String
+  public let profileReference: String
+  public let materializedPlanDigestSHA256: String
+  public let artifactSHA256: String
+  public let providerExecutableSHA256: String
+  public let confirmedStepIDs: [String]
+  public let resultingTargetEpochSHA256: String
+  public let establishedAtUTC: String
+  public let epochSHA256: String
+
+  enum CodingKeys: String, CodingKey {
+    case epochID = "epochId"
+    case source
+    case stableTargetIdentitySHA256 = "stableTargetIdentitySha256"
+    case bindingRevision
+    case coveredIntents
+    case uncertainEffectSetSHA256 = "uncertainEffectSetSha256"
+    case coverageContractVersion
+    case coveredEffectSetSHA256 = "coveredEffectSetSha256"
+    case recoveryJobID = "recoveryJobId"
+    case recoveryIntentEventID = "recoveryIntentEventId"
+    case operationReference
+    case profileReference
+    case materializedPlanDigestSHA256 = "materializedPlanDigestSha256"
+    case artifactSHA256 = "artifactSha256"
+    case providerExecutableSHA256 = "providerExecutableSha256"
+    case confirmedStepIDs = "confirmedStepIds"
+    case resultingTargetEpochSHA256 = "resultingTargetEpochSha256"
+    case establishedAtUTC = "establishedAtUtc"
+    case epochSHA256 = "epochSha256"
+  }
+}
+
 public struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable {
   public let jobID: String
   public let operationReference: String
@@ -193,6 +269,7 @@ public struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable 
   public let startedAtUTC: String?
   public let firstEvidenceStepAtUTC: String?
   public let finishedAtUTC: String?
+  public let recoveryEpoch: RuntimeHardwareEvidenceRecoveryEpoch?
   public let artifacts: [RuntimeHardwareEvidenceArtifact]
   public let blockers: [String]
 
@@ -213,6 +290,7 @@ public struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable 
     case startedAtUTC = "startedAtUtc"
     case firstEvidenceStepAtUTC = "firstEvidenceStepAtUtc"
     case finishedAtUTC = "finishedAtUtc"
+    case recoveryEpoch
     case artifacts
     case blockers
   }
@@ -246,11 +324,11 @@ public struct HardwareEvidenceIncomplete: Sendable, Equatable {
 }
 
 public enum HardwareEvidenceProjectionResult: Sendable, Equatable {
-  case published(HardwareEvidenceV5Record)
+  case published(HardwareEvidenceV6Record)
   case evidenceIncomplete(HardwareEvidenceIncomplete)
 }
 
-public struct HardwareEvidenceV5Record: Codable, Sendable, Equatable {
+public struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
   public let schemaVersion: String
   public let evidenceId: String
   public let executor: Executor
@@ -266,6 +344,7 @@ public struct HardwareEvidenceV5Record: Codable, Sendable, Equatable {
   public let executedAt: String
   public let validUntil: String?
   public let artifacts: [Artifact]
+  public let recovery: Recovery?
   public let deviations: [String]?
   public let notes: String?
 
@@ -318,6 +397,58 @@ public struct HardwareEvidenceV5Record: Codable, Sendable, Equatable {
     public let reference: String
     public let sha256: String
     public let note: String?
+  }
+
+  public struct Recovery: Codable, Sendable, Equatable {
+    public let disposition: String
+    public let epochId: String
+    public let source: String
+    public let coveredIntents: [CoveredIntent]
+    public let uncertainEffectSetDigest: String
+    public let coverageContractVersion: String
+    public let coveredEffectSetDigest: String
+    public let recoveryJobId: String
+    public let recoveryIntentEventId: String
+    public let operationReference: String
+    public let profileReference: String
+    public let planDigest: String
+    public let artifactDigest: String
+    public let providerExecutableDigest: String
+    public let target: RecoveryTarget
+    public let capability: RecoveryCapability?
+    public let confirmedStepIds: [String]
+    public let postflight: RecoveryPostflight
+    public let resultingTargetEpochDigest: String
+    public let originalOutcomesRemainUnknown: Bool
+    public let originalJobsSucceeded: Bool
+
+    public struct CoveredIntent: Codable, Sendable, Equatable {
+      public let jobId: String
+      public let intentEventId: String
+      public let operationReference: String
+      public let profileReference: String
+      public let possibleEffects: [String]
+    }
+
+    public struct RecoveryTarget: Codable, Sendable, Equatable {
+      public let stableIdentitySHA256: String
+      public let bindingRevision: Int
+      public let confirmationMethod: String
+      public let confirmedAt: String
+    }
+
+    public struct RecoveryCapability: Codable, Sendable, Equatable {
+      public let reference: String
+      public let reservationId: String
+      public let useOrdinal: Int
+    }
+
+    public struct RecoveryPostflight: Codable, Sendable, Equatable {
+      public let flashReadbackConfirmed: Bool
+      public let rebootConfirmed: Bool
+      public let rebindConfirmed: Bool
+      public let runtimeBuildConfirmed: Bool
+    }
   }
 }
 
@@ -443,7 +574,7 @@ public enum HardwareEvidenceProjector {
       if authority.kind == .standingAuthorization
         || authority.kind == .evolutionCampaignConfirmation
       {
-        reasons.append("legacy authority kind cannot be emitted as V5 evidence")
+        reasons.append("legacy authority kind cannot be emitted as V6 evidence")
       }
       if effect == .destructive, authority.kind == .runtimeCapability {
         guard
@@ -530,15 +661,147 @@ public enum HardwareEvidenceProjector {
       }
     }
 
+    let projectedRecovery: HardwareEvidenceV6Record.Recovery?
+    if let recovery = receipt.recoveryEpoch {
+      let requiredSteps: Set<String> = [
+        "flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
+        "rebind-and-verify-build",
+      ]
+      let possibleEffects = recovery.coveredIntents.flatMap(\.possibleEffects)
+      let recoveryHashes = [
+        recovery.stableTargetIdentitySHA256,
+        recovery.uncertainEffectSetSHA256,
+        recovery.coveredEffectSetSHA256,
+        recovery.materializedPlanDigestSHA256,
+        recovery.artifactSHA256,
+        recovery.providerExecutableSHA256,
+        recovery.resultingTargetEpochSHA256,
+        recovery.epochSHA256,
+      ]
+      if effect != .destructive {
+        reasons.append("recovery lineage is attached to a non-destructive run")
+      }
+      if recovery.source != "historicalRecognition"
+        && recovery.source != "distinctRecoveryExecution"
+      {
+        reasons.append("recovery source is unknown")
+      }
+      if recoveryHashes.contains(where: { !validSHA256($0) })
+        || !validRecoveryEpochID(recovery.epochID)
+        || recovery.recoveryJobID.isEmpty
+        || recovery.recoveryIntentEventID.isEmpty
+        || recovery.coverageContractVersion.isEmpty
+        || !validOperationReference(recovery.operationReference)
+        || recovery.operationReference != "flash.dayu200@1"
+        || !["dayu200@1", "dayu200@2"].contains(recovery.profileReference)
+      {
+        reasons.append("recovery identity, plan, Artifact, tool, or epoch facts are malformed")
+      }
+      if recovery.stableTargetIdentitySHA256 != identity
+        || recovery.bindingRevision != bindingRevision
+      {
+        reasons.append("recovery target identity or binding does not match fresh confirmation")
+      }
+      if recovery.operationReference != receipt.operationReference
+        || recovery.materializedPlanDigestSHA256 != authority?.planDigest
+        || recovery.artifactSHA256 != authority?.artifactDigest
+        || recovery.providerExecutableSHA256 != observation.toolSHA256
+        || !receipt.artifacts.contains(where: { $0.sha256 == recovery.artifactSHA256 })
+      {
+        reasons.append("recovery operation, plan, Artifact, or tool correlation drifted")
+      }
+      if recovery.coveredIntents.isEmpty
+        || recovery.coveredIntents.contains(where: {
+          $0.jobID.isEmpty || $0.intentEventID.isEmpty
+            || $0.possibleEffects.isEmpty
+            || Set($0.possibleEffects).count != $0.possibleEffects.count
+        })
+        || effectSetDigest(possibleEffects) != recovery.uncertainEffectSetSHA256
+      {
+        reasons.append("recovery uncertain-effect lineage is incomplete or drifted")
+      }
+      if !requiredSteps.isSubset(of: Set(recovery.confirmedStepIDs))
+        || Set(recovery.confirmedStepIDs).count != recovery.confirmedStepIDs.count
+      {
+        reasons.append("recovery typed outcomes or postflight are incomplete")
+      }
+      let establishedAt = parseDate(recovery.establishedAtUTC)
+      if establishedAt == nil || establishedAt! > finishDate {
+        reasons.append("recovery epoch time is malformed or follows evidence execution")
+      }
+      let recoveryCapability: HardwareEvidenceV6Record.Recovery.RecoveryCapability?
+      if recovery.source == "distinctRecoveryExecution" {
+        if recovery.recoveryJobID == jobID,
+          receipt.terminalState == "recovered",
+          authority?.kind == .runtimeCapability,
+          let capabilityReference = nonempty(authority?.reference),
+          let reservationID = nonempty(authority?.reservationID),
+          let useOrdinal = authority?.useOrdinal,
+          useOrdinal >= 1
+        {
+          recoveryCapability = HardwareEvidenceV6Record.Recovery.RecoveryCapability(
+            reference: capabilityReference,
+            reservationId: reservationID,
+            useOrdinal: useOrdinal)
+        } else {
+          reasons.append("distinct recovery capability, Job, or terminal lineage is incomplete")
+          recoveryCapability = nil
+        }
+      } else {
+        recoveryCapability = nil
+      }
+      projectedRecovery = HardwareEvidenceV6Record.Recovery(
+        disposition: "supersedingRecoveryEpoch",
+        epochId: recovery.epochID,
+        source: recovery.source,
+        coveredIntents: recovery.coveredIntents.map {
+          HardwareEvidenceV6Record.Recovery.CoveredIntent(
+            jobId: $0.jobID, intentEventId: $0.intentEventID,
+            operationReference: $0.operationReference,
+            profileReference: $0.profileReference,
+            possibleEffects: $0.possibleEffects)
+        },
+        uncertainEffectSetDigest: recovery.uncertainEffectSetSHA256,
+        coverageContractVersion: recovery.coverageContractVersion,
+        coveredEffectSetDigest: recovery.coveredEffectSetSHA256,
+        recoveryJobId: recovery.recoveryJobID,
+        recoveryIntentEventId: recovery.recoveryIntentEventID,
+        operationReference: recovery.operationReference,
+        profileReference: recovery.profileReference,
+        planDigest: recovery.materializedPlanDigestSHA256,
+        artifactDigest: recovery.artifactSHA256,
+        providerExecutableDigest: recovery.providerExecutableSHA256,
+        target: HardwareEvidenceV6Record.Recovery.RecoveryTarget(
+          stableIdentitySHA256: recovery.stableTargetIdentitySHA256,
+          bindingRevision: recovery.bindingRevision,
+          confirmationMethod: observation.confirmationMethod,
+          confirmedAt: confirmed),
+        capability: recoveryCapability,
+        confirmedStepIds: recovery.confirmedStepIDs,
+        postflight: HardwareEvidenceV6Record.Recovery.RecoveryPostflight(
+          flashReadbackConfirmed: true,
+          rebootConfirmed: true,
+          rebindConfirmed: true,
+          runtimeBuildConfirmed: true),
+        resultingTargetEpochDigest: recovery.resultingTargetEpochSHA256,
+        originalOutcomesRemainUnknown: true,
+        originalJobsSucceeded: false)
+    } else {
+      if receipt.terminalState == "recovered" {
+        reasons.append("recovered terminal is missing durable recovery lineage")
+      }
+      projectedRecovery = nil
+    }
+
     guard reasons.isEmpty, let terminal else { return incomplete(reasons) }
-    let record = HardwareEvidenceV5Record(
-      schemaVersion: "5.0.0",
+    let record = HardwareEvidenceV6Record(
+      schemaVersion: "6.0.0",
       evidenceId: claims.evidenceID,
-      executor: HardwareEvidenceV5Record.Executor(
+      executor: HardwareEvidenceV6Record.Executor(
         kind: receipt.executor,
         id: receipt.executorID,
         authority: authority.map {
-          HardwareEvidenceV5Record.Authority(
+          HardwareEvidenceV6Record.Authority(
             kind: $0.kind,
             reference: $0.reference,
             reservationId: $0.reservationID,
@@ -548,24 +811,24 @@ public enum HardwareEvidenceProjector {
             targetBindingDigest: $0.targetBindingDigest,
             artifactDigest: $0.artifactDigest)
         }),
-      runtime: HardwareEvidenceV5Record.Runtime(
+      runtime: HardwareEvidenceV6Record.Runtime(
         operationReference: receipt.operationReference,
         jobId: jobID,
         catalogDigest: receipt.catalogDigest,
         terminalState: terminal,
         startedAt: started,
         finishedAt: finished),
-      targetConfirmation: HardwareEvidenceV5Record.TargetConfirmation(
+      targetConfirmation: HardwareEvidenceV6Record.TargetConfirmation(
         confirmedDeviceIdentitySHA256: identity,
         bindingRevision: bindingRevision,
         confirmedAt: confirmed,
         method: observation.confirmationMethod),
-      device: HardwareEvidenceV5Record.Device(
+      device: HardwareEvidenceV6Record.Device(
         model: model,
         serialSHA256: identity,
         firmware: firmware,
         bindingRevision: bindingRevision),
-      toolchain: HardwareEvidenceV5Record.Toolchain(
+      toolchain: HardwareEvidenceV6Record.Toolchain(
         hdcVersion: observation.toolVersion,
         hdcSHA256: observation.toolSHA256),
       transport: transport,
@@ -576,9 +839,10 @@ public enum HardwareEvidenceProjector {
       executedAt: finished,
       validUntil: claims.validUntilUTC,
       artifacts: receipt.artifacts.map {
-        HardwareEvidenceV5Record.Artifact(
+        HardwareEvidenceV6Record.Artifact(
           reference: $0.reference, sha256: $0.sha256, note: nil)
       },
+      recovery: projectedRecovery,
       deviations: nil,
       notes: claims.notes)
     return .published(record)
@@ -601,10 +865,23 @@ public enum HardwareEvidenceProjector {
       || ("a"..."f").contains(String($0)) }
   }
 
+  private static func effectSetDigest(_ effects: [String]) -> String {
+    let bytes = Data(Array(Set(effects)).sorted().joined(separator: "\n").utf8)
+    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+  }
+
   private static func validEvidenceID(_ value: String) -> Bool {
     guard value.hasPrefix("EVD-"), value.count > 4 else { return false }
     return value.dropFirst(4).allSatisfy {
       $0.isASCII && ($0.isUppercase || $0.isNumber || "._-".contains($0))
+    }
+  }
+
+  private static func validRecoveryEpochID(_ value: String) -> Bool {
+    guard value.hasPrefix("recovery-epoch-") else { return false }
+    let suffix = value.dropFirst("recovery-epoch-".count)
+    return suffix.count == 32 && suffix.allSatisfy {
+      $0.isASCII && ($0.isNumber || ("a"..."f").contains(String($0)))
     }
   }
 
@@ -641,7 +918,7 @@ public enum HardwareEvidenceProjector {
   ) -> String? {
     if outcomeUnknown { return "outcomeUnknown" }
     switch value {
-    case "succeeded", "partial", "failed", "cancelled": return value
+    case "succeeded", "recovered", "partial", "failed", "cancelled": return value
     default: return nil
     }
   }
@@ -655,14 +932,16 @@ public enum HardwareEvidenceProjector {
   }
 }
 
-/// Read-only compatibility discriminator. Historical V2-V4 bytes are returned
-/// untouched; the V5 writer never attempts to migrate or re-encode them.
+/// Read-only compatibility discriminator. Historical V1-V5 bytes are returned
+/// untouched; the V6 writer never attempts to migrate or re-encode them.
 public enum HardwareEvidenceDocumentReader {
   public enum Version: String, Sendable, Equatable {
+    case legacyV1 = "1.0.0"
     case legacyV2 = "2.0.0"
     case legacyV3 = "3.0.0"
     case legacyV4 = "4.0.0"
-    case currentV5 = "5.0.0"
+    case legacyV5 = "5.0.0"
+    case currentV6 = "6.0.0"
   }
 
   public static func version(of data: Data) -> Version? {

@@ -88,6 +88,11 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let createdAtUTC: String?
   public let startedAtUTC: String?
   public let finishedAtUTC: String?
+  /// A later complete-overwrite epoch can establish the current target state
+  /// without rewriting this Job's unknown outcome.
+  public let supersededByRecoveryEpochID: String?
+  /// Present on the distinct recovery Job that established the epoch.
+  public let recoveryEpochID: String?
 
   public init(
     jobID: String,
@@ -103,7 +108,9 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     actualEffect: String? = nil,
     createdAtUTC: String? = nil,
     startedAtUTC: String? = nil,
-    finishedAtUTC: String? = nil
+    finishedAtUTC: String? = nil,
+    supersededByRecoveryEpochID: String? = nil,
+    recoveryEpochID: String? = nil
   ) {
     self.jobID = jobID
     self.operationReference = operationReference
@@ -119,6 +126,8 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     self.createdAtUTC = createdAtUTC
     self.startedAtUTC = startedAtUTC
     self.finishedAtUTC = finishedAtUTC
+    self.supersededByRecoveryEpochID = supersededByRecoveryEpochID
+    self.recoveryEpochID = recoveryEpochID
   }
 }
 
@@ -213,6 +222,15 @@ public struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable
   }
 }
 
+struct RuntimeCompleteOverwriteRecoveryContext: Codable, Sendable, Equatable {
+  let coveredIntents: [SupersededRecoveryIntent]
+  let uncertainEffectSetSHA256: String
+  let coverageContractVersion: String
+  let coveredEffectSetSHA256: String
+  let profileReference: String
+  let destructiveEpochOrdinal: Int
+}
+
 /// The admission decision actually consumed by this job. This record is
 /// audit provenance only: reading or projecting it cannot mint an
 /// authority or reach the dispatch port.
@@ -226,6 +244,11 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   /// exclusively from the protected broker reservation.
   public let campaignCorrelation: RuntimeCampaignEvidenceCorrelation?
   public let runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation?
+  /// Runtime-internal recovery proof captured at the last safe boundary.
+  /// It remains inside the persisted admission envelope so old Job record
+  /// schema stays frozen and a process restart cannot lose recovery identity.
+  var completeOverwriteRecovery: RuntimeCompleteOverwriteRecoveryContext?
+  var recoveryProviderExecutableSHA256: String?
 
   public init(
     kind: RuntimeEvidenceAuthorityKind,
@@ -243,6 +266,8 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
     self.consumptionFingerprintSHA256 = consumptionFingerprintSHA256
     self.campaignCorrelation = campaignCorrelation
     self.runtimeCapabilityCorrelation = runtimeCapabilityCorrelation
+    self.completeOverwriteRecovery = nil
+    self.recoveryProviderExecutableSHA256 = nil
   }
 }
 
@@ -345,6 +370,7 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let startedAtUTC: String?
   public let firstEvidenceStepAtUTC: String?
   public let finishedAtUTC: String?
+  public let recoveryEpoch: SupersedingRecoveryEpoch?
   /// Persisted typed inputs for the read-only History parameter inspector.
   /// They remain structured JSON values; no executable or argv can be
   /// reconstructed from this projection.
@@ -586,6 +612,8 @@ public actor RuntimeJobEngine {
   private struct PreparedAuthorization: Sendable {
     let reference: RuntimeCapabilityReference?
     let evidence: RuntimeAdmissionEvidence?
+    let completeOverwriteRecovery: RuntimeCompleteOverwriteRecoveryContext?
+    let recognizedRecoveryEpochID: String?
   }
 
   private struct MaterializedPlanStep: Codable {
@@ -1060,6 +1088,15 @@ public actor RuntimeJobEngine {
       materializedBindingRevision: materialized.bindingRevision)
     record.state = JobState.preflight.rawValue
     record.timeline = ["jobCreated", "queued->preflight"]
+    if let recovery = preparedAuthorization.completeOverwriteRecovery {
+      record.timeline.append(
+        "complete-overwrite recovery classified epoch \(recovery.destructiveEpochOrdinal); "
+          + "covered intents \(recovery.coveredIntents.count)")
+    }
+    if let epochID = preparedAuthorization.recognizedRecoveryEpochID {
+      record.timeline.append(
+        "recognized durable complete-overwrite supersession \(epochID); device dispatch 0")
+    }
     try configuration.admissionFaultInjector.check(.beforeAdmission)
     switch try admissionService.admit(record: record, requestHash: fingerprint) {
     case .duplicate(let existingJobID):
@@ -1083,11 +1120,13 @@ public actor RuntimeJobEngine {
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
         eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
-        timestamp: timestamp, executionMode: "execute"))
+        timestamp: timestamp, executionMode: "execute",
+        schemaVersion: Self.journalSchemaVersion(of: record)))
     try journal.appendAndSynchronize(
       JournalEvent.stateTransition(
         eventID: "to-preflight", sequence: 1, sessionID: record.sessionID, jobID: jobID,
-        timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted"))
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted",
+        schemaVersion: Self.journalSchemaVersion(of: record)))
     try configuration.admissionFaultInjector.check(.afterJournalAppend)
     try configuration.admissionFaultInjector.check(.beforeRecordPersist)
     try persistRuntimeRecord(record)
@@ -1106,6 +1145,7 @@ public actor RuntimeJobEngine {
     guard
       runtime.record.state == JobState.preflight.rawValue
         || runtime.record.state == JobState.running.rawValue
+        || runtime.record.state == JobState.recoveringByCompleteOverwrite.rawValue
         || runtime.record.state == JobState.resumeAtConfirmedSafeBoundary.rawValue
     else {
       throw RuntimeJobEngineError.jobNotRunnable(
@@ -1136,6 +1176,10 @@ public actor RuntimeJobEngine {
     case .running:
       runtime.record.timeline.append("resumed: journal-confirmed provider boundary")
       jobs[jobID] = runtime
+    case .recoveringByCompleteOverwrite:
+      runtime.record.timeline.append(
+        "resumed: journal-confirmed complete-overwrite recovery boundary")
+      jobs[jobID] = runtime
     default:
       throw RuntimeJobEngineError.jobNotRunnable(
         "job \(jobID) is \(runtime.record.state), not runnable")
@@ -1159,10 +1203,12 @@ public actor RuntimeJobEngine {
       }
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
+      let executionState = Self.executionState(of: current.record)
       switch failure {
       case .outcomeUnknown(let reason):
         try transition(
-          &current, from: .running, to: .waitingForRecovery, reason: "outcomeUnknown: \(reason)")
+          &current, from: executionState, to: .waitingForRecovery,
+          reason: "outcomeUnknown: \(reason)")
         current.record.outcomeUnknown = true
         current.record.finishedAtUTC = nowUTC()
         try persistRuntimeRecord(current.record)
@@ -1175,7 +1221,9 @@ public actor RuntimeJobEngine {
         .confirmedNotExecutedWithDiagnostic(let reason, _):
         // The state graph routes every terminal outcome through
         // finalizing: a job always gets its wrap-up phase, success or not.
-        try transition(&current, from: .running, to: .finalizing, reason: reason)
+        try transition(&current, from: executionState, to: .finalizing, reason: reason)
+        // `executionState` distinguishes a new recovery epoch from an
+        // ordinary workflow; neither branch reuses the predecessor intent.
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
         try persistRuntimeRecord(current.record)
@@ -1185,7 +1233,7 @@ public actor RuntimeJobEngine {
           state: JobState.failed.rawValue)
         return statusAndReleaseTerminalRuntime(current.record)
       case .failed(let reason):
-        try transition(&current, from: .running, to: .finalizing, reason: reason)
+        try transition(&current, from: executionState, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
         try persistRuntimeRecord(current.record)
@@ -1198,7 +1246,7 @@ public actor RuntimeJobEngine {
     } catch let failure as RuntimeArtifactPublicationFailure {
       var current = jobs[jobID] ?? runtime
       try transition(
-        &current, from: .running, to: .finalizing,
+        &current, from: Self.executionState(of: current.record), to: .finalizing,
         reason: "artifact publication failed: \(failure.detail)")
       try transition(
         &current, from: .finalizing, to: .failed,
@@ -1213,16 +1261,20 @@ public actor RuntimeJobEngine {
     }
 
     var current = jobs[jobID] ?? runtime
+    var establishedRecoveryEpochID: String?
+    let executionState = Self.executionState(of: current.record)
     if cancellationRequests.contains(jobID) {
       cancellationRequests.remove(jobID)
-      try transition(&current, from: .running, to: .cancelRequested, reason: "client-cancel")
+      try transition(
+        &current, from: executionState, to: .cancelRequested, reason: "client-cancel")
       try transition(
         &current, from: .cancelRequested, to: .cancellingAtSafeBoundary,
         reason: "safe-boundary")
       try transition(
         &current, from: .cancellingAtSafeBoundary, to: .cancelled, reason: "steps-drained")
     } else {
-      try transition(&current, from: .running, to: .finalizing, reason: "steps-complete")
+      try transition(
+        &current, from: executionState, to: .finalizing, reason: "steps-complete")
       jobs[jobID] = current
       do {
         try await publishFinalizeArtifacts(jobID: jobID, descriptor: descriptor)
@@ -1240,14 +1292,28 @@ public actor RuntimeJobEngine {
         return statusAndReleaseTerminalRuntime(current.record)
       }
       current = jobs[jobID] ?? current
-      try transition(&current, from: .finalizing, to: .succeeded, reason: "finalized")
+      if current.record.admissionEvidence?.completeOverwriteRecovery != nil {
+        let epoch = try await establishSupersedingRecoveryEpoch(
+          runtime: &current, descriptor: descriptor)
+        establishedRecoveryEpochID = epoch.epochID
+        current.record.timeline.append(
+          "superseding recovery epoch \(epoch.epochID) established; original outcomes remain unknown")
+        try persistRuntimeRecord(current.record)
+        jobs[jobID] = current
+        try transition(
+          &current, from: .finalizing, to: .recovered,
+          reason: "complete overwrite, readback, reboot, rebind and postflight confirmed")
+      } else {
+        try transition(&current, from: .finalizing, to: .succeeded, reason: "finalized")
+      }
     }
     current.record.finishedAtUTC = nowUTC()
     try persistRuntimeRecord(current.record)
     jobs[jobID] = current
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
-    return statusAndReleaseTerminalRuntime(current.record)
+    return statusAndReleaseTerminalRuntime(
+      current.record, recoveryEpochID: establishedRecoveryEpochID)
   }
 
   private func executeSteps(
@@ -2053,7 +2119,8 @@ public actor RuntimeJobEngine {
         identitySnapshotHash: isDeviceBound ? journalIdentity : nil),
       attempt: 1,
       bindingRevision: isDeviceBound
-        ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil)
+        ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil,
+      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
     runtime.record.recoveryStepID = step.stepID
     runtime.record.recoveryIntentEventID = intentEventID
     runtime.record.recoveryAction = try PersistedTypedProviderAction(action)
@@ -2128,7 +2195,8 @@ public actor RuntimeJobEngine {
           result: "failed",
           outcomeCertainty: .confirmed,
           semanticCode: confirmedNotExecuted
-            ? Self.confirmedNotExecutedSemanticCode : nil))
+            ? Self.confirmedNotExecutedSemanticCode : nil,
+          schemaVersion: Self.journalSchemaVersion(of: current.record)))
       current.nextSequence += 1
       if confirmedNotExecuted {
         let suffix = diagnostic.map { " [diagnostic=\($0.rawValue)]" } ?? ""
@@ -2154,7 +2222,8 @@ public actor RuntimeJobEngine {
           sessionID: current.record.sessionID, jobID: jobID, timestamp: outcomeAt,
           stepID: step.stepID, attempt: 1,
           correlatesToIntentEventID: intentEventID,
-          result: "succeeded", outcomeCertainty: .confirmed))
+          result: "succeeded", outcomeCertainty: .confirmed,
+          schemaVersion: Self.journalSchemaVersion(of: current.record)))
       current.nextSequence += 1
       current.record.timeline.append("verified \(step.stepID) \(summary.keys.sorted())")
       current.record.recoveryStepID = nil
@@ -2174,7 +2243,8 @@ public actor RuntimeJobEngine {
           sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
           stepID: step.stepID, attempt: 1,
           correlatesToIntentEventID: intentEventID,
-          result: "failed", outcomeCertainty: .confirmed))
+          result: "failed", outcomeCertainty: .confirmed,
+          schemaVersion: Self.journalSchemaVersion(of: current.record)))
       current.nextSequence += 1
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
@@ -2205,7 +2275,8 @@ public actor RuntimeJobEngine {
             sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
             stepID: step.stepID, attempt: 1,
             correlatesToIntentEventID: intentEventID,
-            result: "succeeded", outcomeCertainty: .confirmed))
+            result: "succeeded", outcomeCertainty: .confirmed,
+            schemaVersion: Self.journalSchemaVersion(of: current.record)))
         current.nextSequence += 1
         current.record.timeline.append("dispatched \(step.stepID); awaiting readback")
         current.record.recoveryStepID = nil
@@ -2635,12 +2706,20 @@ public actor RuntimeJobEngine {
     cancellationRequests.insert(jobID)
   }
 
-  public func status(jobID: String) throws -> RuntimeJobStatus {
-    status(of: try recordForRead(jobID: jobID))
+  public func status(jobID: String) async throws -> RuntimeJobStatus {
+    let record = try recordForRead(jobID: jobID)
+    let indexes = await recoveryEpochIndexes()
+    return status(
+      of: record,
+      supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
+      recoveryEpochID: indexes.establishedByJobID[record.jobID])
   }
 
-  public func evidenceSnapshot(jobID: String) throws -> RuntimeJobEvidenceSnapshot {
+  public func evidenceSnapshot(jobID: String) async throws -> RuntimeJobEvidenceSnapshot {
     let record = try recordForRead(jobID: jobID)
+    let epochs = try await RuntimeSupersedingRecoveryStore(
+      stateDirectory: configuration.stateDirectory).list()
+    let recoveryEpoch = epochs.last(where: { $0.recoveryJobID == record.jobID })
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
       operationReference: record.operationReference,
@@ -2658,6 +2737,7 @@ public actor RuntimeJobEngine {
       startedAtUTC: record.startedAtUTC,
       firstEvidenceStepAtUTC: record.firstEvidenceStepAtUTC,
       finishedAtUTC: record.finishedAtUTC,
+      recoveryEpoch: recoveryEpoch,
       inputs: record.request.inputs)
   }
 
@@ -2696,20 +2776,27 @@ public actor RuntimeJobEngine {
   /// latter is projected from SQLite so callers keep the established `job.list`
   /// behaviour without forcing the daemon to retain a journal writer per
   /// completed job.
-  public func listJobs() -> [RuntimeJobStatus] {
+  public func listJobs() async -> [RuntimeJobStatus] {
+    let indexes = await recoveryEpochIndexes()
     var statuses: [String: RuntimeJobStatus] = [:]
     if let persisted = try? admissionService.allJobs() {
       for row in persisted {
         guard let data = row.initialRecordData,
           let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
         else { continue }
-        statuses[record.jobID] = status(of: record)
+        statuses[record.jobID] = status(
+          of: record,
+          supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
+          recoveryEpochID: indexes.establishedByJobID[record.jobID])
       }
     }
     // Active snapshots can contain timeline entries accumulated since their
     // last durable projection; they take precedence over the history index.
     for runtime in jobs.values {
-      statuses[runtime.record.jobID] = status(of: runtime.record)
+      statuses[runtime.record.jobID] = status(
+        of: runtime.record,
+        supersededByRecoveryEpochID: indexes.supersededByJobID[runtime.record.jobID],
+        recoveryEpochID: indexes.establishedByJobID[runtime.record.jobID])
     }
     return statuses.values.sorted { $0.jobID < $1.jobID }
   }
@@ -2717,7 +2804,10 @@ public actor RuntimeJobEngine {
   /// Reads compact terminal history from SQLite.  Active jobs still return
   /// their in-memory snapshots above; both views use the same typed status
   /// model and opaque cursor contract.
-  public func listJobs(pageSize: Int, cursor: String? = nil) throws -> RuntimeJobStatusPage {
+  public func listJobs(
+    pageSize: Int, cursor: String? = nil
+  ) async throws -> RuntimeJobStatusPage {
+    let indexes = await recoveryEpochIndexes()
     let page = try admissionService.listJobs(pageSize: pageSize, cursor: cursor)
     let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
       guard let data = persisted.initialRecordData,
@@ -2726,7 +2816,10 @@ public actor RuntimeJobEngine {
         throw RuntimeJobEngineError.internalFailure(
           "Runtime job history record \(persisted.jobID) is unreadable")
       }
-      return status(of: record)
+      return status(
+        of: record,
+        supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
+        recoveryEpochID: indexes.establishedByJobID[record.jobID])
     }
     return RuntimeJobStatusPage(jobs: statuses, nextCursor: page.nextCursor)
   }
@@ -2906,7 +2999,7 @@ public actor RuntimeJobEngine {
     var recovered: [RuntimeJobStatus] = []
     for persisted in persistedJobs {
       if jobs[persisted.jobID] != nil { continue }
-      let replayed = try recoveryService.replay(persisted)
+      let replayed = try await recoveryService.replay(persisted)
       try persistRuntimeRecord(replayed.record)
       recovered.append(status(of: replayed.record))
       jobs[persisted.jobID] = JobRuntime(
@@ -3044,7 +3137,8 @@ public actor RuntimeJobEngine {
           recoveryAttemptID: recoveryAttemptID,
           sourceState: .waitingForRecovery,
           lastDurableSequence: inspection.lastDurableSequence ?? 0,
-          trigger: "manual"))
+          trigger: "manual",
+          schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
       runtime.nextSequence += 1
       runtime.record.timeline.append("reconcile started \(stepID)")
       jobs[jobID] = runtime
@@ -3179,7 +3273,8 @@ public actor RuntimeJobEngine {
             attempt: 1,
             correlatesToIntentEventID: intentEventID,
             result: "succeeded",
-            outcomeCertainty: .confirmed))
+            outcomeCertainty: .confirmed,
+            schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
         runtime.nextSequence += 1
       }
       nextState = .resumeAtConfirmedSafeBoundary
@@ -3209,7 +3304,9 @@ public actor RuntimeJobEngine {
             // usage terminal did not say so, and the campaign burned as
             // `unsafePartial` anyway — the product throwing away the strongest
             // evidence it owns (TASK-AIN-020).
-            semanticCode: Self.confirmedNotExecutedSemanticCode))
+            semanticCode: Self.confirmedNotExecutedSemanticCode,
+            schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+
         runtime.nextSequence += 1
       }
       // An unknown action is never resent automatically, even when it was
@@ -3241,7 +3338,8 @@ public actor RuntimeJobEngine {
       nextState: nextState,
       outcomeCertainty: certainty,
       safeBoundaryConfirmed: safeBoundary,
-      evidence: [detail])
+      evidence: [detail],
+      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
     try runtime.journal.appendAndSynchronize(reconcileOutcome)
     runtime.nextSequence += 1
     try transition(
@@ -3291,6 +3389,109 @@ public actor RuntimeJobEngine {
   }
 
   // MARK: Helpers
+
+  private static func executionState(of record: RuntimeJobRecord) -> JobState {
+    record.state == JobState.recoveringByCompleteOverwrite.rawValue
+      ? .recoveringByCompleteOverwrite : .running
+  }
+
+  private static func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
+    record.operationReference == "flash.dayu200@1"
+      ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
+  }
+
+  private func establishSupersedingRecoveryEpoch(
+    runtime: inout JobRuntime,
+    descriptor: CatalogOperationDescriptor
+  ) async throws -> SupersedingRecoveryEpoch {
+    guard let recovery = runtime.record.admissionEvidence?.completeOverwriteRecovery,
+      let contract = descriptor.completeOverwriteRecovery,
+      contract.contractVersion == recovery.coverageContractVersion,
+      let profileContract = contract.profile(reference: recovery.profileReference),
+      Self.effectSetDigest(profileContract.coveredEffects)
+        == recovery.coveredEffectSetSHA256,
+      let stableIdentity = runtime.record.materializedStableTargetIdentitySHA256,
+      let bindingRevision = runtime.record.materializedBindingRevision,
+      let planDigest = runtime.record.materializedPlanDigest,
+      let artifactSHA256 = runtime.record.admissionEvidence?
+        .runtimeCapabilityCorrelation?.artifactSHA256,
+      let providerSHA256 = runtime.record.admissionEvidence?
+        .recoveryProviderExecutableSHA256,
+      Self.isLowercaseSHA256(artifactSHA256),
+      Self.isLowercaseSHA256(providerSHA256)
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "complete-overwrite terminal lacks immutable coverage, target, Artifact or tool facts")
+    }
+    let replay = try DurableJournalRecovery.inspect(
+      url: jobDirectory(for: runtime.record.jobID)
+        .appendingPathComponent("journal.jsonl"))
+    guard !replay.hasTornTail, replay.outstandingIntents.isEmpty,
+      replay.unknownOutcomes.isEmpty
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "complete-overwrite terminal has unresolved recovery intent")
+    }
+    let requiredSteps = [contract.overwriteStepID] + contract.verificationStepIDs
+    var confirmedIntentByStep: [String: JournalEvent] = [:]
+    var confirmedStepIDs: [String] = []
+    var seenConfirmedStepIDs: Set<String> = []
+    for outcome in replay.events where outcome.kind == .stepOutcome {
+      guard let stepID = outcome.stepID,
+        outcome.payload["result"] == .string("succeeded"),
+        outcome.payload["outcomeCertainty"] == .string("confirmed"),
+        let intentEventID = outcome.correlatedIntentEventID,
+        let intent = replay.events.first(where: {
+          $0.kind == .stepIntent && $0.eventID == intentEventID
+            && $0.stepID == stepID
+        })
+      else { continue }
+      if seenConfirmedStepIDs.insert(stepID).inserted {
+        confirmedStepIDs.append(stepID)
+      }
+      if requiredSteps.contains(stepID) {
+        confirmedIntentByStep[stepID] = intent
+      }
+    }
+    guard Set(requiredSteps).isSubset(of: Set(confirmedIntentByStep.keys)),
+      let recoveryIntent = confirmedIntentByStep[contract.overwriteStepID]
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "complete-overwrite terminal lacks all write/readback/postflight outcomes")
+    }
+    let resultingEpoch = RuntimeJobRecord.sha256Hex(
+      Data(
+        [
+          stableIdentity, String(bindingRevision), runtime.record.jobID,
+          planDigest, artifactSHA256, requiredSteps.joined(separator: ","),
+        ].joined(separator: "\n").utf8))
+    return try await RuntimeSupersedingRecoveryStore(
+      stateDirectory: configuration.stateDirectory
+    ).append(
+      SupersedingRecoveryEpochDraft(
+        source: .distinctRecoveryExecution,
+        stableTargetIdentitySHA256: stableIdentity,
+        bindingRevision: bindingRevision,
+        coveredIntents: recovery.coveredIntents,
+        uncertainEffectSetSHA256: recovery.uncertainEffectSetSHA256,
+        coverageContractVersion: recovery.coverageContractVersion,
+        coveredEffectSetSHA256: recovery.coveredEffectSetSHA256,
+        recoveryJobID: runtime.record.jobID,
+        recoveryIntentEventID: recoveryIntent.eventID,
+        operationReference: runtime.record.operationReference,
+        profileReference: recovery.profileReference,
+        materializedPlanDigestSHA256: planDigest,
+        artifactSHA256: artifactSHA256,
+        providerExecutableSHA256: providerSHA256,
+        confirmedStepIDs: confirmedStepIDs,
+        resultingTargetEpochSHA256: resultingEpoch,
+        establishedAtUTC: nowUTC()))
+  }
+
+  private static func effectSetDigest(_ effects: [String]) -> String {
+    RuntimeJobRecord.sha256Hex(
+      Data(Array(Set(effects)).sorted().joined(separator: "\n").utf8))
+  }
 
   private static func reconciliationStepID(
     originalStepID: String,
@@ -4024,7 +4225,9 @@ public actor RuntimeJobEngine {
           reference: "default-read-only-policy",
           admittedAtUTC: admittedAt,
           validUntilUTC: nil,
-          consumptionFingerprintSHA256: nil))
+          consumptionFingerprintSHA256: nil),
+        completeOverwriteRecovery: nil,
+        recognizedRecoveryEpochID: nil)
     }
 
     guard let policy = descriptor.authorization[effect] else {
@@ -4042,6 +4245,30 @@ public actor RuntimeJobEngine {
         "legacy campaign reservations are decode/export-only and cannot admit a new execution")
     }
 
+    let recoveryAdmission: RuntimeCompleteOverwriteAdmissionResult
+    if effect == .destructive {
+      guard let identity = materialized.stableTargetIdentitySHA256,
+        let bindingRevision = materialized.bindingRevision
+      else {
+        throw RuntimeJobEngineError.rejected(
+          .authorizationRequired,
+          "complete-overwrite admission requires stable target identity and binding")
+      }
+      do {
+        recoveryAdmission = try await RuntimeRecoveryService(
+          stateDirectory: configuration.stateDirectory, nowUTC: nowUTC
+        ).completeOverwriteAdmission(
+          request: request, descriptor: descriptor,
+          stableIdentitySHA256: identity, bindingRevision: bindingRevision)
+      } catch let error as RuntimeCompleteOverwriteRecoveryError {
+        throw RuntimeJobEngineError.rejected(
+          .authorizationRequired,
+          "non-overridable recovery blocker: \(error)")
+      }
+    } else {
+      recoveryAdmission = .noRecovery
+    }
+
     let authorization: RuntimeCapabilityReference
     if policy == .runtimeCapability {
       guard request.authorization == nil else {
@@ -4055,7 +4282,8 @@ public actor RuntimeJobEngine {
           "catalog disabled Runtime capability issuance for \(descriptor.reference)")
       }
       authorization = try await automaticRuntimeCapability(
-        descriptor: descriptor, query: query)
+        descriptor: descriptor, query: query,
+        recoveryContext: recoveryAdmission.recoveryContext)
     } else if let supplied = request.authorization {
       authorization = supplied
     } else if effect == .deviceMutation,
@@ -4083,7 +4311,8 @@ public actor RuntimeJobEngine {
         : query.workspaceIsIsolatedTaskCopy)
     {
       authorization = try await automaticRuntimeCapability(
-        descriptor: descriptor, query: query)
+        descriptor: descriptor, query: query,
+        recoveryContext: recoveryAdmission.recoveryContext)
     } else {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
@@ -4094,7 +4323,10 @@ public actor RuntimeJobEngine {
         capabilityID: authorization.capabilityID,
         query: query,
         nowUTC: admittedAt)
-      return PreparedAuthorization(reference: authorization, evidence: nil)
+      return PreparedAuthorization(
+        reference: authorization, evidence: nil,
+        completeOverwriteRecovery: recoveryAdmission.recoveryContext,
+        recognizedRecoveryEpochID: recoveryAdmission.recognizedEpoch?.epochID)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
@@ -4243,7 +4475,8 @@ public actor RuntimeJobEngine {
   /// use blocks later automatic execution of the same mutation scope.
   private func automaticRuntimeCapability(
     descriptor: CatalogOperationDescriptor,
-    query: RuntimeCapabilityAuthorizationQuery
+    query: RuntimeCapabilityAuthorizationQuery,
+    recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
   ) async throws -> RuntimeCapabilityReference {
     let issuedAtUTC = nowUTC()
     guard let expiresAtUTC = Self.automaticCapabilityExpiry(
@@ -4258,18 +4491,15 @@ public actor RuntimeJobEngine {
         stableIdentitySHA256: query.targetStableIdentitySHA256 ?? "",
         bindingRevision: query.targetBindingRevision ?? 0,
         reservationID: nil,
-        jobID: nil)
+        jobID: nil,
+        recoveryContext: recoveryContext)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
         "automatic Runtime target lineage is blocked: \(error)")
     }
-    let scopeFingerprint = Self.authorizationScopeFingerprint(of: query)
-    let policyFingerprint =
-      RuntimeJobRecord.sha256Hex(
-        Data("\(RuntimeOperationCatalog.catalogDigest)\n\(scopeFingerprint)".utf8)
-      )
-      .uppercased()
+    let policyFingerprint = Self.automaticCapabilityPolicyFingerprint(
+      query: query, recoveryContext: recoveryContext)
 
     // Destructive envelopes are one-shot. A failed use advances only when
     // provider outcome/readback durably classified it safeToReflash. Known
@@ -4303,7 +4533,9 @@ public actor RuntimeJobEngine {
           case .pending, .outcomeUnknown, .legacyUnverified:
             return RuntimeCapabilityReference(capabilityID: capabilityID)
           case .confirmed:
-            guard terminal.terminalState == JobState.succeeded.rawValue else {
+            guard terminal.terminalState == JobState.succeeded.rawValue
+              || terminal.terminalState == JobState.recovered.rawValue
+            else {
               return RuntimeCapabilityReference(capabilityID: capabilityID)
             }
             destructiveAttemptCount = 0
@@ -4398,6 +4630,22 @@ public actor RuntimeJobEngine {
       "automatic Runtime capability generations are exhausted")
   }
 
+  private static func automaticCapabilityPolicyFingerprint(
+    query: RuntimeCapabilityAuthorizationQuery,
+    recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
+  ) -> String {
+    let scopeFingerprint = authorizationScopeFingerprint(of: query)
+    let recoveryFingerprint = recoveryContext.map {
+      "\($0.uncertainEffectSetSHA256)\n\($0.coverageContractVersion)\n"
+        + "\($0.coveredEffectSetSHA256)\n\($0.destructiveEpochOrdinal)"
+    } ?? "ordinary"
+    return RuntimeJobRecord.sha256Hex(
+      Data(
+        "\(RuntimeOperationCatalog.catalogDigest)\n\(scopeFingerprint)\n"
+          .appending(recoveryFingerprint).utf8)
+    ).uppercased()
+  }
+
   /// Prevents a caller from bypassing an unknown mutation by changing typed
   /// inputs and therefore selecting a different automatic capability scope.
   /// A crash-recovered pending reservation may continue only for its exact
@@ -4406,8 +4654,17 @@ public actor RuntimeJobEngine {
     stableIdentitySHA256: String,
     bindingRevision: Int,
     reservationID: String?,
-    jobID: String?
+    jobID: String?,
+    recoveryContext: RuntimeCompleteOverwriteRecoveryContext? = nil
   ) async throws {
+    let epochs = try await RuntimeSupersedingRecoveryStore(
+      stateDirectory: configuration.stateDirectory).list()
+    let supersededJobIDs = Set(
+      epochs.filter {
+        $0.stableTargetIdentitySHA256 == stableIdentitySHA256
+          && $0.bindingRevision == bindingRevision
+      }.flatMap { $0.coveredIntents.map(\.jobID) })
+      .union(recoveryContext.map { Set($0.coveredIntents.map(\.jobID)) } ?? [])
     for status in try await capabilityStore.list() {
       for entry in status.lineage
       where entry.targetStableIdentitySHA256 == stableIdentitySHA256
@@ -4415,6 +4672,7 @@ public actor RuntimeJobEngine {
         && entry.outcome != .confirmed
         && entry.outcome != .safeToReflash
       {
+        if supersededJobIDs.contains(entry.jobID) { continue }
         if entry.outcome == .pending,
           entry.reservationID == reservationID,
           entry.jobID == jobID
@@ -4428,6 +4686,49 @@ public actor RuntimeJobEngine {
     }
   }
 
+  private func freshCompleteOverwriteRecoveryProof(
+    runtime: JobRuntime,
+    descriptor: CatalogOperationDescriptor,
+    effect: WorkflowEffect,
+    validatedFacts: ProviderFacts?,
+    deviceLineage: (identity: String, bindingRevision: Int)?
+  ) async throws -> (
+    context: RuntimeCompleteOverwriteRecoveryContext?, providerSHA256: String?
+  ) {
+    guard effect == .destructive, descriptor.completeOverwriteRecovery != nil else {
+      return (nil, nil)
+    }
+    guard let facts = validatedFacts,
+      let identity = facts.deviceIdentitySHA256,
+      let bindingRevision = facts.bindingRevision,
+      identity == deviceLineage?.identity,
+      bindingRevision == deviceLineage?.bindingRevision,
+      Self.isLowercaseSHA256(facts.toolSHA256),
+      !facts.toolVersion.isEmpty,
+      facts.deviceMode != nil
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "completeOverwriteRecovery.freshTargetTopologyOrToolMissing")
+    }
+    let admission: RuntimeCompleteOverwriteAdmissionResult
+    do {
+      admission = try await RuntimeRecoveryService(
+        stateDirectory: configuration.stateDirectory, nowUTC: nowUTC
+      ).completeOverwriteAdmission(
+        request: runtime.record.request, descriptor: descriptor,
+        stableIdentitySHA256: identity, bindingRevision: bindingRevision)
+    } catch let error as RuntimeCompleteOverwriteRecoveryError {
+      throw RuntimeDispatchFailure.failed(
+        "non-overridable recovery blocker: \(error)")
+    }
+    guard let context = admission.recoveryContext else { return (nil, nil) }
+    guard admission.recognizedEpoch == nil else {
+      throw RuntimeDispatchFailure.failed(
+        "completeOverwriteRecovery.freshProofDrifted")
+    }
+    return (context, facts.toolSHA256)
+  }
+
   private func consumeCapabilityBeforeMutation(
     jobID: String,
     descriptor: CatalogOperationDescriptor,
@@ -4437,7 +4738,8 @@ public actor RuntimeJobEngine {
     guard var runtime = jobs[jobID] else {
       throw RuntimeDispatchFailure.failed("job disappeared before capability consumption")
     }
-    if let evidence = runtime.record.admissionEvidence {
+    let persistedEvidence = runtime.record.admissionEvidence
+    if let evidence = persistedEvidence {
       guard
         evidence.kind == .runtimeCapability,
         evidence.reference == runtime.record.request.authorization?.capabilityID
@@ -4445,7 +4747,6 @@ public actor RuntimeJobEngine {
         throw RuntimeDispatchFailure.failed(
           "authorizationRequired: persisted admission evidence does not match the mutation")
       }
-      return
     }
     if runtime.record.request.campaignReservation != nil {
       throw RuntimeDispatchFailure.failed(
@@ -4525,21 +4826,65 @@ public actor RuntimeJobEngine {
         workspaceIsIsolatedTaskCopy: workspace.isolatedTaskCopy)
     }
     do {
+      let liveRecovery = try await freshCompleteOverwriteRecoveryProof(
+        runtime: runtime, descriptor: descriptor, effect: effect,
+        validatedFacts: validatedFacts, deviceLineage: deviceLineage)
+      if let evidence = persistedEvidence {
+        guard evidence.completeOverwriteRecovery == liveRecovery.context else {
+          throw RuntimeDispatchFailure.failed(
+            "completeOverwriteRecovery.freshProofDrifted")
+        }
+        if let recovery = liveRecovery.context {
+          guard runtime.record.state == JobState.running.rawValue
+              || runtime.record.state == JobState.recoveringByCompleteOverwrite.rawValue
+          else {
+            throw RuntimeDispatchFailure.failed(
+              "completeOverwriteRecovery.invalidPersistedState")
+          }
+          if runtime.record.state == JobState.running.rawValue {
+            try transition(
+              &runtime, from: .running, to: .recoveringByCompleteOverwrite,
+              reason:
+                "resume distinct complete-overwrite capability; original intents not replayed")
+            runtime.record.timeline.append(
+              "recovery coverage \(recovery.coveredEffectSetSHA256) for "
+                + "\(recovery.coveredIntents.count) unknown intent(s)")
+            try persistRuntimeRecord(runtime.record)
+            jobs[jobID] = runtime
+          }
+        } else if runtime.record.state == JobState.recoveringByCompleteOverwrite.rawValue {
+          throw RuntimeDispatchFailure.failed(
+            "completeOverwriteRecovery.persistedContextMissing")
+        }
+        return
+      }
       if let deviceLineage {
-        // Device lineage guards one device against a second mutation while an
-        // earlier one is unresolved. A workspace has no device to protect, and
-        // the capability record's own lineage check still applies to both.
+        // Cross-Job lineage is checked once, before authority consumption.
+        // Persisted evidence means this exact Job already owns that use; its
+        // journal-confirmed reconcile continuation must not be mistaken for a
+        // second mutation Job.
         try await validateNoUnresolvedMutationLineage(
           stableIdentitySHA256: deviceLineage.identity,
           bindingRevision: deviceLineage.bindingRevision,
           reservationID: runtime.record.request.idempotencyKey,
-          jobID: jobID)
+          jobID: jobID,
+          recoveryContext: liveRecovery.context)
       }
       guard
         let status = try await capabilityStore.inspect(
           capabilityID: authorization.capabilityID)
       else {
         throw RuntimeCapabilityStoreError.capabilityNotFound(authorization.capabilityID)
+      }
+      if status.capability.issuer.kind == .runtimeDefaultPolicy {
+        let fingerprint = Self.automaticCapabilityPolicyFingerprint(
+          query: query, recoveryContext: liveRecovery.context)
+        guard authorization.capabilityID.hasPrefix(
+          "CAP-RT-POLICY-\(fingerprint.prefix(40))-G")
+        else {
+          throw RuntimeDispatchFailure.failed(
+            "completeOverwriteRecovery.freshProofDrifted")
+        }
       }
       let consumption = try await capabilityStore.consume(
         capabilityID: authorization.capabilityID,
@@ -4559,21 +4904,33 @@ public actor RuntimeJobEngine {
           descriptor: descriptor, inputs: runtime.record.request.inputs),
         targetBindingDigestSHA256: targetBindingDigest,
         artifactSHA256: artifactFacts["artifactSha256"])
-      runtime.record.admissionEvidence = RuntimeAdmissionEvidence(
+      var admissionEvidence = RuntimeAdmissionEvidence(
         kind: .runtimeCapability,
         reference: authorization.capabilityID,
         admittedAtUTC: consumption.consumedAtUTC,
         validUntilUTC: status.capability.expiresAtUTC,
         consumptionFingerprintSHA256: consumption.queryFingerprintSHA256,
         runtimeCapabilityCorrelation: correlation)
+      admissionEvidence.completeOverwriteRecovery = liveRecovery.context
+      admissionEvidence.recoveryProviderExecutableSHA256 = liveRecovery.providerSHA256
+      runtime.record.admissionEvidence = admissionEvidence
       runtime.record.timeline.append(
         "capability consumed before first mutation")
-      // Keep the consumed evidence in the actor snapshot before the disk
-      // write. If that write fails, run() can still persist the same
-      // evidence while finalizing the fail-closed job; after a process
-      // crash, the store's reservation-idempotent receipt reconstructs it.
+      // The consumed authority and its exact recovery proof become durable
+      // before the recovery-only state is entered. A restart can therefore
+      // re-prove and resume this boundary without replaying old intent.
       jobs[jobID] = runtime
       try persistRuntimeRecord(runtime.record)
+      if let recovery = liveRecovery.context {
+        try transition(
+          &runtime, from: .running, to: .recoveringByCompleteOverwrite,
+          reason: "distinct complete-overwrite capability reserved; original intents not replayed")
+        runtime.record.timeline.append(
+          "recovery coverage \(recovery.coveredEffectSetSHA256) for "
+            + "\(recovery.coveredIntents.count) unknown intent(s)")
+        try persistRuntimeRecord(runtime.record)
+        jobs[jobID] = runtime
+      }
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: capability denied before mutation: \(error)")
@@ -4906,7 +5263,8 @@ public actor RuntimeJobEngine {
         eventID: "t-\(runtime.nextSequence)", sequence: runtime.nextSequence,
         sessionID: runtime.record.sessionID, jobID: runtime.record.jobID,
         timestamp: nowUTC(), from: from, to: to, reason: reason,
-        triggerEventID: triggerEventID))
+        triggerEventID: triggerEventID,
+        schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
     runtime.nextSequence += 1
     runtime.record.state = to.rawValue
     runtime.record.timeline.append("\(from.rawValue)->\(to.rawValue)")
@@ -4936,8 +5294,11 @@ public actor RuntimeJobEngine {
   /// and detailed runtime projection in the daemon only makes memory grow with
   /// history.  Outcome-unknown jobs are deliberately excluded: they remain
   /// active until an explicit reconciliation reaches a certain terminal state.
-  private func statusAndReleaseTerminalRuntime(_ record: RuntimeJobRecord) -> RuntimeJobStatus {
-    let jobStatus = status(of: record)
+  private func statusAndReleaseTerminalRuntime(
+    _ record: RuntimeJobRecord,
+    recoveryEpochID: String? = nil
+  ) -> RuntimeJobStatus {
+    let jobStatus = status(of: record, recoveryEpochID: recoveryEpochID)
     if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
       jobs.removeValue(forKey: record.jobID)
       cancellationRequests.remove(record.jobID)
@@ -4959,13 +5320,20 @@ public actor RuntimeJobEngine {
     return record
   }
 
-  private func status(of record: RuntimeJobRecord) -> RuntimeJobStatus {
+  private func status(
+    of record: RuntimeJobRecord,
+    supersededByRecoveryEpochID: String? = nil,
+    recoveryEpochID: String? = nil
+  ) -> RuntimeJobStatus {
     RuntimeJobStatus(
       jobID: record.jobID,
       operationReference: record.operationReference,
       targetID: record.request.target.targetID,
       state: record.state,
-      waitingForHuman: record.state == "waitingForRecovery",
+      // Uncertain effects are resolved by Runtime proof. Eligible recovery is
+      // automatic; ineligible recovery is a non-overridable diagnostic, never
+      // a request for approval.
+      waitingForHuman: false,
       outcomeUnknown: record.outcomeUnknown,
       outstandingResidueCount: record.outstandingResidueCount,
       timeline: record.timeline,
@@ -4974,7 +5342,29 @@ public actor RuntimeJobEngine {
       actualEffect: record.actualEffect,
       createdAtUTC: record.createdAtUTC,
       startedAtUTC: record.startedAtUTC,
-      finishedAtUTC: record.finishedAtUTC)
+      finishedAtUTC: record.finishedAtUTC,
+      supersededByRecoveryEpochID: supersededByRecoveryEpochID,
+      recoveryEpochID: recoveryEpochID)
+  }
+
+  private struct RecoveryEpochIndexes {
+    var supersededByJobID: [String: String] = [:]
+    var establishedByJobID: [String: String] = [:]
+  }
+
+  private func recoveryEpochIndexes() async -> RecoveryEpochIndexes {
+    guard let store = try? RuntimeSupersedingRecoveryStore(
+      stateDirectory: configuration.stateDirectory),
+      let epochs = try? await store.list()
+    else { return RecoveryEpochIndexes() }
+    var indexes = RecoveryEpochIndexes()
+    for epoch in epochs {
+      indexes.establishedByJobID[epoch.recoveryJobID] = epoch.epochID
+      for intent in epoch.coveredIntents {
+        indexes.supersededByJobID[intent.jobID] = epoch.epochID
+      }
+    }
+    return indexes
   }
 
   private static func fingerprint(of data: Data) -> String {

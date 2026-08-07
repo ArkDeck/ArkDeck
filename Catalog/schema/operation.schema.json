@@ -160,6 +160,55 @@
       "description": "Structurally pinned: an unknown external outcome always requires reconcile, never an automatic replay.",
       "const": "reconcileRequired"
     },
+    "completeOverwriteRecovery": {
+      "description": "Reviewed semantic coverage for a distinct complete-overwrite recovery. This is not permission to replay an unknown Step and carries no executable or caller-controlled fact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractVersion",
+        "profiles",
+        "overwriteStepID",
+        "verificationStepIDs"
+      ],
+      "properties": {
+        "contractVersion": { "const": "1.0.0" },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "coveredEffects"],
+            "properties": {
+              "reference": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*@[0-9]+$"
+              },
+              "coveredEffects": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^partition:[a-z][a-z0-9_]*$"
+                }
+              }
+            }
+          }
+        },
+        "overwriteStepID": { "$ref": "#/$defs/identifier" },
+        "verificationStepIDs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    },
     "artifacts": {
       "type": "array",
       "maxItems": 16,

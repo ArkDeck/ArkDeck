@@ -41,9 +41,11 @@ public struct JournalEvent: Equatable, Sendable {
   public static let authorizedAgentSchemaVersion = "2.0.0"
   public static let rockchipAuthorizedAgentSchemaVersion = "2.1.0"
   public static let agentAuthoritySchemaVersion = "2.2.0"
+  public static let completeOverwriteRecoverySchemaVersion = "3.0.0"
 
   static func isSupportedSchemaVersion(_ value: String) -> Bool {
-    value == schemaVersion || supportsAuthorizationCorrelation(value)
+    value == schemaVersion || value == completeOverwriteRecoverySchemaVersion
+      || supportsAuthorizationCorrelation(value)
   }
 
   static func supportsAuthorizationCorrelation(_ value: String) -> Bool {
@@ -53,6 +55,10 @@ public struct JournalEvent: Equatable, Sendable {
 
   static func usesAgentAuthorityUnion(_ value: String) -> Bool {
     value == agentAuthoritySchemaVersion
+  }
+
+  static func usesLegacyAuthorizationSemantics(_ value: String) -> Bool {
+    value == schemaVersion || value == completeOverwriteRecoverySchemaVersion
   }
 
   public let schemaVersion: String

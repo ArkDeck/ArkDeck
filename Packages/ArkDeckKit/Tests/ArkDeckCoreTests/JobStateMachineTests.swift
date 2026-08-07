@@ -36,7 +36,9 @@ final class JobStateMachineTests: XCTestCase {
   }
 
   func testTerminalStatesHaveNoDestinationsForEitherMode() {
-    let terminalStates: Set<JobState> = [.planned, .succeeded, .failed, .cancelled, .interrupted]
+    let terminalStates: Set<JobState> = [
+      .planned, .succeeded, .recovered, .failed, .cancelled, .interrupted,
+    ]
     XCTAssertEqual(Set(JobState.allCases.filter(\.isTerminal)), terminalStates)
 
     for mode in JobExecutionMode.allCases {
@@ -51,16 +53,24 @@ final class JobStateMachineTests: XCTestCase {
     }
   }
 
-  func testJobStatesExactlyMatchTheLockedJournalContract() throws {
+  func testJobStatesVersionTheRecoveryExtensionWithoutMutatingTheLockedJournalContract() throws {
     let contract = try loadContract(named: "journal-event.schema.json")
     let definitions = try XCTUnwrap(contract["$defs"] as? [String: Any])
     let stateDefinition = try XCTUnwrap(definitions["jobState"] as? [String: Any])
     let contractStates = try XCTUnwrap(stateDefinition["enum"] as? [String])
 
-    XCTAssertEqual(JobState.allCases.map(\.rawValue), contractStates)
+    let recoveryStates: Set<String> = [
+      JobState.recoveringByCompleteOverwrite.rawValue,
+      JobState.recovered.rawValue,
+    ]
+    XCTAssertEqual(JobState.schemaVersion, "2.0.0")
+    XCTAssertEqual(
+      Set(JobState.allCases.map(\.rawValue)).subtracting(recoveryStates),
+      Set(contractStates))
+    XCTAssertTrue(Set(contractStates).isDisjoint(with: recoveryStates))
   }
 
-  func testCoreTransitionGraphUnionExactlyMatchesTheLockedJournalContract() throws {
+  func testCoreTransitionGraphVersionsRecoveryEdgesWithoutMutatingTheLockedJournalContract() throws {
     let contractPairs = try loadContractTransitionPairs()
     let swiftPairs = Set(
       JobExecutionMode.allCases.flatMap { mode in
@@ -71,7 +81,17 @@ final class JobStateMachineTests: XCTestCase {
         }
       })
 
-    XCTAssertEqual(swiftPairs, contractPairs)
+    let recoveryPairs: Set<StateTransitionPair> = [
+      .init(from: .running, to: .recoveringByCompleteOverwrite),
+      .init(from: .waitingForRecovery, to: .recoveringByCompleteOverwrite),
+      .init(from: .reconciling, to: .recoveringByCompleteOverwrite),
+      .init(from: .recoveringByCompleteOverwrite, to: .cancelRequested),
+      .init(from: .recoveringByCompleteOverwrite, to: .finalizing),
+      .init(from: .recoveringByCompleteOverwrite, to: .waitingForRecovery),
+      .init(from: .finalizing, to: .recovered),
+    ]
+    XCTAssertEqual(swiftPairs.subtracting(recoveryPairs), contractPairs)
+    XCTAssertEqual(swiftPairs.subtracting(contractPairs), recoveryPairs)
   }
 
   func testResumeMarkerDestinationSetsIncludeBothApprovedSafetyExits() {
@@ -89,6 +109,28 @@ final class JobStateMachineTests: XCTestCase {
       ),
       [.planning, .finalizing, .waitingForRecovery]
     )
+  }
+
+  // TEST-AC-JOB-001-05 / autonomousCompleteOverwriteRecoveryContract
+  func testTEST_AC_JOB_001_05_CompleteProofUsesDistinctRecoveryAndTerminalState() throws {
+    var machine = try makeWaitingForRecoveryMachine()
+    try machine.handle(.completeOverwriteRecoveryStarted)
+    XCTAssertEqual(machine.state, .recoveringByCompleteOverwrite)
+
+    try machine.handle(.workflowCompleted)
+    XCTAssertEqual(machine.state, .finalizing)
+    try machine.handle(.finalizationCompleted)
+    XCTAssertEqual(machine.state, .recovered)
+    XCTAssertNotEqual(machine.state, .succeeded)
+  }
+
+  func testPlanOnlyCannotEnterTheCompleteOverwriteRecoveryBranch() throws {
+    XCTAssertFalse(
+      JobStateMachine.isAllowedTransition(
+        from: .waitingForRecovery, to: .recoveringByCompleteOverwrite, mode: .planOnly))
+    XCTAssertFalse(
+      JobStateMachine.isAllowedTransition(
+        from: .reconciling, to: .recoveringByCompleteOverwrite, mode: .planOnly))
   }
 
   func testJournalContractContainsBothApprovedResumeMarkerPairsAndOldReaderRejectsThem() throws {
@@ -239,7 +281,7 @@ final class JobStateMachineTests: XCTestCase {
   }
 
   // TEST-AC-JOB-001-03 / recoveryFaultInjection
-  func testTEST_AC_JOB_001_03_MissingDestructiveOutcomeCanOnlyWaitForRecovery() throws {
+  func testTEST_AC_JOB_001_03_MissingDestructiveOutcomeStartsWaitingWithoutReplay() throws {
     var machine = try JobStateMachine(
       mode: .execute,
       recoveringFrom: .running,
@@ -304,8 +346,7 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertTrue(machine.state.isTerminal)
   }
 
-  // TEST-AC-JOB-001-05 / recoveryFaultInjection
-  func testTEST_AC_JOB_001_05_RecoveryRequiresEveryResumePrecondition() throws {
+  func testLegacyResumeRecoveryRequiresEveryResumePrecondition() throws {
     let incompleteEvidenceVectors = [
       RecoveryResumeEvidence(
         restartSafe: false, safeBoundaryConfirmed: true, outcomeConfirmed: true,

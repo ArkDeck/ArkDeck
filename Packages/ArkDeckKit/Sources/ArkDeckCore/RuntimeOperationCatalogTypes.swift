@@ -168,6 +168,45 @@ public struct CatalogArtifactDescriptor: Equatable, Sendable {
   }
 }
 
+/// A reviewed declaration that one exact operation/profile pair can replace
+/// every possible effect of an earlier uncertain destructive epoch. The
+/// declaration describes semantic coverage only; it carries no executable,
+/// argv, target, Artifact or caller-controlled proof surface.
+public struct CatalogCompleteOverwriteRecoveryProfileDescriptor: Equatable, Sendable {
+  public let reference: String
+  public let coveredEffects: [String]
+
+  public init(reference: String, coveredEffects: [String]) {
+    self.reference = reference
+    self.coveredEffects = coveredEffects
+  }
+}
+
+public struct CatalogCompleteOverwriteRecoveryDescriptor: Equatable, Sendable {
+  public let contractVersion: String
+  public let profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor]
+  public let overwriteStepID: String
+  public let verificationStepIDs: [String]
+
+  public init(
+    contractVersion: String,
+    profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor],
+    overwriteStepID: String,
+    verificationStepIDs: [String]
+  ) {
+    self.contractVersion = contractVersion
+    self.profiles = profiles
+    self.overwriteStepID = overwriteStepID
+    self.verificationStepIDs = verificationStepIDs
+  }
+
+  public func profile(
+    reference: String
+  ) -> CatalogCompleteOverwriteRecoveryProfileDescriptor? {
+    profiles.first { $0.reference == reference }
+  }
+}
+
 public struct CatalogOperationDescriptor: Equatable, Sendable {
   public let id: String
   public let version: Int
@@ -187,6 +226,7 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
   public let preflightAttempts: Int
   public let artifacts: [CatalogArtifactDescriptor]
   public let profiles: [String]
+  public let completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor?
 
   public init(
     id: String,
@@ -206,7 +246,8 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
     outputByteBudget: Int,
     preflightAttempts: Int,
     artifacts: [CatalogArtifactDescriptor],
-    profiles: [String]
+    profiles: [String],
+    completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor? = nil
   ) {
     self.id = id
     self.version = version
@@ -226,6 +267,7 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
     self.preflightAttempts = preflightAttempts
     self.artifacts = artifacts
     self.profiles = profiles
+    self.completeOverwriteRecovery = completeOverwriteRecovery
   }
 
   /// Canonical `id@version` reference string.

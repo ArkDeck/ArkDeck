@@ -292,7 +292,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let status = try await engine.run(jobID: jobID)
-        return success(id: request.id, result: Self.encodeStatus(status))
+        // `recovered` is a durable Runtime terminal with richer lineage, but
+        // legacy one-shot runners know only the successful transport terminal
+        // `succeeded`. Evidence and subsequent status/list calls keep the
+        // exact `recovered` state; only this synchronous completion response
+        // uses the compatibility terminal so automation does not cancel a
+        // completed recovery Job.
+        let completionState =
+          status.state == JobState.recovered.rawValue
+          ? JobState.succeeded.rawValue : status.state
+        return success(
+          id: request.id,
+          result: Self.encodeStatus(status, stateOverride: completionState))
       } catch let error as RuntimeJobEngineError {
         return failure(id: request.id, code: .rejected, message: "\(error)")
       } catch {
@@ -301,7 +312,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
     case "job.list":
       let statuses = await engine.listJobs()
-      return success(id: request.id, result: .array(statuses.map(Self.encodeStatus)))
+      return success(id: request.id, result: .array(statuses.map { Self.encodeStatus($0) }))
 
     case "job.list-page":
       let pageSize: Int
@@ -327,7 +338,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return success(
           id: request.id,
           result: .object([
-            "jobs": .array(page.jobs.map(Self.encodeStatus)),
+            "jobs": .array(page.jobs.map { Self.encodeStatus($0) }),
             "nextCursor": page.nextCursor.map(JSONValue.string) ?? .null,
           ]))
       } catch {
@@ -1161,12 +1172,15 @@ public struct RuntimeControlPlaneHandler: Sendable {
     ])
   }
 
-  private static func encodeStatus(_ status: RuntimeJobStatus) -> JSONValue {
+  private static func encodeStatus(
+    _ status: RuntimeJobStatus,
+    stateOverride: String? = nil
+  ) -> JSONValue {
     .object([
       "jobId": .string(status.jobID),
       "operation": .string(status.operationReference),
       "targetId": .string(status.targetID),
-      "state": .string(status.state),
+      "state": .string(stateOverride ?? status.state),
       "waitingForHuman": .bool(status.waitingForHuman),
       "outcomeUnknown": .bool(status.outcomeUnknown),
       "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
@@ -1177,6 +1191,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "createdAtUtc": status.createdAtUTC.map(JSONValue.string) ?? .null,
       "startedAtUtc": status.startedAtUTC.map(JSONValue.string) ?? .null,
       "finishedAtUtc": status.finishedAtUTC.map(JSONValue.string) ?? .null,
+      "supersededByRecoveryEpochId": status.supersededByRecoveryEpochID
+        .map(JSONValue.string) ?? .null,
+      "recoveryEpochId": status.recoveryEpochID.map(JSONValue.string) ?? .null,
     ])
   }
 
@@ -1194,7 +1211,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     let effectLevel = snapshot.actualEffect.flatMap {
       ["hostOnly", "readOnly", "deviceMutation", "destructive"].contains($0) ? $0 : nil
     }
-    let authority: JSONValue
+    var authority: JSONValue
     if let value = snapshot.authority {
       var fields: [String: JSONValue] = [
         "kind": .string(value.kind.rawValue),
@@ -1254,6 +1271,46 @@ public struct RuntimeControlPlaneHandler: Sendable {
     } else {
       observation = .null
     }
+    let recoveryEpoch: JSONValue
+    if let value = snapshot.recoveryEpoch {
+      recoveryEpoch = .object([
+        "epochId": .string(value.epochID),
+        "source": .string(value.source.rawValue),
+        "stableTargetIdentitySha256": .string(value.stableTargetIdentitySHA256),
+        "bindingRevision": .integer(Int64(value.bindingRevision)),
+        "coveredIntents": .array(
+          value.coveredIntents.map { intent in
+            .object([
+              "jobId": .string(intent.jobID),
+              "intentEventId": .string(intent.intentEventID),
+              "operationReference": .string(intent.operationReference),
+              "profileReference": .string(intent.profileReference),
+              "observedAtUtc": .string(intent.observedAtUTC),
+              "possibleEffects": .array(intent.possibleEffects.map(JSONValue.string)),
+            ])
+          }),
+        "uncertainEffectSetSha256": .string(value.uncertainEffectSetSHA256),
+        "coverageContractVersion": .string(value.coverageContractVersion),
+        "coveredEffectSetSha256": .string(value.coveredEffectSetSHA256),
+        "recoveryJobId": .string(value.recoveryJobID),
+        "recoveryIntentEventId": .string(value.recoveryIntentEventID),
+        "operationReference": .string(value.operationReference),
+        "profileReference": .string(value.profileReference),
+        "materializedPlanDigestSha256": .string(value.materializedPlanDigestSHA256),
+        "artifactSha256": .string(value.artifactSHA256),
+        "providerExecutableSha256": .string(value.providerExecutableSHA256),
+        "confirmedStepIds": .array(value.confirmedStepIDs.map(JSONValue.string)),
+        "resultingTargetEpochSha256": .string(value.resultingTargetEpochSHA256),
+        "establishedAtUtc": .string(value.establishedAtUTC),
+        "epochSha256": .string(value.epochSHA256),
+      ])
+    } else {
+      recoveryEpoch = .null
+    }
+    if case .object(var fields) = authority {
+      fields["recoveryEpoch"] = recoveryEpoch
+      authority = .object(fields)
+    }
     return .object([
       "jobId": .string(snapshot.jobID),
       "operationReference": .string(snapshot.operationReference),
@@ -1271,6 +1328,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "startedAtUtc": optionalString(snapshot.startedAtUTC),
       "firstEvidenceStepAtUtc": optionalString(snapshot.firstEvidenceStepAtUTC),
       "finishedAtUtc": optionalString(snapshot.finishedAtUTC),
+      "recoveryEpoch": recoveryEpoch,
       "parameters": .object(snapshot.inputs ?? [:]),
       "artifacts": .array(
         artifacts.map { artifact in

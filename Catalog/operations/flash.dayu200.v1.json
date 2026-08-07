@@ -170,6 +170,46 @@
   "outputByteBudget": 134217728,
   "retry": { "preflightAttempts": 1, "mutationAttempts": 1 },
   "unknownOutcome": "reconcileRequired",
+  "completeOverwriteRecovery": {
+    "contractVersion": "1.0.0",
+    "profiles": [
+      {
+        "reference": "dayu200@1",
+        "coveredEffects": [
+          "partition:uboot",
+          "partition:boot_linux",
+          "partition:system",
+          "partition:vendor",
+          "partition:userdata",
+          "partition:resource",
+          "partition:ramdisk",
+          "partition:misc",
+          "partition:parameter"
+        ]
+      },
+      {
+        "reference": "dayu200@2",
+        "coveredEffects": [
+          "partition:uboot",
+          "partition:resource",
+          "partition:boot_linux",
+          "partition:ramdisk",
+          "partition:system",
+          "partition:vendor",
+          "partition:updater",
+          "partition:chip_ckm",
+          "partition:userdata"
+        ]
+      }
+    ],
+    "overwriteStepID": "flash-partitions",
+    "verificationStepIDs": [
+      "verify-flash-readback",
+      "reboot-device",
+      "wait-for-hdc",
+      "rebind-and-verify-build"
+    ]
+  },
   "artifacts": [
     { "name": "flash-report.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "post-flash-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "sensitive", "required": true },

@@ -125,6 +125,12 @@ enum JournalEventSemanticValidator {
     try event.noStepEnvelope()
     try event.payload.requireKeys(["from", "to", "reason"], optional: ["triggerEventId"])
     guard let transition = event.stateTransition else { throw payload(event, "invalid Job state") }
+    let recoveryStates: Set<JobState> = [.recoveringByCompleteOverwrite, .recovered]
+    if recoveryStates.contains(transition.from) || recoveryStates.contains(transition.to) {
+      guard event.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion else {
+        throw payload(event, "complete-overwrite recovery state requires schemaVersion 3.0.0")
+      }
+    }
     _ = try event.payload.requiredNonemptyString("reason", context: "stateTransition")
     try event.payload.validateNullableNonemptyString("triggerEventId", context: "stateTransition")
     let allowed =
@@ -442,8 +448,15 @@ enum JournalEventSemanticValidator {
     try event.noStepEnvelope()
     try event.payload.requireKeys(["terminalStatus", "manifestSha256", "outcomeCertainty"])
     let status = try event.payload.requiredString("terminalStatus", context: "finalized")
-    guard ["planned", "succeeded", "failed", "cancelled", "interrupted"].contains(status) else {
+    guard ["planned", "succeeded", "recovered", "failed", "cancelled", "interrupted"]
+      .contains(status)
+    else {
       throw payload(event, "invalid terminal status")
+    }
+    if status == JobState.recovered.rawValue,
+      event.schemaVersion != JournalEvent.completeOverwriteRecoverySchemaVersion
+    {
+      throw payload(event, "recovered terminal requires schemaVersion 3.0.0")
     }
     let hash = try event.payload.requiredString("manifestSha256", context: "finalized")
     guard hash.isLowercaseSHA256 else { throw payload(event, "invalid manifestSha256") }

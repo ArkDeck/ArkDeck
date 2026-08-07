@@ -35,54 +35,51 @@ Workflow SHALL 只组合批准的 typed step，例如 HDC/remote tool、send/rec
 
 ### Requirement: REQ-WF-004 Trusted Runtime facts and truthful hardware evidence
 
-Runtime SHALL 仅从同一 Job 的 durable admission/intent/outcome、trusted target/binding/tool
-facts 和已发布 Artifact metadata 推导 realHardware evidence。Agent `hostOnly`/`readOnly`
-run SHALL 记录 `defaultReadOnlyPolicy`；`deviceMutation`/`destructive` SHALL 记录
-`runtimeCapability`。destructive evidence reference SHALL 精确匹配首个 external intent 前由
-protected-main Runtime 生成并 durable reserve 的 capability use，并关联 operation/version、
-plan、target/binding、typed inputs、Artifact hashes、reservation/use ordinal 与 terminal
-disposition。
+Runtime SHALL 仅从 durable admission/intent/outcome/recovery lineage、trusted target/binding/
+tool facts 和已发布 immutable Artifact metadata 推导 realHardware evidence。Agent
+`hostOnly`/`readOnly` run SHALL 记录 `defaultReadOnlyPolicy`；`deviceMutation`/`destructive`
+SHALL 记录 `runtimeCapability`。destructive evidence SHALL 精确关联 operation/version、plan、
+target/binding、typed inputs、Artifact hashes、reservation/use ordinal 与 terminal disposition。
 
-Schema validation、evidence packaging、imported Manifest、caller assertion、UI confirmation、
-connected USB、历史 authority 或聊天消息 SHALL NOT mint、变更、扩大或追溯提供
-RuntimeCapability。新 writer SHALL NOT 写入 `standingAuthorization` 或
-`evolutionCampaignConfirmation`；历史 V1-V4 evidence 保持不可变、可 decode/export，但其
-authority reference SHALL NOT admit/reserve/dispatch 新 Step 或迁移成 capability。
+Superseding recovery evidence 还 SHALL 记录每个 covered unknown intent、conservative
+uncertain-effect-set digest、Provider coverage contract version、exact recovery plan、fresh
+identity/topology、每个 typed effect outcome、reboot/rebind/postflight 与 resulting target epoch。
+只有这些 trusted facts 完整时才可发布 `SupersedingRecoveryEpoch`。它 SHALL 明示原 outcome
+仍 unknown，且不得把原 Job 投影为 succeeded。
 
-缺失、stale、mismatched、unknown、caller-supplied 或非 durable trusted facts；effect/
-capability mismatch；未匹配 intent/outcome；non-terminal/unsafe predecessor；或不可验证
-Artifact hash SHALL 阻止 evidence publication。该 blocker SHALL NOT 把 Job 变为 success，
-也 SHALL NOT dispatch、retry、replay 或 recover device Step。Target identity 与 raw artifacts
-继续适用隐私和不可变规则。
+Schema validation、evidence packaging、Manifest、caller assertion、UI/chat confirmation、
+connected USB、历史 authority 或 terminal 文本 SHALL NOT mint capability、生成 coverage proof
+或追溯改变旧 outcome。已有后续 Flash history 只有在全部同 target、ordering、coverage、
+outcomes 与 postflight facts 可验证时 MAY 新增 supersession relation。
+
+缺失、stale、mismatched、unknown、caller-supplied 或非 durable trusted facts；未匹配
+intent/outcome；不可界定/覆盖 effect；或不可验证 Artifact hash SHALL 阻止 evidence
+publication 和 recovery dispatch。Target identity 与 raw artifacts 继续适用隐私和不可变规则。
 
 #### Scenario: AC-WF-004-01 Agent evidence facts complete
 
-- GIVEN Agent 完成真实 read-only、deviceMutation 或 destructive typed run，且同一 Job 有
-  完整 trusted admission、fresh target/binding/tool facts、durable Step outcomes、reservation
-  lineage 和 immutable Artifact metadata
+- GIVEN Agent 完成真实 typed run 或 complete-overwrite recovery，且 trusted admission、fresh
+  target/tool facts、durable outcomes、lineage 和 Artifact metadata 完整
 - WHEN Runtime projects hardware evidence
-- THEN record 包含实际 executor/effect/Step kinds、匹配的 `defaultReadOnlyPolicy` 或
-  `runtimeCapability` provenance、target confirmation、plan/use correlation 和 Artifact hashes
-- AND record 通过 schema 与 semantic validation，且不 mint capability
+- THEN record 包含实际 executor/effect/Steps、匹配 policy provenance、target/plan/use/Artifact
+  correlation，并在 recovery 时包含 effect-set/coverage/supersession/postflight facts
+- AND record 通过 schema/semantic validation，但不 mint capability 或重写旧 outcome
 
 #### Scenario: AC-WF-004-02 Required evidence facts are untrusted or incomplete
 
-- GIVEN Agent run 缺少 required trusted fact、target/binding stale 或 mismatch、capability/effect
-  mismatch、intent/outcome/lineage 不完整，或 Artifact hash 不可验证
-- WHEN Runtime 被请求发布 hardware evidence
-- THEN Runtime 返回 `evidenceIncomplete`，schema-valid realHardware publication 为 0
-- AND caller fields、historical receipt、UI/human text 或 legacy authority 不能使 run PASS 或
-  authorize/replay device Step
+- GIVEN run/recovery 缺少 required trusted fact、identity、coverage、outcome、lineage 或 hash
+- WHEN Runtime 被请求发布 evidence 或 supersession relation
+- THEN schema-valid publication 与 recovery dispatch 均为 0，并报告精确 blocker
+- AND caller、UI/chat、historical receipt 或 terminal text 不能使 run PASS
 
 #### Scenario: AC-WF-004-03 Legacy E2 evidence cannot substitute for Runtime admission
 
-- GIVEN 新 destructive Agent Job 或 V5 evidence 声称 `standingAuthorization` 或
-  `evolutionCampaignConfirmation`，或尝试从历史 authority/evidence 迁移 RuntimeCapability
+- GIVEN 新 destructive run/recovery 声称 legacy authority，或尝试迁移 authority/evidence
 - WHEN Runtime validates admission or projects the Job
-- THEN 新 dispatch 与 V5 evidence publication 均为 0，并如实报告 legacy-authority blocker
-- AND 历史 bytes 仅可 decode/export，不发生 capability minting、reservation、migration 或 replay
+- THEN 新 dispatch、capability mint 与 supersession publication 均为 0
+- AND 历史 bytes 仅可 decode/export，不发生 migration 或 replay
 
-### Requirement: REQ-JOB-001 Distinct Job terminal states
+### Requirement: REQ-JOB-001 Distinct recovery and terminal semantics
 
 Job SHALL 使用以下 Core transition graph；未列出的 transition SHALL fail closed 并记录 invariant violation。平台 SHALL NOT 新增绕过确认、recovery 或 cancellation 的状态路径。
 
@@ -98,10 +95,16 @@ execute:
   any cancellable execute nonterminal → cancelRequested
                                       → cancellingAtSafeBoundary → cancelled
 
-  waitingForRecovery --explicit reconcile/recovery request--> reconciling
+  waitingForRecovery --explicit reconcile request--> reconciling
   reconciling ├→ resumeAtConfirmedSafeBoundary → running
               ├→ finalizing → failed
               └→ waitingForRecovery
+  waitingForRecovery | reconciling
+    --automatic trusted complete-overwrite proof--> recoveringByCompleteOverwrite
+  recoveringByCompleteOverwrite
+              ├--all effects + reboot/rebind/postflight confirmed--> finalizing → recovered
+              ├--outcome/effect becomes unknown--> waitingForRecovery
+              └--confirmed failure with target state known--> finalizing → failed
   resumeAtConfirmedSafeBoundary
               ├--confirmed failure--> finalizing → failed
               └--external outcome/identity unknown--> waitingForRecovery
@@ -124,13 +127,23 @@ launch recovery:
                       └--external outcome/identity unknown--> waitingForRecovery
 ```
 
-`confirmed failure` SHALL 表示 failure、设备身份及其外部副作用结果均已确定；只要设备身份或任一 external-effect outcome 仍未知，系统 SHALL 进入或保持 `waitingForRecovery`，不得用 `failed` 掩盖未知结果。`waitingForRecovery` 只能通过显式的 Provider recovery/reconcile 请求进入 `reconciling`，或者通过经审计的用户放弃进入 `userAbandonRequested`。只有 Provider 声明 restart-safe、安全边界已确认、最后 outcome 确定且设备 binding 已确认时，`reconciling` 才能进入 `resumeAtConfirmedSafeBoundary`；能确定失败且无需猜测副作用时才能进入 `finalizing → failed`。否则 SHALL 回到 `waitingForRecovery`。
+`confirmed failure` SHALL 表示 failure、设备身份及其外部副作用结果均已确定；只要设备身份或任一 external-effect outcome 仍未知，系统 SHALL 进入或保持 `waitingForRecovery`，不得用 `failed` 掩盖未知结果。`waitingForRecovery` 可通过显式 Provider reconcile 进入 `reconciling`、通过经审计的用户放弃进入 `userAbandonRequested`，或在 Runtime 已 durable 完成 autonomous trusted proof 后进入 `recoveringByCompleteOverwrite`。只有 Provider 声明 restart-safe、安全边界已确认、最后 outcome 确定且设备 binding 已确认时，`reconciling` 才能进入 `resumeAtConfirmedSafeBoundary`；能确定失败且无需猜测副作用时才能进入 `finalizing → failed`。否则 SHALL 回到 `waitingForRecovery`。
+
+进入 `recoveringByCompleteOverwrite` 前，Runtime SHALL durable 记录 conservative effect set、
+reviewed Provider coverage contract、fresh identity/binding/topology、immutable Artifact、new
+capability reservation 与 recovery intent。该状态只能 dispatch proof 中声明的 recovery
+Steps。只有全部 effects 与 reboot/rebind/runtime-build postflight confirmed 后，才可经
+`finalizing` 进入 `recovered` 并写 `SupersedingRecoveryEpoch`。`recovered` 是与 `succeeded`、
+`failed`、`cancelled`、`interrupted` 不同的 terminal disposition；它只声明当前 target epoch
+已知，不修改原 unknown outcome，也不声明原 Job succeeded。History/UI/Manifest/export SHALL
+显示原始 unknown intent 与恢复 linkage。若已有 durable 后续 Flash 满足完整 proof，
+Reconciler MAY 以零 device dispatch 建立 relation。
 
 `resumeAtConfirmedSafeBoundary` SHALL 是恢复控制标记而非普通 Workflow Step 派发阶段。Job SHALL 先转移到 `running` 或 `planning` 才能派发普通 Step。若在该转移前发现 confirmed failure，Job SHALL 直接进入 `finalizing → failed`；若设备身份或任一 external-effect outcome 未知，Job SHALL 直接进入 `waitingForRecovery`。这两个分支 SHALL NOT 先伪造 `running` 或 `planning` 状态，且在 marker 状态的普通 Step 派发数 SHALL 为 0。未知 Step SHALL NOT 被派发、重放或猜测性补偿。
 
 Journal transition-pair contract SHALL 同时允许 `resumeAtConfirmedSafeBoundary → finalizing` 与 `resumeAtConfirmedSafeBoundary → waitingForRecovery`。Pair membership 不构成语义授权：semantic validator SHALL 仅在 failure、identity 与全部 external-effect outcome confirmed 时接受前一 pair，仅在 identity 或至少一个 external-effect outcome unknown 时接受后一 pair；evidence 与 pair 不匹配时 SHALL 拒绝并记录 invariant violation。
 
-`cancellable nonterminal` SHALL 排除 `waitingForRecovery`、`userAbandonRequested`、`reconciling` 和 `finalizing`。执行 `criticalNonInterruptible` Step 时，取消请求仍 SHALL durable 记录并进入 `cancellingAtSafeBoundary`，该状态表示等待 Provider 报告安全边界，而不是强杀当前进程；到达安全边界后才进入 `cancelled`。`planned`、`succeeded`、`failed`、`cancelled` 和 `interrupted` SHALL 是不同终态。终态 Job SHALL NOT 接受新的 external-effect Step。UI、manifest、History 和导出 SHALL NOT 把这些状态折叠为同一个“完成”。
+`cancellable nonterminal` SHALL 排除 `waitingForRecovery`、`userAbandonRequested`、`reconciling` 和 `finalizing`。执行 `criticalNonInterruptible` Step 时，取消请求仍 SHALL durable 记录并进入 `cancellingAtSafeBoundary`，该状态表示等待 Provider 报告安全边界，而不是强杀当前进程；到达安全边界后才进入 `cancelled`。`planned`、`succeeded`、`recovered`、`failed`、`cancelled` 和 `interrupted` SHALL 是不同终态。终态 Job SHALL NOT 接受新的 external-effect Step。UI、manifest、History 和导出 SHALL NOT 把这些状态折叠为同一个“完成”。
 
 #### Scenario: AC-JOB-001-01 Planned 不是刷机成功
 
@@ -141,16 +154,16 @@ Journal transition-pair contract SHALL 同时允许 `resumeAtConfirmedSafeBounda
 
 #### Scenario: AC-JOB-001-02 非法终态迁移
 
-- GIVEN Job 已处于 succeeded、planned、failed、cancelled 或 interrupted
+- GIVEN Job 已处于 succeeded、recovered、planned、failed、cancelled 或 interrupted
 - WHEN任何组件请求迁移回 running 或派发 external-effect Step
 - THEN请求被拒绝并记录 invariant violation
 
-#### Scenario: AC-JOB-001-03 Recovery 不得绕过确认
+#### Scenario: AC-JOB-001-03 Recovery does not replay an unknown Step
 
-- GIVEN启动时发现没有 outcome 的 destructive intent
+- GIVEN 启动时发现没有 outcome 的 destructive intent
 - WHEN Reconciler 运行
-- THEN允许的路径只有 waitingForRecovery
-- AND不得直接迁移到 running/succeeded 或重放该 Step
+- THEN 原 Step dispatch 数为 0，原 outcome 保持 unknown
+- AND 只有完整 proof 可进入 distinct complete-overwrite recovery，否则保持 waitingForRecovery
 
 #### Scenario: AC-JOB-001-04 Execute preflight 确定失败
 
@@ -159,13 +172,12 @@ Journal transition-pair contract SHALL 同时允许 `resumeAtConfirmedSafeBounda
 - THEN路径为 preflight → finalizing → failed
 - AND该 Job 不会永久停留在非终态
 
-#### Scenario: AC-JOB-001-05 Waiting recovery 的受控恢复
+#### Scenario: AC-JOB-001-05 Waiting recovery has an autonomous proven branch
 
-- GIVEN Job 因设备身份或外部 outcome 未知而处于 waitingForRecovery
-- WHEN用户发起 Provider recovery/reconcile
-- THEN下一状态只能是 reconciling
-- AND只有 restart-safe、安全边界、确定 outcome 和已确认 binding 全部成立时才能经 resumeAtConfirmedSafeBoundary 回到 running
-- AND任一条件不成立时回到 waitingForRecovery，且不派发未知 Step
+- GIVEN Job 因 external outcome unknown 而处于 waitingForRecovery，stable identity 已确认
+- WHEN Runtime 计算 conservative effect union 与 Provider coverage
+- THEN proof 完整时无需用户请求即可进入 recoveringByCompleteOverwrite
+- AND proof 缺失时仍处于 waitingForRecovery、dispatch 为 0，并报告不可 override blocker
 
 #### Scenario: AC-JOB-001-06 普通步骤取消
 
@@ -231,16 +243,25 @@ Journal transition-pair contract SHALL 同时允许 `resumeAtConfirmedSafeBounda
 - THEN字符按单个 argv 传递
 - AND没有 shell expansion
 
-### Requirement: REQ-JOB-006 Crash reconciliation never guesses
+### Requirement: REQ-JOB-006 Crash reconciliation never guesses or blindly replays
 
-启动并取得单实例锁后，系统 SHALL 扫描未 finalize Session。只有 Provider 声明 restartSafe、最后 outcome 确定且设备匹配时 MAY 从安全边界恢复。只有 intent 没有 outcome SHALL 标记 `outcomeUnknown`；destructive step SHALL NOT 自动重放或猜测性补偿。
+启动并取得单实例锁后，系统 SHALL 扫描未 finalize Session。只有 Provider 声明 restartSafe、
+最后 outcome 确定且设备匹配时 MAY 从普通安全边界恢复。只有 intent 没有 outcome SHALL 标记
+`outcomeUnknown`；该 destructive Step SHALL NOT 重放或猜测性补偿。
+
+对 identity 已知的 unknown destructive intent，Reconciler SHALL 自动评估 exact published
+Provider 的 complete-overwrite supersession contract。只有 durable old intent 足以界定 effect
+union，且 fresh target/topology、Artifact、coverage、verification 和 budget 全部成立时，才
+MAY 创建 distinct recovery capability/reservation/intent。既有 durable 后续 Flash 也只有在
+完整 proof 下可零 dispatch 建立 supersession relation。否则保持 waitingForRecovery，且用户
+确认不能改变结果。
 
 #### Scenario: AC-JOB-006-01 Flash outcome 缺失
 
-- GIVEN App 在 flash intent durable 后、outcome 前崩溃
-- WHEN重启 reconcile
-- THEN Job 进入 waitingForRecovery/outcomeUnknown
-- AND flash dispatch 数不增加
+- GIVEN App 在 Flash intent durable 后、outcome 前崩溃
+- WHEN 重启 reconcile
+- THEN 原 Flash dispatch 数不增加，原 intent 标记 outcomeUnknown
+- AND 完整 supersession proof 成立时自动运行 distinct recovery；不成立时零 dispatch 并报告 blocker
 
 ### Requirement: REQ-JOB-007 Audited recovery abandonment
 

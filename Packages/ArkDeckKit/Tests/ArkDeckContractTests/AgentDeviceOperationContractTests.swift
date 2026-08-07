@@ -105,10 +105,18 @@ final class AgentDeviceOperationContractTests: XCTestCase {
     }
 
     let facts = try schemaFacts(agent: agent, human: human)
-    XCTAssertEqual(facts.jobStates, Set(JobState.allCases.map(\.rawValue)))
+    let recoveryStates: Set<String> = [
+      JobState.recoveringByCompleteOverwrite.rawValue,
+      JobState.recovered.rawValue,
+    ]
+    XCTAssertEqual(
+      facts.jobStates,
+      Set(JobState.allCases.map(\.rawValue)).subtracting(recoveryStates))
     XCTAssertEqual(
       facts.terminalJobStates,
-      Set(JobState.allCases.filter(\.isTerminal).map(\.rawValue)))
+      Set(JobState.allCases.filter(\.isTerminal).map(\.rawValue)).subtracting(recoveryStates))
+    XCTAssertEqual(JobState.schemaVersion, "2.0.0")
+    XCTAssertTrue(facts.jobStates.isDisjoint(with: recoveryStates))
     XCTAssertEqual(facts.operationIDs.count, 15)
     XCTAssertEqual(facts.humanCategories.count, 8)
     XCTAssertEqual(facts.prohibitedAutomation.count, 9)

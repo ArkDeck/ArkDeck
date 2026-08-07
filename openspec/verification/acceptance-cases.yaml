@@ -67,7 +67,7 @@ cases:
   - { acceptance_id: AC-FLASH-013-01, test_id: TEST-AC-FLASH-013-01, method: recoveryFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-013-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-014-01, test_id: TEST-AC-FLASH-014-01, method: realHardwareMatrix, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-014-01, minimum_evidence: realHardware, hardware_capability: flash }
   - { acceptance_id: AC-FLASH-015-01, test_id: TEST-AC-FLASH-015-01, method: agentExecutionPolicyContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-01, minimum_evidence: contract }
-  - { acceptance_id: AC-FLASH-015-02, test_id: TEST-AC-FLASH-015-02, method: safeReflashLineageContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-02, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-015-02, test_id: TEST-AC-FLASH-015-02, method: completeOverwriteRecoveryLineageContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-02, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-015-03, test_id: TEST-AC-FLASH-015-03, method: runtimeOwnedCapabilityContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-015-03, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-016-01, test_id: TEST-AC-FLASH-016-01, method: unknownBuildImportContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-016-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-016-02, test_id: TEST-AC-FLASH-016-02, method: archiveDerivationFailureContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-016-02, minimum_evidence: contract }
@@ -97,14 +97,14 @@ cases:
   - { acceptance_id: AC-JOB-001-02, test_id: TEST-AC-JOB-001-02, method: stateMachineProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-02, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-001-03, test_id: TEST-AC-JOB-001-03, method: recoveryFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-03, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-001-04, test_id: TEST-AC-JOB-001-04, method: stateMachineProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-04, minimum_evidence: contract }
-  - { acceptance_id: AC-JOB-001-05, test_id: TEST-AC-JOB-001-05, method: recoveryFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-05, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-001-05, test_id: TEST-AC-JOB-001-05, method: autonomousCompleteOverwriteRecoveryContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-05, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-001-06, test_id: TEST-AC-JOB-001-06, method: cancellationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-06, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-001-07, test_id: TEST-AC-JOB-001-07, method: recoveryDecisionJournalStateMachineContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-001-07, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-002-01, test_id: TEST-AC-JOB-002-01, method: journalFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-002-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-003-01, test_id: TEST-AC-JOB-003-01, method: criticalCancellationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-003-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-004-01, test_id: TEST-AC-JOB-004-01, method: compensationFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-004-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-005-01, test_id: TEST-AC-JOB-005-01, method: processContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-005-01, minimum_evidence: contract }
-  - { acceptance_id: AC-JOB-006-01, test_id: TEST-AC-JOB-006-01, method: crashWindowFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-006-01, minimum_evidence: contract }
+  - { acceptance_id: AC-JOB-006-01, test_id: TEST-AC-JOB-006-01, method: crashAndCompleteOverwriteRecoveryFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-006-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-007-01, test_id: TEST-AC-JOB-007-01, method: abandonJournalFaultInjection, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-007-01, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-007-02, test_id: TEST-AC-JOB-007-02, method: hazardGateContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-007-02, minimum_evidence: contract }
   - { acceptance_id: AC-JOB-008-01, test_id: TEST-AC-JOB-008-01, method: platformInstanceContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-JOB-008-01, minimum_evidence: platform }
@@ -141,6 +141,6 @@ cases:
 
   - { acceptance_id: AC-WF-001-01, test_id: TEST-AC-WF-001-01, method: workflowSchemaContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-001-01, minimum_evidence: contract }
   - { acceptance_id: AC-WF-002-01, test_id: TEST-AC-WF-002-01, method: effectLatticeProperty, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-002-01, minimum_evidence: contract }
-  - { acceptance_id: AC-WF-004-01, test_id: TEST-AC-WF-004-01, method: hardwareEvidenceProjectionContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-01, minimum_evidence: contract }
+  - { acceptance_id: AC-WF-004-01, test_id: TEST-AC-WF-004-01, method: hardwareEvidenceV6RecoveryProjectionContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-01, minimum_evidence: contract }
   - { acceptance_id: AC-WF-004-02, test_id: TEST-AC-WF-004-02, method: hardwareEvidenceFailClosedContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-02, minimum_evidence: contract }
   - { acceptance_id: AC-WF-004-03, test_id: TEST-AC-WF-004-03, method: hardwareEvidenceAuthoritySeparationContract, expected_source: openspec/specs/workflow-journal-recovery/spec.md#AC-WF-004-03, minimum_evidence: contract }
