@@ -14,25 +14,25 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
   private let provider = RockchipRockUSBFlashProvider()
   private let timestamp = "2026-07-21T08:00:00Z"
 
-  // MARK: - Profile pin (RF-001 part 1 contract, drift guard)
+  // MARK: - Single profile seed pin (drift guard)
 
-  func testProfilePinsTaskRF001PartOneContract() {
+  func testProfilePinsCurrentDAYU200SeedArchive() {
     let profile = RockchipFlashProfile.dayu200
-    XCTAssertEqual(profile.archiveSizeBytes, 732_948_803)
+    XCTAssertEqual(profile.archiveSizeBytes, 730_769_584)
     XCTAssertEqual(
       profile.archiveSHA256,
-      "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280")
+      "6a023c738ac585b8a6f537c99f2ab2df95a5359fd6d4dd33150fad62e71f064e")
     XCTAssertEqual(profile.members.count, 17)
     XCTAssertEqual(
       profile.member(named: "system.img")?.sha256,
-      "aef65124a814fcce8345dbfbdf049aaa862bd76786d099095c6951b4561ba1bb")
+      "86357e57a183278e1662d55c2d560a35e8e685613bd270f62df42bdf783f0650")
     XCTAssertEqual(profile.member(named: "system.img")?.sizeBytes, 2_147_483_648)
     XCTAssertEqual(
       profile.member(named: "uboot.img")?.sha256,
       "c1c801e45cbb92ee63e14df3dda5d819792e02295525bd53dbf750efb645916d")
     XCTAssertEqual(
       profile.member(named: "userdata.img")?.sha256,
-      "715e7998ebd47653a0ec2e062964224684762ab8686330c6b69b8d5f1f55886c")
+      "ea60e842586208b660b72ae4b507a1f4cabb397e912156f342f30f21907e1255")
 
     XCTAssertEqual(
       profile.mappedPartitions.map(\.partitionName),

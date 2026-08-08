@@ -845,7 +845,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
   @Published private(set) var activeJobID: String?
   @Published private(set) var isRefreshingDeviceAccess = false
   @Published private(set) var profileReference =
-    FlashApplicationFacade.profileReferences.last ?? "dayu200@1"
+    FlashApplicationFacade.profileReferences.last ?? "dayu200"
 
   private let provider: any FlashApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
@@ -1143,7 +1143,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
         self.submission = terminal
         let detail = await detailProvider.loadJobDetail(
           jobID: terminal.jobID,
-          operationReference: "flash.dayu200@1")
+          operationReference: "flash.dayu200")
         guard self.selectedArchiveURL == archiveURL,
           self.plan == executionPlan,
           !Task.isCancelled

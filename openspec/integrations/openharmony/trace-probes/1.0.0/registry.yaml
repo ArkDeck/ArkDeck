@@ -29,7 +29,7 @@
   "capabilityMatrix": [
     {
       "tool": "hitrace",
-      "family": "hitrace.dayu200-oh7.text-v1",
+      "family": "hitrace.dayu200-oh7.text",
       "help": "registered",
       "tagList": "registered",
       "minimalCapture": "registered",
@@ -46,7 +46,7 @@
     },
     {
       "tool": "bytrace",
-      "family": "bytrace.dayu200-oh7.text-v1",
+      "family": "bytrace.dayu200-oh7.text",
       "help": "registered",
       "tagList": "registered",
       "minimalCapture": "unregistered",

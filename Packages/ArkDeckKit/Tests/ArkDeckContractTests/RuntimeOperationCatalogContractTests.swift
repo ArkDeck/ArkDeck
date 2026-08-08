@@ -59,7 +59,7 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
         "port-forward.remove@1/read-evidence-firmware": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
-        "flash.dayu200@1/capture-post-flash-diagnostics": CatalogActionReference(
+        "flash.dayu200/capture-post-flash-diagnostics": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
       ])
   }
@@ -75,9 +75,9 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
 }
 
 final class CompleteOverwriteRecoveryCatalogContractTests: XCTestCase {
-  func testDAYU200ProfilesPublishExactClosedRecoveryCoverage() throws {
+  func testDAYU200ProfilePublishesExactClosedRecoveryCoverage() throws {
     let operation = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let recovery = try XCTUnwrap(operation.completeOverwriteRecovery)
     XCTAssertEqual(recovery.contractVersion, "1.0.0")
     XCTAssertEqual(recovery.overwriteStepID, "flash-partitions")
@@ -88,20 +88,14 @@ final class CompleteOverwriteRecoveryCatalogContractTests: XCTestCase {
         "rebind-and-verify-build",
       ])
     XCTAssertEqual(
-      recovery.profile(reference: "dayu200@1")?.coveredEffects,
-      [
-        "partition:uboot", "partition:boot_linux", "partition:system",
-        "partition:vendor", "partition:userdata", "partition:resource",
-        "partition:ramdisk", "partition:misc", "partition:parameter",
-      ])
-    XCTAssertEqual(
-      recovery.profile(reference: "dayu200@2")?.coveredEffects,
+      recovery.profile(reference: "dayu200")?.coveredEffects,
       [
         "partition:uboot", "partition:resource", "partition:boot_linux",
         "partition:ramdisk", "partition:system", "partition:vendor",
         "partition:updater", "partition:chip_ckm", "partition:userdata",
       ])
-    XCTAssertNil(recovery.profile(reference: "dayu200@3"))
+    XCTAssertNil(recovery.profile(reference: "dayu200@1"))
+    XCTAssertNil(recovery.profile(reference: "dayu200@2"))
     XCTAssertEqual(
       operation.steps.first(where: { $0.stepID == recovery.overwriteStepID })?.effect,
       .destructive)

@@ -301,9 +301,9 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
 
   /// Without a prober the durable adoption record is all this port has, and
   /// it cannot support any of these three: they stay unknown rather than
-  /// fabricated. The previous "hdc"/"dayu200@1" literals were adoption-era
+  /// fabricated. The previous "hdc"/"dayu200" literals were adoption-era
   /// guesses that flowed into evidence as if measured, and the real firmware
-  /// profile (dayu200@2) contradicted one of them.
+  /// profile (dayu200) contradicted one of them.
   ///
   /// With a prober they are measured read-only. A probe failure — including a
   /// device that is simply not attached — is encoded as `absent`, not thrown:
@@ -331,9 +331,8 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
     // actually authorizes a write.
     let profileID =
       observation.buildFingerprint.flatMap { fingerprint in
-        RockchipFlashProfile.supportedDAYU200Profiles.first {
-          $0.firmwareVersion == fingerprint
-        }?.catalogReference
+        RockchipFlashProfile.dayu200.firmwareVersion == fingerprint
+          ? RockchipFlashProfile.dayu200.catalogReference : nil
       } ?? "unknown"
     return (observation.deviceMode, observation.buildFingerprint, profileID)
   }

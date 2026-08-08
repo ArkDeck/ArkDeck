@@ -103,7 +103,7 @@ struct FlashBundleImportPolicy: Sendable {
   static let production: FlashBundleImportPolicy = {
     FlashBundleImportPolicy(candidates: [
       Candidate(expectedByteCount: nil, expectedSHA256: nil) { url in
-        let board = RockchipFlashProfile.dayu200OpenHarmony70035
+        let board = RockchipFlashProfile.dayu200
         let summary: GzipTarArchiveSummary
         do {
           summary = try GzipTarArchiveReader.summarize(

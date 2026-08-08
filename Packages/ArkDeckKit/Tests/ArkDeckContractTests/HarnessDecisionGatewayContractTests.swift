@@ -375,7 +375,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HarnessDecisionProposal.parse(
         encodeProposal([
-          "kind": .string("invokeOperation"), "operationRef": .string("flash.dayu200@1"),
+          "kind": .string("invokeOperation"), "operationRef": .string("flash.dayu200"),
           "hypothesis": .string("reflash it"),
         ]), offeredOperations: offered)
     ) {
@@ -384,7 +384,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
       guard case .operationNotOffered(let reference, let alternatives)? =
         $0 as? HarnessDecisionRejection
       else { return XCTFail("expected operationNotOffered, got \($0)") }
-      XCTAssertEqual(reference, "flash.dayu200@1")
+      XCTAssertEqual(reference, "flash.dayu200")
       XCTAssertEqual(Set(alternatives), offered)
       XCTAssertTrue(
         ($0 as? HarnessDecisionRejection)?.reasonCode.contains("offered=") == true,

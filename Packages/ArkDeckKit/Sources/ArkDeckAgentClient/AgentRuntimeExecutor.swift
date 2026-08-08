@@ -76,7 +76,7 @@ public enum RuntimeAgentExecutorError: Error, Equatable, Sendable {
 
 public struct RuntimeAgentExecutionRequest: Codable, Sendable, Equatable {
   public let operationID: String
-  public let operationVersion: Int
+  public let operationVersion: Int?
   public let inputs: [String: JSONValue]
   public let capabilityReference: String?
   public let targetID: String?
@@ -88,7 +88,7 @@ public struct RuntimeAgentExecutionRequest: Codable, Sendable, Equatable {
 
   public init(
     operationID: String,
-    operationVersion: Int,
+    operationVersion: Int? = nil,
     inputs: [String: JSONValue] = [:],
     capabilityReference: String? = nil,
     targetID: String? = nil,
@@ -104,7 +104,7 @@ public struct RuntimeAgentExecutionRequest: Codable, Sendable, Equatable {
     self.executionID = executionID
   }
 
-  var reference: String { "\(operationID)@\(operationVersion)" }
+  var reference: String { operationVersion.map { "\(operationID)@\($0)" } ?? operationID }
 }
 
 public struct AgentRuntimeExecutor: Sendable {
@@ -332,6 +332,10 @@ public struct AgentRuntimeExecutor: Sendable {
       }
     }
 
+    var operation: [String: JSONValue] = ["id": .string(request.operationID)]
+    if let version = request.operationVersion {
+      operation["version"] = .integer(Int64(version))
+    }
     var payload: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),
       "schemaVersion": .string("2.0.0"),
@@ -341,10 +345,7 @@ public struct AgentRuntimeExecutor: Sendable {
         "targetId": .string(target.targetID),
         "expectedBindingRevision": .integer(Int64(target.bindingRevision)),
       ]),
-      "operation": .object([
-        "id": .string(request.operationID),
-        "version": .integer(Int64(request.operationVersion)),
-      ]),
+      "operation": .object(operation),
     ]
     if !request.inputs.isEmpty { payload["inputs"] = .object(request.inputs) }
     if let capability = request.capabilityReference {

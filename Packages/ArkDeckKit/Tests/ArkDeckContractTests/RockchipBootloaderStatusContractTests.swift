@@ -43,7 +43,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
   }
 
   func testRuntimeOnboardsUniqueLoaderAndAdvancesOnlySelectedAdjacentTarget() throws {
-    let fixture = try makeLegacyFixture()
+    let fixture = try makeCurrentFixture()
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
@@ -84,7 +84,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
   }
 
   func testLostBindingResponseCanRetryTheSameOldRevisionIdempotently() throws {
-    let fixture = try makeLegacyFixture()
+    let fixture = try makeCurrentFixture()
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
@@ -101,7 +101,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     XCTAssertEqual(retry.selectionEvidenceSHA256, first.selectionEvidenceSHA256)
   }
 
-  func testRuntimeReattestsHistoricalBindingWhenSelectedTargetIsAlreadyTheLiveLoader() throws {
+  func testHistoricalSameRevisionBindingIsRejectedWithoutRewrite() throws {
     let fixture = try makeSameLoaderLegacyFixture()
     let statusBefore = try observer(
       targets: fixture.targets,
@@ -117,60 +117,31 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         targetID: fixture.target.targetID,
         bindingRevision: 2))
 
+    let originalBinding = try fixture.bindings.loadExisting()
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
       bindingStore: fixture.bindings,
       usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.loader] }))
-    let receipt = try coordinator.bindCurrentLoader(
-      targetID: fixture.target.targetID,
-      expectedBindingRevision: fixture.target.bindingRevision)
-
-    XCTAssertTrue(receipt.updated)
-    XCTAssertEqual(receipt.previousRevision, 2)
-    XCTAssertEqual(receipt.currentRevision, 2)
-    XCTAssertEqual(receipt.selectionEvidenceSHA256.count, 64)
-    let unchangedTarget = try XCTUnwrap(
-      fixture.targets.find(targetID: fixture.target.targetID))
-    XCTAssertEqual(unchangedTarget, fixture.target)
-
-    let stored = try fixture.bindings.loadExisting()
-    XCTAssertEqual(stored.revision, 2)
-    XCTAssertEqual(stored.serial, fixture.loader.serial)
-    XCTAssertFalse(
-      stored.evidence.contains { $0.hasPrefix("rebind:chat-confirmation-sha256=") })
-    XCTAssertTrue(
-      stored.evidence.contains(
-        "rebind:user-selection-sha256=\(receipt.selectionEvidenceSHA256)"))
+    XCTAssertThrowsError(
+      try coordinator.bindCurrentLoader(
+        targetID: fixture.target.targetID,
+        expectedBindingRevision: fixture.target.bindingRevision))
+    XCTAssertEqual(try fixture.bindings.loadExisting(), originalBinding)
     XCTAssertEqual(
-      try stored.confirmedHDCNormalAlias()?.identitySHA256,
-      digest(fixture.hdcSerial))
-    let lineage = try XCTUnwrap(stored.runtimeTargetLineageAdvance())
-    XCTAssertEqual(lineage.previousRevision, 1)
-    XCTAssertEqual(lineage.currentRevision, 2)
-    XCTAssertEqual(
-      lineage.currentStableIdentitySHA256,
-      digest(fixture.loader.serial))
+      try fixture.targets.find(targetID: fixture.target.targetID), fixture.target)
 
     let statusAfter = try observer(
       targets: fixture.targets,
       bindings: fixture.bindings,
       identities: [fixture.loader]
     ).observeBootloaderStatus()
-    XCTAssertEqual(statusAfter.disposition, .exactBoundTarget)
+    XCTAssertEqual(statusAfter.disposition, .targetBindingUnprepared)
     XCTAssertEqual(statusAfter.targetID, fixture.target.targetID)
     XCTAssertEqual(statusAfter.bindingRevision, 2)
-
-    let retry = try coordinator.bindCurrentLoader(
-      targetID: fixture.target.targetID,
-      expectedBindingRevision: fixture.target.bindingRevision)
-    XCTAssertFalse(retry.updated)
-    XCTAssertEqual(retry.previousRevision, 2)
-    XCTAssertEqual(retry.currentRevision, 2)
-    XCTAssertEqual(retry.selectionEvidenceSHA256, receipt.selectionEvidenceSHA256)
   }
 
   func testAmbiguousLoaderRefusesBeforeChangingBindingOrTarget() throws {
-    let fixture = try makeLegacyFixture()
+    let fixture = try makeCurrentFixture()
     let another = loaderIdentity(serial: "loader-another", topology: "19791872")
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: fixture.targets,
@@ -199,7 +170,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       usbProbe: RockchipProductUSBProbe(identitySource: { identities }))
   }
 
-  private func makeLegacyFixture() throws -> (
+  private func makeCurrentFixture() throws -> (
     targets: RuntimeTargetStore,
     bindings: RockchipProductBindingStore,
     target: RuntimeTargetRecord,
@@ -232,10 +203,12 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         evidence: [
           "product:e0-iokit-single-loader-readback",
           "identity:serial-sha256=\(oldLoaderDigest)",
-          "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
           "identity:previous-serial-sha256=\(digest(hdcSerial))",
           "binding:previous-revision=1",
           "binding:previous-usb-topology=16777216",
+          "identity:hdc-normal-alias-sha256=\(digest(hdcSerial))",
+          "binding:hdc-normal-alias-usb-topology=16777216",
+          "rebind:user-selection-sha256=\(String(repeating: "c", count: 64))",
         ]))
     return (targets, bindings, advanced, currentLoader)
   }
@@ -244,8 +217,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     targets: RuntimeTargetStore,
     bindings: RockchipProductBindingStore,
     target: RuntimeTargetRecord,
-    loader: RockchipProductUSBIdentity,
-    hdcSerial: String
+    loader: RockchipProductUSBIdentity
   ) {
     let targets = try RuntimeTargetStore(
       directoryURL: root.appendingPathComponent("targets-same-loader", isDirectory: true))
@@ -278,7 +250,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
           "binding:previous-revision=1",
           "binding:previous-usb-topology=16777216",
         ]))
-    return (targets, bindings, advanced, loader, hdcSerial)
+    return (targets, bindings, advanced, loader)
   }
 
   private func loaderIdentity(serial: String, topology: String) -> RockchipProductUSBIdentity {

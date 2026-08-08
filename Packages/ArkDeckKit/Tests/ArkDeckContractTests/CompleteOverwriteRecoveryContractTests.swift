@@ -37,7 +37,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         executionConnectKey: "sealed-complete-overwrite-connect-key",
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-fixture",
         buildFingerprint: "fixture-before-recovery", transport: "sealed-fixture",
-        profileID: "dayu200@2", collectedAtUTC: "2026-08-08T01:00:00Z")
+        profileID: "dayu200", collectedAtUTC: "2026-08-08T01:00:00Z")
     }
   }
 
@@ -354,7 +354,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       idempotencyKey: "idempotency-incomplete-coverage",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200-RECOVERY", expectedBindingRevision: 2),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: incompleteInputs)
     await assertRecoveryBlocked(
       "completeOverwriteRecovery.incompleteRequestedCoverage",
@@ -576,7 +576,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let data = Data(
       """
       {"ok":true,"result":[
-        {"jobId":"job-old","operation":"flash.dayu200@1","targetId":"target-1",
+        {"jobId":"job-old","operation":"flash.dayu200","targetId":"target-1",
          "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
          "outstandingResidueCount":0,"timeline":[],
          "supersededByRecoveryEpochId":"\(epochID)"}
@@ -598,7 +598,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       coveredIntents: [
         SupersededRecoveryIntent(
           jobID: "job-old", intentEventID: "intent-old",
-          operationReference: "flash.dayu200@1", profileReference: "dayu200@2",
+          operationReference: "flash.dayu200", profileReference: "dayu200",
           observedAtUTC: "2026-08-08T00:00:00Z", possibleEffects: effects)
       ],
       uncertainEffectSetSHA256: effectDigest(effects),
@@ -606,8 +606,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       coveredEffectSetSHA256: String(repeating: "1", count: 64),
       recoveryJobID: "job-recovery",
       recoveryIntentEventID: "intent-recovery",
-      operationReference: "flash.dayu200@1",
-      profileReference: "dayu200@2",
+      operationReference: "flash.dayu200",
+      profileReference: "dayu200",
       materializedPlanDigestSHA256: String(repeating: "2", count: 64),
       artifactSHA256: String(repeating: "3", count: 64),
       providerExecutableSHA256: String(repeating: "4", count: 64),
@@ -624,7 +624,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   private func flashDescriptor() throws -> CatalogOperationDescriptor {
-    try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
   }
 
   private func flashRequest(
@@ -632,16 +632,16 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     lease: String = "lease-v1:recovery:ART-0123456789abcdef0123456789abcdef"
   ) throws -> RuntimeOperationRequest {
     let partitions = try XCTUnwrap(
-      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200@2")
+      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200")
     ).coveredEffects.map { String($0.dropFirst("partition:".count)) }
     return try RuntimeOperationRequest(
       requestID: "request-\(id)", idempotencyKey: "idempotency-\(id)",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200-RECOVERY", expectedBindingRevision: 2),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: [
         "imageBundleLease": .string(lease),
-        "deviceProfile": .string("dayu200@2"),
+        "deviceProfile": .string("dayu200"),
         "partitionPlan": .array(partitions.map(JSONValue.string)),
         "postFlashVerification": .string("full"),
       ])
@@ -752,7 +752,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   ) throws -> RuntimeJobRecord {
     var record = RuntimeJobRecord(
       jobID: jobID, request: try flashRequest(id: jobID),
-      operationReference: "flash.dayu200@1",
+      operationReference: "flash.dayu200",
       catalogDigest: RuntimeOperationCatalog.catalogDigest,
       providerID: "rockchip", createdAtUTC: createdAtUTC,
       actualEffect: WorkflowEffect.destructive.rawValue,
@@ -864,7 +864,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private func writeHostProof(record: RuntimeJobRecord, stepID: String) throws {
     let action: RockchipProviderAction
     let partitions = try XCTUnwrap(
-      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200@2")
+      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200")
     ).coveredEffects.map { String($0.dropFirst("partition:".count)) }
     let bundle = RockchipRuntimeFlashBundle(
       artifactLeaseID: "lease-fixture", artifactID: "artifact-fixture",
@@ -915,7 +915,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   private func recoveryArchive() throws -> Data {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let partitionEntries = profile.mappedPartitions.map {
       "0x1@0x\(String($0.offsetSectors, radix: 16))(\($0.partitionName))"
     } + profile.membershiplessPartitionsWriteForbidden.enumerated().map {
@@ -936,7 +936,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   private func recoveryPartitions() throws -> [String] {
     try XCTUnwrap(
-      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200@2")
+      try flashDescriptor().completeOverwriteRecovery?.profile(reference: "dayu200")
     ).coveredEffects.map { String($0.dropFirst("partition:".count)) }
   }
 

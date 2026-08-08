@@ -220,7 +220,7 @@ struct RuntimeRecoveryService {
             stableIdentitySHA256: stableIdentitySHA256,
             bindingRevision: bindingRevision)
         }) { continue }
-        guard record.operationReference == "flash.dayu200@1",
+        guard record.operationReference == "flash.dayu200",
           stepID == "flash-partitions", !profile.isEmpty,
           let partitions, !partitions.isEmpty,
           replay.events.contains(where: {
@@ -729,7 +729,7 @@ struct RuntimeRecoveryService {
   }
 
   private func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
-    record.operationReference == "flash.dayu200@1"
+    record.operationReference == "flash.dayu200"
       ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
   }
 

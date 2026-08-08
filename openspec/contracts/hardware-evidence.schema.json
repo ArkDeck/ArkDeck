@@ -63,7 +63,7 @@
       "properties": {
         "operationReference": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$"
+          "pattern": "^[a-z][a-z0-9.-]*(?:@[1-9][0-9]*)?$"
         },
         "jobId": { "type": "string", "minLength": 1 },
         "catalogDigest": {
@@ -235,7 +235,7 @@
               "intentEventId": { "type": "string", "minLength": 1 },
               "operationReference": {
                 "type": "string",
-                "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$"
+                "pattern": "^[a-z][a-z0-9.-]*(?:@[1-9][0-9]*)?$"
               },
               "profileReference": { "type": "string", "minLength": 1 },
               "possibleEffects": {
@@ -260,7 +260,7 @@
         "recoveryIntentEventId": { "type": "string", "minLength": 1 },
         "operationReference": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9.-]*@[1-9][0-9]*$"
+          "pattern": "^[a-z][a-z0-9.-]*(?:@[1-9][0-9]*)?$"
         },
         "profileReference": { "type": "string", "minLength": 1 },
         "planDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },

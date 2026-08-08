@@ -65,7 +65,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
     let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
 
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
@@ -329,7 +329,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
         buildFingerprint: "preflight-only",
         transport: "sealed-fixture",
-        profileID: "dayu200@2",
+        profileID: "dayu200",
         collectedAtUTC: EngineLaneCampaignDaemonContractTests.fixedNow)
     }
   }

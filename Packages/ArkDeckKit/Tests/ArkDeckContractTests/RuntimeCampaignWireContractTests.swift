@@ -27,7 +27,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       requestID: "req-campaign-wire",
       idempotencyKey: "idem-campaign-wire",
       target: DurableTargetReference(targetID: "TGT-DAYU200-01", expectedBindingRevision: 7),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       campaignReservation: RuntimeCampaignReservationReference(
         reservationID: "ain019-abc123"))
     let decoded = try RuntimeOperationCodec.decodeRequest(
@@ -41,7 +41,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         requestID: "req-two-authorities",
         idempotencyKey: "idem-two-authorities",
         target: DurableTargetReference(targetID: "TGT-1", expectedBindingRevision: 1),
-        operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+        operation: RuntimeOperationReference(id: "flash.dayu200"),
         authorization: RuntimeCapabilityReference(capabilityID: "CAP-RT-X-1"),
         campaignReservation: RuntimeCampaignReservationReference(
           reservationID: "ain019-abc123"))
@@ -58,7 +58,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         requestID: "req-bad-reservation",
         idempotencyKey: "idem-bad-reservation",
         target: DurableTargetReference(targetID: "TGT-1", expectedBindingRevision: 1),
-        operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+        operation: RuntimeOperationReference(id: "flash.dayu200"),
         campaignReservation: RuntimeCampaignReservationReference(reservationID: "no spaces")))
 
     // Old wire without the field still decodes (2.x minor addition).
@@ -147,7 +147,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
     let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
 
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(
       "arkdeck-campaign-wire-\(UUID().uuidString.lowercased())", isDirectory: true)
@@ -310,7 +310,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
         buildFingerprint: "preflight-only",
         transport: "sealed-fixture",
-        profileID: "dayu200@2", collectedAtUTC: RuntimeCampaignWireContractTests.fixedNow)
+        profileID: "dayu200", collectedAtUTC: RuntimeCampaignWireContractTests.fixedNow)
     }
   }
 
@@ -330,7 +330,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       idempotencyKey: "idem-\(requestID)",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200-70035", expectedBindingRevision: 7),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: inputs,
       campaignReservation: RuntimeCampaignReservationReference(reservationID: reservationID))
   }

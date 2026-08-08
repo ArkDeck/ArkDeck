@@ -882,12 +882,12 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let baseline = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let repaired = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 90,
       loaderPollIntervalMilliseconds: 250, hdcCommandTimeoutSeconds: 45,
@@ -924,12 +924,12 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let baseline = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let repaired = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], hdcCommandTimeoutSeconds: 45,
       userdataImpact: "ERASE-USERDATA")
@@ -964,18 +964,18 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let first = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let second = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 46,
       userdataImpact: "ERASE-USERDATA")
     let third = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], loaderDiscoveryTimeoutSeconds: 47,
       userdataImpact: "ERASE-USERDATA")
@@ -1010,12 +1010,12 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let wrongMode = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal], userdataImpact: "ERASE-USERDATA")
     let repaired = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let flash = StartingModeMismatchThenSuccessEvolutionFlash(
@@ -1050,7 +1050,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let loaderOnly = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.loader], loaderDiscoveryTimeoutSeconds: 46,
       userdataImpact: "ERASE-USERDATA")
@@ -1089,7 +1089,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let strategy = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let flash = PreAdmittingEvolutionFlash(ledger: ledger, now: Self.confirmedAt)
@@ -1135,12 +1135,12 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let wrongMode = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal], userdataImpact: "ERASE-USERDATA")
     let repaired = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let flash = PreAdmittingEvolutionFlash(
@@ -1174,7 +1174,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     _ = try ledger.create(assertion)
     let baseline = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2", archiveDigestSHA256: assertion.archiveDigestSHA256,
+      deviceProfileReference: "dayu200", archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
     let flash = RejectingBeforeReservationEvolutionFlash()
@@ -1701,7 +1701,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testLoaderTransitionClassificationExcludesEveryDestructiveOrUnknownKind() {
-    // Exactly what `flash.dayu200@1` journals when it dies at the transition:
+    // Exactly what `flash.dayu200` journals when it dies at the transition:
     // its host-only prefix plus the enterUpdater intent, and nothing past it.
     XCTAssertTrue(
       RockchipEvolutionCampaignHost.isLoaderTransitionOnly(
@@ -1730,7 +1730,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   /// terminal is producible rather than only seedable.
   ///
   /// Real-input gated, and unavoidably so: `validateCampaignReservation`
-  /// admits a campaign reservation for `flash.dayu200@1` and nothing else, and
+  /// admits a campaign reservation for `flash.dayu200` and nothing else, and
   /// that operation's host steps read a genuine DAYU200 images archive. No
   /// device is involved — the first mutating dispatch never spawns.
   func testTheEngineWritesTheUnknownTerminalTheReadbackConsumes() async throws {
@@ -1738,7 +1738,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let root = temporaryDirectory("engine-written-unknown")
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -1812,7 +1812,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       requestID: "req-campaign-unknown", idempotencyKey: "idem-campaign-unknown",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200-70035", expectedBindingRevision: 7),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: [
         "imageBundleLease": .string(lease),
         "deviceProfile": .string(profile.catalogReference),
@@ -2222,7 +2222,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     let suffix = String(format: "%016X", ordinal)
     let strategy = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2",
+      deviceProfileReference: "dayu200",
       archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")
@@ -2464,7 +2464,7 @@ private actor SafeFailureThenSuccessEvolutionFlash: RockchipEvolutionFlashDispat
     ledger: RockchipEvolutionCampaignLedger,
     now: String,
     safeFailureCount: Int = 1,
-    failureStepID: String = "flash.dayu200@1"
+    failureStepID: String = "flash.dayu200"
   ) {
     self.ledger = ledger
     self.now = now
@@ -2664,7 +2664,7 @@ private struct ScriptedCampaignAttemptAdmitter: RockchipEvolutionCampaignAttempt
       // The real service's spelling: the campaign error, unwrapped.
       throw RockchipEvolutionCampaignError.admissionRejected("startingModeNotAllowed:\(mode)")
     }
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     _ = try ledger.reserveAttempt(
       campaignID: permit.assertion.campaignID, candidateID: permit.candidate.candidateID,
       ordinal: 1,
@@ -2754,7 +2754,7 @@ private struct RefusalAfterReserveEvolutionFlash: RockchipEvolutionFlashDispatch
   ) async throws -> RockchipFlashExecutionResult {
     try reserve()
     throw RockchipFlashExecutionError.submissionRefused(
-      detail: "the runtime rejected the submission: flash.dayu200@1 is runtime unavailable")
+      detail: "the runtime rejected the submission: flash.dayu200 is runtime unavailable")
   }
 }
 
@@ -2807,7 +2807,7 @@ private struct UnknownOutcomeFlashFactsPort: RockchipRuntimeFactsPort {
       executionConnectKey: "sealed-campaign-unknown-connect-key",
       deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
       buildFingerprint: "preflight-only", transport: "sealed-fixture",
-      profileID: "dayu200@2", collectedAtUTC: "2026-08-02T08:00:00Z")
+      profileID: "dayu200", collectedAtUTC: "2026-08-02T08:00:00Z")
   }
 }
 

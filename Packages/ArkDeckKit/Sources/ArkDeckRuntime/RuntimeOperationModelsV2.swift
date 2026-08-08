@@ -69,14 +69,14 @@ public struct DurableTargetReference: Equatable, Sendable, Codable {
 
 public struct RuntimeOperationReference: Equatable, Sendable, Codable {
   public let id: String
-  public let version: Int
+  public let version: Int?
 
-  public init(id: String, version: Int) {
+  public init(id: String, version: Int? = nil) {
     self.id = id
     self.version = version
   }
 
-  public var reference: String { "\(id)@\(version)" }
+  public var reference: String { version.map { "\(id)@\($0)" } ?? id }
 
   func validate() throws {
     guard
@@ -93,11 +93,11 @@ public struct RuntimeOperationReference: Equatable, Sendable, Codable {
         path: "$.operation.id",
         message: "malformed operation id")
     }
-    guard version >= 1 else {
-      throw RuntimeOperationRequestRejection(
-        code: .unknownOperation,
-        path: "$.operation.version",
-        message: "operation version must be >= 1")
+    if let version, version < 1 {
+        throw RuntimeOperationRequestRejection(
+          code: .unknownOperation,
+          path: "$.operation.version",
+          message: "operation version must be >= 1")
     }
   }
 }
@@ -274,11 +274,11 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     targetID: String,
     expectedBindingRevision: Int?,
     operationID: String,
-    version: Int,
+    version: Int?,
     requestID: String,
     idempotencyKey: String
   ) throws -> RuntimeOperationRequest {
-    let reference = "\(operationID)@\(version)"
+    let reference = RuntimeOperationReference(id: operationID, version: version).reference
     let descriptor = RuntimeOperationCatalog.descriptor(reference: reference)
     if descriptor?.binding == .confirmedDevice, expectedBindingRevision == nil {
       throw RuntimeOperationRequestRejection(
@@ -314,11 +314,10 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   public static func capabilityDraftTarget(
     targetID: String,
     operationID: String,
-    version: Int,
+    version: Int?,
     currentDeviceBindingRevision: () throws -> Int
   ) rethrows -> DurableTargetReference {
-    let descriptor = RuntimeOperationCatalog.descriptor(
-      reference: "\(operationID)@\(version)")
+    let descriptor = RuntimeOperationCatalog.descriptor(id: operationID, version: version)
     let revision: Int?
     if descriptor?.binding == .confirmedDevice {
       revision = try currentDeviceBindingRevision()

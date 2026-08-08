@@ -44,7 +44,7 @@
 - `TASK-OBS-002` 已交付 HDC App 观察面，是本次布局重构的历史设计输入；
 - `TASK-RKFUI-002` 已描述 Flash plan-only UI 与全局 Job presentation，但其旧 facade / plan artifact 假设与当前 daemon `job.plan` 语义不完全一致，不能直接照抄；
 - 当前没有打开的 PR；最近合入的 #1100 只更新设计稿，没有修改生产 SwiftUI；
-- `flash.dayu200@1`、现有 DeviceProviders 和 Runtime Job engine 已存在，本任务不重复创建它们。
+- `flash.dayu200`、现有 DeviceProviders 和 Runtime Job engine 已存在，本任务不重复创建它们。
 
 实现 PR 可使用 base-tree `TASK-BRC-005` 作为 `scripts/check_pr_paths.py` 的机械路径护栏，因为其 Allowed paths 覆盖 `ArkDeckApp/**`、`ArkDeckAppUITests/**` 和 `ArkDeck.xcodeproj/**`。这不恢复该历史 Task 的 readiness/hardware/evidence 链，也不得修改其 task/evidence 文件或声称完成其 signed Sandbox E0 验收。
 

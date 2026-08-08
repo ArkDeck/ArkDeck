@@ -52,7 +52,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
         buildFingerprint: "preflight-only",
         transport: "sealed-fixture",
-        profileID: "dayu200@2", collectedAtUTC: "2026-08-01T00:00:00Z")
+        profileID: "dayu200", collectedAtUTC: "2026-08-01T00:00:00Z")
     }
   }
 
@@ -62,7 +62,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
     let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
 
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(
       "arkdeck-e2-consume-\(UUID().uuidString.lowercased())", isDirectory: true)
@@ -117,7 +117,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
       capabilityID: "CAP-RT-LEGACY-DESTRUCTIVE-970",
       targetScope: .stablePhysicalIdentity(sha256: Self.targetIdentity),
       operationScope: [
-        RuntimeCapabilityOperationScope(operationID: "flash.dayu200", version: 1)
+        RuntimeCapabilityOperationScope(operationID: "flash.dayu200")
       ],
       effectCeiling: .destructive,
       inputConstraints: exactStringConstraints(from: inputs),
@@ -252,7 +252,7 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
       idempotencyKey: "idem-\(requestID)",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200-70035", expectedBindingRevision: 7),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: inputs,
       authorization: capabilityID.map(RuntimeCapabilityReference.init))
   }

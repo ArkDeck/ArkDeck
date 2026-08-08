@@ -692,8 +692,8 @@ public enum HardwareEvidenceProjector {
         || recovery.recoveryIntentEventID.isEmpty
         || recovery.coverageContractVersion.isEmpty
         || !validOperationReference(recovery.operationReference)
-        || recovery.operationReference != "flash.dayu200@1"
-        || !["dayu200@1", "dayu200@2"].contains(recovery.profileReference)
+        || recovery.operationReference != "flash.dayu200"
+        || recovery.profileReference != "dayu200"
       {
         reasons.append("recovery identity, plan, Artifact, tool, or epoch facts are malformed")
       }
@@ -905,9 +905,12 @@ public enum HardwareEvidenceProjector {
 
   private static func validOperationReference(_ value: String) -> Bool {
     let parts = value.split(separator: "@", omittingEmptySubsequences: false)
-    guard parts.count == 2, let version = Int(parts[1]), version > 0,
+    guard parts.count == 1 || parts.count == 2,
       let first = parts[0].first, first.isLowercase
     else { return false }
+    if parts.count == 2 {
+      guard let version = Int(parts[1]), version > 0 else { return false }
+    }
     return parts[0].allSatisfy {
       $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "." || $0 == "-")
     }

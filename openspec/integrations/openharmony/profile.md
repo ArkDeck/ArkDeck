@@ -40,7 +40,7 @@ Recipe 数据位于 `openspec/contracts/catalogs/dump-recipes.yaml`。Adapter �
 结构化 registry：
 `openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml`
 （`OPENHARMONY-TRACE-PROBES@1.0.0`，SHA-256
-`9d2a390b84092f1d78d86c10bf182884bc3a2ef8b3cdc3d35ed8e7e2b087b613`）；逐文件
+`5825db47f97dea3bddaede95b7c6401fa898bf9dd2c6c5c783628d9a89ffcde3`）；逐文件
 resource closure：同目录 `resources.json`（SHA-256
 `6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879`）。
 来源是维护者 `lvye` 于 2026-07-22 在 DAYU200/OpenHarmony 7.0.0.34、USB、HDC
@@ -52,8 +52,8 @@ capture marker bytes。
 
 | Tool/family | Registered conclusion | Authority boundary |
 | --- | --- | --- |
-| `hitrace.dayu200-oh7.text-v1` | `--help`/`-h` 为同一 registered help family；`-l` 登记 81 个 tag；`-t 5 -b 2048 sched -o <owned-path>` 的最小 capture 产生非空 text ftrace，`-b` 单位按该 help 原文登记为 KB | 仅 exact durable target、pinned HDC、同窗口 help/tag receipt 与 UUID-owned path 可用；exit 0 单独不构成成功，须 ordered marker + exact output path + remote/local byte-size match + registered ftrace header；cleanup 仅在这些 receipt 后；不构成其他固件或硬件支持声明 |
-| `bytrace.dayu200-oh7.text-v1` | help/tag family registered；所报 duration/buffer/output/begin-finish surface 可用于 configuration probe | 本窗口未执行 bytrace capture，因此 `probeOnlyNotCaptureEligible`；不得从与 hitrace 形似、工具名或 exit 0 推断 capture support |
+| `hitrace.dayu200-oh7.text` | `--help`/`-h` 为同一 registered help family；`-l` 登记 81 个 tag；`-t 5 -b 2048 sched -o <owned-path>` 的最小 capture 产生非空 text ftrace，`-b` 单位按该 help 原文登记为 KB | 仅 exact durable target、pinned HDC、同窗口 help/tag receipt 与 UUID-owned path 可用；exit 0 单独不构成成功，须 ordered marker + exact output path + remote/local byte-size match + registered ftrace header；cleanup 仅在这些 receipt 后；不构成其他固件或硬件支持声明 |
+| `bytrace.dayu200-oh7.text` | help/tag family registered；所报 duration/buffer/output/begin-finish surface 可用于 configuration probe | 本窗口未执行 bytrace capture，因此 `probeOnlyNotCaptureEligible`；不得从与 hitrace 形似、工具名或 exit 0 推断 capture support |
 
 未知/漂移 family 一律 `unsupported`/raw detail。当前 registry 的 adapter adoption 属
 TASK-TR-003；本登记自身不实现 parser，不改变 capability/support/conformance/release

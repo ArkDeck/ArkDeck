@@ -50,7 +50,7 @@ package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
   package init() {}
 
   package func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
-    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let board = RockchipFlashProfile.dayu200
     let summary = try GzipTarArchiveReader.summarize(
       fileAt: archiveURL,
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
@@ -62,7 +62,7 @@ package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
   /// published after the last release could not be planned at all.
   func makeValidatedExecutePlan(
     summary: GzipTarArchiveSummary,
-    board: RockchipFlashProfile = .dayu200OpenHarmony70035
+    board: RockchipFlashProfile = .dayu200
   ) throws -> RockchipFlashPlan {
     let profile: RockchipFlashProfile
     do {

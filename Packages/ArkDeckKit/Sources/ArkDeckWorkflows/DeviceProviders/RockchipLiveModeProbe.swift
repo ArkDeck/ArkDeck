@@ -152,7 +152,7 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
         "-t", connectKey, "shell", "param", "get",
         // The same param the post-flash verifier pins against a published
         // profile's `runtimeBuildVersion`, which is also the profile's
-        // `firmwareVersion` for every versioned DAYU200 profile. Reading any
+        // `firmwareVersion` for the singleton DAYU200 profile. Reading any
         // other property would produce a fingerprint that cannot match a
         // published profile on a real device.
         HDCAllowlistedProperty.fullBuildVersion.rawValue,

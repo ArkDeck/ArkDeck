@@ -3,7 +3,7 @@
 // The production provider reads operation availability and adopted target
 // facts from the daemon, materializes an exact Rockchip plan in-process from a
 // user-selected archive, imports that archive, and submits the published
-// `flash.dayu200@1` typed operation. Runtime owns capability creation and all
+// `flash.dayu200` typed operation. Runtime owns capability creation and all
 // target/plan/artifact admission; the App cannot supply or administer one.
 
 import ArkDeckCore
@@ -295,8 +295,7 @@ public protocol FlashApplicationProviding: Sendable {
 }
 
 public enum FlashApplicationFacade {
-  public static let profileReferences = RockchipFlashProfile.supportedDAYU200Profiles.map(
-    \.catalogReference)
+  public static let profileReferences = [RockchipFlashProfile.dayu200.catalogReference]
 
   public static func make(
     arguments: [String] = ProcessInfo.processInfo.arguments
@@ -436,7 +435,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         target: DurableTargetReference(
           targetID: target.id,
           expectedBindingRevision: target.bindingRevision),
-        operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+        operation: RuntimeOperationReference(id: "flash.dayu200"),
         inputs: [
           "imageBundleLease": .string(lease),
           "deviceProfile": .string(plan.profileReference),
@@ -711,10 +710,10 @@ enum FlashWorkspaceResponseDecoding {
         return .unavailable(reasons: [failure.message])
       case .success(let entries):
         guard
-          let flash = entries.first(where: { $0["reference"] as? String == "flash.dayu200@1" }),
+          let flash = entries.first(where: { $0["reference"] as? String == "flash.dayu200" }),
           let state = flash["availability"] as? String
         else {
-          return .unavailable(reasons: ["flash.dayu200@1 is not published by this Runtime"])
+          return .unavailable(reasons: ["flash.dayu200 is not published by this Runtime"])
         }
         let reasons = flash["reasons"] as? [String] ?? []
         return state == "available"

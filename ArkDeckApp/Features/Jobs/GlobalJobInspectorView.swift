@@ -119,7 +119,7 @@ struct GlobalJobInspectorView: View {
           }
         }
         HStack(spacing: 6) {
-          Text(job.operationReference)
+          Text(displayedOperationReference(job.operationReference))
             .font(.callout.monospaced())
             .lineLimit(1)
           if let badge = RuntimeExecutionModeBadge(job.executionMode) {
@@ -159,7 +159,9 @@ struct GlobalJobInspectorView: View {
 
           Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
             factRow("jobInspector.fact.job", job.id)
-            factRow("jobInspector.fact.operation", job.operationReference)
+            factRow(
+              "jobInspector.fact.operation",
+              displayedOperationReference(job.operationReference))
             factRow("jobInspector.fact.target", job.targetID)
             if let badge = RuntimeExecutionModeBadge(job.executionMode) {
               GridRow(alignment: .firstTextBaseline) {
@@ -277,7 +279,7 @@ struct GlobalJobInspectorView: View {
       if let job = focusedJob {
         HStack(spacing: 8) {
           stateLabel(job)
-          Text(job.operationReference)
+          Text(displayedOperationReference(job.operationReference))
             .font(.callout.monospaced())
             .lineLimit(1)
           if activeJobCount > 0 {

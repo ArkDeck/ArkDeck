@@ -1,4 +1,4 @@
-// Product-owned per-action RockUSB host for flash.dayu200@1.
+// Product-owned per-action RockUSB host for flash.dayu200.
 //
 // RuntimeJobEngine owns capability admission and the outer write-ahead
 // intent. This host does not construct another authorization/session model:
@@ -585,7 +585,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       // stager still checks the second.
       let profile: RockchipFlashProfile
       do {
-        profile = try RockchipFlashProfile.dayu200OpenHarmony70035.forArchive(at: bundle.fileURL)
+        profile = try RockchipFlashProfile.dayu200.forArchive(at: bundle.fileURL)
       } catch {
         throw RuntimeDispatchFailure.failed(
           "RockUSB staging bundle does not fit the DAYU200 board: \(error)")
@@ -795,7 +795,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     case .verifyFlashReadback(let bundle):
       // Same as the write step: the board describes the bundle in hand, and
       // the derived identity must be the one the plan was built for.
-      let readbackBoard = RockchipFlashProfile.dayu200OpenHarmony70035
+      let readbackBoard = RockchipFlashProfile.dayu200
       let profile: RockchipFlashProfile
       do {
         profile = try describeBundle(readbackBoard, bundle.fileURL)
@@ -1026,7 +1026,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     // last step before the first partition write, so it was the last place
     // that could happen. The bytes are still checked: the stager re-hashes the
     // archive against this profile before anything reaches the device.
-    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let board = RockchipFlashProfile.dayu200
     let profile: RockchipFlashProfile
     do {
       profile = try describeBundle(board, bundle.fileURL)
@@ -2082,10 +2082,10 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
         && descriptor.identifier == "rockchip.rockusb.rebind-loader.v1"
     case .rockchip(.flashPartitions(let bundle)):
       return descriptor.identifier
-        == "rockchip.rockusb.flash-dayu200.v1:\(bundle.sha256.prefix(16))"
+        == "rockchip.rockusb.flash-dayu200:\(bundle.sha256.prefix(16))"
     case .rockchip(.verifyFlashReadback(let bundle)):
       return descriptor.identifier
-        == "rockchip.rockusb.verify-dayu200.v1:\(bundle.sha256.prefix(16))"
+        == "rockchip.rockusb.verify-dayu200:\(bundle.sha256.prefix(16))"
     case .rockchip(.rebootToNormal(let identity)):
       return identity == descriptor.expectedIdentitySHA256
         && descriptor.identifier == "rockchip.rockusb.reboot-normal.v1"

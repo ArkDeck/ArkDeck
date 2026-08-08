@@ -354,5 +354,5 @@
     { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }
   ],
-  "profiles": ["openharmony-standard@1", "dayu200@1"]
+  "profiles": ["openharmony-standard@1", "dayu200"]
 }

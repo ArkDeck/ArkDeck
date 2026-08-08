@@ -109,7 +109,7 @@ final class HarnessMemoryContractTests: XCTestCase {
           "failureFingerprints":[],
           "operationReferences":[],
           "revisionScope":{"exactRevisions":["\(revisionA)"]},
-          "deviceProfiles":["dayu200@1"],
+          "deviceProfiles":["dayu200"],
           "toolchainProfiles":["waterflow-debug@1"]
         },
         "invalidationConditions":[
@@ -274,7 +274,7 @@ final class HarnessMemoryContractTests: XCTestCase {
 
   private func exactScope(
     revision: String? = nil,
-    device: String = "dayu200@1",
+    device: String = "dayu200",
     toolchain: String = "waterflow-debug@1",
     component: String = HarnessTaskType.debugCrash.rawValue,
     filePath: String = "entry/src/main/ets/pages/Index.ets",
@@ -297,7 +297,7 @@ final class HarnessMemoryContractTests: XCTestCase {
       HarnessMemoryInvalidationCondition(
         kind: .revisionLeavesScope, expectedValues: [revisionA]),
       HarnessMemoryInvalidationCondition(
-        kind: .deviceProfileLeavesScope, expectedValues: ["dayu200@1"]),
+        kind: .deviceProfileLeavesScope, expectedValues: ["dayu200"]),
       HarnessMemoryInvalidationCondition(
         kind: .toolchainProfileLeavesScope, expectedValues: ["waterflow-debug@1"]),
       HarnessMemoryInvalidationCondition(
@@ -346,7 +346,7 @@ final class HarnessMemoryContractTests: XCTestCase {
       filePaths: ["entry/src/main/ets/pages/Index.ets"],
       symbols: ["CrashController.onClick"],
       operationReferences: ["workspace.inspect-diff@1"],
-      revision: revisionA, deviceProfiles: ["dayu200@1"],
+      revision: revisionA, deviceProfiles: ["dayu200"],
       toolchainProfiles: ["waterflow-debug@1"])
   }
 
@@ -359,7 +359,7 @@ final class HarnessMemoryContractTests: XCTestCase {
         desiredState: [
           "component": .string(HarnessTaskType.debugCrash.rawValue),
           "baseWorkspaceRevision": .string(revisionA),
-          "deviceProfile": .string("dayu200@1"),
+          "deviceProfile": .string("dayu200"),
           "buildPresetRef": .string("waterflow-debug@1"),
         ]),
       successCriteria: [],

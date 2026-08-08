@@ -232,7 +232,7 @@ public struct RockchipFlashPreflight: Sendable {
     // into the product refused a firmware daily published after the last
     // release — measured with `7.0.0.37` on 2026-08-05, which fits the board
     // with no structural violation.
-    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let board = RockchipFlashProfile.dayu200
     let build: RockchipImageBuildDescriptor
     do {
       build = try probes.archiveBuild(archiveURL, board)

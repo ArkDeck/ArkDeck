@@ -28,7 +28,7 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
 
   init(
     port: RockchipProductionAdmissionPort,
-    profiles: [RockchipFlashProfile] = RockchipFlashProfile.supportedDAYU200Profiles,
+    profiles: [RockchipFlashProfile] = [RockchipFlashProfile.dayu200],
     makeID: @escaping @Sendable (String) -> String = { prefix in
       "\(prefix)-\(UUID().uuidString.lowercased())"
     }

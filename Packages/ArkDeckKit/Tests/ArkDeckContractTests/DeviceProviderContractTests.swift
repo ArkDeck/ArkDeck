@@ -31,7 +31,7 @@ final class DeviceProviderContractTests: XCTestCase {
           "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
         executionConnectKey: "150100424a544e4600",
         deviceMode: "hdc", buildFingerprint: nil,
-        profileID: "dayu200@1", collectedAtUTC: "2026-07-30T00:00:00Z")
+        profileID: "dayu200", collectedAtUTC: "2026-07-30T00:00:00Z")
     }
   }
 
@@ -61,7 +61,7 @@ final class DeviceProviderContractTests: XCTestCase {
 
   func testRockchipExecutionAdmissionRequiresCrossModeBindingFact() async throws {
     let operation = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let provider = RockchipFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
     let ready = try await provider.resolveFacts(targetID: "TGT-1")
@@ -107,7 +107,7 @@ final class DeviceProviderContractTests: XCTestCase {
       XCTAssertTrue(detail.contains("bundleName"), detail)
     }
     // A kind with no registered action at all still fails closed.
-    let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let flashStep = flash.steps.first { $0.kind == .flashPartition }!
     XCTAssertThrowsError(try hdc.action(for: flashStep, operation: flash, inputs: [:])) { error in
       guard case DeviceProviderError.unsupportedStepKind = error else {
@@ -236,11 +236,11 @@ final class DeviceProviderContractTests: XCTestCase {
 
   func testRockchipMaterializesEveryPublishedRuntimeStepWithoutLegacyAuthorization() throws {
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let provider = RockchipFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
     let inputs: [String: JSONValue] = [
-      "deviceProfile": .string("dayu200@1"),
+      "deviceProfile": .string("dayu200"),
       "imageBundleLease": .string("lease:flash-artifact"),
       "partitionPlan": .array(
         RockchipFlashProfile.dayu200.mappedPartitions.map {
@@ -283,9 +283,14 @@ final class DeviceProviderContractTests: XCTestCase {
       guard case .hostManaged(let runtimeDescriptor) = plan.kind else {
         return XCTFail("\(step.stepID) did not produce a host-managed typed plan")
       }
-      XCTAssertTrue(
-        runtimeDescriptor.identifier.hasSuffix(".v1")
-          || runtimeDescriptor.identifier.contains(".v1:"), runtimeDescriptor.identifier)
+      if ["flash-partitions", "verify-flash-readback"].contains(step.stepID) {
+        XCTAssertFalse(
+          runtimeDescriptor.identifier.contains(".v1"), runtimeDescriptor.identifier)
+      } else {
+        XCTAssertTrue(
+          runtimeDescriptor.identifier.hasSuffix(".v1")
+            || runtimeDescriptor.identifier.contains(".v1:"), runtimeDescriptor.identifier)
+      }
       XCTAssertEqual(runtimeDescriptor.jobID, stepContext.jobID)
       XCTAssertEqual(runtimeDescriptor.stepID, step.stepID)
       XCTAssertEqual(runtimeDescriptor.targetID, stepContext.targetID)
@@ -301,7 +306,7 @@ final class DeviceProviderContractTests: XCTestCase {
 
   func testRockchipRejectsPartitionDriftBeforeAuthorization() throws {
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let provider = RockchipFlashProviderAdapter(
       factsPort: RockchipFactsPort(), availability: .available)
     let flashStep = try XCTUnwrap(
@@ -310,7 +315,7 @@ final class DeviceProviderContractTests: XCTestCase {
       try provider.action(
         for: flashStep, operation: descriptor,
         inputs: [
-          "deviceProfile": .string("dayu200@1"),
+          "deviceProfile": .string("dayu200"),
           "partitionPlan": .array([.string("userdata")]),
         ],
         context: flashContext))

@@ -527,11 +527,11 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HarnessEvolutionPolicy(
         baseRevision: base, allowedPaths: ["Sources/**"],
-        allowedOperations: ["flash.dayu200@1"])
+        allowedOperations: ["flash.dayu200"])
     ) { error in
       XCTAssertEqual(
         error as? HarnessEvolutionPolicyError,
-        .destructiveOperationNotAllowed("flash.dayu200@1"))
+        .destructiveOperationNotAllowed("flash.dayu200"))
     }
   }
 

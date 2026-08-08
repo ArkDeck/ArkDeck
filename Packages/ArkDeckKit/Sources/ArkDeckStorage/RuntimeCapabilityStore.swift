@@ -340,7 +340,7 @@ public actor RuntimeCapabilityStore {
         reservationID: reservationID,
         jobID: resolvedJobID,
         consumedAtUTC: nowUTC,
-        operationReference: "\(query.operationID)@\(query.operationVersion)",
+        operationReference: query.operationReference,
         effect: query.effect.rawValue,
         targetStableIdentitySHA256: query.targetStableIdentitySHA256,
         bindingRevision: query.targetBindingRevision,
@@ -568,7 +568,7 @@ public actor RuntimeCapabilityStore {
     includePlan: Bool
   ) -> String {
     var components: [String] = [
-      "operation=\(query.operationID)@\(query.operationVersion)",
+      "operation=\(query.operationReference)",
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",

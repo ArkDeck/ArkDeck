@@ -119,8 +119,8 @@ do {
   fail("request unreadable")
 }
 
-guard input.operationReference == "flash.dayu200@1",
-  input.deviceProfileReference == "dayu200@2",
+guard input.operationReference == "flash.dayu200",
+  input.deviceProfileReference == "dayu200",
   input.archiveDigestSHA256.range(
     of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
   input.stepSetDigestSHA256.range(

@@ -209,7 +209,9 @@ public struct CatalogCompleteOverwriteRecoveryDescriptor: Equatable, Sendable {
 
 public struct CatalogOperationDescriptor: Equatable, Sendable {
   public let id: String
-  public let version: Int
+  /// Published protocol version. A singleton operation may omit it and use
+  /// the bare `id` as its complete identity.
+  public let version: Int?
   public let title: String
   public let provider: CatalogProvider
   public let minimumEffect: WorkflowEffect
@@ -230,7 +232,7 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
 
   public init(
     id: String,
-    version: Int,
+    version: Int?,
     title: String,
     provider: CatalogProvider,
     minimumEffect: WorkflowEffect,
@@ -270,8 +272,10 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
     self.completeOverwriteRecovery = completeOverwriteRecovery
   }
 
-  /// Canonical `id@version` reference string.
-  public var reference: String { "\(id)@\(version)" }
+  /// Canonical public reference. Singleton operations use the bare ID.
+  public var reference: String {
+    version.map { "\(id)@\($0)" } ?? id
+  }
 }
 
 /// The compiled operation catalog. Data is generated from Catalog/ and lives
@@ -280,12 +284,15 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
 public enum RuntimeOperationCatalog {
   /// Looks up a descriptor by exact `id` + `version`. Unknown references
   /// return nil; callers must fail closed (unknown operation), never guess.
-  public static func descriptor(id: String, version: Int) -> CatalogOperationDescriptor? {
+  public static func descriptor(id: String, version: Int?) -> CatalogOperationDescriptor? {
     operations.first { $0.id == id && $0.version == version }
   }
 
   public static func descriptor(reference: String) -> CatalogOperationDescriptor? {
     let parts = reference.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+    if parts.count == 1 {
+      return descriptor(id: String(parts[0]), version: nil)
+    }
     guard parts.count == 2, let version = Int(parts[1]), version > 0 else { return nil }
     return descriptor(id: String(parts[0]), version: version)
   }

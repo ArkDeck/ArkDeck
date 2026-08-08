@@ -7,7 +7,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   func testRuntimeAvailabilityAndTargetFactsDecodeWithoutInventingDefaults() throws {
     let operations = try response([
       [
-        "reference": "flash.dayu200@1",
+        "reference": "flash.dayu200",
         "availability": "available",
         "reasons": [],
       ]
@@ -41,7 +41,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   func testUnavailableOperationKeepsRuntimeReasonsVisible() throws {
     let operations = try response([
       [
-        "reference": "flash.dayu200@1",
+        "reference": "flash.dayu200",
         "availability": "unavailable",
         "reasons": ["provider_not_registered", "target facts are incomplete"],
       ]
@@ -60,7 +60,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     let presentation = FlashWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
-          ["reference": "flash.dayu200@1", "availability": "available", "reasons": []]
+          ["reference": "flash.dayu200", "availability": "available", "reasons": []]
         ])),
       targetResponse: .success(
         try response([
@@ -88,7 +88,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     let presentation = FlashWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
-          ["reference": "flash.dayu200@1", "availability": "available", "reasons": []]
+          ["reference": "flash.dayu200", "availability": "available", "reasons": []]
         ])),
       targetResponse: .success(try response([])),
       bootloaderResponse: .success(bootloader))
@@ -117,7 +117,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     let presentation = FlashWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
-          ["reference": "flash.dayu200@1", "availability": "available", "reasons": []]
+          ["reference": "flash.dayu200", "availability": "available", "reasons": []]
         ])),
       targetResponse: .success(
         try response([
@@ -141,7 +141,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   }
 
   func testPlanPresentationPreservesEveryTypedStepAndMarksPlanOnlyAsNotExecuted() throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .planOnly, archiveValidation: .valid, planNonce: "ui-test")
     let target = FlashTargetPresentation(
@@ -199,7 +199,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
   }
 
   func testExecutePresentationRemainsReviewOnlyUntilRuntimeSubmission() throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .execute, archiveValidation: .valid, planNonce: "ui-test")
     let presentation = FlashPlanPresentationBuilder.presentation(
@@ -214,7 +214,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
 
   func testExecuteReviewUsesTheRuntimeCanonicalPlan() throws {
     let provider = RockchipRockUSBFlashProvider(
-      profile: RockchipFlashProfile.dayu200OpenHarmony70035)
+      profile: RockchipFlashProfile.dayu200)
     let reviewedPlan = try FlashPlanPresentationBuilder.materializePlan(
       provider: provider,
       mode: .execute,
@@ -230,7 +230,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
 
   func testPreviewModesCannotReuseExecutableStepIdentities() throws {
     let provider = RockchipRockUSBFlashProvider(
-      profile: RockchipFlashProfile.dayu200OpenHarmony70035)
+      profile: RockchipFlashProfile.dayu200)
     let executePlan = try FlashPlanPresentationBuilder.materializePlan(
       provider: provider,
       mode: .execute,
@@ -271,13 +271,13 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       "result": [
         "targetId": target.id,
         "bindingRevision": target.bindingRevision,
-        "profileReference": "dayu200@1",
+        "profileReference": "dayu200",
         "observations": rows,
       ],
     ])
 
     let decoded = FlashPrerequisiteResponseDecoding.observations(
-      .success(data), target: target, profileReference: "dayu200@1")
+      .success(data), target: target, profileReference: "dayu200")
     guard case .success(let observations) = decoded else {
       return XCTFail("matching Runtime prerequisite facts must decode")
     }
@@ -287,14 +287,14 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       id: target.id, bindingRevision: 5, toolVersion: target.toolVersion,
       adoptedAtUTC: target.adoptedAtUTC)
     guard case .failure = FlashPrerequisiteResponseDecoding.observations(
-      .success(data), target: wrongBinding, profileReference: "dayu200@1")
+      .success(data), target: wrongBinding, profileReference: "dayu200")
     else { return XCTFail("stale binding facts must fail closed") }
   }
 
   private func executePresentation(
     target: FlashTargetPresentation
   ) throws -> FlashExactPlanPresentation {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .execute, archiveValidation: .valid, planNonce: "ui-confirmation-test")
     return FlashPlanPresentationBuilder.presentation(

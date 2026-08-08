@@ -323,5 +323,5 @@ archive.
 #### Scenario: AC-FLASH-018-02 Step materialization performs no archive I/O
 
 - GIVEN typed inputs and resolved context for a Flash Job
-- WHEN each published step of `flash.dayu200@1` is materialized
+- WHEN each published step of `flash.dayu200` is materialized
 - THEN every step materializes without opening the image archive

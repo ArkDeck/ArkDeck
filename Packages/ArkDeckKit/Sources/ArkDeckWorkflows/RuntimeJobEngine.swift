@@ -749,7 +749,7 @@ public actor RuntimeJobEngine {
       }
       if descriptor.reference == "debug.hap@1"
         || descriptor.reference == "deploy.native-library.app-owned@1"
-        || descriptor.reference == "flash.dayu200@1"
+        || descriptor.reference == "flash.dayu200"
         || RuntimeArtifactService.workspaceOperationReferences.contains(descriptor.reference),
         artifactStore == nil
       {
@@ -1566,7 +1566,7 @@ public actor RuntimeJobEngine {
             || step.kind == .applyWorkspacePatch
             || step.kind == .symbolizeWorkspaceCrash
             || step.kind == .runDeterministicAnalyzer
-            || descriptor.reference == "flash.dayu200@1"
+            || descriptor.reference == "flash.dayu200"
             || descriptor.reference == "deploy.native-library.app-owned@1"
           ? try await resolvedInputArtifact(jobID: jobID) : nil
         additionalArtifacts =
@@ -2767,7 +2767,7 @@ public actor RuntimeJobEngine {
       return  // this step owns no declared product
     }
     guard let artifactStore else {
-      if descriptor.reference == "flash.dayu200@1" {
+      if descriptor.reference == "flash.dayu200" {
         throw RuntimeArtifactPublicationFailure(
           detail: "Artifact store is required for \(descriptor.reference)")
       }
@@ -2910,7 +2910,7 @@ public actor RuntimeJobEngine {
       let names = RuntimeArtifactService.finalizeArtifacts[descriptor.reference]
     else { return }
     guard let artifactStore else {
-      if descriptor.reference == "flash.dayu200@1" {
+      if descriptor.reference == "flash.dayu200" {
         throw RuntimeArtifactPublicationFailure(
           detail: "Artifact store is required for \(descriptor.reference)")
       }
@@ -3012,7 +3012,7 @@ public actor RuntimeJobEngine {
       appendTimeline(
         jobID: jobID,
         entry: "incomplete: missing required \(missingRequired.map(\.name).sorted())")
-      if descriptor.reference == "flash.dayu200@1" {
+      if descriptor.reference == "flash.dayu200" {
         throw RuntimeArtifactPublicationFailure(
           detail: "required Flash artifacts are missing: "
             + missingRequired.map(\.name).sorted().joined(separator: ", "))
@@ -3351,7 +3351,7 @@ public actor RuntimeJobEngine {
     expectedBindingRevision: Int
   ) throws -> String? {
     let candidates = jobs.values.filter { runtime in
-      runtime.record.operationReference == "flash.dayu200@1"
+      runtime.record.operationReference == "flash.dayu200"
         && runtime.record.request.target.targetID == targetID
         && runtime.record.request.target.expectedBindingRevision == expectedBindingRevision
         && runtime.record.state == JobState.waitingForRecovery.rawValue
@@ -3486,7 +3486,7 @@ public actor RuntimeJobEngine {
     expectedBindingRevision: Int
   ) throws -> (intent: OutstandingJournalIntent, inspection: JournalReplay) {
     guard let runtime = jobs[jobID],
-      runtime.record.operationReference == "flash.dayu200@1",
+      runtime.record.operationReference == "flash.dayu200",
       runtime.record.request.target.targetID == targetID,
       runtime.record.request.target.expectedBindingRevision == expectedBindingRevision,
       runtime.record.state == JobState.waitingForRecovery.rawValue,
@@ -3897,7 +3897,7 @@ public actor RuntimeJobEngine {
   }
 
   private static func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
-    record.operationReference == "flash.dayu200@1"
+    record.operationReference == "flash.dayu200"
       ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
   }
 
@@ -4009,12 +4009,12 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     step: CatalogStepDescriptor
   ) async throws {
-    if descriptor.reference == "flash.dayu200@1" {
+    if descriptor.reference == "flash.dayu200" {
       guard let resolved = try await resolvedInputArtifact(jobID: jobID) else {
         throw RuntimeDispatchFailure.failed(
           "flash host verification cannot resolve its typed imageBundleLease")
       }
-      let board = RockchipFlashProfile.dayu200OpenHarmony70035
+      let board = RockchipFlashProfile.dayu200
       let summary: GzipTarArchiveSummary
       do {
         summary = try GzipTarArchiveReader.summarize(
@@ -4145,7 +4145,7 @@ public actor RuntimeJobEngine {
         runtime.record.request.inputs["libraryArtifactLease"]
       else { return nil }
       lease = value
-    case "flash.dayu200@1":
+    case "flash.dayu200":
       guard case .string(let value)? =
         runtime.record.request.inputs["imageBundleLease"]
       else { return nil }
@@ -4288,7 +4288,7 @@ public actor RuntimeJobEngine {
     case "deploy.native-library.app-owned@1":
       leaseInputName = "libraryArtifactLease"
       artifactLabel = "native library"
-    case "flash.dayu200@1":
+    case "flash.dayu200":
       leaseInputName = "imageBundleLease"
       artifactLabel = "flash bundle"
     case "workspace.apply-patch@1":
@@ -5915,7 +5915,7 @@ public actor RuntimeJobEngine {
     of query: RuntimeCapabilityAuthorizationQuery
   ) -> String {
     var components: [String] = [
-      "operation=\(query.operationID)@\(query.operationVersion)",
+      "operation=\(query.operationReference)",
       "effect=\(query.effect.rawValue)",
       "target=\(query.targetStableIdentitySHA256 ?? "-")",
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
@@ -6536,8 +6536,8 @@ public actor RuntimeJobEngine {
     for descriptor: CatalogOperationDescriptor,
     artifact: ProviderResolvedInputArtifact?
   ) -> String? {
-    guard descriptor.reference == "flash.dayu200@1", let artifact else { return nil }
-    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    guard descriptor.reference == "flash.dayu200", let artifact else { return nil }
+    let board = RockchipFlashProfile.dayu200
     guard
       let summary = try? GzipTarArchiveReader.summarize(
         fileAt: artifact.fileURL,

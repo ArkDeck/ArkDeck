@@ -8,7 +8,7 @@ public enum TraceProbeAdapterProfile {
   public static let registryID = "OPENHARMONY-TRACE-PROBES"
   public static let registryVersion = "1.0.0"
   public static let registrySHA256 =
-    "9d2a390b84092f1d78d86c10bf182884bc3a2ef8b3cdc3d35ed8e7e2b087b613"
+    "5825db47f97dea3bddaede95b7c6401fa898bf9dd2c6c5c783628d9a89ffcde3"
   public static let resourceManifestSHA256 =
     "6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879"
 
@@ -23,8 +23,8 @@ public enum TraceProbeAdapterProfile {
   public static let rawFtraceHeaderResourceSHA256 =
     "4b6433a1845d533dd466aeb3db965e273f4d4db582c94fe67cf1cb6e1a625ae0"
 
-  public static let hitraceHelpFamily = "hitrace.dayu200-oh7.text-v1"
-  public static let bytraceHelpFamily = "bytrace.dayu200-oh7.text-v1"
+  public static let hitraceHelpFamily = "hitrace.dayu200-oh7.text"
+  public static let bytraceHelpFamily = "bytrace.dayu200-oh7.text"
 
   static let helpResourceByteCount = 3_382
   static let tagListResourceByteCount = 3_604

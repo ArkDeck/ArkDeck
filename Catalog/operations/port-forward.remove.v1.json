@@ -105,5 +105,5 @@
       "required": true
     }
   ],
-  "profiles": ["openharmony-standard@1", "dayu200@1"]
+  "profiles": ["openharmony-standard@1", "dayu200"]
 }

@@ -422,7 +422,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
 
   // MARK: preflight (TASK-AIN-019)
 
-  private static let publishedArchive = RockchipFlashProfile.supportedDAYU200Profiles[0]
+  private static let publishedArchive = [RockchipFlashProfile.dayu200][0]
   private static let boundIdentity = String(repeating: "a", count: 64)
 
   private func preflightProbes(
@@ -519,7 +519,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
   func testPreflightRefusesAnArchiveThatDoesNotFitTheBoardAndAdmitsOneItHasNeverSeen()
     async throws
   {
-    let board = RockchipFlashProfile.dayu200OpenHarmony70035
+    let board = RockchipFlashProfile.dayu200
     let unknownDigest = String(repeating: "f", count: 64)
 
     // Never seen, fits the board: admitted, and the finding says which build.

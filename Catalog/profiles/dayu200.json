@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "dayu200",
+  "provider": "rockchip",
+  "title": "DAYU200 (RK3568)",
+  "constraints": {
+    "deviceModel": "DAYU200 (RK3568)",
+    "loaderTransport": [
+      "usb"
+    ],
+    "partitionVocabulary": [
+      "uboot",
+      "resource",
+      "boot_linux",
+      "ramdisk",
+      "system",
+      "vendor",
+      "updater",
+      "chip_ckm",
+      "userdata"
+    ],
+    "notes": "All compatible archives must satisfy the DAYU200 board-scoped 17-member layout. The plan writes exactly uboot, resource, boot_linux, ramdisk, system, vendor, updater, chip_ckm and userdata in offset order; chip_prod/sys_prod and all memberless partitions remain write-forbidden. Runtime admission pins the exact plan, target, binding and Artifact facts."
+  },
+  "supportedOperations": [
+    "observe.device@1",
+    "capture.diagnostics@1",
+    "debug.hap@1",
+    "deploy.native-library.app-owned@1",
+    "deploy.native-library.system@1",
+    "flash.dayu200"
+  ]
+}

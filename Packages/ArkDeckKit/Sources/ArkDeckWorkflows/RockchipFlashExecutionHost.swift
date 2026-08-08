@@ -269,7 +269,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     throws -> RockchipLoaderBindingRecoveryProof?
   {
     guard evidence.contains("product:e0-iokit-single-loader-readback"),
-      values(prefix: "rebind:chat-confirmation-sha256=").isEmpty,
+      evidence.filter({ $0.hasPrefix("rebind:") }).count == 1,
       let advance = try runtimeTargetLineageAdvance(),
       try confirmedHDCNormalAlias() != nil
     else { return nil }
@@ -284,71 +284,6 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       previousRevision: advance.previousRevision,
       currentRevision: advance.currentRevision,
       selectionEvidenceSHA256: selection)
-  }
-
-  /// One-time migration input for bindings created before Runtime-owned
-  /// Loader onboarding replaced the historical chat-confirmation field. It
-  /// is deliberately not used by admission or live target matching: callers
-  /// may only carry the already-recorded HDC-normal alias into a new binding
-  /// whose authority comes from a fresh Runtime observation plus an explicit
-  /// target selection.
-  func migrationHDCNormalAlias()
-    throws -> (identitySHA256: String, usbTopology: String)?
-  {
-    let explicitIdentities = values(prefix: "identity:hdc-normal-alias-sha256=")
-    let explicitTopologies = values(prefix: "binding:hdc-normal-alias-usb-topology=")
-    if explicitIdentities.count == 1, explicitTopologies.count == 1,
-      let identity = explicitIdentities.first, let topology = explicitTopologies.first,
-      RockchipStandingAuthorization.isCanonicalSHA256(identity), !topology.isEmpty
-    {
-      return (identity, topology)
-    }
-    guard revision == 2,
-      values(prefix: "rebind:chat-confirmation-sha256=").count == 1,
-      values(prefix: "identity:previous-serial-sha256=").count == 1,
-      values(prefix: "binding:previous-usb-topology=").count == 1,
-      let identity = values(prefix: "identity:previous-serial-sha256=").first,
-      let topology = values(prefix: "binding:previous-usb-topology=").first,
-      RockchipStandingAuthorization.isCanonicalSHA256(identity), !topology.isEmpty
-    else { return nil }
-    return (identity, topology)
-  }
-
-  /// Decodes the one historical rev2 binding shape that predates
-  /// Runtime-owned Loader onboarding. The chat digest is validated only as a
-  /// legacy schema marker and is never copied into the replacement or used as
-  /// authority. A fresh unique Loader observation plus the caller's selected
-  /// target are still required before any durable rewrite.
-  func legacyLoaderAttestationMigrationProof()
-    throws -> (identitySHA256: String, previousRevision: Int, usbTopology: String)?
-  {
-    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
-    let currentIdentities = values(prefix: "identity:serial-sha256=")
-    let chatMarkers = values(prefix: "rebind:chat-confirmation-sha256=")
-    let runtimeSelections = values(prefix: "rebind:user-selection-sha256=")
-    let previousIdentities = values(prefix: "identity:previous-serial-sha256=")
-    let previousRevisions = values(prefix: "binding:previous-revision=")
-    let previousTopologies = values(prefix: "binding:previous-usb-topology=")
-    guard revision == 2,
-      currentIdentities == [currentIdentity],
-      chatMarkers.count == 1,
-      runtimeSelections.isEmpty,
-      previousIdentities.count == 1,
-      previousRevisions == ["1"],
-      previousTopologies.count == 1,
-      let chatMarker = chatMarkers.first,
-      let previousIdentity = previousIdentities.first,
-      let previousTopology = previousTopologies.first,
-      RockchipStandingAuthorization.isCanonicalSHA256(chatMarker),
-      RockchipStandingAuthorization.isCanonicalSHA256(previousIdentity),
-      previousIdentity != currentIdentity,
-      !previousTopology.isEmpty,
-      previousTopology.utf8.allSatisfy({ (48...57).contains($0) }),
-      previousTopology == "0" || previousTopology.first != "0"
-    else { return nil }
-    return (previousIdentity, 1, previousTopology)
   }
 
   /// Answers whether this owner-only product binding covers the exact
@@ -396,11 +331,6 @@ package struct RockchipLoaderBindingRecoveryProof: Sendable, Equatable {
   package let previousRevision: Int
   package let currentRevision: Int
   package let selectionEvidenceSHA256: String
-}
-
-enum RockchipProductBindingReplacementKind: Sendable {
-  case adjacentIdentityTransition
-  case sameRevisionLegacyLoaderAttestation
 }
 
 package struct RockchipProductBindingStore: Sendable {
@@ -520,8 +450,7 @@ package struct RockchipProductBindingStore: Sendable {
   func replace(
     expectedRevision: Int,
     expectedSerialSHA256: String,
-    with candidate: RockchipProductBindingSnapshot,
-    kind: RockchipProductBindingReplacementKind = .adjacentIdentityTransition
+    with candidate: RockchipProductBindingSnapshot
   ) throws -> RockchipProductBindingSnapshot {
     try validate(candidate)
     try prepareRoot()
@@ -544,23 +473,9 @@ package struct RockchipProductBindingStore: Sendable {
     }
     let existingDigest = SHA256.hash(data: Data(existing.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
-    let replacementShapeMatches: Bool
-    switch kind {
-    case .adjacentIdentityTransition:
-      replacementShapeMatches = candidate.revision == existing.revision + 1
-    case .sameRevisionLegacyLoaderAttestation:
-      let legacyProof = try existing.legacyLoaderAttestationMigrationProof()
-      let runtimeProof = try candidate.loaderBindingRecoveryProof()
-      replacementShapeMatches =
-        candidate.revision == existing.revision
-        && candidate.serial == existing.serial
-        && candidate.usbTopology == existing.usbTopology
-        && legacyProof != nil
-        && runtimeProof != nil
-    }
     guard existing.revision == expectedRevision,
       existingDigest == expectedSerialSHA256,
-      replacementShapeMatches
+      candidate.revision == existing.revision + 1
     else { throw configurationError("durable binding changed before Loader rebind") }
 
     let encoder = JSONEncoder()

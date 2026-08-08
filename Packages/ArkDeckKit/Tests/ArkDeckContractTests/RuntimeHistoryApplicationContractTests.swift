@@ -142,10 +142,10 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let presentation = decode(
       """
       {"ok":true,"id":"x","result":[
-        {"jobId":"job-unknown","operation":"flash.dayu200@1","targetId":"t-1",
+        {"jobId":"job-unknown","operation":"flash.dayu200","targetId":"t-1",
          "state":"interrupted","waitingForHuman":false,"outcomeUnknown":true,
          "outstandingResidueCount":2,"timeline":["queued","running","interrupted"]},
-        {"jobId":"job-waiting","operation":"flash.dayu200@1","targetId":"t-2",
+        {"jobId":"job-waiting","operation":"flash.dayu200","targetId":"t-2",
          "state":"running","waitingForHuman":true,"outcomeUnknown":false,
          "outstandingResidueCount":0,"timeline":["queued","running"]},
         {"jobId":"job-settled","operation":"observe.devices@1","targetId":"t-3",

@@ -998,7 +998,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       facts.serverFacts["componentSigningTeam"],
       BundledRockchipComponent.signingTeamIdentifier)
     // Facts the adoption record cannot support are reported unknown, never
-    // fabricated: the old "dayu200@1"/"hdc" literals were guesses flowing
+    // fabricated: the old "dayu200"/"hdc" literals were guesses flowing
     // into evidence as if measured. With no probe composed nothing measured
     // them, so this stays exactly where #992 left it.
     XCTAssertEqual(facts.profileID, "unknown")
@@ -1075,7 +1075,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {
     let published = try XCTUnwrap(
-      RockchipFlashProfile.profile(reference: "dayu200@2"))
+      RockchipFlashProfile.profile(reference: "dayu200"))
     XCTAssertEqual(
       published.firmwareVersion, "OpenHarmony-7.0.0.35-20260728_180253")
 
@@ -1086,7 +1086,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(hdcOnPublishedBuild.facts.deviceMode, "hdc")
     XCTAssertEqual(
       hdcOnPublishedBuild.facts.buildFingerprint, published.firmwareVersion)
-    XCTAssertEqual(hdcOnPublishedBuild.facts.profileID, "dayu200@2")
+    XCTAssertEqual(hdcOnPublishedBuild.facts.profileID, "dayu200")
     // The probe is addressed by the adopted record's connect key, never by a
     // request field.
     let probedKeys = await hdcOnPublishedBuild.probe.observedConnectKeys()
@@ -1878,7 +1878,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let availability = await engine.operationAvailability()
     let flash = try XCTUnwrap(
       availability.first {
-        $0.reference == "flash.dayu200@1"
+        $0.reference == "flash.dayu200"
       })
     XCTAssertEqual(flash.state, .available)
     XCTAssertEqual(flash.reasons, [])
@@ -1889,7 +1889,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         sha256: String(repeating: "a", count: 64)),
       operationScope: [
         RuntimeCapabilityOperationScope(
-          operationID: "flash.dayu200", version: 1)
+          operationID: "flash.dayu200")
       ],
       effectCeiling: .destructive,
       issuedAtUTC: "2026-07-31T00:00:00Z",

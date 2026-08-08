@@ -79,7 +79,6 @@ FORBIDDEN_FIELD_NAMES = frozenset(
 TOP_LEVEL_REQUIRED = (
     "schemaVersion",
     "id",
-    "version",
     "title",
     "provider",
     "effect",
@@ -96,7 +95,7 @@ TOP_LEVEL_REQUIRED = (
     "artifacts",
     "profiles",
 )
-TOP_LEVEL_OPTIONAL = ("defaultPolicyIssuance", "completeOverwriteRecovery")
+TOP_LEVEL_OPTIONAL = ("version", "defaultPolicyIssuance", "completeOverwriteRecovery")
 STEP_REQUIRED = ("stepID", "kind", "effect", "cancellation", "binding", "compensation")
 STEP_OPTIONAL = ("actionRef", "optional", "notes")
 FIELD_REQUIRED = ("type", "required")
@@ -358,7 +357,8 @@ def validate_operation(
     _require_enum(doc["provider"], PROVIDERS, f"{where}.provider")
     _require_enum(doc["binding"], BINDINGS, f"{where}.binding")
     _require_enum(doc["concurrencyKey"], CONCURRENCY_KEYS, f"{where}.concurrencyKey")
-    _require_int(doc["version"], f"{where}.version", 1, 10_000)
+    if "version" in doc:
+        _require_int(doc["version"], f"{where}.version", 1, 10_000)
     _require_int(doc["timeoutSeconds"], f"{where}.timeoutSeconds", 1, 7200)
     _require_int(doc["outputByteBudget"], f"{where}.outputByteBudget", 1024, 1 << 30)
 
@@ -565,19 +565,44 @@ def validate_operation(
 
 
 def validate_profile(doc, where: str) -> None:
-    required = ("schemaVersion", "id", "version", "provider", "title", "constraints", "supportedOperations")
+    required = ("schemaVersion", "id", "provider", "title", "constraints", "supportedOperations")
     if not isinstance(doc, dict):
         raise CatalogError(f"{where}: document must be an object")
-    _require_keys(doc, required, (), where)
+    _require_keys(doc, required, ("version",), where)
     if doc["schemaVersion"] != "1.0.0":
         raise CatalogError(f"{where}: unsupported schemaVersion")
     _require_enum(doc["provider"], PROVIDERS, f"{where}.provider")
-    _require_int(doc["version"], f"{where}.version", 1, 10_000)
+    if "version" in doc:
+        _require_int(doc["version"], f"{where}.version", 1, 10_000)
     if not isinstance(doc["constraints"], dict):
         raise CatalogError(f"{where}.constraints: must be an object")
     ops = doc["supportedOperations"]
     if not isinstance(ops, list) or not ops or len(set(ops)) != len(ops):
         raise CatalogError(f"{where}.supportedOperations: must be a non-empty unique list")
+
+
+def operation_reference(doc: dict) -> str:
+    version = doc.get("version")
+    return doc["id"] if version is None else f"{doc['id']}@{version}"
+
+
+def operation_sort_key(doc: dict) -> tuple[str, int]:
+    return doc["id"], doc.get("version", 0)
+
+
+def profile_reference(doc: dict) -> str:
+    """Return the public identity of a profile.
+
+    Most profiles remain explicitly versioned. A profile with no meaningful
+    parallel revisions may omit ``version`` and use its bare ID; this prevents
+    a board identity such as DAYU200 from being confused with firmware builds.
+    """
+    version = doc.get("version")
+    return doc["id"] if version is None else f"{doc['id']}@{version}"
+
+
+def profile_sort_key(doc: dict) -> tuple[str, int]:
+    return doc["id"], doc.get("version", 0)
 
 
 def load_catalog(
@@ -595,7 +620,10 @@ def load_catalog(
             doc, registry, str(path.relative_to(REPO_ROOT)),
             stdout_actions=stdout_actions, remote_actions=remote_actions
         )
-        expected_name = f"{doc['id']}.v{doc['version']}.json"
+        expected_name = (
+            f"{doc['id']}.json" if "version" not in doc
+            else f"{doc['id']}.v{doc['version']}.json"
+        )
         if path.name != expected_name:
             raise CatalogError(f"{path}: file name must be {expected_name}")
         operations.append(doc)
@@ -605,30 +633,55 @@ def load_catalog(
     for path in sorted(profiles_dir.glob("*.json")):
         doc = json.loads(path.read_text(encoding="utf-8"))
         validate_profile(doc, str(path.relative_to(REPO_ROOT)))
-        expected_name = f"{doc['id']}.v{doc['version']}.json"
+        expected_name = (
+            f"{doc['id']}.json" if "version" not in doc
+            else f"{doc['id']}.v{doc['version']}.json"
+        )
         if path.name != expected_name:
             raise CatalogError(f"{path}: file name must be {expected_name}")
         profiles.append(doc)
 
-    operation_refs = {f"{doc['id']}@{doc['version']}" for doc in operations}
-    profile_refs = {f"{doc['id']}@{doc['version']}" for doc in profiles}
+    operation_refs = {operation_reference(doc) for doc in operations}
+    profile_refs = {profile_reference(doc) for doc in profiles}
     for doc in operations:
         missing = set(doc["profiles"]) - profile_refs
         if missing:
-            raise CatalogError(f"operation {doc['id']}@{doc['version']}: unknown profiles {sorted(missing)}")
+            raise CatalogError(
+                f"operation {operation_reference(doc)}: unknown profiles {sorted(missing)}"
+            )
     for doc in profiles:
         missing = set(doc["supportedOperations"]) - operation_refs
         if missing:
-            raise CatalogError(f"profile {doc['id']}@{doc['version']}: unknown operations {sorted(missing)}")
+            raise CatalogError(
+                f"profile {profile_reference(doc)}: unknown operations {sorted(missing)}"
+            )
     duplicate_ids = len(operation_refs) != len(operations)
     if duplicate_ids:
-        raise CatalogError("duplicate operation id@version")
+        raise CatalogError("duplicate operation reference")
+    operations_by_id: dict[str, list[dict]] = {}
+    for doc in operations:
+        operations_by_id.setdefault(doc["id"], []).append(doc)
+    for operation_id, variants in operations_by_id.items():
+        if len(variants) > 1 and any("version" not in item for item in variants):
+            raise CatalogError(
+                f"operation {operation_id}: an unversioned operation cannot coexist with versioned variants"
+            )
+    if len(profile_refs) != len(profiles):
+        raise CatalogError("duplicate profile reference")
+    profiles_by_id: dict[str, list[dict]] = {}
+    for doc in profiles:
+        profiles_by_id.setdefault(doc["id"], []).append(doc)
+    for profile_id, variants in profiles_by_id.items():
+        if len(variants) > 1 and any("version" not in item for item in variants):
+            raise CatalogError(
+                f"profile {profile_id}: an unversioned profile cannot coexist with versioned variants"
+            )
     return operations, profiles
 
 
 def catalog_digest(operations: list[dict]) -> str:
     canonical = json.dumps(
-        sorted(operations, key=lambda doc: (doc["id"], doc["version"])),
+        sorted(operations, key=operation_sort_key),
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
@@ -707,7 +760,7 @@ def generate_swift(operations: list[dict], digest: str) -> str:
         "",
         "  public static let operations: [CatalogOperationDescriptor] = [",
     ]
-    for doc in sorted(operations, key=lambda d: (d["id"], d["version"])):
+    for doc in sorted(operations, key=operation_sort_key):
         permitted = ", ".join(f".{value}" for value in sorted(doc["effect"]["permitted"], key=lambda v: EFFECTS.index(v)))
         authorization = ", ".join(
             f".{auth_effect}: .{policy}"
@@ -718,7 +771,8 @@ def generate_swift(operations: list[dict], digest: str) -> str:
         issuance = doc.get("defaultPolicyIssuance", "enabled")
         lines.append("    CatalogOperationDescriptor(")
         lines.append(f"      id: {_swift_string(doc['id'])},")
-        lines.append(f"      version: {doc['version']},")
+        version = "nil" if "version" not in doc else str(doc["version"])
+        lines.append(f"      version: {version},")
         lines.append(f"      title: {_swift_string(doc['title'])},")
         lines.append(f"      provider: .{doc['provider']},")
         lines.append(f"      minimumEffect: .{doc['effect']['minimum']},")
@@ -795,7 +849,7 @@ def generate_matrix(operations: list[dict], profiles: list[dict], digest: str) -
         "| Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
-    for doc in sorted(operations, key=lambda d: (d["id"], d["version"])):
+    for doc in sorted(operations, key=operation_sort_key):
         permitted = sorted(doc["effect"]["permitted"], key=lambda v: EFFECTS.index(v))
         effect_span = (
             permitted[0] if len(permitted) == 1 else f"{permitted[0]} → {permitted[-1]}"
@@ -808,7 +862,7 @@ def generate_matrix(operations: list[dict], profiles: list[dict], digest: str) -
         )
         issuance = doc.get("defaultPolicyIssuance", "enabled")
         lines.append(
-            f"| `{doc['id']}@{doc['version']}` | {doc['provider']} | {effect_span} "
+            f"| `{operation_reference(doc)}` | {doc['provider']} | {effect_span} "
             f"| {authorization} | {issuance} | {doc['binding']} | {doc['concurrencyKey']} "
             f"| {doc['timeoutSeconds']} | {doc['outputByteBudget']} |"
         )
@@ -817,9 +871,9 @@ def generate_matrix(operations: list[dict], profiles: list[dict], digest: str) -
     lines.append("")
     lines.append("| Profile | Provider | Supported operations |")
     lines.append("| --- | --- | --- |")
-    for doc in sorted(profiles, key=lambda d: (d["id"], d["version"])):
+    for doc in sorted(profiles, key=profile_sort_key):
         ops = ", ".join(f"`{ref}`" for ref in doc["supportedOperations"])
-        lines.append(f"| `{doc['id']}@{doc['version']}` | {doc['provider']} | {ops} |")
+        lines.append(f"| `{profile_reference(doc)}` | {doc['provider']} | {ops} |")
     lines.append("")
     return "\n".join(lines)
 

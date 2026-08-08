@@ -121,16 +121,16 @@ public enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
 public struct RuntimeCapabilityOperationScope: Equatable, Sendable, Codable {
   /// Exact catalog operation id, e.g. "debug.hap".
   public let operationID: String
-  /// Exact catalog operation version. Ranges are deliberately not
-  /// expressible: a new operation version is a new authorization decision.
-  public let version: Int
+  /// Exact catalog operation version when the operation publishes one.
+  /// Ranges are deliberately not expressible.
+  public let version: Int?
 
-  public init(operationID: String, version: Int) {
+  public init(operationID: String, version: Int? = nil) {
     self.operationID = operationID
     self.version = version
   }
 
-  public var reference: String { "\(operationID)@\(version)" }
+  public var reference: String { version.map { "\(operationID)@\($0)" } ?? operationID }
 }
 
 /// Closed input-constraint vocabulary. A constraint narrows what a request
@@ -278,7 +278,7 @@ public enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
 /// pins carried by the capability?
 public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   public let operationID: String
-  public let operationVersion: Int
+  public let operationVersion: Int?
   public let effect: WorkflowEffect
   public let targetStableIdentitySHA256: String?
   public let targetBindingRevision: Int?
@@ -300,7 +300,7 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
 
   public init(
     operationID: String,
-    operationVersion: Int,
+    operationVersion: Int? = nil,
     effect: WorkflowEffect,
     targetStableIdentitySHA256: String?,
     targetBindingRevision: Int?,
@@ -324,6 +324,10 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
     self.workspaceRevision = workspaceRevision
     self.workspaceFileScopesDigest = workspaceFileScopesDigest
     self.workspaceIsIsolatedTaskCopy = workspaceIsIsolatedTaskCopy
+  }
+
+  public var operationReference: String {
+    operationVersion.map { "\(operationID)@\($0)" } ?? operationID
   }
 }
 
@@ -457,7 +461,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
     }
     for scope in operationScope {
       guard
-        !scope.operationID.isEmpty, scope.version >= 1,
+        !scope.operationID.isEmpty, scope.version.map({ $0 >= 1 }) ?? true,
         scope.operationID.allSatisfy({
           $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "." || $0 == "-")
         })
@@ -574,7 +578,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
       return .failure(
         .init(
           reason: .operationScopeMismatch,
-          detail: "\(query.operationID)@\(query.operationVersion) not in scope"))
+          detail: "\(query.operationReference) not in scope"))
     }
     switch targetScope {
     case .anyTarget:

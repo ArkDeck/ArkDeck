@@ -76,7 +76,7 @@ struct ArkDeckCommandLine {
     case "execute":
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "use the ArkDeck Flash UI or submit flash.dayu200@1 through the typed Job API")
+        message: "use the ArkDeck Flash UI or submit flash.dayu200 through the typed Job API")
     case "continue":
       throw CLIError(
         exitCode: EX_USAGE,
@@ -323,7 +323,7 @@ struct ArkDeckCommandLine {
           message: """
             standing-authorization flash no longer executes in this process; it runs on the \
             runtime job lane under a maintainer-issued exact-plan capability. Steps:
-              1. arkdeck capability draft --target <id> --operation flash.dayu200@1 \
+              1. arkdeck capability draft --target <id> --operation flash.dayu200 \
             --inputs-file <inputs.json> --output-directory <dir>
               2. open a PR that backfills the drafted envelope, and have the maintainer merge it
               3. arkdeck capability install --file <cap.json>
@@ -878,7 +878,7 @@ struct ArkDeckCommandLine {
   }
 
   static func selectedProfile(options: CLIOptions) throws -> RockchipFlashProfile {
-    let profileReference = options.value("--device-profile") ?? "dayu200@1"
+    let profileReference = options.value("--device-profile") ?? "dayu200"
     guard let profile = RockchipFlashProfile.board(reference: profileReference) else {
       throw CLIError(
         exitCode: EX_USAGE,
@@ -892,12 +892,9 @@ struct ArkDeckCommandLine {
   /// the plan instead of having to be found in a list of known builds.
   static func publishedProfile(for plan: RockchipFlashPlan) throws -> RockchipFlashProfile {
     // Board facts only, which is all its consumers read — the provider's step
-    // set and the authorization gate. Both published references describe the
-    // same board: `dayu200@2` already reused `dayu200@1`'s mapped partitions,
-    // forbidden partitions and prerequisites verbatim, and differed only in
-    // which build it enumerated. The build's own facts travel on the plan.
+    // set and the authorization gate. Per-build facts travel on the plan.
     _ = plan
-    return .dayu200OpenHarmony70035
+    return .dayu200
   }
 
   static func bindingState(_ options: CLIOptions) -> RockchipDeviceBindingState {
@@ -936,9 +933,9 @@ struct ArkDeckCommandLine {
   static func printExactPlan(_ plan: RockchipFlashPlan) {
     print("\nExact plan (\(plan.executionMode.rawValue))")
     print("  provider: \(RockchipRockUSBFlashProvider.providerIdentity)")
-    if let profile = RockchipFlashProfile.supportedDAYU200Profiles.first(where: {
-      $0.archiveSHA256 == plan.archiveSHA256
-    }) {
+    if let profile = RockchipFlashProfile.profile(
+      archiveSHA256: plan.archiveSHA256, byteCount: Int(plan.archiveSizeBytes)
+    ) {
       print("  profile: \(profile.catalogReference) (\(profile.firmwareVersion))")
     }
     print("  target: \(RockchipFlashProfile.targetDeviceModel)")
@@ -958,7 +955,7 @@ struct ArkDeckCommandLine {
     // archive it was built for. Finding a profile whose compiled-in digest
     // equals the plan's is how a build published after the last release ended
     // up with a complete plan it could not write down.
-    let document = RockchipRockUSBFlashProvider(profile: .dayu200OpenHarmony70035)
+    let document = RockchipRockUSBFlashProvider(profile: .dayu200)
       .planDocument(for: plan)
     let url = outputURL(options, fileName: "arkdeck-flash-plan.json")
     try document.canonicalData().write(to: url, options: .atomic)
@@ -1029,10 +1026,10 @@ struct ArkDeckCommandLine {
       --expected-sha256 <full-product-pin>
         arkdeck flash install-binding
         arkdeck flash plan --images <images.tar.gz> \
-      [--device-profile <dayu200@1|dayu200@2>] [--mode planOnly|simulated] [--out <dir>]
+      [--device-profile <dayu200>] [--mode planOnly|simulated] [--out <dir>]
         arkdeck flash status --campaign-id <ECAMP-id>
         arkdeck flash postflight --observation <observation.json> \
-      [--device-profile <dayu200@1|dayu200@2>]
+      [--device-profile <dayu200>]
         arkdeck update-feed prepare --sequence <n> --version <x.y.z> \
       --minimum-system <x.y.z> --issued-at <RFC3339> --expires-at <RFC3339> \
       --artifact <ArkDeck.dmg> --artifact-url <https-url> --notes <summary> --out <dir>
@@ -1042,7 +1039,7 @@ struct ArkDeckCommandLine {
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
-        arkdeck job submit --target <id> --operation <id@version> \
+        arkdeck job submit --target <id> --operation <reference> \
       [--expected-binding-revision <n>] [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
@@ -1053,7 +1050,7 @@ struct ArkDeckCommandLine {
         arkdeck capability inspect --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
-      [--device-profile <dayu200@1|dayu200@2>] [--json]
+      [--device-profile <dayu200>] [--json]
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
         arkdeck task submit --target <id> --goal <text> [--crash-signature <SIGx+Symbol>] \
       [--intake <text>] [--project <ref>] [--max-rounds <n>] \
@@ -1075,7 +1072,7 @@ struct ArkDeckCommandLine {
         arkdeck task promotion --task <HTASK-id> [--destination <directory>] [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
-        arkdeck agent run --operation <id@version> [--target <id>] [--inputs-file <path>] \
+        arkdeck agent run --operation <reference> [--target <id>] [--inputs-file <path>] \
       [--capability <CAP-RT-...>] [--json]
         arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
 

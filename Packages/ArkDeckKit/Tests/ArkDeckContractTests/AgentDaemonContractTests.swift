@@ -258,7 +258,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let observe = rows.first { $0["reference"] == .string("observe.device@1") }
     XCTAssertEqual(observe?["availability"], .string("available"))
     XCTAssertEqual(observe?["reasons"], .array([]))
-    let flash = rows.first { $0["reference"] == .string("flash.dayu200@1") }
+    let flash = rows.first { $0["reference"] == .string("flash.dayu200") }
     XCTAssertEqual(flash?["availability"], .string("unavailable"))
     guard case .array(let flashReasons)? = flash?["reasons"] else {
       return XCTFail("unavailable operation must explain why")
@@ -280,7 +280,7 @@ final class AgentDaemonContractTests: XCTestCase {
       Data(
         """
         {"protocolVersion":"1.0.0","id":"d","method":"operation.describe",
-         "params":{"reference":"flash.dayu200@1"}}
+         "params":{"reference":"flash.dayu200"}}
         """.utf8))
     guard case .object(let fields)? = describe.result else {
       return XCTFail("describe must return an object")
@@ -320,7 +320,7 @@ final class AgentDaemonContractTests: XCTestCase {
       handler, method: "flash.prerequisites",
       params: [
         "targetId": .string(target.targetID),
-        "profileReference": .string("dayu200@1"),
+        "profileReference": .string("dayu200"),
       ])
     guard case .object(let result)? = response.result,
       case .array(let observations)? = result["observations"]
@@ -334,7 +334,7 @@ final class AgentDaemonContractTests: XCTestCase {
       handler, method: "flash.prerequisites",
       params: [
         "targetId": .string("target-missing"),
-        "profileReference": .string("dayu200@1"),
+        "profileReference": .string("dayu200"),
       ])
     XCTAssertFalse(missing.ok)
     XCTAssertEqual(missing.error?.code, "notFound")
@@ -1022,8 +1022,8 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("health must answer from the real binary")
     }
     XCTAssertEqual(health["status"], .string("ok"))
-    guard let flash = try listOperations(socketPath: socketURL.path)["flash.dayu200@1"] else {
-      return XCTFail("production daemon must publish flash.dayu200@1 availability")
+    guard let flash = try listOperations(socketPath: socketURL.path)["flash.dayu200"] else {
+      return XCTFail("production daemon must publish flash.dayu200 availability")
     }
     XCTAssertEqual(flash.availability, "unavailable")
     XCTAssertEqual(flash.reasons.count, 1, "\(flash.reasons)")
@@ -1066,7 +1066,7 @@ final class AgentDaemonContractTests: XCTestCase {
         JSONValue.self, from: cliOutputData),
       case .object(let listedFlash)? = listedOperations.first(where: { item in
         guard case .object(let fields) = item else { return false }
-        return fields["reference"] == .string("flash.dayu200@1")
+        return fields["reference"] == .string("flash.dayu200")
       })
     else {
       return XCTFail("arkdeck operation list must expose daemon availability")
@@ -1191,13 +1191,13 @@ final class AgentDaemonContractTests: XCTestCase {
       observe.availability, "available",
       "a configured ARKDECK_HDC_PATH must admit observation: \(observe.reasons)")
 
-    // The Rockchip half. Whether flash.dayu200@1 becomes available also
+    // The Rockchip half. Whether flash.dayu200 becomes available also
     // depends on the installed product component, which no test can install
     // (production trust is a Developer ID signature) or uninstall. What is
     // host-independent is the direction: configuring HDC must retire the
     // descriptor-bound blocker, leaving at most the component one.
-    guard let flash = operations["flash.dayu200@1"] else {
-      return XCTFail("production daemon must publish flash.dayu200@1 availability")
+    guard let flash = operations["flash.dayu200"] else {
+      return XCTFail("production daemon must publish flash.dayu200 availability")
     }
     XCTAssertFalse(
       flash.reasons.contains { $0.contains("requires descriptor-bound HDC") },
@@ -1757,7 +1757,7 @@ final class AgentDaemonContractTests: XCTestCase {
 
     // Any well-formed declaration is admissible, including the two builds that
     // used to be the only ones, and including one nobody has seen.
-    for profile in RockchipFlashProfile.supportedDAYU200Profiles {
+    for profile in [RockchipFlashProfile.dayu200] {
       XCTAssertNotNil(
         FlashBundleImportPolicy.production.candidate(
           byteCount: Int(profile.archiveSizeBytes), sha256: profile.archiveSHA256))

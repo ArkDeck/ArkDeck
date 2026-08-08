@@ -237,19 +237,19 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
   private static func flashCapability(
     from operations: [[String: Any]]
   ) -> OverviewCapabilityItemPresentation {
-    guard let row = operations.first(where: { $0["reference"] as? String == "flash.dayu200@1" }),
+    guard let row = operations.first(where: { $0["reference"] as? String == "flash.dayu200" }),
       let availability = row["availability"] as? String,
       let reasons = row["reasons"] as? [String]
     else {
       return OverviewCapabilityItemPresentation(
         id: "rockusb-flash", name: "RockUSB Flash", state: .unknown,
-        evidence: "Runtime omitted flash.dayu200@1 availability")
+        evidence: "Runtime omitted flash.dayu200 availability")
     }
     return OverviewCapabilityItemPresentation(
       id: "rockusb-flash", name: "RockUSB Flash",
       state: availability == "available" ? .available : .unavailable,
       evidence: availability == "available"
-        ? "flash.dayu200@1 provider and lowering are available"
+        ? "flash.dayu200 provider and lowering are available"
         : (reasons.isEmpty ? "Runtime reported unavailable" : reasons.joined(separator: " · ")))
   }
 }
@@ -270,7 +270,7 @@ private actor OverviewCapabilityFixtureProvider: OverviewCapabilityApplicationPr
           evidence: "UI fixture · unrecognized help family"),
         OverviewCapabilityItemPresentation(
           id: "rockusb-flash", name: "RockUSB Flash", state: .available,
-          evidence: "UI fixture · flash.dayu200@1 available"),
+          evidence: "UI fixture · flash.dayu200 available"),
       ])
   }
 }
