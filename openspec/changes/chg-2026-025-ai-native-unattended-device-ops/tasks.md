@@ -3746,3 +3746,83 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   7.0.0.35 真镜像实跑通过(229s,主要是 731MB 哈希),设备 dispatch=0。
   其余四例全部无门。
 - 全量 `swift test`:1400 tests,0 failures,12 skipped(既有真机/真输入门)。
+
+## TASK-AIN-021 — App 生产可观察性与 typed 调试闭环收口
+
+- Status:in-progress（生产实现已在本地垂直工作树完成，等待本 Task 路径护栏经维护者
+  review/merge 进入 protected `main` 后提交产品 PR；本 Task PR 自身不修改产品代码、
+  Catalog 或 Runtime 行为）
+- Golden Journey:GJ-4 为首要阻塞；同时关闭 GJ-1/GJ-2/GJ-3/GJ-5 已有生产数据只差
+  App/facade 投影的断点
+- Platform:macos
+- Requirements:`REQ-UX-007`、`REQ-WF-003`、`REQ-DEBUG-008`、`REQ-TRACE-010`、
+  `REQ-FLASH-012`、`REQ-FLASH-013`、`REQ-FLASH-015`、`REQ-STO-003`
+- Acceptance:`AC-UX-007-01`、`AC-WF-003-01`、`AC-WF-003-02`、
+  `AC-DEBUG-008-01`、`AC-DEBUG-008-04`、`AC-TRACE-010-01`、
+  `AC-FLASH-012-01`、`AC-FLASH-013-01`、`AC-FLASH-015-01`、`AC-STO-003-01`
+- Depends on:protected `main` 上已发布的 Agent XPC、Runtime Job、Artifact、Flash、Trace、
+  Debug 与 Harness task contracts；历史 blocked/done Task 只作设计输入，不恢复 readiness
+  链，也不阻止当前产品缺陷修复
+- Production reachability:`ArkDeckApp workspace → production facade → Agent XPC →
+  protected-main daemon → RuntimeJobEngine / Artifact store / typed Provider → App timeline,
+  diagnostics, artifact export and terminal result`
+- Trusted fact sources:Job/Session/Artifact 元数据来自 daemon-owned durable store；设备、
+  binding、firmware、prerequisite、Trace tag、Debug package/forward 与 Rockchip access 判定
+  来自 typed production probes；App 只投影或提交 published operation reference + typed
+  inputs，不构造 capability、trusted fact、argv、远端路径或硬件 evidence
+- Allowed paths:
+  - `ArkDeck.xcodeproj/**`
+  - `ArkDeckApp/**`
+  - `ArkDeckAppUITests/**`
+  - `Catalog/**`
+  - `Packages/ArkDeckKit/**`
+  - `docs/design/**`
+  - `scripts/catalog_gen/**`
+- Forbidden paths:
+  - `openspec/constitution.md`、`openspec/specs/**`、`openspec/contracts/**`、
+    `openspec/verification/**`、`openspec/baselines/**`、`openspec/integrations/**`、
+    `openspec/platforms/**`
+  - `.github/**`、`AGENTS.md`、`PRODUCT-LOOP.md`、其他 change 目录
+  - caller/Agent capability administration、trusted-fact 注入、raw shell/command/argv、
+    任意 remote path、effect downgrade、unknown destructive intent replay、fixture/simulation
+    冒充生产或真实设备结果
+- Risk:high（新增两个已由 `REQ-DEBUG-008` 批准语义覆盖的 typed port-forward Catalog
+  operation，并把取消、Artifact 导出及生产探测接到 App；Runtime-owned admission、binding、
+  exact plan、intent-before-effect、semantic outcome、privacy 和 unknown-outcome fail-closed
+  不变量保持不变）
+- Hardware required:yes（仅 GJ-4 当前 Catalog digest 的最终 DAYU200 UI Flash 验收；
+  Task PR 与产品 PR 的 host gates 均不连接设备，设备 offline 时如实保持
+  `BLOCKED_BY_PRODUCT_DEFECT`，不得记为 `REAL_DEVICE_PASS`）
+- Decision-Grade:D1（新 published operation 的 exact Catalog materialization 随产品 PR
+  由维护者 review/merge 批准；不改变 destructive 自动化准入策略）
+
+### Deliverables
+
+- Flash submit 后在同步 `job.run` 期间持续轮询 `job.list` 并逐步投影 timeline；
+  `criticalNonInterruptible` 取消语义进入 presentation，取消只停止安全边界后的后续步骤。
+- Flash 维持单击按钮启动：移除文字短语确认，只保留 userdata 影响传达；Runtime-owned E2
+  capability、exact plan/binding/fresh facts 与首个外部 effect 前 durable reserve 不变。
+- 接通 Rockchip permission/driver access advisor、HDC `.timedOut`、Flash prerequisite 与
+  firmware/binding postflight；缺字段显示 unavailable，不造占位成功。
+- Trace/Debug/UI Dump/History 接通生产 probe 与 Artifact metadata/read/export；导出敏感
+  Artifact 必须显式 opt-in，size/SHA-256 与 privacy/status 逐项校验。
+- 以 `port-forward.create@1` / `port-forward.remove@1` 发布 closed typed operation：端口
+  仅接受受限十进制字段，exact inverse compensation + semantic readback，零 raw argv/path。
+- Overview capability matrix 与 Automation 只开放既有 read/list/reconcile/pause/cancel 面，
+  不开放 task submit、human resolution、capability 管理或未发布 Runtime 管理方法。
+- 同车更新 macOS 设计稿、交互 brief 与 prototype，使文字确认、Flash timeline、诊断、
+  Artifact、Debug forward 和 Automation UI 与生产行为一致。
+
+### Verification
+
+- `sh scripts/check-sdd.sh`、catalog generator unittest 与 zero-drift check 全绿。
+- `swift test --package-path Packages/ArkDeckKit --parallel --num-workers 8` 全量通过；
+  App `xcodebuild` 在禁用签名的隔离 DerivedData 中成功。
+- 合约测试覆盖 allowlist、semantic exit-zero failure、typed port bounds/inverse/readback、
+  Artifact chunk/hash/privacy、Flash polling/critical cancel/postflight、production facade 零
+  fixture fallback。
+- 产品 PR 的 `scripts/check_pr_paths.py --preflight` 必须以本 Task 的 base-tree Allowed
+  paths 覆盖完整 diff 后才能 push；不得在同一产品 PR 扩张本声明。
+- 当前 Catalog digest 的 DAYU200 真机 UI 路径只有完整 submit→execute→rebind→postflight
+  才能记 `REAL_DEVICE_PASS`；设备 Offline、任何 identity/permission/driver/outcome 不确定时
+  新 dispatch 为 0，并如实记录 blocker。
