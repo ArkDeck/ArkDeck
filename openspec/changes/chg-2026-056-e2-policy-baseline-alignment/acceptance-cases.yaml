@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 7
+change_revision: 9
 platform: macos
 evidence_classes:
 - contract
@@ -16,9 +16,12 @@ cases:
   minimum_evidence: contract
   expected_result: >-
     New writers and admission paths contain no E2, standing authorization or
-    campaign requirement; flash.dayu200@1 and deploy.native-library.system@1
+    campaign requirement; the unversioned flash.dayu200 and deploy.native-library.system@1
     remain destructive with unchanged typed Steps and use the unified
-    RuntimeCapability policy.
+    RuntimeCapability policy. Exactly one unversioned dayu200 profile retains
+    the current nine-partition recovery facts. flash.dayu200@1, dayu200@1 and
+    dayu200@2 are rejected for new requests without an alias or history rewrite;
+    App/UI/CLI/Agent/Provider output contains only flash.dayu200.
 - acceptance_id: E2R-RUNTIME-001
   test_id: TEST-E2R-RUNTIME-001
   method: >-
