@@ -87,9 +87,26 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
   }
 
+  private final class AdvancingClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var tick = 0
+
+    func nowUTC() -> String {
+      lock.withLock {
+        defer { tick += 1 }
+        return String(format: "2026-07-29T00:00:%02dZ", min(tick, 59))
+      }
+    }
+
+    var callCount: Int {
+      lock.withLock { tick }
+    }
+  }
+
   private func makeEngine(
     dispatcher: ScriptedDispatcher,
     nowUTC: String = "2026-07-29T00:00:00Z",
+    engineNowUTC: (@Sendable () -> String)? = nil,
     admissionFaultInjector: RuntimeAdmissionFaultInjector = .none
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let capabilityStore = try RuntimeCapabilityStore(
@@ -108,7 +125,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
-      nowUTC: { nowUTC })
+      nowUTC: engineNowUTC ?? { nowUTC })
     return (engine, capabilityStore)
   }
 
@@ -535,6 +552,27 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       record.request.authorization?.capabilityID,
       status.capability.capabilityID,
       "the daemon-owned reference must survive restart in the persisted typed request")
+  }
+
+  func testAutomaticCapabilityValidationUsesFreshClockAfterIssuance() async throws {
+    let clock = AdvancingClock()
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, capabilityStore) = try makeEngine(
+      dispatcher: dispatcher,
+      engineNowUTC: { clock.nowUTC() })
+    let lease = try await publishHAPLease()
+
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-auto-fresh-clock",
+        idempotencyKey: "idem-hap-auto-fresh-clock"))
+
+    let job = try await engine.status(jobID: acceptance.jobID)
+    let capabilities = try await capabilityStore.list()
+    let capability = try XCTUnwrap(capabilities.first?.capability)
+    XCTAssertGreaterThanOrEqual(job.createdAtUTC ?? "", capability.issuedAtUTC)
+    XCTAssertGreaterThanOrEqual(clock.callCount, 4)
   }
 
   func testAutomaticE1CapabilityRenewsWithoutHumanAuthorization() async throws {

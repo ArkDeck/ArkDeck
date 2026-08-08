@@ -4835,7 +4835,7 @@ public actor RuntimeJobEngine {
       try await capabilityStore.validateNewExecution(
         capabilityID: authorization.capabilityID,
         query: query,
-        nowUTC: admittedAt)
+        nowUTC: nowUTC())
       return PreparedAuthorization(
         reference: authorization, evidence: nil,
         completeOverwriteRecovery: recoveryAdmission.recoveryContext,
