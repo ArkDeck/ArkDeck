@@ -408,13 +408,22 @@ private struct AppShellView: View {
   }
 
   private func navigationRow(_ item: ArkDeckNavigationItem) -> some View {
-    Label {
-      Text(LocalizedStringKey(item.localizationKey))
-    } icon: {
-      Image(systemName: item.systemImageName)
+    NavigationLink(value: ShellSelection.navigation(item)) {
+      Label {
+        Text(LocalizedStringKey(item.localizationKey))
+      } icon: {
+        Image(systemName: item.systemImageName)
+      }
+      .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+      .contentShape(Rectangle())
     }
+    // NavigationLink is the native selectable element for a split-view
+    // sidebar. It keeps the visible label, stable identifier, selected state
+    // and activation action together instead of flattening them into an
+    // identifier-less AXRow.
+    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+    .contentShape(Rectangle())
     .accessibilityIdentifier(item.accessibilityIdentifier)
-    .tag(ShellSelection.navigation(item))
   }
 }
 

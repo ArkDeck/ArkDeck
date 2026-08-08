@@ -972,29 +972,31 @@ final class AppShellUITests: XCTestCase {
 
   // MARK: - Helpers
 
-  /// Sidebar rows expose their identifier on the static text inside the cell;
-  /// clicking that text does not move List selection, so the enclosing cell is
-  /// what must be pressed, by coordinate.
+  /// Sidebar rows expose one full-width native navigation element. Its name,
+  /// identifier and pointer frame stay together even after selection, so
+  /// assistive technology can activate the same target a person sees.
   private func select(
     _ identifier: String, in app: XCUIApplication,
     file: StaticString = #filePath, line: UInt = #line
   ) {
-    // The sidebar is an outline; `app.cells` also matches History's table rows,
-    // so the query has to say which list it means.
-    let cell = app.outlines.cells.containing(.staticText, identifier: identifier).firstMatch
+    let row = element(identifier, in: app)
     XCTAssertTrue(
-      cell.waitForExistenceFast(timeout: 10), "sidebar must expose \(identifier)",
+      row.waitForExistenceFast(timeout: 10), "sidebar must expose \(identifier)",
       file: file, line: line)
+    XCTAssertGreaterThan(
+      row.frame.width, 1, "sidebar target must have a clickable width", file: file, line: line)
+    XCTAssertGreaterThan(
+      row.frame.height, 1, "sidebar target must have a clickable height", file: file, line: line)
     let windowFrame = app.windows.firstMatch.frame
     let toolbar = app.toolbars.firstMatch
     let contentMinY = toolbar.exists ? toolbar.frame.maxY : windowFrame.minY
     let contentFrame = CGRect(
       x: windowFrame.minX, y: contentMinY,
       width: windowFrame.width, height: max(0, windowFrame.maxY - contentMinY))
-    let visibleFrame = cell.frame.intersection(contentFrame)
+    let visibleFrame = row.frame.intersection(contentFrame)
     if !visibleFrame.isNull, visibleFrame.height > 1 {
-      let normalizedY = (visibleFrame.midY - cell.frame.minY) / cell.frame.height
-      cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: normalizedY)).click()
+      let normalizedY = (visibleFrame.midY - row.frame.minY) / row.frame.height
+      row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: normalizedY)).click()
       return
     }
 
@@ -1010,13 +1012,12 @@ final class AppShellUITests: XCTestCase {
       XCTFail("unknown sidebar item \(identifier)", file: file, line: line)
       return
     }
-    let overviewCell = app.outlines.cells
-      .containing(.staticText, identifier: "app.navigation.overview").firstMatch
-    XCTAssertTrue(overviewCell.exists, file: file, line: line)
+    let overviewRow = element("app.navigation.overview", in: app)
+    XCTAssertTrue(overviewRow.exists, file: file, line: line)
     let focusPoint = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
       .withOffset(
         CGVector(
-          dx: overviewCell.frame.midX - windowFrame.minX,
+          dx: overviewRow.frame.midX - windowFrame.minX,
           dy: contentMinY - windowFrame.minY + 35))
     focusPoint.click()
     for _ in items {
