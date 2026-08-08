@@ -763,6 +763,10 @@ public actor RuntimeJobEngine {
   private let capabilityStore: RuntimeCapabilityStore
   private let artifactStore: RuntimeArtifactStore?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
+  /// Present in the production daemon. A lease spans only an actively
+  /// executing real Job and prevents idle *system* sleep; display sleep,
+  /// screen lock, lid closure and explicit sleep remain unaffected.
+  private let powerActivityController: PowerActivityController?
   /// Campaign-lane E2 authority ledger, shared (file plus flock) with the
   /// campaign admission service that mints reservations. Absent means this
   /// runtime cannot honor campaign-reservation requests and refuses them.
@@ -782,6 +786,7 @@ public actor RuntimeJobEngine {
     capabilityStore: RuntimeCapabilityStore,
     artifactStore: RuntimeArtifactStore? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
+    powerActivityController: PowerActivityController? = nil,
     agentUsageLedger: AgentAuthorityUsageLedger? = nil,
     flashStagingAvailableBytes: (@Sendable (URL) throws -> Int64)? = nil,
     nowUTC: @escaping @Sendable () -> String
@@ -792,6 +797,7 @@ public actor RuntimeJobEngine {
     self.capabilityStore = capabilityStore
     self.artifactStore = artifactStore
     self.traceRuntimeProbe = traceRuntimeProbe
+    self.powerActivityController = powerActivityController
     self.agentUsageLedger = agentUsageLedger
     self.flashStagingAvailableBytes =
       flashStagingAvailableBytes
@@ -1249,6 +1255,20 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.jobNotRunnable(
         "job \(jobID) was materialized against a different catalog digest")
     }
+
+    // Acquire before the running transition or any external dispatch. If the
+    // host cannot create the assertion the Job stays at its current durable
+    // safe boundary and may be retried; it never silently runs sleep-prone.
+    // Process-scoped assertions are also released by macOS on a hard crash.
+    let powerLease: PowerActivityLease?
+    do {
+      powerLease = try powerActivityController?.acquire(
+        reason: "ArkDeck Runtime Job \(jobID) (\(descriptor.reference))")
+    } catch {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "idle-system-sleep assertion unavailable; zero dispatch: \(error)")
+    }
+    defer { powerLease?.end() }
 
     if runtime.record.startedAtUTC == nil {
       runtime.record.startedAtUTC = nowUTC()

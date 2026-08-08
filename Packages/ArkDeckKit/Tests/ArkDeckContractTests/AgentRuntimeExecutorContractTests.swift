@@ -176,6 +176,37 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)
   }
 
+  func testHeadlessVerifierClosesUDSRuntimeArtifactAndPostflightWithoutUI() throws {
+    let client = try startDaemon()
+    let verifier = RuntimeHeadlessVerifier(
+      client: client, nowUTC: { "2026-07-29T00:00:00Z" })
+
+    let outcome = try verifier.verifyObserveDevice(
+      maximumWaitSeconds: 30, executionID: "headless-contract-001")
+    guard case .verified(let report) = outcome else {
+      return XCTFail("the headless Runtime chain must close: \(outcome)")
+    }
+
+    XCTAssertEqual(report.schemaVersion, "arkdeck-headless-runtime-verification/v1")
+    XCTAssertEqual(
+      report.classification, "runtimeReceipt",
+      "a fixture-backed contract must never label itself REAL_DEVICE_PASS")
+    XCTAssertTrue(report.runtimeVerified, "\(report.blockers)")
+    XCTAssertTrue(report.checks.udsHealthVerified)
+    XCTAssertTrue(report.checks.terminalReceiptVerified)
+    XCTAssertTrue(report.checks.trustedEvidenceVerified)
+    XCTAssertTrue(report.checks.artifactsVerified)
+    XCTAssertTrue(report.checks.runtimePostflightVerified)
+    XCTAssertEqual(report.receipt.operationReference, "observe.device@1")
+    XCTAssertEqual(report.receipt.terminalState, "succeeded")
+    XCTAssertFalse(report.receipt.outcomeUnknown)
+    XCTAssertEqual(
+      Set(report.artifactInventory.map(\.name)),
+      Set(["binding-snapshot.json", "device-facts.json", "tool-facts.json"]))
+    XCTAssertTrue(report.artifactInventory.allSatisfy { $0.status == "published" })
+    XCTAssertTrue(report.artifactInventory.allSatisfy { $0.jobID == report.receipt.jobID })
+  }
+
   func testDaemonPreservesHistoricalCampaignCorrelationForDecodeOnlyExport() throws {
     let digest = String(repeating: "a", count: 64)
     let currentCorrelation = RuntimeCampaignEvidenceCorrelation(
@@ -392,6 +423,46 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       return XCTFail("job.list must answer")
     }
     XCTAssertEqual(jobs.count, 1, "resume must not duplicate runtime jobs")
+  }
+
+  func testExplicitTargetNeverDispatchesAfterSelectingAnotherVisibleCandidate() throws {
+    let client = try startDaemon(
+      candidates: [
+        BootstrapCandidate(connectKey: "BBB", state: "Connected"),
+        BootstrapCandidate(connectKey: "CCC", state: "Connected"),
+      ],
+      preAdoptedConnectKey: "AAA")
+    guard case .array(let targets) = try client.request(method: "target.list"),
+      case .object(let original)? = targets.first,
+      case .string(let requestedTargetID)? = original["targetId"]
+    else {
+      return XCTFail("pre-adopted requested target must be listed")
+    }
+
+    let executor = self.executor(client)
+    let paused = try executor.run(
+      RuntimeAgentExecutionRequest(
+        operationID: "observe.device", operationVersion: 1,
+        targetID: requestedTargetID,
+        executionID: "explicit-target-candidate-mismatch-001"))
+    guard case .awaitingHumanAction(let selection, _) = paused else {
+      return XCTFail("ambiguous physical candidates must pause: \(paused)")
+    }
+    XCTAssertEqual(selection.kind, .selectTarget)
+    XCTAssertEqual(selection.selectionOptions, ["BBB", "CCC"])
+
+    let mismatched = try executor.resume(
+      resumeToken: selection.resumeToken, selection: "BBB")
+    guard case .awaitingHumanAction(let reconnect, let receipt) = mismatched else {
+      return XCTFail("a different physical target must not continue: \(mismatched)")
+    }
+    XCTAssertEqual(reconnect.kind, .physicalReconnect)
+    XCTAssertTrue(reconnect.prompt.contains("not the requested target"))
+    XCTAssertNil(receipt.jobID)
+    guard case .array(let jobs) = try client.request(method: "job.list") else {
+      return XCTFail("job.list must answer")
+    }
+    XCTAssertTrue(jobs.isEmpty, "target mismatch must remain zero-dispatch")
   }
 
   func testAgentSurfaceCannotManageCapabilitiesOrCarryCommands() throws {

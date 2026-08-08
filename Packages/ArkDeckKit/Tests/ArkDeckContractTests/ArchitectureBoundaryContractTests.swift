@@ -53,10 +53,11 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       "ArkDeckWorkflows", "ArkDeckAgentClient",
     ],
     "ArkDeckAgentClient": ["ArkDeckCore"],
+    "ArkDeckLaunchAgent": [],
     "ArkDeckAgentDaemon": ["ArkDeckCore", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"],
     "ArkDeckCLI": [
       "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
-      "ArkDeckAgentClient",
+      "ArkDeckAgentClient", "ArkDeckLaunchAgent",
     ],
     "ArkDeckAgentDaemonMain": [
       "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore", "ArkDeckHarness",
@@ -79,6 +80,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
     ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
     ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
+    ("ArkDeckLaunchAgent", "LaunchAgents", []),
     ("ArkDeckAgentDaemon", "Sources/ArkDeckAgentDaemon", []),
     ("ArkDeckCLI", "Sources/ArkDeckCLI", []),
     ("ArkDeckAgentDaemonMain", "Sources/ArkDeckAgentDaemonMain", []),

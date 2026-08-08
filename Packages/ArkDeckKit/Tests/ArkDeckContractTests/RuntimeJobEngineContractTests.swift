@@ -113,14 +113,17 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
 
     private let script: Script
+    private let beforeDispatch: (@Sendable () -> Void)?
     private let lock = NSLock()
     private(set) var dispatchCount = 0
 
-    init(script: Script) {
+    init(script: Script, beforeDispatch: (@Sendable () -> Void)? = nil) {
       self.script = script
+      self.beforeDispatch = beforeDispatch
     }
 
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      beforeDispatch?()
       lock.withLock { dispatchCount += 1 }
       switch (script, plan.action) {
       case (.knownFailureOnDeviceProbe, .hdc(.observeDevice)):
@@ -184,17 +187,20 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     dispatcher: ScriptedDispatcher,
     nowUTC: String = "2026-07-29T00:00:00Z",
     engineNowUTC: (@Sendable () -> String)? = nil,
-    admissionFaultInjector: RuntimeAdmissionFaultInjector = .none
+    admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
+    powerActivityController: PowerActivityController? = nil,
+    stateRoot: URL? = nil
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
+    let stateRoot = stateRoot ?? self.stateDirectory!
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateRoot.appendingPathComponent("capabilities", isDirectory: true))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateRoot.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { nowUTC })
     self.artifactStore = artifactStore
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory,
+        stateDirectory: stateRoot,
         admissionFaultInjector: admissionFaultInjector),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(factsPort: FactsPort())
@@ -202,8 +208,99 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
+      powerActivityController: powerActivityController,
       nowUTC: engineNowUTC ?? { nowUTC })
     return (engine, capabilityStore)
+  }
+
+  func testActiveJobOwnsIdleSleepLeaseAcrossDispatchAndEveryTerminal() async throws {
+    let backend = EnginePowerActivityBackend()
+    let controller = PowerActivityController(backend: backend)
+    let observation = LockedPowerObservation()
+    let dispatcher = ScriptedDispatcher(
+      script: .observationHappy,
+      beforeDispatch: {
+        observation.record(activeLeaseCount: controller.activeLeaseCount)
+      })
+    let (engine, _) = try makeEngine(
+      dispatcher: dispatcher, powerActivityController: controller)
+    let acceptance = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-power-success-01"))
+    let status = try await engine.run(jobID: acceptance.jobID)
+
+    XCTAssertEqual(status.state, JobState.succeeded.rawValue)
+    XCTAssertTrue(observation.everyDispatchWasProtected)
+    XCTAssertGreaterThan(observation.dispatchCount, 0)
+    XCTAssertEqual(backend.beginCount, 1)
+    XCTAssertEqual(backend.endCount, 1)
+    XCTAssertEqual(controller.activeLeaseCount, 0)
+
+    let unknownBackend = EnginePowerActivityBackend()
+    let unknownController = PowerActivityController(backend: unknownBackend)
+    let unknownDispatcher = ScriptedDispatcher(script: .outcomeUnknownOnDeviceProbe)
+    let unknownRoot = stateDirectory.appendingPathComponent("unknown-power", isDirectory: true)
+    let (unknownEngine, _) = try makeEngine(
+      dispatcher: unknownDispatcher, powerActivityController: unknownController,
+      stateRoot: unknownRoot)
+    let unknownAcceptance = try await unknownEngine.submit(
+      observeRequest(idempotencyKey: "idem-power-unknown-01"))
+    let unknown = try await unknownEngine.run(jobID: unknownAcceptance.jobID)
+    XCTAssertEqual(unknown.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertEqual(unknownBackend.beginCount, 1)
+    XCTAssertEqual(unknownBackend.endCount, 1)
+    XCTAssertEqual(unknownController.activeLeaseCount, 0)
+
+    let cancelledBackend = EnginePowerActivityBackend()
+    let cancelledController = PowerActivityController(backend: cancelledBackend)
+    let cancelledDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let cancelledRoot = stateDirectory.appendingPathComponent(
+      "cancelled-power", isDirectory: true)
+    let (cancelledEngine, _) = try makeEngine(
+      dispatcher: cancelledDispatcher, powerActivityController: cancelledController,
+      stateRoot: cancelledRoot)
+    let cancelledAcceptance = try await cancelledEngine.submit(
+      observeRequest(idempotencyKey: "idem-power-cancelled-01"))
+    try await cancelledEngine.requestCancel(jobID: cancelledAcceptance.jobID)
+    let cancelled = try await cancelledEngine.run(jobID: cancelledAcceptance.jobID)
+    XCTAssertEqual(cancelled.state, JobState.cancelled.rawValue)
+    XCTAssertEqual(cancelledBackend.beginCount, 1)
+    XCTAssertEqual(cancelledBackend.endCount, 1)
+    XCTAssertEqual(cancelledController.activeLeaseCount, 0)
+  }
+
+  func testIdleSleepAssertionFailureLeavesJobAtSafeBoundaryWithZeroDispatch() async throws {
+    let backend = EnginePowerActivityBackend()
+    backend.failNextBegin = true
+    let controller = PowerActivityController(backend: backend)
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, _) = try makeEngine(
+      dispatcher: dispatcher, powerActivityController: controller)
+    let acceptance = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-power-refusal-01"))
+
+    do {
+      _ = try await engine.run(jobID: acceptance.jobID)
+      XCTFail("a missing idle-sleep assertion must refuse before dispatch")
+    } catch let error as RuntimeJobEngineError {
+      guard case .jobNotRunnable(let detail) = error else {
+        return XCTFail("unexpected Runtime error: \(error)")
+      }
+      XCTAssertTrue(detail.contains("idle-system-sleep assertion unavailable"))
+      XCTAssertTrue(detail.contains("zero dispatch"))
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    let refusedStatus = try await engine.status(jobID: acceptance.jobID)
+    XCTAssertEqual(refusedStatus.state, JobState.preflight.rawValue)
+    XCTAssertEqual(controller.activeLeaseCount, 0)
+    XCTAssertEqual(backend.beginAttemptCount, 1)
+    XCTAssertEqual(backend.endCount, 0)
+
+    let retried = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(retried.state, JobState.succeeded.rawValue)
+    XCTAssertGreaterThan(dispatcher.dispatchCount, 0)
+    XCTAssertEqual(backend.beginAttemptCount, 2)
+    XCTAssertEqual(backend.beginCount, 1)
+    XCTAssertEqual(backend.endCount, 1)
   }
 
   private func observeRequest(
@@ -1311,5 +1408,71 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       }
     #endif
     return Bundle.main.bundleURL
+  }
+}
+
+private final class EnginePowerActivityBackend: PowerActivityBackend, @unchecked Sendable {
+  private let lock = NSLock()
+  private var beginAttempts = 0
+  private var begins = 0
+  private var ends = 0
+  var failNextBegin = false
+
+  func beginIdleSleepPrevention(reason _: String) throws -> AnyObject {
+    lock.lock()
+    beginAttempts += 1
+    let shouldFail = failNextBegin
+    failNextBegin = false
+    if !shouldFail { begins += 1 }
+    lock.unlock()
+    if shouldFail { throw RuntimeJobEngineError.internalFailure("power backend refused") }
+    return NSObject()
+  }
+
+  func endIdleSleepPrevention(_: AnyObject) {
+    lock.lock()
+    ends += 1
+    lock.unlock()
+  }
+
+  var beginAttemptCount: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return beginAttempts
+  }
+
+  var beginCount: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return begins
+  }
+
+  var endCount: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return ends
+  }
+}
+
+private final class LockedPowerObservation: @unchecked Sendable {
+  private let lock = NSLock()
+  private var counts: [Int] = []
+
+  func record(activeLeaseCount: Int) {
+    lock.lock()
+    counts.append(activeLeaseCount)
+    lock.unlock()
+  }
+
+  var everyDispatchWasProtected: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return !counts.isEmpty && counts.allSatisfy { $0 == 1 }
+  }
+
+  var dispatchCount: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return counts.count
   }
 }
