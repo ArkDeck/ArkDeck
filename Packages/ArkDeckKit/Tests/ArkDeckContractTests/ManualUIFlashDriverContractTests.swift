@@ -2,15 +2,18 @@ import Foundation
 import XCTest
 
 final class ManualUIFlashDriverContractTests: XCTestCase {
-  private func driverSource() throws -> String {
+  private func repositorySource(_ path: String) throws -> String {
     var repositoryRoot = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 {
       repositoryRoot.deleteLastPathComponent()
     }
     return try String(
-      contentsOf: repositoryRoot
-        .appendingPathComponent("scripts/rockchip_component/manual_ui_flash.swift"),
+      contentsOf: repositoryRoot.appendingPathComponent(path),
       encoding: .utf8)
+  }
+
+  private func driverSource() throws -> String {
+    try repositorySource("scripts/rockchip_component/manual_ui_flash.swift")
   }
 
   func testDriverUsesThePublishedOneClickFlashSurface() throws {
@@ -28,8 +31,18 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
     XCTAssertTrue(
       source.contains("try driver.waitForEnabled(\"flash.execute.submit\", timeout: 30)"))
+    XCTAssertTrue(
+      source.contains("try driver.waitForPresence(\"flash.impact.userdata\", timeout: 30)"))
+    XCTAssertFalse(source.contains("\"ERASE-USERDATA\","))
     XCTAssertTrue(source.contains("try driver.assertNoFlashSubmission()"))
     XCTAssertTrue(source.contains("try driver.submit(\"flash.execute.submit\")"))
+  }
+
+  func testApplicationExposesLocalizedUserdataImpactWithStableAccessibilityIdentity() throws {
+    let source = try repositorySource("ArkDeckApp/Features/Flash/FlashWorkspaceView.swift")
+    XCTAssertTrue(
+      source.contains(".accessibilityIdentifier(dataImpactIdentifier(impact))"))
+    XCTAssertTrue(source.contains("return \"flash.impact.userdata\""))
   }
 
   func testNavigationHasNativeActionFallbackWhenAXOmitsTheFrame() throws {

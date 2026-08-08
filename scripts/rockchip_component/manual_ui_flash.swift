@@ -798,9 +798,9 @@ func run() throws {
       options.expectedArchiveDigest,
       options.expectedStepSetDigest,
       options.expectedTargetID,
-      "ERASE-USERDATA",
     ],
     timeout: 30)
+  try driver.waitForPresence("flash.impact.userdata", timeout: 30)
   try driver.waitForAbsence("flash.confirm.sheet", timeout: 1)
   try driver.waitForPresence("flash.execute.submit", timeout: 30)
   try driver.waitForEnabled("flash.execute.submit", timeout: 30)
