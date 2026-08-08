@@ -3358,7 +3358,7 @@ public actor RuntimeJobEngine {
     expectedBindingRevision: Int
   ) throws -> String? {
     let candidates = jobs.values.filter { runtime in
-      runtime.record.operationReference == "flash.dayu200"
+      Self.isDayu200Flash(runtime.record)
         && runtime.record.request.target.targetID == targetID
         && runtime.record.request.target.expectedBindingRevision == expectedBindingRevision
         && runtime.record.state == JobState.waitingForRecovery.rawValue
@@ -3493,7 +3493,7 @@ public actor RuntimeJobEngine {
     expectedBindingRevision: Int
   ) throws -> (intent: OutstandingJournalIntent, inspection: JournalReplay) {
     guard let runtime = jobs[jobID],
-      runtime.record.operationReference == "flash.dayu200",
+      Self.isDayu200Flash(runtime.record),
       runtime.record.request.target.targetID == targetID,
       runtime.record.request.target.expectedBindingRevision == expectedBindingRevision,
       runtime.record.state == JobState.waitingForRecovery.rawValue,
@@ -3905,8 +3905,14 @@ public actor RuntimeJobEngine {
       ? .recoveringByCompleteOverwrite : .running
   }
 
-  private static func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
-    record.operationReference == "flash.dayu200"
+  static func isDayu200Flash(_ record: RuntimeJobRecord) -> Bool {
+    // operationReference is durable presentation data and may contain the pre-singleton "@1" alias.
+    // The typed request operation ID is the stable identity for recovery and journal compatibility.
+    record.request.operation.id == "flash.dayu200"
+  }
+
+  static func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
+    isDayu200Flash(record)
       ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
   }
 
