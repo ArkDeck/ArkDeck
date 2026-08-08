@@ -1664,7 +1664,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertThrowsError(try candidates[0].validate(notAnArchive))
   }
 
-  func testChunkedFlashBundleImportPublishesATargetBoundFileLease() async throws {
+  func testChunkedFlashBundleImportAcceptsDailyFilenameAndPublishesCanonicalLease() async throws {
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent(
         "targets-flash", isDirectory: true))
@@ -1699,7 +1699,8 @@ final class AgentDaemonContractTests: XCTestCase {
       handler, method: "artifact.importFlashBundle.begin",
       params: [
         "targetId": .string(target.targetID),
-        "name": .string("images.tar.gz"),
+        "name": .string(
+          "version-Daily_Version-OpenHarmony_7.0.0.35-20260728_180253-dayu200_img.tar.gz"),
         "byteCount": .integer(Int64(bytes.count)),
         "sha256": .string(digest),
       ])
@@ -1757,6 +1758,9 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(lease.contains(stateDirectory.path))
     let metadata = try await artifactStore.inspect(
       jobID: jobID, artifactID: artifactID)
+    XCTAssertEqual(
+      metadata.name, "images.tar.gz",
+      "caller filenames must neither gate import nor control the artifact namespace")
     XCTAssertEqual(metadata.mediaType, "application/gzip")
     XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
     XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
@@ -1826,6 +1830,18 @@ final class AgentDaemonContractTests: XCTestCase {
       byteCount: 730_766_386,
       sha256: "8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a")
     XCTAssertTrue(unknownBuild.ok, unknownBuild.error?.message ?? "-")
+
+    let nameless = try await request(
+      handler, method: "artifact.importFlashBundle.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "byteCount": .integer(730_766_386),
+        "sha256": .string(
+          "8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a"),
+      ])
+    XCTAssertTrue(
+      nameless.ok,
+      "source name is optional metadata; archive bytes are judged on commit")
   }
 
   func testNativeLibraryImportValidatesELFAndPublishesBoundLease() async throws {

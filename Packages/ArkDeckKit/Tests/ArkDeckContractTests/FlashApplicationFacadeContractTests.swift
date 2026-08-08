@@ -150,27 +150,6 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(reviewedPlan.steps.map(\.id), campaignPlan.steps.map(\.id))
   }
 
-  func testRuntimeImportUsesCanonicalBundleNameInsteadOfLocalDailyFilename() throws {
-    let target = FlashTargetPresentation(
-      id: "target-dayu200-a",
-      bindingRevision: 4,
-      toolVersion: "3.2.0f",
-      adoptedAtUTC: "2026-08-06T08:00:00Z")
-    let plan = try executePresentation(target: target)
-    XCTAssertEqual(
-      plan.imageFileName,
-      "dayu200_img.tar.gz",
-      "the operator-facing filename remains presentation metadata")
-
-    let params = FlashRuntimeSubmissionRequest.importBeginParams(
-      target: target, plan: plan)
-
-    XCTAssertEqual(params["name"], .string("images.tar.gz"))
-    XCTAssertEqual(params["targetId"], .string(target.id))
-    XCTAssertEqual(params["byteCount"], .integer(plan.archiveSizeBytes))
-    XCTAssertEqual(params["sha256"], .string(plan.archiveSHA256))
-  }
-
   func testPreviewModesCannotReuseExecutableStepIdentities() throws {
     let provider = RockchipRockUSBFlashProvider(
       profile: RockchipFlashProfile.dayu200OpenHarmony70035)
