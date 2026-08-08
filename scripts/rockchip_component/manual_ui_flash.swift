@@ -4,9 +4,10 @@
 // XCTest/UI-test target because a flash attempt can take several minutes.
 //
 // The driver exercises ArkDeck's real Accessibility surface, verifies the
-// exact plan shown by the UI, acknowledges userdata loss, and presses the
-// App's typed Runtime submit control. Runtime creates/consumes the capability;
-// this driver has no authority or capability administration surface.
+// exact plan and userdata impact shown by the UI, and presses the App's
+// one-click typed Runtime submit control. Runtime creates/consumes the
+// capability; this driver has no authority or capability administration
+// surface.
 
 import AppKit
 import ApplicationServices
@@ -388,32 +389,38 @@ final class AccessibilityDriver {
     return false
   }
 
-  /// Replaces a text field exactly as a person would, then waits until the
-  /// accessibility value proves SwiftUI accepted the edit.
-  func replaceText(_ value: String, identifier: String, timeout: TimeInterval = 20) throws {
-    try revealAndClick(identifier, timeout: timeout)
-    key(virtualCode: CGKeyCode(kVK_ANSI_A), flags: [.maskCommand])
-    type(value)
-    try waitForExactValue(value, identifier: identifier, timeout: timeout)
-  }
-
   private func click(_ element: AXUIElement, identifier: String) throws {
-    guard let frame = frame(of: element), frame.width > 0, frame.height > 0 else {
-      throw DriverFailure.message("UI element has no clickable frame: \(identifier)")
+    if let frame = frame(of: element), frame.width > 0, frame.height > 0 {
+      let point = CGPoint(x: frame.midX, y: frame.midY)
+      guard
+        let down = CGEvent(
+          mouseEventSource: nil, mouseType: .leftMouseDown,
+          mouseCursorPosition: point, mouseButton: .left),
+        let up = CGEvent(
+          mouseEventSource: nil, mouseType: .leftMouseUp,
+          mouseCursorPosition: point, mouseButton: .left)
+      else {
+        throw DriverFailure.message("could not create pointer events for \(identifier)")
+      }
+      down.post(tap: .cghidEventTap)
+      up.post(tap: .cghidEventTap)
+      return
     }
-    let point = CGPoint(x: frame.midX, y: frame.midY)
-    guard
-      let down = CGEvent(
-        mouseEventSource: nil, mouseType: .leftMouseDown,
-        mouseCursorPosition: point, mouseButton: .left),
-      let up = CGEvent(
-        mouseEventSource: nil, mouseType: .leftMouseUp,
-        mouseCursorPosition: point, mouseButton: .left)
-    else {
-      throw DriverFailure.message("could not create pointer events for \(identifier)")
-    }
-    down.post(tap: .cghidEventTap)
-    up.post(tap: .cghidEventTap)
+
+    // macOS 26 can flatten a SwiftUI NavigationSplitView label into an AXRow
+    // whose visual frame is omitted even though it remains actionable. Keep
+    // the native action/settable-selection fallback bounded to the exact
+    // element found by identifier or localized visible text.
+    let pressed = AXUIElementPerformAction(element, kAXPressAction as CFString)
+    if pressed == .success { return }
+    let selected = AXUIElementSetAttributeValue(
+      element, kAXSelectedAttribute as CFString, kCFBooleanTrue)
+    if selected == .success { return }
+
+    let role = stringAttribute(element, kAXRoleAttribute as CFString) ?? "unknown"
+    throw DriverFailure.message(
+      "UI element has no clickable frame or native selection action: \(identifier) "
+        + "role=\(role) AXPress=\(pressed.rawValue) AXSelected=\(selected.rawValue)")
   }
 
   func setValue(_ value: String, identifier: String, timeout: TimeInterval = 20) throws {
@@ -515,25 +522,6 @@ final class AccessibilityDriver {
     throw DriverFailure.message("file picker did not accept the Go to Folder path")
   }
 
-  func waitForExactValue(
-    _ expected: String, identifier: String, timeout: TimeInterval
-  ) throws {
-    let deadline = Date().addingTimeInterval(timeout)
-    var observed: [String] = []
-    repeat {
-      if let element = element(identifier: identifier) {
-        scrollToBottom(containing: element)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        observed = strings(near: element)
-        if observed.contains(expected) { return }
-      }
-      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-    } while Date() < deadline
-    throw DriverFailure.message(
-      "UI element \(identifier) did not expose exact value \(expected) before timeout; "
-        + "observed: \(observed)")
-  }
-
   /// Waits only on the post-submit presentation owned by the current review.
   /// Historical Runtime cards deliberately do not participate in this check.
   func waitForFlashSubmission(timeout: TimeInterval) throws -> (jobID: String, state: String) {
@@ -561,6 +549,16 @@ final class AccessibilityDriver {
     } while Date() < deadline
     throw DriverFailure.message(
       "current UI submission did not return a terminal Runtime Flash result before timeout")
+  }
+
+  func assertNoFlashSubmission() throws {
+    let forbidden = [
+      "flash.execute.failure", "flash.execute.jobId", "flash.execute.terminal",
+    ]
+    if let exposed = forbidden.first(where: { element(identifier: $0) != nil }) {
+      throw DriverFailure.message(
+        "Flash UI exposed \(exposed) before the one-click submit action")
+    }
   }
 
   func chooseFile(_ url: URL) throws {
@@ -794,11 +792,8 @@ func run() throws {
     ],
     timeout: 180)
 
-  try driver.press("flash.execute.review")
-  let destructivePhrase = "FLASH \(options.expectedPlanDigest.prefix(12))"
   try driver.waitForFacts(
     [
-      destructivePhrase,
       options.expectedPlanDigest,
       options.expectedArchiveDigest,
       options.expectedStepSetDigest,
@@ -806,31 +801,17 @@ func run() throws {
       "ERASE-USERDATA",
     ],
     timeout: 30)
-  try driver.replaceText(
-    destructivePhrase, identifier: "flash.confirm.destructivePhrase", timeout: 20)
-  try driver.replaceText(
-    "ERASE-USERDATA", identifier: "flash.confirm.userdataPhrase", timeout: 20)
-  try driver.revealAndClick("flash.confirm.accept")
-  try driver.waitForAbsence("flash.confirm.sheet", timeout: 30)
-  try driver.waitForFacts(
-    [
-      options.expectedPlanDigest,
-      options.expectedArchiveDigest,
-      options.expectedTargetID,
-    ],
-    timeout: 30)
-  // SwiftUI may merge the receipt Label into its decorated container, while
-  // the submit control remains a stable, named post-review element.
-  try driver.waitForExactValue(
-    "0", identifier: "flash.execute.mutationDispatchCount", timeout: 30)
+  try driver.waitForAbsence("flash.confirm.sheet", timeout: 1)
   try driver.waitForPresence("flash.execute.submit", timeout: 30)
+  try driver.waitForEnabled("flash.execute.submit", timeout: 30)
+  try driver.assertNoFlashSubmission()
   if options.stopBeforeSubmit {
     print(
-      "UI_REVIEW_PASS: reviewed typed Flash request is ready; "
-        + "mutation dispatch count is 0 and no Runtime Job was submitted")
+      "UI_REVIEW_PASS: exact typed Flash request is ready for one-click submit; "
+        + "no Runtime Job is exposed before the button is pressed")
     return
   }
-  print("UI_REVIEW_PASS: submitting the reviewed typed Flash request through ArkDeck UI")
+  print("UI_REVIEW_PASS: submitting the exact typed Flash request with one ArkDeck UI click")
   try driver.submit("flash.execute.submit")
   let submission = try driver.waitForFlashSubmission(timeout: options.timeoutSeconds)
   guard submission.state == "succeeded" else {
