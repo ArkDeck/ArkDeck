@@ -64,6 +64,7 @@ public enum ArkDeckAgentXPC {
     "device.candidates",
     "debug.probe",
     "debug.template.run",
+    "flash.bootloader-status",
     "flash.prerequisites",
     "job.evidence",
     "job.list",
@@ -82,6 +83,14 @@ public enum ArkDeckAgentXPC {
     "artifact.importFlashBundle.append",
     "artifact.importFlashBundle.begin",
     "artifact.importFlashBundle.commit",
+  ]
+
+  /// The App may ask Runtime to bind one freshly re-read Loader candidate to
+  /// the explicitly selected adopted target. This method is not a device
+  /// command and cannot dispatch Flash; the daemon applies Core rebind policy
+  /// and persists the adjacent revision before returning.
+  public static let forwardableRockchipBindingMethods: Set<String> = [
+    "flash.bind-current-loader"
   ]
 
   /// These names are generic in the daemon protocol. The XPC endpoint must
@@ -107,6 +116,7 @@ public enum ArkDeckAgentXPC {
   public static let forwardableMethods =
     forwardableReadOnlyMethods
     .union(forwardableFlashBundleMethods)
+    .union(forwardableRockchipBindingMethods)
     .union(gatedAppJobMethods)
     .union(forwardableAutomationMethods)
 

@@ -43,6 +43,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   private struct ConfirmingDispatcher: RuntimeProcessDispatching {
     let log: DispatchLog
+    var outcomeUnknownStepID: String? = nil
 
     func unavailableReason(providerID _: String) -> String? { nil }
 
@@ -51,6 +52,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         throw RuntimeDispatchFailure.failed("recovery fixture received a non-host-managed plan")
       }
       await log.record(descriptor.stepID)
+      if descriptor.stepID == outcomeUnknownStepID {
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "fixture lost the enter-Loader process after durable intent")
+      }
       return ProviderProcessReceipt(
         exitStatus: 0, stdout: Data("confirmed fixture".utf8), stderr: Data(),
         stdoutTruncated: false, durationSeconds: 0.001,
@@ -154,6 +159,94 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         return XCTFail("unexpected tamper refusal: \(error)")
       }
     }
+  }
+
+  func testUniqueLoaderBindingClosesOnlyOutstandingEnterLoaderIntentWithoutReplay()
+    async throws
+  {
+    let archive = try recoveryArchive()
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let artifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-loader-input", sessionID: "session-loader-input",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
+          stableIdentitySHA256: identity),
+        contents: archive))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+    let dispatchLog = DispatchLog()
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: stateDirectory),
+      providers: DeviceProviderRegistry(providers: [
+        RockchipFlashProviderAdapter(
+          factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
+          availability: .available)
+      ]),
+      dispatcher: ConfirmingDispatcher(
+        log: dispatchLog, outcomeUnknownStepID: "enter-loader-mode"),
+      capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let request = try flashRequest(id: "loader-binding", lease: lease)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let accepted = try await engine.submit(encoder.encode(request))
+    let expectedBindingRevision = try XCTUnwrap(
+      request.target.expectedBindingRevision)
+
+    let parked = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(parked.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertTrue(parked.outcomeUnknown)
+    let pendingJobID = try await engine.loaderTransitionAwaitingBinding(
+      targetID: request.target.targetID,
+      expectedBindingRevision: expectedBindingRevision)
+    XCTAssertEqual(pendingJobID, accepted.jobID)
+
+    let selectionEvidence = String(repeating: "a", count: 64)
+    let settled = try await engine.settleLoaderTransitionAfterBinding(
+      jobID: accepted.jobID,
+      targetID: request.target.targetID,
+      previousBindingRevision: 2,
+      currentBindingRevision: 3,
+      selectionEvidenceSHA256: selectionEvidence)
+    XCTAssertEqual(settled.state, JobState.failed.rawValue)
+    XCTAssertFalse(settled.outcomeUnknown)
+    XCTAssertTrue(
+      settled.timeline.contains {
+        $0.contains("original action not replayed")
+      })
+    let pendingAfterSettlement = try await engine.loaderTransitionAwaitingBinding(
+      targetID: request.target.targetID,
+      expectedBindingRevision: expectedBindingRevision)
+    XCTAssertNil(pendingAfterSettlement)
+
+    let dispatches = await dispatchLog.snapshot()
+    XCTAssertEqual(dispatches, ["enter-loader-mode"])
+    let replay = try DurableJournalRecovery.inspect(
+      url: stateDirectory.appendingPathComponent(
+        "jobs/\(accepted.jobID)/journal.jsonl"))
+    XCTAssertTrue(replay.outstandingIntents.isEmpty)
+    XCTAssertTrue(replay.unknownOutcomes.isEmpty)
+    XCTAssertEqual(replay.currentState, .failed)
+    XCTAssertTrue(
+      replay.events.contains {
+        $0.kind == .stepOutcome
+          && $0.stepID == "enter-loader-mode"
+          && $0.payload["outcomeCertainty"] == .string("confirmed")
+      })
+    let capabilityStatuses = try await capabilityStore.list()
+    let consumed = try XCTUnwrap(capabilityStatuses.only)
+    XCTAssertEqual(consumed.lineage.last?.outcome, .confirmed)
+    XCTAssertEqual(consumed.lineage.last?.outcomeHistory.last?.terminalState, "failed")
   }
 
   func testCompleteLaterFlashHistoryAppendsSupersessionWithoutChangingUnknownJobs() async throws {

@@ -221,7 +221,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       evidence: [
         "product:e0-iokit-single-loader-readback",
         "identity:serial-sha256=\(currentIdentity)",
-        "rebind:chat-confirmation-sha256=\(confirmation)",
+        "rebind:user-selection-sha256=\(confirmation)",
         "identity:previous-serial-sha256=\(previousIdentity)",
         "binding:previous-revision=1",
         "binding:previous-usb-topology=18874368",
@@ -255,10 +255,12 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       evidence: [
         "product:e0-iokit-single-loader-readback",
         "identity:serial-sha256=\(loaderIdentity)",
-        "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+        "rebind:user-selection-sha256=\(String(repeating: "b", count: 64))",
         "identity:previous-serial-sha256=\(normalIdentity)",
         "binding:previous-revision=1",
         "binding:previous-usb-topology=18874368",
+        "identity:hdc-normal-alias-sha256=\(normalIdentity)",
+        "binding:hdc-normal-alias-usb-topology=18874368",
       ])
 
     XCTAssertTrue(
@@ -325,10 +327,12 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     let evidence = [
       "product:e0-iokit-single-loader-readback",
       "identity:serial-sha256=\(loaderIdentity)",
-      "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+      "rebind:user-selection-sha256=\(String(repeating: "b", count: 64))",
       "identity:previous-serial-sha256=\(normalIdentity)",
       "binding:previous-revision=1",
       "binding:previous-usb-topology=18874368",
+      "identity:hdc-normal-alias-sha256=\(normalIdentity)",
+      "binding:hdc-normal-alias-usb-topology=18874368",
     ]
     let snapshot = RockchipProductBindingSnapshot(
       revision: 2, serial: loaderSerial, usbTopology: "17956864", evidence: evidence)
@@ -374,7 +378,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     let confirmation = String(repeating: "b", count: 64)
     let validEvidence = [
       "identity:serial-sha256=\(currentIdentity)",
-      "rebind:chat-confirmation-sha256=\(confirmation)",
+      "rebind:user-selection-sha256=\(confirmation)",
       "identity:previous-serial-sha256=\(previousIdentity)",
       "binding:previous-revision=1",
       "binding:previous-usb-topology=18874368",
@@ -384,8 +388,8 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       Array(validEvidence.dropFirst()),
       validEvidence + ["identity:previous-serial-sha256=\(String(repeating: "c", count: 64))"],
       validEvidence.map {
-        $0.hasPrefix("rebind:chat-confirmation-sha256=")
-          ? "rebind:chat-confirmation-sha256=not-a-digest" : $0
+        $0.hasPrefix("rebind:user-selection-sha256=")
+          ? "rebind:user-selection-sha256=not-a-digest" : $0
       },
     ] {
       XCTAssertThrowsError(

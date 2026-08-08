@@ -3341,6 +3341,183 @@ public actor RuntimeJobEngine {
     return recovered
   }
 
+  /// Returns the one unresolved DAYU200 enter-Loader intent that a fresh,
+  /// user-selected Loader binding may close. This performs no write and is
+  /// intentionally stricter than ordinary reconciliation: an explicit
+  /// outcomeUnknown row, a torn journal, a destructive intent or more than
+  /// one candidate can never be converted into a confirmed transition.
+  public func loaderTransitionAwaitingBinding(
+    targetID: String,
+    expectedBindingRevision: Int
+  ) throws -> String? {
+    let candidates = jobs.values.filter { runtime in
+      runtime.record.operationReference == "flash.dayu200@1"
+        && runtime.record.request.target.targetID == targetID
+        && runtime.record.request.target.expectedBindingRevision == expectedBindingRevision
+        && runtime.record.state == JobState.waitingForRecovery.rawValue
+        && runtime.record.outcomeUnknown
+        && runtime.record.recoveryStepID == "enter-loader-mode"
+        && runtime.record.recoveryIntentEventID != nil
+    }
+    guard candidates.count <= 1 else {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "multiple unresolved Loader transitions cover target \(targetID)")
+    }
+    guard let candidate = candidates.first else { return nil }
+    _ = try pendingLoaderTransition(
+      jobID: candidate.record.jobID,
+      targetID: targetID,
+      expectedBindingRevision: expectedBindingRevision)
+    return candidate.record.jobID
+  }
+
+  /// Closes only an outstanding enter-Loader intent after Runtime has
+  /// durably advanced the selected target from the old HDC personality to a
+  /// freshly observed, unique Loader personality. The old Job never resumes:
+  /// it becomes a certain failed Job at a confirmed safe boundary, forcing a
+  /// newly materialized plan against the new binding revision.
+  public func settleLoaderTransitionAfterBinding(
+    jobID: String,
+    targetID: String,
+    previousBindingRevision: Int,
+    currentBindingRevision: Int,
+    selectionEvidenceSHA256: String
+  ) async throws -> RuntimeJobStatus {
+    guard currentBindingRevision == previousBindingRevision + 1,
+      Self.isLowercaseSHA256(selectionEvidenceSHA256)
+    else {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "Loader binding settlement requires one adjacent revision and canonical evidence")
+    }
+    guard var runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let pending = try pendingLoaderTransition(
+      jobID: jobID,
+      targetID: targetID,
+      expectedBindingRevision: previousBindingRevision)
+    let attemptID = "loader-binding-\(jobID)-\(runtime.nextSequence)"
+    try transition(
+      &runtime,
+      from: .waitingForRecovery,
+      to: .reconciling,
+      reason: "begin Runtime Loader binding settlement")
+    try runtime.journal.appendAndSynchronize(
+      JournalEvent.reconcileStarted(
+        eventID: "reconcile-start-\(runtime.nextSequence)",
+        sequence: runtime.nextSequence,
+        sessionID: runtime.record.sessionID,
+        jobID: jobID,
+        timestamp: nowUTC(),
+        recoveryAttemptID: attemptID,
+        sourceState: .waitingForRecovery,
+        lastDurableSequence: pending.inspection.lastDurableSequence ?? 0,
+        trigger: "deviceReturned",
+        schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+    runtime.nextSequence += 1
+    try runtime.journal.appendAndSynchronize(
+      JournalEvent.stepOutcome(
+        eventID: "loader-binding-outcome-\(runtime.nextSequence)",
+        sequence: runtime.nextSequence,
+        sessionID: runtime.record.sessionID,
+        jobID: jobID,
+        timestamp: nowUTC(),
+        stepID: pending.intent.stepID,
+        attempt: pending.intent.attempt,
+        correlatesToIntentEventID: pending.intent.eventID,
+        result: "succeeded",
+        outcomeCertainty: .confirmed,
+        summary: "unique Loader observed and bound to the selected Runtime target",
+        schemaVersion: Self.journalSchemaVersion(of: runtime.record),
+        authorizationRef: pending.intent.authorizationReference,
+        agentAuthorizationRef: pending.intent.agentExecutionAuthorityReference,
+        usageReservationID: pending.intent.usageReservationID))
+    runtime.nextSequence += 1
+    let reconcileOutcome = try JournalEvent.reconcileOutcome(
+      eventID: "reconcile-outcome-\(runtime.nextSequence)",
+      sequence: runtime.nextSequence,
+      sessionID: runtime.record.sessionID,
+      jobID: jobID,
+      timestamp: nowUTC(),
+      bindingRevision: currentBindingRevision,
+      recoveryAttemptID: attemptID,
+      result: "finalizeConfirmedFailure",
+      nextState: .finalizing,
+      outcomeCertainty: .confirmed,
+      safeBoundaryConfirmed: true,
+      evidence: [
+        "runtime-loader-binding-sha256=\(selectionEvidenceSHA256)",
+        "binding-revision=\(previousBindingRevision)->\(currentBindingRevision)",
+      ],
+      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
+    try runtime.journal.appendAndSynchronize(reconcileOutcome)
+    runtime.nextSequence += 1
+    try transition(
+      &runtime,
+      from: .reconciling,
+      to: .finalizing,
+      reason: "Loader transition confirmed; binding changed; fresh plan required",
+      triggerEventID: reconcileOutcome.eventID)
+    try transition(
+      &runtime,
+      from: .finalizing,
+      to: .failed,
+      reason: "old Flash Job closed at Loader boundary; fresh plan required")
+    runtime.record.outcomeUnknown = false
+    runtime.record.recoveryStepID = nil
+    runtime.record.recoveryIntentEventID = nil
+    runtime.record.recoveryAction = nil
+    runtime.record.finishedAtUTC = nowUTC()
+    runtime.record.timeline.append(
+      "reconciled: Loader bound at revision \(currentBindingRevision); original action not replayed")
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
+    try await recordCapabilityOutcome(
+      for: runtime.record,
+      outcome: .confirmed,
+      state: JobState.failed.rawValue)
+    return statusAndReleaseTerminalRuntime(runtime.record)
+  }
+
+  private func pendingLoaderTransition(
+    jobID: String,
+    targetID: String,
+    expectedBindingRevision: Int
+  ) throws -> (intent: OutstandingJournalIntent, inspection: JournalReplay) {
+    guard let runtime = jobs[jobID],
+      runtime.record.operationReference == "flash.dayu200@1",
+      runtime.record.request.target.targetID == targetID,
+      runtime.record.request.target.expectedBindingRevision == expectedBindingRevision,
+      runtime.record.state == JobState.waitingForRecovery.rawValue,
+      runtime.record.outcomeUnknown,
+      runtime.record.recoveryStepID == "enter-loader-mode",
+      let recoveryIntentID = runtime.record.recoveryIntentEventID
+    else {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "Job \(jobID) is not an unresolved enter-Loader transition for the selected target")
+    }
+    let inspection = try DurableJournalRecovery.inspect(
+      url: jobDirectory(for: jobID).appendingPathComponent("journal.jsonl"))
+    guard !inspection.hasTornTail,
+      inspection.currentState == .waitingForRecovery,
+      inspection.unknownOutcomes.isEmpty,
+      inspection.outstandingIntents.count == 1,
+      let intent = inspection.outstandingIntents.first,
+      intent.eventID == recoveryIntentID,
+      intent.stepID == "enter-loader-mode",
+      intent.attempt > 0,
+      intent.effect == .deviceMutation,
+      intent.bindingRevision == expectedBindingRevision,
+      !inspection.events.contains(where: {
+        $0.kind == .stepIntent && ($0.stepEffect ?? .hostOnly) >= .destructive
+      })
+    else {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "Loader transition journal is ambiguous, destructive or already outcomeUnknown")
+    }
+    return (intent, inspection)
+  }
+
   public func reconcile(jobID: String) async throws -> RuntimeJobStatus {
     guard var runtime = jobs[jobID] else {
       return status(of: try recordForRead(jobID: jobID))

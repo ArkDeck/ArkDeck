@@ -34,15 +34,20 @@ public struct FlashTargetPresentation: Sendable, Equatable, Identifiable {
 public struct FlashWorkspacePresentation: Sendable, Equatable {
   public let availability: FlashOperationAvailability
   public let targets: [FlashTargetPresentation]
+  public let bootloaderStatus: RockchipBootloaderStatus
   public let targetLoadFailure: String?
 
   public init(
     availability: FlashOperationAvailability,
     targets: [FlashTargetPresentation],
+    bootloaderStatus: RockchipBootloaderStatus = RockchipBootloaderStatus(
+      disposition: .absent, observationCount: 0, mode: nil,
+      targetID: nil, bindingRevision: nil),
     targetLoadFailure: String? = nil
   ) {
     self.availability = availability
     self.targets = targets
+    self.bootloaderStatus = bootloaderStatus
     self.targetLoadFailure = targetLoadFailure
   }
 
@@ -267,6 +272,11 @@ public enum FlashRunResult: Sendable, Equatable {
   case failed(String)
 }
 
+public enum FlashLoaderBindingResult: Sendable, Equatable {
+  case bound(FlashTargetPresentation)
+  case failed(String)
+}
+
 public protocol FlashApplicationProviding: Sendable {
   func refreshWorkspace() async -> FlashWorkspacePresentation
   func preparePlan(
@@ -280,6 +290,7 @@ public protocol FlashApplicationProviding: Sendable {
     plan: FlashExactPlanPresentation
   ) async -> FlashSubmissionResult
   func run(jobID: String) async -> FlashRunResult
+  func bindCurrentLoader(target: FlashTargetPresentation) async -> FlashLoaderBindingResult
   func cancel(jobID: String) async -> Bool
 }
 
@@ -291,7 +302,7 @@ public enum FlashApplicationFacade {
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any FlashApplicationProviding {
     if arguments.contains("--ui-test-flash") || arguments.contains("--ui-test-flash-plan") {
-      return FlashFixtureApplicationProvider()
+      return FlashFixtureApplicationProvider(arguments: arguments)
     }
     return FlashProductionApplicationProvider()
   }
@@ -301,9 +312,11 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
   func refreshWorkspace() async -> FlashWorkspacePresentation {
     async let operations = FlashXPCTransport.request(method: "operation.list")
     async let targets = FlashXPCTransport.request(method: "target.list")
+    async let bootloader = FlashXPCTransport.request(method: "flash.bootloader-status")
     return FlashWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
-      targetResponse: await targets)
+      targetResponse: await targets,
+      bootloaderResponse: await bootloader)
   }
 
   func preparePlan(
@@ -484,11 +497,61 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     else { return false }
     return result["cancelRequested"] as? Bool == true
   }
+
+  func bindCurrentLoader(
+    target: FlashTargetPresentation
+  ) async -> FlashLoaderBindingResult {
+    do {
+      let result = try await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "flash.bind-current-loader",
+          params: [
+            "targetId": .string(target.id),
+            "expectedBindingRevision": .integer(Int64(target.bindingRevision)),
+          ]))
+      guard result["targetId"] as? String == target.id,
+        result["previousBindingRevision"] as? Int == target.bindingRevision,
+        let revision = result["bindingRevision"] as? Int,
+        revision == target.bindingRevision + 1,
+        let evidence = result["selectionEvidenceSha256"] as? String,
+        evidence.count == 64,
+        evidence.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
+      else {
+        return .failed("Runtime returned incomplete Loader binding facts")
+      }
+      return .bound(
+        FlashTargetPresentation(
+          id: target.id,
+          bindingRevision: revision,
+          toolVersion: target.toolVersion,
+          adoptedAtUTC: target.adoptedAtUTC))
+    } catch let failure as FlashResponseFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
 }
 
 private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
+  private let fixtureStateURL: URL?
+
+  init(arguments: [String]) {
+    if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
+      arguments.indices.contains(index + 1)
+    {
+      fixtureStateURL = URL(fileURLWithPath: arguments[index + 1])
+    } else {
+      fixtureStateURL = nil
+    }
+  }
+
   func refreshWorkspace() async -> FlashWorkspacePresentation {
-    FlashWorkspacePresentation(
+    let fixtureState = fixtureStateURL.flatMap {
+      try? String(contentsOf: $0, encoding: .utf8)
+    } ?? ""
+    let loaderIsUnbound = fixtureState.contains("--ui-test-flash-loader-unbound")
+    return FlashWorkspacePresentation(
       availability: .available,
       targets: [
         FlashTargetPresentation(
@@ -496,7 +559,13 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
           bindingRevision: 7,
           toolVersion: "3.2.0f",
           adoptedAtUTC: "2026-08-06T08:00:00Z")
-      ])
+      ],
+      bootloaderStatus: RockchipBootloaderStatus(
+        disposition: loaderIsUnbound ? .unbound : .exactBoundTarget,
+        observationCount: 1,
+        mode: "loader",
+        targetID: loaderIsUnbound ? nil : "target-fixture-dayu200",
+        bindingRevision: loaderIsUnbound ? nil : 7))
   }
 
   func preparePlan(
@@ -542,20 +611,33 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
         timeline: ["jobCreated", "finalized"]))
   }
 
+  func bindCurrentLoader(target: FlashTargetPresentation) async -> FlashLoaderBindingResult {
+    .bound(
+      FlashTargetPresentation(
+        id: target.id,
+        bindingRevision: target.bindingRevision + 1,
+        toolVersion: target.toolVersion,
+        adoptedAtUTC: target.adoptedAtUTC))
+  }
+
   func cancel(jobID _: String) async -> Bool { true }
 }
 
 enum FlashWorkspaceResponseDecoding {
   static func presentation(
     operationResponse: Result<Data, FlashXPCReadFailure>,
-    targetResponse: Result<Data, FlashXPCReadFailure>
+    targetResponse: Result<Data, FlashXPCReadFailure>,
+    bootloaderResponse: Result<Data, FlashXPCReadFailure> = .failure(
+      .transport("Bootloader status was not requested"))
   ) -> FlashWorkspacePresentation {
     let availability = decodeAvailability(operationResponse)
+    let bootloaderStatus = decodeBootloaderStatus(bootloaderResponse)
     switch targetResponse {
     case .failure(let failure):
       return FlashWorkspacePresentation(
         availability: availability,
         targets: [],
+        bootloaderStatus: bootloaderStatus,
         targetLoadFailure: failure.message)
     case .success(let data):
       switch decodeResultArray(data) {
@@ -563,6 +645,7 @@ enum FlashWorkspaceResponseDecoding {
         return FlashWorkspacePresentation(
           availability: availability,
           targets: [],
+          bootloaderStatus: bootloaderStatus,
           targetLoadFailure: failure.message)
       case .success(let entries):
         var targets: [FlashTargetPresentation] = []
@@ -576,6 +659,7 @@ enum FlashWorkspaceResponseDecoding {
             return FlashWorkspacePresentation(
               availability: availability,
               targets: [],
+              bootloaderStatus: bootloaderStatus,
               targetLoadFailure: "Runtime returned a target without complete binding facts")
           }
           targets.append(
@@ -585,9 +669,34 @@ enum FlashWorkspaceResponseDecoding {
               toolVersion: toolVersion,
               adoptedAtUTC: adoptedAtUTC))
         }
-        return FlashWorkspacePresentation(availability: availability, targets: targets)
+        return FlashWorkspacePresentation(
+          availability: availability, targets: targets,
+          bootloaderStatus: bootloaderStatus)
       }
     }
+  }
+
+  private static func decodeBootloaderStatus(
+    _ response: Result<Data, FlashXPCReadFailure>
+  ) -> RockchipBootloaderStatus {
+    guard case .success(let data) = response,
+      let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      envelope["ok"] as? Bool == true,
+      let result = envelope["result"] as? [String: Any],
+      let dispositionText = result["disposition"] as? String,
+      let disposition = RockchipBootloaderBindingDisposition(rawValue: dispositionText),
+      let count = result["observationCount"] as? Int
+    else {
+      return RockchipBootloaderStatus(
+        disposition: .absent, observationCount: 0, mode: nil,
+        targetID: nil, bindingRevision: nil)
+    }
+    return RockchipBootloaderStatus(
+      disposition: disposition,
+      observationCount: count,
+      mode: result["mode"] as? String,
+      targetID: result["targetId"] as? String,
+      bindingRevision: result["bindingRevision"] as? Int)
   }
 
   private static func decodeAvailability(
