@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-056-e2-policy-baseline-alignment@r7
+> Change:CHG-2026-056-e2-policy-baseline-alignment@r9
 > Status:planned
 > Baseline:`CORE-3.0.0` -> proposed `CORE-4.0.0`
 > Proposal phase executes zero real device, Runtime capability, recovery or history mutation.
@@ -19,7 +19,7 @@
 
 | Acceptance | Method | Expected result | Evidence |
 | --- | --- | --- | --- |
-| `POL-RECOVERY-001`, `POL-AGENT-002`, `E2R-CATALOG-001` | Cross-file policy/Catalog/Provider audit | Flash remains typed and destructive; no E2/UI/chat authority returns; only reviewed exact operation/profile pairs may declare complete-overwrite recovery | document + contract |
+| `POL-RECOVERY-001`, `POL-AGENT-002`, `E2R-CATALOG-001` | Cross-file policy/Catalog/Provider/UI audit | Flash remains typed and destructive; only bare `flash.dayu200` is published/displayed; Steps/effect/Provider remain unchanged; exactly one profile `dayu200` retains the current recovery coverage; versioned operation/profile strings are rejected; no E2/UI/chat authority returns | document + contract |
 | `AC-FLASH-015-03`, `E2R-RUNTIME-001` | Fake initial Agent Flash through production Runtime composition | Runtime mints/reserves its exact capability and dispatches published fake Steps with no authority or user-message input | contract |
 | `AC-FLASH-015-02`, `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RECOVERY-001` | Seed durable outcomeUnknown, known identity and a fully covering Provider plan; run launch and live recovery | Original Step dispatch stays 0; a distinct capability/reservation/intent executes complete overwrite automatically; only all confirmed effects + reboot/rebind/postflight create recovered target epoch | contract/fault |
 | `AC-FLASH-015-01`, `E2R-RECOVERY-NEGATIVE-001`, `E2R-NEGATIVE-001` | Pairwise faults over identity, binding/topology, effect closure, omitted/protected partition, coverage declaration, Artifact/tool/plan drift, caller proof, cancellation, expiry and budget | Original replay and recovery dispatch both remain 0; exact durable blocker is produced and has no approval override | contract/fault |
@@ -61,6 +61,19 @@
 - Scan UI and Runtime responses: eligible paths contain no human-action request; ineligible paths
   contain a stable machine-readable blocker and no “confirm/continue anyway” action.
 - Scan logs/evidence for raw device identity, local user path, secrets and authority/capability bytes.
+- Reject `dayu200@1` and `dayu200@2` in Catalog lookup, Provider profile selection and Runtime
+  recovery matching; accept exactly `dayu200`, with no alias or silent durable-record migration.
+- Reject a Catalog that publishes bare `dayu200` together with any versioned variant, and prove the
+  sole recovery universe remains the current nine-partition set.
+- Assert the sole operation source is `Catalog/operations/flash.dayu200.json` and the old
+  `.v1.json` path is absent; its document has no `version`, new wire/capability writers omit it, and
+  `flash.dayu200@1` is decode/export-only legacy that cannot match or dispatch.
+- Scan App/UI tests/localization/prototype/CLI/Agent/Provider output and require the sole visible
+  operation label `flash.dayu200`, with no DAYU200 `.v1`/`@1` suffix.
+- Assert DAYU200 hitrace/bytrace families expose no `-v1` suffix and their updated registry digest
+  remains closed over the unchanged golden-resource manifest.
+- Present an old rev2/chat-attestation binding and prove Runtime reports it unprepared, rejects
+  same-revision replacement, leaves the bytes unchanged and dispatches no Flash effect.
 
 ## Host gates before hardware
 
@@ -76,12 +89,12 @@ python3 scripts/check_pr_paths.py --repo-root . --preflight \
 Every command must exit 0. Focused tests, fake recovery and simulation are development feedback;
 they do not replace `E2R-GJ4-001` or authorize hardware.
 
-## Proposal-phase non-interference
+## r9 host-validation non-interference
 
-- Diff is confined to `openspec/changes/chg-2026-056-e2-policy-baseline-alignment/**`.
+- Local implementation changes only Catalog/source/tests/docs inside the reviewed task paths.
 - Device/HDC/RockUSB, Runtime dispatch, capability/reservation and history mutation counts are 0.
 - Existing waitingForRecovery Jobs and target-lane claims remain untouched.
-- No proposal result is hardware evidence, recovery proof or `REAL_DEVICE_PASS`.
+- No host-test result is hardware evidence, recovery proof or `REAL_DEVICE_PASS`.
 
 ## Deviations
 
@@ -93,7 +106,7 @@ requires another revision of this same change and maintainer review before imple
 
 - [x] r5/r6 no-E2 adjudication and implementation are present on protected `main` through
   #1178/#1181/#1183.
-- [ ] r7 is reviewed and merged by the human maintainer before implementation begins.
+- [ ] r9 is reviewed and merged by the human maintainer before publication or hardware use.
 - [ ] All canonical and change-local contract acceptance passes.
 - [ ] All host gates pass at the exact implementation head.
 - [ ] Real DAYU200 autonomous recovery/UI Flash/postflight passes with truthful V6 evidence.

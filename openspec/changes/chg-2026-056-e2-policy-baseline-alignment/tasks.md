@@ -2,8 +2,8 @@
 
 ## TASK-E2B-001 — Close GJ-4 with Runtime-owned admission and autonomous proven recovery
 
-- Status:blocked (r5/r6 implementation is present on protected main through #1183; r7 autonomous
-  complete-overwrite recovery awaits maintainer review/merge before implementation or hardware use)
+- Status:blocked (r5/r6 implementation is present on protected main through #1183; r9 autonomous
+  recovery/profile consolidation awaits maintainer review/merge before publication or hardware use)
 - Golden Journey:GJ-4
 - Platform:macos; windows/linux contract compatibility only
 - Requirements:`POL-RECOVERY-001`, `POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-013`,
@@ -15,7 +15,7 @@
   `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RUNTIME-001`,
   `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`, `E2R-GJ4-001`
-- Depends on:maintainer reviews and merges CHG-2026-056@r7 to protected `main`
+- Depends on:maintainer reviews and merges CHG-2026-056@r9 to protected `main`
 - Production reachability:
   `ArkDeckApp/manual UI driver -> Agent XPC -> protected-main RuntimeJobEngine ->
   RuntimeCapabilityStore -> Rockchip Runtime composition -> typed Provider -> DAYU200`
@@ -26,16 +26,27 @@
   - `PRODUCT-LOOP.md`
   - `AGENTS.md`
   - `Catalog/schema/operation.schema.json`
-  - `Catalog/operations/flash.dayu200.v1.json`
+  - `Catalog/operations/capture.diagnostics.v1.json`
+  - `Catalog/operations/debug.hap.v1.json`
+  - `Catalog/operations/deploy.native-library.app-owned.v1.json`
+  - `Catalog/operations/flash.dayu200.json`
+  - `Catalog/operations/flash.dayu200.v1.json` (rename source)
   - `Catalog/operations/deploy.native-library.system.v1.json`
-  - `Catalog/profiles/dayu200.v1.json` (notes text only; identity and partition mapping are forbidden)
-  - `Catalog/profiles/dayu200.v2.json`
+  - `Catalog/operations/observe.device.v1.json`
+  - `Catalog/operations/port-forward.create.v1.json`
+  - `Catalog/operations/port-forward.remove.v1.json`
+  - `Catalog/profiles/dayu200.json`
+  - `Catalog/profiles/dayu200.v1.json` (delete)
+  - `Catalog/profiles/dayu200.v2.json` (delete)
   - `Catalog/generated/effect-authorization-matrix.md`
   - `openspec/constitution.md`
   - `openspec/specs/flashing/spec.md`
   - `openspec/specs/workflow-journal-recovery/spec.md`
   - `openspec/contracts/provider-contracts.md`
   - `openspec/contracts/hardware-evidence.schema.json`
+  - `openspec/integrations/INTEGRATION-PROFILES.lock.yaml`
+  - `openspec/integrations/openharmony/profile.md`
+  - `openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml`
   - `openspec/governance/enforcement.md`
   - `openspec/verification/policy.md`
   - `openspec/verification/acceptance-index.txt`
@@ -63,39 +74,63 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalReplay.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/EvolutionCampaignAuthority.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/EvolutionCampaignAttemptAdmission.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/EvolutionCampaignEngineLaneAdmitter.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/EvolutionCandidatePipeline.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/FlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewCapabilityApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactService.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashPreflight.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecutionHost.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipBootloaderStatus.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashSessionReconcile.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/EvolutionCampaignHost.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/HarnessAdapters/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/LocalAgentEvolutionStrategyRepairer.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/HardwareEvidenceProjector.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/AgentRuntimeExecutor.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/FlashBundleArtifactImport.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentXPCListener.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/HumanActionRequired.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/RuntimeOperationModelsV2.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/EngineLaneEvolutionFlashDispatcher.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckHarness/Application/HarnessPolicyGuard.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckHarness/Domain/HarnessEvolution.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckHarness/Candidate/main.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/**`
   - `ArkDeckApp/Features/Flash/**`
+  - `ArkDeckApp/Features/History/RuntimeHistoryView.swift`
+  - `ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift`
   - `ArkDeckApp/Resources/FlashLocalizable.xcstrings`
   - `ArkDeckAppUITests/AppShell/AppShellUITests.swift`
+  - `docs/design/prototype.html`
+  - `docs/design/design-agent-briefs.md`
+  - `docs/design/macos-ux-interaction-spec.md`
+  - `ArkDeckApp/Documentation/macos-ui-implementation-proposal.md`
 - Forbidden paths:
-  - integration/device profile identity or partition mapping beyond the exact stale note above
+  - integration/device profile identity beyond the exact v1/v2-to-`dayu200` consolidation and
+    DAYU200 trace-family `-v1` suffix removal, or any partition mapping other than the retained
+    current nine-partition facts
   - new operation, Provider, raw command surface, executable/argv input or effect downgrade
   - caller/Agent capability administration or trusted-fact injection
   - legacy authority instance bytes or migration into RuntimeCapability
   - retry/replay or guessed outcome for an unknown intent; recovery without a reviewed exact
     Provider coverage contract and complete Runtime-derived proof
-- Risk:destructive (r7 intentionally permits a distinct full-overwrite dispatch after an unknown
+- Risk:destructive (r9 intentionally permits a distinct full-overwrite dispatch after an unknown
   destructive outcome when complete Runtime proof exists; real validation erases DAYU200 userdata)
 - Hardware required:yes, but only after approved implementation passes every host gate
 - Decision-Grade:D1 for Core implementation approval; D2 for the later physical device window
@@ -155,3 +190,24 @@
   durable `safeToReflash` or `safeToSupersedeByCompleteOverwrite`; hard-stop for unknown identity,
   incomplete coverage, undeclared Provider support, drift, cancellation or exhausted budget.
 - Never consume or migrate a legacy standing/campaign record to make the new path pass.
+
+### r9 DAYU200 singleton deliverables and verification
+
+- Publish exactly one unversioned `dayu200` Catalog profile and remove both versioned files and all
+  production references to `dayu200@1`/`dayu200@2`.
+- Retain the current seed archive/build, nine-partition complete-overwrite coverage and
+  write-forbidden facts; retain already-published generic observe/debug/deploy/flash capabilities.
+- Publish the typed operation only as `flash.dayu200`, with no Catalog version field, while keeping
+  its destructive effect/Steps/Provider unchanged and profile input enum exactly `dayu200`.
+- Rename its singleton Catalog source file to `flash.dayu200.json`; assert the old `.v1.json`
+  source path is absent and UI/CLI/Agent/Provider new writers expose no DAYU200 version suffix.
+- Rename DAYU200 hitrace/bytrace family identifiers without `-v1`, refresh the registry digest,
+  and leave the captured golden bytes and capability authority unchanged.
+- Remove the old rev2/chat-attestation same-revision migration and its versioned selection digest;
+  historical bindings remain readable but unprepared, unchanged and unable to authorize Flash.
+- Keep old versioned request/capability/journal values decode/export-only; prove
+  `flash.dayu200@1` cannot match the new operation or authorize/recover/dispatch it.
+- Prove Catalog schema/generator/Swift parity; reject a bare/versioned mixture for one profile ID;
+  prove both old profile strings fail lookup/admission with zero external dispatch.
+- Do not rewrite historical evidence or guess that an incomplete old recovery is compatible. Such a
+  Job remains blocked until exact durable proof satisfies the reviewed recovery contract.

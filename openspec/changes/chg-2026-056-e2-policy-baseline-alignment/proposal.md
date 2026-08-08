@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 7
+revision: 9
 status: proposed
 class: core
 core_change_level: major
@@ -12,16 +12,37 @@ platforms: [macos, windows, linux]
 # 让 destructive Runtime 在可证明条件下自主完成 Flash 恢复
 
 > r5 经维护者裁决移除了独立 E2/standing/campaign 人工授权层；r6 补齐实现路径，随后
-> #1183 已把 Runtime-owned destructive admission 合入 protected `main`。这些批准不授权 r7。
+> #1183 已把 Runtime-owned destructive admission 合入 protected `main`。这些批准不授权
+> r7/r8/r9。
+>
+> r8（2026-08-08）同时收敛 GJ-4 迭代中暴露的 DAYU200 profile 身份分叉。按
+> `REQ-FLASH-016`，profile 表达的是 board-scoped 约束，build/archive 是由 Artifact 派生的
+> facts；因此 `dayu200@1` 与 `dayu200@2` 不应作为两个可选设备 profile 长期共存。r8 删除
+> 两个 versioned profile，发布唯一无版本引用 `dayu200`，保留当前九分区约束与 seed
+> archive facts，并保留该 board 已发布的 observe/debug/deploy/flash 能力合集。
+>
+> r9 把 singleton typed operation 从 `flash.dayu200@1` 收敛为裸引用 `flash.dayu200`，删除
+> Catalog `version` 字段和 UI/CLI/Agent/Provider 中的 DAYU200 版本展示；effect、Steps、argv、
+> Provider 与 RuntimeCapability 精确绑定不变。新请求中的 `dayu200@1`/`dayu200@2` profile 及
+> `flash.dayu200@1` operation 均 fail closed，不提供 alias；
+> 历史 evidence/journal 字节不重写，仍持有旧 profile identity 且无法精确证明兼容的未完成
+> recovery 保持 blocked。Catalog generator 允许其它 profile 继续显式 version，但禁止同一 ID
+> 的裸 profile 与 versioned variants 共存。
+>
+> r9 的 singleton source naming 同样把 operation 文件从 `flash.dayu200.v1.json` 改为
+> `flash.dayu200.json`。新 Runtime operation/capability/journal writer 对该 operation 省略 version；
+> 旧 versioned bytes 只可 decode/export，不能匹配新 Catalog、mint capability、reserve、恢复
+> 或 dispatch。
 >
 > r7（2026-08-08）处理真实 GJ-4 暴露的下一层阻塞：旧或当前 Flash 只要留下一个
 > `outcomeUnknown` write intent，目标 lane 就永久停止，即使后续完整 Flash 已经把同一物理
 > 目标的全部相关分区写入并通过 postflight。当前语义把“禁止盲重放”扩大成“任何恢复都要
 > 永久中断”，重新引入反复询问人工的自动化断点。
 >
-> r7 是新的 MAJOR Safety 裁决，只含 proposal/delta/design/tasks/verification。维护者
-> review/merge 到 protected `main` 前，不修改生产代码、不迁移历史 Job、不签发 capability、
-> 不执行 HDC/RockUSB/Flash/erase，也不以本提案绕过当前 blocker。
+> r7/r8/r9 是新的 MAJOR Safety 与已发布 profile/operation-contract 裁决。维护者 review/merge
+> 到 protected `main` 前，不迁移历史 Job、不签发 capability、不执行
+> HDC/RockUSB/Flash/erase，也不以本提案绕过当前 blocker。r9 的实现可在同一产品变更中用纯
+> host gate 验证，但不得据此自称已批准或产生 `REAL_DEVICE_PASS`。
 
 ## Why
 
@@ -83,8 +104,9 @@ In scope:
   recovery epoch 与 truthful supersession evidence。
 - 修改 `PRODUCT-LOOP.md` §15：`STILL_UNKNOWN`/`PARTIALLY_COMPLETED` 先自动评估 reviewed
   recovery proof；可恢复时不再请求人工决策，不可恢复时也不提供 confirmation override。
-- exact DAYU200 Flash Provider/profile 增加完整覆盖 contract；不新增 operation、Provider 或
-  profile，不改变 partition mapping、write-forbidden 集合、argv、工具或刷写字节。
+- exact DAYU200 Flash Provider/profile 增加完整覆盖 contract；不新增 operation、Provider，
+  并把两个 versioned DAYU200 profiles 收敛为唯一 `dayu200`。保留当前 partition mapping、
+  write-forbidden 集合、argv、工具与刷写字节。
 - Job/journal/RuntimeCapability/target-lane/evidence schema 增加 recovery lineage、effect-set/
   coverage digests、`SupersedingRecoveryEpoch` 和与 ordinary success 分离的 recovery terminal。
 - UI/Agent-facing `outcomeUnknownDecision` 在可机械恢复时消失；不可恢复时成为只读 blocker，
@@ -98,14 +120,16 @@ Observable behavior:
 - Before: target lane 中任一 destructive `outcomeUnknown` 永久阻断新 Flash，并进入人工决策。
 - After: 原 unknown intent 仍不重放；如果 Runtime 证明完整覆盖，则自动执行或识别一个更晚的
   recovery epoch，目标 lane 恢复为 known，AI 无需询问即可继续 GJ-4。
+- Profile identity: Before 同一 board 同时暴露 `dayu200@1`/`dayu200@2`；After 新请求只接受
+  `dayu200`，旧 versioned profile reference 无 alias 且零 dispatch。
 - Unchanged: identity 或 effect domain 不可证明、覆盖不完整、Artifact/tool/plan 漂移、取消或
   预算耗尽时 dispatch 为 0；人类确认、UI 点击、evidence 文本不能放宽该结果。
 
 ## Out of scope
 
 - 不允许盲 retry/replay 原始 unknown Step，不把未知 outcome 改写成 succeeded/failed。
-- 不删除或降低 `destructive` effect，不新增 generic shell/HDC/RockUSB Step，不改变
-  DAYU200 partition mapping、write-forbidden 分区、刷写顺序或工具参数。
+- 不删除或降低 `destructive` effect，不新增 generic shell/HDC/RockUSB Step，不改变所保留
+  的当前 DAYU200 partition mapping、write-forbidden 分区、刷写顺序或工具参数。
 - 不让 caller/Agent/candidate/repairer 提供 target facts、effect set、coverage proof、
   capability、outcome 或 supersession relation。
 - 不把“设备能启动”“某个后续 Job succeeded”“用户确认”或 simulation/fake/plan-only 当成
@@ -123,11 +147,14 @@ Observable behavior:
   `AC-WF-004-03`, `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`.
 - Change-local acceptance: existing `E2R-*` plus `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`.
-- Modified published operation/profile: `flash.dayu200@1` with DAYU200 v1/v2 recovery coverage
-  declaration only; operation inputs, typed Steps, effect, Provider and partition facts unchanged.
+- Modified published operation/profile: `flash.dayu200@1` 收敛为无版本 `flash.dayu200`，其
+  `deviceProfile` enum 与 recovery coverage 从 DAYU200 v1/v2 收敛为唯一 `dayu200`；typed
+  Steps、effect、Provider 不变，partition facts 保留当前九分区集合；DAYU200 trace family
+  也去除仅用于历史分代的 `-v1` 展示后缀，golden bytes 与 authority boundary 不变；旧
+  rev2/chat-attestation binding 取消就地升级路径，只能作为不具备准入权的历史记录读取。
 - Modified contracts: Provider contract `2.0.0 -> 3.0.0`; hardware evidence `5.0.0 -> 6.0.0`;
   versioned journal/Runtime capability and target-lane recovery records with legacy read support.
-- Core baseline: `CORE-4.0.0` remains the unratified candidate over current `CORE-3.0.0`; r7 revises
+- Core baseline: `CORE-4.0.0` remains the unratified candidate over current `CORE-3.0.0`; r9 revises
   the same pending Safety candidate rather than opening a duplicate baseline/change.
 
 ## Platform impact
@@ -153,6 +180,12 @@ Observable behavior:
   The Agent is not repeatedly asked for a confirmation that Runtime cannot use.
 - **Compatibility:** prior journal/evidence/authority bytes remain immutable and decode/exportable.
   New writers append versioned recovery relation records; no in-place migration changes old facts.
+- **Profile compatibility:** new admission accepts exactly `dayu200`; `dayu200@1`/`dayu200@2` are not
+  aliases. A pending legacy Job whose exact profile cannot be reconciled remains fail-closed rather
+  than being silently widened to the retained board contract.
+- **Operation compatibility:** new admission accepts exactly `flash.dayu200`. Historical
+  `flash.dayu200@1` request/capability/journal values remain decodable/exportable but cannot match,
+  reserve, recover or dispatch the new singleton operation.
 - **Privacy:** target IDs remain digested; raw archive/device artifacts remain local and immutable.
 - **Rollback:** old Runtime ignores/rejects new recovery records and reverts to blocking unresolved
   target lanes. It SHALL NOT replay any old or recovery intent during downgrade.
@@ -160,11 +193,12 @@ Observable behavior:
 ## Approval and implementation sequence
 
 1. #1178/#1181/#1183 remain the trust root for r5/r6 no-E2 Runtime admission and implementation.
-2. r7 is a fresh policy revision. CI green does not approve it; human maintainer review/merge to
+2. r9 is a fresh policy/profile/operation revision. CI green does not approve it; human maintainer review/merge to
    protected `main` does. `status: proposed` is intentionally not self-changed by the Agent.
-3. Before that merge: proposal-only diff, zero device/recovery/history mutation.
-4. After merge: implement the reviewed deltas, tests and historical semantic scanner on a new
-   `agent/**` product branch; pass all host gates before any real device window.
+3. Before that merge: zero device/recovery/history mutation. Host-only implementation and contract
+   tests do not constitute approval or hardware evidence.
+4. After merge: publish the reviewed deltas from an `agent/**` product branch; pass all host gates
+   before any real device window.
 5. Real validation must first prove the existing target-lane facts, then execute the standalone UI
    Flash without chat/campaign/unknown-decision prompts, and record truthful realHardware evidence.
 
@@ -183,3 +217,20 @@ r7 extends `TASK-E2B-001` only for the production surfaces needed by the approve
 This addendum does not authorize a new operation/provider/profile, raw command, partition-map
 change, caller-controlled proof or broader device access. Any such need requires another reviewed
 revision before implementation.
+
+## r9 DAYU200 singleton consolidation addendum
+
+- Delete `dayu200.v1.json` and `dayu200.v2.json`; publish one `dayu200.json` without a profile
+  `version` field.
+- Retain the current seed archive/build facts, nine-partition recovery universe and write-forbidden
+  facts. Preserve generic board operations that were already published across the two old entries.
+- Require operation inputs, runtime defaults, Provider lookup, recovery matching, CLI/App/Harness
+  composition and generated Swift Catalog to use exactly `dayu200`.
+- Reject both historical versioned profile strings for all new admission paths. Do not introduce a
+  compatibility alias or rewrite durable history; an incompatible pending recovery remains blocked.
+- Publish the typed operation only as `flash.dayu200`, remove its Catalog `version` field, and make
+  new Runtime operation/capability writers omit the optional version.
+- Rename the singleton Catalog source to `flash.dayu200.json`; remove DAYU200-specific `.v1`
+  Provider action labels and every UI-facing `@1` suffix.
+- Keep historical versioned request/capability/journal decoding read-only. Never alias or migrate
+  `flash.dayu200@1` into the new operation; it must fail closed for admission and recovery.
