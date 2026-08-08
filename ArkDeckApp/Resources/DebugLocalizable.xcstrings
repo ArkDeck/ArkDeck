@@ -1,6 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "debug.action.cancel":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Stop after the current step"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"当前步骤后停止"}}}},
     "debug.action.refresh":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Refresh Debug facts"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"刷新调试信息"}}}},
     "debug.apps.ability":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Ability name"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Ability 名称"}}}},
     "debug.apps.action.start":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Start Ability"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"启动 Ability"}}}},
@@ -121,6 +122,7 @@
     "debug.network.rules.empty":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"No forwarding inventory"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有端口转发清单"}}}},
     "debug.network.rules.empty.detail":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"The current Runtime publishes no operation for reading forward/reverse rules."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"当前 Runtime 未发布读取 forward/reverse 规则的 operation。"}}}},
     "debug.network.rules.local":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Host endpoint"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Host 端点"}}}},
+    "debug.network.rules.action":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Action"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"操作"}}}},
     "debug.network.rules.remote":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Device endpoint"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"设备端点"}}}},
     "debug.network.rules.state":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"State"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"状态"}}}},
     "debug.network.rules.title":{"localizations":{"en":{"stringUnit":{"state":"translated","value":"Forward / reverse rules"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"Forward / reverse 规则"}}}},

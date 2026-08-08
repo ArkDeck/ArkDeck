@@ -89,6 +89,12 @@ enum RuntimeArtifactService {
       "process-readback": ["process-readback.json"],
       "capture-diagnostics": ["debug-hilog.txt"],
     ],
+    "port-forward.create@1": [
+      "verify-port-rule": ["port-rule-readback.json"]
+    ],
+    "port-forward.remove@1": [
+      "verify-port-rule": ["port-rule-readback.json"]
+    ],
     "deploy.native-library.app-owned@1": [
       "atomic-publish": ["publish-report.json"],
       "verify-loaded-library": ["verification-report.json"],
@@ -101,7 +107,7 @@ enum RuntimeArtifactService {
 
   /// Products synthesized at finalization rather than by one typed step.
   static let finalizeArtifacts: [String: [String]] = [
-    "capture.diagnostics@1": ["artifact-index.json", "capture-summary.json"],
+    "capture.diagnostics@1": ["capture.log", "artifact-index.json", "capture-summary.json"],
     "flash.dayu200@1": ["flash-report.json"],
   ]
 
@@ -113,6 +119,9 @@ enum RuntimeArtifactService {
     finalizeArtifactNames: [String],
     completedStepIDs: Set<String>
   ) throws -> Data {
+    if descriptor.reference == "capture.diagnostics@1", name == "capture.log" {
+      return Data((record.timeline.joined(separator: "\n") + "\n").utf8)
+    }
     var perArtifact: [String: JSONValue] = [:]
     for declaration in descriptor.artifacts
     where !finalizeArtifactNames.contains(declaration.name) {
@@ -172,9 +181,55 @@ enum RuntimeArtifactService {
       }
       payload["request"] = .object(requestFields)
     }
+    if descriptor.reference == "capture.diagnostics@1",
+      case .array(let requestedTags)? = record.request.inputs["traceCategories"],
+      !requestedTags.isEmpty
+    {
+      let beforeByName = Dictionary(
+        uniqueKeysWithValues: (record.traceProbeBefore?.parameters ?? []).map { ($0.name, $0) })
+      let afterByName = Dictionary(
+        uniqueKeysWithValues: (record.traceProbeAfter?.parameters ?? []).map { ($0.name, $0) })
+      let parameterRecords: [JSONValue] = TraceDebugParameterCatalog.definitions.map { definition in
+        .object([
+          "name": .string(definition.name),
+          "desired": .string(definition.profileValue),
+          "before": traceParameterJSON(beforeByName[definition.name]),
+          "after": traceParameterJSON(afterByName[definition.name]),
+          "restored": .null,
+        ])
+      }
+      var trace: [String: JSONValue] = [
+        "toolIdentity": record.traceProbeBefore?.tool.map(JSONValue.string) ?? .null,
+        "adapterFamily": record.traceProbeBefore?.family.map(JSONValue.string) ?? .null,
+        "tags": .array(requestedTags),
+        "parameters": .array(parameterRecords),
+      ]
+      if case .integer(let duration)? = record.request.inputs["durationSeconds"] {
+        trace["durationSeconds"] = .integer(duration)
+      }
+      if case .integer(let buffer)? = record.request.inputs["traceBufferKB"] {
+        trace["bufferKB"] = .integer(buffer)
+      }
+      if let raw = recorded.first(where: { $0.name == "trace.htrace" && $0.status.isPublished }) {
+        trace["rawArtifactId"] = .string(raw.artifactID)
+        trace["rawSha256"] = .string(raw.sha256)
+        trace["rawByteCount"] = .integer(Int64(raw.byteCount))
+      }
+      payload["trace"] = .object(trace)
+    }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     return try encoder.encode(payload)
+  }
+
+  private static func traceParameterJSON(
+    _ observation: TraceRuntimeParameterObservation?
+  ) -> JSONValue {
+    guard let observation else { return .object(["state": .string("unobserved")]) }
+    var fields: [String: JSONValue] = ["state": .string(observation.state.rawValue)]
+    if let value = observation.value { fields["value"] = .string(value) }
+    if let detail = observation.detail { fields["detail"] = .string(detail) }
+    return .object(fields)
   }
 
   static func artifactContents(

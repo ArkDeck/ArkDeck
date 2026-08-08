@@ -1,6 +1,6 @@
 // The XPC transport's whole job is to be narrower than the Unix socket.
-// These tests pin the exact read + typed Flash surface. It exposes no generic
-// mutation or capability administration.
+// These tests pin the exact read + closed App-owned Job surface. It exposes
+// no arbitrary operation or capability administration.
 
 import ArkDeckCore
 import Foundation
@@ -15,14 +15,17 @@ final class AgentXPCTransportContractTests: XCTestCase {
       #"{"protocolVersion":"1.0.0","id":"contract","method":"\#(method)"}"#.utf8)
   }
 
-  private func submitFrame(operationID: String = "flash.dayu200") throws -> Data {
+  private func submitFrame(
+    operationID: String = "flash.dayu200",
+    clientName: String = "ArkDeckApp.FlashWorkspace"
+  ) throws -> Data {
     let typedRequest = """
       {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
       "requestId":"ui-request","idempotencyKey":"ui-request-123",\
       "target":{"targetId":"target-1","expectedBindingRevision":2},\
       "operation":{"id":"\(operationID)","version":1},"inputs":{},\
       "requestedOutputs":["hardwareEvidence"],\
-      "clientContext":{"clientName":"ArkDeckApp.FlashWorkspace"}}
+      "clientContext":{"clientName":"\(clientName)"}}
       """
     return try ArkDeckAgentXPC.requestFrame(
       method: "job.submit", params: ["requestJson": .string(typedRequest)],
@@ -44,12 +47,13 @@ final class AgentXPCTransportContractTests: XCTestCase {
   func testTheAllowlistForwardsExactlyTheAppControlPlane() {
     for method in ArkDeckAgentXPC.forwardableReadOnlyMethods
       .union(ArkDeckAgentXPC.forwardableFlashBundleMethods)
+      .union(ArkDeckAgentXPC.forwardableAutomationMethods)
     {
       XCTAssertEqual(
         AgentXPCEndpoint.admission(of: frame(method: method)), .direct(method: method),
         "\(method) is on the allowlist and must forward")
     }
-    for method in ArkDeckAgentXPC.gatedFlashJobMethods {
+    for method in ArkDeckAgentXPC.gatedAppJobMethods {
       XCTAssertNil(
         AgentXPCEndpoint.admission(of: frame(method: method)),
         "\(method) needs a typed payload or a UI-owned Job identifier")
@@ -61,8 +65,11 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableReadOnlyMethods,
       [
-        "artifact.inspect", "artifact.list", "device.candidates", "job.evidence",
-        "job.list", "job.list-page", "job.status", "operation.list", "target.list",
+        "artifact.inspect", "artifact.list", "artifact.read", "debug.probe",
+        "debug.template.run",
+        "device.candidates", "flash.prerequisites",
+        "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
+        "target.list", "trace.probe",
       ],
       "read-only surface drift is a control-plane decision")
     XCTAssertEqual(
@@ -73,20 +80,39 @@ final class AgentXPCTransportContractTests: XCTestCase {
       ],
       "widening the Flash artifact surface is forbidden")
     XCTAssertEqual(
-      ArkDeckAgentXPC.gatedFlashJobMethods, ["job.run", "job.submit"],
+      ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")
+    XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableAutomationMethods,
+      ["task.cancel", "task.list", "task.pause", "task.reconcile"],
+      "Automation may control existing typed tasks but cannot create or widen them")
   }
 
   func testOnlyTheTypedFlashUISubmitAndItsJobShapeReachTheGate() throws {
     XCTAssertEqual(
       AgentXPCEndpoint.admission(of: try submitFrame()),
-      .flashSubmit(requestID: "contract-submit"))
+      .appSubmit(requestID: "contract-submit", kind: .flash))
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "capture.diagnostics", clientName: "ArkDeckApp.TraceWorkspace")),
+      .appSubmit(requestID: "contract-submit", kind: .trace))
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "capture.diagnostics",
+          clientName: "ArkDeckApp.DebugWorkspace.Logs")),
+      .appSubmit(requestID: "contract-submit", kind: .debugLogs))
     XCTAssertNil(AgentXPCEndpoint.admission(of: try submitFrame(operationID: "debug.app")))
 
     let run = try ArkDeckAgentXPC.requestFrame(
       method: "job.run", params: ["jobId": .string("JOB-FLASH-1")], requestID: "run")
     XCTAssertEqual(
-      AgentXPCEndpoint.admission(of: run), .flashRun(jobID: "JOB-FLASH-1"))
+      AgentXPCEndpoint.admission(of: run), .appRun(jobID: "JOB-FLASH-1"))
+    let cancel = try ArkDeckAgentXPC.requestFrame(
+      method: "job.cancel", params: ["jobId": .string("JOB-FLASH-1")], requestID: "cancel")
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(of: cancel), .appCancel(jobID: "JOB-FLASH-1"))
 
     let injected = try ArkDeckAgentXPC.requestFrame(
       method: "job.submit",
@@ -113,23 +139,30 @@ final class AgentXPCTransportContractTests: XCTestCase {
         requestID: "contract-submit"))
   }
 
-  func testFlashJobBindingIsOneShot() async {
-    let gate = AgentXPCFlashJobGate()
-    let beforeRecord = await gate.consume("JOB-FLASH-1")
+  func testAppJobBindingPermitsOneRunAndOwnsCancellationUntilFinish() async {
+    let gate = AgentXPCAppJobGate()
+    let beforeRecord = await gate.beginRun("JOB-FLASH-1")
     XCTAssertFalse(beforeRecord)
-    await gate.record("JOB-FLASH-1")
-    let firstRun = await gate.consume("JOB-FLASH-1")
-    let replay = await gate.consume("JOB-FLASH-1")
+    await gate.record("JOB-FLASH-1", kind: .flash)
+    let ownsQueued = await gate.owns("JOB-FLASH-1")
+    XCTAssertTrue(ownsQueued)
+    let firstRun = await gate.beginRun("JOB-FLASH-1")
+    let ownsRunning = await gate.owns("JOB-FLASH-1")
+    XCTAssertTrue(ownsRunning)
+    let replay = await gate.beginRun("JOB-FLASH-1")
     XCTAssertTrue(firstRun)
     XCTAssertFalse(replay)
+    await gate.finish("JOB-FLASH-1")
+    let ownsFinished = await gate.owns("JOB-FLASH-1")
+    XCTAssertFalse(ownsFinished)
   }
 
   // The load-bearing assertion: no generic mutation, target, capability or
-  // non-Flash artifact surface crosses the App transport.
+  // path-based Artifact surface crosses the App transport.
   func testEveryNonFlashMutationMethodIsRefusedBeforeTheHandler() {
     for method in [
-      "job.cancel", "job.reconcile", "job.plan",
-      "target.adopt", "artifact.export", "artifact.read",
+      "job.reconcile", "job.plan",
+      "target.adopt", "artifact.export",
       "artifact.importHap.begin", "artifact.importHap.append",
       "artifact.importHap.commit", "artifact.importHap.abort",
       "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.commit",

@@ -19,6 +19,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "deploy.native-library.system@1",
         "flash.dayu200@1",
         "observe.device@1",
+        "port-forward.create@1",
+        "port-forward.remove@1",
         "workspace.apply-patch@1",
         "workspace.build-openharmony@1",
         "workspace.create-checkpoint@1",

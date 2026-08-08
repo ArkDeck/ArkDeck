@@ -303,6 +303,21 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
         + "sudo=0 helper_install=0 system_rule=0 group_acl=0")
   }
 
+  func testFlashApplicationFacadeProjectsTheClosedReadOnlyAccessDiagnosis() async {
+    let provider = RockchipDeviceAccessApplicationFacade.make(
+      arguments: ["ArkDeck", "--ui-test-flash"])
+
+    let presentation = await provider.refresh()
+
+    XCTAssertEqual(presentation.availability, .available)
+    XCTAssertEqual(presentation.advice?.verdict, .accessible)
+    XCTAssertEqual(presentation.advice?.responsibility, .user)
+    XCTAssertEqual(presentation.advice?.remediation, .chooseSupportedLoaderObservation)
+    XCTAssertTrue(presentation.advice?.reprobeAvailable == true)
+    XCTAssertEqual(presentation.observationCount, 1)
+    XCTAssertEqual(presentation.observedModes, [.loader])
+  }
+
   func testAdapterMaterializesOnlyAbsoluteIdentityBoundLDArgvAndRejectsDriftBeforeLaunch()
     async throws
   {

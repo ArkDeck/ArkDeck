@@ -16,6 +16,10 @@ public enum TraceProbeAdapterProfile {
     "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39"
   public static let bytraceHelpResourceSHA256 =
     "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd"
+  public static let hitraceTagListResourceSHA256 =
+    "ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96"
+  public static let bytraceTagListResourceSHA256 =
+    "c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810"
   public static let rawFtraceHeaderResourceSHA256 =
     "4b6433a1845d533dd466aeb3db965e273f4d4db582c94fe67cf1cb6e1a625ae0"
 
@@ -23,6 +27,7 @@ public enum TraceProbeAdapterProfile {
   public static let bytraceHelpFamily = "bytrace.dayu200-oh7.text-v1"
 
   static let helpResourceByteCount = 3_382
+  static let tagListResourceByteCount = 3_604
   static let rawFtraceHeaderByteCount = 601
 
   // The registry permits ignoring only the leading `YYYY/MM/DD HH:MM:SS ` bytes on the
@@ -31,6 +36,10 @@ public enum TraceProbeAdapterProfile {
     "b40edec78a823762d64599b21c4fd2c82be4a9071e0457120a6e6526433ed3f8"
   static let bytraceHelpTimestampNormalizedSuffixSHA256 =
     "e11541d1b671170d16c300d01dcbb5f50301e9e2533622f1e91b257a8561548e"
+  static let hitraceTagListTimestampNormalizedSuffixSHA256 =
+    "9c781ec48cf4b1cc6f3115be75687efb7e8b9078fdee767e1bee150ad2b758d0"
+  static let bytraceTagListTimestampNormalizedSuffixSHA256 =
+    "d8475c07177f87f8640ef3a52382e0ccaed42115c6a1592ef42c99fffb18204a"
 }
 
 public enum TraceProbeTool: String, Equatable, Sendable {
@@ -60,6 +69,27 @@ public struct TraceProbeHelpEvaluation: Equatable, Sendable {
     self.rawHelp = rawHelp
     self.rawStderr = rawStderr
     rawHelpSHA256 = TraceProbeAdapter.sha256(rawHelp)
+  }
+}
+
+public struct TraceProbeTagEvaluation: Equatable, Sendable {
+  public let selection: TraceProbeAdapterSelection
+  public let tags: [String]
+  public let rawTagList: Data
+  public let rawStderr: Data
+  public let rawTagListSHA256: String
+
+  fileprivate init(
+    selection: TraceProbeAdapterSelection,
+    tags: [String],
+    rawTagList: Data,
+    rawStderr: Data
+  ) {
+    self.selection = selection
+    self.tags = tags
+    self.rawTagList = rawTagList
+    self.rawStderr = rawStderr
+    rawTagListSHA256 = TraceProbeAdapter.sha256(rawTagList)
   }
 }
 
@@ -103,6 +133,61 @@ public enum TraceProbeAdapter {
       selection: selection,
       rawHelp: stdout,
       rawStderr: stderr)
+  }
+
+  /// Classifies and parses only the exact registered tag-list byte family.
+  /// A partial marker match, an exit status, or a familiar tool name yields
+  /// no tags and therefore no capture authority.
+  public static func evaluateTagList(
+    tool: TraceProbeTool,
+    stdout: Data,
+    stderr: Data = Data()
+  ) -> TraceProbeTagEvaluation {
+    guard stderr.isEmpty,
+      stdout.count == TraceProbeAdapterProfile.tagListResourceByteCount,
+      let suffix = timestampNormalizedSuffix(stdout),
+      let text = String(data: stdout, encoding: .utf8)
+    else {
+      return TraceProbeTagEvaluation(
+        selection: .unsupported, tags: [], rawTagList: stdout, rawStderr: stderr)
+    }
+    let suffixSHA256 = sha256(suffix)
+    let selection: TraceProbeAdapterSelection
+    switch tool {
+    case .hitrace:
+      guard suffixSHA256
+        == TraceProbeAdapterProfile.hitraceTagListTimestampNormalizedSuffixSHA256
+      else {
+        return TraceProbeTagEvaluation(
+          selection: .unsupported, tags: [], rawTagList: stdout, rawStderr: stderr)
+      }
+      selection = .captureEligible(
+        tool: .hitrace, family: TraceProbeAdapterProfile.hitraceHelpFamily)
+    case .bytrace:
+      guard suffixSHA256
+        == TraceProbeAdapterProfile.bytraceTagListTimestampNormalizedSuffixSHA256
+      else {
+        return TraceProbeTagEvaluation(
+          selection: .unsupported, tags: [], rawTagList: stdout, rawStderr: stderr)
+      }
+      selection = .probeOnlyNotCaptureEligible(
+        tool: .bytrace, family: TraceProbeAdapterProfile.bytraceHelpFamily)
+    }
+    let tags = text.split(whereSeparator: \.isNewline).dropFirst(2).compactMap {
+      line -> String? in
+      guard let separator = line.range(of: " - ") else { return nil }
+      let name = line[..<separator.lowerBound].trimmingCharacters(in: .whitespaces)
+      guard !name.isEmpty, name.utf8.count <= 64,
+        name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") })
+      else { return nil }
+      return name
+    }
+    guard !tags.isEmpty, Set(tags).count == tags.count else {
+      return TraceProbeTagEvaluation(
+        selection: .unsupported, tags: [], rawTagList: stdout, rawStderr: stderr)
+    }
+    return TraceProbeTagEvaluation(
+      selection: selection, tags: tags, rawTagList: stdout, rawStderr: stderr)
   }
 
   fileprivate static func sha256(_ data: Data) -> String {

@@ -512,6 +512,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "hdc.createPortForward",
         arguments: [
+          "direction": .string(spec.direction.rawValue),
           "localPort": .integer(Int64(spec.localPort)),
           "remotePort": .integer(Int64(spec.remotePort)),
         ])
@@ -519,6 +520,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "hdc.removePortForward",
         arguments: [
+          "direction": .string(spec.direction.rawValue),
           "localPort": .integer(Int64(spec.localPort)),
           "remotePort": .integer(Int64(spec.remotePort)),
         ])
@@ -536,6 +538,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "hdc.readPortForwardPresence",
         arguments: [
+          "direction": .string(spec.direction.rawValue),
           "localPort": .integer(Int64(spec.localPort)),
           "remotePort": .integer(Int64(spec.remotePort)),
         ])
@@ -688,6 +691,14 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "persisted \(kind).\(key) is not an integer")
       }
       return exact
+    }
+    func portDirection() throws -> HDCPortForwardDirection {
+      guard let value = try optionalString("direction") else { return .forward }
+      guard let direction = HDCPortForwardDirection(rawValue: value) else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind).direction is not a closed port direction")
+      }
+      return direction
     }
     func rockchipBundle() throws -> RockchipRuntimeFlashBundle {
       let byteCount = try integer("artifactByteCount")
@@ -956,9 +967,11 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .hdc(.uninstallPackage(try bundle()))
     case "hdc.createPortForward":
       return .hdc(.createPortForward(try HDCPortForwardSpec(
+        direction: try portDirection(),
         localPort: integer("localPort"), remotePort: integer("remotePort"))))
     case "hdc.removePortForward":
       return .hdc(.removePortForward(try HDCPortForwardSpec(
+        direction: try portDirection(),
         localPort: integer("localPort"), remotePort: integer("remotePort"))))
     case "hdc.readPackagePresence":
       return .hdc(.readPackagePresence(try bundle()))
@@ -968,6 +981,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .hdc(.readOwnedPathPresence(try path()))
     case "hdc.readPortForwardPresence":
       return .hdc(.readPortForwardPresence(try HDCPortForwardSpec(
+        direction: try portDirection(),
         localPort: integer("localPort"), remotePort: integer("remotePort"))))
     case "hdc.sendNativeLibraryToStaging":
       return .hdc(.sendNativeLibraryToStaging(try nativeDeployment()))

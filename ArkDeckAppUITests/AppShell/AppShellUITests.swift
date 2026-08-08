@@ -281,8 +281,8 @@ final class AppShellUITests: XCTestCase {
       "starting the wait must show the countdown strip", file: file, line: line)
     XCTAssertFalse(beginWait.isEnabled, "polling disables the start action", file: file, line: line)
     XCTAssertTrue(
-      element("device.wait.windowClosed", in: app).waitForExistenceFast(timeout: 15),
-      "an unanswered window must close honestly", file: file, line: line)
+      element("device.wait.timedOut", in: app).waitForExistenceFast(timeout: 15),
+      "the domain-owned wait must publish its timeout", file: file, line: line)
     XCTAssertTrue(
       app.buttons["device.wait.openOverviewRecovery"].exists,
       "the closed window offers the Overview recovery path, not a restart here",
@@ -293,7 +293,7 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("device.trust.ready", in: app).waitForExistenceFast(timeout: 10),
       "an authorized device ends the wait as ready", file: file, line: line)
-    XCTAssertFalse(element("device.wait.windowClosed", in: app).exists, file: file, line: line)
+    XCTAssertFalse(element("device.wait.timedOut", in: app).exists, file: file, line: line)
     writeFixtureState("", in: app, file: file, line: line)
     select("app.navigation.overview", in: app)
     XCTAssertTrue(
@@ -326,12 +326,10 @@ final class AppShellUITests: XCTestCase {
       "the disabled preparation action needs a visible recovery instruction",
       file: file, line: line)
 
-    // Execute can be reviewed only after an exact plan exists, but the App has
-    // no E2 submit or authority transport. The locked boundary and disabled
-    // review action stay visible, and returning to plan-only has no side effect.
-    // Execute is a real, Runtime-owned submission surface now. With no plan
-    // prepared the review action renders disabled, and no submit control
-    // exists before a confirmed human handoff.
+    // Execute is a real, Runtime-owned submission surface. With no exact plan
+    // prepared the run action remains disabled and no submit control exists;
+    // once the fixture materializes the plan, the separate check below proves
+    // the one-click action is enabled without a confirmation sheet or phrase.
     let executeMode = element("flash.mode.execute", in: app)
     XCTAssertTrue(executeMode.exists, file: file, line: line)
     executeMode.click()
@@ -566,11 +564,10 @@ final class AppShellUITests: XCTestCase {
       app.staticTexts["history.empty.title"].exists, "it is not an empty history",
       file: file, line: line)
 
-    // The exact-plan review and its destructive confirmation assert English
-    // strings; the flow itself is language-independent, so one language
-    // carries it.
+    // The exact-plan run action asserts English strings; the flow itself is
+    // language-independent, so one language carries it.
     if language == "(en)" {
-      walkExactFlashPlanConfirmation(in: app, file: file, line: line)
+      walkExactFlashPlanRunAction(in: app, file: file, line: line)
     }
 
     do {
@@ -843,10 +840,10 @@ final class AppShellUITests: XCTestCase {
   }
 
   /// The exact-plan fixture is presentation-only: it bypasses the system file
-  /// picker so this flow can walk every review state inside the sweep's
-  /// launch, and the accepted confirmation arms — but never clicks — the
-  /// submit action, so the fixture run still submits nothing.
-  private func walkExactFlashPlanConfirmation(
+  /// picker so this flow can walk the complete inline review inside the
+  /// sweep's launch. The enabled one-click Flash action is never clicked, so
+  /// the fixture run still submits nothing.
+  private func walkExactFlashPlanRunAction(
     in app: XCUIApplication, file: StaticString, line: UInt
   ) {
     writeFixtureState("--ui-test-flash-plan", in: app, file: file, line: line)
@@ -874,39 +871,12 @@ final class AppShellUITests: XCTestCase {
       app.staticTexts["Runtime check pending"].waitForExistenceFast(timeout: 5),
       file: file, line: line)
 
-    let review = app.buttons["flash.execute.review"]
-    XCTAssertTrue(review.exists, file: file, line: line)
-    XCTAssertTrue(review.isEnabled, file: file, line: line)
-    scrollIntoView(review, in: app)
-    review.click()
-    guard displayedValues(for: review).contains("Confirm this exact Flash plan") else {
-      return XCTFail(
-        "review action state: \(String(describing: review.value))", file: file, line: line)
-    }
-
-    let confirmationSheet = element("flash.confirm.sheet", in: app)
-    XCTAssertTrue(confirmationSheet.waitForExistenceFast(timeout: 10), file: file, line: line)
-    let expectedPhrase = app.staticTexts["flash.confirm.expectedDestructivePhrase"]
-    XCTAssertTrue(expectedPhrase.waitForExistenceFast(timeout: 5), file: file, line: line)
-    guard
-      let phrase = displayedValues(for: expectedPhrase).first(where: { $0.hasPrefix("FLASH ") })
-    else {
-      return XCTFail(
-        "the confirmation sheet must expose its exact FLASH phrase", file: file, line: line)
-    }
-
-    paste(phrase, into: app.textFields["flash.confirm.destructivePhrase"], in: app)
-    paste("ERASE-USERDATA", into: app.textFields["flash.confirm.userdataPhrase"], in: app)
-
-    let accept = app.buttons["flash.confirm.accept"]
-    scrollIntoView(accept, in: app)
-    accept.click()
-    XCTAssertTrue(
-      element("flash.execute.handoff", in: app).waitForExistenceFast(timeout: 10),
-      "exact phrases must produce the local human-review receipt", file: file, line: line)
     let submit = app.buttons["flash.execute.submit"]
     XCTAssertTrue(submit.exists, file: file, line: line)
+    scrollIntoView(submit, in: app)
     XCTAssertTrue(submit.isEnabled, file: file, line: line)
+    XCTAssertEqual(submit.label, "Erase userdata and flash", file: file, line: line)
+    XCTAssertFalse(element("flash.confirm.sheet", in: app).exists, file: file, line: line)
     XCTAssertFalse(element("flash.execute.terminal", in: app).exists, file: file, line: line)
   }
 
@@ -921,22 +891,12 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
-  /// Pasting replaces per-character key synthesis: the assertion is about the
-  /// phrase-matching logic, not the keyboard input path, and a paste spends
-  /// two events where typing spends one per character.
-  private func paste(_ text: String, into field: XCUIElement, in app: XCUIApplication) {
-    field.click()
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(text, forType: .string)
-    app.typeKey("v", modifierFlags: .command)
-  }
-
   // MARK: - Fixture-specific launches (locale-independent assertions)
 
   // A history that could not be read must never look like an empty history.
   // The exact-plan fixture is presentation-only: it bypasses the system file
   // picker so UI automation can walk every review state, but its provider has
-  // no transport and the accepted confirmation still creates no Runtime Job.
+  // no transport and the one-click Flash action remains untouched.
   /// The Settings scene, which nothing had ever opened.
   ///
   /// The update surface was the only one in the App with no fixture, so this

@@ -65,7 +65,7 @@ export interface StageTrackProps {
  *  the connection between stages is the point. A task can also go *backwards*
  *  here — returning to `analyzing` after `verifying` fails is a legitimate
  *  transition, and it must not be drawn as a new stage or as progress lost.
- *  Stage, lifecycle and conditions are three orthogonal facts (spec v0.3 §5.9);
+ *  Stage, lifecycle and conditions are three orthogonal facts (spec v0.4 §5.9);
  *  do not collapse them into one indicator. */
 export function StageTrack({ stages, currentIndex, className }: StageTrackProps) {
   return (

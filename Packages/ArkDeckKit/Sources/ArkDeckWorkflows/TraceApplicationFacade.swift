@@ -1,12 +1,15 @@
-// App-facing Trace projection over Runtime's read-only XPC door.
+// App-facing Trace projection over Runtime's closed typed XPC door.
 //
 // capture.diagnostics@1 publishes a typed traceCategories leg, but the App
 // read surface does not currently return the per-target hitrace/bytrace probe,
 // raw help, parameter snapshots or mutation receipts required by the accepted
 // Trace contract. This facade exposes that gap alongside exact Catalog facts;
-// it has no submission, cancellation, parameter-write or artifact transport.
+// Submission is limited to capture.diagnostics@1 and a target/binding pair
+// obtained from Runtime. It has no parameter-write or arbitrary command path.
 
 import ArkDeckCore
+import ArkDeckOpenHarmony
+import ArkDeckRuntime
 import Foundation
 import os
 
@@ -126,19 +129,25 @@ public struct TraceWorkspacePresentation: Sendable, Equatable {
   public let relatedDiagnosticsJobs: [TraceRelatedJobPresentation]
   public let targetLoadFailure: String?
   public let jobLoadFailure: String?
+  public let runtimeProbe: TraceRuntimeProbeSnapshot?
+  public let probeFailure: String?
 
   public init(
     operation: TraceOperationPresentation,
     targets: [TraceTargetPresentation],
     relatedDiagnosticsJobs: [TraceRelatedJobPresentation],
     targetLoadFailure: String? = nil,
-    jobLoadFailure: String? = nil
+    jobLoadFailure: String? = nil,
+    runtimeProbe: TraceRuntimeProbeSnapshot? = nil,
+    probeFailure: String? = nil
   ) {
     self.operation = operation
     self.targets = targets
     self.relatedDiagnosticsJobs = relatedDiagnosticsJobs
     self.targetLoadFailure = targetLoadFailure
     self.jobLoadFailure = jobLoadFailure
+    self.runtimeProbe = runtimeProbe
+    self.probeFailure = probeFailure
   }
 
   public static let loading = TraceWorkspacePresentation(
@@ -158,6 +167,36 @@ public enum TraceNumericInputValidation: Sendable, Equatable {
   case invalid(TraceNumericInputFailure)
 }
 
+public struct TraceJobAcceptancePresentation: Sendable, Equatable {
+  public let jobID: String
+
+  public init(jobID: String) { self.jobID = jobID }
+}
+
+public enum TraceJobSubmissionResult: Sendable, Equatable {
+  case submitted(TraceJobAcceptancePresentation)
+  case failed(String)
+}
+
+public struct TraceJobTerminalPresentation: Sendable, Equatable {
+  public let jobID: String
+  public let state: String
+  public let outcomeUnknown: Bool
+  public let timeline: [String]
+
+  public init(jobID: String, state: String, outcomeUnknown: Bool, timeline: [String]) {
+    self.jobID = jobID
+    self.state = state
+    self.outcomeUnknown = outcomeUnknown
+    self.timeline = timeline
+  }
+}
+
+public enum TraceJobRunResult: Sendable, Equatable {
+  case completed(TraceJobTerminalPresentation)
+  case failed(String)
+}
+
 public enum TraceNumericInputValidator {
   public static func validate(
     _ value: String,
@@ -173,7 +212,15 @@ public enum TraceNumericInputValidator {
 }
 
 public protocol TraceApplicationProviding: Sendable {
-  func refreshWorkspace() async -> TraceWorkspacePresentation
+  func refreshWorkspace(targetID: String?) async -> TraceWorkspacePresentation
+  func submitCapture(
+    target: TraceTargetPresentation,
+    durationSeconds: Int,
+    tags: [String],
+    bufferKB: Int
+  ) async -> TraceJobSubmissionResult
+  func run(jobID: String) async -> TraceJobRunResult
+  func cancel(jobID: String) async -> Bool
 }
 
 public enum TraceApplicationFacade {
@@ -224,14 +271,229 @@ public enum TraceApplicationFacade {
 }
 
 private actor TraceProductionApplicationProvider: TraceApplicationProviding {
-  func refreshWorkspace() async -> TraceWorkspacePresentation {
+  func refreshWorkspace(targetID: String?) async -> TraceWorkspacePresentation {
     async let operations = TraceXPCReadTransport.request(method: "operation.list")
     async let targets = TraceXPCReadTransport.request(method: "target.list")
     async let jobs = TraceXPCReadTransport.request(method: "job.list")
-    return TraceWorkspaceResponseDecoding.presentation(
+    let base = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
       jobResponse: await jobs)
+    guard let selected = base.targets.first(where: { $0.id == targetID }) ?? base.targets.first
+    else { return base }
+    let probe = TraceRuntimeProbeResponseDecoding.snapshot(
+      await TraceXPCReadTransport.request(
+        method: "trace.probe", params: ["targetId": .string(selected.id)]),
+      target: selected)
+    switch probe {
+    case .success(let snapshot):
+      return TraceWorkspacePresentation(
+        operation: base.operation, targets: base.targets,
+        relatedDiagnosticsJobs: base.relatedDiagnosticsJobs,
+        targetLoadFailure: base.targetLoadFailure,
+        jobLoadFailure: base.jobLoadFailure,
+        runtimeProbe: snapshot)
+    case .failure(let failure):
+      return TraceWorkspacePresentation(
+        operation: base.operation, targets: base.targets,
+        relatedDiagnosticsJobs: base.relatedDiagnosticsJobs,
+        targetLoadFailure: base.targetLoadFailure,
+        jobLoadFailure: base.jobLoadFailure,
+        probeFailure: failure.message)
+    }
+  }
+
+  func submitCapture(
+    target: TraceTargetPresentation,
+    durationSeconds: Int,
+    tags: [String],
+    bufferKB: Int
+  ) async -> TraceJobSubmissionResult {
+    guard (1...600).contains(durationSeconds), (1_024...65_536).contains(bufferKB),
+      !tags.isEmpty, tags.count <= 24,
+      Set(tags).count == tags.count,
+      tags.allSatisfy({ tag in
+        !tag.isEmpty && tag.utf8.count <= 64
+          && tag.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
+      })
+    else { return .failed("Trace request is outside the published bounds") }
+    do {
+      let nonce = UUID().uuidString.lowercased()
+      let request = try RuntimeOperationRequest(
+        requestID: "trace-ui-\(nonce)",
+        idempotencyKey: "trace-ui-\(nonce)",
+        target: DurableTargetReference(
+          targetID: target.id, expectedBindingRevision: target.bindingRevision),
+        operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
+        inputs: [
+          "durationSeconds": .integer(Int64(durationSeconds)),
+          "hilogFilters": .array([]),
+          "traceCategories": .array(tags.map(JSONValue.string)),
+          "traceBufferKB": .integer(Int64(bufferKB)),
+          "uiDump": .bool(false),
+          "crashLogs": .bool(false),
+          "uiScreenshot": .bool(false),
+          "uiComponentTree": .bool(false),
+          "redactionProfile": .string("standard"),
+        ],
+        requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.TraceWorkspace"))
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let requestData = try encoder.encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed Trace request")
+      }
+      let result = try TraceXPCResponseDecoding.resultObject(
+        await TraceXPCReadTransport.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
+      guard let jobID = result["jobId"] as? String, !jobID.isEmpty else {
+        return .failed("Runtime accepted Trace without returning a Job ID")
+      }
+      return .submitted(TraceJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as TraceResponseFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  func run(jobID: String) async -> TraceJobRunResult {
+    do {
+      let result = try TraceXPCResponseDecoding.resultObject(
+        await TraceXPCReadTransport.request(
+          method: "job.run", params: ["jobId": .string(jobID)]))
+      guard result["jobId"] as? String == jobID,
+        let state = result["state"] as? String,
+        let outcomeUnknown = result["outcomeUnknown"] as? Bool,
+        let timeline = result["timeline"] as? [String]
+      else { return .failed("Runtime returned incomplete terminal Trace facts") }
+      return .completed(
+        TraceJobTerminalPresentation(
+          jobID: jobID, state: state, outcomeUnknown: outcomeUnknown, timeline: timeline))
+    } catch let failure as TraceResponseFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  func cancel(jobID: String) async -> Bool {
+    guard let result = try? TraceXPCResponseDecoding.resultObject(
+      await TraceXPCReadTransport.request(
+        method: "job.cancel", params: ["jobId": .string(jobID)]))
+    else { return false }
+    return result["cancelRequested"] as? Bool == true
+  }
+}
+
+private enum TraceXPCResponseDecoding {
+  static func resultObject(
+    _ response: Result<Data, TraceXPCReadFailure>
+  ) throws -> [String: Any] {
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure(let failure): throw TraceResponseFailure(message: failure.message)
+    }
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { throw TraceResponseFailure(message: "Runtime returned an unreadable response") }
+    if let error = envelope["error"] as? [String: Any] {
+      throw TraceResponseFailure(
+        message: "Runtime refused the request: "
+          + (error["message"] as? String ?? "no message"))
+    }
+    guard envelope["ok"] as? Bool == true,
+      let result = envelope["result"] as? [String: Any]
+    else { throw TraceResponseFailure(message: "Runtime returned no result object") }
+    return result
+  }
+}
+
+enum TraceRuntimeProbeResponseDecoding {
+  static func snapshot(
+    _ response: Result<Data, TraceXPCReadFailure>,
+    target: TraceTargetPresentation
+  ) -> Result<TraceRuntimeProbeSnapshot, TraceResponseFailure> {
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure(let failure):
+      return .failure(TraceResponseFailure(message: failure.message))
+    }
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { return .failure(TraceResponseFailure(message: "Runtime returned an unreadable probe")) }
+    if let error = envelope["error"] as? [String: Any] {
+      return .failure(
+        TraceResponseFailure(
+          message: "Runtime refused the Trace probe: "
+            + (error["message"] as? String ?? "no message")))
+    }
+    guard envelope["ok"] as? Bool == true,
+      let result = envelope["result"] as? [String: Any],
+      result["targetId"] as? String == target.id,
+      result["bindingRevision"] as? Int == target.bindingRevision,
+      let disposition = result["adapterDisposition"] as? String,
+      ["captureEligible", "unsupported"].contains(disposition),
+      let tags = result["supportedTags"] as? [String],
+      Set(tags).count == tags.count,
+      let toolRows = result["tools"] as? [[String: Any]],
+      let rows = result["parameters"] as? [[String: Any]]
+    else { return .failure(TraceResponseFailure(message: "Runtime returned mismatched probe facts")) }
+
+    var tools: [TraceRuntimeToolObservation] = []
+    for row in toolRows {
+      guard let tool = row["tool"] as? String,
+        ["hitrace", "bytrace"].contains(tool),
+        let dispositionText = row["disposition"] as? String,
+        let toolDisposition = TraceRuntimeToolDisposition(rawValue: dispositionText)
+      else { return .failure(TraceResponseFailure(message: "Runtime returned malformed tool facts")) }
+      tools.append(
+        TraceRuntimeToolObservation(
+          tool: tool,
+          disposition: toolDisposition,
+          family: row["family"] as? String,
+          rawHelpSHA256: row["rawHelpSha256"] as? String,
+          detail: row["detail"] as? String))
+    }
+    guard Set(tools.map(\.tool)) == Set(["hitrace", "bytrace"]) else {
+      return .failure(TraceResponseFailure(message: "Runtime omitted a required tool probe"))
+    }
+
+    let expectedNames = Set(TraceDebugParameterCatalog.definitions.map(\.name))
+    var names: Set<String> = []
+    var parameters: [TraceRuntimeParameterObservation] = []
+    for row in rows {
+      guard let name = row["name"] as? String, expectedNames.contains(name), names.insert(name).inserted,
+        let stateText = row["state"] as? String,
+        let state = TraceRuntimeParameterState(rawValue: stateText)
+      else { return .failure(TraceResponseFailure(message: "Runtime returned malformed parameter facts")) }
+      let value = row["value"] as? String
+      let detail = row["detail"] as? String
+      guard (state == .value) == (value != nil), state != .unreadable || detail != nil else {
+        return .failure(TraceResponseFailure(message: "Runtime returned contradictory parameter facts"))
+      }
+      parameters.append(
+        TraceRuntimeParameterObservation(
+          name: name, state: state, value: value, detail: detail))
+    }
+    guard names == expectedNames else {
+      return .failure(TraceResponseFailure(message: "Runtime omitted parameter facts"))
+    }
+    let tool = result["tool"] as? String
+    let family = result["family"] as? String
+    guard disposition != "captureEligible"
+      || (tool == TraceProbeTool.hitrace.rawValue && family != nil && !tags.isEmpty)
+    else { return .failure(TraceResponseFailure(message: "Runtime returned incomplete adapter facts")) }
+    return .success(
+      TraceRuntimeProbeSnapshot(
+        targetID: target.id, bindingRevision: target.bindingRevision,
+        adapterDisposition: disposition, tool: tool, family: family,
+        supportedTags: tags,
+        rawHelp: result["rawHelp"] as? String,
+        rawHelpSHA256: result["rawHelpSha256"] as? String,
+        tools: tools,
+        parameters: parameters))
   }
 }
 
@@ -377,7 +639,7 @@ enum TraceWorkspaceResponseDecoding {
   }
 }
 
-private struct TraceResponseFailure: Error {
+struct TraceResponseFailure: Error {
   let message: String
 }
 
@@ -407,11 +669,13 @@ enum TraceXPCReadFailure: Error, Sendable, Equatable {
 }
 
 private enum TraceXPCReadTransport {
-  static func request(method: String) async -> Result<Data, TraceXPCReadFailure> {
+  static func request(
+    method: String,
+    params: [String: JSONValue]? = nil
+  ) async -> Result<Data, TraceXPCReadFailure> {
     let frame: Data
     do {
-      frame = try JSONSerialization.data(
-        withJSONObject: ["v": 1, "id": UUID().uuidString, "method": method])
+      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
     } catch {
       return .failure(.transport("Could not compose a Runtime request"))
     }

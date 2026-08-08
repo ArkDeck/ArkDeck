@@ -19,7 +19,7 @@ public final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked
 
   private let handler: RuntimeControlPlaneHandler
   private let listener: NSXPCListener
-  private let flashJobs = AgentXPCFlashJobGate()
+  private let appJobs = AgentXPCAppJobGate()
 
   public init(handler: RuntimeControlPlaneHandler) {
     self.handler = handler
@@ -45,7 +45,7 @@ public final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked
     _ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection
   ) -> Bool {
     connection.exportedInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-    connection.exportedObject = AgentXPCEndpoint(handler: handler, flashJobs: flashJobs)
+    connection.exportedObject = AgentXPCEndpoint(handler: handler, appJobs: appJobs)
     connection.resume()
     return true
   }
@@ -56,16 +56,36 @@ public final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked
 /// queued Job. The listener therefore shares the identifiers returned by
 /// successful, typed Flash submissions across the App's short-lived XPC
 /// connections. Only those identifiers may cross the run boundary, once.
-actor AgentXPCFlashJobGate {
-  private var runnableJobIDs: Set<String> = []
+enum AgentXPCAppJobKind: String, Sendable, Equatable {
+  case flash
+  case trace
+  case debugLogs
+  case debugHAP
+  case debugPorts
+}
 
-  func record(_ jobID: String) {
+actor AgentXPCAppJobGate {
+  private var runnableJobs: [String: AgentXPCAppJobKind] = [:]
+  private var runningJobs: [String: AgentXPCAppJobKind] = [:]
+
+  func record(_ jobID: String, kind: AgentXPCAppJobKind) {
     guard !jobID.isEmpty, jobID.count <= 128 else { return }
-    runnableJobIDs.insert(jobID)
+    runnableJobs[jobID] = kind
   }
 
-  func consume(_ jobID: String) -> Bool {
-    runnableJobIDs.remove(jobID) != nil
+  func beginRun(_ jobID: String) -> Bool {
+    guard let kind = runnableJobs.removeValue(forKey: jobID) else { return false }
+    runningJobs[jobID] = kind
+    return true
+  }
+
+  func owns(_ jobID: String) -> Bool {
+    runnableJobs[jobID] != nil || runningJobs[jobID] != nil
+  }
+
+  func finish(_ jobID: String) {
+    runningJobs.removeValue(forKey: jobID)
+    runnableJobs.removeValue(forKey: jobID)
   }
 }
 
@@ -74,16 +94,17 @@ actor AgentXPCFlashJobGate {
 final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Sendable {
   enum Admission: Equatable {
     case direct(method: String)
-    case flashSubmit(requestID: String)
-    case flashRun(jobID: String)
+    case appSubmit(requestID: String, kind: AgentXPCAppJobKind)
+    case appRun(jobID: String)
+    case appCancel(jobID: String)
   }
 
   private let handler: RuntimeControlPlaneHandler
-  private let flashJobs: AgentXPCFlashJobGate
+  private let appJobs: AgentXPCAppJobGate
 
-  init(handler: RuntimeControlPlaneHandler, flashJobs: AgentXPCFlashJobGate) {
+  init(handler: RuntimeControlPlaneHandler, appJobs: AgentXPCAppJobGate) {
     self.handler = handler
-    self.flashJobs = flashJobs
+    self.appJobs = appJobs
   }
 
   func sendRequestFrame(
@@ -95,22 +116,33 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       return
     }
     let handler = self.handler
-    let flashJobs = self.flashJobs
+    let appJobs = self.appJobs
     Task {
-      if case .flashRun(let jobID) = admission,
-        !(await flashJobs.consume(jobID))
-      {
-        reply(nil, ArkDeckAgentXPC.RefusalReason.methodNotAllowlisted.rawValue)
-        return
+      switch admission {
+      case .appRun(let jobID):
+        guard await appJobs.beginRun(jobID) else {
+          reply(nil, ArkDeckAgentXPC.RefusalReason.methodNotAllowlisted.rawValue)
+          return
+        }
+      case .appCancel(let jobID):
+        guard await appJobs.owns(jobID) else {
+          reply(nil, ArkDeckAgentXPC.RefusalReason.methodNotAllowlisted.rawValue)
+          return
+        }
+      case .direct, .appSubmit:
+        break
       }
       // This is the same request path the Unix socket uses: same decode, same
       // Runtime admission and same audit record. The XPC boundary adds only a
       // narrower operation/job ownership check.
       let response = await handler.handleLine(frame)
-      if case .flashSubmit(let requestID) = admission,
+      if case .appSubmit(let requestID, let kind) = admission,
         let jobID = Self.successfulSubmittedJobID(in: response, requestID: requestID)
       {
-        await flashJobs.record(jobID)
+        await appJobs.record(jobID, kind: kind)
+      }
+      if case .appRun(let jobID) = admission {
+        await appJobs.finish(jobID)
       }
       reply(response, nil)
     }
@@ -127,6 +159,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
 
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
+      || ArkDeckAgentXPC.forwardableAutomationMethods.contains(request.method)
     {
       return .direct(method: request.method)
     }
@@ -135,36 +168,57 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       guard
         request.params?.count == 1,
         case .string(let requestJSON)? = request.params?["requestJson"],
-        isTypedFlashUIRequest(requestJSON)
+        let kind = typedAppJobKind(requestJSON)
       else { return nil }
-      return .flashSubmit(requestID: request.id)
+      return .appSubmit(requestID: request.id, kind: kind)
     case "job.run":
       guard
         request.params?.count == 1,
         case .string(let jobID)? = request.params?["jobId"],
         !jobID.isEmpty, jobID.count <= 128
       else { return nil }
-      return .flashRun(jobID: jobID)
+      return .appRun(jobID: jobID)
+    case "job.cancel":
+      guard
+        request.params?.count == 1,
+        case .string(let jobID)? = request.params?["jobId"],
+        !jobID.isEmpty, jobID.count <= 128
+      else { return nil }
+      return .appCancel(jobID: jobID)
     default:
       return nil
     }
   }
 
-  private static func isTypedFlashUIRequest(_ requestJSON: String) -> Bool {
+  private static func typedAppJobKind(_ requestJSON: String) -> AgentXPCAppJobKind? {
     guard
       let data = requestJSON.data(using: .utf8),
       case .object(let request)? = try? JSONDecoder().decode(JSONValue.self, from: data),
       case .string("runtime-operation-request")? = request["documentType"],
       case .string("2.0.0")? = request["schemaVersion"],
       case .object(let operation)? = request["operation"],
-      case .string("flash.dayu200")? = operation["id"],
+      case .string(let operationID)? = operation["id"],
       case .integer(1)? = operation["version"],
       request["authorization"] == nil,
       request["campaignReservation"] == nil,
       case .object(let context)? = request["clientContext"],
-      case .string("ArkDeckApp.FlashWorkspace")? = context["clientName"]
-    else { return false }
-    return true
+      case .string(let clientName)? = context["clientName"]
+    else { return nil }
+    switch (clientName, operationID) {
+    case ("ArkDeckApp.FlashWorkspace", "flash.dayu200"):
+      return .flash
+    case ("ArkDeckApp.TraceWorkspace", "capture.diagnostics"):
+      return .trace
+    case ("ArkDeckApp.DebugWorkspace.Logs", "capture.diagnostics"):
+      return .debugLogs
+    case ("ArkDeckApp.DebugWorkspace.Apps", "debug.hap"):
+      return .debugHAP
+    case ("ArkDeckApp.DebugWorkspace.Network", "port-forward.create"),
+      ("ArkDeckApp.DebugWorkspace.Network", "port-forward.remove"):
+      return .debugPorts
+    default:
+      return nil
+    }
   }
 
   static func successfulSubmittedJobID(in response: Data, requestID: String) -> String? {

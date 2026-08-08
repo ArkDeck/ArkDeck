@@ -11,6 +11,7 @@
 // no cached last-good value and no partial render.
 
 import ArkDeckCore
+import CryptoKit
 import Foundation
 import os
 
@@ -100,6 +101,15 @@ public struct RuntimeJobParameterPresentation: Sendable, Equatable, Identifiable
   public var id: String { name }
 }
 
+public struct RuntimeTraceParameterPresentation: Sendable, Equatable, Identifiable {
+  public let name: String
+  public let beforeState: String
+  public let beforeValue: String?
+  public let afterState: String
+  public let afterValue: String?
+  public var id: String { name }
+}
+
 public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
   public let catalogDigest: String
   public let bindingRevision: Int?
@@ -118,6 +128,9 @@ public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
   public let observedModel: String?
   public let observedFirmware: String?
   public let observedTransport: String?
+  public let observedBindingRevision: Int?
+  public let traceTags: [String]
+  public let traceParameters: [RuntimeTraceParameterPresentation]
   public let blockers: [String]
 }
 
@@ -144,6 +157,11 @@ public struct RuntimeJobDetailPresentation: Sendable, Equatable {
   public let artifacts: [RuntimeArtifactPresentation]
 }
 
+public enum RuntimeArtifactExportResult: Sendable, Equatable {
+  case completed(URL)
+  case failed(String)
+}
+
 /// Closed App-facing surface. It exposes one read and nothing else: there is
 /// no submit, run, cancel, reconcile, adopt or import method to call.
 public protocol RuntimeHistoryApplicationProviding: Sendable {
@@ -151,13 +169,20 @@ public protocol RuntimeHistoryApplicationProviding: Sendable {
 }
 
 /// A second closed reader keeps on-demand detail separate from the global
-/// summary refresh. Its single method reads evidence and Artifact metadata;
-/// it cannot read bytes, export files, or mutate a Job.
+/// summary refresh. Export reads only one metadata-bound Artifact through a
+/// bounded chunk method and writes it in the App process to a user-selected
+/// URL; the destination path never crosses the daemon boundary.
 public protocol RuntimeJobDetailApplicationProviding: Sendable {
   func loadJobDetail(
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation
+  func exportArtifact(
+    jobID: String,
+    artifact: RuntimeArtifactPresentation,
+    destinationURL: URL,
+    allowSensitive: Bool
+  ) async -> RuntimeArtifactExportResult
 }
 
 public enum RuntimeHistoryApplicationFacade {
@@ -175,7 +200,10 @@ public enum RuntimeJobDetailApplicationFacade {
   public static func make(
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any RuntimeJobDetailApplicationProviding {
-    if arguments.contains("--ui-test-runtime-history") {
+    if arguments.contains("--ui-test-runtime-history")
+      || arguments.contains("--ui-test-flash")
+      || arguments.contains("--ui-test-flash-plan")
+    {
       return RuntimeJobDetailFixtureProvider()
     }
     return RuntimeJobDetailXPCProvider()
@@ -212,6 +240,159 @@ private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding 
       operationReference: operationReference,
       evidenceResponse: evidence,
       artifactResponse: artifacts)
+  }
+
+  func exportArtifact(
+    jobID: String,
+    artifact: RuntimeArtifactPresentation,
+    destinationURL: URL,
+    allowSensitive: Bool
+  ) async -> RuntimeArtifactExportResult {
+    guard artifact.status == "published" else {
+      return .failed("Only a published Artifact can be exported")
+    }
+    guard artifact.byteCount >= 0, artifact.byteCount <= Int64(Int.max) else {
+      return .failed("Artifact byte count is outside this host's export range")
+    }
+    guard artifact.privacy != "sensitive" || allowSensitive else {
+      return .failed("Sensitive Artifact export requires explicit opt-in")
+    }
+    let gainedScope = destinationURL.startAccessingSecurityScopedResource()
+    defer {
+      if gainedScope { destinationURL.stopAccessingSecurityScopedResource() }
+    }
+    let temporaryURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("arkdeck-artifact-\(UUID().uuidString.lowercased())")
+    defer { try? FileManager.default.removeItem(at: temporaryURL) }
+    guard FileManager.default.createFile(atPath: temporaryURL.path, contents: nil),
+      let handle = try? FileHandle(forWritingTo: temporaryURL)
+    else {
+      return .failed("The App could not create a bounded export staging file")
+    }
+    var handleIsOpen = true
+    defer {
+      if handleIsOpen { try? handle.close() }
+    }
+
+    do {
+      var offset: Int64 = 0
+      var digest = SHA256()
+      let expectedCount = artifact.byteCount
+      while offset < expectedCount {
+        let response = await RuntimeHistoryXPCReadTransport.request(
+          method: "artifact.read",
+          params: [
+            "jobId": .string(jobID),
+            "artifactId": .string(artifact.id),
+            "offset": .integer(offset),
+            "maxBytes": .integer(256 * 1_024),
+            "allowSensitive": .bool(allowSensitive),
+          ])
+        let chunk = try RuntimeArtifactChunkResponseDecoding.chunk(
+          response,
+          jobID: jobID,
+          artifact: artifact,
+          expectedOffset: offset)
+        guard !chunk.data.isEmpty else {
+          throw RuntimeArtifactExportFailure(
+            message: "Runtime returned an empty non-terminal Artifact chunk")
+        }
+        try handle.write(contentsOf: chunk.data)
+        digest.update(data: chunk.data)
+        offset = chunk.nextOffset
+        guard chunk.eof == (offset == expectedCount) else {
+          throw RuntimeArtifactExportFailure(
+            message: "Runtime Artifact end-of-file facts drifted during export")
+        }
+      }
+      try handle.synchronize()
+      try handle.close()
+      handleIsOpen = false
+      let actualSHA256 = digest.finalize().map { String(format: "%02x", $0) }.joined()
+      guard actualSHA256 == artifact.sha256 else {
+        throw RuntimeArtifactExportFailure(
+          message: "Exported Artifact SHA-256 does not match Runtime metadata")
+      }
+
+      if FileManager.default.fileExists(atPath: destinationURL.path) {
+        let values = try destinationURL.resourceValues(forKeys: [
+          .isRegularFileKey, .isSymbolicLinkKey,
+        ])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else {
+          throw RuntimeArtifactExportFailure(
+            message: "The selected export destination is not a regular file")
+        }
+        _ = try FileManager.default.replaceItemAt(
+          destinationURL, withItemAt: temporaryURL)
+      } else {
+        try FileManager.default.copyItem(at: temporaryURL, to: destinationURL)
+      }
+      return .completed(destinationURL)
+    } catch let failure as RuntimeArtifactExportFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed("Artifact export failed: \(error)")
+    }
+  }
+}
+
+private struct RuntimeArtifactExportFailure: Error {
+  let message: String
+}
+
+private enum RuntimeArtifactChunkResponseDecoding {
+  struct Chunk {
+    let data: Data
+    let nextOffset: Int64
+    let eof: Bool
+  }
+
+  static func chunk(
+    _ response: RuntimeHistoryTransportResult,
+    jobID _: String,
+    artifact: RuntimeArtifactPresentation,
+    expectedOffset: Int64
+  ) throws -> Chunk {
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure(let reason): throw RuntimeArtifactExportFailure(message: reason)
+    }
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      throw RuntimeArtifactExportFailure(message: "Runtime returned an unreadable Artifact chunk")
+    }
+    if let error = envelope["error"] as? [String: Any] {
+      let code = error["code"] as? String ?? "unknown"
+      let message = error["message"] as? String ?? "no message"
+      throw RuntimeArtifactExportFailure(
+        message: "Runtime refused Artifact export: \(code) — \(message)")
+    }
+    guard envelope["ok"] as? Bool == true,
+      let result = envelope["result"] as? [String: Any],
+      result["artifactId"] as? String == artifact.id,
+      let offset = int64(result["offset"]), offset == expectedOffset,
+      let nextOffset = int64(result["nextOffset"]), nextOffset > offset,
+      let total = int64(result["totalByteCount"]), total == artifact.byteCount,
+      let byteCount = int64(result["byteCount"]), byteCount == nextOffset - offset,
+      let encoded = result["base64"] as? String,
+      let bytes = Data(base64Encoded: encoded), Int64(bytes.count) == byteCount,
+      let eof = result["eof"] as? Bool,
+      nextOffset <= artifact.byteCount
+    else {
+      throw RuntimeArtifactExportFailure(
+        message: "Runtime returned incomplete or drifting Artifact chunk facts")
+    }
+    return Chunk(data: bytes, nextOffset: nextOffset, eof: eof)
+  }
+
+  private static func int64(_ value: Any?) -> Int64? {
+    switch value {
+    case let number as NSNumber: return number.int64Value
+    case let value as Int: return Int64(value)
+    case let value as Int64: return value
+    default: return nil
+    }
   }
 }
 
@@ -418,6 +599,7 @@ enum RuntimeJobDetailResponseDecoding {
     }
     let authority = envelope["authority"] as? [String: Any]
     let observation = envelope["observation"] as? [String: Any]
+    let trace = decodeTraceEvidence(envelope)
     return .available(
       RuntimeJobEvidencePresentation(
         catalogDigest: catalogDigest,
@@ -437,7 +619,49 @@ enum RuntimeJobDetailResponseDecoding {
         observedModel: observation?["model"] as? String,
         observedFirmware: observation?["firmware"] as? String,
         observedTransport: observation?["transport"] as? String,
+        observedBindingRevision: observation?["bindingRevision"] as? Int,
+        traceTags: trace.tags,
+        traceParameters: trace.parameters,
         blockers: envelope["blockers"] as? [String] ?? []))
+  }
+
+  private static func decodeTraceEvidence(
+    _ envelope: [String: Any]
+  ) -> (tags: [String], parameters: [RuntimeTraceParameterPresentation]) {
+    guard let before = envelope["traceProbeBefore"] as? [String: Any],
+      let after = envelope["traceProbeAfter"] as? [String: Any],
+      before["targetId"] as? String == after["targetId"] as? String,
+      before["bindingRevision"] as? Int == after["bindingRevision"] as? Int,
+      let tags = before["supportedTags"] as? [String],
+      let beforeRows = before["parameters"] as? [[String: Any]],
+      let afterRows = after["parameters"] as? [[String: Any]]
+    else { return ([], []) }
+    let beforeByName = Dictionary(
+      uniqueKeysWithValues: beforeRows.compactMap { row -> (String, [String: Any])? in
+        guard let name = row["name"] as? String else { return nil }
+        return (name, row)
+      })
+    let afterByName = Dictionary(
+      uniqueKeysWithValues: afterRows.compactMap { row -> (String, [String: Any])? in
+        guard let name = row["name"] as? String else { return nil }
+        return (name, row)
+      })
+    let expectedNames = TraceDebugParameterCatalog.definitions.map(\.name)
+    guard Set(beforeByName.keys) == Set(expectedNames),
+      Set(afterByName.keys) == Set(expectedNames)
+    else { return ([], []) }
+    let parameters = expectedNames.compactMap { name -> RuntimeTraceParameterPresentation? in
+      guard let before = beforeByName[name], let after = afterByName[name],
+        let beforeState = before["state"] as? String,
+        let afterState = after["state"] as? String
+      else { return nil }
+      return RuntimeTraceParameterPresentation(
+        name: name,
+        beforeState: beforeState, beforeValue: before["value"] as? String,
+        afterState: afterState, afterValue: after["value"] as? String)
+    }
+    guard parameters.count == expectedNames.count else { return ([], []) }
+    return (tags, parameters)
   }
 
   private static func decodeArtifacts(
@@ -583,8 +807,11 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
         authorityKind: isFlash ? "runtimeCapability" : "defaultReadOnlyPolicy",
         authorityReference: "fixture-read-only",
         observedModel: "DAYU200",
-        observedFirmware: "OpenHarmony fixture",
-        observedTransport: "fixture",
+        observedFirmware: isFlash ? "OpenHarmony-7.0.0.36" : "OpenHarmony fixture",
+        observedTransport: isFlash ? "usb" : "fixture",
+        observedBindingRevision: isFlash ? 2 : 1,
+        traceTags: [],
+        traceParameters: [],
         blockers: isFlash ? ["outcomeUnknown"] : []),
       artifactAvailability: .available,
       artifacts: isFlash
@@ -604,6 +831,21 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
             redactionApplied: true)
         ]
         : [])
+  }
+
+  func exportArtifact(
+    jobID _: String,
+    artifact _: RuntimeArtifactPresentation,
+    destinationURL: URL,
+    allowSensitive _: Bool
+  ) async -> RuntimeArtifactExportResult {
+    do {
+      try Data("ArkDeck UI fixture Artifact\n".utf8).write(
+        to: destinationURL, options: .atomic)
+      return .completed(destinationURL)
+    } catch {
+      return .failed("Fixture Artifact export failed: \(error)")
+    }
   }
 }
 

@@ -65,7 +65,7 @@ struct TraceConfigurationView: View {
         }
 
         DisclosureGroup(traceString("trace.probe.rawHelp.title")) {
-          Text(traceString("trace.probe.rawHelp.empty"))
+          Text(model.selectedRuntimeProbe?.rawHelp ?? traceString("trace.probe.rawHelp.empty"))
             .font(.callout.monospaced())
             .foregroundStyle(.secondary)
             .textSelection(.enabled)
@@ -180,23 +180,29 @@ struct TraceConfigurationView: View {
         Text(traceString("trace.tags.title"))
           .font(.subheadline.weight(.semibold))
         Spacer(minLength: 12)
-        Text(traceString("trace.tags.unverifiedCount") + " \(model.requestedTags.count)")
+        Text(
+          String(
+            format: traceString("trace.tags.verifiedCount"),
+            model.requestedTags.count - model.unsupportedRequestedTags.count,
+            model.requestedTags.count))
           .font(.caption.monospacedDigit())
-          .foregroundStyle(.orange)
+          .foregroundStyle(model.unsupportedRequestedTags.isEmpty ? Color.green : Color.orange)
       }
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
         ForEach(model.requestedTags, id: \.self) { tag in
-          Label(tag, systemImage: "questionmark.circle")
+          let supported = model.confirmedTags.contains(tag)
+          Label(tag, systemImage: supported ? "checkmark.circle.fill" : "xmark.circle.fill")
             .font(.callout.monospaced())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(supported ? Color.green : Color.red)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary.opacity(0.5), in: Capsule())
-            .accessibilityLabel("\(tag), \(traceString("trace.tags.unverified"))")
+            .accessibilityLabel(
+              "\(tag), \(traceString(supported ? "trace.tags.supported" : "trace.tags.unsupported"))")
         }
       }
-      Text(traceString("trace.tags.unverifiedNote"))
+      Text(traceString("trace.tags.verifiedNote"))
         .font(.footnote)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
@@ -298,16 +304,18 @@ struct TraceConfigurationView: View {
           TableColumn(traceString("trace.parameters.desired")) { row in
             Text(row.desiredValue).font(.callout.monospaced())
           }
-          TableColumn(traceString("trace.parameters.before")) { _ in
-            Text(traceString("trace.parameters.notObserved"))
-              .foregroundStyle(.secondary)
+          TableColumn(traceString("trace.parameters.before")) { row in
+            Text(parameterBeforeValue(row.name))
+              .font(.callout.monospaced())
+              .foregroundStyle(.primary)
           }
-          TableColumn(traceString("trace.parameters.probe")) { _ in
-            Text(traceString("trace.value.unverified"))
+          TableColumn(traceString("trace.parameters.after")) { row in
+            Text(parameterAfterValue(row.name))
+              .font(.callout.monospaced())
               .foregroundStyle(.secondary)
           }
           TableColumn(traceString("trace.parameters.restore")) { _ in
-            Text(traceString("trace.value.unavailable"))
+            Text(traceString("trace.parameters.notChanged"))
               .foregroundStyle(.secondary)
           }
         }
@@ -334,11 +342,19 @@ struct TraceConfigurationView: View {
         .accessibilityIdentifier("trace.parameters.persistConfirm")
         .padding(.leading, 28)
 
-        traceNotice(
-          traceString("trace.parameters.snapshotGap"),
-          systemImage: "lock.trianglebadge.exclamationmark",
-          color: .orange,
-          identifier: "trace.parameters.snapshotGap")
+        if model.hasParameterSnapshotFacts {
+          traceNotice(
+            traceString("trace.parameters.snapshotReady"),
+            systemImage: "checkmark.shield",
+            color: .green,
+            identifier: "trace.parameters.snapshotReady")
+        } else {
+          traceNotice(
+            model.workspace.probeFailure ?? traceString("trace.parameters.snapshotGap"),
+            systemImage: "lock.trianglebadge.exclamationmark",
+            color: .orange,
+            identifier: "trace.parameters.snapshotGap")
+        }
 
         HStack(alignment: .top, spacing: 8) {
           Image(systemName: "arrow.trianglehead.2.clockwise")
@@ -361,6 +377,7 @@ struct TraceConfigurationView: View {
     GroupBox(traceString("trace.filter.title")) {
       VStack(alignment: .leading, spacing: 10) {
         Toggle(traceString("trace.filter.createFileAsset"), isOn: filterBinding)
+          .disabled(!model.workspace.operation.supportsFilteredTraceArtifact)
           .accessibilityIdentifier("trace.filter.createFileAsset")
         Text(traceString("trace.filter.description"))
           .font(.footnote)
@@ -380,6 +397,36 @@ struct TraceConfigurationView: View {
   private var parameterRows: [TraceParameterTableRow] {
     TraceDebugParameterCatalog.definitions.map {
       TraceParameterTableRow(name: $0.name, desiredValue: $0.profileValue)
+    }
+  }
+
+  private func parameterBeforeValue(_ name: String) -> String {
+    if let evidence = model.traceParameterEvidence(name: name) {
+      return parameterEvidenceValue(state: evidence.beforeState, value: evidence.beforeValue)
+    }
+    guard let observation = model.parameterObservation(name: name) else {
+      return traceString("trace.parameters.notObserved")
+    }
+    return switch observation.state {
+    case .value: observation.value ?? traceString("trace.value.unavailable")
+    case .missing: traceString("trace.parameters.missing")
+    case .unreadable: traceString("trace.parameters.unreadable")
+    }
+  }
+
+  private func parameterAfterValue(_ name: String) -> String {
+    guard let evidence = model.traceParameterEvidence(name: name) else {
+      return traceString("trace.value.unverified")
+    }
+    return parameterEvidenceValue(state: evidence.afterState, value: evidence.afterValue)
+  }
+
+  private func parameterEvidenceValue(state: String, value: String?) -> String {
+    switch state {
+    case "value": value ?? traceString("trace.value.unavailable")
+    case "missing": traceString("trace.parameters.missing")
+    case "unreadable": traceString("trace.parameters.unreadable")
+    default: traceString("trace.value.unverified")
     }
   }
 

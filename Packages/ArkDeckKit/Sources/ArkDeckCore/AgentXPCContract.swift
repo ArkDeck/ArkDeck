@@ -60,13 +60,18 @@ public enum ArkDeckAgentXPC {
   public static let forwardableReadOnlyMethods: Set<String> = [
     "artifact.inspect",
     "artifact.list",
+    "artifact.read",
     "device.candidates",
+    "debug.probe",
+    "debug.template.run",
+    "flash.prerequisites",
     "job.evidence",
     "job.list",
     "job.list-page",
     "job.status",
     "operation.list",
     "target.list",
+    "trace.probe",
   ]
 
   /// Bundle ingestion is the stateless effectful part of the closed Flash
@@ -80,17 +85,30 @@ public enum ArkDeckAgentXPC {
   ]
 
   /// These names are generic in the daemon protocol. The XPC endpoint must
-  /// additionally prove an exact `flash.dayu200@1` UI request and bind the
-  /// returned Job identifier before forwarding either one.
-  public static let gatedFlashJobMethods: Set<String> = [
+  /// additionally prove one of the closed App-owned typed requests and bind
+  /// the returned Job identifier before forwarding run or cancel.
+  public static let gatedAppJobMethods: Set<String> = [
+    "job.cancel",
     "job.run",
     "job.submit",
+  ]
+
+  /// Existing Harness tasks are already closed typed runtime records. The App
+  /// may list them and request only bounded lifecycle transitions; it cannot
+  /// submit a new task, provide a human-resolution string, propose source,
+  /// export promotion material, or administer a capability.
+  public static let forwardableAutomationMethods: Set<String> = [
+    "task.cancel",
+    "task.list",
+    "task.pause",
+    "task.reconcile",
   ]
 
   public static let forwardableMethods =
     forwardableReadOnlyMethods
     .union(forwardableFlashBundleMethods)
-    .union(gatedFlashJobMethods)
+    .union(gatedAppJobMethods)
+    .union(forwardableAutomationMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.
   /// They are stable strings so the App can present an accurate cause rather

@@ -15,7 +15,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(operation.supportsTypedTraceCategories)
     XCTAssertTrue(operation.supportsRawTraceArtifact)
     XCTAssertFalse(operation.supportsFilteredTraceArtifact)
-    XCTAssertFalse(operation.supportsCaptureLogArtifact)
+    XCTAssertTrue(operation.supportsCaptureLogArtifact)
     XCTAssertFalse(operation.exposesAdapterCapabilityFacts)
     XCTAssertFalse(operation.exposesParameterSnapshotFacts)
   }
@@ -125,7 +125,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       "Runtime returned an incomplete diagnostics job")
   }
 
-  func testFacadeExposesOneReadAndNoMutationTransport() throws {
+  func testFacadeExposesClosedTypedTraceSubmitRunAndCancel() throws {
     let facade = try source(
       "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceApplicationFacade.swift")
     let protocolBody = try XCTUnwrap(
@@ -133,21 +133,23 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
         .last?.split(separator: "public enum TraceApplicationFacade", maxSplits: 1).first)
 
     XCTAssertTrue(protocolBody.contains("refreshWorkspace"))
-    XCTAssertFalse(protocolBody.contains("submit"))
-    XCTAssertFalse(protocolBody.contains("cancel"))
+    XCTAssertTrue(protocolBody.contains("submitCapture"))
+    XCTAssertTrue(protocolBody.contains("run(jobID:"))
+    XCTAssertTrue(protocolBody.contains("cancel(jobID:"))
     XCTAssertFalse(protocolBody.contains("write"))
     XCTAssertTrue(facade.contains("method: \"operation.list\""))
     XCTAssertTrue(facade.contains("method: \"target.list\""))
     XCTAssertTrue(facade.contains("method: \"job.list\""))
-    for forbidden in [
-      "method: \"job.submit\"", "method: \"job.cancel\"",
-      "method: \"artifact.import\"", "method: \"artifact.export\"",
-    ] {
+    XCTAssertTrue(facade.contains("method: \"job.submit\""))
+    XCTAssertTrue(facade.contains("method: \"job.run\""))
+    XCTAssertTrue(facade.contains("method: \"job.cancel\""))
+    XCTAssertTrue(facade.contains("ArkDeckApp.TraceWorkspace"))
+    for forbidden in ["method: \"artifact.import\"", "method: \"artifact.export\""] {
       XCTAssertFalse(facade.contains(forbidden), forbidden)
     }
   }
 
-  func testAppRoutesTraceWorkspaceAndKeepsStartLocked() throws {
+  func testAppRoutesTraceWorkspaceAndStartsOnlyThroughTheFacade() throws {
     let app = try source("ArkDeckApp/App/ArkDeckApp.swift")
     let workspace = try source("ArkDeckApp/Features/Trace/TraceWorkspaceView.swift")
     let configuration = try source(
@@ -157,17 +159,63 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(
       workspace.contains(
         "String.LocalizationValue(key), table: \"TraceLocalizable\""))
-    // The start button names its configuration and duration, and admits a
-    // parameter-mutating run applies parameters first; the action closure
-    // stays empty and the control stays disabled.
-    XCTAssertTrue(workspace.contains("Button(startActionTitle) {}"))
+    XCTAssertTrue(workspace.contains("model.submit()"))
     XCTAssertTrue(workspace.contains("trace.action.startNamed"))
     XCTAssertTrue(workspace.contains("trace.action.applyAndStartNamed"))
-    XCTAssertTrue(workspace.contains(".disabled(true)"))
+    XCTAssertTrue(workspace.contains("model.cancel()"))
     XCTAssertTrue(configuration.contains("TracePresetCatalog.definitions"))
     XCTAssertTrue(configuration.contains("TraceDebugParameterCatalog.definitions"))
     XCTAssertFalse(workspace.contains("job.submit"))
     XCTAssertFalse(configuration.contains("shell"))
+  }
+
+  func testRuntimeProbeDecoderPinsTargetBindingAdapterTagsAndAllParameters() throws {
+    let target = TraceTargetPresentation(
+      id: "target-a", bindingRevision: 9, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-06T08:00:00Z")
+    let rows: [[String: Any]] = TraceDebugParameterCatalog.definitions.map {
+      ["name": $0.name, "state": "value", "value": "0", "detail": NSNull()]
+    }
+    let result: [String: Any] = [
+      "targetId": "target-a", "bindingRevision": 9,
+      "adapterDisposition": "captureEligible", "tool": "hitrace",
+      "family": "hitrace.dayu200-oh7.text-v1", "supportedTags": ["ace"],
+      "rawHelp": "registered", "rawHelpSha256": String(repeating: "a", count: 64),
+      "tools": [
+        [
+          "tool": "hitrace", "disposition": "captureEligible",
+          "family": "hitrace.dayu200-oh7.text-v1",
+          "rawHelpSha256": String(repeating: "a", count: 64),
+          "detail": NSNull(),
+        ],
+        [
+          "tool": "bytrace", "disposition": "unrecognized",
+          "family": NSNull(),
+          "rawHelpSha256": String(repeating: "b", count: 64),
+          "detail": NSNull(),
+        ],
+      ],
+      "parameters": rows,
+    ]
+    let data = try JSONSerialization.data(
+      withJSONObject: ["id": "probe", "ok": true, "result": result])
+    let decoded = TraceRuntimeProbeResponseDecoding.snapshot(.success(data), target: target)
+    guard case .success(let snapshot) = decoded else {
+      return XCTFail("complete target-bound probe should decode")
+    }
+    XCTAssertEqual(snapshot.targetID, target.id)
+    XCTAssertEqual(snapshot.bindingRevision, target.bindingRevision)
+    XCTAssertEqual(snapshot.supportedTags, ["ace"])
+    XCTAssertEqual(snapshot.tools.map(\.tool), ["hitrace", "bytrace"])
+    XCTAssertEqual(snapshot.parameters.count, TraceDebugParameterCatalog.definitions.count)
+
+    var drifted = result
+    drifted["bindingRevision"] = 10
+    let driftedData = try JSONSerialization.data(
+      withJSONObject: ["id": "probe", "ok": true, "result": drifted])
+    guard case .failure = TraceRuntimeProbeResponseDecoding.snapshot(
+      .success(driftedData), target: target)
+    else { return XCTFail("binding drift must fail closed") }
   }
 
   func testTraceLocalizationCoversClosedPresetsModesAndStagesInBothLanguages() throws {

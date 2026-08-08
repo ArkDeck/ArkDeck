@@ -996,20 +996,35 @@ final class RockchipProductExecutionSettings: @unchecked Sendable {
   }
 
   static func load() throws -> RockchipProductExecutionSettings {
+    let discovery = try loadDiscovery()
+    let manager = FileManager.default
+    let usage = discovery.root.appending(
+      path: "AuthorizationUsage", directoryHint: .isDirectory)
+    try manager.createDirectory(
+      at: usage, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    guard chmod(usage.path, 0o700) == 0 else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "owner-only Application Support directory")
+    }
+    let binding = try RockchipProductBindingStore(rootURL: discovery.root).loadExisting()
+    return RockchipProductExecutionSettings(
+      usageRoot: usage, tool: discovery.tool, binding: binding,
+      toolWorkingDirectory: discovery.toolWorkingDirectory)
+  }
+
+  static func loadDiscovery() throws -> RockchipProductDiscoverySettings {
     let manager = FileManager.default
     let applicationSupport = try manager.url(
       for: .applicationSupportDirectory, in: .userDomainMask,
       appropriateFor: nil, create: true)
     let root = applicationSupport.appending(path: "ArkDeck", directoryHint: .isDirectory)
-    let usage = root.appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
-    for directory in [root, usage] {
-      try manager.createDirectory(
-        at: directory, withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700])
-      guard chmod(directory.path, 0o700) == 0 else {
-        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-          "owner-only Application Support directory")
-      }
+    try manager.createDirectory(
+      at: root, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    guard chmod(root.path, 0o700) == 0 else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "owner-only Application Support directory")
     }
 
     let defaults = UserDefaults.standard
@@ -1041,11 +1056,9 @@ final class RockchipProductExecutionSettings: @unchecked Sendable {
       sha256: RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
       platformTrust: RockchipPlatformTrustReceipt(
         codeTrust: trust, quarantinePresent: quarantine))
-    let binding = try RockchipProductBindingStore(rootURL: root).loadExisting()
     let toolWorkingDirectory = try RockchipProductToolRuntimeDirectory.prepare(root: root)
-    return RockchipProductExecutionSettings(
-      usageRoot: usage, tool: selectedTool, binding: binding,
-      toolWorkingDirectory: toolWorkingDirectory)
+    return RockchipProductDiscoverySettings(
+      root: root, tool: selectedTool, toolWorkingDirectory: toolWorkingDirectory)
   }
 
   fileprivate static func productKeychainToken() throws -> String? {
@@ -1065,6 +1078,12 @@ final class RockchipProductExecutionSettings: @unchecked Sendable {
     }
     return String(data: data, encoding: .utf8)
   }
+}
+
+struct RockchipProductDiscoverySettings: Sendable {
+  let root: URL
+  let tool: RockchipSelectedDiscoveryTool
+  let toolWorkingDirectory: URL
 }
 
 struct RockchipProductUSBIdentity: Sendable, Equatable {

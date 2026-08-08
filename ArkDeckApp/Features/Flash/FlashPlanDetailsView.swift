@@ -96,10 +96,9 @@ struct FlashPlanDetailsView: View {
 
 }
 
-/// The profile's prerequisites, always expanded: what has to hold before the
-/// plan is worth reading. Requirement level is the only fact the read facade
-/// carries — satisfied/unknown verdicts stay honest as "pending" until a
-/// Runtime check result reaches the App.
+/// The profile's prerequisites, always expanded with the latest read-only
+/// Runtime verdict. Symbols are paired with text so the state is not conveyed
+/// by colour alone.
 struct FlashPrerequisitesList: View {
   let prerequisites: [FlashPrerequisitePresentation]
 
@@ -114,8 +113,8 @@ struct FlashPrerequisitesList: View {
 
   private func prerequisiteRow(_ prerequisite: FlashPrerequisitePresentation) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 10) {
-      Image(systemName: prerequisiteSymbol(prerequisite.requirement))
-        .foregroundStyle(prerequisiteColor(prerequisite.requirement))
+      Image(systemName: prerequisiteSymbol(prerequisite.status))
+        .foregroundStyle(prerequisiteColor(prerequisite.status))
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(flashText(prerequisiteName(prerequisite.identifier)))
@@ -125,9 +124,9 @@ struct FlashPrerequisitesList: View {
           .foregroundStyle(.secondary)
       }
       Spacer(minLength: 8)
-      Text(flashText("flash.plan.prerequisitePending"))
+      Text(flashText(statusName(prerequisite.status)))
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(prerequisiteColor(prerequisite.status))
     }
     .padding(10)
     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
@@ -154,19 +153,27 @@ struct FlashPrerequisitesList: View {
     }
   }
 
-  private func prerequisiteSymbol(_ requirement: RockchipPrerequisiteRequirement) -> String {
-    switch requirement {
-    case .required: "exclamationmark.circle"
-    case .optional: "info.circle"
-    case .notApplicable: "minus.circle"
+  private func statusName(_ status: RockchipPrerequisiteStatus) -> String {
+    switch status {
+    case .satisfied: "flash.prerequisite.status.satisfied"
+    case .unsatisfied: "flash.prerequisite.status.unsatisfied"
+    case .unknown: "flash.prerequisite.status.unknown"
     }
   }
 
-  private func prerequisiteColor(_ requirement: RockchipPrerequisiteRequirement) -> Color {
-    switch requirement {
-    case .required: .orange
-    case .optional: .blue
-    case .notApplicable: .secondary
+  private func prerequisiteSymbol(_ status: RockchipPrerequisiteStatus) -> String {
+    switch status {
+    case .satisfied: "checkmark.circle.fill"
+    case .unsatisfied: "xmark.octagon.fill"
+    case .unknown: "questionmark.circle"
+    }
+  }
+
+  private func prerequisiteColor(_ status: RockchipPrerequisiteStatus) -> Color {
+    switch status {
+    case .satisfied: .green
+    case .unsatisfied: .red
+    case .unknown: .orange
     }
   }
 }

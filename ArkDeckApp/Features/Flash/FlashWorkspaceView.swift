@@ -29,17 +29,16 @@ struct FlashWorkspaceView: View {
   let onRefreshRuntimeHistory: () -> Void
   let onOpenHistory: () -> Void
   @State private var isImporterPresented = false
-  @State private var confirmationPlan: FlashExactPlanPresentation?
-  @State private var isConfirmationPresented = false
-  @FocusState private var isReviewActionFocused: Bool
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
         modeStatus
         availabilitySection
+        deviceAccessSection
         FlashRuntimeActivityView(
           presentation: runtimeHistory,
+          plan: model.plan,
           onOpenHistory: onOpenHistory)
         // Reading order matches the spec: Availability → Profile & Image Set
         // → Prerequisites → Exact Plan → Review & Run. Prerequisites are a
@@ -115,23 +114,16 @@ struct FlashWorkspaceView: View {
       case .failure: model.rejectArchiveSelection()
       }
     }
-    .sheet(
-      isPresented: $isConfirmationPresented,
-      onDismiss: {
-        confirmationPlan = nil
-        // Focus returns to the trigger, so a keyboard user lands where the
-        // sheet was opened from instead of at the window's first responder.
-        isReviewActionFocused = true
-      }
-    ) {
-      if let confirmationPlan {
-        FlashDestructiveConfirmationSheet(plan: confirmationPlan) {
-          destructivePhrase, userdataPhrase in
-          model.confirm(
-            reviewedPlan: confirmationPlan,
-            destructivePhrase: destructivePhrase,
-            userdataPhrase: userdataPhrase)
+    .task(id: model.isSubmitting) {
+      guard model.isSubmitting else {
+        if model.submission != nil || model.submissionFailure != nil {
+          onRefreshRuntimeHistory()
         }
+        return
+      }
+      while !Task.isCancelled && model.isSubmitting {
+        onRefreshRuntimeHistory()
+        try? await Task.sleep(for: .milliseconds(750))
       }
     }
   }
@@ -207,6 +199,118 @@ struct FlashWorkspaceView: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
+    }
+  }
+
+  private var deviceAccessSection: some View {
+    GroupBox(flashText("flash.deviceAccess.title")) {
+      VStack(alignment: .leading, spacing: 10) {
+        switch model.deviceAccess.availability {
+        case .checking:
+          HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(flashText("flash.deviceAccess.checking"))
+          }
+        case .unavailable(let reason):
+          Label(
+            flashText("flash.deviceAccess.toolUnavailable"),
+            systemImage: "wrench.and.screwdriver.fill"
+          )
+          .foregroundStyle(.orange)
+          Text(reason)
+            .font(.callout.monospaced())
+            .textSelection(.enabled)
+        case .available:
+          if let advice = model.deviceAccess.advice {
+            Label(
+              flashText(deviceAccessVerdictKey(advice.verdict)),
+              systemImage: deviceAccessSymbol(advice.verdict)
+            )
+            .foregroundStyle(deviceAccessColor(advice.verdict))
+            .font(.callout.weight(.semibold))
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+              GridRow {
+                Text(flashText("flash.deviceAccess.responsibility"))
+                  .foregroundStyle(.secondary)
+                Text(flashText(deviceAccessResponsibilityKey(advice.responsibility)))
+              }
+              GridRow {
+                Text(flashText("flash.deviceAccess.nextStep"))
+                  .foregroundStyle(.secondary)
+                Text(flashText(deviceAccessRemediationKey(advice.remediation)))
+                  .fixedSize(horizontal: false, vertical: true)
+              }
+              if model.deviceAccess.observationCount > 0 {
+                GridRow {
+                  Text(flashText("flash.deviceAccess.observations"))
+                    .foregroundStyle(.secondary)
+                  Text(
+                    String(
+                      format: flashText("flash.deviceAccess.observationValue"),
+                      model.deviceAccess.observationCount,
+                      model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", "))
+                  )
+                }
+              }
+            }
+          }
+        }
+        if model.deviceAccess.advice?.reprobeAvailable == true {
+          Button(flashText("flash.deviceAccess.reprobe")) {
+            model.refreshDeviceAccess()
+          }
+          .disabled(model.isRefreshingDeviceAccess)
+          .accessibilityIdentifier("flash.deviceAccess.reprobe")
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, 4)
+    }
+    .accessibilityIdentifier("flash.deviceAccess")
+  }
+
+  private func deviceAccessVerdictKey(_ verdict: RockchipDeviceAccessVerdict) -> String {
+    switch verdict {
+    case .accessible: "flash.deviceAccess.verdict.accessible"
+    case .offlineOrUnauthorized: "flash.deviceAccess.verdict.offline"
+    case .permissionDenied: "flash.deviceAccess.verdict.permissionDenied"
+    case .driverUnavailable: "flash.deviceAccess.verdict.driverUnavailable"
+    case .protocolBlocked: "flash.deviceAccess.verdict.protocolBlocked"
+    case .malformedOutput: "flash.deviceAccess.verdict.malformedOutput"
+    case .toolBlocked: "flash.deviceAccess.verdict.toolBlocked"
+    case .probeFailed: "flash.deviceAccess.verdict.probeFailed"
+    }
+  }
+
+  private func deviceAccessResponsibilityKey(
+    _ responsibility: RockchipDeviceAccessResponsibility
+  ) -> String {
+    "flash.deviceAccess.responsibility.\(responsibility.rawValue)"
+  }
+
+  private func deviceAccessRemediationKey(
+    _ remediation: RockchipDeviceAccessRemediation
+  ) -> String {
+    "flash.deviceAccess.remediation.\(remediation.rawValue)"
+  }
+
+  private func deviceAccessSymbol(_ verdict: RockchipDeviceAccessVerdict) -> String {
+    switch verdict {
+    case .accessible: "checkmark.circle.fill"
+    case .offlineOrUnauthorized: "cable.connector.slash"
+    case .permissionDenied: "lock.trianglebadge.exclamationmark"
+    case .driverUnavailable: "wrench.and.screwdriver.fill"
+    case .protocolBlocked, .malformedOutput, .toolBlocked, .probeFailed:
+      "exclamationmark.triangle.fill"
+    }
+  }
+
+  private func deviceAccessColor(_ verdict: RockchipDeviceAccessVerdict) -> Color {
+    switch verdict {
+    case .accessible: .green
+    case .permissionDenied, .driverUnavailable: .red
+    case .offlineOrUnauthorized, .protocolBlocked, .malformedOutput, .toolBlocked, .probeFailed:
+      .orange
     }
   }
 
@@ -495,63 +599,82 @@ struct FlashWorkspaceView: View {
         switch model.mode {
         case .execute:
           Divider()
-          if let handoff = model.humanHandoff {
-            confirmedHandoff(handoff)
-            Button {
-              model.submit()
-            } label: {
-              if model.isSubmitting {
-                HStack(spacing: 8) {
-                  ProgressView().controlSize(.small)
-                  Text(flashText("flash.action.submitting"))
-                }
-              } else {
-                Text(flashText("flash.action.submit"))
-              }
-            }
-              .buttonStyle(.borderedProminent)
-              .tint(.red)
-              .disabled(!model.canSubmit)
-              .accessibilityIdentifier("flash.execute.submit")
-            if let submission = model.submission {
-              let successful = submission.state == "succeeded" || submission.state == "recovered"
-              Label(
-                String(format: flashText("flash.execute.terminal"), submission.state),
-                systemImage: successful
-                  ? "checkmark.circle.fill" : "xmark.octagon.fill"
-              )
-              .foregroundStyle(successful ? .green : .red)
-              .accessibilityIdentifier("flash.execute.terminal")
-              Text(submission.jobID)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
-                .accessibilityIdentifier("flash.execute.jobId")
-            } else if let failure = model.submissionFailure {
-              Label(failure, systemImage: "xmark.octagon.fill")
-                .foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("flash.execute.failure")
-            }
-          } else {
+          if model.plan != nil {
             Label(
-              flashText("flash.execute.confirmationRequired"),
-              systemImage: "person.crop.circle.badge.exclamationmark"
+              flashText("flash.execute.recoveryPath"),
+              systemImage: "arrow.uturn.backward.circle"
             )
-            .font(.callout.weight(.semibold))
+            .font(.callout)
+            .foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
-            Button(flashText("flash.action.reviewImpact")) {
-              if let plan = model.plan {
-                confirmationPlan = plan
-                isConfirmationPresented = true
+            Label(
+              flashText("flash.execute.powerWarning"),
+              systemImage: "bolt.trianglebadge.exclamationmark.fill"
+            )
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
+          }
+          Button {
+            model.submit()
+          } label: {
+            if model.isSubmitting {
+              HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(flashText("flash.action.submitting"))
               }
+            } else {
+              Text(flashText("flash.action.submit"))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            .disabled(!model.canReviewDestructiveImpact)
-            .focused($isReviewActionFocused)
-            .accessibilityIdentifier("flash.execute.review")
-            .accessibilityValue(
-              isConfirmationPresented ? flashText("flash.confirm.title") : "")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(.red)
+          .disabled(!model.canSubmit)
+          .accessibilityIdentifier("flash.execute.submit")
+          if model.activeJobID != nil {
+            Button(flashText("flash.action.cancel"), role: .cancel) {
+              model.cancelActiveJob()
+            }
+            .disabled(model.isCancelling)
+            .accessibilityIdentifier("flash.execute.cancel")
+            Text(flashText("flash.action.cancel.help"))
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          if !model.canSubmit && !model.isSubmitting {
+            Label(
+              flashText("flash.execute.planRequired"),
+              systemImage: "list.bullet.clipboard"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          }
+          Label(flashText("flash.execute.reviewNotAuthority"), systemImage: "lock.shield")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          if let submission = model.submission {
+            let successful = submission.state == "succeeded" || submission.state == "recovered"
+            Label(
+              String(format: flashText("flash.execute.terminal"), submission.state),
+              systemImage: successful
+                ? "checkmark.circle.fill" : "xmark.octagon.fill"
+            )
+            .foregroundStyle(successful ? .green : .red)
+            .accessibilityIdentifier("flash.execute.terminal")
+            Text(submission.jobID)
+              .font(.caption.monospaced())
+              .textSelection(.enabled)
+              .accessibilityIdentifier("flash.execute.jobId")
+            if let postflight = model.postflightEvidence, let plan = model.plan {
+              flashPostflight(plan: plan, evidence: postflight)
+            }
+          } else if let failure = model.submissionFailure {
+            Label(failure, systemImage: "xmark.octagon.fill")
+              .foregroundStyle(.red)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("flash.execute.failure")
           }
         case .planOnly:
           Label(flashText("flash.planOnly.noSubmission"), systemImage: "checkmark.shield")
@@ -572,49 +695,6 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private func confirmedHandoff(_ handoff: FlashHumanHandoffPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Label(flashText("flash.execute.confirmed"), systemImage: "checkmark.seal.fill")
-        .font(.callout.weight(.semibold))
-        .foregroundStyle(.orange)
-      LabeledContent(flashText("flash.confirm.target")) {
-        Text("\(handoff.target.id) · r\(handoff.target.bindingRevision)")
-          .font(.body.monospaced())
-      }
-      LabeledContent(flashText("flash.execute.confirmedAt")) {
-        Text(handoff.confirmedAtUTC).font(.body.monospaced())
-      }
-      LabeledContent(flashText("flash.plan.digest")) {
-        Text(handoff.planDigestSHA256)
-          .font(.body.monospaced())
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .help(handoff.planDigestSHA256)
-      }
-      LabeledContent(flashText("flash.plan.archiveHash")) {
-        Text(handoff.archiveSHA256)
-          .font(.body.monospaced())
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .help(handoff.archiveSHA256)
-      }
-      // The dispatch counter is the receipt that reviewing wrote nothing to
-      // the device: it must read 0 here, and showing it is the point.
-      LabeledContent(flashText("flash.execute.mutationDispatch")) {
-        Text(String(handoff.deviceMutationDispatchCount))
-          .font(.body.monospacedDigit())
-          .accessibilityIdentifier("flash.execute.mutationDispatchCount")
-      }
-      Label(flashText("flash.execute.reviewNotAuthority"), systemImage: "exclamationmark.shield")
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("flash.execute.handoff")
-    }
-    .padding(12)
-    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-  }
-
   private func dataImpactLabel(_ impact: FlashDataImpactPresentation) -> some View {
     switch impact {
     case .mappedPartitionsOverwritten(let count):
@@ -626,6 +706,70 @@ struct FlashWorkspaceView: View {
     case .forbiddenAreasPreserved:
       return Label(flashText("flash.impact.preserved"), systemImage: "checkmark.shield.fill")
     }
+  }
+
+  private func flashPostflight(
+    plan: FlashExactPlanPresentation,
+    evidence: RuntimeJobEvidencePresentation
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(flashText("flash.postflight.title"))
+        .font(.subheadline.weight(.semibold))
+      if let observedFirmware = evidence.observedFirmware {
+        postflightRow(
+          label: flashText("flash.postflight.build"),
+          expected: plan.runtimeBuildVersion,
+          observed: observedFirmware,
+          matches: observedFirmware == plan.runtimeBuildVersion,
+          identifier: "flash.postflight.build")
+      }
+      if let before = plan.target?.bindingRevision,
+        let after = evidence.observedBindingRevision
+      {
+        postflightRow(
+          label: flashText("flash.postflight.binding"),
+          expected: "r\(before) → r\(before + 1)",
+          observed: "r\(before) → r\(after)",
+          matches: after == before + 1,
+          identifier: "flash.postflight.binding")
+      }
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("flash.postflight")
+  }
+
+  private func postflightRow(
+    label: String,
+    expected: String,
+    observed: String,
+    matches: Bool,
+    identifier: String
+  ) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Image(systemName: matches ? "checkmark.circle.fill" : "xmark.octagon.fill")
+        .foregroundStyle(matches ? .green : .red)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(label).font(.callout.weight(.semibold))
+        Text(
+          String(
+            format: flashText("flash.postflight.comparison"),
+            expected, observed)
+        )
+        .font(.caption.monospaced())
+        .textSelection(.enabled)
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(
+      String(
+        format: flashText(
+          matches ? "flash.postflight.match" : "flash.postflight.mismatch"),
+        label, expected, observed))
+    .accessibilityIdentifier(identifier)
   }
 
   private func planFailureKey(_ code: FlashPlanFailureCode) -> String {
@@ -648,16 +792,22 @@ final class FlashWorkspaceViewModel: ObservableObject {
   @Published private(set) var plan: FlashExactPlanPresentation?
   @Published private(set) var planFailureCode: FlashPlanFailureCode?
   @Published private(set) var planFailureDetail: String?
-  @Published private(set) var humanHandoff: FlashHumanHandoffPresentation?
   @Published private(set) var submission: FlashSubmissionPresentation?
   @Published private(set) var submissionFailure: String?
+  @Published private(set) var postflightEvidence: RuntimeJobEvidencePresentation?
+  @Published private(set) var deviceAccess = RockchipDeviceAccessPresentation.loading
   @Published private(set) var isRefreshing = false
   @Published private(set) var isPreparingPlan = false
   @Published private(set) var isSubmitting = false
+  @Published private(set) var isCancelling = false
+  @Published private(set) var activeJobID: String?
+  @Published private(set) var isRefreshingDeviceAccess = false
   @Published private(set) var profileReference =
     FlashApplicationFacade.profileReferences.last ?? "dayu200@1"
 
   private let provider: any FlashApplicationProviding
+  private let detailProvider: any RuntimeJobDetailApplicationProviding
+  private let deviceAccessProvider: any RockchipDeviceAccessApplicationProviding
   private let preparesUITestPlan: Bool
   /// The UI-test state file, honored only when the launch already carries the
   /// Flash fixture arguments: it lets one launched sweep walk the empty
@@ -668,9 +818,15 @@ final class FlashWorkspaceViewModel: ObservableObject {
 
   init(
     provider: any FlashApplicationProviding,
+    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil,
+    deviceAccessProvider: (any RockchipDeviceAccessApplicationProviding)? = nil,
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) {
     self.provider = provider
+    self.detailProvider = detailProvider
+      ?? RuntimeJobDetailApplicationFacade.make(arguments: arguments)
+    self.deviceAccessProvider = deviceAccessProvider
+      ?? RockchipDeviceAccessApplicationFacade.make(arguments: arguments)
     preparesUITestPlan = arguments.contains("--ui-test-flash-plan")
     if arguments.contains("--ui-test-flash") || preparesUITestPlan,
       let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
@@ -703,26 +859,18 @@ final class FlashWorkspaceViewModel: ObservableObject {
       && !isPreparingPlan
   }
 
-  var canReviewDestructiveImpact: Bool {
-    mode == .execute
-      && plan?.mode == .execute
-      && plan?.target == selectedTarget
-      && !isPreparingPlan
-  }
-
   var canSubmit: Bool {
     guard mode == .execute, !isSubmitting,
       let archive = selectedArchiveURL,
-      let plan,
-      let handoff = humanHandoff
+      let plan
     else { return false }
     return !archive.path.isEmpty
       && plan.target == selectedTarget
-      && handoff.planDigestSHA256 == plan.planDigestSHA256
-      && handoff.archiveSHA256 == plan.archiveSHA256
+      && plan.mode == .execute
   }
 
   func refresh() {
+    refreshDeviceAccess()
     guard !isRefreshing else { return }
     isRefreshing = true
     let provider = provider
@@ -752,6 +900,19 @@ final class FlashWorkspaceViewModel: ObservableObject {
         }
         self.preparePlan()
       }
+    }
+  }
+
+  func refreshDeviceAccess() {
+    guard !isRefreshingDeviceAccess else { return }
+    isRefreshingDeviceAccess = true
+    let provider = deviceAccessProvider
+    Task { [weak self] in
+      let next = await provider.refresh()
+      guard let self else { return }
+      defer { self.isRefreshingDeviceAccess = false }
+      guard !Task.isCancelled else { return }
+      self.deviceAccess = next
     }
   }
 
@@ -787,9 +948,9 @@ final class FlashWorkspaceViewModel: ObservableObject {
     guard let archiveURL = selectedArchiveURL, canPreparePlan else { return }
     isPreparingPlan = true
     plan = nil
-    humanHandoff = nil
     submission = nil
     submissionFailure = nil
+    postflightEvidence = nil
     planFailureCode = nil
     planFailureDetail = nil
     let provider = provider
@@ -821,52 +982,83 @@ final class FlashWorkspaceViewModel: ObservableObject {
     }
   }
 
-  func confirm(
-    reviewedPlan: FlashExactPlanPresentation,
-    destructivePhrase: String,
-    userdataPhrase: String
-  ) -> FlashManualConfirmationResult {
-    let result = FlashManualConfirmationValidator.confirm(
-      currentPlan: plan,
-      reviewedPlan: reviewedPlan,
-      currentTarget: selectedTarget,
-      destructivePhrase: destructivePhrase,
-      userdataPhrase: userdataPhrase,
-      confirmedAtUTC: ISO8601DateFormatter().string(from: Date()))
-    if case .accepted(let handoff) = result {
-      humanHandoff = handoff
-    }
-    return result
-  }
-
   func submit() {
     guard canSubmit, let archiveURL = selectedArchiveURL, let plan else { return }
     isSubmitting = true
     submission = nil
     submissionFailure = nil
+    postflightEvidence = nil
     let provider = provider
+    let detailProvider = detailProvider
     Task { [weak self] in
-      let result = await provider.submit(archiveURL: archiveURL, plan: plan)
+      let submissionResult = await provider.submit(archiveURL: archiveURL, plan: plan)
       guard let self else { return }
-      defer { self.isSubmitting = false }
       guard self.selectedArchiveURL == archiveURL,
         self.plan == plan,
         !Task.isCancelled
-      else { return }
-      switch result {
-      case .completed(let terminal):
+      else {
+        self.isSubmitting = false
+        return
+      }
+      switch submissionResult {
+      case .accepted(let jobID):
+        self.activeJobID = jobID
+        let runResult = await provider.run(jobID: jobID)
+        guard self.selectedArchiveURL == archiveURL,
+          self.plan == plan,
+          !Task.isCancelled
+        else {
+          self.activeJobID = nil
+          self.isSubmitting = false
+          self.isCancelling = false
+          return
+        }
+        self.activeJobID = nil
+        self.isSubmitting = false
+        self.isCancelling = false
+        guard case .completed(let terminal) = runResult else {
+          if case .failed(let detail) = runResult {
+            self.submissionFailure = detail
+          }
+          return
+        }
         self.submission = terminal
+        let detail = await detailProvider.loadJobDetail(
+          jobID: terminal.jobID,
+          operationReference: "flash.dayu200@1")
+        guard self.selectedArchiveURL == archiveURL,
+          self.plan == plan,
+          !Task.isCancelled
+        else { return }
+        self.postflightEvidence = detail.evidence
       case .failed(let detail):
+        self.isSubmitting = false
         self.submissionFailure = detail
+      }
+    }
+  }
+
+  func cancelActiveJob() {
+    guard let jobID = activeJobID, !isCancelling else { return }
+    isCancelling = true
+    let provider = provider
+    Task { [weak self] in
+      let accepted = await provider.cancel(jobID: jobID)
+      guard let self, self.activeJobID == jobID else { return }
+      self.isCancelling = false
+      if !accepted {
+        self.submissionFailure = "Runtime refused the cancellation request"
       }
     }
   }
 
   private func invalidatePlan() {
     plan = nil
-    humanHandoff = nil
     submission = nil
     submissionFailure = nil
+    postflightEvidence = nil
+    activeJobID = nil
+    isCancelling = false
     planFailureCode = nil
     planFailureDetail = nil
   }

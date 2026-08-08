@@ -371,6 +371,8 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let firstEvidenceStepAtUTC: String?
   public let finishedAtUTC: String?
   public let recoveryEpoch: SupersedingRecoveryEpoch?
+  public var traceProbeBefore: TraceRuntimeProbeSnapshot? = nil
+  public var traceProbeAfter: TraceRuntimeProbeSnapshot? = nil
   /// Persisted typed inputs for the read-only History parameter inspector.
   /// They remain structured JSON values; no executable or argv can be
   /// reconstructed from this projection.
@@ -691,6 +693,7 @@ public actor RuntimeJobEngine {
   private let dispatcher: any RuntimeProcessDispatching
   private let capabilityStore: RuntimeCapabilityStore
   private let artifactStore: RuntimeArtifactStore?
+  private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   /// Campaign-lane E2 authority ledger, shared (file plus flock) with the
   /// campaign admission service that mints reservations. Absent means this
   /// runtime cannot honor campaign-reservation requests and refuses them.
@@ -707,6 +710,7 @@ public actor RuntimeJobEngine {
     dispatcher: any RuntimeProcessDispatching,
     capabilityStore: RuntimeCapabilityStore,
     artifactStore: RuntimeArtifactStore? = nil,
+    traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     agentUsageLedger: AgentAuthorityUsageLedger? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) throws {
@@ -715,6 +719,7 @@ public actor RuntimeJobEngine {
     self.dispatcher = dispatcher
     self.capabilityStore = capabilityStore
     self.artifactStore = artifactStore
+    self.traceRuntimeProbe = traceRuntimeProbe
     self.agentUsageLedger = agentUsageLedger
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
@@ -1195,11 +1200,12 @@ public actor RuntimeJobEngine {
         try await mutationLane.withMutationLane(deviceID: targetID, requestID: capturedJobID) {
           [weak self] in
           guard let self else { throw RuntimeJobEngineError.internalFailure("engine gone") }
-          try await self.executeSteps(
+          try await self.executeStepsWithTraceEvidence(
             jobID: capturedJobID, descriptor: descriptor, provider: provider)
         }
       } else {
-        try await executeSteps(jobID: jobID, descriptor: descriptor, provider: provider)
+        try await executeStepsWithTraceEvidence(
+          jobID: jobID, descriptor: descriptor, provider: provider)
       }
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
@@ -1314,6 +1320,131 @@ public actor RuntimeJobEngine {
       for: current.record, outcome: .confirmed, state: current.record.state)
     return statusAndReleaseTerminalRuntime(
       current.record, recoveryEpochID: establishedRecoveryEpochID)
+  }
+
+  /// A selected trace leg is bracketed by two Runtime-owned read snapshots.
+  /// Both reads run inside the same target mutation lane as the trace itself;
+  /// no other ArkDeck mutation can slip between `before`, the capture, and
+  /// `after`. The snapshots are durable Job facts, not caller-provided input.
+  private func executeStepsWithTraceEvidence(
+    jobID: String,
+    descriptor: CatalogOperationDescriptor,
+    provider: any DeviceProvider
+  ) async throws {
+    guard descriptor.reference == "capture.diagnostics@1",
+      case .array(let requestedTagValues)? = jobs[jobID]?.record.request.inputs["traceCategories"],
+      !requestedTagValues.isEmpty
+    else {
+      try await executeSteps(jobID: jobID, descriptor: descriptor, provider: provider)
+      return
+    }
+    guard let traceRuntimeProbe else {
+      throw RuntimeDispatchFailure.failed(
+        "Trace parameter evidence probe is not configured; refusing before capture")
+    }
+    let requestedTags = requestedTagValues.compactMap { value -> String? in
+      guard case .string(let tag) = value else { return nil }
+      return tag
+    }
+    guard requestedTags.count == requestedTagValues.count else {
+      throw RuntimeDispatchFailure.failed("Trace tag request lost its typed string shape")
+    }
+    let targetID = jobs[jobID]?.record.request.target.targetID ?? ""
+    let expectedRevision = jobs[jobID]?.record.request.target.expectedBindingRevision
+    do {
+      let before = try await traceRuntimeProbe.probeTraceRuntime(targetID: targetID)
+      try Self.validateTraceRuntimeProbe(
+        before, targetID: targetID, bindingRevision: expectedRevision,
+        requestedTags: requestedTags)
+      guard var runtime = jobs[jobID] else {
+        throw RuntimeJobEngineError.jobNotFound(jobID)
+      }
+      runtime.record.traceProbeBefore = before
+      runtime.record.timeline.append("trace parameters snapshotted before capture")
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
+    } catch let error as RuntimeDispatchFailure {
+      throw error
+    } catch {
+      throw RuntimeDispatchFailure.failed("Trace before snapshot failed: \(error)")
+    }
+
+    do {
+      try await executeSteps(jobID: jobID, descriptor: descriptor, provider: provider)
+    } catch {
+      let executionFailure = error
+      do {
+        try await captureTraceAfterSnapshot(
+          jobID: jobID, probe: traceRuntimeProbe, targetID: targetID,
+          expectedRevision: expectedRevision, requestedTags: requestedTags)
+      } catch {
+        appendTimeline(
+          jobID: jobID,
+          entry: "Trace after snapshot unavailable after execution failure: \(error)")
+      }
+      throw executionFailure
+    }
+
+    do {
+      try await captureTraceAfterSnapshot(
+        jobID: jobID, probe: traceRuntimeProbe, targetID: targetID,
+        expectedRevision: expectedRevision, requestedTags: requestedTags)
+    } catch let error as RuntimeDispatchFailure {
+      if cancellationRequests.contains(jobID) {
+        appendTimeline(jobID: jobID, entry: "Trace after snapshot unavailable during cancellation")
+        return
+      }
+      throw error
+    } catch {
+      if cancellationRequests.contains(jobID) {
+        appendTimeline(
+          jobID: jobID, entry: "Trace after snapshot unavailable during cancellation: \(error)")
+        return
+      }
+      throw RuntimeDispatchFailure.failed("Trace after snapshot failed: \(error)")
+    }
+  }
+
+  private func captureTraceAfterSnapshot(
+    jobID: String,
+    probe: any TraceRuntimeProbing,
+    targetID: String,
+    expectedRevision: Int?,
+    requestedTags: [String]
+  ) async throws {
+    let after = try await probe.probeTraceRuntime(targetID: targetID)
+    try Self.validateTraceRuntimeProbe(
+      after, targetID: targetID, bindingRevision: expectedRevision,
+      requestedTags: requestedTags)
+    guard var runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    runtime.record.traceProbeAfter = after
+    runtime.record.timeline.append("trace parameters snapshotted after capture")
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
+  }
+
+  private static func validateTraceRuntimeProbe(
+    _ snapshot: TraceRuntimeProbeSnapshot,
+    targetID: String,
+    bindingRevision: Int?,
+    requestedTags: [String]
+  ) throws {
+    guard snapshot.targetID == targetID,
+      bindingRevision == snapshot.bindingRevision,
+      snapshot.adapterDisposition == "captureEligible",
+      snapshot.tool == "hitrace",
+      snapshot.family != nil,
+      !snapshot.supportedTags.isEmpty,
+      requestedTags.allSatisfy(snapshot.supportedTags.contains),
+      snapshot.parameters.count == TraceDebugParameterCatalog.definitions.count,
+      Set(snapshot.parameters.map(\.name))
+        == Set(TraceDebugParameterCatalog.definitions.map(\.name))
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "Trace probe facts do not match target, binding, adapter, tags, or parameter catalog")
+    }
   }
 
   private func executeSteps(
@@ -1568,9 +1699,164 @@ public actor RuntimeJobEngine {
             deployment: deployment, completedStepIDs: completedStepIDs,
             failedStepID: step.stepID, originalFailure: failure)
         }
+        if let mutationStepID = Self.portForwardMutationStepID(
+          for: descriptor.reference),
+          completedStepIDs.contains(mutationStepID),
+          let spec = Self.portForwardSpec(from: action)
+            ?? Self.portForwardSpec(
+              from: jobs[jobID]?.record.request.inputs ?? [:])
+        {
+          try await compensatePortForward(
+            jobID: jobID, originalDescriptor: descriptor,
+            provider: provider, spec: spec)
+        }
         throw failure
       }
     }
+  }
+
+  /// Restores the exact port-rule state after a confirmed failure that occurs
+  /// after the mutation. The inverse operation is closed over the original
+  /// typed pair; neither caller input nor a shell fragment is introduced on
+  /// the compensation path. A second readback is mandatory so a successful
+  /// process exit can never be mistaken for restored state.
+  private func compensatePortForward(
+    jobID: String,
+    originalDescriptor: CatalogOperationDescriptor,
+    provider: any DeviceProvider,
+    spec: HDCPortForwardSpec
+  ) async throws {
+    guard let runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let compensatingReference: String
+    let mutationKind: WorkflowStepKind
+    let mutationAction: TypedProviderAction
+    switch originalDescriptor.reference {
+    case "port-forward.create@1":
+      compensatingReference = "port-forward.remove@1"
+      mutationKind = .removePortForward
+      mutationAction = .hdc(.removePortForward(spec))
+    case "port-forward.remove@1":
+      compensatingReference = "port-forward.create@1"
+      mutationKind = .createPortForward
+      mutationAction = .hdc(.createPortForward(spec))
+    default:
+      return
+    }
+    guard let compensatingDescriptor = RuntimeOperationCatalog.descriptor(
+      reference: compensatingReference)
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "missing published compensation operation \(compensatingReference)")
+    }
+    let facts = try await providers.resolveFacts(
+      providerID: originalDescriptor.provider.rawValue,
+      targetID: runtime.record.request.target.targetID)
+    try Self.validateMaterializedTargetFacts(
+      facts, record: runtime.record,
+      providerID: originalDescriptor.provider.rawValue)
+
+    let mutationStep = CatalogStepDescriptor(
+      stepID: "compensate-port-rule",
+      kind: mutationKind,
+      effect: .deviceMutation,
+      cancellation: .atSafeBoundary,
+      binding: .confirmedDevice,
+      isOptional: false,
+      compensation: .none)
+    let mutationContext = ProviderExecutionContext(
+      jobID: jobID, stepID: mutationStep.stepID,
+      targetID: runtime.record.request.target.targetID,
+      bindingRevision: runtime.record.request.target.expectedBindingRevision,
+      connectKey: facts.executionConnectKey,
+      expectedIdentitySHA256: facts.deviceIdentitySHA256,
+      toolVersion: facts.toolVersion,
+      toolSHA256: facts.toolSHA256,
+      nowUTC: nowUTC())
+    let mutationPlan = try provider.lower(
+      action: mutationAction, context: mutationContext)
+    do {
+      try await dispatchWithWAL(
+        jobID: jobID, step: mutationStep, action: mutationAction,
+        plan: mutationPlan, provider: provider, context: mutationContext,
+        descriptor: compensatingDescriptor, evidenceFacts: facts)
+
+      let verifyStep = CatalogStepDescriptor(
+        stepID: "verify-port-rule-compensation",
+        kind: .verifyRemoteState,
+        effect: .readOnly,
+        cancellation: .immediate,
+        binding: .confirmedDevice,
+        isOptional: false,
+        compensation: .none)
+      let verifyContext = ProviderExecutionContext(
+        jobID: jobID, stepID: verifyStep.stepID,
+        targetID: runtime.record.request.target.targetID,
+        bindingRevision: runtime.record.request.target.expectedBindingRevision,
+        connectKey: facts.executionConnectKey,
+        expectedIdentitySHA256: facts.deviceIdentitySHA256,
+        toolVersion: facts.toolVersion,
+        toolSHA256: facts.toolSHA256,
+        nowUTC: nowUTC())
+      let verifyAction = TypedProviderAction.hdc(.readPortForwardPresence(spec))
+      let verifyPlan = try provider.lower(
+        action: verifyAction, context: verifyContext)
+      try await dispatchWithWAL(
+        jobID: jobID, step: verifyStep, action: verifyAction,
+        plan: verifyPlan, provider: provider, context: verifyContext,
+        descriptor: compensatingDescriptor, evidenceFacts: facts)
+      appendTimeline(
+        jobID: jobID,
+        entry: "compensated port rule to \(compensatingReference)")
+    } catch let compensationFailure as RuntimeDispatchFailure {
+      appendTimeline(
+        jobID: jobID,
+        entry: "port-rule compensation failed closed: \(compensationFailure)")
+      throw compensationFailure
+    }
+  }
+
+  private static func portForwardMutationStepID(
+    for operationReference: String
+  ) -> String? {
+    switch operationReference {
+    case "port-forward.create@1": return "create-port-rule"
+    case "port-forward.remove@1": return "remove-port-rule"
+    default: return nil
+    }
+  }
+
+  private static func portForwardSpec(
+    from action: TypedProviderAction
+  ) -> HDCPortForwardSpec? {
+    switch action {
+    case .hdc(.createPortForward(let spec)),
+      .hdc(.removePortForward(let spec)),
+      .hdc(.readPortForwardPresence(let spec)):
+      return spec
+    default:
+      return nil
+    }
+  }
+
+  /// A later host-only failure no longer carries the mutation action, so the
+  /// compensation path must be able to recover the same closed rule from the
+  /// immutable request. This accepts only the Catalog-shaped fields and the
+  /// same bounded port vocabulary as provider lowering.
+  private static func portForwardSpec(
+    from inputs: [String: JSONValue]
+  ) -> HDCPortForwardSpec? {
+    guard case .string(let directionValue)? = inputs["direction"],
+      let direction = HDCPortForwardDirection(rawValue: directionValue),
+      case .integer(let localPort)? = inputs["localPort"],
+      case .integer(let remotePort)? = inputs["remotePort"],
+      localPort >= 1_024, localPort <= 65_535,
+      remotePort >= 1_024, remotePort <= 65_535
+    else { return nil }
+    return try? HDCPortForwardSpec(
+      direction: direction,
+      localPort: Int(localPort), remotePort: Int(remotePort))
   }
 
   private func compensateNativeLibrary(
@@ -1891,10 +2177,17 @@ public actor RuntimeJobEngine {
     "deploy.native-library.app-owned@1": [
       "send-to-staging": "verify-remote-staging"
     ],
+    "port-forward.create@1": [
+      "create-port-rule": "verify-port-rule"
+    ],
+    "port-forward.remove@1": [
+      "remove-port-rule": "verify-port-rule"
+    ],
   ]
 
   static let evidenceEligibleOperations: Set<String> = [
     "observe.device@1", "capture.diagnostics@1", "debug.hap@1",
+    "port-forward.create@1", "port-forward.remove@1",
   ]
 
   static func requiresEvidencePreflight(_ descriptor: CatalogOperationDescriptor) -> Bool {
@@ -2102,7 +2395,8 @@ public actor RuntimeJobEngine {
     }
     let workflowStep = try Self.journalStep(
       for: step, jobID: jobID, inputs: runtime.record.request.inputs,
-      action: action, resolvedInputArtifact: context.resolvedInputArtifact)
+      action: action, resolvedInputArtifact: context.resolvedInputArtifact,
+      operationReference: descriptor.reference)
     let intentEventID = "intent-\(step.stepID)"
     // Journal target evidence mirrors the descriptor-bound facts without
     // persisting the raw connect key.
@@ -2211,7 +2505,26 @@ public actor RuntimeJobEngine {
       throw failure
     }
 
-    let outcome = try provider.verify(receipt: receipt, action: action, context: context)
+    let providerOutcome = try provider.verify(receipt: receipt, action: action, context: context)
+    let outcome: ProviderSemanticOutcome
+    if step.stepID == "verify-port-rule"
+      || step.stepID == "verify-port-rule-compensation",
+      case .verified(let summary) = providerOutcome,
+      let rawPresent = summary["present"],
+      let present = Bool(rawPresent)
+    {
+      let expectedPresent = descriptor.reference == "port-forward.create@1"
+      outcome =
+        present == expectedPresent
+        ? providerOutcome
+        : .failed(
+          code: "portForwardReadbackMismatch",
+          detail: expectedPresent
+            ? "the exact typed rule is absent after create"
+            : "the exact typed rule remains after remove")
+    } else {
+      outcome = providerOutcome
+    }
     var current = jobs[jobID] ?? runtime
     switch outcome {
     case .verified(let summary):
@@ -2738,6 +3051,8 @@ public actor RuntimeJobEngine {
       firstEvidenceStepAtUTC: record.firstEvidenceStepAtUTC,
       finishedAtUTC: record.finishedAtUTC,
       recoveryEpoch: recoveryEpoch,
+      traceProbeBefore: record.traceProbeBefore,
+      traceProbeAfter: record.traceProbeAfter,
       inputs: record.request.inputs)
   }
 
@@ -3908,7 +4223,8 @@ public actor RuntimeJobEngine {
         }
         let workflowStep = try Self.journalStep(
           for: step, jobID: context.jobID, inputs: request.inputs,
-          action: action, resolvedInputArtifact: resolved)
+          action: action, resolvedInputArtifact: resolved,
+          operationReference: descriptor.reference)
         switch plan.kind {
         case .process(let executableSHA256, let argumentSummary, let timeoutSeconds):
           materializedSteps.append(
@@ -4005,7 +4321,8 @@ public actor RuntimeJobEngine {
         }
         let workflowStep = try Self.journalStep(
           for: rollbackStep, jobID: context.jobID, inputs: request.inputs,
-          action: rollbackAction, resolvedInputArtifact: resolved)
+          action: rollbackAction, resolvedInputArtifact: resolved,
+          operationReference: descriptor.reference)
         guard case .processSequence(
           let executableSHA256, let invocations) = rollbackPlan.kind
         else {
@@ -5483,7 +5800,8 @@ public actor RuntimeJobEngine {
     jobID: String,
     inputs: [String: JSONValue] = [:],
     action: TypedProviderAction? = nil,
-    resolvedInputArtifact: ProviderResolvedInputArtifact? = nil
+    resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
+    operationReference: String? = nil
   ) throws -> WorkflowStep {
     var bundleName: String?
     if case .string(let value)? = inputs["bundleName"] { bundleName = value }
@@ -5752,6 +6070,26 @@ public actor RuntimeJobEngine {
           "abilityName": .string(abilityName ?? "EntryAbility"),
         ]
       }
+    case .createPortForward:
+      guard case .hdc(.createPortForward(let spec))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed port-forward create action")
+      }
+      arguments = [
+        "forwardId": .string(
+          "port_forward_\(spec.direction.rawValue)_\(spec.localPort)_\(spec.remotePort)"),
+        "hostEndpoint": .string("tcp:\(spec.localPort)"),
+        "deviceEndpoint": .string("tcp:\(spec.remotePort)"),
+      ]
+    case .removePortForward:
+      guard case .hdc(.removePortForward(let spec))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed port-forward remove action")
+      }
+      arguments = [
+        "forwardId": .string(
+          "port_forward_\(spec.direction.rawValue)_\(spec.localPort)_\(spec.remotePort)")
+      ]
     case .runApprovedRemoteRead:
       if case .hdc(.inspectNativeLibrary(let deployment, let expectation))? = action {
         arguments = [
@@ -5824,6 +6162,14 @@ public actor RuntimeJobEngine {
         break
       } else if case .hdc(.verifyProcessState(let bundle))? = action {
         probeID = "process.\(bundle.bundleName)"
+      } else if case .hdc(.readPortForwardPresence(let spec))? = action {
+        arguments = [
+          "probeId": .string(
+            "port-forward.\(spec.direction.rawValue).\(spec.localPort).\(spec.remotePort)"),
+          "expectedState": .string(
+            operationReference == "port-forward.remove@1" ? "absent" : "present"),
+        ]
+        break
       } else if case .hdc(.inspectNativeLibrary(let deployment, .targetLoaded))? = action {
         arguments = [
           "probeId": .string("native-library-loader"),

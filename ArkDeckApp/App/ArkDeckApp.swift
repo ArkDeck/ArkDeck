@@ -7,6 +7,8 @@ import SwiftUI
 struct ArkDeckApp: App {
   @StateObject private var hdcDiagnostics = HDCStatusViewModel(
     provider: HDCApplicationDiagnosticsFacade.make())
+  @StateObject private var overviewCapabilities = OverviewCapabilityViewModel(
+    provider: OverviewCapabilityApplicationFacade.make())
   @StateObject private var autoUpdate = AutoUpdateViewModel()
   @StateObject private var runtimeHistory = RuntimeHistoryViewModel(
     provider: RuntimeHistoryApplicationFacade.make(),
@@ -19,6 +21,8 @@ struct ArkDeckApp: App {
     provider: DebugApplicationFacade.make())
   @StateObject private var traceWorkspace = TraceWorkspaceViewModel(
     provider: TraceApplicationFacade.make())
+  @StateObject private var automationWorkspace = AutomationWorkspaceViewModel(
+    provider: AutomationApplicationFacade.make())
   @StateObject private var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
   @StateObject private var deviceList = DeviceListViewModel(
@@ -28,22 +32,26 @@ struct ArkDeckApp: App {
     WindowGroup {
       AppShellView(
         hdcDiagnostics: hdcDiagnostics,
+        overviewCapabilities: overviewCapabilities,
         autoUpdate: autoUpdate,
         runtimeHistory: runtimeHistory,
         flashWorkspace: flashWorkspace,
         uiDumpWorkspace: uiDumpWorkspace,
         debugWorkspace: debugWorkspace,
         traceWorkspace: traceWorkspace,
+        automationWorkspace: automationWorkspace,
         deviceList: deviceList
       )
       .task {
         hdcDiagnostics.refresh()
+        overviewCapabilities.refresh()
         autoUpdate.startup()
         runtimeHistory.refresh()
         flashWorkspace.refresh()
         uiDumpWorkspace.refresh()
         debugWorkspace.refresh()
         traceWorkspace.refresh()
+        automationWorkspace.refresh()
         deviceList.refresh()
       }
     }
@@ -72,6 +80,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
   case debug
   case uiDump
   case trace
+  case automation
   case history
 
   var id: String { rawValue }
@@ -83,6 +92,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "app.navigation.debug"
     case .uiDump: "app.navigation.uiDump"
     case .trace: "app.navigation.trace"
+    case .automation: "app.navigation.automation"
     case .history: "app.navigation.history"
     }
   }
@@ -94,6 +104,7 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
     case .debug: "ladybug"
     case .uiDump: "rectangle.3.group"
     case .trace: "waveform.path.ecg"
+    case .automation: "gearshape.2"
     case .history: "clock.arrow.circlepath"
     }
   }
@@ -134,12 +145,14 @@ private struct AppShellView: View {
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
   @State private var isJobInspectorExpanded = false
   @ObservedObject var hdcDiagnostics: HDCStatusViewModel
+  @ObservedObject var overviewCapabilities: OverviewCapabilityViewModel
   @ObservedObject var autoUpdate: AutoUpdateViewModel
   @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
   @ObservedObject var flashWorkspace: FlashWorkspaceViewModel
   @ObservedObject var uiDumpWorkspace: UIDumpWorkspaceViewModel
   @ObservedObject var debugWorkspace: DebugWorkspaceViewModel
   @ObservedObject var traceWorkspace: TraceWorkspaceViewModel
+  @ObservedObject var automationWorkspace: AutomationWorkspaceViewModel
   @ObservedObject var deviceList: DeviceListViewModel
 
   private var shellSelection: ShellSelection {
@@ -170,6 +183,7 @@ private struct AppShellView: View {
             navigationRow(.debug)
             navigationRow(.uiDump)
             navigationRow(.trace)
+            navigationRow(.automation)
           }
           Section("app.navigation.section.records") {
             navigationRow(.history)
@@ -208,7 +222,7 @@ private struct AppShellView: View {
       let waitedKey: String?
       switch deviceList.authorizationWait {
       case .idle: waitedKey = nil
-      case .polling(let key, _), .windowClosed(let key): waitedKey = key
+      case .polling(let key, _), .timedOut(let key), .unavailable(let key, _): waitedKey = key
       }
       guard let waitedKey else { return }
       if case .device(waitedKey) = ShellSelection(storageValue: newValue) { return }
@@ -322,8 +336,13 @@ private struct AppShellView: View {
     case .overview:
       HDCStatusView(
         presentation: hdcDiagnostics.presentation,
-        onRefresh: hdcDiagnostics.refresh,
-        isRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
+        capabilityMatrix: overviewCapabilities.presentation,
+        onRefresh: {
+          hdcDiagnostics.refresh()
+          overviewCapabilities.refresh()
+        },
+        isRefreshInFlight: hdcDiagnostics.isRefreshInFlight
+          || overviewCapabilities.isRefreshInFlight,
         onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
         onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
         onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
@@ -334,9 +353,11 @@ private struct AppShellView: View {
         presentation: runtimeHistory.presentation,
         detailsByJobID: runtimeHistory.detailsByJobID,
         loadingDetailJobIDs: runtimeHistory.loadingDetailJobIDs,
+        exportStatesByArtifactID: runtimeHistory.exportStatesByArtifactID,
         isRefreshInFlight: runtimeHistory.isRefreshInFlight,
         onRefresh: runtimeHistory.refresh,
-        onLoadDetail: runtimeHistory.loadDetail)
+        onLoadDetail: runtimeHistory.loadDetail,
+        onExportArtifact: runtimeHistory.exportArtifact)
     case .flash:
       FlashWorkspaceView(
         model: flashWorkspace,
@@ -352,6 +373,8 @@ private struct AppShellView: View {
       UIDumpWorkspaceView(model: uiDumpWorkspace)
     case .trace:
       TraceWorkspaceView(model: traceWorkspace)
+    case .automation:
+      AutomationWorkspaceView(model: automationWorkspace)
     }
   }
 
@@ -712,6 +735,30 @@ private final class HDCStatusViewModel: ObservableObject {
       let next = await operation(provider)
       guard !Task.isCancelled else { return }
       self?.presentation = next
+    }
+  }
+}
+
+@MainActor
+private final class OverviewCapabilityViewModel: ObservableObject {
+  @Published private(set) var presentation = OverviewCapabilityMatrixPresentation.loading
+  @Published private(set) var isRefreshInFlight = false
+  private let provider: any OverviewCapabilityApplicationProviding
+
+  init(provider: any OverviewCapabilityApplicationProviding) {
+    self.provider = provider
+  }
+
+  func refresh() {
+    guard !isRefreshInFlight else { return }
+    isRefreshInFlight = true
+    let provider = provider
+    Task { [weak self] in
+      let next = await provider.refresh()
+      guard let self else { return }
+      self.isRefreshInFlight = false
+      guard !Task.isCancelled else { return }
+      self.presentation = next
     }
   }
 }

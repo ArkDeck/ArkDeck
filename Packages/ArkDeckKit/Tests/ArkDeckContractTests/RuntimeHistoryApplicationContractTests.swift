@@ -175,6 +175,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "authority": ["kind": "defaultReadOnlyPolicy", "reference": "policy@1"],
       "observation": [
         "model": "DAYU200", "firmware": "OpenHarmony", "transport": "usb",
+        "bindingRevision": 8,
       ],
       "blockers": [],
     ])
@@ -206,6 +207,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(detail.evidence?.parameters.map(\.name), ["includeToolFacts", "limit"])
     XCTAssertEqual(detail.evidence?.parameters.map(\.value), ["true", "2"])
     XCTAssertTrue(detail.evidence?.parametersWereReported == true)
+    XCTAssertEqual(detail.evidence?.observedBindingRevision, 8)
     XCTAssertEqual(detail.artifactAvailability, .available)
     XCTAssertEqual(detail.artifacts.count, 1)
     XCTAssertEqual(detail.artifacts.first?.role, "raw")
@@ -292,9 +294,10 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
     XCTAssertEqual(
-      detailProtocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 1,
-      "the App-facing Runtime detail surface must expose exactly one call")
+      detailProtocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 2,
+      "the App-facing Runtime detail surface must expose only detail and bounded export")
     XCTAssertTrue(detailProtocolBody.contains("func loadJobDetail("))
+    XCTAssertTrue(detailProtocolBody.contains("func exportArtifact("))
 
     // Only the read-only method may be named anywhere in this file: a
     // mutating method name appearing here would mean the App can compose a
@@ -310,5 +313,6 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(source.contains("request(method: \"job.list\")"))
     XCTAssertTrue(source.contains("method: \"job.evidence\""))
     XCTAssertTrue(source.contains("method: \"artifact.list\""))
+    XCTAssertTrue(source.contains("method: \"artifact.read\""))
   }
 }

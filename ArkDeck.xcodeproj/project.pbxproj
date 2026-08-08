@@ -19,7 +19,6 @@
 		D10000000000000000000001 /* DeviceWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* DeviceWorkspace.swift */; };
 		A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* RuntimeHistoryView.swift */; };
 		A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* FlashWorkspaceView.swift */; };
-		A100000000000000000000A5 /* FlashDestructiveConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */; };
 		A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A7 /* FlashPlanDetailsView.swift */; };
 		A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A9 /* FlashRuntimeActivityView.swift */; };
 		A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000AC /* GlobalJobInspectorView.swift */; };
@@ -33,6 +32,7 @@
 		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
+		E10000000000000000000001 /* AutomationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AutomationWorkspaceView.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
@@ -68,7 +68,6 @@
 		D10000000000000000000002 /* DeviceWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWorkspace.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* RuntimeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeHistoryView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003C /* FlashWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashWorkspaceView.swift; sourceTree = "<group>"; };
-		A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashDestructiveConfirmationSheet.swift; sourceTree = "<group>"; };
 		A100000000000000000000A7 /* FlashPlanDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashPlanDetailsView.swift; sourceTree = "<group>"; };
 		A100000000000000000000A9 /* FlashRuntimeActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashRuntimeActivityView.swift; sourceTree = "<group>"; };
 		A100000000000000000000AC /* GlobalJobInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalJobInspectorView.swift; sourceTree = "<group>"; };
@@ -82,6 +81,7 @@
 		A100000000000000000000D2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
+		E10000000000000000000002 /* AutomationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationWorkspaceView.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -132,6 +132,7 @@
 				B10000000000000000000009 /* Trace Feature */,
 				A100000000000000000000D4 /* Settings Feature */,
 				D10000000000000000000003 /* Devices Feature */,
+				E10000000000000000000003 /* Automation Feature */,
 				A10000000000000000000023 /* ArkDeckApp.entitlements */,
 				A1000000000000000000002D /* RockchipComponent.entitlements */,
 			);
@@ -199,7 +200,6 @@
 			children = (
 				C10000000000000000000011 /* FlashLocalization.swift */,
 				A1000000000000000000003C /* FlashWorkspaceView.swift */,
-				A100000000000000000000A6 /* FlashDestructiveConfirmationSheet.swift */,
 				A100000000000000000000A7 /* FlashPlanDetailsView.swift */,
 				A100000000000000000000A9 /* FlashRuntimeActivityView.swift */,
 			);
@@ -254,6 +254,14 @@
 				D10000000000000000000002 /* DeviceWorkspace.swift */,
 			);
 			path = Features/Devices;
+			sourceTree = "<group>";
+		};
+		E10000000000000000000003 /* Automation Feature */ = {
+			isa = PBXGroup;
+			children = (
+				E10000000000000000000002 /* AutomationWorkspaceView.swift */,
+			);
+			path = Features/Automation;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000039 /* Shared Features */ = {
@@ -426,7 +434,6 @@
 				D10000000000000000000001 /* DeviceWorkspace.swift in Sources */,
 				A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */,
 				A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */,
-				A100000000000000000000A5 /* FlashDestructiveConfirmationSheet.swift in Sources */,
 				A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */,
 				A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */,
 				A100000000000000000000AB /* GlobalJobInspectorView.swift in Sources */,
@@ -437,6 +444,7 @@
 				B10000000000000000000003 /* TraceProgressArtifactsView.swift in Sources */,
 				A100000000000000000000D0 /* SettingsRootView.swift in Sources */,
 				C10000000000000000000001 /* FlashLocalization.swift in Sources */,
+				E10000000000000000000001 /* AutomationWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

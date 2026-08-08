@@ -132,6 +132,12 @@ final class TraceAdapterGoldenTests: XCTestCase {
       try resource(id: "tr001-bytrace-help-dayu200-oh7", manifest: manifest).sha256,
       TraceProbeAdapterProfile.bytraceHelpResourceSHA256)
     XCTAssertEqual(
+      try resource(id: "tr001-hitrace-tags-dayu200-oh7", manifest: manifest).sha256,
+      TraceProbeAdapterProfile.hitraceTagListResourceSHA256)
+    XCTAssertEqual(
+      try resource(id: "tr001-bytrace-tags-dayu200-oh7", manifest: manifest).sha256,
+      TraceProbeAdapterProfile.bytraceTagListResourceSHA256)
+    XCTAssertEqual(
       try resource(id: "tr001-raw-ftrace-header-dayu200-oh7", manifest: manifest).sha256,
       TraceProbeAdapterProfile.rawFtraceHeaderResourceSHA256)
   }
@@ -226,6 +232,35 @@ final class TraceAdapterGoldenTests: XCTestCase {
     XCTAssertEqual(withStderr.selection, .unsupported)
     XCTAssertEqual(withStderr.rawHelp, golden)
     XCTAssertEqual(withStderr.rawStderr, stderr)
+  }
+
+  func testRegisteredTagListsYieldOnlyExactParsedCapabilities() throws {
+    let manifest = try loadManifest()
+    let hitraceBytes = try bytes(id: "tr001-hitrace-tags-dayu200-oh7", manifest: manifest)
+    let bytraceBytes = try bytes(id: "tr001-bytrace-tags-dayu200-oh7", manifest: manifest)
+
+    let hitrace = TraceProbeAdapter.evaluateTagList(tool: .hitrace, stdout: hitraceBytes)
+    XCTAssertEqual(
+      hitrace.selection,
+      .captureEligible(
+        tool: .hitrace, family: TraceProbeAdapterProfile.hitraceHelpFamily))
+    XCTAssertTrue(hitrace.tags.contains("ace"))
+    XCTAssertTrue(hitrace.tags.contains("sched"))
+    XCTAssertEqual(Set(hitrace.tags).count, hitrace.tags.count)
+
+    let bytrace = TraceProbeAdapter.evaluateTagList(tool: .bytrace, stdout: bytraceBytes)
+    XCTAssertEqual(
+      bytrace.selection,
+      .probeOnlyNotCaptureEligible(
+        tool: .bytrace, family: TraceProbeAdapterProfile.bytraceHelpFamily))
+    XCTAssertEqual(bytrace.tags, hitrace.tags)
+
+    var drifted = hitraceBytes
+    drifted[drifted.index(before: drifted.endIndex)] = 33
+    let rejected = TraceProbeAdapter.evaluateTagList(tool: .hitrace, stdout: drifted)
+    XCTAssertEqual(rejected.selection, .unsupported)
+    XCTAssertTrue(rejected.tags.isEmpty)
+    XCTAssertEqual(rejected.rawTagList, drifted)
   }
 
   // MARK: - AC-TRACE-007-01

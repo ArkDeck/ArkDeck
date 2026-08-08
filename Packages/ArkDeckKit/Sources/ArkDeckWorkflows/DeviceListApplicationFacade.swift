@@ -9,6 +9,7 @@
 // refused by the App transport's allowlist).
 
 import ArkDeckCore
+import ArkDeckOpenHarmony
 import Foundation
 import os
 
@@ -78,8 +79,27 @@ public struct DeviceListPresentation: Sendable, Equatable {
   public static let loading = DeviceListPresentation(availability: .checking, candidates: [])
 }
 
+/// Result of the domain-owned bounded physical-trust wait. The App may show
+/// the deadline, but it neither polls HDC nor classifies the terminal state.
+/// `.timedOut` therefore means the production reader exhausted its bounded
+/// window; it is not inferred from a view timer or a fixture-only flag.
+public struct DeviceAuthorizationWaitResult: Sendable, Equatable {
+  public let authorization: HDCAuthorizationState
+  public let presentation: DeviceListPresentation
+
+  public init(
+    authorization: HDCAuthorizationState,
+    presentation: DeviceListPresentation
+  ) {
+    self.authorization = authorization
+    self.presentation = presentation
+  }
+}
+
 public protocol DeviceListApplicationProviding: Sendable {
+  var authorizationWaitWindowSeconds: TimeInterval { get }
   func refreshCandidates() async -> DeviceListPresentation
+  func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult
 }
 
 public enum DeviceListApplicationFacade {
@@ -94,6 +114,9 @@ public enum DeviceListApplicationFacade {
 }
 
 private actor DeviceListProductionApplicationProvider: DeviceListApplicationProviding {
+  nonisolated let authorizationWaitWindowSeconds: TimeInterval = 180
+  private let authorizationProbeInterval: Duration = .seconds(5)
+
   func refreshCandidates() async -> DeviceListPresentation {
     let base: DeviceListPresentation
     switch await DeviceListXPCReadTransport.request(method: "device.candidates") {
@@ -104,6 +127,63 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
       base = DeviceCandidatesResponseDecoding.presentation(data)
     }
     return await joinObservedFacts(into: base)
+  }
+
+  func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult {
+    await boundedAuthorizationWait(
+      connectKey: connectKey,
+      window: .seconds(authorizationWaitWindowSeconds),
+      interval: authorizationProbeInterval)
+  }
+
+  private func boundedAuthorizationWait(
+    connectKey: String,
+    window: Duration,
+    interval: Duration
+  ) async -> DeviceAuthorizationWaitResult {
+    guard !connectKey.isEmpty else {
+      return DeviceAuthorizationWaitResult(
+        authorization: .unavailable(reason: "The selected device has no connect key"),
+        presentation: .loading)
+    }
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: window)
+    var latest = await refreshCandidates()
+    while true {
+      if Task.isCancelled {
+        return DeviceAuthorizationWaitResult(
+          authorization: .cancelled, presentation: latest)
+      }
+      switch latest.availability {
+      case .checking:
+        break
+      case .unavailable(let reason):
+        return DeviceAuthorizationWaitResult(
+          authorization: .unavailable(reason: reason), presentation: latest)
+      case .available:
+        guard let candidate = latest.candidates.first(where: { $0.connectKey == connectKey })
+        else {
+          return DeviceAuthorizationWaitResult(
+            authorization: .unavailable(reason: "The selected device is no longer visible"),
+            presentation: latest)
+        }
+        if candidate.isAuthorized {
+          return DeviceAuthorizationWaitResult(
+            authorization: .ready, presentation: latest)
+        }
+      }
+      guard clock.now < deadline else {
+        return DeviceAuthorizationWaitResult(
+          authorization: .timedOut, presentation: latest)
+      }
+      do {
+        try await clock.sleep(until: min(deadline, clock.now.advanced(by: interval)))
+      } catch {
+        return DeviceAuthorizationWaitResult(
+          authorization: .cancelled, presentation: latest)
+      }
+      latest = await refreshCandidates()
+    }
   }
 
   /// Decorates adopted candidates with the model / firmware / transport their
@@ -257,9 +337,18 @@ enum DeviceCandidatesResponseDecoding {
 /// unauthorized candidate to Connected — the transition a real device makes
 /// when its owner accepts the trust prompt.
 private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProviding {
+  nonisolated let authorizationWaitWindowSeconds: TimeInterval
   private let stateFileURL: URL?
+  private let authorizationProbeInterval: Duration
 
   init(arguments: [String] = ProcessInfo.processInfo.arguments) {
+    if arguments.contains("--ui-test-device-poll-fast") {
+      authorizationWaitWindowSeconds = 2
+      authorizationProbeInterval = .milliseconds(250)
+    } else {
+      authorizationWaitWindowSeconds = 180
+      authorizationProbeInterval = .seconds(5)
+    }
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
@@ -296,6 +385,34 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
           adoptedTargetID: nil,
           bindingRevision: nil),
       ])
+  }
+
+  func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(authorizationWaitWindowSeconds))
+    var latest = await refreshCandidates()
+    while true {
+      if Task.isCancelled {
+        return DeviceAuthorizationWaitResult(
+          authorization: .cancelled, presentation: latest)
+      }
+      if latest.candidates.first(where: { $0.connectKey == connectKey })?.isAuthorized == true {
+        return DeviceAuthorizationWaitResult(
+          authorization: .ready, presentation: latest)
+      }
+      guard clock.now < deadline else {
+        return DeviceAuthorizationWaitResult(
+          authorization: .timedOut, presentation: latest)
+      }
+      do {
+        try await clock.sleep(
+          until: min(deadline, clock.now.advanced(by: authorizationProbeInterval)))
+      } catch {
+        return DeviceAuthorizationWaitResult(
+          authorization: .cancelled, presentation: latest)
+      }
+      latest = await refreshCandidates()
+    }
   }
 }
 

@@ -380,22 +380,56 @@ struct UIDumpWorkspaceView: View {
         Text(string("uiDump.artifacts.description"))
           .font(.footnote)
           .foregroundStyle(.secondary)
-        // Size, hash and sensitivity columns wait for real values: a column
-        // of "pending" placeholders reads as data without carrying any.
-        // Sensitivity lives as the full sentence below the table instead.
-        Table(artifactExpectations) {
-          TableColumn(string("uiDump.artifacts.name")) { artifact in
-            Text(artifact.name).font(.callout.monospaced())
+        if model.runtimeArtifacts.isEmpty {
+          Table(artifactExpectations) {
+            TableColumn(string("uiDump.artifacts.name")) { artifact in
+              Text(artifact.name).font(.callout.monospaced())
+            }
+            TableColumn(string("uiDump.artifacts.role")) { artifact in
+              Text(artifact.role)
+            }
+            TableColumn(string("uiDump.artifacts.origin")) { artifact in
+              Text(artifact.origin)
+            }
           }
-          TableColumn(string("uiDump.artifacts.role")) { artifact in
-            Text(artifact.role)
+          .frame(minHeight: 145)
+          .accessibilityIdentifier("uiDump.artifacts.table")
+          if let failure = model.runtimeArtifactFailures.first {
+            notice(
+              failure,
+              systemImage: "exclamationmark.triangle",
+              color: .orange,
+              identifier: "uiDump.artifacts.runtimeFailure")
           }
-          TableColumn(string("uiDump.artifacts.origin")) { artifact in
-            Text(artifact.origin)
+        } else {
+          Table(model.runtimeArtifacts) {
+            TableColumn(string("uiDump.artifacts.name")) { artifact in
+              Text(artifact.name).font(.callout.monospaced())
+            }
+            TableColumn(string("uiDump.artifacts.role")) { artifact in
+              Text(artifact.role ?? "—")
+            }
+            TableColumn(string("uiDump.artifacts.size")) { artifact in
+              Text(ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file))
+                .monospacedDigit()
+            }
+            TableColumn(string("uiDump.artifacts.sha256")) { artifact in
+              Text(artifact.sha256)
+                .font(.caption.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(artifact.sha256)
+            }
+            TableColumn(string("uiDump.artifacts.privacy")) { artifact in
+              Text(artifact.privacy)
+            }
+            TableColumn(string("uiDump.artifacts.status")) { artifact in
+              Text(artifact.status)
+            }
           }
+          .frame(minHeight: 145)
+          .accessibilityIdentifier("uiDump.artifacts.table")
         }
-        .frame(minHeight: 145)
-        .accessibilityIdentifier("uiDump.artifacts.table")
         Text(string("uiDump.artifacts.sensitivityNote"))
           .font(.footnote)
           .foregroundStyle(.secondary)
@@ -752,16 +786,35 @@ final class UIDumpWorkspaceViewModel: ObservableObject {
   @Published private(set) var debugPolicy = UIDumpDebugParameterPolicy.unchanged
   @Published private(set) var persistentEnableConfirmed = false
   @Published private(set) var isRefreshing = false
+  @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  @Published private(set) var artifactFailuresByJobID: [String: String] = [:]
 
   let canUseTemporaryRestore = false
   private let provider: any UIDumpApplicationProviding
+  private let detailProvider: any RuntimeJobDetailApplicationProviding
 
-  init(provider: any UIDumpApplicationProviding) {
+  init(
+    provider: any UIDumpApplicationProviding,
+    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil
+  ) {
     self.provider = provider
+    self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
   }
 
   var selectedTarget: UIDumpTargetPresentation? {
     workspace.targets.first { $0.id == selectedTargetID }
+  }
+
+  var runtimeArtifacts: [RuntimeArtifactPresentation] {
+    workspace.relatedJobs
+      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
+      .flatMap { artifactsByJobID[$0.id] ?? [] }
+  }
+
+  var runtimeArtifactFailures: [String] {
+    workspace.relatedJobs
+      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
+      .compactMap { artifactFailuresByJobID[$0.id] }
   }
 
   var selectedRecipe: UIDumpRecipeDefinition {
@@ -772,6 +825,7 @@ final class UIDumpWorkspaceViewModel: ObservableObject {
     guard !isRefreshing else { return }
     isRefreshing = true
     let provider = provider
+    let detailProvider = detailProvider
     Task { [weak self] in
       let next = await provider.refreshWorkspace()
       guard let self else { return }
@@ -784,6 +838,22 @@ final class UIDumpWorkspaceViewModel: ObservableObject {
         : next.targets.first?.id ?? ""
       self.workspace = next
       self.selectedTargetID = nextTargetID
+      var artifacts: [String: [RuntimeArtifactPresentation]] = [:]
+      var failures: [String: String] = [:]
+      for job in next.relatedJobs.prefix(3) {
+        let detail = await detailProvider.loadJobDetail(
+          jobID: job.id,
+          operationReference: UIDumpApplicationFacade.operationReference)
+        switch detail.artifactAvailability {
+        case .available:
+          artifacts[job.id] = detail.artifacts
+        case .unavailable(let reason):
+          failures[job.id] = reason
+        }
+      }
+      guard !Task.isCancelled else { return }
+      self.artifactsByJobID = artifacts
+      self.artifactFailuresByJobID = failures
       if previousTarget != self.selectedTarget {
         self.clearTargetScopedInput()
       }

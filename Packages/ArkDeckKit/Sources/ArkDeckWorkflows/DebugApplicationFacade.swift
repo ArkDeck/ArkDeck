@@ -1,12 +1,11 @@
-// App-facing Debug workspace projection over Runtime's read-only XPC door.
+// App-facing Debug workspace over Runtime's closed typed XPC door.
 //
-// This surface reads published operation availability, adopted target facts,
-// and related jobs. It cannot import a HAP, submit a job, create a forward,
-// clear a device buffer, request root, or run a command. Keeping those verbs
-// absent is load-bearing: the UI can explain what the current Runtime supports
-// without accidentally becoming a second admission path.
+// The only executable work exposed here is capture.diagnostics@1 and four
+// target-bound read-only templates. There is no executable, argv, endpoint or
+// authority input: the daemon owns lowering and the App receives a disclosure.
 
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 import os
 
@@ -168,19 +167,25 @@ public struct DebugWorkspacePresentation: Sendable, Equatable {
   public let jobs: [DebugJobPresentation]
   public let targetLoadFailure: String?
   public let jobLoadFailure: String?
+  public let runtimeProbe: DebugRuntimeProbeSnapshot?
+  public let probeFailure: String?
 
   public init(
     operations: [DebugOperationPresentation],
     targets: [DebugTargetPresentation],
     jobs: [DebugJobPresentation],
     targetLoadFailure: String? = nil,
-    jobLoadFailure: String? = nil
+    jobLoadFailure: String? = nil,
+    runtimeProbe: DebugRuntimeProbeSnapshot? = nil,
+    probeFailure: String? = nil
   ) {
     self.operations = operations
     self.targets = targets
     self.jobs = jobs
     self.targetLoadFailure = targetLoadFailure
     self.jobLoadFailure = jobLoadFailure
+    self.runtimeProbe = runtimeProbe
+    self.probeFailure = probeFailure
   }
 
   public static let loading = DebugWorkspacePresentation(
@@ -198,16 +203,45 @@ public struct DebugCommandTemplatePresentation: Sendable, Equatable, Identifiabl
   public let id: String
   public let effect: String
   public let parameterNames: [String]
-  public let isPublishedByRuntimeOperation: Bool
+  public let isRunnable: Bool
 
   public init(
-    id: String, effect: String, parameterNames: [String], isPublishedByRuntimeOperation: Bool
+    id: String, effect: String, parameterNames: [String], isRunnable: Bool
   ) {
     self.id = id
     self.effect = effect
     self.parameterNames = parameterNames
-    self.isPublishedByRuntimeOperation = isPublishedByRuntimeOperation
+    self.isRunnable = isRunnable
   }
+}
+
+public struct DebugLogJobAcceptancePresentation: Sendable, Equatable {
+  public let jobID: String
+  public init(jobID: String) { self.jobID = jobID }
+}
+
+public enum DebugLogJobSubmissionResult: Sendable, Equatable {
+  case submitted(DebugLogJobAcceptancePresentation)
+  case failed(String)
+}
+
+public struct DebugLogJobTerminalPresentation: Sendable, Equatable {
+  public let jobID: String
+  public let state: String
+  public let outcomeUnknown: Bool
+  public let timeline: [String]
+
+  public init(jobID: String, state: String, outcomeUnknown: Bool, timeline: [String]) {
+    self.jobID = jobID
+    self.state = state
+    self.outcomeUnknown = outcomeUnknown
+    self.timeline = timeline
+  }
+}
+
+public enum DebugLogJobRunResult: Sendable, Equatable {
+  case completed(DebugLogJobTerminalPresentation)
+  case failed(String)
 }
 
 public enum DebugPortRuleDirection: String, CaseIterable, Sendable {
@@ -248,11 +282,11 @@ public enum DebugPortRuleValidator {
     guard !localPortText.isEmpty, localPortText.allSatisfy(\.isNumber),
       let localPort = Int(localPortText)
     else { return .invalid(.localPortNotNumeric) }
-    guard (1...65_535).contains(localPort) else { return .invalid(.localPortOutOfRange) }
+    guard (1_024...65_535).contains(localPort) else { return .invalid(.localPortOutOfRange) }
     guard !remotePortText.isEmpty, remotePortText.allSatisfy(\.isNumber),
       let remotePort = Int(remotePortText)
     else { return .invalid(.remotePortNotNumeric) }
-    guard (1...65_535).contains(remotePort) else { return .invalid(.remotePortOutOfRange) }
+    guard (1_024...65_535).contains(remotePort) else { return .invalid(.remotePortOutOfRange) }
     return .valid(
       DebugValidatedPortRule(
         direction: direction, localPort: localPort, remotePort: remotePort))
@@ -280,49 +314,53 @@ public enum DebugTypedValueValidator {
 }
 
 public protocol DebugApplicationProviding: Sendable {
-  func refreshWorkspace() async -> DebugWorkspacePresentation
+  func refreshWorkspace(targetID: String?) async -> DebugWorkspacePresentation
+  func submitLogs(
+    target: DebugTargetPresentation,
+    durationSeconds: Int,
+    filters: [String]
+  ) async -> DebugLogJobSubmissionResult
+  func run(jobID: String) async -> DebugLogJobRunResult
+  func cancel(jobID: String) async -> Bool
+  func submitPortRule(
+    target: DebugTargetPresentation,
+    rule: DebugValidatedPortRule,
+    removing: Bool
+  ) async -> DebugLogJobSubmissionResult
+  func runTemplate(
+    target: DebugTargetPresentation,
+    templateID: String
+  ) async -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure>
 }
 
 public enum DebugApplicationFacade {
   public static let debugHAPReference = "debug.hap@1"
   public static let captureDiagnosticsReference = "capture.diagnostics@1"
+  public static let createPortForwardReference = "port-forward.create@1"
+  public static let removePortForwardReference = "port-forward.remove@1"
 
   static let descriptors: [CatalogOperationDescriptor] = [
     RuntimeOperationCatalog.descriptor(reference: captureDiagnosticsReference),
     RuntimeOperationCatalog.descriptor(reference: debugHAPReference),
+    RuntimeOperationCatalog.descriptor(reference: createPortForwardReference),
+    RuntimeOperationCatalog.descriptor(reference: removePortForwardReference),
   ].compactMap { $0 }
 
-  /// Approved action identifiers are visible for discovery, but none are
-  /// represented as independently runnable: no published Runtime operation
-  /// currently exposes a generic one-shot-command request.
-  ///
-  /// This is the Commands surface's closed read-only set — exactly the
-  /// `runApprovedRemoteRead` vocabulary that takes no confirmation. Members
-  /// of the mutation vocabulary (`requestRootMode` and the native-library
-  /// actions under `runApprovedRemoteMutation`) are not command templates:
-  /// they require a confirmationId and belong to their own workflows.
+  /// The exact read-only template set implemented by the daemon. No member
+  /// accepts user text; the Debug parameter key is fixed in provider code.
   public static let approvedCommandTemplates: [DebugCommandTemplatePresentation] = [
     DebugCommandTemplatePresentation(
-      id: "deviceSummary", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
+      id: DebugRuntimeCommandTemplate.packageInventory.rawValue,
+      effect: "readOnly", parameterNames: [], isRunnable: true),
     DebugCommandTemplatePresentation(
-      id: "systemProperties", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
+      id: DebugRuntimeCommandTemplate.debugParameterRead.rawValue,
+      effect: "readOnly", parameterNames: [], isRunnable: true),
     DebugCommandTemplatePresentation(
-      id: "processList", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
+      id: DebugRuntimeCommandTemplate.windowInventory.rawValue,
+      effect: "readOnly", parameterNames: [], isRunnable: true),
     DebugCommandTemplatePresentation(
-      id: "packageInfo", effect: "readOnly", parameterNames: ["bundleName"],
-      isPublishedByRuntimeOperation: false),
-    DebugCommandTemplatePresentation(
-      id: "storageUsage", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
-    DebugCommandTemplatePresentation(
-      id: "deviceModel", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
-    DebugCommandTemplatePresentation(
-      id: "firmwareBuild", effect: "readOnly", parameterNames: [],
-      isPublishedByRuntimeOperation: false),
+      id: DebugRuntimeCommandTemplate.uptime.rawValue,
+      effect: "readOnly", parameterNames: [], isRunnable: true),
   ]
 
   public static func make() -> any DebugApplicationProviding {
@@ -378,14 +416,169 @@ public enum DebugApplicationFacade {
 }
 
 private actor DebugProductionApplicationProvider: DebugApplicationProviding {
-  func refreshWorkspace() async -> DebugWorkspacePresentation {
+  func refreshWorkspace(targetID: String?) async -> DebugWorkspacePresentation {
     async let operations = DebugXPCReadTransport.request(method: "operation.list")
     async let targets = DebugXPCReadTransport.request(method: "target.list")
     async let jobs = DebugXPCReadTransport.request(method: "job.list")
-    return DebugWorkspaceResponseDecoding.presentation(
+    let base = DebugWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
       jobResponse: await jobs)
+    guard let target = base.targets.first(where: { $0.id == targetID }) ?? base.targets.first
+    else { return base }
+    switch DebugRuntimeResponseDecoding.snapshot(
+      await DebugXPCReadTransport.request(
+        method: "debug.probe", params: ["targetId": .string(target.id)]),
+      target: target)
+    {
+    case .success(let snapshot):
+      return DebugWorkspacePresentation(
+        operations: base.operations, targets: base.targets, jobs: base.jobs,
+        targetLoadFailure: base.targetLoadFailure, jobLoadFailure: base.jobLoadFailure,
+        runtimeProbe: snapshot)
+    case .failure(let failure):
+      return DebugWorkspacePresentation(
+        operations: base.operations, targets: base.targets, jobs: base.jobs,
+        targetLoadFailure: base.targetLoadFailure, jobLoadFailure: base.jobLoadFailure,
+        probeFailure: failure.message)
+    }
+  }
+
+  func submitLogs(
+    target: DebugTargetPresentation,
+    durationSeconds: Int,
+    filters: [String]
+  ) async -> DebugLogJobSubmissionResult {
+    guard (1...600).contains(durationSeconds), filters.count <= 16,
+      filters.allSatisfy(DebugTypedValueValidator.isSafeHilogComponent)
+    else { return .failed("HiLog request is outside the published bounds") }
+    do {
+      let nonce = UUID().uuidString.lowercased()
+      let request = try RuntimeOperationRequest(
+        requestID: "debug-logs-ui-\(nonce)",
+        idempotencyKey: "debug-logs-ui-\(nonce)",
+        target: DurableTargetReference(
+          targetID: target.id, expectedBindingRevision: target.bindingRevision),
+        operation: RuntimeOperationReference(id: "capture.diagnostics", version: 1),
+        inputs: [
+          "durationSeconds": .integer(Int64(durationSeconds)),
+          "hilogFilters": .array(filters.map(JSONValue.string)),
+          "uiDump": .bool(false),
+          "crashLogs": .bool(false),
+          "uiScreenshot": .bool(false),
+          "uiComponentTree": .bool(false),
+          "redactionProfile": .string("standard"),
+        ],
+        requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.DebugWorkspace.Logs"))
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let requestData = try encoder.encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed HiLog request")
+      }
+      let result = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
+      guard let jobID = result["jobId"] as? String, !jobID.isEmpty else {
+        return .failed("Runtime accepted HiLog capture without returning a Job ID")
+      }
+      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  func run(jobID: String) async -> DebugLogJobRunResult {
+    do {
+      let result = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.run", params: ["jobId": .string(jobID)]))
+      guard result["jobId"] as? String == jobID,
+        let state = result["state"] as? String,
+        let outcomeUnknown = result["outcomeUnknown"] as? Bool,
+        let timeline = result["timeline"] as? [String]
+      else { return .failed("Runtime returned incomplete terminal HiLog facts") }
+      return .completed(
+        DebugLogJobTerminalPresentation(
+          jobID: jobID, state: state, outcomeUnknown: outcomeUnknown, timeline: timeline))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  func cancel(jobID: String) async -> Bool {
+    guard let result = try? DebugRuntimeResponseDecoding.resultObject(
+      await DebugXPCReadTransport.request(
+        method: "job.cancel", params: ["jobId": .string(jobID)]))
+    else { return false }
+    return result["cancelRequested"] as? Bool == true
+  }
+
+  func submitPortRule(
+    target: DebugTargetPresentation,
+    rule: DebugValidatedPortRule,
+    removing: Bool
+  ) async -> DebugLogJobSubmissionResult {
+    guard (1_024...65_535).contains(rule.localPort),
+      (1_024...65_535).contains(rule.remotePort)
+    else { return .failed("Port rule is outside the published bounds") }
+    do {
+      let nonce = UUID().uuidString.lowercased()
+      let operationID = removing ? "port-forward.remove" : "port-forward.create"
+      let request = try RuntimeOperationRequest(
+        requestID: "debug-network-ui-\(nonce)",
+        idempotencyKey: "debug-network-ui-\(nonce)",
+        target: DurableTargetReference(
+          targetID: target.id, expectedBindingRevision: target.bindingRevision),
+        operation: RuntimeOperationReference(id: operationID, version: 1),
+        inputs: [
+          "direction": .string(rule.direction.rawValue),
+          "localPort": .integer(Int64(rule.localPort)),
+          "remotePort": .integer(Int64(rule.remotePort)),
+        ],
+        requestedOutputs: [.derivedArtifacts, .hardwareEvidence],
+        clientContext: RuntimeClientContext(
+          clientName: "ArkDeckApp.DebugWorkspace.Network"))
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let requestData = try encoder.encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed port rule")
+      }
+      let result = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
+      guard let jobID = result["jobId"] as? String, !jobID.isEmpty else {
+        return .failed("Runtime accepted the port rule without returning a Job ID")
+      }
+      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  func runTemplate(
+    target: DebugTargetPresentation,
+    templateID: String
+  ) async -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure> {
+    guard DebugRuntimeCommandTemplate(rawValue: templateID) != nil else {
+      return .failure(.transport("Unknown Debug template"))
+    }
+    return DebugRuntimeResponseDecoding.command(
+      await DebugXPCReadTransport.request(
+        method: "debug.template.run",
+        params: [
+          "targetId": .string(target.id),
+          "templateId": .string(templateID),
+        ]),
+      target: target, templateID: templateID)
   }
 }
 
@@ -492,6 +685,8 @@ enum DebugWorkspaceResponseDecoding {
           guard
             operation == DebugApplicationFacade.debugHAPReference
               || operation == DebugApplicationFacade.captureDiagnosticsReference
+              || operation == DebugApplicationFacade.createPortForwardReference
+              || operation == DebugApplicationFacade.removePortForwardReference
           else { continue }
           guard
             let id = entry["jobId"] as? String,
@@ -533,6 +728,105 @@ enum DebugWorkspaceResponseDecoding {
   }
 }
 
+enum DebugRuntimeResponseDecoding {
+  static func resultObject(
+    _ response: Result<Data, DebugXPCReadFailure>
+  ) throws -> [String: Any] {
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure(let failure): throw failure
+    }
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { throw DebugXPCReadFailure.transport("Runtime returned an unreadable response") }
+    if let error = envelope["error"] as? [String: Any] {
+      throw DebugXPCReadFailure.transport(
+        "Runtime refused the request: " + (error["message"] as? String ?? "no message"))
+    }
+    guard envelope["ok"] as? Bool == true,
+      let result = envelope["result"] as? [String: Any]
+    else { throw DebugXPCReadFailure.transport("Runtime returned no result object") }
+    return result
+  }
+
+  static func snapshot(
+    _ response: Result<Data, DebugXPCReadFailure>,
+    target: DebugTargetPresentation
+  ) -> Result<DebugRuntimeProbeSnapshot, DebugXPCReadFailure> {
+    do {
+      let result = try resultObject(response)
+      guard result["targetId"] as? String == target.id,
+        result["bindingRevision"] as? Int == target.bindingRevision,
+        let packages = result["packages"] as? [String],
+        Set(packages).count == packages.count,
+        packages.allSatisfy({ DebugTypedValueValidator.isSafeTypedIdentifier($0) }),
+        let ruleRows = result["portRules"] as? [[String: Any]],
+        let warnings = result["warnings"] as? [String]
+      else { return .failure(.transport("Runtime returned mismatched Debug probe facts")) }
+      var rules: [DebugRuntimePortRule] = []
+      for row in ruleRows {
+        guard let directionText = row["direction"] as? String,
+          let direction = DebugRuntimePortDirection(rawValue: directionText),
+          let localPort = row["localPort"] as? Int,
+          let remotePort = row["remotePort"] as? Int,
+          (1...65_535).contains(localPort), (1...65_535).contains(remotePort)
+        else { return .failure(.transport("Runtime returned malformed port rules")) }
+        rules.append(
+          DebugRuntimePortRule(
+            direction: direction, localPort: localPort, remotePort: remotePort))
+      }
+      return .success(
+        DebugRuntimeProbeSnapshot(
+          targetID: target.id, bindingRevision: target.bindingRevision,
+          packages: packages, portRules: rules, warnings: warnings))
+    } catch let failure as DebugXPCReadFailure {
+      return .failure(failure)
+    } catch {
+      return .failure(.transport(String(describing: error)))
+    }
+  }
+
+  static func command(
+    _ response: Result<Data, DebugXPCReadFailure>,
+    target: DebugTargetPresentation,
+    templateID: String
+  ) -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure> {
+    do {
+      let result = try resultObject(response)
+      guard result["targetId"] as? String == target.id,
+        result["bindingRevision"] as? Int == target.bindingRevision,
+        result["templateId"] as? String == templateID,
+        result["effect"] as? String == "readOnly",
+        result["executable"] as? String == "hdc",
+        let executableSHA256 = result["executableSha256"] as? String,
+        executableSHA256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+        let arguments = result["arguments"] as? [String],
+        arguments.first == "-t", arguments.dropFirst().first == "<redacted-connect-key>",
+        let loweringSHA256 = result["loweringSha256"] as? String,
+        loweringSHA256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+        let durationMilliseconds = result["durationMilliseconds"] as? Int,
+        durationMilliseconds >= 0,
+        let stdout = result["stdout"] as? String,
+        let stderr = result["stderr"] as? String,
+        let outputTruncated = result["outputTruncated"] as? Bool
+      else { return .failure(.transport("Runtime returned mismatched Debug command facts")) }
+      let exitCode = result["exitCode"] as? Int
+      return .success(
+        DebugRuntimeCommandResult(
+          targetID: target.id, bindingRevision: target.bindingRevision,
+          templateID: templateID, effect: "readOnly", executable: "hdc",
+          executableSHA256: executableSHA256, argumentDisclosure: arguments,
+          loweringSHA256: loweringSHA256, exitCode: exitCode,
+          durationMilliseconds: durationMilliseconds,
+          stdout: stdout, stderr: stderr, outputTruncated: outputTruncated))
+    } catch let failure as DebugXPCReadFailure {
+      return .failure(failure)
+    } catch {
+      return .failure(.transport(String(describing: error)))
+    }
+  }
+}
+
 private struct DebugResponseFailure: Error {
   let message: String
 }
@@ -552,22 +846,24 @@ private struct DecodedList<Value> {
   }
 }
 
-enum DebugXPCReadFailure: Error, Sendable, Equatable {
+public enum DebugXPCReadFailure: Error, Sendable, Equatable {
   case transport(String)
 
-  var message: String {
+  public var message: String {
     switch self {
     case .transport(let message): message
     }
   }
 }
 
-private enum DebugXPCReadTransport {
-  static func request(method: String) async -> Result<Data, DebugXPCReadFailure> {
+enum DebugXPCReadTransport {
+  static func request(
+    method: String,
+    params: [String: JSONValue]? = nil
+  ) async -> Result<Data, DebugXPCReadFailure> {
     let frame: Data
     do {
-      frame = try JSONSerialization.data(
-        withJSONObject: ["v": 1, "id": UUID().uuidString, "method": method])
+      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
     } catch {
       return .failure(.transport("Could not compose a Runtime request"))
     }

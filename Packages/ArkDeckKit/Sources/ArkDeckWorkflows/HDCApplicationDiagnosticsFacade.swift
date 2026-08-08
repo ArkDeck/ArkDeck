@@ -22,9 +22,6 @@ public protocol HDCApplicationDiagnosticsProviding: Sendable {
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation
-  func refreshAuthorization(
-    for durableBinding: DurableCurrentDeviceBinding
-  ) async -> HDCDiagnosticsPresentation
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation
 }
 
@@ -110,24 +107,6 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     let result = await sessionLifecycle.dispatch(confirmation: confirmation)
     await sessionDiagnostics.applyLifecycleDispatchResult(result)
     return await overlayCurrentDeviceEvents(on: sessionDiagnostics.refresh())
-  }
-
-  func refreshAuthorization(
-    for durableBinding: DurableCurrentDeviceBinding
-  ) async -> HDCDiagnosticsPresentation {
-    await attachSessionIfConfigured()
-    guard let sessionDiagnostics, let registeredToolchain, let registeredEndpoint,
-      let registeredServerIdentity
-    else {
-      return await overlayCurrentDeviceEvents(on: provider.refresh())
-    }
-    let result = await HDCSelectedDeviceAuthorizationProbe().probe(
-      endpoint: registeredEndpoint,
-      toolchain: registeredToolchain,
-      serverIdentity: registeredServerIdentity,
-      durableBinding: durableBinding)
-    await sessionDiagnostics.applyRegisteredAuthorization(result.authorization)
-    return await overlayCurrentDeviceEvents(on: provider.refresh())
   }
 
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation {
@@ -414,12 +393,6 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
   }
 
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation { presentation() }
-
-  func refreshAuthorization(
-    for _: DurableCurrentDeviceBinding
-  ) async -> HDCDiagnosticsPresentation {
-    presentation()
-  }
 
   func selectUserConfiguredExecutable(_: URL) async throws -> HDCDiagnosticsPresentation {
     presentation()

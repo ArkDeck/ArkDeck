@@ -1,23 +1,23 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.3（design input，非 normative；2026-08-05 按当前 `main` 代码与 Catalog 对齐）
+> Status：draft v0.4（design input，非 normative；2026-08-08 按当前 App / Runtime / Catalog 对齐）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v0.3 目标与当前实现边界
+## 0. v0.4 目标与当前实现边界
 
-v0.3 不新增 Runtime 能力，目标是把已有的 typed operation、设备状态、Job、Artifact、Recovery 和 bounded AI loop 组织成现代 macOS 工具界面：原生窗口层级、可调整的 split view、系统工具栏、适合长时间工作的紧凑密度，以及不依赖颜色的安全状态。
+v0.4 把已落地的生产诊断、Job 控制、Artifact 导出和 bounded Automation 控制组织成现代 macOS 工具界面：原生窗口层级、可调整的 split view、系统工具栏、适合长时间工作的紧凑密度，以及不依赖颜色的安全状态。
 
 当前代码与目标设计的边界必须如实呈现：
 
-| Surface | 当前 `main` | v0.3 设计目标 |
+| Surface | 当前实现 | v0.4 设计目标 |
 | --- | --- | --- |
-| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；已有 Overview / Flash / Debug / UI Dump / Trace / History 导航词汇 | 保留原生 split view；补齐统一 toolbar、设备 scope、全局 Job inspector 与窗口自适应 |
-| Overview | `HDCStatusView` 已展示 path/source/hash/trust/client/server/daemon/endpoint/health/ownership/authorization/channel protection，并有显式 refresh、HDC 选择和 recovery preview/confirm/dispatch | 重新分组为「服务器」「设备与通道」「能力」「需处理事项」，不把诊断字段堆成单张表 |
+| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / UI Dump / Trace / History / Automation 均有实际工作区 | 保留原生 split view；统一 toolbar、设备 scope、全局 Job inspector 与窗口自适应 |
+| Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
-| Runtime capability | Catalog 已发布 observe / diagnostics / HAP / native library / Flash / analyzer / workspace typed operations；Harness 已有 lifecycle、stage、conditions、Attempt、budgets 与 HumanActionRequired | UI 只提交 operation reference + typed inputs；展示 availability、effect、预算和实际 lowering 的只读回显，绝不提供 raw command 输入 |
-| 其余功能页 | 导航存在，但主窗口尚未有对应 production view；原型是目标稿，不得标为当前已实现 | 按本文档逐页落地；未接 production provider 时显示 `UNAVAILABLE + reasonCode`，不能使用演示结果冒充真实能力 |
+| Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
+| Runtime data | Trace tag / 参数快照、Debug probe、Flash prerequisite / postflight、Artifact metadata 均有生产 facade | 缺失字段显示 unknown / unavailable，不使用 fixture、占位行或默认值补齐 |
 
 ## 1. 现代 macOS 设计原则
 
@@ -89,9 +89,9 @@ Primary Window
 
 ### 4.3 危险确认 sheet（REQ-UX-005）
 
-- 使用 macOS sheet，而非居中网页 modal。标题 = 动词 + 对象；正文固定展示设备 identity / binding、effect、不可逆内容、recovery path。
-- erase / format / destructive 至少两项逐项确认；主按钮是完整动作，例如「刷写 rk3568-dev 的 2 个分区」，不用「确定」。
-- 默认焦点在取消；`Esc` 关闭；Tab 不离开 sheet；关闭后焦点回触发按钮。
+- 需要独立决策的 host-wide 或非计划内危险动作使用 macOS sheet，而非居中网页 modal。标题 = 动词 + 对象；正文固定展示 identity / binding、effect、不可逆内容、recovery path。默认焦点在取消；`Esc` 关闭；Tab 不离开 sheet；关闭后焦点回触发按钮。
+- Flash 是已发布 typed operation 的专用例外：Exact Plan、目标、镜像、分区、userdata 影响、供电要求和 bootloader / 厂商恢复路径已在同一页面按阅读顺序完整展示后，直接提供一个完整命名的主按钮「擦除用户数据并刷机」。不再打开第二个 sheet，不要求勾选框或输入确认短语。
+- 点击 Flash 主按钮只是对已展示影响的 UX acknowledgement，不是 Runtime authority。Runtime 仍须在首个外部 effect 前重新 materialize plan，并以 fresh target / binding / tool / Artifact facts 与 Runtime-owned capability fail closed 准入。
 
 ### 4.4 Availability、effect 与状态
 
@@ -106,12 +106,15 @@ Primary Window
 - Toolbar：设备 scope、`⌘R` 刷新、必要时「选择 HDC…」。刷新中保留原快照并显示小型 progress，不让内容跳空。
 - 顶部 status strip：HDC server health、target ready、channel protection、需要处理数量。
 - 内容按四个 section 排列：Server & Toolchain；Selected Device & Binding；Capabilities；Needs Attention。path/hash 允许复制，长值用中间省略且可查看完整值。
+- 能力矩阵只显示生产探测的 `hidumper`、`hitrace`、`bytrace` 与 Catalog 发布状态 `RockUSB Flash`；不得硬编码设备、虚构 `flashd` 探测或把 probe failure 写成“不存在”。
+- Rockchip 访问诊断必须把 `permissionDenied`、`driverUnavailable` 与 offline / unauthorized 分开显示，并给出责任方、ArkDeck 外的最小修复步骤和可否重新探测；不得建议 App 自行 sudo、安装驱动或放宽全局权限。
 - recovery preview / exact-generation confirmation / dispatch 保持三步，不合并成一个“修复”按钮；host-wide 影响用 sheet 列出 affected devices / Jobs / other clients。
 
 ### 5.2 设备接管与授权（REQ-HDC-007）
 
 - Sidebar 未授权设备行显示 warning symbol +「需要信任」，选中后 detail 显示三步 onboarding：解锁 → 设备端信任 → 有界等待。
 - E000002（等待）与 E000003（拒绝/超时）分状态；retry 是普通按钮。重启 shared HDC server 属独立危险 sheet，绝不成为默认修复。
+- production authorization verdict 由 `device.candidates` 的 domain-owned durable binding 刷新入口生成；App 只解码并展示 `authorized` / `pending` / `timedOut` 等闭集事实，不构造 `DurableCurrentDeviceBinding`。`denied` 在生产 probe 尚无判据时不得由 fixture 推断。
 
 ### 5.3 UI Dump
 
@@ -123,7 +126,7 @@ Primary Window
 ### 5.4 Trace
 
 - Toolbar 或 section header 使用 Preset / Custom segmented control；只显示设备已确认 tag，unsupported tag 禁用并解释。
-- 参数 snapshot diff 是 table，不用彩色卡片；missing / unreadable 明确「不可自动恢复」。需重启时在执行前显示影响。
+- `trace.probe` 返回 target / binding 绑定的 tag 集与全部参数 before 值；Job evidence 返回 after 值。snapshot diff 是 table，不用彩色卡片；missing / unreadable 明确「不可自动恢复」。需重启时在执行前显示影响。
 - 无可靠总量时显示 indeterminate + elapsed，不伪造百分比。完成后 raw / filtered / capture.log 分列，筛选是派生产物操作。
 
 ### 5.5 Debug 工作台
@@ -131,21 +134,26 @@ Primary Window
 - 四个 tab：Logs / Apps / Network / Commands。Tab 遵循 macOS keyboard pattern；tab 内容改变时焦点不被强制移动。
 - Logs：bounded live viewport、等级/tag/filter、host shard 状态；「暂停界面」不停止 host capture。「清空设备 buffer」位于 destructive actions menu，走危险 sheet。
 - Apps：HAP import、install/start/stop/uninstall；mutation 与 read-only action 分组，package/PID 使用 tabular numbers。
-- Network：typed forward rows，端口字段校验；不接受 shell fragment。
-- Commands：只能选择 approved typed template / operation reference 并填写其 schema-defined inputs。Provider 生成的 executable + argv 作为只读 disclosure 展示；没有任意文本命令输入，也不模拟 PTY。
+- Network：`port-forward.create@1` / `port-forward.remove@1` 产生真实 Runtime Job，端口只接受 1024…65535 的十进制字段；失败后以 exact inverse + readback 补偿，不接受 shell fragment。
+- Commands：只能选择 daemon 实现的 closed read-only template。执行结果可显示已脱敏 connect key 的 executable / argument disclosure 与 lowering SHA；这些值从不作为请求字段，没有任意文本命令输入，也不模拟 PTY。
 
 ### 5.6 Flash
 
 - Toolbar 中放 Execute / Plan only / Simulated segmented control，模式 badge 紧随标题并永久保留。
 - 详情顺序：Availability → Profile & Image Set → Prerequisites → Exact Plan → Review & Run。required prerequisite 为 unknown/unsatisfied 时，Run 区显示 blocker，不只留下灰色按钮。
 - Exact Plan table 展示 step、typed parameters 摘要、effect、execution disposition。plan-only 的 mutation/destructive 行显示 `notExecuted(planned)`。
-- critical write 期间在 Job Inspector 和页面内同时显示「当前写入不会被强杀；停止只作用于后续步骤」与电源提示。断连进入 rebind confirmation，不静默续刷。
+- 提交后直到 `job.run` 返回前，页面自动轮询 Runtime 的 `job.list` 并逐条显示真实 timeline；不依赖用户手动刷新。critical write 期间在 Job Inspector 和页面内显示同一句「当前写入不会被强杀；停止只作用于后续步骤」与电源提示。
+- Runtime 返回 Job ID 后立即显示「取消剩余步骤」；请求通过 `job.cancel` 到达 Runtime。临界写入不会被强杀，取消在下一个安全边界生效，不回放 unknown destructive intent。
+- rebind 按 transport 分流：USB 只有在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整匹配时可自动 rebind 并继续；TCP / UART 断连必须停在人工确认，任何证据不完整或漂移都 fail closed。不得把 USB 的已证明自动恢复写成“静默续刷”。
+- 当前发布的 `flash.dayu200@1` 只有 USB / RockUSB 路径，因此产品不暴露 rebind confirm / abort 控件；未来若发布 TCP / UART Flash operation，必须先补齐对应 domain 状态与 confirm / abort RPC，不能只在 UI 伪造停点。
+- 成功后的 Postflight 只展示 Runtime 已投影的事实：设备回报 build 与镜像期望的对照、binding revision `n → n+1`。manifest 全 executed + SHA 在 wire 没有字段前不画占位第三行。
 
 ### 5.7 History（REQ-UX-004）
 
 - 三栏：filter/sidebar → Session table → detail inspector。筛选支持 status、executionMode、device、time 和全文搜索；filter 可保存为 toolbar menu。
 - interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。
-- Detail 分组为 Summary / Timeline / Parameters / Artifacts / Recovery linkage。支持 Finder 定位；显式导出前展示敏感数据预览。
+- Detail 分组为 Summary / Timeline / Parameters / Artifacts / Recovery linkage。Artifact 行展示 name / role / origin / size / SHA-256 / privacy / status。
+- 导出以单个 Artifact 为边界：先显示文件名、size、privacy 与 SHA-256；敏感 Artifact 要求显式确认。App 以有界 chunk 读取、复算 byteCount / SHA-256 后写入用户选择的位置，目标路径不跨 daemon 边界。成功后可在 Finder 定位。
 
 ### 5.8 Settings
 
@@ -153,16 +161,15 @@ Primary Window
 - Toolchain 切换明确「只影响新 Job」；Storage 展示 root、quota、retention、pinned 与当前使用量；Updates 复用已实现的 signed update flow。
 - 诊断包默认不含 device raw，可预览勾选且无自动上传（AC-DIAG-002-01）。
 
-### 5.9 Automation / Bounded AI Debug Loop（code-backed design candidate）
+### 5.9 Automation / Bounded AI Debug Loop
 
-该页面对应当前 Harness 代码的 `HarnessTaskLifecycle`、`HarnessTaskStage`、conditions、Attempt、budgets、allowed operations 与 HumanActionRequired。它是已有 Runtime 能力的呈现候选；进入 production 前仍需 accepted UX delta。
+Automation 是现有 Harness task plane 的生产监控与有限生命周期控制面，不是 Git `TASK-*` 看板，也不带 Preview badge。
 
-- Sidebar 增加 Automation（Preview），不与 Git `TASK-*` 混淆；运行单元始终显示为 `HTASK-*`。
-- Summary strip：goal、target + expected binding revision、lifecycle、current stage、round、elapsed。
-- Stage timeline 固定为 initializing → reproducing → collecting → analyzing → patching → building → deploying → verifying；fallback 回 analyzing 用回向箭头，不伪装成新成功阶段。
-- Budget panel 展示 consumed / max：rounds、wall clock、Artifact bytes、E1 mutations、model calls，以及 max no-progress rounds / retries。接近上限只警告；耗尽时停止并显示 machine reason。
-- Allowed operations 以只读 chips 显示；任何 raw command surface 在提交前拒绝。Attempt detail 展示 strategy fingerprint、base/patch revision、confirmed/disproved facts、ActionRun、evaluation、runtime/build Artifact 与 outcome。
-- `humanRequired` 使用 4.2 的 banner；授权缺失、outcomeUnknown、strategy exhausted、evidence integrity、environment unavailable 使用各自准确文案，不自动重试。
+- 两栏 split view：左栏列出既有 `HTASK-*`；右栏展示 goal、type、lifecycle、stage、target、round、version、updated、active Job、wait reason 与 Runtime 返回的 allowed operations。
+- App 只开放 `task.list`、`task.reconcile`、`task.pause`、`task.cancel`；不能 submit 新 task、提供 human resolution、resume、propose patch、导出 promotion、GC workspace 或管理 capability。
+- reconcile / pause / cancel 的响应必须返回同一个 HTASK 的完整新快照；task ID 漂移或字段不完整即失败，不局部拼接事实。
+- allowed operations 只读展示。页面不得出现 raw command、argv、远端路径、预算编辑器、源码 patch 输入或权限安装入口。
+- Attempt、budgets、conditions 与 HumanActionRequired 只有在 Runtime wire 完整投影后才能新增；v0.4 不用模拟数据补这些区域。
 
 ## 6. 可访问性、本地化与动效
 
@@ -178,7 +185,7 @@ Primary Window
 - 原型必须声明演示数据，不连接设备；任何 simulated、planned、fake 结果不得展示为真实硬件结果。
 - 每次原型变更至少检查：UTF-8/中文；light/dark；900×600 与宽屏；键盘遍历与 modal focus return；Reduce Motion；所有导航页；typed-only 命令面；Job 跨页可见。
 
-## 8. v0.3 已决视觉项
+## 8. v0.4 已决视觉项
 
 - 图标：产品使用 SF Symbols；HTML 原型使用单色 inline SVG 近似，禁止 Emoji 作为最终导航图标。
 - 密度：默认紧凑舒适（macOS medium sidebar size）；不额外提供 App 内密度开关，尊重系统设置。

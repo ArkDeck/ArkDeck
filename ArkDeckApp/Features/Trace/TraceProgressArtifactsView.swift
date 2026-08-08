@@ -60,6 +60,25 @@ struct TraceProgressArtifactsView: View {
           .font(.footnote)
           .foregroundStyle(.secondary)
 
+        if !model.runtimeArtifacts.isEmpty {
+          VStack(alignment: .leading, spacing: 8) {
+            Text(traceString("trace.artifacts.runtimeTitle"))
+              .font(.subheadline.weight(.semibold))
+            ForEach(model.runtimeArtifacts) { artifact in
+              runtimeArtifactRow(artifact)
+            }
+          }
+          .accessibilityIdentifier("trace.artifacts.runtime")
+          Divider()
+        } else if let failure = model.runtimeArtifactFailures.first {
+          traceNotice(
+            failure,
+            systemImage: "exclamationmark.triangle",
+            color: .orange,
+            identifier: "trace.artifacts.runtimeFailure")
+          Divider()
+        }
+
         VStack(alignment: .leading, spacing: 0) {
           artifactRow(
             file: "trace.htrace",
@@ -111,6 +130,32 @@ struct TraceProgressArtifactsView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
     }
+  }
+
+  private func runtimeArtifactRow(_ artifact: RuntimeArtifactPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline, spacing: 10) {
+        Text(artifact.name)
+          .font(.callout.monospaced().weight(.semibold))
+          .textSelection(.enabled)
+        Spacer(minLength: 12)
+        Text(ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file))
+          .font(.caption.monospacedDigit())
+        Text(artifact.status)
+          .font(.caption.weight(.semibold))
+      }
+      Text(artifact.sha256)
+        .font(.caption.monospaced())
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .help(artifact.sha256)
+        .textSelection(.enabled)
+      Text("\(artifact.privacy) · \(artifact.role ?? "—")")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+    .padding(.vertical, 5)
+    .accessibilityElement(children: .combine)
   }
 
   private var cancelDetail: String {

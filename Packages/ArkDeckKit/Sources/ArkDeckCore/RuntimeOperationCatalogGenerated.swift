@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "d64ebd04e9865ae8e6a0eb6aa5810b4b2dd5ed90f241b457a9c8eec9333c7a95"
+  public static let catalogDigest = "2330926e667b06bc6833e9c736c5d0fb0b59054ec24a09bcdac272883842617a"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -159,6 +159,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "crash-log.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "application-liveness.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "trace.htrace", role: .raw, mediaType: "application/octet-stream", privacy: .sensitive, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "capture.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: false, retentionClass: .default),
         CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
@@ -396,6 +397,76 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "device-facts.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "tool-facts.json", role: .raw, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "binding-snapshot.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["openharmony-standard@1", "dayu200@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "port-forward.create",
+      version: 1,
+      title: "Create and verify one target-bound HDC TCP port rule",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "direction", type: .string, isRequired: true, enumValues: ["forward", "reverse"]),
+        CatalogFieldDescriptor(name: "localPort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535),
+        CatalogFieldDescriptor(name: "remotePort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "ruleReadback", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "create-port-rule", kind: .createPortForward, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .rollbackPublished),
+        CatalogStepDescriptor(stepID: "verify-port-rule", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 1048576,
+      preflightAttempts: 2,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "port-rule-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["openharmony-standard@1", "dayu200@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "port-forward.remove",
+      version: 1,
+      title: "Remove and verify one target-bound HDC TCP port rule",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "direction", type: .string, isRequired: true, enumValues: ["forward", "reverse"]),
+        CatalogFieldDescriptor(name: "localPort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535),
+        CatalogFieldDescriptor(name: "remotePort", type: .integer, isRequired: true, minimum: 1024, maximum: 65535)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "ruleReadback", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "remove-port-rule", kind: .removePortForward, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .rollbackPublished),
+        CatalogStepDescriptor(stepID: "verify-port-rule", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 1048576,
+      preflightAttempts: 2,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "port-rule-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
       profiles: ["openharmony-standard@1", "dayu200@1"]
     ),
