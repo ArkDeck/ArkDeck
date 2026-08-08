@@ -101,6 +101,74 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     XCTAssertEqual(retry.selectionEvidenceSHA256, first.selectionEvidenceSHA256)
   }
 
+  func testRuntimeReattestsHistoricalBindingWhenSelectedTargetIsAlreadyTheLiveLoader() throws {
+    let fixture = try makeSameLoaderLegacyFixture()
+    let statusBefore = try observer(
+      targets: fixture.targets,
+      bindings: fixture.bindings,
+      identities: [fixture.loader]
+    ).observeBootloaderStatus()
+    XCTAssertEqual(
+      statusBefore,
+      RockchipBootloaderStatus(
+        disposition: .targetBindingUnprepared,
+        observationCount: 1,
+        mode: "loader",
+        targetID: fixture.target.targetID,
+        bindingRevision: 2))
+
+    let coordinator = ProductRockchipLoaderBindingCoordinator(
+      targetStore: fixture.targets,
+      bindingStore: fixture.bindings,
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.loader] }))
+    let receipt = try coordinator.bindCurrentLoader(
+      targetID: fixture.target.targetID,
+      expectedBindingRevision: fixture.target.bindingRevision)
+
+    XCTAssertTrue(receipt.updated)
+    XCTAssertEqual(receipt.previousRevision, 2)
+    XCTAssertEqual(receipt.currentRevision, 2)
+    XCTAssertEqual(receipt.selectionEvidenceSHA256.count, 64)
+    let unchangedTarget = try XCTUnwrap(
+      fixture.targets.find(targetID: fixture.target.targetID))
+    XCTAssertEqual(unchangedTarget, fixture.target)
+
+    let stored = try fixture.bindings.loadExisting()
+    XCTAssertEqual(stored.revision, 2)
+    XCTAssertEqual(stored.serial, fixture.loader.serial)
+    XCTAssertFalse(
+      stored.evidence.contains { $0.hasPrefix("rebind:chat-confirmation-sha256=") })
+    XCTAssertTrue(
+      stored.evidence.contains(
+        "rebind:user-selection-sha256=\(receipt.selectionEvidenceSHA256)"))
+    XCTAssertEqual(
+      try stored.confirmedHDCNormalAlias()?.identitySHA256,
+      digest(fixture.hdcSerial))
+    let lineage = try XCTUnwrap(stored.runtimeTargetLineageAdvance())
+    XCTAssertEqual(lineage.previousRevision, 1)
+    XCTAssertEqual(lineage.currentRevision, 2)
+    XCTAssertEqual(
+      lineage.currentStableIdentitySHA256,
+      digest(fixture.loader.serial))
+
+    let statusAfter = try observer(
+      targets: fixture.targets,
+      bindings: fixture.bindings,
+      identities: [fixture.loader]
+    ).observeBootloaderStatus()
+    XCTAssertEqual(statusAfter.disposition, .exactBoundTarget)
+    XCTAssertEqual(statusAfter.targetID, fixture.target.targetID)
+    XCTAssertEqual(statusAfter.bindingRevision, 2)
+
+    let retry = try coordinator.bindCurrentLoader(
+      targetID: fixture.target.targetID,
+      expectedBindingRevision: fixture.target.bindingRevision)
+    XCTAssertFalse(retry.updated)
+    XCTAssertEqual(retry.previousRevision, 2)
+    XCTAssertEqual(retry.currentRevision, 2)
+    XCTAssertEqual(retry.selectionEvidenceSHA256, receipt.selectionEvidenceSHA256)
+  }
+
   func testAmbiguousLoaderRefusesBeforeChangingBindingOrTarget() throws {
     let fixture = try makeLegacyFixture()
     let another = loaderIdentity(serial: "loader-another", topology: "19791872")
@@ -170,6 +238,47 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
           "binding:previous-usb-topology=16777216",
         ]))
     return (targets, bindings, advanced, currentLoader)
+  }
+
+  private func makeSameLoaderLegacyFixture() throws -> (
+    targets: RuntimeTargetStore,
+    bindings: RockchipProductBindingStore,
+    target: RuntimeTargetRecord,
+    loader: RockchipProductUSBIdentity,
+    hdcSerial: String
+  ) {
+    let targets = try RuntimeTargetStore(
+      directoryURL: root.appendingPathComponent("targets-same-loader", isDirectory: true))
+    let bindings = RockchipProductBindingStore(
+      rootURL: root.appendingPathComponent("binding-same-loader", isDirectory: true))
+    let hdcSerial = "hdc-normal-connect-key"
+    let loader = loaderIdentity(serial: "loader-current-session", topology: "17956864")
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: digest(hdcSerial),
+      connectKey: hdcSerial,
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z").record
+    let loaderDigest = digest(loader.serial)
+    let advanced = try targets.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: adopted.stablePhysicalIdentitySHA256,
+        previousRevision: adopted.bindingRevision,
+        currentStableIdentitySHA256: loaderDigest,
+        currentRevision: adopted.bindingRevision + 1)).record
+    _ = try bindings.install(
+      RockchipProductBindingSnapshot(
+        revision: 2,
+        serial: loader.serial,
+        usbTopology: loader.topology,
+        evidence: [
+          "product:e0-iokit-single-loader-readback",
+          "identity:serial-sha256=\(loaderDigest)",
+          "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+          "identity:previous-serial-sha256=\(digest(hdcSerial))",
+          "binding:previous-revision=1",
+          "binding:previous-usb-topology=16777216",
+        ]))
+    return (targets, bindings, advanced, loader, hdcSerial)
   }
 
   private func loaderIdentity(serial: String, topology: String) -> RockchipProductUSBIdentity {

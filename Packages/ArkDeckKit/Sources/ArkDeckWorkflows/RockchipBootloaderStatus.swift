@@ -99,9 +99,20 @@ public struct ProductRockchipBootloaderStatusObserver:
     }
 
     let binding = try bindingStore.loadIfPresent()
-    let covered = try binding.map {
-      try $0.coversRuntimeTarget(target) && $0.matchesConfirmedLiveIdentity(identity)
-    } ?? false
+    let covered: Bool
+    if let binding {
+      do {
+        covered = try binding.coversRuntimeTarget(target)
+          && binding.matchesConfirmedLiveIdentity(identity)
+      } catch {
+        // A decoded historical or otherwise incomplete binding is a safe,
+        // actionable onboarding state. Do not turn it into an RPC failure and
+        // do not claim it covers the live target.
+        covered = false
+      }
+    } else {
+      covered = false
+    }
     return RockchipBootloaderStatus(
       disposition: covered ? .exactBoundTarget : .targetBindingUnprepared,
       observationCount: 1,
@@ -196,6 +207,89 @@ public struct ProductRockchipLoaderBindingCoordinator:
     let existingIdentity = SHA256.hash(data: Data(existing.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
 
+    if target.bindingRevision == expectedBindingRevision,
+      existing.revision == expectedBindingRevision,
+      existingIdentity == target.stablePhysicalIdentitySHA256,
+      currentIdentity == existingIdentity,
+      identity.topology == existing.usbTopology
+    {
+      let alreadyCovered = (try? existing.coversRuntimeTarget(target)) == true
+        && (try? existing.matchesConfirmedLiveIdentity(identity)) == true
+      if alreadyCovered,
+        let proof = try existing.loaderBindingRecoveryProof(),
+        proof.currentRevision == expectedBindingRevision
+      {
+        return RockchipLoaderBindingReceipt(
+          targetID: targetID,
+          previousRevision: expectedBindingRevision,
+          currentRevision: expectedBindingRevision,
+          updated: false,
+          selectionEvidenceSHA256: proof.selectionEvidenceSHA256)
+      }
+
+      guard let legacy = try existing.legacyLoaderAttestationMigrationProof()
+      else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected Loader binding is not eligible for fresh Runtime attestation")
+      }
+      let targetConnectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      guard targetConnectIdentity == legacy.identitySHA256 else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected target connect key does not match its durable HDC-normal alias")
+      }
+      let matchingTargets = try targetStore.list().filter {
+        $0.bindingRevision == expectedBindingRevision
+          && $0.stablePhysicalIdentitySHA256 == currentIdentity
+      }
+      guard matchingTargets.map(\.targetID) == [targetID] else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected target binding lineage is missing or ambiguous")
+      }
+
+      let selectionDigest = Self.selectionDigest(
+        targetID: targetID,
+        previousRevision: legacy.previousRevision,
+        currentRevision: expectedBindingRevision,
+        previousIdentity: legacy.identitySHA256,
+        currentIdentity: currentIdentity,
+        currentTopology: identity.topology)
+      let refreshed = RockchipProductBindingSnapshot(
+        revision: expectedBindingRevision,
+        serial: identity.serial,
+        usbTopology: identity.topology,
+        evidence: [
+          "product:e0-iokit-single-loader-readback",
+          "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
+          "identity:serial-sha256=\(currentIdentity)",
+          "identity:previous-serial-sha256=\(legacy.identitySHA256)",
+          "binding:previous-revision=\(legacy.previousRevision)",
+          "binding:previous-usb-topology=\(legacy.usbTopology)",
+          "identity:hdc-normal-alias-sha256=\(legacy.identitySHA256)",
+          "binding:hdc-normal-alias-usb-topology=\(legacy.usbTopology)",
+          "rebind:user-selection-sha256=\(selectionDigest)",
+        ])
+      try Self.authorizeSelectedLoader(
+        identity: identity, currentIdentity: currentIdentity)
+      let stored = try bindingStore.replace(
+        expectedRevision: expectedBindingRevision,
+        expectedSerialSHA256: existingIdentity,
+        with: refreshed,
+        kind: .sameRevisionLegacyLoaderAttestation)
+      guard try stored.coversRuntimeTarget(target),
+        try stored.matchesConfirmedLiveIdentity(identity)
+      else {
+        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+          "fresh Loader attestation did not cover the selected Runtime target")
+      }
+      return RockchipLoaderBindingReceipt(
+        targetID: targetID,
+        previousRevision: expectedBindingRevision,
+        currentRevision: expectedBindingRevision,
+        updated: true,
+        selectionEvidenceSHA256: selectionDigest)
+    }
+
     if target.bindingRevision == expectedBindingRevision + 1,
       existing.revision == target.bindingRevision,
       currentIdentity == target.stablePhysicalIdentitySHA256,
@@ -242,39 +336,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
         "selected target binding lineage is missing or ambiguous")
     }
 
-    let candidateID = "loader-\(currentIdentity.prefix(12))"
-    let candidateEvidence = [
-      "product:e0-iokit-single-loader-readback",
-      "identity:serial-sha256=\(currentIdentity)",
-      "binding:usb-topology=\(identity.topology)",
-      "mode:loader",
-    ]
-    let snapshot = try DeviceIdentitySnapshot(attributes: [
-      "serial": .string(identity.serial),
-      "usbTopology": .string(identity.topology),
-      "mode": .string("loader"),
-    ])
-    let candidate = try DeviceRebindCandidate(
-      candidateID: candidateID,
-      connectKey: identity.topology,
-      transport: .usb,
-      identitySnapshot: snapshot,
-      evidence: candidateEvidence,
-      usbEvidence: USBRebindEvidence(
-        serialMatches: false,
-        daemonFingerprintMatches: false,
-        topologyMatches: false,
-        expectedModeMatches: true,
-        modelBuildMatches: false))
-    let context = DeviceRebindContext(
-      transport: .usb,
-      disconnected: true,
-      endpointExplicitlyAdded: true,
-      expectedModeTransition: true,
-      candidates: [candidate],
-      userConfirmedCandidateID: candidateID)
-    try DeviceRebindPolicy.authorizePersistence(
-      context: context, selectedCandidate: candidate, confirmedBy: .user)
+    try Self.authorizeSelectedLoader(identity: identity, currentIdentity: currentIdentity)
 
     let nextRevision = expectedBindingRevision + 1
     let selectionDigest = Self.selectionDigest(
@@ -341,5 +403,44 @@ public struct ProductRockchipLoaderBindingCoordinator:
       currentTopology,
     ].joined(separator: "\n").utf8))
     .map { String(format: "%02x", $0) }.joined()
+  }
+
+  private static func authorizeSelectedLoader(
+    identity: RockchipProductUSBIdentity,
+    currentIdentity: String
+  ) throws {
+    let candidateID = "loader-\(currentIdentity.prefix(12))"
+    let candidateEvidence = [
+      "product:e0-iokit-single-loader-readback",
+      "identity:serial-sha256=\(currentIdentity)",
+      "binding:usb-topology=\(identity.topology)",
+      "mode:loader",
+    ]
+    let snapshot = try DeviceIdentitySnapshot(attributes: [
+      "serial": .string(identity.serial),
+      "usbTopology": .string(identity.topology),
+      "mode": .string("loader"),
+    ])
+    let candidate = try DeviceRebindCandidate(
+      candidateID: candidateID,
+      connectKey: identity.topology,
+      transport: .usb,
+      identitySnapshot: snapshot,
+      evidence: candidateEvidence,
+      usbEvidence: USBRebindEvidence(
+        serialMatches: false,
+        daemonFingerprintMatches: false,
+        topologyMatches: false,
+        expectedModeMatches: true,
+        modelBuildMatches: false))
+    let context = DeviceRebindContext(
+      transport: .usb,
+      disconnected: true,
+      endpointExplicitlyAdded: true,
+      expectedModeTransition: true,
+      candidates: [candidate],
+      userConfirmedCandidateID: candidateID)
+    try DeviceRebindPolicy.authorizePersistence(
+      context: context, selectedCandidate: candidate, confirmedBy: .user)
   }
 }

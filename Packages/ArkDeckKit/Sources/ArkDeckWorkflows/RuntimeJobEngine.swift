@@ -3383,11 +3383,12 @@ public actor RuntimeJobEngine {
     currentBindingRevision: Int,
     selectionEvidenceSHA256: String
   ) async throws -> RuntimeJobStatus {
-    guard currentBindingRevision == previousBindingRevision + 1,
+    guard currentBindingRevision == previousBindingRevision
+        || currentBindingRevision == previousBindingRevision + 1,
       Self.isLowercaseSHA256(selectionEvidenceSHA256)
     else {
       throw RuntimeJobEngineError.jobNotRunnable(
-        "Loader binding settlement requires one adjacent revision and canonical evidence")
+        "Loader binding settlement requires the selected or one adjacent revision and canonical evidence")
     }
     guard var runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)

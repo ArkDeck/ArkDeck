@@ -359,7 +359,7 @@ final class AgentDaemonContractTests: XCTestCase {
         RockchipLoaderBindingReceipt(
           targetID: targetID,
           previousRevision: expectedBindingRevision,
-          currentRevision: expectedBindingRevision + 1,
+          currentRevision: expectedBindingRevision,
           updated: true,
           selectionEvidenceSHA256: String(repeating: "c", count: 64))
       }
@@ -394,7 +394,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(bound.ok, bound.error?.message ?? "-")
     XCTAssertEqual(receipt["targetId"], .string("TGT-SELECTED"))
     XCTAssertEqual(receipt["previousBindingRevision"], .integer(2))
-    XCTAssertEqual(receipt["bindingRevision"], .integer(3))
+    XCTAssertEqual(receipt["bindingRevision"], .integer(2))
     XCTAssertEqual(receipt["settledJobId"], .null)
     XCTAssertNil(receipt["serial"])
     XCTAssertNil(receipt["usbTopology"])

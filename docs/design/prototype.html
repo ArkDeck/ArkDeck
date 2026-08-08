@@ -991,7 +991,7 @@ function pFlash(){
     ["4","enter-loader-mode","bound target","mut","deviceMutation"],
     ["5","wait-loader-disconnect","expected USB transition","read","readOnly"],
     ["6","wait-loader-reconnect","expected USB transition","read","readOnly"],
-    ["7","rebind-loader-identity","stable identity · n→n+1","read","readOnly"],
+    ["7","rebind-loader-identity","fresh identity · n→n / n→n+1","read","readOnly"],
     ["8","flash-partitions","partitionPlan + exact digest","destr","destructive"],
     ["9","verify-flash-readback","per-partition readback","read","readOnly"],
     ["10","reboot-device","bound target","mut","deviceMutation"],
@@ -1015,7 +1015,7 @@ function pFlash(){
     ${S.loaderBound?`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span class="chip ok">Loader 已绑定到所选设备</span><span class="mono">1 个 loader observation · Runtime probe</span>
       <button class="btn" onclick="doneBtn(this,'已重新检查')">重新检查设备访问</button>
-    </div>`:`<div class="warnbox"><b>DAYU200 已进入 Loader 模式</b><br>ArkDeck 已发现一台 Loader，但它尚未关联到持久设备。请选择该设备，然后只需点击一次刷机；Runtime 会先绑定 Loader、刷新精确计划，并仅在全部前置条件通过后继续。</div>`}
+    </div>`:`<div class="warnbox"><b>DAYU200 已进入 Loader 模式</b><br>ArkDeck 已发现一台 Loader，但它尚未完成 Runtime-owned 设备关联或新鲜重核验。请选择该设备，然后只需点击一次刷机；Runtime 会先绑定或重核验 Loader、刷新精确计划，并仅在全部前置条件通过后继续。</div>`}
     <dl class="kv"><dt>责任方</dt><dd>设备操作员</dd><dt>最小动作</dt><dd>${S.loaderBound?"无需处理":"确认当前选择的是刚进入 Loader 的设备"}</dd></dl>
     <p class="hint">permission denied、driver unavailable、offline / unauthorized、tool blocked 与 protocol blocked 会分别显示责任方和 ArkDeck 外最小修复动作；页面不提供 sudo 或驱动安装。</p>
     <p class="hint">Loader 绑定只提交所选 target + expected revision；Runtime 重新读取唯一 Loader 并做 CAS，不向 App 暴露 serial / topology，也不派发设备命令。</p>
@@ -1050,7 +1050,7 @@ function pFlash(){
         </table></div>
       </div>
       <div class="card"><h2>Target</h2>
-        <dl class="kv"><dt>target</dt><dd>已接管 DAYU200</dd><dt>binding</dt><dd>${S.loaderBound?"revision n+1":"revision n · Loader 未关联"}</dd><dt>tool</dt><dd>pinned rkdeveloptool · version 来自 Runtime</dd></dl>
+        <dl class="kv"><dt>target</dt><dd>已接管 DAYU200</dd><dt>binding</dt><dd>${S.loaderBound?"revision n / n+1 · Runtime attested":"revision n · Loader 待关联/重核验"}</dd><dt>tool</dt><dd>pinned rkdeveloptool · version 来自 Runtime</dd></dl>
       </div>
       ${S.lastFlash?`<div class="card" data-acin><span class="ac">postflight verify</span>
         <h2>上次执行 · Postflight</h2>
@@ -1074,7 +1074,7 @@ function pFlash(){
       </div>
       ${m==="execute"?'<p class="hint">点击主按钮即提交；不再打开确认 sheet、checkbox 或文字短语。该点击只是 UX acknowledgement，Runtime capability 与 fresh facts 仍是唯一准入。</p>':""}
       ${m==="execute"&&S.flashJob&&S.flashJob.phases[S.flashJob.phaseIdx]==="flash-partitions"?`<div class="warnbox" data-acin><span class="ac">AC-FLASH-009-01</span>⚠ 正在写入分区 —— <b>临界区不可中断</b>:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。</div>`:""}
-      ${m==="simulated"?'<p class="hint">fixture-a3 使用 TCP 断连注入并停在「WaitReconnect → Rebind 确认」。USB 在稳定身份、相邻 binding revision 与 plan 阶段证据完整时自动 rebind；证据不足则阻断。</p>':""}
+      ${m==="simulated"?'<p class="hint">fixture-a3 使用 TCP 断连注入并停在「WaitReconnect → Rebind 确认」。USB 只在稳定身份、同 revision fresh re-attestation 或一个相邻 binding revision 与 plan 阶段证据完整时自动 rebind；证据不足则阻断。</p>':""}
     </div>
   </div>`;
 }

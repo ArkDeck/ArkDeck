@@ -103,6 +103,43 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
         bindingRevision: nil))
   }
 
+  func testBootloaderStatusProjectsSelectedTargetThatNeedsFreshAttestation() throws {
+    let bootloader = try JSONSerialization.data(withJSONObject: [
+      "id": "bootloader", "ok": true,
+      "result": [
+        "disposition": "targetBindingUnprepared",
+        "observationCount": 1,
+        "mode": "loader",
+        "targetId": "target-dayu200-a",
+        "bindingRevision": 2,
+      ],
+    ])
+    let presentation = FlashWorkspaceResponseDecoding.presentation(
+      operationResponse: .success(
+        try response([
+          ["reference": "flash.dayu200@1", "availability": "available", "reasons": []]
+        ])),
+      targetResponse: .success(
+        try response([
+          [
+            "targetId": "target-dayu200-a",
+            "bindingRevision": 2,
+            "toolVersion": "3.2.0f",
+            "adoptedAtUtc": "2026-08-06T08:00:00Z",
+          ]
+        ])),
+      bootloaderResponse: .success(bootloader))
+
+    XCTAssertEqual(
+      presentation.bootloaderStatus,
+      RockchipBootloaderStatus(
+        disposition: .targetBindingUnprepared,
+        observationCount: 1,
+        mode: "loader",
+        targetID: "target-dayu200-a",
+        bindingRevision: 2))
+  }
+
   func testPlanPresentationPreservesEveryTypedStepAndMarksPlanOnlyAsNotExecuted() throws {
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
