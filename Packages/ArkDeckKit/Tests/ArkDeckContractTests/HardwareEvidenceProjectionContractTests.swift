@@ -148,7 +148,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       coveredIntents: [
         .init(
           jobID: "job-old-unknown", intentEventID: "intent-flash-old",
-          operationReference: "flash.dayu200@1", profileReference: "dayu200@2",
+          operationReference: "flash.dayu200", profileReference: "dayu200",
           observedAtUTC: "2026-07-29T00:00:00Z", possibleEffects: possibleEffects)
       ],
       uncertainEffectSetSHA256: effectDigest,
@@ -156,8 +156,8 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       coveredEffectSetSHA256: String(repeating: "1", count: 64),
       recoveryJobID: recoveryJobID,
       recoveryIntentEventID: "intent-flash-partitions-recovery",
-      operationReference: "flash.dayu200@1",
-      profileReference: "dayu200@2",
+      operationReference: "flash.dayu200",
+      profileReference: "dayu200",
       materializedPlanDigestSHA256: runtimePlanDigest,
       artifactSHA256: artifactSHA256 ?? artifactDigest,
       providerExecutableSHA256: toolDigest,
@@ -303,7 +303,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
   func testDistinctRecoveryProjectsClosedV6Lineage() throws {
     let result = HardwareEvidenceProjector.project(
       receipt: receipt(
-        providerID: "rockchip", operationReference: "flash.dayu200@1",
+        providerID: "rockchip", operationReference: "flash.dayu200",
         effect: .destructive, authorityKind: .runtimeCapability,
         terminalState: "recovered", recoveryEpoch: recoveryEpoch()),
       claims: claims())
@@ -322,7 +322,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
   func testHistoricalRecoveryRelationUsesZeroDispatchLineageWithoutInventingCapability() throws {
     let result = HardwareEvidenceProjector.project(
       receipt: receipt(
-        providerID: "rockchip", operationReference: "flash.dayu200@1",
+        providerID: "rockchip", operationReference: "flash.dayu200",
         effect: .destructive, authorityKind: .runtimeCapability,
         recoveryEpoch: recoveryEpoch(
           source: "historicalRecognition", recoveryJobID: "job-later-complete")),
@@ -339,16 +339,16 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
   func testRecoveryEvidenceRejectsMissingOrDriftedLineage() {
     let invalid = [
       receipt(
-        providerID: "rockchip", operationReference: "flash.dayu200@1",
+        providerID: "rockchip", operationReference: "flash.dayu200",
         effect: .destructive, authorityKind: .runtimeCapability,
         terminalState: "recovered", recoveryEpoch: nil),
       receipt(
-        providerID: "rockchip", operationReference: "flash.dayu200@1",
+        providerID: "rockchip", operationReference: "flash.dayu200",
         effect: .destructive, authorityKind: .runtimeCapability,
         terminalState: "recovered",
         recoveryEpoch: recoveryEpoch(confirmedStepIDs: ["flash-partitions"])),
       receipt(
-        providerID: "rockchip", operationReference: "flash.dayu200@1",
+        providerID: "rockchip", operationReference: "flash.dayu200",
         effect: .destructive, authorityKind: .runtimeCapability,
         terminalState: "recovered",
         recoveryEpoch: recoveryEpoch(artifactSHA256: String(repeating: "9", count: 64))),

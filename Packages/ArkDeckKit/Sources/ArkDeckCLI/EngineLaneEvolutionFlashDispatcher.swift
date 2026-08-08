@@ -202,7 +202,7 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
       idempotencyKey: "campaign-\(admitted.reservationID)",
       target: DurableTargetReference(
         targetID: runtimeTargetID, expectedBindingRevision: bindingRevision),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: [
         "imageBundleLease": .string(lease),
         "deviceProfile": .string(profile.catalogReference),

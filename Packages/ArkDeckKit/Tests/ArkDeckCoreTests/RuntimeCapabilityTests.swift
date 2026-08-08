@@ -36,7 +36,7 @@ final class RuntimeCapabilityTests: XCTestCase {
     try RuntimeCapability(
       capabilityID: "CAP-RT-DAYU200-FLASH-001",
       targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
-      operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+      operationScope: [.init(operationID: "flash.dayu200")],
       effectCeiling: .destructive,
       issuedAtUTC: "2026-07-01T00:00:00Z",
       expiresAtUTC: "2026-08-01T00:00:00Z",
@@ -47,7 +47,7 @@ final class RuntimeCapabilityTests: XCTestCase {
 
   private func query(
     operationID: String = "debug.hap",
-    version: Int = 1,
+    version: Int? = 1,
     effect: WorkflowEffect = .deviceMutation,
     target: String? = String(repeating: "a", count: 64),
     bindingRevision: Int? = 7,
@@ -79,6 +79,36 @@ final class RuntimeCapabilityTests: XCTestCase {
       expiresAtUTC: "9999-12-31T23:59:59Z",
       maximumUses: 10_000,
       issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
+  }
+
+  func testDAYU200SingletonCapabilityDoesNotAliasLegacyVersionedScope() throws {
+    let current = try makeE2()
+    let query = RuntimeCapabilityAuthorizationQuery(
+      operationID: "flash.dayu200",
+      operationVersion: nil,
+      effect: .destructive,
+      targetStableIdentitySHA256: String(repeating: "a", count: 64),
+      targetBindingRevision: 7,
+      planDigest: String(repeating: "b", count: 64),
+      inputs: [:])
+    XCTAssertNoThrow(
+      try current.authorizes(
+        query, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1).get())
+
+    let legacy = try RuntimeCapability(
+      capabilityID: "CAP-RT-DAYU200-FLASH-LEGACY-001",
+      targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
+      operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+      effectCeiling: .destructive,
+      issuedAtUTC: "2026-07-01T00:00:00Z",
+      expiresAtUTC: "2026-08-01T00:00:00Z",
+      maximumUses: 1,
+      issuer: .init(kind: .maintainerMergedPR, reference: "historical decode-only"),
+      exactPlanDigest: String(repeating: "b", count: 64))
+    assertDenied(
+      legacy.authorizes(
+        query, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1),
+      .operationScopeMismatch)
   }
 
   func testRuntimePolicyBindsCompleteTypedInputMap() throws {
@@ -156,7 +186,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
-        operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+        operationScope: [.init(operationID: "flash.dayu200")],
         effectCeiling: .destructive,
         exactInputs: [:],
         exactArtifactFacts: ["artifactSha256": String(repeating: "a", count: 64)],
@@ -170,7 +200,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
-        operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+        operationScope: [.init(operationID: "flash.dayu200")],
         effectCeiling: .destructive,
         issuedAtUTC: "2026-07-01T00:00:00Z",
         expiresAtUTC: "2026-08-01T00:00:00Z",
@@ -184,7 +214,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
-        operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+        operationScope: [.init(operationID: "flash.dayu200")],
         effectCeiling: .destructive,
         issuedAtUTC: "2026-07-01T00:00:00Z",
         expiresAtUTC: "2026-08-01T00:00:00Z",
@@ -198,7 +228,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .anyTarget,
-        operationScope: [.init(operationID: "flash.dayu200", version: 1)],
+        operationScope: [.init(operationID: "flash.dayu200")],
         effectCeiling: .destructive,
         issuedAtUTC: "2026-07-01T00:00:00Z",
         expiresAtUTC: "2026-08-01T00:00:00Z",
@@ -334,19 +364,21 @@ final class RuntimeCapabilityTests: XCTestCase {
   func testE2PlanDigestBindingFailClosed() throws {
     let capability = try makeE2()
     let good = query(
-      operationID: "flash.dayu200", effect: .destructive,
+      operationID: "flash.dayu200", version: nil, effect: .destructive,
       planDigest: String(repeating: "b", count: 64))
     XCTAssertNoThrow(
       try capability.authorizes(good, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1).get())
     assertDenied(
       capability.authorizes(
-        query(operationID: "flash.dayu200", effect: .destructive, planDigest: nil),
+        query(
+          operationID: "flash.dayu200", version: nil, effect: .destructive,
+          planDigest: nil),
         nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1),
       .planDigestRequired)
     assertDenied(
       capability.authorizes(
         query(
-          operationID: "flash.dayu200", effect: .destructive,
+          operationID: "flash.dayu200", version: nil, effect: .destructive,
           planDigest: String(repeating: "d", count: 64)),
         nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1),
       .planDigestMismatch)

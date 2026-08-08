@@ -93,5 +93,5 @@
     { "name": "tool-facts.json", "role": "raw", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "binding-snapshot.json", "role": "derived", "mediaType": "application/json", "privacy": "sensitive", "required": true }
   ],
-  "profiles": ["openharmony-standard@1", "dayu200@1"]
+  "profiles": ["openharmony-standard@1", "dayu200"]
 }

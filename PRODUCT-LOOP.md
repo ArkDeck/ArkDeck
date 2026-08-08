@@ -579,7 +579,7 @@ Capability 不得在 Provider 或 Plan 不可用时被消耗。
 
 ```json
 {
-  "reference": "flash.dayu200@1",
+  "reference": "flash.dayu200",
   "status": "unavailable",
   "reasonCode": "provider_not_registered",
   "reason": "Rockchip provider is not registered in the production runtime"

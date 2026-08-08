@@ -4,7 +4,7 @@
 // existing observation surfaces behind injected ports; the Rockchip adapter
 // lowers each typed action for the engine's per-action host. It used to wrap
 // the in-process RockchipFlashExecutionHost whole — that host was retired in
-// T25, and the engine is now the only thing that executes flash.dayu200@1.
+// T25, and the engine is now the only thing that executes flash.dayu200.
 
 import ArkDeckCore
 import ArkDeckOpenHarmony
@@ -2874,7 +2874,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
   public func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
-    guard operation.reference == "flash.dayu200@1" else {
+    guard operation.reference == "flash.dayu200" else {
       return .unavailable(
         reason: "Rockchip provider has no typed plan for \(operation.reference)")
     }
@@ -2893,7 +2893,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     for operation: CatalogOperationDescriptor,
     facts: ProviderFacts
   ) -> String? {
-    guard operation.reference == "flash.dayu200@1" else { return nil }
+    guard operation.reference == "flash.dayu200" else { return nil }
     guard
       facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey]
         == TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
@@ -2919,7 +2919,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     inputs: [String: JSONValue],
     context: ProviderExecutionContext
   ) throws -> TypedProviderAction {
-    guard operation.reference == "flash.dayu200@1" else {
+    guard operation.reference == "flash.dayu200" else {
       throw DeviceProviderError.unsupportedStepKind(
         "\(step.kind.rawValue) has no Rockchip action for \(operation.reference)")
     }
@@ -2971,7 +2971,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       return .rockchip(
         .verifyBuild(
           connectKey: connectKey,
-          expectedProductModel: RockchipFlashProfile.dayu200OpenHarmony70035.runtimeProductModel,
+          expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
           expectedBuildVersion: expectedBuildVersion))
     case ("capture-post-flash-diagnostics", .captureRemoteStdout):
       return .rockchip(.capturePostFlashDiagnostics(
@@ -3005,11 +3005,11 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       descriptor = "rockchip.rockusb.rebind-loader.v1"
     case .flashPartitions(let bundle):
       descriptor =
-        "rockchip.rockusb.flash-dayu200.v1:"
+        "rockchip.rockusb.flash-dayu200:"
         + String(bundle.sha256.prefix(16))
     case .verifyFlashReadback(let bundle):
       descriptor =
-        "rockchip.rockusb.verify-dayu200.v1:"
+        "rockchip.rockusb.verify-dayu200:"
         + String(bundle.sha256.prefix(16))
     case .rebootToNormal:
       descriptor = "rockchip.rockusb.reboot-normal.v1"
@@ -3141,7 +3141,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       let profile = RockchipFlashProfile.profile(reference: profileReference)
     else {
       throw DeviceProviderError.unsupportedAction(
-        "flash requires a published versioned DAYU200 device profile")
+        "flash requires the published DAYU200 device profile")
     }
     guard case .string(let artifactLeaseID)? = inputs["imageBundleLease"],
       !artifactLeaseID.isEmpty

@@ -78,4 +78,18 @@ final class JobsLocalizationContractTests: XCTestCase {
 
     XCTAssertTrue(project.contains("JobsLocalizable.xcstrings in Resources"))
   }
+
+  func testDAYU200OperationIsDisplayedWithoutHistoricalVersionSuffixes() throws {
+    let inspector = try String(contentsOf: sourceURL, encoding: .utf8)
+    let history = try String(
+      contentsOf: repositoryRoot.appendingPathComponent(
+        "ArkDeckApp/Features/History/RuntimeHistoryView.swift"),
+      encoding: .utf8)
+
+    XCTAssertTrue(inspector.contains("displayedOperationReference(job.operationReference)"))
+    XCTAssertTrue(history.contains("displayedOperationReference(job.operationReference)"))
+    XCTAssertTrue(history.contains(#"reference.hasPrefix("flash.dayu200@")"#))
+    XCTAssertFalse(inspector.contains("flash.dayu200@1"))
+    XCTAssertFalse(history.contains("flash.dayu200@1"))
+  }
 }

@@ -17,7 +17,7 @@ final class RuntimeOperationCatalogTests: XCTestCase {
         "debug.hap@1",
         "deploy.native-library.app-owned@1",
         "deploy.native-library.system@1",
-        "flash.dayu200@1",
+        "flash.dayu200",
         "observe.device@1",
         "port-forward.create@1",
         "port-forward.remove@1",
@@ -44,6 +44,8 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "debug.hap@0"))
     XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "debug.hap"))
     XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "debug.hap@x"))
+    XCTAssertNotNil(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+    XCTAssertNil(RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
   }
 
   func testEveryStepRespectsWorkflowStepRegistryMinimums() {
@@ -110,7 +112,7 @@ final class RuntimeOperationCatalogTests: XCTestCase {
       RuntimeOperationCatalog.descriptor(id: "deploy.native-library.system", version: 1))
     XCTAssertEqual(system.permittedEffects, [.destructive])
     XCTAssertTrue(system.defaultPolicyIssuanceEnabled)
-    let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(id: "flash.dayu200", version: 1))
+    let flash = try XCTUnwrap(RuntimeOperationCatalog.descriptor(id: "flash.dayu200", version: nil))
     XCTAssertEqual(flash.permittedEffects, [.destructive])
     XCTAssertEqual(flash.provider, .rockchip)
     XCTAssertTrue(flash.defaultPolicyIssuanceEnabled)

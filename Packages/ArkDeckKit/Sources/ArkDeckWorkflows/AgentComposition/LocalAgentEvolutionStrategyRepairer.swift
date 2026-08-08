@@ -140,7 +140,7 @@ public struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStra
   ) throws -> RockchipEvolutionTypedStrategy {
     try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2",
+      deviceProfileReference: "dayu200",
       archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: modes,

@@ -54,7 +54,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
 {
   public static let documentType = "rockchip-evolution-campaign-confirmation"
   public static let schemaVersion = "1.0.0"
-  public static let operationReference = "flash.dayu200@1"
+  public static let operationReference = "flash.dayu200"
   public static let candidateBuildTarget = "ArkDeckEvolutionCandidate"
   public static let maximumAttemptLimit = 16
   public static let maximumValiditySeconds: TimeInterval = 4 * 60 * 60
@@ -404,7 +404,7 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
   ) throws {
     let modes = Array(Set(allowedStartingModes)).sorted { $0.rawValue < $1.rawValue }
     guard operationReference == RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference == "dayu200@2",
+      deviceProfileReference == "dayu200",
       RockchipEvolutionCampaignConfirmationAssertion.isSHA256(archiveDigestSHA256),
       RockchipEvolutionCampaignConfirmationAssertion.isSHA256(stepSetDigestSHA256),
       !modes.isEmpty,

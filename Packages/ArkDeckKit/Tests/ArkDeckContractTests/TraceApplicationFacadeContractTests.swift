@@ -179,12 +179,12 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     let result: [String: Any] = [
       "targetId": "target-a", "bindingRevision": 9,
       "adapterDisposition": "captureEligible", "tool": "hitrace",
-      "family": "hitrace.dayu200-oh7.text-v1", "supportedTags": ["ace"],
+      "family": "hitrace.dayu200-oh7.text", "supportedTags": ["ace"],
       "rawHelp": "registered", "rawHelpSha256": String(repeating: "a", count: 64),
       "tools": [
         [
           "tool": "hitrace", "disposition": "captureEligible",
-          "family": "hitrace.dayu200-oh7.text-v1",
+          "family": "hitrace.dayu200-oh7.text",
           "rawHelpSha256": String(repeating: "a", count: 64),
           "detail": NSNull(),
         ],

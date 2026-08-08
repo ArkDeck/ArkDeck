@@ -328,7 +328,7 @@ struct RuntimeHistoryView: View {
           .width(min: 105, ideal: 125)
           TableColumn(historyLocalized("history.column.operation")) { job in
             VStack(alignment: .leading, spacing: 2) {
-              Text(job.operationReference)
+              Text(displayedOperationReference(job.operationReference))
                 .font(.body.monospaced())
                 .lineLimit(1)
               if let badge = historyExecutionModeBadge(job.executionMode) {
@@ -416,7 +416,7 @@ struct RuntimeHistoryView: View {
           "history.detail.session", job.sessionID ?? historyLocalized("history.value.notReported"),
           id: "history.detail.session", monospaced: true)
         row(
-          "history.detail.operation", job.operationReference,
+          "history.detail.operation", displayedOperationReference(job.operationReference),
           id: "history.detail.operation", monospaced: true)
         row("history.detail.target", job.targetID, id: "history.detail.target", monospaced: true)
         row("history.detail.state", localizedState(job.state), id: "history.detail.state")
@@ -1107,6 +1107,13 @@ enum RuntimeArtifactExportState: Equatable {
   case exporting
   case completed(URL)
   case failed(String)
+}
+
+/// UI label only. Durable history keeps the exact old reference for detail
+/// loading/export, while the product surface presents DAYU200 as one
+/// singleton operation without reviving retired version choices.
+func displayedOperationReference(_ reference: String) -> String {
+  reference.hasPrefix("flash.dayu200@") ? "flash.dayu200" : reference
 }
 
 /// A permanent outline marker for a job's execution mode, shared by History

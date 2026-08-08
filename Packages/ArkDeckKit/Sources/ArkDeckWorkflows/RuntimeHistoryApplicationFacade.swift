@@ -785,7 +785,7 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
-    let isFlash = operationReference == "flash.dayu200@1"
+    let isFlash = operationReference == "flash.dayu200"
     return RuntimeJobDetailPresentation(
       jobID: jobID,
       evidenceAvailability: .available,
@@ -898,7 +898,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
         jobs: [
           RuntimeJobSummaryPresentation(
             id: "job-fixture-flash-running",
-            operationReference: "flash.dayu200@1",
+            operationReference: "flash.dayu200",
             targetID: "target-fixture-dayu200",
             state: "running",
             waitingForHuman: false,
@@ -918,7 +918,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
         jobs: [
           RuntimeJobSummaryPresentation(
             id: "job-fixture-flash-succeeded",
-            operationReference: "flash.dayu200@1",
+            operationReference: "flash.dayu200",
             targetID: "target-fixture-dayu200",
             state: "succeeded",
             waitingForHuman: false,
@@ -953,7 +953,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
           finishedAtUTC: "2026-08-06T07:00:02Z"),
         RuntimeJobSummaryPresentation(
           id: "job-fixture-0002",
-          operationReference: "flash.dayu200@1",
+          operationReference: "flash.dayu200",
           targetID: "target-fixture-b",
           state: "interrupted",
           waitingForHuman: true,

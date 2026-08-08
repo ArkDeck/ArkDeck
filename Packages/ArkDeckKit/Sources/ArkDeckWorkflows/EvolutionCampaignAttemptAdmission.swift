@@ -25,7 +25,7 @@ public struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
   public let sessionID: String
   public let targetStableIdentitySHA256: String
   public let bindingRevision: Int
-  /// Published profile reference (`dayu200@1`, `dayu200@2`) selected by the
+  /// Published profile reference (`dayu200`) selected by the
   /// materialized plan's exact archive identity, never by a caller field.
   public let deviceProfileReference: String
   public let partitionPlan: [String]

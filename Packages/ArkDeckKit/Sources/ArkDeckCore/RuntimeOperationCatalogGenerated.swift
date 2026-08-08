@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "2330926e667b06bc6833e9c736c5d0fb0b59054ec24a09bcdac272883842617a"
+  public static let catalogDigest = "4041944428d12e97b1d373cc54d25f9fe8de07937208f9be40a751a9543a759e"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -163,7 +163,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "debug.hap",
@@ -217,7 +217,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "process-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "debug-hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "deploy.native-library.app-owned",
@@ -263,7 +263,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "publish-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "verification-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "deploy.native-library.system",
@@ -309,11 +309,11 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "verification-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "backup-receipt.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "flash.dayu200",
-      version: 1,
+      version: nil,
       title: "Flash a bound DAYU200 (RK3568) from a trusted image bundle with rebind and post-flash verification",
       provider: .rockchip,
       minimumEffect: .destructive,
@@ -323,7 +323,7 @@ extension RuntimeOperationCatalog {
       binding: .confirmedDevice,
       concurrencyKey: .deviceExclusive,
       inputs: [
-        CatalogFieldDescriptor(name: "deviceProfile", type: .string, isRequired: true, enumValues: ["dayu200@1", "dayu200@2"]),
+        CatalogFieldDescriptor(name: "deviceProfile", type: .string, isRequired: true, enumValues: ["dayu200"]),
         CatalogFieldDescriptor(name: "imageBundleLease", type: .artifactLease, isRequired: true),
         CatalogFieldDescriptor(name: "partitionPlan", type: .stringArray, isRequired: true, maxLength: 32, maxItems: 16),
         CatalogFieldDescriptor(name: "postFlashVerification", type: .string, isRequired: false, enumValues: ["basic", "full"])
@@ -356,10 +356,10 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "post-flash-facts.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "post-flash-hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default)
       ],
-      profiles: ["dayu200@1", "dayu200@2"],
+      profiles: ["dayu200"],
       completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor(
         contractVersion: "1.0.0",
-        profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200@1", coveredEffects: ["partition:uboot", "partition:boot_linux", "partition:system", "partition:vendor", "partition:userdata", "partition:resource", "partition:ramdisk", "partition:misc", "partition:parameter"]), CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200@2", coveredEffects: ["partition:uboot", "partition:resource", "partition:boot_linux", "partition:ramdisk", "partition:system", "partition:vendor", "partition:updater", "partition:chip_ckm", "partition:userdata"])],
+        profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200", coveredEffects: ["partition:uboot", "partition:resource", "partition:boot_linux", "partition:ramdisk", "partition:system", "partition:vendor", "partition:updater", "partition:chip_ckm", "partition:userdata"])],
         overwriteStepID: "flash-partitions",
         verificationStepIDs: ["verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build"])
     ),
@@ -398,7 +398,7 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "tool-facts.json", role: .raw, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
         CatalogArtifactDescriptor(name: "binding-snapshot.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "port-forward.create",
@@ -433,7 +433,7 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "port-rule-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "port-forward.remove",
@@ -468,7 +468,7 @@ extension RuntimeOperationCatalog {
       artifacts: [
         CatalogArtifactDescriptor(name: "port-rule-readback.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
-      profiles: ["openharmony-standard@1", "dayu200@1"]
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "workspace.apply-patch",

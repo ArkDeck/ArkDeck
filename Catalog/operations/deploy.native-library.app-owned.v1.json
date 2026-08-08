@@ -165,5 +165,5 @@
     { "name": "publish-report.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "verification-report.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }
   ],
-  "profiles": ["openharmony-standard@1", "dayu200@1"]
+  "profiles": ["openharmony-standard@1", "dayu200"]
 }

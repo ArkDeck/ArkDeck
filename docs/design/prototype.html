@@ -358,7 +358,7 @@ const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug"
 const HIST=[
   {id:"S-0713-06", st:"cancelled",   mode:"execute",   dev:"DAYU200", what:"Trace · 渲染/动画 30s(用户取消)", when:"07-13 10:21"},
   {id:"S-0712-01", st:"succeeded",   mode:"execute",   dev:"DAYU200", what:"Trace · ArkUI 深度 15s", when:"07-12 14:02"},
-  {id:"S-0712-02", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200@1", when:"07-12 15:40"},
+  {id:"S-0712-02", st:"planned",     mode:"planOnly",  dev:"DAYU200", what:"Flash · flash.dayu200", when:"07-12 15:40"},
   {id:"S-0712-03", st:"succeeded",   mode:"simulated", dev:"SIM-fixture-a3", what:"Flash · 断连注入场景(reconcile 一致)", when:"07-12 16:11"},
   {id:"S-0711-04", st:"interrupted", mode:"execute",   dev:"DAYU200", what:"Flash · flash-partitions(outcomeUnknown)", when:"07-11 23:47"},
   {id:"S-0711-05", st:"failed",      mode:"execute",   dev:"DAYU200", what:"UI Dump · elementTree(设备离线)", when:"07-11 20:15"}
@@ -514,7 +514,7 @@ function recoveryHTML(){
   return `<div class="banner" data-acin>
     <header>⚠ 存在未完成的恢复项<span class="ac">REQ-UX-003</span></header>
     <div class="ritem">
-      <div class="ri"><b>Flash · flash.dayu200@1 · flash-partitions</b> <span class="chip warn">outcomeUnknown</span>
+      <div class="ri"><b>Flash · flash.dayu200 · flash-partitions</b> <span class="chip warn">outcomeUnknown</span>
         <p>原 Job 的设备影响保持未知。Runtime 只有在 durable facts、同一目标、不可变 Artifact 与 Provider complete-overwrite coverage 全部匹配时，才会建立独立恢复 epoch；证据缺失或漂移时零新 dispatch，用户确认不能绕过。</p></div>
       <div class="ra">
         <button class="btn" onclick="go('history')">在 History 查看证据</button>
@@ -556,7 +556,7 @@ function pOverview(){
         <tr><td>hidumper</td><td><span class="chip ok">可用</span></td><td class="mono">windowInventory · lowering sha256 4f2a…</td></tr>
         <tr><td>hitrace</td><td><span class="chip ok">可用</span></td><td class="mono">captureEligible · tags × 11</td></tr>
         <tr><td>bytrace</td><td><span class="chip warn">无法确认</span></td><td class="mono">probeFailed · read-only probe</td></tr>
-        <tr><td>RockUSB Flash</td><td><span class="chip ok">可用</span></td><td class="mono">flash.dayu200@1 · Catalog published</td></tr>
+        <tr><td>RockUSB Flash</td><td><span class="chip ok">可用</span></td><td class="mono">flash.dayu200 · Catalog published</td></tr>
       </table></div>
     </div>
     <div class="card" data-acin><span class="ac">AC-UX-007-01</span>
@@ -1006,7 +1006,7 @@ function pFlash(){
   <div class="card">
     <h2>Availability</h2>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span class="chip ok">AVAILABLE</span><span class="mono">flash.dayu200@1</span>
+      <span class="chip ok">AVAILABLE</span><span class="mono">flash.dayu200</span>
     </div>
     <p class="hint">Runtime 可以为已接管 DAYU200 生成精确计划；availability、effect 与原因均来自 Catalog / daemon，不由界面猜测。</p>
   </div>
@@ -1033,8 +1033,8 @@ function pFlash(){
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card"><h2>Profile &amp; Image Set</h2>
         <dl class="kv">
-          <dt>operation</dt><dd>flash.dayu200@1</dd>
-          <dt>profile</dt><dd>dayu200@1</dd>
+          <dt>operation</dt><dd>flash.dayu200</dd>
+          <dt>profile</dt><dd>dayu200</dd>
           <dt>image bundle</dt><dd>images.tar.gz · size / SHA-256 由 Runtime 编码</dd>
           <dt>partition plan</dt><dd>来自 profile 闭集 · 最多 16 项</dd>
         </dl>
@@ -1080,7 +1080,7 @@ function pFlash(){
 }
 function runFlash(){
   S.loaderBound=true;
-  S.flashJob=startJob(addJob({title:"Flash · flash.dayu200@1 · 已接管 DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
+  S.flashJob=startJob(addJob({title:"Flash · flash.dayu200 · 已接管 DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
     phases:["verify-image-bundle","hash-images","confirm-flash-intent","enter-loader-mode","wait-loader-disconnect","wait-loader-reconnect","rebind-loader-identity","flash-partitions","verify-flash-readback","reboot-device","wait-for-hdc","rebind-and-verify-build","capture-post-flash-diagnostics","finalize-session"],
     phaseIdx:0,safeBoundary:8,tick:520,log:["→ verify-image-bundle","已获取 CriticalActivityLease(idle sleep 保持)"],pages:["flash"],
     doneMsg:"完成:postflight 校验通过,设备回报 build 与镜像期望一致。",
@@ -1092,18 +1092,18 @@ function runFlash(){
 }
 function runPlanOnly(){
   S.planSaved=true;
-  const j={id:"J"+(S.jobSeq++),title:"Flash(plan-only) · flash.dayu200@1",mode:"planOnly",dev:"DAYU200",risk:1,state:"planned",
+  const j={id:"J"+(S.jobSeq++),title:"Flash(plan-only) · flash.dayu200",mode:"planOnly",dev:"DAYU200",risk:1,state:"planned",
     phases:["Preflight","Validate","makePlan","Persist plan"],phaseIdx:4,safeBoundary:0,tick:0,cancelled:false,
     log:["完整计划含 14 个 Catalog 步骤；deviceMutation / destructive 全部 notExecuted(planned)，mutation dispatch = 0。"]};
   S.jobs.push(j);histFromJob(j);openDrawer();renderDrawer();renderPage();
 }
 function planModal(){
   modal(`<div class="modal" role="dialog" aria-modal="true">
-    <h3>plan artifact — flash.dayu200@1 <span class="chip planned">◇ PLANNED</span></h3>
+    <h3>plan artifact — flash.dayu200 <span class="chip planned">◇ PLANNED</span></h3>
     <div class="logtail" style="max-height:240px">{
   "schema": "flash-plan/1.0",
-  "operation": "flash.dayu200@1",
-  "profile": "dayu200@1",
+  "operation": "flash.dayu200",
+  "profile": "dayu200",
   "target": {"id": "TGT-…", "bindingRevision": "n"},
   "stepSet": ["verify-image-bundle", "hash-images", "confirm-flash-intent",
     "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",

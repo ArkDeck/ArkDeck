@@ -153,5 +153,5 @@
     { "name": "verification-report.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "backup-receipt.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true, "retentionClass": "pinnedUntilVerified" }
   ],
-  "profiles": ["openharmony-standard@1", "dayu200@1"]
+  "profiles": ["openharmony-standard@1", "dayu200"]
 }

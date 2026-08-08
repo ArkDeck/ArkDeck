@@ -705,7 +705,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     case .persistenceRejected: return "flash.persistenceRejected"
     // Step identifiers are evidence identifiers, not failure-code components:
     // published operation references contain `@` (for example
-    // `flash.dayu200@1`), while observations deliberately accept only the
+    // `flash.dayu200`), while observations deliberately accept only the
     // narrow, bounded failure-code grammar. Keep the repair signal stable and
     // retain the exact step detail in the durable job evidence instead.
     case .semanticFailure(let stepID, _):

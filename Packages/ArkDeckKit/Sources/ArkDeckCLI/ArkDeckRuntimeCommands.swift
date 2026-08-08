@@ -141,11 +141,21 @@ enum RuntimeCLI {
       guard let operationIndex = rest.firstIndex(of: "--operation"),
         operationIndex + 1 < rest.count
       else {
-        throw CLIError(exitCode: EX_USAGE, message: "agent run requires --operation <id@version>")
+        throw CLIError(exitCode: EX_USAGE, message: "agent run requires --operation <reference>")
       }
-      let parts = rest[operationIndex + 1].split(separator: "@")
-      guard parts.count == 2, let version = Int(parts[1]) else {
-        throw CLIError(exitCode: EX_USAGE, message: "operation must be <id>@<version>")
+      let parts = rest[operationIndex + 1].split(
+        separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+      guard parts.count == 1 || parts.count == 2 else {
+        throw CLIError(exitCode: EX_USAGE, message: "invalid operation reference")
+      }
+      let version: Int?
+      if parts.count == 2 {
+        guard let parsed = Int(parts[1]), parsed > 0 else {
+          throw CLIError(exitCode: EX_USAGE, message: "invalid operation version")
+        }
+        version = parsed
+      } else {
+        version = nil
       }
       var inputs: [String: JSONValue] = [:]
       if let index = rest.firstIndex(of: "--inputs-file"), index + 1 < rest.count {
@@ -470,7 +480,7 @@ enum RuntimeCLI {
         message:
           "artifact import-flash-bundle requires "
           + "--target <id> --file <images.tar.gz> "
-          + "[--device-profile <dayu200@1|dayu200@2>]")
+          + "[--device-profile <dayu200>]")
     }
     let targetID = arguments[targetIndex + 1]
     let url = URL(fileURLWithPath: arguments[fileIndex + 1]).standardizedFileURL
@@ -483,7 +493,7 @@ enum RuntimeCLI {
     {
       profileReference = arguments[profileIndex + 1]
     } else {
-      profileReference = "dayu200@1"
+      profileReference = "dayu200"
     }
     guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
       throw CLIError(
@@ -940,13 +950,23 @@ enum RuntimeCLI {
         throw CLIError(
           exitCode: EX_USAGE,
           message:
-            "job submit requires --target <id> --operation <id@version>, "
+            "job submit requires --target <id> --operation <reference>, "
             + "or --request-file <path> for typed inputs")
       }
       let reference = rest[operationIndex + 1]
-      let parts = reference.split(separator: "@")
-      guard parts.count == 2, let version = Int(parts[1]) else {
-        throw CLIError(exitCode: EX_USAGE, message: "operation must be <id>@<version>")
+      let parts = reference.split(
+        separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+      guard parts.count == 1 || parts.count == 2 else {
+        throw CLIError(exitCode: EX_USAGE, message: "invalid operation reference")
+      }
+      let version: Int?
+      if parts.count == 2 {
+        guard let parsed = Int(parts[1]), parsed > 0 else {
+          throw CLIError(exitCode: EX_USAGE, message: "invalid operation version")
+        }
+        version = parsed
+      } else {
+        version = nil
       }
       // The CLI builds a typed v2 request: no governance identifiers exist
       // in this surface to pass along even by accident. The document itself is

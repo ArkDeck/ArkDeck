@@ -13,11 +13,11 @@ final class FlashArtifactContractTests: XCTestCase {
       idempotencyKey: "idem-flash-artifacts",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200", expectedBindingRevision: 7),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: [
         "imageBundleLease": .string(
           "lease-v1:input-flash:ART-0123456789abcdef0123456789abcdef"),
-        "deviceProfile": .string("dayu200@1"),
+        "deviceProfile": .string("dayu200"),
         "partitionPlan": .array([.string("boot"), .string("system")]),
         "postFlashVerification": .string("full"),
       ],
@@ -26,7 +26,7 @@ final class FlashArtifactContractTests: XCTestCase {
     var record = RuntimeJobRecord(
       jobID: "job-flash-artifacts",
       request: request,
-      operationReference: "flash.dayu200@1",
+      operationReference: "flash.dayu200",
       catalogDigest: String(repeating: "c", count: 64),
       providerID: "rockchip",
       createdAtUTC: "2026-07-31T00:00:00Z",
@@ -58,29 +58,29 @@ final class FlashArtifactContractTests: XCTestCase {
 
   func testFlashStepsOwnEveryDeclaredRuntimeProduct() throws {
     XCTAssertEqual(
-      RuntimeArtifactService.artifactMapping["flash.dayu200@1"]?["rebind-and-verify-build"],
+      RuntimeArtifactService.artifactMapping["flash.dayu200"]?["rebind-and-verify-build"],
       ["post-flash-facts.json"])
     XCTAssertEqual(
-      RuntimeArtifactService.artifactMapping["flash.dayu200@1"]?[
+      RuntimeArtifactService.artifactMapping["flash.dayu200"]?[
         "capture-post-flash-diagnostics"],
       ["post-flash-hilog.txt"])
     XCTAssertEqual(
-      RuntimeArtifactService.finalizeArtifacts["flash.dayu200@1"],
+      RuntimeArtifactService.finalizeArtifacts["flash.dayu200"],
       ["flash-report.json"])
 
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let mapped =
       Set(
-        RuntimeArtifactService.artifactMapping["flash.dayu200@1", default: [:]]
+        RuntimeArtifactService.artifactMapping["flash.dayu200", default: [:]]
           .values.flatMap { $0 })
-      .union(RuntimeArtifactService.finalizeArtifacts["flash.dayu200@1", default: []])
+      .union(RuntimeArtifactService.finalizeArtifacts["flash.dayu200", default: []])
     XCTAssertEqual(mapped, Set(descriptor.artifacts.map(\.name)))
   }
 
   func testBasicFlashIntentionallyOmitsOnlyOptionalHilog() throws {
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let diagnostics = try XCTUnwrap(
       descriptor.steps.first { $0.stepID == "capture-post-flash-diagnostics" })
 
@@ -102,7 +102,7 @@ final class FlashArtifactContractTests: XCTestCase {
 
   func testPostFlashFactsUseVerifiedReadbackAndHilogUsesReceiptBytes() throws {
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let record = try flashRecord()
     let receipt = ProviderProcessReceipt(
       exitStatus: 0,
@@ -146,7 +146,7 @@ final class FlashArtifactContractTests: XCTestCase {
       .appendingPathComponent("arkdeck-flash-artifacts-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let record = try flashRecord()
     let receipt = ProviderProcessReceipt(
       exitStatus: 0,
@@ -217,7 +217,7 @@ final class FlashArtifactContractTests: XCTestCase {
         "verify-flash-readback") == true)
     let flashRequest = try XCTUnwrap(
       reportDocument["request"] as? [String: Any])
-    XCTAssertEqual(flashRequest["deviceProfile"] as? String, "dayu200@1")
+    XCTAssertEqual(flashRequest["deviceProfile"] as? String, "dayu200")
     XCTAssertEqual(
       flashRequest["partitionPlan"] as? [String],
       ["boot", "system"])

@@ -210,7 +210,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     let requestURL = candidateRoot.appending(path: "candidate-request.json")
     let request = RockchipEvolutionCampaignConfirmationAssertion.canonicalData([
       "archiveDigestSHA256": .string(assertion.archiveDigestSHA256),
-      "deviceProfileReference": .string("dayu200@2"),
+      "deviceProfileReference": .string("dayu200"),
       "operationReference": .string(
         RockchipEvolutionCampaignConfirmationAssertion.operationReference),
       "stepSetDigestSHA256": .string(assertion.stepSetDigestSHA256),
@@ -635,7 +635,7 @@ public struct PublishedRockchipEvolutionStrategyRepairer:
     }
     return try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2",
+      deviceProfileReference: "dayu200",
       archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: RockchipEvolutionStartingMode.allCases,

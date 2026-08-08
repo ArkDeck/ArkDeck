@@ -12,7 +12,7 @@ struct FlashRuntimeActivityView: View {
   let onOpenHistory: () -> Void
 
   private var flashJobs: [RuntimeJobSummaryPresentation] {
-    presentation.jobs.filter { $0.operationReference == "flash.dayu200@1" }
+    presentation.jobs.filter { $0.operationReference == "flash.dayu200" }
   }
 
   /// Unknown effects and human stops outrank recency. Hiding either behind a

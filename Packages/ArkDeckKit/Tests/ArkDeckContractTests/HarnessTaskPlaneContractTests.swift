@@ -792,12 +792,12 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let (coordinator, _) = try makeCoordinator(port: port)
 
     do {
-      _ = try await coordinator.submit(submission(allowedOperations: ["flash.dayu200@1"]))
+      _ = try await coordinator.submit(submission(allowedOperations: ["flash.dayu200"]))
       XCTFail("an operation outside the task type's closed set must be refused")
     } catch {
       XCTAssertEqual(
         error as? HarnessTaskSubmissionError,
-        .operationNotPermittedForType("flash.dayu200@1"))
+        .operationNotPermittedForType("flash.dayu200"))
     }
     do {
       _ = try await coordinator.submit(submission(maxRounds: 0))
@@ -903,7 +903,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
         "buildPresetRef": .string("waterflow-debug"),
         "testPresetRef": .string("waterflow-tests"),
-        "deviceProfile": .string("dayu200@1"),
+        "deviceProfile": .string("dayu200"),
         "baseWorkspaceRevision": .string(String(repeating: "c", count: 64)),
         "component": .string("WaterFlow.RecoverBack"),
         "maxRounds": .integer(3),
@@ -935,7 +935,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "baselineHapArtifactLease": .string("lease-v1:input-hap:ART-crash-fixture"),
         "buildPresetRef": .string("waterflow-debug"),
         "testPresetRef": .string("waterflow-tests"),
-        "deviceProfile": .string("dayu200@1"),
+        "deviceProfile": .string("dayu200"),
         "baseWorkspaceRevision": .string(String(repeating: "c", count: 64)),
         "component": .string("WaterFlow.RecoverBack"),
       ]))

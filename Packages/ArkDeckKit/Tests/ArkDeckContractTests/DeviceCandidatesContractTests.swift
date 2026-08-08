@@ -187,7 +187,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
          "state":"succeeded","finishedAtUtc":"2026-08-06T00:00:00Z"},
         {"jobId":"job-running","operation":"observe.device@1","targetId":"t-1",
          "state":"running","finishedAtUtc":"2026-08-07T00:00:00Z"},
-        {"jobId":"job-flash","operation":"flash.dayu200@1","targetId":"t-1",
+        {"jobId":"job-flash","operation":"flash.dayu200","targetId":"t-1",
          "state":"succeeded","finishedAtUtc":"2026-08-07T00:00:00Z"},
         {"jobId":"job-other","operation":"observe.device@1","targetId":"t-2",
          "state":"succeeded","finishedAtUtc":"2026-08-05T00:00:00Z"}

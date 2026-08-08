@@ -32,7 +32,7 @@ final class AppShellUITests: XCTestCase {
         attentionNone: "None",
         attentionClear: "Nothing needs attention in the current diagnostics."),
       flash: Flash(
-        availability: "AVAILABLE — Runtime can materialize flash.dayu200@1",
+        availability: "AVAILABLE — Runtime can materialize flash.dayu200",
         modeBadge: "PLANNED — no deviceMutation or destructive dispatch",
         target: "target-fixture-dayu200",
         emptyPlan: "No exact plan yet",
@@ -84,7 +84,7 @@ final class AppShellUITests: XCTestCase {
         attentionNone: "无",
         attentionClear: "当前诊断中没有需要处理的事项。"),
       flash: Flash(
-        availability: "AVAILABLE — Runtime 可生成 flash.dayu200@1 计划",
+        availability: "AVAILABLE — Runtime 可生成 flash.dayu200 计划",
         modeBadge: "PLANNED — 不派发 deviceMutation 或 destructive 步骤",
         target: "target-fixture-dayu200",
         emptyPlan: "尚未生成精确计划",

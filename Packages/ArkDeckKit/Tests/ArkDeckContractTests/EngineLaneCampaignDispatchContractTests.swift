@@ -13,7 +13,7 @@ import XCTest
 /// the engine admits, and the terminal translation that decides whether a
 /// campaign retries, stops, or is told it succeeded.
 final class EngineLaneCampaignDispatchContractTests: XCTestCase {
-  private static let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+  private static let profile = RockchipFlashProfile.dayu200
   private static let archiveURL = URL(fileURLWithPath: "/tmp/images.tar.gz")
 
   private static func admitted(
@@ -51,7 +51,7 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     XCTAssertEqual(request.campaignReservation?.reservationID, attempt.reservationID)
     XCTAssertNil(request.authorization)
     XCTAssertEqual(request.operation.id, "flash.dayu200")
-    XCTAssertEqual(request.operation.version, 1)
+    XCTAssertNil(request.operation.version)
     XCTAssertEqual(request.target.targetID, "TGT-DAYU200-70035")
     XCTAssertEqual(request.target.expectedBindingRevision, 7)
     XCTAssertEqual(
@@ -59,7 +59,7 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     // Profile and partition set come from the admitted attempt's materialized
     // plan, so the submitted bytes cannot name a different archive or a wider
     // partition set than the campaign was confirmed against.
-    XCTAssertEqual(request.inputs["deviceProfile"], .string("dayu200@2"))
+    XCTAssertEqual(request.inputs["deviceProfile"], .string("dayu200"))
     XCTAssertEqual(
       request.inputs["partitionPlan"],
       .array(Self.profile.mappedPartitions.map { .string($0.partitionName) }))
@@ -230,7 +230,7 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       submitAndRun: { _ in
         throw EngineLaneSubmissionRefusal(
           detail:
-            "the runtime rejected the submission: flash.dayu200@1 is runtime unavailable")
+            "the runtime rejected the submission: flash.dayu200 is runtime unavailable")
       },
       // The archive reads fine here; this test is about what the *daemon*
       // answers at submit, so the dispatch must reach it.
@@ -266,7 +266,7 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       campaignID: "ECAMP-\(String(repeating: "A", count: 24))", ordinal: 1,
       reservationID: "ain019-reservation-1", jobID: "j", sessionID: "s",
       targetStableIdentitySHA256: String(repeating: "a", count: 64),
-      bindingRevision: 7, deviceProfileReference: "dayu200@2",
+      bindingRevision: 7, deviceProfileReference: "dayu200",
       // A partition set the published profile does not have.
       partitionPlan: ["userdata"], archiveSHA256: Self.profile.archiveSHA256,
       postFlashVerification: "full")
@@ -319,7 +319,7 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       validUntil: "2026-08-03T03:00:00Z")
     let strategy = try RockchipEvolutionTypedStrategy(
       operationReference: RockchipEvolutionCampaignConfirmationAssertion.operationReference,
-      deviceProfileReference: "dayu200@2",
+      deviceProfileReference: "dayu200",
       archiveDigestSHA256: assertion.archiveDigestSHA256,
       stepSetDigestSHA256: assertion.stepSetDigestSHA256,
       allowedStartingModes: [.hdcNormal, .loader], userdataImpact: "ERASE-USERDATA")

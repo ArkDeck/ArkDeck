@@ -67,6 +67,22 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     XCTAssertEqual(encodedOnce, encodedTwice)
   }
 
+  func testDAYU200SingletonRequestOmitsVersionOnTheWire() throws {
+    let request = try RuntimeOperationRequest(
+      requestID: "req-flash-singleton",
+      idempotencyKey: "idem-flash-singleton",
+      target: DurableTargetReference(targetID: "TGT-DAYU200-01"),
+      operation: RuntimeOperationReference(id: "flash.dayu200"))
+    let encoded = try RuntimeOperationCodec.encodeRequest(request)
+    let object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    let operation = try XCTUnwrap(object["operation"] as? [String: Any])
+    XCTAssertEqual(operation["id"] as? String, "flash.dayu200")
+    XCTAssertNil(operation["version"])
+    XCTAssertEqual(try RuntimeOperationCodec.decodeRequest(encoded).operation.reference,
+      "flash.dayu200")
+  }
+
   func testGovernanceFieldsAreRejectedWithStableCode() {
     let variants = [
       "\"changeId\": \"CHG-2026-001\"",

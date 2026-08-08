@@ -108,20 +108,19 @@ public struct RockchipFlashProfile: Sendable {
     mappedPartitions: [RockchipMappedPartition],
     membershiplessPartitionsWriteForbidden: [String],
     prerequisites: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteRequirement],
-    catalogReference: String = "dayu200@1",
-    firmwareVersion: String = "legacy-pinned-build",
+    catalogReference: String = "dayu200",
+    firmwareVersion: String = "OpenHarmony-7.0.0.35-20260728_180253",
     runtimeProductModel: String = "DAYU200",
-    runtimeBuildVersion: String = "OpenHarmony-7.0.0.33"
+    runtimeBuildVersion: String = "OpenHarmony-7.0.0.36"
   ) throws {
     guard
-      catalogReference.range(
-        of: #"^dayu200@[1-9][0-9]*$"#, options: .regularExpression) != nil,
+      catalogReference == "dayu200",
       !firmwareVersion.isEmpty,
       !runtimeProductModel.isEmpty,
       !runtimeBuildVersion.isEmpty
     else {
       throw RockchipFlashProfileError.invalidProfileDefinition(
-        "profile reference and firmware version must be versioned")
+        "profile reference must be dayu200 and firmware facts must be present")
     }
     guard members.count == Set(members.map(\.name)).count else {
       throw RockchipFlashProfileError.invalidProfileDefinition("duplicate archive member name")
@@ -171,140 +170,10 @@ public struct RockchipFlashProfile: Sendable {
     members.filter { $0.classification == .orphanImageWriteForbidden }.map(\.name)
   }
 
-  // MARK: - Pinned DAYU200 profile (images-tar-contract.md §1)
-
+  /// The sole DAYU200 board profile. The retained seed archive is the former
+  /// v2 daily image; runtime plans replace its per-build facts with those read
+  /// from the exact leased archive while preserving this closed board layout.
   public static let dayu200: RockchipFlashProfile = {
-    // Force-try is deliberate: this literal profile is validated by the same invariants as
-    // any runtime profile, and a definition error must be unbuildable, not recoverable.
-    // swift-format-ignore: NeverForceUnwrap
-    try! RockchipFlashProfile(
-      archiveSizeBytes: 732_948_803,
-      archiveSHA256: "fc7637f34a8394847b1b6c7e7ff2750863d18c6dc05e184abaf5aed70ec75280",
-      members: [
-        .init(
-          name: "boot_linux.img", sizeBytes: 67_108_864,
-          sha256: "390c2cf2bf59f8bedc99a9622a1263410c6132341aece6a1b9c30ed5567a9523",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "chip_ckm.img", sizeBytes: 33_554_432,
-          sha256: "b60b62747679659c337eef737ea5064bbcea68b9fc219f62a076c06d05a6c81a",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "chip_prod.img", sizeBytes: 52_428_800,
-          sha256: "6d009c6b685f65f91bd77ceb201916f07dde8668fde4432ee534bb04e0b6cbad",
-          classification: .orphanImageWriteForbidden),
-        .init(
-          name: "config.cfg", sizeBytes: 10_399,
-          sha256: "4d06d303faff1d3e530a9d2c9bb22073427b0b498bb4bb438b5177897d86f33c",
-          classification: .nonPartitionMetadata),
-        .init(
-          name: "daily_build.log", sizeBytes: 24_496_219,
-          sha256: "5823dd263cab3168dbd3ee098c5b5045b82b8393548b9da9f095de2883a2a0e9",
-          classification: .nonPartitionMetadata),
-        .init(
-          name: "manifest_tag.xml", sizeBytes: 114_913,
-          sha256: "fd458507b4bb63f372049a0bb9a2cd779af426e2d27de43134ace05e5884ff74",
-          classification: .nonPartitionMetadata),
-        .init(
-          name: "MiniLoaderAll.bin", sizeBytes: 455_104,
-          sha256: "1cdd418032195210f191445ed96e2da5ea83d2cfe880c912ebec635839d76542",
-          classification: .loaderMaskromBranchOnly),
-        .init(
-          name: "parameter.txt", sizeBytes: 788,
-          sha256: "35464e3f0b883a8a043dd45ae7ab2342c86b7aa27f24aa1e5a0ccfb6f442d048",
-          classification: .partitionTable),
-        .init(
-          name: "ramdisk.img", sizeBytes: 2_385_465,
-          sha256: "cc6f7c3d9568cbb3f810edd67ebe0015a04734605ca4f21c065ce94f88ec3b07",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "resource.img", sizeBytes: 5_652_480,
-          sha256: "161cf158f6f256e7794568b1307581e4656da1a8d8d3d2612da73195d3eda06e",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "sys_prod.img", sizeBytes: 52_428_800,
-          sha256: "8dfb72cfa61dc748f62f3d766214ab579c857f3b8a62e6890a8abc7ae0ac1062",
-          classification: .orphanImageWriteForbidden),
-        .init(
-          name: "system.img", sizeBytes: 2_147_483_648,
-          sha256: "aef65124a814fcce8345dbfbdf049aaa862bd76786d099095c6951b4561ba1bb",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "uboot.img", sizeBytes: 4_194_304,
-          sha256: "c1c801e45cbb92ee63e14df3dda5d819792e02295525bd53dbf750efb645916d",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "updater_binary", sizeBytes: 3_248_612,
-          sha256: "84659f9fd5a13b8293904f9ad7531ee9637523efffb90e74a49443f9f8ef5cd5",
-          classification: .nonPartitionMetadata),
-        .init(
-          name: "updater.img", sizeBytes: 20_692_486,
-          sha256: "5f70d2f79cbcda267a20aff98c187ffdaac2ce1f693ae6f7dbdc2bec7b1c5494",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "userdata.img", sizeBytes: 1_468_006_400,
-          sha256: "715e7998ebd47653a0ec2e062964224684762ab8686330c6b69b8d5f1f55886c",
-          classification: .mappedPartitionImage),
-        .init(
-          name: "vendor.img", sizeBytes: 268_431_360,
-          sha256: "61e0c9adda4420417d88bcc1f4d725558b75e41046f528100a584c8dc466cd41",
-          classification: .mappedPartitionImage),
-      ],
-      mappedPartitions: [
-        .init(
-          writeOrder: 1, partitionName: "uboot", imageMemberName: "uboot.img",
-          offsetSectors: 8192),
-        .init(
-          writeOrder: 2, partitionName: "resource", imageMemberName: "resource.img",
-          offsetSectors: 28672),
-        .init(
-          writeOrder: 3, partitionName: "boot_linux", imageMemberName: "boot_linux.img",
-          offsetSectors: 40960),
-        .init(
-          writeOrder: 4, partitionName: "ramdisk", imageMemberName: "ramdisk.img",
-          offsetSectors: 237_568),
-        .init(
-          writeOrder: 5, partitionName: "system", imageMemberName: "system.img",
-          offsetSectors: 245_760),
-        .init(
-          writeOrder: 6, partitionName: "vendor", imageMemberName: "vendor.img",
-          offsetSectors: 4_440_064),
-        .init(
-          writeOrder: 7, partitionName: "updater", imageMemberName: "updater.img",
-          offsetSectors: 6_742_016),
-        .init(
-          writeOrder: 8, partitionName: "chip_ckm", imageMemberName: "chip_ckm.img",
-          offsetSectors: 6_938_624),
-        .init(
-          writeOrder: 9, partitionName: "userdata", imageMemberName: "userdata.img",
-          offsetSectors: 19_955_712),
-      ],
-      membershiplessPartitionsWriteForbidden: [
-        "misc", "bootctrl", "sys-prod", "chip-prod", "eng_system", "eng_chipset",
-      ],
-      prerequisites: [
-        .loader: .required,
-        .recoveryPath: .required,
-        // The 9-partition write sequence overwrites `userdata`, so the unlocked/strong-confirm
-        // prerequisite is always required for this profile, not only for explicit erase.
-        .unlocked: .required,
-        .stablePower: .optional,
-      ],
-      catalogReference: "dayu200@1",
-      firmwareVersion: "legacy-pinned-build",
-      // `const.product.model` baked into the DAYU200 daily images is "ohos",
-      // not the board's marketing name (verified in the .33 and .35 system
-      // images and on the booted device on 2026-08-04).
-      runtimeProductModel: "ohos",
-      runtimeBuildVersion: "OpenHarmony-7.0.0.33"
-    )
-  }()
-
-  /// OpenHarmony 7.0.0.35 daily image published on 2026-07-28. The archive
-  /// and every member are independently pinned; only the nine mapped images
-  /// participate in the write plan, while the two orphan images remain
-  /// explicitly write-forbidden.
-  public static let dayu200OpenHarmony70035: RockchipFlashProfile = {
     // swift-format-ignore: NeverForceUnwrap
     try! RockchipFlashProfile(
       archiveSizeBytes: 730_769_584,
@@ -379,11 +248,45 @@ public struct RockchipFlashProfile: Sendable {
           sha256: "b3ffda2b6dbae220361721ee6b78d25e2055ab506e5480b17eacf477ea482360",
           classification: .mappedPartitionImage),
       ],
-      mappedPartitions: dayu200.mappedPartitions,
-      membershiplessPartitionsWriteForbidden:
-        dayu200.membershiplessPartitionsWriteForbidden,
-      prerequisites: dayu200.prerequisites,
-      catalogReference: "dayu200@2",
+      mappedPartitions: [
+        .init(
+          writeOrder: 1, partitionName: "uboot", imageMemberName: "uboot.img",
+          offsetSectors: 8192),
+        .init(
+          writeOrder: 2, partitionName: "resource", imageMemberName: "resource.img",
+          offsetSectors: 28672),
+        .init(
+          writeOrder: 3, partitionName: "boot_linux", imageMemberName: "boot_linux.img",
+          offsetSectors: 40960),
+        .init(
+          writeOrder: 4, partitionName: "ramdisk", imageMemberName: "ramdisk.img",
+          offsetSectors: 237_568),
+        .init(
+          writeOrder: 5, partitionName: "system", imageMemberName: "system.img",
+          offsetSectors: 245_760),
+        .init(
+          writeOrder: 6, partitionName: "vendor", imageMemberName: "vendor.img",
+          offsetSectors: 4_440_064),
+        .init(
+          writeOrder: 7, partitionName: "updater", imageMemberName: "updater.img",
+          offsetSectors: 6_742_016),
+        .init(
+          writeOrder: 8, partitionName: "chip_ckm", imageMemberName: "chip_ckm.img",
+          offsetSectors: 6_938_624),
+        .init(
+          writeOrder: 9, partitionName: "userdata", imageMemberName: "userdata.img",
+          offsetSectors: 19_955_712),
+      ],
+      membershiplessPartitionsWriteForbidden: [
+        "misc", "bootctrl", "sys-prod", "chip-prod", "eng_system", "eng_chipset",
+      ],
+      prerequisites: [
+        .loader: .required,
+        .recoveryPath: .required,
+        .unlocked: .required,
+        .stablePower: .optional,
+      ],
+      catalogReference: "dayu200",
       firmwareVersion: "OpenHarmony-7.0.0.35-20260728_180253",
       // The daily archive's *name* says 7.0.0.35, but the params baked into
       // its system.img — and therefore what the booted device answers — say
@@ -396,27 +299,16 @@ public struct RockchipFlashProfile: Sendable {
     )
   }()
 
-  public static let supportedDAYU200Profiles: [RockchipFlashProfile] = [
-    .dayu200, .dayu200OpenHarmony70035,
-  ]
-
   public static func profile(reference: String) -> RockchipFlashProfile? {
-    supportedDAYU200Profiles.first { $0.catalogReference == reference }
+    reference == dayu200.catalogReference ? dayu200 : nil
   }
 
   public static func profile(archiveSHA256: String, byteCount: Int) -> RockchipFlashProfile? {
-    supportedDAYU200Profiles.first {
-      $0.archiveSHA256 == archiveSHA256.lowercased()
-        && $0.archiveSizeBytes == Int64(byteCount)
-    }
+    dayu200.archiveSHA256 == archiveSHA256.lowercased()
+      && dayu200.archiveSizeBytes == Int64(byteCount) ? dayu200 : nil
   }
 
-  public var planDocumentVersion: String {
-    guard let version = catalogReference.split(separator: "@").last else {
-      return Self.profileVersion
-    }
-    return "\(version).0.0"
-  }
+  public var planDocumentVersion: String { Self.profileVersion }
 }
 
 // MARK: - Archive validation (REQ-FLASH-003 face used by TASK-RF-002)
@@ -657,14 +549,8 @@ extension RockchipFlashProfile {
       RockchipImageArchiveIntrospection.describe(summary: summary, board: self))
   }
 
-  /// The board every published DAYU200 reference resolves to.
-  ///
-  /// `dayu200@1` and `dayu200@2` are kept as published input values because
-  /// removing one would move the catalog digest and drop every Golden Journey
-  /// out of `REAL_DEVICE_PASS`. They already described the same board: the
-  /// second reused the first's mapped partitions, forbidden partitions and
-  /// prerequisites verbatim, and differed only in which build it enumerated.
+  /// The one published DAYU200 reference resolves to the sole board profile.
   public static func board(reference: String) -> RockchipFlashProfile? {
-    supportedDAYU200Profiles.first { $0.catalogReference == reference }
+    reference == dayu200.catalogReference ? dayu200 : nil
   }
 }

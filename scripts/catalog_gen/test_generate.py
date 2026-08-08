@@ -11,7 +11,9 @@ from __future__ import annotations
 import copy
 import json
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -39,7 +41,7 @@ class RealCatalogTests(unittest.TestCase):
     def test_real_catalog_validates_and_cross_references(self):
         operations, profiles = _real_operations()
         self.assertEqual(
-            sorted(f"{op['id']}@{op['version']}" for op in operations),
+            sorted(generate.operation_reference(op) for op in operations),
             [
                 "analyzer.extract-crash-signature@1",
                 "analyzer.summarize-hilog@1",
@@ -48,7 +50,7 @@ class RealCatalogTests(unittest.TestCase):
                 "debug.hap@1",
                 "deploy.native-library.app-owned@1",
                 "deploy.native-library.system@1",
-                "flash.dayu200@1",
+                "flash.dayu200",
                 "observe.device@1",
                 "port-forward.create@1",
                 "port-forward.remove@1",
@@ -65,9 +67,46 @@ class RealCatalogTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            sorted(f"{p['id']}@{p['version']}" for p in profiles),
-            ["dayu200@1", "dayu200@2", "openharmony-standard@1", "workspace-host@1"],
+            sorted(generate.profile_reference(p) for p in profiles),
+            ["dayu200", "openharmony-standard@1", "workspace-host@1"],
         )
+
+    def test_dayu200_is_the_only_unversioned_singleton_profile(self):
+        _, profiles = _real_operations()
+        dayu200 = [profile for profile in profiles if profile["id"] == "dayu200"]
+        self.assertEqual(len(dayu200), 1)
+        self.assertNotIn("version", dayu200[0])
+        self.assertEqual(generate.profile_reference(dayu200[0]), "dayu200")
+
+    def test_dayu200_operation_uses_the_singleton_source_filename(self):
+        self.assertTrue((generate.OPERATIONS_DIR / "flash.dayu200.json").is_file())
+        self.assertFalse((generate.OPERATIONS_DIR / "flash.dayu200.v1.json").exists())
+        operations, _ = _real_operations()
+        dayu200 = [operation for operation in operations if operation["id"] == "flash.dayu200"]
+        self.assertEqual(len(dayu200), 1)
+        self.assertNotIn("version", dayu200[0])
+        self.assertEqual(generate.operation_reference(dayu200[0]), "flash.dayu200")
+
+    def test_unversioned_operation_cannot_coexist_with_a_versioned_variant(self):
+        with tempfile.TemporaryDirectory(dir=generate.REPO_ROOT) as root:
+            root_path = Path(root)
+            operations_dir = root_path / "operations"
+            profiles_dir = root_path / "profiles"
+            shutil.copytree(generate.OPERATIONS_DIR, operations_dir)
+            shutil.copytree(generate.PROFILES_DIR, profiles_dir)
+            versioned = json.loads(
+                (operations_dir / "flash.dayu200.json").read_text(encoding="utf-8")
+            )
+            versioned["version"] = 1
+            (operations_dir / "flash.dayu200.v1.json").write_text(
+                json.dumps(versioned), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                generate.CatalogError, "unversioned operation cannot coexist"
+            ):
+                generate.load_catalog(
+                    operations_dir=operations_dir, profiles_dir=profiles_dir
+                )
 
     def test_generation_is_deterministic(self):
         first = generate.generated_outputs()
@@ -112,7 +151,9 @@ class RealCatalogTests(unittest.TestCase):
                 action_ref = step["actionRef"]
                 pair = (action_ref["catalogId"], action_ref["actionId"])
                 self.assertIn(pair[1], registry[pair[0]])
-                observed[f"{operation['id']}@{operation['version']}/{step['stepID']}"] = pair
+                observed[
+                    f"{generate.operation_reference(operation)}/{step['stepID']}"
+                ] = pair
         self.assertEqual(
             observed,
             {
@@ -131,7 +172,7 @@ class RealCatalogTests(unittest.TestCase):
                 "debug.hap@1/capture-diagnostics": (
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
-                "flash.dayu200@1/capture-post-flash-diagnostics": (
+                "flash.dayu200/capture-post-flash-diagnostics": (
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
             },
@@ -151,7 +192,7 @@ class RealCatalogTests(unittest.TestCase):
                 self.assertEqual(action_ref["catalogId"], "arkdeck-remote-operations")
                 self.assertEqual(registry[action_ref["actionId"]], step["kind"])
                 observed[
-                    f"{operation['id']}@{operation['version']}/{step['stepID']}"
+                    f"{generate.operation_reference(operation)}/{step['stepID']}"
                 ] = action_ref["actionId"]
         self.assertEqual(
             observed,

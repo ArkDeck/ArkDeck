@@ -141,14 +141,14 @@ Primary Window
 
 - Toolbar 中放 Execute / Plan only / Simulated segmented control，模式 badge 紧随标题并永久保留。
 - 详情顺序：Availability → Profile & Image Set → Prerequisites → Exact Plan → Review & Run。required prerequisite 为 unknown/unsatisfied 时，Run 区显示 blocker，不只留下灰色按钮。
-- Execute 的 `recoveryPath` 必须来自 owner-only DAYU200 跨模式 binding 对当前 target stable identity、所选 binding revision 与 HDC connect-key alias 的精确覆盖；新跨模式 identity transition 仍只接受相邻 revision，同 revision 仅接受已经完成 fresh Runtime attestation 的历史 rev2 迁移。仅有 HDC adoption 时显示 unsatisfied。此时仍可审阅 Exact Plan，但主按钮不可提交，Runtime 也必须在 capability 签发和首个外部 effect 前以同一事实拒绝。
-- 页面通过只读 `flash.bootloader-status` 区分未发现、多个候选、已精确绑定和「唯一 DAYU200 已在 Loader、但尚未关联 target 或仅有 legacy attestation」。最后一种情况在 Rockchip device access 卡内只显示说明，不增加第二个绑定按钮；用户选择 target 后点击一次红色刷机按钮，同一次提交先把所选既有 target + expected binding revision 交给 Runtime。Runtime 必须重新读取唯一 Loader：新跨模式身份持久化相邻 revision；已匹配同一 target/revision 的历史 rev2 绑定则仅在 HDC-normal alias、唯一 target 与 live Loader 全部一致时，以同 revision 原子替换 legacy chat 标记并写入新的 Runtime user-selection attestation。随后重新生成精确计划，并仅在全部 required prerequisite 满足后提交 Flash。不得把 raw serial / topology 送进 App。
+- Execute 的 `recoveryPath` 必须来自 owner-only DAYU200 跨模式 binding 对当前 target stable identity、所选 binding revision 与 HDC connect-key alias 的精确覆盖；新跨模式 identity transition 只接受相邻 revision，同 revision 只接受已经完成的当前 Runtime attestation。仅有 HDC adoption 时显示 unsatisfied。此时仍可审阅 Exact Plan，但主按钮不可提交，Runtime 也必须在 capability 签发和首个外部 effect 前以同一事实拒绝。
+- 页面通过只读 `flash.bootloader-status` 区分未发现、多个候选、已精确绑定和「唯一 DAYU200 已在 Loader、但尚未关联 target」。最后一种情况在 Rockchip device access 卡内只显示说明，不增加第二个绑定按钮；用户选择 target 后点击一次红色刷机按钮，同一次提交先把所选既有 target + expected binding revision 交给 Runtime。Runtime 必须重新读取唯一 Loader，并把新的跨模式身份持久化为相邻 revision；不完整或历史 binding 保持 unprepared，不能就地升级或参与刷机准入。随后重新生成精确计划，并仅在全部 required prerequisite 满足后提交 Flash。不得把 raw serial / topology 送进 App。
 - Loader 绑定是设备身份选择，不是刷机危险确认：不要求输入短语、checkbox 或第二个 sheet，也不派发设备命令。若它闭合的是唯一、尚无 outcome 行的 `enter-loader-mode` intent，旧 Job 以 confirmed failure 结束且原 action 不重放；机械结算只接受被选择的同 revision fresh re-attestation 或一个相邻 revision。显式 `outcomeUnknown`、多个候选、stale revision、损坏日志、任何 destructive intent 或重新 materialize 后仍有 blocker 都保持 fail closed。绑定落盘后的崩溃恢复只完成同一机械结算，不触发 dispatch。
 - Exact Plan table 展示 step、typed parameters 摘要、effect、execution disposition。plan-only 的 mutation/destructive 行显示 `notExecuted(planned)`。
 - 提交后直到 `job.run` 返回前，页面自动轮询 Runtime 的 `job.list` 并逐条显示真实 timeline；不依赖用户手动刷新。critical write 期间在 Job Inspector 和页面内显示同一句「当前写入不会被强杀；停止只作用于后续步骤」与电源提示。
 - Runtime 返回 Job ID 后立即显示「取消剩余步骤」；请求通过 `job.cancel` 到达 Runtime。临界写入不会被强杀，取消在下一个安全边界生效，不回放 unknown destructive intent。
 - rebind 按 transport 分流：USB 只有在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整匹配时可自动 rebind 并继续；TCP / UART 断连必须停在人工确认，任何证据不完整或漂移都 fail closed。不得把 USB 的已证明自动恢复写成“静默续刷”。
-- 当前发布的 `flash.dayu200@1` 只有 USB / RockUSB 路径，因此执行中的 Job 不暴露 rebind confirm / abort 控件；上面的 Loader target 绑定是执行前身份关联，不是断连后续刷确认。未来若发布 TCP / UART Flash operation，必须先补齐对应 domain 状态与 confirm / abort RPC，不能只在 UI 伪造停点。
+- 当前发布的 `flash.dayu200` 只有 USB / RockUSB 路径，因此执行中的 Job 不暴露 rebind confirm / abort 控件；上面的 Loader target 绑定是执行前身份关联，不是断连后续刷确认。未来若发布 TCP / UART Flash operation，必须先补齐对应 domain 状态与 confirm / abort RPC，不能只在 UI 伪造停点。
 - 成功后的 Postflight 只展示 Runtime 已投影的事实：设备回报 build 与镜像期望的对照、binding revision `n → n+1`。manifest 全 executed + SHA 在 wire 没有字段前不画占位第三行。
 
 ### 5.7 History（REQ-UX-004）

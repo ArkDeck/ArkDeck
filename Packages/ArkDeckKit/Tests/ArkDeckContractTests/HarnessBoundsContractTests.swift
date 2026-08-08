@@ -192,7 +192,7 @@ final class HarnessBoundsContractTests: XCTestCase {
   func testAnIsolatedCopyAuthorizesItselfWhileASharedTreeStillNeedsAGrant() async {
     let permitted: Set<String> = [
       DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
-      "debug.hap@1", "flash.dayu200@1", "workspace.apply-patch@1",
+      "debug.hap@1", "flash.dayu200", "workspace.apply-patch@1",
     ]
     let budgets = HarnessTaskBudgets(
       maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 2)
@@ -241,7 +241,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     inputsDigest: String = digestHex("{}"),
     permitted: Set<String> = [
       DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
-      "debug.hap@1", "flash.dayu200@1",
+      "debug.hap@1", "flash.dayu200",
     ],
     failure: HarnessFailureRecord? = nil,
     previousStrategy: HarnessStrategySignature? = nil,
@@ -613,22 +613,22 @@ final class HarnessBoundsContractTests: XCTestCase {
   // MARK: - HTP-AC-11: E2 never, E1 only with an existing capability
 
   func testDestructiveOperationsAreNeverAutomated() async {
-    let capabilities = StubCapabilityPort(held: ["flash.dayu200@1"])
+    let capabilities = StubCapabilityPort(held: ["flash.dayu200"])
     let policyGuard = HarnessPolicyGuard(
       availability: StubAvailabilityPort(), capabilities: capabilities)
     let generous = snapshot(
-      allowed: ["flash.dayu200@1"],
+      allowed: ["flash.dayu200"],
       budgets: HarnessTaskBudgets(
         maxRounds: 8, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 8))
 
     let verdict = await policyGuard.evaluate(
-      guardInput(generous, operation: "flash.dayu200@1"))
+      guardInput(generous, operation: "flash.dayu200"))
     XCTAssertEqual(
-      verdict, .refuse(.destructiveEffectNeverAutomated(reference: "flash.dayu200@1")),
+      verdict, .refuse(.destructiveEffectNeverAutomated(reference: "flash.dayu200")),
       "a budget and a capability do not make E2 automatable")
     XCTAssertFalse(
       HarnessTaskCoordinator.defaultPolicy(for: .debugCrash).allowedOperations.contains(
-        "flash.dayu200@1"))
+        "flash.dayu200"))
   }
 
   /// An E1 step always needs mutation budget. Whether it also needs a grant a
@@ -652,7 +652,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     // No budget for mutations at all — refused for either kind of operation.
     let permitted: Set<String> = [
       DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
-      "debug.hap@1", "flash.dayu200@1", "workspace.apply-patch@1",
+      "debug.hap@1", "flash.dayu200", "workspace.apply-patch@1",
     ]
     for operation in ["debug.hap@1", "workspace.apply-patch@1"] {
       let noBudget = await withoutCapability.evaluate(
@@ -944,7 +944,7 @@ final class HarnessBoundsContractTests: XCTestCase {
       ],
       desiredState: [
         "baseWorkspaceRevision": .string(String(repeating: "a", count: 64)),
-        "deviceProfile": .string("dayu200@1"),
+        "deviceProfile": .string("dayu200"),
         "buildPresetRef": .string("waterflow-debug@1"),
       ])
     let task = try await coordinator.submit(submission)

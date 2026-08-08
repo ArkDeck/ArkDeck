@@ -227,67 +227,8 @@ public struct ProductRockchipLoaderBindingCoordinator:
           selectionEvidenceSHA256: proof.selectionEvidenceSHA256)
       }
 
-      guard let legacy = try existing.legacyLoaderAttestationMigrationProof()
-      else {
-        throw RockchipFlashExecutionError.admissionRejected(
-          "selected Loader binding is not eligible for fresh Runtime attestation")
-      }
-      let targetConnectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
-        .map { String(format: "%02x", $0) }.joined()
-      guard targetConnectIdentity == legacy.identitySHA256 else {
-        throw RockchipFlashExecutionError.admissionRejected(
-          "selected target connect key does not match its durable HDC-normal alias")
-      }
-      let matchingTargets = try targetStore.list().filter {
-        $0.bindingRevision == expectedBindingRevision
-          && $0.stablePhysicalIdentitySHA256 == currentIdentity
-      }
-      guard matchingTargets.map(\.targetID) == [targetID] else {
-        throw RockchipFlashExecutionError.admissionRejected(
-          "selected target binding lineage is missing or ambiguous")
-      }
-
-      let selectionDigest = Self.selectionDigest(
-        targetID: targetID,
-        previousRevision: legacy.previousRevision,
-        currentRevision: expectedBindingRevision,
-        previousIdentity: legacy.identitySHA256,
-        currentIdentity: currentIdentity,
-        currentTopology: identity.topology)
-      let refreshed = RockchipProductBindingSnapshot(
-        revision: expectedBindingRevision,
-        serial: identity.serial,
-        usbTopology: identity.topology,
-        evidence: [
-          "product:e0-iokit-single-loader-readback",
-          "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
-          "identity:serial-sha256=\(currentIdentity)",
-          "identity:previous-serial-sha256=\(legacy.identitySHA256)",
-          "binding:previous-revision=\(legacy.previousRevision)",
-          "binding:previous-usb-topology=\(legacy.usbTopology)",
-          "identity:hdc-normal-alias-sha256=\(legacy.identitySHA256)",
-          "binding:hdc-normal-alias-usb-topology=\(legacy.usbTopology)",
-          "rebind:user-selection-sha256=\(selectionDigest)",
-        ])
-      try Self.authorizeSelectedLoader(
-        identity: identity, currentIdentity: currentIdentity)
-      let stored = try bindingStore.replace(
-        expectedRevision: expectedBindingRevision,
-        expectedSerialSHA256: existingIdentity,
-        with: refreshed,
-        kind: .sameRevisionLegacyLoaderAttestation)
-      guard try stored.coversRuntimeTarget(target),
-        try stored.matchesConfirmedLiveIdentity(identity)
-      else {
-        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
-          "fresh Loader attestation did not cover the selected Runtime target")
-      }
-      return RockchipLoaderBindingReceipt(
-        targetID: targetID,
-        previousRevision: expectedBindingRevision,
-        currentRevision: expectedBindingRevision,
-        updated: true,
-        selectionEvidenceSHA256: selectionDigest)
+      throw RockchipFlashExecutionError.admissionRejected(
+        "selected Loader binding does not carry current Runtime attestation")
     }
 
     if target.bindingRevision == expectedBindingRevision + 1,
@@ -316,7 +257,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
       existing.revision == expectedBindingRevision,
       existingIdentity == target.stablePhysicalIdentitySHA256,
       currentIdentity != existingIdentity,
-      let hdcAlias = try existing.migrationHDCNormalAlias()
+      let hdcAlias = try existing.confirmedHDCNormalAlias()
     else {
       throw RockchipFlashExecutionError.admissionRejected(
         "selected target has no migratable HDC-to-Loader binding lineage")
@@ -394,7 +335,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
     currentTopology: String
   ) -> String {
     SHA256.hash(data: Data([
-      "rockchip-loader-user-selection-v1",
+      "rockchip-loader-user-selection",
       targetID,
       String(previousRevision),
       String(currentRevision),

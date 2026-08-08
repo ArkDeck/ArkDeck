@@ -99,7 +99,7 @@ enum RuntimeArtifactService {
       "atomic-publish": ["publish-report.json"],
       "verify-loaded-library": ["verification-report.json"],
     ],
-    "flash.dayu200@1": [
+    "flash.dayu200": [
       "rebind-and-verify-build": ["post-flash-facts.json"],
       "capture-post-flash-diagnostics": ["post-flash-hilog.txt"],
     ],
@@ -108,7 +108,7 @@ enum RuntimeArtifactService {
   /// Products synthesized at finalization rather than by one typed step.
   static let finalizeArtifacts: [String: [String]] = [
     "capture.diagnostics@1": ["capture.log", "artifact-index.json", "capture-summary.json"],
-    "flash.dayu200@1": ["flash-report.json"],
+    "flash.dayu200": ["flash-report.json"],
   ]
 
   static func finalArtifactContents(
@@ -169,7 +169,7 @@ enum RuntimeArtifactService {
       payload["missingRequired"] = .array(
         missingRequired.map { .string($0.name) })
     }
-    if descriptor.reference == "flash.dayu200@1" {
+    if descriptor.reference == "flash.dayu200" {
       appendFlashArtifactLineage(to: &payload, record: record)
       payload["verifiedSteps"] = .array(
         completedStepIDs.sorted().map { .string($0) })
@@ -324,7 +324,7 @@ enum RuntimeArtifactService {
         fields["expectedBindingRevision"] = .integer(Int64(revision))
       }
     }
-    if descriptor.reference == "flash.dayu200@1" {
+    if descriptor.reference == "flash.dayu200" {
       appendFlashArtifactLineage(to: &fields, record: record)
     }
     let encoder = JSONEncoder()

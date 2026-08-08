@@ -122,7 +122,7 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         deviceIdentitySHA256: NativeLibraryDeploymentContractTests.identity,
         executionConnectKey: "150100424a544e4600",
         deviceMode: "hdc", buildFingerprint: "fixture-build",
-        profileID: "dayu200@1", collectedAtUTC: "2026-07-30T00:00:00Z")
+        profileID: "dayu200", collectedAtUTC: "2026-07-30T00:00:00Z")
     }
   }
 

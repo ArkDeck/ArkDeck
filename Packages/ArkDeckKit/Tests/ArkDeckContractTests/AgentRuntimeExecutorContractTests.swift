@@ -195,7 +195,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       from: JSONSerialization.data(withJSONObject: historicalJSON))
     let snapshot = RuntimeJobEvidenceSnapshot(
       jobID: "job-campaign-evidence-001",
-      operationReference: "flash.dayu200@1",
+      operationReference: "flash.dayu200",
       catalogDigest: String(repeating: "f", count: 64),
       targetID: "TGT-CAMPAIGN-EVIDENCE-001",
       bindingRevision: 7,

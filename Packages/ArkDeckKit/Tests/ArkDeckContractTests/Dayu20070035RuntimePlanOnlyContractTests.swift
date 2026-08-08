@@ -44,13 +44,13 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",
         buildFingerprint: "preflight-only",
         transport: "sealed-fixture",
-        profileID: "dayu200@2", collectedAtUTC: "2026-08-01T00:00:00Z")
+        profileID: "dayu200", collectedAtUTC: "2026-08-01T00:00:00Z")
     }
   }
 
   func testOpenHarmony70035ProfilePinsEveryMemberAndExactNinePartitionPlan() throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
-    XCTAssertEqual(profile.catalogReference, "dayu200@2")
+    let profile = RockchipFlashProfile.dayu200
+    XCTAssertEqual(profile.catalogReference, "dayu200")
     XCTAssertEqual(profile.firmwareVersion, "OpenHarmony-7.0.0.35-20260728_180253")
     // The booted device answers with the values baked into system.img — model
     // "ohos" and fullname "OpenHarmony-7.0.0.36" — not with values inferred
@@ -128,23 +128,19 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     XCTAssertEqual(profile.writeForbiddenMemberNames.sorted(), ["chip_prod.img", "sys_prod.img"])
 
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
-    XCTAssertEqual(descriptor.profiles, ["dayu200@1", "dayu200@2"])
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+    XCTAssertEqual(descriptor.profiles, ["dayu200"])
     XCTAssertEqual(
       descriptor.inputs.first { $0.name == "deviceProfile" }?.enumValues,
-      ["dayu200@1", "dayu200@2"])
+      ["dayu200"])
   }
 
-  /// Partition order is still the board's and is still enforced. What no
-  /// longer refuses a bundle is naming the other published `deviceProfile`
-  /// value: both describe the same board — `dayu200@2` always reused
-  /// `dayu200@1`'s mapped partitions, forbidden partitions and prerequisites
-  /// verbatim — and they differed only in which firmware build each
-  /// enumerated, which is no longer a profile's business.
-  func testProviderEnforcesPartitionOrderAndTreatsBothReferencesAsOneBoard() throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+  /// Partition order is still the board's and is still enforced. The two old
+  /// versioned references are no longer aliases for new destructive requests.
+  func testProviderEnforcesPartitionOrderAndRejectsVersionedReferences() throws {
+    let profile = RockchipFlashProfile.dayu200
     let descriptor = try XCTUnwrap(
-      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
     let step = try XCTUnwrap(
       descriptor.steps.first { $0.stepID == "flash-partitions" })
     let context = ProviderExecutionContext(
@@ -167,7 +163,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       case .rockchip(.flashPartitions(let bundle)) = try provider.action(
         for: step, operation: descriptor, inputs: inputs, context: context)
     else {
-      return XCTFail("v2 must materialize the typed Rockchip flash action")
+      return XCTFail("DAYU200 must materialize the typed Rockchip flash action")
     }
     XCTAssertEqual(bundle.sha256, profile.archiveSHA256)
     XCTAssertEqual(bundle.partitionNames, profile.mappedPartitions.map(\.partitionName))
@@ -179,24 +175,14 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       try provider.action(
         for: step, operation: descriptor, inputs: reordered, context: context))
 
-    var otherReference = inputs
-    otherReference["deviceProfile"] = .string("dayu200@1")
-    guard
-      case .rockchip(.flashPartitions(let sameBundle)) = try provider.action(
-        for: step, operation: descriptor, inputs: otherReference, context: context)
-    else {
-      return XCTFail("both published references describe the same board")
+    for reference in ["dayu200@1", "dayu200@2", "dayu200@99"] {
+      var rejected = inputs
+      rejected["deviceProfile"] = .string(reference)
+      XCTAssertThrowsError(
+        try provider.action(
+          for: step, operation: descriptor, inputs: rejected, context: context),
+        reference)
     }
-    XCTAssertEqual(sameBundle.partitionNames, bundle.partitionNames)
-    XCTAssertEqual(sameBundle.sha256, bundle.sha256)
-
-    // An unpublished reference is still refused: the catalog enumerates which
-    // boards exist, and that has not changed.
-    var unknownReference = inputs
-    unknownReference["deviceProfile"] = .string("dayu200@99")
-    XCTAssertThrowsError(
-      try provider.action(
-        for: step, operation: descriptor, inputs: unknownReference, context: context))
   }
 
   /// A summary as a real read produces one: member digests, the captured
@@ -237,7 +223,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
   /// does not fit the board — a missing image, an unknown partition, an
   /// unreadable version — not that nobody had met it before.
   func testAuthorizedExecutePlanFactsPlanForWhateverFitsTheBoard() throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let port = RockchipProductExecutePlanFactPort()
 
     let plan = try port.makeValidatedExecutePlan(summary: summary(for: profile))
@@ -280,8 +266,8 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     }
   }
 
-  func testHumanExecuteGateProducesExactV2HandoffWithZeroDispatch() async throws {
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+  func testHumanExecuteGateProducesExactDAYU200HandoffWithZeroDispatch() async throws {
+    let profile = RockchipFlashProfile.dayu200
     let provider = RockchipRockUSBFlashProvider(profile: profile)
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     let binding = RockchipRealDeviceBinding(
@@ -313,7 +299,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       manualConfirmation: confirmation,
       monitor: monitor)
     guard case .authorizedForHumanExecution(let handoff) = decision.outcome else {
-      return XCTFail("dayu200@2 must produce a human-only exact handoff")
+      return XCTFail("dayu200 must produce a human-only exact handoff")
     }
     XCTAssertEqual(handoff.planDigestSHA256, plan.planDigestSHA256)
     XCTAssertEqual(handoff.stepSetDigestSHA256, plan.stepSetDigestSHA256)
@@ -340,7 +326,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
     let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     let summary = try GzipTarArchiveReader.summarize(
       fileAt: archiveURL,
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: profile))
@@ -395,10 +381,10 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       inputs: flashInputs(lease: lease, profile: profile))
     let preview = try await engine.planOnly(encoded(request))
     XCTAssertEqual(preview.executionMode, "planOnly")
-    XCTAssertEqual(preview.operationReference, "flash.dayu200@1")
+    XCTAssertEqual(preview.operationReference, "flash.dayu200")
     XCTAssertEqual(preview.bindingRevision, 7)
     XCTAssertEqual(preview.stableIdentitySHA256, Self.targetIdentity)
-    XCTAssertEqual(preview.inputs["deviceProfile"], .string("dayu200@2"))
+    XCTAssertEqual(preview.inputs["deviceProfile"], .string("dayu200"))
     XCTAssertEqual(
       preview.inputs["partitionPlan"],
       .array(profile.mappedPartitions.map { .string($0.partitionName) }))
@@ -423,17 +409,16 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
             requestID: "real-plan-only-wrong-order", lease: lease,
             inputs: wrongOrder))))
 
-    var wrongVersion = flashInputs(lease: lease, profile: profile)
-    wrongVersion["deviceProfile"] = .string("dayu200@1")
-    let crossReferencePreview = try await engine.planOnly(
-      encoded(
-        try flashRequest(
-          requestID: "real-plan-only-cross-reference", lease: lease,
-          inputs: wrongVersion)))
-    XCTAssertEqual(crossReferencePreview.inputs["deviceProfile"], .string("dayu200@1"))
-    XCTAssertEqual(
-      crossReferencePreview.steps.map(\.stepID), preview.steps.map(\.stepID),
-      "both published references select the same DAYU200 board")
+    for (index, reference) in ["dayu200@1", "dayu200@2"].enumerated() {
+      var versioned = flashInputs(lease: lease, profile: profile)
+      versioned["deviceProfile"] = .string(reference)
+      await XCTAssertThrowsErrorAsync(
+        try await engine.planOnly(
+          encoded(
+            try flashRequest(
+              requestID: "real-plan-only-versioned-\(index)", lease: lease,
+              inputs: versioned))))
+    }
     let negativeDispatchCount = await dispatchLog.snapshot()
     let negativeJobs = await engine.listJobs()
     let negativeCapabilities = try await capabilityStore.list()
@@ -491,7 +476,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
         rootURL: root.appendingPathComponent("artifacts", isDirectory: true),
         nowUTC: { "2026-08-01T00:00:00Z" }),
       nowUTC: { "2026-08-01T00:00:00Z" })
-    let profile = RockchipFlashProfile.dayu200OpenHarmony70035
+    let profile = RockchipFlashProfile.dayu200
     do {
       _ = try await engine.draftCapability(
         encoded(
@@ -537,7 +522,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       idempotencyKey: "idem-\(requestID)",
       target: DurableTargetReference(
         targetID: "TGT-DAYU200-70035", expectedBindingRevision: 7),
-      operation: RuntimeOperationReference(id: "flash.dayu200", version: 1),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
       inputs: inputs)
   }
 
