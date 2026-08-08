@@ -625,22 +625,27 @@ public struct RuntimeControlPlaneHandler: Sendable {
           message: "artifact store and target store are required for flash bundle import")
       }
       guard case .string(let targetID)? = request.params?["targetId"],
-        case .string(let name)? = request.params?["name"],
         case .integer(let byteCountValue)? = request.params?["byteCount"],
         case .string(let sha256)? = request.params?["sha256"],
         byteCountValue >= 0, byteCountValue <= Int64(Int.max)
       else {
         return failure(
           id: request.id, code: .invalidParams,
-          message: "targetId, name, byteCount and sha256 are required")
+          message: "targetId, byteCount and sha256 are required")
       }
       do {
         guard let target = try targetStore.find(targetID: targetID) else {
           return failure(
             id: request.id, code: .notFound, message: "unknown target \(targetID)")
         }
+        // `name`, when supplied by an older caller, is untrusted source
+        // metadata rather than an admission fact or daemon-local path. The
+        // bytes are staged under an opaque ID and judged on commit by
+        // gzip/tar, digest and DAYU200 structure. Keep the store's logical
+        // product name server-owned so local filenames neither gate import
+        // nor influence the artifact namespace.
         let uploadID = try await flashBundleImports.begin(
-          target: target, name: name, byteCount: Int(byteCountValue),
+          target: target, name: "images.tar.gz", byteCount: Int(byteCountValue),
           sha256: sha256)
         return success(
           id: request.id,
