@@ -2889,6 +2889,21 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     return try await factsPort.currentFacts(targetID: targetID)
   }
 
+  package func executionAdmissionBlocker(
+    for operation: CatalogOperationDescriptor,
+    facts: ProviderFacts
+  ) -> String? {
+    guard operation.reference == "flash.dayu200@1" else { return nil }
+    guard
+      facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey]
+        == TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+    else {
+      return "flash.crossModeBindingUnprepared: target \(facts.targetID ?? "unknown") "
+        + "is not covered by the durable DAYU200 cross-mode binding"
+    }
+    return nil
+  }
+
   package func action(
     for step: CatalogStepDescriptor,
     operation: CatalogOperationDescriptor,

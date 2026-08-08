@@ -160,6 +160,15 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let writeForbiddenMemberNames: [String]
   public let prerequisites: [FlashPrerequisitePresentation]
 
+  /// Required profile facts which the latest Runtime portrait did not prove.
+  /// Unknown is a blocker just like an explicit negative: the one-click UI
+  /// removes redundant confirmation ceremony, not the pre-effect fact gate.
+  public var blockingRequiredPrerequisites: [FlashPrerequisitePresentation] {
+    prerequisites.filter {
+      $0.requirement == .required && $0.status != .satisfied
+    }
+  }
+
   public init(
     mode: RockchipFlashExecutionMode,
     target: FlashTargetPresentation?,

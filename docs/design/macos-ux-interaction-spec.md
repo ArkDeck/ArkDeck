@@ -141,6 +141,7 @@ Primary Window
 
 - Toolbar 中放 Execute / Plan only / Simulated segmented control，模式 badge 紧随标题并永久保留。
 - 详情顺序：Availability → Profile & Image Set → Prerequisites → Exact Plan → Review & Run。required prerequisite 为 unknown/unsatisfied 时，Run 区显示 blocker，不只留下灰色按钮。
+- Execute 的 `recoveryPath` 必须来自 owner-only DAYU200 跨模式 binding 对当前 target stable identity、相邻 binding revision 与 HDC connect-key alias 的精确覆盖；仅有 HDC adoption 时显示 unsatisfied。此时仍可审阅 Exact Plan，但主按钮不可提交，Runtime 也必须在 capability 签发和首个外部 effect 前以同一事实拒绝。
 - Exact Plan table 展示 step、typed parameters 摘要、effect、execution disposition。plan-only 的 mutation/destructive 行显示 `notExecuted(planned)`。
 - 提交后直到 `job.run` 返回前，页面自动轮询 Runtime 的 `job.list` 并逐条显示真实 timeline；不依赖用户手动刷新。critical write 期间在 Job Inspector 和页面内显示同一句「当前写入不会被强杀；停止只作用于后续步骤」与电源提示。
 - Runtime 返回 Job ID 后立即显示「取消剩余步骤」；请求通过 `job.cancel` 到达 Runtime。临界写入不会被强杀，取消在下一个安全边界生效，不回放 unknown destructive intent。

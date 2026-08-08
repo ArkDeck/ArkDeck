@@ -228,9 +228,14 @@ public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
 /// never from request fields. This makes the target identity and binding
 /// revision used for plan admission the same durable facts used by HDC.
 public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
+  package static let crossModeBindingServerFactKey = "dayu200CrossModeBinding"
+  package static let crossModeBindingSatisfied = "satisfied"
+  package static let crossModeBindingUnprepared = "unprepared"
+
   private let targetStore: RuntimeTargetStore
   private let resolver: any RuntimeExecutableResolving
   private let prober: (any RockchipLiveModeProbing)?
+  private let bindingStore: RockchipProductBindingStore?
   private let nowUTC: @Sendable () -> String
 
   /// `prober: nil` keeps the record-only behaviour: mode, build and profile
@@ -240,11 +245,13 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
     targetStore: RuntimeTargetStore,
     resolver: any RuntimeExecutableResolving,
     prober: (any RockchipLiveModeProbing)? = nil,
+    bindingStore: RockchipProductBindingStore? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.targetStore = targetStore
     self.resolver = resolver
     self.prober = prober
+    self.bindingStore = bindingStore
     self.nowUTC = nowUTC
   }
 
@@ -260,15 +267,26 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
         "product-owned Rockchip component is unavailable: \(error)")
     }
     let live = await liveFacts(connectKey: target.connectKey)
+    var serverFacts = [
+      "componentPackage": BundledRockchipComponent.packageID,
+      "componentSigningIdentifier": BundledRockchipComponent.signingIdentifier,
+      "componentSigningTeam": BundledRockchipComponent.signingTeamIdentifier,
+    ]
+    if let bindingStore {
+      let covered: Bool
+      if let binding = try bindingStore.loadIfPresent() {
+        covered = try binding.coversRuntimeTarget(target)
+      } else {
+        covered = false
+      }
+      serverFacts[Self.crossModeBindingServerFactKey] = covered
+        ? Self.crossModeBindingSatisfied : Self.crossModeBindingUnprepared
+    }
     return ProviderFacts(
       providerID: "rockchip",
       toolVersion: BundledRockchipComponent.reportedVersion,
       toolSHA256: component.sha256,
-      serverFacts: [
-        "componentPackage": BundledRockchipComponent.packageID,
-        "componentSigningIdentifier": BundledRockchipComponent.signingIdentifier,
-        "componentSigningTeam": BundledRockchipComponent.signingTeamIdentifier,
-      ],
+      serverFacts: serverFacts,
       targetID: target.targetID,
       bindingRevision: target.bindingRevision,
       deviceIdentitySHA256: target.stablePhysicalIdentitySHA256,
@@ -332,18 +350,28 @@ extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObservin
     targetID: String
   ) async throws -> [RockchipPrerequisiteObservation] {
     let facts = try await currentFacts(targetID: targetID)
+    let crossModeBindingReady =
+      facts.serverFacts[Self.crossModeBindingServerFactKey]
+      == Self.crossModeBindingSatisfied
     let statuses: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteStatus]
     switch facts.deviceMode {
     case "loader":
       // Mirrors RockchipProductPrerequisitePort: one attributable Loader
       // observation proves the three product prerequisites that port emits.
       // Stable power has no production sensor and therefore remains unknown.
-      statuses = [
-        .loader: .satisfied,
-        .recoveryPath: .satisfied,
-        .unlocked: .satisfied,
-        .stablePower: .unknown,
-      ]
+      statuses = crossModeBindingReady || bindingStore == nil
+        ? [
+          .loader: .satisfied,
+          .recoveryPath: .satisfied,
+          .unlocked: .satisfied,
+          .stablePower: .unknown,
+        ]
+        : [
+          .loader: .unknown,
+          .recoveryPath: .unsatisfied,
+          .unlocked: .unknown,
+          .stablePower: .unknown,
+        ]
     case "maskrom":
       statuses = [
         .loader: .unsatisfied,
@@ -351,9 +379,25 @@ extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObservin
         .unlocked: .unknown,
         .stablePower: .unknown,
       ]
+    case "hdc" where crossModeBindingReady:
+      // The target is currently addressable through HDC and the owner-only
+      // binding already proves its exact Loader identity/revision and normal
+      // alias.  That is the published USB recovery path the execute plan
+      // consumes; stable power has no production sensor and stays unknown.
+      statuses = [
+        .loader: .satisfied,
+        .recoveryPath: .satisfied,
+        .unlocked: .satisfied,
+        .stablePower: .unknown,
+      ]
+    case "hdc" where bindingStore != nil:
+      statuses = [
+        .loader: .unknown,
+        .recoveryPath: .unsatisfied,
+        .unlocked: .unknown,
+        .stablePower: .unknown,
+      ]
     default:
-      // HDC-normal can enter Loader only as an admitted typed step. A plan
-      // preview cannot claim that future transition already succeeded.
       statuses = Dictionary(
         uniqueKeysWithValues: RockchipPrerequisiteIdentifier.allCases.map { ($0, .unknown) })
     }

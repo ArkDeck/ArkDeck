@@ -301,7 +301,10 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         providerID: "rockchip",
         toolVersion: BundledRockchipComponent.reportedVersion,
         toolSHA256: RuntimeCampaignWireContractTests.toolIdentity,
-        serverFacts: [:], targetID: targetID, bindingRevision: 7,
+        serverFacts: [
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+        ], targetID: targetID, bindingRevision: 7,
         deviceIdentitySHA256: RuntimeCampaignWireContractTests.targetIdentity,
         executionConnectKey: "sealed-campaign-wire-connect-key",
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",

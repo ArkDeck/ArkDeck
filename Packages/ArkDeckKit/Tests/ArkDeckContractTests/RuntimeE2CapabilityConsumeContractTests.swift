@@ -42,7 +42,10 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
         providerID: "rockchip",
         toolVersion: BundledRockchipComponent.reportedVersion,
         toolSHA256: RuntimeE2CapabilityConsumeContractTests.toolIdentity,
-        serverFacts: [:], targetID: targetID, bindingRevision: 7,
+        serverFacts: [
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+        ], targetID: targetID, bindingRevision: 7,
         deviceIdentitySHA256:
           RuntimeE2CapabilityConsumeContractTests.targetIdentity,
         executionConnectKey: "sealed-consume-e2e-connect-key",

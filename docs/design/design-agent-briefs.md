@@ -403,6 +403,7 @@ com.ohos.launcher
 **当前生产事实与刻意边界**:
 
 - Prerequisites 来自 target / binding / profile-bound `flash.prerequisites`，闭集为 `loader` / `recoveryPath` / `unlocked` / `stablePower`；没有 `flashd`。
+- `recoveryPath` 只有在 owner-only DAYU200 跨模式 binding 精确覆盖当前 target identity、相邻 revision 与 HDC alias 时才是 satisfied；HDC adoption 本身不构成跨模式证明。required 项为 unknown / unsatisfied 时保留 Exact Plan 审阅，显示可见 blocker 并禁用主按钮，Runtime 使用同一事实在 capability 签发与首个外部 effect 前双重拒绝。
 - Trace tag、参数 before / after、Debug 日志 / 包清单 / 端口规则和 Overview 能力矩阵均接生产 facade。缺失或不匹配时显示 unavailable / unknown，不用 fixture 补洞。
 - Flash `job.cancel` 已开放，临界写入只停止后续步骤；Artifact 在 History 中逐项导出；Automation 只开放既有 task 的 list / reconcile / pause / cancel。
 - HDC production authorization 由 domain-owned durable binding 刷新；App 可展示真实 `.timedOut`，但生产 probe 尚不能推导的 `denied` 不得从 fixture 搬过来。

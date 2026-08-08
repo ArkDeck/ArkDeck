@@ -609,6 +609,7 @@ public actor RuntimeJobEngine {
     let bindingRevision: Int?
     let planDigest: String
     let artifactFacts: [String: String]
+    let providerFacts: ProviderFacts?
   }
 
   private struct PreparedAuthorization: Sendable {
@@ -1592,6 +1593,13 @@ public actor RuntimeJobEngine {
           }
           appendTimeline(jobID: jobID, entry: "target facts unavailable: \(error)")
         }
+      }
+      if step.effect >= .deviceMutation, let resolvedFacts,
+        let blocker = provider.executionAdmissionBlocker(
+          for: descriptor, facts: resolvedFacts)
+      {
+        throw RuntimeDispatchFailure.failed(
+          "provider execution prerequisite blocked before external effect: \(blocker)")
       }
       if Self.requiresEvidencePreflight(descriptor), Self.isEvidencePreflightStep(step) {
         try Self.validateEvidenceFacts(
@@ -4386,7 +4394,8 @@ public actor RuntimeJobEngine {
             "artifactSha256": $0.sha256,
             "artifactByteCount": String($0.byteCount),
           ]
-        } ?? [:])
+        } ?? [:],
+        providerFacts: facts)
     } catch let error as RuntimeJobEngineError {
       throw error
     } catch {
@@ -4551,6 +4560,15 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
         "catalog has no authorization policy for effect \(effect.rawValue)")
+    }
+    if let facts = materialized.providerFacts,
+      let provider = providers.provider(id: descriptor.provider.rawValue),
+      let blocker = provider.executionAdmissionBlocker(
+        for: descriptor, facts: facts)
+    {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "provider execution prerequisite blocked before capability issuance: \(blocker)")
     }
     let query = try authorizationQuery(
       request: request, descriptor: descriptor,

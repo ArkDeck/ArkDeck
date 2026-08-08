@@ -1006,6 +1006,73 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertNil(facts.buildFingerprint)
   }
 
+  func testProductionFactsAndPrerequisitesRequireExactCrossModeBinding() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+    let boundConnectKey = "device-bound"
+    let boundIdentity = SHA256.hash(data: Data(boundConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let bound = try targetStore.adopt(
+      stableIdentitySHA256: boundIdentity, connectKey: boundConnectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z"
+    ).record
+    let unboundConnectKey = "device-unbound"
+    let unboundIdentity = SHA256.hash(data: Data(unboundConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let unbound = try targetStore.adopt(
+      stableIdentitySHA256: unboundIdentity, connectKey: unboundConnectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:01Z"
+    ).record
+    let bindingStore = RockchipProductBindingStore(
+      rootURL: root.appendingPathComponent("product-binding", isDirectory: true))
+    _ = try bindingStore.install(
+      RockchipProductBindingSnapshot(
+        revision: 1, serial: boundConnectKey, usbTopology: "42",
+        evidence: [
+          "product:e0-iokit-single-dayu200-readback",
+          "usb:vendor=8711,profile=dayu200-cross-mode",
+          "identity:serial-sha256=\(boundIdentity)",
+        ]))
+    let component = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let port = TargetStoreRockchipRuntimeFactsPort(
+      targetStore: targetStore,
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      prober: RecordingLiveModeProbe(
+        observation: RockchipLiveModeObservation(
+          deviceMode: "hdc", buildFingerprint: nil)),
+      bindingStore: bindingStore,
+      nowUTC: { "2026-08-08T00:01:00Z" })
+
+    let boundFacts = try await port.currentFacts(targetID: bound.targetID)
+    XCTAssertEqual(
+      boundFacts.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey],
+      TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied)
+    let ready = try await port.observePrerequisites(targetID: bound.targetID)
+    XCTAssertTrue(
+      ready.filter { $0.identifier != .stablePower }
+        .allSatisfy { $0.status == .satisfied })
+    XCTAssertEqual(
+      ready.first { $0.identifier == .stablePower }?.status, .unknown)
+
+    let unboundFacts = try await port.currentFacts(targetID: unbound.targetID)
+    XCTAssertEqual(
+      unboundFacts.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey],
+      TargetStoreRockchipRuntimeFactsPort.crossModeBindingUnprepared)
+    let blocked = try await port.observePrerequisites(targetID: unbound.targetID)
+    XCTAssertEqual(
+      blocked.first { $0.identifier == .recoveryPath }?.status,
+      .unsatisfied)
+    XCTAssertEqual(
+      blocked.first { $0.identifier == .loader }?.status,
+      .unknown)
+  }
+
   func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {
     let published = try XCTUnwrap(
       RockchipFlashProfile.profile(reference: "dayu200@2"))
