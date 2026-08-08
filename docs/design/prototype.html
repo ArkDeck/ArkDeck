@@ -343,7 +343,7 @@ const S = {
   ],
   fwd:[{l:"tcp:9222", r:"tcp:9222"}],
   cmd:{val:"device.packageInventory", hist:[]},
-  flashMode:"execute", flashPrerequisitesReady:true, flashJob:null, planSaved:false, lastFlash:null,
+  flashMode:"execute", flashPrerequisitesReady:true, loaderBound:false, flashJob:null, planSaved:false, lastFlash:null,
   debugTab:"logs", hf:{st:"all", mode:"all", dev:"all"}, histSel:null, histSeq:1,
   hdcSel:"deveco",
   jobs:[], jobSeq:1
@@ -1012,12 +1012,13 @@ function pFlash(){
   </div>
   <div class="card">
     <h2>Rockchip device access</h2>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span class="chip ok">可访问</span><span class="mono">1 个 loader observation · Runtime probe</span>
+    ${S.loaderBound?`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="chip ok">Loader 已绑定到所选设备</span><span class="mono">1 个 loader observation · Runtime probe</span>
       <button class="btn" onclick="doneBtn(this,'已重新检查')">重新检查设备访问</button>
-    </div>
-    <dl class="kv"><dt>责任方</dt><dd>用户</dd><dt>最小动作</dt><dd>选择受支持的 loader observation</dd></dl>
+    </div>`:`<div class="warnbox"><b>DAYU200 已进入 Loader 模式</b><br>ArkDeck 已发现一台 Loader，但它尚未关联到持久设备。请选择该设备，然后只需点击一次刷机；Runtime 会先绑定 Loader、刷新精确计划，并仅在全部前置条件通过后继续。</div>`}
+    <dl class="kv"><dt>责任方</dt><dd>设备操作员</dd><dt>最小动作</dt><dd>${S.loaderBound?"无需处理":"确认当前选择的是刚进入 Loader 的设备"}</dd></dl>
     <p class="hint">permission denied、driver unavailable、offline / unauthorized、tool blocked 与 protocol blocked 会分别显示责任方和 ArkDeck 外最小修复动作；页面不提供 sudo 或驱动安装。</p>
+    <p class="hint">Loader 绑定只提交所选 target + expected revision；Runtime 重新读取唯一 Loader 并做 CAS，不向 App 暴露 serial / topology，也不派发设备命令。</p>
   </div>
   <div class="card" data-acin><span class="ac">REQ-UX-006 · AC-FLASH-004-01</span>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -1043,13 +1044,13 @@ function pFlash(){
         <h2>Prerequisites</h2>
         <div class="tablewrap"><table>
           <tr><td>loader</td><td><span class="chip ok">satisfied</span></td><td class="mono">flash.prerequisites</td></tr>
-          <tr><td>recoveryPath</td><td><span class="chip ok">satisfied</span></td><td class="mono">bootloader / vendor recovery</td></tr>
-          <tr><td>unlocked</td><td><span class="chip ok">satisfied</span></td><td class="mono">target-bound probe</td></tr>
+          <tr><td>recoveryPath</td><td><span class="chip ${S.loaderBound?"ok":"bad"}">${S.loaderBound?"satisfied":"unsatisfied"}</span></td><td class="mono">bootloader / vendor recovery</td></tr>
+          <tr><td>unlocked</td><td><span class="chip ${S.loaderBound?"ok":"warn"}">${S.loaderBound?"satisfied":"unknown"}</span></td><td class="mono">target-bound probe</td></tr>
           <tr><td>stablePower</td><td><span class="chip ok">satisfied</span></td><td class="mono">target-bound probe</td></tr>
         </table></div>
       </div>
       <div class="card"><h2>Target</h2>
-        <dl class="kv"><dt>target</dt><dd>已接管 DAYU200</dd><dt>binding</dt><dd>revision n</dd><dt>tool</dt><dd>pinned rkdeveloptool · version 来自 Runtime</dd></dl>
+        <dl class="kv"><dt>target</dt><dd>已接管 DAYU200</dd><dt>binding</dt><dd>${S.loaderBound?"revision n+1":"revision n · Loader 未关联"}</dd><dt>tool</dt><dd>pinned rkdeveloptool · version 来自 Runtime</dd></dl>
       </div>
       ${S.lastFlash?`<div class="card" data-acin><span class="ac">postflight verify</span>
         <h2>上次执行 · Postflight</h2>
@@ -1078,6 +1079,7 @@ function pFlash(){
   </div>`;
 }
 function runFlash(){
+  S.loaderBound=true;
   S.flashJob=startJob(addJob({title:"Flash · flash.dayu200@1 · 已接管 DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
     phases:["verify-image-bundle","hash-images","confirm-flash-intent","enter-loader-mode","wait-loader-disconnect","wait-loader-reconnect","rebind-loader-identity","flash-partitions","verify-flash-readback","reboot-device","wait-for-hdc","rebind-and-verify-build","capture-post-flash-diagnostics","finalize-session"],
     phaseIdx:0,safeBoundary:8,tick:520,log:["→ verify-image-bundle","已获取 CriticalActivityLease(idle sleep 保持)"],pages:["flash"],

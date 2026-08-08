@@ -70,6 +70,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let bootstrap: DeviceBootstrapMachine?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
+  private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
+  private let rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   private let debugRuntimeProbe: (any DebugRuntimeProbing)?
   /// Absent means the harness plane is not configured in this composition;
@@ -92,6 +94,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
+    rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     harnessCoordinator: HarnessTaskCoordinator? = nil,
@@ -105,6 +109,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
+      rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
+      rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
       harnessCoordinator: harnessCoordinator,
@@ -122,6 +128,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
+    rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     harnessCoordinator: HarnessTaskCoordinator?,
@@ -135,6 +143,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.bootstrap = bootstrap
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
+    self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
+    self.rockchipLoaderBindingCoordinator = rockchipLoaderBindingCoordinator
     self.traceRuntimeProbe = traceRuntimeProbe
     self.debugRuntimeProbe = debugRuntimeProbe
     self.harnessCoordinator = harnessCoordinator
@@ -263,6 +273,74 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(
           id: request.id, code: .rejected,
           message: "Flash prerequisites could not be observed: \(error)")
+      }
+
+    case "flash.bootloader-status":
+      guard let rockchipBootloaderStatusObserver else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Rockchip bootloader status observation is not configured")
+      }
+      do {
+        let status = try rockchipBootloaderStatusObserver.observeBootloaderStatus()
+        return success(
+          id: request.id,
+          result: .object([
+            "disposition": .string(status.disposition.rawValue),
+            "observationCount": .integer(Int64(status.observationCount)),
+            "mode": status.mode.map(JSONValue.string) ?? .null,
+            "targetId": status.targetID.map(JSONValue.string) ?? .null,
+            "bindingRevision": status.bindingRevision.map { .integer(Int64($0)) } ?? .null,
+          ]))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Rockchip bootloader status could not be observed: \(error)")
+      }
+
+    case "flash.bind-current-loader":
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .integer(let expectedRevision)? = request.params?["expectedBindingRevision"],
+        expectedRevision > 0
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "targetId and expectedBindingRevision are required")
+      }
+      guard let rockchipLoaderBindingCoordinator else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Rockchip Loader binding is not configured")
+      }
+      do {
+        let pendingJobID = try await engine.loaderTransitionAwaitingBinding(
+          targetID: targetID,
+          expectedBindingRevision: Int(expectedRevision))
+        let receipt = try rockchipLoaderBindingCoordinator.bindCurrentLoader(
+          targetID: targetID,
+          expectedBindingRevision: Int(expectedRevision))
+        if let pendingJobID {
+          _ = try await engine.settleLoaderTransitionAfterBinding(
+            jobID: pendingJobID,
+            targetID: receipt.targetID,
+            previousBindingRevision: receipt.previousRevision,
+            currentBindingRevision: receipt.currentRevision,
+            selectionEvidenceSHA256: receipt.selectionEvidenceSHA256)
+        }
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(receipt.targetID),
+            "previousBindingRevision": .integer(Int64(receipt.previousRevision)),
+            "bindingRevision": .integer(Int64(receipt.currentRevision)),
+            "updated": .bool(receipt.updated),
+            "selectionEvidenceSha256": .string(receipt.selectionEvidenceSHA256),
+            "settledJobId": pendingJobID.map(JSONValue.string) ?? .null,
+          ]))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Rockchip Loader binding was refused: \(error)")
       }
 
     case "trace.probe":

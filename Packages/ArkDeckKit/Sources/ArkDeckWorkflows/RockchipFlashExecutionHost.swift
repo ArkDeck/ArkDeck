@@ -148,7 +148,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   /// Converts the owner-only Rockchip rebind evidence into the one adjacent
   /// edge the generic Runtime target store may apply. Revision 1 has no edge
   /// to apply. Later revisions must carry one unambiguous previous identity,
-  /// previous revision/topology and the explicit rebind confirmation digest;
+  /// previous revision/topology and the Runtime user-selection digest;
   /// incomplete or invented lineage never reaches the target store.
   package func runtimeTargetLineageAdvance()
     throws -> RuntimeTargetBindingLineageAdvance?
@@ -166,7 +166,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     let previousIdentities = values(prefix: "identity:previous-serial-sha256=")
     let previousRevisions = values(prefix: "binding:previous-revision=")
     let previousTopologies = values(prefix: "binding:previous-usb-topology=")
-    let confirmations = values(prefix: "rebind:chat-confirmation-sha256=")
+    let confirmations = values(prefix: "rebind:user-selection-sha256=")
     guard previousIdentities.count == 1,
       previousRevisions.count == 1,
       previousTopologies.count == 1,
@@ -200,7 +200,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   /// the Loader identity as the stable campaign identity, but the immediately
   /// preceding HDC-normal identity remains the only address from which the
   /// typed `enter-loader` step can start.  Accept that alias only when the
-  /// owner-only binding carries the complete, explicitly confirmed adjacent
+  /// owner-only binding carries the complete Runtime-observed adjacent
   /// lineage edge.  A digest without its paired topology, a Loader claiming
   /// the previous HDC identity, or any older/unrelated identity remains a
   /// mismatch.
@@ -233,7 +233,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
 
   /// The one HDC-normal personality this binding's confirmed lineage accepts
   /// besides its current identity, or nil when there is no valid confirmed
-  /// edge (revision 1, or evidence without the explicit rebind confirmation).
+  /// edge (revision 1, or evidence without the Runtime user-selection proof).
   /// This is the single source for the alias every identity comparison must
   /// use — the executing gates through `matchesConfirmedLiveIdentity`, and
   /// the flash preflight, which on 2026-08-04 compared raw digests instead
@@ -243,10 +243,74 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     throws -> (identitySHA256: String, usbTopology: String)?
   {
     guard evidence.contains("product:e0-iokit-single-loader-readback"),
-      let advance = try runtimeTargetLineageAdvance(),
-      let previousTopology = values(prefix: "binding:previous-usb-topology=").first
+      try runtimeTargetLineageAdvance() != nil
     else { return nil }
-    return (advance.previousStableIdentitySHA256, previousTopology)
+    let identities = values(prefix: "identity:hdc-normal-alias-sha256=")
+    let topologies = values(prefix: "binding:hdc-normal-alias-usb-topology=")
+    guard identities.count == 1, topologies.count == 1,
+      let identity = identities.first, let topology = topologies.first,
+      RockchipStandingAuthorization.isCanonicalSHA256(identity),
+      !topology.isEmpty,
+      topology.utf8.allSatisfy({ (48...57).contains($0) }),
+      topology == "0" || topology.first != "0"
+    else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding HDC-normal alias is invalid or ambiguous")
+    }
+    return (identity, topology)
+  }
+
+  /// Durable proof sufficient to finish the narrow crash window after a
+  /// Runtime-owned Loader binding was published but before its outstanding
+  /// enter-Loader Job intent was settled. This never observes or dispatches a
+  /// device action; it only exposes the redacted adjacent revisions and the
+  /// Runtime selection digest already validated by the binding document.
+  package func loaderBindingRecoveryProof()
+    throws -> RockchipLoaderBindingRecoveryProof?
+  {
+    guard evidence.contains("product:e0-iokit-single-loader-readback"),
+      let advance = try runtimeTargetLineageAdvance(),
+      try confirmedHDCNormalAlias() != nil
+    else { return nil }
+    let selections = values(prefix: "rebind:user-selection-sha256=")
+    guard selections.count == 1, let selection = selections.first,
+      RockchipStandingAuthorization.isCanonicalSHA256(selection)
+    else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable Loader binding selection evidence is invalid or ambiguous")
+    }
+    return RockchipLoaderBindingRecoveryProof(
+      previousRevision: advance.previousRevision,
+      currentRevision: advance.currentRevision,
+      selectionEvidenceSHA256: selection)
+  }
+
+  /// One-time migration input for bindings created before Runtime-owned
+  /// Loader onboarding replaced the historical chat-confirmation field. It
+  /// is deliberately not used by admission or live target matching: callers
+  /// may only carry the already-recorded HDC-normal alias into a new binding
+  /// whose authority comes from a fresh Runtime observation plus an explicit
+  /// target selection.
+  func migrationHDCNormalAlias()
+    throws -> (identitySHA256: String, usbTopology: String)?
+  {
+    let explicitIdentities = values(prefix: "identity:hdc-normal-alias-sha256=")
+    let explicitTopologies = values(prefix: "binding:hdc-normal-alias-usb-topology=")
+    if explicitIdentities.count == 1, explicitTopologies.count == 1,
+      let identity = explicitIdentities.first, let topology = explicitTopologies.first,
+      RockchipStandingAuthorization.isCanonicalSHA256(identity), !topology.isEmpty
+    {
+      return (identity, topology)
+    }
+    guard revision == 2,
+      values(prefix: "rebind:chat-confirmation-sha256=").count == 1,
+      values(prefix: "identity:previous-serial-sha256=").count == 1,
+      values(prefix: "binding:previous-usb-topology=").count == 1,
+      let identity = values(prefix: "identity:previous-serial-sha256=").first,
+      let topology = values(prefix: "binding:previous-usb-topology=").first,
+      RockchipStandingAuthorization.isCanonicalSHA256(identity), !topology.isEmpty
+    else { return nil }
+    return (identity, topology)
   }
 
   /// Answers whether this owner-only product binding covers the exact
@@ -288,6 +352,12 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       $0.hasPrefix(prefix) ? String($0.dropFirst(prefix.count)) : nil
     }
   }
+}
+
+package struct RockchipLoaderBindingRecoveryProof: Sendable, Equatable {
+  package let previousRevision: Int
+  package let currentRevision: Int
+  package let selectionEvidenceSHA256: String
 }
 
 package struct RockchipProductBindingStore: Sendable {
@@ -399,6 +469,86 @@ package struct RockchipProductBindingStore: Sendable {
       throw configurationError("binding write-readback failed")
     }
     return (readback, true)
+  }
+
+  /// Atomically replaces exactly the expected current binding with one
+  /// adjacent Runtime-observed revision. The caller has already applied Core
+  /// rebind policy; this store enforces compare-and-swap and schema/readback.
+  func replace(
+    expectedRevision: Int,
+    expectedSerialSHA256: String,
+    with candidate: RockchipProductBindingSnapshot
+  ) throws -> RockchipProductBindingSnapshot {
+    try validate(candidate)
+    try prepareRoot()
+    let rootDescriptor = Darwin.open(
+      rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard rootDescriptor >= 0 else { throw configurationError("binding root cannot be opened") }
+    defer { Darwin.close(rootDescriptor) }
+    let lockDescriptor = Darwin.openat(
+      rootDescriptor, Self.lockFileName,
+      O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+    guard lockDescriptor >= 0 else { throw configurationError("binding lock cannot be opened") }
+    defer { Darwin.close(lockDescriptor) }
+    try validateOwnedRegularFile(lockDescriptor, permissions: 0o600, label: "binding lock")
+    guard flock(lockDescriptor, LOCK_EX) == 0 else {
+      throw configurationError("binding lock cannot be acquired")
+    }
+    defer { _ = flock(lockDescriptor, LOCK_UN) }
+    guard let existing = try load(rootDescriptor: rootDescriptor) else {
+      throw configurationError("durable Rockchip binding is not installed")
+    }
+    let existingDigest = SHA256.hash(data: Data(existing.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    guard existing.revision == expectedRevision,
+      existingDigest == expectedSerialSHA256,
+      candidate.revision == existing.revision + 1
+    else { throw configurationError("durable binding changed before Loader rebind") }
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    var document = try encoder.encode(candidate)
+    document.append(0x0A)
+    guard document.count <= Self.maximumDocumentBytes else {
+      throw configurationError("binding document exceeds its product limit")
+    }
+    let temporaryName = ".rockchip-binding.\(UUID().uuidString.lowercased()).part"
+    let temporaryDescriptor = Darwin.openat(
+      rootDescriptor, temporaryName,
+      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+    guard temporaryDescriptor >= 0 else {
+      throw configurationError("binding temporary file cannot be created")
+    }
+    var temporaryOpen = true
+    defer {
+      if temporaryOpen { Darwin.close(temporaryDescriptor) }
+      _ = unlinkat(rootDescriptor, temporaryName, 0)
+    }
+    do {
+      try writeAll(document, descriptor: temporaryDescriptor)
+      guard fchmod(temporaryDescriptor, S_IRUSR | S_IWUSR) == 0,
+        Darwin.fsync(temporaryDescriptor) == 0,
+        Darwin.fcntl(temporaryDescriptor, F_FULLFSYNC) == 0
+      else { throw configurationError("binding temporary file cannot be synchronized") }
+      guard Darwin.close(temporaryDescriptor) == 0 else {
+        throw configurationError("binding temporary file cannot be closed")
+      }
+      temporaryOpen = false
+      guard renameat(
+        rootDescriptor, temporaryName, rootDescriptor, Self.bindingFileName) == 0
+      else { throw configurationError("binding replacement cannot be committed") }
+      guard Darwin.fsync(rootDescriptor) == 0 else {
+        throw configurationError("binding directory cannot be synchronized")
+      }
+    } catch let error as RockchipFlashExecutionError {
+      throw error
+    } catch {
+      throw configurationError("binding replacement failed")
+    }
+    guard let readback = try load(rootDescriptor: rootDescriptor), readback == candidate else {
+      throw configurationError("binding replacement readback failed")
+    }
+    return readback
   }
 
   private func prepareRoot() throws {
@@ -1165,6 +1315,13 @@ struct RockchipProductUSBProbe: Sendable {
     }
   ) {
     self.identitySource = identitySource
+  }
+
+  /// Enumerates registered DAYU200 personalities without selecting or
+  /// mutating one. Callers must keep raw identities inside the product-owned
+  /// boundary and expose only a redacted projection.
+  func registeredDAYU200Identities() throws -> [RockchipProductUSBIdentity] {
+    try identitySource().filter(\.isRegisteredDAYU200Mode)
   }
 
   func singleLoader(selector: String? = nil) throws -> RockchipProductUSBIdentity {

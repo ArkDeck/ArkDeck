@@ -153,6 +153,8 @@ final class AgentDaemonContractTests: XCTestCase {
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportPolicy: FlashBundleImportPolicy = .production,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
+    rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
@@ -179,6 +181,8 @@ final class AgentDaemonContractTests: XCTestCase {
         "flash-bundle-imports-\(UUID().uuidString)", isDirectory: true),
       flashBundleImportPolicy: flashBundleImportPolicy,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
+      rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
+      rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       harnessCoordinator: nil,
       methodObserver: nil)
     return (handler, engine)
@@ -334,6 +338,66 @@ final class AgentDaemonContractTests: XCTestCase {
       ])
     XCTAssertFalse(missing.ok)
     XCTAssertEqual(missing.error?.code, "notFound")
+  }
+
+  func testBootloaderStatusAndClosedLoaderBindingHaveRedactedWireShapes() async throws {
+    struct StatusObserver: RockchipBootloaderStatusObserving {
+      func observeBootloaderStatus() throws -> RockchipBootloaderStatus {
+        RockchipBootloaderStatus(
+          disposition: .unbound,
+          observationCount: 1,
+          mode: "loader",
+          targetID: nil,
+          bindingRevision: nil)
+      }
+    }
+    struct BindingCoordinator: RockchipLoaderBindingCoordinating {
+      func bindCurrentLoader(
+        targetID: String,
+        expectedBindingRevision: Int
+      ) throws -> RockchipLoaderBindingReceipt {
+        RockchipLoaderBindingReceipt(
+          targetID: targetID,
+          previousRevision: expectedBindingRevision,
+          currentRevision: expectedBindingRevision + 1,
+          updated: true,
+          selectionEvidenceSHA256: String(repeating: "c", count: 64))
+      }
+    }
+    let (handler, _) = try makeStack(
+      rockchipBootloaderStatusObserver: StatusObserver(),
+      rockchipLoaderBindingCoordinator: BindingCoordinator())
+
+    let observed = try await request(handler, method: "flash.bootloader-status")
+    guard case .object(let status)? = observed.result else {
+      return XCTFail("bootloader status must be an object")
+    }
+    XCTAssertTrue(observed.ok)
+    XCTAssertEqual(status["disposition"], .string("unbound"))
+    XCTAssertEqual(status["observationCount"], .integer(1))
+    XCTAssertEqual(status["mode"], .string("loader"))
+    XCTAssertEqual(status["targetId"], .null)
+    XCTAssertEqual(
+      Set(status.keys),
+      ["disposition", "observationCount", "mode", "targetId", "bindingRevision"])
+
+    let bound = try await request(
+      handler,
+      method: "flash.bind-current-loader",
+      params: [
+        "targetId": .string("TGT-SELECTED"),
+        "expectedBindingRevision": .integer(2),
+      ])
+    guard case .object(let receipt)? = bound.result else {
+      return XCTFail("Loader binding must return a receipt")
+    }
+    XCTAssertTrue(bound.ok, bound.error?.message ?? "-")
+    XCTAssertEqual(receipt["targetId"], .string("TGT-SELECTED"))
+    XCTAssertEqual(receipt["previousBindingRevision"], .integer(2))
+    XCTAssertEqual(receipt["bindingRevision"], .integer(3))
+    XCTAssertEqual(receipt["settledJobId"], .null)
+    XCTAssertNil(receipt["serial"])
+    XCTAssertNil(receipt["usbTopology"])
   }
 
   func testPlanPreviewRemainsReadOnlyAndCapabilityAdministrationIsNotAgentFacing() async throws {
@@ -1056,7 +1120,7 @@ final class AgentDaemonContractTests: XCTestCase {
         usbTopology: "17956864",
         evidence: [
           "identity:serial-sha256=\(currentIdentity)",
-          "rebind:chat-confirmation-sha256=\(String(repeating: "b", count: 64))",
+          "rebind:user-selection-sha256=\(String(repeating: "b", count: 64))",
           "identity:previous-serial-sha256=\(previousIdentity)",
           "binding:previous-revision=1",
           "binding:previous-usb-topology=18874368",

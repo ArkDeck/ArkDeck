@@ -47,6 +47,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
   func testTheAllowlistForwardsExactlyTheAppControlPlane() {
     for method in ArkDeckAgentXPC.forwardableReadOnlyMethods
       .union(ArkDeckAgentXPC.forwardableFlashBundleMethods)
+      .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
       .union(ArkDeckAgentXPC.forwardableAutomationMethods)
     {
       XCTAssertEqual(
@@ -67,7 +68,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       [
         "artifact.inspect", "artifact.list", "artifact.read", "debug.probe",
         "debug.template.run",
-        "device.candidates", "flash.prerequisites",
+        "device.candidates", "flash.bootloader-status", "flash.prerequisites",
         "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
         "target.list", "trace.probe",
       ],
@@ -79,6 +80,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "artifact.importFlashBundle.begin", "artifact.importFlashBundle.commit",
       ],
       "widening the Flash artifact surface is forbidden")
+    XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableRockchipBindingMethods,
+      ["flash.bind-current-loader"],
+      "Loader binding must remain one closed Runtime-owned identity action")
     XCTAssertEqual(
       ArkDeckAgentXPC.gatedAppJobMethods, ["job.cancel", "job.run", "job.submit"],
       "generic job names must stay behind the payload and ownership gate")

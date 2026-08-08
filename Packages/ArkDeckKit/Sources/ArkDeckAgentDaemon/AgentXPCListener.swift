@@ -159,6 +159,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
 
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
+      || ArkDeckAgentXPC.forwardableRockchipBindingMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableAutomationMethods.contains(request.method)
     {
       return .direct(method: request.method)

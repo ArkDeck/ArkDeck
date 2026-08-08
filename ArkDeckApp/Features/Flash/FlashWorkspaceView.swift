@@ -262,6 +262,30 @@ struct FlashWorkspaceView: View {
           .disabled(model.isRefreshingDeviceAccess)
           .accessibilityIdentifier("flash.deviceAccess.reprobe")
         }
+        if model.workspace.bootloaderStatus.disposition == .unbound,
+          model.workspace.bootloaderStatus.mode == "loader"
+        {
+          Divider()
+          Label(
+            flashText("flash.bootloader.unbound.title"),
+            systemImage: "externaldrive.badge.questionmark"
+          )
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(.orange)
+          Text(flashText("flash.bootloader.unbound.detail"))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        } else if model.workspace.bootloaderStatus.disposition == .exactBoundTarget,
+          model.workspace.bootloaderStatus.mode == "loader"
+        {
+          Label(
+            flashText("flash.bootloader.bound"),
+            systemImage: "checkmark.seal.fill"
+          )
+          .foregroundStyle(.green)
+          .accessibilityIdentifier("flash.bootloader.bound")
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
@@ -643,6 +667,7 @@ struct FlashWorkspaceView: View {
           }
           if let plan = model.plan,
             !plan.blockingRequiredPrerequisites.isEmpty,
+            !model.willBindCurrentLoaderOnSubmit,
             !model.isSubmitting
           {
             Label(
@@ -879,7 +904,15 @@ final class FlashWorkspaceViewModel: ObservableObject {
     return !archive.path.isEmpty
       && plan.target == selectedTarget
       && plan.mode == .execute
-      && plan.blockingRequiredPrerequisites.isEmpty
+      && (plan.blockingRequiredPrerequisites.isEmpty || willBindCurrentLoaderOnSubmit)
+  }
+
+  var willBindCurrentLoaderOnSubmit: Bool {
+    guard mode == .execute, selectedTarget != nil else { return false }
+    let status = workspace.bootloaderStatus
+    return status.disposition == .unbound
+      && status.observationCount == 1
+      && status.mode == "loader"
   }
 
   func refresh() {
@@ -1004,10 +1037,70 @@ final class FlashWorkspaceViewModel: ObservableObject {
     let provider = provider
     let detailProvider = detailProvider
     Task { [weak self] in
-      let submissionResult = await provider.submit(archiveURL: archiveURL, plan: plan)
       guard let self else { return }
       guard self.selectedArchiveURL == archiveURL,
         self.plan == plan,
+        !Task.isCancelled
+      else {
+        self.isSubmitting = false
+        return
+      }
+      var executionPlan = plan
+      if self.willBindCurrentLoaderOnSubmit, let selectedTarget = plan.target {
+        let bindingResult = await provider.bindCurrentLoader(target: selectedTarget)
+        guard self.selectedArchiveURL == archiveURL,
+          self.plan == plan,
+          self.selectedTarget == selectedTarget,
+          !Task.isCancelled
+        else {
+          self.isSubmitting = false
+          return
+        }
+        guard case .bound(let rebound) = bindingResult else {
+          self.isSubmitting = false
+          if case .failed(let detail) = bindingResult {
+            self.submissionFailure = detail
+          }
+          return
+        }
+        self.applyBoundLoader(rebound)
+        let refreshed = await provider.preparePlan(
+          archiveURL: archiveURL,
+          profileReference: plan.profileReference,
+          mode: .execute,
+          target: rebound)
+        guard self.selectedArchiveURL == archiveURL,
+          self.selectedTarget == rebound,
+          !Task.isCancelled
+        else {
+          self.isSubmitting = false
+          return
+        }
+        guard case .ready(let reboundPlan) = refreshed else {
+          self.isSubmitting = false
+          if case .failed(let code, let detail) = refreshed {
+            self.planFailureCode = code
+            self.planFailureDetail = detail
+          }
+          return
+        }
+        self.plan = reboundPlan
+        guard reboundPlan.target == rebound,
+          reboundPlan.mode == .execute,
+          reboundPlan.blockingRequiredPrerequisites.isEmpty
+        else {
+          self.isSubmitting = false
+          self.submissionFailure =
+            "Loader was bound, but Runtime prerequisites still block Flash"
+          return
+        }
+        executionPlan = reboundPlan
+      }
+
+      let submissionResult = await provider.submit(
+        archiveURL: archiveURL, plan: executionPlan)
+      guard self.selectedArchiveURL == archiveURL,
+        self.plan == executionPlan,
         !Task.isCancelled
       else {
         self.isSubmitting = false
@@ -1018,7 +1111,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
         self.activeJobID = jobID
         let runResult = await provider.run(jobID: jobID)
         guard self.selectedArchiveURL == archiveURL,
-          self.plan == plan,
+          self.plan == executionPlan,
           !Task.isCancelled
         else {
           self.activeJobID = nil
@@ -1040,7 +1133,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
           jobID: terminal.jobID,
           operationReference: "flash.dayu200@1")
         guard self.selectedArchiveURL == archiveURL,
-          self.plan == plan,
+          self.plan == executionPlan,
           !Task.isCancelled
         else { return }
         self.postflightEvidence = detail.evidence
@@ -1049,6 +1142,19 @@ final class FlashWorkspaceViewModel: ObservableObject {
         self.submissionFailure = detail
       }
     }
+  }
+
+  private func applyBoundLoader(_ rebound: FlashTargetPresentation) {
+    workspace = FlashWorkspacePresentation(
+      availability: workspace.availability,
+      targets: workspace.targets.map { $0.id == rebound.id ? rebound : $0 },
+      bootloaderStatus: RockchipBootloaderStatus(
+        disposition: .exactBoundTarget,
+        observationCount: 1,
+        mode: "loader",
+        targetID: rebound.id,
+        bindingRevision: rebound.bindingRevision),
+      targetLoadFailure: workspace.targetLoadFailure)
   }
 
   func cancelActiveJob() {

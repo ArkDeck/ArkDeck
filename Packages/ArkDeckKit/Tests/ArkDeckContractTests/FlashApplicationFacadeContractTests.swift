@@ -74,6 +74,35 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       "Runtime returned a target without complete binding facts")
   }
 
+  func testBootloaderStatusProjectsUnboundLoaderWithoutRawIdentityFacts() throws {
+    let bootloader = try JSONSerialization.data(withJSONObject: [
+      "id": "bootloader", "ok": true,
+      "result": [
+        "disposition": "unbound",
+        "observationCount": 1,
+        "mode": "loader",
+        "targetId": NSNull(),
+        "bindingRevision": NSNull(),
+      ],
+    ])
+    let presentation = FlashWorkspaceResponseDecoding.presentation(
+      operationResponse: .success(
+        try response([
+          ["reference": "flash.dayu200@1", "availability": "available", "reasons": []]
+        ])),
+      targetResponse: .success(try response([])),
+      bootloaderResponse: .success(bootloader))
+
+    XCTAssertEqual(
+      presentation.bootloaderStatus,
+      RockchipBootloaderStatus(
+        disposition: .unbound,
+        observationCount: 1,
+        mode: "loader",
+        targetID: nil,
+        bindingRevision: nil))
+  }
+
   func testPlanPresentationPreservesEveryTypedStepAndMarksPlanOnlyAsNotExecuted() throws {
     let profile = RockchipFlashProfile.dayu200OpenHarmony70035
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(

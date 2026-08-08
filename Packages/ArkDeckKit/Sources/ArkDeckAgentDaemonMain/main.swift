@@ -202,6 +202,10 @@ Task.detached {
     )
     let targetStore = try RuntimeTargetStore(
       directoryURL: resolvedStateDirectory.appendingPathComponent("targets", isDirectory: true))
+    var startupLoaderBindingRecovery: (
+      targetID: String,
+      proof: RockchipLoaderBindingRecoveryProof
+    )?
 
     // A Loader rebind advances the product's owner-only Rockchip binding,
     // while the adopted Runtime target deliberately keeps its normal-mode
@@ -212,14 +216,26 @@ Task.detached {
     let rockchipRoot = resolvedStateDirectory.deletingLastPathComponent()
     if resolvedStateDirectory.lastPathComponent == "Agentd",
       rockchipRoot.lastPathComponent == "ArkDeck",
-      let binding = try RockchipProductBindingStore(rootURL: rockchipRoot).loadIfPresent(),
-      let advance = try binding.runtimeTargetLineageAdvance()
+      let binding = try RockchipProductBindingStore(rootURL: rockchipRoot).loadIfPresent()
     {
-      let result = try targetStore.advanceBindingLineage(advance)
-      if result.updated {
-        print(
-          "advanced runtime target \(result.record.targetID) to Rockchip binding revision "
-            + "\(result.record.bindingRevision)")
+      do {
+        if let advance = try binding.runtimeTargetLineageAdvance() {
+          let result = try targetStore.advanceBindingLineage(advance)
+          if let proof = try binding.loaderBindingRecoveryProof() {
+            startupLoaderBindingRecovery = (result.record.targetID, proof)
+          }
+          if result.updated {
+            print(
+              "advanced runtime target \(result.record.targetID) to Rockchip binding revision "
+                + "\(result.record.bindingRevision)")
+          }
+        }
+      } catch {
+        // Historical bindings may carry the retired chat-confirmation field.
+        // They are deliberately unusable for admission, but the daemon must
+        // stay available so the user can select a target and let Runtime
+        // migrate it from a fresh, unique Loader observation.
+        print("Rockchip binding requires Runtime Loader onboarding: \(error)")
       }
     }
 
@@ -493,6 +509,22 @@ Task.detached {
       print("recovered \(recovered.count) active job(s); unknown outcomes parked")
       fflush(stdout)
     }
+    if let recovery = startupLoaderBindingRecovery,
+      let pendingJobID = try await engine.loaderTransitionAwaitingBinding(
+        targetID: recovery.targetID,
+        expectedBindingRevision: recovery.proof.previousRevision)
+    {
+      _ = try await engine.settleLoaderTransitionAfterBinding(
+        jobID: pendingJobID,
+        targetID: recovery.targetID,
+        previousBindingRevision: recovery.proof.previousRevision,
+        currentBindingRevision: recovery.proof.currentRevision,
+        selectionEvidenceSHA256: recovery.proof.selectionEvidenceSHA256)
+      print(
+        "settled recovered Loader transition \(pendingJobID) without replay at binding revision "
+          + "\(recovery.proof.currentRevision)")
+      fflush(stdout)
+    }
     // Harness task plane (CHG-2026-054): one composition root, not a second
     // daemon. It reaches execution only through the engine port below.
     let harnessStore = try HarnessTaskStore(
@@ -581,6 +613,10 @@ Task.detached {
       flashBundleImportDirectory: resolvedStateDirectory.appendingPathComponent(
         "flash-bundle-imports", isDirectory: true),
       flashPrerequisiteObserver: rockchipFactsPort,
+      rockchipBootloaderStatusObserver: ProductRockchipBootloaderStatusObserver(
+        targetStore: targetStore, applicationSupportRoot: rockchipRoot),
+      rockchipLoaderBindingCoordinator: ProductRockchipLoaderBindingCoordinator(
+        targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
       harnessCoordinator: harness)

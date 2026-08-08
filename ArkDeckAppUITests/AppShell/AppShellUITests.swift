@@ -842,13 +842,18 @@ final class AppShellUITests: XCTestCase {
   /// The exact-plan fixture is presentation-only: it bypasses the system file
   /// picker so this flow can walk the complete inline review inside the
   /// sweep's launch. The enabled one-click Flash action is never clicked, so
-  /// the fixture run still submits nothing.
+  /// the fixture run exercises the one-click Loader-bind + Flash handoff only
+  /// against the in-process presentation fixture; no device transport exists.
   private func walkExactFlashPlanRunAction(
     in app: XCUIApplication, file: StaticString, line: UInt
   ) {
-    writeFixtureState("--ui-test-flash-plan", in: app, file: file, line: line)
+    writeFixtureState(
+      "--ui-test-flash-loader-unbound\n--ui-test-flash-plan",
+      in: app, file: file, line: line)
     select("app.navigation.flash", in: app)
     app.buttons["flash.refresh"].click()
+    app.buttons["flash.mode.execute"].click()
+    XCTAssertFalse(app.buttons["flash.bootloader.bind"].exists, file: file, line: line)
     XCTAssertTrue(
       element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
       "the fixture must materialize an exact execute plan", file: file, line: line)
@@ -878,6 +883,15 @@ final class AppShellUITests: XCTestCase {
     XCTAssertEqual(submit.label, "Erase userdata and flash", file: file, line: line)
     XCTAssertFalse(element("flash.confirm.sheet", in: app).exists, file: file, line: line)
     XCTAssertFalse(element("flash.execute.terminal", in: app).exists, file: file, line: line)
+    submit.click()
+    XCTAssertTrue(
+      element("flash.bootloader.bound", in: app).waitForExistenceFast(timeout: 10),
+      "the single Flash click must bind the Loader without a confirmation sheet",
+      file: file, line: line)
+    XCTAssertTrue(
+      element("flash.execute.terminal", in: app).waitForExistenceFast(timeout: 10),
+      "the same Flash click must continue into the fixture execution",
+      file: file, line: line)
   }
 
   private func writeFixtureState(
