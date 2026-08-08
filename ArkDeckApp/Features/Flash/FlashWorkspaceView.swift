@@ -622,6 +622,7 @@ struct FlashWorkspaceView: View {
             .font(.subheadline.weight(.semibold))
           ForEach(Array(plan.dataImpact.enumerated()), id: \.offset) { _, impact in
             dataImpactLabel(impact)
+              .accessibilityIdentifier(dataImpactIdentifier(impact))
           }
         }
 
@@ -747,6 +748,17 @@ struct FlashWorkspaceView: View {
       return Label(flashText("flash.impact.userdata"), systemImage: "trash.fill")
     case .forbiddenAreasPreserved:
       return Label(flashText("flash.impact.preserved"), systemImage: "checkmark.shield.fill")
+    }
+  }
+
+  private func dataImpactIdentifier(_ impact: FlashDataImpactPresentation) -> String {
+    switch impact {
+    case .mappedPartitionsOverwritten:
+      return "flash.impact.partitions"
+    case .userDataDestroyed:
+      return "flash.impact.userdata"
+    case .forbiddenAreasPreserved:
+      return "flash.impact.preserved"
     }
   }
 
