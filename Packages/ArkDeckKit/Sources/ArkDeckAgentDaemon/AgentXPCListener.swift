@@ -199,7 +199,6 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       case .string("2.0.0")? = request["schemaVersion"],
       case .object(let operation)? = request["operation"],
       case .string(let operationID)? = operation["id"],
-      case .integer(1)? = operation["version"],
       request["authorization"] == nil,
       request["campaignReservation"] == nil,
       case .object(let context)? = request["clientContext"],
@@ -207,15 +206,20 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
     else { return nil }
     switch (clientName, operationID) {
     case ("ArkDeckApp.FlashWorkspace", "flash.dayu200"):
+      guard operation["version"] == nil else { return nil }
       return .flash
     case ("ArkDeckApp.TraceWorkspace", "capture.diagnostics"):
+      guard case .integer(1)? = operation["version"] else { return nil }
       return .trace
     case ("ArkDeckApp.DebugWorkspace.Logs", "capture.diagnostics"):
+      guard case .integer(1)? = operation["version"] else { return nil }
       return .debugLogs
     case ("ArkDeckApp.DebugWorkspace.Apps", "debug.hap"):
+      guard case .integer(1)? = operation["version"] else { return nil }
       return .debugHAP
     case ("ArkDeckApp.DebugWorkspace.Network", "port-forward.create"),
       ("ArkDeckApp.DebugWorkspace.Network", "port-forward.remove"):
+      guard case .integer(1)? = operation["version"] else { return nil }
       return .debugPorts
     default:
       return nil
