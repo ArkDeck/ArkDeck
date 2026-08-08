@@ -47,21 +47,27 @@ public struct ProductRockchipBootloaderStatusObserver:
 {
   private let targetStore: RuntimeTargetStore
   private let bindingStore: RockchipProductBindingStore
+  private let postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore
   private let usbProbe: RockchipProductUSBProbe
 
   public init(targetStore: RuntimeTargetStore, applicationSupportRoot: URL) {
     self.targetStore = targetStore
     self.bindingStore = RockchipProductBindingStore(rootURL: applicationSupportRoot)
+    self.postFlashHDCBindingStore = RockchipPostFlashHDCBindingStore(
+      rootURL: applicationSupportRoot)
     self.usbProbe = RockchipProductUSBProbe()
   }
 
   init(
     targetStore: RuntimeTargetStore,
     bindingStore: RockchipProductBindingStore,
+    postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil,
     usbProbe: RockchipProductUSBProbe
   ) {
     self.targetStore = targetStore
     self.bindingStore = bindingStore
+    self.postFlashHDCBindingStore = postFlashHDCBindingStore
+      ?? RockchipPostFlashHDCBindingStore(rootURL: bindingStore.rootURL)
     self.usbProbe = usbProbe
   }
 
@@ -78,6 +84,22 @@ public struct ProductRockchipBootloaderStatusObserver:
 
     let digest = SHA256.hash(data: Data(identity.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
+    let binding = try bindingStore.loadIfPresent()
+    if identity.isHDCNormal,
+      let binding,
+      let routed = try postFlashHDCBindingStore.loadIfPresent(),
+      let target = try targetStore.find(targetID: routed.targetID),
+      try routed.covers(target: target, binding: binding),
+      routed.hdcIdentitySHA256 == digest,
+      routed.usbTopology == identity.topology
+    {
+      return RockchipBootloaderStatus(
+        disposition: .exactBoundTarget,
+        observationCount: 1,
+        mode: Self.mode(of: identity),
+        targetID: target.targetID,
+        bindingRevision: target.bindingRevision)
+    }
     let matchingTargets = try targetStore.list().filter {
       $0.stablePhysicalIdentitySHA256 == digest
     }
@@ -98,7 +120,6 @@ public struct ProductRockchipBootloaderStatusObserver:
         bindingRevision: nil)
     }
 
-    let binding = try bindingStore.loadIfPresent()
     let covered: Bool
     if let binding {
       do {

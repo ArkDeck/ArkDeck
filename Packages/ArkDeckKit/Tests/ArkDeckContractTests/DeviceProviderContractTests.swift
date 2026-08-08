@@ -24,7 +24,10 @@ final class DeviceProviderContractTests: XCTestCase {
         toolSHA256: String(repeating: "c", count: 64),
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
-            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied,
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+            "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
         ],
         targetID: targetID, bindingRevision: 1,
         deviceIdentitySHA256:
@@ -66,6 +69,23 @@ final class DeviceProviderContractTests: XCTestCase {
       factsPort: RockchipFactsPort(), availability: .available)
     let ready = try await provider.resolveFacts(targetID: "TGT-1")
     XCTAssertNil(provider.executionAdmissionBlocker(for: operation, facts: ready))
+
+    let missingPostflightRoute = ProviderFacts(
+      providerID: ready.providerID, toolVersion: ready.toolVersion,
+      toolSHA256: ready.toolSHA256,
+      serverFacts: [
+        TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+      ], targetID: ready.targetID, bindingRevision: ready.bindingRevision,
+      deviceIdentitySHA256: ready.deviceIdentitySHA256,
+      executionConnectKey: ready.executionConnectKey,
+      deviceMode: ready.deviceMode, buildFingerprint: ready.buildFingerprint,
+      profileID: ready.profileID, collectedAtUTC: ready.collectedAtUTC)
+    XCTAssertEqual(
+      provider.executionAdmissionBlocker(
+        for: operation, facts: missingPostflightRoute),
+      "flash.postFlashHDCBindingUnprepared: target TGT-1 has no trusted HDC identity "
+        + "and USB topology for postflight")
 
     let unprepared = ProviderFacts(
       providerID: ready.providerID, toolVersion: ready.toolVersion,
@@ -261,6 +281,7 @@ final class DeviceProviderContractTests: XCTestCase {
         expectedIdentitySHA256: flashContext.expectedIdentitySHA256,
         toolVersion: flashContext.toolVersion,
         toolSHA256: flashContext.toolSHA256,
+        serverFacts: flashContext.serverFacts,
         nowUTC: flashContext.nowUTC,
         resolvedInputArtifact: flashContext.resolvedInputArtifact,
         // The version the resolved bundle declares is a fact the Runtime reads
@@ -286,6 +307,9 @@ final class DeviceProviderContractTests: XCTestCase {
       if ["flash-partitions", "verify-flash-readback"].contains(step.stepID) {
         XCTAssertFalse(
           runtimeDescriptor.identifier.contains(".v1"), runtimeDescriptor.identifier)
+      } else if ["wait-for-hdc", "rebind-and-verify-build"].contains(step.stepID) {
+        XCTAssertTrue(
+          runtimeDescriptor.identifier.hasSuffix(".v2"), runtimeDescriptor.identifier)
       } else {
         XCTAssertTrue(
           runtimeDescriptor.identifier.hasSuffix(".v1")
@@ -355,6 +379,11 @@ final class DeviceProviderContractTests: XCTestCase {
         "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
       toolVersion: "rkdeveloptool ver 1.32",
       toolSHA256: String(repeating: "c", count: 64),
+      serverFacts: [
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+          "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
+      ],
       nowUTC: "2026-07-30T00:00:00Z",
       resolvedInputArtifact: ProviderResolvedInputArtifact(
         artifactID: "flash-artifact",

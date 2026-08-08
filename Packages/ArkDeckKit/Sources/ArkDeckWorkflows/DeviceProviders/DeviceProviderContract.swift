@@ -118,6 +118,22 @@ public struct RockchipRuntimeFlashBundle: Sendable, Equatable {
 /// deliberately absent: the Runtime consumes its exact capability immediately
 /// before the first mutation and the Provider cannot request a second,
 /// legacy authorization token.
+public struct RockchipHDCReconnectExpectation: Sendable, Equatable, Codable {
+  public let previousConnectKey: String
+  public let previousIdentitySHA256: String
+  public let usbTopology: String
+
+  public init(
+    previousConnectKey: String,
+    previousIdentitySHA256: String,
+    usbTopology: String
+  ) {
+    self.previousConnectKey = previousConnectKey
+    self.previousIdentitySHA256 = previousIdentitySHA256
+    self.usbTopology = usbTopology
+  }
+}
+
 public enum RockchipProviderAction: Sendable, Equatable {
   case enterLoader(connectKey: String)
   case observeHDCNormalUSB(connectKey: String)
@@ -128,10 +144,15 @@ public enum RockchipProviderAction: Sendable, Equatable {
   case verifyFlashReadback(RockchipRuntimeFlashBundle)
   case rebootToNormal(stableIdentitySHA256: String)
   case waitForHDCReconnect(connectKey: String)
+  case waitForBoundHDCReconnect(expectation: RockchipHDCReconnectExpectation)
   case verifyBuild(
     connectKey: String,
     expectedProductModel: String? = nil,
     expectedBuildVersion: String? = nil)
+  case verifyBoundBuild(
+    expectation: RockchipHDCReconnectExpectation,
+    expectedProductModel: String,
+    expectedBuildVersion: String)
   case capturePostFlashDiagnostics(connectKey: String, request: HDCHilogCaptureRequest)
 }
 
@@ -272,7 +293,8 @@ package enum TypedProviderAction: Sendable, Equatable {
     case .rockchip(.observeHDCNormalUSB), .rockchip(.waitForHDCDisconnect),
       .rockchip(.waitForLoader),
       .rockchip(.rebindLoader), .rockchip(.verifyFlashReadback),
-      .rockchip(.waitForHDCReconnect), .rockchip(.verifyBuild),
+      .rockchip(.waitForHDCReconnect), .rockchip(.waitForBoundHDCReconnect),
+      .rockchip(.verifyBuild), .rockchip(.verifyBoundBuild),
       .rockchip(.capturePostFlashDiagnostics):
       return .readOnly
     case .rockchip(.flashPartitions):
@@ -596,6 +618,10 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "rockchip.waitForHDCReconnect",
         arguments: ["connectKey": .string(connectKey)])
+    case .rockchip(.waitForBoundHDCReconnect(let expectation)):
+      self.init(
+        kind: "rockchip.waitForBoundHDCReconnect",
+        arguments: Self.rockchipHDCExpectationArguments(expectation))
     case .rockchip(
       .verifyBuild(let connectKey, let expectedProductModel, let expectedBuildVersion)):
       var arguments: [String: JSONValue] = ["connectKey": .string(connectKey)]
@@ -606,6 +632,12 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         arguments["expectedBuildVersion"] = .string(expectedBuildVersion)
       }
       self.init(kind: "rockchip.verifyBuild", arguments: arguments)
+    case .rockchip(
+      .verifyBoundBuild(let expectation, let expectedProductModel, let expectedBuildVersion)):
+      var arguments = Self.rockchipHDCExpectationArguments(expectation)
+      arguments["expectedProductModel"] = .string(expectedProductModel)
+      arguments["expectedBuildVersion"] = .string(expectedBuildVersion)
+      self.init(kind: "rockchip.verifyBoundBuild", arguments: arguments)
     case .rockchip(.capturePostFlashDiagnostics(let connectKey, let request)):
       self.init(
         kind: "rockchip.capturePostFlashDiagnostics",
@@ -640,6 +672,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       "artifactSha256": .string(bundle.sha256),
       "artifactByteCount": .integer(Int64(bundle.byteCount)),
       "partitionNames": .array(bundle.partitionNames.map(JSONValue.string)),
+    ]
+  }
+
+  private static func rockchipHDCExpectationArguments(
+    _ expectation: RockchipHDCReconnectExpectation
+  ) -> [String: JSONValue] {
+    [
+      "previousConnectKey": .string(expectation.previousConnectKey),
+      "previousIdentitySha256": .string(expectation.previousIdentitySHA256),
+      "usbTopology": .string(expectation.usbTopology),
     ]
   }
 
@@ -722,6 +764,27 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         sha256: try string("artifactSha256"),
         byteCount: byteCount,
         partitionNames: try stringArray("partitionNames"))
+    }
+    func rockchipHDCExpectation() throws -> RockchipHDCReconnectExpectation {
+      let previousConnectKey = try string("previousConnectKey")
+      let previousIdentity = try string("previousIdentitySha256")
+      let topology = try string("usbTopology")
+      let connectIdentity = SHA256.hash(data: Data(previousConnectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      guard !previousConnectKey.isEmpty,
+        previousIdentity.count == 64,
+        previousIdentity.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+        connectIdentity == previousIdentity,
+        !topology.isEmpty,
+        topology.utf8.allSatisfy({ (48...57).contains($0) })
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted \(kind) carries an invalid HDC binding expectation")
+      }
+      return RockchipHDCReconnectExpectation(
+        previousConnectKey: previousConnectKey,
+        previousIdentitySHA256: previousIdentity,
+        usbTopology: topology)
     }
     func path() throws -> HDCOwnedRemotePath {
       let reconstructed = try HDCOwnedRemotePath(
@@ -1027,12 +1090,21 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         stableIdentitySHA256: try string("stableIdentitySha256")))
     case "rockchip.waitForHDCReconnect":
       return .rockchip(.waitForHDCReconnect(connectKey: try string("connectKey")))
+    case "rockchip.waitForBoundHDCReconnect":
+      return .rockchip(.waitForBoundHDCReconnect(
+        expectation: try rockchipHDCExpectation()))
     case "rockchip.verifyBuild":
       return .rockchip(
         .verifyBuild(
           connectKey: try string("connectKey"),
           expectedProductModel: try optionalString("expectedProductModel"),
           expectedBuildVersion: try optionalString("expectedBuildVersion")))
+    case "rockchip.verifyBoundBuild":
+      return .rockchip(
+        .verifyBoundBuild(
+          expectation: try rockchipHDCExpectation(),
+          expectedProductModel: try string("expectedProductModel"),
+          expectedBuildVersion: try string("expectedBuildVersion")))
     case "rockchip.capturePostFlashDiagnostics":
       return .rockchip(.capturePostFlashDiagnostics(
         connectKey: try string("connectKey"),
@@ -1399,6 +1471,10 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   public let expectedIdentitySHA256: String?
   public let toolVersion: String?
   public let toolSHA256: String?
+  /// Provider-owned facts resolved alongside the target. Request inputs have
+  /// no route to this dictionary; closed provider adapters may consume only
+  /// their registered keys when materializing an action.
+  public let serverFacts: [String: String]
   public let nowUTC: String
   public let resolvedInputArtifact: ProviderResolvedInputArtifact?
   /// Further packages of a multi-package install, in the caller's order.
@@ -1427,6 +1503,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     expectedIdentitySHA256: String? = nil,
     toolVersion: String? = nil,
     toolSHA256: String? = nil,
+    serverFacts: [String: String] = [:],
     nowUTC: String,
     resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
     additionalInputArtifacts: [ProviderResolvedInputArtifact] = [],
@@ -1441,6 +1518,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
     self.expectedIdentitySHA256 = expectedIdentitySHA256
     self.toolVersion = toolVersion
     self.toolSHA256 = toolSHA256
+    self.serverFacts = serverFacts
     self.nowUTC = nowUTC
     self.resolvedInputArtifact = resolvedInputArtifact
     self.additionalInputArtifacts = additionalInputArtifacts

@@ -1627,6 +1627,7 @@ public actor RuntimeJobEngine {
         expectedIdentitySHA256: resolvedFacts?.deviceIdentitySHA256,
         toolVersion: resolvedFacts?.toolVersion,
         toolSHA256: resolvedFacts?.toolSHA256,
+        serverFacts: resolvedFacts?.serverFacts ?? [:],
         nowUTC: nowUTC(),
         resolvedInputArtifact: resolvedArtifact,
         additionalInputArtifacts: additionalArtifacts,
@@ -1781,6 +1782,7 @@ public actor RuntimeJobEngine {
       expectedIdentitySHA256: facts.deviceIdentitySHA256,
       toolVersion: facts.toolVersion,
       toolSHA256: facts.toolSHA256,
+      serverFacts: facts.serverFacts,
       nowUTC: nowUTC())
     let mutationPlan = try provider.lower(
       action: mutationAction, context: mutationContext)
@@ -1806,6 +1808,7 @@ public actor RuntimeJobEngine {
         expectedIdentitySHA256: facts.deviceIdentitySHA256,
         toolVersion: facts.toolVersion,
         toolSHA256: facts.toolSHA256,
+        serverFacts: facts.serverFacts,
         nowUTC: nowUTC())
       let verifyAction = TypedProviderAction.hdc(.readPortForwardPresence(spec))
       let verifyPlan = try provider.lower(
@@ -1909,6 +1912,7 @@ public actor RuntimeJobEngine {
         expectedIdentitySHA256: facts.deviceIdentitySHA256,
         toolVersion: facts.toolVersion,
         toolSHA256: facts.toolSHA256,
+        serverFacts: facts.serverFacts,
         nowUTC: nowUTC())
       let action = TypedProviderAction.hdc(.rollbackNativeLibrary(deployment))
       let plan = try provider.lower(action: action, context: context)
@@ -1943,6 +1947,7 @@ public actor RuntimeJobEngine {
       expectedIdentitySHA256: facts.deviceIdentitySHA256,
       toolVersion: facts.toolVersion,
       toolSHA256: facts.toolSHA256,
+      serverFacts: facts.serverFacts,
       nowUTC: nowUTC())
     let cleanupAction = TypedProviderAction.hdc(.cleanupNativeLibrary(deployment))
     let cleanupPlan = try provider.lower(action: cleanupAction, context: cleanupContext)
@@ -2073,6 +2078,7 @@ public actor RuntimeJobEngine {
         expectedIdentitySHA256: facts.deviceIdentitySHA256,
         toolVersion: facts.toolVersion,
         toolSHA256: facts.toolSHA256,
+        serverFacts: facts.serverFacts,
         nowUTC: nowUTC())
       let action = try provider.action(
         for: step, operation: descriptor, inputs: runtime.record.request.inputs,
@@ -3212,6 +3218,7 @@ public actor RuntimeJobEngine {
       expectedIdentitySHA256: facts.deviceIdentitySHA256,
       toolVersion: facts.toolVersion,
       toolSHA256: facts.toolSHA256,
+      serverFacts: facts.serverFacts,
       nowUTC: nowUTC())
     let reference = ProviderDurableIntentReference(
       jobID: jobID, stepID: debt.stepID,
@@ -3672,6 +3679,7 @@ public actor RuntimeJobEngine {
       expectedIdentitySHA256: facts.deviceIdentitySHA256,
       toolVersion: facts.toolVersion,
       toolSHA256: facts.toolSHA256,
+      serverFacts: facts.serverFacts,
       nowUTC: nowUTC())
     let action = try persistedAction.materialize()
     let reference = ProviderDurableIntentReference(
@@ -3700,6 +3708,7 @@ public actor RuntimeJobEngine {
           expectedIdentitySHA256: context.expectedIdentitySHA256,
           toolVersion: context.toolVersion,
           toolSHA256: context.toolSHA256,
+          serverFacts: context.serverFacts,
           nowUTC: context.nowUTC,
           resolvedInputArtifact: context.resolvedInputArtifact,
           // A reconciliation readback derives from the same context it is
@@ -4390,6 +4399,7 @@ public actor RuntimeJobEngine {
           expectedIdentitySHA256: facts?.deviceIdentitySHA256,
           toolVersion: facts?.toolVersion,
           toolSHA256: facts?.toolSHA256,
+          serverFacts: facts?.serverFacts ?? [:],
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
           additionalInputArtifacts: additionalResolved,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
@@ -4487,6 +4497,7 @@ public actor RuntimeJobEngine {
           expectedIdentitySHA256: facts.deviceIdentitySHA256,
           toolVersion: facts.toolVersion,
           toolSHA256: facts.toolSHA256,
+          serverFacts: facts.serverFacts,
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved))
@@ -6019,7 +6030,7 @@ public actor RuntimeJobEngine {
       switch action {
       case .rockchip(.rebindLoader):
         arguments = ["evidencePolicy": .string("rockusbLoaderIdentity")]
-      case .rockchip(.verifyBuild):
+      case .rockchip(.verifyBuild), .rockchip(.verifyBoundBuild):
         arguments = ["evidencePolicy": .string("postFlashBuild")]
       default:
         arguments = ["evidencePolicy": .string("coreMinimum")]
@@ -6040,7 +6051,7 @@ public actor RuntimeJobEngine {
           "deadlineMilliseconds": .integer(45_000),
           "reason": .string("loaderReconnect"),
         ]
-      case .rockchip(.waitForHDCReconnect):
+      case .rockchip(.waitForHDCReconnect), .rockchip(.waitForBoundHDCReconnect):
         arguments = [
           "deadlineMilliseconds": .integer(120_000),
           "reason": .string("normalModeReconnect"),

@@ -2800,7 +2800,10 @@ private struct UnknownOutcomeFlashFactsPort: RockchipRuntimeFactsPort {
       toolSHA256: String(repeating: "c", count: 64),
       serverFacts: [
         TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
-          TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied,
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+          "b02f833b2ad58b84c66c9fe4d4970e39c70c8434c90b393b44325d124a1ed2e0",
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
       ], targetID: targetID, bindingRevision: 7,
       deviceIdentitySHA256:
         "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",

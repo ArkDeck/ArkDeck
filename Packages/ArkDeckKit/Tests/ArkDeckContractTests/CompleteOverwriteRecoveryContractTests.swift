@@ -31,7 +31,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         toolSHA256: toolSHA256,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
-            crossModeBinding
+            crossModeBinding,
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+            "046eb5cb504a4487bd67f0a6f7be370c0be7d2952f0964c390b74c047d3dea70",
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
         ], targetID: targetID,
         bindingRevision: 2, deviceIdentitySHA256: identity,
         executionConnectKey: "sealed-complete-overwrite-connect-key",

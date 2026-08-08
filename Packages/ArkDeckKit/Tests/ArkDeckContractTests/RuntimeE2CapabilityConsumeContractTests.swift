@@ -44,7 +44,10 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
         toolSHA256: RuntimeE2CapabilityConsumeContractTests.toolIdentity,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
-            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied,
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+            "ba4e14a400c3861f2e5ebfbdabfe76b86a5b156d913e59027c325e783e2e44ee",
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
         ], targetID: targetID, bindingRevision: 7,
         deviceIdentitySHA256:
           RuntimeE2CapabilityConsumeContractTests.targetIdentity,
