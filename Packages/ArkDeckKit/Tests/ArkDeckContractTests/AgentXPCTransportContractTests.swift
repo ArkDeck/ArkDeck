@@ -17,13 +17,17 @@ final class AgentXPCTransportContractTests: XCTestCase {
 
   private func submitFrame(
     operationID: String = "flash.dayu200",
+    operationVersion: Int? = nil,
     clientName: String = "ArkDeckApp.FlashWorkspace"
   ) throws -> Data {
+    let operationJSON = operationVersion.map {
+      #"{"id":"\#(operationID)","version":\#($0)}"#
+    } ?? #"{"id":"\#(operationID)"}"#
     let typedRequest = """
       {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
       "requestId":"ui-request","idempotencyKey":"ui-request-123",\
       "target":{"targetId":"target-1","expectedBindingRevision":2},\
-      "operation":{"id":"\(operationID)","version":1},"inputs":{},\
+      "operation":\(operationJSON),"inputs":{},\
       "requestedOutputs":["hardwareEvidence"],\
       "clientContext":{"clientName":"\(clientName)"}}
       """
@@ -100,14 +104,31 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertEqual(
       AgentXPCEndpoint.admission(
         of: try submitFrame(
-          operationID: "capture.diagnostics", clientName: "ArkDeckApp.TraceWorkspace")),
+          operationID: "capture.diagnostics", operationVersion: 1,
+          clientName: "ArkDeckApp.TraceWorkspace")),
       .appSubmit(requestID: "contract-submit", kind: .trace))
     XCTAssertEqual(
       AgentXPCEndpoint.admission(
         of: try submitFrame(
           operationID: "capture.diagnostics",
+          operationVersion: 1,
           clientName: "ArkDeckApp.DebugWorkspace.Logs")),
       .appSubmit(requestID: "contract-submit", kind: .debugLogs))
+    XCTAssertNil(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(operationVersion: 1)),
+      "the singleton Flash reference must not regress to a versioned request")
+    XCTAssertNil(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "capture.diagnostics", clientName: "ArkDeckApp.TraceWorkspace")),
+      "versioned App operations must not omit their published version")
+    XCTAssertNil(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "capture.diagnostics", operationVersion: 2,
+          clientName: "ArkDeckApp.TraceWorkspace")),
+      "versioned App operations must remain pinned to their exact published version")
     XCTAssertNil(AgentXPCEndpoint.admission(of: try submitFrame(operationID: "debug.app")))
 
     let run = try ArkDeckAgentXPC.requestFrame(
