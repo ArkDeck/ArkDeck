@@ -1091,6 +1091,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     // request field.
     let probedKeys = await hdcOnPublishedBuild.probe.observedConnectKeys()
     XCTAssertEqual(probedKeys, ["device-1"])
+    let probedIdentities = await hdcOnPublishedBuild.probe.observedStableIdentities()
+    XCTAssertEqual(probedIdentities, [String(repeating: "a", count: 64)])
 
     // An unpublished build names no profile. Reporting the nearest published
     // one would be the same guess #992 removed.
@@ -1153,8 +1155,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .success("const.ohos.fullname = OpenHarmony-7.0.0.35-20260728_180253\n"),
     ])
     let hdcObservation = try await FoundationRockchipLiveModeProbe(
-      hdcResolver: resolver, rockchipResolver: resolver, runner: connected
-    ).observe(connectKey: "device-1")
+      hdcResolver: resolver, rockchipResolver: resolver, runner: connected,
+      usbProbe: MissingUSBProbe()
+    ).observe(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     XCTAssertEqual(hdcObservation.deviceMode, "hdc")
     XCTAssertEqual(
       hdcObservation.buildFingerprint, "OpenHarmony-7.0.0.35-20260728_180253")
@@ -1175,8 +1179,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .exit(1),
     ])
     let partial = try await FoundationRockchipLiveModeProbe(
-      hdcResolver: resolver, rockchipResolver: resolver, runner: buildUnreadable
-    ).observe(connectKey: "device-1")
+      hdcResolver: resolver, rockchipResolver: resolver, runner: buildUnreadable,
+      usbProbe: MissingUSBProbe()
+    ).observe(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     XCTAssertEqual(partial.deviceMode, "hdc")
     XCTAssertNil(partial.buildFingerprint)
 
@@ -1188,8 +1194,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         .success("DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=17\t\(reported)\n"),
       ])
       let observation = try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: runner
-      ).observe(connectKey: "device-1")
+        hdcResolver: resolver, rockchipResolver: resolver, runner: runner,
+        usbProbe: FixedUSBProbe(identity: String(repeating: "a", count: 64))
+      ).observe(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
       XCTAssertEqual(observation.deviceMode, expected)
       XCTAssertNil(observation.buildFingerprint)
       let commands = await runner.invocations()
@@ -1211,6 +1219,24 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           sha256: Self.reviewedSignedComponentSHA256),
       ])
 
+    // A single `ld` observation is not enough to assign a Loader to this
+    // target. The IOKit identity must match the durable target identity before
+    // the tool's mode can become a prerequisite fact.
+    let mismatchedIdentity = ProbeCommandRunner(responses: [
+      .success("[Empty]\n")
+    ])
+    await assertNotObservable {
+      try await FoundationRockchipLiveModeProbe(
+        hdcResolver: resolver, rockchipResolver: resolver,
+        runner: mismatchedIdentity,
+        usbProbe: FixedUSBProbe(identity: String(repeating: "b", count: 64))
+      ).observe(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
+    }
+    let mismatchedCommands = await mismatchedIdentity.invocations()
+    XCTAssertEqual(
+      mismatchedCommands.map(\.arguments), [["list", "targets", "-v"]])
+
     // `ld` carries no serial, so a mode read while two RockUSB devices are
     // attached belongs to nobody in particular.
     let ambiguous = ProbeCommandRunner(responses: [
@@ -1221,8 +1247,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: ambiguous
-      ).observe(connectKey: "device-1")
+        hdcResolver: resolver, rockchipResolver: resolver, runner: ambiguous,
+        usbProbe: FixedUSBProbe(identity: String(repeating: "a", count: 64))
+      ).observe(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
 
     // Nothing on either surface.
@@ -1231,8 +1259,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: nothing
-      ).observe(connectKey: "device-1")
+        hdcResolver: resolver, rockchipResolver: resolver, runner: nothing,
+        usbProbe: MissingUSBProbe()
+      ).observe(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
 
     // A target list this parser does not recognize is never downgraded to
@@ -1242,8 +1272,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ])
     await assertNotObservable {
       try await FoundationRockchipLiveModeProbe(
-        hdcResolver: resolver, rockchipResolver: resolver, runner: malformed
-      ).observe(connectKey: "device-1")
+        hdcResolver: resolver, rockchipResolver: resolver, runner: malformed,
+        usbProbe: MissingUSBProbe()
+      ).observe(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
 
     // No probe executable, no observation — never a PATH search.
@@ -1251,8 +1283,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       try await FoundationRockchipLiveModeProbe(
         hdcResolver: FixedExecutableResolver(table: [:]),
         rockchipResolver: resolver,
-        runner: ProbeCommandRunner(responses: [])
-      ).observe(connectKey: "device-1")
+        runner: ProbeCommandRunner(responses: []),
+        usbProbe: MissingUSBProbe()
+      ).observe(
+        connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64))
     }
   }
 
@@ -1304,7 +1338,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   private actor RecordingLiveModeProbe: RockchipLiveModeProbing {
     private let observation: RockchipLiveModeObservation?
     private let failure: RockchipLiveModeProbeFailure?
-    private var connectKeys: [String] = []
+    private var observedTargets: [(connectKey: String, stableIdentitySHA256: String)] = []
 
     init(observation: RockchipLiveModeObservation) {
       self.observation = observation
@@ -1316,12 +1350,16 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       self.failure = failure
     }
 
-    func observedConnectKeys() -> [String] { connectKeys }
+    func observedConnectKeys() -> [String] { observedTargets.map(\.connectKey) }
+    func observedStableIdentities() -> [String] {
+      observedTargets.map(\.stableIdentitySHA256)
+    }
 
     func observe(
-      connectKey: String
+      connectKey: String,
+      stableIdentitySHA256: String
     ) async throws -> RockchipLiveModeObservation {
-      connectKeys.append(connectKey)
+      observedTargets.append((connectKey, stableIdentitySHA256))
       guard let observation else { throw failure! }
       return observation
     }

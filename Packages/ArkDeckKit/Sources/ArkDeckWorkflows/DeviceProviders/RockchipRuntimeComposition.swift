@@ -266,7 +266,9 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       throw DeviceProviderError.factsUnavailable(
         "product-owned Rockchip component is unavailable: \(error)")
     }
-    let live = await liveFacts(connectKey: target.connectKey)
+    let live = await liveFacts(
+      connectKey: target.connectKey,
+      stableIdentitySHA256: target.stablePhysicalIdentitySHA256)
     var serverFacts = [
       "componentPackage": BundledRockchipComponent.packageID,
       "componentSigningIdentifier": BundledRockchipComponent.signingIdentifier,
@@ -310,13 +312,16 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   /// consume point. Throwing here would take device-absent planOnly and draft
   /// with it, and those must stay possible with no device on the host.
   private func liveFacts(
-    connectKey: String?
+    connectKey: String?,
+    stableIdentitySHA256: String
   ) async -> (deviceMode: String, buildFingerprint: String?, profileID: String) {
     guard let prober, let connectKey else {
       return ("unknown", nil, "unknown")
     }
     guard
-      let observation = try? await prober.observe(connectKey: connectKey)
+      let observation = try? await prober.observe(
+        connectKey: connectKey,
+        stableIdentitySHA256: stableIdentitySHA256)
     else {
       return ("absent", nil, "unknown")
     }
