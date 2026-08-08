@@ -436,6 +436,42 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     XCTAssertTrue(status.lineageAllowsNewExecution)
   }
 
+  func testDedicatedReadbackCanResolveUnknownAsSafeToReflash() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 2))
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-safe-reconcile",
+      jobID: "job-safe-reconcile", query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-safe-reconcile",
+      jobID: "job-safe-reconcile", outcome: .outcomeUnknown,
+      terminalState: "waitingForRecovery", atUTC: "2026-07-15T00:01:00Z")
+    try await store.recordOutcome(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-safe-reconcile",
+      jobID: "job-safe-reconcile", outcome: .safeToReflash,
+      terminalState: "failed", atUTC: "2026-07-15T00:02:00Z")
+
+    let inspected = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
+    let status = try XCTUnwrap(inspected)
+    XCTAssertEqual(status.consumptionCount, 1)
+    XCTAssertEqual(
+      status.lineage.first?.outcomeHistory.map(\.outcome),
+      [.outcomeUnknown, .safeToReflash])
+    XCTAssertTrue(status.lineageAllowsNewExecution)
+
+    do {
+      try await store.recordOutcome(
+        capabilityID: "CAP-RT-STORE-001", reservationID: "res-safe-reconcile",
+        jobID: "job-safe-reconcile", outcome: .confirmed,
+        terminalState: "succeeded", atUTC: "2026-07-15T00:03:00Z")
+      XCTFail("a safeToReflash terminal must remain immutable")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .outcomeConflict = error else {
+        return XCTFail("expected outcomeConflict, got \(error)")
+      }
+    }
+  }
+
   func testConfirmedLineageStillRejectsScopeDriftWithoutConsuming() async throws {
     let store = try makeStore()
     try await store.install(try e1Capability(maximumUses: 2))
