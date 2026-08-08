@@ -2,6 +2,7 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -811,6 +812,53 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   }
 
   // MARK: - Unknown outcome and reconcile
+
+  func testFlashSingletonPersistedAliasKeepsRecoveryJournalSchema() throws {
+    for (index, operationReference) in ["flash.dayu200", "flash.dayu200@1"].enumerated() {
+      let request = try RuntimeOperationRequest(
+        requestID: "req-schema-\(index)",
+        idempotencyKey: "idem-schema-\(index)",
+        target: DurableTargetReference(
+          targetID: "TGT-DAYU200-01", expectedBindingRevision: 7),
+        operation: RuntimeOperationReference(id: "flash.dayu200", version: 1))
+      let record = RuntimeJobRecord(
+        jobID: "job-schema-\(index)", request: request,
+        operationReference: operationReference,
+        catalogDigest: RuntimeOperationCatalog.catalogDigest,
+        providerID: "rockchip", createdAtUTC: "2026-08-08T00:00:00Z",
+        actualEffect: WorkflowEffect.destructive.rawValue,
+        admissionEvidence: nil, materializedPlanDigest: nil,
+        materializedStableTargetIdentitySHA256: nil,
+        materializedBindingRevision: 7)
+
+      XCTAssertTrue(RuntimeJobEngine.isDayu200Flash(record))
+      XCTAssertEqual(
+        RuntimeJobEngine.journalSchemaVersion(of: record),
+        JournalEvent.completeOverwriteRecoverySchemaVersion)
+
+      let journalURL = stateDirectory.appendingPathComponent(
+        "flash-schema-\(index)-journal.jsonl")
+      let journal = try FileDurableJournal(url: journalURL)
+      let schemaVersion = RuntimeJobEngine.journalSchemaVersion(of: record)
+      try journal.appendAndSynchronize(
+        try JournalEvent.jobCreated(
+          eventID: "created", sequence: 0, sessionID: record.sessionID,
+          jobID: record.jobID, timestamp: record.createdAtUTC,
+          executionMode: "execute", schemaVersion: schemaVersion))
+      try journal.appendAndSynchronize(
+        try JournalEvent.stateTransition(
+          eventID: "preflight", sequence: 1, sessionID: record.sessionID,
+          jobID: record.jobID, timestamp: record.createdAtUTC,
+          from: .queued, to: .preflight, reason: "fixture",
+          schemaVersion: schemaVersion))
+      let replay = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertEqual(replay.schemaVersion, JournalEvent.completeOverwriteRecoverySchemaVersion)
+      XCTAssertTrue(
+        replay.events.allSatisfy {
+          $0.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion
+        })
+    }
+  }
 
   func testOutcomeUnknownParksAndReconcileClears() async throws {
     let dispatcher = ScriptedDispatcher(script: .outcomeUnknownOnDeviceProbe)
