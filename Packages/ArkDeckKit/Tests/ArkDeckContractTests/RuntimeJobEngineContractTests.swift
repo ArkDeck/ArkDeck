@@ -82,6 +82,11 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         return ProviderProcessReceipt(
           exitStatus: 0, stdout: Data("OpenHarmony-4.1-release\n".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01)
+      case (_, .hdc(.readOwnedPathPresence)):
+        return ProviderProcessReceipt(
+          exitStatus: 0,
+          stdout: Data("ls: /data/local/tmp/arkdeck/missing: No such file or directory\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
       default:
         throw RuntimeDispatchFailure.failed("unscripted action")
       }
@@ -903,6 +908,56 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(
       reconciledOutcome.payload["semanticCode"], .string("confirmedNotExecuted"),
       "a proven non-execution that is not labelled as one is evidence nothing can read")
+  }
+
+  func testTerminalReconcileRepairsSafeToReflashLineageWithoutRedispatch() async throws {
+    let dispatcher = ScriptedDispatcher(script: .outcomeUnknownOnHAPSend)
+    let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease()
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease, requestID: "req-terminal-lineage-repair",
+        idempotencyKey: "idem-terminal-lineage-repair"))
+    let capabilities = try await capabilityStore.list()
+    let capabilityID = try XCTUnwrap(
+      capabilities.first?.capability.capabilityID)
+
+    let parked = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(parked.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertTrue(parked.outcomeUnknown)
+    let capabilityURL = stateDirectory
+      .appendingPathComponent("capabilities", isDirectory: true)
+      .appendingPathComponent("runtime-capabilities.json")
+    let parkedCapabilityBytes = try Data(contentsOf: capabilityURL)
+
+    let firstReconcile = try await engine.reconcile(jobID: acceptance.jobID)
+    XCTAssertEqual(firstReconcile.state, JobState.failed.rawValue)
+    XCTAssertFalse(firstReconcile.outcomeUnknown)
+    let dispatchesAfterProof = dispatcher.dispatchCount
+    let firstLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
+    XCTAssertEqual(
+      firstLineage?.lineage.first?.outcomeHistory.map(\.outcome),
+      [.outcomeUnknown, .safeToReflash])
+
+    // Recreate the production crash/failure window: journal + terminal Job
+    // are durable, while the independently durable capability store still has
+    // only its earlier outcomeUnknown node.
+    try parkedCapabilityBytes.write(to: capabilityURL, options: .atomic)
+    let rolledBackLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
+    XCTAssertEqual(
+      rolledBackLineage?.lineage.first?.outcomeHistory.map(\.outcome),
+      [.outcomeUnknown])
+
+    let repaired = try await engine.reconcile(jobID: acceptance.jobID)
+    XCTAssertEqual(repaired.state, JobState.failed.rawValue)
+    XCTAssertFalse(repaired.outcomeUnknown)
+    XCTAssertEqual(
+      dispatcher.dispatchCount, dispatchesAfterProof,
+      "terminal lineage repair must not repeat readback or original mutation")
+    let repairedLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
+    XCTAssertEqual(
+      repairedLineage?.lineage.first?.outcomeHistory.map(\.outcome),
+      [.outcomeUnknown, .safeToReflash])
   }
 
   // MARK: - Cancel

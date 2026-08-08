@@ -3528,9 +3528,12 @@ public actor RuntimeJobEngine {
 
   public func reconcile(jobID: String) async throws -> RuntimeJobStatus {
     guard var runtime = jobs[jobID] else {
-      return status(of: try recordForRead(jobID: jobID))
+      let record = try recordForRead(jobID: jobID)
+      try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
+      return status(of: record)
     }
     guard runtime.record.outcomeUnknown else {
+      try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
       return statusAndReleaseTerminalRuntime(runtime.record)
     }
     let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
@@ -3578,7 +3581,7 @@ public actor RuntimeJobEngine {
       try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       try await recordCapabilityOutcome(
-        for: runtime.record, outcome: .confirmed,
+        for: runtime.record, outcome: .safeToReflash,
         state: JobState.failed.rawValue)
       return statusAndReleaseTerminalRuntime(runtime.record)
     }
@@ -3896,6 +3899,56 @@ public actor RuntimeJobEngine {
       break
     }
     return statusAndReleaseTerminalRuntime(runtime.record)
+  }
+
+  /// A confirmed-not-executed decision and terminal Job record become durable
+  /// before the capability lineage is appended. If the daemon stops or that
+  /// final append fails, a later explicit reconcile must be able to finish the
+  /// bookkeeping without dispatching a Provider readback (and never the
+  /// original mutation) again.
+  private func repairTerminalSafeToReflashLineageIfNeeded(
+    for record: RuntimeJobRecord
+  ) async throws {
+    guard !record.outcomeUnknown,
+      record.state == JobState.failed.rawValue,
+      record.admissionEvidence?.kind == .runtimeCapability
+        || record.admissionEvidence?.kind == .standingAuthorization
+    else { return }
+
+    let replay = try DurableJournalRecovery.inspect(
+      url: jobDirectory(for: record.jobID).appendingPathComponent("journal.jsonl"))
+    guard replay.currentState == .failed,
+      let provenNonExecution = replay.events.last(where: {
+        $0.kind == .stepOutcome
+          && $0.payload["semanticCode"]
+            == .string(Self.confirmedNotExecutedSemanticCode)
+          && $0.payload["outcomeCertainty"]
+            == .string(JournalOutcomeCertainty.confirmed.rawValue)
+      }),
+      let intentID = provenNonExecution.correlatedIntentEventID,
+      replay.events.contains(where: {
+        $0.kind == .stepIntent && $0.eventID == intentID
+          && ($0.stepEffect ?? .hostOnly) >= .deviceMutation
+      }),
+      !replay.events.contains(where: {
+        $0.sequence > provenNonExecution.sequence && $0.kind == .stepIntent
+          && ($0.stepEffect ?? .hostOnly) >= .deviceMutation
+      })
+    else { return }
+
+    if let reconcileOutcome = replay.events.last(where: {
+      $0.kind == .reconcileOutcome && $0.sequence > provenNonExecution.sequence
+    }) {
+      guard replay.lastReconcileOutcomeCertainty == .confirmed,
+        reconcileOutcome.payload["result"] == .string("finalizeConfirmedFailure"),
+        reconcileOutcome.payload["nextState"] == .string(JobState.finalizing.rawValue),
+        reconcileOutcome.payload["safeBoundaryConfirmed"] == .bool(true)
+      else { return }
+    }
+
+    try await recordCapabilityOutcome(
+      for: record, outcome: .safeToReflash,
+      state: JobState.failed.rawValue)
   }
 
   // MARK: Helpers

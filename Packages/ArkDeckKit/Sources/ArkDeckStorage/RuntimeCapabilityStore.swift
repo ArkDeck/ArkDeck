@@ -375,8 +375,9 @@ public actor RuntimeCapabilityStore {
   }
 
   /// Appends an outcome record for the owning Job. `outcomeUnknown` may
-  /// later advance to `confirmed` after dedicated readback, but a confirmed
-  /// record is immutable and no other transition can widen authority.
+  /// later advance to `confirmed` or `safeToReflash` after dedicated
+  /// readback, but a confirmed record is immutable and no other transition
+  /// can widen authority.
   public func recordOutcome(
     capabilityID: String,
     reservationID: String,
@@ -427,7 +428,8 @@ public actor RuntimeCapabilityStore {
           return
         }
         let resolvesUnknown =
-          current.outcome == .outcomeUnknown && outcome == .confirmed
+          current.outcome == .outcomeUnknown
+          && (outcome == .confirmed || outcome == .safeToReflash)
         let resolvesLegacy = current.outcome == .legacyUnverified
         guard resolvesUnknown || resolvesLegacy else {
           throw RuntimeCapabilityStoreError.outcomeConflict(
@@ -850,9 +852,11 @@ public actor RuntimeCapabilityStore {
         for outcome in use.outcomes {
           let allowed =
             priorOutcome == .pending
-            || (priorOutcome == .outcomeUnknown && outcome.outcome == .confirmed)
+            || (priorOutcome == .outcomeUnknown
+              && (outcome.outcome == .confirmed || outcome.outcome == .safeToReflash))
             || (priorOutcome == .legacyUnverified
-              && (outcome.outcome == .confirmed || outcome.outcome == .outcomeUnknown))
+              && (outcome.outcome == .confirmed || outcome.outcome == .safeToReflash
+                || outcome.outcome == .outcomeUnknown))
           guard allowed,
             outcome.outcome != .pending,
             !outcome.jobID.isEmpty,
