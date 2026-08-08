@@ -385,12 +385,8 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       let begin = try await FlashXPCResponseDecoding.resultObject(
         await FlashXPCTransport.request(
           method: "artifact.importFlashBundle.begin",
-          params: [
-            "targetId": .string(target.id),
-            "name": .string(archiveURL.lastPathComponent),
-            "byteCount": .integer(plan.archiveSizeBytes),
-            "sha256": .string(plan.archiveSHA256),
-          ]))
+          params: FlashRuntimeSubmissionRequest.importBeginParams(
+            target: target, plan: plan)))
       guard let uploadID = begin["uploadId"] as? String,
         let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
         maximumChunkBytes > 0
@@ -491,6 +487,25 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     } catch {
       return .failed(String(describing: error))
     }
+  }
+}
+
+enum FlashRuntimeSubmissionRequest {
+  /// The Runtime import contract names the logical DAYU200 bundle, not the
+  /// operator's local download filename. The latter remains presentation
+  /// metadata and may include daily-build prefixes and timestamps.
+  static let canonicalArchiveName = "images.tar.gz"
+
+  static func importBeginParams(
+    target: FlashTargetPresentation,
+    plan: FlashExactPlanPresentation
+  ) -> [String: JSONValue] {
+    [
+      "targetId": .string(target.id),
+      "name": .string(canonicalArchiveName),
+      "byteCount": .integer(plan.archiveSizeBytes),
+      "sha256": .string(plan.archiveSHA256),
+    ]
   }
 }
 
