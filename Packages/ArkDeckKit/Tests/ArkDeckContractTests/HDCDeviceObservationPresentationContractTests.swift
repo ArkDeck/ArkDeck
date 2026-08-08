@@ -586,11 +586,21 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
     let app = try repositorySourceText("ArkDeckApp/App/ArkDeckApp.swift")
     let view = try repositorySourceText("ArkDeckApp/Features/HDC/HDCStatusView.swift")
     let modelStart = try XCTUnwrap(app.range(of: "private final class HDCStatusViewModel"))
-    let model = String(app[modelStart.lowerBound...])
+    let modelEnd = try XCTUnwrap(
+      app.range(
+        of: "private final class OverviewCapabilityViewModel",
+        range: modelStart.upperBound..<app.endIndex))
+    let model = String(app[modelStart.lowerBound..<modelEnd.lowerBound])
 
-    XCTAssertEqual(occurrences(of: "onRefresh: hdcDiagnostics.refresh", in: app), 1)
+    let overviewStart = try XCTUnwrap(app.range(of: "HDCStatusView("))
+    let overviewEnd = try XCTUnwrap(
+      app.range(of: "case .history:", range: overviewStart.upperBound..<app.endIndex))
+    let overviewWiring = String(app[overviewStart.lowerBound..<overviewEnd.lowerBound])
+
+    XCTAssertEqual(occurrences(of: "hdcDiagnostics.refresh()", in: overviewWiring), 1)
+    XCTAssertEqual(occurrences(of: "overviewCapabilities.refresh()", in: overviewWiring), 1)
     XCTAssertEqual(
-      occurrences(of: "isRefreshInFlight: hdcDiagnostics.isRefreshInFlight", in: app),
+      occurrences(of: "hdcDiagnostics.isRefreshInFlight", in: overviewWiring),
       1)
     XCTAssertEqual(occurrences(of: "let next = await provider.refresh()", in: model), 1)
 

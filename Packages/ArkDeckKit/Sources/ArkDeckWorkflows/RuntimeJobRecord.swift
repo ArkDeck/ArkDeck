@@ -30,6 +30,11 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public var timeline: [String] = []
   public var evidencePreflight: RuntimeEvidencePreflightAccumulator?
   public var evidenceObservation: RuntimeEvidenceObservation?
+  /// Runtime-owned snapshots surrounding one selected Trace leg. These are
+  /// captured inside the target's mutation lane, so History never mistakes
+  /// a later page refresh for facts belonging to this Job.
+  public var traceProbeBefore: TraceRuntimeProbeSnapshot?
+  public var traceProbeAfter: TraceRuntimeProbeSnapshot?
   public var actualStepKinds: [String]?
   public var startedAtUTC: String?
   public var firstEvidenceStepAtUTC: String?

@@ -131,6 +131,14 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let clipped = try await store.read(
       jobID: "job-1", artifactID: metadata.artifactID, maximumBytes: 4)
     XCTAssertEqual(clipped.count, 4)
+    let secondChunk = try await store.read(
+      jobID: "job-1", artifactID: metadata.artifactID,
+      offset: 4, maximumBytes: 5)
+    XCTAssertEqual(secondChunk, Data("rial\"".utf8))
+    await XCTAssertThrowsErrorAsync(
+      try await store.read(
+        jobID: "job-1", artifactID: metadata.artifactID,
+        offset: metadata.byteCount + 1, maximumBytes: 1))
     await XCTAssertThrowsErrorAsync(
       try await store.read(
         jobID: "job-1", artifactID: metadata.artifactID,

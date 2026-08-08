@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "port-forward.remove",
+  "version": 1,
+  "title": "Remove and verify one target-bound HDC TCP port rule",
+  "provider": "hdc",
+  "effect": { "minimum": "deviceMutation", "permitted": ["deviceMutation"] },
+  "authorization": { "deviceMutation": "standingCapability" },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "direction": {
+        "type": "string",
+        "required": true,
+        "enum": ["forward", "reverse"]
+      },
+      "localPort": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1024,
+        "maximum": 65535
+      },
+      "remotePort": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1024,
+        "maximum": 65535
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "ruleReadback": { "type": "artifactReference", "required": true }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "confirm-evidence-target",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-model",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "deviceModel"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-firmware",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "firmwareBuild"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "remove-port-rule",
+      "kind": "removePortForward",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "rollbackPublished"
+    },
+    {
+      "stepID": "verify-port-rule",
+      "kind": "verifyRemoteState",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 120,
+  "outputByteBudget": 1048576,
+  "retry": { "preflightAttempts": 2, "mutationAttempts": 1 },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "port-rule-readback.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": ["openharmony-standard@1", "dayu200@1"]
+}

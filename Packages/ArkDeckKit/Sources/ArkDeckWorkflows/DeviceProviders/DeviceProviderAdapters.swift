@@ -82,7 +82,8 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     switch operation.reference {
-    case "observe.device@1", "capture.diagnostics@1", "debug.hap@1":
+    case "observe.device@1", "capture.diagnostics@1", "debug.hap@1",
+      "port-forward.create@1", "port-forward.remove@1":
       return .available
     case "deploy.native-library.app-owned@1":
       return appOwnedNativeLibraryAvailability
@@ -124,12 +125,21 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       return .hdc(.observeDevice(connectKey: "resolved-by-binding"))
     case .sendFile, .installPackage, .startApplication, .stopApplication, .uninstallPackage:
       return try debugHAPAction(for: step, inputs: inputs, context: context)
+    case .createPortForward:
+      return .hdc(.createPortForward(try portForwardSpec(inputs)))
+    case .removePortForward:
+      return .hdc(.removePortForward(try portForwardSpec(inputs)))
     case .runApprovedRemoteRead:
       if descriptorIsDebugHAP(operation), step.actionReference?.actionID == "packageInfo" {
         return try debugHAPAction(for: step, inputs: inputs, context: context)
       }
       return try approvedRemoteReadAction(for: step, inputs: inputs)
     case .verifyRemoteState:
+      if operation.reference == "port-forward.create@1"
+        || operation.reference == "port-forward.remove@1"
+      {
+        return .hdc(.readPortForwardPresence(try portForwardSpec(inputs)))
+      }
       if descriptorIsDebugHAP(operation) {
         return try debugHAPAction(for: step, inputs: inputs, context: context)
       }
@@ -205,6 +215,23 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
   private func descriptorIsDebugHAP(_ operation: CatalogOperationDescriptor) -> Bool {
     operation.id == "debug.hap"
+  }
+
+  private func portForwardSpec(
+    _ inputs: [String: JSONValue]
+  ) throws -> HDCPortForwardSpec {
+    guard case .string(let directionText)? = inputs["direction"],
+      let direction = HDCPortForwardDirection(rawValue: directionText),
+      case .integer(let localValue)? = inputs["localPort"],
+      case .integer(let remoteValue)? = inputs["remotePort"],
+      let localPort = Int(exactly: localValue),
+      let remotePort = Int(exactly: remoteValue)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "direction, localPort and remotePort are required for a port rule")
+    }
+    return try HDCPortForwardSpec(
+      direction: direction, localPort: localPort, remotePort: remotePort)
   }
 
   private func descriptorIsAppOwnedNativeLibrary(
@@ -919,21 +946,23 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
               timeoutSeconds: 30),
           ]))
     case .createPortForward(let spec):
+      let verb = spec.direction == .forward ? "fport" : "rport"
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            ["fport", "tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"],
+            [verb, "tcp:\(spec.localPort)", "tcp:\(spec.remotePort)"],
             context: context),
           timeoutSeconds: 30))
     case .removePortForward(let spec):
+      let verb = spec.direction == .forward ? "fport" : "rport"
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
-            ["fport", "rm", "tcp:\(spec.localPort)"], context: context),
+            [verb, "rm", "tcp:\(spec.localPort)"], context: context),
           timeoutSeconds: 30))
     case .readPackagePresence(let bundle):
       return TypedProcessPlan(
@@ -967,12 +996,13 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           argumentSummary: try deviceArguments(
             ["shell", "ls", "-ld", path.remotePath], context: context),
           timeoutSeconds: 15))
-    case .readPortForwardPresence:
+    case .readPortForwardPresence(let spec):
+      let verb = spec.direction == .forward ? "fport" : "rport"
       return TypedProcessPlan(
         action: action,
         kind: .process(
           executableSHA256: "resolved-at-dispatch",
-          argumentSummary: try deviceArguments(["fport", "ls"], context: context),
+          argumentSummary: try deviceArguments([verb, "ls"], context: context),
           timeoutSeconds: 30))
     case .sendNativeLibraryToStaging(let deployment):
       guard let resolved = context.resolvedInputArtifact,

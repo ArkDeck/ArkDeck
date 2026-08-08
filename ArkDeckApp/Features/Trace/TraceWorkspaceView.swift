@@ -48,7 +48,7 @@ struct TraceWorkspaceView: View {
           VStack(alignment: .leading, spacing: 6) { capabilityLabels }
         }
 
-        if !model.workspace.operation.exposesAdapterCapabilityFacts {
+        if !model.hasAdapterCapabilityFacts {
           traceNotice(
             traceString("trace.availability.probeGap"),
             systemImage: "waveform.badge.exclamationmark",
@@ -95,10 +95,10 @@ struct TraceWorkspaceView: View {
       supported: model.workspace.operation.supportsRawTraceArtifact)
     traceCapability(
       traceString("trace.availability.adapter"),
-      supported: model.workspace.operation.exposesAdapterCapabilityFacts)
+      supported: model.hasAdapterCapabilityFacts)
     traceCapability(
       traceString("trace.availability.parameters"),
-      supported: model.workspace.operation.exposesParameterSnapshotFacts)
+      supported: model.hasParameterSnapshotFacts)
   }
 
   private var target: some View {
@@ -216,22 +216,52 @@ struct TraceWorkspaceView: View {
 
         Text(traceString("trace.review.blockers"))
           .font(.subheadline.weight(.semibold))
-        ForEach(Array(reviewBlockers.enumerated()), id: \.offset) { _, blocker in
-          Label(blocker, systemImage: "xmark.circle")
+        if reviewBlockers.isEmpty {
+          Label(traceString("trace.review.ready"), systemImage: "checkmark.shield.fill")
             .font(.callout)
-            .foregroundStyle(.red)
-            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(.green)
+        } else {
+          ForEach(Array(reviewBlockers.enumerated()), id: \.offset) { _, blocker in
+            Label(blocker, systemImage: "xmark.circle")
+              .font(.callout)
+              .foregroundStyle(.red)
+              .fixedSize(horizontal: false, vertical: true)
+          }
         }
 
         HStack {
+          if let activeJobID = model.activeJobID {
+            Button(traceString("trace.action.cancel")) { model.cancel() }
+              .disabled(model.isCancelling)
+              .accessibilityIdentifier("trace.cancel")
+            Text(activeJobID)
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .truncationMode(.middle)
+          }
           Spacer()
-          Button(startActionTitle) {}
+          Button(model.isSubmitting ? traceString("trace.action.running") : startActionTitle) {
+            model.submit()
+          }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("trace.start")
-            .disabled(true)
+            .disabled(!reviewBlockers.isEmpty || model.isSubmitting)
             .help(reviewBlockers.joined(separator: "\n"))
         }
-        Text(traceString("trace.review.noDispatch"))
+        if let failure = model.submissionFailure {
+          Label(failure, systemImage: "exclamationmark.triangle.fill")
+            .font(.footnote)
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("trace.submission.failure")
+        } else if let terminal = model.terminalSubmission {
+          Text("\(terminal.state) · \(terminal.jobID)")
+            .font(.footnote.monospaced())
+            .foregroundStyle(terminal.outcomeUnknown ? Color.orange : Color.secondary)
+            .textSelection(.enabled)
+        }
+        Text(traceString("trace.review.typedDispatch"))
           .font(.footnote)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .trailing)
@@ -272,7 +302,7 @@ struct TraceWorkspaceView: View {
     if !model.bufferIsValid {
       values.append(traceString("trace.blocker.buffer"))
     }
-    if !model.workspace.operation.exposesAdapterCapabilityFacts {
+    if !model.hasAdapterCapabilityFacts {
       values.append(traceString("trace.blocker.adapter"))
     }
     // Two distinct failures share this list: an empty request (a capture
@@ -280,18 +310,12 @@ struct TraceWorkspaceView: View {
     // probe has classified yet. Neither implies the other.
     if model.requestedTags.isEmpty {
       values.append(traceString("trace.blocker.noTags"))
-    } else {
+    } else if !model.unsupportedRequestedTags.isEmpty {
       values.append(traceString("trace.blocker.tags"))
     }
-    if !model.workspace.operation.exposesParameterSnapshotFacts {
+    if !model.hasParameterSnapshotFacts {
       values.append(traceString("trace.blocker.parameters"))
     }
-    if !model.workspace.operation.supportsFilteredTraceArtifact
-      || !model.workspace.operation.supportsCaptureLogArtifact
-    {
-      values.append(traceString("trace.blocker.artifacts"))
-    }
-    values.append(traceString("trace.blocker.readOnlyTransport"))
     return values
   }
 
@@ -315,24 +339,82 @@ final class TraceWorkspaceViewModel: ObservableObject {
   @Published private(set) var persistentChangeConfirmed = false
   @Published private(set) var filtersCreateFileAsset = false
   @Published private(set) var isRefreshing = false
+  @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  @Published private(set) var artifactFailuresByJobID: [String: String] = [:]
+  @Published private(set) var evidenceByJobID: [String: RuntimeJobEvidencePresentation] = [:]
+  @Published private(set) var activeJobID: String?
+  @Published private(set) var terminalSubmission: TraceJobTerminalPresentation?
+  @Published private(set) var submissionFailure: String?
+  @Published private(set) var isSubmitting = false
+  @Published private(set) var isCancelling = false
 
   private let provider: any TraceApplicationProviding
+  private let detailProvider: any RuntimeJobDetailApplicationProviding
 
-  init(provider: any TraceApplicationProviding) {
+  init(
+    provider: any TraceApplicationProviding,
+    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil
+  ) {
     self.provider = provider
+    self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
   }
 
   var selectedTarget: TraceTargetPresentation? {
     workspace.targets.first { $0.id == selectedTargetID }
   }
 
+  var runtimeArtifacts: [RuntimeArtifactPresentation] {
+    workspace.relatedDiagnosticsJobs
+      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
+      .flatMap { artifactsByJobID[$0.id] ?? [] }
+  }
+
+  var runtimeArtifactFailures: [String] {
+    workspace.relatedDiagnosticsJobs
+      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
+      .compactMap { artifactFailuresByJobID[$0.id] }
+  }
+
+  var latestTraceEvidence: RuntimeJobEvidencePresentation? {
+    workspace.relatedDiagnosticsJobs
+      .filter { selectedTargetID.isEmpty || $0.targetID == selectedTargetID }
+      .compactMap { evidenceByJobID[$0.id] }
+      .first { !$0.traceParameters.isEmpty }
+  }
+
+  func traceParameterEvidence(name: String) -> RuntimeTraceParameterPresentation? {
+    latestTraceEvidence?.traceParameters.first { $0.name == name }
+  }
+
   var selectedPreset: TracePresetDefinition {
     TracePresetCatalog.definition(for: selectedPresetID)
   }
 
-  /// The current read facade exposes no per-target probe receipt, so an empty
-  /// collection means unknown capabilities, not a device with zero tags.
-  var confirmedTags: [String] { [] }
+  var hasAdapterCapabilityFacts: Bool {
+    selectedRuntimeProbe?.adapterDisposition == "captureEligible"
+  }
+
+  var hasParameterSnapshotFacts: Bool {
+    selectedRuntimeProbe?.parameters.count == TraceDebugParameterCatalog.definitions.count
+  }
+
+  var confirmedTags: [String] { selectedRuntimeProbe?.supportedTags ?? [] }
+
+  var unsupportedRequestedTags: [String] {
+    requestedTags.filter { !confirmedTags.contains($0) }
+  }
+
+  func parameterObservation(name: String) -> TraceRuntimeParameterObservation? {
+    selectedRuntimeProbe?.parameters.first { $0.name == name }
+  }
+
+  var selectedRuntimeProbe: TraceRuntimeProbeSnapshot? {
+    guard let probe = workspace.runtimeProbe,
+      probe.targetID == selectedTargetID,
+      probe.bindingRevision == selectedTarget?.bindingRevision
+    else { return nil }
+    return probe
+  }
 
   var requestedTags: [String] {
     configurationMode == .preset ? selectedPreset.logicalTags : customTags.sorted()
@@ -377,8 +459,11 @@ final class TraceWorkspaceViewModel: ObservableObject {
     guard !isRefreshing else { return }
     isRefreshing = true
     let provider = provider
+    let detailProvider = detailProvider
+    let targetID = selectedTargetID
     Task { [weak self] in
-      let next = await provider.refreshWorkspace()
+      let next = await provider.refreshWorkspace(
+        targetID: targetID.isEmpty ? nil : targetID)
       guard let self else { return }
       defer { self.isRefreshing = false }
       guard !Task.isCancelled else { return }
@@ -389,6 +474,27 @@ final class TraceWorkspaceViewModel: ObservableObject {
         : next.targets.first?.id ?? ""
       self.workspace = next
       self.selectedTargetID = nextTargetID
+      var artifacts: [String: [RuntimeArtifactPresentation]] = [:]
+      var failures: [String: String] = [:]
+      var evidence: [String: RuntimeJobEvidencePresentation] = [:]
+      for job in next.relatedDiagnosticsJobs.prefix(3) {
+        let detail = await detailProvider.loadJobDetail(
+          jobID: job.id,
+          operationReference: TraceApplicationFacade.operationReference)
+        switch detail.artifactAvailability {
+        case .available:
+          artifacts[job.id] = detail.artifacts
+        case .unavailable(let reason):
+          failures[job.id] = reason
+        }
+        if let jobEvidence = detail.evidence, !jobEvidence.traceParameters.isEmpty {
+          evidence[job.id] = jobEvidence
+        }
+      }
+      guard !Task.isCancelled else { return }
+      self.artifactsByJobID = artifacts
+      self.artifactFailuresByJobID = failures
+      self.evidenceByJobID = evidence
       if previousTarget != self.selectedTarget {
         self.resetTargetScopedReview()
       }
@@ -399,6 +505,7 @@ final class TraceWorkspaceViewModel: ObservableObject {
     guard selectedTargetID != targetID else { return }
     selectedTargetID = targetID
     resetTargetScopedReview()
+    refresh()
   }
 
   /// Custom is another entry to the same request, not a second run mode: it
@@ -450,7 +557,70 @@ final class TraceWorkspaceViewModel: ObservableObject {
   }
 
   func setFiltersCreateFileAsset(_ filters: Bool) {
+    guard workspace.operation.supportsFilteredTraceArtifact else {
+      filtersCreateFileAsset = false
+      return
+    }
     filtersCreateFileAsset = filters
+  }
+
+  func submit() {
+    guard !isSubmitting, let target = selectedTarget,
+      case .valid(let durationSeconds) = durationValidation,
+      case .valid(let bufferKB) = bufferValidation,
+      hasAdapterCapabilityFacts, hasParameterSnapshotFacts,
+      !requestedTags.isEmpty, unsupportedRequestedTags.isEmpty,
+      parameterMode == .unchanged
+    else { return }
+    isSubmitting = true
+    activeJobID = nil
+    terminalSubmission = nil
+    submissionFailure = nil
+    let provider = provider
+    let tags = requestedTags
+    Task { [weak self] in
+      let submitted = await provider.submitCapture(
+        target: target, durationSeconds: durationSeconds, tags: tags, bufferKB: bufferKB)
+      guard let self, !Task.isCancelled else { return }
+      switch submitted {
+      case .failed(let failure):
+        self.submissionFailure = failure
+        self.isSubmitting = false
+      case .submitted(let acceptance):
+        self.activeJobID = acceptance.jobID
+        let polling = Task { @MainActor [weak self] in
+          while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled else { break }
+            self?.refresh()
+          }
+        }
+        let result = await provider.run(jobID: acceptance.jobID)
+        polling.cancel()
+        guard !Task.isCancelled else { return }
+        self.activeJobID = nil
+        self.isSubmitting = false
+        switch result {
+        case .completed(let terminal): self.terminalSubmission = terminal
+        case .failed(let failure): self.submissionFailure = failure
+        }
+        self.refresh()
+      }
+    }
+  }
+
+  func cancel() {
+    guard let jobID = activeJobID, !isCancelling else { return }
+    isCancelling = true
+    let provider = provider
+    Task { [weak self] in
+      let accepted = await provider.cancel(jobID: jobID)
+      guard let self else { return }
+      self.isCancelling = false
+      if !accepted {
+        self.submissionFailure = traceString("trace.cancel.failed")
+      }
+    }
   }
 
   private func resetTargetScopedReview() {

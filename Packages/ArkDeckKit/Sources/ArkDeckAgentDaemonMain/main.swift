@@ -229,12 +229,20 @@ Task.detached {
     var hdcDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
       reason: "no HDC executable configured (set ARKDECK_HDC_PATH); dispatch stays fail-closed")
     var hdcExecutableResolver: (any RuntimeExecutableResolving)?
+    var traceRuntimeProbe: (any TraceRuntimeProbing)? = nil
+    var debugRuntimeProbe: (any DebugRuntimeProbing)? = nil
     var executableSHA = ""
     if let configuredHDC {
       let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
       executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
       hdcExecutableResolver = resolver
       hdcDispatcher = DescriptorBoundProcessDispatcher.hdc(resolver: resolver)
+      traceRuntimeProbe = FoundationTraceRuntimeProbe(
+        targetStore: targetStore, hdcResolver: resolver,
+        workingDirectory: resolvedStateDirectory)
+      debugRuntimeProbe = FoundationDebugRuntimeProbe(
+        targetStore: targetStore, hdcResolver: resolver,
+        workingDirectory: resolvedStateDirectory)
     }
 
     let hdcProvider = HDCObservationProviderAdapter(
@@ -278,10 +286,11 @@ Task.detached {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
         resolver: rockchipResolver, unavailableDetail: rockchipToolRuntimeFailure)
     }
+    let rockchipFactsPort = TargetStoreRockchipRuntimeFactsPort(
+      targetStore: targetStore, resolver: rockchipResolver,
+      prober: rockchipProber, nowUTC: utcNow)
     let rockchipProvider = RockchipFlashProviderAdapter(
-      factsPort: TargetStoreRockchipRuntimeFactsPort(
-        targetStore: targetStore, resolver: rockchipResolver,
-        prober: rockchipProber, nowUTC: utcNow),
+      factsPort: rockchipFactsPort,
       // The closed typed plan is present. Executable/HDC/state availability
       // belongs to the live dispatcher so an installed product component can
       // become visible without caching a startup-only rejection.
@@ -469,6 +478,7 @@ Task.detached {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
+      traceRuntimeProbe: traceRuntimeProbe,
       agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
       nowUTC: utcNow)
     let bootstrap = DeviceBootstrapMachine(
@@ -568,6 +578,9 @@ Task.detached {
       artifactStore: artifactStore,
       flashBundleImportDirectory: resolvedStateDirectory.appendingPathComponent(
         "flash-bundle-imports", isDirectory: true),
+      flashPrerequisiteObserver: rockchipFactsPort,
+      traceRuntimeProbe: traceRuntimeProbe,
+      debugRuntimeProbe: debugRuntimeProbe,
       harnessCoordinator: harness)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)

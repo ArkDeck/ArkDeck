@@ -1,3 +1,4 @@
+import AppKit
 import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
@@ -15,9 +16,11 @@ struct RuntimeHistoryView: View {
   let presentation: RuntimeHistoryPresentation
   let detailsByJobID: [String: RuntimeJobDetailPresentation]
   let loadingDetailJobIDs: Set<String>
+  let exportStatesByArtifactID: [String: RuntimeArtifactExportState]
   let isRefreshInFlight: Bool
   let onRefresh: (() -> Void)?
   let onLoadDetail: ((String, String) -> Void)?
+  let onExportArtifact: ((String, RuntimeArtifactPresentation, URL, Bool) -> Void)?
 
   @State private var selectedJobID: RuntimeJobSummaryPresentation.ID?
   @State private var searchText = ""
@@ -26,6 +29,9 @@ struct RuntimeHistoryView: View {
   @State private var sessionFilter = Self.allSessions
   @State private var targetFilter = Self.allTargets
   @State private var timeFilter = HistoryTimeFilter.anyTime
+  @State private var pendingExportArtifact: RuntimeArtifactPresentation?
+  @State private var pendingExportJobID: String?
+  @State private var isExportPreviewPresented = false
 
   @AppStorage("history.savedFilter.exists") private var hasSavedFilter = false
   @AppStorage("history.savedFilter.search") private var savedSearchText = ""
@@ -88,6 +94,28 @@ struct RuntimeHistoryView: View {
         let job = presentation.jobs.first(where: { $0.id == jobID })
       else { return }
       onLoadDetail?(job.id, job.operationReference)
+    }
+    .confirmationDialog(
+      historyLocalized("history.artifacts.exportPreview.title"),
+      isPresented: $isExportPreviewPresented,
+      presenting: pendingExportArtifact
+    ) { artifact in
+      Button(
+        historyLocalized(
+          artifact.privacy == "sensitive"
+            ? "history.artifacts.exportSensitive" : "history.artifacts.exportConfirm")
+      ) {
+        chooseExportDestination(for: artifact)
+      }
+      Button(historyLocalized("history.artifacts.exportCancel"), role: .cancel) {}
+    } message: { artifact in
+      Text(
+        String(
+          format: historyLocalized("history.artifacts.exportPreview.message"),
+          artifact.name,
+          ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file),
+          artifact.privacy,
+          artifact.sha256))
     }
   }
 
@@ -591,28 +619,23 @@ struct RuntimeHistoryView: View {
         } else {
           VStack(alignment: .leading, spacing: 10) {
             ForEach(detail.artifacts) { artifact in
-              artifactRow(artifact)
+              artifactRow(artifact, jobID: job.id)
             }
           }
           .accessibilityIdentifier("history.artifacts")
         }
-        Label(historyLocalized("history.artifacts.metadataOnly"), systemImage: "lock.doc")
+        Label(historyLocalized("history.artifacts.exportBoundary"), systemImage: "lock.doc")
           .font(.footnote)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
-        HStack(spacing: 8) {
-          Button(historyLocalized("history.artifacts.showInFinder")) {}
-            .disabled(true)
-          Button(historyLocalized("history.artifacts.export")) {}
-            .disabled(true)
-        }
-        .help(historyLocalized("history.artifacts.metadataOnly"))
-        .accessibilityHint(historyLocalized("history.artifacts.metadataOnly"))
       }
     }
   }
 
-  private func artifactRow(_ artifact: RuntimeArtifactPresentation) -> some View {
+  private func artifactRow(
+    _ artifact: RuntimeArtifactPresentation,
+    jobID: String
+  ) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       ViewThatFits(in: .horizontal) {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -646,10 +669,59 @@ struct RuntimeHistoryView: View {
           .foregroundStyle(.orange)
           .textSelection(.enabled)
       }
+      HStack(spacing: 8) {
+        Button(historyLocalized("history.artifacts.export")) {
+          pendingExportArtifact = artifact
+          pendingExportJobID = jobID
+          isExportPreviewPresented = true
+        }
+        .disabled(
+          artifact.status != "published"
+            || exportStatesByArtifactID[artifact.id] == .exporting)
+        .accessibilityIdentifier("history.artifact.export.\(artifact.id)")
+        if case .completed(let url) = exportStatesByArtifactID[artifact.id] {
+          Button(historyLocalized("history.artifacts.showInFinder")) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+          }
+          .accessibilityIdentifier("history.artifact.finder.\(artifact.id)")
+        }
+        if exportStatesByArtifactID[artifact.id] == .exporting {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel(historyLocalized("history.artifacts.exporting"))
+        }
+      }
+      if case .failed(let reason) = exportStatesByArtifactID[artifact.id] {
+        Label(reason, systemImage: "xmark.octagon")
+          .font(.caption)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("history.artifact.exportFailure.\(artifact.id)")
+      }
     }
     .padding(10)
     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
     .accessibilityIdentifier("history.artifact.\(artifact.id)")
+  }
+
+  private func chooseExportDestination(for artifact: RuntimeArtifactPresentation) {
+    guard let jobID = pendingExportJobID else { return }
+    let panel = NSSavePanel()
+    panel.canCreateDirectories = true
+    panel.isExtensionHidden = false
+    panel.nameFieldStringValue = safeExportName(artifact.name)
+    Task { @MainActor in
+      guard await panel.begin() == .OK, let url = panel.url else { return }
+      onExportArtifact?(
+        jobID, artifact, url, artifact.privacy == "sensitive")
+    }
+  }
+
+  private func safeExportName(_ value: String) -> String {
+    let sanitized = value
+      .replacingOccurrences(of: "/", with: "_")
+      .replacingOccurrences(of: ":", with: "_")
+    return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
   }
 
   private func artifactStatus(_ artifact: RuntimeArtifactPresentation) -> some View {
@@ -948,6 +1020,7 @@ final class RuntimeHistoryViewModel: ObservableObject {
   @Published private(set) var presentation: RuntimeHistoryPresentation = .loading
   @Published private(set) var detailsByJobID: [String: RuntimeJobDetailPresentation] = [:]
   @Published private(set) var loadingDetailJobIDs: Set<String> = []
+  @Published private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
   @Published private(set) var isRefreshInFlight = false
   private let provider: any RuntimeHistoryApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
@@ -1003,6 +1076,37 @@ final class RuntimeHistoryViewModel: ObservableObject {
       self.detailsByJobID[jobID] = detail
     }
   }
+
+  func exportArtifact(
+    jobID: String,
+    artifact: RuntimeArtifactPresentation,
+    destinationURL: URL,
+    allowSensitive: Bool
+  ) {
+    guard exportStatesByArtifactID[artifact.id] != .exporting else { return }
+    exportStatesByArtifactID[artifact.id] = .exporting
+    let detailProvider = detailProvider
+    Task { [weak self] in
+      let result = await detailProvider.exportArtifact(
+        jobID: jobID,
+        artifact: artifact,
+        destinationURL: destinationURL,
+        allowSensitive: allowSensitive)
+      guard let self, !Task.isCancelled else { return }
+      switch result {
+      case .completed(let url):
+        self.exportStatesByArtifactID[artifact.id] = .completed(url)
+      case .failed(let reason):
+        self.exportStatesByArtifactID[artifact.id] = .failed(reason)
+      }
+    }
+  }
+}
+
+enum RuntimeArtifactExportState: Equatable {
+  case exporting
+  case completed(URL)
+  case failed(String)
 }
 
 /// A permanent outline marker for a job's execution mode, shared by History

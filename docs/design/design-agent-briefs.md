@@ -20,51 +20,52 @@
 用 ArkDeck 组件画 **Overview** 页。
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(◎ Overview · ⚡ Flash · 🐞 Debug · 🌲 UI Dump · 📈 Trace · 🗂 History · ⚙ Settings,Overview 为当前页)。
+左栏的设备行由 `device.candidates` 动态产生；`NavItem` × 7（Overview · Flash · Debug · UI Dump · Trace · History · Automation，Overview 为当前页），不画 Settings 导航项。
 内容区自上而下:`StatusStrip` 四格 → 两列 `Card` 网格,四张卡片依次是 HDC 工具链 / 连接与通道保护 / 能力矩阵 / 设备访问诊断。
 底部 `JobInspector` 折叠态常驻。
 
-**内容** — 逐字使用,不要改写、不要翻译、不要补充:
+**内容** — 只绑定生产 presentation，不硬编码设备、build、serial、hash 或探测结论:
 
 StatusStrip 四格:
-- `HDC server` → `healthy · generation 7`
-- `目标设备` → `rk3568-dev · ready`
-- `通道保护` → `加密未验证`
-- `需处理` → `2 项`
+- `HDC server` → 当前 health / generation
+- `目标设备` → 当前 adopted target / connection state；无 target 时显示明确空态
+- `通道保护` → 当前 protection verdict
+- `需处理` → 当前诊断计数
 
 卡片一「HDC 工具链」,用 `KeyValueList`:
-| 来源 | DevEco SDK(external) |
-| 路径 | /Applications/DevEco-Studio.app/…/toolchains/hdc |
-| 平台信任 | unverified + warn Chip `inspection pending` |
-| client / server / daemon | 3.1.0e / 3.1.0a / unknown + warn Chip `mismatchUnverified` |
-| server | ok Chip `healthy` · generation 7 · ownership external |
-| endpoint | 127.0.0.1:8710 · source DevEco SDK |
-| SHA-256 | 9f31…c2ae · 最近验证 07-13 09:12 |
-| 自动 lifecycle / subserver | 0 / 0 + ok Chip `无静默派发` |
+| 来源 / 路径 | 当前 HDC selection snapshot |
+| 平台信任 | 当前 trust verdict + reason |
+| client / server / daemon | 当前版本事实；缺失写 unknown |
+| server | health · generation · ownership |
+| endpoint | 当前 host / port / source |
+| SHA-256 | 完整值可选择，视觉中间省略 |
+| 自动 lifecycle / subserver | Runtime 返回的计数 |
 
-卡片尾注:`版本字符串不一致:只读能力已探测降级可用;Flash 需命中已验证组合。ArkDeck 不会自动重启 external server。`
+版本不一致时尾注:`版本字符串不一致:只读能力按独立探测结论呈现;Flash 仍需命中已验证组合。ArkDeck 不会自动重启 external server。`
 
 卡片二「连接与通道保护」,`KeyValueList`:
-- `rk3568-dev` → `USB` + ok Chip `已授权` + warn Chip `加密未验证`
+- 当前设备 → transport + 独立 authorization Chip + 独立 channel-protection Chip
 - `策略` → `无可靠加密证据 → 按未受保护通道处理;设备授权 ≠ 链路机密性`
 
-卡片三「能力矩阵(rk3568-dev)」,`DataTable`,列 = 能力 / 状态 / 探测证据(第三列 mono):
-- hidumper · ok Chip `可用` · `-w/-element/-lastpage 已确认`
-- hitrace · ok Chip `可用` · `tag×11 · buffer ≤ 307200`
-- bytrace · dim Chip `不存在` · (空)
-- flashd · warn Chip `无法确认` · `查看 raw` 按钮
+卡片三「能力矩阵（当前 target）」,`DataTable`,列 = 能力 / 状态 / 探测证据（第三列 mono），固定四行:
+- `hidumper`：`debug.template.run(windowInventory)` 的 target / binding-bound 结果
+- `hitrace`：`trace.probe` 的 disposition、family、tag 数与 help SHA
+- `bytrace`：同一 `trace.probe` 的独立 disposition；probe failed / unrecognized 都显示 `无法确认`
+- `RockUSB Flash`：Catalog 中 `flash.dayu200@1` 的 availability / reason
+
+状态闭集为 `可用` / `受限` / `不可用` / `无法确认`。不存在 `flashd` 行，也没有 raw shell 输出入口。
 
 卡片四「设备访问诊断」,当前无异常时的文案:
 `当前未发现 permissionDenied / driverUnavailable。若出现,将区别于 offline/unauthorized 展示,并给出由谁执行的最小权限修复步骤;ArkDeck 不会自动提权或写系统规则。`
 
 **必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
 
-1. **`flashd` 是「无法确认」,不是「不存在」。** 两者必须视觉可分:bytrace 用 dim(确实探测到不存在),flashd 用 warn 且带「查看 raw」入口。ArkDeck 不从"没探测到"推断"没有"。
+1. **unknown 与 unavailable 必须视觉可分。** probe failed / unrecognized 是「无法确认」，Catalog 明确 unavailable 才是「不可用」；ArkDeck 不从“没探测到”推断“没有”。
 2. **「已授权」与「加密未验证」是两枚独立 chip,不能合并成一个状态。** 设备授权 ≠ 链路机密性。
 3. **版本不一致(`mismatchUnverified`)不阻断只读能力,但阻断 Flash。** 尾注要说清这个分级,不要写成"工具链故障"。
 4. `ownership: external` 意味着这个 server 是 DevEco 起的——页面上不能出现任何"重启 server"的主按钮,那是 §5.2 里的独立危险 sheet。
 
-**不要做的事**:不要发明设备名、build 串或 hash;不要把四张卡合并成一张长表;不要给任何 chip 配 emoji。
+**不要做的事**:不要发明设备名、build 串或 hash；不要复活 `flashd`、raw shell 或 `查看 raw`；不要把四张卡合并成一张长表；不要给任何 chip 配 emoji。
 
 ---
 
@@ -75,11 +76,11 @@ StatusStrip 四格:
 用 ArkDeck 组件画 **设备授权** 页。
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
-左栏:`DeviceRow` × 2(rk3568-dev · ready;unknown-tablet · unauthorized,**当前选中**)+ `NavItem` × 7(◎ Overview · ⚡ Flash · 🐞 Debug · 🌲 UI Dump · 📈 Trace · 🗂 History · ⚙ Settings)。本页是点击未授权设备行进入的,不是导航目的地 —— 七个 `NavItem` 全部非活动。
+左栏设备行来自 `device.candidates`，当前选中 unauthorized candidate；`NavItem` × 7（Overview · Flash · Debug · UI Dump · Trace · History · Automation）。本页是点击未授权设备行进入的,不是导航目的地 —— 七个 `NavItem` 全部非活动。
 内容区只有一张 `Card`,宽度上限 640,不铺满 detail:标题 → 三步 onboarding 有序列表 → 状态块(随阶段替换) → 一行按钮。三步就是 spec 说的 解锁 → 设备端信任 → 有界等待。
 底部 `JobInspector` 折叠态常驻。
 
-一共画 **四个状态**:`idle` / `polling`(E000002 等待中) / `denied`(E000003) / `ready`,外加一张独立的 `DangerConfirmDialog`。四个状态共用同一张卡的骨架,只换状态块和按钮行。
+一共画 **四个生产状态**:`idle` / `polling`(E000002 等待中) / `timedOut`(E000003) / `ready`,外加一张独立的 `DangerConfirmDialog`。四个状态共用同一张卡的骨架,只换状态块和按钮行。`denied` 暂无生产 probe 判据，不画成生产状态。
 
 **内容** — 逐字使用,不要改写、不要翻译、不要补充:
 
@@ -94,7 +95,7 @@ StatusStrip 四格:
 状态块,每个阶段只出现一个:
 - `idle` — 无状态块。
 - `polling` — warn `Chip`(带缓慢脉冲):`等待设备端确认… 03:00`。`03:00` 是 mm:ss 倒计时,从 180 秒起数。
-- `denied` — warn `Callout`:`授权被拒绝或弹窗超时(E000003)。请检查设备的 USB 调试开关后重试。若重试无效,可重启共享 HDC server——这会影响 DevEco 与所有已连接设备,需要你显式确认。`
+- `timedOut` — warn `Callout`:`等待设备授权超时(E000003 · timedOut)。这不等同于已知 denied。请解锁设备、检查 USB 调试与信任弹窗后重试。`
 - `ready` — ok `Callout`:`已授权,设备 Ready——列表与 Overview 已更新。`
 
 按钮行:
@@ -102,7 +103,7 @@ StatusStrip 四格:
 | --- | --- | --- |
 | idle | primary `开始等待授权` | — |
 | polling | primary `开始等待授权`,disabled | — |
-| denied | primary `重试:开始等待授权` | danger `重启共享 HDC server…` |
+| timedOut | primary `重试:开始等待授权` | danger `重启共享 HDC server…` |
 | ready | primary `开始等待授权` | — |
 
 左栏未授权设备行:warning symbol + `需要信任`,transport `USB`。
@@ -124,7 +125,7 @@ StatusStrip 四格:
 
 1. **E000002 与 E000003 是两个状态,不是同一条错误的两种措辞。** E000002 = 还在等(warn chip + 倒计时,主按钮 disabled,没有次按钮);E000003 = 等待窗口已经关掉(warn callout + 可点的重试)。同一张卡上永远不会同时出现这两块。
 2. **retry 是普通按钮。** `Button variant="primary"`,没有确认 sheet、没有勾选门、没有 danger 描边。「再等一次」在 ArkDeck 眼里是零代价动作,不该被仪式化。
-3. **重启共享 HDC server 绝不是默认修复。** 它只在 `denied` 态出现,只在次要位置,永远不占主按钮位、不预选、不出现在 idle/polling/ready。它走独立 sheet 且必须勾选才解锁 —— 因为这个 server 是 DevEco 起的,重启掉的是别人的会话。
+3. **重启共享 HDC server 绝不是默认修复。** 它只在 `timedOut` 态出现,只在次要位置,永远不占主按钮位、不预选、不出现在 idle/polling/ready。它走独立 sheet 且必须勾选才解锁 —— 因为这个 server 是 DevEco 起的,重启掉的是别人的会话。
 4. **左栏那一行读作「需要信任」,不是「离线」也不是「错误」。** 未授权是一个人能当场解决的状态;offline 不是。三态点必须可分:ready = ok、unauthorized = warn、offline = 灰。
 5. **有界等待要把边界画出来。** `03:00` 是真的会走到 0,走到 0 就翻成 E000003。不要画无限旋转的 spinner,也不要给这段等待配百分比进度 —— ArkDeck 不知道用户什么时候会去点那个弹窗。
 6. **`ready` 那张图里设备名和 build 变了(unknown-tablet → ohos-tablet · OpenHarmony 5.0.0.46)。** 授权之前 ArkDeck 拿不到设备身份,这不是刷新延迟,是「没测到」和「测到的值」的区别。
@@ -386,7 +387,29 @@ com.ohos.launcher
 
 > 贴进 claude.ai/design 项目的新对话。
 
-用 ArkDeck 组件画 **Flash** 页。三个模式各画一张(Execute / Plan only / Simulated),外加一张「正在写入分区」的执行中状态。
+用 ArkDeck 组件画 **Flash** 页。三个模式各画一张(Execute / Plan only / Simulated),外加一张「正在写入分区」的执行中状态。以当前 DAYU200 / `flash.dayu200@1` 产品事实为准。
+
+**当前权威 brief（旧原型 literals 全部失效）**:
+
+- 顺序固定为 Availability → Rockchip device access → Profile & Image Set → Prerequisites → Exact Plan → Review & Run。所有 target、build、partition、size、hash、toolchain 与 plan digest 都直接绑定 App facade 的生产 presentation；不得硬编码 rk3568、flashd 或示例 serial。
+- Execute 的 Exact Plan 与 data impact 完整展示后，只有一个 danger 主按钮 `擦除用户数据并刷机`。不打开确认 sheet，不画 checkbox，不要求输入短语。按钮说明须明确它只是 UX acknowledgement；Runtime capability 与 fresh facts 仍是唯一准入。
+- 提交期间每 750ms 读取 `job.list`，用 indeterminate progress + 真实 timeline 展示状态；不画百分比或 ETA。timeline 尾部进入 `criticalNonInterruptible` step 时，页面与 Job Inspector 同时显示完全一致的临界写入 callout。
+- Rockchip 访问卡必须区分 permission denied、driver unavailable、offline/unauthorized、tool blocked 与 protocol blocked，并显示责任方、ArkDeck 外最小修复动作和普通 `重新检查设备访问` 按钮。不得画 sudo、驱动安装或全局权限放宽入口。
+- 成功后只画两个已有生产字段的 Postflight 对照：`observation.firmware` 对 profile `runtimeBuildVersion`；pre binding revision 对 `observation.bindingRevision`，成功关系为 `n→n+1`。manifest 全 executed + SHA 尚无字段，不画占位行。
+- USB rebind 在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整时自动继续，任何缺失或漂移都 fail closed；TCP / UART 断连才进入人工 rebind confirmation。不要把有 durable proof 的 USB 恢复写成“静默续刷”。
+- 当前 Catalog 只发布 USB / RockUSB 的 `flash.dayu200@1`，所以不要画 rebind confirm / abort 控件；未来 TCP / UART Flash 必须先有 domain 状态与 RPC，设计不能先行伪造。
+- Plan only / Simulated badge 永久保留；Execute 没有 badge。所有状态以 symbol + 文案表达，不只靠颜色；长 hash 中间省略但完整值可选择/查看；900×600 和 VoiceOver 阅读顺序必须保留主按钮前的风险信息。
+
+**当前生产事实与刻意边界**:
+
+- Prerequisites 来自 target / binding / profile-bound `flash.prerequisites`，闭集为 `loader` / `recoveryPath` / `unlocked` / `stablePower`；没有 `flashd`。
+- Trace tag、参数 before / after、Debug 日志 / 包清单 / 端口规则和 Overview 能力矩阵均接生产 facade。缺失或不匹配时显示 unavailable / unknown，不用 fixture 补洞。
+- Flash `job.cancel` 已开放，临界写入只停止后续步骤；Artifact 在 History 中逐项导出；Automation 只开放既有 task 的 list / reconcile / pause / cancel。
+- HDC production authorization 由 domain-owned durable binding 刷新；App 可展示真实 `.timedOut`，但生产 probe 尚不能推导的 `denied` 不得从 fixture 搬过来。
+- Flash Postflight 仍只有 build 对照与 binding revision 两行；manifest 全 executed + SHA 无 wire 字段，继续不画。
+
+<details>
+<summary>已废止的 rk3568 / flashd 原型参考（仅供追溯，不得用于新设计或实现）</summary>
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
 左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(Flash 为当前页)。
@@ -426,18 +449,13 @@ Plan only 模式下,**每一行**最后一列都是 `Chip` tone `planned`:`notEx
 Review & Run 区,按模式三态:
 - Execute:`Button` variant `danger`:`刷写 rk3568-dev(2 个分区)…`。flashd 仍为 unknown 时按钮 disabled,`title` = `required prerequisite flashd 为 unknown,临界步骤前阻断`,并且**旁边一句可见的阻断说明**:`⚠ flashd unknown → 执行分支被阻断(不能刷到一半才发现)`
 - Plan only:`Button` primary `生成完整计划(零设备写入)`;生成后追加 `Button` `查看 plan artifact` + `Chip` planned `◇ planned · 已持久化`
-- Simulated:`Button` primary `运行模拟场景(断连注入)`,下面一句 hint:`fixture-a3 会在 flash boot 后注入断连:预期走「WaitReconnect → Rebind 确认」而不是静默续刷,回连后由你确认同一设备再继续。`(原型这句里还夹着一个 AC 编号,那是评审叠层,不进产品——本页任何地方都不要画 REQ/AC chip。)
+- Simulated:`Button` primary `运行模拟场景(断连注入)`。只有模拟 **TCP / UART** transport 时才进入 `WaitReconnect → Rebind 确认`；模拟 USB 时，在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整匹配后自动 rebind，证据不足则 fail closed。(原型里的 AC 编号是评审叠层，不进产品——本页任何地方都不要画 REQ/AC chip。)
 
 执行中(Execute 且任务在跑),Exact Plan 卡片内 `Callout` tone `danger`:
 `正在写入分区 —— 临界区不可中断:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。`
 (⚠ 由 `Callout` 自己画,文案里别再打一个。)
 
-`刷写 rk3568-dev(2 个分区)…` 打开 `DangerConfirmDialog`:
-- title `刷写 rk3568-dev 的 2 个分区`
-- impactTitle `影响范围`
-- impact 三条:`设备:rk3568-dev · serial 150100469… · binding rev 3(已确认)` / `写入:boot(64MB)、system(2.1GB)——将覆盖现有系统` / `失败可能导致设备无法启动,需使用厂商恢复工具;ArkDeck 不保证可自动恢复`
-- acknowledgements **两条**:`我确认目标设备与镜像匹配(rk3568 · OpenHarmony 5.0)` / `我已确认稳定供电与厂商恢复路径可用`
-- confirmLabel `刷写 rk3568-dev 的 2 个分区`
+Execute 不打开 `DangerConfirmDialog`，也不要求 checkbox 或文字短语。Exact Plan、目标、镜像、分区、userdata 影响、供电提示和 bootloader / 厂商恢复路径在 Review & Run 中完整可见；随后只有一个 danger 主按钮 `擦除用户数据并刷机`。点击即提交 typed request，但该点击只是 UX acknowledgement，Runtime capability 与 fresh facts 仍是唯一准入。
 
 `JobInspector` 里的 Execute 任务:标题 `Flash · rk3568-5.0-full · rk3568-dev`,`PhaseTrack` 九阶段 `Preflight` `EnterUpdater` `Re-identify` `flash boot` `flash system` `Verify` `Reboot` `Postflight` `Complete`,当前停在 `flash system`。日志尾部:
 ```
@@ -473,13 +491,12 @@ Plan only 任务:标题 `Flash(plan-only)· rk3568-5.0-full`,阶段 `Preflight` 
 ```
 sheet 尾注:`plan artifact 已持久化到 Session;PLANNED 标识在历史与导出中永久保留。`
 
-Simulated 任务:标题 `Flash(simulated)· fixture-a3 断连注入`,设备 `SIM-fixture-a3`,阶段 `Preflight` `EnterUpdater` `flash boot` `注入断连` `WaitReconnect` `Rebind 确认` `reconcile` `Complete`,停在 `Rebind 确认`。日志首行 `→ Preflight(合成设备,无真实 connectKey)`,停下时追加 `检测到断连后回连:等待用户 rebind 确认(不静默续刷)。`
+Simulated 任务:标题 `Flash(simulated)· fixture-a3 TCP 断连注入`,设备 `SIM-fixture-a3`,阶段 `Preflight` `EnterUpdater` `flash boot` `注入断连` `WaitReconnect` `Rebind 确认` `reconcile` `Complete`,停在 `Rebind 确认`。日志首行 `→ Preflight(合成设备,无真实 connectKey)`,停下时追加 `检测到 TCP 断连后回连:等待用户 rebind 确认。`USB fixture 不复用这条人工确认路径：完整证据允许自动 rebind，缺失或漂移直接阻断。
 rebind 区块(在 Job inspector 里,不是弹窗):粗体 `设备回连,需确认后继续`,mono 证据行 `同一 serial · binding revision 3→4 · updater 阶段与 plan 一致`,两个按钮 primary `确认同一设备,继续` / `中止`。确认后日志 `用户确认 rebind:同一 serial · binding revision 3→4;继续执行。`;中止后任务终态为已取消,日志 `用户中止 rebind:剩余步骤不执行;该结论写入审计。`。完成文案 `完成:reconcile 与注入脚本一致;SIMULATED 标识永久保留。`
 
-卡片「上次执行 · Postflight」(仅执行成功后),`KeyValueList`:
+卡片「上次执行 · Postflight」(仅执行成功后),`KeyValueList`，只画 Runtime 当前已投影的两行:
 | 设备回报 build | OpenHarmony 5.0.0.96 + ok `Chip` `= 镜像期望 ✓` |
 | 设备身份 | 同一 serial · binding revision 3→4 |
-| manifest | 9 steps 全部 executed · SHA e0a1…88f2 |
 
 **必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
 
@@ -488,10 +505,12 @@ rebind 区块(在 Job inspector 里,不是弹窗):粗体 `设备回连,需确认
 3. **unknown 的前置条件要画成「带理由的阻断」,不是一个灰按钮。** `flashd 能力` 是 unknown 时,`⚠ flashd unknown → 执行分支被阻断(不能刷到一半才发现)` 这句必须**可见**——它不能只藏在 disabled 按钮的 hover title 里。unknown 用 warn,不用 danger:ArkDeck 不知道,和 ArkDeck 知道它不行,是两件事。
 4. **Exact Plan 的 effect 列和 disposition 列是这张表存在的理由。** 五步各自的 effect 分级(deviceMutation / destructive / readOnly)用 `EffectBadge` 画满;Plan only 下每行都要有 `notExecuted(planned)`,配合 `mutationDispatch: 0`——plan-only 不是「按钮变灰的 Execute」,它是一次真的、有产物的、零写入的运行。
 5. **临界写入期间,页面和 Job inspector 说同一句话。** 措辞是「取消只会停止后续步骤」,不是「无法取消」:当前写入不会被强杀,后续步骤会停。电源提示要保留那句诚实的括号——`idle sleep 已由系统保持,但合盖无法被阻止`。这一刻取消按钮变 `等待安全边界…` 并禁用。
-6. **断连 → rebind 确认,摆证据不摆结论。** rebind 区块给的是可核对的原始比对(同一 serial、binding revision 3→4、updater 阶段与 plan 一致),不是一句「已校验通过」。两个按钮,中止那条也写进审计。任何情况下都不静默续刷。
-7. **Postflight 是「设备回报 build = 镜像期望」的对照,不是「成功」两个字。** 三行都要在:build 对照、身份同一性、manifest 全 executed。
+6. **断连按 transport 分流,摆证据不摆结论。** TCP / UART rebind 区块给可核对的原始比对，并保留继续 / 中止两个明确选择。USB 在稳定身份、相邻 revision、updater/plan 阶段证据完整时按 Core 自动 rebind；缺证据或漂移时零新 dispatch。不要把有 durable proof 的 USB 自动恢复描述成“静默续刷”。
+7. **Postflight 是「设备回报 build = 镜像期望」的对照,不是「成功」两个字。** 当前只画 build 对照与 binding `n→n+1`；manifest 全 executed + SHA 尚无生产字段，不画占位行。
 
-**不要做的事**:不要画百分比进度条或 ETA(设备不报可信字节总量,用 `PhaseTrack` + `IndeterminateBar`);不要发明分区名、镜像名、大小、hash、serial、build 串或 fixture id;不要让 Execute 模式在 flashd unknown 时还能点主按钮;不要把 SIMULATED 缩成角落里的小灰字;危险 sheet 的主按钮不要写「确定」;不要给 chip 配 emoji。
+**不要做的事**:不要画百分比进度条或 ETA(设备不报可信字节总量,用 `PhaseTrack` + `IndeterminateBar`);不要发明分区名、镜像名、大小、hash、serial、build 串或 fixture id;不要把 SIMULATED 缩成角落里的小灰字;不要给 Flash 添加确认 sheet、勾选框或文字短语;不要给 chip 配 emoji。
+
+</details>
 
 ---
 
@@ -541,21 +560,22 @@ Parameters(只有 Trace / UI Dump 会话有),`DataTable`,列 = 参数(mono)/ bef
 - `persist.ace.trace.build.enabled` · `false` · `false` · ok `Chip` `已恢复`
 - `persist.rosen.animationtrace.enabled` · `missing` · `missing` · dim `Chip` `未改变`
 
-Artifacts,小标题 `Artifact(role / origin / hash)`,`DataTable` 列 = 文件(mono)/ role / origin / SHA-256(mono),按会话类型取:
+Artifacts,小标题 `Artifact`,`DataTable` 列 = 文件(mono)/ role / origin / size / SHA-256(mono)/ privacy / status。所有值来自 `artifact.list`，按会话类型取生产返回行；不得使用下面的旧示例 hash 作为真实值:
 - Trace:`raw.ftrace` · raw / device · `3f9a…b1c7`;`filtered.ftrace` · derived / host · `c822…04de`;`capture.log` · log / host · `910b…77aa`
 - UI Dump:`stdout.elementtree.txt` · raw / stdout · `7d1a…90ff`;`sidecar.arkui.dump` · raw / device · `e33b…12c0`;`merged.elementtree.json` · derived / host · `a1f4…77b3`
 - Flash(execute):`plan.json` · plan / host · `b7c3…e901`;`flash.log` · log / host · `44d0…a2c8`
 - Flash(plan-only):只有 `plan.json` · plan / host · `b7c3…e901`
 空表文案:`无产物(planned 会话仅含 plan artifact)`
 
-详情底部两个按钮:`在访达中显示`(点后变 `已在访达中显示(演示)` 并禁用)、`导出…`。
+每个 `published` Artifact 行有 `导出…`；成功后同一行出现 `在 Finder 中显示`。missing / invalid 状态禁用导出并显示 status detail。
 
-`导出…` 开普通 sheet:
-- 标题 `导出 Session — S-0711-04`,后面跟该会话的模式 badge(simulated 的会话带 `▤ SIMULATED · fixture-a3`)
-- `Callout` tone `warn`:`产物可能包含页面文本、包名与设备标识符,按敏感数据处理;导出内容由你逐项确认。`
-- 四个勾选项,默认态照抄:`manifest 与审计记录`(勾)/ `派生产物(filtered / merged)`(勾)/ `raw 产物(可能含敏感内容)`(**不勾**)/ `connectKey 脱敏(推荐保持开启)`(勾)
-- hint:`planned / simulated 标识在导出包中永久保留。`
-- 按钮 `取消` / primary `导出 Session 包`,点后变 `✓ 已导出(演示):~/Downloads/S-0711-04.arkdeck.zip`
+`导出…` 先开系统 confirmation dialog:
+- 标题 `导出 Artifact`
+- message 逐项展示实际文件名、格式化 size、privacy 与完整 SHA-256
+- 普通 Artifact 主按钮 `选择导出位置`；sensitive Artifact 主按钮 `导出敏感 Artifact…`，明确这是显式敏感数据 opt-in
+- 取消后不产生读取；确认后再开 `NSSavePanel`
+
+导出过程中显示小型 `ProgressView`。App 分块读取并复算 byteCount / SHA-256，校验通过才落到用户选择的位置；失败在行内显示原因。设计中不画 Session zip、多选项或 connectKey 脱敏开关，因为当前生产能力的边界是单个不可变 Artifact。
 
 **必须画出的语义** — 这几条是本页的存在理由,画错就等于画反:
 
@@ -567,10 +587,10 @@ Artifacts,小标题 `Artifact(role / origin / hash)`,`DataTable` 列 = 文件(mo
 2. **unknown outcome 额外背着 needsAttention。** 详情审计行里的 `outcomeUnknown` 与 `needsAttention` 都要出现,并且要指出未执行的补偿(`未执行补偿:restoreParam×2`)——归档不等于收拾干净了。这条会话与 `RecoveryBanner` 上那条 Flash 恢复项是同一件事,详情里要能看出这层关联(Recovery linkage 分组的内容就是它;原型只给了这一行审计文案,没有跳转控件,别自己发明按钮标签)。
 3. **三栏,不是两栏。** 筛选是一栏,清单是一栏,详情是一栏;详情栏常驻(选中前显示那句空态文案),不要做成点一下才滑出来的抽屉。
 4. **详情分组顺序固定:Summary / Timeline / Parameters / Artifacts / Recovery linkage。** 每组一个小标题,不要把它们合并成一张长 KeyValueList。
-5. **导出先看敏感数据预览,再导出。** 四个勾选项的默认态本身就是设计:raw 默认不勾、connectKey 脱敏默认开。把 raw 默认勾上就把这一整条画反了。
-6. **planned / simulated 标识跟着会话进历史、进导出。** 表格行、详情 Summary、导出 sheet 标题三处都要带;`S-0712-02` 这类 planned 会话只有 plan artifact,没有产物,空表文案要如实写出来——那不是「加载失败」。
+5. **导出先看精确 Artifact 元数据,再选择位置。** name / size / privacy / SHA-256 四项都要出现；sensitive 使用更明确的主按钮，不能与普通产物无差别导出。
+6. **planned / simulated 标识跟着会话进入 History。** `S-0712-02` 这类 planned 会话若没有已发布 Artifact，空表文案要如实写出来——那不是「加载失败」。单 Artifact 导出保留其既有 bytes 与 metadata，不生成新的 Session mode 声明。
 
-**不要做的事**:不要用颜色区分状态(要 symbol + 文字,高对比度模式下也得读得出来);不要把「已中断」画成「失败」的红色变体;不要发明 Session id、hash、时间戳、设备名或文件名;不要在导出对话框上默认勾选 raw 产物;不要给状态 chip 配 emoji——`✓ ✕ ◇ ⊘ ⚠ ▤` 是排版符号,走 `Chip` 的 `icon` 位,照抄即可。
+**不要做的事**:不要用颜色区分状态(要 symbol + 文字,高对比度模式下也得读得出来);不要把「已中断」画成「失败」的红色变体;不要发明 Session id、hash、时间戳、设备名或文件名;不要画尚不存在的 Session zip 导出或多选清单;不要给状态 chip 配 emoji——`✓ ✕ ◇ ⊘ ⚠ ▤` 是排版符号,走 `Chip` 的 `icon` 位,照抄即可。
 
 ---
 
@@ -634,7 +654,31 @@ Artifacts,小标题 `Artifact(role / origin / hash)`,`DataTable` 列 = 文件(mo
 
 > 贴进 claude.ai/design 项目的新对话。
 
-用 ArkDeck 组件画 **Automation** 页。这一页是 **code-backed design candidate**:它对应 Harness 代码里已有的 `HarnessTaskLifecycle`、`HarnessTaskStage`、conditions、Attempt、budgets、allowed operations 与 HumanActionRequired,是既有 Runtime 能力的呈现候选,进入 production 前仍需一条被接受的 UX delta。页面自己要说出这件事(标题旁那枚徽标),这一稿也不要画成已上线功能。
+用 ArkDeck 组件画 **Automation** 页。该页已经是生产工作区：它只监控现有 Harness task，并开放 Runtime 已实现的三个有界生命周期动作；不带 Preview badge。
+
+**当前权威 brief（只画 production wire 已有字段）**:
+
+- Sidebar 的第七项是 Automation，正常导航样式，不带 Preview / planned badge。`HTASK-*` 是 Runtime task ID，与 Git `TASK-*` 无关。
+- 内容使用两栏 `HSplitView`。左栏是 Runtime 返回的 task list：lifecycle symbol + 文字、active round、HTASK ID、goal；右栏是所选 task 详情。
+- 详情顶部依次显示 lifecycle、stage、type 与 goal；Facts 区只显示 task ID、target ID、round、version、updated UTC，以及有值时的 active Job ID / wait reason。
+- Allowed operations 区只读显示 Runtime 返回的字符串；空数组显示明确空态，不把它变成按钮或输入。
+- 动作固定为 `Reconcile`（primary）、`Pause`、`Cancel`（destructive），分别映射 `task.reconcile` / `task.pause` / `task.cancel`。terminal task 禁用全部动作；waiting / humanRequired 额外禁用 Pause。动作期间禁用重复提交并显示小型 progress。
+- 页面底部常驻 boundary callout：App 不能创建 task、提供 human resolution、resume、propose patch、导出 promotion、GC workspace 或管理 capability。失败原因行内显示并可完整阅读。
+- toolbar 只有 Refresh。unavailable 显示 Runtime reason + 连接指导；空 list 显示“没有 Automation task”；未选中显示选择提示。
+- 不画 Attempts、budgets、conditions、StageTrack 或 HumanActionRequired action，因为这些字段尚未由当前 App facade 投影。不得用 v0.3 演示数据补齐。
+
+**必须画出的语义**:
+
+1. lifecycle 与 stage 是两条独立事实，均使用 Runtime 原文；lifecycle 以 symbol + 文字表达，不只靠颜色。
+2. 所有动作都绑定当前选中的完整 HTASK ID；响应若返回不同 ID 或缺字段，整次刷新失败，不拼接局部事实。
+3. Allowed operations 是证据，不是 authority 或快捷操作入口。
+4. `Cancel` 取消的是现有 Harness task，不等同于任意 Runtime Job 的取消，也不扩大 task 的 allowed operations。
+5. 900×600 下仍保留 list / detail 对应关系；键盘焦点和 VoiceOver 先读任务，再读事实、操作和 boundary。
+
+**不要做的事**:不要画 task submit、resume、human decision 文本框、patch 编辑器、预算编辑器、workspace GC、promotion 导出或 capability admin；不要发明 HTASK、target、goal、round、wait reason 或 allowed operation；不要提供 raw command / argv / 远端路径输入。
+
+<details>
+<summary>已废止的 v0.3 Automation Preview 候选（仅供追溯，不得用于新设计或实现）</summary>
 
 **布局** — `WindowFrame`,标题 `ArkDeck — OpenHarmony 设备工作台`。
 左栏:`DeviceRow` × 2(rk3568-dev / unknown-tablet)+ `NavItem` × 7(Overview · Flash · Debug · UI Dump · Trace · History · Automation,Automation 为当前页)。Automation 的 label 后面跟一枚小 `Chip tone="dim"` `Preview`——`NavItem` 没有 badge 属性,徽标从 label 传进去。icon 用 `Symbol`(`overview` / `flash` / `debug` / `dump` / `trace` / `history` / `automation`),不用 emoji。
@@ -700,3 +744,5 @@ RecoveryBanner 一项,kind = `humanRequired`:
 6. **`humanRequired` 复用 §4.2 的同一个 banner family,理由要具体到 block 类型。** 它摊开三行事实:`reasonCode`(机器可读的 block)、`需要你做`(最小人工动作,不是一句「请检查设备」)、`之后回到`(恢复到哪个 stage,让人知道按下按钮会发生什么)。按钮写「我已完成上述动作」,不写「继续」——人只能为自己做过的事作证。ArkDeck 在这里不自动重试。授权缺失、outcomeUnknown、strategy exhausted、evidence integrity、environment unavailable 是五种不同的 block,各有各的准确文案;原型只给了授权缺失这一种(E000003),另外四种没有文案,不要照着编。
 
 **不要做的事**:不要发明 HTASK 编号、设备名、fingerprint、revision、阶段名或预算数字;不要把 Attempt 的 Outcome 与任务的 Lifecycle 用同一枚 chip 表达(`noProgress` / `● active` 说的是这一次尝试,`● running` 说的是整个任务);不要在底部 Job inspector 里给 HTASK 补一条假的运行中 Job——HTASK 与 Job 是两套单位;不要画 AC 标注 chip(`HarnessTask lifecycle / stage`、`bounded debug loop budgets` 这类只在原型评审模式里叠加,不进产品);不要把「Preview · code-backed candidate」徽标删掉或降级成灰字,它是这一页尚未被接受为 production 的唯一可见证据。
+
+</details>

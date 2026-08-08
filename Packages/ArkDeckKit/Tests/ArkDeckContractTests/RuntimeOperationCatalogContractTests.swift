@@ -51,6 +51,14 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
         "debug.hap@1/package-readback": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "packageInfo"),
+        "port-forward.create@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "port-forward.create@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
+        "port-forward.remove@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "port-forward.remove@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
         "flash.dayu200@1/capture-post-flash-diagnostics": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
       ])

@@ -7,19 +7,18 @@ import SwiftUI
 /// Everything here reads the `device.candidates` discovery projection. The
 /// App can list candidates and re-read their state; it cannot adopt or
 /// restart anything from this surface, and adoption is named as the CLI act
-/// it is. The bounded authorization wait below is an App-owned deadline over
-/// repeated reads of that same projection — which is why its countdown is
-/// real: the clock being counted down is this view model's own.
+/// it is. Workflows owns the bounded authorization polling and terminal
+/// classification; the App renders its published window and result.
 @MainActor
 final class DeviceListViewModel: ObservableObject {
   /// One device's bounded trust wait. `polling` carries the App-owned
-  /// deadline the countdown renders; `windowClosed` is the honest terminal:
-  /// the wait window ended without the device reporting Connected — whether
-  /// the prompt was declined or simply never answered, the tool does not say.
+  /// deadline the countdown renders; `timedOut` is emitted only when the
+  /// Workflows provider exhausts its production polling policy.
   enum AuthorizationWait: Equatable {
     case idle
     case polling(connectKey: String, deadline: Date)
-    case windowClosed(connectKey: String)
+    case timedOut(connectKey: String)
+    case unavailable(connectKey: String, reason: String)
   }
 
   @Published private(set) var presentation = DeviceListPresentation.loading
@@ -28,24 +27,11 @@ final class DeviceListViewModel: ObservableObject {
 
   private let provider: any DeviceListApplicationProviding
   private let waitWindow: TimeInterval
-  private let probeInterval: TimeInterval
   private var waitTask: Task<Void, Never>?
 
-  init(
-    provider: any DeviceListApplicationProviding,
-    arguments: [String] = ProcessInfo.processInfo.arguments
-  ) {
+  init(provider: any DeviceListApplicationProviding) {
     self.provider = provider
-    // UI automation shrinks the window so a sweep can watch it close without
-    // spending three real minutes; the product default matches the design's
-    // bounded 180-second wait.
-    if arguments.contains("--ui-test-device-poll-fast") {
-      waitWindow = 6
-      probeInterval = 1
-    } else {
-      waitWindow = 180
-      probeInterval = 5
-    }
+    waitWindow = provider.authorizationWaitWindowSeconds
   }
 
   func refresh() {
@@ -65,33 +51,34 @@ final class DeviceListViewModel: ObservableObject {
     presentation.candidates.first { $0.connectKey == connectKey }
   }
 
-  /// Starts (or restarts) the bounded wait for one device's trust prompt:
-  /// re-read the candidate list on a fixed interval until the device reports
-  /// Connected or the App-owned window ends. Zero device effect — every probe
-  /// is the same read the Re-check button performs.
+  /// Starts (or restarts) the domain-owned bounded wait for one device's trust
+  /// prompt. The local deadline only renders the same published window; it
+  /// never decides whether the result is timed out, denied, or ready.
   func beginAuthorizationWait(forConnectKey connectKey: String) {
     waitTask?.cancel()
     let deadline = Date().addingTimeInterval(waitWindow)
     authorizationWait = .polling(connectKey: connectKey, deadline: deadline)
     let provider = provider
-    let interval = probeInterval
     waitTask = Task { [weak self] in
-      while !Task.isCancelled {
-        let next = await provider.refreshCandidates()
-        guard let self, !Task.isCancelled else { return }
-        self.presentation = next
-        guard case .polling(let waited, let waitDeadline) = self.authorizationWait,
-          waited == connectKey
-        else { return }
-        if self.candidate(forConnectKey: connectKey)?.isAuthorized == true {
-          self.authorizationWait = .idle
-          return
-        }
-        if Date() >= waitDeadline {
-          self.authorizationWait = .windowClosed(connectKey: connectKey)
-          return
-        }
-        try? await Task.sleep(for: .seconds(interval))
+      let result = await provider.waitForAuthorization(connectKey: connectKey)
+      guard let self, !Task.isCancelled else { return }
+      guard case .polling(let waited, _) = self.authorizationWait,
+        waited == connectKey
+      else { return }
+      self.presentation = result.presentation
+      switch result.authorization {
+      case .ready:
+        self.authorizationWait = .idle
+      case .timedOut:
+        self.authorizationWait = .timedOut(connectKey: connectKey)
+      case .cancelled:
+        self.authorizationWait = .idle
+      case .unavailable(let reason), .denied(let reason), .keyAccessDenied(let reason):
+        self.authorizationWait = .unavailable(connectKey: connectKey, reason: reason)
+      case .unauthorizedWaitingForTrust:
+        self.authorizationWait = .unavailable(
+          connectKey: connectKey,
+          reason: "Authorization wait ended without a terminal classification")
       }
     }
   }
@@ -107,7 +94,8 @@ final class DeviceListViewModel: ObservableObject {
   func authorizationWaitState(forConnectKey connectKey: String) -> AuthorizationWait {
     switch authorizationWait {
     case .polling(let waited, _) where waited == connectKey: return authorizationWait
-    case .windowClosed(let waited) where waited == connectKey: return authorizationWait
+    case .timedOut(let waited) where waited == connectKey: return authorizationWait
+    case .unavailable(let waited, _) where waited == connectKey: return authorizationWait
     default: return .idle
     }
   }
@@ -297,10 +285,8 @@ struct DeviceDetailView: View {
     }
   }
 
-  /// The bounded wait's own strip. Polling shows a real countdown — the
-  /// deadline is the view model's, so the clock is honest — and the closed
-  /// window states what is known: no authorization arrived inside it. Neither
-  /// declined nor timed-out is claimed; the tool reports only Unauthorized.
+  /// The bounded wait's own strip. Polling shows the provider's real deadline;
+  /// terminal states come from Workflows and are not inferred from this view.
   @ViewBuilder
   private var authorizationWaitBlock: some View {
     switch waitState {
@@ -321,13 +307,13 @@ struct DeviceDetailView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
       .accessibilityIdentifier("device.wait.polling")
-    case .windowClosed:
+    case .timedOut:
       VStack(alignment: .leading, spacing: 10) {
         deviceNotice(
-          deviceString("device.wait.windowClosed"),
+          deviceString("device.wait.timedOut"),
           systemImage: "exclamationmark.triangle.fill",
           color: .orange,
-          identifier: "device.wait.windowClosed")
+          identifier: "device.wait.timedOut")
         // Restarting the shared HDC server is never the default fix: it is a
         // separate, explicitly confirmed flow that lives on Overview, and it
         // affects DevEco and every connected device. This button only leads
@@ -335,6 +321,12 @@ struct DeviceDetailView: View {
         Button(deviceString("device.wait.openOverviewRecovery"), action: onOpenOverview)
           .accessibilityIdentifier("device.wait.openOverviewRecovery")
       }
+    case .unavailable(_, let reason):
+      deviceNotice(
+        String(format: deviceString("device.wait.unavailable"), reason),
+        systemImage: "xmark.octagon.fill",
+        color: .red,
+        identifier: "device.wait.unavailable")
     }
   }
 
@@ -344,7 +336,10 @@ struct DeviceDetailView: View {
       if candidate.state == "Unauthorized" {
         Button(
           {
-            if case .windowClosed = waitState {
+            if case .timedOut = waitState {
+              return deviceString("device.action.retryWait")
+            }
+            if case .unavailable = waitState {
               return deviceString("device.action.retryWait")
             }
             return deviceString("device.action.beginWait")

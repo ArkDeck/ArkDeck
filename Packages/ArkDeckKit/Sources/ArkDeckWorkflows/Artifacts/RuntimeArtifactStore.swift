@@ -817,13 +817,18 @@ public actor RuntimeArtifactStore {
   }
 
   public func read(
-    jobID: String, artifactID: String, maximumBytes: Int = 1 << 20, allowSensitive: Bool = false
+    jobID: String, artifactID: String, offset: Int = 0,
+    maximumBytes: Int = 1 << 20, allowSensitive: Bool = false
   ) throws -> Data {
     guard (1...Self.maximumReadBytes).contains(maximumBytes) else {
       throw RuntimeArtifactError.ioFailure(
         "artifact read bound must be 1...\(Self.maximumReadBytes) bytes")
     }
     let metadata = try inspect(jobID: jobID, artifactID: artifactID)
+    guard offset >= 0, offset <= metadata.byteCount else {
+      throw RuntimeArtifactError.ioFailure(
+        "artifact read offset must be within 0...\(metadata.byteCount)")
+    }
     guard metadata.status.isPublished else {
       throw RuntimeArtifactError.artifactNotFound(
         "\(artifactID) is recorded as \(metadata.status)")
@@ -836,6 +841,7 @@ public actor RuntimeArtifactStore {
       throw RuntimeArtifactError.ioFailure("artifact bytes are missing for \(artifactID)")
     }
     defer { try? handle.close() }
+    try handle.seek(toOffset: UInt64(offset))
     return (try? handle.read(upToCount: maximumBytes)) ?? Data()
   }
 

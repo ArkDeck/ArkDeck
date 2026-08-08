@@ -229,7 +229,32 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "an unadopted candidate carries no observation")
   }
 
-  // The facade's provider protocol carries exactly one read and no writes.
+  func testApplicationFacadeOwnsTheBoundedAuthorizationTimeoutAndReadyVerdict() async throws {
+    try FileManager.default.createDirectory(
+      at: stateDirectory, withIntermediateDirectories: true)
+    let state = stateDirectory.appendingPathComponent("device-authorization-state.txt")
+    try Data().write(to: state)
+    let provider = DeviceListApplicationFacade.make(arguments: [
+      "ArkDeck", "--ui-test-devices", "--ui-test-device-poll-fast",
+      "--ui-test-fixture-state", state.path,
+    ])
+
+    let timedOut = await provider.waitForAuthorization(connectKey: "7f2c091a445e21")
+    XCTAssertEqual(timedOut.authorization, .timedOut)
+    XCTAssertEqual(timedOut.presentation.candidates.first(where: {
+      $0.connectKey == "7f2c091a445e21"
+    })?.state, "Unauthorized")
+
+    try Data("--ui-test-device-authorized".utf8).write(to: state)
+    let ready = await provider.waitForAuthorization(connectKey: "7f2c091a445e21")
+    XCTAssertEqual(ready.authorization, .ready)
+    XCTAssertTrue(ready.presentation.candidates.first(where: {
+      $0.connectKey == "7f2c091a445e21"
+    })?.isAuthorized == true)
+  }
+
+  // The facade's provider protocol carries candidate and authorization reads
+  // only; neither method can name a Runtime write.
   func testApplicationSurfaceCannotNameAWriteMethod() throws {
     let source = try String(
       contentsOf: URL(fileURLWithPath: #filePath)
@@ -237,13 +262,16 @@ final class DeviceCandidatesContractTests: XCTestCase {
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/DeviceListApplicationFacade.swift"),
       encoding: .utf8)
-    let protocolBody = try XCTUnwrap(
-      source.range(of: "public protocol DeviceListApplicationProviding: Sendable {")
-        .map { source[$0.upperBound...] }
-        .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
+    let protocolStart = try XCTUnwrap(
+      source.range(of: "public protocol DeviceListApplicationProviding: Sendable {")?.upperBound)
+    let protocolEnd = try XCTUnwrap(
+      source.range(of: "public enum DeviceListApplicationFacade", range: protocolStart..<source.endIndex)?
+        .lowerBound)
+    let protocolBody = String(source[protocolStart..<protocolEnd])
     XCTAssertEqual(
-      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 1)
+      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 2)
     XCTAssertTrue(protocolBody.contains("func refreshCandidates()"))
+    XCTAssertTrue(protocolBody.contains("func waitForAuthorization(connectKey: String)"))
     XCTAssertTrue(source.contains("method: \"device.candidates\""))
     for forbidden in [
       "method: \"target.adopt\"", "method: \"job.submit\"", "method: \"job.cancel\"",

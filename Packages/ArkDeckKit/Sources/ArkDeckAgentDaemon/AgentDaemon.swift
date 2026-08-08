@@ -69,6 +69,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
   private let artifactStore: RuntimeArtifactStore?
+  private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
+  private let traceRuntimeProbe: (any TraceRuntimeProbing)?
+  private let debugRuntimeProbe: (any DebugRuntimeProbing)?
   /// Absent means the harness plane is not configured in this composition;
   /// `task.*` then fails closed instead of half-existing.
   let harnessCoordinator: HarnessTaskCoordinator?
@@ -88,6 +91,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrap: DeviceBootstrapMachine? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
+    flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
+    debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     harnessCoordinator: HarnessTaskCoordinator? = nil,
     methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
@@ -98,6 +104,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       artifactStore: artifactStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
+      flashPrerequisiteObserver: flashPrerequisiteObserver,
+      traceRuntimeProbe: traceRuntimeProbe,
+      debugRuntimeProbe: debugRuntimeProbe,
       harnessCoordinator: harnessCoordinator,
       methodObserver: methodObserver)
   }
@@ -112,6 +121,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
     artifactStore: RuntimeArtifactStore?,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
+    flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
+    traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
+    debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     harnessCoordinator: HarnessTaskCoordinator?,
     methodObserver: (@Sendable (String) -> Void)?
   ) {
@@ -122,6 +134,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.targetStore = targetStore
     self.bootstrap = bootstrap
     self.artifactStore = artifactStore
+    self.flashPrerequisiteObserver = flashPrerequisiteObserver
+    self.traceRuntimeProbe = traceRuntimeProbe
+    self.debugRuntimeProbe = debugRuntimeProbe
     self.harnessCoordinator = harnessCoordinator
     self.hapImports = HAPArtifactImportCoordinator()
     if let flashBundleImportDirectory {
@@ -209,6 +224,169 @@ public struct RuntimeControlPlaneHandler: Sendable {
             (availability?.reasons ?? ["runtime availability could not be resolved"])
               .map(JSONValue.string)),
         ]))
+
+    case "flash.prerequisites":
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .string(let profileReference)? = request.params?["profileReference"],
+        RockchipFlashProfile.board(reference: profileReference) != nil
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "a supported targetId and profileReference are required")
+      }
+      guard let targetStore, let flashPrerequisiteObserver else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Flash prerequisite observation is not configured")
+      }
+      do {
+        guard let target = try targetStore.find(targetID: targetID) else {
+          return failure(id: request.id, code: .notFound, message: "target is not adopted")
+        }
+        let observations = try await flashPrerequisiteObserver.observePrerequisites(
+          targetID: targetID)
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(target.targetID),
+            "bindingRevision": .integer(Int64(target.bindingRevision)),
+            "profileReference": .string(profileReference),
+            "observations": .array(
+              observations.map {
+                .object([
+                  "identifier": .string($0.identifier.rawValue),
+                  "status": .string($0.status.rawValue),
+                ])
+              }),
+          ]))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Flash prerequisites could not be observed: \(error)")
+      }
+
+    case "trace.probe":
+      guard case .string(let targetID)? = request.params?["targetId"] else {
+        return failure(
+          id: request.id, code: .invalidParams, message: "targetId is required")
+      }
+      guard let traceRuntimeProbe else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Trace Runtime probing is not configured")
+      }
+      do {
+        let snapshot = try await traceRuntimeProbe.probeTraceRuntime(targetID: targetID)
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(snapshot.targetID),
+            "bindingRevision": .integer(Int64(snapshot.bindingRevision)),
+            "adapterDisposition": .string(snapshot.adapterDisposition),
+            "tool": snapshot.tool.map(JSONValue.string) ?? .null,
+            "family": snapshot.family.map(JSONValue.string) ?? .null,
+            "supportedTags": .array(snapshot.supportedTags.map(JSONValue.string)),
+            "rawHelp": snapshot.rawHelp.map(JSONValue.string) ?? .null,
+            "rawHelpSha256": snapshot.rawHelpSHA256.map(JSONValue.string) ?? .null,
+            "tools": .array(
+              snapshot.tools.map { observation in
+                .object([
+                  "tool": .string(observation.tool),
+                  "disposition": .string(observation.disposition.rawValue),
+                  "family": observation.family.map(JSONValue.string) ?? .null,
+                  "rawHelpSha256": observation.rawHelpSHA256.map(JSONValue.string) ?? .null,
+                  "detail": observation.detail.map(JSONValue.string) ?? .null,
+                ])
+              }),
+            "parameters": .array(
+              snapshot.parameters.map { observation in
+                .object([
+                  "name": .string(observation.name),
+                  "state": .string(observation.state.rawValue),
+                  "value": observation.value.map(JSONValue.string) ?? .null,
+                  "detail": observation.detail.map(JSONValue.string) ?? .null,
+                ])
+              }),
+          ]))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Trace Runtime probe failed: \(error)")
+      }
+
+    case "debug.probe":
+      guard case .string(let targetID)? = request.params?["targetId"] else {
+        return failure(
+          id: request.id, code: .invalidParams, message: "targetId is required")
+      }
+      guard let debugRuntimeProbe else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Debug Runtime probing is not configured")
+      }
+      do {
+        let snapshot = try await debugRuntimeProbe.probeDebugRuntime(targetID: targetID)
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(snapshot.targetID),
+            "bindingRevision": .integer(Int64(snapshot.bindingRevision)),
+            "packages": .array(snapshot.packages.map(JSONValue.string)),
+            "portRules": .array(
+              snapshot.portRules.map { rule in
+                .object([
+                  "direction": .string(rule.direction.rawValue),
+                  "localPort": .integer(Int64(rule.localPort)),
+                  "remotePort": .integer(Int64(rule.remotePort)),
+                ])
+              }),
+            "warnings": .array(snapshot.warnings.map(JSONValue.string)),
+          ]))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Debug Runtime probe failed: \(error)")
+      }
+
+    case "debug.template.run":
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .string(let templateID)? = request.params?["templateId"],
+        let template = DebugRuntimeCommandTemplate(rawValue: templateID)
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "targetId and a closed templateId are required")
+      }
+      guard let debugRuntimeProbe else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Debug Runtime probing is not configured")
+      }
+      do {
+        let result = try await debugRuntimeProbe.runDebugTemplate(
+          targetID: targetID, template: template)
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(result.targetID),
+            "bindingRevision": .integer(Int64(result.bindingRevision)),
+            "templateId": .string(result.templateID),
+            "effect": .string(result.effect),
+            "executable": .string(result.executable),
+            "executableSha256": .string(result.executableSHA256),
+            "arguments": .array(result.argumentDisclosure.map(JSONValue.string)),
+            "loweringSha256": .string(result.loweringSHA256),
+            "exitCode": result.exitCode.map { .integer(Int64($0)) } ?? .null,
+            "durationMilliseconds": .integer(Int64(result.durationMilliseconds)),
+            "stdout": .string(result.stdout),
+            "stderr": .string(result.stderr),
+            "outputTruncated": .bool(result.outputTruncated),
+          ]))
+      } catch {
+        return failure(
+          id: request.id, code: .rejected,
+          message: "Debug template failed: \(error)")
+      }
 
     case "capability.list":
       do {
@@ -968,14 +1146,31 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       var allowSensitive = false
       if case .bool(let flag)? = request.params?["allowSensitive"] { allowSensitive = flag }
+      var offset = 0
+      if case .integer(let requestedOffset)? = request.params?["offset"] {
+        guard requestedOffset >= 0, requestedOffset <= Int64(Int.max) else {
+          return failure(
+            id: request.id, code: .invalidParams,
+            message: "offset must be a non-negative host integer")
+        }
+        offset = Int(requestedOffset)
+      }
       do {
+        let metadata = try await artifactStore.inspect(
+          jobID: jobID, artifactID: artifactID)
         let data = try await artifactStore.read(
-          jobID: jobID, artifactID: artifactID, maximumBytes: maximumBytes,
+          jobID: jobID, artifactID: artifactID, offset: offset,
+          maximumBytes: maximumBytes,
           allowSensitive: allowSensitive)
+        let nextOffset = offset + data.count
         return success(
           id: request.id,
           result: .object([
             "artifactId": .string(artifactID),
+            "offset": .integer(Int64(offset)),
+            "nextOffset": .integer(Int64(nextOffset)),
+            "totalByteCount": .integer(Int64(metadata.byteCount)),
+            "eof": .bool(nextOffset == metadata.byteCount),
             "byteCount": .integer(Int64(data.count)),
             "base64": .string(data.base64EncodedString()),
           ]))
@@ -1334,6 +1529,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "firstEvidenceStepAtUtc": optionalString(snapshot.firstEvidenceStepAtUTC),
       "finishedAtUtc": optionalString(snapshot.finishedAtUTC),
       "recoveryEpoch": recoveryEpoch,
+      "traceProbeBefore": encodeTraceRuntimeProbe(snapshot.traceProbeBefore),
+      "traceProbeAfter": encodeTraceRuntimeProbe(snapshot.traceProbeAfter),
       "parameters": .object(snapshot.inputs ?? [:]),
       "artifacts": .array(
         artifacts.map { artifact in
@@ -1350,6 +1547,30 @@ public struct RuntimeControlPlaneHandler: Sendable {
           ])
         }),
       "blockers": .array(blockers.map(JSONValue.string)),
+    ])
+  }
+
+  private static func encodeTraceRuntimeProbe(
+    _ snapshot: TraceRuntimeProbeSnapshot?
+  ) -> JSONValue {
+    guard let snapshot else { return .null }
+    return .object([
+      "targetId": .string(snapshot.targetID),
+      "bindingRevision": .integer(Int64(snapshot.bindingRevision)),
+      "adapterDisposition": .string(snapshot.adapterDisposition),
+      "tool": snapshot.tool.map(JSONValue.string) ?? .null,
+      "family": snapshot.family.map(JSONValue.string) ?? .null,
+      "supportedTags": .array(snapshot.supportedTags.map(JSONValue.string)),
+      "rawHelpSha256": snapshot.rawHelpSHA256.map(JSONValue.string) ?? .null,
+      "parameters": .array(
+        snapshot.parameters.map { observation in
+          .object([
+            "name": .string(observation.name),
+            "state": .string(observation.state.rawValue),
+            "value": observation.value.map(JSONValue.string) ?? .null,
+            "detail": observation.detail.map(JSONValue.string) ?? .null,
+          ])
+        }),
     ])
   }
 

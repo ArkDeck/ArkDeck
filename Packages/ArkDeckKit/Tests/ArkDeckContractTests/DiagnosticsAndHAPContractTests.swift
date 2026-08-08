@@ -35,6 +35,25 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
   }
 
+  private struct TraceProbe: TraceRuntimeProbing {
+    func probeTraceRuntime(targetID: String) async throws -> TraceRuntimeProbeSnapshot {
+      TraceRuntimeProbeSnapshot(
+        targetID: targetID,
+        bindingRevision: 7,
+        adapterDisposition: "captureEligible",
+        tool: "hitrace",
+        family: "hitrace-openharmony",
+        supportedTags: ["ohos"],
+        rawHelp: nil,
+        rawHelpSHA256: nil,
+        tools: [],
+        parameters: TraceDebugParameterCatalog.definitions.map {
+          TraceRuntimeParameterObservation(
+            name: $0.name, state: .value, value: "false")
+        })
+    }
+  }
+
   /// Scriptable dispatcher: each action family can be told to succeed, to
   /// fail, or - the case that matters most - to exit cleanly while the
   /// readback shows nothing happened.
@@ -401,6 +420,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
+      traceRuntimeProbe: TraceProbe(),
       nowUTC: { "2026-07-29T00:00:00Z" })
     return (engine, capabilityStore, artifactStore)
   }
@@ -783,6 +803,24 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     // hilog is required; an empty capture is unknown, which halts.
     XCTAssertNotEqual(status.state, "succeeded")
     XCTAssertTrue(status.outcomeUnknown || status.state == "failed", status.state)
+  }
+
+  func testTraceAfterSnapshotDoesNotDisappearBehindAnEarlierKnownFailure() async throws {
+    var script = ScriptedDispatcher.Script()
+    script.hilogEmpty = true
+    let dispatcher = ScriptedDispatcher(script: script)
+    let (engine, capabilities, _) = try makeEngine(dispatcher: dispatcher)
+    try await installCaptureCapability(capabilities)
+    let acceptance = try await engine.submit(
+      captureRequest(
+        withTrace: true, key: "idem-trace-failed-with-after",
+        capability: "CAP-RT-CAPTURE-001"))
+
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertNotEqual(status.state, "succeeded")
+    let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
+    XCTAssertNotNil(evidence.traceProbeBefore)
+    XCTAssertNotNil(evidence.traceProbeAfter)
   }
 
   /// The trace leg used to be refused at admission because neither half of

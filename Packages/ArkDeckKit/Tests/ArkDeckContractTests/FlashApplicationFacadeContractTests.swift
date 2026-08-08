@@ -118,6 +118,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     XCTAssertEqual(
       Set(presentation.prerequisites.map(\.identifier)),
       Set(profile.prerequisites.keys))
+    XCTAssertTrue(presentation.prerequisites.allSatisfy { $0.status == .unknown })
   }
 
   func testExecutePresentationRemainsReviewOnlyUntilRuntimeSubmission() throws {
@@ -168,135 +169,49 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     }
   }
 
-  func testExactDoubleConfirmationProducesOnlyAZeroDispatchHumanHandoff() throws {
+  func testPlanPresentationPreservesCriticalCancellationSemantics() throws {
     let target = FlashTargetPresentation(
       id: "target-dayu200-a",
       bindingRevision: 4,
       toolVersion: "3.2.0f",
       adoptedAtUTC: "2026-08-06T08:00:00Z")
     let presentation = try executePresentation(target: target)
-    let phrase = FlashManualConfirmationValidator.destructivePhrase(for: presentation)
 
-    let result = FlashManualConfirmationValidator.confirm(
-      currentPlan: presentation,
-      reviewedPlan: presentation,
-      currentTarget: target,
-      destructivePhrase: phrase,
-      userdataPhrase: FlashManualConfirmationValidator.userdataPhrase,
-      confirmedAtUTC: "2026-08-06T12:00:00Z")
-
-    guard case .accepted(let handoff) = result else {
-      return XCTFail("exact confirmation should produce a human handoff: \(result)")
-    }
-    XCTAssertEqual(handoff.target, target)
-    XCTAssertEqual(handoff.planDigestSHA256, presentation.planDigestSHA256)
-    XCTAssertEqual(handoff.archiveSHA256, presentation.archiveSHA256)
-    XCTAssertEqual(handoff.destructiveConfirmationPhrase, phrase)
-    XCTAssertEqual(handoff.deviceMutationDispatchCount, 0)
+    XCTAssertEqual(
+      presentation.steps.first(where: { $0.kind == "flashPartition" })?.cancellation,
+      .criticalNonInterruptible)
   }
 
-  func testConfirmationFailsClosedOnEveryPhrasePlanAndTargetMismatch() throws {
+  func testPrerequisiteResponsePinsTargetBindingProfileAndClosedVocabulary() throws {
     let target = FlashTargetPresentation(
-      id: "target-dayu200-a",
-      bindingRevision: 4,
-      toolVersion: "3.2.0f",
+      id: "target-dayu200-a", bindingRevision: 4, toolVersion: "3.2.0f",
       adoptedAtUTC: "2026-08-06T08:00:00Z")
-    let reviewed = try executePresentation(target: target)
-    let phrase = FlashManualConfirmationValidator.destructivePhrase(for: reviewed)
-
-    func confirm(
-      currentPlan: FlashExactPlanPresentation? = nil,
-      currentTarget: FlashTargetPresentation? = nil,
-      destructivePhrase: String? = nil,
-      userdataPhrase: String? = nil
-    ) -> FlashManualConfirmationResult {
-      FlashManualConfirmationValidator.confirm(
-        currentPlan: currentPlan ?? reviewed,
-        reviewedPlan: reviewed,
-        currentTarget: currentTarget ?? target,
-        destructivePhrase: destructivePhrase ?? phrase,
-        userdataPhrase: userdataPhrase ?? FlashManualConfirmationValidator.userdataPhrase,
-        confirmedAtUTC: "2026-08-06T12:00:00Z")
+    let rows = RockchipPrerequisiteIdentifier.allCases.map {
+      ["identifier": $0.rawValue, "status": "satisfied"]
     }
+    let data = try JSONSerialization.data(withJSONObject: [
+      "id": "test", "ok": true,
+      "result": [
+        "targetId": target.id,
+        "bindingRevision": target.bindingRevision,
+        "profileReference": "dayu200@1",
+        "observations": rows,
+      ],
+    ])
 
-    XCTAssertEqual(
-      confirm(destructivePhrase: "FLASH wrong"),
-      .rejected(.destructivePhraseMismatch))
-    XCTAssertEqual(
-      confirm(userdataPhrase: "ERASE USERDATA"),
-      .rejected(.userdataPhraseMismatch))
-    XCTAssertEqual(
-      confirm(
-        currentTarget: FlashTargetPresentation(
-          id: target.id,
-          bindingRevision: target.bindingRevision + 1,
-          toolVersion: target.toolVersion,
-          adoptedAtUTC: target.adoptedAtUTC)),
-      .rejected(.missingOrStaleTarget))
-    XCTAssertEqual(
-      FlashManualConfirmationValidator.confirm(
-        currentPlan: reviewed,
-        reviewedPlan: reviewed,
-        currentTarget: nil,
-        destructivePhrase: phrase,
-        userdataPhrase: FlashManualConfirmationValidator.userdataPhrase,
-        confirmedAtUTC: "2026-08-06T12:00:00Z"),
-      .rejected(.missingOrStaleTarget))
-    XCTAssertEqual(
-      FlashManualConfirmationValidator.confirm(
-        currentPlan: nil,
-        reviewedPlan: reviewed,
-        currentTarget: target,
-        destructivePhrase: phrase,
-        userdataPhrase: FlashManualConfirmationValidator.userdataPhrase,
-        confirmedAtUTC: "2026-08-06T12:00:00Z"),
-      .rejected(.stalePlan))
+    let decoded = FlashPrerequisiteResponseDecoding.observations(
+      .success(data), target: target, profileReference: "dayu200@1")
+    guard case .success(let observations) = decoded else {
+      return XCTFail("matching Runtime prerequisite facts must decode")
+    }
+    XCTAssertEqual(Set(observations.map(\.identifier)), Set(RockchipPrerequisiteIdentifier.allCases))
 
-    let stale = FlashExactPlanPresentation(
-      mode: reviewed.mode,
-      target: reviewed.target,
-      profileReference: reviewed.profileReference,
-      toolchainFingerprint: reviewed.toolchainFingerprint,
-      imageFileName: "different-images.tar.gz",
-      runtimeBuildVersion: reviewed.runtimeBuildVersion,
-      archiveSizeBytes: reviewed.archiveSizeBytes,
-      archiveSHA256: reviewed.archiveSHA256,
-      mappedPartitionCount: reviewed.mappedPartitionCount,
-      planDigestSHA256: reviewed.planDigestSHA256,
-      stepSetDigestSHA256: reviewed.stepSetDigestSHA256,
-      steps: reviewed.steps,
-      dataImpact: reviewed.dataImpact,
-      partitions: reviewed.partitions,
-      writeForbiddenMemberNames: reviewed.writeForbiddenMemberNames,
-      prerequisites: reviewed.prerequisites)
-    XCTAssertEqual(confirm(currentPlan: stale), .rejected(.stalePlan))
-
-    let nonExecute = FlashExactPlanPresentation(
-      mode: .planOnly,
-      target: reviewed.target,
-      profileReference: reviewed.profileReference,
-      toolchainFingerprint: reviewed.toolchainFingerprint,
-      imageFileName: reviewed.imageFileName,
-      runtimeBuildVersion: reviewed.runtimeBuildVersion,
-      archiveSizeBytes: reviewed.archiveSizeBytes,
-      archiveSHA256: reviewed.archiveSHA256,
-      mappedPartitionCount: reviewed.mappedPartitionCount,
-      planDigestSHA256: reviewed.planDigestSHA256,
-      stepSetDigestSHA256: reviewed.stepSetDigestSHA256,
-      steps: reviewed.steps,
-      dataImpact: reviewed.dataImpact,
-      partitions: reviewed.partitions,
-      writeForbiddenMemberNames: reviewed.writeForbiddenMemberNames,
-      prerequisites: reviewed.prerequisites)
-    XCTAssertEqual(
-      FlashManualConfirmationValidator.confirm(
-        currentPlan: nonExecute,
-        reviewedPlan: nonExecute,
-        currentTarget: target,
-        destructivePhrase: phrase,
-        userdataPhrase: FlashManualConfirmationValidator.userdataPhrase,
-        confirmedAtUTC: "2026-08-06T12:00:00Z"),
-      .rejected(.notExecutePlan))
+    let wrongBinding = FlashTargetPresentation(
+      id: target.id, bindingRevision: 5, toolVersion: target.toolVersion,
+      adoptedAtUTC: target.adoptedAtUTC)
+    guard case .failure = FlashPrerequisiteResponseDecoding.observations(
+      .success(data), target: wrongBinding, profileReference: "dayu200@1")
+    else { return XCTFail("stale binding facts must fail closed") }
   }
 
   private func executePresentation(

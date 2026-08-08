@@ -63,11 +63,18 @@ public enum FlashPlanStepDisposition: String, Sendable, Equatable {
   case executionLocked
 }
 
+public enum FlashPlanCancellation: String, Sendable, Equatable {
+  case immediate
+  case atSafeBoundary
+  case criticalNonInterruptible
+}
+
 public struct FlashPlanStepPresentation: Sendable, Equatable, Identifiable {
   public let id: String
   public let kind: String
   public let argumentSummary: String
   public let effect: FlashPlanEffect
+  public let cancellation: FlashPlanCancellation
   public let disposition: FlashPlanStepDisposition
 
   public init(
@@ -75,12 +82,14 @@ public struct FlashPlanStepPresentation: Sendable, Equatable, Identifiable {
     kind: String,
     argumentSummary: String,
     effect: FlashPlanEffect,
+    cancellation: FlashPlanCancellation,
     disposition: FlashPlanStepDisposition
   ) {
     self.id = id
     self.kind = kind
     self.argumentSummary = argumentSummary
     self.effect = effect
+    self.cancellation = cancellation
     self.disposition = disposition
   }
 }
@@ -118,15 +127,18 @@ public struct FlashPartitionPresentation: Sendable, Equatable, Identifiable {
 public struct FlashPrerequisitePresentation: Sendable, Equatable, Identifiable {
   public let identifier: RockchipPrerequisiteIdentifier
   public let requirement: RockchipPrerequisiteRequirement
+  public let status: RockchipPrerequisiteStatus
 
   public var id: RockchipPrerequisiteIdentifier { identifier }
 
   public init(
     identifier: RockchipPrerequisiteIdentifier,
-    requirement: RockchipPrerequisiteRequirement
+    requirement: RockchipPrerequisiteRequirement,
+    status: RockchipPrerequisiteStatus = .unknown
   ) {
     self.identifier = identifier
     self.requirement = requirement
+    self.status = status
   }
 }
 
@@ -183,6 +195,30 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     self.writeForbiddenMemberNames = writeForbiddenMemberNames
     self.prerequisites = prerequisites
   }
+
+  func withPrerequisiteObservations(
+    _ observations: [RockchipPrerequisiteObservation]
+  ) -> FlashExactPlanPresentation {
+    let statuses = Dictionary(
+      observations.map { ($0.identifier, $0.status) },
+      uniquingKeysWith: { existing, incoming in
+        existing == .satisfied ? incoming : existing
+      })
+    return FlashExactPlanPresentation(
+      mode: mode, target: target, profileReference: profileReference,
+      toolchainFingerprint: toolchainFingerprint, imageFileName: imageFileName,
+      runtimeBuildVersion: runtimeBuildVersion,
+      archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256,
+      mappedPartitionCount: mappedPartitionCount,
+      planDigestSHA256: planDigestSHA256, stepSetDigestSHA256: stepSetDigestSHA256,
+      steps: steps, dataImpact: dataImpact, partitions: partitions,
+      writeForbiddenMemberNames: writeForbiddenMemberNames,
+      prerequisites: prerequisites.map {
+        FlashPrerequisitePresentation(
+          identifier: $0.identifier, requirement: $0.requirement,
+          status: statuses[$0.identifier] ?? .unknown)
+      })
+  }
 }
 
 public enum FlashPlanFailureCode: String, Sendable, Equatable {
@@ -213,105 +249,13 @@ public struct FlashSubmissionPresentation: Sendable, Equatable {
 }
 
 public enum FlashSubmissionResult: Sendable, Equatable {
-  case completed(FlashSubmissionPresentation)
+  case accepted(jobID: String)
   case failed(String)
 }
 
-/// An in-memory record that a human reviewed one exact execute-plan snapshot.
-///
-/// This is deliberately not a Runtime authority, capability, reservation or
-/// Job request. Producing this value always has zero device dispatch; the
-/// separate submit action still enters the full Runtime admission gate.
-public struct FlashHumanHandoffPresentation: Sendable, Equatable {
-  public let confirmedAtUTC: String
-  public let target: FlashTargetPresentation
-  public let profileReference: String
-  public let imageFileName: String
-  public let archiveSHA256: String
-  public let planDigestSHA256: String
-  public let stepSetDigestSHA256: String
-  public let destructiveConfirmationPhrase: String
-  public let deviceMutationDispatchCount: Int
-
-  public init(
-    confirmedAtUTC: String,
-    target: FlashTargetPresentation,
-    profileReference: String,
-    imageFileName: String,
-    archiveSHA256: String,
-    planDigestSHA256: String,
-    stepSetDigestSHA256: String,
-    destructiveConfirmationPhrase: String,
-    deviceMutationDispatchCount: Int
-  ) {
-    self.confirmedAtUTC = confirmedAtUTC
-    self.target = target
-    self.profileReference = profileReference
-    self.imageFileName = imageFileName
-    self.archiveSHA256 = archiveSHA256
-    self.planDigestSHA256 = planDigestSHA256
-    self.stepSetDigestSHA256 = stepSetDigestSHA256
-    self.destructiveConfirmationPhrase = destructiveConfirmationPhrase
-    self.deviceMutationDispatchCount = deviceMutationDispatchCount
-  }
-}
-
-public enum FlashManualConfirmationFailure: String, Sendable, Equatable {
-  case notExecutePlan
-  case missingOrStaleTarget
-  case stalePlan
-  case destructivePhraseMismatch
-  case userdataPhraseMismatch
-}
-
-public enum FlashManualConfirmationResult: Sendable, Equatable {
-  case accepted(FlashHumanHandoffPresentation)
-  case rejected(FlashManualConfirmationFailure)
-}
-
-/// Validates the two human confirmation phrases against an immutable plan
-/// snapshot. It can only produce a presentation-only handoff record.
-public enum FlashManualConfirmationValidator {
-  public static let userdataPhrase = "ERASE-USERDATA"
-
-  public static func destructivePhrase(for plan: FlashExactPlanPresentation) -> String {
-    "FLASH \(plan.planDigestSHA256.prefix(12))"
-  }
-
-  public static func confirm(
-    currentPlan: FlashExactPlanPresentation?,
-    reviewedPlan: FlashExactPlanPresentation,
-    currentTarget: FlashTargetPresentation?,
-    destructivePhrase: String,
-    userdataPhrase: String,
-    confirmedAtUTC: String
-  ) -> FlashManualConfirmationResult {
-    guard reviewedPlan.mode == .execute else { return .rejected(.notExecutePlan) }
-    guard let reviewedTarget = reviewedPlan.target,
-      currentTarget == reviewedTarget
-    else {
-      return .rejected(.missingOrStaleTarget)
-    }
-    guard currentPlan == reviewedPlan else { return .rejected(.stalePlan) }
-    let expectedDestructive = self.destructivePhrase(for: reviewedPlan)
-    guard destructivePhrase == expectedDestructive else {
-      return .rejected(.destructivePhraseMismatch)
-    }
-    guard userdataPhrase == self.userdataPhrase else {
-      return .rejected(.userdataPhraseMismatch)
-    }
-    return .accepted(
-      FlashHumanHandoffPresentation(
-        confirmedAtUTC: confirmedAtUTC,
-        target: reviewedTarget,
-        profileReference: reviewedPlan.profileReference,
-        imageFileName: reviewedPlan.imageFileName,
-        archiveSHA256: reviewedPlan.archiveSHA256,
-        planDigestSHA256: reviewedPlan.planDigestSHA256,
-        stepSetDigestSHA256: reviewedPlan.stepSetDigestSHA256,
-        destructiveConfirmationPhrase: expectedDestructive,
-        deviceMutationDispatchCount: 0))
-  }
+public enum FlashRunResult: Sendable, Equatable {
+  case completed(FlashSubmissionPresentation)
+  case failed(String)
 }
 
 public protocol FlashApplicationProviding: Sendable {
@@ -326,6 +270,8 @@ public protocol FlashApplicationProviding: Sendable {
     archiveURL: URL,
     plan: FlashExactPlanPresentation
   ) async -> FlashSubmissionResult
+  func run(jobID: String) async -> FlashRunResult
+  func cancel(jobID: String) async -> Bool
 }
 
 public enum FlashApplicationFacade {
@@ -361,13 +307,32 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     defer {
       if gainedScope { archiveURL.stopAccessingSecurityScopedResource() }
     }
-    return await Task.detached(priority: .userInitiated) {
+    let local = await Task.detached(priority: .userInitiated) {
       FlashPlanPresentationBuilder.prepare(
         archiveURL: archiveURL,
         profileReference: profileReference,
         mode: mode,
         target: target)
     }.value
+    guard mode == .execute, let target, case .ready(let plan) = local else {
+      return local
+    }
+    let response = await FlashXPCTransport.request(
+      method: "flash.prerequisites",
+      params: [
+        "targetId": .string(target.id),
+        "profileReference": .string(profileReference),
+      ])
+    switch FlashPrerequisiteResponseDecoding.observations(
+      response, target: target, profileReference: profileReference)
+    {
+    case .success(let observations):
+      return .ready(plan.withPrerequisiteObservations(observations))
+    case .failure:
+      // The exact plan remains reviewable, but every unobserved prerequisite
+      // stays unknown. Runtime performs the authoritative probe before write.
+      return local
+    }
   }
 
   func submit(
@@ -472,6 +437,16 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       guard let jobID = submitted["jobId"] as? String else {
         return .failed("Runtime accepted Flash without returning a Job ID")
       }
+      return .accepted(jobID: jobID)
+    } catch let failure as FlashResponseFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
+  func run(jobID: String) async -> FlashRunResult {
+    do {
       let terminal = try await FlashXPCResponseDecoding.resultObject(
         await FlashXPCTransport.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
@@ -491,6 +466,14 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     } catch {
       return .failed(String(describing: error))
     }
+  }
+
+  func cancel(jobID: String) async -> Bool {
+    guard let result = try? await FlashXPCResponseDecoding.resultObject(
+      await FlashXPCTransport.request(
+        method: "job.cancel", params: ["jobId": .string(jobID)]))
+    else { return false }
+    return result["cancelRequested"] as? Bool == true
   }
 }
 
@@ -520,12 +503,17 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
     do {
       let plan = try provider.makePlan(
         mode: mode, archiveValidation: .valid, planNonce: "ui-fixture")
-      return .ready(
-        FlashPlanPresentationBuilder.presentation(
+      let presentation = FlashPlanPresentationBuilder.presentation(
           plan: plan,
           profile: board,
           target: target,
-          imageFileName: archiveURL.lastPathComponent))
+          imageFileName: archiveURL.lastPathComponent)
+      let observations = RockchipPrerequisiteIdentifier.allCases.map {
+        RockchipPrerequisiteObservation(
+          identifier: $0,
+          status: $0 == .stablePower ? .unknown : .satisfied)
+      }
+      return .ready(presentation.withPrerequisiteObservations(observations))
     } catch {
       return .failed(code: .planMaterializationFailed, detail: String(describing: error))
     }
@@ -535,11 +523,17 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
     archiveURL _: URL,
     plan _: FlashExactPlanPresentation
   ) async -> FlashSubmissionResult {
+    .accepted(jobID: "job-ui-fixture-flash")
+  }
+
+  func run(jobID _: String) async -> FlashRunResult {
     .completed(
       FlashSubmissionPresentation(
         jobID: "job-ui-fixture-flash", state: "succeeded", outcomeUnknown: false,
         timeline: ["jobCreated", "finalized"]))
   }
+
+  func cancel(jobID _: String) async -> Bool { true }
 }
 
 enum FlashWorkspaceResponseDecoding {
@@ -632,7 +626,63 @@ enum FlashWorkspaceResponseDecoding {
   }
 }
 
-private struct FlashResponseFailure: Error {
+enum FlashPrerequisiteResponseDecoding {
+  static func observations(
+    _ response: Result<Data, FlashXPCReadFailure>,
+    target: FlashTargetPresentation,
+    profileReference: String
+  ) -> Result<[RockchipPrerequisiteObservation], FlashResponseFailure> {
+    let data: Data
+    switch response {
+    case .success(let value): data = value
+    case .failure(let failure):
+      return .failure(FlashResponseFailure(message: failure.message))
+    }
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return .failure(FlashResponseFailure(message: "Runtime returned an unreadable response"))
+    }
+    if let error = envelope["error"] as? [String: Any] {
+      let code = error["code"] as? String ?? "unknown"
+      let message = error["message"] as? String ?? "no message"
+      return .failure(
+        FlashResponseFailure(message: "Runtime refused the request: \(code) — \(message)"))
+    }
+    guard envelope["ok"] as? Bool == true,
+      let result = envelope["result"] as? [String: Any],
+      result["targetId"] as? String == target.id,
+      result["bindingRevision"] as? Int == target.bindingRevision,
+      result["profileReference"] as? String == profileReference,
+      let rows = result["observations"] as? [[String: Any]]
+    else {
+      return .failure(
+        FlashResponseFailure(message: "Runtime returned mismatched prerequisite facts"))
+    }
+    var seen: Set<RockchipPrerequisiteIdentifier> = []
+    var observations: [RockchipPrerequisiteObservation] = []
+    for row in rows {
+      guard let identifierText = row["identifier"] as? String,
+        let identifier = RockchipPrerequisiteIdentifier(rawValue: identifierText),
+        !seen.contains(identifier),
+        let statusText = row["status"] as? String,
+        let status = RockchipPrerequisiteStatus(rawValue: statusText)
+      else {
+        return .failure(
+          FlashResponseFailure(message: "Runtime returned malformed prerequisite facts"))
+      }
+      seen.insert(identifier)
+      observations.append(
+        RockchipPrerequisiteObservation(identifier: identifier, status: status))
+    }
+    guard seen == Set(RockchipPrerequisiteIdentifier.allCases) else {
+      return .failure(
+        FlashResponseFailure(message: "Runtime omitted a prerequisite fact"))
+    }
+    return .success(observations)
+  }
+}
+
+struct FlashResponseFailure: Error {
   let message: String
 }
 
@@ -759,6 +809,7 @@ enum FlashPlanPresentationBuilder {
           kind: step.kind.rawValue,
           argumentSummary: argumentSummary(step.arguments),
           effect: FlashPlanEffect(rawValue: step.effect.rawValue) ?? .hostOnly,
+          cancellation: FlashPlanCancellation(rawValue: step.cancellation.rawValue) ?? .immediate,
           disposition: disposition)
       },
       dataImpact: [

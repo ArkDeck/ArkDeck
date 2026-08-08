@@ -316,6 +316,53 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   }
 }
 
+/// Read-only prerequisite portrait used by the App's exact-plan review.
+///
+/// This is intentionally a projection of facts the production Runtime already
+/// measures. It does not participate in admission and it never upgrades an
+/// unobservable condition: the protected Runtime repeats its own fresh probe
+/// before a destructive dispatch.
+public protocol RockchipFlashPrerequisiteObserving: Sendable {
+  func observePrerequisites(targetID: String) async throws
+    -> [RockchipPrerequisiteObservation]
+}
+
+extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObserving {
+  public func observePrerequisites(
+    targetID: String
+  ) async throws -> [RockchipPrerequisiteObservation] {
+    let facts = try await currentFacts(targetID: targetID)
+    let statuses: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteStatus]
+    switch facts.deviceMode {
+    case "loader":
+      // Mirrors RockchipProductPrerequisitePort: one attributable Loader
+      // observation proves the three product prerequisites that port emits.
+      // Stable power has no production sensor and therefore remains unknown.
+      statuses = [
+        .loader: .satisfied,
+        .recoveryPath: .satisfied,
+        .unlocked: .satisfied,
+        .stablePower: .unknown,
+      ]
+    case "maskrom":
+      statuses = [
+        .loader: .unsatisfied,
+        .recoveryPath: .unsatisfied,
+        .unlocked: .unknown,
+        .stablePower: .unknown,
+      ]
+    default:
+      // HDC-normal can enter Loader only as an admitted typed step. A plan
+      // preview cannot claim that future transition already succeeded.
+      statuses = Dictionary(
+        uniqueKeysWithValues: RockchipPrerequisiteIdentifier.allCases.map { ($0, .unknown) })
+    }
+    return RockchipPrerequisiteIdentifier.allCases.map {
+      RockchipPrerequisiteObservation(identifier: $0, status: statuses[$0] ?? .unknown)
+    }
+  }
+}
+
 /// The Rockchip route is installed in production even while it is
 /// unavailable. It validates the exact host-managed action shape and exposes
 /// the concrete compatibility blocker through operation.list. It must not

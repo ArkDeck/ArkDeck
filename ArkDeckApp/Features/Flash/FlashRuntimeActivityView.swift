@@ -3,10 +3,12 @@ import ArkDeckWorkflows
 import Foundation
 import SwiftUI
 
-/// Read-only projection of Runtime's Flash jobs. This surface can explain an
-/// active or failed flash, but it cannot cancel, retry, reconcile or resume it.
+/// Read-only projection of Runtime's Flash jobs. Cancellation is intentionally
+/// owned by the submitting workspace, which can name only its gated Job ID;
+/// this shared history card cannot retry, reconcile, resume, or mutate jobs.
 struct FlashRuntimeActivityView: View {
   let presentation: RuntimeHistoryPresentation
+  let plan: FlashExactPlanPresentation?
   let onOpenHistory: () -> Void
 
   private var flashJobs: [RuntimeJobSummaryPresentation] {
@@ -33,6 +35,10 @@ struct FlashRuntimeActivityView: View {
         recoveryBanner(job)
       }
 
+      if let job = focusedJob, criticalStep(for: job) != nil {
+        criticalWriteCallout
+      }
+
       GroupBox(flashText("flash.runtime.title")) {
         VStack(alignment: .leading, spacing: 12) {
           switch presentation.availability {
@@ -49,6 +55,32 @@ struct FlashRuntimeActivityView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 4)
       }
+    }
+  }
+
+  private var criticalWriteCallout: some View {
+    Label(
+      flashText("flash.runtime.criticalWrite"),
+      systemImage: "exclamationmark.triangle.fill"
+    )
+    .font(.callout.weight(.semibold))
+    .foregroundStyle(.orange)
+    .fixedSize(horizontal: false, vertical: true)
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .accessibilityIdentifier("flash.runtime.criticalWrite")
+  }
+
+  private func criticalStep(
+    for job: RuntimeJobSummaryPresentation
+  ) -> FlashPlanStepPresentation? {
+    guard let tail = job.timeline.last,
+      let state = JobState(rawValue: job.state), !state.isTerminal
+    else { return nil }
+    return plan?.steps.first { step in
+      step.cancellation == .criticalNonInterruptible
+        && (tail == step.id || tail.contains(" \(step.id)"))
     }
   }
 

@@ -448,18 +448,28 @@ public struct HDCApplicationLivenessRequest: Sendable, Equatable {
   }
 }
 
+public enum HDCPortForwardDirection: String, Sendable, Equatable {
+  case forward
+  case reverse
+}
+
 public struct HDCPortForwardSpec: Sendable, Equatable {
+  public let direction: HDCPortForwardDirection
   public let localPort: Int
   public let remotePort: Int
 
-  public init(localPort: Int, remotePort: Int) throws {
+  public init(
+    direction: HDCPortForwardDirection = .forward,
+    localPort: Int,
+    remotePort: Int
+  ) throws {
     for (value, field) in [(localPort, "localPort"), (remotePort, "remotePort")] {
       guard (1024...65535).contains(value) else {
         throw HDCE0RequestError.outOfBounds(field: field, detail: "1024...65535")
       }
     }
+    self.direction = direction
     self.localPort = localPort
     self.remotePort = remotePort
   }
 }
-

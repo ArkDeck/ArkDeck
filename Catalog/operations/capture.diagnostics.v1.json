@@ -350,6 +350,7 @@
     { "name": "crash-log.txt", "role": "raw", "mediaType": "text/plain", "privacy": "sensitive", "required": false },
     { "name": "application-liveness.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": false },
     { "name": "trace.htrace", "role": "raw", "mediaType": "application/octet-stream", "privacy": "sensitive", "required": false },
+    { "name": "capture.log", "role": "log", "mediaType": "text/plain", "privacy": "standard", "required": false },
     { "name": "artifact-index.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true },
     { "name": "capture-summary.json", "role": "derived", "mediaType": "application/json", "privacy": "standard", "required": true }
   ],

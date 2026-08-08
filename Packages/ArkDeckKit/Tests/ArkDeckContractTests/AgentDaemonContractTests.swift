@@ -152,6 +152,7 @@ final class AgentDaemonContractTests: XCTestCase {
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportPolicy: FlashBundleImportPolicy = .production,
+    flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
@@ -177,6 +178,7 @@ final class AgentDaemonContractTests: XCTestCase {
       flashBundleImportDirectory: stateDirectory.appendingPathComponent(
         "flash-bundle-imports-\(UUID().uuidString)", isDirectory: true),
       flashBundleImportPolicy: flashBundleImportPolicy,
+      flashPrerequisiteObserver: flashPrerequisiteObserver,
       harnessCoordinator: nil,
       methodObserver: nil)
     return (handler, engine)
@@ -286,6 +288,52 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("describe must include availability reasons")
     }
     XCTAssertFalse(reasons.isEmpty)
+  }
+
+  func testFlashPrerequisitesAreReadOnlyTargetBoundRuntimeFacts() async throws {
+    struct Observer: RockchipFlashPrerequisiteObserving {
+      func observePrerequisites(
+        targetID _: String
+      ) async throws -> [RockchipPrerequisiteObservation] {
+        RockchipPrerequisiteIdentifier.allCases.map {
+          RockchipPrerequisiteObservation(
+            identifier: $0,
+            status: $0 == .stablePower ? .unknown : .satisfied)
+        }
+      }
+    }
+    let targets = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent(
+        "targets-prerequisites", isDirectory: true))
+    let target = try targets.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z").record
+    let (handler, _) = try makeStack(
+      targetStore: targets, flashPrerequisiteObserver: Observer())
+
+    let response = try await request(
+      handler, method: "flash.prerequisites",
+      params: [
+        "targetId": .string(target.targetID),
+        "profileReference": .string("dayu200@1"),
+      ])
+    guard case .object(let result)? = response.result,
+      case .array(let observations)? = result["observations"]
+    else { return XCTFail("prerequisite read must return a bound result") }
+    XCTAssertTrue(response.ok)
+    XCTAssertEqual(result["targetId"], .string(target.targetID))
+    XCTAssertEqual(result["bindingRevision"], .integer(Int64(target.bindingRevision)))
+    XCTAssertEqual(observations.count, RockchipPrerequisiteIdentifier.allCases.count)
+
+    let missing = try await request(
+      handler, method: "flash.prerequisites",
+      params: [
+        "targetId": .string("target-missing"),
+        "profileReference": .string("dayu200@1"),
+      ])
+    XCTAssertFalse(missing.ok)
+    XCTAssertEqual(missing.error?.code, "notFound")
   }
 
   func testPlanPreviewRemainsReadOnlyAndCapabilityAdministrationIsNotAgentFacing() async throws {

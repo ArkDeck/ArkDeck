@@ -50,6 +50,8 @@ class RealCatalogTests(unittest.TestCase):
                 "deploy.native-library.system@1",
                 "flash.dayu200@1",
                 "observe.device@1",
+                "port-forward.create@1",
+                "port-forward.remove@1",
                 "workspace.apply-patch@1",
                 "workspace.build-openharmony@1",
                 "workspace.create-checkpoint@1",
@@ -532,14 +534,14 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
             ),
-            3,
+            5,
         )
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
             ),
-            3,
+            5,
         )
         self.assertEqual(
             swift.count(

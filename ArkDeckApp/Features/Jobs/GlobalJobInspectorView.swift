@@ -103,6 +103,20 @@ struct GlobalJobInspectorView: View {
             .font(.caption)
             .foregroundStyle(.orange)
           }
+
+          if isCriticalStepActive(job) {
+            Label(
+              jobsText("jobInspector.criticalWrite"),
+              systemImage: "exclamationmark.triangle.fill"
+            )
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityIdentifier("jobInspector.criticalWrite")
+          }
         }
         HStack(spacing: 6) {
           Text(job.operationReference)
@@ -332,6 +346,16 @@ struct GlobalJobInspectorView: View {
   private func isActive(_ job: RuntimeJobSummaryPresentation) -> Bool {
     guard let state = JobState(rawValue: job.state) else { return false }
     return !state.isTerminal
+  }
+
+  private func isCriticalStepActive(_ job: RuntimeJobSummaryPresentation) -> Bool {
+    guard isActive(job), let tail = job.timeline.last,
+      let descriptor = RuntimeOperationCatalog.descriptor(reference: job.operationReference)
+    else { return false }
+    return descriptor.steps.contains { step in
+      step.cancellation == .criticalNonInterruptible
+        && (tail == step.stepID || tail.contains(" \(step.stepID)"))
+    }
   }
 
   private func stateText(_ rawState: String) -> Text {

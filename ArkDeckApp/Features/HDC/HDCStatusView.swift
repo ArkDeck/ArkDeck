@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 /// requests back to that use case.
 struct HDCStatusView: View {
   let presentation: HDCDiagnosticsPresentation
+  let capabilityMatrix: OverviewCapabilityMatrixPresentation
   let onRefresh: (() -> Void)?
   let isRefreshInFlight: Bool
   let onRequestRecoveryImpactPreview: (() -> Void)?
@@ -22,6 +23,7 @@ struct HDCStatusView: View {
 
   init(
     presentation: HDCDiagnosticsPresentation,
+    capabilityMatrix: OverviewCapabilityMatrixPresentation = .loading,
     onRefresh: (() -> Void)? = nil,
     isRefreshInFlight: Bool = false,
     onRequestRecoveryImpactPreview: (() -> Void)? = nil,
@@ -31,6 +33,7 @@ struct HDCStatusView: View {
     configurationError: String? = nil
   ) {
     self.presentation = presentation
+    self.capabilityMatrix = capabilityMatrix
     self.onRefresh = onRefresh
     self.isRefreshInFlight = isRefreshInFlight
     self.onRequestRecoveryImpactPreview = onRequestRecoveryImpactPreview
@@ -218,6 +221,90 @@ struct HDCStatusView: View {
           "overview.field.lifecycleAvailability", lifecycleAvailabilityText,
           id: "hdc.lifecycle.availability")
       }
+      Divider()
+      VStack(alignment: .leading, spacing: 8) {
+        Text(capabilityMatrixTitle)
+          .font(.subheadline.weight(.semibold))
+          .accessibilityIdentifier("overview.capabilities.matrixTitle")
+        if let failure = capabilityMatrix.failure, capabilityMatrix.items.isEmpty {
+          Label(failure, systemImage: "questionmark.circle")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("overview.capabilities.failure")
+        } else if capabilityMatrix.items.isEmpty {
+          HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("overview.capabilities.loading")
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+        } else {
+          Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+            GridRow {
+              Text("overview.capabilities.column.capability")
+              Text("overview.capabilities.column.state")
+              Text("overview.capabilities.column.evidence")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            Divider().gridCellColumns(3)
+            ForEach(capabilityMatrix.items) { item in
+              GridRow(alignment: .firstTextBaseline) {
+                Text(item.name).font(.body.monospaced())
+                Label {
+                  Text(LocalizedStringKey(capabilityStateKey(item.state)))
+                } icon: {
+                  Image(systemName: capabilityStateSymbol(item.state))
+                    .foregroundStyle(capabilityStateColor(item.state))
+                    .accessibilityHidden(true)
+                }
+                .accessibilityIdentifier("overview.capabilities.\(item.id).state")
+                Text(item.evidence)
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+                  .fixedSize(horizontal: false, vertical: true)
+                  .accessibilityIdentifier("overview.capabilities.\(item.id).evidence")
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private var capabilityMatrixTitle: String {
+    guard let targetID = capabilityMatrix.targetID else {
+      return String(localized: "overview.capabilities.title.noTarget")
+    }
+    return String(
+      format: String(localized: "overview.capabilities.title.target"), targetID,
+      capabilityMatrix.bindingRevision ?? 0)
+  }
+
+  private func capabilityStateKey(_ state: OverviewCapabilityState) -> String {
+    switch state {
+    case .available: "overview.capabilities.state.available"
+    case .limited: "overview.capabilities.state.limited"
+    case .unavailable: "overview.capabilities.state.unavailable"
+    case .unknown: "overview.capabilities.state.unknown"
+    }
+  }
+
+  private func capabilityStateSymbol(_ state: OverviewCapabilityState) -> String {
+    switch state {
+    case .available: "checkmark.circle"
+    case .limited: "minus.circle"
+    case .unavailable: "xmark.octagon"
+    case .unknown: "questionmark.circle"
+    }
+  }
+
+  private func capabilityStateColor(_ state: OverviewCapabilityState) -> Color {
+    switch state {
+    case .available: .green
+    case .limited: .orange
+    case .unavailable: .red
+    case .unknown: .secondary
     }
   }
 

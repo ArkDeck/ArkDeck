@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `d64ebd04e9865ae8e6a0eb6aa5810b4b2dd5ed90f241b457a9c8eec9333c7a95`
+Catalog digest: `2330926e667b06bc6833e9c736c5d0fb0b59054ec24a09bcdac272883842617a`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -16,6 +16,8 @@ Catalog digest: `d64ebd04e9865ae8e6a0eb6aa5810b4b2dd5ed90f241b457a9c8eec9333c7a9
 | `deploy.native-library.system@1` | hdc | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.dayu200@1` | rockchip | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `observe.device@1` | hdc | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-shared-readonly | 60 | 1048576 |
+| `port-forward.create@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 120 | 1048576 |
+| `port-forward.remove@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 120 | 1048576 |
 | `workspace.apply-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.build-openharmony@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |
 | `workspace.create-checkpoint@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 120 | 1048576 |

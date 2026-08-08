@@ -63,7 +63,7 @@ struct DebugWorkspaceView: View {
           }
           .accessibilityIdentifier("debug.activeJobs")
         }
-        Button(action: model.refresh) {
+        Button { model.refresh(targetID: selectedTargetID) } label: {
           Label(DebugL10n.text("debug.action.refresh"), systemImage: "arrow.clockwise")
         }
         .disabled(model.isRefreshing)
@@ -72,6 +72,9 @@ struct DebugWorkspaceView: View {
     }
     .onAppear(perform: reconcileTargetSelection)
     .onChange(of: model.workspace.targets) { _, _ in reconcileTargetSelection() }
+    .onChange(of: selectedTargetID) { _, targetID in
+      model.refresh(targetID: targetID)
+    }
   }
 
   private var workspaceHeader: some View {
@@ -182,23 +185,33 @@ struct DebugWorkspaceView: View {
     switch selectedTab {
     case .logs:
       DebugLogsWorkspace(
+        model: model,
         operation: model.workspace.operation(
           DebugApplicationFacade.captureDiagnosticsReference),
         target: selectedTarget,
         relatedJobs: model.workspace.jobs.filter {
           $0.operationReference == DebugApplicationFacade.captureDiagnosticsReference
-        })
+        },
+        runtimeArtifacts: model.runtimeArtifacts(
+          operationReference: DebugApplicationFacade.captureDiagnosticsReference,
+          targetID: selectedTarget?.id))
     case .apps:
       DebugAppsWorkspace(
         operation: model.workspace.operation(DebugApplicationFacade.debugHAPReference),
         target: selectedTarget,
         relatedJobs: model.workspace.jobs.filter {
           $0.operationReference == DebugApplicationFacade.debugHAPReference
-        })
+        },
+        runtimeProbe: model.workspace.runtimeProbe,
+        probeFailure: model.workspace.probeFailure)
     case .network:
-      DebugNetworkWorkspace(target: selectedTarget)
+      DebugNetworkWorkspace(
+        model: model,
+        target: selectedTarget,
+        runtimeProbe: model.workspace.runtimeProbe,
+        probeFailure: model.workspace.probeFailure)
     case .commands:
-      DebugCommandsWorkspace(target: selectedTarget)
+      DebugCommandsWorkspace(model: model, target: selectedTarget)
     }
   }
 
@@ -224,9 +237,11 @@ struct DebugWorkspaceView: View {
 }
 
 private struct DebugLogsWorkspace: View {
+  @ObservedObject var model: DebugWorkspaceViewModel
   let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
   let relatedJobs: [DebugJobPresentation]
+  let runtimeArtifacts: [RuntimeArtifactPresentation]
 
   @State private var durationSeconds = 30
   @State private var minimumLevel = "Warn"
@@ -255,6 +270,12 @@ private struct DebugLogsWorkspace: View {
       guard DebugTypedValueValidator.isSafeHilogComponent(field.value) else { return nil }
       return "\(field.name):\(field.value)"
     } + ["level:\(minimumLevel.lowercased())"]
+  }
+
+  private var operationIsAvailable: Bool {
+    guard let operation else { return false }
+    if case .available = operation.availability { return true }
+    return false
   }
 
   var body: some View {
@@ -345,12 +366,41 @@ private struct DebugLogsWorkspace: View {
               label: "hilogFilters",
               value: filterTokens.isEmpty ? "[]" : "[\(filterTokens.joined(separator: ", "))]")
             DebugCodeRow(label: "uiDump", value: "false")
-            Button(DebugL10n.text("debug.logs.start")) {}
-              .buttonStyle(.borderedProminent)
-              .disabled(true)
-              .help(DebugL10n.text("debug.blocked.readOnlyTransport"))
-              .accessibilityIdentifier("debug.logs.start")
-            DebugBlockedReason(text: DebugL10n.text("debug.blocked.readOnlyTransport"))
+            HStack {
+              if model.activeLogJobID != nil {
+                Button(DebugL10n.text("debug.action.cancel")) { model.cancelLogs() }
+                  .disabled(model.isCancellingLogs)
+                  .accessibilityIdentifier("debug.logs.cancel")
+              } else {
+                Button(DebugL10n.text("debug.logs.start")) {
+                  guard let target else { return }
+                  model.submitLogs(
+                    target: target, durationSeconds: durationSeconds, filters: filterTokens)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                  target == nil || !operationIsAvailable || !invalidFilterNames.isEmpty
+                    || model.isSubmittingLogs)
+                .accessibilityIdentifier("debug.logs.start")
+              }
+              if let jobID = model.activeLogJobID {
+                ProgressView().controlSize(.small)
+                Text(jobID).font(.caption.monospaced()).lineLimit(1)
+              }
+            }
+            if let failure = model.logFailure {
+              Label(failure, systemImage: "xmark.octagon")
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .textSelection(.enabled)
+            } else if let terminal = model.logTerminal {
+              Label(
+                "\(terminal.state) · \(terminal.jobID)",
+                systemImage: terminal.state == "succeeded" ? "checkmark.circle.fill" : "info.circle"
+              )
+              .font(.footnote)
+              .foregroundStyle(terminal.state == "succeeded" ? .green : .secondary)
+            }
           }
         }
 
@@ -366,16 +416,14 @@ private struct DebugLogsWorkspace: View {
         DebugCard(title: DebugL10n.text("debug.logs.live.title"), symbol: "text.alignleft") {
           VStack(alignment: .leading, spacing: 10) {
             HStack {
-              // Pausing freezes the viewport, never the host capture, and only
-              // an active capture has a viewport to pause — so the button is
-              // disabled while nothing is being captured, which in this
-              // read-only build is always.
+              // Pausing is deliberately a local viewport state; it never
+              // cancels or suspends the Runtime Job.
               Button(
                 DebugL10n.text(isViewportPaused ? "debug.logs.resume" : "debug.logs.pause")
               ) {
                 isViewportPaused.toggle()
               }
-              .disabled(true)
+              .disabled(model.activeLogJobID == nil)
               .help(DebugL10n.text("debug.logs.pause.requiresCapture"))
               .accessibilityIdentifier("debug.logs.pauseViewport")
               Spacer()
@@ -389,7 +437,7 @@ private struct DebugLogsWorkspace: View {
             ZStack {
               RoundedRectangle(cornerRadius: 8)
                 .fill(Color(nsColor: .textBackgroundColor))
-              VStack(spacing: 8) {
+              VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "text.page.badge.magnifyingglass")
                   .font(.title2)
                   .foregroundStyle(.secondary)
@@ -400,6 +448,15 @@ private struct DebugLogsWorkspace: View {
                   .foregroundStyle(.secondary)
                   .multilineTextAlignment(.center)
                   .frame(maxWidth: 420)
+                if let terminal = model.logTerminal, !terminal.timeline.isEmpty {
+                  Divider()
+                  ForEach(Array(terminal.timeline.suffix(12).enumerated()), id: \.offset) {
+                    _, entry in
+                    Text(entry)
+                      .font(.caption.monospaced())
+                      .textSelection(.enabled)
+                  }
+                }
               }
               .padding()
             }
@@ -425,14 +482,38 @@ private struct DebugLogsWorkspace: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
             Divider()
-            ContentUnavailableView {
-              Label(
-                DebugL10n.text("debug.logs.shards.empty"),
-                systemImage: "externaldrive.badge.questionmark")
-            } description: {
-              Text(DebugL10n.text("debug.logs.shards.empty.detail"))
+            if runtimeArtifacts.isEmpty {
+              ContentUnavailableView {
+                Label(
+                  DebugL10n.text("debug.logs.shards.empty"),
+                  systemImage: "externaldrive.badge.questionmark")
+              } description: {
+                Text(DebugL10n.text("debug.logs.shards.empty.detail"))
+              }
+              .frame(minHeight: 110)
+            } else {
+              ForEach(runtimeArtifacts) { artifact in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(artifact.name).font(.callout.monospaced())
+                    Text("\(artifact.status) · \(artifact.privacy)")
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                  Spacer(minLength: 12)
+                  Text(
+                    ByteCountFormatter.string(
+                      fromByteCount: artifact.byteCount, countStyle: .file)
+                  )
+                  .font(.caption.monospacedDigit())
+                  Text(String(artifact.sha256.prefix(12)))
+                    .font(.caption.monospaced())
+                    .frame(width: 100, alignment: .trailing)
+                    .help(artifact.sha256)
+                }
+                .accessibilityElement(children: .combine)
+              }
             }
-            .frame(minHeight: 110)
             Divider()
             HStack {
               Label(
@@ -494,6 +575,8 @@ private struct DebugAppsWorkspace: View {
   let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
   let relatedJobs: [DebugJobPresentation]
+  let runtimeProbe: DebugRuntimeProbeSnapshot?
+  let probeFailure: String?
 
   @State private var isImporterPresented = false
   @State private var selectedHAPURL: URL?
@@ -677,12 +760,32 @@ private struct DebugAppsWorkspace: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
         Divider()
-        ContentUnavailableView {
-          Label(DebugL10n.text("debug.apps.inventory.empty"), systemImage: "app.dashed")
-        } description: {
-          Text(DebugL10n.text("debug.apps.inventory.empty.detail"))
+        if let runtimeProbe, runtimeProbe.targetID == target?.id,
+          !runtimeProbe.packages.isEmpty
+        {
+          ForEach(runtimeProbe.packages, id: \.self) { package in
+            HStack {
+              Text(package).font(.callout.monospaced()).textSelection(.enabled)
+              Spacer()
+              Text("—").font(.body.monospacedDigit()).foregroundStyle(.secondary)
+              Text("—").frame(width: 100, alignment: .trailing).foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+          }
+        } else {
+          ContentUnavailableView {
+            Label(DebugL10n.text("debug.apps.inventory.empty"), systemImage: "app.dashed")
+          } description: {
+            Text(probeFailure ?? DebugL10n.text("debug.apps.inventory.empty.detail"))
+          }
+          .frame(minHeight: 120)
         }
-        .frame(minHeight: 120)
+        if let warnings = runtimeProbe?.warnings, !warnings.isEmpty {
+          Text(warnings.joined(separator: " · "))
+            .font(.caption.monospaced())
+            .foregroundStyle(.orange)
+            .textSelection(.enabled)
+        }
         HStack {
           Button(DebugL10n.text("debug.apps.action.start")) {}.disabled(true)
           Button(DebugL10n.text("debug.apps.action.stop")) {}.disabled(true)
@@ -722,7 +825,10 @@ private struct DebugAppsWorkspace: View {
 }
 
 private struct DebugNetworkWorkspace: View {
+  @ObservedObject var model: DebugWorkspaceViewModel
   let target: DebugTargetPresentation?
+  let runtimeProbe: DebugRuntimeProbeSnapshot?
+  let probeFailure: String?
 
   @State private var direction = DebugPortRuleDirection.forward
   @State private var localPort = ""
@@ -775,11 +881,44 @@ private struct DebugNetworkWorkspace: View {
             label: DebugL10n.text("debug.network.typedRule"),
             value: "\(rule.direction.rawValue) · tcp:\(rule.localPort) → tcp:\(rule.remotePort)")
         }
-        Button(DebugL10n.text("debug.network.add")) {}
+        Button(DebugL10n.text("debug.network.add")) {
+          guard let target, case .valid(let rule) = validation else { return }
+          model.mutatePortRule(target: target, rule: rule, removing: false)
+        }
           .buttonStyle(.borderedProminent)
-          .disabled(true)
-          .help(DebugL10n.text("debug.blocked.forwardOperation"))
-        DebugBlockedReason(text: DebugL10n.text("debug.blocked.forwardOperation"))
+          .disabled(
+            target == nil || model.isMutatingPortRule
+              || {
+                if case .valid = validation { return false }
+                return true
+              }())
+        if let jobID = model.activePortRuleJobID {
+          HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(jobID).font(.caption.monospaced()).lineLimit(1)
+            Spacer()
+            Button(DebugL10n.text("debug.action.cancel")) {
+              model.cancelPortRuleMutation()
+            }
+            .disabled(model.isCancellingPortRule)
+          }
+          .accessibilityIdentifier("debug.network.activeJob")
+        }
+        if let failure = model.portRuleFailure {
+          Label(failure, systemImage: "exclamationmark.triangle")
+            .font(.footnote)
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        if let terminal = model.portRuleTerminal {
+          Label(
+            "\(terminal.state) · \(terminal.jobID)",
+            systemImage: terminal.state == "succeeded"
+              ? "checkmark.circle" : "exclamationmark.circle"
+          )
+          .font(.footnote.monospaced())
+          .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
+        }
       }
     }
   }
@@ -812,27 +951,62 @@ private struct DebugNetworkWorkspace: View {
           Text(DebugL10n.text("debug.network.rules.remote"))
           Text(DebugL10n.text("debug.network.rules.state"))
             .frame(width: 90, alignment: .trailing)
+          Text(DebugL10n.text("debug.network.rules.action"))
+            .frame(width: 72, alignment: .trailing)
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
         Divider()
-        ContentUnavailableView {
-          Label(
-            DebugL10n.text("debug.network.rules.empty"),
-            systemImage: "point.3.filled.connected.trianglepath.dotted")
-        } description: {
-          Text(DebugL10n.text("debug.network.rules.empty.detail"))
+        if let runtimeProbe, runtimeProbe.targetID == target?.id,
+          !runtimeProbe.portRules.isEmpty
+        {
+          ForEach(Array(runtimeProbe.portRules.enumerated()), id: \.offset) { _, rule in
+            HStack {
+              Text(rule.direction.rawValue)
+              Text("tcp:\(rule.localPort)").font(.body.monospacedDigit())
+              Spacer()
+              Text("tcp:\(rule.remotePort)").font(.body.monospacedDigit())
+              Text("active")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.green)
+                .frame(width: 90, alignment: .trailing)
+              Button(DebugL10n.text("debug.network.delete"), role: .destructive) {
+                guard let target,
+                  let direction = DebugPortRuleDirection(rawValue: rule.direction.rawValue)
+                else { return }
+                model.mutatePortRule(
+                  target: target,
+                  rule: DebugValidatedPortRule(
+                    direction: direction,
+                    localPort: rule.localPort,
+                    remotePort: rule.remotePort),
+                  removing: true)
+              }
+              .frame(width: 72, alignment: .trailing)
+              .disabled(model.isMutatingPortRule)
+            }
+            .accessibilityElement(children: .combine)
+          }
+        } else {
+          ContentUnavailableView {
+            Label(
+              DebugL10n.text("debug.network.rules.empty"),
+              systemImage: "point.3.filled.connected.trianglepath.dotted")
+          } description: {
+            Text(probeFailure ?? DebugL10n.text("debug.network.rules.empty.detail"))
+          }
+          .frame(minHeight: 180)
         }
-        .frame(minHeight: 180)
-        Divider()
-        HStack {
-          Label(DebugL10n.text("debug.network.delete.scope"), systemImage: "target")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-          Spacer()
-          Button(DebugL10n.text("debug.network.delete"), role: .destructive) {}
-            .disabled(true)
+        if let warnings = runtimeProbe?.warnings.filter({ $0.contains("Rules") }),
+          !warnings.isEmpty
+        {
+          Text(warnings.joined(separator: " · "))
+            .font(.caption.monospaced())
+            .foregroundStyle(.orange)
         }
+        Label(DebugL10n.text("debug.network.delete.scope"), systemImage: "target")
+          .font(.footnote)
+          .foregroundStyle(.secondary)
       }
     }
   }
@@ -850,11 +1024,11 @@ private struct DebugNetworkWorkspace: View {
 }
 
 private struct DebugCommandsWorkspace: View {
+  @ObservedObject var model: DebugWorkspaceViewModel
   let target: DebugTargetPresentation?
 
   @State private var selectedTemplateID =
     DebugApplicationFacade.approvedCommandTemplates.first?.id
-  @State private var bundleName = ""
 
   private var selectedTemplate: DebugCommandTemplatePresentation? {
     DebugApplicationFacade.approvedCommandTemplates.first { $0.id == selectedTemplateID }
@@ -897,6 +1071,7 @@ private struct DebugCommandsWorkspace: View {
       }
       .frame(width: geometry.size.width, height: geometry.size.height)
     }
+    .onChange(of: selectedTemplateID) { _, _ in model.clearCommandResult() }
   }
 
   private var commandDetail: some View {
@@ -912,30 +1087,9 @@ private struct DebugCommandsWorkspace: View {
                 Text(target?.id ?? DebugL10n.text("debug.target.none"))
                   .font(.body.monospaced())
               }
-              if template.parameterNames.contains("bundleName") {
-                TextField(
-                  DebugL10n.text("debug.commands.bundle"), text: $bundleName,
-                  prompt: Text("com.example.app")
-                )
-                .textFieldStyle(.roundedBorder)
-                if !bundleName.isEmpty,
-                  !DebugTypedValueValidator.isSafeTypedIdentifier(bundleName)
-                {
-                  Label(
-                    DebugL10n.format(
-                      "debug.typed.invalidIdentifier",
-                      DebugL10n.text("debug.commands.bundle")),
-                    systemImage: "exclamationmark.circle"
-                  )
-                  .font(.footnote)
-                  .foregroundStyle(.red)
-                  .accessibilityIdentifier("debug.commands.bundle.invalid")
-                }
-              } else {
-                Text(DebugL10n.text("debug.commands.noParameters"))
-                  .font(.callout)
-                  .foregroundStyle(.secondary)
-              }
+              Text(DebugL10n.text("debug.commands.noParameters"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
           }
 
@@ -945,10 +1099,16 @@ private struct DebugCommandsWorkspace: View {
             VStack(alignment: .leading, spacing: 10) {
               DebugCodeRow(
                 label: DebugL10n.text("debug.commands.executable"),
-                value: DebugL10n.text("debug.commands.notGenerated"))
+                value: model.commandResult.map {
+                  "\($0.executable) · sha256:\($0.executableSHA256.prefix(12))"
+                } ?? DebugL10n.text("debug.commands.notGenerated"))
               DebugCodeRow(
                 label: DebugL10n.text("debug.commands.arguments"),
-                value: DebugL10n.text("debug.commands.notGenerated"))
+                value: model.commandResult?.argumentDisclosure.joined(separator: " ")
+                  ?? DebugL10n.text("debug.commands.notGenerated"))
+              if let result = model.commandResult {
+                DebugCodeRow(label: "lowering sha256", value: result.loweringSHA256)
+              }
               Text(DebugL10n.text("debug.commands.argv.note"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -959,33 +1119,46 @@ private struct DebugCommandsWorkspace: View {
             VStack(alignment: .leading, spacing: 10) {
               HStack {
                 DebugCodeRow(
-                  label: DebugL10n.text("debug.commands.result.exitCode"), value: "—")
+                  label: DebugL10n.text("debug.commands.result.exitCode"),
+                  value: model.commandResult?.exitCode.map(String.init) ?? "—")
                 Spacer()
                 DebugCodeRow(
-                  label: DebugL10n.text("debug.commands.result.duration"), value: "—")
+                  label: DebugL10n.text("debug.commands.result.duration"),
+                  value: model.commandResult.map { "\($0.durationMilliseconds) ms" } ?? "—")
               }
               Divider()
               LabeledContent(DebugL10n.text("debug.commands.result.stdout")) {
-                Text(DebugL10n.text("debug.commands.result.none"))
-                  .foregroundStyle(.secondary)
+                Text(model.commandResult?.stdout ?? DebugL10n.text("debug.commands.result.none"))
+                  .font(.body.monospaced())
+                  .textSelection(.enabled)
               }
               LabeledContent(DebugL10n.text("debug.commands.result.stderr")) {
-                Text(DebugL10n.text("debug.commands.result.none"))
-                  .foregroundStyle(.secondary)
+                Text(model.commandResult?.stderr ?? DebugL10n.text("debug.commands.result.none"))
+                  .font(.body.monospaced())
+                  .textSelection(.enabled)
               }
             }
           }
 
           HStack {
-            Button(DebugL10n.text("debug.commands.run")) {}
+            Button(DebugL10n.text("debug.commands.run")) {
+              guard let target else { return }
+              model.runTemplate(target: target, templateID: template.id)
+            }
               .buttonStyle(.borderedProminent)
-              .disabled(true)
+              .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
             Spacer()
             Label(DebugL10n.text("debug.commands.noPTY"), systemImage: "rectangle.slash")
               .font(.footnote)
               .foregroundStyle(.secondary)
           }
-          DebugBlockedReason(text: DebugL10n.text("debug.blocked.commandOperation"))
+          if model.isRunningCommand { ProgressView().controlSize(.small) }
+          if let failure = model.commandFailure {
+            Label(failure, systemImage: "xmark.octagon")
+              .font(.footnote)
+              .foregroundStyle(.red)
+              .textSelection(.enabled)
+          }
           Text(DebugL10n.text("debug.commands.footerNoFreeText"))
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -1166,20 +1339,196 @@ private func effectColor(_ effect: String) -> Color {
 final class DebugWorkspaceViewModel: ObservableObject {
   @Published private(set) var workspace = DebugWorkspacePresentation.loading
   @Published private(set) var isRefreshing = false
+  @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  @Published private(set) var isSubmittingLogs = false
+  @Published private(set) var isCancellingLogs = false
+  @Published private(set) var activeLogJobID: String?
+  @Published private(set) var logTerminal: DebugLogJobTerminalPresentation?
+  @Published private(set) var logFailure: String?
+  @Published private(set) var isRunningCommand = false
+  @Published private(set) var commandResult: DebugRuntimeCommandResult?
+  @Published private(set) var commandFailure: String?
+  @Published private(set) var isMutatingPortRule = false
+  @Published private(set) var isCancellingPortRule = false
+  @Published private(set) var activePortRuleJobID: String?
+  @Published private(set) var portRuleTerminal: DebugLogJobTerminalPresentation?
+  @Published private(set) var portRuleFailure: String?
 
   private let provider: any DebugApplicationProviding
+  private let detailProvider: any RuntimeJobDetailApplicationProviding
 
-  init(provider: any DebugApplicationProviding) {
+  init(
+    provider: any DebugApplicationProviding,
+    detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil
+  ) {
     self.provider = provider
+    self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
   }
 
-  func refresh() {
+  func runtimeArtifacts(
+    operationReference: String,
+    targetID: String?
+  ) -> [RuntimeArtifactPresentation] {
+    workspace.jobs
+      .filter {
+        $0.operationReference == operationReference
+          && (targetID == nil || $0.targetID == targetID)
+      }
+      .flatMap { artifactsByJobID[$0.id] ?? [] }
+  }
+
+  func refresh(targetID: String? = nil) {
     guard !isRefreshing else { return }
     isRefreshing = true
-    Task {
-      workspace = await provider.refreshWorkspace()
-      isRefreshing = false
+    let provider = provider
+    let detailProvider = detailProvider
+    Task { [weak self] in
+      let next = await provider.refreshWorkspace(targetID: targetID)
+      var artifacts: [String: [RuntimeArtifactPresentation]] = [:]
+      for job in next.jobs.prefix(6) {
+        let detail = await detailProvider.loadJobDetail(
+          jobID: job.id,
+          operationReference: job.operationReference)
+        if case .available = detail.artifactAvailability {
+          artifacts[job.id] = detail.artifacts
+        }
+      }
+      guard let self else { return }
+      defer { self.isRefreshing = false }
+      guard !Task.isCancelled else { return }
+      self.workspace = next
+      self.artifactsByJobID = artifacts
     }
+  }
+
+  func submitLogs(
+    target: DebugTargetPresentation,
+    durationSeconds: Int,
+    filters: [String]
+  ) {
+    guard !isSubmittingLogs else { return }
+    isSubmittingLogs = true
+    activeLogJobID = nil
+    logTerminal = nil
+    logFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let submitted = await provider.submitLogs(
+        target: target, durationSeconds: durationSeconds, filters: filters)
+      guard let self, !Task.isCancelled else { return }
+      switch submitted {
+      case .failed(let failure):
+        self.logFailure = failure
+        self.isSubmittingLogs = false
+      case .submitted(let acceptance):
+        self.activeLogJobID = acceptance.jobID
+        let polling = Task { @MainActor [weak self] in
+          while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled else { break }
+            self?.refresh(targetID: target.id)
+          }
+        }
+        let result = await provider.run(jobID: acceptance.jobID)
+        polling.cancel()
+        guard !Task.isCancelled else { return }
+        self.activeLogJobID = nil
+        self.isSubmittingLogs = false
+        switch result {
+        case .completed(let terminal): self.logTerminal = terminal
+        case .failed(let failure): self.logFailure = failure
+        }
+        self.refresh(targetID: target.id)
+      }
+    }
+  }
+
+  func cancelLogs() {
+    guard let jobID = activeLogJobID, !isCancellingLogs else { return }
+    isCancellingLogs = true
+    let provider = provider
+    Task { [weak self] in
+      let accepted = await provider.cancel(jobID: jobID)
+      guard let self else { return }
+      self.isCancellingLogs = false
+      if !accepted { self.logFailure = "Runtime refused the cancellation request" }
+    }
+  }
+
+  func mutatePortRule(
+    target: DebugTargetPresentation,
+    rule: DebugValidatedPortRule,
+    removing: Bool
+  ) {
+    guard !isMutatingPortRule else { return }
+    isMutatingPortRule = true
+    activePortRuleJobID = nil
+    portRuleTerminal = nil
+    portRuleFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let submitted = await provider.submitPortRule(
+        target: target, rule: rule, removing: removing)
+      guard let self, !Task.isCancelled else { return }
+      switch submitted {
+      case .failed(let failure):
+        self.portRuleFailure = failure
+        self.isMutatingPortRule = false
+      case .submitted(let acceptance):
+        self.activePortRuleJobID = acceptance.jobID
+        let polling = Task { @MainActor [weak self] in
+          while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled else { break }
+            self?.refresh(targetID: target.id)
+          }
+        }
+        let result = await provider.run(jobID: acceptance.jobID)
+        polling.cancel()
+        guard !Task.isCancelled else { return }
+        self.activePortRuleJobID = nil
+        self.isMutatingPortRule = false
+        switch result {
+        case .completed(let terminal): self.portRuleTerminal = terminal
+        case .failed(let failure): self.portRuleFailure = failure
+        }
+        self.refresh(targetID: target.id)
+      }
+    }
+  }
+
+  func cancelPortRuleMutation() {
+    guard let jobID = activePortRuleJobID, !isCancellingPortRule else { return }
+    isCancellingPortRule = true
+    let provider = provider
+    Task { [weak self] in
+      let accepted = await provider.cancel(jobID: jobID)
+      guard let self else { return }
+      self.isCancellingPortRule = false
+      if !accepted { self.portRuleFailure = "Runtime refused the cancellation request" }
+    }
+  }
+
+  func runTemplate(target: DebugTargetPresentation, templateID: String) {
+    guard !isRunningCommand else { return }
+    isRunningCommand = true
+    commandResult = nil
+    commandFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let result = await provider.runTemplate(target: target, templateID: templateID)
+      guard let self else { return }
+      self.isRunningCommand = false
+      switch result {
+      case .success(let command): self.commandResult = command
+      case .failure(let failure): self.commandFailure = failure.message
+      }
+    }
+  }
+
+  func clearCommandResult() {
+    commandResult = nil
+    commandFailure = nil
   }
 }
 

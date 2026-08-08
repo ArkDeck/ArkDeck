@@ -1,7 +1,7 @@
-/* ArkDeck design tokens — aligned to docs/design/macos-ux-interaction-spec.md v0.3
-   and docs/design/prototype.html v0.3.
+/* ArkDeck design tokens — aligned to docs/design/macos-ux-interaction-spec.md v0.4
+   and docs/design/prototype.html v0.4.
 
-   The spec's normative position (v0.3 §2) is that the SHIPPING macOS app uses
+   The spec's normative position (v0.4 §2) is that the SHIPPING macOS app uses
    SwiftUI/AppKit semantic colors (`windowBackgroundColor`, `Color.accentColor`,
    system green/orange/red) and never hardcodes these hex values. The values
    below are the spec's own "原型 fallback" column — the web-side stand-in for
