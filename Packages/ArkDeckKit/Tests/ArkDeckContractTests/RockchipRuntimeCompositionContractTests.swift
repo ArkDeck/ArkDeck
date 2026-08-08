@@ -2415,15 +2415,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       criticalNonInterruptible: false)
 
     XCTAssertEqual(receipt.exitStatus, 0)
-    // `pwd -P` prints the physical name; the prepared URL carries Foundation's
-    // canonical one, which strips a leading `/private`. Resolve both so the
-    // comparison is between directories, not between spellings.
+    // `pwd -P` and Foundation may spell `/private/tmp` differently across OS
+    // and toolchain versions. The contract is directory identity, not text.
     let childDirectory = URL(
       fileURLWithPath: try XCTUnwrap(String(data: receipt.stdout, encoding: .utf8))
         .trimmingCharacters(in: .whitespacesAndNewlines))
-    XCTAssertEqual(
-      childDirectory.resolvingSymlinksInPath().path,
-      toolWorkingDirectory.resolvingSymlinksInPath().path,
+    XCTAssertSameFileSystemItem(
+      childDirectory,
+      toolWorkingDirectory,
       "every child of this runner must run inside product-owned tool state")
     XCTAssertEqual(
       FileManager.default.currentDirectoryPath, callerDirectory,
