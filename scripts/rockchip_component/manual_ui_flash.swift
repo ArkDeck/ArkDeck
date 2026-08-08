@@ -234,12 +234,19 @@ struct Options {
   let expectedTargetID: String
   let expectedBindingRevision: Int
   let timeoutSeconds: TimeInterval
+  let stopBeforeSubmit: Bool
 
   static func parse(_ arguments: [String]) throws -> Options {
     var values: [String: String] = [:]
+    var flags: Set<String> = []
     var index = 0
     while index < arguments.count {
       let argument = arguments[index]
+      if argument == "--stop-before-submit" {
+        flags.insert(argument)
+        index += 1
+        continue
+      }
       guard argument.hasPrefix("--"), index + 1 < arguments.count else {
         throw DriverFailure.message("invalid or missing value for argument: \(argument)")
       }
@@ -295,7 +302,8 @@ struct Options {
       expectedStepSetDigest: try digest("--expected-step-set-digest-sha256"),
       expectedTargetID: try required("--expected-target"),
       expectedBindingRevision: revision,
-      timeoutSeconds: timeoutSeconds)
+      timeoutSeconds: timeoutSeconds,
+      stopBeforeSubmit: flags.contains("--stop-before-submit"))
   }
 }
 
@@ -316,6 +324,96 @@ final class AccessibilityDriver {
     guard result == .success else {
       throw DriverFailure.message("could not press \(identifier): AX error \(result.rawValue)")
     }
+  }
+
+  /// Clicks the visual centre of an accessibility element.
+  ///
+  /// SwiftUI controls can report a successful AXPress without delivering the
+  /// operator gesture. A real pointer click matches the interaction exercised
+  /// by this manual, real-device driver.
+  func click(
+    _ identifier: String, fallbackStrings: [String] = [], timeout: TimeInterval = 20
+  ) throws {
+    let element = try waitForElement(
+      identifier: identifier, fallbackStrings: fallbackStrings, timeout: timeout)
+    try click(element, identifier: identifier)
+  }
+
+  /// Scrolls the element's containing area to the bottom before clicking it.
+  func revealAndClick(_ identifier: String, timeout: TimeInterval = 20) throws {
+    let element = try waitForElement(identifier: identifier, timeout: timeout)
+    scrollToBottom(containing: element)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    try click(element, identifier: identifier)
+  }
+
+  /// Delivers the submit gesture exactly once. SwiftUI on macOS can expose a
+  /// Button whose AX frame does not hit its visual action. In that case the
+  /// same, now-visible AXButton receives AXPress, but only after proving the
+  /// pointer path did not synchronously disable the control.
+  func submit(_ identifier: String, timeout: TimeInterval = 20) throws {
+    let element = try waitForElement(identifier: identifier, timeout: timeout)
+    scrollToBottom(containing: element)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    try click(element, identifier: identifier)
+    if observesSubmitStarted(identifier: identifier, timeout: 2) { return }
+
+    let current = try waitForElement(identifier: identifier, timeout: 2)
+    let pressed = AXUIElementPerformAction(current, kAXPressAction as CFString)
+    guard pressed == .success,
+      observesSubmitStarted(identifier: identifier, timeout: 10)
+    else {
+      let role = stringAttribute(current, kAXRoleAttribute as CFString) ?? "unknown"
+      var rawActions: CFArray?
+      AXUIElementCopyActionNames(current, &rawActions)
+      let actions = (rawActions as? [String]) ?? []
+      throw DriverFailure.message(
+        "UI submit action was not delivered; role=\(role) frame=\(String(describing: frame(of: current))) "
+          + "actions=\(actions) AXPress=\(pressed.rawValue)")
+    }
+  }
+
+  private func observesSubmitStarted(identifier: String, timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if element(identifier: "flash.execute.failure") != nil
+        || element(identifier: "flash.execute.terminal") != nil
+      {
+        return true
+      }
+      guard let element = element(identifier: identifier) else { return true }
+      if attribute(element, kAXEnabledAttribute as CFString) as? Bool == false { return true }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    } while Date() < deadline
+    return false
+  }
+
+  /// Replaces a text field exactly as a person would, then waits until the
+  /// accessibility value proves SwiftUI accepted the edit.
+  func replaceText(_ value: String, identifier: String, timeout: TimeInterval = 20) throws {
+    try revealAndClick(identifier, timeout: timeout)
+    key(virtualCode: CGKeyCode(kVK_ANSI_A), flags: [.maskCommand])
+    type(value)
+    try waitForExactValue(value, identifier: identifier, timeout: timeout)
+  }
+
+  private func click(_ element: AXUIElement, identifier: String) throws {
+    guard let frame = frame(of: element), frame.width > 0, frame.height > 0 else {
+      throw DriverFailure.message("UI element has no clickable frame: \(identifier)")
+    }
+    let point = CGPoint(x: frame.midX, y: frame.midY)
+    guard
+      let down = CGEvent(
+        mouseEventSource: nil, mouseType: .leftMouseDown,
+        mouseCursorPosition: point, mouseButton: .left),
+      let up = CGEvent(
+        mouseEventSource: nil, mouseType: .leftMouseUp,
+        mouseCursorPosition: point, mouseButton: .left)
+    else {
+      throw DriverFailure.message("could not create pointer events for \(identifier)")
+    }
+    down.post(tap: .cghidEventTap)
+    up.post(tap: .cghidEventTap)
   }
 
   func setValue(_ value: String, identifier: String, timeout: TimeInterval = 20) throws {
@@ -342,48 +440,148 @@ final class AccessibilityDriver {
 
   func waitForFacts(_ facts: [String], timeout: TimeInterval) throws {
     let deadline = Date().addingTimeInterval(timeout)
+    var missing = facts
     repeat {
       let visible = allStrings()
-      if facts.allSatisfy({ fact in visible.contains(where: { $0.contains(fact) }) }) {
-        return
-      }
+      missing = facts.filter { fact in !visible.contains(where: { $0.contains(fact) }) }
+      if missing.isEmpty { return }
       RunLoop.current.run(until: Date().addingTimeInterval(0.2))
     } while Date() < deadline
-    throw DriverFailure.message("UI did not expose every expected exact-plan fact before timeout")
+    throw DriverFailure.message(
+      "UI did not expose expected facts before timeout: \(missing.joined(separator: ", "))")
   }
 
   func waitForPresence(_ identifier: String, timeout: TimeInterval) throws {
     _ = try waitForElement(identifier: identifier, timeout: timeout)
   }
 
-  func waitForFlashTerminal(timeout: TimeInterval) throws -> String {
+  func waitForAbsence(_ identifier: String, timeout: TimeInterval) throws {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
-      let visible = allStrings()
-      for state in ["succeeded", "failed", "waitingForRecovery", "cancelled"]
-      where visible.contains(where: { $0.contains(state) }) {
-        return state
+      if element(identifier: identifier) == nil { return }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    throw DriverFailure.message("UI element remained present: \(identifier)")
+  }
+
+  func waitForEnabled(_ identifier: String, timeout: TimeInterval) throws {
+    try waitForEnabledState(true, identifier: identifier, timeout: timeout)
+  }
+
+  func waitForDisabled(_ identifier: String, timeout: TimeInterval) throws {
+    try waitForEnabledState(false, identifier: identifier, timeout: timeout)
+  }
+
+  private func waitForEnabledState(
+    _ expected: Bool, identifier: String, timeout: TimeInterval
+  ) throws {
+    if observesEnabledState(expected, identifier: identifier, timeout: timeout) { return }
+    throw DriverFailure.message(
+      "UI element \(identifier) did not become \(expected ? "enabled" : "disabled")")
+  }
+
+  private func observesEnabledState(
+    _ expected: Bool, identifier: String, timeout: TimeInterval
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if let element = element(identifier: identifier),
+        attribute(element, kAXEnabledAttribute as CFString) as? Bool == expected
+      {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    return false
+  }
+
+  func openGoToFolder(timeout: TimeInterval) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if element(identifier: "PathTextField") != nil { return }
+      key(virtualCode: CGKeyCode(kVK_ANSI_G), flags: [.maskCommand, .maskShift])
+      RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    } while Date() < deadline
+    throw DriverFailure.message("file picker did not open the Go to Folder path field")
+  }
+
+  func commitGoToFolder(timeout: TimeInterval) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if element(identifier: "PathTextField") == nil { return }
+      key(virtualCode: CGKeyCode(kVK_Return))
+      RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    } while Date() < deadline
+    throw DriverFailure.message("file picker did not accept the Go to Folder path")
+  }
+
+  func waitForExactValue(
+    _ expected: String, identifier: String, timeout: TimeInterval
+  ) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    var observed: [String] = []
+    repeat {
+      if let element = element(identifier: identifier) {
+        scrollToBottom(containing: element)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        observed = strings(near: element)
+        if observed.contains(expected) { return }
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    } while Date() < deadline
+    throw DriverFailure.message(
+      "UI element \(identifier) did not expose exact value \(expected) before timeout; "
+        + "observed: \(observed)")
+  }
+
+  /// Waits only on the post-submit presentation owned by the current review.
+  /// Historical Runtime cards deliberately do not participate in this check.
+  func waitForFlashSubmission(timeout: TimeInterval) throws -> (jobID: String, state: String) {
+    let deadline = Date().addingTimeInterval(timeout)
+    let terminalStates = ["succeeded", "failed", "waitingForRecovery", "cancelled"]
+    repeat {
+      if let failure = element(identifier: "flash.execute.failure") {
+        let detail = strings(near: failure)
+          .filter { !$0.isEmpty && $0 != "flash.execute.failure" }
+          .joined(separator: " | ")
+        throw DriverFailure.message(
+          "Runtime Flash submission failed before returning a Job: \(detail)")
+      }
+      if let job = element(identifier: "flash.execute.jobId"),
+        let terminal = element(identifier: "flash.execute.terminal")
+      {
+        let jobID = strings(near: job).first { $0.hasPrefix("job-") }
+        let terminalStrings = strings(near: terminal)
+        let state = terminalStates.first { state in
+          terminalStrings.contains(where: { $0 == state || $0.contains(state) })
+        }
+        if let jobID, let state { return (jobID, state) }
       }
       RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     } while Date() < deadline
-    throw DriverFailure.message("Runtime Flash did not reach a terminal state before timeout")
+    throw DriverFailure.message(
+      "current UI submission did not return a terminal Runtime Flash result before timeout")
   }
 
   func chooseFile(_ url: URL) throws {
     try press("flash.image.choose")
-    RunLoop.current.run(until: Date().addingTimeInterval(0.7))
-    key(virtualCode: CGKeyCode(kVK_ANSI_G), flags: [.maskCommand, .maskShift])
-    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-    type(url.path)
-    key(virtualCode: CGKeyCode(kVK_Return))
-    RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-    key(virtualCode: CGKeyCode(kVK_Return))
+    try waitForPresence("open-panel", timeout: 20)
+    try openGoToFolder(timeout: 10)
+    try setValue(url.path, identifier: "PathTextField")
+    try commitGoToFolder(timeout: 10)
+    try waitForEnabled("OKButton", timeout: 20)
+    try press("OKButton")
+    try waitForAbsence("open-panel", timeout: 20)
+    try waitForFacts([url.lastPathComponent], timeout: 60)
   }
 
-  private func waitForElement(identifier: String, timeout: TimeInterval) throws -> AXUIElement {
+  private func waitForElement(
+    identifier: String, fallbackStrings: [String] = [], timeout: TimeInterval
+  ) throws -> AXUIElement {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if let element = element(identifier: identifier) { return element }
+      if let element = element(displayingAny: fallbackStrings) { return element }
       RunLoop.current.run(until: Date().addingTimeInterval(0.2))
     } while Date() < deadline
     throw DriverFailure.message("UI element not found: \(identifier)")
@@ -392,6 +590,18 @@ final class AccessibilityDriver {
   private func element(identifier: String) -> AXUIElement? {
     descendants(of: application).first {
       stringAttribute($0, kAXIdentifierAttribute as CFString) == identifier
+    }
+  }
+
+  private func element(displayingAny strings: [String]) -> AXUIElement? {
+    guard !strings.isEmpty else { return nil }
+    let attributes = [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute]
+      .map { $0 as CFString }
+    return descendants(of: application).first { element in
+      attributes.contains { attribute in
+        guard let value = stringAttribute(element, attribute) else { return false }
+        return strings.contains(value)
+      }
     }
   }
 
@@ -422,6 +632,33 @@ final class AccessibilityDriver {
     }
   }
 
+  private func strings(near element: AXUIElement) -> [String] {
+    let attributes = [
+      kAXIdentifierAttribute, kAXTitleAttribute, kAXDescriptionAttribute,
+      kAXValueAttribute, kAXHelpAttribute,
+    ].map { $0 as CFString }
+    return descendants(of: element).flatMap { descendant in
+      attributes.compactMap { stringAttribute(descendant, $0) }
+    }
+  }
+
+  private func frame(of element: AXUIElement) -> CGRect? {
+    guard
+      let positionValue = attribute(element, kAXPositionAttribute as CFString),
+      CFGetTypeID(positionValue) == AXValueGetTypeID(),
+      let sizeValue = attribute(element, kAXSizeAttribute as CFString),
+      CFGetTypeID(sizeValue) == AXValueGetTypeID()
+    else { return nil }
+
+    var position = CGPoint.zero
+    var size = CGSize.zero
+    guard
+      AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
+      AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+    else { return nil }
+    return CGRect(origin: position, size: size)
+  }
+
   private func attribute(_ element: AXUIElement, _ name: CFString) -> CFTypeRef? {
     var value: CFTypeRef?
     guard AXUIElementCopyAttributeValue(element, name, &value) == .success else { return nil }
@@ -429,7 +666,11 @@ final class AccessibilityDriver {
   }
 
   private func stringAttribute(_ element: AXUIElement, _ name: CFString) -> String? {
-    attribute(element, name) as? String
+    let value = attribute(element, name)
+    if let string = value as? String { return string }
+    if let attributed = value as? NSAttributedString { return attributed.string }
+    if let number = value as? NSNumber { return number.stringValue }
+    return nil
   }
 
   private func key(virtualCode: CGKeyCode, flags: CGEventFlags = []) {
@@ -439,6 +680,39 @@ final class AccessibilityDriver {
     let up = CGEvent(keyboardEventSource: nil, virtualKey: virtualCode, keyDown: false)
     up?.flags = flags
     up?.post(tap: .cghidEventTap)
+  }
+
+  private func scrollDown() {
+    CGEvent(
+      scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+      wheel1: -6, wheel2: 0, wheel3: 0
+    )?.post(tap: .cghidEventTap)
+  }
+
+  private func scrollToBottom(containing element: AXUIElement) {
+    var current: AXUIElement? = element
+    for _ in 0..<30 {
+      guard let scope = current else { break }
+      if stringAttribute(scope, kAXRoleAttribute as CFString) == (kAXScrollAreaRole as String),
+        let rawScrollBar = attribute(scope, kAXVerticalScrollBarAttribute as CFString),
+        CFGetTypeID(rawScrollBar) == AXUIElementGetTypeID()
+      {
+        let scrollBar = rawScrollBar as! AXUIElement
+        if AXUIElementSetAttributeValue(
+          scrollBar, kAXValueAttribute as CFString, NSNumber(value: 1)) == .success
+        {
+          return
+        }
+      }
+      if let parent = attribute(scope, kAXParentAttribute as CFString),
+        CFGetTypeID(parent) == AXUIElementGetTypeID()
+      {
+        current = (parent as! AXUIElement)
+      } else {
+        current = nil
+      }
+    }
+    scrollDown()
   }
 
   private func type(_ text: String) {
@@ -451,9 +725,22 @@ final class AccessibilityDriver {
   }
 }
 
+private func isSameApplication(_ lhs: URL, _ rhs: URL) -> Bool {
+  let lhs = lhs.standardizedFileURL.resolvingSymlinksInPath()
+  let rhs = rhs.standardizedFileURL.resolvingSymlinksInPath()
+  if lhs == rhs { return true }
+
+  let key = URLResourceKey.fileResourceIdentifierKey
+  let lhsIdentifier = try? lhs.resourceValues(forKeys: [key]).fileResourceIdentifier
+  let rhsIdentifier = try? rhs.resourceValues(forKeys: [key]).fileResourceIdentifier
+  guard let lhsIdentifier, let rhsIdentifier else { return false }
+  return lhsIdentifier.isEqual(rhsIdentifier)
+}
+
 func launch(_ appURL: URL) throws -> pid_t {
   if let running = NSWorkspace.shared.runningApplications.first(where: {
-    $0.bundleURL?.standardizedFileURL == appURL
+    guard let bundleURL = $0.bundleURL else { return false }
+    return isSameApplication(bundleURL, appURL)
   }) {
     running.activate(options: [.activateAllWindows])
     return running.processIdentifier
@@ -472,6 +759,12 @@ func launch(_ appURL: URL) throws -> pid_t {
   semaphore.wait()
   if let launchError { throw launchError }
   guard let launched else { throw DriverFailure.message("ArkDeck did not launch") }
+  guard let launchedURL = launched.bundleURL,
+    isSameApplication(launchedURL, appURL)
+  else {
+    throw DriverFailure.message(
+      "Launch Services opened a different ArkDeck instance; close duplicate bundle IDs and retry")
+  }
   return launched.processIdentifier
 }
 
@@ -480,10 +773,15 @@ func run() throws {
   let pid = try launch(options.appURL)
   let driver = try AccessibilityDriver(processIdentifier: pid)
 
-  try driver.press("app.navigation.flash")
-  try driver.press("flash.mode.execute")
+  // macOS 26 can flatten SwiftUI List labels into an AXRow and omit the
+  // identifier. The bounded visible-text fallback covers ArkDeck's supported
+  // English and Simplified Chinese localizations without hard-coded coordinates.
+  try driver.click("app.navigation.flash", fallbackStrings: ["Flash", "刷机"])
+  try driver.waitForPresence("flash.mode", timeout: 20)
+  try driver.click("flash.mode.execute")
   try driver.chooseFile(options.archiveURL)
   try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
+  try driver.waitForEnabled("flash.plan.prepare", timeout: 30)
   try driver.press("flash.plan.prepare", timeout: 30)
   try driver.waitForFacts(
     [
@@ -508,9 +806,12 @@ func run() throws {
       "ERASE-USERDATA",
     ],
     timeout: 30)
-  try driver.setValue(destructivePhrase, identifier: "flash.confirm.destructivePhrase")
-  try driver.setValue("ERASE-USERDATA", identifier: "flash.confirm.userdataPhrase")
-  try driver.press("flash.confirm.accept")
+  try driver.replaceText(
+    destructivePhrase, identifier: "flash.confirm.destructivePhrase", timeout: 20)
+  try driver.replaceText(
+    "ERASE-USERDATA", identifier: "flash.confirm.userdataPhrase", timeout: 20)
+  try driver.revealAndClick("flash.confirm.accept")
+  try driver.waitForAbsence("flash.confirm.sheet", timeout: 30)
   try driver.waitForFacts(
     [
       options.expectedPlanDigest,
@@ -520,14 +821,23 @@ func run() throws {
     timeout: 30)
   // SwiftUI may merge the receipt Label into its decorated container, while
   // the submit control remains a stable, named post-review element.
+  try driver.waitForExactValue(
+    "0", identifier: "flash.execute.mutationDispatchCount", timeout: 30)
   try driver.waitForPresence("flash.execute.submit", timeout: 30)
-  print("UI_REVIEW_PASS: submitting the reviewed typed Flash request through ArkDeck UI")
-  try driver.press("flash.execute.submit")
-  let terminal = try driver.waitForFlashTerminal(timeout: options.timeoutSeconds)
-  guard terminal == "succeeded" else {
-    throw DriverFailure.message("Runtime Flash stopped in \(terminal)")
+  if options.stopBeforeSubmit {
+    print(
+      "UI_REVIEW_PASS: reviewed typed Flash request is ready; "
+        + "mutation dispatch count is 0 and no Runtime Job was submitted")
+    return
   }
-  print("REAL_DEVICE_PASS: ArkDeck UI Flash Runtime Job succeeded")
+  print("UI_REVIEW_PASS: submitting the reviewed typed Flash request through ArkDeck UI")
+  try driver.submit("flash.execute.submit")
+  let submission = try driver.waitForFlashSubmission(timeout: options.timeoutSeconds)
+  guard submission.state == "succeeded" else {
+    throw DriverFailure.message(
+      "Runtime Flash Job \(submission.jobID) stopped in \(submission.state)")
+  }
+  print("REAL_DEVICE_PASS: ArkDeck UI Flash Runtime Job \(submission.jobID) succeeded")
 }
 
 func runFlashBridge(_ arguments: [String]) throws -> Never {
@@ -543,9 +853,25 @@ func runFlashBridge(_ arguments: [String]) throws -> Never {
   return ManualFlashXPCBridge(socketPath: socketPath).run()
 }
 
+func requestAccessibilityPermission() -> Never {
+  let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+  let trusted = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+  if trusted {
+    print("manual_ui_flash: Accessibility access is already enabled")
+    exit(0)
+  }
+  fputs(
+    "manual_ui_flash: enable Manual UI Flash Driver in System Settings > "
+      + "Privacy & Security > Accessibility, then run the driver again\n",
+    stderr)
+  exit(3)
+}
+
 do {
   let arguments = Array(CommandLine.arguments.dropFirst())
-  if arguments.first == "--xpc-flash-bridge" {
+  if arguments == ["--request-accessibility"] {
+    requestAccessibilityPermission()
+  } else if arguments.first == "--xpc-flash-bridge" {
     try runFlashBridge(Array(arguments.dropFirst()))
   } else {
     try run()
