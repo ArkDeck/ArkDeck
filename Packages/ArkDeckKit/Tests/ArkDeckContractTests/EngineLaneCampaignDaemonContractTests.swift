@@ -322,7 +322,10 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         toolSHA256: EngineLaneCampaignDaemonContractTests.toolIdentity,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
-            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied,
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+            "97ca3a7cd7a1edef8ecdad6549bd5195e8151b17d2bcccc3c86f1633b3160803",
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
         ], targetID: targetID, bindingRevision: bindingRevision,
         deviceIdentitySHA256: EngineLaneCampaignDaemonContractTests.targetIdentity,
         executionConnectKey: "sealed-engine-lane-connect-key",

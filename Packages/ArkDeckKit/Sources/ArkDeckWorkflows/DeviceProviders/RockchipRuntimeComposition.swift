@@ -231,11 +231,14 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   package static let crossModeBindingServerFactKey = "dayu200CrossModeBinding"
   package static let crossModeBindingSatisfied = "satisfied"
   package static let crossModeBindingUnprepared = "unprepared"
+  package static let hdcAliasIdentityServerFactKey = "dayu200HDCNormalAliasSHA256"
+  package static let hdcAliasTopologyServerFactKey = "dayu200HDCNormalAliasUSBTopology"
 
   private let targetStore: RuntimeTargetStore
   private let resolver: any RuntimeExecutableResolving
   private let prober: (any RockchipLiveModeProbing)?
   private let bindingStore: RockchipProductBindingStore?
+  private let postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore?
   private let nowUTC: @Sendable () -> String
 
   /// `prober: nil` keeps the record-only behaviour: mode, build and profile
@@ -246,12 +249,14 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
     resolver: any RuntimeExecutableResolving,
     prober: (any RockchipLiveModeProbing)? = nil,
     bindingStore: RockchipProductBindingStore? = nil,
+    postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.targetStore = targetStore
     self.resolver = resolver
     self.prober = prober
     self.bindingStore = bindingStore
+    self.postFlashHDCBindingStore = postFlashHDCBindingStore
     self.nowUTC = nowUTC
   }
 
@@ -266,9 +271,8 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       throw DeviceProviderError.factsUnavailable(
         "product-owned Rockchip component is unavailable: \(error)")
     }
-    let live = await liveFacts(
-      connectKey: target.connectKey,
-      stableIdentitySHA256: target.stablePhysicalIdentitySHA256)
+    var executionConnectKey = target.connectKey
+    var coveredBinding: RockchipProductBindingSnapshot?
     var serverFacts = [
       "componentPackage": BundledRockchipComponent.packageID,
       "componentSigningIdentifier": BundledRockchipComponent.signingIdentifier,
@@ -278,11 +282,49 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       let covered: Bool
       if let binding = try bindingStore.loadIfPresent() {
         covered = try binding.coversRuntimeTarget(target)
+        if covered {
+          coveredBinding = binding
+          var alias = try binding.confirmedHDCNormalAlias()
+          if let routed = try postFlashHDCBindingStore?.loadIfPresent(),
+            try routed.covers(target: target, binding: binding)
+          {
+            executionConnectKey = routed.hdcConnectKey
+            alias = (routed.hdcIdentitySHA256, routed.usbTopology)
+          }
+          if let alias {
+            serverFacts[Self.hdcAliasIdentityServerFactKey] = alias.identitySHA256
+            serverFacts[Self.hdcAliasTopologyServerFactKey] = alias.usbTopology
+          }
+        }
       } else {
         covered = false
       }
       serverFacts[Self.crossModeBindingServerFactKey] = covered
         ? Self.crossModeBindingSatisfied : Self.crossModeBindingUnprepared
+    }
+    let live = await liveFacts(
+      connectKey: executionConnectKey,
+      stableIdentitySHA256: target.stablePhysicalIdentitySHA256)
+    // A revision-1 adoption can itself be the exact HDC-normal personality:
+    // it has no adjacent lineage edge yet, but its owner binding still pins
+    // the live serial and topology.  Use it only after a fresh HDC-mode probe.
+    // A Loader-only revision 1 has no normal-mode topology and remains blocked
+    // before any write instead of discovering that only after reboot.
+    if serverFacts[Self.hdcAliasIdentityServerFactKey] == nil,
+      live.deviceMode == "hdc",
+      let binding = coveredBinding
+    {
+      let connectIdentity = SHA256.hash(data: Data(executionConnectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      let bindingIdentity = SHA256.hash(data: Data(binding.serial.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      if connectIdentity == bindingIdentity,
+        !binding.usbTopology.isEmpty,
+        binding.usbTopology.utf8.allSatisfy({ (48...57).contains($0) })
+      {
+        serverFacts[Self.hdcAliasIdentityServerFactKey] = connectIdentity
+        serverFacts[Self.hdcAliasTopologyServerFactKey] = binding.usbTopology
+      }
     }
     return ProviderFacts(
       providerID: "rockchip",
@@ -292,7 +334,7 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       targetID: target.targetID,
       bindingRevision: target.bindingRevision,
       deviceIdentitySHA256: target.stablePhysicalIdentitySHA256,
-      executionConnectKey: target.connectKey,
+      executionConnectKey: executionConnectKey,
       deviceMode: live.deviceMode,
       buildFingerprint: live.buildFingerprint,
       profileID: live.profileID,
@@ -444,14 +486,16 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
     resolver: any RuntimeExecutableResolving,
     hdcResolver: any RuntimeExecutableResolving,
     stateDirectory: URL,
-    toolWorkingDirectory: URL
+    toolWorkingDirectory: URL,
+    postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil
   ) {
     self.resolver = resolver
     host = DurableRockchipRuntimeActionHost(
       executor: FoundationRockchipRuntimeActionExecutor(
         hdcResolver: hdcResolver,
         runner: FoundationRockchipRuntimeCommandRunner(
-          workingDirectory: toolWorkingDirectory)),
+          workingDirectory: toolWorkingDirectory),
+        postFlashHDCBindingStore: postFlashHDCBindingStore),
       records: RockchipRuntimeActionRecordStore(
         rootURL: stateDirectory.appendingPathComponent(
           "rockchip-runtime", isDirectory: true)))

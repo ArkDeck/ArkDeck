@@ -234,6 +234,12 @@ struct RockchipRuntimeLoaderIdentity: Sendable, Equatable {
   let topology: String
 }
 
+struct RockchipRuntimeHDCIdentity: Sendable, Equatable {
+  let connectKey: String
+  let serialDigestSHA256: String
+  let topology: String
+}
+
 protocol RockchipRuntimeUSBProbing: Sendable {
   func singleLoader(
     stableIdentitySHA256: String
@@ -241,6 +247,16 @@ protocol RockchipRuntimeUSBProbing: Sendable {
   func singleHDCNormal(
     stableIdentitySHA256: String
   ) throws -> RockchipRuntimeLoaderIdentity
+  func singleHDCNormal(
+    usbTopology: String
+  ) throws -> RockchipRuntimeHDCIdentity
+}
+
+extension RockchipRuntimeUSBProbing {
+  func singleHDCNormal(usbTopology _: String) throws -> RockchipRuntimeHDCIdentity {
+    throw RockchipFlashExecutionError.admissionRejected(
+      "topology-bound HDC observation is unavailable")
+  }
 }
 
 struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
@@ -263,6 +279,17 @@ struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
     let identity = try probe.singleConnected(
       stableIdentitySHA256: stableIdentitySHA256)
     return RockchipRuntimeLoaderIdentity(
+      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
+        .map { String(format: "%02x", $0) }.joined(),
+      topology: identity.topology)
+  }
+
+  func singleHDCNormal(
+    usbTopology: String
+  ) throws -> RockchipRuntimeHDCIdentity {
+    let identity = try probe.singleConnected(selector: usbTopology)
+    return RockchipRuntimeHDCIdentity(
+      connectKey: identity.serial,
       serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
         .map { String(format: "%02x", $0) }.joined(),
       topology: identity.topology)
@@ -564,6 +591,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
   private let readback: any RockchipRuntimePartitionReadbackVerifying
   private let enterLoaderReadbackTimeoutSeconds: Int
+  private let postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore?
+  private let nowUTC: @Sendable () -> String
 
   /// `runner` has no default on purpose. The production runner cannot be
   /// constructed without a product-owned working directory, and this executor
@@ -574,6 +603,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     usbProbe: any RockchipRuntimeUSBProbing = ProductRockchipRuntimeUSBProbe(),
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
     enterLoaderReadbackTimeoutSeconds: Int = 45,
+    postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil,
+    nowUTC: @escaping @Sendable () -> String = {
+      ISO8601DateFormatter().string(from: Date())
+    },
     describeBundle: (
       @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
     )? = nil,
@@ -622,6 +655,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     self.describeBundle =
       describeBundle ?? { board, url in try board.forArchive(at: url) }
     self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
+    self.postFlashHDCBindingStore = postFlashHDCBindingStore
+    self.nowUTC = nowUTC
     self.readback =
       readback ?? FoundationRockchipRuntimePartitionReadback(runner: runner)
   }
@@ -904,6 +939,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       return result(
         summary: ["hdcState": "connected"], receipts: receipts)
 
+    case .waitForBoundHDCReconnect(let expectation):
+      let (identity, receipts) = try await waitForBoundHDC(
+        expectation: expectation,
+        timeoutSeconds: 120,
+        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+      return result(
+        summary: [
+          "hdcState": "connected",
+          "hdcIdentitySha256": identity.serialDigestSHA256,
+          "usbTopology": identity.topology,
+        ],
+        receipts: receipts)
+
     case .verifyBuild(
       let connectKey, let expectedProductModel, let expectedBuildVersion):
       guard let expectedProductModel, !expectedProductModel.isEmpty,
@@ -947,6 +995,76 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "verification": "exact-published-profile",
         ],
         receipts: [modelReceipt, versionReceipt])
+
+    case .verifyBoundBuild(
+      let expectation, let expectedProductModel, let expectedBuildVersion):
+      guard !expectedProductModel.isEmpty, !expectedBuildVersion.isEmpty,
+        let postFlashHDCBindingStore
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash binding verification is not fully configured")
+      }
+      let (identity, observationReceipts) = try await waitForBoundHDC(
+        expectation: expectation,
+        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        commandTimeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15)
+      let hdc = try resolveHDC()
+      let modelReceipt = try await run(
+        executable: hdc,
+        arguments: [
+          "-t", identity.connectKey, "shell", "param", "get",
+          HDCAllowlistedProperty.productModel.rawValue,
+        ],
+        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        budget: 64 * 1024)
+      let versionReceipt = try await run(
+        executable: hdc,
+        arguments: [
+          "-t", identity.connectKey, "shell", "param", "get",
+          HDCAllowlistedProperty.fullBuildVersion.rawValue,
+        ],
+        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
+        budget: 64 * 1024)
+      let model = try property(
+        modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)
+      let version = try property(
+        versionReceipt, key: HDCAllowlistedProperty.fullBuildVersion.rawValue)
+      guard model == expectedProductModel else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash model readback does not match the published profile")
+      }
+      guard version == expectedBuildVersion else {
+        throw RuntimeDispatchFailure.failed(
+          "post-flash build readback does not match the published profile")
+      }
+      do {
+        _ = try postFlashHDCBindingStore.publish(
+          RockchipPostFlashHDCBinding(
+            targetID: descriptor.targetID,
+            bindingRevision: descriptor.bindingRevision,
+            stableLoaderIdentitySHA256: descriptor.expectedIdentitySHA256,
+            previousHDCIdentitySHA256: expectation.previousIdentitySHA256,
+            hdcIdentitySHA256: identity.serialDigestSHA256,
+            hdcConnectKey: identity.connectKey,
+            usbTopology: identity.topology,
+            productModel: model,
+            buildVersion: version,
+            jobID: descriptor.jobID,
+            establishedAtUTC: nowUTC()),
+          expectedPreviousHDCIdentitySHA256: expectation.previousIdentitySHA256)
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "verified post-flash HDC binding could not be persisted: \(error)")
+      }
+      return result(
+        summary: [
+          "model": model,
+          "firmware": version,
+          "hdcIdentitySha256": identity.serialDigestSHA256,
+          "usbTopology": identity.topology,
+          "verification": "exact-published-profile-and-bound-hdc",
+        ],
+        receipts: observationReceipts + [modelReceipt, versionReceipt])
 
     case .capturePostFlashDiagnostics(let connectKey, let request):
       let hdc = try resolveHDC()
@@ -1219,6 +1337,82 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       (expectedConnected
         ? "descriptor-bound HDC target did not reconnect before the deadline"
         : "descriptor-bound HDC target did not disconnect before the deadline")
+        + malformedSuffix)
+  }
+
+  /// Resolves the normal-mode HDC personality through the owner-only USB
+  /// topology carried by the durable DAYU200 binding. A firmware image may
+  /// legitimately change the HDC serial, so the old connect key is evidence
+  /// of the previous route, not the only acceptable postcondition. Exactly
+  /// one registered HDC USB identity at the expected topology and exactly one
+  /// matching Connected HDC row are required on every successful return.
+  private func waitForBoundHDC(
+    expectation: RockchipHDCReconnectExpectation,
+    timeoutSeconds: Int,
+    commandTimeoutSeconds: Int
+  ) async throws -> (RockchipRuntimeHDCIdentity, [ProviderSubprocessReceipt]) {
+    let previousDigest = SHA256.hash(data: Data(expectation.previousConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    guard previousDigest == expectation.previousIdentitySHA256,
+      !expectation.usbTopology.isEmpty,
+      expectation.usbTopology.utf8.allSatisfy({ (48...57).contains($0) })
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "post-flash HDC binding expectation is malformed")
+    }
+    let hdc = try resolveHDC()
+    let deadline = ContinuousClock.now.advanced(by: .seconds(timeoutSeconds))
+    var receipts: [ProviderSubprocessReceipt] = []
+    var lastMalformedReason: String?
+    while ContinuousClock.now < deadline {
+      let receipt = try await run(
+        executable: hdc,
+        arguments: ["list", "targets", "-v"],
+        timeoutSeconds: commandTimeoutSeconds,
+        budget: 64 * 1024)
+      receipts.append(receipt)
+      switch HDCObservationSemanticParser.parseTargetList(
+        stdout: receipt.stdout,
+        profile: .openHarmony320Family,
+        toolVersion: "3.2.0f",
+        truncated: receipt.stdoutTruncated)
+      {
+      case .parsed(let list):
+        if let identity = try? usbProbe.singleHDCNormal(
+          usbTopology: expectation.usbTopology)
+        {
+          let observedDigest = SHA256.hash(data: Data(identity.connectKey.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+          guard identity.topology == expectation.usbTopology,
+            identity.serialDigestSHA256 == observedDigest
+          else {
+            throw RuntimeDispatchFailure.failed(
+              "topology-bound HDC USB identity is internally inconsistent")
+          }
+          guard list.targets.filter({
+            $0.connectKey == identity.connectKey && $0.state == "Connected"
+          }).count == 1 else { break }
+          return (identity, receipts)
+        }
+      case .unsupportedVersion(let version):
+        throw RuntimeDispatchFailure.failed(
+          "HDC target parser does not support \(version)")
+      case .invalidEncoding:
+        throw RuntimeDispatchFailure.failed("HDC target list is not UTF-8")
+      case .truncated:
+        throw RuntimeDispatchFailure.failed("HDC target list exceeded its byte budget")
+      case .empty:
+        break
+      case .malformed(let reason):
+        lastMalformedReason = reason
+      }
+      try await Task.sleep(for: .seconds(1))
+    }
+    let malformedSuffix = lastMalformedReason.map {
+      "; last malformed target list read: \($0)"
+    } ?? ""
+    throw RuntimeDispatchFailure.failed(
+      "topology-bound HDC target did not reconnect before the deadline"
         + malformedSuffix)
   }
 
@@ -2092,9 +2286,15 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     case .rockchip(.waitForHDCReconnect(let connectKey)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.wait-reconnect.v1"
+    case .rockchip(.waitForBoundHDCReconnect(let expectation)):
+      return expectation.previousConnectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.wait-bound-reconnect.v2"
     case .rockchip(.verifyBuild(let connectKey, _, _)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.verify-build.v1"
+    case .rockchip(.verifyBoundBuild(let expectation, _, _)):
+      return expectation.previousConnectKey == descriptor.connectKey
+        && descriptor.identifier == "rockchip.hdc.verify-bound-build.v2"
     case .rockchip(.capturePostFlashDiagnostics(let connectKey, _)):
       return connectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.capture-post-flash-hilog.v1"

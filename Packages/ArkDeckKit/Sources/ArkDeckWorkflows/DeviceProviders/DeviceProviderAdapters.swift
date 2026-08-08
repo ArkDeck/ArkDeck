@@ -2901,6 +2901,23 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       return "flash.crossModeBindingUnprepared: target \(facts.targetID ?? "unknown") "
         + "is not covered by the durable DAYU200 cross-mode binding"
     }
+    guard
+      let identity = facts.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey],
+      identity.count == 64,
+      identity.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+      let connectKey = facts.executionConnectKey,
+      !connectKey.isEmpty,
+      SHA256.hash(data: Data(connectKey.utf8))
+        .map({ String(format: "%02x", $0) }).joined() == identity,
+      let topology = facts.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
+      !topology.isEmpty,
+      topology.utf8.allSatisfy({ (48...57).contains($0) })
+    else {
+      return "flash.postFlashHDCBindingUnprepared: target \(facts.targetID ?? "unknown") "
+        + "has no trusted HDC identity and USB topology for postflight"
+    }
     return nil
   }
 
@@ -2949,7 +2966,8 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     case ("reboot-device", .rebootDevice):
       return .rockchip(.rebootToNormal(stableIdentitySHA256: identity))
     case ("wait-for-hdc", .waitForReconnect):
-      return .rockchip(.waitForHDCReconnect(connectKey: connectKey))
+      return .rockchip(.waitForBoundHDCReconnect(
+        expectation: try hdcReconnectExpectation(context: context, connectKey: connectKey)))
     case ("rebind-and-verify-build", .probeDevice):
       let bundle = try flashBundle(inputs: inputs, context: context)
       // The version to expect is the one baked into the system image this plan
@@ -2969,8 +2987,9 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       }
       _ = bundle
       return .rockchip(
-        .verifyBuild(
-          connectKey: connectKey,
+        .verifyBoundBuild(
+          expectation: try hdcReconnectExpectation(
+            context: context, connectKey: connectKey),
           expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
           expectedBuildVersion: expectedBuildVersion))
     case ("capture-post-flash-diagnostics", .captureRemoteStdout):
@@ -3015,8 +3034,12 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       descriptor = "rockchip.rockusb.reboot-normal.v1"
     case .waitForHDCReconnect:
       descriptor = "rockchip.hdc.wait-reconnect.v1"
+    case .waitForBoundHDCReconnect:
+      descriptor = "rockchip.hdc.wait-bound-reconnect.v2"
     case .verifyBuild:
       descriptor = "rockchip.hdc.verify-build.v1"
+    case .verifyBoundBuild:
+      descriptor = "rockchip.hdc.verify-bound-build.v2"
     case .capturePostFlashDiagnostics:
       descriptor = "rockchip.hdc.capture-post-flash-hilog.v1"
     }
@@ -3048,6 +3071,31 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
           providerExecutableSHA256: providerExecutableSHA256,
           actionSHA256: actionSHA256,
           executionTuning: context.campaignExecutionTuning)))
+  }
+
+  private func hdcReconnectExpectation(
+    context: ProviderExecutionContext,
+    connectKey: String
+  ) throws -> RockchipHDCReconnectExpectation {
+    guard
+      let identity = context.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey],
+      identity.count == 64,
+      identity.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+      let topology = context.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
+      !topology.isEmpty,
+      topology.utf8.allSatisfy({ (48...57).contains($0) }),
+      SHA256.hash(data: Data(connectKey.utf8))
+        .map({ String(format: "%02x", $0) }).joined() == identity
+    else {
+      throw DeviceProviderError.factsUnavailable(
+        "post-flash HDC binding expectation is absent or malformed")
+    }
+    return RockchipHDCReconnectExpectation(
+      previousConnectKey: connectKey,
+      previousIdentitySHA256: identity,
+      usbTopology: topology)
   }
 
   package func verify(
@@ -3102,7 +3150,9 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
         throw DeviceProviderError.factsUnavailable(
           "normal-mode recovery has no descriptor-bound connect key")
       }
-      action = .rockchip(.waitForHDCReconnect(connectKey: connectKey))
+      action = .rockchip(.waitForBoundHDCReconnect(
+        expectation: try hdcReconnectExpectation(
+          context: context, connectKey: connectKey)))
     default:
       return nil
     }

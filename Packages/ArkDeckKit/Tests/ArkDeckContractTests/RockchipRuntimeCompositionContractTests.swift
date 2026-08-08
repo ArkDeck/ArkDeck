@@ -86,13 +86,19 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     private var listCount = 0
     private let productModel: String
     private let buildVersion: String
+    private let connectedTarget: String
+    private let emptyFirstTargetList: Bool
 
     init(
       productModel: String = RockchipFlashProfile.dayu200.runtimeProductModel,
-      buildVersion: String = RockchipFlashProfile.dayu200.runtimeBuildVersion
+      buildVersion: String = RockchipFlashProfile.dayu200.runtimeBuildVersion,
+      connectedTarget: String = "device-1",
+      emptyFirstTargetList: Bool = true
     ) {
       self.productModel = productModel
       self.buildVersion = buildVersion
+      self.connectedTarget = connectedTarget
+      self.emptyFirstTargetList = emptyFirstTargetList
     }
 
     func run(
@@ -110,9 +116,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       case ["list", "targets", "-v"]:
         listCount += 1
         stdout =
-          listCount == 1
+          emptyFirstTargetList && listCount == 1
           ? "[Empty]\n"
-          : "device-1\t\tUSB\tConnected\tlocalhost\n"
+          : "\(connectedTarget)\t\tUSB\tConnected\tlocalhost\n"
       case ["ld"]:
         stdout = "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"
       case ["ppt"]:
@@ -246,6 +252,51 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       return RockchipRuntimeLoaderIdentity(
         serialDigestSHA256: expected,
         topology: "42")
+    }
+  }
+
+  private struct TopologyBoundUSBProbe: RockchipRuntimeUSBProbing {
+    let connectKey: String
+    let topology: String
+    let reportedTopology: String
+    let reportedDigest: String
+
+    init(
+      connectKey: String,
+      topology: String,
+      reportedTopology: String? = nil,
+      reportedDigest: String? = nil
+    ) {
+      self.connectKey = connectKey
+      self.topology = topology
+      self.reportedTopology = reportedTopology ?? topology
+      self.reportedDigest = reportedDigest
+        ?? SHA256.hash(data: Data(connectKey.utf8))
+          .map { String(format: "%02x", $0) }.joined()
+    }
+
+    func singleLoader(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw RuntimeDispatchFailure.failed("fixture has no Loader")
+    }
+
+    func singleHDCNormal(
+      stableIdentitySHA256 _: String
+    ) throws -> RockchipRuntimeLoaderIdentity {
+      throw RuntimeDispatchFailure.failed("fixture uses topology-bound HDC")
+    }
+
+    func singleHDCNormal(
+      usbTopology: String
+    ) throws -> RockchipRuntimeHDCIdentity {
+      guard usbTopology == topology else {
+        throw RuntimeDispatchFailure.failed("fixture topology mismatch")
+      }
+      return RockchipRuntimeHDCIdentity(
+        connectKey: connectKey,
+        serialDigestSHA256: reportedDigest,
+        topology: reportedTopology)
     }
   }
 
@@ -734,6 +785,173 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(polls, 2, "the malformed first read must be re-polled, not fatal")
   }
 
+  func testPostFlashHDCSerialRotationUsesBoundTopologyAndPublishesOnlyAfterExactBuild()
+    async throws
+  {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let previousConnectKey = "device-1"
+    let nextConnectKey = "device-2"
+    let previousDigest = SHA256.hash(data: Data(previousConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let nextDigest = SHA256.hash(data: Data(nextConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let expectation = RockchipHDCReconnectExpectation(
+      previousConnectKey: previousConnectKey,
+      previousIdentitySHA256: previousDigest,
+      usbTopology: "42")
+    let store = RockchipPostFlashHDCBindingStore(
+      rootURL: root.appendingPathComponent("binding", isDirectory: true))
+    let log = CommandLog(
+      connectedTarget: nextConnectKey, emptyFirstTargetList: false)
+    let executor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: ScriptedCommandRunner(log: log),
+      usbProbe: TopologyBoundUSBProbe(
+        connectKey: nextConnectKey, topology: expectation.usbTopology),
+      postFlashHDCBindingStore: store,
+      nowUTC: { "2026-08-08T01:02:03Z" })
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+
+    let wait = RockchipProviderAction.waitForBoundHDCReconnect(expectation: expectation)
+    let waitPlan = try rockchipPlan(
+      action: wait, stepID: "wait-for-hdc", toolSHA256: component.sha256)
+    let waitResult = try await executor.execute(
+      action: wait, descriptor: hostDescriptor(waitPlan),
+      rockchipExecutable: component, actionDirectory: root)
+    XCTAssertEqual(waitResult.summary["hdcIdentitySha256"], nextDigest)
+    XCTAssertEqual(waitResult.summary["usbTopology"], expectation.usbTopology)
+    XCTAssertNil(
+      try store.loadIfPresent(),
+      "reconnect alone must not rotate a trusted route before build verification")
+
+    let verify = RockchipProviderAction.verifyBoundBuild(
+      expectation: expectation,
+      expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+      expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    let verifyPlan = try rockchipPlan(
+      action: verify, stepID: "rebind-and-verify-build", toolSHA256: component.sha256)
+    let verified = try await executor.execute(
+      action: verify, descriptor: hostDescriptor(verifyPlan),
+      rockchipExecutable: component, actionDirectory: root)
+    XCTAssertEqual(verified.summary["verification"], "exact-published-profile-and-bound-hdc")
+
+    let binding = try XCTUnwrap(store.loadIfPresent())
+    XCTAssertEqual(binding.targetID, "TGT-HOST")
+    XCTAssertEqual(binding.bindingRevision, 7)
+    XCTAssertEqual(binding.previousHDCIdentitySHA256, previousDigest)
+    XCTAssertEqual(binding.hdcIdentitySHA256, nextDigest)
+    XCTAssertEqual(binding.hdcConnectKey, nextConnectKey)
+    XCTAssertEqual(binding.usbTopology, expectation.usbTopology)
+    XCTAssertEqual(binding.productModel, RockchipFlashProfile.dayu200.runtimeProductModel)
+    XCTAssertEqual(binding.buildVersion, RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    XCTAssertEqual(binding.jobID, "job-host")
+    let invocations = await log.snapshot()
+    XCTAssertTrue(invocations.contains {
+      $0.arguments.starts(with: ["-t", nextConnectKey, "shell", "param", "get"])
+    })
+    XCTAssertFalse(invocations.contains {
+      $0.arguments.starts(with: ["-t", previousConnectKey])
+    })
+  }
+
+  func testPostFlashHDCBindingRejectsInexactBuildAndInconsistentTopology() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let previousConnectKey = "device-1"
+    let nextConnectKey = "device-2"
+    let expectation = RockchipHDCReconnectExpectation(
+      previousConnectKey: previousConnectKey,
+      previousIdentitySHA256: SHA256.hash(data: Data(previousConnectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined(),
+      usbTopology: "42")
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let action = RockchipProviderAction.verifyBoundBuild(
+      expectation: expectation,
+      expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+      expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    let plan = try rockchipPlan(
+      action: action, stepID: "rebind-and-verify-build", toolSHA256: component.sha256)
+
+    let buildStore = RockchipPostFlashHDCBindingStore(
+      rootURL: root.appendingPathComponent("bad-build", isDirectory: true))
+    let badBuildExecutor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: ScriptedCommandRunner(
+        log: CommandLog(
+          buildVersion: "OpenHarmony-7.0.0.34", connectedTarget: nextConnectKey,
+          emptyFirstTargetList: false)),
+      usbProbe: TopologyBoundUSBProbe(connectKey: nextConnectKey, topology: "42"),
+      postFlashHDCBindingStore: buildStore)
+    await XCTAssertThrowsErrorAsync(
+      try await badBuildExecutor.execute(
+        action: action, descriptor: hostDescriptor(plan),
+        rockchipExecutable: component, actionDirectory: root))
+    XCTAssertNil(try buildStore.loadIfPresent())
+
+    let topologyStore = RockchipPostFlashHDCBindingStore(
+      rootURL: root.appendingPathComponent("bad-topology", isDirectory: true))
+    let badTopologyExecutor = FoundationRockchipRuntimeActionExecutor(
+      hdcResolver: FixedExecutableResolver(
+        table: [
+          "hdc": ResolvedExecutable(
+            path: "/product/hdc", sha256: String(repeating: "b", count: 64))
+        ]),
+      runner: ScriptedCommandRunner(
+        log: CommandLog(
+          connectedTarget: nextConnectKey, emptyFirstTargetList: false)),
+      usbProbe: TopologyBoundUSBProbe(
+        connectKey: nextConnectKey, topology: "42", reportedTopology: "43"),
+      postFlashHDCBindingStore: topologyStore)
+    await XCTAssertThrowsErrorAsync(
+      try await badTopologyExecutor.execute(
+        action: action, descriptor: hostDescriptor(plan),
+        rockchipExecutable: component, actionDirectory: root))
+    XCTAssertNil(try topologyStore.loadIfPresent())
+  }
+
+  func testPostFlashHDCBindingPublicationIsCrashRetryIdempotent() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = RockchipPostFlashHDCBindingStore(rootURL: root)
+    let previousConnectKey = "device-1"
+    let nextConnectKey = "device-2"
+    let previousDigest = SHA256.hash(data: Data(previousConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let nextDigest = SHA256.hash(data: Data(nextConnectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    func candidate(at establishedAtUTC: String) -> RockchipPostFlashHDCBinding {
+      RockchipPostFlashHDCBinding(
+        targetID: "TGT-HOST", bindingRevision: 7,
+        stableLoaderIdentitySHA256: String(repeating: "a", count: 64),
+        previousHDCIdentitySHA256: previousDigest,
+        hdcIdentitySHA256: nextDigest, hdcConnectKey: nextConnectKey,
+        usbTopology: "42",
+        productModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        buildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        jobID: "job-host", establishedAtUTC: establishedAtUTC)
+    }
+
+    let first = try store.publish(
+      candidate(at: "2026-08-08T01:02:03Z"),
+      expectedPreviousHDCIdentitySHA256: previousDigest)
+    let retry = try store.publish(
+      candidate(at: "2026-08-08T01:03:04Z"),
+      expectedPreviousHDCIdentitySHA256: previousDigest)
+    XCTAssertEqual(retry, first)
+    XCTAssertEqual(retry.establishedAtUTC, "2026-08-08T01:02:03Z")
+  }
+
   func testAFailureAfterTheFirstWriteStaysUnresolved() async throws {
     // The mutation control for the rule above: once a write has been spawned
     // the device may have changed, so the same failure must NOT be restated as
@@ -1071,6 +1289,87 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(
       blocked.first { $0.identifier == .loader }?.status,
       .unknown)
+  }
+
+  func testFactsRouteTheOriginalTargetThroughItsVerifiedPostFlashHDCAlias() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+    let previousHDC = "device-1"
+    let loader = "loader-1"
+    let nextHDC = "device-2"
+    let previousDigest = SHA256.hash(data: Data(previousHDC.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let loaderDigest = SHA256.hash(data: Data(loader.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let nextDigest = SHA256.hash(data: Data(nextHDC.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let adopted = try targetStore.adopt(
+      stableIdentitySHA256: previousDigest, connectKey: previousHDC,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z"
+    ).record
+    let target = try targetStore.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: adopted.stablePhysicalIdentitySHA256,
+        previousRevision: adopted.bindingRevision,
+        currentStableIdentitySHA256: loaderDigest,
+        currentRevision: adopted.bindingRevision + 1)
+    ).record
+    let bindingRoot = root.appendingPathComponent("binding", isDirectory: true)
+    let bindingStore = RockchipProductBindingStore(rootURL: bindingRoot)
+    let binding = try bindingStore.install(
+      RockchipProductBindingSnapshot(
+        revision: target.bindingRevision, serial: loader, usbTopology: "43",
+        evidence: [
+          "product:e0-iokit-single-loader-readback",
+          "identity:serial-sha256=\(loaderDigest)",
+          "identity:previous-serial-sha256=\(previousDigest)",
+          "binding:previous-revision=\(adopted.bindingRevision)",
+          "binding:previous-usb-topology=42",
+          "identity:hdc-normal-alias-sha256=\(previousDigest)",
+          "binding:hdc-normal-alias-usb-topology=42",
+          "rebind:user-selection-sha256=\(String(repeating: "c", count: 64))",
+        ])).snapshot
+    XCTAssertTrue(try binding.coversRuntimeTarget(target))
+    let postFlashStore = RockchipPostFlashHDCBindingStore(rootURL: bindingRoot)
+    _ = try postFlashStore.publish(
+      RockchipPostFlashHDCBinding(
+        targetID: target.targetID, bindingRevision: target.bindingRevision,
+        stableLoaderIdentitySHA256: loaderDigest,
+        previousHDCIdentitySHA256: previousDigest,
+        hdcIdentitySHA256: nextDigest, hdcConnectKey: nextHDC,
+        usbTopology: "42",
+        productModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        buildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        jobID: "job-flash", establishedAtUTC: "2026-08-08T00:10:00Z"),
+      expectedPreviousHDCIdentitySHA256: previousDigest)
+    let component = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let probe = RecordingLiveModeProbe(
+      observation: RockchipLiveModeObservation(
+        deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion))
+    let port = TargetStoreRockchipRuntimeFactsPort(
+      targetStore: targetStore,
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      prober: probe,
+      bindingStore: bindingStore,
+      postFlashHDCBindingStore: postFlashStore,
+      nowUTC: { "2026-08-08T00:11:00Z" })
+
+    let facts = try await port.currentFacts(targetID: target.targetID)
+    XCTAssertEqual(facts.executionConnectKey, nextHDC)
+    XCTAssertEqual(
+      facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey],
+      nextDigest)
+    XCTAssertEqual(
+      facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
+      "42")
+    let observedConnectKeys = await probe.observedConnectKeys()
+    let observedStableIdentities = await probe.observedStableIdentities()
+    XCTAssertEqual(observedConnectKeys, [nextHDC])
+    XCTAssertEqual(observedStableIdentities, [loaderDigest])
   }
 
   func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {
@@ -1922,6 +2221,12 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           rootURL: root.appendingPathComponent(
             "rockchip-runtime", isDirectory: true))))
     let identity = String(repeating: "a", count: 64)
+    let hdcIdentity = SHA256.hash(data: Data("device-1".utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let reconnectExpectation = RockchipHDCReconnectExpectation(
+      previousConnectKey: "device-1",
+      previousIdentitySHA256: hdcIdentity,
+      usbTopology: "42")
     let bundle = flashBundle()
     let actions: [RockchipProviderAction] = [
       .enterLoader(connectKey: "device-1"),
@@ -1933,8 +2238,13 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       .verifyFlashReadback(bundle),
       .rebootToNormal(stableIdentitySHA256: identity),
       .waitForHDCReconnect(connectKey: "device-1"),
+      .waitForBoundHDCReconnect(expectation: reconnectExpectation),
       .verifyBuild(
         connectKey: "device-1",
+        expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion),
+      .verifyBoundBuild(
+        expectation: reconnectExpectation,
         expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
         expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion),
       .capturePostFlashDiagnostics(
@@ -2098,6 +2408,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testRockchipMutationsMaterializeDedicatedReadOnlyReconciliation() throws {
     let provider = RockchipFlashProviderAdapter(availability: .available)
     let bundle = flashBundle()
+    let hdcIdentity = SHA256.hash(data: Data("device-1".utf8))
+      .map { String(format: "%02x", $0) }.joined()
     let context = ProviderExecutionContext(
       jobID: "job-reconcile",
       stepID: "reconcile-flash-partitions-attempt",
@@ -2107,6 +2419,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       expectedIdentitySHA256: String(repeating: "a", count: 64),
       toolVersion: BundledRockchipComponent.reportedVersion,
       toolSHA256: Self.reviewedSignedComponentSHA256,
+      serverFacts: [
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey: hdcIdentity,
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
+      ],
       nowUTC: "2026-07-31T00:00:00Z")
     let cases: [(TypedProviderAction, TypedProviderAction)] = [
       (
@@ -2120,7 +2436,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       (
         .rockchip(.rebootToNormal(
           stableIdentitySHA256: String(repeating: "a", count: 64))),
-        .rockchip(.waitForHDCReconnect(connectKey: "device-1"))
+        .rockchip(.waitForBoundHDCReconnect(
+          expectation: RockchipHDCReconnectExpectation(
+            previousConnectKey: "device-1",
+            previousIdentitySHA256: hdcIdentity,
+            usbTopology: "42")))
       ),
     ]
 

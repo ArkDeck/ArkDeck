@@ -303,7 +303,10 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         toolSHA256: RuntimeCampaignWireContractTests.toolIdentity,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
-            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied,
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:
+            "a34ad955908981d35ebf5feb6f18132cd209a61f409ab0894042c3b41df851a2",
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey: "42",
         ], targetID: targetID, bindingRevision: 7,
         deviceIdentitySHA256: RuntimeCampaignWireContractTests.targetIdentity,
         executionConnectKey: "sealed-campaign-wire-connect-key",

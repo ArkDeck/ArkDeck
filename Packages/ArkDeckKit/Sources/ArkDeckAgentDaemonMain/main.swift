@@ -287,13 +287,16 @@ Task.detached {
     // composed. Without a descriptor-bound HDC there is no read-only surface
     // to measure the target's mode on, and a mode asserted without one is
     // exactly the fabrication #992 removed — so the port stays record-only.
+    let postFlashHDCBindingStore = RockchipPostFlashHDCBindingStore(
+      rootURL: rockchipRoot)
     var rockchipProber: (any RockchipLiveModeProbing)?
     if let hdcExecutableResolver, let toolWorkingDirectory = rockchipToolWorkingDirectory {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
         resolver: rockchipResolver,
         hdcResolver: hdcExecutableResolver,
         stateDirectory: resolvedStateDirectory,
-        toolWorkingDirectory: toolWorkingDirectory)
+        toolWorkingDirectory: toolWorkingDirectory,
+        postFlashHDCBindingStore: postFlashHDCBindingStore)
       rockchipProber = FoundationRockchipLiveModeProbe(
         hdcResolver: hdcExecutableResolver,
         rockchipResolver: rockchipResolver,
@@ -306,6 +309,7 @@ Task.detached {
       targetStore: targetStore, resolver: rockchipResolver,
       prober: rockchipProber,
       bindingStore: RockchipProductBindingStore(rootURL: rockchipRoot),
+      postFlashHDCBindingStore: postFlashHDCBindingStore,
       nowUTC: utcNow)
     let rockchipProvider = RockchipFlashProviderAdapter(
       factsPort: rockchipFactsPort,
