@@ -43,6 +43,7 @@
 		A1000000000000000000001A /* sbom.spdx.json in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002A /* sbom.spdx.json */; };
 		A1000000000000000000001B /* THIRD-PARTY-NOTICES.txt in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002B /* THIRD-PARTY-NOTICES.txt */; };
 		A1000000000000000000001C /* source-distribution-manifest.json in Embed Rockchip Component Metadata */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002C /* source-distribution-manifest.json */; };
+		F20000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +85,7 @@
 		E10000000000000000000002 /* AutomationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationWorkspaceView.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
+		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -159,6 +161,7 @@
 		A10000000000000000000034 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				F20000000000000000000002 /* Assets.xcassets */,
 				A10000000000000000000021 /* Localizable.xcstrings */,
 				A100000000000000000000A4 /* FlashLocalizable.xcstrings */,
 				A100000000000000000000AE /* JobsLocalizable.xcstrings */,
@@ -381,6 +384,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20000000000000000000001 /* Assets.xcassets in Resources */,
 				A10000000000000000000011 /* Localizable.xcstrings in Resources */,
 				A100000000000000000000A3 /* FlashLocalizable.xcstrings in Resources */,
 				A100000000000000000000AD /* JobsLocalizable.xcstrings in Resources */,
@@ -513,6 +517,7 @@
 		A10000000000000000000072 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ArkDeckApp/ArkDeckApp.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
@@ -543,6 +548,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ArkDeckApp/ArkDeckApp.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
