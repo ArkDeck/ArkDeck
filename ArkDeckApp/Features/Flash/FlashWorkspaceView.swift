@@ -262,7 +262,8 @@ struct FlashWorkspaceView: View {
           .disabled(model.isRefreshingDeviceAccess)
           .accessibilityIdentifier("flash.deviceAccess.reprobe")
         }
-        if model.workspace.bootloaderStatus.disposition == .unbound,
+        if (model.workspace.bootloaderStatus.disposition == .unbound
+          || model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared),
           model.workspace.bootloaderStatus.mode == "loader"
         {
           Divider()
@@ -272,7 +273,11 @@ struct FlashWorkspaceView: View {
           )
           .font(.callout.weight(.semibold))
           .foregroundStyle(.orange)
-          Text(flashText("flash.bootloader.unbound.detail"))
+          Text(
+            flashText(
+              model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared
+                ? "flash.bootloader.unprepared.detail"
+                : "flash.bootloader.unbound.detail"))
             .font(.callout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -908,11 +913,18 @@ final class FlashWorkspaceViewModel: ObservableObject {
   }
 
   var willBindCurrentLoaderOnSubmit: Bool {
-    guard mode == .execute, selectedTarget != nil else { return false }
+    guard mode == .execute, let selectedTarget else { return false }
     let status = workspace.bootloaderStatus
-    return status.disposition == .unbound
-      && status.observationCount == 1
-      && status.mode == "loader"
+    guard status.observationCount == 1, status.mode == "loader" else { return false }
+    switch status.disposition {
+    case .unbound:
+      return true
+    case .targetBindingUnprepared:
+      return status.targetID == selectedTarget.id
+        && status.bindingRevision == selectedTarget.bindingRevision
+    case .absent, .ambiguous, .exactBoundTarget:
+      return false
+    }
   }
 
   func refresh() {

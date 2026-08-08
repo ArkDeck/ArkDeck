@@ -164,6 +164,16 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   func testUniqueLoaderBindingClosesOnlyOutstandingEnterLoaderIntentWithoutReplay()
     async throws
   {
+    try await assertLoaderBindingSettlement(currentBindingRevision: 3)
+  }
+
+  func testFreshAttestationAtTheSameRevisionClosesEnterLoaderIntentWithoutReplay()
+    async throws
+  {
+    try await assertLoaderBindingSettlement(currentBindingRevision: 2)
+  }
+
+  private func assertLoaderBindingSettlement(currentBindingRevision: Int) async throws {
     let archive = try recoveryArchive()
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
@@ -216,7 +226,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       jobID: accepted.jobID,
       targetID: request.target.targetID,
       previousBindingRevision: 2,
-      currentBindingRevision: 3,
+      currentBindingRevision: currentBindingRevision,
       selectionEvidenceSHA256: selectionEvidence)
     XCTAssertEqual(settled.state, JobState.failed.rawValue)
     XCTAssertFalse(settled.outcomeUnknown)

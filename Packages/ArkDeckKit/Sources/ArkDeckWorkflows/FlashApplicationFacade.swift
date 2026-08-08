@@ -512,7 +512,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       guard result["targetId"] as? String == target.id,
         result["previousBindingRevision"] as? Int == target.bindingRevision,
         let revision = result["bindingRevision"] as? Int,
-        revision == target.bindingRevision + 1,
+        revision == target.bindingRevision || revision == target.bindingRevision + 1,
         let evidence = result["selectionEvidenceSha256"] as? String,
         evidence.count == 64,
         evidence.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
