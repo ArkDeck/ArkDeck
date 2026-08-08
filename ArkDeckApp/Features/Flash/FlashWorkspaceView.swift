@@ -641,7 +641,19 @@ struct FlashWorkspaceView: View {
               .foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
           }
-          if !model.canSubmit && !model.isSubmitting {
+          if let plan = model.plan,
+            !plan.blockingRequiredPrerequisites.isEmpty,
+            !model.isSubmitting
+          {
+            Label(
+              flashText("flash.execute.prerequisiteBlocker"),
+              systemImage: "exclamationmark.triangle"
+            )
+            .font(.callout)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("flash.execute.prerequisiteBlocker")
+          } else if !model.canSubmit && !model.isSubmitting {
             Label(
               flashText("flash.execute.planRequired"),
               systemImage: "list.bullet.clipboard"
@@ -867,6 +879,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
     return !archive.path.isEmpty
       && plan.target == selectedTarget
       && plan.mode == .execute
+      && plan.blockingRequiredPrerequisites.isEmpty
   }
 
   func refresh() {

@@ -21,7 +21,11 @@ final class DeviceProviderContractTests: XCTestCase {
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
         providerID: "rockchip", toolVersion: "rkdeveloptool ver 1.32",
-        toolSHA256: String(repeating: "c", count: 64), serverFacts: [:],
+        toolSHA256: String(repeating: "c", count: 64),
+        serverFacts: [
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+        ],
         targetID: targetID, bindingRevision: 1,
         deviceIdentitySHA256:
           "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
@@ -53,6 +57,31 @@ final class DeviceProviderContractTests: XCTestCase {
     XCTAssertNotNil(registry.provider(id: "hdc"))
     XCTAssertNotNil(registry.provider(id: "rockchip"))
     XCTAssertNil(registry.provider(id: "adb"))
+  }
+
+  func testRockchipExecutionAdmissionRequiresCrossModeBindingFact() async throws {
+    let operation = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200@1"))
+    let provider = RockchipFlashProviderAdapter(
+      factsPort: RockchipFactsPort(), availability: .available)
+    let ready = try await provider.resolveFacts(targetID: "TGT-1")
+    XCTAssertNil(provider.executionAdmissionBlocker(for: operation, facts: ready))
+
+    let unprepared = ProviderFacts(
+      providerID: ready.providerID, toolVersion: ready.toolVersion,
+      toolSHA256: ready.toolSHA256,
+      serverFacts: [
+        TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingUnprepared
+      ], targetID: ready.targetID, bindingRevision: ready.bindingRevision,
+      deviceIdentitySHA256: ready.deviceIdentitySHA256,
+      executionConnectKey: ready.executionConnectKey,
+      deviceMode: ready.deviceMode, buildFingerprint: ready.buildFingerprint,
+      profileID: ready.profileID, collectedAtUTC: ready.collectedAtUTC)
+    XCTAssertEqual(
+      provider.executionAdmissionBlocker(for: operation, facts: unprepared),
+      "flash.crossModeBindingUnprepared: target TGT-1 is not covered by the durable "
+        + "DAYU200 cross-mode binding")
   }
 
   func testHDCActionMappingIsClosedAndFailClosed() throws {

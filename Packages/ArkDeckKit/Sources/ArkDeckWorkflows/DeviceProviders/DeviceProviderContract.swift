@@ -1504,6 +1504,15 @@ package protocol DeviceProvider: Sendable {
 
   func resolveFacts(targetID: String) async throws -> ProviderFacts
 
+  /// Provider-owned execution readiness derived only from resolved Runtime
+  /// facts. Plan-only may still materialize with a blocker so a person can
+  /// inspect the exact plan; mutation admission and consume-time revalidation
+  /// call this hook and fail closed before the first external effect.
+  func executionAdmissionBlocker(
+    for operation: CatalogOperationDescriptor,
+    facts: ProviderFacts
+  ) -> String?
+
   /// Maps a catalog step (closed kind vocabulary) to this provider's typed
   /// action. Unknown/unsupported kinds must throw, never guess.
   func action(
@@ -1568,6 +1577,13 @@ extension DeviceProvider {
     .unavailable(
       reason: "provider \(providerID) has not published runtime availability "
         + "for \(operation.reference)")
+  }
+
+  package func executionAdmissionBlocker(
+    for operation: CatalogOperationDescriptor,
+    facts: ProviderFacts
+  ) -> String? {
+    nil
   }
 
   package func action(

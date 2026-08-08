@@ -249,6 +249,33 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     return (advance.previousStableIdentitySHA256, previousTopology)
   }
 
+  /// Answers whether this owner-only product binding covers the exact
+  /// Runtime target used to materialize a Flash plan.  A target adopted from
+  /// HDC alone is not cross-mode evidence: the binding must name the same
+  /// stable Loader identity and adjacent revision, and its retained HDC
+  /// connect key must be either that identity (revision 1) or the one
+  /// explicitly confirmed normal-mode alias.
+  ///
+  /// Keeping this comparison beside the binding decoder is important.  Both
+  /// the App prerequisite portrait and the protected Runtime admission gate
+  /// consume this result, so malformed or partial lineage cannot be rendered
+  /// as a warning while still authorizing `enter-loader`.
+  package func coversRuntimeTarget(_ target: RuntimeTargetRecord) throws -> Bool {
+    _ = try runtimeTargetLineageAdvance()
+    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    guard target.stablePhysicalIdentitySHA256 == currentIdentity,
+      target.bindingRevision == revision
+    else { return false }
+
+    let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8)).map {
+      String(format: "%02x", $0)
+    }.joined()
+    if connectIdentity == currentIdentity { return true }
+    return try confirmedHDCNormalAlias()?.identitySHA256 == connectIdentity
+  }
+
   func confirmedHDCConnectKey(
     for identity: RockchipProductUSBIdentity
   ) throws -> String? {

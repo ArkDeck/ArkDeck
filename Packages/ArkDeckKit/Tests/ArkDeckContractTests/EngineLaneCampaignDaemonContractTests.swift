@@ -320,7 +320,10 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         providerID: "rockchip",
         toolVersion: BundledRockchipComponent.reportedVersion,
         toolSHA256: EngineLaneCampaignDaemonContractTests.toolIdentity,
-        serverFacts: [:], targetID: targetID, bindingRevision: bindingRevision,
+        serverFacts: [
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+            TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+        ], targetID: targetID, bindingRevision: bindingRevision,
         deviceIdentitySHA256: EngineLaneCampaignDaemonContractTests.targetIdentity,
         executionConnectKey: "sealed-engine-lane-connect-key",
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-facts",

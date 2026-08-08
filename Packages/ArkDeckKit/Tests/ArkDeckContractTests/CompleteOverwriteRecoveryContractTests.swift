@@ -23,11 +23,16 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private struct RecoveryFactsPort: RockchipRuntimeFactsPort {
     let identity: String
     let toolSHA256: String
+    var crossModeBinding = TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
 
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
         providerID: "rockchip", toolVersion: BundledRockchipComponent.reportedVersion,
-        toolSHA256: toolSHA256, serverFacts: [:], targetID: targetID,
+        toolSHA256: toolSHA256,
+        serverFacts: [
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+            crossModeBinding
+        ], targetID: targetID,
         bindingRevision: 2, deviceIdentitySHA256: identity,
         executionConnectKey: "sealed-complete-overwrite-connect-key",
         deviceModel: "DAYU200 (RK3568)", deviceMode: "sealed-fixture",
@@ -410,6 +415,57 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(epochsAfterReplay, [epoch])
     let dispatchesAfterReplay = await dispatchLog.snapshot()
     XCTAssertEqual(dispatchesAfterReplay.count, dispatchCountAtCrash)
+  }
+
+  func testUnpreparedCrossModeBindingRejectsBeforeCapabilityAndDispatch() async throws {
+    let archive = try recoveryArchive()
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let artifact = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-unprepared-input", sessionID: "session-unprepared-input",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
+          stableIdentitySHA256: identity),
+        contents: archive))
+    let lease = try await artifactStore.leaseReference(
+      jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilityStore = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+    let dispatchLog = DispatchLog()
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: stateDirectory),
+      providers: DeviceProviderRegistry(providers: [
+        RockchipFlashProviderAdapter(
+          factsPort: RecoveryFactsPort(
+            identity: identity, toolSHA256: providerSHA256,
+            crossModeBinding:
+              TargetStoreRockchipRuntimeFactsPort.crossModeBindingUnprepared),
+          availability: .available)
+      ]),
+      dispatcher: ConfirmingDispatcher(log: dispatchLog),
+      capabilityStore: capabilityStore, artifactStore: artifactStore,
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let request = try flashRequest(id: "unprepared-cross-mode", lease: lease)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+
+    do {
+      _ = try await engine.submit(encoder.encode(request))
+      XCTFail("an HDC-only target must not receive a Flash capability")
+    } catch let RuntimeJobEngineError.rejected(code, detail) {
+      XCTAssertEqual(code, .authorizationRequired)
+      XCTAssertTrue(detail.contains("flash.crossModeBindingUnprepared"), detail)
+    }
+    let capabilities = try await capabilityStore.list()
+    let dispatches = await dispatchLog.snapshot()
+    XCTAssertTrue(capabilities.isEmpty)
+    XCTAssertTrue(dispatches.isEmpty)
   }
 
   func testSupersededUnknownPresentationIsTruthfulButNoLongerNeedsAttention() throws {

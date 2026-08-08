@@ -274,6 +274,18 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
       topology: "18874368", productName: "HDC Device")
     XCTAssertTrue(try snapshot.matchesConfirmedLiveIdentity(normal))
+    XCTAssertTrue(
+      try snapshot.coversRuntimeTarget(
+        RuntimeTargetRecord(
+          targetID: "TGT-BOUND", stablePhysicalIdentitySHA256: loaderIdentity,
+          bindingRevision: 2, connectKey: normalSerial, toolVersion: "3.2.0f",
+          adoptedAtUTC: "2026-08-08T00:00:00Z")))
+    XCTAssertFalse(
+      try snapshot.coversRuntimeTarget(
+        RuntimeTargetRecord(
+          targetID: "TGT-OTHER", stablePhysicalIdentitySHA256: normalIdentity,
+          bindingRevision: 1, connectKey: normalSerial, toolVersion: "3.2.0f",
+          adoptedAtUTC: "2026-08-08T00:00:00Z")))
     XCTAssertEqual(try snapshot.confirmedHDCConnectKey(for: normal), normalSerial)
     XCTAssertEqual(
       RockchipHDCIntegrationProfile.enterLoaderArguments(connectKey: normalSerial),

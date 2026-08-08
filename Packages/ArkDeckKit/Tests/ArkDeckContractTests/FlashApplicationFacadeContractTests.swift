@@ -119,6 +119,17 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       Set(presentation.prerequisites.map(\.identifier)),
       Set(profile.prerequisites.keys))
     XCTAssertTrue(presentation.prerequisites.allSatisfy { $0.status == .unknown })
+    XCTAssertEqual(
+      Set(presentation.blockingRequiredPrerequisites.map(\.identifier)),
+      Set([.loader, .recoveryPath, .unlocked]))
+
+    let ready = presentation.withPrerequisiteObservations(
+      RockchipPrerequisiteIdentifier.allCases.map {
+        RockchipPrerequisiteObservation(
+          identifier: $0,
+          status: $0 == .stablePower ? .unknown : .satisfied)
+      })
+    XCTAssertTrue(ready.blockingRequiredPrerequisites.isEmpty)
   }
 
   func testExecutePresentationRemainsReviewOnlyUntilRuntimeSubmission() throws {

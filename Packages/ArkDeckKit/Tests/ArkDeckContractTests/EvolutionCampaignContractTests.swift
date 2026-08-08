@@ -2798,7 +2798,10 @@ private struct UnknownOutcomeFlashFactsPort: RockchipRuntimeFactsPort {
       providerID: "rockchip",
       toolVersion: BundledRockchipComponent.reportedVersion,
       toolSHA256: String(repeating: "c", count: 64),
-      serverFacts: [:], targetID: targetID, bindingRevision: 7,
+      serverFacts: [
+        TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
+          TargetStoreRockchipRuntimeFactsPort.crossModeBindingSatisfied
+      ], targetID: targetID, bindingRevision: 7,
       deviceIdentitySHA256:
         "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
       executionConnectKey: "sealed-campaign-unknown-connect-key",

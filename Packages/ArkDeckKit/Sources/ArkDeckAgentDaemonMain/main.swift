@@ -288,7 +288,9 @@ Task.detached {
     }
     let rockchipFactsPort = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore, resolver: rockchipResolver,
-      prober: rockchipProber, nowUTC: utcNow)
+      prober: rockchipProber,
+      bindingStore: RockchipProductBindingStore(rootURL: rockchipRoot),
+      nowUTC: utcNow)
     let rockchipProvider = RockchipFlashProviderAdapter(
       factsPort: rockchipFactsPort,
       // The closed typed plan is present. Executable/HDC/state availability
