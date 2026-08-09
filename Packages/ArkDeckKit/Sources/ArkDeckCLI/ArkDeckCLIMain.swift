@@ -1045,8 +1045,8 @@ struct ArkDeckCommandLine {
       [--expected-binding-revision <n>] [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
-        arkdeck debug start --request-file <flash-request.json> [--json]
-        arkdeck debug evaluate --invocation <id> --candidate-file <decision.json> \
+        arkdeck debug start --request-file <typed-request.json> [--json]
+        arkdeck debug evaluate --invocation <id> --action-file <effect-action.json> \
       --source-sha256 <sha256> --build-sha256 <sha256> [--json]
         arkdeck debug status --invocation <id> [--json]
         arkdeck cleanup-debt list [--json]

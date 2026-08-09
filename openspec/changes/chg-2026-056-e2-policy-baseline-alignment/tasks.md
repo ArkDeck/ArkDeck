@@ -5,7 +5,9 @@
 - Status:ready (IMPLEMENTING: r10 was reviewed by #1217 and its Runtime invocation landed in
   #1219. #1220–#1223 closed the pre-admission actuator path. The next real submit exposed r11's
   displaced advanced-target binding defect; its policy delta and product fix travel together and
-  cannot touch hardware before this exact diff is reviewed/merged. Host contract evidence is not
+  #1224/#1225 closed that defect. r12 replaces r10's per-problem repair allowlist with the
+  invariant-bounded typed-effect broker; it cannot touch hardware before this exact diff is
+  reviewed/merged. Host contract evidence is not
   real-device completion; GJ-4 remains IMPLEMENTING until the explicit device window reaches
   success or reports one truthful non-overridable blocker.)
 - Golden Journey:GJ-4
@@ -20,8 +22,8 @@
   `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`, `E2R-GJ4-001`
 - Depends on:r7/r9/r10 approval dependencies are satisfied by #1193/#1194, #1206/#1207 and
-  #1217; r11 requires this exact product/policy PR to merge before hardware use, followed by the
-  explicit D2 real-device window
+  #1217; r11 is satisfied by #1224/#1225. r12 requires this exact product/policy PR to merge before
+  hardware use, followed by the explicit D2 real-device window
 - Production reachability:
   `ArkDeckApp/manual UI driver -> Agent XPC -> protected-main RuntimeJobEngine ->
   RuntimeCapabilityStore -> Rockchip Runtime composition -> typed Provider -> DAYU200`
@@ -279,6 +281,35 @@
   the only owner of transport, facts, plan, capability, reservation, journal and outcome.
 - Stop with `repairSurfaceInsufficient` rather than widening the candidate grammar when a repair
   needs a new external effect, target rule, trusted fact, Step, command, partition or Provider plan.
+
+### r12 invariant-bounded candidate debugging deliverables
+
+- Replace the DAYU200 repair alternative/observation/timing grammar with the stable effect-level
+  `observePinnedRequest`, `executePinnedRequest` and `stop` actions.
+- Allow one invocation to pin any already-published typed request that protected Runtime can fully
+  materialize; require a binding revision for every device-effect seed.
+- Persist candidate source/build/action digests as non-authoritative provenance and keep the exact
+  request, plan, facts, capability, reservation and outcome Runtime-owned.
+- Classify a failed Job with no durable device-effect intent as safe continuation independent of
+  its error code or message. Never infer safety once a mutation/destructive intent exists.
+- Check the latest effect epoch even when later plan-only observations exist. Preserve the existing
+  unknown-outcome complete-overwrite proof, sixteen-epoch/four-hour/concurrency-one limits and
+  zero-dispatch stops.
+- Bump only the invocation/attempt-permit documents to schema 2.0.0; fail closed on old active
+  candidate sessions and never rewrite existing Job/capability/journal/outcome bytes.
+
+### r12 Verification
+
+- Contract-test exact action shapes, duplicate/authority/target/plan/argv/timing injection and an
+  unknown problem name; every invalid action dispatches zero.
+- Exercise at least two published operation references through the same broker implementation so
+  no Flash-specific debug allowlist remains.
+- In one durable invocation, run a safe failed candidate and a succeeding candidate revision with
+  no Git/Task/PR/merge input.
+- Through production `RuntimeJobEngine` journal inspection, prove a novel failure with no
+  device-effect intent returns `safeToReflash` because of effect evidence, not failure vocabulary.
+- Prove known post-effect failure, unknown without broker recovery proof, expiry and epoch 17 remain
+  fail closed.
 
 ### r11 displaced binding reactivation deliverables and verification
 

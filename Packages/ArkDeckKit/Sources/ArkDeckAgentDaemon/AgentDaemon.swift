@@ -543,24 +543,24 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id, code: .internalError,
           message: "Runtime debug invocation is not configured")
       }
-      let expected = Set(["invocationId", "candidateJson", "sourceSha256", "buildSha256"])
+      let expected = Set(["invocationId", "actionJson", "sourceSha256", "buildSha256"])
       guard let params = request.params, Set(params.keys) == expected,
         case .string(let invocationID)? = params["invocationId"],
-        case .string(let candidateJSON)? = params["candidateJson"],
+        case .string(let actionJSON)? = params["actionJson"],
         case .string(let sourceSHA256)? = params["sourceSha256"],
         case .string(let buildSHA256)? = params["buildSha256"]
       else {
         return failure(
           id: request.id, code: .invalidParams,
           message:
-            "debug.evaluate accepts exactly invocationId, candidateJson, sourceSha256 and buildSha256")
+            "debug.evaluate accepts exactly invocationId, actionJson, sourceSha256 and buildSha256")
       }
       do {
         let provenance = try RuntimeDebugCandidateProvenance(
           sourceSHA256: sourceSHA256, buildSHA256: buildSHA256)
         let status = try await debugInvocationController.evaluate(
           invocationID: invocationID,
-          candidateData: Data(candidateJSON.utf8),
+          actionData: Data(actionJSON.utf8),
           provenance: provenance)
         return success(id: request.id, result: try Self.encodeCodable(status))
       } catch let error as RuntimeDebugInvocationError {

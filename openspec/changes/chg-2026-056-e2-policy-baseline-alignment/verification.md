@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-056-e2-policy-baseline-alignment@r11
+> Change:CHG-2026-056-e2-policy-baseline-alignment@r12
 > Status:planned
 > Baseline:`CORE-3.0.0` -> proposed `CORE-4.0.0`
 > Proposal phase executes zero real device, Runtime capability, recovery or history mutation.
@@ -21,7 +21,7 @@
 | Acceptance | Method | Expected result | Evidence |
 | --- | --- | --- | --- |
 | `POL-RECOVERY-001`, `POL-AGENT-002`, `E2R-CATALOG-001` | Cross-file policy/Catalog/Provider/UI audit | Flash remains typed and destructive; only bare `flash.dayu200` is published/displayed; Steps/effect/Provider remain unchanged; exactly one profile `dayu200` retains the current recovery coverage; versioned operation/profile strings are rejected; no E2/UI/chat authority returns | document + contract |
-| `AC-FLASH-015-03`, `E2R-RUNTIME-001` | Fake initial Agent Flash plus two isolated candidate decisions through production Runtime composition | Runtime independently validates the closed repair envelope, mints/reserves its exact capability and dispatches published fake Steps with no authority, Git/PR/merge or user-message input | contract |
+| `AC-FLASH-015-03`, `E2R-RUNTIME-001` | Two candidate revisions request one exact published typed seed through production Runtime composition | Runtime validates only effect-level actions, independently re-materializes and admits the exact seed, and dispatches published fake Steps with no authority, Git/PR/merge or user-message input | contract |
 | `AC-FLASH-015-02`, `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RECOVERY-001` | Seed durable outcomeUnknown, known identity and a fully covering Provider plan; run launch and live recovery | Original Step dispatch stays 0; a distinct capability/reservation/intent executes complete overwrite automatically; only all confirmed effects + reboot/rebind/postflight create recovered target epoch | contract/fault |
 | `AC-FLASH-015-01`, `E2R-RECOVERY-NEGATIVE-001`, `E2R-NEGATIVE-001` | Pairwise faults over identity, binding/topology, effect closure, omitted/protected partition, coverage declaration, Artifact/tool/plan/repair-envelope drift, candidate/caller proof, cancellation, expiry and budget | Original replay, invalid candidate and recovery dispatch all remain 0; exact durable blocker is produced and has no approval override | contract/fault |
 | `AC-WF-004-01`, `AC-WF-004-02`, `E2R-HISTORY-001` | Immutable old-unknown + later-Flash fixtures with varied facts | Only complete same-target, ordered, full-coverage, per-effect and postflight proof appends a supersession relation with zero hardware dispatch; old bytes/outcome remain unchanged | schema/compatibility contract |
@@ -132,6 +132,20 @@ they do not replace `E2R-GJ4-001` or authorize hardware.
   the exact accepted request, stripped of App client context and captured owner-only, can seed the
   existing Runtime debug invocation.
 
+## r12 invariant-boundary verification addendum
+
+- The candidate decoder accepts only observe/execute/stop effect actions. There is no operation-,
+  Provider-, device- or failure-specific repair vocabulary.
+- Start the same controller with Flash and at least one other already-published typed request. The
+  seed is immutable after start and every device-effect seed is binding-pinned.
+- Candidate source/build/action digests appear only as provenance and a plan digest pin. Removing
+  Runtime target, Artifact, capability, reservation or journal proof still refuses dispatch.
+- A novel failed Job with zero device-effect intents permits another candidate. Adding one
+  mutation/destructive intent changes the decision to capability-lineage/recovery rules; changing
+  only the diagnostic text does not.
+- Old r10 invocation/attempt bytes do not decode as r12 permits and cannot regain an execution
+  budget. Existing Job/capability/journal bytes remain untouched.
+
 ## Deviations
 
 Any need for a new operation/Provider/profile, partition or argv change, caller-controlled proof,
@@ -146,8 +160,10 @@ requires another revision of this same change and maintainer review before imple
 - [x] r9 proposal/implementation are present on protected `main` through #1206/#1207.
 - [x] r10 was reviewed and merged by the human maintainer in #1217 before candidate-backed
   device use; this is the protected-main policy boundary implemented by the follow-up product PR.
-- [ ] r11 displaced-binding reactivation policy and product code are reviewed/merged together
-  before any candidate build or reactivated binding is used against hardware.
+- [x] r11 displaced-binding reactivation policy and product code were reviewed/merged through
+  #1224/#1225.
+- [ ] r12 invariant-bounded candidate broker and product code are reviewed/merged together before
+  its schema-2 invocation is used against hardware.
 - [ ] All canonical and change-local contract acceptance passes.
 - [ ] All host gates pass at the exact implementation head.
 - [ ] Real DAYU200 autonomous recovery/UI Flash/postflight passes with truthful V6 evidence.
