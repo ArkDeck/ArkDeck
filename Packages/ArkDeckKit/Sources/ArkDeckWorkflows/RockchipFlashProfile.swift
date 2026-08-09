@@ -76,7 +76,7 @@ public enum RockchipPrerequisiteStatus: String, Codable, Equatable, Sendable {
   case unknown
 }
 
-public struct RockchipFlashProfile: Sendable {
+public struct RockchipFlashProfile: Equatable, Sendable {
   public static let profileIdentity = "arkdeck.rockchip-rockusb-flash-profile.dayu200"
   public static let profileVersion = "1.0.0"
   public static let targetDeviceModel = "DAYU200 (RK3568)"

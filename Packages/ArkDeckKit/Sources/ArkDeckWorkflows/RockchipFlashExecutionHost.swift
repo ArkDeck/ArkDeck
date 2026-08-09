@@ -1719,12 +1719,14 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
       throw RockchipAuthorizationFactError.invalidRequest(field: "archiveURL")
     }
 
-    let plan: RockchipFlashPlan
+    let validatedPlan: RockchipValidatedExecutePlanFacts
     let binding: RockchipTrustedDurableBindingFact
-    do { plan = try await planPort.makeValidatedExecutePlan(archiveURL: request.archiveURL) } catch
-    {
+    do {
+      validatedPlan = try await planPort.makeValidatedExecutePlan(archiveURL: request.archiveURL)
+    } catch {
       throw RockchipAuthorizationFactError.factPortFailed(name: "plan")
     }
+    let plan = validatedPlan.plan
     do { binding = try await bindingPort.currentDurableBinding() } catch {
       throw RockchipAuthorizationFactError.factPortFailed(name: "binding")
     }
@@ -1826,6 +1828,7 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
         ].joined(separator: "|").utf8))
     return RockchipTrustedAuthorizationFacts(
       plan: plan, executableIdentity: executableIdentity,
+      archiveProfile: validatedPlan.archiveProfile,
       bindingReference: binding.receipt.reference,
       targetDigestSHA256: targetDigest, serialDigestSHA256: serialDigest,
       usbTopology: liveIdentity.topology, observationSequence: 1,
@@ -1957,6 +1960,7 @@ final class RockchipProductionAdmissionPort: @unchecked Sendable,
         startingMode: startingMode)
       return RockchipExecutionAdmission(
         backing: .evolutionCampaign(token), plan: token.facts.plan,
+        archiveProfile: token.facts.archiveProfile,
         authorityReference: .agent(token.authorizationReference),
         usageReservationID: token.usageReservation.reservationID,
         targetID: targetID, bindingRevision: token.facts.bindingReference.revision,

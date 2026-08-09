@@ -169,6 +169,7 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
 
   let backing: Backing
   let plan: RockchipFlashPlan
+  let archiveProfile: RockchipFlashProfile
   let authorityReference: AuthorityReference
   let usageReservationID: String
   let targetID: String
@@ -183,6 +184,7 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   init(
     backing: Backing,
     plan: RockchipFlashPlan,
+    archiveProfile: RockchipFlashProfile,
     authorityReference: AuthorityReference,
     usageReservationID: String,
     targetID: String,
@@ -196,6 +198,7 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
   ) {
     self.backing = backing
     self.plan = plan
+    self.archiveProfile = archiveProfile
     self.authorityReference = authorityReference
     self.usageReservationID = usageReservationID
     self.targetID = targetID

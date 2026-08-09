@@ -2682,7 +2682,9 @@ private struct ScriptedCampaignAttemptAdmitter: RockchipEvolutionCampaignAttempt
       bindingRevision: permit.assertion.bindingLineageRootRevision,
       deviceProfileReference: profile.catalogReference,
       partitionPlan: profile.mappedPartitions.map(\.partitionName),
+      archiveSizeBytes: profile.archiveSizeBytes,
       archiveSHA256: profile.archiveSHA256,
+      archiveProfile: profile,
       postFlashVerification: "full")
   }
 }

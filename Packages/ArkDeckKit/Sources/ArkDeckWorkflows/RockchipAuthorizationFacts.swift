@@ -42,19 +42,26 @@ final class RockchipContinuousAdmissionClock: @unchecked Sendable, RockchipAdmis
   }
 }
 
+package struct RockchipValidatedExecutePlanFacts: Sendable, Equatable {
+  package let plan: RockchipFlashPlan
+  package let archiveProfile: RockchipFlashProfile
+}
+
 protocol RockchipExecutePlanFactPort: Sendable {
-  func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan
+  func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipValidatedExecutePlanFacts
 }
 
 package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
   package init() {}
 
-  package func makeValidatedExecutePlan(archiveURL: URL) async throws -> RockchipFlashPlan {
+  package func makeValidatedExecutePlan(
+    archiveURL: URL
+  ) async throws -> RockchipValidatedExecutePlanFacts {
     let board = RockchipFlashProfile.dayu200
     let summary = try GzipTarArchiveReader.summarize(
       fileAt: archiveURL,
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
-    return try makeValidatedExecutePlan(summary: summary, board: board)
+    return try makeValidatedExecutePlanFacts(summary: summary, board: board)
   }
 
   /// The plan is built for the archive in hand. It used to be built only for
@@ -64,6 +71,13 @@ package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
     summary: GzipTarArchiveSummary,
     board: RockchipFlashProfile = .dayu200
   ) throws -> RockchipFlashPlan {
+    try makeValidatedExecutePlanFacts(summary: summary, board: board).plan
+  }
+
+  func makeValidatedExecutePlanFacts(
+    summary: GzipTarArchiveSummary,
+    board: RockchipFlashProfile
+  ) throws -> RockchipValidatedExecutePlanFacts {
     let profile: RockchipFlashProfile
     do {
       profile = try board.forBuild(
@@ -78,7 +92,9 @@ package struct RockchipProductExecutePlanFactPort: RockchipExecutePlanFactPort {
     // the observation reports.
     let verdict = provider.profile.validate(summary.archiveObservation())
     guard verdict == .valid else { throw RockchipAuthorizationFactError.archiveValidationFailed }
-    return try provider.makePlan(mode: .execute, archiveValidation: verdict)
+    return RockchipValidatedExecutePlanFacts(
+      plan: try provider.makePlan(mode: .execute, archiveValidation: verdict),
+      archiveProfile: profile)
   }
 }
 
@@ -214,6 +230,10 @@ struct RockchipTrustedAuthorizationFacts: Sendable, Equatable {
   /// Descriptor-bound identity collected for the exact executable used by the trusted probe.
   /// This remains internal authority evidence; callers cannot synthesize or serialize it.
   let executableIdentity: ProcessExecutableIdentityReceipt
+  /// Invocation-local profile derived from the same archive snapshot as
+  /// `plan`. It is carried forward only after all admission correlations pass;
+  /// upload and daemon import still validate the source bytes independently.
+  let archiveProfile: RockchipFlashProfile
   let bindingReference: DeviceBindingReference
   let targetDigestSHA256: String
   let serialDigestSHA256: String
@@ -315,13 +335,15 @@ struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
       throw RockchipAuthorizationFactError.invalidRequest(field: "archiveURL")
     }
 
-    let plan: RockchipFlashPlan
+    let validatedPlan: RockchipValidatedExecutePlanFacts
     let binding: RockchipTrustedDurableBindingFact
     let toolDevice: RockchipTrustedToolDeviceFact
     let prerequisites: RockchipTrustedPrerequisiteFact
     let readback: RockchipTrustedIdentityReadbackFact
-    do { plan = try await planPort.makeValidatedExecutePlan(archiveURL: request.archiveURL) } catch
-    { throw RockchipAuthorizationFactError.factPortFailed(name: "plan") }
+    do {
+      validatedPlan = try await planPort.makeValidatedExecutePlan(archiveURL: request.archiveURL)
+    } catch { throw RockchipAuthorizationFactError.factPortFailed(name: "plan") }
+    let plan = validatedPlan.plan
     do { binding = try await bindingPort.currentDurableBinding() } catch {
       throw RockchipAuthorizationFactError.factPortFailed(name: "binding")
     }
@@ -459,6 +481,7 @@ struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
         ].joined(separator: "|").utf8))
     return RockchipTrustedAuthorizationFacts(
       plan: plan, executableIdentity: toolDevice.executableIdentity,
+      archiveProfile: validatedPlan.archiveProfile,
       bindingReference: durable.reference, targetDigestSHA256: targetDigest,
       serialDigestSHA256: durableSerialDigest, usbTopology: topology,
       observationSequence: readback.observationSequence,

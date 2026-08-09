@@ -232,12 +232,37 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     XCTAssertEqual(plan, expected)
     XCTAssertEqual(plan.archiveSHA256, profile.archiveSHA256)
 
+    // Admission receives both values from this one summary. Dispatcher may
+    // therefore reuse the invocation-local profile without a second archive
+    // description pass, while upload/import still validate the actual file.
+    let validated = try port.makeValidatedExecutePlanFacts(
+      summary: summary(for: profile), board: profile)
+    XCTAssertEqual(validated.plan, plan)
+    XCTAssertEqual(validated.archiveProfile.catalogReference, profile.catalogReference)
+    XCTAssertEqual(validated.archiveProfile.archiveSizeBytes, profile.archiveSizeBytes)
+    XCTAssertEqual(validated.archiveProfile.archiveSHA256, profile.archiveSHA256)
+    XCTAssertEqual(validated.archiveProfile.members, profile.members)
+    XCTAssertEqual(validated.archiveProfile.mappedPartitions, profile.mappedPartitions)
+    XCTAssertEqual(
+      validated.archiveProfile.membershiplessPartitionsWriteForbidden,
+      profile.membershiplessPartitionsWriteForbidden)
+    XCTAssertEqual(validated.archiveProfile.prerequisites, profile.prerequisites)
+    XCTAssertEqual(validated.archiveProfile.runtimeBuildVersion, profile.runtimeBuildVersion)
+    XCTAssertEqual(validated.archiveProfile.firmwareVersion, profile.runtimeBuildVersion)
+
     // A build nobody enumerated plans, and its plan records its own digest.
     let unknownDigest = String(repeating: "0", count: 64)
     let unknownPlan = try port.makeValidatedExecutePlan(
       summary: summary(for: profile, archiveSHA256: unknownDigest))
     XCTAssertEqual(unknownPlan.archiveSHA256, unknownDigest)
     XCTAssertEqual(unknownPlan.steps.count, plan.steps.count)
+    let unknownValidated = try port.makeValidatedExecutePlanFacts(
+      summary: summary(for: profile, archiveSHA256: unknownDigest), board: profile)
+    XCTAssertEqual(unknownValidated.plan.archiveSHA256, unknownDigest)
+    XCTAssertEqual(unknownValidated.archiveProfile.archiveSHA256, unknownDigest)
+    XCTAssertEqual(
+      unknownValidated.archiveProfile.runtimeBuildVersion,
+      profile.runtimeBuildVersion)
 
     // Structural drift still fails closed: an image the board maps is absent.
     let missingImage = profile.members.filter { $0.name != "system.img" }

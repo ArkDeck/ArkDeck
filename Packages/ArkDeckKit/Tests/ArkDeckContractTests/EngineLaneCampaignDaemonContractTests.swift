@@ -169,7 +169,9 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       targetStableIdentitySHA256: Self.targetIdentity, bindingRevision: 2,
       deviceProfileReference: profile.catalogReference,
       partitionPlan: profile.mappedPartitions.map(\.partitionName),
+      archiveSizeBytes: profile.archiveSizeBytes,
       archiveSHA256: profile.archiveSHA256,
+      archiveProfile: profile,
       postFlashVerification: "full")
     // The same bytes the RPC import would have produced, published into the
     // store the handler serves (see the note at the top of this file).
