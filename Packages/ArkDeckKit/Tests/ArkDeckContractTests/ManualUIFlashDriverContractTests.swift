@@ -65,4 +65,19 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(implementation.contains("kAXPressAction"))
     XCTAssertTrue(implementation.contains("kAXSelectedAttribute"))
   }
+
+  func testTargetPickerRequiresTheRequestedValueToBecomeObservable() throws {
+    let source = try driverSource()
+    let startMarker =
+      "  func selectPickerValue(_ value: String, identifier: String) throws {"
+    let endMarker = "\n  func waitForFacts("
+    let start = try XCTUnwrap(source.range(of: startMarker)?.lowerBound)
+    let end = try XCTUnwrap(source.range(of: endMarker, range: start..<source.endIndex)?.lowerBound)
+    let implementation = source[start..<end]
+
+    XCTAssertTrue(implementation.contains("kAXPopUpButtonRole"))
+    XCTAssertTrue(implementation.contains("observesPickerValue"))
+    XCTAssertTrue(implementation.contains("did not select"))
+    XCTAssertFalse(implementation.contains("if direct == .success { return }"))
+  }
 }
