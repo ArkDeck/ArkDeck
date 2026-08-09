@@ -541,6 +541,42 @@ private struct RuntimeArtifactPublicationFailure: Error, Sendable {
   let detail: String
 }
 
+/// Per-operation cache for the expensive build string derived from a Flash
+/// archive. The Artifact store still re-hashes and revalidates the lease at
+/// every existing admission and pre-dispatch boundary; this only prevents the
+/// same already-identified bytes from being decompressed again while one plan
+/// or one Job execution is walking its steps.
+struct RuntimeFlashBuildVersionCache {
+  private struct Key: Equatable {
+    let artifactID: String
+    let path: String
+    let sha256: String
+    let byteCount: Int
+  }
+
+  private struct Entry {
+    let key: Key
+    let value: String?
+  }
+
+  private var entry: Entry?
+
+  mutating func resolve(
+    artifact: ProviderResolvedInputArtifact,
+    reader: () -> String?
+  ) -> String? {
+    let key = Key(
+      artifactID: artifact.artifactID,
+      path: artifact.fileURL.standardizedFileURL.path,
+      sha256: artifact.sha256,
+      byteCount: artifact.byteCount)
+    if let entry, entry.key == key { return entry.value }
+    let value = reader()
+    entry = Entry(key: key, value: value)
+    return value
+  }
+}
+
 // MARK: - Admission fault injection
 
 /// Crash-consistency test seam. Production uses `.none`; tests inject an
@@ -1477,6 +1513,7 @@ public actor RuntimeJobEngine {
     provider: any DeviceProvider
   ) async throws {
     var completedStepIDs = jobs[jobID]?.completedStepIDs ?? []
+    var flashBuildVersionCache = RuntimeFlashBuildVersionCache()
     for step in descriptor.steps {
       if jobs[jobID].map({ cancellationRequests.contains($0.record.jobID) }) == true {
         return  // safe boundary between steps; run() records the transitions
@@ -1656,7 +1693,8 @@ public actor RuntimeJobEngine {
         additionalInputArtifacts: additionalArtifacts,
         campaignExecutionTuning: campaignExecutionTuning,
         expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
-          for: descriptor, artifact: resolvedArtifact))
+          for: descriptor, artifact: resolvedArtifact,
+          cache: &flashBuildVersionCache))
       let action: TypedProviderAction
       do {
         action = try provider.action(
@@ -4545,6 +4583,7 @@ public actor RuntimeJobEngine {
     do {
       let runtimeTuning = try executionTuning(for: request)
       var materializedSteps: [MaterializedPlanStep] = []
+      var flashBuildVersionCache = RuntimeFlashBuildVersionCache()
       for step in selectedSteps {
         switch step.kind {
         case .preflightHostStorage, .postprocessArtifact, .finalizeSession, .hashFile,
@@ -4576,7 +4615,8 @@ public actor RuntimeJobEngine {
           additionalInputArtifacts: additionalResolved,
           campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
-            for: descriptor, artifact: resolved))
+            for: descriptor, artifact: resolved,
+            cache: &flashBuildVersionCache))
         let action = try provider.action(
           for: step, operation: descriptor, inputs: request.inputs,
           context: context)
@@ -4674,7 +4714,8 @@ public actor RuntimeJobEngine {
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
           campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
-            for: descriptor, artifact: resolved))
+            for: descriptor, artifact: resolved,
+            cache: &flashBuildVersionCache))
         let publishAction = try provider.action(
           for: publishStep, operation: descriptor, inputs: request.inputs,
           context: context)
@@ -6763,23 +6804,26 @@ public actor RuntimeJobEngine {
   /// job does not carry one.
   ///
   /// Read here, where the Runtime already resolves leases from disk, so that a
-  /// step materializer stays a pure function of its typed inputs. One pass
-  /// over the archive per job; a flash campaign runs for minutes and this
-  /// costs about eleven seconds.
+  /// step materializer stays a pure function of its typed inputs. The local
+  /// cache makes this one decompression pass per materialization or Job run,
+  /// without changing any existing fresh Artifact lease validation.
   private func declaredRuntimeBuildVersion(
     for descriptor: CatalogOperationDescriptor,
-    artifact: ProviderResolvedInputArtifact?
+    artifact: ProviderResolvedInputArtifact?,
+    cache: inout RuntimeFlashBuildVersionCache
   ) -> String? {
     guard descriptor.reference == "flash.dayu200", let artifact else { return nil }
-    let board = RockchipFlashProfile.dayu200
-    guard
-      let summary = try? GzipTarArchiveReader.summarize(
-        fileAt: artifact.fileURL,
-        derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board)),
-      let build = try? RockchipImageArchiveIntrospection.describe(
-        summary: summary, board: board)
-    else { return nil }
-    return build.runtimeBuildVersion
+    return cache.resolve(artifact: artifact) {
+      let board = RockchipFlashProfile.dayu200
+      guard
+        let summary = try? GzipTarArchiveReader.summarize(
+          fileAt: artifact.fileURL,
+          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board)),
+        let build = try? RockchipImageArchiveIntrospection.describe(
+          summary: summary, board: board)
+      else { return nil }
+      return build.runtimeBuildVersion
+    }
   }
 
 }
