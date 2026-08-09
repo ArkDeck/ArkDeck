@@ -14,193 +14,6 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-/// The only data an isolated repair candidate may return to protected-main
-/// Runtime. None of these cases can name authority, trusted facts or an
-/// executable device plan.
-public enum RuntimeCandidateDecision: Equatable, Sendable {
-  case usePublishedDefaults
-  case selectPublishedAlternative(String)
-  case boundedTiming(parameter: String, value: Int)
-  case requestPublishedObservation(String)
-  case stop(reasonCode: String)
-}
-
-public struct RuntimeCandidateTimingBounds: Equatable, Sendable {
-  public let minimum: Int
-  public let maximum: Int
-
-  public init(minimum: Int, maximum: Int) throws {
-    guard minimum >= 0, maximum >= minimum, maximum <= 3_600_000 else {
-      throw RuntimeCandidateDecisionError.invalidEnvelope("timingBounds")
-    }
-    self.minimum = minimum
-    self.maximum = maximum
-  }
-
-  fileprivate func contains(_ value: Int) -> Bool {
-    minimum...maximum ~= value
-  }
-}
-
-/// A reviewed, protected-main allowlist. A candidate can select inside this
-/// envelope, but cannot add a key or widen a bound.
-public struct RuntimeCandidateRepairEnvelope: Equatable, Sendable {
-  public static let maximumEntriesPerKind = 32
-
-  fileprivate let alternativeIDs: Set<String>
-  fileprivate let observationIDs: Set<String>
-  fileprivate let timingBounds: [String: RuntimeCandidateTimingBounds]
-
-  public init(
-    alternativeIDs: [String],
-    observationIDs: [String],
-    timingBounds: [String: RuntimeCandidateTimingBounds]
-  ) throws {
-    guard alternativeIDs.count <= Self.maximumEntriesPerKind,
-      observationIDs.count <= Self.maximumEntriesPerKind,
-      timingBounds.count <= Self.maximumEntriesPerKind,
-      Set(alternativeIDs).count == alternativeIDs.count,
-      Set(observationIDs).count == observationIDs.count,
-      alternativeIDs.allSatisfy(RuntimeCandidateDecisionCodec.isIdentifier),
-      observationIDs.allSatisfy(RuntimeCandidateDecisionCodec.isIdentifier),
-      timingBounds.keys.allSatisfy(RuntimeCandidateDecisionCodec.isIdentifier)
-    else {
-      throw RuntimeCandidateDecisionError.invalidEnvelope("closedRepairEnvelope")
-    }
-    self.alternativeIDs = Set(alternativeIDs)
-    self.observationIDs = Set(observationIDs)
-    self.timingBounds = timingBounds
-  }
-}
-
-public enum RuntimeCandidateDecisionError: Error, Equatable, Sendable {
-  case invalidDocument
-  case invalidEnvelope(String)
-  case unsupportedSchemaVersion
-  case unsupportedKind
-  case closedShapeViolation
-  case invalidIdentifier(String)
-  case alternativeNotPublished(String)
-  case observationNotPublished(String)
-  case timingNotPublished(String)
-  case timingOutOfBounds(String)
-}
-
-/// Strict decoder and Runtime-side repair-envelope validator.
-///
-/// The decoder rejects duplicate JSON members before decoding. Each decision
-/// kind then requires an exact key set, so adding `target`, `argv`, `plan`,
-/// `capability` or any future field fails closed rather than being ignored by
-/// Swift's ordinary `Decodable` behavior.
-public enum RuntimeCandidateDecisionCodec {
-  public static let schemaVersion = "1.0.0"
-  public static let maximumDocumentBytes = 8 * 1_024
-
-  public static func decode(
-    _ data: Data,
-    envelope: RuntimeCandidateRepairEnvelope
-  ) throws -> RuntimeCandidateDecision {
-    guard !data.isEmpty, data.count <= maximumDocumentBytes else {
-      throw RuntimeCandidateDecisionError.invalidDocument
-    }
-    let object: [String: JSONValue]
-    do {
-      object = try strictObject(from: data)
-    } catch {
-      throw RuntimeCandidateDecisionError.invalidDocument
-    }
-    guard case .string(let version)? = object["schemaVersion"],
-      version == schemaVersion
-    else {
-      throw RuntimeCandidateDecisionError.unsupportedSchemaVersion
-    }
-    guard case .string(let kind)? = object["kind"] else {
-      throw RuntimeCandidateDecisionError.unsupportedKind
-    }
-
-    switch kind {
-    case "usePublishedDefaults":
-      try requireKeys(object, exactly: ["schemaVersion", "kind"])
-      return .usePublishedDefaults
-
-    case "selectPublishedAlternative":
-      try requireKeys(
-        object, exactly: ["schemaVersion", "kind", "alternativeId"])
-      let identifier = try identifier(object, key: "alternativeId")
-      guard envelope.alternativeIDs.contains(identifier) else {
-        throw RuntimeCandidateDecisionError.alternativeNotPublished(identifier)
-      }
-      return .selectPublishedAlternative(identifier)
-
-    case "boundedTiming":
-      try requireKeys(
-        object, exactly: ["schemaVersion", "kind", "parameter", "value"])
-      let parameter = try identifier(object, key: "parameter")
-      guard let bounds = envelope.timingBounds[parameter] else {
-        throw RuntimeCandidateDecisionError.timingNotPublished(parameter)
-      }
-      guard case .integer(let rawValue)? = object["value"],
-        let value = Int(exactly: rawValue), bounds.contains(value)
-      else {
-        throw RuntimeCandidateDecisionError.timingOutOfBounds(parameter)
-      }
-      return .boundedTiming(parameter: parameter, value: value)
-
-    case "requestPublishedObservation":
-      try requireKeys(
-        object, exactly: ["schemaVersion", "kind", "observationId"])
-      let identifier = try identifier(object, key: "observationId")
-      guard envelope.observationIDs.contains(identifier) else {
-        throw RuntimeCandidateDecisionError.observationNotPublished(identifier)
-      }
-      return .requestPublishedObservation(identifier)
-
-    case "stop":
-      try requireKeys(object, exactly: ["schemaVersion", "kind", "reasonCode"])
-      return .stop(reasonCode: try identifier(object, key: "reasonCode"))
-
-    default:
-      throw RuntimeCandidateDecisionError.unsupportedKind
-    }
-  }
-
-  fileprivate static func isIdentifier(_ value: String) -> Bool {
-    value.utf8.count <= 128
-      && value.range(
-        of: #"^[a-z][A-Za-z0-9.-]*$"#, options: .regularExpression) != nil
-  }
-
-  private static func identifier(
-    _ object: [String: JSONValue], key: String
-  ) throws -> String {
-    guard case .string(let value)? = object[key], isIdentifier(value) else {
-      throw RuntimeCandidateDecisionError.invalidIdentifier(key)
-    }
-    return value
-  }
-
-  private static func requireKeys(
-    _ object: [String: JSONValue], exactly expected: Set<String>
-  ) throws {
-    guard Set(object.keys) == expected else {
-      throw RuntimeCandidateDecisionError.closedShapeViolation
-    }
-  }
-
-  /// Reuses ArkDeckStorage's raw-byte duplicate-member validator. Wrapping
-  /// the candidate as audit details preserves duplicate keys until that
-  /// validator has rejected them; JSONDecoder alone would silently collapse
-  /// or ignore authority-bearing additions.
-  private static func strictObject(from data: Data) throws -> [String: JSONValue] {
-    var wrapper = Data(
-      #"{"schemaVersion":"1.0.0","recordId":"candidate-decision","auditId":"candidate-decision","correlationId":"candidate-decision","sessionId":"candidate-decision","jobId":"candidate-decision","category":"preview","timestamp":"2026-08-09T00:00:00Z","details":"#
-        .utf8)
-    wrapper.append(data)
-    wrapper.append(UInt8(ascii: "}"))
-    return try SessionAuditCodec.decode(wrapper).details
-  }
-}
-
 public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case rejected(RuntimeOperationErrorCode, String)
   case idempotencyConflict(String)
@@ -843,10 +656,10 @@ public actor RuntimeJobEngine {
     let bindingRevision: Int?
     let providerID: String
     /// Present only for a Runtime-owned debug attempt. These pins make the
-    /// protected repair decision part of the authorized materialized plan;
-    /// ordinary Jobs retain their pre-r10 digest bytes.
+    /// candidate's effect-level broker action part of the authorized
+    /// materialized plan; ordinary Jobs retain their existing digest bytes.
     let runtimeDebugInvocationID: String?
-    let runtimeDebugDecisionSHA256: String?
+    let runtimeDebugCandidateActionSHA256: String?
     let steps: [MaterializedPlanStep]
 
     enum CodingKeys: String, CodingKey {
@@ -858,7 +671,7 @@ public actor RuntimeJobEngine {
       case bindingRevision
       case providerID
       case runtimeDebugInvocationID
-      case runtimeDebugDecisionSHA256
+      case runtimeDebugCandidateActionSHA256
       case steps
     }
 
@@ -875,7 +688,7 @@ public actor RuntimeJobEngine {
       try container.encodeIfPresent(
         runtimeDebugInvocationID, forKey: .runtimeDebugInvocationID)
       try container.encodeIfPresent(
-        runtimeDebugDecisionSHA256, forKey: .runtimeDebugDecisionSHA256)
+        runtimeDebugCandidateActionSHA256, forKey: .runtimeDebugCandidateActionSHA256)
       try container.encode(steps, forKey: .steps)
     }
   }
@@ -3261,6 +3074,20 @@ public actor RuntimeJobEngine {
     if record.outcomeUnknown || record.state == JobState.waitingForRecovery.rawValue {
       return .outcomeUnknown
     }
+    if record.state == JobState.failed.rawValue {
+      let replay = try DurableJournalRecovery.inspect(
+        url: jobDirectory(for: jobID).appendingPathComponent("journal.jsonl"))
+      let intents = replay.events.filter { $0.kind == .stepIntent }
+      if intents.allSatisfy({ $0.stepEffect != nil })
+        && !intents.contains(where: { $0.stepEffect! >= .deviceMutation })
+      {
+        // Typed-only execution and intent-before-effect make this a general
+        // proof, independent of the failure reason: no device effect could
+        // have been dispatched. A materially different candidate may stay in
+        // the same invocation instead of opening a PR for the new reason.
+        return .safeToReflash
+      }
+    }
     guard let capabilityID = record.admissionEvidence?.reference,
       let capability = try await capabilityStore.inspect(capabilityID: capabilityID),
       let use = capability.lineage.last(where: { $0.jobID == jobID })
@@ -4880,7 +4707,7 @@ public actor RuntimeJobEngine {
         bindingRevision: bindingRevision,
         providerID: descriptor.provider.rawValue,
         runtimeDebugInvocationID: runtimeTuning.debug?.invocationID,
-        runtimeDebugDecisionSHA256: runtimeTuning.debug?.decisionSHA256,
+        runtimeDebugCandidateActionSHA256: runtimeTuning.debug?.candidateActionSHA256,
         steps: materializedSteps)
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -5281,19 +5108,19 @@ public actor RuntimeJobEngine {
 
   private struct RuntimeExecutionTuningContext {
     let tuning: AgentAuthorityCampaignExecutionTuning?
-    let debug: RuntimeDebugAttemptTuningRecord?
+    let debug: RuntimeDebugAttemptPermitRecord?
   }
 
-  /// Resolves tuning only from a protected Runtime-owned attempt document or
-  /// a historical broker reservation. Neither route reads operation inputs,
-  /// and the two provenance kinds can never be combined.
+  /// Resolves a protected Runtime-owned debug permit independently from the
+  /// historical campaign timing record. A candidate permit carries no
+  /// timing, plan or Provider controls and the provenance kinds cannot mix.
   private func executionTuning(
     for request: RuntimeOperationRequest?
   ) throws -> RuntimeExecutionTuningContext {
     guard let request else {
       return RuntimeExecutionTuningContext(tuning: nil, debug: nil)
     }
-    let debug = try RuntimeDebugAttemptTuningStore.loadExact(
+    let debug = try RuntimeDebugAttemptPermitStore.loadExact(
       stateDirectory: configuration.stateDirectory, request: request,
       nowUTC: nowUTC())
     let campaign = try campaignExecutionTuning(for: request)
@@ -5301,8 +5128,7 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "a Runtime debug attempt cannot carry historical campaign tuning")
     }
-    return RuntimeExecutionTuningContext(
-      tuning: debug?.tuning ?? campaign, debug: debug)
+    return RuntimeExecutionTuningContext(tuning: campaign, debug: debug)
   }
 
   /// Reads only the timing controls that the protected historical campaign

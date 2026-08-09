@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 11
+revision: 12
 status: proposed
 class: core
 core_change_level: major
@@ -46,6 +46,12 @@ platforms: [macos, windows, linux]
 > 一个不推进 target revision 的 same-revision reactivation binding；fresh identity、
 > record/action hash、route 与唯一 topology
 > 任一不成立都在 Flash dispatch 前拒绝。
+>
+> r12（2026-08-09）修正 r10 的边界错误：候选准入不再按已知问题枚举 repair
+> alternative/observation/timing，而只按 ArkDeck 的 typed-effect 安全不变量判断。一个 invocation
+> 固定任意已发布 typed request；候选只能请求观察、执行该固定请求或停止。是否允许下一轮由
+> durable device-effect intent、RuntimeCapability lineage、unknown recovery proof 与硬预算决定，
+> 不由错误名称决定。详见 `design-r12.md`。
 >
 > r9 的 singleton source naming 同样把 operation 文件从 `flash.dayu200.v1.json` 改为
 > `flash.dayu200.json`。新 Runtime operation/capability/journal writer 对该 operation 省略 version；
@@ -292,6 +298,31 @@ The maintainer is requested to approve the following indivisible boundary, detai
 If r10 is rejected, r5's current boundary remains: UI/client candidates may exercise the published
 Runtime, but a Runtime/Provider repair cannot affect a real device until it is merged. The stale r9
 merge dependency remains removed either way because #1206/#1207 already satisfied it.
+
+## r12 invariant-bounded candidate debugging decision
+
+r12 supersedes only r10's repair-envelope control surface; all protected Runtime ownership and
+recovery rules remain. The maintainer is requested to approve the indivisible boundary in
+`design-r12.md`:
+
+1. Candidate eligibility is defined by the protected typed-effect invariants, not by a list of
+   previously observed failure or repair kinds.
+2. One invocation pins any request already published and fully materializable by protected-main
+   Runtime. Candidate actions can only observe that request, ask the broker to execute it, or stop.
+3. Candidate actions cannot carry or change operation, target, binding, inputs, Artifact, plan,
+   Step, timing, executable/argv, capability, trusted fact, outcome or recovery proof.
+4. A failed Job with no durable device-effect intent is mechanically safe to continue regardless
+   of its diagnostic. Once a device-effect intent exists, only capability lineage
+   `safeToReflash` or the existing complete-overwrite proof can reach another dispatch.
+5. Candidate source/build digests remain non-authoritative provenance. Every execution is freshly
+   materialized and admitted by the protected broker under the existing sixteen-epoch/four-hour/
+   concurrency-one budget.
+6. New operation/provider/profile or destructive-policy semantics still require the final reviewed
+   Repo-plane PR. An ordinary new product failure does not.
+
+If r12 is rejected, protected main retains r10's closed repair envelope and the product continues
+to stop on `repairSurfaceInsufficient`; this implementation must not be used on hardware before
+maintainer review/merge.
 
 ## r11 displaced binding reactivation decision
 

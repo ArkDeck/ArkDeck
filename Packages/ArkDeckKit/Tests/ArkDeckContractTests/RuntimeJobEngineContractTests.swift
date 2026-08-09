@@ -39,6 +39,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   private final class ScriptedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
     enum Script {
       case observationHappy
+      case knownFailureOnDeviceProbe
       case outcomeUnknownOnDeviceProbe
       case outcomeUnknownOnHAPSend
     }
@@ -54,6 +55,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
       lock.withLock { dispatchCount += 1 }
       switch (script, plan.action) {
+      case (.knownFailureOnDeviceProbe, .hdc(.observeDevice)):
+        throw RuntimeDispatchFailure.failed("new pre-effect product failure")
       case (.outcomeUnknownOnDeviceProbe, .hdc(.observeDevice)):
         throw RuntimeDispatchFailure.outcomeUnknown("dispatcher lost the child process")
       case (.outcomeUnknownOnHAPSend, .hdc(.sendArtifactToStaging)):
@@ -260,6 +263,25 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let inspection = try DurableJournalRecovery.inspect(url: journalURL)
     XCTAssertTrue(inspection.outstandingIntents.isEmpty)
     XCTAssertTrue(inspection.unknownOutcomes.isEmpty)
+  }
+
+  func testDebugOutcomeUsesDurableEffectIntentInsteadOfFailureVocabulary() async throws {
+    let dispatcher = ScriptedDispatcher(script: .knownFailureOnDeviceProbe)
+    let (engine, _) = try makeEngine(dispatcher: dispatcher)
+    let acceptance = try await engine.submit(observeRequest())
+    let status = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, "failed")
+
+    let outcome = try await engine.runtimeDebugExecutionOutcome(jobID: acceptance.jobID)
+    XCTAssertEqual(outcome, .safeToReflash)
+    let replay = try DurableJournalRecovery.inspect(
+      url: stateDirectory.appendingPathComponent(
+        "jobs/\(acceptance.jobID)/journal.jsonl"))
+    XCTAssertFalse(
+      replay.events.contains {
+        $0.kind == .stepIntent && $0.stepEffect.map { $0 >= .deviceMutation } == true
+      },
+      "a new known failure is retryable because durable effects are absent, not because its name is listed")
   }
 
   // MARK: - Idempotency

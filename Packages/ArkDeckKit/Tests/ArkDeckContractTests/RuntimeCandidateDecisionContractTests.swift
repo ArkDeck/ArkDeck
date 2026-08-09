@@ -3,115 +3,68 @@ import XCTest
 
 @testable import ArkDeckWorkflows
 
-final class RuntimeCandidateDecisionContractTests: XCTestCase {
-  private func envelope() throws -> RuntimeCandidateRepairEnvelope {
-    try RuntimeCandidateRepairEnvelope(
-      alternativeIDs: ["postflight.uniqueHdcPersonality"],
-      observationIDs: ["postflight.hdcCandidates"],
-      timingBounds: [
-        "hdcReconnectDeadlineMilliseconds": try RuntimeCandidateTimingBounds(
-          minimum: 30_000, maximum: 180_000)
-      ])
-  }
-
-  func testClosedPublishedDecisionsDecode() throws {
-    let vectors: [(String, RuntimeCandidateDecision)] = [
+final class RuntimeCandidateActionContractTests: XCTestCase {
+  func testActionsAreEffectLevelAndDoNotEnumerateRepairKinds() throws {
+    let vectors: [(String, RuntimeDebugCandidateAction)] = [
       (
-        #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults"}"#,
-        .usePublishedDefaults
+        #"{"schemaVersion":"1.0.0","action":"observePinnedRequest"}"#,
+        .observePinnedRequest
       ),
       (
-        #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"postflight.uniqueHdcPersonality"}"#,
-        .selectPublishedAlternative("postflight.uniqueHdcPersonality")
+        #"{"schemaVersion":"1.0.0","action":"executePinnedRequest"}"#,
+        .executePinnedRequest
       ),
       (
-        #"{"schemaVersion":"1.0.0","kind":"boundedTiming","parameter":"hdcReconnectDeadlineMilliseconds","value":120000}"#,
-        .boundedTiming(parameter: "hdcReconnectDeadlineMilliseconds", value: 120_000)
-      ),
-      (
-        #"{"schemaVersion":"1.0.0","kind":"requestPublishedObservation","observationId":"postflight.hdcCandidates"}"#,
-        .requestPublishedObservation("postflight.hdcCandidates")
-      ),
-      (
-        #"{"schemaVersion":"1.0.0","kind":"stop","reasonCode":"repairSurfaceInsufficient"}"#,
-        .stop(reasonCode: "repairSurfaceInsufficient")
+        #"{"schemaVersion":"1.0.0","action":"stop","reasonCode":"budgetExhausted"}"#,
+        .stop(reasonCode: "budgetExhausted")
       ),
     ]
 
     for (document, expected) in vectors {
       XCTAssertEqual(
-        try RuntimeCandidateDecisionCodec.decode(Data(document.utf8), envelope: envelope()),
-        expected)
+        try RuntimeDebugCandidateActionCodec.decode(Data(document.utf8)), expected)
     }
   }
 
-  func testAuthorityFactAndPlanFieldsAreRejected() throws {
-    let forbidden = [
-      "operation", "profile", "target", "bindingRevision", "partition", "artifact",
-      "step", "effect", "executable", "argv", "capability", "reservation", "outcome",
-      "coverageProof",
-    ]
-    for key in forbidden {
+  func testCandidateCannotInjectAuthorityTargetPlanArgvOrRepairParameters() {
+    for key in [
+      "authority", "capability", "target", "binding", "operation", "inputs", "plan",
+      "step", "argv", "executable", "timing", "alternativeId", "observationId",
+    ] {
       let document =
-        #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults","\#(key)":"forged"}"#
+        #"{"schemaVersion":"1.0.0","action":"executePinnedRequest","\#(key)":"forged"}"#
       XCTAssertThrowsError(
-        try RuntimeCandidateDecisionCodec.decode(Data(document.utf8), envelope: envelope()),
-        "candidate field \(key) must fail closed"
+        try RuntimeDebugCandidateActionCodec.decode(Data(document.utf8))
       ) { error in
-        XCTAssertEqual(error as? RuntimeCandidateDecisionError, .closedShapeViolation)
+        XCTAssertEqual(error as? RuntimeDebugCandidateActionError, .closedShapeViolation)
       }
     }
   }
 
-  func testDuplicateMemberIsRejectedBeforeDecoding() throws {
-    let document =
-      #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults","kind":"stop"}"#
+  func testDuplicateMemberAndUnknownActionFailClosed() {
+    let duplicate =
+      #"{"schemaVersion":"1.0.0","action":"executePinnedRequest","action":"stop"}"#
     XCTAssertThrowsError(
-      try RuntimeCandidateDecisionCodec.decode(Data(document.utf8), envelope: envelope())
+      try RuntimeDebugCandidateActionCodec.decode(Data(duplicate.utf8))
     ) { error in
-      XCTAssertEqual(error as? RuntimeCandidateDecisionError, .invalidDocument)
+      XCTAssertEqual(error as? RuntimeDebugCandidateActionError, .invalidDocument)
+    }
+
+    let unknown = #"{"schemaVersion":"1.0.0","action":"fixNewestFailure"}"#
+    XCTAssertThrowsError(
+      try RuntimeDebugCandidateActionCodec.decode(Data(unknown.utf8))
+    ) { error in
+      XCTAssertEqual(error as? RuntimeDebugCandidateActionError, .unsupportedAction)
     }
   }
 
-  func testUnpublishedAlternativeObservationAndTimingAreRejected() throws {
-    let vectors: [(String, RuntimeCandidateDecisionError)] = [
-      (
-        #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"provider.newCommand"}"#,
-        .alternativeNotPublished("provider.newCommand")
-      ),
-      (
-        #"{"schemaVersion":"1.0.0","kind":"requestPublishedObservation","observationId":"device.rawIdentity"}"#,
-        .observationNotPublished("device.rawIdentity")
-      ),
-      (
-        #"{"schemaVersion":"1.0.0","kind":"boundedTiming","parameter":"newTimeout","value":1000}"#,
-        .timingNotPublished("newTimeout")
-      ),
-      (
-        #"{"schemaVersion":"1.0.0","kind":"boundedTiming","parameter":"hdcReconnectDeadlineMilliseconds","value":180001}"#,
-        .timingOutOfBounds("hdcReconnectDeadlineMilliseconds")
-      ),
-    ]
-
-    for (document, expected) in vectors {
-      XCTAssertThrowsError(
-        try RuntimeCandidateDecisionCodec.decode(Data(document.utf8), envelope: envelope())
-      ) { error in
-        XCTAssertEqual(error as? RuntimeCandidateDecisionError, expected)
-      }
+  func testStopReasonIsClosedDiagnosticNotAnEffectCarrier() {
+    for reason in ["", "UPPER_CASE", "contains space", String(repeating: "a", count: 129)] {
+      let encoded = try! JSONSerialization.data(
+        withJSONObject: [
+          "schemaVersion": "1.0.0", "action": "stop", "reasonCode": reason,
+        ], options: [.sortedKeys])
+      XCTAssertThrowsError(try RuntimeDebugCandidateActionCodec.decode(encoded))
     }
-  }
-
-  func testRepairEnvelopeCannotBeWidenedByMalformedEntries() throws {
-    XCTAssertThrowsError(
-      try RuntimeCandidateRepairEnvelope(
-        alternativeIDs: ["valid", "valid"], observationIDs: [], timingBounds: [:]))
-    XCTAssertThrowsError(
-      try RuntimeCandidateRepairEnvelope(
-        alternativeIDs: ["../../provider"], observationIDs: [], timingBounds: [:]))
-    XCTAssertThrowsError(
-      try RuntimeCandidateTimingBounds(minimum: -1, maximum: 1))
-    XCTAssertThrowsError(
-      try RuntimeCandidateTimingBounds(minimum: 10, maximum: 9))
   }
 }

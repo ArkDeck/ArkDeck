@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 11
+change_revision: 12
 platform: macos
 evidence_classes:
 - contract
@@ -35,14 +35,14 @@ cases:
     trusted facts, generates and reserves its exact RuntimeCapability, dispatches
     only the declared fake typed Steps and persists truthful intent/outcome and
     capability lineage without caller administration. A second isolated candidate
-    may follow a durable safeToReflash without a per-attempt PR; its decision is
-    accepted only inside the reviewed repair envelope.
+    may follow a durable safeToReflash without a per-attempt PR; the broker accepts
+    only observe/execute/stop for the exact pinned typed request.
 - acceptance_id: E2R-NEGATIVE-001
   test_id: TEST-E2R-NEGATIVE-001
   method: >-
     Fault matrix over caller forgery, target/binding/input/plan/archive/artifact/
     tool drift, reservation lineage, crash, cancellation, missing recovery proof,
-    candidate authority/fact/plan/argv injection, repair-envelope drift, expiry and
+    candidate authority/fact/plan/argv/timing injection, seed drift, expiry and
     attempt/concurrency budgets.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#negative-and-recovery-tests
   minimum_evidence: contract

@@ -1037,7 +1037,7 @@ enum RuntimeCLI {
       guard let requestPath = value("--request-file") else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "debug start requires --request-file <flash-request.json>")
+          message: "debug start requires --request-file <typed-request.json>")
       }
       let requestURL = URL(fileURLWithPath: requestPath)
       guard let requestJSON = try? String(contentsOf: requestURL, encoding: .utf8) else {
@@ -1050,26 +1050,26 @@ enum RuntimeCLI {
 
     case "evaluate":
       guard let invocationID = value("--invocation"),
-        let candidatePath = value("--candidate-file"),
+        let actionPath = value("--action-file"),
         let sourceSHA256 = value("--source-sha256"),
         let buildSHA256 = value("--build-sha256")
       else {
         throw CLIError(
           exitCode: EX_USAGE,
           message:
-            "debug evaluate requires --invocation <id> --candidate-file <decision.json> "
+            "debug evaluate requires --invocation <id> --action-file <effect-action.json> "
             + "--source-sha256 <sha256> --build-sha256 <sha256>")
       }
-      let candidateURL = URL(fileURLWithPath: candidatePath)
-      guard let candidateJSON = try? String(contentsOf: candidateURL, encoding: .utf8) else {
-        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(candidateURL.path)")
+      let actionURL = URL(fileURLWithPath: actionPath)
+      guard let actionJSON = try? String(contentsOf: actionURL, encoding: .utf8) else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(actionURL.path)")
       }
       emit(
         try client.request(
           method: "debug.evaluate",
           params: [
             "invocationId": .string(invocationID),
-            "candidateJson": .string(candidateJSON),
+            "actionJson": .string(actionJSON),
             "sourceSha256": .string(sourceSHA256),
             "buildSha256": .string(buildSHA256),
           ]),

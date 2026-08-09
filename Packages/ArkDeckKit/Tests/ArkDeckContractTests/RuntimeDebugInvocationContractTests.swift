@@ -51,15 +51,15 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       do {
         let request = try RuntimeOperationCodec.decodeRequest(requestData)
         if let permitStateDirectory {
-          _ = try RuntimeDebugAttemptTuningStore.loadExact(
+          _ = try RuntimeDebugAttemptPermitStore.loadExact(
             stateDirectory: permitStateDirectory, request: request,
             nowUTC: "2026-08-09T00:00:00Z")
         }
         executedRequests.append(request)
         let outcome = outcomes.isEmpty ? .failedKnown : outcomes.removeFirst()
         return RuntimeDebugDriverResult(
-          jobID: "job-fake-\(executedRequests.count)", outcome: outcome,
-          detail: "mechanical contract fake")
+          jobID: outcome == .refused ? nil : "job-fake-\(executedRequests.count)",
+          outcome: outcome, detail: "mechanical contract fake")
       } catch {
         return RuntimeDebugDriverResult(jobID: nil, outcome: .refused, detail: "\(error)")
       }
@@ -68,6 +68,11 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     func requests() -> [RuntimeOperationRequest] { executedRequests }
     func preparations() -> Int { prepareCount }
   }
+
+  private let observeAction = Data(
+    #"{"schemaVersion":"1.0.0","action":"observePinnedRequest"}"#.utf8)
+  private let executeAction = Data(
+    #"{"schemaVersion":"1.0.0","action":"executePinnedRequest"}"#.utf8)
 
   private func seedRequest() throws -> RuntimeOperationRequest {
     try RuntimeOperationRequest(
@@ -88,10 +93,10 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     return try encoder.encode(value)
   }
 
-  private func provenance() throws -> RuntimeDebugCandidateProvenance {
+  private func provenance(_ ordinal: Int = 1) throws -> RuntimeDebugCandidateProvenance {
     try RuntimeDebugCandidateProvenance(
-      sourceSHA256: String(repeating: "a", count: 64),
-      buildSHA256: String(repeating: "b", count: 64))
+      sourceSHA256: String(format: "%064x", ordinal),
+      buildSHA256: String(format: "%064x", ordinal + 100))
   }
 
   private func temporaryRoot() -> URL {
@@ -100,7 +105,7 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
   }
 
-  func testOneInvocationContinuesAcrossSafeFailureWithoutMergeBoundary() async throws {
+  func testNovelCandidateRevisionContinuesWithoutARepairKindOrMergeBoundary() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(
@@ -113,26 +118,22 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
 
     let observed = try await controller.evaluate(
       invocationID: started.invocationID,
-      candidateData: Data(
-        #"{"schemaVersion":"1.0.0","kind":"requestPublishedObservation","observationId":"freshPlan"}"#.utf8),
+      actionData: observeAction,
       provenance: provenance())
     XCTAssertEqual(observed.destructiveEpochsUsed, 0)
-    let preparationCount = await driver.preparations()
-    XCTAssertEqual(preparationCount, 2)
+    XCTAssertEqual(observed.evaluations.last?.candidateAction, "observePinnedRequest")
 
     let first = try await controller.evaluate(
       invocationID: started.invocationID,
-      candidateData: Data(
-        #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults"}"#.utf8),
+      actionData: executeAction,
       provenance: provenance())
     XCTAssertEqual(first.state, "active")
     XCTAssertEqual(first.evaluations.last?.disposition, "nextCandidateAllowed")
 
     let completed = try await controller.evaluate(
       invocationID: started.invocationID,
-      candidateData: Data(
-        #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"extendedPostflight"}"#.utf8),
-      provenance: provenance())
+      actionData: executeAction,
+      provenance: provenance(2))
     XCTAssertEqual(completed.state, "succeeded")
     XCTAssertEqual(completed.destructiveEpochsUsed, 2)
 
@@ -148,7 +149,7 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     }
     XCTAssertNotEqual(requests[0].idempotencyKey, requests[1].idempotencyKey)
     XCTAssertThrowsError(
-      try RuntimeDebugAttemptTuningStore.loadExact(
+      try RuntimeDebugAttemptPermitStore.loadExact(
         stateDirectory: root, request: requests[1],
         nowUTC: "2026-08-09T00:10:00Z"),
       "a terminal invocation cannot be resubmitted outside its budget ledger")
@@ -160,7 +161,31 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(reopenedStatus, completed)
   }
 
-  func testCandidateCannotInjectAuthorityTargetPlanOrArgv() async throws {
+  func testBrokerScopesToAnyPublishedTypedSeedInsteadOfAFlashProblemList() async throws {
+    let root = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let driver = ScriptedDriver(outcomes: [.succeeded], permitStateDirectory: root)
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: driver,
+      nowUTC: { "2026-08-09T00:00:00Z" })
+    let seed = try RuntimeOperationRequest(
+      requestID: "observe-seed",
+      idempotencyKey: "observe-seed-request",
+      target: DurableTargetReference(
+        targetID: "dayu200-selected", expectedBindingRevision: 7),
+      operation: RuntimeOperationReference(id: "observe.device", version: 1))
+    let started = try await controller.start(seedRequestData: encode(seed))
+    XCTAssertEqual(started.operationReference, "observe.device@1")
+
+    let completed = try await controller.evaluate(
+      invocationID: started.invocationID,
+      actionData: executeAction, provenance: provenance())
+    XCTAssertEqual(completed.state, "succeeded")
+    let requests = await driver.requests()
+    XCTAssertEqual(requests.map(\.operation.reference), ["observe.device@1"])
+  }
+
+  func testCandidateCannotInjectAuthorityTargetPlanArgvTimingOrAlternative() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(outcomes: [.succeeded])
@@ -169,14 +194,16 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       nowUTC: { "2026-08-09T00:00:00Z" })
     let started = try await controller.start(seedRequestData: encode(seedRequest()))
 
-    for forbidden in ["target", "plan", "argv", "capability", "outcome"] {
+    for forbidden in [
+      "target", "plan", "argv", "capability", "outcome", "timing", "alternativeId",
+    ] {
       let candidate =
-        "{\"schemaVersion\":\"1.0.0\",\"kind\":\"usePublishedDefaults\","
+        "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\","
         + "\"\(forbidden)\":\"forged\"}"
       do {
         _ = try await controller.evaluate(
           invocationID: started.invocationID,
-          candidateData: Data(candidate.utf8), provenance: provenance())
+          actionData: Data(candidate.utf8), provenance: provenance())
         XCTFail("\(forbidden) must fail closed")
       } catch let error as RuntimeDebugInvocationError {
         guard case .invalidCandidate = error else {
@@ -188,7 +215,7 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertTrue(rejectedRequests.isEmpty)
   }
 
-  func testOnlySafeToReflashOrUnknownRecoveryCanReachAnotherEpoch() async throws {
+  func testKnownPostEffectFailureBlocksEveryLaterCandidate() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(outcomes: [.failedKnown, .succeeded])
@@ -198,18 +225,16 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     let started = try await controller.start(seedRequestData: encode(seedRequest()))
     let blocked = try await controller.evaluate(
       invocationID: started.invocationID,
-      candidateData: Data(
-        #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults"}"#.utf8),
+      actionData: executeAction,
       provenance: provenance())
     XCTAssertEqual(blocked.state, "blocked")
 
     do {
       _ = try await controller.evaluate(
         invocationID: started.invocationID,
-        candidateData: Data(
-          #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"balancedDefaults"}"#.utf8),
-        provenance: provenance())
-      XCTFail("known unsafe failure must block continuation")
+        actionData: executeAction,
+        provenance: provenance(2))
+      XCTFail("known post-effect failure must block continuation")
     } catch let error as RuntimeDebugInvocationError {
       XCTAssertEqual(error, .invocationNotActive("blocked"))
     }
@@ -217,30 +242,24 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(blockedRequests.count, 1)
   }
 
-  func testSixteenDestructiveEpochBudgetIsEnforced() async throws {
+  func testSixteenDestructiveEpochBudgetIsEnforcedAcrossArbitraryBuilds() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
-    let driver = ScriptedDriver(
-      outcomes: Array(repeating: .safeToReflash, count: 17))
+    let driver = ScriptedDriver(outcomes: Array(repeating: .safeToReflash, count: 17))
     let controller = try RuntimeDebugInvocationController(
       stateDirectory: root, driver: driver,
       nowUTC: { "2026-08-09T00:00:00Z" })
     let started = try await controller.start(seedRequestData: encode(seedRequest()))
 
-    for value in 15..<31 {
-      let candidate =
-        "{\"schemaVersion\":\"1.0.0\",\"kind\":\"boundedTiming\","
-        + "\"parameter\":\"loaderDiscoveryTimeoutSeconds\",\"value\":\(value)}"
+    for ordinal in 1...16 {
       _ = try await controller.evaluate(
         invocationID: started.invocationID,
-        candidateData: Data(candidate.utf8), provenance: provenance())
+        actionData: executeAction, provenance: provenance(ordinal))
     }
     do {
       _ = try await controller.evaluate(
         invocationID: started.invocationID,
-        candidateData: Data(
-          #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"fastLoaderDetection"}"#.utf8),
-        provenance: provenance())
+        actionData: executeAction, provenance: provenance(17))
       XCTFail("seventeenth destructive epoch must be refused")
     } catch let error as RuntimeDebugInvocationError {
       XCTAssertEqual(error, .epochBudgetExhausted)
@@ -249,19 +268,14 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(boundedRequests.count, 16)
   }
 
-  func testRuntimeMintedCapabilityKeepsExactDebugTuningButInputDriftFailsClosed() throws {
+  func testRuntimePermitPinsExactRequestWithoutCandidateTuning() throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let request = try seedRequest()
-    let tuning = try AgentAuthorityCampaignExecutionTuning(
-      loaderDiscoveryTimeoutSeconds: 60,
-      loaderPollIntervalMilliseconds: 250,
-      hdcCommandTimeoutSeconds: 20,
-      readOnlyCommandTimeoutSeconds: 15)
-    try RuntimeDebugAttemptTuningStore.persist(
+    let actionSHA = String(repeating: "a", count: 64)
+    try RuntimeDebugAttemptPermitStore.persist(
       stateDirectory: root, invocationID: "debug-test",
-      request: request, decisionSHA256: String(repeating: "a", count: 64),
-      tuning: tuning)
+      request: request, candidateActionSHA256: actionSHA)
 
     let admitted = try RuntimeOperationRequest(
       requestID: request.requestID,
@@ -272,9 +286,9 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       requestedOutputs: request.requestedOutputs,
       authorization: RuntimeCapabilityReference(capabilityID: "CAP-RT-DEBUG-TEST"))
     XCTAssertEqual(
-      try RuntimeDebugAttemptTuningStore.loadExact(
-        stateDirectory: root, request: admitted)?.tuning,
-      tuning)
+      try RuntimeDebugAttemptPermitStore.loadExact(
+        stateDirectory: root, request: admitted)?.candidateActionSHA256,
+      actionSHA)
 
     let drifted = try RuntimeOperationRequest(
       requestID: request.requestID,
@@ -285,11 +299,11 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       requestedOutputs: request.requestedOutputs,
       authorization: admitted.authorization)
     XCTAssertThrowsError(
-      try RuntimeDebugAttemptTuningStore.loadExact(
+      try RuntimeDebugAttemptPermitStore.loadExact(
         stateDirectory: root, request: drifted))
   }
 
-  func testUnknownOutcomeCanOnlyProceedAsANewRuntimeProvenRecoveryAttempt() async throws {
+  func testUnknownOutcomeCanOnlyReachProtectedRuntimeAsANewCandidate() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(outcomes: [.outcomeUnknown, .succeeded])
@@ -299,16 +313,14 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     let started = try await controller.start(seedRequestData: encode(seedRequest()))
     let unknown = try await controller.evaluate(
       invocationID: started.invocationID,
-      candidateData: Data(
-        #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults"}"#.utf8),
+      actionData: executeAction,
       provenance: provenance())
     XCTAssertEqual(
       unknown.evaluations.last?.disposition, "awaitingRuntimeRecoveryProof")
 
     let recovered = try await controller.evaluate(
       invocationID: started.invocationID,
-      candidateData: Data(
-        #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"patientModeTransition"}"#.utf8),
+      actionData: executeAction,
       provenance: provenance())
     XCTAssertEqual(recovered.state, "succeeded")
     let requests = await driver.requests()
@@ -316,7 +328,30 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertNotEqual(requests[0].idempotencyKey, requests[1].idempotencyKey)
   }
 
-  func testElapsedFourHoursAndEnvelopeMissDispatchZero() async throws {
+  func testRefusalBeforeDispatchIsFreeAndDoesNotCloseTheInvocation() async throws {
+    let root = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let driver = ScriptedDriver(outcomes: [.refused, .succeeded])
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: driver,
+      nowUTC: { "2026-08-09T00:00:00Z" })
+    let started = try await controller.start(seedRequestData: encode(seedRequest()))
+
+    let refused = try await controller.evaluate(
+      invocationID: started.invocationID,
+      actionData: executeAction, provenance: provenance())
+    XCTAssertEqual(refused.state, "active")
+    XCTAssertEqual(refused.destructiveEpochsUsed, 0)
+    XCTAssertNil(refused.evaluations.last?.destructiveEpoch)
+
+    let completed = try await controller.evaluate(
+      invocationID: started.invocationID,
+      actionData: executeAction, provenance: provenance(2))
+    XCTAssertEqual(completed.state, "succeeded")
+    XCTAssertEqual(completed.destructiveEpochsUsed, 1)
+  }
+
+  func testUnknownProblemVocabularyAndElapsedFourHoursDispatchZero() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(outcomes: [.succeeded])
@@ -328,26 +363,27 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     do {
       _ = try await controller.evaluate(
         invocationID: started.invocationID,
-        candidateData: Data(
-          #"{"schemaVersion":"1.0.0","kind":"selectPublishedAlternative","alternativeId":"newExternalCommand"}"#.utf8),
+        actionData: Data(
+          #"{"schemaVersion":"1.0.0","action":"fixNewProblemType"}"#.utf8),
         provenance: provenance())
-      XCTFail("an envelope miss must stop with repairSurfaceInsufficient")
+      XCTFail("problem vocabulary must not cross the effect broker")
     } catch let error as RuntimeDebugInvocationError {
-      XCTAssertEqual(error, .repairSurfaceInsufficient("newExternalCommand"))
+      guard case .invalidCandidate = error else {
+        return XCTFail("unexpected error \(error)")
+      }
     }
 
     clock.set("2026-08-09T04:00:01Z")
     do {
       _ = try await controller.evaluate(
         invocationID: started.invocationID,
-        candidateData: Data(
-          #"{"schemaVersion":"1.0.0","kind":"usePublishedDefaults"}"#.utf8),
-        provenance: provenance())
+        actionData: executeAction,
+        provenance: provenance(2))
       XCTFail("elapsed four-hour budget must refuse evaluation")
     } catch let error as RuntimeDebugInvocationError {
       XCTAssertEqual(error, .invocationExpired)
     }
-    let requests = await driver.requests()
-    XCTAssertTrue(requests.isEmpty)
+    let expiredRequests = await driver.requests()
+    XCTAssertTrue(expiredRequests.isEmpty)
   }
 }

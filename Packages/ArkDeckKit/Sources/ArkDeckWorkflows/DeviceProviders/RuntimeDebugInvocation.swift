@@ -1,11 +1,11 @@
-// Protected Runtime-owned Flash debug invocation and Provider repair envelope
-// (CHG-2026-056 r10).
+// Protected Runtime-owned Flash debug invocation and effect broker
+// (CHG-2026-056 r12).
 //
-// An isolated candidate can return only RuntimeCandidateDecision. This actor
-// pins the original typed request, maps a reviewed decision to bounded
-// provider tuning, and drives every real attempt through RuntimeJobEngine.
-// It never accepts authority, target, inputs, a plan, argv or trusted facts
-// from the candidate.
+// An isolated candidate may change arbitrary non-kernel product code. Its
+// only interaction with the protected Runtime is one effect-level action:
+// observe the pinned request, execute it through RuntimeJobEngine, or stop.
+// The broker never accepts authority, target, inputs, a plan, argv, timing
+// controls or trusted facts from candidate code.
 
 import ArkDeckCore
 import ArkDeckRuntime
@@ -16,13 +16,11 @@ import Foundation
 public enum RuntimeDebugInvocationError: Error, Equatable, Sendable {
   case invalidSeedRequest(String)
   case invalidCandidate(String)
-  case repairSurfaceInsufficient(String)
   case invalidProvenance(String)
   case invocationNotFound(String)
   case invocationNotActive(String)
   case invocationExpired
   case epochBudgetExhausted
-  case candidateNotMateriallyDistinct
   case evaluationAlreadyRunning
   case predecessorBlocksContinuation(String)
   case persistenceFailure(String)
@@ -74,6 +72,88 @@ public struct RuntimeDebugCandidateProvenance: Codable, Equatable, Sendable {
   }
 }
 
+/// The effect-level boundary between arbitrary candidate orchestration and
+/// protected-main Runtime. These are not repair kinds: a new product failure
+/// does not require a new case. `executePinnedRequest` can only ask the broker
+/// to re-materialize the exact seed request; `observePinnedRequest` is
+/// plan-only and dispatch-free.
+public enum RuntimeDebugCandidateAction: Equatable, Sendable {
+  case observePinnedRequest
+  case executePinnedRequest
+  case stop(reasonCode: String)
+}
+
+public enum RuntimeDebugCandidateActionError: Error, Equatable, Sendable {
+  case invalidDocument
+  case unsupportedSchemaVersion
+  case unsupportedAction
+  case closedShapeViolation
+  case invalidReasonCode
+}
+
+public enum RuntimeDebugCandidateActionCodec {
+  public static let schemaVersion = "1.0.0"
+  public static let maximumDocumentBytes = 8 * 1_024
+
+  public static func decode(_ data: Data) throws -> RuntimeDebugCandidateAction {
+    guard !data.isEmpty, data.count <= maximumDocumentBytes else {
+      throw RuntimeDebugCandidateActionError.invalidDocument
+    }
+    let object: [String: JSONValue]
+    do {
+      object = try strictObject(from: data)
+    } catch {
+      throw RuntimeDebugCandidateActionError.invalidDocument
+    }
+    guard case .string(let version)? = object["schemaVersion"],
+      version == schemaVersion
+    else {
+      throw RuntimeDebugCandidateActionError.unsupportedSchemaVersion
+    }
+    guard case .string(let action)? = object["action"] else {
+      throw RuntimeDebugCandidateActionError.unsupportedAction
+    }
+    switch action {
+    case "observePinnedRequest":
+      try requireKeys(object, exactly: ["schemaVersion", "action"])
+      return .observePinnedRequest
+    case "executePinnedRequest":
+      try requireKeys(object, exactly: ["schemaVersion", "action"])
+      return .executePinnedRequest
+    case "stop":
+      try requireKeys(object, exactly: ["schemaVersion", "action", "reasonCode"])
+      guard case .string(let reason)? = object["reasonCode"],
+        reason.utf8.count <= 128,
+        reason.range(of: #"^[a-z][A-Za-z0-9.-]*$"#, options: .regularExpression) != nil
+      else {
+        throw RuntimeDebugCandidateActionError.invalidReasonCode
+      }
+      return .stop(reasonCode: reason)
+    default:
+      throw RuntimeDebugCandidateActionError.unsupportedAction
+    }
+  }
+
+  private static func requireKeys(
+    _ object: [String: JSONValue], exactly expected: Set<String>
+  ) throws {
+    guard Set(object.keys) == expected else {
+      throw RuntimeDebugCandidateActionError.closedShapeViolation
+    }
+  }
+
+  /// Preserve duplicate members until ArkDeckStorage's strict raw-byte
+  /// validator rejects them. JSONDecoder alone would silently collapse them.
+  private static func strictObject(from data: Data) throws -> [String: JSONValue] {
+    var wrapper = Data(
+      #"{"schemaVersion":"1.0.0","recordId":"candidate-action","auditId":"candidate-action","correlationId":"candidate-action","sessionId":"candidate-action","jobId":"candidate-action","category":"preview","timestamp":"2026-08-09T00:00:00Z","details":"#
+        .utf8)
+    wrapper.append(data)
+    wrapper.append(UInt8(ascii: "}"))
+    return try SessionAuditCodec.decode(wrapper).details
+  }
+}
+
 public struct RuntimeDebugObservation: Codable, Equatable, Sendable {
   public let observationID: String
   public let materializedPlanDigest: String
@@ -88,8 +168,8 @@ public struct RuntimeDebugEvaluation: Codable, Equatable, Sendable {
   public let destructiveEpoch: Int?
   public let candidateSourceSHA256: String
   public let candidateBuildSHA256: String
-  public let decisionSHA256: String
-  public let decisionKind: String
+  public let candidateActionSHA256: String
+  public let candidateAction: String
   public let requestID: String?
   public let idempotencyKey: String?
   public let jobID: String?
@@ -118,32 +198,29 @@ public struct RuntimeDebugInvocationStatus: Codable, Equatable, Sendable {
 /// Durable per-attempt provenance consumed by RuntimeJobEngine while it
 /// materializes and executes the exact generated request. The file is not an
 /// authority: it cannot mint a capability or bypass normal admission.
-struct RuntimeDebugAttemptTuningRecord: Codable, Equatable, Sendable {
-  static let schemaVersion = "1.0.0"
+struct RuntimeDebugAttemptPermitRecord: Codable, Equatable, Sendable {
+  static let schemaVersion = "2.0.0"
   let schemaVersion: String
   let invocationID: String
   let idempotencyKey: String
   let requestFingerprintSHA256: String
-  let decisionSHA256: String
-  let tuning: AgentAuthorityCampaignExecutionTuning
+  let candidateActionSHA256: String
 }
 
-enum RuntimeDebugAttemptTuningStore {
+enum RuntimeDebugAttemptPermitStore {
   static func persist(
     stateDirectory: URL,
     invocationID: String,
     request: RuntimeOperationRequest,
-    decisionSHA256: String,
-    tuning: AgentAuthorityCampaignExecutionTuning
+    candidateActionSHA256: String
   ) throws {
     let encodedRequest = try canonicalEncode(request)
-    let record = RuntimeDebugAttemptTuningRecord(
-      schemaVersion: RuntimeDebugAttemptTuningRecord.schemaVersion,
+    let record = RuntimeDebugAttemptPermitRecord(
+      schemaVersion: RuntimeDebugAttemptPermitRecord.schemaVersion,
       invocationID: invocationID,
       idempotencyKey: request.idempotencyKey,
       requestFingerprintSHA256: sha256(encodedRequest),
-      decisionSHA256: decisionSHA256,
-      tuning: tuning)
+      candidateActionSHA256: candidateActionSHA256)
     try DurableFileWriter.createOrReplaceAtomically(
       destination: url(stateDirectory: stateDirectory, idempotencyKey: request.idempotencyKey),
       data: try canonicalEncode(record))
@@ -151,11 +228,11 @@ enum RuntimeDebugAttemptTuningStore {
 
   static func loadExact(
     stateDirectory: URL, request: RuntimeOperationRequest, nowUTC: String? = nil
-  ) throws -> RuntimeDebugAttemptTuningRecord? {
+  ) throws -> RuntimeDebugAttemptPermitRecord? {
     let location = url(stateDirectory: stateDirectory, idempotencyKey: request.idempotencyKey)
     guard FileManager.default.fileExists(atPath: location.path) else { return nil }
     let record = try JSONDecoder().decode(
-      RuntimeDebugAttemptTuningRecord.self, from: Data(contentsOf: location))
+      RuntimeDebugAttemptPermitRecord.self, from: Data(contentsOf: location))
     guard request.campaignReservation == nil, request.clientContext == nil else {
       throw RuntimeDebugInvocationError.persistenceFailure(
         "Runtime debug attempt cannot gain campaign or client provenance")
@@ -171,7 +248,7 @@ enum RuntimeDebugAttemptTuningStore {
       operation: request.operation,
       inputs: request.inputs,
       requestedOutputs: request.requestedOutputs)
-    guard record.schemaVersion == RuntimeDebugAttemptTuningRecord.schemaVersion,
+    guard record.schemaVersion == RuntimeDebugAttemptPermitRecord.schemaVersion,
       record.idempotencyKey == request.idempotencyKey,
       record.requestFingerprintSHA256 == sha256(try canonicalEncode(unsigned))
     else {
@@ -195,7 +272,7 @@ enum RuntimeDebugAttemptTuningStore {
         invocation.evaluations.contains(where: {
           $0.disposition == "executing"
             && $0.idempotencyKey == request.idempotencyKey
-            && $0.decisionSHA256 == record.decisionSHA256
+            && $0.candidateActionSHA256 == record.candidateActionSHA256
             && $0.destructiveEpoch != nil
         })
       else {
@@ -224,7 +301,7 @@ enum RuntimeDebugAttemptTuningStore {
 }
 
 private struct RuntimeDebugInvocationDocument: Codable, Equatable, Sendable {
-  static let schemaVersion = "1.0.0"
+  static let schemaVersion = "2.0.0"
   let schemaVersion: String
   let invocationID: String
   var state: String
@@ -268,14 +345,12 @@ public actor RuntimeDebugInvocationController {
     } catch {
       throw RuntimeDebugInvocationError.invalidSeedRequest("\(error)")
     }
-    guard request.operation.reference == "flash.dayu200",
-      request.target.expectedBindingRevision != nil,
-      request.authorization == nil,
+    guard request.authorization == nil,
       request.campaignReservation == nil,
       request.clientContext == nil
     else {
       throw RuntimeDebugInvocationError.invalidSeedRequest(
-        "debug invocation requires one unprivileged, binding-pinned flash.dayu200 request")
+        "debug invocation requires one unprivileged typed request without caller provenance")
     }
     let preview = try await driver.prepare(seedRequestData)
     guard preview.operationReference == request.operation.reference,
@@ -288,7 +363,15 @@ public actor RuntimeDebugInvocationController {
       throw RuntimeDebugInvocationError.invalidSeedRequest(
         "Runtime plan-only preview drifted from the pinned seed request")
     }
-    let canonicalRequest = try RuntimeDebugAttemptTuningStore.canonicalEncode(request)
+    let deviceScoped = preview.steps.contains {
+      $0.effect == WorkflowEffect.deviceMutation.rawValue
+        || $0.effect == WorkflowEffect.destructive.rawValue
+    }
+    guard !deviceScoped || request.target.expectedBindingRevision != nil else {
+      throw RuntimeDebugInvocationError.invalidSeedRequest(
+        "device effect debug invocation requires a binding-pinned target")
+    }
+    let canonicalRequest = try RuntimeDebugAttemptPermitStore.canonicalEncode(request)
     let created = try currentDate()
     let invocationID = "debug-\(UUID().uuidString.lowercased())"
     let document = RuntimeDebugInvocationDocument(
@@ -296,7 +379,7 @@ public actor RuntimeDebugInvocationController {
       invocationID: invocationID,
       state: "active",
       seedRequest: request,
-      seedRequestFingerprintSHA256: RuntimeDebugAttemptTuningStore.sha256(canonicalRequest),
+      seedRequestFingerprintSHA256: RuntimeDebugAttemptPermitStore.sha256(canonicalRequest),
       baselineMaterializedPlanDigest: preview.materializedPlanDigest,
       createdAtUTC: format(created),
       expiresAtUTC: format(created.addingTimeInterval(Self.maximumDurationSeconds)),
@@ -312,7 +395,7 @@ public actor RuntimeDebugInvocationController {
 
   public func evaluate(
     invocationID: String,
-    candidateData: Data,
+    actionData: Data,
     provenance: RuntimeDebugCandidateProvenance
   ) async throws -> RuntimeDebugInvocationStatus {
     guard !activeEvaluations.contains(invocationID) else {
@@ -331,28 +414,21 @@ public actor RuntimeDebugInvocationController {
       throw RuntimeDebugInvocationError.invocationExpired
     }
 
-    let decision: RuntimeCandidateDecision
+    let action: RuntimeDebugCandidateAction
     do {
-      decision = try RuntimeCandidateDecisionCodec.decode(
-        candidateData, envelope: Self.dayu200Envelope)
-    } catch let error as RuntimeCandidateDecisionError {
-      switch error {
-      case .alternativeNotPublished(let value), .observationNotPublished(let value),
-        .timingNotPublished(let value):
-        throw RuntimeDebugInvocationError.repairSurfaceInsufficient(value)
-      default:
-        throw RuntimeDebugInvocationError.invalidCandidate("\(error)")
-      }
+      action = try RuntimeDebugCandidateActionCodec.decode(actionData)
     } catch {
       throw RuntimeDebugInvocationError.invalidCandidate("\(error)")
     }
-    let canonicalDecision = try Self.canonicalDecisionData(decision)
-    let decisionSHA256 = RuntimeDebugAttemptTuningStore.sha256(canonicalDecision)
+    let canonicalAction = try Self.canonicalActionData(action)
+    let actionSHA256 = RuntimeDebugAttemptPermitStore.sha256(canonicalAction)
+    let candidateRevisionSHA256 = try Self.candidateRevisionSHA256(
+      actionData: canonicalAction, provenance: provenance)
     if let index = document.evaluations.indices.last,
       document.evaluations[index].disposition == "executing"
     {
       let interrupted = document.evaluations[index]
-      guard interrupted.decisionSHA256 == decisionSHA256,
+      guard interrupted.candidateActionSHA256 == actionSHA256,
         interrupted.candidateSourceSHA256 == provenance.sourceSHA256,
         interrupted.candidateBuildSHA256 == provenance.buildSHA256,
         let requestID = interrupted.requestID,
@@ -368,39 +444,33 @@ public actor RuntimeDebugInvocationController {
         operation: document.seedRequest.operation,
         inputs: document.seedRequest.inputs,
         requestedOutputs: document.seedRequest.requestedOutputs)
-      try RuntimeDebugAttemptTuningStore.persist(
+      try RuntimeDebugAttemptPermitStore.persist(
         stateDirectory: stateDirectory,
         invocationID: invocationID,
         request: resumed,
-        decisionSHA256: decisionSHA256,
-        tuning: try Self.tuning(for: decision))
+        candidateActionSHA256: actionSHA256)
       let result = await driver.execute(
-        try RuntimeDebugAttemptTuningStore.canonicalEncode(resumed))
+        try RuntimeDebugAttemptPermitStore.canonicalEncode(resumed))
       return try finish(result, at: index, document: &document)
-    }
-    if document.evaluations.contains(where: {
-      $0.decisionSHA256 == decisionSHA256
-    }) {
-      throw RuntimeDebugInvocationError.candidateNotMateriallyDistinct
     }
 
     let ordinal = document.evaluations.count + 1
-    switch decision {
+    switch action {
     case .stop(let reasonCode):
       document.state = "stopped"
       document.evaluations.append(
         evaluation(
           ordinal: ordinal, epoch: nil, provenance: provenance,
-          decisionSHA256: decisionSHA256, kind: "stop", disposition: "stopped",
+          actionSHA256: actionSHA256, action: "stop", disposition: "stopped",
           detail: reasonCode))
       try persist(document)
       return status(document)
 
-    case .requestPublishedObservation(let observationID):
-      let seed = try RuntimeDebugAttemptTuningStore.canonicalEncode(document.seedRequest)
+    case .observePinnedRequest:
+      let seed = try RuntimeDebugAttemptPermitStore.canonicalEncode(document.seedRequest)
       let preview = try await driver.prepare(seed)
       let observation = RuntimeDebugObservation(
-        observationID: observationID,
+        observationID: "pinnedRequest",
         materializedPlanDigest: preview.materializedPlanDigest,
         targetID: preview.targetID,
         bindingRevision: preview.bindingRevision,
@@ -409,22 +479,25 @@ public actor RuntimeDebugInvocationController {
       document.evaluations.append(
         evaluation(
           ordinal: ordinal, epoch: nil, provenance: provenance,
-          decisionSHA256: decisionSHA256, kind: "requestPublishedObservation",
+          actionSHA256: actionSHA256, action: "observePinnedRequest",
           disposition: "observed", detail: "fresh Runtime plan-only observation",
           observation: observation))
       try persist(document)
       return status(document)
 
-    case .usePublishedDefaults, .selectPublishedAlternative, .boundedTiming:
+    case .executePinnedRequest:
       break
     }
 
-    if let predecessor = document.evaluations.last, predecessor.destructiveEpoch != nil {
+    if let predecessor = document.evaluations.last(where: { $0.destructiveEpoch != nil }) {
       switch predecessor.outcome {
       case .safeToReflash, .outcomeUnknown:
         break
       case .none where predecessor.disposition == "executing":
-        guard predecessor.decisionSHA256 == decisionSHA256 else {
+        guard predecessor.candidateActionSHA256 == actionSHA256,
+          predecessor.candidateSourceSHA256 == provenance.sourceSHA256,
+          predecessor.candidateBuildSHA256 == provenance.buildSHA256
+        else {
           throw RuntimeDebugInvocationError.predecessorBlocksContinuation(
             "an interrupted attempt must resume its exact candidate")
         }
@@ -437,10 +510,11 @@ public actor RuntimeDebugInvocationController {
       throw RuntimeDebugInvocationError.epochBudgetExhausted
     }
 
-    let tuning = try Self.tuning(for: decision)
     let epoch = document.destructiveEpochsUsed + 1
     let requestID = "debug-\(String(invocationID.suffix(12)))-e\(epoch)"
-    let idempotencyKey = "runtime-debug-\(String(invocationID.suffix(12)))-e\(epoch)-\(decisionSHA256.prefix(12))"
+    let idempotencyKey =
+      "runtime-debug-\(String(invocationID.suffix(12)))-e\(epoch)-"
+      + String(candidateRevisionSHA256.prefix(12))
     let generated: RuntimeOperationRequest
     do {
       generated = try RuntimeOperationRequest(
@@ -453,19 +527,18 @@ public actor RuntimeDebugInvocationController {
     } catch {
       throw RuntimeDebugInvocationError.invalidSeedRequest("cannot derive attempt request: \(error)")
     }
-    try RuntimeDebugAttemptTuningStore.persist(
+    try RuntimeDebugAttemptPermitStore.persist(
       stateDirectory: stateDirectory,
       invocationID: invocationID,
       request: generated,
-      decisionSHA256: decisionSHA256,
-      tuning: tuning)
-    let generatedData = try RuntimeDebugAttemptTuningStore.canonicalEncode(generated)
+      candidateActionSHA256: actionSHA256)
+    let generatedData = try RuntimeDebugAttemptPermitStore.canonicalEncode(generated)
 
     document.destructiveEpochsUsed = epoch
     document.evaluations.append(
       evaluation(
         ordinal: ordinal, epoch: epoch, provenance: provenance,
-        decisionSHA256: decisionSHA256, kind: Self.kind(of: decision),
+        actionSHA256: actionSHA256, action: "executePinnedRequest",
         requestID: requestID, idempotencyKey: idempotencyKey,
         disposition: "executing", detail: "Runtime attempt durably prepared"))
     try persist(document)
@@ -504,8 +577,8 @@ public actor RuntimeDebugInvocationController {
       destructiveEpoch: result.jobID == nil ? nil : prepared.destructiveEpoch,
       candidateSourceSHA256: prepared.candidateSourceSHA256,
       candidateBuildSHA256: prepared.candidateBuildSHA256,
-      decisionSHA256: prepared.decisionSHA256,
-      decisionKind: prepared.decisionKind,
+      candidateActionSHA256: prepared.candidateActionSHA256,
+      candidateAction: prepared.candidateAction,
       requestID: prepared.requestID,
       idempotencyKey: prepared.idempotencyKey,
       jobID: result.jobID,
@@ -555,7 +628,7 @@ public actor RuntimeDebugInvocationController {
     do {
       try DurableFileWriter.createOrReplaceAtomically(
         destination: url(document.invocationID),
-        data: try RuntimeDebugAttemptTuningStore.canonicalEncode(document))
+        data: try RuntimeDebugAttemptPermitStore.canonicalEncode(document))
     } catch {
       throw RuntimeDebugInvocationError.persistenceFailure("\(error)")
     }
@@ -581,8 +654,8 @@ public actor RuntimeDebugInvocationController {
     ordinal: Int,
     epoch: Int?,
     provenance: RuntimeDebugCandidateProvenance,
-    decisionSHA256: String,
-    kind: String,
+    actionSHA256: String,
+    action: String,
     requestID: String? = nil,
     idempotencyKey: String? = nil,
     disposition: String,
@@ -593,7 +666,7 @@ public actor RuntimeDebugInvocationController {
       ordinal: ordinal, destructiveEpoch: epoch,
       candidateSourceSHA256: provenance.sourceSHA256,
       candidateBuildSHA256: provenance.buildSHA256,
-      decisionSHA256: decisionSHA256, decisionKind: kind,
+      candidateActionSHA256: actionSHA256, candidateAction: action,
       requestID: requestID, idempotencyKey: idempotencyKey, jobID: nil,
       outcome: nil, disposition: disposition, detail: detail,
       evaluatedAtUTC: nowUTC(), observation: observation)
@@ -614,88 +687,34 @@ public actor RuntimeDebugInvocationController {
     ISO8601DateFormatter().string(from: date)
   }
 
-  private static let dayu200Envelope: RuntimeCandidateRepairEnvelope = {
-    try! RuntimeCandidateRepairEnvelope(
-      alternativeIDs: [
-        "balancedDefaults", "fastLoaderDetection", "patientModeTransition",
-        "extendedPostflight",
-      ],
-      observationIDs: ["freshPlan", "currentTarget", "postflightReadiness"],
-      timingBounds: [
-        "loaderDiscoveryTimeoutSeconds": try RuntimeCandidateTimingBounds(
-          minimum: 15, maximum: 120),
-        "loaderPollIntervalMilliseconds": try RuntimeCandidateTimingBounds(
-          minimum: 100, maximum: 2_000),
-        "hdcCommandTimeoutSeconds": try RuntimeCandidateTimingBounds(
-          minimum: 5, maximum: 60),
-        "readOnlyCommandTimeoutSeconds": try RuntimeCandidateTimingBounds(
-          minimum: 5, maximum: 60),
-      ])
-  }()
-
-  private static func tuning(
-    for decision: RuntimeCandidateDecision
-  ) throws -> AgentAuthorityCampaignExecutionTuning {
-    var values = (loader: 120, poll: 500, hdc: 20, readOnly: 15)
-    switch decision {
-    case .usePublishedDefaults:
-      break
-    case .selectPublishedAlternative(let identifier):
-      switch identifier {
-      case "balancedDefaults": break
-      case "fastLoaderDetection": values = (60, 250, 20, 15)
-      case "patientModeTransition": values = (120, 1_000, 30, 20)
-      case "extendedPostflight": values = (120, 500, 45, 60)
-      default:
-        throw RuntimeDebugInvocationError.invalidCandidate("unpublished alternative")
-      }
-    case .boundedTiming(let parameter, let value):
-      switch parameter {
-      case "loaderDiscoveryTimeoutSeconds": values.loader = value
-      case "loaderPollIntervalMilliseconds": values.poll = value
-      case "hdcCommandTimeoutSeconds": values.hdc = value
-      case "readOnlyCommandTimeoutSeconds": values.readOnly = value
-      default:
-        throw RuntimeDebugInvocationError.invalidCandidate("unpublished timing")
-      }
-    case .requestPublishedObservation, .stop:
-      throw RuntimeDebugInvocationError.invalidCandidate("decision does not execute")
-    }
-    return try AgentAuthorityCampaignExecutionTuning(
-      loaderDiscoveryTimeoutSeconds: values.loader,
-      loaderPollIntervalMilliseconds: values.poll,
-      hdcCommandTimeoutSeconds: values.hdc,
-      readOnlyCommandTimeoutSeconds: values.readOnly)
-  }
-
-  private static func kind(of decision: RuntimeCandidateDecision) -> String {
-    switch decision {
-    case .usePublishedDefaults: return "usePublishedDefaults"
-    case .selectPublishedAlternative: return "selectPublishedAlternative"
-    case .boundedTiming: return "boundedTiming"
-    case .requestPublishedObservation: return "requestPublishedObservation"
-    case .stop: return "stop"
-    }
-  }
-
-  private static func canonicalDecisionData(_ decision: RuntimeCandidateDecision) throws -> Data {
+  private static func canonicalActionData(
+    _ action: RuntimeDebugCandidateAction
+  ) throws -> Data {
     var object: [String: JSONValue] = [
-      "schemaVersion": .string(RuntimeCandidateDecisionCodec.schemaVersion),
-      "kind": .string(kind(of: decision)),
+      "schemaVersion": .string(RuntimeDebugCandidateActionCodec.schemaVersion)
     ]
-    switch decision {
-    case .usePublishedDefaults: break
-    case .selectPublishedAlternative(let identifier):
-      object["alternativeId"] = .string(identifier)
-    case .boundedTiming(let parameter, let value):
-      object["parameter"] = .string(parameter)
-      object["value"] = .integer(Int64(value))
-    case .requestPublishedObservation(let identifier):
-      object["observationId"] = .string(identifier)
+    switch action {
+    case .observePinnedRequest:
+      object["action"] = .string("observePinnedRequest")
+    case .executePinnedRequest:
+      object["action"] = .string("executePinnedRequest")
     case .stop(let reasonCode):
+      object["action"] = .string("stop")
       object["reasonCode"] = .string(reasonCode)
     }
-    return try RuntimeDebugAttemptTuningStore.canonicalEncode(object)
+    return try RuntimeDebugAttemptPermitStore.canonicalEncode(object)
+  }
+
+  private static func candidateRevisionSHA256(
+    actionData: Data, provenance: RuntimeDebugCandidateProvenance
+  ) throws -> String {
+    let object: [String: JSONValue] = [
+      "actionSha256": .string(RuntimeDebugAttemptPermitStore.sha256(actionData)),
+      "buildSha256": .string(provenance.buildSHA256),
+      "sourceSha256": .string(provenance.sourceSHA256),
+    ]
+    return RuntimeDebugAttemptPermitStore.sha256(
+      try RuntimeDebugAttemptPermitStore.canonicalEncode(object))
   }
 }
 
