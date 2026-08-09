@@ -604,13 +604,16 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     readback: (any RockchipRuntimePartitionReadbackVerifying)? = nil,
     enterLoaderReadbackTimeoutSeconds: Int = 45,
     postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil,
+    imageCache: RockchipFlashImageCache? = nil,
     nowUTC: @escaping @Sendable () -> String = {
       ISO8601DateFormatter().string(from: Date())
     },
     describeBundle: (
       @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
     )? = nil,
-    stage: @escaping RockchipRuntimeStaging = { bundle, sessionRoot in
+    stage: RockchipRuntimeStaging? = nil
+  ) {
+    self.stage = stage ?? { bundle, sessionRoot in
       // Read the bundle in hand rather than looking it up by digest. A build
       // the product has never seen is not the same thing as an unusable one:
       // what matters is that it fits the board and that these are the bytes
@@ -629,10 +632,12 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         throw RuntimeDispatchFailure.failed(
           "RockUSB staging bundle drifted from its lease")
       }
-      let staged = try RockchipFlashExecutionStager.stage(
-        archiveURL: bundle.fileURL,
-        sessionRoot: sessionRoot,
-        profile: profile)
+      let staged = try imageCache?.images(
+        archiveURL: bundle.fileURL, profile: profile)
+        ?? RockchipFlashExecutionStager.stage(
+          archiveURL: bundle.fileURL,
+          sessionRoot: sessionRoot,
+          profile: profile)
       return Dictionary(
         uniqueKeysWithValues: staged.map { memberName, image in
           (
@@ -647,11 +652,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           )
         })
     }
-  ) {
     self.hdcResolver = hdcResolver
     self.runner = runner
     self.usbProbe = usbProbe
-    self.stage = stage
     self.describeBundle =
       describeBundle ?? { board, url in try board.forArchive(at: url) }
     self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
@@ -1172,7 +1175,15 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       throw RuntimeDispatchFailure.failed(
         "cannot create job-owned Rockchip staging root: \(error)")
     }
-    var staged: [String: RockchipRuntimeStagedImageHandle]
+    var staged: [String: RockchipRuntimeStagedImageHandle] = [:]
+    defer {
+      // Expanded bytes are either owned by the single-entry content cache or
+      // by this action's `work` directory. Release descriptors first, then
+      // remove any job-local expansion on every exit path, including a
+      // pre-write refusal or an unknown result after a partition write.
+      staged.removeAll()
+      try? FileManager.default.removeItem(at: work)
+    }
     do {
       staged = try stage(bundle, work)
     } catch {

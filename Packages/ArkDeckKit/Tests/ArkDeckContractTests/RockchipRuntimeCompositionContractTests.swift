@@ -982,6 +982,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
     let writes = await log.writes
     XCTAssertEqual(writes.count, 1, "exactly the first write was dispatched")
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: root.appending(path: "work").path),
+      "archive-derived job staging must be removed even after a write failure")
   }
 
   func testGPTHeaderParseAcceptsOnlyARealHeader() throws {
