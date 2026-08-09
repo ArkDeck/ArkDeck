@@ -15,11 +15,58 @@ enum RockchipFlashStagingError: Error, Equatable, Sendable {
   case memberHashMismatch(String)
   case archiveSizeMismatch
   case archiveHashMismatch
+  case insufficientStagingCapacity(requiredBytes: Int64, availableBytes: Int64)
   case writeFailed(String, Int32)
   case descriptorIdentityChanged(String)
   case decompressionFailed
   case truncatedArchive
   case corruptTarHeader
+}
+
+enum RockchipFlashStagingCapacity {
+  /// Leave enough space for Job state, capability lineage and filesystem
+  /// metadata to become durable after the image set has been staged. Filling
+  /// the volume exactly to the image byte count makes a confirmed pre-write
+  /// refusal itself impossible to record.
+  static let durableMetadataReserveBytes: Int64 = 64 * 1_024 * 1_024
+
+  static func requiredBytes(for profile: RockchipFlashProfile) throws -> Int64 {
+    var required = durableMetadataReserveBytes
+    for mapping in profile.mappedPartitions {
+      guard let member = profile.member(named: mapping.imageMemberName) else {
+        throw RockchipFlashStagingError.memberSetMismatch
+      }
+      let addition = required.addingReportingOverflow(member.sizeBytes)
+      guard !addition.overflow else {
+        throw RockchipFlashStagingError.memberSizeMismatch(mapping.imageMemberName)
+      }
+      required = addition.partialValue
+    }
+    return required
+  }
+
+  static func availableBytes(at root: URL) throws -> Int64 {
+    var filesystem = statfs()
+    guard statfs(root.path, &filesystem) == 0 else {
+      throw RockchipFlashStagingError.writeFailed(root.path, errno)
+    }
+    let available = UInt64(filesystem.f_bavail).multipliedReportingOverflow(
+      by: UInt64(filesystem.f_bsize))
+    guard !available.overflow else { return Int64.max }
+    return Int64(clamping: available.partialValue)
+  }
+
+  static func require(profile: RockchipFlashProfile, availableBytes: Int64) throws {
+    let required = try requiredBytes(for: profile)
+    guard availableBytes >= required else {
+      throw RockchipFlashStagingError.insufficientStagingCapacity(
+        requiredBytes: required, availableBytes: max(0, availableBytes))
+    }
+  }
+
+  static func require(profile: RockchipFlashProfile, at root: URL) throws {
+    try require(profile: profile, availableBytes: try availableBytes(at: root))
+  }
 }
 
 final class StagedRockchipImage: @unchecked Sendable {
@@ -92,10 +139,24 @@ enum RockchipFlashExecutionStager {
       rootMetadata.st_mode & 0o077 == 0
     else { throw RockchipFlashStagingError.invalidSessionRoot }
 
+    // Recheck on the exact staging filesystem immediately before allocation.
+    // The engine also performs this check during its host-only verification
+    // step, before Loader transition, but free space can drift meanwhile.
+    try RockchipFlashStagingCapacity.require(profile: profile, at: sessionRoot)
+
     let stagingURL = sessionRoot.appending(path: "staging", directoryHint: .isDirectory)
     guard Darwin.mkdir(stagingURL.path, 0o700) == 0 else {
       if errno == EEXIST { throw RockchipFlashStagingError.stagingPathExists }
       throw RockchipFlashStagingError.writeFailed(stagingURL.path, errno)
+    }
+    var preserveCompletedStaging = false
+    defer {
+      if !preserveCompletedStaging {
+        // `staging` is an owner-only directory created by this invocation.
+        // Every byte is derived from the still-pinned archive, so a failed
+        // stage must release it before Runtime persists the refusal.
+        try? FileManager.default.removeItem(at: stagingURL)
+      }
     }
     let stagingDescriptor = Darwin.open(
       stagingURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
@@ -177,6 +238,7 @@ enum RockchipFlashExecutionStager {
     for image in images.values {
       try image.revalidate()
     }
+    preserveCompletedStaging = true
     return images
   }
 }

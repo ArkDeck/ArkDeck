@@ -35,6 +35,9 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
       XCTAssertThrowsError(
         try RockchipFlashExecutionStager.stage(
           archiveURL: archive, sessionRoot: root, profile: built.profile))
+      XCTAssertFalse(
+        FileManager.default.fileExists(atPath: root.appending(path: "staging").path),
+        "a rejected stage must release every archive-derived byte")
     }
 
     let fixture = try RockchipExecutionTestFixture.make()
@@ -51,6 +54,30 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
     try FileManager.default.moveItem(at: stagedPath, to: displaced)
     try Data("replacement".utf8).write(to: stagedPath)
     XCTAssertThrowsError(try image.revalidate())
+  }
+
+  func testStagingCapacityPinsEveryMappedImageAndDurableMetadataReserve() throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let imageBytes = try fixture.profile.mappedPartitions.reduce(Int64(0)) { total, mapping in
+      let member = try XCTUnwrap(fixture.profile.member(named: mapping.imageMemberName))
+      return total + member.sizeBytes
+    }
+    let required = try RockchipFlashStagingCapacity.requiredBytes(for: fixture.profile)
+    XCTAssertEqual(
+      required, imageBytes + RockchipFlashStagingCapacity.durableMetadataReserveBytes)
+    XCTAssertNoThrow(
+      try RockchipFlashStagingCapacity.require(
+        profile: fixture.profile, availableBytes: required))
+    XCTAssertThrowsError(
+      try RockchipFlashStagingCapacity.require(
+        profile: fixture.profile, availableBytes: required - 1)
+    ) { error in
+      XCTAssertEqual(
+        error as? RockchipFlashStagingError,
+        .insufficientStagingCapacity(
+          requiredBytes: required, availableBytes: required - 1))
+    }
   }
 
   private enum ArchiveFault { case traversal, duplicate, link }
