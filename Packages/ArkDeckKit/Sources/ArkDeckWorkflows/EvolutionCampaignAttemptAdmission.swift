@@ -29,7 +29,12 @@ public struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
   /// materialized plan's exact archive identity, never by a caller field.
   public let deviceProfileReference: String
   public let partitionPlan: [String]
+  public let archiveSizeBytes: Int64
   public let archiveSHA256: String
+  /// Exact archive-derived profile materialized by this attempt's admission.
+  /// This is an invocation-local handoff, not caller authority; upload and
+  /// daemon import still revalidate the archive bytes before dispatch.
+  public let archiveProfile: RockchipFlashProfile
   /// The confirmed plan's own verification level, carried rather than
   /// re-chosen: the engine lane must ask for exactly the post-flash checks
   /// the campaign was confirmed against.
@@ -45,7 +50,9 @@ public struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
     bindingRevision: Int,
     deviceProfileReference: String,
     partitionPlan: [String],
+    archiveSizeBytes: Int64,
     archiveSHA256: String,
+    archiveProfile: RockchipFlashProfile,
     postFlashVerification: String
   ) {
     self.campaignID = campaignID
@@ -57,7 +64,9 @@ public struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
     self.bindingRevision = bindingRevision
     self.deviceProfileReference = deviceProfileReference
     self.partitionPlan = partitionPlan
+    self.archiveSizeBytes = archiveSizeBytes
     self.archiveSHA256 = archiveSHA256
+    self.archiveProfile = archiveProfile
     self.postFlashVerification = postFlashVerification
   }
 }

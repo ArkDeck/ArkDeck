@@ -15,7 +15,6 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
   RockchipEvolutionCampaignAttemptAdmitting
 {
   private let port: RockchipProductionAdmissionPort
-  private let profiles: [RockchipFlashProfile]
   private let makeID: @Sendable (String) -> String
 
   /// Production composition has no caller-supplied dependency, clock, ledger
@@ -28,13 +27,11 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
 
   init(
     port: RockchipProductionAdmissionPort,
-    profiles: [RockchipFlashProfile] = [RockchipFlashProfile.dayu200],
     makeID: @escaping @Sendable (String) -> String = { prefix in
       "\(prefix)-\(UUID().uuidString.lowercased())"
     }
   ) {
     self.port = port
-    self.profiles = profiles
     self.makeID = makeID
   }
 
@@ -69,9 +66,15 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
     // place a firmware daily published after the release was turned away —
     // found by running a real campaign, after ten earlier ones had been found
     // the same way.
-    guard let board = profiles.first else {
+    let profile = admission.archiveProfile
+    guard
+      let board = RockchipFlashProfile.board(reference: profile.catalogReference),
+      profile.mappedPartitions == board.mappedPartitions,
+      profile.archiveSHA256 == admission.plan.archiveSHA256,
+      profile.archiveSizeBytes == admission.plan.archiveSizeBytes
+    else {
       throw RockchipEvolutionCampaignError.admissionRejected(
-        "no published DAYU200 board profile")
+        "admission profile does not correlate with the materialized DAYU200 plan")
     }
     return RockchipEvolutionCampaignAdmittedAttempt(
       campaignID: token.campaignID,
@@ -83,10 +86,12 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
       bindingRevision: admission.bindingRevision,
       deviceProfileReference: board.catalogReference,
       partitionPlan: board.mappedPartitions.map(\.partitionName),
+      archiveSizeBytes: admission.plan.archiveSizeBytes,
       // The confirmed plan's archive, not a constant: this is the digest the
       // operator confirmed, and the engine re-checks it against the leased
       // bytes before the first write.
       archiveSHA256: admission.plan.archiveSHA256,
+      archiveProfile: profile,
       postFlashVerification: admission.plan.postFlashVerification.rawValue)
   }
 }

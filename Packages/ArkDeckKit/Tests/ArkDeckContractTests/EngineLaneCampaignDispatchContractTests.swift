@@ -1,4 +1,6 @@
 import ArkDeckAgentClient
+import CryptoKit
+import Darwin
 import XCTest
 
 @testable import ArkDeckCLI
@@ -14,7 +16,8 @@ import XCTest
 /// campaign retries, stops, or is told it succeeded.
 final class EngineLaneCampaignDispatchContractTests: XCTestCase {
   private static let profile = RockchipFlashProfile.dayu200
-  private static let archiveURL = URL(fileURLWithPath: "/tmp/images.tar.gz")
+  private static let archiveURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+    "arkdeck-dispatch-must-not-redescribe-\(UUID().uuidString.lowercased()).tar.gz")
 
   private static func admitted(
     ordinal: Int = 1,
@@ -30,7 +33,9 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       bindingRevision: 7,
       deviceProfileReference: profile.catalogReference,
       partitionPlan: profile.mappedPartitions.map(\.partitionName),
+      archiveSizeBytes: profile.archiveSizeBytes,
       archiveSHA256: profile.archiveSHA256,
+      archiveProfile: profile,
       postFlashVerification: "full")
   }
 
@@ -170,8 +175,9 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     XCTAssertTrue(calls.isEmpty, "an unauthorized attempt must not reach the daemon: \(calls)")
   }
 
-  func testAdmittedDispatchImportsTheArchiveThenSubmitsAndRuns() async throws {
+  func testAdmittedDispatchHandsAdmissionProfileToImportWithoutRedescribingArchive() async throws {
     let attempt = Self.admitted()
+    XCTAssertFalse(FileManager.default.fileExists(atPath: Self.archiveURL.path))
     let gateway = RecordingGateway(
       terminal: EngineLaneJobTerminal(
         jobID: "job-run", state: "succeeded", outcomeUnknown: false, timeline: []))
@@ -186,7 +192,12 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     XCTAssertEqual(result.jobID, "job-run")
     let calls = gateway.calls()
     XCTAssertEqual(
-      calls, ["bindingRevision:TGT-DAYU200-70035", "import:/tmp/images.tar.gz", "submitAndRun"],
+      calls,
+      [
+        "bindingRevision:TGT-DAYU200-70035",
+        "import:\(Self.archiveURL.path)",
+        "submitAndRun",
+      ],
       "the archive must be leased into the daemon store before the job is submitted")
     let submitted = try XCTUnwrap(gateway.submittedRequestJSON())
     XCTAssertEqual(
@@ -231,10 +242,7 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
         throw EngineLaneSubmissionRefusal(
           detail:
             "the runtime rejected the submission: flash.dayu200 is runtime unavailable")
-      },
-      // The archive reads fine here; this test is about what the *daemon*
-      // answers at submit, so the dispatch must reach it.
-      describeArchive: { board, _ in board })
+      })
     let dispatcher = EngineLaneEvolutionFlashDispatcher(
       runtimeTargetID: "TGT-DAYU200-70035", admitter: nil, gateway: gateway)
     let request = try RockchipFlashExecutionRequest(
@@ -268,7 +276,9 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       targetStableIdentitySHA256: String(repeating: "a", count: 64),
       bindingRevision: 7, deviceProfileReference: "dayu200",
       // A partition set the published profile does not have.
-      partitionPlan: ["userdata"], archiveSHA256: Self.profile.archiveSHA256,
+      partitionPlan: ["userdata"], archiveSizeBytes: Self.profile.archiveSizeBytes,
+      archiveSHA256: Self.profile.archiveSHA256,
+      archiveProfile: Self.profile,
       postFlashVerification: "full")
 
     do {
@@ -281,6 +291,89 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     }
     let calls = gateway.calls()
     XCTAssertTrue(calls.isEmpty, "\(calls)")
+  }
+
+  func testAnAdmissionProfileWithDigestDriftNeverDispatches() async throws {
+    let gateway = RecordingGateway()
+    let dispatcher = EngineLaneEvolutionFlashDispatcher(
+      runtimeTargetID: "TGT-DAYU200-70035", admitter: nil,
+      gateway: gateway.value())
+    let request = try RockchipFlashExecutionRequest(
+      evolutionCampaignAttempt: try Self.permit(), archiveURL: Self.archiveURL,
+      targetLocationSelector: "42")
+    let profile = try RockchipFlashProfile(
+      archiveSizeBytes: Self.profile.archiveSizeBytes,
+      archiveSHA256: String(repeating: "b", count: 64),
+      members: Self.profile.members,
+      mappedPartitions: Self.profile.mappedPartitions,
+      membershiplessPartitionsWriteForbidden:
+        Self.profile.membershiplessPartitionsWriteForbidden,
+      prerequisites: Self.profile.prerequisites,
+      firmwareVersion: Self.profile.firmwareVersion,
+      runtimeProductModel: Self.profile.runtimeProductModel,
+      runtimeBuildVersion: Self.profile.runtimeBuildVersion)
+    let drifted = RockchipEvolutionCampaignAdmittedAttempt(
+      campaignID: "ECAMP-\(String(repeating: "A", count: 24))", ordinal: 1,
+      reservationID: "ain019-reservation-1", jobID: "j", sessionID: "s",
+      targetStableIdentitySHA256: String(repeating: "a", count: 64),
+      bindingRevision: 7, deviceProfileReference: "dayu200",
+      partitionPlan: Self.profile.mappedPartitions.map(\.partitionName),
+      archiveSizeBytes: Self.profile.archiveSizeBytes,
+      archiveSHA256: Self.profile.archiveSHA256,
+      archiveProfile: profile,
+      postFlashVerification: "full")
+
+    do {
+      _ = try await dispatcher.execute(request, admitted: drifted)
+      XCTFail("a profile that drifted from admission must not reach the daemon")
+    } catch let error as RockchipFlashExecutionError {
+      guard case .admissionRejected = error else {
+        return XCTFail("expected an admission refusal, got \(error)")
+      }
+    }
+    XCTAssertTrue(gateway.calls().isEmpty, "\(gateway.calls())")
+  }
+
+  func testImportRejectsAdmissionSizeOrDigestDriftBeforeAnyRPC() throws {
+    let bytes = Data("not-a-flash-archive".utf8)
+    let actualDigest = SHA256.hash(data: bytes)
+      .map { String(format: "%02x", $0) }.joined()
+    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "arkdeck-admission-profile-drift-\(UUID().uuidString.lowercased()).tar.gz")
+    try bytes.write(to: fileURL, options: .atomic)
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+
+    let board = Self.profile
+    func profile(size: Int64, digest: String) throws -> RockchipFlashProfile {
+      try RockchipFlashProfile(
+        archiveSizeBytes: size, archiveSHA256: digest,
+        members: board.members, mappedPartitions: board.mappedPartitions,
+        membershiplessPartitionsWriteForbidden:
+          board.membershiplessPartitionsWriteForbidden,
+        prerequisites: board.prerequisites,
+        firmwareVersion: board.firmwareVersion,
+        runtimeProductModel: board.runtimeProductModel,
+        runtimeBuildVersion: board.runtimeBuildVersion)
+    }
+    let profiles = [
+      try profile(size: Int64(bytes.count + 1), digest: actualDigest),
+      try profile(size: Int64(bytes.count), digest: String(repeating: "0", count: 64)),
+    ]
+    let client = AgentClient(
+      socketPath: FileManager.default.temporaryDirectory.appendingPathComponent(
+        "arkdeck-no-rpc-\(UUID().uuidString.lowercased()).sock").path)
+
+    for drifted in profiles {
+      do {
+        _ = try RuntimeCLI.importFlashBundleLease(
+          client: client, targetID: "TGT-DAYU200-70035",
+          archiveURL: fileURL, profile: drifted)
+        XCTFail("size/SHA drift must be rejected before opening a daemon connection")
+      } catch let error as CLIError {
+        XCTAssertEqual(error.exitCode, EX_DATAERR)
+        XCTAssertTrue(error.message.contains("profile materialized by admission"), error.message)
+      }
+    }
   }
 
   // MARK: - Fixtures
@@ -389,24 +482,6 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
             throw AgentClientError.transport("connection closed before response")
           }
           return terminal
-        },
-        // Reading the archive is a seam like the other three, so these tests
-        // still prove every branch with no 730 MB file. The fixture answers
-        // with the board carrying the admitted attempt's own archive digest —
-        // the bytes the attempt was admitted for.
-        describeArchive: { board, _ in
-          try board.forBuild(
-            RockchipImageBuildDescriptor(
-              archiveSizeBytes: board.archiveSizeBytes,
-              archiveSHA256: board.archiveSHA256,
-              members: board.members,
-              declaredPartitions: board.mappedPartitions.map {
-                RockchipDeclaredPartition(
-                  name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
-              } + board.membershiplessPartitionsWriteForbidden.map {
-                RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-              },
-              runtimeBuildVersion: board.runtimeBuildVersion))
         })
     }
   }

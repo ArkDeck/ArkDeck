@@ -495,14 +495,14 @@ enum RuntimeCLI {
     } else {
       profileReference = "dayu200"
     }
-    guard let profile = RockchipFlashProfile.profile(reference: profileReference) else {
+    guard RockchipFlashProfile.profile(reference: profileReference) != nil else {
       throw CLIError(
         exitCode: EX_USAGE,
         message: "unsupported DAYU200 device profile \(profileReference)")
     }
     emit(
       try importFlashBundleResult(
-        client: client, targetID: targetID, url: url, profile: profile),
+        client: client, targetID: targetID, url: url, expectedProfile: nil),
       json: json)
   }
 
@@ -517,7 +517,7 @@ enum RuntimeCLI {
   ) throws -> String {
     let result = try importFlashBundleResult(
       client: client, targetID: targetID,
-      url: archiveURL.standardizedFileURL, profile: profile)
+      url: archiveURL.standardizedFileURL, expectedProfile: profile)
     guard case .object(let fields) = result,
       case .string(let lease)? = fields["lease"], !lease.isEmpty
     else {
@@ -529,14 +529,16 @@ enum RuntimeCLI {
 
   /// Streams the archive to the daemon and returns the commit response. The
   /// wire name is the published member name the daemon pins; the on-disk
-  /// basename is not what identifies these bytes — the exact published size
-  /// and SHA-256 are, and they are checked before, during and after the
-  /// upload.
+  /// basename is not what identifies these bytes. A campaign supplies its
+  /// admission-derived profile and must match its exact size/SHA before the
+  /// first RPC. The generic import lane accepts a structurally valid new daily
+  /// and lets daemon validation derive its identity. Both lanes re-hash the
+  /// same descriptor while uploading and reject source-file drift.
   private static func importFlashBundleResult(
     client: AgentClient,
     targetID: String,
     url: URL,
-    profile: RockchipFlashProfile
+    expectedProfile: RockchipFlashProfile?
   ) throws -> JSONValue {
     let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
     guard descriptor >= 0 else {
@@ -559,6 +561,16 @@ enum RuntimeCLI {
     // board; the CLI states facts about the file it holds, and pins nothing.
     let declaredByteCount = Int64(before.st_size)
     let declaredSHA256 = try Self.streamedDigest(ofDescriptor: descriptor)
+    if let expectedProfile {
+      guard declaredByteCount == expectedProfile.archiveSizeBytes,
+        declaredSHA256 == expectedProfile.archiveSHA256
+      else {
+        throw CLIError(
+          exitCode: EX_DATAERR,
+          message:
+            "flash bundle size or SHA-256 does not match the profile materialized by admission")
+      }
+    }
 
     let begin = try client.request(
       method: "artifact.importFlashBundle.begin",

@@ -75,8 +75,9 @@ public enum RockchipEvolutionCampaignPlanning {
       (60...Int(RockchipEvolutionCampaignConfirmationAssertion.maximumValiditySeconds))
         .contains(validitySeconds)
     else { throw RockchipEvolutionCampaignError.invalidAssertion("preview") }
-    let plan = try await RockchipProductExecutePlanFactPort()
+    let validatedPlan = try await RockchipProductExecutePlanFactPort()
       .makeValidatedExecutePlan(archiveURL: archiveURL.standardizedFileURL)
+    let plan = validatedPlan.plan
     let roots = try RockchipEvolutionProductRoots.load()
     let binding = try RockchipProductBindingStore(rootURL: roots.arkDeckRoot).loadExisting()
     let stableIdentity = SHA256.hash(data: Data(binding.serial.utf8))
