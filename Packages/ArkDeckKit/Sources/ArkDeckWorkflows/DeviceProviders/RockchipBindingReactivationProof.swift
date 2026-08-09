@@ -100,20 +100,28 @@ package struct RockchipRuntimeBindingReactivationProofSource:
     guard !currentRoutes.isEmpty, !confirmedRoutes.isEmpty else { return nil }
     let currentKeys = Set(currentRoutes.map(\.connectKey))
     let directTopologies = Set(currentRoutes.compactMap(\.topology))
-    let confirmedKeys = Set(confirmedRoutes.map(\.connectKey))
-    let identities = Set(confirmedRoutes.map(\.identitySHA256))
-    let topologies = Set(confirmedRoutes.map(\.topology))
-    let providers = Set(currentRoutes.map(\.providerExecutableSHA256))
-      .union(confirmedRoutes.map(\.providerExecutableSHA256))
+    let currentProviders = Set(currentRoutes.map(\.providerExecutableSHA256))
+    guard currentProviders.count == 1, let currentProvider = currentProviders.first else {
+      return nil
+    }
+    // A retained route from an older provider binary is not evidence for the
+    // current revision, but it also must not poison a newer exact pair. Anchor
+    // correlation in the current-revision intent's provider, then require the
+    // adjacent confirmed receipt to have been produced by that same binary.
+    let matchingConfirmedRoutes = confirmedRoutes.filter {
+      $0.providerExecutableSHA256 == currentProvider
+    }
+    let confirmedKeys = Set(matchingConfirmedRoutes.map(\.connectKey))
+    let identities = Set(matchingConfirmedRoutes.map(\.identitySHA256))
+    let topologies = Set(matchingConfirmedRoutes.map(\.topology))
     guard currentKeys == [target.connectKey],
       confirmedKeys == [target.connectKey],
       identities == [Self.sha256(target.connectKey)],
       topologies.count == 1,
-      providers.count == 1,
       directTopologies.isEmpty || directTopologies == topologies,
       let topology = topologies.first,
       let currentIntentDigest = currentRoutes.map(\.intentSHA256).sorted().first,
-      let routeReceiptDigest = confirmedRoutes.map(\.receiptSHA256).sorted().first
+      let routeReceiptDigest = matchingConfirmedRoutes.map(\.receiptSHA256).sorted().first
     else { return nil }
 
     return RockchipBindingReactivationProof(

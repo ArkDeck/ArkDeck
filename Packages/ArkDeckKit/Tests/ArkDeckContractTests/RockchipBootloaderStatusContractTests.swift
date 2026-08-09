@@ -285,6 +285,41 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       "two confirmed topologies must fail closed instead of selecting one")
   }
 
+  func testRuntimeReactivationProofSourceScopesHistoryToCurrentProvider() throws {
+    let fixture = try makeDisplacedAdvancedFixture("durable-proof-provider-history")
+    let recordRoot = root.appendingPathComponent(
+      "runtime-proof-provider-history", isDirectory: true)
+    let currentProvider = String(repeating: "a", count: 64)
+    try writeCurrentRouteIntent(
+      root: recordRoot,
+      jobID: "job-current",
+      target: fixture.target,
+      providerExecutableSHA256: currentProvider)
+    try writeConfirmedHDCRoute(
+      root: recordRoot,
+      jobID: "job-current-provider-route",
+      stepID: "reconcile-enter-loader-mode-current-provider",
+      target: fixture.target,
+      bindingRevision: fixture.target.bindingRevision - 1,
+      stableIdentitySHA256: digest("prior-loader"),
+      topology: "18874368",
+      providerExecutableSHA256: currentProvider)
+    try writeConfirmedHDCRoute(
+      root: recordRoot,
+      jobID: "job-stale-provider-route",
+      stepID: "reconcile-enter-loader-mode-stale-provider",
+      target: fixture.target,
+      bindingRevision: fixture.target.bindingRevision - 1,
+      stableIdentitySHA256: digest("older-loader"),
+      topology: "19791872",
+      providerExecutableSHA256: String(repeating: "b", count: 64))
+
+    let proof = try XCTUnwrap(
+      RockchipRuntimeBindingReactivationProofSource(rootURL: recordRoot)
+        .proof(for: fixture.target))
+    XCTAssertEqual(proof.hdcUSBTopology, "18874368")
+  }
+
   func testRuntimeReactivationProofSourceRejectsHashAndOwnershipDrift() throws {
     let fixture = try makeDisplacedAdvancedFixture("durable-proof-negative")
     let hashRoot = root.appendingPathComponent("runtime-proof-hash", isDirectory: true)
