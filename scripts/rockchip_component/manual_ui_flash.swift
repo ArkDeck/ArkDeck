@@ -434,15 +434,46 @@ final class AccessibilityDriver {
 
   func selectPickerValue(_ value: String, identifier: String) throws {
     let element = try waitForElement(identifier: identifier, timeout: 20)
-    let direct = AXUIElementSetAttributeValue(
-      element, kAXValueAttribute as CFString, value as CFTypeRef)
-    if direct == .success { return }
-    let pressed = AXUIElementPerformAction(element, kAXPressAction as CFString)
-    guard pressed == .success else {
-      throw DriverFailure.message("could not open picker \(identifier)")
+    if stringAttribute(element, kAXValueAttribute as CFString) == value { return }
+
+    let role = stringAttribute(element, kAXRoleAttribute as CFString)
+    if role == (kAXPopUpButtonRole as String) {
+      let pressed = AXUIElementPerformAction(element, kAXPressAction as CFString)
+      guard pressed == .success else {
+        throw DriverFailure.message("could not open picker \(identifier)")
+      }
+      type(value)
+      key(virtualCode: CGKeyCode(kVK_Return))
+    } else {
+      let direct = AXUIElementSetAttributeValue(
+        element, kAXValueAttribute as CFString, value as CFTypeRef)
+      guard direct == .success else {
+        throw DriverFailure.message("could not set picker \(identifier)")
+      }
     }
-    type(value)
-    key(virtualCode: CGKeyCode(kVK_Return))
+
+    guard observesPickerValue(value, identifier: identifier, timeout: 5) else {
+      let observed = self.element(identifier: identifier).flatMap {
+        stringAttribute($0, kAXValueAttribute as CFString)
+      } ?? "unavailable"
+      throw DriverFailure.message(
+        "picker \(identifier) did not select \(value); observed \(observed)")
+    }
+  }
+
+  private func observesPickerValue(
+    _ expected: String, identifier: String, timeout: TimeInterval
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if let current = element(identifier: identifier),
+        stringAttribute(current, kAXValueAttribute as CFString) == expected
+      {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    } while Date() < deadline
+    return false
   }
 
   func waitForFacts(_ facts: [String], timeout: TimeInterval) throws {
