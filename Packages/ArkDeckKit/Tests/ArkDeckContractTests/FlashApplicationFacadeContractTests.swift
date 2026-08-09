@@ -4,6 +4,22 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class FlashApplicationFacadeContractTests: XCTestCase {
+  func testPostflightBindingKeepsTheSubmittedPlanRevision() {
+    let confirmed = FlashPostflightPresentationBuilder.binding(
+      plannedRevision: 3,
+      observedRevision: 3)
+
+    XCTAssertEqual(confirmed.expected, "r3 → r3")
+    XCTAssertEqual(confirmed.observed, "r3 → r3")
+    XCTAssertTrue(confirmed.matches)
+
+    let drifted = FlashPostflightPresentationBuilder.binding(
+      plannedRevision: 3,
+      observedRevision: 4)
+    XCTAssertEqual(drifted.observed, "r3 → r4")
+    XCTAssertFalse(drifted.matches)
+  }
+
   func testRuntimeAvailabilityAndTargetFactsDecodeWithoutInventingDefaults() throws {
     let operations = try response([
       [

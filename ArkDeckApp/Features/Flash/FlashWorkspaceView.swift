@@ -793,11 +793,14 @@ struct FlashWorkspaceView: View {
       if let before = plan.target?.bindingRevision,
         let after = evidence.observedBindingRevision
       {
+        let binding = FlashPostflightPresentationBuilder.binding(
+          plannedRevision: before,
+          observedRevision: after)
         postflightRow(
           label: flashText("flash.postflight.binding"),
-          expected: "r\(before) → r\(before + 1)",
-          observed: "r\(before) → r\(after)",
-          matches: after == before + 1,
+          expected: binding.expected,
+          observed: binding.observed,
+          matches: binding.matches,
           identifier: "flash.postflight.binding")
       }
     }

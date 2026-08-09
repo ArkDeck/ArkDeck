@@ -1085,7 +1085,7 @@ function runFlash(){
     phaseIdx:0,safeBoundary:8,tick:520,log:["→ verify-image-bundle","已获取 CriticalActivityLease(idle sleep 保持)"],pages:["flash"],
     doneMsg:"完成:postflight 校验通过,设备回报 build 与镜像期望一致。",
     onDone:st=>{S.flashJob=null;
-      if(st==="succeeded"){S.lastFlash={build:"Runtime observation.firmware",binding:"n→n+1"};
+      if(st==="succeeded"){S.lastFlash={build:"Runtime observation.firmware",binding:"n→n"};
         DEVICES[0].build="由最新 Runtime observation 提供";renderDevs();}
       renderPageIf(["flash"]);}}));
   renderPage();
