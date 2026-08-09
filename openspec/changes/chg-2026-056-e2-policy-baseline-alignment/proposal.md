@@ -317,7 +317,11 @@ recovery rules remain. The maintainer is requested to approve the indivisible bo
 5. Candidate source/build digests remain non-authoritative provenance. Every execution is freshly
    materialized and admitted by the protected broker under the existing sixteen-epoch/four-hour/
    concurrency-one budget.
-6. New operation/provider/profile or destructive-policy semantics still require the final reviewed
+6. Before Runtime admission, candidates compose a bounded pre-submit Flash UI action program rather
+   than selecting from known per-control repair fields. Protected main supplies all pinned values,
+   rejects submit/result actions, re-verifies the exact review and owns the sole submit. A
+   zero-dispatch refusal may retry without a material-distinct fingerprint rule.
+7. New operation/provider/profile or destructive-policy semantics still require the final reviewed
    Repo-plane PR. An ordinary new product failure does not.
 
 If r12 is rejected, protected main retains r10's closed repair envelope and the product continues

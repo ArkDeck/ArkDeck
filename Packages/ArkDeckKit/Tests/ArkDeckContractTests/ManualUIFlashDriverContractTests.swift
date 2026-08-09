@@ -118,30 +118,31 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
   func testDriverObservesExecuteModeAndUsesPointerForTheSwiftUIFileButton() throws {
     let source = try driverSource()
-    XCTAssertTrue(source.contains("case .selected:"))
-    XCTAssertTrue(source.contains("try driver.waitForSelected(\"flash.mode.execute\""))
+    XCTAssertTrue(source.contains("case .waitForSelected:"))
+    XCTAssertTrue(source.contains("try driver.waitForSelected(action.identifier!"))
     XCTAssertTrue(source.contains("try driver.chooseFileIfNeeded("))
-    XCTAssertTrue(source.contains("delivery: candidate.decision.imageChooserDelivery"))
+    XCTAssertTrue(source.contains("options.archiveURL, delivery: action.delivery!"))
     XCTAssertTrue(source.contains("element(identifier: \"flash.image.value\")"))
     XCTAssertTrue(source.contains("== url.lastPathComponent"))
     XCTAssertTrue(source.contains("try perform(\"flash.image.choose\""))
     XCTAssertFalse(source.contains("try press(\"flash.image.choose\")"))
   }
 
-  func testExternalCandidateUsesAClosedPreAdmissionEnvelopeWithoutPRInput() throws {
+  func testExternalCandidateUsesAComposablePreSubmitProgramWithoutPRInput() throws {
     let source = try driverSource()
     XCTAssertTrue(source.contains("--candidate-file"))
     XCTAssertTrue(source.contains("--debug-session-file"))
     XCTAssertTrue(
       source.contains(
         "Set(dynamic.allKeys.map(\\.stringValue)) == Set(CodingKeys.allCases.map(\\.stringValue))"))
-    XCTAssertTrue(source.contains("candidate decision must have the exact published shape"))
-    XCTAssertTrue(source.contains("candidate decision is outside the published UI repair envelope"))
+    XCTAssertTrue(source.contains("for action in candidate.program.actions"))
+    XCTAssertTrue(source.contains("stable effect grammar rather than an enumeration"))
+    XCTAssertFalse(source.contains("published UI repair envelope"))
     XCTAssertFalse(source.contains("git commit"))
     XCTAssertFalse(source.contains("gh pr"))
   }
 
-  func testStandaloneValidatorAcceptsDefaultAndRejectsAuthorityField() throws {
+  func testStandaloneValidatorAcceptsNovelCompositionAndRejectsAuthorityField() throws {
     let candidateURL = repositoryRoot().appendingPathComponent(
       "scripts/rockchip_component/manual_ui_flash_candidate.json")
     let accepted = try runCandidateValidator(candidateURL)
@@ -150,6 +151,18 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
     var object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
+    var actions = try XCTUnwrap(object["actions"] as? [[String: Any]])
+    actions.insert(
+      ["kind": "waitForPresence", "identifier": "flash.novel.debug.control"], at: 0)
+    object["actions"] = actions
+    let novelURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("manual-ui-novel-\(UUID().uuidString).json")
+    try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+      .write(to: novelURL, options: .atomic)
+    defer { try? FileManager.default.removeItem(at: novelURL) }
+    let novel = try runCandidateValidator(novelURL)
+    XCTAssertEqual(novel.status, 0, novel.stderr)
+
     object["capability"] = "candidate-must-not-supply"
     let invalidURL = FileManager.default.temporaryDirectory
       .appendingPathComponent("manual-ui-invalid-\(UUID().uuidString).json")
@@ -158,7 +171,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: invalidURL) }
     let rejected = try runCandidateValidator(invalidURL)
     XCTAssertEqual(rejected.status, 2)
-    XCTAssertTrue(rejected.stderr.contains("candidate decision must have the exact published shape"))
+    XCTAssertTrue(rejected.stderr.contains("candidate UI program must have the exact published shape"))
   }
 
   func testRockchipSourceManifestPinsCurrentRepoBuildInputsBeforePush() throws {
@@ -187,7 +200,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     }
   }
 
-  func testCandidateCannotNameTargetArchivePlanControlOrSubmit() throws {
+  func testCandidateProgramCannotNameTargetArchivePlanValueOrSubmit() throws {
     let data = try Data(
       contentsOf: repositoryRoot()
         .appendingPathComponent("scripts/rockchip_component/manual_ui_flash_candidate.json"))
@@ -195,16 +208,30 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertEqual(
       Set(object.keys),
       Set([
-        "documentType", "schemaVersion", "applicationActivation", "navigationDelivery",
-        "executeModeDelivery", "executeModeObservation", "imageChooserDelivery",
-        "planPreparationDelivery", "activationSettleMilliseconds", "controlTimeoutSeconds",
-        "planTimeoutSeconds",
+        "documentType", "schemaVersion", "applicationActivation",
+        "activationSettleMilliseconds", "controlTimeoutSeconds", "planTimeoutSeconds", "actions",
       ]))
     let forbidden = [
-      "app", "target", "archive", "plan", "controlIdentifier", "operation", "argv",
+      "app", "target", "archive", "plan", "operation", "argv",
       "executable", "capability", "reservation", "submit", "job", "runtimeSocket",
     ]
     for key in forbidden { XCTAssertNil(object[key], "candidate exposed forbidden key \(key)") }
+
+    var forbiddenAction = object
+    forbiddenAction["actions"] = [[
+      "kind": "perform",
+      "identifier": "flash.execute.submit",
+      "delivery": "pointerClick",
+      "fallbackStrings": [],
+    ]]
+    let invalidURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("manual-ui-submit-\(UUID().uuidString).json")
+    try JSONSerialization.data(withJSONObject: forbiddenAction, options: [.sortedKeys])
+      .write(to: invalidURL, options: .atomic)
+    defer { try? FileManager.default.removeItem(at: invalidURL) }
+    let rejected = try runCandidateValidator(invalidURL)
+    XCTAssertEqual(rejected.status, 2)
+    XCTAssertTrue(rejected.stderr.contains("escaped the exact Flash pre-submit surface"))
 
     let source = try driverSource()
     XCTAssertTrue(source.contains("try driver.assertNoFlashSubmission()"))
@@ -214,7 +241,9 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
   func testPreAdmissionLoopRetriesSafeRefusalsAndBlocksUnknownSubmission() throws {
     let source = try driverSource()
-    XCTAssertTrue(source.contains("candidate is not materially distinct from a prior attempt"))
+    XCTAssertFalse(source.contains("candidate is not materially distinct from a prior attempt"))
+    XCTAssertTrue(source.contains("document.attempts.count < Self.maximumAttempts"))
+    XCTAssertTrue(source.contains("candidateProgramSHA256"))
     XCTAssertTrue(source.contains("candidateAppExecutableSHA256"))
     XCTAssertTrue(source.contains("applicationExecutableSHA256(options.appURL)"))
     XCTAssertTrue(source.contains("prior UI submission outcome is not terminal"))

@@ -1,13 +1,34 @@
 {
-  "documentType": "manual-ui-flash-candidate",
-  "schemaVersion": "1.0.0",
+  "documentType": "manual-ui-flash-candidate-program",
+  "schemaVersion": "2.0.0",
   "applicationActivation": "activateAndRaise",
-  "navigationDelivery": "pointerClick",
-  "executeModeDelivery": "pointerClick",
-  "executeModeObservation": "selected",
-  "imageChooserDelivery": "pointerClick",
-  "planPreparationDelivery": "accessibilityPress",
   "activationSettleMilliseconds": 100,
   "controlTimeoutSeconds": 20,
-  "planTimeoutSeconds": 180
+  "planTimeoutSeconds": 180,
+  "actions": [
+    {
+      "kind": "perform",
+      "identifier": "app.navigation.flash",
+      "delivery": "pointerClick",
+      "fallbackStrings": ["Flash", "刷机"]
+    },
+    {"kind": "waitForPresence", "identifier": "flash.mode"},
+    {
+      "kind": "perform",
+      "identifier": "flash.mode.execute",
+      "delivery": "pointerClick",
+      "fallbackStrings": []
+    },
+    {"kind": "waitForSelected", "identifier": "flash.mode.execute"},
+    {"kind": "choosePinnedArchive", "delivery": "pointerClick"},
+    {"kind": "selectPinnedTarget"},
+    {"kind": "waitForEnabled", "identifier": "flash.plan.prepare"},
+    {
+      "kind": "perform",
+      "identifier": "flash.plan.prepare",
+      "delivery": "accessibilityPress",
+      "fallbackStrings": []
+    },
+    {"kind": "waitForPinnedPlan"}
+  ]
 }

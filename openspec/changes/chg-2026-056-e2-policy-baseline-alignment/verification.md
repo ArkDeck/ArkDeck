@@ -145,6 +145,11 @@ they do not replace `E2R-GJ4-001` or authorize hardware.
   only the diagnostic text does not.
 - Old r10 invocation/attempt bytes do not decode as r12 permits and cannot regain an execution
   budget. Existing Job/capability/journal bytes remain untouched.
+- A candidate composes a previously unseen `flash.*` pre-submit observation/action without a source
+  change. Raw pinned values, non-Flash selectors and `flash.execute.*` are rejected before UI
+  delivery, while protected main re-verifies the complete pinned review before its sole submit.
+- A pre-submit refusal may retry the same program/App fingerprint because it dispatched no device
+  effect. Attempt 65, elapsed four hours and any possibly requested submission still stop closed.
 
 ## Deviations
 
