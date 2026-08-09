@@ -45,6 +45,15 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(source.contains("return \"flash.impact.userdata\""))
   }
 
+  func testApplicationCanActivateAnExactSelectedTargetFromEitherRegisteredMode() throws {
+    let source = try repositorySource("ArkDeckApp/Features/Flash/FlashWorkspaceView.swift")
+    XCTAssertTrue(source.contains("willActivateCurrentTargetOnSubmit"))
+    XCTAssertTrue(
+      source.contains("status.mode == \"loader\" || status.mode == \"hdcNormal\""))
+    XCTAssertTrue(source.contains("disposition: .exactBoundTarget"))
+    XCTAssertTrue(source.contains("mode: observedMode"))
+  }
+
   func testNavigationHasNativeActionFallbackWhenAXOmitsTheFrame() throws {
     let source = try driverSource()
     let startMarker =

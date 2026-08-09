@@ -1015,10 +1015,10 @@ function pFlash(){
     ${S.loaderBound?`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span class="chip ok">Loader 已绑定到所选设备</span><span class="mono">1 个 loader observation · Runtime probe</span>
       <button class="btn" onclick="doneBtn(this,'已重新检查')">重新检查设备访问</button>
-    </div>`:`<div class="warnbox"><b>DAYU200 已进入 Loader 模式</b><br>ArkDeck 已发现一台 Loader，但它尚未完成 Runtime-owned 设备关联或新鲜重核验。请选择该设备，然后只需点击一次刷机；Runtime 会先绑定或重核验 Loader、刷新精确计划，并仅在全部前置条件通过后继续。</div>`}
-    <dl class="kv"><dt>责任方</dt><dd>设备操作员</dd><dt>最小动作</dt><dd>${S.loaderBound?"无需处理":"确认当前选择的是刚进入 Loader 的设备"}</dd></dl>
+    </div>`:`<div class="warnbox"><b>所选 DAYU200 需要切换为当前绑定</b><br>ArkDeck 已发现唯一一台精确匹配所选 revision-1 target 的 DAYU200（HDC-normal 或 Loader）。只需点击一次刷机；Runtime 会 fresh-read 身份、原子切换 active binding、刷新精确计划，并仅在全部前置条件通过后继续。</div>`}
+    <dl class="kv"><dt>责任方</dt><dd>设备操作员</dd><dt>最小动作</dt><dd>${S.loaderBound?"无需处理":"确认当前选择的是已连接的目标设备"}</dd></dl>
     <p class="hint">permission denied、driver unavailable、offline / unauthorized、tool blocked 与 protocol blocked 会分别显示责任方和 ArkDeck 外最小修复动作；页面不提供 sudo 或驱动安装。</p>
-    <p class="hint">Loader 绑定只提交所选 target + expected revision；Runtime 重新读取唯一 Loader 并做 CAS，不向 App 暴露 serial / topology，也不派发设备命令。</p>
+    <p class="hint">当前目标绑定只提交所选 target + expected revision；Runtime 重新读取唯一注册 DAYU200。另一台设备只允许精确切换到 revision-1 target；同一设备的 HDC→Loader 变化仍只允许相邻 revision。App 不接收 serial / topology，绑定本身不派发设备命令。</p>
   </div>
   <div class="card" data-acin><span class="ac">REQ-UX-006 · AC-FLASH-004-01</span>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">

@@ -452,6 +452,47 @@ package struct RockchipProductBindingStore: Sendable {
     expectedSerialSHA256: String,
     with candidate: RockchipProductBindingSnapshot
   ) throws -> RockchipProductBindingSnapshot {
+    try compareAndSwap(
+      expectedRevision: expectedRevision,
+      expectedSerialSHA256: expectedSerialSHA256,
+      requiredCandidateRevision: expectedRevision + 1,
+      with: candidate,
+      mismatch: "durable binding changed before Loader rebind")
+  }
+
+  /// Switches the singleton active binding to an already-adopted revision-1
+  /// target. The coordinator proves the fresh, unique USB identity and exact
+  /// selected target before reaching this owner-only compare-and-swap. Keeping
+  /// this separate from adjacent same-device lineage replacement prevents a
+  /// target switch from being mistaken for a revision advance.
+  func activateSelectedInitialTarget(
+    expectedRevision: Int,
+    expectedSerialSHA256: String,
+    with candidate: RockchipProductBindingSnapshot
+  ) throws -> RockchipProductBindingSnapshot {
+    let candidateIdentity = SHA256.hash(data: Data(candidate.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    guard candidate.revision == 1,
+      candidateIdentity != expectedSerialSHA256,
+      candidate.evidence.contains(where: { $0.hasPrefix("rebind:user-selection-sha256=") })
+    else {
+      throw configurationError("selected initial target binding is invalid")
+    }
+    return try compareAndSwap(
+      expectedRevision: expectedRevision,
+      expectedSerialSHA256: expectedSerialSHA256,
+      requiredCandidateRevision: 1,
+      with: candidate,
+      mismatch: "durable binding changed before selected target activation")
+  }
+
+  private func compareAndSwap(
+    expectedRevision: Int,
+    expectedSerialSHA256: String,
+    requiredCandidateRevision: Int,
+    with candidate: RockchipProductBindingSnapshot,
+    mismatch: String
+  ) throws -> RockchipProductBindingSnapshot {
     try validate(candidate)
     try prepareRoot()
     let rootDescriptor = Darwin.open(
@@ -475,8 +516,8 @@ package struct RockchipProductBindingStore: Sendable {
       .map { String(format: "%02x", $0) }.joined()
     guard existing.revision == expectedRevision,
       existingDigest == expectedSerialSHA256,
-      candidate.revision == existing.revision + 1
-    else { throw configurationError("durable binding changed before Loader rebind") }
+      candidate.revision == requiredCandidateRevision
+    else { throw configurationError(mismatch) }
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]

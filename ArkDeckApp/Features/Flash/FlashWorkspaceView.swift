@@ -290,6 +290,19 @@ struct FlashWorkspaceView: View {
           )
           .foregroundStyle(.green)
           .accessibilityIdentifier("flash.bootloader.bound")
+        } else if model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
+          model.workspace.bootloaderStatus.mode == "hdcNormal"
+        {
+          Label(
+            flashText("flash.binding.unprepared.hdc.title"),
+            systemImage: "externaldrive.badge.questionmark"
+          )
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(.orange)
+          Text(flashText("flash.binding.unprepared.hdc.detail"))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -673,7 +686,7 @@ struct FlashWorkspaceView: View {
           }
           if let plan = model.plan,
             !plan.blockingRequiredPrerequisites.isEmpty,
-            !model.willBindCurrentLoaderOnSubmit,
+            !model.willActivateCurrentTargetOnSubmit,
             !model.isSubmitting
           {
             Label(
@@ -921,16 +934,18 @@ final class FlashWorkspaceViewModel: ObservableObject {
     return !archive.path.isEmpty
       && plan.target == selectedTarget
       && plan.mode == .execute
-      && (plan.blockingRequiredPrerequisites.isEmpty || willBindCurrentLoaderOnSubmit)
+      && (plan.blockingRequiredPrerequisites.isEmpty || willActivateCurrentTargetOnSubmit)
   }
 
-  var willBindCurrentLoaderOnSubmit: Bool {
+  var willActivateCurrentTargetOnSubmit: Bool {
     guard mode == .execute, let selectedTarget else { return false }
     let status = workspace.bootloaderStatus
-    guard status.observationCount == 1, status.mode == "loader" else { return false }
+    guard status.observationCount == 1,
+      status.mode == "loader" || status.mode == "hdcNormal"
+    else { return false }
     switch status.disposition {
     case .unbound:
-      return true
+      return status.mode == "loader"
     case .targetBindingUnprepared:
       return status.targetID == selectedTarget.id
         && status.bindingRevision == selectedTarget.bindingRevision
@@ -1070,7 +1085,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
         return
       }
       var executionPlan = plan
-      if self.willBindCurrentLoaderOnSubmit, let selectedTarget = plan.target {
+      if self.willActivateCurrentTargetOnSubmit, let selectedTarget = plan.target {
         let bindingResult = await provider.bindCurrentLoader(target: selectedTarget)
         guard self.selectedArchiveURL == archiveURL,
           self.plan == plan,
@@ -1169,13 +1184,14 @@ final class FlashWorkspaceViewModel: ObservableObject {
   }
 
   private func applyBoundLoader(_ rebound: FlashTargetPresentation) {
+    let observedMode = workspace.bootloaderStatus.mode
     workspace = FlashWorkspacePresentation(
       availability: workspace.availability,
       targets: workspace.targets.map { $0.id == rebound.id ? rebound : $0 },
       bootloaderStatus: RockchipBootloaderStatus(
         disposition: .exactBoundTarget,
         observationCount: 1,
-        mode: "loader",
+        mode: observedMode,
         targetID: rebound.id,
         bindingRevision: rebound.bindingRevision),
       targetLoadFailure: workspace.targetLoadFailure)
