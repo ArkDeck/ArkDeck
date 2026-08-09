@@ -212,8 +212,8 @@ extension HarnessTaskCoordinator {
         //
         // Nothing widens here. An empty-inputs proposal dispatches the
         // handler's own step verbatim; what the model contributes is the
-        // hypothesis and reason code attached to it, and its standing ability
-        // to answer `noSafeAction` instead.
+        // hypothesis and reason code attached to it. Task termination remains
+        // owned by deterministic policy and observed Runtime facts.
         proposal.inputs.isEmpty || deterministic.inputs == proposal.inputs
       else { throw HarnessDecisionRejection.operationNotExpected(proposed) }
       return
@@ -236,14 +236,26 @@ extension HarnessTaskCoordinator {
         proposed: proposal.operationReference ?? proposal.kind.rawValue,
         step: expected)
     }
+    switch proposal.kind {
+    case .requestHuman, .noSafeAction:
+      // A producer can report that it has no candidate, but accepting that as
+      // the task's conclusion gives one model response authority over the
+      // lifecycle and bypasses every task-owned retry budget. The rejection
+      // is charged like any other transported proposal; the deterministic
+      // route then decides whether this wake is retryable or is a real hard
+      // boundary.
+      throw HarnessDecisionRejection.terminalDecisionNotProposable(proposal.kind)
+    case .proposePatch, .invokeOperation:
+      break
+    }
   }
 
   /// The typed inputs an accepted proposal executes with.
   ///
   /// Only an `invokeOperation` that agreed with the handler's operation and
   /// stated no inputs of its own inherits them; every other shape keeps what
-  /// it carried, which for a patch proposal, a `noSafeAction` or a
-  /// `requestHuman` is nothing.
+  /// it carried. Terminal proposal shapes are rejected before this helper is
+  /// used, but still return their empty input map for diagnostic callers.
   static func effectiveInputs(
     of proposal: HarnessDecisionProposal,
     against deterministic: HarnessDecision

@@ -525,6 +525,33 @@ public enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
   case stalePatch
 }
 
+/// Closed coordinator handling for every promotion-gate failure. Keeping the
+/// mapping exhaustive means a newly added gate cannot silently inherit the
+/// old catch-all `humanRequired` behavior.
+enum HarnessPromotionGateDisposition: Equatable, Sendable {
+  /// The current candidate is unusable, but no uncertain external effect was
+  /// created by the gate. Roll it back when necessary and try a new candidate
+  /// inside the task's existing attempt/effect/model budgets.
+  case retryCandidate
+  /// The task itself lacks the immutable policy that defines its isolation
+  /// boundary. No candidate can repair that missing authority/fact.
+  case evidenceIntegrityBlock
+}
+
+extension HarnessPromotionGateFailure {
+  var coordinatorDisposition: HarnessPromotionGateDisposition {
+    switch self {
+    case .evolutionPolicyMissing:
+      return .evidenceIntegrityBlock
+    case .candidatePatchMissing, .candidateArtifactMissing,
+      .buildNotPassed, .buildArtifactMissing, .testsNotPassed,
+      .deviceVerificationNotPassed, .deviceEvidenceMissing,
+      .evaluationNotPassed, .scopeCheckFailed, .stalePatch:
+      return .retryCandidate
+    }
+  }
+}
+
 public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   public static let documentType = "harness-promotion-candidate"
   public static let schemaVersion = "1.0.0"

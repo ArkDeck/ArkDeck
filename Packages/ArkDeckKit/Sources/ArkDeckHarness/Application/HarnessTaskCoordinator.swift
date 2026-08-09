@@ -1982,7 +1982,12 @@ public actor HarnessTaskCoordinator {
           throw HarnessRepairPortError.malformedReadback("preparedApplyDecision")
         }
         nextAttempt = HarnessRepairAttempt(
-          proposal: proposal, checkpointJobID: observation.jobID)
+          proposal: proposal, checkpointJobID: observation.jobID,
+          // Reverting a source patch does not change the device. Preserve the
+          // last deployment observation across candidate replacement so the
+          // apply Decision is checked against the fact it was planned on;
+          // the next verified deploy readback replaces this value.
+          deployedDigest: snapshot.repairAttempt?.deployedDigest)
         nextPhase = .patching
 
       case DebugCrashTaskHandler.applyPatch:
@@ -2126,6 +2131,13 @@ public actor HarnessTaskCoordinator {
       operationReference == DebugCrashTaskHandler.deployHAP
       ? Self.verificationEpochObservedState(snapshot)
       : snapshot.observedState
+    if operationReference == DebugCrashTaskHandler.createCheckpoint {
+      // The replacement candidate now has its own durable Attempt and exact
+      // checkpoint. The prior promotion failure has done its routing job and
+      // must not steer a later build/test failure around the normal rollback
+      // path.
+      observed.removeValue(forKey: DebugCrashTaskHandler.promotionRetryReasonKey)
+    }
     observed[HarnessRepairAttempt.observedStateKey] = nextAttempt.json
     try await appendTaskMemory(
       snapshot, kind: .observation,
@@ -2432,26 +2444,17 @@ public actor HarnessTaskCoordinator {
   ) async throws -> EvaluationStep {
     try await recordAttemptEvaluation(taskID: snapshot.htaskID, evaluation: evaluation)
     let history = try await store.attempts(snapshot.htaskID)
-    guard let attempt = history.last(where: { $0.outcome == .active }),
-      let candidate = attempt.candidatePatch
-    else {
-      let reason = "candidatePatchUnavailableAtPromotion"
-      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
-      let blocked = try await commit(
-        snapshot,
-        transition(
-          snapshot, causation: .evaluation, reasonCode: reason,
-          status: .humanRequired, activeJob: .cleared,
-          consumedBudget: consumed, evaluationID: evaluation.evaluationID,
-          artifactRefs: artifactRefs, observedState: observedState,
-          result: HarnessTaskResult(
-            outcome: .humanRequired, reasonCode: reason,
-            summary: "Evaluation passed without a durable CandidatePatch Artifact.",
-            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
-          conditions: conditions))
-      return .ended(
-        HarnessReconcileOutcome(
-          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+    guard let attempt = history.last(where: { $0.outcome == .active }) else {
+      return try await stopForPromotionIntegrity(
+        snapshot: snapshot, evaluation: evaluation, consumed: consumed,
+        artifactRefs: artifactRefs, observedState: observedState, conditions: conditions,
+        reasonCode: "promotionGateRejected:activeAttemptMissing")
+    }
+    guard let candidate = attempt.candidatePatch else {
+      return try await handlePromotionGateFailure(
+        .candidatePatchMissing, snapshot: snapshot, attempt: attempt,
+        evaluation: evaluation, consumed: consumed, artifactRefs: artifactRefs,
+        observedState: observedState, conditions: conditions)
     }
     let promotion: HarnessPromotionCandidate
     do {
@@ -2466,24 +2469,19 @@ public actor HarnessTaskCoordinator {
       promotion = try HarnessPromotionGate.evaluate(
         snapshot: snapshot, attempt: attempt, evaluation: evaluation,
         promotionCandidateID: promotionCandidateIDFactory(), createdAtUTC: nowUTC())
+    } catch let failure as HarnessPromotionGateFailure {
+      return try await handlePromotionGateFailure(
+        failure, snapshot: snapshot, attempt: attempt, evaluation: evaluation,
+        consumed: consumed, artifactRefs: artifactRefs,
+        observedState: observedState, conditions: conditions)
     } catch {
-      let reason = "promotionGateRejected:\(error)"
-      try await closeAttempt(snapshot.htaskID, outcome: .humanRequired, reason: reason)
-      let blocked = try await commit(
-        snapshot,
-        transition(
-          snapshot, causation: .evaluation, reasonCode: reason,
-          status: .humanRequired, activeJob: .cleared, consumedBudget: consumed,
-          evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
-          observedState: observedState,
-          result: HarnessTaskResult(
-            outcome: .humanRequired, reasonCode: reason,
-            summary: "Promotion facts drifted or did not satisfy every required gate.",
-            evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs),
-          conditions: conditions))
-      return .ended(
-        HarnessReconcileOutcome(
-          snapshot: blocked, action: .stoppedForHuman, reasonCode: reason))
+      // A failed live-workspace readback is not a rejected candidate. Without
+      // that trusted fact the coordinator cannot prove which source tree it
+      // would repair, so this remains a typed integrity boundary.
+      return try await stopForPromotionIntegrity(
+        snapshot: snapshot, evaluation: evaluation, consumed: consumed,
+        artifactRefs: artifactRefs, observedState: observedState, conditions: conditions,
+        reasonCode: "promotionGateRejected:workspaceFactUnavailable")
     }
     try await recordAttemptPromotion(promotion, taskID: snapshot.htaskID)
     try await closeAttempt(
@@ -2507,6 +2505,83 @@ public actor HarnessTaskCoordinator {
       HarnessReconcileOutcome(
         snapshot: succeeded, action: .evaluatedSucceeded,
         reasonCode: "promotionCandidateReady"))
+  }
+
+  /// Route a closed promotion failure without a catch-all terminal default.
+  /// The disposition switch is exhaustive in `HarnessEvolution.swift`, so a
+  /// future gate case cannot compile until its autonomous-debug boundary is
+  /// chosen deliberately.
+  private func handlePromotionGateFailure(
+    _ failure: HarnessPromotionGateFailure,
+    snapshot: HarnessTaskSnapshot,
+    attempt: HarnessAttempt,
+    evaluation: HarnessEvaluation,
+    consumed: HarnessConsumedBudget,
+    artifactRefs: [String],
+    observedState: [String: JSONValue],
+    conditions: [HarnessTaskCondition]
+  ) async throws -> EvaluationStep {
+    let reason = "promotionGateRejected:\(failure)"
+    switch failure.coordinatorDisposition {
+    case .retryCandidate:
+      var retryObserved = observedState
+      retryObserved[DebugCrashTaskHandler.promotionRetryReasonKey] = .string(reason)
+      if let repair = snapshot.repairAttempt,
+        repair.patchAttemptRef != nil, !repair.reverted
+      {
+        // The gate itself has no external effect, but the rejected candidate
+        // may already be applied. Keep its Attempt active until the published
+        // exact revert is read back; only then may a new strategy begin.
+        retryObserved[HarnessRepairAttempt.observedStateKey] =
+          repair.updating(rollbackRequired: true).json
+      } else {
+        try await closeAttempt(snapshot.htaskID, outcome: .failed, reason: reason)
+      }
+      try await appendTaskMemory(
+        snapshot, kind: .attempt,
+        summary: "promotion rejected the candidate; autonomous retry scheduled: \(reason)",
+        confidence: .observed,
+        evidence: HarnessMemoryEvidence(
+          requestIDs: [attempt.attemptID], artifactIDs: artifactRefs))
+      let retrying = try await commit(
+        snapshot,
+        transition(
+          snapshot, causation: .evaluation, reasonCode: reason, status: .running,
+          activeJob: .cleared, consumedBudget: consumed,
+          evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
+          observedState: retryObserved, conditions: conditions))
+      return .continues(retrying)
+    case .evidenceIntegrityBlock:
+      return try await stopForPromotionIntegrity(
+        snapshot: snapshot, evaluation: evaluation, consumed: consumed,
+        artifactRefs: artifactRefs, observedState: observedState, conditions: conditions,
+        reasonCode: reason)
+    }
+  }
+
+  private func stopForPromotionIntegrity(
+    snapshot: HarnessTaskSnapshot,
+    evaluation: HarnessEvaluation,
+    consumed: HarnessConsumedBudget,
+    artifactRefs: [String],
+    observedState: [String: JSONValue],
+    conditions: [HarnessTaskCondition],
+    reasonCode: String
+  ) async throws -> EvaluationStep {
+    let recorded = try await commit(
+      snapshot,
+      transition(
+        snapshot, causation: .evaluation, reasonCode: reasonCode, status: .running,
+        activeJob: .cleared, consumedBudget: consumed,
+        evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
+        observedState: observedState, conditions: conditions))
+    let blocked = try await recordBlock(
+      recorded, block: .evidenceIntegrity, reasonCode: reasonCode,
+      round: recorded.activeRound, jobID: nil, requestID: nil)
+    return .ended(
+      HarnessReconcileOutcome(
+        snapshot: blocked.snapshot, action: .stoppedEvidenceIntegrity,
+        reasonCode: reasonCode))
   }
 
   /// A round that added no verified evidence, no sample and no verdict change

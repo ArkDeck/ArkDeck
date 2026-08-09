@@ -83,6 +83,11 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// deployment succeeds. Phase alone cannot carry this fact because the
   /// following capture legitimately moves `reproducing` back to `collecting`.
   public static let baselineDeploymentMarker = "baselineCrashFixtureDeployed"
+  /// An evaluation may pass while its source candidate fails the final
+  /// promotion gate (for example because the isolated tree drifted). The
+  /// failure is durable evidence that a new candidate is needed; it is not a
+  /// human-authority request and it must survive the exact rollback wake.
+  public static let promotionRetryReasonKey = "promotionCandidateRetryReason"
   /// Bounded HiLog remains diagnostic context only. It proves neither a
   /// crash nor that the declared application is alive.
   public static let hilogArtifact = "hilog.txt"
@@ -129,6 +134,9 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     {
       return mutationBudgetAvailable(snapshot, operations: [Self.revertPatch])
         ? [Self.revertPatch] : []
+    }
+    if snapshot.observedState[Self.promotionRetryReasonKey] != nil {
+      return repairRouteBudgetAvailable(snapshot) ? [Self.applyPatch] : []
     }
     if pendingAnalysisLease(snapshot) != nil {
       return [Self.analyzeCrashLedger]
@@ -236,6 +244,14 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           + "another strategy is considered.",
         reasonCode: "rollbackFailedRepair", phaseOnDispatch: .analyzing)
     }
+    if case .string(let reason)? = snapshot.observedState[Self.promotionRetryReasonKey] {
+      return patchProposalQuestion(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        hypothesis:
+          "The previous candidate passed product evaluation but was rejected before promotion "
+          + "(\(reason)); propose a distinct bounded candidate against the current isolated "
+          + "workspace facts.")
+    }
     if let lease = pendingAnalysisLease(snapshot) {
       return invoke(
         snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
@@ -315,27 +331,11 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         // A model-backed producer may replace this deterministic fallback with
         // a strictly parsed PROPOSE_PATCH. Without patch bytes there is
         // nothing safe for the built-in strategy to invent.
-        guard repairRouteBudgetAvailable(snapshot) else {
-          return noSafeAction(
-            snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
-            reasonCode: "repairMutationBudgetUnavailable",
-            hypothesis:
-              "A positive E1 task may request a patch only when its remaining budget covers "
-              + "apply, build, tests, verified deployment and mandatory rollback reserve.")
-        }
-        return HarnessPlannedStep(
-          decision: HarnessDecision(
-            decisionID: decisionID,
-            htaskID: snapshot.htaskID,
-            round: round,
-            kind: .requestHuman,
-            hypothesis:
-              "The evaluator judged the declared criteria failed on verified evidence; "
-              + "repairing it requires a bounded PROPOSE_PATCH decision.",
-            reasonCode: "patchProposalRequired",
-            producer: producerID,
-            createdAtUTC: nowUTC),
-          phaseOnDispatch: nil)
+        return patchProposalQuestion(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          hypothesis:
+            "The evaluator judged the declared criteria failed on verified evidence; "
+            + "repairing it requires a bounded PROPOSE_PATCH decision.")
       case .none:
         // Nothing has been judged yet - either the first capture is still
         // pending or no evaluator is configured in this composition. Either
@@ -454,6 +454,38 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
         reasonCode: "deploymentReadbackUnavailable",
         hypothesis: "Deployment may advance only through an equal artifact-digest readback.")
     }
+  }
+
+  /// The one deterministic question a model may answer with source bytes.
+  /// Every route to it shares the same remaining-effect check, so adding a
+  /// new candidate-retry cause cannot accidentally bypass the rollback
+  /// reserve or manufacture a human stop.
+  private func patchProposalQuestion(
+    _ snapshot: HarnessTaskSnapshot,
+    decisionID: String,
+    round: Int,
+    nowUTC: String,
+    hypothesis: String
+  ) -> HarnessPlannedStep {
+    guard repairRouteBudgetAvailable(snapshot) else {
+      return noSafeAction(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        reasonCode: "repairMutationBudgetUnavailable",
+        hypothesis:
+          "A positive E1 task may request a patch only when its remaining budget covers "
+          + "apply, build, tests, verified deployment and mandatory rollback reserve.")
+    }
+    return HarnessPlannedStep(
+      decision: HarnessDecision(
+        decisionID: decisionID,
+        htaskID: snapshot.htaskID,
+        round: round,
+        kind: .requestHuman,
+        hypothesis: hypothesis,
+        reasonCode: "patchProposalRequired",
+        producer: producerID,
+        createdAtUTC: nowUTC),
+      phaseOnDispatch: nil)
   }
 
   public func phase(
