@@ -9,10 +9,12 @@
 //
 // Three properties are deliberate:
 //
-//   * it is off unless an operator turns it on. A daemon that dispatches
-//     device operations on a timer is a different safety posture from one
-//     that answers requests, so auto-drive is opt-in per run, exactly like
-//     model egress (TASK-HTP-004);
+//   * it is on for every submitted task. The task's typed policy and budgets
+//     are the authority boundary; asking an operator to turn the loop after
+//     accepting that bounded submission creates an unrelated merge/run
+//     boundary. An operator can still disable the scheduler explicitly for
+//     maintenance, and model egress remains a separate project privacy
+//     choice (TASK-HTP-004);
 //   * one reconcile per drivable task per wake, never a loop-until-terminal
 //     inner spin. The coordinator's "at most one effectful job per wake"
 //     invariant (HTP-AC-1) stays the unit of progress, and one task cannot
@@ -55,31 +57,32 @@ public struct HarnessAutoDriveReport: Equatable, Sendable {
   public let wakes: Int
   public let reconciles: Int
   public let dispatchedJobIDs: [String]
-  /// Tasks dropped because reconcile kept throwing. Recorded rather than
-  /// retried forever: a task whose every step fails is a defect to look at,
-  /// not a thing to spin on.
-  public let abandonedTaskIDs: [String]
+  /// Tasks whose scheduler call crossed the repeated-failure alert threshold
+  /// and had not recovered by the end of this run. They are never dropped:
+  /// the task's own durable budgets and terminal state remain the stop rule.
+  public let degradedTaskIDs: [String]
 
   public init(
-    wakes: Int, reconciles: Int, dispatchedJobIDs: [String], abandonedTaskIDs: [String]
+    wakes: Int, reconciles: Int, dispatchedJobIDs: [String], degradedTaskIDs: [String]
   ) {
     self.wakes = wakes
     self.reconciles = reconciles
     self.dispatchedJobIDs = dispatchedJobIDs
-    self.abandonedTaskIDs = abandonedTaskIDs
+    self.degradedTaskIDs = degradedTaskIDs
   }
 }
 
 public struct HarnessAutoDriveTicker: Sendable {
-  /// Environment variable an operator sets to turn auto-drive on, in whole
-  /// seconds. Absent, unparsable or out of range means off - the daemon keeps
-  /// its request/response behaviour and nothing is dispatched on a timer.
+  /// Optional environment override. A missing value uses the product default;
+  /// `off` or `0` explicitly disables scheduling for maintenance. Malformed
+  /// values fail closed instead of silently selecting another cadence.
   public static let intervalEnvironmentKey = "ARKDECK_HARNESS_AUTODRIVE_SECONDS"
+  public static let defaultIntervalSeconds = 1
   public static let minimumIntervalSeconds = 1
   public static let maximumIntervalSeconds = 3600
-  /// Consecutive throwing reconciles before a task is dropped from the
-  /// driven set. Three, matching the harness's three-strike stance for
-  /// repeated identical failures (TASK-HTP-003).
+  /// Consecutive throwing reconciles before the scheduler emits a degraded
+  /// alert. It keeps driving: an in-memory scheduler exception is not a new
+  /// authority boundary and cannot replace the task's durable budgets.
   public static let maximumConsecutiveFailures = 3
 
   private let target: any HarnessAutoDriveTarget
@@ -101,14 +104,20 @@ public struct HarnessAutoDriveTicker: Sendable {
     self.log = log
   }
 
-  /// Interval an operator configured, or `nil` for off. Out-of-range values
-  /// are off rather than clamped: a run that asked for a cadence the product
-  /// will not honour should say so, not silently get another one.
+  /// Effective interval, or `nil` only when explicitly disabled or malformed.
+  /// Out-of-range values are off rather than clamped: a run that asked for a
+  /// cadence the product will not honour should say so, not silently get one.
   public static func configuredIntervalSeconds(
     _ environment: [String: String]
   ) -> Int? {
-    guard let raw = environment[intervalEnvironmentKey]?.trimmingCharacters(in: .whitespaces),
-      !raw.isEmpty,
+    guard let configured = environment[intervalEnvironmentKey] else {
+      return defaultIntervalSeconds
+    }
+    let raw = configured.trimmingCharacters(in: .whitespacesAndNewlines)
+    if raw == "0" || raw.caseInsensitiveCompare("off") == .orderedSame {
+      return nil
+    }
+    guard !raw.isEmpty,
       let seconds = Int(raw),
       seconds >= minimumIntervalSeconds,
       seconds <= maximumIntervalSeconds
@@ -125,7 +134,7 @@ public struct HarnessAutoDriveTicker: Sendable {
     var reconciles = 0
     var dispatched: [String] = []
     var failures: [String: Int] = [:]
-    var abandoned: Set<String> = []
+    var degraded: Set<String> = []
 
     while !Task.isCancelled, maximumWakes.map({ wakes < $0 }) ?? true {
       wakes += 1
@@ -139,12 +148,13 @@ public struct HarnessAutoDriveTicker: Sendable {
         if (try? await sleep(intervalSeconds)) == nil { break }
         continue
       }
-      for htaskID in drivable where !abandoned.contains(htaskID) {
+      for htaskID in drivable {
         if Task.isCancelled { break }
         do {
           let outcome = try await target.reconcile(htaskID)
           reconciles += 1
           failures[htaskID] = 0
+          degraded.remove(htaskID)
           if let jobID = outcome.dispatchedJobID {
             dispatched.append(jobID)
             log(
@@ -159,11 +169,11 @@ public struct HarnessAutoDriveTicker: Sendable {
           let count = (failures[htaskID] ?? 0) + 1
           failures[htaskID] = count
           log("harness auto-drive \(htaskID) failed (\(count)): \(error)")
-          if count >= Self.maximumConsecutiveFailures {
-            abandoned.insert(htaskID)
+          if count == Self.maximumConsecutiveFailures {
+            degraded.insert(htaskID)
             log(
-              "harness auto-drive stopped driving \(htaskID) after "
-                + "\(count) consecutive failures")
+              "harness auto-drive marked \(htaskID) degraded after "
+                + "\(count) consecutive failures; continuing within task budgets")
           }
         }
       }
@@ -172,6 +182,6 @@ public struct HarnessAutoDriveTicker: Sendable {
     }
     return HarnessAutoDriveReport(
       wakes: wakes, reconciles: reconciles, dispatchedJobIDs: dispatched,
-      abandonedTaskIDs: abandoned.sorted())
+      degradedTaskIDs: degraded.sorted())
   }
 }

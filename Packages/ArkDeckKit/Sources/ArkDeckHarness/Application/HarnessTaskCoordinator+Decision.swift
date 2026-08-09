@@ -6,11 +6,12 @@
 // byte ceiling, it passes the identity screen, and the returned bytes survive
 // the strict parser.
 //
-// Any failure along that chain falls back to the deterministic handler for
-// that wake - and records why, in the task's own memory and in the decision
-// record. The fallback is strictly narrower than the model path (E0 only,
-// closed operation set), so it cannot be a quiet escalation; what it must not
-// be is invisible, which is why nothing here swallows a rejection.
+// Any failure along that chain records why and returns the deterministic
+// handler's step. If that step can make progress, the wake executes it. If it
+// is the bounded patch question and transport really occurred, the caller
+// charges the call and leaves the task running for another wake; only the
+// task's model-call budget may end those retries. Pre-transport privacy,
+// identity and context refusals retain the deterministic human boundary.
 
 import ArkDeckCore
 import ArkDeckRuntime

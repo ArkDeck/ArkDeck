@@ -44,7 +44,13 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
         requestFingerprintSHA256: String(repeating: "e", count: 64),
         materializedPlanDigest: String(repeating: "f", count: 64),
         inputs: request.inputs,
-        steps: [], jobAdmitted: false, dispatchDisposition: "notDispatched")
+        steps: [
+          RuntimePlanOnlyStep(
+            stepID: "step-preview", kind: "test",
+            effect: request.operation.id == "flash.dayu200"
+              ? WorkflowEffect.destructive.rawValue : WorkflowEffect.readOnly.rawValue,
+            cancellation: "atSafeBoundary", binding: "exactTarget", isOptional: false)
+        ], jobAdmitted: false, dispatchDisposition: "notDispatched")
     }
 
     func execute(_ requestData: Data) async -> RuntimeDebugDriverResult {
@@ -161,7 +167,7 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(reopenedStatus, completed)
   }
 
-  func testBrokerScopesToAnyPublishedTypedSeedInsteadOfAFlashProblemList() async throws {
+  func testBrokerRejectsOrdinaryDebugSeedsAndRoutesThemToTheHarnessPlane() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let driver = ScriptedDriver(outcomes: [.succeeded], permitStateDirectory: root)
@@ -174,15 +180,20 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       target: DurableTargetReference(
         targetID: "dayu200-selected", expectedBindingRevision: 7),
       operation: RuntimeOperationReference(id: "observe.device", version: 1))
-    let started = try await controller.start(seedRequestData: encode(seed))
-    XCTAssertEqual(started.operationReference, "observe.device@1")
-
-    let completed = try await controller.evaluate(
-      invocationID: started.invocationID,
-      actionData: executeAction, provenance: provenance())
-    XCTAssertEqual(completed.state, "succeeded")
-    let requests = await driver.requests()
-    XCTAssertEqual(requests.map(\.operation.reference), ["observe.device@1"])
+    do {
+      _ = try await controller.start(seedRequestData: encode(seed))
+      XCTFail("ordinary read-only debugging belongs to a bounded Harness task")
+    } catch let error as RuntimeDebugInvocationError {
+      guard case .invalidSeedRequest(let detail) = error else {
+        return XCTFail("unexpected error \(error)")
+      }
+      XCTAssertTrue(detail.contains("ordinary Agent debugging"))
+      XCTAssertTrue(detail.contains("Harness task"))
+    }
+    let preparationCount = await driver.preparations()
+    let dispatchedRequests = await driver.requests()
+    XCTAssertEqual(preparationCount, 1)
+    XCTAssertTrue(dispatchedRequests.isEmpty)
   }
 
   func testCandidateCannotInjectAuthorityTargetPlanArgvTimingOrAlternative() async throws {

@@ -839,7 +839,7 @@ struct FlashWorkspaceView: View {
         format: flashText(
           matches ? "flash.postflight.match" : "flash.postflight.mismatch"),
         label, expected, observed))
-    .accessibilityIdentifier(identifier)
+    .accessibilityIdentifier("\(identifier).\(matches ? "match" : "mismatch")")
   }
 
   private func planFailureKey(_ code: FlashPlanFailureCode) -> String {

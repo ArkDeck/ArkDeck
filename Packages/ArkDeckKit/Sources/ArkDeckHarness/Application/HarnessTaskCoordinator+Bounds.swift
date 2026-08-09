@@ -85,7 +85,8 @@ extension HarnessTaskCoordinator {
     reasonCode: String,
     round: Int?,
     jobID: String?,
-    requestID: String?
+    requestID: String?,
+    modelCallsSpent: Int = 0
   ) async throws -> (snapshot: HarnessTaskSnapshot, action: HarnessStoredHumanAction) {
     try await closeAttempt(
       snapshot.htaskID, outcome: .humanRequired, reason: reasonCode)
@@ -105,7 +106,10 @@ extension HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .humanBlocked, reasonCode: reasonCode, status: .humanRequired,
-        activeJob: .cleared, jobID: jobID,
+        activeJob: .cleared,
+        consumedBudget: charging(
+          snapshot.consumedBudget, modelCalls: modelCallsSpent),
+        jobID: jobID,
         result: HarnessTaskResult(
           outcome: .humanRequired, reasonCode: reasonCode,
           summary: Self.summary(of: action), evaluationID: snapshot.latestEvaluationID,

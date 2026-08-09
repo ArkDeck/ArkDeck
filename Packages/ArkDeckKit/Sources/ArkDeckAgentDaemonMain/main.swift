@@ -649,11 +649,10 @@ Task.detached {
       // Redirected stdout is block-buffered: without this flush an operator
       // tailing the log sees nothing until the daemon exits.
       fflush(stdout)
-      // Auto-drive turns the harness crank so a single `task.submit`
-      // converges without anyone poking `task.reconcile`. Off unless the
-      // operator sets an interval: a daemon that dispatches on a timer is a
-      // different posture from one that only answers requests, and that is
-      // the operator's call, not a default (TASK-HTP-006).
+      // Auto-drive turns the harness crank so a single bounded `task.submit`
+      // converges without anyone poking `task.reconcile`. The accepted task
+      // policy and budgets are the boundary; the environment only overrides
+      // cadence or explicitly disables scheduling for maintenance.
       if let interval = HarnessAutoDriveTicker.configuredIntervalSeconds(
         ProcessInfo.processInfo.environment)
       {
