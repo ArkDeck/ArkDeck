@@ -7,6 +7,61 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class RuntimeJobEngineContractTests: XCTestCase {
+  func testFlashBuildVersionCacheReadsEachResolvedArtifactOnlyOnce() {
+    let first = ProviderResolvedInputArtifact(
+      artifactID: "ART-flash",
+      fileURL: URL(fileURLWithPath: "/tmp/arkdeck-flash.imgs"),
+      sha256: String(repeating: "a", count: 64),
+      byteCount: 731_180_594)
+    var cache = RuntimeFlashBuildVersionCache()
+    var reads = 0
+
+    let initial = cache.resolve(artifact: first) {
+      reads += 1
+      return "OpenHarmony-7.0.0.34"
+    }
+    let repeated = cache.resolve(artifact: first) {
+      reads += 1
+      return "must-not-be-read"
+    }
+
+    XCTAssertEqual(initial, "OpenHarmony-7.0.0.34")
+    XCTAssertEqual(repeated, initial)
+    XCTAssertEqual(reads, 1)
+
+    let changedBytes = ProviderResolvedInputArtifact(
+      artifactID: first.artifactID,
+      fileURL: first.fileURL,
+      sha256: String(repeating: "b", count: 64),
+      byteCount: first.byteCount)
+    let refreshed = cache.resolve(artifact: changedBytes) {
+      reads += 1
+      return "OpenHarmony-7.0.0.35"
+    }
+    XCTAssertEqual(refreshed, "OpenHarmony-7.0.0.35")
+    XCTAssertEqual(reads, 2)
+  }
+
+  func testFlashBuildVersionCacheAlsoCachesAnUnreadableDescription() {
+    let artifact = ProviderResolvedInputArtifact(
+      artifactID: "ART-invalid-flash",
+      fileURL: URL(fileURLWithPath: "/tmp/invalid-flash.imgs"),
+      sha256: String(repeating: "c", count: 64),
+      byteCount: 64)
+    var cache = RuntimeFlashBuildVersionCache()
+    var reads = 0
+
+    XCTAssertNil(cache.resolve(artifact: artifact) {
+      reads += 1
+      return nil
+    })
+    XCTAssertNil(cache.resolve(artifact: artifact) {
+      reads += 1
+      return "must-not-be-read"
+    })
+    XCTAssertEqual(reads, 1)
+  }
+
   private var stateDirectory: URL!
   private var artifactStore: RuntimeArtifactStore!
 
