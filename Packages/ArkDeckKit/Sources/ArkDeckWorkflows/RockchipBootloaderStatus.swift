@@ -178,10 +178,11 @@ public protocol RockchipLoaderBindingCoordinating: Sendable {
   ) throws -> RockchipLoaderBindingReceipt
 }
 
-/// Runtime-owned Loader onboarding. The caller selects only an already
+/// Runtime-owned DAYU200 onboarding. The caller selects only an already
 /// adopted target and its expected revision; Runtime obtains every candidate
-/// identity/topology fact afresh, applies Core's manual USB rebind policy,
-/// persists the owner binding, then advances the generic target store.
+/// identity/topology fact afresh, applies Core's manual USB rebind policy, and
+/// either activates an exact revision-1 target or advances the same target's
+/// HDC-to-Loader lineage.
 public struct ProductRockchipLoaderBindingCoordinator:
   RockchipLoaderBindingCoordinating, Sendable
 {
@@ -218,15 +219,80 @@ public struct ProductRockchipLoaderBindingCoordinator:
         "selected target or binding revision is stale")
     }
     let identities = try usbProbe.registeredDAYU200Identities()
-    guard identities.count == 1, let identity = identities.first, identity.isLoader else {
+    guard identities.count == 1, let identity = identities.first,
+      identity.isRegisteredDAYU200Mode
+    else {
       throw RockchipFlashExecutionError.admissionRejected(
-        "exactly one DAYU200 Loader is required for binding")
+        "exactly one registered DAYU200 USB identity is required for binding")
     }
     let currentIdentity = SHA256.hash(data: Data(identity.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
     let existing = try bindingStore.loadExisting()
     let existingIdentity = SHA256.hash(data: Data(existing.serial.utf8))
       .map { String(format: "%02x", $0) }.joined()
+
+    // A newly adopted board can coexist with an older board's singleton
+    // active binding. Selecting that exact revision-1 target in the App is
+    // the explicit switch: Runtime still requires one fresh USB identity,
+    // exact target identity/connect-key equality, and a unique target record.
+    // Historical same-identity bindings are deliberately excluded and remain
+    // byte-for-byte unprepared as required by the compatibility contract.
+    if target.bindingRevision == expectedBindingRevision,
+      target.bindingRevision == 1,
+      currentIdentity != existingIdentity,
+      currentIdentity == target.stablePhysicalIdentitySHA256
+    {
+      let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      let matchingTargets = try targetStore.list().filter {
+        $0.bindingRevision == 1
+          && $0.stablePhysicalIdentitySHA256 == currentIdentity
+      }
+      guard connectIdentity == currentIdentity,
+        matchingTargets.map(\.targetID) == [targetID]
+      else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected target does not uniquely match the current DAYU200 identity")
+      }
+
+      try Self.authorizeSelectedTarget(identity: identity, currentIdentity: currentIdentity)
+      let selectionDigest = Self.selectionDigest(
+        targetID: targetID,
+        previousRevision: existing.revision,
+        currentRevision: target.bindingRevision,
+        previousIdentity: existingIdentity,
+        currentIdentity: currentIdentity,
+        currentTopology: identity.topology)
+      let next = RockchipProductBindingSnapshot(
+        revision: target.bindingRevision,
+        serial: identity.serial,
+        usbTopology: identity.topology,
+        evidence: [
+          "product:e0-iokit-single-dayu200-readback",
+          "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
+          "identity:serial-sha256=\(currentIdentity)",
+          "binding:selected-target-id=\(targetID)",
+          "binding:replaced-active-revision=\(existing.revision)",
+          "identity:replaced-active-serial-sha256=\(existingIdentity)",
+          "rebind:user-selection-sha256=\(selectionDigest)",
+        ])
+      let stored = try bindingStore.activateSelectedInitialTarget(
+        expectedRevision: existing.revision,
+        expectedSerialSHA256: existingIdentity,
+        with: next)
+      guard try stored.coversRuntimeTarget(target),
+        try stored.matchesConfirmedLiveIdentity(identity)
+      else {
+        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+          "selected target activation did not cover the fresh DAYU200 identity")
+      }
+      return RockchipLoaderBindingReceipt(
+        targetID: targetID,
+        previousRevision: target.bindingRevision,
+        currentRevision: target.bindingRevision,
+        updated: true,
+        selectionEvidenceSHA256: selectionDigest)
+    }
 
     if target.bindingRevision == expectedBindingRevision,
       existing.revision == expectedBindingRevision,
@@ -236,6 +302,24 @@ public struct ProductRockchipLoaderBindingCoordinator:
     {
       let alreadyCovered = (try? existing.coversRuntimeTarget(target)) == true
         && (try? existing.matchesConfirmedLiveIdentity(identity)) == true
+      let initialSelections = existing.evidence.compactMap { value -> String? in
+        let prefix = "rebind:user-selection-sha256="
+        return value.hasPrefix(prefix) ? String(value.dropFirst(prefix.count)) : nil
+      }
+      if alreadyCovered,
+        existing.revision == 1,
+        existing.evidence.contains("binding:selected-target-id=\(targetID)"),
+        initialSelections.count == 1,
+        let selection = initialSelections.first,
+        RockchipStandingAuthorization.isCanonicalSHA256(selection)
+      {
+        return RockchipLoaderBindingReceipt(
+          targetID: targetID,
+          previousRevision: expectedBindingRevision,
+          currentRevision: expectedBindingRevision,
+          updated: false,
+          selectionEvidenceSHA256: selection)
+      }
       if alreadyCovered,
         let proof = try existing.loaderBindingRecoveryProof(),
         proof.currentRevision == expectedBindingRevision
@@ -250,6 +334,11 @@ public struct ProductRockchipLoaderBindingCoordinator:
 
       throw RockchipFlashExecutionError.admissionRejected(
         "selected Loader binding does not carry current Runtime attestation")
+    }
+
+    guard identity.isLoader else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "the selected HDC-normal target has no active cross-mode binding")
     }
 
     if target.bindingRevision == expectedBindingRevision + 1,
@@ -298,7 +387,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
         "selected target binding lineage is missing or ambiguous")
     }
 
-    try Self.authorizeSelectedLoader(identity: identity, currentIdentity: currentIdentity)
+    try Self.authorizeSelectedTarget(identity: identity, currentIdentity: currentIdentity)
 
     let nextRevision = expectedBindingRevision + 1
     let selectionDigest = Self.selectionDigest(
@@ -367,21 +456,22 @@ public struct ProductRockchipLoaderBindingCoordinator:
     .map { String(format: "%02x", $0) }.joined()
   }
 
-  private static func authorizeSelectedLoader(
+  private static func authorizeSelectedTarget(
     identity: RockchipProductUSBIdentity,
     currentIdentity: String
   ) throws {
-    let candidateID = "loader-\(currentIdentity.prefix(12))"
+    let mode = identity.isLoader ? "loader" : "hdc-normal"
+    let candidateID = "dayu200-\(mode)-\(currentIdentity.prefix(12))"
     let candidateEvidence = [
-      "product:e0-iokit-single-loader-readback",
+      "product:e0-iokit-single-dayu200-readback",
       "identity:serial-sha256=\(currentIdentity)",
       "binding:usb-topology=\(identity.topology)",
-      "mode:loader",
+      "mode:\(mode)",
     ]
     let snapshot = try DeviceIdentitySnapshot(attributes: [
       "serial": .string(identity.serial),
       "usbTopology": .string(identity.topology),
-      "mode": .string("loader"),
+      "mode": .string(mode),
     ])
     let candidate = try DeviceRebindCandidate(
       candidateID: candidateID,

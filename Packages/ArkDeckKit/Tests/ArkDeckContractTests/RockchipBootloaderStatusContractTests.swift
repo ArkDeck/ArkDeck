@@ -83,6 +83,120 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     XCTAssertEqual(status.bindingRevision, 3)
   }
 
+  func testRuntimeActivatesOnlyTheExactSelectedRevisionOneTargetAcrossDAYU200Modes() throws {
+    let identities: [(name: String, identity: RockchipProductUSBIdentity)] = [
+      ("loader", loaderIdentity(serial: "selected-loader", topology: "17956864")),
+      ("hdc", hdcIdentity(serial: "selected-hdc", topology: "18874368")),
+    ]
+
+    for fixture in identities {
+      let targets = try RuntimeTargetStore(
+        directoryURL: root
+          .appendingPathComponent("targets-switch-\(fixture.name)", isDirectory: true))
+      let bindings = RockchipProductBindingStore(
+        rootURL: root
+          .appendingPathComponent("binding-switch-\(fixture.name)", isDirectory: true))
+      let previousIdentity = hdcIdentity(
+        serial: "previous-hdc-\(fixture.name)", topology: "16777216")
+      let previousTarget = try targets.adopt(
+        stableIdentitySHA256: digest(previousIdentity.serial),
+        connectKey: previousIdentity.serial,
+        toolVersion: "3.2.0f",
+        nowUTC: "2026-08-08T00:00:00Z").record
+      _ = try bindings.install(
+        RockchipProductBindingSnapshot(
+          revision: 1,
+          serial: previousIdentity.serial,
+          usbTopology: previousIdentity.topology,
+          evidence: [
+            "product:e0-iokit-single-dayu200-readback",
+            "identity:serial-sha256=\(digest(previousIdentity.serial))",
+          ]))
+      let selectedTarget = try targets.adopt(
+        stableIdentitySHA256: digest(fixture.identity.serial),
+        connectKey: fixture.identity.serial,
+        toolVersion: "3.2.0f",
+        nowUTC: "2026-08-08T00:01:00Z").record
+
+      let statusBefore = try observer(
+        targets: targets,
+        bindings: bindings,
+        identities: [fixture.identity]
+      ).observeBootloaderStatus()
+      XCTAssertEqual(statusBefore.disposition, .targetBindingUnprepared)
+      XCTAssertEqual(statusBefore.targetID, selectedTarget.targetID)
+
+      let coordinator = ProductRockchipLoaderBindingCoordinator(
+        targetStore: targets,
+        bindingStore: bindings,
+        usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.identity] }))
+      let receipt = try coordinator.bindCurrentLoader(
+        targetID: selectedTarget.targetID,
+        expectedBindingRevision: selectedTarget.bindingRevision)
+      let retry = try coordinator.bindCurrentLoader(
+        targetID: selectedTarget.targetID,
+        expectedBindingRevision: selectedTarget.bindingRevision)
+
+      XCTAssertTrue(receipt.updated)
+      XCTAssertFalse(retry.updated)
+      XCTAssertEqual(receipt.previousRevision, 1)
+      XCTAssertEqual(receipt.currentRevision, 1)
+      XCTAssertEqual(retry.selectionEvidenceSHA256, receipt.selectionEvidenceSHA256)
+      XCTAssertEqual(receipt.selectionEvidenceSHA256.count, 64)
+      XCTAssertEqual(
+        try targets.find(targetID: selectedTarget.targetID), selectedTarget)
+      XCTAssertEqual(
+        try targets.find(targetID: previousTarget.targetID), previousTarget)
+      let stored = try bindings.loadExisting()
+      XCTAssertEqual(stored.revision, 1)
+      XCTAssertEqual(stored.serial, fixture.identity.serial)
+      XCTAssertTrue(
+        stored.evidence.contains("binding:selected-target-id=\(selectedTarget.targetID)"))
+      XCTAssertEqual(
+        try observer(
+          targets: targets,
+          bindings: bindings,
+          identities: [fixture.identity]
+        ).observeBootloaderStatus().disposition,
+        .exactBoundTarget)
+    }
+  }
+
+  func testSelectedInitialTargetActivationRejectsConnectKeyDriftWithoutChangingBinding() throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: root.appendingPathComponent("targets-switch-drift", isDirectory: true))
+    let bindings = RockchipProductBindingStore(
+      rootURL: root.appendingPathComponent("binding-switch-drift", isDirectory: true))
+    let previous = hdcIdentity(serial: "previous-active", topology: "16777216")
+    let current = hdcIdentity(serial: "current-live", topology: "18874368")
+    _ = try bindings.install(
+      RockchipProductBindingSnapshot(
+        revision: 1,
+        serial: previous.serial,
+        usbTopology: previous.topology,
+        evidence: [
+          "product:e0-iokit-single-dayu200-readback",
+          "identity:serial-sha256=\(digest(previous.serial))",
+        ]))
+    let selected = try targets.adopt(
+      stableIdentitySHA256: digest(current.serial),
+      connectKey: "different-connect-key",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z").record
+    let originalBinding = try bindings.loadExisting()
+    let coordinator = ProductRockchipLoaderBindingCoordinator(
+      targetStore: targets,
+      bindingStore: bindings,
+      usbProbe: RockchipProductUSBProbe(identitySource: { [current] }))
+
+    XCTAssertThrowsError(
+      try coordinator.bindCurrentLoader(
+        targetID: selected.targetID,
+        expectedBindingRevision: selected.bindingRevision))
+    XCTAssertEqual(try bindings.loadExisting(), originalBinding)
+    XCTAssertEqual(try targets.find(targetID: selected.targetID), selected)
+  }
+
   func testLostBindingResponseCanRetryTheSameOldRevisionIdempotently() throws {
     let fixture = try makeCurrentFixture()
     let coordinator = ProductRockchipLoaderBindingCoordinator(

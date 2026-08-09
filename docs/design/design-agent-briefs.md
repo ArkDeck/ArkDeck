@@ -395,8 +395,8 @@ com.ohos.launcher
 - Execute 的 Exact Plan 与 data impact 完整展示后，只有一个 danger 主按钮 `擦除用户数据并刷机`。不打开确认 sheet，不画 checkbox，不要求输入短语。按钮说明须明确它只是 UX acknowledgement；Runtime capability 与 fresh facts 仍是唯一准入。
 - 提交期间每 750ms 读取 `job.list`，用 indeterminate progress + 真实 timeline 展示状态；不画百分比或 ETA。timeline 尾部进入 `criticalNonInterruptible` step 时，页面与 Job Inspector 同时显示完全一致的临界写入 callout。
 - Rockchip 访问卡必须区分 permission denied、driver unavailable、offline/unauthorized、tool blocked 与 protocol blocked，并显示责任方、ArkDeck 外最小修复动作和普通 `重新检查设备访问` 按钮。不得画 sudo、驱动安装或全局权限放宽入口。
-- 若只读状态确认唯一 DAYU200 已在 Loader、但未关联 durable target，在 Rockchip 访问卡内追加 warn callout `DAYU200 已进入 Loader 模式` 与说明文案；不再增加第二个绑定按钮。用户选择 target 后仍只点击一次 `擦除用户数据并刷机`，同一次提交先做 Loader 身份关联、按返回 revision 重新生成精确计划，并仅在全部 required prerequisite 满足后继续。绑定成功后状态变为 ok `Loader 已绑定到所选设备`。不画 serial/topology，不打开 sheet，不要求 checkbox 或输入短语。
-- 这次执行前身份关联不是 Runtime authority，也不是执行中 rebind confirm。Runtime 必须 fresh-read 唯一 Loader，新跨模式身份只通过 CAS 持久化为相邻 binding；不完整或历史 binding 不得就地升级或提供刷机准入。对唯一未落 outcome 的 enter-Loader intent 只做同 revision 或一个相邻 revision 的零重放结算；ambiguous / stale / 显式 outcomeUnknown / destructive intent 或重新 materialize 后仍有 blocker 时一律不提交 Flash。
+- 若只读状态确认唯一 DAYU200 精确匹配所选 target、但尚未成为 active binding，在 Rockchip 访问卡内追加 warn callout；HDC-normal 显示 `所选 DAYU200 需要切换为当前绑定`，Loader 显示 `DAYU200 已进入 Loader 模式`。不增加第二个绑定按钮。用户仍只点击一次 `擦除用户数据并刷机`，同一次提交先闭合当前目标身份、按返回 revision 重新生成精确计划，并仅在全部 required prerequisite 满足后继续。绑定成功后 Loader 状态变为 ok `Loader 已绑定到所选设备`。不画 serial/topology，不打开 sheet，不要求 checkbox 或输入短语。
+- 这次执行前身份关联不是 Runtime authority，也不是执行中 rebind confirm。Runtime 必须 fresh-read 唯一注册 DAYU200。切换另一台已采用设备时只接受 revision-1 target，且 fresh identity 必须同时精确匹配 target stable identity 与 connect key；以独立 CAS 切换 active binding，不伪造 revision 前进。同一设备的新跨模式身份仍只通过 CAS 持久化为相邻 binding；不完整或历史同身份 binding 不得就地升级或提供刷机准入。对唯一未落 outcome 的 enter-Loader intent 只做同 revision 或一个相邻 revision 的零重放结算；ambiguous / stale / 显式 outcomeUnknown / destructive intent 或重新 materialize 后仍有 blocker 时一律不提交 Flash。
 - 成功后只画两个已有生产字段的 Postflight 对照：`observation.firmware` 对 profile `runtimeBuildVersion`；pre binding revision 对 `observation.bindingRevision`，成功关系为 `n→n+1`。manifest 全 executed + SHA 尚无字段，不画占位行。
 - USB rebind 在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整时自动继续，任何缺失或漂移都 fail closed；TCP / UART 断连才进入人工 rebind confirmation。不要把有 durable proof 的 USB 恢复写成“静默续刷”。
 - 当前 Catalog 只发布 USB / RockUSB 的 `flash.dayu200`，所以执行中的 Job 不画 rebind confirm / abort 控件；Loader target 绑定只出现在执行前的 Rockchip 访问卡。未来 TCP / UART Flash 必须先有 domain 状态与 RPC，设计不能先行伪造。
@@ -405,7 +405,7 @@ com.ohos.launcher
 **当前生产事实与刻意边界**:
 
 - Prerequisites 来自 target / binding / profile-bound `flash.prerequisites`，闭集为 `loader` / `recoveryPath` / `unlocked` / `stablePower`；没有 `flashd`。
-- `recoveryPath` 只有在 owner-only DAYU200 跨模式 binding 精确覆盖当前 target identity、相邻 revision 与 HDC alias 时才是 satisfied；HDC adoption 本身不构成跨模式证明。required 项为 unknown / unsatisfied 时保留 Exact Plan 审阅，显示可见 blocker 并禁用主按钮，Runtime 使用同一事实在 capability 签发与首个外部 effect 前双重拒绝。
+- `recoveryPath` 只有在 owner-only DAYU200 binding 精确覆盖当前 target identity、revision 与适用 HDC alias 时才是 satisfied。HDC adoption 本身不构成证明；但所选 revision-1 target 与 fresh 唯一 HDC USB identity/stable identity/connect key 全量精确匹配时，同一次主按钮动作可先完成 active-binding CAS，再重新读取 prerequisites。required 项仍为 unknown / unsatisfied 时保留 Exact Plan 审阅并禁用提交，Runtime 使用同一事实在 capability 签发与首个外部 effect 前双重拒绝。
 - Trace tag、参数 before / after、Debug 日志 / 包清单 / 端口规则和 Overview 能力矩阵均接生产 facade。缺失或不匹配时显示 unavailable / unknown，不用 fixture 补洞。
 - Flash `job.cancel` 已开放，临界写入只停止后续步骤；Artifact 在 History 中逐项导出；Automation 只开放既有 task 的 list / reconcile / pause / cancel。
 - HDC production authorization 由 domain-owned durable binding 刷新；App 可展示真实 `.timedOut`，但生产 probe 尚不能推导的 `denied` 不得从 fixture 搬过来。
