@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 9
+revision: 10
 status: proposed
 class: core
 core_change_level: major
@@ -9,11 +9,13 @@ core_baseline: CORE-3.0.0
 platforms: [macos, windows, linux]
 ---
 
-# 让 destructive Runtime 在可证明条件下自主完成 Flash 恢复
+# 让 destructive Runtime 自主完成 Flash 恢复与候选调试
 
 > r5 经维护者裁决移除了独立 E2/standing/campaign 人工授权层；r6 补齐实现路径，随后
 > #1183 已把 Runtime-owned destructive admission 合入 protected `main`。这些批准不授权
-> r7/r8/r9。
+> r7/r8/r9。r7 的 proposal/implementation 已由 #1193/#1194 合入，r9 的 singleton
+> proposal/implementation 已由 #1206/#1207 合入；旧 tasks/verification 中“r9 等待
+> review/merge”的文字是陈旧记录，不是 Runtime admission fact，也不再阻止硬件验证。
 >
 > r8（2026-08-08）同时收敛 GJ-4 迭代中暴露的 DAYU200 profile 身份分叉。按
 > `REQ-FLASH-016`，profile 表达的是 board-scoped 约束，build/archive 是由 Artifact 派生的
@@ -28,6 +30,14 @@ platforms: [macos, windows, linux]
 > 历史 evidence/journal 字节不重写，仍持有旧 profile identity 且无法精确证明兼容的未完成
 > recovery 保持 blocked。Catalog generator 允许其它 profile 继续显式 version，但禁止同一 ID
 > 的裸 profile 与 versioned variants 共存。
+
+> r10（2026-08-09）处理迁移后仍然存在的产品断点：r5 保留了 protected-main broker，
+> 却没有把旧 Evolution 的隔离候选修复循环迁入 Runtime-owned invocation；旧候选又只能改
+> mode/timeout，不能处理 Runtime/Provider/binding/journal/postflight 缺陷。结果是每次真实失败
+> 都要先合入修复 PR 才能观察下一层。r10 增加 Runtime-mediated、closed-grammar 的非权威
+> candidate decision；设备 transport、plan、trusted facts、capability、reservation、outcome 与
+> dispatch 仍全部由 protected-main Runtime 独立推导和持有。候选调试通过后只提交一次最终
+> promotion PR，不再把 PR 当成每轮实验的同步原语。
 >
 > r9 的 singleton source naming 同样把 operation 文件从 `flash.dayu200.v1.json` 改为
 > `flash.dayu200.json`。新 Runtime operation/capability/journal writer 对该 operation 省略 version；
@@ -39,10 +49,10 @@ platforms: [macos, windows, linux]
 > 目标的全部相关分区写入并通过 postflight。当前语义把“禁止盲重放”扩大成“任何恢复都要
 > 永久中断”，重新引入反复询问人工的自动化断点。
 >
-> r7/r8/r9 是新的 MAJOR Safety 与已发布 profile/operation-contract 裁决。维护者 review/merge
-> 到 protected `main` 前，不迁移历史 Job、不签发 capability、不执行
-> HDC/RockUSB/Flash/erase，也不以本提案绕过当前 blocker。r9 的实现可在同一产品变更中用纯
-> host gate 验证，但不得据此自称已批准或产生 `REAL_DEVICE_PASS`。
+> r10 是新的 destructive 自动化准入边界裁决。维护者 review/merge 到 protected `main` 前，
+> 不启用 candidate-backed destructive evaluation，不执行候选驱动的 HDC/RockUSB/Flash/erase，
+> 也不以本提案绕过当前 blocker。host-only schema/validator/fixture 可以实现和验证，但不得
+> 据此自称已批准或产生 `REAL_DEVICE_PASS`。
 
 ## Why
 
@@ -154,8 +164,8 @@ Observable behavior:
   rev2/chat-attestation binding 取消就地升级路径，只能作为不具备准入权的历史记录读取。
 - Modified contracts: Provider contract `2.0.0 -> 3.0.0`; hardware evidence `5.0.0 -> 6.0.0`;
   versioned journal/Runtime capability and target-lane recovery records with legacy read support.
-- Core baseline: `CORE-4.0.0` remains the unratified candidate over current `CORE-3.0.0`; r9 revises
-  the same pending Safety candidate rather than opening a duplicate baseline/change.
+- Core baseline: `CORE-4.0.0` remains the unratified candidate over current `CORE-3.0.0`; r10
+  continues the same pending Safety candidate rather than opening a duplicate baseline/change.
 
 ## Platform impact
 
@@ -193,13 +203,16 @@ Observable behavior:
 ## Approval and implementation sequence
 
 1. #1178/#1181/#1183 remain the trust root for r5/r6 no-E2 Runtime admission and implementation.
-2. r9 is a fresh policy/profile/operation revision. CI green does not approve it; human maintainer review/merge to
-   protected `main` does. `status: proposed` is intentionally not self-changed by the Agent.
-3. Before that merge: zero device/recovery/history mutation. Host-only implementation and contract
-   tests do not constitute approval or hardware evidence.
-4. After merge: publish the reviewed deltas from an `agent/**` product branch; pass all host gates
-   before any real device window.
-5. Real validation must first prove the existing target-lane facts, then execute the standalone UI
+2. #1193/#1194 and #1206/#1207 are the protected-main approval/implementation history for r7 and
+   r9. Their merge dependencies are satisfied even while `CORE-4.0.0` awaits separate ratification.
+3. r10 is a fresh destructive-automation boundary revision. CI green does not approve it; human
+   maintainer review/merge to protected `main` does. `status: proposed` is intentionally not
+   self-changed by the Agent.
+4. Before that merge: candidate-backed device dispatch is zero. Host-only schema, validator,
+   fixtures and contract tests do not constitute approval or hardware evidence.
+5. After merge: implement/publish the reviewed candidate loop from an `agent/**` product branch;
+   pass all host gates before one bounded real device window.
+6. Real validation must first prove the existing target-lane facts, then execute the standalone UI
    Flash without chat/campaign/unknown-decision prompts, and record truthful realHardware evidence.
 
 ## r7 implementation path addendum
@@ -234,3 +247,35 @@ revision before implementation.
   Provider action labels and every UI-facing `@1` suffix.
 - Keep historical versioned request/capability/journal decoding read-only. Never alias or migrate
   `flash.dayu200@1` into the new operation; it must fail closed for admission and recovery.
+
+## r10 Runtime-mediated candidate debugging decision
+
+The maintainer is requested to approve the following indivisible boundary, detailed in
+`design-r10.md`:
+
+1. A PR is the final promotion boundary, not a per-attempt runtime synchronization primitive.
+   Within one bounded debug invocation, an eligible next candidate requires no Task, Change, PR,
+   merge, chat confirmation or UI acknowledgement.
+2. The isolated candidate/repairer owns only source editing, build, host tests and a closed
+   `CandidateDecision`. It has no device transport, Runtime socket, capability/fact/reservation/
+   journal store, raw target identity or executable plan.
+3. `CandidateDecision` can select only an alternative or bounded value already present in the
+   exact reviewed operation/provider repair envelope, request a published read-only observation,
+   use defaults, or stop. Unknown and authority-bearing fields are rejected.
+4. Protected-main Runtime independently materializes the operation/plan, reads fresh target,
+   binding, tool and Artifact facts, validates the candidate decision, and mints/reserves/consumes
+   the exact capability. Candidate provenance never satisfies an admission predicate.
+5. Every destructive next epoch retains the existing predecessor, unknown-outcome, cancellation,
+   drift, sixteen-attempt, four-hour and concurrency-one rules. r10 does not replay unknown intent
+   or weaken complete-overwrite recovery proof.
+6. The first DAYU200 repair envelope covers the already-observed repair space: mode transitions,
+   bounded deadlines, unique post-flash HDC-personality selection and read-only postflight.
+7. A repair requiring a new effect, Step, command, partition, target rule, trusted fact or Provider
+   plan stops as `repairSurfaceInsufficient` with zero new dispatch; the candidate grammar is not
+   widened at runtime.
+8. Success exports one ordinary promotion candidate. Only that final source change enters the
+   normal PR review path; no per-attempt PR is created.
+
+If r10 is rejected, r5's current boundary remains: UI/client candidates may exercise the published
+Runtime, but a Runtime/Provider repair cannot affect a real device until it is merged. The stale r9
+merge dependency remains removed either way because #1206/#1207 already satisfied it.

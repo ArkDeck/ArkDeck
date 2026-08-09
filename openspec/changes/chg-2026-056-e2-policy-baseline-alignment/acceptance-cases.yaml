@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-056-e2-policy-baseline-alignment
-change_revision: 9
+change_revision: 10
 platform: macos
 evidence_classes:
 - contract
@@ -25,21 +25,25 @@ cases:
 - acceptance_id: E2R-RUNTIME-001
   test_id: TEST-E2R-RUNTIME-001
   method: >-
-    Fake-provider end-to-end Agent request through production Runtime composition
-    with no authority, campaign or chat fields.
+    Fake-provider end-to-end Agent request plus a two-candidate Runtime-owned
+    debug invocation through production Runtime composition, with no authority,
+    campaign, Git, PR, merge or chat fields.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
   minimum_evidence: contract
   expected_result: >-
     Protected-main Runtime completely materializes the published plan, derives
     trusted facts, generates and reserves its exact RuntimeCapability, dispatches
     only the declared fake typed Steps and persists truthful intent/outcome and
-    capability lineage without caller administration.
+    capability lineage without caller administration. A second isolated candidate
+    may follow a durable safeToReflash without a per-attempt PR; its decision is
+    accepted only inside the reviewed repair envelope.
 - acceptance_id: E2R-NEGATIVE-001
   test_id: TEST-E2R-NEGATIVE-001
   method: >-
     Fault matrix over caller forgery, target/binding/input/plan/archive/artifact/
     tool drift, reservation lineage, crash, cancellation, missing recovery proof,
-    expiry and attempt/concurrency budgets.
+    candidate authority/fact/plan/argv injection, repair-envelope drift, expiry and
+    attempt/concurrency budgets.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#negative-and-recovery-tests
   minimum_evidence: contract
   expected_result: >-
@@ -95,15 +99,15 @@ cases:
 - acceptance_id: E2R-NOQUESTION-001
   test_id: TEST-E2R-NOQUESTION-001
   method: >-
-    Agent/UI surface audit and fake Runtime flows for initial Flash, ordinary
-    safeToReflash continuation, eligible complete-overwrite recovery and an
-    ineligible recovery blocker.
+    Agent/UI surface audit and fake Runtime flows for initial Flash, a distinct
+    isolated candidate after safeToReflash, eligible complete-overwrite recovery
+    and an ineligible recovery blocker.
   expected_source: openspec/changes/chg-2026-056-e2-policy-baseline-alignment/verification.md#acceptance-matrix
   minimum_evidence: contract
   expected_result: >-
-    Eligible paths run without standing/campaign/UI/chat/human-action input;
-    the ineligible path reports a non-overridable diagnostic rather than asking
-    a user to authorize absent device-state proof.
+    Eligible paths run without standing/campaign/UI/chat/human-action or
+    per-attempt Git/PR/merge input; the ineligible path reports a non-overridable
+    diagnostic rather than asking a user to authorize absent device-state proof.
 - acceptance_id: E2R-GJ4-001
   test_id: TEST-E2R-GJ4-001
   method: >-
@@ -115,7 +119,8 @@ cases:
   minimum_evidence: realHardware
   expected_result: >-
     The real typed Flash completes without standing authorization, campaign or
-    per-attempt chat or outcome-decision confirmation; postflight proves the
-    flashed build, V6 evidence records the actual Agent executor, RuntimeCapability,
-    exact target/plan/Artifact and applicable recovery lineage, and the driver
-    remains outside all default Swift/Xcode/UI test discovery.
+    per-attempt PR/merge/chat or outcome-decision confirmation; postflight proves
+    the flashed build, V6 evidence records the actual Agent executor,
+    RuntimeCapability, exact target/plan/Artifact, candidate provenance and
+    applicable recovery lineage, and the driver remains outside all default
+    Swift/Xcode/UI test discovery.
