@@ -162,6 +162,12 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable binding current identity evidence is missing or ambiguous")
     }
+    // A same-revision reactivation never invents or reapplies an adjacent
+    // target-store edge. Its complete proof is a different closed evidence
+    // shape: one exact target plus correlated Runtime intent/route receipt.
+    // Validate that shape before returning nil so malformed reactivation
+    // bytes cannot become useful merely because the live Loader matches.
+    if try reactivationEvidence() != nil { return nil }
     if revision == 1 { return nil }
 
     let previousIdentities = values(prefix: "identity:previous-serial-sha256=")
@@ -243,9 +249,14 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   package func confirmedHDCNormalAlias()
     throws -> (identitySHA256: String, usbTopology: String)?
   {
-    guard evidence.contains("product:e0-iokit-single-loader-readback"),
-      try runtimeTargetLineageAdvance() != nil
-    else { return nil }
+    guard evidence.contains("product:e0-iokit-single-loader-readback") else { return nil }
+    let adjacent = try runtimeTargetLineageAdvance() != nil
+    let reactivated = try reactivationEvidence() != nil
+    guard adjacent != reactivated else {
+      if !adjacent { return nil }
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding carries ambiguous HDC alias authority")
+    }
     let identities = values(prefix: "identity:hdc-normal-alias-sha256=")
     let topologies = values(prefix: "binding:hdc-normal-alias-usb-topology=")
     guard identities.count == 1, topologies.count == 1,
@@ -306,12 +317,34 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     guard target.stablePhysicalIdentitySHA256 == currentIdentity,
       target.bindingRevision == revision
     else { return false }
+    if let reactivation = try reactivationEvidence(),
+      reactivation.targetID != target.targetID
+    {
+      return false
+    }
 
     let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8)).map {
       String(format: "%02x", $0)
     }.joined()
     if connectIdentity == currentIdentity { return true }
     return try confirmedHDCNormalAlias()?.identitySHA256 == connectIdentity
+  }
+
+  /// Returns the current App-selection digest only for a fully validated
+  /// same-revision Runtime reactivation of this exact target. This supports
+  /// idempotent retries after the binding CAS committed but before the XPC
+  /// reply arrived; it does not make the snapshot a lineage-recovery proof.
+  package func reactivationSelectionEvidence(
+    targetID: String
+  ) throws -> String? {
+    guard let proof = try reactivationEvidence(), proof.targetID == targetID else {
+      return nil
+    }
+    return proof.selectionEvidenceSHA256
+  }
+
+  package func reactivatedTargetID() throws -> String? {
+    try reactivationEvidence()?.targetID
   }
 
   func confirmedHDCConnectKey(
@@ -325,6 +358,88 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     evidence.compactMap {
       $0.hasPrefix(prefix) ? String($0.dropFirst(prefix.count)) : nil
     }
+  }
+
+  private struct ReactivationEvidence {
+    let targetID: String
+    let selectionEvidenceSHA256: String
+  }
+
+  /// Validates the non-lineage same-revision activation evidence. Any partial
+  /// marker is a hard configuration error; a clean absence returns nil so
+  /// revision-1 and adjacent-lineage documents retain their existing shape.
+  private func reactivationEvidence() throws -> ReactivationEvidence? {
+    let targetIDs = values(prefix: "binding:reactivated-target-id=")
+    let currentIntents = values(prefix: "binding:reactivation-current-intent-sha256=")
+    let routeReceipts = values(prefix: "binding:reactivation-route-receipt-sha256=")
+    let replacedRevisions = values(prefix: "binding:replaced-active-revision=")
+    let replacedIdentities = values(prefix: "identity:replaced-active-serial-sha256=")
+    let selections = values(prefix: "rebind:user-selection-sha256=")
+    let markerCount = targetIDs.count + currentIntents.count + routeReceipts.count
+    if markerCount == 0 { return nil }
+
+    let previousIdentities = values(prefix: "identity:previous-serial-sha256=")
+    let previousRevisions = values(prefix: "binding:previous-revision=")
+    let previousTopologies = values(prefix: "binding:previous-usb-topology=")
+    let aliases = values(prefix: "identity:hdc-normal-alias-sha256=")
+    let aliasTopologies = values(prefix: "binding:hdc-normal-alias-usb-topology=")
+    guard revision > 1,
+      evidence.contains("product:e0-iokit-single-loader-readback"),
+      targetIDs.count == 1,
+      currentIntents.count == 1,
+      routeReceipts.count == 1,
+      replacedRevisions.count == 1,
+      replacedIdentities.count == 1,
+      selections.count == 1,
+      aliases.count == 1,
+      aliasTopologies.count == 1,
+      previousIdentities.isEmpty,
+      previousRevisions.isEmpty,
+      previousTopologies.isEmpty,
+      let targetID = targetIDs.first,
+      targetID.range(
+        of: #"^TGT-[A-Za-z0-9][A-Za-z0-9._-]{0,123}$"#,
+        options: .regularExpression) != nil,
+      let currentIntent = currentIntents.first,
+      let routeReceipt = routeReceipts.first,
+      let replacedRevisionText = replacedRevisions.first,
+      let replacedRevision = Int(replacedRevisionText),
+      replacedRevision > 0,
+      let replacedIdentity = replacedIdentities.first,
+      let selection = selections.first,
+      let alias = aliases.first,
+      let aliasTopology = aliasTopologies.first,
+      RockchipStandingAuthorization.isCanonicalSHA256(currentIntent),
+      RockchipStandingAuthorization.isCanonicalSHA256(routeReceipt),
+      currentIntent != routeReceipt,
+      RockchipStandingAuthorization.isCanonicalSHA256(replacedIdentity),
+      replacedIdentity != SHA256.hash(data: Data(serial.utf8)).map({
+        String(format: "%02x", $0)
+      }).joined(),
+      RockchipStandingAuthorization.isCanonicalSHA256(selection),
+      RockchipStandingAuthorization.isCanonicalSHA256(alias),
+      !aliasTopology.isEmpty,
+      aliasTopology.utf8.allSatisfy({ (48...57).contains($0) }),
+      aliasTopology == "0" || aliasTopology.first != "0"
+    else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding reactivation evidence is invalid or ambiguous")
+    }
+    let expectedSelection = SHA256.hash(data: Data([
+      "rockchip-loader-user-selection",
+      targetID,
+      String(replacedRevision),
+      String(revision),
+      replacedIdentity,
+      SHA256.hash(data: Data(serial.utf8)).map { String(format: "%02x", $0) }.joined(),
+      usbTopology,
+    ].joined(separator: "\n").utf8)).map { String(format: "%02x", $0) }.joined()
+    guard selection == expectedSelection else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding reactivation selection digest does not match its exact facts")
+    }
+    return ReactivationEvidence(
+      targetID: targetID, selectionEvidenceSHA256: selection)
   }
 }
 
@@ -485,6 +600,35 @@ package struct RockchipProductBindingStore: Sendable {
       requiredCandidateRevision: 1,
       with: candidate,
       mismatch: "durable binding changed before selected target activation")
+  }
+
+  /// Switches the singleton active binding to an already-adopted advanced
+  /// target only after the coordinator has built the closed same-revision
+  /// Runtime reactivation evidence. Unlike `replace`, this does not advance
+  /// target lineage; unlike revision-1 activation, it requires a validated
+  /// HDC alias so the post-flash target cannot be guessed after reboot.
+  func activateSelectedTarget(
+    expectedRevision: Int,
+    expectedSerialSHA256: String,
+    with candidate: RockchipProductBindingSnapshot
+  ) throws -> RockchipProductBindingSnapshot {
+    let candidateIdentity = SHA256.hash(data: Data(candidate.serial.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    guard candidate.revision > 1,
+      candidateIdentity != expectedSerialSHA256,
+      try candidate.runtimeTargetLineageAdvance() == nil,
+      try candidate.confirmedHDCNormalAlias() != nil,
+      let targetID = try candidate.reactivatedTargetID(),
+      try candidate.reactivationSelectionEvidence(targetID: targetID) != nil
+    else {
+      throw configurationError("selected advanced target binding is invalid")
+    }
+    return try compareAndSwap(
+      expectedRevision: expectedRevision,
+      expectedSerialSHA256: expectedSerialSHA256,
+      requiredCandidateRevision: candidate.revision,
+      with: candidate,
+      mismatch: "durable binding changed before selected target reactivation")
   }
 
   private func compareAndSwap(

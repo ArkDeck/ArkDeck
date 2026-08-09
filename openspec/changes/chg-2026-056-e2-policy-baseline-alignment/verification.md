@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-056-e2-policy-baseline-alignment@r10
+> Change:CHG-2026-056-e2-policy-baseline-alignment@r11
 > Status:planned
 > Baseline:`CORE-3.0.0` -> proposed `CORE-4.0.0`
 > Proposal phase executes zero real device, Runtime capability, recovery or history mutation.
@@ -27,6 +27,7 @@
 | `AC-WF-004-01`, `AC-WF-004-02`, `E2R-HISTORY-001` | Immutable old-unknown + later-Flash fixtures with varied facts | Only complete same-target, ordered, full-coverage, per-effect and postflight proof appends a supersession relation with zero hardware dispatch; old bytes/outcome remain unchanged | schema/compatibility contract |
 | `AC-WF-004-03`, `E2R-COMPAT-001` | V1–V5 decode/export and V6 writer fixtures | Legacy authority/evidence/recovery bytes remain readable and immutable; none can mint capability, coverage or a supersession relation | compatibility contract |
 | `AC-FLASH-007-01`, `AC-FLASH-013-01`, `E2R-NOQUESTION-001` | Agent/UI/human-action surface audit and fake eligible/ineligible flows | Initial Agent Flash, eligible next candidate and recovery require no UI/chat/human or per-attempt PR/merge decision; ineligible state is a diagnostic blocker, never an approval question | platform + contract |
+| `AC-FLASH-010-02` | Exact advanced target + displaced active binding + correlated owner-only Runtime intent/receipt fixtures | Fresh exact Loader reactivates the same revision without a target-store write; non-adjacent revision, provider/hash/receipt drift and multiple topologies leave binding/target byte-stable and dispatch zero | contract/fault |
 | `E2R-GJ4-001` | After approval and host gates, execute one Runtime-owned candidate-debug invocation on one real DAYU200; inspect Job/Session/Artifact/candidate/postflight/recovery lineage | Target lane is mechanically reconciled or recovered, real UI Flash succeeds or stops once with a truthful blocker, flashed build is read back on success, V6 evidence is truthful, and no intermediate PR or E2/campaign/chat/outcome-decision prompt occurs | realHardware |
 
 ## Positive recovery vectors
@@ -75,6 +76,14 @@
   remains closed over the unchanged golden-resource manifest.
 - Present an old rev2/chat-attestation binding and prove Runtime reports it unprepared, rejects
   same-revision replacement, leaves the bytes unchanged and dispatches no Flash effect.
+- Present a displaced advanced target and prove reactivation requires the exact current-revision
+  reconnect intent plus a directly-previous-revision, same-provider, same-connect-key confirmed HDC
+  route receipt. Independently vary target, revision, provider executable, stable identity, connect
+  key, action hash, receipt correlation, file ownership/mode, truncation and topology; every
+  mismatch leaves binding/target unchanged and dispatches zero.
+- Present two individually valid HDC route receipts with different topologies and prove Runtime
+  refuses rather than ranking either route. Prove an exact committed reactivation can retry after a
+  lost response but cannot emit `RuntimeTargetBindingLineageAdvance` or binding recovery proof.
 
 ## Host gates before hardware
 
@@ -137,6 +146,8 @@ requires another revision of this same change and maintainer review before imple
 - [x] r9 proposal/implementation are present on protected `main` through #1206/#1207.
 - [x] r10 was reviewed and merged by the human maintainer in #1217 before candidate-backed
   device use; this is the protected-main policy boundary implemented by the follow-up product PR.
+- [ ] r11 displaced-binding reactivation policy and product code are reviewed/merged together
+  before any candidate build or reactivated binding is used against hardware.
 - [ ] All canonical and change-local contract acceptance passes.
 - [ ] All host gates pass at the exact implementation head.
 - [ ] Real DAYU200 autonomous recovery/UI Flash/postflight passes with truthful V6 evidence.

@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-056-e2-policy-baseline-alignment
-revision: 10
+revision: 11
 status: proposed
 class: core
 core_change_level: major
@@ -9,7 +9,7 @@ core_baseline: CORE-3.0.0
 platforms: [macos, windows, linux]
 ---
 
-# 让 destructive Runtime 自主完成 Flash 恢复与候选调试
+# 让 destructive Runtime 自主完成 Flash 恢复、候选调试与精确 binding 重新激活
 
 > r5 经维护者裁决移除了独立 E2/standing/campaign 人工授权层；r6 补齐实现路径，随后
 > #1183 已把 Runtime-owned destructive admission 合入 protected `main`。这些批准不授权
@@ -38,6 +38,14 @@ platforms: [macos, windows, linux]
 > candidate decision；设备 transport、plan、trusted facts、capability、reservation、outcome 与
 > dispatch 仍全部由 protected-main Runtime 独立推导和持有。候选调试通过后只提交一次最终
 > promotion PR，不再把 PR 当成每轮实验的同步原语。
+>
+> r11（2026-08-09）处理真实 UI 提交前暴露的 singleton binding 缺口：选择第二块板会覆盖
+> 第一块 advanced target 的 active binding；该 target 以后即使以 exact Loader 返回也没有
+> 受支持的重新激活路径。r11 不恢复丢失字节、不猜 adjacent lineage，而仅从 current-revision
+> typed intent 与直接前一 revision、同 provider/connectKey 的 confirmed HDC-route receipt 恢复
+> 一个不推进 target revision 的 same-revision reactivation binding；fresh identity、
+> record/action hash、route 与唯一 topology
+> 任一不成立都在 Flash dispatch 前拒绝。
 >
 > r9 的 singleton source naming 同样把 operation 文件从 `flash.dayu200.v1.json` 改为
 > `flash.dayu200.json`。新 Runtime operation/capability/journal writer 对该 operation 省略 version；
@@ -150,11 +158,13 @@ Observable behavior:
 ## Scope
 
 - Modified policies: `POL-RECOVERY-001`, `POL-AGENT-002`.
-- Modified requirements: `REQ-FLASH-007`, `REQ-FLASH-013`, `REQ-FLASH-015`, `REQ-WF-004`,
+- Modified requirements: `REQ-FLASH-007`, `REQ-FLASH-010`, `REQ-FLASH-013`, `REQ-FLASH-015`, `REQ-WF-004`,
   `REQ-JOB-001`, `REQ-JOB-006`.
 - Modified acceptance: `AC-FLASH-007-01`, `AC-FLASH-013-01`, `AC-FLASH-015-01`,
   `AC-FLASH-015-02`, `AC-FLASH-015-03`, `AC-WF-004-01`, `AC-WF-004-02`,
   `AC-WF-004-03`, `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`.
+- Added acceptance: `AC-FLASH-010-02` (exact displaced-target same-revision reactivation;
+  incomplete/ambiguous proof keeps target/binding unchanged and dispatches zero effects).
 - Change-local acceptance: existing `E2R-*` plus `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`.
 - Modified published operation/profile: `flash.dayu200@1` 收敛为无版本 `flash.dayu200`，其
@@ -214,6 +224,9 @@ Observable behavior:
    pass all host gates before one bounded real device window.
 6. Real validation must first prove the existing target-lane facts, then execute the standalone UI
    Flash without chat/campaign/unknown-decision prompts, and record truthful realHardware evidence.
+7. r11 changes the USB binding admission rule and is effective only after this exact product/policy
+   diff is reviewed and merged to protected `main`; candidate code performs no device or Runtime
+   store mutation before that merge.
 
 ## r7 implementation path addendum
 
@@ -279,3 +292,26 @@ The maintainer is requested to approve the following indivisible boundary, detai
 If r10 is rejected, r5's current boundary remains: UI/client candidates may exercise the published
 Runtime, but a Runtime/Provider repair cannot affect a real device until it is merged. The stale r9
 merge dependency remains removed either way because #1206/#1207 already satisfied it.
+
+## r11 displaced binding reactivation decision
+
+The maintainer is requested to approve the indivisible rule in `design-r11.md`:
+
+1. An advanced target displaced from the singleton active binding may be reactivated at the same
+   revision only from protected-main Runtime proof, never from current-device uniqueness, Job
+   success, legacy authority or caller/UI evidence.
+2. Proof requires one fresh exact Loader, a unique current target/revision/stable identity, a
+   current-revision typed HDC reconnect intent with recomputed action hash, and a correlated
+   directly-previous-revision confirmed HDC-normal route receipt from the same provider executable
+   for the same connect key with one unique topology.
+3. The binding CAS does not write `RuntimeTargetStore` and carries a non-lineage evidence shape;
+   it cannot satisfy adjacent-binding crash recovery. A lost response may retry only the exact
+   newly active target idempotently.
+4. Missing/malformed/non-owner-only records, non-adjacent revision, provider/identity/route/hash
+   drift, receipt mismatch or two topologies keep binding and target bytes unchanged and result in
+   zero Flash dispatch.
+5. The r9 rev2/chat-attestation same-revision migration remains rejected and byte-stable.
+
+If r11 is rejected, the current fail-closed behavior remains: the displaced target reports
+`targetBindingUnprepared`; the operator must connect the still-active target instead, and Runtime
+must not manufacture the missing binding.

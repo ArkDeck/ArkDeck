@@ -26,6 +26,15 @@ macOS、Windows、Linux 和其他未来平台 SHALL 实现同一组 Core Require
 
 `connectKey` 只用于寻址。任何 device mutation 前，系统 SHALL 使用已确认且已持久化的 binding revision。TCP/UART 断线后 SHALL 人工确认；USB 自动重绑定 SHALL 满足 Core 不可降低的证据基线。
 
+singleton active binding 被另一已接管 USB target 替换后，advanced target 的 same-revision
+重新激活 SHALL NOT 从 target ID、当前唯一设备、成功文本或旧 chat attestation 推断。
+protected-main Runtime 仅可在 fresh USB 读回恰一台精确 Loader、target/revision/stable identity
+唯一匹配，并且同一 provider executable 的 owner-only typed intent 与直接前一 revision 的
+semantic receipt 完整证明该 revision 使用过同一 HDC connect identity 且 topology 唯一时，
+原子发布一个不推进 target lineage 的 reactivation binding。任一记录缺失、action hash 不符、
+跨 revision/provider、route/topology 歧义或身份漂移 SHALL 零写入、零
+destructive dispatch；旧 incomplete binding 仍只读且不得就地升级。
+
 ## POL-HDC-001 Protect shared HDC infrastructure
 
 HDC server 是 host-wide 共享资源。ArkDeck SHALL 建模 server ownership，SHALL NOT 自动停止 external/unknown server，并 SHALL 将 server 全局事件传播到所有受影响设备和 Job。
