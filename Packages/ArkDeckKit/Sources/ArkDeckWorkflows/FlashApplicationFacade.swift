@@ -262,6 +262,35 @@ public struct FlashSubmissionPresentation: Sendable, Equatable {
   }
 }
 
+public struct FlashPostflightBindingPresentation: Sendable, Equatable {
+  public let expected: String
+  public let observed: String
+  public let matches: Bool
+
+  public init(expected: String, observed: String, matches: Bool) {
+    self.expected = expected
+    self.observed = observed
+    self.matches = matches
+  }
+}
+
+public enum FlashPostflightPresentationBuilder {
+  /// A Loader activation may advance the target binding before the exact plan
+  /// is submitted. Once submitted, Flash remains pinned to that materialized
+  /// revision while the verified post-flash HDC route is associated with it.
+  /// Treating every successful Flash as another revision advance makes a
+  /// confirmed Runtime success appear as a UI failure.
+  public static func binding(
+    plannedRevision: Int,
+    observedRevision: Int
+  ) -> FlashPostflightBindingPresentation {
+    FlashPostflightBindingPresentation(
+      expected: "r\(plannedRevision) → r\(plannedRevision)",
+      observed: "r\(plannedRevision) → r\(observedRevision)",
+      matches: observedRevision == plannedRevision)
+  }
+}
+
 public enum FlashSubmissionResult: Sendable, Equatable {
   case accepted(jobID: String)
   case failed(String)

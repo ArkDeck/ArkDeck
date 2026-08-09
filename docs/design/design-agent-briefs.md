@@ -398,7 +398,7 @@ com.ohos.launcher
 - 若只读状态确认唯一 DAYU200 精确匹配所选 target、但尚未成为 active binding，在 Rockchip 访问卡内追加 warn callout；HDC-normal 显示 `所选 DAYU200 需要切换为当前绑定`，Loader 显示 `DAYU200 已进入 Loader 模式`。不增加第二个绑定按钮。用户仍只点击一次 `擦除用户数据并刷机`，同一次提交先闭合当前目标身份、按返回 revision 重新生成精确计划，并仅在全部 required prerequisite 满足后继续。绑定成功后 Loader 状态变为 ok `Loader 已绑定到所选设备`。不画 serial/topology，不打开 sheet，不要求 checkbox 或输入短语。
 - 此处 bootloader 只表示 `0x2207:0x350a` RockUSB Loader；HDC fastboot `-bootloader`、其他 USB mode 或只有命令 exit 0 都不能点亮 Loader/prerequisite。Provider 从 HDC-normal 固定进入 `loader`，必须取得 exact Loader identity 与 `rkdeveloptool ld` 语义回读，随后在同一 Job 内继续刷写，不再要求用户点击第二次。
 - 这次执行前身份关联不是 Runtime authority，也不是执行中 rebind confirm。Runtime 必须 fresh-read 唯一注册 DAYU200。切换另一台已采用设备时只接受 revision-1 target，且 fresh identity 必须同时精确匹配 target stable identity 与 connect key；以独立 CAS 切换 active binding，不伪造 revision 前进。同一设备的新跨模式身份仍只通过 CAS 持久化为相邻 binding；不完整或历史同身份 binding 不得就地升级或提供刷机准入。对唯一未落 outcome 的 enter-Loader intent 只做同 revision 或一个相邻 revision 的零重放结算；ambiguous / stale / 显式 outcomeUnknown / destructive intent 或重新 materialize 后仍有 blocker 时一律不提交 Flash。
-- 成功后只画两个已有生产字段的 Postflight 对照：`observation.firmware` 对 profile `runtimeBuildVersion`；pre binding revision 对 `observation.bindingRevision`，成功关系为 `n→n+1`。manifest 全 executed + SHA 尚无字段，不画占位行。
+- 成功后只画两个已有生产字段的 Postflight 对照：`observation.firmware` 对 profile `runtimeBuildVersion`；提交时已经 materialize 的 binding revision 对 `observation.bindingRevision`，成功关系为 `n→n`。执行前 Loader 激活若产生相邻 revision，App 会先用新 revision 重新生成精确计划；Flash Job 内经 topology + build 证明的新 HDC alias 仍关联到该计划固定的 target/revision。manifest 全 executed + SHA 尚无字段，不画占位行。
 - USB rebind 在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整时自动继续，任何缺失或漂移都 fail closed；TCP / UART 断连才进入人工 rebind confirmation。不要把有 durable proof 的 USB 恢复写成“静默续刷”。
 - 当前 Catalog 只发布 USB / RockUSB 的 `flash.dayu200`，所以执行中的 Job 不画 rebind confirm / abort 控件；Loader target 绑定只出现在执行前的 Rockchip 访问卡。未来 TCP / UART Flash 必须先有 domain 状态与 RPC，设计不能先行伪造。
 - Plan only / Simulated badge 永久保留；Execute 没有 badge。所有状态以 symbol + 文案表达，不只靠颜色；长 hash 中间省略但完整值可选择/查看；900×600 和 VoiceOver 阅读顺序必须保留主按钮前的风险信息。
@@ -510,7 +510,7 @@ rebind 区块(在 Job inspector 里,不是弹窗):粗体 `设备回连,需确认
 4. **Exact Plan 的 effect 列和 disposition 列是这张表存在的理由。** 五步各自的 effect 分级(deviceMutation / destructive / readOnly)用 `EffectBadge` 画满;Plan only 下每行都要有 `notExecuted(planned)`,配合 `mutationDispatch: 0`——plan-only 不是「按钮变灰的 Execute」,它是一次真的、有产物的、零写入的运行。
 5. **临界写入期间,页面和 Job inspector 说同一句话。** 措辞是「取消只会停止后续步骤」,不是「无法取消」:当前写入不会被强杀,后续步骤会停。电源提示要保留那句诚实的括号——`idle sleep 已由系统保持,但合盖无法被阻止`。这一刻取消按钮变 `等待安全边界…` 并禁用。
 6. **断连按 transport 分流,摆证据不摆结论。** TCP / UART rebind 区块给可核对的原始比对，并保留继续 / 中止两个明确选择。USB 在稳定身份、相邻 revision、updater/plan 阶段证据完整时按 Core 自动 rebind；缺证据或漂移时零新 dispatch。不要把有 durable proof 的 USB 自动恢复描述成“静默续刷”。
-7. **Postflight 是「设备回报 build = 镜像期望」的对照,不是「成功」两个字。** 当前只画 build 对照与 binding `n→n+1`；manifest 全 executed + SHA 尚无生产字段，不画占位行。
+7. **Postflight 是「设备回报 build = 镜像期望」的对照,不是「成功」两个字。** 当前只画 build 对照与提交后保持固定的 binding `n→n`；执行前 Loader 激活产生的相邻 revision 已包含在最终提交的精确计划中。manifest 全 executed + SHA 尚无生产字段，不画占位行。
 
 **不要做的事**:不要画百分比进度条或 ETA(设备不报可信字节总量,用 `PhaseTrack` + `IndeterminateBar`);不要发明分区名、镜像名、大小、hash、serial、build 串或 fixture id;不要把 SIMULATED 缩成角落里的小灰字;不要给 Flash 添加确认 sheet、勾选框或文字短语;不要给 chip 配 emoji。
 
