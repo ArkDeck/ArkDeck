@@ -66,6 +66,23 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(implementation.contains("kAXSelectedAttribute"))
   }
 
+  func testDriverRaisesTheExactAppBeforeDeliveringPointerOrKeyboardInput() throws {
+    let source = try driverSource()
+    XCTAssertTrue(
+      source.contains(
+        "runningApplication.activate(options: [.activateAllWindows])"))
+    XCTAssertTrue(source.contains("kAXFocusedWindowAttribute"))
+    XCTAssertTrue(source.contains("kAXRaiseAction"))
+    XCTAssertTrue(source.contains("try activateApplication()"))
+  }
+
+  func testDriverObservesExecuteModeAndUsesPointerForTheSwiftUIFileButton() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("try driver.waitForSelected(\"flash.mode.execute\", timeout: 5)"))
+    XCTAssertTrue(source.contains("try click(\"flash.image.choose\")"))
+    XCTAssertFalse(source.contains("try press(\"flash.image.choose\")"))
+  }
+
   func testTargetPickerRequiresTheRequestedValueToBecomeObservable() throws {
     let source = try driverSource()
     let startMarker =

@@ -310,16 +310,22 @@ struct Options {
 
 final class AccessibilityDriver {
   private let application: AXUIElement
+  private let runningApplication: NSRunningApplication
 
   init(processIdentifier: pid_t) throws {
     guard AXIsProcessTrusted() else {
       throw DriverFailure.message(
         "Accessibility access is required for the executable running this script")
     }
+    guard let runningApplication = NSRunningApplication(processIdentifier: processIdentifier) else {
+      throw DriverFailure.message("ArkDeck process is no longer running")
+    }
     application = AXUIElementCreateApplication(processIdentifier)
+    self.runningApplication = runningApplication
   }
 
   func press(_ identifier: String, timeout: TimeInterval = 20) throws {
+    try activateApplication()
     let element = try waitForElement(identifier: identifier, timeout: timeout)
     let result = AXUIElementPerformAction(element, kAXPressAction as CFString)
     guard result == .success else {
@@ -390,6 +396,7 @@ final class AccessibilityDriver {
   }
 
   private func click(_ element: AXUIElement, identifier: String) throws {
+    try activateApplication()
     if let frame = frame(of: element), frame.width > 0, frame.height > 0 {
       let point = CGPoint(x: frame.midX, y: frame.midY)
       guard
@@ -433,6 +440,7 @@ final class AccessibilityDriver {
   }
 
   func selectPickerValue(_ value: String, identifier: String) throws {
+    try activateApplication()
     let element = try waitForElement(identifier: identifier, timeout: 20)
     if stringAttribute(element, kAXValueAttribute as CFString) == value { return }
 
@@ -493,6 +501,19 @@ final class AccessibilityDriver {
     _ = try waitForElement(identifier: identifier, timeout: timeout)
   }
 
+  func waitForSelected(_ identifier: String, timeout: TimeInterval) throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      if let element = element(identifier: identifier) {
+        let selected = attribute(element, kAXSelectedAttribute as CFString) as? Bool
+        let numericValue = attribute(element, kAXValueAttribute as CFString) as? NSNumber
+        if selected == true || numericValue?.boolValue == true { return }
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    } while Date() < deadline
+    throw DriverFailure.message("UI element did not become selected: \(identifier)")
+  }
+
   func waitForAbsence(_ identifier: String, timeout: TimeInterval) throws {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
@@ -534,6 +555,7 @@ final class AccessibilityDriver {
   }
 
   func openGoToFolder(timeout: TimeInterval) throws {
+    try activateApplication()
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if element(identifier: "PathTextField") != nil { return }
@@ -544,6 +566,7 @@ final class AccessibilityDriver {
   }
 
   func commitGoToFolder(timeout: TimeInterval) throws {
+    try activateApplication()
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if element(identifier: "PathTextField") == nil { return }
@@ -593,7 +616,7 @@ final class AccessibilityDriver {
   }
 
   func chooseFile(_ url: URL) throws {
-    try press("flash.image.choose")
+    try click("flash.image.choose")
     try waitForPresence("open-panel", timeout: 20)
     try openGoToFolder(timeout: 10)
     try setValue(url.path, identifier: "PathTextField")
@@ -692,6 +715,31 @@ final class AccessibilityDriver {
     var value: CFTypeRef?
     guard AXUIElementCopyAttributeValue(element, name, &value) == .success else { return nil }
     return value
+  }
+
+  private func activateApplication() throws {
+    guard runningApplication.activate(options: [.activateAllWindows]) else {
+      throw DriverFailure.message("could not activate the exact ArkDeck application")
+    }
+
+    var window: AXUIElement?
+    if let rawFocused = attribute(application, kAXFocusedWindowAttribute as CFString),
+      CFGetTypeID(rawFocused) == AXUIElementGetTypeID()
+    {
+      window = (rawFocused as! AXUIElement)
+    } else if let rawWindows = attribute(application, kAXWindowsAttribute as CFString),
+      let windows = rawWindows as? [AXUIElement]
+    {
+      window = windows.first
+    }
+    guard let window else {
+      throw DriverFailure.message("the exact ArkDeck application has no interactive window")
+    }
+    let raised = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+    guard raised == .success else {
+      throw DriverFailure.message("could not raise the exact ArkDeck window: AX error \(raised.rawValue)")
+    }
+    RunLoop.current.run(until: Date().addingTimeInterval(0.1))
   }
 
   private func stringAttribute(_ element: AXUIElement, _ name: CFString) -> String? {
@@ -808,6 +856,7 @@ func run() throws {
   try driver.click("app.navigation.flash", fallbackStrings: ["Flash", "刷机"])
   try driver.waitForPresence("flash.mode", timeout: 20)
   try driver.click("flash.mode.execute")
+  try driver.waitForSelected("flash.mode.execute", timeout: 5)
   try driver.chooseFile(options.archiveURL)
   try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
   try driver.waitForEnabled("flash.plan.prepare", timeout: 30)
