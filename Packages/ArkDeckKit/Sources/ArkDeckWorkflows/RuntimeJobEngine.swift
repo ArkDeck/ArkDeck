@@ -899,6 +899,7 @@ public actor RuntimeJobEngine {
   private let agentUsageLedger: AgentAuthorityUsageLedger?
   private let mutationLane = DeviceMutationLaneCoordinator()
   private let admissionService: RuntimeAdmissionService
+  private let flashStagingAvailableBytes: @Sendable (URL) throws -> Int64
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
@@ -911,6 +912,7 @@ public actor RuntimeJobEngine {
     artifactStore: RuntimeArtifactStore? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     agentUsageLedger: AgentAuthorityUsageLedger? = nil,
+    flashStagingAvailableBytes: (@Sendable (URL) throws -> Int64)? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) throws {
     self.configuration = configuration
@@ -920,6 +922,9 @@ public actor RuntimeJobEngine {
     self.artifactStore = artifactStore
     self.traceRuntimeProbe = traceRuntimeProbe
     self.agentUsageLedger = agentUsageLedger
+    self.flashStagingAvailableBytes =
+      flashStagingAvailableBytes
+      ?? { try RockchipFlashStagingCapacity.availableBytes(at: $0) }
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
       at: configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true),
@@ -4336,20 +4341,36 @@ public actor RuntimeJobEngine {
       // whether they are a usable images archive for this board — read, not
       // recognised. The timeline records the build that was admitted, which is
       // now a fact about the archive rather than a name from a list.
+      let build: RockchipImageBuildDescriptor
+      let profile: RockchipFlashProfile
       do {
-        let build = try RockchipImageArchiveIntrospection.describe(
+        build = try RockchipImageArchiveIntrospection.describe(
           summary: summary, board: board)
-        _ = try board.forBuild(build)
-        appendTimeline(
-          jobID: jobID,
-          entry:
-            "\(step.stepID) profile=\(profileReference) build=\(build.runtimeBuildVersion) "
-            + "sha256=\(summary.archiveSHA256)")
-        return
+        profile = try board.forBuild(build)
       } catch {
         throw RuntimeDispatchFailure.failed(
           "flash bundle is not a usable DAYU200 images archive: \(error)")
       }
+      do {
+        let requiredBytes = try RockchipFlashStagingCapacity.requiredBytes(for: profile)
+        let availableBytes = try flashStagingAvailableBytes(configuration.stateDirectory)
+        try RockchipFlashStagingCapacity.require(
+          profile: profile, availableBytes: availableBytes)
+        appendTimeline(
+          jobID: jobID,
+          entry:
+            "flash staging capacity preflight required=\(requiredBytes) "
+            + "available=\(availableBytes)")
+      } catch {
+        throw RuntimeDispatchFailure.failed(
+          "flash staging capacity preflight failed before device transition: \(error)")
+      }
+      appendTimeline(
+        jobID: jobID,
+        entry:
+          "\(step.stepID) profile=\(profileReference) build=\(build.runtimeBuildVersion) "
+          + "sha256=\(summary.archiveSHA256)")
+      return
     }
     guard descriptor.reference == "deploy.native-library.app-owned@1" else {
       return
