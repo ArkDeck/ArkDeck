@@ -114,6 +114,14 @@ they do not replace `E2R-GJ4-001` or authorize hardware.
   space without exposing raw serial/topology or allowing a candidate-selected target.
 - One real GJ-4 invocation may begin only after r10 approval and all host gates. It must finish or
   stop truthfully without an intermediate PR; only the final successful candidate is promoted.
+- Exercise the protected pre-admission actuator with at least two materially distinct closed UI
+  candidates in one session: a refused candidate creates no Job, and the next candidate can reach
+  `UI_REVIEW_PASS` without Git/PR/merge input. The candidate cannot name identities, facts, control
+  identifiers, the submit action, executable/argv or authority.
+- Once the fixed submit barrier is crossed, crash/timeout before a terminal observation seals the UI
+  session as `submissionOutcomeUnknown`. A terminal non-success moves to Runtime continuation; only
+  the exact accepted request, stripped of App client context and captured owner-only, can seed the
+  existing Runtime debug invocation.
 
 ## Deviations
 

@@ -12,6 +12,7 @@
 import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -23,6 +24,205 @@ enum DriverFailure: Error, CustomStringConvertible {
     case .message(let message): message
     }
   }
+}
+
+private struct CandidateCodingKey: CodingKey {
+  let stringValue: String
+  let intValue: Int? = nil
+
+  init?(stringValue: String) { self.stringValue = stringValue }
+  init?(intValue: Int) { return nil }
+}
+
+private enum CandidateApplicationActivation: String, Codable {
+  case activateOnly
+  case activateAndRaise
+}
+
+private enum CandidateControlDelivery: String, Codable {
+  case accessibilityPress
+  case pointerClick
+}
+
+private enum CandidateModeObservation: String, Codable {
+  case present
+  case selected
+}
+
+/// Untrusted, pre-admission candidate output. The candidate can select only
+/// reviewed UI-delivery alternatives and bounded waits. The exact app,
+/// controls, archive, target, plan facts and submit action remain in this
+/// protected-main actuator and cannot be supplied by the candidate.
+private struct ManualUIFlashCandidateDecision: Codable, Equatable {
+  static let documentType = "manual-ui-flash-candidate"
+  static let schemaVersion = "1.0.0"
+
+  let documentType: String
+  let schemaVersion: String
+  let applicationActivation: CandidateApplicationActivation
+  let navigationDelivery: CandidateControlDelivery
+  let executeModeDelivery: CandidateControlDelivery
+  let executeModeObservation: CandidateModeObservation
+  let imageChooserDelivery: CandidateControlDelivery
+  let planPreparationDelivery: CandidateControlDelivery
+  let activationSettleMilliseconds: Int
+  let controlTimeoutSeconds: Int
+  let planTimeoutSeconds: Int
+
+  private enum CodingKeys: String, CodingKey, CaseIterable {
+    case documentType
+    case schemaVersion
+    case applicationActivation
+    case navigationDelivery
+    case executeModeDelivery
+    case executeModeObservation
+    case imageChooserDelivery
+    case planPreparationDelivery
+    case activationSettleMilliseconds
+    case controlTimeoutSeconds
+    case planTimeoutSeconds
+  }
+
+  init(from decoder: any Decoder) throws {
+    let dynamic = try decoder.container(keyedBy: CandidateCodingKey.self)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    guard Set(dynamic.allKeys.map(\.stringValue)) == Set(CodingKeys.allCases.map(\.stringValue))
+    else {
+      throw DriverFailure.message("candidate decision must have the exact published shape")
+    }
+    documentType = try container.decode(String.self, forKey: .documentType)
+    schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
+    applicationActivation = try container.decode(
+      CandidateApplicationActivation.self, forKey: .applicationActivation)
+    navigationDelivery = try container.decode(
+      CandidateControlDelivery.self, forKey: .navigationDelivery)
+    executeModeDelivery = try container.decode(
+      CandidateControlDelivery.self, forKey: .executeModeDelivery)
+    executeModeObservation = try container.decode(
+      CandidateModeObservation.self, forKey: .executeModeObservation)
+    imageChooserDelivery = try container.decode(
+      CandidateControlDelivery.self, forKey: .imageChooserDelivery)
+    planPreparationDelivery = try container.decode(
+      CandidateControlDelivery.self, forKey: .planPreparationDelivery)
+    activationSettleMilliseconds = try container.decode(
+      Int.self, forKey: .activationSettleMilliseconds)
+    controlTimeoutSeconds = try container.decode(Int.self, forKey: .controlTimeoutSeconds)
+    planTimeoutSeconds = try container.decode(Int.self, forKey: .planTimeoutSeconds)
+    guard documentType == Self.documentType,
+      schemaVersion == Self.schemaVersion,
+      (50...2_000).contains(activationSettleMilliseconds),
+      (5...60).contains(controlTimeoutSeconds),
+      (30...300).contains(planTimeoutSeconds)
+    else {
+      throw DriverFailure.message("candidate decision is outside the published UI repair envelope")
+    }
+  }
+}
+
+private struct LoadedManualUICandidate {
+  let decision: ManualUIFlashCandidateDecision
+  let decisionData: Data
+  let decisionSHA256: String
+  let actuatorSHA256: String
+}
+
+private func sha256(_ data: Data) -> String {
+  SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+}
+
+private func canonicalData<T: Encodable>(_ value: T) throws -> Data {
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+  return try encoder.encode(value)
+}
+
+private func protectedMainActuatorCommit() throws -> String {
+  let scriptURL = URL(fileURLWithPath: #filePath).standardizedFileURL
+  let repositoryRoot = scriptURL.deletingLastPathComponent()
+    .deletingLastPathComponent().deletingLastPathComponent()
+
+  func git(_ arguments: [String], maximumBytes: Int) throws -> Data {
+    let output = Pipe()
+    let errors = Pipe()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = ["-C", repositoryRoot.path] + arguments
+    process.environment = [
+      "PATH": "/usr/bin:/bin",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "LC_ALL": "C",
+    ]
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0, data.count <= maximumBytes else {
+      let detail = String(decoding: errorData.prefix(1_024), as: UTF8.self)
+      throw DriverFailure.message("could not verify protected-main actuator: \(detail)")
+    }
+    return data
+  }
+
+  let rootData = try git(["rev-parse", "--show-toplevel"], maximumBytes: 4_096)
+  let root = String(decoding: rootData, as: UTF8.self)
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+  guard URL(fileURLWithPath: root).standardizedFileURL == repositoryRoot else {
+    throw DriverFailure.message("manual UI actuator is not at the repository top level")
+  }
+  let oidData = try git(["rev-parse", "origin/main^{commit}"], maximumBytes: 256)
+  let oid = String(decoding: oidData, as: UTF8.self)
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+  guard oid.range(of: "^[0-9a-f]{40,64}$", options: .regularExpression) != nil else {
+    throw DriverFailure.message("origin/main did not resolve to a commit")
+  }
+  let reviewed = try git(
+    [
+      "show", "--no-ext-diff", "--no-textconv",
+      "origin/main:scripts/rockchip_component/manual_ui_flash.swift",
+    ],
+    maximumBytes: 2 * 1_024 * 1_024)
+  let current = try Data(contentsOf: scriptURL)
+  guard reviewed == current else {
+    throw DriverFailure.message(
+      "device/UI execution requires the exact actuator from origin/main; "
+        + "use candidate JSON or an isolated App build instead of running an unmerged driver")
+  }
+  return oid
+}
+
+private func loadCandidateDecision(at url: URL) throws -> LoadedManualUICandidate {
+  let data = try Data(contentsOf: url)
+  guard !data.isEmpty, data.count <= 64 * 1_024 else {
+    throw DriverFailure.message("candidate decision must be 1...65536 bytes")
+  }
+  let decision: ManualUIFlashCandidateDecision
+  do {
+    decision = try JSONDecoder().decode(ManualUIFlashCandidateDecision.self, from: data)
+  } catch let failure as DriverFailure {
+    throw failure
+  } catch {
+    throw DriverFailure.message("candidate decision is invalid: \(error)")
+  }
+  let normalized = try canonicalData(decision)
+  let actuatorURL = URL(fileURLWithPath: #filePath).standardizedFileURL
+  return LoadedManualUICandidate(
+    decision: decision,
+    decisionData: normalized,
+    decisionSHA256: sha256(normalized),
+    actuatorSHA256: sha256(try Data(contentsOf: actuatorURL)))
+}
+
+private func applicationExecutableSHA256(_ appURL: URL) throws -> String {
+  guard let executableURL = Bundle(url: appURL)?.executableURL,
+    executableURL.standardizedFileURL.path.hasPrefix(appURL.standardizedFileURL.path + "/"),
+    FileManager.default.isExecutableFile(atPath: executableURL.path)
+  else {
+    throw DriverFailure.message("candidate app has no in-bundle executable")
+  }
+  return sha256(try Data(contentsOf: executableURL))
 }
 
 @objc private protocol ManualFlashXPCProtocol {
@@ -41,7 +241,7 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
 {
   private enum Admission {
     case direct
-    case flashSubmit(requestID: String)
+    case flashSubmit(requestID: String, debugSeed: Data)
     case flashRun(jobID: String)
   }
 
@@ -53,12 +253,14 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
   ]
 
   private let socketPath: String
+  private let captureDebugSeedURL: URL?
   private let listener = NSXPCListener(machServiceName: "com.arkdeck.agentd")
   private let jobLock = NSLock()
   private var runnableJobIDs: Set<String> = []
 
-  init(socketPath: String) {
+  init(socketPath: String, captureDebugSeedURL: URL?) {
     self.socketPath = socketPath
+    self.captureDebugSeedURL = captureDebugSeedURL
     super.init()
     listener.delegate = self
   }
@@ -94,10 +296,23 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
     DispatchQueue.global(qos: .userInitiated).async {
       do {
         let response = try forward(frame: frame, socketPath: socketPath)
-        if case .flashSubmit(let requestID) = admission,
+        if case .flashSubmit(let requestID, let debugSeed) = admission,
           let jobID = Self.successfulSubmittedJobID(in: response, requestID: requestID)
         {
           self.record(jobID: jobID)
+          if let captureURL = self.captureDebugSeedURL {
+            do {
+              try Self.persistDebugSeed(debugSeed, to: captureURL)
+              print(
+                "RUNTIME_DEBUG_SEED: job=\(jobID) path=\(captureURL.path) "
+                  + "sha256=\(sha256(debugSeed))")
+            } catch {
+              fputs(
+                "manual_ui_flash: Runtime debug seed capture failed after Job admission: "
+                  + "\(error)\n",
+                stderr)
+            }
+          }
         }
         reply(response, nil)
       } catch {
@@ -134,7 +349,12 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
         let context = typed["clientContext"] as? [String: Any],
         context["clientName"] as? String == "ArkDeckApp.FlashWorkspace"
       else { return nil }
-      return .flashSubmit(requestID: requestID)
+      var debugSeed = typed
+      debugSeed.removeValue(forKey: "clientContext")
+      guard let debugSeedData = try? JSONSerialization.data(
+        withJSONObject: debugSeed, options: [.sortedKeys])
+      else { return nil }
+      return .flashSubmit(requestID: requestID, debugSeed: debugSeedData)
     case "job.run":
       guard let jobID = params["jobId"] as? String,
         !jobID.isEmpty, jobID.count <= 128
@@ -155,6 +375,34 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
       !jobID.isEmpty, jobID.count <= 128
     else { return nil }
     return jobID
+  }
+
+  private static func persistDebugSeed(_ data: Data, to url: URL) throws {
+    if FileManager.default.fileExists(atPath: url.path) {
+      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+      guard attributes[.type] as? FileAttributeType == .typeRegular,
+        try Data(contentsOf: url) == data
+      else {
+        throw DriverFailure.message("capture destination already contains a different seed")
+      }
+      return
+    }
+    let descriptor = Darwin.open(url.path, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)
+    guard descriptor >= 0 else {
+      throw DriverFailure.message("could not create owner-only Runtime debug seed: errno \(errno)")
+    }
+    defer { close(descriptor) }
+    try data.withUnsafeBytes { bytes in
+      var offset = 0
+      while offset < bytes.count {
+        let count = Darwin.write(
+          descriptor, bytes.baseAddress!.advanced(by: offset), bytes.count - offset)
+        guard count > 0 else {
+          throw DriverFailure.message("could not write Runtime debug seed: errno \(errno)")
+        }
+        offset += count
+      }
+    }
   }
 
   private func record(jobID: String) {
@@ -229,6 +477,8 @@ private func forward(frame: Data, socketPath: String) throws -> Data {
 struct Options {
   let appURL: URL
   let archiveURL: URL
+  let candidateURL: URL
+  let debugSessionURL: URL?
   let expectedPlanDigest: String
   let expectedArchiveDigest: String
   let expectedStepSetDigest: String
@@ -240,15 +490,26 @@ struct Options {
   static func parse(_ arguments: [String]) throws -> Options {
     var values: [String: String] = [:]
     var flags: Set<String> = []
+    let valueArguments: Set<String> = [
+      "--app", "--archive", "--candidate-file", "--debug-session-file",
+      "--expected-plan-digest-sha256", "--expected-archive-digest-sha256",
+      "--expected-step-set-digest-sha256", "--expected-target",
+      "--expected-binding-revision", "--timeout-seconds",
+    ]
     var index = 0
     while index < arguments.count {
       let argument = arguments[index]
       if argument == "--stop-before-submit" {
+        guard !flags.contains(argument) else {
+          throw DriverFailure.message("duplicate argument: \(argument)")
+        }
         flags.insert(argument)
         index += 1
         continue
       }
-      guard argument.hasPrefix("--"), index + 1 < arguments.count else {
+      guard valueArguments.contains(argument), values[argument] == nil,
+        index + 1 < arguments.count
+      else {
         throw DriverFailure.message("invalid or missing value for argument: \(argument)")
       }
       values[argument] = arguments[index + 1]
@@ -295,9 +556,45 @@ struct Options {
       throw DriverFailure.message("--timeout-seconds must be between 60 and 14400")
     }
 
+    let defaultCandidateURL = URL(fileURLWithPath: #filePath).standardizedFileURL
+      .deletingLastPathComponent()
+      .appendingPathComponent("manual_ui_flash_candidate.json")
+    let candidateURL: URL
+    if let path = values["--candidate-file"] {
+      candidateURL = URL(fileURLWithPath: path).standardizedFileURL
+      var isDirectory: ObjCBool = false
+      guard path.hasPrefix("/"),
+        FileManager.default.fileExists(atPath: candidateURL.path, isDirectory: &isDirectory),
+        !isDirectory.boolValue,
+        values["--debug-session-file"] != nil
+      else {
+        throw DriverFailure.message(
+          "an external --candidate-file requires an absolute readable file and "
+            + "--debug-session-file")
+      }
+    } else {
+      candidateURL = defaultCandidateURL
+    }
+    var debugSessionURL: URL?
+    if let path = values["--debug-session-file"] {
+      let url = URL(fileURLWithPath: path).standardizedFileURL
+      let parent = url.deletingLastPathComponent()
+      var isDirectory: ObjCBool = false
+      guard path.hasPrefix("/"),
+        FileManager.default.fileExists(atPath: parent.path, isDirectory: &isDirectory),
+        isDirectory.boolValue
+      else {
+        throw DriverFailure.message(
+          "--debug-session-file requires an absolute path in an existing directory")
+      }
+      debugSessionURL = url
+    }
+
     return Options(
       appURL: appURL,
       archiveURL: try existingFile("--archive"),
+      candidateURL: candidateURL,
+      debugSessionURL: debugSessionURL,
       expectedPlanDigest: try digest("--expected-plan-digest-sha256"),
       expectedArchiveDigest: try digest("--expected-archive-digest-sha256"),
       expectedStepSetDigest: try digest("--expected-step-set-digest-sha256"),
@@ -308,11 +605,199 @@ struct Options {
   }
 }
 
-final class AccessibilityDriver {
+private struct ManualUIDebugAttempt: Codable {
+  let ordinal: Int
+  let candidateDecisionSHA256: String
+  let candidateActuatorSHA256: String
+  let candidateAppExecutableSHA256: String
+  let startedAtUTC: String
+  var state: String
+  var detail: String
+  var jobID: String?
+  var runtimeState: String?
+}
+
+private struct ManualUIDebugSessionDocument: Codable {
+  static let documentType = "manual-ui-flash-debug-session"
+  static let schemaVersion = "1.0.0"
+
+  let documentType: String
+  let schemaVersion: String
+  let invocationID: String
+  var state: String
+  let protectedMainCommitOID: String
+  let appPath: String
+  let archiveSHA256: String
+  let planSHA256: String
+  let stepSetSHA256: String
+  let targetID: String
+  let bindingRevision: Int
+  let createdAtUTC: String
+  let expiresAtUTC: String
+  var attempts: [ManualUIDebugAttempt]
+}
+
+/// Non-authoritative, durable pre-admission loop record. It cannot authorize a
+/// Job; it only prevents a host candidate from silently replaying after the UI
+/// has requested submission without a terminal observation.
+private final class ManualUIDebugSessionRecorder {
+  static let maximumAttempts = 64
+  static let maximumDuration: TimeInterval = 4 * 60 * 60
+
+  private let url: URL
+  private var document: ManualUIDebugSessionDocument
+  private var attemptIndex: Int
+
+  init(
+    url: URL,
+    options: Options,
+    candidate: LoadedManualUICandidate,
+    appExecutableSHA256: String,
+    protectedMainCommitOID: String
+  ) throws {
+    self.url = url
+    let formatter = ISO8601DateFormatter()
+    let now = Date()
+    if FileManager.default.fileExists(atPath: url.path) {
+      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+      guard attributes[.type] as? FileAttributeType == .typeRegular else {
+        throw DriverFailure.message("debug session must be a regular file, not a symlink")
+      }
+      let storedData = try Data(contentsOf: url)
+      guard storedData.count <= 1 * 1_024 * 1_024 else {
+        throw DriverFailure.message("debug session is oversized")
+      }
+      document = try JSONDecoder().decode(
+        ManualUIDebugSessionDocument.self, from: storedData)
+      guard document.documentType == ManualUIDebugSessionDocument.documentType,
+        document.schemaVersion == ManualUIDebugSessionDocument.schemaVersion,
+        document.protectedMainCommitOID == protectedMainCommitOID,
+        document.appPath == options.appURL.path,
+        document.archiveSHA256 == options.expectedArchiveDigest,
+        document.planSHA256 == options.expectedPlanDigest,
+        document.stepSetSHA256 == options.expectedStepSetDigest,
+        document.targetID == options.expectedTargetID,
+        document.bindingRevision == options.expectedBindingRevision,
+        let expiry = formatter.date(from: document.expiresAtUTC), now <= expiry
+      else {
+        throw DriverFailure.message("debug session identity drifted or expired")
+      }
+      guard document.state == "active" else {
+        throw DriverFailure.message(
+          "debug session is \(document.state); reconcile Runtime or start a new exact session")
+      }
+      if let last = document.attempts.last,
+        ["submissionRequested", "submissionOutcomeUnknown"].contains(last.state)
+      {
+        throw DriverFailure.message(
+          "prior UI submission outcome is not terminal; refusing another candidate")
+      }
+      if let last = document.attempts.last,
+        last.candidateDecisionSHA256 == candidate.decisionSHA256,
+        last.candidateActuatorSHA256 == candidate.actuatorSHA256,
+        last.candidateAppExecutableSHA256 == appExecutableSHA256,
+        ["preparingUI", "uiReady"].contains(last.state)
+      {
+        attemptIndex = document.attempts.count - 1
+        document.attempts[attemptIndex].state = "preparingUI"
+        document.attempts[attemptIndex].detail = "resumed exact pre-admission candidate"
+        try persist()
+        return
+      }
+      guard document.attempts.count < Self.maximumAttempts else {
+        throw DriverFailure.message("debug session exhausted its 64 pre-admission candidates")
+      }
+      guard !document.attempts.contains(where: {
+        $0.candidateDecisionSHA256 == candidate.decisionSHA256
+          && $0.candidateActuatorSHA256 == candidate.actuatorSHA256
+          && $0.candidateAppExecutableSHA256 == appExecutableSHA256
+      }) else {
+        throw DriverFailure.message("candidate is not materially distinct from a prior attempt")
+      }
+    } else {
+      document = ManualUIDebugSessionDocument(
+        documentType: ManualUIDebugSessionDocument.documentType,
+        schemaVersion: ManualUIDebugSessionDocument.schemaVersion,
+        invocationID: "ui-debug-\(UUID().uuidString.lowercased())",
+        state: "active",
+        protectedMainCommitOID: protectedMainCommitOID,
+        appPath: options.appURL.path,
+        archiveSHA256: options.expectedArchiveDigest,
+        planSHA256: options.expectedPlanDigest,
+        stepSetSHA256: options.expectedStepSetDigest,
+        targetID: options.expectedTargetID,
+        bindingRevision: options.expectedBindingRevision,
+        createdAtUTC: formatter.string(from: now),
+        expiresAtUTC: formatter.string(from: now.addingTimeInterval(Self.maximumDuration)),
+        attempts: [])
+    }
+    document.attempts.append(
+      ManualUIDebugAttempt(
+        ordinal: document.attempts.count + 1,
+        candidateDecisionSHA256: candidate.decisionSHA256,
+        candidateActuatorSHA256: candidate.actuatorSHA256,
+        candidateAppExecutableSHA256: appExecutableSHA256,
+        startedAtUTC: formatter.string(from: now),
+        state: "preparingUI",
+        detail: "candidate admitted to protected UI actuator",
+        jobID: nil,
+        runtimeState: nil))
+    attemptIndex = document.attempts.count - 1
+    try persist()
+  }
+
+  var invocationID: String { document.invocationID }
+  var requiresFreshCandidateApp: Bool { document.attempts[attemptIndex].ordinal > 1 }
+
+  func markUIReady() throws {
+    document.attempts[attemptIndex].state = "uiReady"
+    document.attempts[attemptIndex].detail =
+      "exact plan and impact are visible; external dispatch remains zero"
+    try persist()
+  }
+
+  func markSubmissionRequested() throws {
+    document.attempts[attemptIndex].state = "submissionRequested"
+    document.attempts[attemptIndex].detail = "one protected-main UI submit action requested"
+    try persist()
+  }
+
+  func markRuntimeTerminal(jobID: String, state: String) throws {
+    document.attempts[attemptIndex].state = "runtimeTerminal"
+    document.attempts[attemptIndex].detail = "Runtime returned durable terminal \(state)"
+    document.attempts[attemptIndex].jobID = jobID
+    document.attempts[attemptIndex].runtimeState = state
+    document.state = state == "succeeded" ? "succeeded" : "runtimeContinuationRequired"
+    try persist()
+  }
+
+  func recordFailure(_ error: Error) {
+    let previous = document.attempts[attemptIndex].state
+    if previous == "submissionRequested" {
+      document.attempts[attemptIndex].state = "submissionOutcomeUnknown"
+      document.attempts[attemptIndex].detail = String(describing: error)
+      document.state = "runtimeContinuationRequired"
+    } else if previous != "runtimeTerminal" {
+      document.attempts[attemptIndex].state = "refused"
+      document.attempts[attemptIndex].detail = String(describing: error)
+    }
+    try? persist()
+  }
+
+  private func persist() throws {
+    let data = try canonicalData(document)
+    try data.write(to: url, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: url.path)
+  }
+}
+
+private final class AccessibilityDriver {
   private let application: AXUIElement
   private let runningApplication: NSRunningApplication
+  private let candidate: ManualUIFlashCandidateDecision
 
-  init(processIdentifier: pid_t) throws {
+  init(processIdentifier: pid_t, candidate: ManualUIFlashCandidateDecision) throws {
     guard AXIsProcessTrusted() else {
       throw DriverFailure.message(
         "Accessibility access is required for the executable running this script")
@@ -322,6 +807,21 @@ final class AccessibilityDriver {
     }
     application = AXUIElementCreateApplication(processIdentifier)
     self.runningApplication = runningApplication
+    self.candidate = candidate
+  }
+
+  func perform(
+    _ identifier: String,
+    delivery: CandidateControlDelivery,
+    fallbackStrings: [String] = [],
+    timeout: TimeInterval
+  ) throws {
+    switch delivery {
+    case .accessibilityPress:
+      try press(identifier, timeout: timeout)
+    case .pointerClick:
+      try click(identifier, fallbackStrings: fallbackStrings, timeout: timeout)
+    }
   }
 
   func press(_ identifier: String, timeout: TimeInterval = 20) throws {
@@ -348,8 +848,9 @@ final class AccessibilityDriver {
 
   /// Scrolls the element's containing area to the bottom before clicking it.
   func revealAndClick(_ identifier: String, timeout: TimeInterval = 20) throws {
+    try activateApplication()
     let element = try waitForElement(identifier: identifier, timeout: timeout)
-    scrollToBottom(containing: element)
+    try scrollToBottom(containing: element)
     RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     try click(element, identifier: identifier)
   }
@@ -359,8 +860,9 @@ final class AccessibilityDriver {
   /// same, now-visible AXButton receives AXPress, but only after proving the
   /// pointer path did not synchronously disable the control.
   func submit(_ identifier: String, timeout: TimeInterval = 20) throws {
+    try activateApplication()
     let element = try waitForElement(identifier: identifier, timeout: timeout)
-    scrollToBottom(containing: element)
+    try scrollToBottom(containing: element)
     RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     try click(element, identifier: identifier)
     if observesSubmitStarted(identifier: identifier, timeout: 2) { return }
@@ -450,8 +952,8 @@ final class AccessibilityDriver {
       guard pressed == .success else {
         throw DriverFailure.message("could not open picker \(identifier)")
       }
-      type(value)
-      key(virtualCode: CGKeyCode(kVK_Return))
+      try type(value)
+      try key(virtualCode: CGKeyCode(kVK_Return))
     } else {
       let direct = AXUIElementSetAttributeValue(
         element, kAXValueAttribute as CFString, value as CFTypeRef)
@@ -559,7 +1061,7 @@ final class AccessibilityDriver {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if element(identifier: "PathTextField") != nil { return }
-      key(virtualCode: CGKeyCode(kVK_ANSI_G), flags: [.maskCommand, .maskShift])
+      try key(virtualCode: CGKeyCode(kVK_ANSI_G), flags: [.maskCommand, .maskShift])
       RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     } while Date() < deadline
     throw DriverFailure.message("file picker did not open the Go to Folder path field")
@@ -570,7 +1072,7 @@ final class AccessibilityDriver {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       if element(identifier: "PathTextField") == nil { return }
-      key(virtualCode: CGKeyCode(kVK_Return))
+      try key(virtualCode: CGKeyCode(kVK_Return))
       RunLoop.current.run(until: Date().addingTimeInterval(0.4))
     } while Date() < deadline
     throw DriverFailure.message("file picker did not accept the Go to Folder path")
@@ -619,25 +1121,29 @@ final class AccessibilityDriver {
   /// already selected in the same App workspace. The filename is only a
   /// reason to skip reopening the system panel: the plan, archive and step-set
   /// digests are still verified below before submit can become eligible.
-  func chooseFileIfNeeded(_ url: URL) throws {
+  func chooseFileIfNeeded(
+    _ url: URL, delivery: CandidateControlDelivery, timeout: TimeInterval
+  ) throws {
     if let current = element(identifier: "flash.image.value"),
       stringAttribute(current, kAXValueAttribute as CFString) == url.lastPathComponent
     {
       return
     }
-    try chooseFile(url)
+    try chooseFile(url, delivery: delivery, timeout: timeout)
   }
 
-  func chooseFile(_ url: URL) throws {
-    try click("flash.image.choose")
-    try waitForPresence("open-panel", timeout: 20)
-    try openGoToFolder(timeout: 10)
+  func chooseFile(
+    _ url: URL, delivery: CandidateControlDelivery, timeout: TimeInterval
+  ) throws {
+    try perform("flash.image.choose", delivery: delivery, timeout: timeout)
+    try waitForPresence("open-panel", timeout: timeout)
+    try openGoToFolder(timeout: timeout)
     try setValue(url.path, identifier: "PathTextField")
-    try commitGoToFolder(timeout: 10)
-    try waitForEnabled("OKButton", timeout: 20)
-    try press("OKButton")
-    try waitForAbsence("open-panel", timeout: 20)
-    try waitForFacts([url.lastPathComponent], timeout: 60)
+    try commitGoToFolder(timeout: timeout)
+    try waitForEnabled("OKButton", timeout: timeout)
+    try press("OKButton", timeout: timeout)
+    try waitForAbsence("open-panel", timeout: timeout)
+    try waitForFacts([url.lastPathComponent], timeout: max(timeout, 30))
   }
 
   private func waitForElement(
@@ -741,28 +1247,47 @@ final class AccessibilityDriver {
         "could not make the exact ArkDeck application frontmost: AX error \(frontmostSet.rawValue)")
     }
 
-    var window: AXUIElement?
-    if let rawFocused = attribute(application, kAXFocusedWindowAttribute as CFString),
-      CFGetTypeID(rawFocused) == AXUIElementGetTypeID()
-    {
-      window = (rawFocused as! AXUIElement)
-    } else if let rawWindows = attribute(application, kAXWindowsAttribute as CFString),
-      let windows = rawWindows as? [AXUIElement]
-    {
-      window = windows.first
+    var raiseResult: AXError?
+    if candidate.applicationActivation == .activateAndRaise {
+      var window: AXUIElement?
+      if let rawFocused = attribute(application, kAXFocusedWindowAttribute as CFString),
+        CFGetTypeID(rawFocused) == AXUIElementGetTypeID()
+      {
+        window = (rawFocused as! AXUIElement)
+      } else if let rawWindows = attribute(application, kAXWindowsAttribute as CFString),
+        let windows = rawWindows as? [AXUIElement]
+      {
+        window = windows.first
+      }
+      guard let window else {
+        throw DriverFailure.message("the exact ArkDeck application has no interactive window")
+      }
+      raiseResult = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
     }
-    guard let window else {
-      throw DriverFailure.message("the exact ArkDeck application has no interactive window")
-    }
-    let raised = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-    RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    RunLoop.current.run(
+      until: Date().addingTimeInterval(
+        TimeInterval(candidate.activationSettleMilliseconds) / 1_000))
     let observedFrontmost = attribute(application, kAXFrontmostAttribute as CFString) as? Bool
-    guard runningApplication.isActive, observedFrontmost == true else {
+    let raiseDetail = raiseResult.map { String($0.rawValue) } ?? "notRequested"
+    do {
+      try requireExactApplicationFrontmost()
+    } catch {
       throw DriverFailure.message(
         "the exact ArkDeck application did not remain frontmost "
           + "[isActive=\(runningApplication.isActive) "
           + "frontmost=\(String(describing: observedFrontmost)) "
-          + "AXRaise=\(raised.rawValue)]")
+          + "AXRaise=\(raiseDetail)]")
+    }
+  }
+
+  private func requireExactApplicationFrontmost() throws {
+    let observedFrontmost = attribute(application, kAXFrontmostAttribute as CFString) as? Bool
+    guard runningApplication.isActive, observedFrontmost == true,
+      NSWorkspace.shared.frontmostApplication?.processIdentifier
+        == runningApplication.processIdentifier
+    else {
+      throw DriverFailure.message(
+        "exact ArkDeck process did not become frontmost; no global input was dispatched")
     }
   }
 
@@ -774,7 +1299,8 @@ final class AccessibilityDriver {
     return nil
   }
 
-  private func key(virtualCode: CGKeyCode, flags: CGEventFlags = []) {
+  private func key(virtualCode: CGKeyCode, flags: CGEventFlags = []) throws {
+    try requireExactApplicationFrontmost()
     let down = CGEvent(keyboardEventSource: nil, virtualKey: virtualCode, keyDown: true)
     down?.flags = flags
     down?.post(tap: .cghidEventTap)
@@ -783,14 +1309,15 @@ final class AccessibilityDriver {
     up?.post(tap: .cghidEventTap)
   }
 
-  private func scrollDown() {
+  private func scrollDown() throws {
+    try requireExactApplicationFrontmost()
     CGEvent(
       scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
       wheel1: -6, wheel2: 0, wheel3: 0
     )?.post(tap: .cghidEventTap)
   }
 
-  private func scrollToBottom(containing element: AXUIElement) {
+  private func scrollToBottom(containing element: AXUIElement) throws {
     var current: AXUIElement? = element
     for _ in 0..<30 {
       guard let scope = current else { break }
@@ -813,10 +1340,11 @@ final class AccessibilityDriver {
         current = nil
       }
     }
-    scrollDown()
+    try scrollDown()
   }
 
-  private func type(_ text: String) {
+  private func type(_ text: String) throws {
+    try requireExactApplicationFrontmost()
     let units = Array(text.utf16)
     let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true)
     units.withUnsafeBufferPointer { buffer in
@@ -838,13 +1366,32 @@ private func isSameApplication(_ lhs: URL, _ rhs: URL) -> Bool {
   return lhsIdentifier.isEqual(rhsIdentifier)
 }
 
-func launch(_ appURL: URL) throws -> pid_t {
+func launch(_ appURL: URL, requireFreshCandidate: Bool) throws -> pid_t {
   if let running = NSWorkspace.shared.runningApplications.first(where: {
     guard let bundleURL = $0.bundleURL else { return false }
     return isSameApplication(bundleURL, appURL)
   }) {
-    running.activate(options: [.activateAllWindows])
-    return running.processIdentifier
+    let executableModified = Bundle(url: appURL)?.executableURL.flatMap {
+      try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+    let loadedCandidateIsStale = running.launchDate.map { launchDate in
+      executableModified.map { $0 > launchDate } ?? false
+    } ?? false
+    if requireFreshCandidate || loadedCandidateIsStale {
+      guard running.terminate() else {
+        throw DriverFailure.message("could not terminate the exact stale candidate App")
+      }
+      let deadline = Date().addingTimeInterval(10)
+      while !running.isTerminated, Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+      }
+      guard running.isTerminated else {
+        throw DriverFailure.message("exact stale candidate App did not terminate cleanly")
+      }
+    } else {
+      running.activate(options: [.activateAllWindows])
+      return running.processIdentifier
+    }
   }
 
   let semaphore = DispatchSemaphore(value: 0)
@@ -870,72 +1417,178 @@ func launch(_ appURL: URL) throws -> pid_t {
 }
 
 func run() throws {
+  let protectedMainCommitOID = try protectedMainActuatorCommit()
   let options = try Options.parse(Array(CommandLine.arguments.dropFirst()))
-  let pid = try launch(options.appURL)
-  let driver = try AccessibilityDriver(processIdentifier: pid)
-
-  // macOS 26 can flatten SwiftUI List labels into an AXRow and omit the
-  // identifier. The bounded visible-text fallback covers ArkDeck's supported
-  // English and Simplified Chinese localizations without hard-coded coordinates.
-  try driver.click("app.navigation.flash", fallbackStrings: ["Flash", "刷机"])
-  try driver.waitForPresence("flash.mode", timeout: 20)
-  try driver.click("flash.mode.execute")
-  try driver.waitForSelected("flash.mode.execute", timeout: 5)
-  try driver.chooseFileIfNeeded(options.archiveURL)
-  try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
-  try driver.waitForEnabled("flash.plan.prepare", timeout: 30)
-  try driver.press("flash.plan.prepare", timeout: 30)
-  try driver.waitForFacts(
-    [
-      options.archiveURL.lastPathComponent,
-      options.expectedPlanDigest,
-      options.expectedArchiveDigest,
-      options.expectedStepSetDigest,
-      options.expectedTargetID,
-      String(options.expectedBindingRevision),
-    ],
-    timeout: 180)
-
-  try driver.waitForFacts(
-    [
-      options.expectedPlanDigest,
-      options.expectedArchiveDigest,
-      options.expectedStepSetDigest,
-      options.expectedTargetID,
-    ],
-    timeout: 30)
-  try driver.waitForPresence("flash.impact.userdata", timeout: 30)
-  try driver.waitForAbsence("flash.confirm.sheet", timeout: 1)
-  try driver.waitForPresence("flash.execute.submit", timeout: 30)
-  try driver.waitForEnabled("flash.execute.submit", timeout: 30)
-  try driver.assertNoFlashSubmission()
-  if options.stopBeforeSubmit {
-    print(
-      "UI_REVIEW_PASS: exact typed Flash request is ready for one-click submit; "
-        + "no Runtime Job is exposed before the button is pressed")
-    return
+  let candidate = try loadCandidateDecision(at: options.candidateURL)
+  let appExecutableSHA256 = try applicationExecutableSHA256(options.appURL)
+  let session = try options.debugSessionURL.map {
+    try ManualUIDebugSessionRecorder(
+      url: $0, options: options, candidate: candidate,
+      appExecutableSHA256: appExecutableSHA256,
+      protectedMainCommitOID: protectedMainCommitOID)
   }
-  print("UI_REVIEW_PASS: submitting the exact typed Flash request with one ArkDeck UI click")
-  try driver.submit("flash.execute.submit")
-  let submission = try driver.waitForFlashSubmission(timeout: options.timeoutSeconds)
-  guard submission.state == "succeeded" else {
-    throw DriverFailure.message(
-      "Runtime Flash Job \(submission.jobID) stopped in \(submission.state)")
+  do {
+    if let session {
+      print(
+        "AGENT_DEBUG_CANDIDATE: invocation=\(session.invocationID) "
+          + "decision=\(candidate.decisionSHA256) app=\(appExecutableSHA256) "
+          + "protectedMain=\(protectedMainCommitOID) externalDispatch=0")
+    }
+    let controlTimeout = TimeInterval(candidate.decision.controlTimeoutSeconds)
+    let planTimeout = TimeInterval(candidate.decision.planTimeoutSeconds)
+    let pid = try launch(
+      options.appURL, requireFreshCandidate: session?.requiresFreshCandidateApp == true)
+    guard try applicationExecutableSHA256(options.appURL) == appExecutableSHA256 else {
+      throw DriverFailure.message("candidate App executable changed before UI activation")
+    }
+    let driver = try AccessibilityDriver(
+      processIdentifier: pid, candidate: candidate.decision)
+
+    // Candidate output selects only delivery alternatives. The ordered
+    // controls and all exact values stay fixed in the protected actuator.
+    try driver.perform(
+      "app.navigation.flash",
+      delivery: candidate.decision.navigationDelivery,
+      fallbackStrings: ["Flash", "刷机"],
+      timeout: controlTimeout)
+    try driver.waitForPresence("flash.mode", timeout: controlTimeout)
+    try driver.perform(
+      "flash.mode.execute", delivery: candidate.decision.executeModeDelivery,
+      timeout: controlTimeout)
+    switch candidate.decision.executeModeObservation {
+    case .present:
+      try driver.waitForPresence("flash.mode.execute", timeout: controlTimeout)
+    case .selected:
+      try driver.waitForSelected("flash.mode.execute", timeout: controlTimeout)
+    }
+    try driver.chooseFileIfNeeded(
+      options.archiveURL,
+      delivery: candidate.decision.imageChooserDelivery,
+      timeout: controlTimeout)
+    try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
+    try driver.waitForEnabled("flash.plan.prepare", timeout: controlTimeout)
+    try driver.perform(
+      "flash.plan.prepare", delivery: candidate.decision.planPreparationDelivery,
+      timeout: controlTimeout)
+    try driver.waitForFacts(
+      [
+        options.archiveURL.lastPathComponent,
+        options.expectedPlanDigest,
+        options.expectedArchiveDigest,
+        options.expectedStepSetDigest,
+        options.expectedTargetID,
+        String(options.expectedBindingRevision),
+      ],
+      timeout: planTimeout)
+
+    try driver.waitForFacts(
+      [
+        options.expectedPlanDigest,
+        options.expectedArchiveDigest,
+        options.expectedStepSetDigest,
+        options.expectedTargetID,
+      ],
+      timeout: controlTimeout)
+    try driver.waitForPresence("flash.impact.userdata", timeout: controlTimeout)
+    try driver.waitForAbsence("flash.confirm.sheet", timeout: 1)
+    try driver.waitForPresence("flash.execute.submit", timeout: controlTimeout)
+    try driver.waitForEnabled("flash.execute.submit", timeout: controlTimeout)
+    try driver.assertNoFlashSubmission()
+    guard try applicationExecutableSHA256(options.appURL) == appExecutableSHA256 else {
+      throw DriverFailure.message("candidate App executable changed before submit barrier")
+    }
+    try session?.markUIReady()
+    if options.stopBeforeSubmit {
+      print(
+        "UI_REVIEW_PASS: exact typed Flash request is ready for one-click submit; "
+          + "no Runtime Job is exposed before the button is pressed")
+      return
+    }
+    print("UI_REVIEW_PASS: submitting the exact typed Flash request with one ArkDeck UI click")
+    try session?.markSubmissionRequested()
+    try driver.submit("flash.execute.submit")
+    let submission = try driver.waitForFlashSubmission(timeout: options.timeoutSeconds)
+    try session?.markRuntimeTerminal(jobID: submission.jobID, state: submission.state)
+    guard submission.state == "succeeded" else {
+      throw DriverFailure.message(
+        "Runtime Flash Job \(submission.jobID) stopped in \(submission.state); "
+          + "continue through the captured Runtime debug seed without an intermediate PR")
+    }
+    print("REAL_DEVICE_PASS: ArkDeck UI Flash Runtime Job \(submission.jobID) succeeded")
+  } catch {
+    session?.recordFailure(error)
+    throw error
   }
-  print("REAL_DEVICE_PASS: ArkDeck UI Flash Runtime Job \(submission.jobID) succeeded")
 }
 
 func runFlashBridge(_ arguments: [String]) throws -> Never {
-  guard arguments.count == 2, arguments[0] == "--socket" else {
-    throw DriverFailure.message(
-      "usage: manual_ui_flash --xpc-flash-bridge --socket <existing-agentd.sock>")
+  let protectedMainCommitOID = try protectedMainActuatorCommit()
+  var values: [String: String] = [:]
+  var index = 0
+  while index < arguments.count {
+    let key = arguments[index]
+    guard ["--socket", "--capture-debug-seed"].contains(key),
+      values[key] == nil, index + 1 < arguments.count
+    else {
+      throw DriverFailure.message(
+        "usage: manual_ui_flash --xpc-flash-bridge --socket <existing-agentd.sock> "
+          + "[--capture-debug-seed <absolute-request.json>]")
+    }
+    values[key] = arguments[index + 1]
+    index += 2
   }
-  let socketPath = arguments[1]
+  guard let socketPath = values["--socket"] else {
+    throw DriverFailure.message(
+      "usage: manual_ui_flash --xpc-flash-bridge --socket <existing-agentd.sock> "
+        + "[--capture-debug-seed <absolute-request.json>]")
+  }
   guard socketPath.hasPrefix("/"), FileManager.default.fileExists(atPath: socketPath) else {
     throw DriverFailure.message("Flash bridge requires an existing absolute Runtime socket")
   }
-  print("manual_ui_flash: bounded App XPC bridge -> \(socketPath)")
-  return ManualFlashXPCBridge(socketPath: socketPath).run()
+  var captureURL: URL?
+  if let path = values["--capture-debug-seed"] {
+    let url = URL(fileURLWithPath: path).standardizedFileURL
+    let parent = url.deletingLastPathComponent()
+    var isDirectory: ObjCBool = false
+    guard path.hasPrefix("/"),
+      FileManager.default.fileExists(atPath: parent.path, isDirectory: &isDirectory),
+      isDirectory.boolValue
+    else {
+      throw DriverFailure.message(
+        "--capture-debug-seed requires an absolute path in an existing directory")
+    }
+    captureURL = url
+  }
+  print(
+    "manual_ui_flash: bounded App XPC bridge -> \(socketPath) "
+      + "protectedMain=\(protectedMainCommitOID)")
+  return ManualFlashXPCBridge(
+    socketPath: socketPath, captureDebugSeedURL: captureURL
+  ).run()
+}
+
+func validateCandidate(_ arguments: [String]) throws {
+  guard arguments.count == 1, arguments[0].hasPrefix("/") else {
+    throw DriverFailure.message(
+      "usage: manual_ui_flash --validate-candidate <absolute-candidate.json>")
+  }
+  let loaded = try loadCandidateDecision(
+    at: URL(fileURLWithPath: arguments[0]).standardizedFileURL)
+  print(
+    "CANDIDATE_VALID: decision=\(loaded.decisionSHA256) "
+      + "protectedActuator=\(loaded.actuatorSHA256)")
+}
+
+func printDebugSessionStatus(_ arguments: [String]) throws {
+  guard arguments.count == 1, arguments[0].hasPrefix("/") else {
+    throw DriverFailure.message(
+      "usage: manual_ui_flash --debug-session-status <absolute-session.json>")
+  }
+  let url = URL(fileURLWithPath: arguments[0]).standardizedFileURL
+  let document = try JSONDecoder().decode(
+    ManualUIDebugSessionDocument.self, from: Data(contentsOf: url))
+  FileHandle.standardOutput.write(try canonicalData(document))
+  FileHandle.standardOutput.write(Data("\n".utf8))
 }
 
 func requestAccessibilityPermission() -> Never {
@@ -958,6 +1611,10 @@ do {
     requestAccessibilityPermission()
   } else if arguments.first == "--xpc-flash-bridge" {
     try runFlashBridge(Array(arguments.dropFirst()))
+  } else if arguments.first == "--validate-candidate" {
+    try validateCandidate(Array(arguments.dropFirst()))
+  } else if arguments.first == "--debug-session-status" {
+    try printDebugSessionStatus(Array(arguments.dropFirst()))
   } else {
     try run()
   }

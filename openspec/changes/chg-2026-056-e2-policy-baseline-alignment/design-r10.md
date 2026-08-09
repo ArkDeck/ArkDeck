@@ -98,6 +98,18 @@ debuggable before promotion. The first DAYU200 envelope must cover the current m
 bounded deadlines, unique post-flash HDC-personality selection and read-only postflight checks,
 because those are the defects that caused the #1210–#1215 merge-before-observe chain.
 
+The invocation begins before Runtime admission. The protected-main manual UI actuator accepts a
+closed candidate decision containing only exact-app activation, reviewed control-delivery
+alternatives and bounded waits. It retains the fixed action order, control identifiers, archive,
+target, plan facts and sole submit action. A pre-submit refusal is dispatch-free and a materially
+distinct next candidate may run in the same durable session. Once submission is requested, loss of
+the terminal observation blocks another UI attempt. The bridge captures only a successfully
+accepted, binding-pinned request, removes App client context, writes it owner-only and uses it as a
+non-authoritative seed for the protected Runtime loop. This closes the #1220 pre-admission gap
+without allowing an unmerged UI driver, broker or Provider to execute. Before it touches UI or XPC,
+the actuator compares its bytes to the local `origin/main` Git blob and records the exact commit;
+candidate variability is confined to the closed decision and isolated App executable digest.
+
 Arbitrary unmerged Runtime or Provider code still cannot replace the protected executor. If a
 candidate needs a new Step, command, partition, target rule, trusted fact or external-effect
 alternative, Runtime returns `repairSurfaceInsufficient` with zero new dispatch. That is a real

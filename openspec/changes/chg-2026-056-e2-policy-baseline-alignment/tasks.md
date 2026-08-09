@@ -2,10 +2,12 @@
 
 ## TASK-E2B-001 — Close GJ-4 with Runtime-owned admission and autonomous proven recovery
 
-- Status:ready (IMPLEMENTING: r10 was reviewed and merged to protected main by #1217; the closed
-  candidate grammar is approved and the Runtime-owned invocation implementation is in progress.
-  Host contract evidence is not real-device completion; GJ-4 remains IMPLEMENTING until the
-  explicit device window reaches success or reports one truthful non-overridable blocker.)
+- Status:ready (IMPLEMENTING: r10 was reviewed by #1217 and its Runtime invocation landed in
+  #1219. #1220 proved the real UI path still stopped before that invocation and used an
+  intermediate PR as experiment transport; the pre-admission candidate actuator and accepted
+  request handoff are now the remaining implementation scope. Host contract evidence is not
+  real-device completion; GJ-4 remains IMPLEMENTING until the explicit device window reaches
+  success or reports one truthful non-overridable blocker.)
 - Golden Journey:GJ-4
 - Platform:macos; windows/linux contract compatibility only
 - Requirements:`POL-RECOVERY-001`, `POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-013`,
@@ -235,6 +237,16 @@
   `repairSurfaceInsufficient` with zero new dispatch.
 - Export one normal promotion candidate only after the real loop passes. The final source change is
   reviewed in one ordinary PR; per-attempt PRs are forbidden.
+- Extend the invocation to the pre-admission UI path: a candidate may select only reviewed exact-app
+  activation, bounded control-delivery alternatives and waits. The protected actuator owns action
+  order, control identifiers, archive, target, plan facts and the sole submit action.
+- Persist an exact pre-admission session. A refusal before submission has external dispatch 0 and
+  may accept a materially distinct candidate; an interrupted submission blocks replay until the
+  Runtime result is reconciled. Material identity includes the closed decision, protected actuator
+  and actual executable digest from an isolated candidate App build.
+- After App `job.submit` is accepted, capture the exact binding-pinned request without App client
+  context as an owner-only, non-authoritative Runtime debug seed. A safe Runtime failure continues
+  through the #1219 invocation, not through an intermediate source PR.
 
 ### r10 Verification
 
@@ -252,6 +264,13 @@
   the next eligible candidate; a genuine envelope miss reports `repairSurfaceInsufficient`.
 - Real GJ-4: one explicit device window reaches success or one truthful non-overridable blocker
   without an intermediate PR. Simulation/fake/host green is not `REAL_DEVICE_PASS`.
+- Pre-admission regression: candidate A may fail before Job creation and candidate B may reach the
+  exact review barrier in the same durable session with dispatch 0 between them. Candidate input
+  cannot name an app, archive, target, plan, control identifier, submit action, executable, argv,
+  Runtime socket or authority.
+- Handoff regression: only a successfully admitted App Flash request can produce the owner-only
+  debug seed; `clientContext` is removed and no authority/campaign field is added. Unknown UI
+  submission state blocks both another UI candidate and automatic destructive replay.
 
 ### r10 Stop conditions
 
