@@ -3,25 +3,25 @@
 ## TASK-E2B-001 — Close GJ-4 with Runtime-owned admission and autonomous proven recovery
 
 - Status:ready (IMPLEMENTING: r10 was reviewed by #1217 and its Runtime invocation landed in
-  #1219. #1220 proved the real UI path still stopped before that invocation and used an
-  intermediate PR as experiment transport; the pre-admission candidate actuator and accepted
-  request handoff are now the remaining implementation scope. Host contract evidence is not
+  #1219. #1220–#1223 closed the pre-admission actuator path. The next real submit exposed r11's
+  displaced advanced-target binding defect; its policy delta and product fix travel together and
+  cannot touch hardware before this exact diff is reviewed/merged. Host contract evidence is not
   real-device completion; GJ-4 remains IMPLEMENTING until the explicit device window reaches
   success or reports one truthful non-overridable blocker.)
 - Golden Journey:GJ-4
 - Platform:macos; windows/linux contract compatibility only
-- Requirements:`POL-RECOVERY-001`, `POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-013`,
+- Requirements:`POL-RECOVERY-001`, `POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-010`, `REQ-FLASH-013`,
   `REQ-FLASH-015`, `REQ-FLASH-016`, `REQ-FLASH-017`, `REQ-FLASH-018`, `REQ-WF-004`,
   `REQ-JOB-001`, `REQ-JOB-006`
-- Acceptance:`AC-FLASH-007-01`, `AC-FLASH-013-01`, `AC-FLASH-015-01`,
+- Acceptance:`AC-FLASH-007-01`, `AC-FLASH-010-02`, `AC-FLASH-013-01`, `AC-FLASH-015-01`,
   `AC-FLASH-015-02`, `AC-FLASH-015-03`,
   `AC-WF-004-01`, `AC-WF-004-02`, `AC-WF-004-03`, `E2R-CATALOG-001`,
   `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RUNTIME-001`,
   `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`, `E2R-GJ4-001`
 - Depends on:r7/r9/r10 approval dependencies are satisfied by #1193/#1194, #1206/#1207 and
-  #1217; the remaining dependency is implementation host gates followed by the explicit D2
-  real-device window
+  #1217; r11 requires this exact product/policy PR to merge before hardware use, followed by the
+  explicit D2 real-device window
 - Production reachability:
   `ArkDeckApp/manual UI driver -> Agent XPC -> protected-main RuntimeJobEngine ->
   RuntimeCapabilityStore -> Rockchip Runtime composition -> typed Provider -> DAYU200`
@@ -279,3 +279,26 @@
   the only owner of transport, facts, plan, capability, reservation, journal and outcome.
 - Stop with `repairSurfaceInsufficient` rather than widening the candidate grammar when a repair
   needs a new external effect, target rule, trusted fact, Step, command, partition or Provider plan.
+
+### r11 displaced binding reactivation deliverables and verification
+
+- Add a read-only proof source over owner-only Rockchip typed action records. It accepts only a
+  current-revision HDC reconnect intent for the exact target/stable Loader identity plus a
+  correlated directly-previous-revision confirmed HDC-normal route receipt from the same provider
+  executable for the same retained connect key.
+- Recompute typed action hashes, require exact intent/receipt correlation and one unique numeric
+  topology; record only SHA-256 references in the active binding evidence.
+- Add a closed same-revision reactivation evidence shape that carries no adjacent-lineage fields,
+  produces no target-store advance and cannot satisfy Loader binding crash recovery.
+- Compare-and-swap only the exact active binding revision/identity after a fresh exactly-one Loader
+  probe and unique target/revision/stable identity match. Preserve `RuntimeTargetStore` bytes.
+- Keep the r9 rev2/chat-attestation historical binding rejection byte-stable. Do not consult Job
+  success text, legacy authority/campaign data or caller/App proof.
+- Positive contract: exact proof reactivates and an XPC lost-response retry is idempotent; the
+  restored HDC alias remains available for bound post-flash reconnect.
+- Negative matrix: missing/wrong target/revision/identity/connect key, non-adjacent revision,
+  provider drift, action hash, receipt pair, file owner/mode/size/truncation and two-topology
+  ambiguity all leave binding/target unchanged and imply external dispatch zero.
+- Candidate implementation and host tests perform no Runtime-store or hardware write. After
+  protected-main merge, rerun a zero-submit exact UI review before requesting a new action-time
+  confirmation for the destructive click.

@@ -126,12 +126,31 @@ Execute 分支从进入升级模式前到 postflight 或稳定 recovery/terminal
 
 进入 updater、重启和返回系统模式 SHALL 使用 Core device binding contract。身份未确认时，任何 Flash mutation SHALL 被阻断。
 
+当 singleton active binding 已切换到另一块板时，advanced USB target 的 same-revision
+重新激活 SHALL 由 protected-main Runtime 独占。Runtime SHALL 同时要求 fresh 恰一台精确
+Loader、唯一 current target/revision/stable identity，以及相互关联的 owner-only typed
+`wait-for-hdc` intent 与直接前一 revision 的 confirmed HDC-route receipt；二者 SHALL 来自
+同一 provider executable、精确给出该 target revision 原先使用的 connect identity，并对
+topology 得出唯一结论。重新激活 SHALL 原子替换 active
+binding 但 SHALL NOT 推进 target revision、伪造 adjacent lineage、迁移旧 chat attestation
+或改写历史 Job/receipt。缺失、篡改、歧义或 drift SHALL 保持 binding/target 原字节不变并在
+任何 Flash dispatch 前拒绝。
+
 #### Scenario: AC-FLASH-010-01 TCP updater 回连
 
 - GIVEN TCP 设备进入升级流程后断线再出现
 - WHEN目标可达
 - THEN必须由用户确认 identity diff
 - AND不会静默续刷
+
+#### Scenario: AC-FLASH-010-02 已接管 Loader target 重新成为 active binding
+
+- GIVEN target A 的 advanced binding 曾被 target B 替换，target A 以 Loader 精确返回
+- AND 同一 provider 的 Runtime durable typed records 完整证明 target A 当前及直接前一 revision 的 HDC route 与唯一 topology
+- WHEN用户在 App 选择 target A 并点击刷机
+- THEN Runtime 可原子重新激活 target A 的 same-revision binding 且不推进 lineage
+- AND旧 incomplete binding、成功字符串或当前“只有一台设备”均不构成证明
+- AND任一 record/hash/identity/route/topology 不完整或歧义时 binding/target 不变且 Flash dispatch 为 0
 
 ### Requirement: REQ-FLASH-011 Host/device space and streaming progress
 

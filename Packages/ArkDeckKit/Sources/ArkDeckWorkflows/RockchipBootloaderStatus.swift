@@ -178,6 +178,48 @@ public protocol RockchipLoaderBindingCoordinating: Sendable {
   ) throws -> RockchipLoaderBindingReceipt
 }
 
+/// Runtime-owned proof that an already-adopted target's latest Loader binding
+/// was previously used with one exact HDC route. The proof is reconstructed
+/// only from correlated owner-only typed intents/receipts; it is not an App or
+/// caller assertion and it never claims that a missing adjacent lineage edge
+/// was persisted.
+package struct RockchipBindingReactivationProof: Sendable, Equatable {
+  package let targetID: String
+  package let bindingRevision: Int
+  package let stableLoaderIdentitySHA256: String
+  package let hdcConnectKey: String
+  package let hdcIdentitySHA256: String
+  package let hdcUSBTopology: String
+  package let currentBindingIntentSHA256: String
+  package let hdcRouteReceiptSHA256: String
+
+  package init(
+    targetID: String,
+    bindingRevision: Int,
+    stableLoaderIdentitySHA256: String,
+    hdcConnectKey: String,
+    hdcIdentitySHA256: String,
+    hdcUSBTopology: String,
+    currentBindingIntentSHA256: String,
+    hdcRouteReceiptSHA256: String
+  ) {
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.stableLoaderIdentitySHA256 = stableLoaderIdentitySHA256
+    self.hdcConnectKey = hdcConnectKey
+    self.hdcIdentitySHA256 = hdcIdentitySHA256
+    self.hdcUSBTopology = hdcUSBTopology
+    self.currentBindingIntentSHA256 = currentBindingIntentSHA256
+    self.hdcRouteReceiptSHA256 = hdcRouteReceiptSHA256
+  }
+}
+
+package protocol RockchipBindingReactivationProving: Sendable {
+  func proof(
+    for target: RuntimeTargetRecord
+  ) throws -> RockchipBindingReactivationProof?
+}
+
 /// Runtime-owned DAYU200 onboarding. The caller selects only an already
 /// adopted target and its expected revision; Runtime obtains every candidate
 /// identity/topology fact afresh, applies Core's manual USB rebind policy, and
@@ -189,21 +231,32 @@ public struct ProductRockchipLoaderBindingCoordinator:
   private let targetStore: RuntimeTargetStore
   private let bindingStore: RockchipProductBindingStore
   private let usbProbe: RockchipProductUSBProbe
+  private let reactivationProofSource: any RockchipBindingReactivationProving
 
   public init(targetStore: RuntimeTargetStore, applicationSupportRoot: URL) {
     self.targetStore = targetStore
     self.bindingStore = RockchipProductBindingStore(rootURL: applicationSupportRoot)
     self.usbProbe = RockchipProductUSBProbe()
+    self.reactivationProofSource = RockchipRuntimeBindingReactivationProofSource(
+      rootURL: applicationSupportRoot
+        .appendingPathComponent("Agentd", isDirectory: true)
+        .appendingPathComponent("rockchip-runtime", isDirectory: true))
   }
 
   init(
     targetStore: RuntimeTargetStore,
     bindingStore: RockchipProductBindingStore,
-    usbProbe: RockchipProductUSBProbe
+    usbProbe: RockchipProductUSBProbe,
+    reactivationProofSource: (any RockchipBindingReactivationProving)? = nil
   ) {
     self.targetStore = targetStore
     self.bindingStore = bindingStore
     self.usbProbe = usbProbe
+    self.reactivationProofSource = reactivationProofSource
+      ?? RockchipRuntimeBindingReactivationProofSource(
+        rootURL: bindingStore.rootURL
+          .appendingPathComponent("Agentd", isDirectory: true)
+          .appendingPathComponent("rockchip-runtime", isDirectory: true))
   }
 
   public func bindCurrentLoader(
@@ -331,6 +384,16 @@ public struct ProductRockchipLoaderBindingCoordinator:
           updated: false,
           selectionEvidenceSHA256: proof.selectionEvidenceSHA256)
       }
+      if alreadyCovered,
+        let selection = try existing.reactivationSelectionEvidence(targetID: targetID)
+      {
+        return RockchipLoaderBindingReceipt(
+          targetID: targetID,
+          previousRevision: expectedBindingRevision,
+          currentRevision: expectedBindingRevision,
+          updated: false,
+          selectionEvidenceSHA256: selection)
+      }
 
       throw RockchipFlashExecutionError.admissionRejected(
         "selected Loader binding does not carry current Runtime attestation")
@@ -339,6 +402,91 @@ public struct ProductRockchipLoaderBindingCoordinator:
     guard identity.isLoader else {
       throw RockchipFlashExecutionError.admissionRejected(
         "the selected HDC-normal target has no active cross-mode binding")
+    }
+
+    // Switching the singleton binding away from an already-advanced target
+    // used to make that target permanently unselectable even when its exact
+    // Loader returned. Reactivation is not a legacy-binding migration: the
+    // old binding bytes are absent and are never guessed. Runtime instead
+    // requires (1) one fresh exact Loader, (2) one unique current target, and
+    // (3) correlated owner-only typed history proving that this same target,
+    // revision and Loader identity previously carried the retained HDC route.
+    if target.bindingRevision == expectedBindingRevision,
+      target.bindingRevision > 1,
+      currentIdentity != existingIdentity,
+      currentIdentity == target.stablePhysicalIdentitySHA256
+    {
+      _ = try existing.runtimeTargetLineageAdvance()
+      let matchingTargets = try targetStore.list().filter {
+        $0.bindingRevision == target.bindingRevision
+          && $0.stablePhysicalIdentitySHA256 == currentIdentity
+      }
+      guard matchingTargets.map(\.targetID) == [targetID],
+        let proof = try reactivationProofSource.proof(for: target)
+      else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected historical target has no complete Runtime reactivation proof")
+      }
+      let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
+        .map { String(format: "%02x", $0) }.joined()
+      guard proof.targetID == targetID,
+        proof.bindingRevision == target.bindingRevision,
+        proof.stableLoaderIdentitySHA256 == currentIdentity,
+        proof.hdcConnectKey == target.connectKey,
+        proof.hdcIdentitySHA256 == connectIdentity,
+        RockchipStandingAuthorization.isCanonicalSHA256(
+          proof.currentBindingIntentSHA256),
+        RockchipStandingAuthorization.isCanonicalSHA256(
+          proof.hdcRouteReceiptSHA256),
+        !proof.hdcUSBTopology.isEmpty,
+        proof.hdcUSBTopology.utf8.allSatisfy({ (48...57).contains($0) })
+      else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected historical target Runtime proof does not match its current binding")
+      }
+
+      try Self.authorizeSelectedTarget(identity: identity, currentIdentity: currentIdentity)
+      let selectionDigest = Self.selectionDigest(
+        targetID: targetID,
+        previousRevision: existing.revision,
+        currentRevision: target.bindingRevision,
+        previousIdentity: existingIdentity,
+        currentIdentity: currentIdentity,
+        currentTopology: identity.topology)
+      let next = RockchipProductBindingSnapshot(
+        revision: target.bindingRevision,
+        serial: identity.serial,
+        usbTopology: identity.topology,
+        evidence: [
+          "product:e0-iokit-single-loader-readback",
+          "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
+          "identity:serial-sha256=\(currentIdentity)",
+          "identity:hdc-normal-alias-sha256=\(proof.hdcIdentitySHA256)",
+          "binding:hdc-normal-alias-usb-topology=\(proof.hdcUSBTopology)",
+          "binding:reactivated-target-id=\(targetID)",
+          "binding:reactivation-current-intent-sha256=\(proof.currentBindingIntentSHA256)",
+          "binding:reactivation-route-receipt-sha256=\(proof.hdcRouteReceiptSHA256)",
+          "binding:replaced-active-revision=\(existing.revision)",
+          "identity:replaced-active-serial-sha256=\(existingIdentity)",
+          "rebind:user-selection-sha256=\(selectionDigest)",
+        ])
+      let stored = try bindingStore.activateSelectedTarget(
+        expectedRevision: existing.revision,
+        expectedSerialSHA256: existingIdentity,
+        with: next)
+      guard try stored.coversRuntimeTarget(target),
+        try stored.matchesConfirmedLiveIdentity(identity),
+        try stored.confirmedHDCNormalAlias()?.identitySHA256 == connectIdentity
+      else {
+        throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+          "reactivated target binding did not cover its fresh Loader and durable HDC route")
+      }
+      return RockchipLoaderBindingReceipt(
+        targetID: targetID,
+        previousRevision: target.bindingRevision,
+        currentRevision: target.bindingRevision,
+        updated: true,
+        selectionEvidenceSHA256: selectionDigest)
     }
 
     if target.bindingRevision == expectedBindingRevision + 1,

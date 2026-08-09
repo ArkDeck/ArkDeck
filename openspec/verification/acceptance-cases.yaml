@@ -62,6 +62,7 @@ cases:
   - { acceptance_id: AC-FLASH-008-01, test_id: TEST-AC-FLASH-008-01, method: criticalCancellationFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-008-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-009-01, test_id: TEST-AC-FLASH-009-01, method: powerSleepFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-009-01, minimum_evidence: platform }
   - { acceptance_id: AC-FLASH-010-01, test_id: TEST-AC-FLASH-010-01, method: transportRecoveryContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-010-01, minimum_evidence: contract }
+  - { acceptance_id: AC-FLASH-010-02, test_id: TEST-AC-FLASH-010-02, method: rockchipBindingReactivationContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-010-02, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-011-01, test_id: TEST-AC-FLASH-011-01, method: progressContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-011-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-012-01, test_id: TEST-AC-FLASH-012-01, method: semanticPostflightContract, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-012-01, minimum_evidence: contract }
   - { acceptance_id: AC-FLASH-013-01, test_id: TEST-AC-FLASH-013-01, method: recoveryFaultInjection, expected_source: openspec/specs/flashing/spec.md#AC-FLASH-013-01, minimum_evidence: contract }
