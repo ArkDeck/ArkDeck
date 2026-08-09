@@ -44,43 +44,115 @@ private enum CandidateControlDelivery: String, Codable {
   case pointerClick
 }
 
-private enum CandidateModeObservation: String, Codable {
-  case present
-  case selected
+private enum CandidateUIActionKind: String, Codable {
+  case perform
+  case waitForPresence
+  case waitForAbsence
+  case waitForEnabled
+  case waitForDisabled
+  case waitForSelected
+  case choosePinnedArchive
+  case selectPinnedTarget
+  case waitForPinnedPlan
 }
 
-/// Untrusted, pre-admission candidate output. The candidate can select only
-/// reviewed UI-delivery alternatives and bounded waits. The exact app,
-/// controls, archive, target, plan facts and submit action remain in this
-/// protected-main actuator and cannot be supplied by the candidate.
-private struct ManualUIFlashCandidateDecision: Codable, Equatable {
-  static let documentType = "manual-ui-flash-candidate"
-  static let schemaVersion = "1.0.0"
+/// One composable, pre-submit UI effect. Candidate programs may change the
+/// order and delivery mechanics without teaching protected main about a new
+/// problem or repair kind. Raw values are deliberately absent: archive,
+/// target and plan facts are supplied only by the protected invocation.
+private struct CandidateUIAction: Codable, Equatable {
+  let kind: CandidateUIActionKind
+  let identifier: String?
+  let delivery: CandidateControlDelivery?
+  let fallbackStrings: [String]?
+
+  private enum CodingKeys: String, CodingKey, CaseIterable {
+    case kind
+    case identifier
+    case delivery
+    case fallbackStrings
+  }
+
+  init(from decoder: any Decoder) throws {
+    let dynamic = try decoder.container(keyedBy: CandidateCodingKey.self)
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    kind = try container.decode(CandidateUIActionKind.self, forKey: .kind)
+
+    let expectedKeys: Set<String>
+    switch kind {
+    case .perform:
+      expectedKeys = ["kind", "identifier", "delivery", "fallbackStrings"]
+      identifier = try container.decode(String.self, forKey: .identifier)
+      delivery = try container.decode(CandidateControlDelivery.self, forKey: .delivery)
+      fallbackStrings = try container.decode([String].self, forKey: .fallbackStrings)
+    case .waitForPresence, .waitForAbsence, .waitForEnabled, .waitForDisabled,
+      .waitForSelected:
+      expectedKeys = ["kind", "identifier"]
+      identifier = try container.decode(String.self, forKey: .identifier)
+      delivery = nil
+      fallbackStrings = nil
+    case .choosePinnedArchive:
+      expectedKeys = ["kind", "delivery"]
+      identifier = nil
+      delivery = try container.decode(CandidateControlDelivery.self, forKey: .delivery)
+      fallbackStrings = nil
+    case .selectPinnedTarget, .waitForPinnedPlan:
+      expectedKeys = ["kind"]
+      identifier = nil
+      delivery = nil
+      fallbackStrings = nil
+    }
+
+    guard Set(dynamic.allKeys.map(\.stringValue)) == expectedKeys else {
+      throw DriverFailure.message("candidate UI action must have its exact effect shape")
+    }
+    if let identifier {
+      guard identifier.range(
+        of: "^(app\\.navigation\\.flash|flash\\.[A-Za-z0-9._-]{1,112})$",
+        options: .regularExpression) != nil,
+        !identifier.hasPrefix("flash.execute.")
+      else {
+        throw DriverFailure.message(
+          "candidate UI action escaped the exact Flash pre-submit surface")
+      }
+    }
+    if let fallbackStrings {
+      guard fallbackStrings.count <= 4,
+        fallbackStrings.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 128 }),
+        fallbackStrings.isEmpty || identifier == "app.navigation.flash"
+      else {
+        throw DriverFailure.message("candidate UI fallback strings are outside bounds")
+      }
+    }
+  }
+
+}
+
+/// Untrusted pre-admission program interpreted by the reviewed actuator. This
+/// is a stable effect grammar rather than an enumeration of known UI failure
+/// modes. It can reach only the exact ArkDeck Flash UI before submit; the
+/// protected actuator alone supplies request values, verifies the complete
+/// typed plan and performs the single Runtime submit.
+private struct ManualUIFlashCandidateProgram: Codable, Equatable {
+  static let documentType = "manual-ui-flash-candidate-program"
+  static let schemaVersion = "2.0.0"
 
   let documentType: String
   let schemaVersion: String
   let applicationActivation: CandidateApplicationActivation
-  let navigationDelivery: CandidateControlDelivery
-  let executeModeDelivery: CandidateControlDelivery
-  let executeModeObservation: CandidateModeObservation
-  let imageChooserDelivery: CandidateControlDelivery
-  let planPreparationDelivery: CandidateControlDelivery
   let activationSettleMilliseconds: Int
   let controlTimeoutSeconds: Int
   let planTimeoutSeconds: Int
+  let actions: [CandidateUIAction]
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case documentType
     case schemaVersion
     case applicationActivation
-    case navigationDelivery
-    case executeModeDelivery
-    case executeModeObservation
-    case imageChooserDelivery
-    case planPreparationDelivery
     case activationSettleMilliseconds
     case controlTimeoutSeconds
     case planTimeoutSeconds
+    case actions
   }
 
   init(from decoder: any Decoder) throws {
@@ -88,41 +160,32 @@ private struct ManualUIFlashCandidateDecision: Codable, Equatable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     guard Set(dynamic.allKeys.map(\.stringValue)) == Set(CodingKeys.allCases.map(\.stringValue))
     else {
-      throw DriverFailure.message("candidate decision must have the exact published shape")
+      throw DriverFailure.message("candidate UI program must have the exact published shape")
     }
     documentType = try container.decode(String.self, forKey: .documentType)
     schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
     applicationActivation = try container.decode(
       CandidateApplicationActivation.self, forKey: .applicationActivation)
-    navigationDelivery = try container.decode(
-      CandidateControlDelivery.self, forKey: .navigationDelivery)
-    executeModeDelivery = try container.decode(
-      CandidateControlDelivery.self, forKey: .executeModeDelivery)
-    executeModeObservation = try container.decode(
-      CandidateModeObservation.self, forKey: .executeModeObservation)
-    imageChooserDelivery = try container.decode(
-      CandidateControlDelivery.self, forKey: .imageChooserDelivery)
-    planPreparationDelivery = try container.decode(
-      CandidateControlDelivery.self, forKey: .planPreparationDelivery)
     activationSettleMilliseconds = try container.decode(
       Int.self, forKey: .activationSettleMilliseconds)
     controlTimeoutSeconds = try container.decode(Int.self, forKey: .controlTimeoutSeconds)
     planTimeoutSeconds = try container.decode(Int.self, forKey: .planTimeoutSeconds)
+    actions = try container.decode([CandidateUIAction].self, forKey: .actions)
     guard documentType == Self.documentType,
       schemaVersion == Self.schemaVersion,
       (50...2_000).contains(activationSettleMilliseconds),
       (5...60).contains(controlTimeoutSeconds),
-      (30...300).contains(planTimeoutSeconds)
+      (30...300).contains(planTimeoutSeconds),
+      (1...64).contains(actions.count)
     else {
-      throw DriverFailure.message("candidate decision is outside the published UI repair envelope")
+      throw DriverFailure.message("candidate UI program is outside the invariant bounds")
     }
   }
 }
 
 private struct LoadedManualUICandidate {
-  let decision: ManualUIFlashCandidateDecision
-  let decisionData: Data
-  let decisionSHA256: String
+  let program: ManualUIFlashCandidateProgram
+  let programSHA256: String
   let actuatorSHA256: String
 }
 
@@ -193,25 +256,24 @@ private func protectedMainActuatorCommit() throws -> String {
   return oid
 }
 
-private func loadCandidateDecision(at url: URL) throws -> LoadedManualUICandidate {
+private func loadCandidateProgram(at url: URL) throws -> LoadedManualUICandidate {
   let data = try Data(contentsOf: url)
   guard !data.isEmpty, data.count <= 64 * 1_024 else {
-    throw DriverFailure.message("candidate decision must be 1...65536 bytes")
+    throw DriverFailure.message("candidate UI program must be 1...65536 bytes")
   }
-  let decision: ManualUIFlashCandidateDecision
+  let program: ManualUIFlashCandidateProgram
   do {
-    decision = try JSONDecoder().decode(ManualUIFlashCandidateDecision.self, from: data)
+    program = try JSONDecoder().decode(ManualUIFlashCandidateProgram.self, from: data)
   } catch let failure as DriverFailure {
     throw failure
   } catch {
-    throw DriverFailure.message("candidate decision is invalid: \(error)")
+    throw DriverFailure.message("candidate UI program is invalid: \(error)")
   }
-  let normalized = try canonicalData(decision)
+  let normalized = try canonicalData(program)
   let actuatorURL = URL(fileURLWithPath: #filePath).standardizedFileURL
   return LoadedManualUICandidate(
-    decision: decision,
-    decisionData: normalized,
-    decisionSHA256: sha256(normalized),
+    program: program,
+    programSHA256: sha256(normalized),
     actuatorSHA256: sha256(try Data(contentsOf: actuatorURL)))
 }
 
@@ -607,7 +669,7 @@ struct Options {
 
 private struct ManualUIDebugAttempt: Codable {
   let ordinal: Int
-  let candidateDecisionSHA256: String
+  let candidateProgramSHA256: String
   let candidateActuatorSHA256: String
   let candidateAppExecutableSHA256: String
   let startedAtUTC: String
@@ -619,7 +681,7 @@ private struct ManualUIDebugAttempt: Codable {
 
 private struct ManualUIDebugSessionDocument: Codable {
   static let documentType = "manual-ui-flash-debug-session"
-  static let schemaVersion = "1.0.0"
+  static let schemaVersion = "2.0.0"
 
   let documentType: String
   let schemaVersion: String
@@ -693,7 +755,7 @@ private final class ManualUIDebugSessionRecorder {
           "prior UI submission outcome is not terminal; refusing another candidate")
       }
       if let last = document.attempts.last,
-        last.candidateDecisionSHA256 == candidate.decisionSHA256,
+        last.candidateProgramSHA256 == candidate.programSHA256,
         last.candidateActuatorSHA256 == candidate.actuatorSHA256,
         last.candidateAppExecutableSHA256 == appExecutableSHA256,
         ["preparingUI", "uiReady"].contains(last.state)
@@ -706,13 +768,6 @@ private final class ManualUIDebugSessionRecorder {
       }
       guard document.attempts.count < Self.maximumAttempts else {
         throw DriverFailure.message("debug session exhausted its 64 pre-admission candidates")
-      }
-      guard !document.attempts.contains(where: {
-        $0.candidateDecisionSHA256 == candidate.decisionSHA256
-          && $0.candidateActuatorSHA256 == candidate.actuatorSHA256
-          && $0.candidateAppExecutableSHA256 == appExecutableSHA256
-      }) else {
-        throw DriverFailure.message("candidate is not materially distinct from a prior attempt")
       }
     } else {
       document = ManualUIDebugSessionDocument(
@@ -734,7 +789,7 @@ private final class ManualUIDebugSessionRecorder {
     document.attempts.append(
       ManualUIDebugAttempt(
         ordinal: document.attempts.count + 1,
-        candidateDecisionSHA256: candidate.decisionSHA256,
+        candidateProgramSHA256: candidate.programSHA256,
         candidateActuatorSHA256: candidate.actuatorSHA256,
         candidateAppExecutableSHA256: appExecutableSHA256,
         startedAtUTC: formatter.string(from: now),
@@ -795,9 +850,9 @@ private final class ManualUIDebugSessionRecorder {
 private final class AccessibilityDriver {
   private let application: AXUIElement
   private let runningApplication: NSRunningApplication
-  private let candidate: ManualUIFlashCandidateDecision
+  private let candidate: ManualUIFlashCandidateProgram
 
-  init(processIdentifier: pid_t, candidate: ManualUIFlashCandidateDecision) throws {
+  init(processIdentifier: pid_t, candidate: ManualUIFlashCandidateProgram) throws {
     guard AXIsProcessTrusted() else {
       throw DriverFailure.message(
         "Accessibility access is required for the executable running this script")
@@ -1419,7 +1474,7 @@ func launch(_ appURL: URL, requireFreshCandidate: Bool) throws -> pid_t {
 func run() throws {
   let protectedMainCommitOID = try protectedMainActuatorCommit()
   let options = try Options.parse(Array(CommandLine.arguments.dropFirst()))
-  let candidate = try loadCandidateDecision(at: options.candidateURL)
+  let candidate = try loadCandidateProgram(at: options.candidateURL)
   let appExecutableSHA256 = try applicationExecutableSHA256(options.appURL)
   let session = try options.debugSessionURL.map {
     try ManualUIDebugSessionRecorder(
@@ -1431,55 +1486,57 @@ func run() throws {
     if let session {
       print(
         "AGENT_DEBUG_CANDIDATE: invocation=\(session.invocationID) "
-          + "decision=\(candidate.decisionSHA256) app=\(appExecutableSHA256) "
+          + "program=\(candidate.programSHA256) app=\(appExecutableSHA256) "
           + "protectedMain=\(protectedMainCommitOID) externalDispatch=0")
     }
-    let controlTimeout = TimeInterval(candidate.decision.controlTimeoutSeconds)
-    let planTimeout = TimeInterval(candidate.decision.planTimeoutSeconds)
+    let controlTimeout = TimeInterval(candidate.program.controlTimeoutSeconds)
+    let planTimeout = TimeInterval(candidate.program.planTimeoutSeconds)
     let pid = try launch(
       options.appURL, requireFreshCandidate: session?.requiresFreshCandidateApp == true)
     guard try applicationExecutableSHA256(options.appURL) == appExecutableSHA256 else {
       throw DriverFailure.message("candidate App executable changed before UI activation")
     }
     let driver = try AccessibilityDriver(
-      processIdentifier: pid, candidate: candidate.decision)
+      processIdentifier: pid, candidate: candidate.program)
 
-    // Candidate output selects only delivery alternatives. The ordered
-    // controls and all exact values stay fixed in the protected actuator.
-    try driver.perform(
-      "app.navigation.flash",
-      delivery: candidate.decision.navigationDelivery,
-      fallbackStrings: ["Flash", "刷机"],
-      timeout: controlTimeout)
-    try driver.waitForPresence("flash.mode", timeout: controlTimeout)
-    try driver.perform(
-      "flash.mode.execute", delivery: candidate.decision.executeModeDelivery,
-      timeout: controlTimeout)
-    switch candidate.decision.executeModeObservation {
-    case .present:
-      try driver.waitForPresence("flash.mode.execute", timeout: controlTimeout)
-    case .selected:
-      try driver.waitForSelected("flash.mode.execute", timeout: controlTimeout)
+    // The candidate composes only pre-submit UI effects. It cannot supply a
+    // target, archive, plan value or submit action; those values are injected
+    // below from the protected invocation and independently re-verified after
+    // the program completes.
+    for action in candidate.program.actions {
+      switch action.kind {
+      case .perform:
+        try driver.perform(
+          action.identifier!, delivery: action.delivery!,
+          fallbackStrings: action.fallbackStrings!, timeout: controlTimeout)
+      case .waitForPresence:
+        try driver.waitForPresence(action.identifier!, timeout: controlTimeout)
+      case .waitForAbsence:
+        try driver.waitForAbsence(action.identifier!, timeout: controlTimeout)
+      case .waitForEnabled:
+        try driver.waitForEnabled(action.identifier!, timeout: controlTimeout)
+      case .waitForDisabled:
+        try driver.waitForDisabled(action.identifier!, timeout: controlTimeout)
+      case .waitForSelected:
+        try driver.waitForSelected(action.identifier!, timeout: controlTimeout)
+      case .choosePinnedArchive:
+        try driver.chooseFileIfNeeded(
+          options.archiveURL, delivery: action.delivery!, timeout: controlTimeout)
+      case .selectPinnedTarget:
+        try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
+      case .waitForPinnedPlan:
+        try driver.waitForFacts(
+          [
+            options.archiveURL.lastPathComponent,
+            options.expectedPlanDigest,
+            options.expectedArchiveDigest,
+            options.expectedStepSetDigest,
+            options.expectedTargetID,
+            String(options.expectedBindingRevision),
+          ],
+          timeout: planTimeout)
+      }
     }
-    try driver.chooseFileIfNeeded(
-      options.archiveURL,
-      delivery: candidate.decision.imageChooserDelivery,
-      timeout: controlTimeout)
-    try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
-    try driver.waitForEnabled("flash.plan.prepare", timeout: controlTimeout)
-    try driver.perform(
-      "flash.plan.prepare", delivery: candidate.decision.planPreparationDelivery,
-      timeout: controlTimeout)
-    try driver.waitForFacts(
-      [
-        options.archiveURL.lastPathComponent,
-        options.expectedPlanDigest,
-        options.expectedArchiveDigest,
-        options.expectedStepSetDigest,
-        options.expectedTargetID,
-        String(options.expectedBindingRevision),
-      ],
-      timeout: planTimeout)
 
     try driver.waitForFacts(
       [
@@ -1572,10 +1629,10 @@ func validateCandidate(_ arguments: [String]) throws {
     throw DriverFailure.message(
       "usage: manual_ui_flash --validate-candidate <absolute-candidate.json>")
   }
-  let loaded = try loadCandidateDecision(
+  let loaded = try loadCandidateProgram(
     at: URL(fileURLWithPath: arguments[0]).standardizedFileURL)
   print(
-    "CANDIDATE_VALID: decision=\(loaded.decisionSHA256) "
+    "CANDIDATE_VALID: program=\(loaded.programSHA256) "
       + "protectedActuator=\(loaded.actuatorSHA256)")
 }
 

@@ -297,6 +297,12 @@
   zero-dispatch stops.
 - Bump only the invocation/attempt-permit documents to schema 2.0.0; fail closed on old active
   candidate sessions and never rewrite existing Job/capability/journal/outcome bytes.
+- Replace the pre-admission per-control delivery fields with a composable Flash UI action program.
+  Candidate actions may address only the exact pre-submit Flash surface and protected pinned-value
+  operations; the program cannot express submit, target/archive/plan values or Runtime authority.
+- Permit another bounded pre-submit attempt regardless of candidate fingerprint because no device
+  effect occurred. Keep the 64-attempt/four-hour budget and seal the session once submission may
+  have occurred. Bump the incompatible UI-session document to schema 2.0.0.
 
 ### r12 Verification
 
@@ -310,6 +316,9 @@
   device-effect intent returns `safeToReflash` because of effect evidence, not failure vocabulary.
 - Prove known post-effect failure, unknown without broker recovery proof, expiry and epoch 17 remain
   fail closed.
+- Validate a newly composed pre-submit UI action without protected-source changes, reject submit or
+  out-of-surface identifiers, and prove an exact refused candidate may retry within the fixed
+  session budget.
 
 ### r11 displaced binding reactivation deliverables and verification
 

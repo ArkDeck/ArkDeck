@@ -41,6 +41,25 @@ outputs for the invocation. A device-effect seed must be binding-pinned. A candi
 the seed; changing operation/provider/profile or destructive policy remains a normal reviewed
 Repo-plane change.
 
+## Pre-submit UI boundary
+
+The same rule applies before the typed request exists. r10 exposed one field for every UI delivery
+choice already encountered and rejected an exact candidate after one refusal. That was another
+problem catalogue.
+
+r12 replaces it with a bounded, composable pre-submit UI action program interpreted by the
+protected actuator. Its primitives can perform or observe an identifier on the exact ArkDeck Flash
+surface, choose the invocation-pinned archive, select the invocation-pinned target and wait for the
+pinned plan. Candidate-supplied raw values and every `flash.execute.*` action are unrepresentable.
+After the program finishes, protected main independently verifies archive/target/binding/plan/step
+digests, userdata impact, submit readiness, App executable identity and absence of an earlier
+submission before it alone performs submit.
+
+A pre-submit refusal has zero device dispatch, so the same or a different action program and App
+revision may be retried until the fixed 64-attempt/four-hour session budget. Candidate fingerprints
+are provenance, not a no-progress oracle. Once submit is requested, the existing unknown-outcome
+seal and Runtime continuation rules still apply.
+
 ## Continuation is derived from effects
 
 Continuation never depends on a failure name:
@@ -74,9 +93,11 @@ admission policy, that final change still requires maintainer review before hard
 ## Compatibility
 
 r10 invocation and attempt documents selected repair tuning and cannot be reinterpreted as r12
-effect actions. r12 writes invocation schema `2.0.0` and attempt-permit schema `2.0.0`; an old
-active invocation fails closed and must be restarted from its original unprivileged typed seed.
-Existing Jobs, capabilities, journals and outcomes are not rewritten.
+effect actions. r10 UI sessions selected fixed delivery fields and cannot be reinterpreted as an
+r12 action program. r12 writes Runtime invocation schema `2.0.0`, attempt-permit schema `2.0.0`
+and UI-session schema `2.0.0`; an old active invocation fails closed and must be restarted from its
+original unprivileged typed seed. Existing Jobs, capabilities, journals and outcomes are not
+rewritten.
 
 ## Verification
 
@@ -89,3 +110,6 @@ Existing Jobs, capabilities, journals and outcomes are not rewritten.
   not its diagnostic string.
 - Keep exact request pins, four-hour/sixteen-epoch/concurrency-one budgets and all unknown-outcome
   recovery rules unchanged.
+- Validate a novel Flash UI identifier/action composition without changing protected source; reject
+  raw request values, non-Flash selectors and every submit/result control. Retry a pre-submit
+  refusal without a material-distinct fingerprint requirement while retaining the session budget.
