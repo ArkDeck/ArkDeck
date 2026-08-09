@@ -615,6 +615,19 @@ final class AccessibilityDriver {
     }
   }
 
+  /// Keeps a repeated manual validation idempotent when the exact archive is
+  /// already selected in the same App workspace. The filename is only a
+  /// reason to skip reopening the system panel: the plan, archive and step-set
+  /// digests are still verified below before submit can become eligible.
+  func chooseFileIfNeeded(_ url: URL) throws {
+    if let current = element(identifier: "flash.image.value"),
+      stringAttribute(current, kAXValueAttribute as CFString) == url.lastPathComponent
+    {
+      return
+    }
+    try chooseFile(url)
+  }
+
   func chooseFile(_ url: URL) throws {
     try click("flash.image.choose")
     try waitForPresence("open-panel", timeout: 20)
@@ -868,7 +881,7 @@ func run() throws {
   try driver.waitForPresence("flash.mode", timeout: 20)
   try driver.click("flash.mode.execute")
   try driver.waitForSelected("flash.mode.execute", timeout: 5)
-  try driver.chooseFile(options.archiveURL)
+  try driver.chooseFileIfNeeded(options.archiveURL)
   try driver.selectPickerValue(options.expectedTargetID, identifier: "flash.target")
   try driver.waitForEnabled("flash.plan.prepare", timeout: 30)
   try driver.press("flash.plan.prepare", timeout: 30)
