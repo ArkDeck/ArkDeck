@@ -1067,6 +1067,13 @@ public actor RuntimeJobEngine {
     // read-only policy.
     let effectiveEffect = Self.effectiveEffect(
       descriptor: descriptor, inputs: request.inputs)
+    if effectiveEffect >= .deviceMutation,
+      let bindingRevision = request.target.expectedBindingRevision
+    {
+      try await repairProvablyTerminalCapabilityOutcomeGaps(
+        targetID: request.target.targetID,
+        bindingRevision: bindingRevision)
+    }
     let jobID = Self.stableJobID(
       idempotencyKey: request.idempotencyKey, requestFingerprint: fingerprint)
     let materialized = try await materializeTypedPlanBeforeAuthorization(
@@ -4008,6 +4015,36 @@ public actor RuntimeJobEngine {
     try await recordCapabilityOutcome(
       for: record, outcome: .safeToReflash,
       state: JobState.failed.rawValue)
+  }
+
+  /// Repairs only lineage gaps whose owning Job already carries a complete,
+  /// journal-confirmed terminal non-execution proof. The Job record becomes
+  /// durable before the independently durable capability outcome, so ENOSPC
+  /// or process loss can leave the former complete and the latter pending.
+  ///
+  /// This runs before expensive mutation plan materialization. Missing,
+  /// malformed, non-terminal, unknown or differently bound records remain
+  /// untouched and the normal lineage gate still rejects them fail-closed.
+  private func repairProvablyTerminalCapabilityOutcomeGaps(
+    targetID: String,
+    bindingRevision: Int
+  ) async throws {
+    let unresolvedJobIDs = Set(
+      try await capabilityStore.list().flatMap { status in
+        status.lineage.compactMap { entry -> String? in
+          guard entry.bindingRevision == bindingRevision,
+            entry.outcome == .pending || entry.outcome == .outcomeUnknown
+          else { return nil }
+          return entry.jobID
+        }
+      })
+    for jobID in unresolvedJobIDs.sorted() {
+      guard let record = try? recordForRead(jobID: jobID),
+        record.request.target.targetID == targetID,
+        record.request.target.expectedBindingRevision == bindingRevision
+      else { continue }
+      try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
+    }
   }
 
   // MARK: Helpers
