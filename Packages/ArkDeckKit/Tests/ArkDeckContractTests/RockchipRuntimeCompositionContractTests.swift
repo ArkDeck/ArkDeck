@@ -1895,7 +1895,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(result.subprocesses.count, 1)
     let invocations = await runner.invocations()
     XCTAssertEqual(invocations.map(\.arguments), [
-      ["-t", "device-1", "target", "boot", "-bootloader"], ["ld"],
+      ["-t", "device-1", "target", "boot", "loader"], ["ld"],
     ])
   }
 
@@ -1934,7 +1934,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     let invocations = await runner.invocations()
     XCTAssertEqual(invocations.map(\.arguments), [
-      ["-t", "device-1", "target", "boot", "-bootloader"], ["ld"],
+      ["-t", "device-1", "target", "boot", "loader"], ["ld"],
     ])
     XCTAssertEqual(invocations.map(\.timeoutSeconds), [7, 9])
   }
@@ -2047,7 +2047,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
     let invocations = await runner.invocations()
     XCTAssertEqual(invocations.map(\.arguments), [
-      ["-t", connectKey, "target", "boot", "-bootloader"]
+      ["-t", connectKey, "target", "boot", "loader"]
     ])
   }
 
