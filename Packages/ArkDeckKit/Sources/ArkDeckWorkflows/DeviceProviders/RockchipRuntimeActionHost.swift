@@ -326,8 +326,72 @@ final class RockchipRuntimeStagedImageHandle: @unchecked Sendable {
 }
 
 typealias RockchipRuntimeStaging =
-  @Sendable (RockchipRuntimeFlashBundle, URL) throws
+  @Sendable (RockchipRuntimeFlashBundle, RockchipFlashProfile, URL) throws
     -> [String: RockchipRuntimeStagedImageHandle]
+
+/// One-entry cache for the board profile derived from an exact Runtime-owned
+/// Artifact lease. Runtime still resolves and re-hashes that lease before
+/// every action, and staging still hashes the archive while expanding it;
+/// this cache only avoids decompressing the same 730 MB archive again to
+/// rediscover its member table and build string in flash and readback. The
+/// flash action passes that exact profile into staging directly.
+final class RockchipFlashBundleProfileCache: @unchecked Sendable {
+  private struct Key: Equatable {
+    let boardReference: String
+    let artifactLeaseID: String
+    let artifactID: String
+    let filePath: String
+    let sha256: String
+    let byteCount: Int
+  }
+
+  private struct Entry {
+    let key: Key
+    let profile: RockchipFlashProfile
+  }
+
+  private let lock = NSLock()
+  private let describeArchive:
+    @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
+  private var entry: Entry?
+
+  init(
+    describeArchive: @escaping @Sendable (
+      RockchipFlashProfile, URL
+    ) throws -> RockchipFlashProfile = { board, url in
+      try board.forArchive(at: url)
+    }
+  ) {
+    self.describeArchive = describeArchive
+  }
+
+  func profile(
+    board: RockchipFlashProfile,
+    bundle: RockchipRuntimeFlashBundle
+  ) throws -> RockchipFlashProfile {
+    try lock.withLock {
+      let key = Key(
+        boardReference: board.catalogReference,
+        artifactLeaseID: bundle.artifactLeaseID,
+        artifactID: bundle.artifactID,
+        filePath: bundle.fileURL.standardizedFileURL.path,
+        sha256: bundle.sha256,
+        byteCount: bundle.byteCount)
+      if let entry, entry.key == key { return entry.profile }
+
+      let profile = try describeArchive(board, bundle.fileURL)
+      guard profile.catalogReference == board.catalogReference,
+        profile.archiveSHA256 == bundle.sha256,
+        profile.archiveSizeBytes == Int64(bundle.byteCount)
+      else {
+        throw RuntimeDispatchFailure.failed(
+          "derived RockUSB bundle profile drifted from its exact Artifact lease")
+      }
+      entry = Entry(key: key, profile: profile)
+      return profile
+    }
+  }
+}
 
 /// How much of the medium the RockUSB read path (`rl`) can actually see,
 /// established before any use of that path as a verifier. `.full` means the
@@ -588,7 +652,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   /// production reads the bytes, which is the only way to know the bundle is
   /// the one this plan was built for.
   private let describeBundle:
-    @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
+    @Sendable (RockchipFlashProfile, RockchipRuntimeFlashBundle) throws
+      -> RockchipFlashProfile
   private let readback: any RockchipRuntimePartitionReadbackVerifying
   private let enterLoaderReadbackTimeoutSeconds: Int
   private let postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore?
@@ -605,27 +670,23 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     enterLoaderReadbackTimeoutSeconds: Int = 45,
     postFlashHDCBindingStore: RockchipPostFlashHDCBindingStore? = nil,
     imageCache: RockchipFlashImageCache? = nil,
+    bundleProfileCache: RockchipFlashBundleProfileCache? = nil,
     nowUTC: @escaping @Sendable () -> String = {
       ISO8601DateFormatter().string(from: Date())
     },
     describeBundle: (
-      @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
+      @Sendable (RockchipFlashProfile, RockchipRuntimeFlashBundle) throws
+        -> RockchipFlashProfile
     )? = nil,
     stage: RockchipRuntimeStaging? = nil
   ) {
-    self.stage = stage ?? { bundle, sessionRoot in
+    let profileCache = bundleProfileCache ?? RockchipFlashBundleProfileCache()
+    self.stage = stage ?? { bundle, profile, sessionRoot in
       // Read the bundle in hand rather than looking it up by digest. A build
       // the product has never seen is not the same thing as an unusable one:
       // what matters is that it fits the board and that these are the bytes
-      // the plan was built for, and `forArchive` decides the first while the
-      // stager still checks the second.
-      let profile: RockchipFlashProfile
-      do {
-        profile = try RockchipFlashProfile.dayu200.forArchive(at: bundle.fileURL)
-      } catch {
-        throw RuntimeDispatchFailure.failed(
-          "RockUSB staging bundle does not fit the DAYU200 board: \(error)")
-      }
+      // the plan was built for. `flashWrites` derives that profile once and
+      // passes it here; the stager still re-hashes the archive itself.
       guard profile.archiveSHA256 == bundle.sha256,
         profile.archiveSizeBytes == Int64(bundle.byteCount)
       else {
@@ -656,7 +717,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     self.runner = runner
     self.usbProbe = usbProbe
     self.describeBundle =
-      describeBundle ?? { board, url in try board.forArchive(at: url) }
+      describeBundle ?? { board, bundle in
+        try profileCache.profile(board: board, bundle: bundle)
+      }
     self.enterLoaderReadbackTimeoutSeconds = enterLoaderReadbackTimeoutSeconds
     self.postFlashHDCBindingStore = postFlashHDCBindingStore
     self.nowUTC = nowUTC
@@ -836,7 +899,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       let readbackBoard = RockchipFlashProfile.dayu200
       let profile: RockchipFlashProfile
       do {
-        profile = try describeBundle(readbackBoard, bundle.fileURL)
+        profile = try describeBundle(readbackBoard, bundle)
       } catch {
         throw RuntimeDispatchFailure.failed(
           "readback bundle does not fit \(readbackBoard.catalogReference): \(error)")
@@ -1150,7 +1213,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     let board = RockchipFlashProfile.dayu200
     let profile: RockchipFlashProfile
     do {
-      profile = try describeBundle(board, bundle.fileURL)
+      profile = try describeBundle(board, bundle)
     } catch {
       throw RuntimeDispatchFailure.failed(
         "flash bundle does not fit \(board.catalogReference): \(error)")
@@ -1185,7 +1248,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       try? FileManager.default.removeItem(at: work)
     }
     do {
-      staged = try stage(bundle, work)
+      staged = try stage(bundle, profile, work)
     } catch {
       throw RuntimeDispatchFailure.failed(
         "pinned flash bundle staging failed before RockUSB writes: \(error)")

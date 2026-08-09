@@ -24,6 +24,23 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  private final class LockedInvocationCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+      lock.lock()
+      count += 1
+      lock.unlock()
+    }
+
+    var value: Int {
+      lock.lock()
+      defer { lock.unlock() }
+      return count
+    }
+  }
+
   private struct SuccessfulActionExecutor: RockchipRuntimeActionExecuting {
     let log: ActionLog
 
@@ -574,7 +591,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       // proving every branch without a real 730 MB archive. The fixture
       // answers with the board carrying the bundle's own identity.
       describeBundle: { _, _ in RockchipFlashProfile.dayu200 },
-      stage: { _, _ in
+      stage: { _, _, _ in
         Dictionary(
           uniqueKeysWithValues: RockchipFlashProfile.dayu200.mappedPartitions.map {
             mapping in
@@ -590,6 +607,63 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
             )
           })
       })
+  }
+
+  func testBundleProfileCacheDescribesOneExactRuntimeLeaseOnlyOnce() throws {
+    let invocations = LockedInvocationCounter()
+    let cache = RockchipFlashBundleProfileCache { _, _ in
+      invocations.increment()
+      return RockchipFlashProfile.dayu200
+    }
+    let bundle = flashBundle()
+
+    let first = try cache.profile(board: .dayu200, bundle: bundle)
+    let repeated = try cache.profile(board: .dayu200, bundle: bundle)
+
+    XCTAssertEqual(first.archiveSHA256, bundle.sha256)
+    XCTAssertEqual(repeated.archiveSHA256, first.archiveSHA256)
+    XCTAssertEqual(invocations.value, 1)
+
+    let nextLease = RockchipRuntimeFlashBundle(
+      artifactLeaseID: "lease:replacement",
+      artifactID: bundle.artifactID,
+      fileURL: bundle.fileURL,
+      sha256: bundle.sha256,
+      byteCount: bundle.byteCount,
+      partitionNames: bundle.partitionNames)
+    _ = try cache.profile(board: .dayu200, bundle: nextLease)
+    XCTAssertEqual(
+      invocations.value, 2,
+      "a new Runtime lease must not inherit a derived profile from the old authority")
+  }
+
+  func testBundleProfileCacheNeverStoresADescriptorThatDriftsFromItsLease() throws {
+    let invocations = LockedInvocationCounter()
+    let cache = RockchipFlashBundleProfileCache { _, _ in
+      invocations.increment()
+      return RockchipFlashProfile.dayu200
+    }
+    let original = flashBundle()
+    let drifted = RockchipRuntimeFlashBundle(
+      artifactLeaseID: original.artifactLeaseID,
+      artifactID: original.artifactID,
+      fileURL: original.fileURL,
+      sha256: String(repeating: "d", count: 64),
+      byteCount: original.byteCount,
+      partitionNames: original.partitionNames)
+
+    for _ in 0..<2 {
+      XCTAssertThrowsError(try cache.profile(board: .dayu200, bundle: drifted)) {
+        error in
+        guard case RuntimeDispatchFailure.failed(let detail) = error else {
+          return XCTFail("expected a definite lease refusal, got \(error)")
+        }
+        XCTAssertTrue(detail.contains("drifted from its exact Artifact lease"), detail)
+      }
+    }
+    XCTAssertEqual(
+      invocations.value, 2,
+      "a drifted description must never become a reusable cache entry")
   }
 
   func testAMediumRefusalBeforeTheFirstWriteIsConfirmedNotExecuted() async throws {
@@ -2529,7 +2603,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       // proving every branch without a real 730 MB archive. The fixture
       // answers with the board carrying the bundle's own identity.
       describeBundle: { _, _ in RockchipFlashProfile.dayu200 },
-      stage: { _, _ in
+      stage: { _, _, _ in
         Dictionary(
           uniqueKeysWithValues:
             RockchipFlashProfile.dayu200.mappedPartitions.map { mapping in
