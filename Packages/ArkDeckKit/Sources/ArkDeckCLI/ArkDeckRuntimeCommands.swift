@@ -1013,8 +1013,10 @@ enum RuntimeCLI {
     }
   }
 
-  /// Protected Runtime Flash debugging. The candidate file is the closed
-  /// decision document approved in r10; the CLI has no target, inputs, plan,
+  /// Protected destructive Flash recovery only. Ordinary Agent debugging is
+  /// submitted once through `arkdeck task`; the Harness owns its bounded
+  /// patch/build/test/deploy/verify loop. The candidate file here is the
+  /// closed recovery decision document; the CLI has no target, inputs, plan,
   /// argv or capability flag on the evaluation path.
   static func runDebug(_ arguments: [String]) throws {
     guard let subcommand = arguments.first else {
@@ -1037,7 +1039,7 @@ enum RuntimeCLI {
       guard let requestPath = value("--request-file") else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "debug start requires --request-file <typed-request.json>")
+          message: "debug start requires --request-file <destructive-flash-request.json>")
       }
       let requestURL = URL(fileURLWithPath: requestPath)
       guard let requestJSON = try? String(contentsOf: requestURL, encoding: .utf8) else {

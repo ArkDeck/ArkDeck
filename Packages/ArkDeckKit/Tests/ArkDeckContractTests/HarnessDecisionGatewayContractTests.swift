@@ -107,6 +107,75 @@ private struct GatewayCapabilities: HarnessCapabilityPort {
   }
 }
 
+/// A narrow fixture for the one decision a deterministic handler cannot
+/// synthesize: source patch bytes. It starts at that question so retry
+/// behavior can be tested without manufacturing device evidence.
+private struct PatchQuestionHandler: HarnessTaskHandler {
+  let type = HarnessTaskType.debugCrash
+  let permittedOperations: Set<String> = [DebugCrashTaskHandler.applyPatch]
+
+  func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+    [DebugCrashTaskHandler.applyPatch]
+  }
+  func defaultSuccessCriteria() -> [HarnessSuccessCriterion] { [] }
+  func requiredE1MutationBudget(goal: HarnessTaskGoal, policy: HarnessTaskPolicy) -> Int { 0 }
+
+  func plan(
+    for snapshot: HarnessTaskSnapshot, decisionID: String, nowUTC: String
+  ) -> HarnessPlannedStep {
+    HarnessPlannedStep(
+      decision: HarnessDecision(
+        decisionID: decisionID, htaskID: snapshot.htaskID,
+        round: snapshot.activeRound + 1, kind: .requestHuman,
+        hypothesis: "The bounded repair needs a patch proposal.",
+        reasonCode: "patchProposalRequired", producer: "patch-question-handler@1",
+        createdAtUTC: nowUTC),
+      phaseOnDispatch: nil)
+  }
+
+  func phase(
+    afterSuccessOf operationReference: String, in phase: HarnessTaskPhase
+  ) -> HarnessTaskPhase { phase }
+}
+
+private struct RejectingPatchRepairPort: HarnessRepairPort {
+  let revision: String
+
+  func currentWorkspaceRevision(
+    relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
+  ) async throws -> String { revision }
+
+  func preparePatch(
+    _ proposal: HarnessPatchProposal, projectRef: String,
+    task: HarnessTaskSnapshot, decisionID: String
+  ) async throws -> HarnessPreparedPatch {
+    throw HarnessRepairPortError.proposalRejected("fixturePreflight")
+  }
+
+  func appliedPatchReadback(
+    jobID: String, proposal: HarnessPatchProposal
+  ) async throws -> HarnessAppliedPatchReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func buildReadback(
+    jobID: String, attempt: HarnessRepairAttempt, buildPresetRef: String,
+    task: HarnessTaskSnapshot
+  ) async throws -> HarnessBuildReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func deployedArtifactDigest(jobID: String) async throws -> String {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func reconcileUnknownPatch(
+    jobID: String, proposal: HarnessPatchProposal
+  ) async throws -> HarnessPatchApplicationReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+}
+
 final class HarnessDecisionGatewayContractTests: XCTestCase {
   private var rootURL: URL!
 
@@ -1148,59 +1217,104 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
       HarnessTaskCoordinator.effectiveInputs(of: prematureStop, against: exactAnalyzer), [:])
   }
 
-  func testConclusionsFollowTheStepNotTheProducer() async throws {
-    // The same two steps, proposed two ways: by the built-in handler (no
-    // gateway configured) and by a model through the port. The state machine
-    // must reach the same conclusions, including the honest stop at the end.
-    func run(_ gateway: (any HarnessDecisionGateway)?) async throws -> [String] {
-      rootURL = FileManager.default.temporaryDirectory
-        .appendingPathComponent("arkdeck-harness-gateway-swap", isDirectory: true)
-        .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
-      try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
-      let jobs = GatewayJobPort()
-      let (coordinator, _, submission) = try makeStack(
-        gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs)
-      let task = try await coordinator.submit(submission)
-      var trace: [String] = []
-      var priorModelCalls = 0
-      for round in 1...4 {
-        let outcome = try await coordinator.reconcile(task.htaskID)
-        XCTAssertGreaterThanOrEqual(
-          outcome.snapshot.consumedBudget.modelCalls, priorModelCalls,
-          "observing a completed runtime job must not erase already charged model calls")
-        priorModelCalls = outcome.snapshot.consumedBudget.modelCalls
-        trace.append("\(outcome.action.rawValue)/\(jobs.submittedOperations.last ?? "-")")
-        if ![HarnessTaskLifecycle.running, .waiting, .created].contains(
-          outcome.snapshot.lifecycle)
-        { break }
-        jobs.finish("JOB-\(round)")
-      }
-      return trace
-    }
+  func testAgentPatchFailuresRetryUntilTheDeclaredModelBudget() async throws {
+    let baseRevision = String(repeating: "1", count: 64)
+    let diff = """
+      diff --git a/Sources/A.swift b/Sources/A.swift
+      --- a/Sources/A.swift
+      +++ b/Sources/A.swift
+      @@ -1 +1 @@
+      -let value = 0
+      +let value = 1
+      """
+    let digest = SHA256.hash(data: Data(diff.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let jobs = GatewayJobPort()
+    let gateway = ScriptedGateway(replies: [
+      // This is syntactically valid and reaches the read-only workspace
+      // preflight, which rejects it before an intent or effect exists.
+      .success(
+        encodeProposal([
+          "kind": .string("proposePatch"),
+          "hypothesis": .string("Change the bounded source branch."),
+          "baseWorkspaceRevision": .string(baseRevision),
+          "patchSha256": .string(digest), "unifiedDiff": .string(diff),
+          "touchedFiles": .array([.string("Sources/A.swift")]),
+          "expectedChangedSymbols": .array([.string("value")]),
+        ])),
+      // A malformed response is a second, distinct pre-dispatch failure.
+      .success(
+        encodeProposal([
+          "kind": .string("noSafeAction"), "hypothesis": .string("already fixed"),
+          "status": .string("succeeded"),
+        ])),
+    ])
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs,
+      repairPort: RejectingPatchRepairPort(revision: baseRevision),
+      handlers: [PatchQuestionHandler()],
+      nowUTC: { "2026-07-31T00:00:00Z" }, decisionGateway: gateway,
+      egressPolicy: HarnessEgressPolicy(enabledProjects: ["demo-app"]))
+    let task = try await coordinator.submit(
+      HarnessTaskSubmission(
+        type: .debugCrash, projectRef: "demo-app",
+        target: HarnessTaskTargetReference(targetID: "TGT-1"),
+        goal: HarnessTaskGoal(summary: "repair the failure"),
+        budgets: HarnessTaskBudgets(
+          maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024,
+          maxE1Mutations: 0, maxModelCalls: 2),
+        policy: HarnessTaskPolicy(
+          allowedOperations: [DebugCrashTaskHandler.applyPatch])))
 
-    let builtIn = try await run(nil)
-    let throughThePort = try await run(
-      ScriptedGateway(replies: [
-        .success(
-          encodeProposal([
-            "kind": .string("invokeOperation"),
-            "operationRef": .string(DebugCrashTaskHandler.observeDevice),
-            "hypothesis": .string("Observe the target first."),
-          ])),
-        .success(
-          encodeProposal([
-            "kind": .string("invokeOperation"),
-            "operationRef": .string(DebugCrashTaskHandler.captureDiagnostics),
-            "hypothesis": .string("Collect the declared evidence."),
-          ])),
-        // Third wake: the model is unreachable. The loop must reach the same
-        // conclusion the built-in producer would.
-        .failure(HarnessDecisionGatewayError.transportFailure("socket closed")),
-      ]))
-    XCTAssertEqual(
-      builtIn, throughThePort,
-      "conclusions must follow the proposed step, not the identity of the producer")
-    XCTAssertEqual(builtIn.last?.hasPrefix("stoppedForHuman"), true)
+    let first = try await coordinator.reconcile(task.htaskID)
+    let second = try await coordinator.reconcile(task.htaskID)
+    let exhausted = try await coordinator.reconcile(task.htaskID)
+    XCTAssertEqual(first.action, .proposalRetryScheduled)
+    XCTAssertEqual(second.action, .proposalRetryScheduled)
+    XCTAssertEqual(exhausted.action, .stoppedBudgetExhausted)
+
+    let loadedSnapshot = try await store.load(task.htaskID)
+    let snapshot = try XCTUnwrap(loadedSnapshot)
+    XCTAssertEqual(snapshot.status, .failed)
+    XCTAssertEqual(snapshot.result?.reasonCode, "maxModelCallsExhausted")
+    XCTAssertEqual(snapshot.consumedBudget.modelCalls, 2)
+    XCTAssertTrue(jobs.submittedOperations.isEmpty)
+    let humanActions = try await coordinator.humanActions(task.htaskID)
+    XCTAssertTrue(humanActions.isEmpty)
+    let events = try await store.events(task.htaskID)
+    XCTAssertEqual(events.filter { $0.causation == .proposalRejected }.count, 2)
+    let modelRuns = try await store.modelRuns(task.htaskID)
+    XCTAssertEqual(modelRuns.count, 2)
+    let attempts = try await store.attempts(task.htaskID)
+    XCTAssertTrue(attempts.contains { $0.outcome == .failed })
+  }
+
+  func testAPreTransportPrivacyRefusalDoesNotBecomeAnAutomaticPatchRetry() async throws {
+    let jobs = GatewayJobPort()
+    let gateway = ScriptedGateway(replies: [])
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, handlers: [PatchQuestionHandler()],
+      nowUTC: { "2026-07-31T00:00:00Z" }, decisionGateway: gateway)
+    let task = try await coordinator.submit(
+      HarnessTaskSubmission(
+        type: .debugCrash, projectRef: "private-project",
+        target: HarnessTaskTargetReference(targetID: "TGT-1"),
+        goal: HarnessTaskGoal(summary: "repair the failure"),
+        budgets: HarnessTaskBudgets(
+          maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024,
+          maxE1Mutations: 0, maxModelCalls: 2),
+        policy: HarnessTaskPolicy(
+          allowedOperations: [DebugCrashTaskHandler.applyPatch])))
+
+    let outcome = try await coordinator.reconcile(task.htaskID)
+    XCTAssertEqual(outcome.action, .stoppedForHuman)
+    XCTAssertEqual(outcome.snapshot.status, .humanRequired)
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
+    XCTAssertTrue(gateway.seenContexts.isEmpty)
+    let modelRuns = try await store.modelRuns(task.htaskID)
+    XCTAssertTrue(modelRuns.isEmpty)
   }
 
   func testTaskStateHoldsNoModelSessionHandle() async throws {

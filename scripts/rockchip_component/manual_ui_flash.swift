@@ -681,7 +681,7 @@ private struct ManualUIDebugAttempt: Codable {
 
 private struct ManualUIDebugSessionDocument: Codable {
   static let documentType = "manual-ui-flash-debug-session"
-  static let schemaVersion = "2.0.0"
+  static let schemaVersion = "3.0.0"
 
   let documentType: String
   let schemaVersion: String
@@ -696,14 +696,17 @@ private struct ManualUIDebugSessionDocument: Codable {
   let bindingRevision: Int
   let createdAtUTC: String
   let expiresAtUTC: String
+  var destructiveEpochsUsed: Int
   var attempts: [ManualUIDebugAttempt]
 }
 
-/// Non-authoritative, durable pre-admission loop record. It cannot authorize a
-/// Job; it only prevents a host candidate from silently replaying after the UI
-/// has requested submission without a terminal observation.
+/// Non-authoritative, durable product-debug loop record. It cannot authorize a
+/// Job; it prevents a host candidate from silently replaying after the UI has
+/// requested submission without a terminal observation and bounds the number
+/// of destructive submits independently from pre-admission repair attempts.
 private final class ManualUIDebugSessionRecorder {
   static let maximumAttempts = 64
+  static let maximumDestructiveEpochs = 16
   static let maximumDuration: TimeInterval = 4 * 60 * 60
 
   private let url: URL
@@ -740,6 +743,7 @@ private final class ManualUIDebugSessionRecorder {
         document.stepSetSHA256 == options.expectedStepSetDigest,
         document.targetID == options.expectedTargetID,
         document.bindingRevision == options.expectedBindingRevision,
+        document.destructiveEpochsUsed <= Self.maximumDestructiveEpochs,
         let expiry = formatter.date(from: document.expiresAtUTC), now <= expiry
       else {
         throw DriverFailure.message("debug session identity drifted or expired")
@@ -784,6 +788,7 @@ private final class ManualUIDebugSessionRecorder {
         bindingRevision: options.expectedBindingRevision,
         createdAtUTC: formatter.string(from: now),
         expiresAtUTC: formatter.string(from: now.addingTimeInterval(Self.maximumDuration)),
+        destructiveEpochsUsed: 0,
         attempts: [])
     }
     document.attempts.append(
@@ -812,8 +817,18 @@ private final class ManualUIDebugSessionRecorder {
   }
 
   func markSubmissionRequested() throws {
+    guard document.destructiveEpochsUsed < Self.maximumDestructiveEpochs else {
+      throw DriverFailure.message(
+        "debug session exhausted its 16 destructive epochs; externalDispatch=0")
+    }
+    // Persist the budget charge before the click. A crash after this point
+    // cannot make an attempted destructive dispatch disappear from the
+    // session's accounting.
+    document.destructiveEpochsUsed += 1
     document.attempts[attemptIndex].state = "submissionRequested"
-    document.attempts[attemptIndex].detail = "one protected-main UI submit action requested"
+    document.attempts[attemptIndex].detail =
+      "protected-main UI submit requested; destructive epoch "
+      + "\(document.destructiveEpochsUsed)/\(Self.maximumDestructiveEpochs)"
     try persist()
   }
 
@@ -822,7 +837,21 @@ private final class ManualUIDebugSessionRecorder {
     document.attempts[attemptIndex].detail = "Runtime returned durable terminal \(state)"
     document.attempts[attemptIndex].jobID = jobID
     document.attempts[attemptIndex].runtimeState = state
-    document.state = state == "succeeded" ? "succeeded" : "runtimeContinuationRequired"
+    document.state = state == "succeeded" ? "active" : "runtimeContinuationRequired"
+    try persist()
+  }
+
+  func markProductVerified() throws {
+    guard document.attempts[attemptIndex].state == "runtimeTerminal",
+      document.attempts[attemptIndex].runtimeState == "succeeded"
+    else {
+      throw DriverFailure.message(
+        "product verification requires a known succeeded Runtime terminal")
+    }
+    document.attempts[attemptIndex].state = "productVerified"
+    document.attempts[attemptIndex].detail =
+      "Runtime terminal and mandatory App postflight semantics both passed"
+    document.state = "succeeded"
     try persist()
   }
 
@@ -832,6 +861,12 @@ private final class ManualUIDebugSessionRecorder {
       document.attempts[attemptIndex].state = "submissionOutcomeUnknown"
       document.attempts[attemptIndex].detail = String(describing: error)
       document.state = "runtimeContinuationRequired"
+    } else if previous == "runtimeTerminal",
+      document.attempts[attemptIndex].runtimeState == "succeeded"
+    {
+      document.attempts[attemptIndex].state = "productVerificationFailed"
+      document.attempts[attemptIndex].detail = String(describing: error)
+      document.state = "active"
     } else if previous != "runtimeTerminal" {
       document.attempts[attemptIndex].state = "refused"
       document.attempts[attemptIndex].detail = String(describing: error)
@@ -1160,6 +1195,22 @@ private final class AccessibilityDriver {
     } while Date() < deadline
     throw DriverFailure.message(
       "current UI submission did not return a terminal Runtime Flash result before timeout")
+  }
+
+  /// Runtime success proves the device operation. It does not prove that the
+  /// candidate App presents the resulting build and rebinding correctly. Both
+  /// semantic rows are mandatory product criteria owned by the protected
+  /// driver, so an untrusted candidate cannot omit them from its program.
+  func waitForProductPostflight(timeout: TimeInterval) throws {
+    try waitForPresence("flash.postflight", timeout: timeout)
+    try waitForPresence("flash.postflight.build.match", timeout: timeout)
+    try waitForPresence("flash.postflight.binding.match", timeout: timeout)
+    if element(identifier: "flash.postflight.build.mismatch") != nil
+      || element(identifier: "flash.postflight.binding.mismatch") != nil
+    {
+      throw DriverFailure.message(
+        "Runtime succeeded but the candidate App presented a postflight mismatch")
+    }
   }
 
   func assertNoFlashSubmission() throws {
@@ -1571,7 +1622,11 @@ func run() throws {
         "Runtime Flash Job \(submission.jobID) stopped in \(submission.state); "
           + "continue through the captured Runtime debug seed without an intermediate PR")
     }
-    print("REAL_DEVICE_PASS: ArkDeck UI Flash Runtime Job \(submission.jobID) succeeded")
+    try driver.waitForProductPostflight(timeout: controlTimeout)
+    try session?.markProductVerified()
+    print(
+      "REAL_DEVICE_PASS: ArkDeck UI Flash Runtime Job \(submission.jobID) succeeded "
+        + "and mandatory App postflight semantics matched")
   } catch {
     session?.recordFailure(error)
     throw error

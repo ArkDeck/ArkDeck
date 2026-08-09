@@ -3,6 +3,13 @@ import Foundation
 import XCTest
 
 final class ManualUIFlashDriverContractTests: XCTestCase {
+  /// Reuse imported SDK modules across validator invocations. The validator
+  /// script itself is still interpreted from current source each time; a
+  /// fresh module cache per assertion turned three small shape checks into
+  /// several minutes of unrelated AppKit/Foundation cold compilation.
+  private static let candidateValidatorModuleCache = FileManager.default.temporaryDirectory
+    .appendingPathComponent("manual-ui-validator-modules-\(UUID().uuidString)", isDirectory: true)
+
   private func repositoryRoot() -> URL {
     var repositoryRoot = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 {
@@ -24,10 +31,8 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   private func runCandidateValidator(_ candidateURL: URL) throws -> (
     status: Int32, stdout: String, stderr: String
   ) {
-    let cache = FileManager.default.temporaryDirectory
-      .appendingPathComponent("manual-ui-validator-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: false)
-    defer { try? FileManager.default.removeItem(at: cache) }
+    let cache = Self.candidateValidatorModuleCache
+    try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
     let output = Pipe()
     let errors = Pipe()
     let process = Process()
@@ -251,6 +256,23 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     XCTAssertTrue(source.contains("runtimeContinuationRequired"))
     XCTAssertTrue(source.contains("externalDispatch=0"))
     XCTAssertTrue(source.contains("continue through the captured Runtime debug seed"))
+  }
+
+  func testRuntimeSuccessStillRequiresProductPostflightBeforeSessionSuccess() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("static let maximumDestructiveEpochs = 16"))
+    XCTAssertTrue(source.contains("var destructiveEpochsUsed: Int"))
+    XCTAssertTrue(source.contains("document.destructiveEpochsUsed += 1"))
+    XCTAssertTrue(source.contains("func waitForProductPostflight"))
+    XCTAssertTrue(source.contains("flash.postflight.build.match"))
+    XCTAssertTrue(source.contains("flash.postflight.binding.match"))
+    XCTAssertTrue(source.contains("productVerificationFailed"))
+    XCTAssertTrue(source.contains("try session?.markProductVerified()"))
+
+    let appSource = try repositorySource("ArkDeckApp/Features/Flash/FlashWorkspaceView.swift")
+    XCTAssertTrue(
+      appSource.contains(
+        #".accessibilityIdentifier("\(identifier).\(matches ? "match" : "mismatch")")"#))
   }
 
   func testOnlyProtectedMainActuatorCanReachUIOrRuntime() throws {

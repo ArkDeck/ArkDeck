@@ -363,13 +363,17 @@ public actor RuntimeDebugInvocationController {
       throw RuntimeDebugInvocationError.invalidSeedRequest(
         "Runtime plan-only preview drifted from the pinned seed request")
     }
-    let deviceScoped = preview.steps.contains {
-      $0.effect == WorkflowEffect.deviceMutation.rawValue
-        || $0.effect == WorkflowEffect.destructive.rawValue
+    let isDestructiveRecovery = preview.steps.contains {
+      $0.effect == WorkflowEffect.destructive.rawValue
     }
-    guard !deviceScoped || request.target.expectedBindingRevision != nil else {
+    guard isDestructiveRecovery else {
       throw RuntimeDebugInvocationError.invalidSeedRequest(
-        "device effect debug invocation requires a binding-pinned target")
+        "Runtime debug is the protected destructive-recovery broker; "
+          + "ordinary Agent debugging must use one bounded Harness task")
+    }
+    guard request.target.expectedBindingRevision != nil else {
+      throw RuntimeDebugInvocationError.invalidSeedRequest(
+        "destructive recovery requires a binding-pinned target")
     }
     let canonicalRequest = try RuntimeDebugAttemptPermitStore.canonicalEncode(request)
     let created = try currentDate()

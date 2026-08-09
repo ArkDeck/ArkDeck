@@ -559,6 +559,10 @@ public enum HarnessTaskCausation: String, CaseIterable, Codable, Sendable {
   /// A typed observation changed one or more condition cells without
   /// changing the product stage (for example a transient disconnect).
   case conditionObserved
+  /// A transported model call for the current patch question was rejected or
+  /// failed. The task remains running and the spent call is durable, so the
+  /// next wake may retry only while its declared model-call budget remains.
+  case proposalRejected
   /// A proposal was refused at the dispatch boundary because the facts it
   /// was made on had moved (CHG-2026-055, TASK-HFA-002). It is recorded as
   /// its own causation so a reader can tell "we declined to act on stale

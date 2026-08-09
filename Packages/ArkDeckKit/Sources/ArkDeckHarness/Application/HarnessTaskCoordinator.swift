@@ -40,6 +40,10 @@ public enum HarnessReconcileAction: String, Sendable, Codable {
   case evaluatedFailedCriteria
   case evaluatedInconclusive
   case stoppedEvidenceIntegrity
+  /// A model call made for the handler's bounded patch question did not
+  /// produce a usable answer. The call is charged and recorded, but the task
+  /// stays running so a later wake can try again within `maxModelCalls`.
+  case proposalRetryScheduled
   /// The proposal was refused at the dispatch boundary because the facts it
   /// stood on had moved (CHG-2026-055, TASK-HFA-002). Nothing was
   /// submitted; the next wake plans again on current facts.
@@ -642,6 +646,21 @@ public actor HarnessTaskCoordinator {
     } else {
       proposal = await plannedProposal(snapshot, handler: handler, basis: basis)
     }
+    if let rejection = proposal.rejection,
+      proposal.modelCallsSpent > 0,
+      proposal.step.decision.kind == .requestHuman,
+      proposal.step.decision.reasonCode == "patchProposalRequired"
+    {
+      // The deterministic step here means "a patch must be proposed"; it
+      // does not mean one malformed response, timeout, or provider error has
+      // proved that a human is required. The task already owns a bounded
+      // model-call budget, so that budget - not an incidental response shape
+      // - is the autonomous-debug boundary. Calls refused before transport
+      // (privacy, identity screening, context ceiling) have
+      // `modelCallsSpent == 0` and deliberately keep the existing human stop.
+      return try await schedulePatchProposalRetry(
+        snapshot, reasonCode: rejection, modelCallsSpent: proposal.modelCallsSpent)
+    }
     let currentAttemptID = try await activeAttempt(snapshot.htaskID)?.attemptID
     let proposedDecision = proposal.step.decision
     let step = HarnessPlannedStep(
@@ -738,7 +757,7 @@ public actor HarnessTaskCoordinator {
   /// A model call is spent whatever came back, so every path out of a wake
   /// that made one has to charge it (CHG-2026-055, TASK-HFA-011). Folding it
   /// into the transition's budget keeps the single write path intact.
-  private func charging(
+  func charging(
     _ budget: HarnessConsumedBudget, modelCalls: Int
   ) -> HarnessConsumedBudget {
     guard modelCalls > 0 else { return budget }
@@ -746,6 +765,27 @@ public actor HarnessTaskCoordinator {
       rounds: budget.rounds, wallClockSeconds: budget.wallClockSeconds,
       artifactBytes: budget.artifactBytes, e1Mutations: budget.e1Mutations,
       modelCalls: budget.modelCalls + modelCalls)
+  }
+
+  /// Keep a pre-dispatch Agent repair failure inside the task that already
+  /// owns its policy and budgets. Callers use this only after proving no
+  /// Runtime intent or external effect was created. Human-authored patches
+  /// and pre-transport privacy refusals never reach this helper.
+  private func schedulePatchProposalRetry(
+    _ snapshot: HarnessTaskSnapshot,
+    reasonCode: String,
+    modelCallsSpent: Int
+  ) async throws -> HarnessReconcileOutcome {
+    precondition(modelCallsSpent > 0)
+    let retrying = try await commit(
+      snapshot,
+      transition(
+        snapshot, causation: .proposalRejected, reasonCode: reasonCode,
+        status: .running,
+        consumedBudget: charging(
+          snapshot.consumedBudget, modelCalls: modelCallsSpent)))
+    return HarnessReconcileOutcome(
+      snapshot: retrying, action: .proposalRetryScheduled, reasonCode: reasonCode)
   }
 
   private func expectedWorkspaceRevision(
@@ -949,7 +989,8 @@ public actor HarnessTaskCoordinator {
       let reason = "patchProposalUnavailable"
       let blocked = try await recordBlock(
         snapshot, block: .environmentUnavailable, reasonCode: reason,
-        round: proposalDecision.round, jobID: nil, requestID: nil)
+        round: proposalDecision.round, jobID: nil, requestID: nil,
+        modelCallsSpent: modelCallsSpent)
       return HarnessReconcileOutcome(
         snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
     }
@@ -984,10 +1025,14 @@ public actor HarnessTaskCoordinator {
         attempt = try await beginStrategyAttempt(
           decision: proposalDecision, proposal: proposal, snapshot: snapshot)
       } catch let error as HarnessAttemptAdmissionError {
+        if case .duplicateStrategy = error, modelCallsSpent > 0 {
+          return try await schedulePatchProposalRetry(
+            snapshot, reasonCode: error.reasonCode, modelCallsSpent: modelCallsSpent)
+        }
         let blocked = try await recordBlock(
           snapshot, block: .strategyExhausted, reasonCode: error.reasonCode,
           round: proposalDecision.round, jobID: nil,
-          requestID: proposalDecision.decisionID)
+          requestID: proposalDecision.decisionID, modelCallsSpent: modelCallsSpent)
         return HarnessReconcileOutcome(
           snapshot: blocked.snapshot, action: .stoppedForHuman,
           reasonCode: error.reasonCode)
@@ -1009,6 +1054,12 @@ public actor HarnessTaskCoordinator {
         preparedInputs = prepared.inputs
         newlyPreparedPatch = prepared
       } catch let error as HarnessRepairPortError {
+        if modelCallsSpent > 0 {
+          try await closeAttempt(
+            snapshot.htaskID, outcome: .failed, reason: error.reasonCode)
+          return try await schedulePatchProposalRetry(
+            snapshot, reasonCode: error.reasonCode, modelCallsSpent: modelCallsSpent)
+        }
         let print = fingerprint(
           snapshot, operationReference: DebugCrashTaskHandler.applyPatch,
           inputsDigest: proposal.patchSHA256,
@@ -1038,7 +1089,7 @@ public actor HarnessTaskCoordinator {
         let blocked = try await recordBlock(
           snapshot, block: .environmentUnavailable, reasonCode: reason,
           round: proposalDecision.round, jobID: nil,
-          requestID: proposalDecision.decisionID)
+          requestID: proposalDecision.decisionID, modelCallsSpent: modelCallsSpent)
         return HarnessReconcileOutcome(
           snapshot: blocked.snapshot, action: .stoppedForHuman, reasonCode: reason)
       }
@@ -1059,6 +1110,12 @@ public actor HarnessTaskCoordinator {
         try await recordAttemptCandidatePatch(candidate, taskID: snapshot.htaskID)
       } catch {
         let reason = "candidatePatchRejected:\(error)"
+        if modelCallsSpent > 0 {
+          try await closeAttempt(
+            snapshot.htaskID, outcome: .failed, reason: reason)
+          return try await schedulePatchProposalRetry(
+            snapshot, reasonCode: reason, modelCallsSpent: modelCallsSpent)
+        }
         let blocked = try await recordBlock(
           snapshot, block: .strategyExhausted, reasonCode: reason,
           round: proposalDecision.round, jobID: nil,

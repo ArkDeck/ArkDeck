@@ -204,11 +204,11 @@ private final class RecordingDriveTarget: HarnessAutoDriveTarget, @unchecked Sen
   private let lock = NSLock()
   private var ids: [String]
   private var reconciled: [String] = []
-  private let failing: Set<String>
+  private var failuresRemaining: [String: Int]
 
-  init(ids: [String], failing: Set<String> = []) {
+  init(ids: [String], failuresBeforeSuccess: [String: Int] = [:]) {
     self.ids = ids
-    self.failing = failing
+    self.failuresRemaining = failuresBeforeSuccess
   }
 
   var reconcileCalls: [String] { lock.withLock { reconciled } }
@@ -218,7 +218,8 @@ private final class RecordingDriveTarget: HarnessAutoDriveTarget, @unchecked Sen
   func reconcile(_ htaskID: String) async throws -> HarnessReconcileOutcome {
     try lock.withLock {
       reconciled.append(htaskID)
-      if failing.contains(htaskID) {
+      if let remaining = failuresRemaining[htaskID], remaining > 0 {
+        failuresRemaining[htaskID] = remaining - 1
         throw HarnessCoordinatorError.notFound(htaskID)
       }
       return HarnessReconcileOutcome(
@@ -338,15 +339,20 @@ final class HarnessConvergenceContractTests: XCTestCase {
       "the five-sample gate must be satisfied by five real captures")
     XCTAssertEqual(jobPort.submittedOperations.first, DebugCrashTaskHandler.observeDevice)
     XCTAssertGreaterThan(report.dispatchedJobIDs.count, 0)
-    XCTAssertEqual(report.abandonedTaskIDs, [])
+    XCTAssertEqual(report.degradedTaskIDs, [])
   }
 
-  func testAutoDriveIsOffUnlessAnOperatorConfiguresAnInterval() {
+  func testAutoDriveDefaultsOnAndOnlyAnExplicitOverrideTurnsItOff() {
     let key = HarnessAutoDriveTicker.intervalEnvironmentKey
-    XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([:]))
+    XCTAssertEqual(
+      HarnessAutoDriveTicker.configuredIntervalSeconds([:]),
+      HarnessAutoDriveTicker.defaultIntervalSeconds,
+      "accepting a bounded task must also turn its loop; no second operator action is required")
     XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([key: ""]))
     XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([key: "soon"]))
     XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([key: "0"]))
+    XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([key: "off"]))
+    XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([key: " OFF "]))
     XCTAssertNil(HarnessAutoDriveTicker.configuredIntervalSeconds([key: "-5"]))
     XCTAssertNil(
       HarnessAutoDriveTicker.configuredIntervalSeconds([key: "3601"]),
@@ -393,17 +399,21 @@ final class HarnessConvergenceContractTests: XCTestCase {
     XCTAssertEqual(after.waitReason, .userSuspended)
   }
 
-  func testAutoDriveStopsDrivingATaskWhoseEveryStepFails() async {
-    let target = RecordingDriveTarget(ids: ["HTASK-BAD"], failing: ["HTASK-BAD"])
+  func testAutoDriveKeepsDrivingAfterSchedulerFailuresUntilTheTaskCanResume() async {
+    let target = RecordingDriveTarget(
+      ids: ["HTASK-TRANSIENT"],
+      failuresBeforeSuccess: [
+        "HTASK-TRANSIENT": HarnessAutoDriveTicker.maximumConsecutiveFailures
+      ])
     let ticker = HarnessAutoDriveTicker(target: target, intervalSeconds: 1, sleep: { _ in })
 
-    let report = await ticker.run(maximumWakes: 10)
+    let report = await ticker.run(maximumWakes: 5)
 
-    XCTAssertEqual(report.abandonedTaskIDs, ["HTASK-BAD"])
+    XCTAssertEqual(report.degradedTaskIDs, [])
     XCTAssertEqual(
-      target.reconcileCalls.count, HarnessAutoDriveTicker.maximumConsecutiveFailures,
-      "a task that cannot take a step is reported, not retried forever")
-    XCTAssertEqual(report.reconciles, 0)
+      target.reconcileCalls.count, 5,
+      "scheduler failures do not invent a stop outside the task's durable budget")
+    XCTAssertEqual(report.reconciles, 2)
   }
 
   // MARK: - Defect 2: required typed inputs were never sent
