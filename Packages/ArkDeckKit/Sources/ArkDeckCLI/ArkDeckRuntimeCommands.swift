@@ -1013,6 +1013,83 @@ enum RuntimeCLI {
     }
   }
 
+  /// Protected Runtime Flash debugging. The candidate file is the closed
+  /// decision document approved in r10; the CLI has no target, inputs, plan,
+  /// argv or capability flag on the evaluation path.
+  static func runDebug(_ arguments: [String]) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing debug subcommand (start|evaluate|status)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    rest.removeAll { $0 == "--json" }
+    let client = client(&rest)
+
+    func value(_ flag: String) -> String? {
+      guard let index = rest.firstIndex(of: flag), index + 1 < rest.count else { return nil }
+      return rest[index + 1]
+    }
+
+    switch subcommand {
+    case "start":
+      guard let requestPath = value("--request-file") else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "debug start requires --request-file <flash-request.json>")
+      }
+      let requestURL = URL(fileURLWithPath: requestPath)
+      guard let requestJSON = try? String(contentsOf: requestURL, encoding: .utf8) else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(requestURL.path)")
+      }
+      emit(
+        try client.request(
+          method: "debug.start", params: ["requestJson": .string(requestJSON)]),
+        json: json)
+
+    case "evaluate":
+      guard let invocationID = value("--invocation"),
+        let candidatePath = value("--candidate-file"),
+        let sourceSHA256 = value("--source-sha256"),
+        let buildSHA256 = value("--build-sha256")
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "debug evaluate requires --invocation <id> --candidate-file <decision.json> "
+            + "--source-sha256 <sha256> --build-sha256 <sha256>")
+      }
+      let candidateURL = URL(fileURLWithPath: candidatePath)
+      guard let candidateJSON = try? String(contentsOf: candidateURL, encoding: .utf8) else {
+        throw CLIError(exitCode: EX_USAGE, message: "cannot read \(candidateURL.path)")
+      }
+      emit(
+        try client.request(
+          method: "debug.evaluate",
+          params: [
+            "invocationId": .string(invocationID),
+            "candidateJson": .string(candidateJSON),
+            "sourceSha256": .string(sourceSHA256),
+            "buildSha256": .string(buildSHA256),
+          ]),
+        json: json)
+
+    case "status":
+      guard let invocationID = value("--invocation") else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "debug status requires --invocation <id>")
+      }
+      emit(
+        try client.request(
+          method: "debug.status", params: ["invocationId": .string(invocationID)]),
+        json: json)
+
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported debug subcommand")
+    }
+  }
+
   // `arkdeck task` (CHG-2026-054, TASK-HTP-001): the autonomous debug face.
   //
   // A caller states a target and a goal. There is no flag here that can

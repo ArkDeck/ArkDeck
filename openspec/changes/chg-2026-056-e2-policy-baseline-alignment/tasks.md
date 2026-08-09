@@ -2,9 +2,10 @@
 
 ## TASK-E2B-001 — Close GJ-4 with Runtime-owned admission and autonomous proven recovery
 
-- Status:blocked (BLOCKED_BY_PRODUCT_DEFECT: r5–r9 are present on protected main through
-  #1183/#1194/#1207, but the Runtime-owned migration omitted the isolated candidate repair loop;
-  r10 awaits maintainer review before candidate-backed destructive evaluation is enabled)
+- Status:ready (IMPLEMENTING: r10 was reviewed and merged to protected main by #1217; the closed
+  candidate grammar is approved and the Runtime-owned invocation implementation is in progress.
+  Host contract evidence is not real-device completion; GJ-4 remains IMPLEMENTING until the
+  explicit device window reaches success or reports one truthful non-overridable blocker.)
 - Golden Journey:GJ-4
 - Platform:macos; windows/linux contract compatibility only
 - Requirements:`POL-RECOVERY-001`, `POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-013`,
@@ -16,8 +17,9 @@
   `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RUNTIME-001`,
   `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`, `E2R-GJ4-001`
-- Depends on:maintainer reviews and merges CHG-2026-056@r10 to protected `main`; r7/r9 approval
-  and implementation dependencies are already satisfied by #1193/#1194 and #1206/#1207
+- Depends on:r7/r9/r10 approval dependencies are satisfied by #1193/#1194, #1206/#1207 and
+  #1217; the remaining dependency is implementation host gates followed by the explicit D2
+  real-device window
 - Production reachability:
   `ArkDeckApp/manual UI driver -> Agent XPC -> protected-main RuntimeJobEngine ->
   RuntimeCapabilityStore -> Rockchip Runtime composition -> typed Provider -> DAYU200`
