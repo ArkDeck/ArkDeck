@@ -1,0 +1,13 @@
+{
+  "documentType": "manual-ui-flash-candidate",
+  "schemaVersion": "1.0.0",
+  "applicationActivation": "activateAndRaise",
+  "navigationDelivery": "pointerClick",
+  "executeModeDelivery": "pointerClick",
+  "executeModeObservation": "selected",
+  "imageChooserDelivery": "pointerClick",
+  "planPreparationDelivery": "accessibilityPress",
+  "activationSettleMilliseconds": 100,
+  "controlTimeoutSeconds": 20,
+  "planTimeoutSeconds": 180
+}

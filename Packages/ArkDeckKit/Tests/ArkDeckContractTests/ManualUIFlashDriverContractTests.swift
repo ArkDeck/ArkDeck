@@ -1,19 +1,53 @@
+import CryptoKit
 import Foundation
 import XCTest
 
 final class ManualUIFlashDriverContractTests: XCTestCase {
-  private func repositorySource(_ path: String) throws -> String {
+  private func repositoryRoot() -> URL {
     var repositoryRoot = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 {
       repositoryRoot.deleteLastPathComponent()
     }
+    return repositoryRoot
+  }
+
+  private func repositorySource(_ path: String) throws -> String {
     return try String(
-      contentsOf: repositoryRoot.appendingPathComponent(path),
+      contentsOf: repositoryRoot().appendingPathComponent(path),
       encoding: .utf8)
   }
 
   private func driverSource() throws -> String {
     try repositorySource("scripts/rockchip_component/manual_ui_flash.swift")
+  }
+
+  private func runCandidateValidator(_ candidateURL: URL) throws -> (
+    status: Int32, stdout: String, stderr: String
+  ) {
+    let cache = FileManager.default.temporaryDirectory
+      .appendingPathComponent("manual-ui-validator-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: cache) }
+    let output = Pipe()
+    let errors = Pipe()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    process.arguments = [
+      "swift", "-module-cache-path", cache.path,
+      repositoryRoot().appendingPathComponent(
+        "scripts/rockchip_component/manual_ui_flash.swift").path,
+      "--validate-candidate", candidateURL.path,
+    ]
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    let stdout = output.fileHandleForReading.readDataToEndOfFile()
+    let stderr = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    return (
+      process.terminationStatus,
+      String(decoding: stdout, as: UTF8.self),
+      String(decoding: stderr, as: UTF8.self))
   }
 
   func testDriverUsesThePublishedOneClickFlashSurface() throws {
@@ -30,9 +64,11 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     }
 
     XCTAssertTrue(
-      source.contains("try driver.waitForEnabled(\"flash.execute.submit\", timeout: 30)"))
+      source.contains(
+        "try driver.waitForEnabled(\"flash.execute.submit\", timeout: controlTimeout)"))
     XCTAssertTrue(
-      source.contains("try driver.waitForPresence(\"flash.impact.userdata\", timeout: 30)"))
+      source.contains(
+        "try driver.waitForPresence(\"flash.impact.userdata\", timeout: controlTimeout)"))
     XCTAssertFalse(source.contains("\"ERASE-USERDATA\","))
     XCTAssertTrue(source.contains("try driver.assertNoFlashSubmission()"))
     XCTAssertTrue(source.contains("try driver.submit(\"flash.execute.submit\")"))
@@ -82,12 +118,148 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
   func testDriverObservesExecuteModeAndUsesPointerForTheSwiftUIFileButton() throws {
     let source = try driverSource()
-    XCTAssertTrue(source.contains("try driver.waitForSelected(\"flash.mode.execute\", timeout: 5)"))
-    XCTAssertTrue(source.contains("try driver.chooseFileIfNeeded(options.archiveURL)"))
+    XCTAssertTrue(source.contains("case .selected:"))
+    XCTAssertTrue(source.contains("try driver.waitForSelected(\"flash.mode.execute\""))
+    XCTAssertTrue(source.contains("try driver.chooseFileIfNeeded("))
+    XCTAssertTrue(source.contains("delivery: candidate.decision.imageChooserDelivery"))
     XCTAssertTrue(source.contains("element(identifier: \"flash.image.value\")"))
     XCTAssertTrue(source.contains("== url.lastPathComponent"))
-    XCTAssertTrue(source.contains("try click(\"flash.image.choose\")"))
+    XCTAssertTrue(source.contains("try perform(\"flash.image.choose\""))
     XCTAssertFalse(source.contains("try press(\"flash.image.choose\")"))
+  }
+
+  func testExternalCandidateUsesAClosedPreAdmissionEnvelopeWithoutPRInput() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("--candidate-file"))
+    XCTAssertTrue(source.contains("--debug-session-file"))
+    XCTAssertTrue(
+      source.contains(
+        "Set(dynamic.allKeys.map(\\.stringValue)) == Set(CodingKeys.allCases.map(\\.stringValue))"))
+    XCTAssertTrue(source.contains("candidate decision must have the exact published shape"))
+    XCTAssertTrue(source.contains("candidate decision is outside the published UI repair envelope"))
+    XCTAssertFalse(source.contains("git commit"))
+    XCTAssertFalse(source.contains("gh pr"))
+  }
+
+  func testStandaloneValidatorAcceptsDefaultAndRejectsAuthorityField() throws {
+    let candidateURL = repositoryRoot().appendingPathComponent(
+      "scripts/rockchip_component/manual_ui_flash_candidate.json")
+    let accepted = try runCandidateValidator(candidateURL)
+    XCTAssertEqual(accepted.status, 0, accepted.stderr)
+    XCTAssertTrue(accepted.stdout.contains("CANDIDATE_VALID:"))
+
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
+    object["capability"] = "candidate-must-not-supply"
+    let invalidURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("manual-ui-invalid-\(UUID().uuidString).json")
+    try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+      .write(to: invalidURL, options: .atomic)
+    defer { try? FileManager.default.removeItem(at: invalidURL) }
+    let rejected = try runCandidateValidator(invalidURL)
+    XCTAssertEqual(rejected.status, 2)
+    XCTAssertTrue(rejected.stderr.contains("candidate decision must have the exact published shape"))
+  }
+
+  func testRockchipSourceManifestPinsCurrentRepoBuildInputsBeforePush() throws {
+    let manifestURL = repositoryRoot().appendingPathComponent(
+      "openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json")
+    let manifest = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
+    let records = try XCTUnwrap(manifest["buildFiles"] as? [[String: Any]])
+    XCTAssertFalse(records.isEmpty)
+
+    for record in records {
+      let relativePath = try XCTUnwrap(record["path"] as? String)
+      let expectedSize = try XCTUnwrap(record["size"] as? Int)
+      let expectedSHA256 = try XCTUnwrap(record["sha256"] as? String)
+      let expectedGitBlob = try XCTUnwrap(record["gitBlob"] as? String)
+      let bytes = try Data(contentsOf: repositoryRoot().appendingPathComponent(relativePath))
+      let sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+      var gitBlobInput = Data("blob \(bytes.count)\0".utf8)
+      gitBlobInput.append(bytes)
+      let gitBlob = Insecure.SHA1.hash(data: gitBlobInput)
+        .map { String(format: "%02x", $0) }.joined()
+
+      XCTAssertEqual(bytes.count, expectedSize, "source manifest size drift: \(relativePath)")
+      XCTAssertEqual(sha256, expectedSHA256, "source manifest SHA-256 drift: \(relativePath)")
+      XCTAssertEqual(gitBlob, expectedGitBlob, "source manifest git blob drift: \(relativePath)")
+    }
+  }
+
+  func testCandidateCannotNameTargetArchivePlanControlOrSubmit() throws {
+    let data = try Data(
+      contentsOf: repositoryRoot()
+        .appendingPathComponent("scripts/rockchip_component/manual_ui_flash_candidate.json"))
+    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    XCTAssertEqual(
+      Set(object.keys),
+      Set([
+        "documentType", "schemaVersion", "applicationActivation", "navigationDelivery",
+        "executeModeDelivery", "executeModeObservation", "imageChooserDelivery",
+        "planPreparationDelivery", "activationSettleMilliseconds", "controlTimeoutSeconds",
+        "planTimeoutSeconds",
+      ]))
+    let forbidden = [
+      "app", "target", "archive", "plan", "controlIdentifier", "operation", "argv",
+      "executable", "capability", "reservation", "submit", "job", "runtimeSocket",
+    ]
+    for key in forbidden { XCTAssertNil(object[key], "candidate exposed forbidden key \(key)") }
+
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("try driver.assertNoFlashSubmission()"))
+    XCTAssertTrue(source.contains("try session?.markSubmissionRequested()"))
+    XCTAssertTrue(source.contains("try driver.submit(\"flash.execute.submit\")"))
+  }
+
+  func testPreAdmissionLoopRetriesSafeRefusalsAndBlocksUnknownSubmission() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("candidate is not materially distinct from a prior attempt"))
+    XCTAssertTrue(source.contains("candidateAppExecutableSHA256"))
+    XCTAssertTrue(source.contains("applicationExecutableSHA256(options.appURL)"))
+    XCTAssertTrue(source.contains("prior UI submission outcome is not terminal"))
+    XCTAssertTrue(source.contains("submissionOutcomeUnknown"))
+    XCTAssertTrue(source.contains("runtimeContinuationRequired"))
+    XCTAssertTrue(source.contains("externalDispatch=0"))
+    XCTAssertTrue(source.contains("continue through the captured Runtime debug seed"))
+  }
+
+  func testOnlyProtectedMainActuatorCanReachUIOrRuntime() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("process.executableURL = URL(fileURLWithPath: \"/usr/bin/git\")"))
+    XCTAssertTrue(source.contains("\"rev-parse\", \"origin/main^{commit}\""))
+    XCTAssertTrue(
+      source.contains(
+        "\"origin/main:scripts/rockchip_component/manual_ui_flash.swift\""))
+    XCTAssertTrue(source.contains("guard reviewed == current"))
+    XCTAssertTrue(source.contains("let protectedMainCommitOID = try protectedMainActuatorCommit()"))
+    XCTAssertTrue(
+      source.contains(
+        "use candidate JSON or an isolated App build instead of running an unmerged driver"))
+  }
+
+  func testNextCandidateRelaunchesExactAppAndPinsItsExecutableBytes() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("requiresFreshCandidateApp"))
+    XCTAssertTrue(source.contains("guard running.terminate()"))
+    XCTAssertTrue(source.contains("guard running.isTerminated"))
+    XCTAssertFalse(source.contains("forceTerminate()"))
+    XCTAssertTrue(
+      source.contains(
+        "applicationExecutableSHA256(options.appURL) == appExecutableSHA256"))
+    XCTAssertTrue(source.contains("candidate App executable changed before UI activation"))
+    XCTAssertTrue(source.contains("candidate App executable changed before submit barrier"))
+  }
+
+  func testBridgeCapturesAcceptedRequestAsUnprivilegedRuntimeDebugSeed() throws {
+    let source = try driverSource()
+    XCTAssertTrue(source.contains("--capture-debug-seed"))
+    XCTAssertTrue(source.contains("debugSeed.removeValue(forKey: \"clientContext\")"))
+    XCTAssertTrue(source.contains("typed[\"authorization\"] == nil"))
+    XCTAssertTrue(source.contains("typed[\"campaignReservation\"] == nil"))
+    XCTAssertTrue(source.contains("O_WRONLY | O_CREAT | O_EXCL"))
+    XCTAssertTrue(source.contains("S_IRUSR | S_IWUSR"))
+    XCTAssertTrue(source.contains("RUNTIME_DEBUG_SEED:"))
   }
 
   func testTargetPickerRequiresTheRequestedValueToBecomeObservable() throws {
