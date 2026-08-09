@@ -932,7 +932,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       "a proven non-execution that is not labelled as one is evidence nothing can read")
   }
 
-  func testTerminalReconcileRepairsSafeToReflashLineageWithoutRedispatch() async throws {
+  func testTerminalLineageRepairsWithoutRedispatchForReconcileAndNextSubmit() async throws {
     let dispatcher = ScriptedDispatcher(script: .outcomeUnknownOnHAPSend)
     let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
     let lease = try await publishHAPLease()
@@ -980,6 +980,37 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(
       repairedLineage?.lineage.first?.outcomeHistory.map(\.outcome),
       [.outcomeUnknown, .safeToReflash])
+
+    // Recreate the production ENOSPC/process-loss window more exactly: the
+    // capability use was consumed, but no outcome append became durable.
+    var pendingDocument = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: parkedCapabilityBytes) as? [String: Any])
+    var pendingRecords = try XCTUnwrap(
+      pendingDocument["records"] as? [[String: Any]])
+    var pendingConsumptions = try XCTUnwrap(
+      pendingRecords.first?["consumptions"] as? [[String: Any]])
+    pendingConsumptions[0]["outcomes"] = []
+    pendingRecords[0]["consumptions"] = pendingConsumptions
+    pendingDocument["records"] = pendingRecords
+    let pendingCapabilityBytes = try JSONSerialization.data(
+      withJSONObject: pendingDocument, options: [.sortedKeys])
+    try pendingCapabilityBytes.write(to: capabilityURL, options: .atomic)
+    let pendingLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
+    XCTAssertEqual(pendingLineage?.lineage.first?.outcome, .pending)
+
+    let dispatchesBeforeNextSubmit = dispatcher.dispatchCount
+    let next = try await engine.submit(
+      hapRequest(
+        lease: lease, requestID: "req-terminal-lineage-next-submit",
+        idempotencyKey: "idem-terminal-lineage-next-submit"))
+    XCTAssertNotEqual(next.jobID, acceptance.jobID)
+    XCTAssertEqual(
+      dispatcher.dispatchCount, dispatchesBeforeNextSubmit,
+      "submit may close proven lineage bookkeeping but must not dispatch a Provider action")
+    let submitRepairedLineage = try await capabilityStore.inspect(capabilityID: capabilityID)
+    XCTAssertEqual(
+      submitRepairedLineage?.lineage.first?.outcomeHistory.map(\.outcome),
+      [.safeToReflash])
   }
 
   // MARK: - Cancel
