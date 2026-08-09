@@ -101,11 +101,12 @@ enum RockchipHDCIntegrationProfile {
   static let dayu200NormalProductID: UInt16 = 0x5000
 
   static func enterLoaderArguments(connectKey: String) -> [String] {
-    // The HDC service owns boot-mode changes.  Keep this as a fixed typed
-    // argv rather than asking a normal-mode shell to interpret `reboot
-    // loader`: the latter was observed to complete without a Loader
-    // transition on the current DAYU200/HDC combination.
-    ["-t", connectKey, "target", "boot", "-bootloader"]
+    // HDC forwards a non-option MODE to `/bin/begetctl reboot`.  DAYU200's
+    // RockUSB flashing personality is `loader`; `-bootloader` selects the
+    // distinct fastboot personality, which rkdeveloptool cannot use.  Keep
+    // the reviewed transition typed and shell-free while naming the exact
+    // mode required by the RockUSB Provider.
+    ["-t", connectKey, "target", "boot", "loader"]
   }
 }
 

@@ -291,7 +291,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     XCTAssertEqual(try snapshot.confirmedHDCConnectKey(for: normal), normalSerial)
     XCTAssertEqual(
       RockchipHDCIntegrationProfile.enterLoaderArguments(connectKey: normalSerial),
-      ["-t", normalSerial, "target", "boot", "-bootloader"])
+      ["-t", normalSerial, "target", "boot", "loader"])
 
     let loader = RockchipProductUSBIdentity(
       serial: loaderSerial,
