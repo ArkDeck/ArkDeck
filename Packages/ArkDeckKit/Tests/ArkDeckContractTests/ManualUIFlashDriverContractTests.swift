@@ -83,6 +83,9 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   func testDriverObservesExecuteModeAndUsesPointerForTheSwiftUIFileButton() throws {
     let source = try driverSource()
     XCTAssertTrue(source.contains("try driver.waitForSelected(\"flash.mode.execute\", timeout: 5)"))
+    XCTAssertTrue(source.contains("try driver.chooseFileIfNeeded(options.archiveURL)"))
+    XCTAssertTrue(source.contains("element(identifier: \"flash.image.value\")"))
+    XCTAssertTrue(source.contains("== url.lastPathComponent"))
     XCTAssertTrue(source.contains("try click(\"flash.image.choose\")"))
     XCTAssertFalse(source.contains("try press(\"flash.image.choose\")"))
   }
