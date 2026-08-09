@@ -1,13 +1,14 @@
 # Verification Plan
 
-> Change:CHG-2026-056-e2-policy-baseline-alignment@r9
+> Change:CHG-2026-056-e2-policy-baseline-alignment@r10
 > Status:planned
 > Baseline:`CORE-3.0.0` -> proposed `CORE-4.0.0`
 > Proposal phase executes zero real device, Runtime capability, recovery or history mutation.
 
 ## Environment
 
-- Proposal review: latest protected `main`; no HDC/RockUSB/device/Runtime-store access.
+- Proposal review: latest protected `main`; no candidate-backed HDC/RockUSB/device/Runtime-store
+  access.
 - Host implementation: macOS, pinned toolchain, fake/scripted Providers, immutable journal fixtures
   and temporary stores only.
 - Real validation after approval and implementation: production signed ArkDeck App,
@@ -20,13 +21,13 @@
 | Acceptance | Method | Expected result | Evidence |
 | --- | --- | --- | --- |
 | `POL-RECOVERY-001`, `POL-AGENT-002`, `E2R-CATALOG-001` | Cross-file policy/Catalog/Provider/UI audit | Flash remains typed and destructive; only bare `flash.dayu200` is published/displayed; Steps/effect/Provider remain unchanged; exactly one profile `dayu200` retains the current recovery coverage; versioned operation/profile strings are rejected; no E2/UI/chat authority returns | document + contract |
-| `AC-FLASH-015-03`, `E2R-RUNTIME-001` | Fake initial Agent Flash through production Runtime composition | Runtime mints/reserves its exact capability and dispatches published fake Steps with no authority or user-message input | contract |
+| `AC-FLASH-015-03`, `E2R-RUNTIME-001` | Fake initial Agent Flash plus two isolated candidate decisions through production Runtime composition | Runtime independently validates the closed repair envelope, mints/reserves its exact capability and dispatches published fake Steps with no authority, Git/PR/merge or user-message input | contract |
 | `AC-FLASH-015-02`, `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RECOVERY-001` | Seed durable outcomeUnknown, known identity and a fully covering Provider plan; run launch and live recovery | Original Step dispatch stays 0; a distinct capability/reservation/intent executes complete overwrite automatically; only all confirmed effects + reboot/rebind/postflight create recovered target epoch | contract/fault |
-| `AC-FLASH-015-01`, `E2R-RECOVERY-NEGATIVE-001`, `E2R-NEGATIVE-001` | Pairwise faults over identity, binding/topology, effect closure, omitted/protected partition, coverage declaration, Artifact/tool/plan drift, caller proof, cancellation, expiry and budget | Original replay and recovery dispatch both remain 0; exact durable blocker is produced and has no approval override | contract/fault |
+| `AC-FLASH-015-01`, `E2R-RECOVERY-NEGATIVE-001`, `E2R-NEGATIVE-001` | Pairwise faults over identity, binding/topology, effect closure, omitted/protected partition, coverage declaration, Artifact/tool/plan/repair-envelope drift, candidate/caller proof, cancellation, expiry and budget | Original replay, invalid candidate and recovery dispatch all remain 0; exact durable blocker is produced and has no approval override | contract/fault |
 | `AC-WF-004-01`, `AC-WF-004-02`, `E2R-HISTORY-001` | Immutable old-unknown + later-Flash fixtures with varied facts | Only complete same-target, ordered, full-coverage, per-effect and postflight proof appends a supersession relation with zero hardware dispatch; old bytes/outcome remain unchanged | schema/compatibility contract |
 | `AC-WF-004-03`, `E2R-COMPAT-001` | V1–V5 decode/export and V6 writer fixtures | Legacy authority/evidence/recovery bytes remain readable and immutable; none can mint capability, coverage or a supersession relation | compatibility contract |
-| `AC-FLASH-007-01`, `AC-FLASH-013-01`, `E2R-NOQUESTION-001` | Agent/UI/human-action surface audit and fake eligible/ineligible flows | Initial Agent Flash, ordinary continuation and eligible recovery require no UI/chat/human decision; ineligible state is a diagnostic blocker, never an approval question | platform + contract |
-| `E2R-GJ4-001` | After approval and host gates, execute the production UI driver on one real DAYU200; inspect Job/Session/Artifact/postflight/recovery lineage | Target lane is mechanically reconciled or recovered, real UI Flash succeeds, flashed build is read back, V6 evidence is truthful, and no E2/campaign/chat/outcome-decision prompt occurs | realHardware |
+| `AC-FLASH-007-01`, `AC-FLASH-013-01`, `E2R-NOQUESTION-001` | Agent/UI/human-action surface audit and fake eligible/ineligible flows | Initial Agent Flash, eligible next candidate and recovery require no UI/chat/human or per-attempt PR/merge decision; ineligible state is a diagnostic blocker, never an approval question | platform + contract |
+| `E2R-GJ4-001` | After approval and host gates, execute one Runtime-owned candidate-debug invocation on one real DAYU200; inspect Job/Session/Artifact/candidate/postflight/recovery lineage | Target lane is mechanically reconciled or recovered, real UI Flash succeeds or stops once with a truthful blocker, flashed build is read back on success, V6 evidence is truthful, and no intermediate PR or E2/campaign/chat/outcome-decision prompt occurs | realHardware |
 
 ## Positive recovery vectors
 
@@ -96,6 +97,24 @@ they do not replace `E2R-GJ4-001` or authorize hardware.
 - Existing waitingForRecovery Jobs and target-lane claims remain untouched.
 - No host-test result is hardware evidence, recovery proof or `REAL_DEVICE_PASS`.
 
+## r10 candidate-loop verification addendum
+
+- Fake-provider tests must run two or more isolated candidates inside one Runtime-owned invocation
+  and prove there is no Git/PR/merge/chat field in the invocation or admission inputs.
+- The candidate output decoder accepts only the closed decision grammar. Fuzz every forbidden
+  authority, fact, target, plan, Step, executable, argv, outcome and coverage field and require
+  external dispatch 0.
+- Runtime recomputes the operation, plan, target/binding, Artifact, tool and decision envelope from
+  protected sources after candidate evaluation and again before the first external effect.
+- An ordinary next destructive epoch requires a durable predecessor `safeToReflash`; unknown
+  intent uses only the existing complete-overwrite recovery proof and is never replayed.
+- Candidate provenance is durable but cannot satisfy any admission predicate. Removing any
+  Runtime-derived proof or introducing digest drift rejects the candidate.
+- The DAYU200 repair envelope covers the observed mode/deadline/HDC-personality/postflight repair
+  space without exposing raw serial/topology or allowing a candidate-selected target.
+- One real GJ-4 invocation may begin only after r10 approval and all host gates. It must finish or
+  stop truthfully without an intermediate PR; only the final successful candidate is promoted.
+
 ## Deviations
 
 Any need for a new operation/Provider/profile, partition or argv change, caller-controlled proof,
@@ -106,7 +125,9 @@ requires another revision of this same change and maintainer review before imple
 
 - [x] r5/r6 no-E2 adjudication and implementation are present on protected `main` through
   #1178/#1181/#1183.
-- [ ] r9 is reviewed and merged by the human maintainer before publication or hardware use.
+- [x] r7 proposal/implementation are present on protected `main` through #1193/#1194.
+- [x] r9 proposal/implementation are present on protected `main` through #1206/#1207.
+- [ ] r10 is reviewed and merged by the human maintainer before candidate-backed device use.
 - [ ] All canonical and change-local contract acceptance passes.
 - [ ] All host gates pass at the exact implementation head.
 - [ ] Real DAYU200 autonomous recovery/UI Flash/postflight passes with truthful V6 evidence.

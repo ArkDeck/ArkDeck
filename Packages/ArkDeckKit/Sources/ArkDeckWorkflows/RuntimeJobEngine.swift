@@ -14,6 +14,193 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
+/// The only data an isolated repair candidate may return to protected-main
+/// Runtime. None of these cases can name authority, trusted facts or an
+/// executable device plan.
+public enum RuntimeCandidateDecision: Equatable, Sendable {
+  case usePublishedDefaults
+  case selectPublishedAlternative(String)
+  case boundedTiming(parameter: String, value: Int)
+  case requestPublishedObservation(String)
+  case stop(reasonCode: String)
+}
+
+public struct RuntimeCandidateTimingBounds: Equatable, Sendable {
+  public let minimum: Int
+  public let maximum: Int
+
+  public init(minimum: Int, maximum: Int) throws {
+    guard minimum >= 0, maximum >= minimum, maximum <= 3_600_000 else {
+      throw RuntimeCandidateDecisionError.invalidEnvelope("timingBounds")
+    }
+    self.minimum = minimum
+    self.maximum = maximum
+  }
+
+  fileprivate func contains(_ value: Int) -> Bool {
+    minimum...maximum ~= value
+  }
+}
+
+/// A reviewed, protected-main allowlist. A candidate can select inside this
+/// envelope, but cannot add a key or widen a bound.
+public struct RuntimeCandidateRepairEnvelope: Equatable, Sendable {
+  public static let maximumEntriesPerKind = 32
+
+  fileprivate let alternativeIDs: Set<String>
+  fileprivate let observationIDs: Set<String>
+  fileprivate let timingBounds: [String: RuntimeCandidateTimingBounds]
+
+  public init(
+    alternativeIDs: [String],
+    observationIDs: [String],
+    timingBounds: [String: RuntimeCandidateTimingBounds]
+  ) throws {
+    guard alternativeIDs.count <= Self.maximumEntriesPerKind,
+      observationIDs.count <= Self.maximumEntriesPerKind,
+      timingBounds.count <= Self.maximumEntriesPerKind,
+      Set(alternativeIDs).count == alternativeIDs.count,
+      Set(observationIDs).count == observationIDs.count,
+      alternativeIDs.allSatisfy(RuntimeCandidateDecisionCodec.isIdentifier),
+      observationIDs.allSatisfy(RuntimeCandidateDecisionCodec.isIdentifier),
+      timingBounds.keys.allSatisfy(RuntimeCandidateDecisionCodec.isIdentifier)
+    else {
+      throw RuntimeCandidateDecisionError.invalidEnvelope("closedRepairEnvelope")
+    }
+    self.alternativeIDs = Set(alternativeIDs)
+    self.observationIDs = Set(observationIDs)
+    self.timingBounds = timingBounds
+  }
+}
+
+public enum RuntimeCandidateDecisionError: Error, Equatable, Sendable {
+  case invalidDocument
+  case invalidEnvelope(String)
+  case unsupportedSchemaVersion
+  case unsupportedKind
+  case closedShapeViolation
+  case invalidIdentifier(String)
+  case alternativeNotPublished(String)
+  case observationNotPublished(String)
+  case timingNotPublished(String)
+  case timingOutOfBounds(String)
+}
+
+/// Strict decoder and Runtime-side repair-envelope validator.
+///
+/// The decoder rejects duplicate JSON members before decoding. Each decision
+/// kind then requires an exact key set, so adding `target`, `argv`, `plan`,
+/// `capability` or any future field fails closed rather than being ignored by
+/// Swift's ordinary `Decodable` behavior.
+public enum RuntimeCandidateDecisionCodec {
+  public static let schemaVersion = "1.0.0"
+  public static let maximumDocumentBytes = 8 * 1_024
+
+  public static func decode(
+    _ data: Data,
+    envelope: RuntimeCandidateRepairEnvelope
+  ) throws -> RuntimeCandidateDecision {
+    guard !data.isEmpty, data.count <= maximumDocumentBytes else {
+      throw RuntimeCandidateDecisionError.invalidDocument
+    }
+    let object: [String: JSONValue]
+    do {
+      object = try strictObject(from: data)
+    } catch {
+      throw RuntimeCandidateDecisionError.invalidDocument
+    }
+    guard case .string(let version)? = object["schemaVersion"],
+      version == schemaVersion
+    else {
+      throw RuntimeCandidateDecisionError.unsupportedSchemaVersion
+    }
+    guard case .string(let kind)? = object["kind"] else {
+      throw RuntimeCandidateDecisionError.unsupportedKind
+    }
+
+    switch kind {
+    case "usePublishedDefaults":
+      try requireKeys(object, exactly: ["schemaVersion", "kind"])
+      return .usePublishedDefaults
+
+    case "selectPublishedAlternative":
+      try requireKeys(
+        object, exactly: ["schemaVersion", "kind", "alternativeId"])
+      let identifier = try identifier(object, key: "alternativeId")
+      guard envelope.alternativeIDs.contains(identifier) else {
+        throw RuntimeCandidateDecisionError.alternativeNotPublished(identifier)
+      }
+      return .selectPublishedAlternative(identifier)
+
+    case "boundedTiming":
+      try requireKeys(
+        object, exactly: ["schemaVersion", "kind", "parameter", "value"])
+      let parameter = try identifier(object, key: "parameter")
+      guard let bounds = envelope.timingBounds[parameter] else {
+        throw RuntimeCandidateDecisionError.timingNotPublished(parameter)
+      }
+      guard case .integer(let rawValue)? = object["value"],
+        let value = Int(exactly: rawValue), bounds.contains(value)
+      else {
+        throw RuntimeCandidateDecisionError.timingOutOfBounds(parameter)
+      }
+      return .boundedTiming(parameter: parameter, value: value)
+
+    case "requestPublishedObservation":
+      try requireKeys(
+        object, exactly: ["schemaVersion", "kind", "observationId"])
+      let identifier = try identifier(object, key: "observationId")
+      guard envelope.observationIDs.contains(identifier) else {
+        throw RuntimeCandidateDecisionError.observationNotPublished(identifier)
+      }
+      return .requestPublishedObservation(identifier)
+
+    case "stop":
+      try requireKeys(object, exactly: ["schemaVersion", "kind", "reasonCode"])
+      return .stop(reasonCode: try identifier(object, key: "reasonCode"))
+
+    default:
+      throw RuntimeCandidateDecisionError.unsupportedKind
+    }
+  }
+
+  fileprivate static func isIdentifier(_ value: String) -> Bool {
+    value.utf8.count <= 128
+      && value.range(
+        of: #"^[a-z][A-Za-z0-9.-]*$"#, options: .regularExpression) != nil
+  }
+
+  private static func identifier(
+    _ object: [String: JSONValue], key: String
+  ) throws -> String {
+    guard case .string(let value)? = object[key], isIdentifier(value) else {
+      throw RuntimeCandidateDecisionError.invalidIdentifier(key)
+    }
+    return value
+  }
+
+  private static func requireKeys(
+    _ object: [String: JSONValue], exactly expected: Set<String>
+  ) throws {
+    guard Set(object.keys) == expected else {
+      throw RuntimeCandidateDecisionError.closedShapeViolation
+    }
+  }
+
+  /// Reuses ArkDeckStorage's raw-byte duplicate-member validator. Wrapping
+  /// the candidate as audit details preserves duplicate keys until that
+  /// validator has rejected them; JSONDecoder alone would silently collapse
+  /// or ignore authority-bearing additions.
+  private static func strictObject(from data: Data) throws -> [String: JSONValue] {
+    var wrapper = Data(
+      #"{"schemaVersion":"1.0.0","recordId":"candidate-decision","auditId":"candidate-decision","correlationId":"candidate-decision","sessionId":"candidate-decision","jobId":"candidate-decision","category":"preview","timestamp":"2026-08-09T00:00:00Z","details":"#
+        .utf8)
+    wrapper.append(data)
+    wrapper.append(UInt8(ascii: "}"))
+    return try SessionAuditCodec.decode(wrapper).details
+  }
+}
+
 public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case rejected(RuntimeOperationErrorCode, String)
   case idempotencyConflict(String)

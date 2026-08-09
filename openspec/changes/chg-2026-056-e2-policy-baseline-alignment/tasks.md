@@ -2,8 +2,9 @@
 
 ## TASK-E2B-001 — Close GJ-4 with Runtime-owned admission and autonomous proven recovery
 
-- Status:blocked (r5/r6 implementation is present on protected main through #1183; r9 autonomous
-  recovery/profile consolidation awaits maintainer review/merge before publication or hardware use)
+- Status:blocked (BLOCKED_BY_PRODUCT_DEFECT: r5–r9 are present on protected main through
+  #1183/#1194/#1207, but the Runtime-owned migration omitted the isolated candidate repair loop;
+  r10 awaits maintainer review before candidate-backed destructive evaluation is enabled)
 - Golden Journey:GJ-4
 - Platform:macos; windows/linux contract compatibility only
 - Requirements:`POL-RECOVERY-001`, `POL-AGENT-002`, `REQ-FLASH-007`, `REQ-FLASH-013`,
@@ -15,7 +16,8 @@
   `AC-JOB-001-03`, `AC-JOB-001-05`, `AC-JOB-006-01`, `E2R-RUNTIME-001`,
   `E2R-NEGATIVE-001`, `E2R-COMPAT-001`, `E2R-RECOVERY-001`,
   `E2R-RECOVERY-NEGATIVE-001`, `E2R-HISTORY-001`, `E2R-NOQUESTION-001`, `E2R-GJ4-001`
-- Depends on:maintainer reviews and merges CHG-2026-056@r9 to protected `main`
+- Depends on:maintainer reviews and merges CHG-2026-056@r10 to protected `main`; r7/r9 approval
+  and implementation dependencies are already satisfied by #1193/#1194 and #1206/#1207
 - Production reachability:
   `ArkDeckApp/manual UI driver -> Agent XPC -> protected-main RuntimeJobEngine ->
   RuntimeCapabilityStore -> Rockchip Runtime composition -> typed Provider -> DAYU200`
@@ -211,3 +213,48 @@
   prove both old profile strings fail lookup/admission with zero external dispatch.
 - Do not rewrite historical evidence or guess that an incomplete old recovery is compatible. Such a
   Job remains blocked until exact durable proof satisfies the reviewed recovery contract.
+
+### r10 Runtime-mediated candidate debugging deliverables
+
+- Replace the retired campaign entry point with one Runtime-owned debug invocation. The invocation
+  carries no human authority and uses the existing sixteen-epoch/four-hour/concurrency-one budget.
+- Keep repairer/candidate in task-owned isolation with no Runtime socket, device transport,
+  capability/fact/reservation/journal stores or raw target identity.
+- Add a closed `CandidateDecision` grammar that can select only reviewed alternatives, bounded
+  timing and published read-only observations. It cannot contain operation/profile, target,
+  partition, Artifact, Step, effect, executable, argv, capability, outcome or coverage fields.
+- Make protected-main Runtime independently re-materialize the published plan, read fresh trusted
+  facts, validate the decision envelope and mint/reserve its exact capability before every use.
+- Return structured, redacted failure observations to the isolated repair loop. A safe terminal may
+  produce the next candidate without a Git task/change/PR/merge/chat prompt; unknown, cancellation,
+  drift and budget stops remain non-overridable.
+- Cover DAYU200 mode transition, bounded deadlines, unique post-flash HDC-personality selection and
+  read-only postflight in the first reviewed repair envelope. Anything outside the envelope returns
+  `repairSurfaceInsufficient` with zero new dispatch.
+- Export one normal promotion candidate only after the real loop passes. The final source change is
+  reviewed in one ordinary PR; per-attempt PRs are forbidden.
+
+### r10 Verification
+
+- Positive fake-provider flow: at least two distinct isolated candidates are built and evaluated in
+  one invocation, the predecessor is durably `safeToReflash`, and the second reaches success with no
+  Git/PR/merge or user-confirmation input.
+- Negative matrix: unknown fields, out-of-range timing, new operation/profile/target/partition/Step,
+  executable/argv, candidate facts/capability/outcome/coverage, digest drift, unknown predecessor,
+  cancellation, attempt 17, elapsed four hours and concurrency two all produce external dispatch 0.
+- Provenance: candidate source/build/decision digests are durable but explicitly non-authoritative;
+  Runtime materialization/fresh facts/capability/reservation/outcome remain the admission record.
+- Post-write failure: Runtime performs only reviewed read-only observation first and never reflashes
+  unless ordinary `safeToReflash` or complete-overwrite recovery independently proves eligibility.
+- Surface audit: active App/Agent/CLI/Runtime responses contain no instruction to merge a PR before
+  the next eligible candidate; a genuine envelope miss reports `repairSurfaceInsufficient`.
+- Real GJ-4: one explicit device window reaches success or one truthful non-overridable blocker
+  without an intermediate PR. Simulation/fake/host green is not `REAL_DEVICE_PASS`.
+
+### r10 Stop conditions
+
+- Before r10 review/merge, implementation is host-only and candidate-backed device dispatch is 0.
+- Never run an unmerged broker or Provider against the device. The protected-main Runtime remains
+  the only owner of transport, facts, plan, capability, reservation, journal and outcome.
+- Stop with `repairSurfaceInsufficient` rather than widening the candidate grammar when a repair
+  needs a new external effect, target rule, trusted fact, Step, command, partition or Provider plan.
