@@ -721,6 +721,12 @@ final class AccessibilityDriver {
     guard runningApplication.activate(options: [.activateAllWindows]) else {
       throw DriverFailure.message("could not activate the exact ArkDeck application")
     }
+    let frontmostSet = AXUIElementSetAttributeValue(
+      application, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+    guard frontmostSet == .success else {
+      throw DriverFailure.message(
+        "could not make the exact ArkDeck application frontmost: AX error \(frontmostSet.rawValue)")
+    }
 
     var window: AXUIElement?
     if let rawFocused = attribute(application, kAXFocusedWindowAttribute as CFString),
@@ -736,10 +742,15 @@ final class AccessibilityDriver {
       throw DriverFailure.message("the exact ArkDeck application has no interactive window")
     }
     let raised = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-    guard raised == .success else {
-      throw DriverFailure.message("could not raise the exact ArkDeck window: AX error \(raised.rawValue)")
-    }
     RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+    let observedFrontmost = attribute(application, kAXFrontmostAttribute as CFString) as? Bool
+    guard runningApplication.isActive, observedFrontmost == true else {
+      throw DriverFailure.message(
+        "the exact ArkDeck application did not remain frontmost "
+          + "[isActive=\(runningApplication.isActive) "
+          + "frontmost=\(String(describing: observedFrontmost)) "
+          + "AXRaise=\(raised.rawValue)]")
+    }
   }
 
   private func stringAttribute(_ element: AXUIElement, _ name: CFString) -> String? {

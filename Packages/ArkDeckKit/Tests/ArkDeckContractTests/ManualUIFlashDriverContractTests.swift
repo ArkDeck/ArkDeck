@@ -72,7 +72,11 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       source.contains(
         "runningApplication.activate(options: [.activateAllWindows])"))
     XCTAssertTrue(source.contains("kAXFocusedWindowAttribute"))
+    XCTAssertTrue(source.contains("kAXFrontmostAttribute"))
     XCTAssertTrue(source.contains("kAXRaiseAction"))
+    XCTAssertTrue(source.contains("runningApplication.isActive"))
+    XCTAssertTrue(source.contains("observedFrontmost == true"))
+    XCTAssertFalse(source.contains("guard raised == .success"))
     XCTAssertTrue(source.contains("try activateApplication()"))
   }
 
