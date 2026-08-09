@@ -37,6 +37,23 @@ public struct RockchipFlashArchiveIdentity: Sendable, Equatable {
   }
 }
 
+/// Everything preflight learns while one exact archive stream passes by.
+/// Identity and build remain separate facts so their agreement is checked at
+/// the product boundary, but production derives both from the same summary —
+/// never from two decompression passes over a large images bundle.
+public struct RockchipFlashArchiveSnapshot: Sendable, Equatable {
+  public let identity: RockchipFlashArchiveIdentity
+  public let build: RockchipImageBuildDescriptor
+
+  public init(
+    identity: RockchipFlashArchiveIdentity,
+    build: RockchipImageBuildDescriptor
+  ) {
+    self.identity = identity
+    self.build = build
+  }
+}
+
 public enum RockchipFlashPreflightCheck: String, Sendable, CaseIterable {
   case rockUSBToolAliveness
   case hdcToolAliveness
@@ -100,12 +117,11 @@ public struct RockchipFlashPreflightReceipt: Sendable, Equatable {
 public struct RockchipFlashPreflightProbes: Sendable {
   public var rockUSBAliveness: @Sendable () async -> RockchipFlashToolAliveness
   public var hdcAliveness: @Sendable () async -> RockchipFlashToolAliveness
-  public var archiveIdentity: @Sendable (URL) throws -> RockchipFlashArchiveIdentity
-  /// The build the archive describes, read from its bytes. A seam like every
-  /// other observation here: the preflight decides what the answer means, and
-  /// a contract test substitutes the answer without a 730 MB file.
-  public var archiveBuild:
-    @Sendable (URL, RockchipFlashProfile) throws -> RockchipImageBuildDescriptor
+  /// Identity and build derived from one stream of the archive's bytes. A seam
+  /// like every other observation here: the preflight decides what the answer
+  /// means, and contract tests substitute it without a 730 MB file.
+  public var archiveSnapshot:
+    @Sendable (URL, RockchipFlashProfile) throws -> RockchipFlashArchiveSnapshot
   /// The stable identity the durable binding names — what the target readback
   /// must match. Kept separate from the readback so the identity comparison
   /// stays in the preflight, where it is visible and testable.
@@ -124,10 +140,9 @@ public struct RockchipFlashPreflightProbes: Sendable {
   public init(
     rockUSBAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
     hdcAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
-    archiveIdentity: @escaping @Sendable (URL) throws -> RockchipFlashArchiveIdentity,
-    archiveBuild: (
-      @Sendable (URL, RockchipFlashProfile) throws -> RockchipImageBuildDescriptor
-    )? = nil,
+    archiveSnapshot:
+      @escaping @Sendable (URL, RockchipFlashProfile) throws
+      -> RockchipFlashArchiveSnapshot,
     boundTargetIdentitySHA256: @escaping @Sendable () throws -> String,
     boundTargetHDCNormalAlias:
       @escaping @Sendable () throws -> (identitySHA256: String, usbTopology: String)? =
@@ -136,15 +151,7 @@ public struct RockchipFlashPreflightProbes: Sendable {
   ) {
     self.rockUSBAliveness = rockUSBAliveness
     self.hdcAliveness = hdcAliveness
-    self.archiveIdentity = archiveIdentity
-    self.archiveBuild =
-      archiveBuild
-      ?? { url, board in
-        let summary = try GzipTarArchiveReader.summarize(
-          fileAt: url,
-          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
-        return try RockchipImageArchiveIntrospection.describe(summary: summary, board: board)
-      }
+    self.archiveSnapshot = archiveSnapshot
     self.boundTargetIdentitySHA256 = boundTargetIdentitySHA256
     self.boundTargetHDCNormalAlias = boundTargetHDCNormalAlias
     self.targetReadback = targetReadback
@@ -218,25 +225,16 @@ public struct RockchipFlashPreflight: Sendable {
   }
 
   private func archiveIntegrity(archiveURL: URL) -> RockchipFlashPreflightFinding {
-    let identity: RockchipFlashArchiveIdentity
-    do {
-      identity = try probes.archiveIdentity(archiveURL)
-    } catch {
-      return RockchipFlashPreflightFinding(
-        check: .archiveIntegrity, passed: false,
-        summary: "the images archive could not be measured: \(error)",
-        remediation: ["point --images at the readable archive this campaign pins"])
-    }
     // Whether this archive can be flashed on this board is decided by reading
     // it, not by recognising its digest. Matching against the builds compiled
     // into the product refused a firmware daily published after the last
     // release — measured with `7.0.0.37` on 2026-08-05, which fits the board
     // with no structural violation.
     let board = RockchipFlashProfile.dayu200
-    let build: RockchipImageBuildDescriptor
+    let snapshot: RockchipFlashArchiveSnapshot
     do {
-      build = try probes.archiveBuild(archiveURL, board)
-      _ = try board.forBuild(build)
+      snapshot = try probes.archiveSnapshot(archiveURL, board)
+      _ = try board.forBuild(snapshot.build)
     } catch {
       return RockchipFlashPreflightFinding(
         check: .archiveIntegrity, passed: false,
@@ -247,8 +245,8 @@ public struct RockchipFlashPreflight: Sendable {
             + "member set fit this board"
         ])
     }
-    guard build.archiveSHA256 == identity.sha256,
-      build.archiveSizeBytes == Int64(identity.byteCount)
+    guard snapshot.build.archiveSHA256 == snapshot.identity.sha256,
+      snapshot.build.archiveSizeBytes == Int64(snapshot.identity.byteCount)
     else {
       return RockchipFlashPreflightFinding(
         check: .archiveIntegrity, passed: false,
@@ -258,7 +256,7 @@ public struct RockchipFlashPreflight: Sendable {
     return RockchipFlashPreflightFinding(
       check: .archiveIntegrity, passed: true,
       summary: "archive fits \(board.catalogReference) and declares "
-        + "\(build.runtimeBuildVersion)")
+        + "\(snapshot.build.runtimeBuildVersion)")
   }
 
   private func targetPresence() -> RockchipFlashPreflightFinding {
@@ -380,10 +378,19 @@ extension RockchipFlashPreflightProbes {
           arguments: RockchipFlashPreflight.hdcReadOnlyArguments,
           runner: runner)
       },
-      archiveIdentity: { url in
-        let summary = try GzipTarArchiveReader.summarize(fileAt: url)
-        return RockchipFlashArchiveIdentity(
-          sha256: summary.archiveSHA256, byteCount: Int(summary.archiveSizeBytes))
+      archiveSnapshot: { url, board in
+        // One streaming pass provides the compressed-byte identity, member
+        // inventory, partition table and runtime build. Preflight used to
+        // decompress the same 730 MB bundle once for identity and again for
+        // build introspection before any Runtime import began.
+        let summary = try GzipTarArchiveReader.summarize(
+          fileAt: url,
+          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+        return RockchipFlashArchiveSnapshot(
+          identity: RockchipFlashArchiveIdentity(
+            sha256: summary.archiveSHA256, byteCount: Int(summary.archiveSizeBytes)),
+          build: try RockchipImageArchiveIntrospection.describe(
+            summary: summary, board: board))
       },
       boundTargetIdentitySHA256: {
         let binding = try RockchipProductBindingStore(

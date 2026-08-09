@@ -81,6 +81,14 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     var clearCount: Int { lock.withLock { clears } }
   }
 
+  private final class ProbeCallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+
+    func increment() { lock.withLock { calls += 1 } }
+    var value: Int { lock.withLock { calls } }
+  }
+
   func testTypedToolTrustRequiresExactPinAndNeverClearsQuarantineImplicitly() throws {
     let root = FileManager.default.temporaryDirectory
       .appending(path: "arkdeck-tool-trust-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -445,23 +453,24 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     return RockchipFlashPreflightProbes(
       rockUSBAliveness: { rockUSB },
       hdcAliveness: { hdc },
-      archiveIdentity: { _ in resolvedArchive },
-      // Reading the archive is a probe like every other observation here, so
-      // these tests keep proving every branch with zero spawn, zero device and
-      // no 730 MB file. The fixture describes a build that fits the board.
-      archiveBuild: { _, board in
-        RockchipImageBuildDescriptor(
-          archiveSizeBytes: resolvedArchive.byteCount == 0
-            ? board.archiveSizeBytes : Int64(resolvedArchive.byteCount),
-          archiveSHA256: resolvedArchive.sha256,
-          members: board.members,
-          declaredPartitions: board.mappedPartitions.map {
-            RockchipDeclaredPartition(
-              name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
-          } + board.membershiplessPartitionsWriteForbidden.map {
-            RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-          },
-          runtimeBuildVersion: board.runtimeBuildVersion)
+      // Reading the archive is one probe like every other observation here,
+      // so these tests prove every branch with zero spawn, zero device and no
+      // 730 MB file. The fixture describes a build that fits the board.
+      archiveSnapshot: { _, board in
+        RockchipFlashArchiveSnapshot(
+          identity: resolvedArchive,
+          build: RockchipImageBuildDescriptor(
+            archiveSizeBytes: resolvedArchive.byteCount == 0
+              ? board.archiveSizeBytes : Int64(resolvedArchive.byteCount),
+            archiveSHA256: resolvedArchive.sha256,
+            members: board.members,
+            declaredPartitions: board.mappedPartitions.map {
+              RockchipDeclaredPartition(
+                name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
+            } + board.membershiplessPartitionsWriteForbidden.map {
+              RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+            },
+            runtimeBuildVersion: board.runtimeBuildVersion))
       },
       boundTargetIdentitySHA256: { boundIdentity },
       boundTargetHDCNormalAlias: { hdcNormalAlias },
@@ -469,12 +478,49 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
   }
 
   func testPreflightPassesWhenAllFourReadOnlyChecksAnswer() async throws {
-    let receipt = await RockchipFlashPreflight(probes: preflightProbes())
+    var probes = preflightProbes()
+    let counter = ProbeCallCounter()
+    let snapshot = probes.archiveSnapshot
+    probes.archiveSnapshot = { url, board in
+      counter.increment()
+      return try snapshot(url, board)
+    }
+    let receipt = await RockchipFlashPreflight(probes: probes)
       .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
     XCTAssertTrue(receipt.isGreen, receipt.renderedLines().joined(separator: "\n"))
+    XCTAssertEqual(counter.value, 1, "preflight must stream one archive snapshot only once")
     XCTAssertEqual(receipt.deviceMutationDispatchCount, 0)
     XCTAssertEqual(
       receipt.findings.map(\.check), RockchipFlashPreflightCheck.allCases)
+  }
+
+  func testPreflightRefusesSnapshotWhoseBuildDriftsFromItsMeasuredIdentity() async throws {
+    let identity = RockchipFlashArchiveIdentity(
+      sha256: String(repeating: "a", count: 64), byteCount: 1_234)
+    var probes = preflightProbes(archive: identity)
+    probes.archiveSnapshot = { _, board in
+      RockchipFlashArchiveSnapshot(
+        identity: identity,
+        build: RockchipImageBuildDescriptor(
+          archiveSizeBytes: 1_234,
+          archiveSHA256: String(repeating: "b", count: 64),
+          members: board.members,
+          declaredPartitions: board.mappedPartitions.map {
+            RockchipDeclaredPartition(
+              name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
+          } + board.membershiplessPartitionsWriteForbidden.map {
+            RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+          },
+          runtimeBuildVersion: board.runtimeBuildVersion))
+    }
+
+    let receipt = await RockchipFlashPreflight(probes: probes)
+      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+
+    XCTAssertEqual(receipt.failedChecks, [.archiveIntegrity])
+    let finding = try XCTUnwrap(
+      receipt.findings.first { $0.check == .archiveIntegrity })
+    XCTAssertTrue(finding.summary.contains("changed while they were being measured"))
   }
 
   func testPreflightTreatsADeviceAbsentNonZeroExitAsAliveButASignalDeathAsRed() async throws {
@@ -536,16 +582,19 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     // Structurally wrong: an image the board maps is absent.
     var probes = preflightProbes(
       archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
-    probes.archiveBuild = { _, board in
-      RockchipImageBuildDescriptor(
-        archiveSizeBytes: 1_234, archiveSHA256: unknownDigest,
-        members: board.members.filter { $0.name != "system.img" },
-        declaredPartitions: board.mappedPartitions.map {
-          RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
-        } + board.membershiplessPartitionsWriteForbidden.map {
-          RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-        },
-        runtimeBuildVersion: board.runtimeBuildVersion)
+    probes.archiveSnapshot = { _, board in
+      RockchipFlashArchiveSnapshot(
+        identity: RockchipFlashArchiveIdentity(
+          sha256: unknownDigest, byteCount: 1_234),
+        build: RockchipImageBuildDescriptor(
+          archiveSizeBytes: 1_234, archiveSHA256: unknownDigest,
+          members: board.members.filter { $0.name != "system.img" },
+          declaredPartitions: board.mappedPartitions.map {
+            RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
+          } + board.membershiplessPartitionsWriteForbidden.map {
+            RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+          },
+          runtimeBuildVersion: board.runtimeBuildVersion))
     }
     let refused = await RockchipFlashPreflight(probes: probes)
       .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
@@ -555,7 +604,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     struct Unreadable: Error {}
     var broken = preflightProbes(
       archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
-    broken.archiveBuild = { _, _ in throw Unreadable() }
+    broken.archiveSnapshot = { _, _ in throw Unreadable() }
     let unreadable = await RockchipFlashPreflight(probes: broken)
       .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
     XCTAssertEqual(unreadable.failedChecks, [.archiveIntegrity])
