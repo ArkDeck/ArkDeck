@@ -17,6 +17,76 @@ import XCTest
 /// so a traversal, duplicate, link or post-stage descriptor replacement must
 /// still be refused.
 final class RockchipFlashExecutionFaultContractTests: XCTestCase {
+  func testContentAddressedImageCacheReusesOneVerifiedExpansion() throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let cacheRoot = fixture.base.appending(path: "image-cache", directoryHint: .isDirectory)
+    let cache = RockchipFlashImageCache(rootURL: cacheRoot)
+
+    var first = try cache.images(
+      archiveURL: fixture.archive, profile: fixture.profile)
+    XCTAssertEqual(Set(first.keys), Set(fixture.profile.mappedPartitions.map(\.imageMemberName)))
+    let entry = cacheRoot.appending(
+      path: fixture.profile.archiveSHA256, directoryHint: .isDirectory)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: entry.path))
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path), [
+      fixture.profile.archiveSHA256
+    ])
+    first.removeAll()
+
+    // A hit must reopen and hash the existing images without consulting or
+    // expanding the archive again. Removing the source makes that observable.
+    try FileManager.default.removeItem(at: fixture.archive)
+    let second = try cache.images(
+      archiveURL: fixture.archive, profile: fixture.profile)
+    XCTAssertEqual(Set(second.keys), Set(fixture.profile.mappedPartitions.map(\.imageMemberName)))
+    for image in second.values { XCTAssertNoThrow(try image.revalidate()) }
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path), [
+      fixture.profile.archiveSHA256
+    ])
+  }
+
+  func testContentAddressedImageCacheEvictsThePreviousArchive() throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let cacheRoot = fixture.base.appending(path: "image-cache", directoryHint: .isDirectory)
+    let cache = RockchipFlashImageCache(rootURL: cacheRoot)
+    var first = try cache.images(
+      archiveURL: fixture.archive, profile: fixture.profile)
+    first.removeAll()
+
+    let alternateMembers = (0..<9).map { index in
+      (name: "image\(index).img", bytes: Data("alternate-image-\(index)".utf8))
+    }
+    let alternateArchive = fixture.base.appending(path: "alternate-images.tar.gz")
+    let alternateBytes = try RockchipExecutionTestFixture.makeGzipTar(
+      members: alternateMembers)
+    try alternateBytes.write(to: alternateArchive)
+    let alternateProfile = try RockchipFlashProfile(
+      archiveSizeBytes: Int64(alternateBytes.count),
+      archiveSHA256: RockchipExecutionTestFixture.sha256(alternateBytes),
+      members: alternateMembers.map {
+        RockchipImagesArchiveMember(
+          name: $0.name, sizeBytes: Int64($0.bytes.count),
+          sha256: RockchipExecutionTestFixture.sha256($0.bytes),
+          classification: .mappedPartitionImage)
+      },
+      mappedPartitions: fixture.profile.mappedPartitions,
+      membershiplessPartitionsWriteForbidden:
+        fixture.profile.membershiplessPartitionsWriteForbidden,
+      prerequisites: fixture.profile.prerequisites)
+
+    let second = try cache.images(
+      archiveURL: alternateArchive, profile: alternateProfile)
+    XCTAssertEqual(Set(second.keys), Set(alternateMembers.map(\.name)))
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path), [
+      alternateProfile.archiveSHA256
+    ])
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: cacheRoot.appending(path: fixture.profile.archiveSHA256).path))
+  }
+
   func testStagingRejectsTraversalDuplicateLinkAndDescriptorReplacement() throws {
     for archiveCase in [ArchiveFault.traversal, .duplicate, .link] {
       let base = FileManager.default.temporaryDirectory.appending(

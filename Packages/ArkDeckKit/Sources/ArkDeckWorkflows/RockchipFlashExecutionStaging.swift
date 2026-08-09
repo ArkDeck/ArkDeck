@@ -241,6 +241,207 @@ enum RockchipFlashExecutionStager {
     preserveCompletedStaging = true
     return images
   }
+
+  /// Reopens a completed, content-addressed image set without expanding the
+  /// archive again. Every file is hashed from an owner-only descriptor before
+  /// it is returned; the cache key alone is never treated as proof that the
+  /// bytes still match the immutable archive profile.
+  static func reopen(
+    stagingURL: URL,
+    profile: RockchipFlashProfile
+  ) throws -> [String: StagedRockchipImage] {
+    guard stagingURL.isFileURL, stagingURL.path.hasPrefix("/") else {
+      throw RockchipFlashStagingError.invalidSessionRoot
+    }
+    var directoryMetadata = stat()
+    guard lstat(stagingURL.path, &directoryMetadata) == 0,
+      directoryMetadata.st_mode & S_IFMT == S_IFDIR,
+      directoryMetadata.st_mode & 0o077 == 0
+    else { throw RockchipFlashStagingError.invalidSessionRoot }
+    let directoryDescriptor = Darwin.open(
+      stagingURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard directoryDescriptor >= 0 else {
+      throw RockchipFlashStagingError.writeFailed(stagingURL.path, errno)
+    }
+    defer { Darwin.close(directoryDescriptor) }
+
+    let expectedNames = Set(profile.mappedPartitions.map(\.imageMemberName))
+    let actualNames: Set<String>
+    do {
+      actualNames = Set(try FileManager.default.contentsOfDirectory(atPath: stagingURL.path))
+    } catch {
+      throw RockchipFlashStagingError.writeFailed(stagingURL.path, errno)
+    }
+    guard actualNames == expectedNames else {
+      throw RockchipFlashStagingError.memberSetMismatch
+    }
+
+    var images: [String: StagedRockchipImage] = [:]
+    for mapping in profile.mappedPartitions {
+      guard let member = profile.member(named: mapping.imageMemberName) else {
+        throw RockchipFlashStagingError.memberSetMismatch
+      }
+      let descriptor = Darwin.openat(
+        directoryDescriptor, member.name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+      guard descriptor >= 0 else {
+        throw RockchipFlashStagingError.writeFailed(member.name, errno)
+      }
+      var descriptorIsOpen = true
+      defer {
+        if descriptorIsOpen { Darwin.close(descriptor) }
+      }
+      var metadata = stat()
+      guard fstat(descriptor, &metadata) == 0,
+        metadata.st_mode & S_IFMT == S_IFREG,
+        metadata.st_mode & 0o7777 == 0o400,
+        metadata.st_size == member.sizeBytes,
+        metadata.st_nlink == 1
+      else {
+        throw RockchipFlashStagingError.descriptorIdentityChanged(member.name)
+      }
+      var hasher = SHA256()
+      var remaining = member.sizeBytes
+      var buffer = [UInt8](repeating: 0, count: 1 << 20)
+      while remaining > 0 {
+        let requested = min(Int64(buffer.count), remaining)
+        let count = Darwin.read(descriptor, &buffer, Int(requested))
+        if count < 0, errno == EINTR { continue }
+        guard count > 0 else {
+          throw RockchipFlashStagingError.memberSizeMismatch(member.name)
+        }
+        hasher.update(data: Data(buffer[0..<count]))
+        remaining -= Int64(count)
+      }
+      var trailing: UInt8 = 0
+      guard Darwin.read(descriptor, &trailing, 1) == 0 else {
+        throw RockchipFlashStagingError.memberSizeMismatch(member.name)
+      }
+      let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      guard digest == member.sha256 else {
+        throw RockchipFlashStagingError.memberHashMismatch(member.name)
+      }
+      let image = StagedRockchipImage(
+        memberName: member.name, partitionName: mapping.partitionName,
+        sizeBytes: member.sizeBytes, sha256: member.sha256,
+        stagedURL: stagingURL.appending(path: member.name),
+        descriptor: descriptor, metadata: metadata)
+      descriptorIsOpen = false
+      try image.revalidate()
+      images[member.name] = image
+    }
+    return images
+  }
+}
+
+/// A bounded, process-owned cache for the expanded Rockchip image set.
+///
+/// The archive SHA-256 is already the immutable identity pinned by the
+/// Artifact lease and Runtime capability. Keeping one fully verified entry
+/// avoids producing another ~3.7 GB copy for each retry while pruning older
+/// firmware and interrupted temporary expansions before a miss is staged.
+final class RockchipFlashImageCache: @unchecked Sendable {
+  private let rootURL: URL
+  private let lock = NSLock()
+
+  init(rootURL: URL) {
+    self.rootURL = rootURL.standardizedFileURL
+  }
+
+  func images(
+    archiveURL: URL,
+    profile: RockchipFlashProfile
+  ) throws -> [String: StagedRockchipImage] {
+    try lock.withLock {
+      try prepareRoot()
+      let digest = profile.archiveSHA256
+      guard digest.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil else {
+        throw RockchipFlashStagingError.archiveHashMismatch
+      }
+      let entryURL = rootURL.appending(path: digest, directoryHint: .isDirectory)
+      try prune(except: digest)
+      if FileManager.default.fileExists(atPath: entryURL.path) {
+        do {
+          return try RockchipFlashExecutionStager.reopen(
+            stagingURL: entryURL, profile: profile)
+        } catch {
+          // A cache is derived and carries no authority. Drifted or incomplete
+          // bytes are removed and rebuilt from the still-pinned archive.
+          do { try FileManager.default.removeItem(at: entryURL) } catch {
+            throw RockchipFlashStagingError.writeFailed(entryURL.path, errno)
+          }
+        }
+      }
+
+      let temporaryURL = rootURL.appending(
+        path: ".tmp-\(UUID().uuidString.lowercased())", directoryHint: .isDirectory)
+      do {
+        try FileManager.default.createDirectory(
+          at: temporaryURL, withIntermediateDirectories: false,
+          attributes: [.posixPermissions: 0o700])
+      } catch {
+        throw RockchipFlashStagingError.writeFailed(temporaryURL.path, errno)
+      }
+      defer { try? FileManager.default.removeItem(at: temporaryURL) }
+
+      var expanded = try RockchipFlashExecutionStager.stage(
+        archiveURL: archiveURL, sessionRoot: temporaryURL, profile: profile)
+      // Close every validation descriptor before moving the directory. New
+      // descriptors are opened against the final content-addressed paths.
+      expanded.removeAll()
+      let expandedURL = temporaryURL.appending(path: "staging", directoryHint: .isDirectory)
+      guard Darwin.rename(expandedURL.path, entryURL.path) == 0 else {
+        throw RockchipFlashStagingError.writeFailed(entryURL.path, errno)
+      }
+      try synchronizeRoot()
+      return try RockchipFlashExecutionStager.reopen(
+        stagingURL: entryURL, profile: profile)
+    }
+  }
+
+  private func prepareRoot() throws {
+    guard rootURL.isFileURL, rootURL.path.hasPrefix("/") else {
+      throw RockchipFlashStagingError.invalidSessionRoot
+    }
+    do {
+      try FileManager.default.createDirectory(
+        at: rootURL, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+    } catch {
+      throw RockchipFlashStagingError.writeFailed(rootURL.path, errno)
+    }
+    var metadata = stat()
+    guard lstat(rootURL.path, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFDIR,
+      metadata.st_mode & 0o077 == 0
+    else { throw RockchipFlashStagingError.invalidSessionRoot }
+  }
+
+  private func prune(except retainedName: String) throws {
+    let entries: [URL]
+    do {
+      entries = try FileManager.default.contentsOfDirectory(
+        at: rootURL, includingPropertiesForKeys: nil)
+    } catch {
+      throw RockchipFlashStagingError.writeFailed(rootURL.path, errno)
+    }
+    for entry in entries where entry.lastPathComponent != retainedName {
+      do { try FileManager.default.removeItem(at: entry) } catch {
+        throw RockchipFlashStagingError.writeFailed(entry.path, errno)
+      }
+    }
+  }
+
+  private func synchronizeRoot() throws {
+    let descriptor = Darwin.open(
+      rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw RockchipFlashStagingError.writeFailed(rootURL.path, errno)
+    }
+    defer { Darwin.close(descriptor) }
+    guard fsync(descriptor) == 0 else {
+      throw RockchipFlashStagingError.writeFailed(rootURL.path, errno)
+    }
+  }
 }
 
 private final class RockchipRawDeflateDecoder {

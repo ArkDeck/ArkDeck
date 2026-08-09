@@ -495,7 +495,10 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
         hdcResolver: hdcResolver,
         runner: FoundationRockchipRuntimeCommandRunner(
           workingDirectory: toolWorkingDirectory),
-        postFlashHDCBindingStore: postFlashHDCBindingStore),
+        postFlashHDCBindingStore: postFlashHDCBindingStore,
+        imageCache: RockchipFlashImageCache(
+          rootURL: stateDirectory.appendingPathComponent(
+            "rockchip-image-cache", isDirectory: true))),
       records: RockchipRuntimeActionRecordStore(
         rootURL: stateDirectory.appendingPathComponent(
           "rockchip-runtime", isDirectory: true)))
