@@ -541,39 +541,54 @@ private struct RuntimeArtifactPublicationFailure: Error, Sendable {
   let detail: String
 }
 
-/// Per-operation cache for the expensive build string derived from a Flash
-/// archive. The Artifact store still re-hashes and revalidates the lease at
-/// every existing admission and pre-dispatch boundary; this only prevents the
-/// same already-identified bytes from being decompressed again while one plan
-/// or one Job execution is walking its steps.
-struct RuntimeFlashBuildVersionCache {
+/// One-entry cache for the complete Flash profile derived from an exact
+/// Runtime-owned Artifact lease. Every caller still resolves that lease
+/// through the Artifact store first, which re-hashes and revalidates the
+/// controlled bytes at the existing admission and pre-dispatch boundaries.
+/// The cache exists only for one RuntimeJobEngine process lifetime and never
+/// crosses a lease, artifact identity, path, digest, size or board.
+struct RuntimeFlashArchiveProfileCache {
   private struct Key: Equatable {
+    let artifactLeaseID: String
     let artifactID: String
     let path: String
     let sha256: String
     let byteCount: Int
+    let boardReference: String
   }
 
   private struct Entry {
     let key: Key
-    let value: String?
+    let profile: RockchipFlashProfile
   }
 
   private var entry: Entry?
 
   mutating func resolve(
+    artifactLeaseID: String,
     artifact: ProviderResolvedInputArtifact,
-    reader: () -> String?
-  ) -> String? {
+    board: RockchipFlashProfile,
+    reader: () throws -> RockchipFlashProfile
+  ) throws -> RockchipFlashProfile {
     let key = Key(
+      artifactLeaseID: artifactLeaseID,
       artifactID: artifact.artifactID,
       path: artifact.fileURL.standardizedFileURL.path,
       sha256: artifact.sha256,
-      byteCount: artifact.byteCount)
-    if let entry, entry.key == key { return entry.value }
-    let value = reader()
-    entry = Entry(key: key, value: value)
-    return value
+      byteCount: artifact.byteCount,
+      boardReference: board.catalogReference)
+    if let entry, entry.key == key { return entry.profile }
+
+    let profile = try reader()
+    guard profile.catalogReference == board.catalogReference,
+      profile.archiveSHA256 == artifact.sha256,
+      profile.archiveSizeBytes == Int64(artifact.byteCount)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "derived Flash profile drifted from its exact Artifact lease")
+    }
+    entry = Entry(key: key, profile: profile)
+    return profile
   }
 }
 
@@ -752,6 +767,7 @@ public actor RuntimeJobEngine {
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
+  private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
 
   public init(
     configuration: Configuration,
@@ -1513,7 +1529,8 @@ public actor RuntimeJobEngine {
     provider: any DeviceProvider
   ) async throws {
     var completedStepIDs = jobs[jobID]?.completedStepIDs ?? []
-    var flashBuildVersionCache = RuntimeFlashBuildVersionCache()
+    let flashArtifactLeaseID = Self.flashArtifactLeaseID(
+      in: jobs[jobID]?.record.request.inputs)
     for step in descriptor.steps {
       if jobs[jobID].map({ cancellationRequests.contains($0.record.jobID) }) == true {
         return  // safe boundary between steps; run() records the transitions
@@ -1694,7 +1711,7 @@ public actor RuntimeJobEngine {
         campaignExecutionTuning: campaignExecutionTuning,
         expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
           for: descriptor, artifact: resolvedArtifact,
-          cache: &flashBuildVersionCache))
+          artifactLeaseID: flashArtifactLeaseID))
       let action: TypedProviderAction
       do {
         action = try provider.action(
@@ -4212,43 +4229,29 @@ public actor RuntimeJobEngine {
     step: CatalogStepDescriptor
   ) async throws {
     if descriptor.reference == "flash.dayu200" {
-      guard let resolved = try await resolvedInputArtifact(jobID: jobID) else {
+      guard let runtime = jobs[jobID],
+        case .string(let artifactLeaseID)? =
+          runtime.record.request.inputs["imageBundleLease"],
+        let resolved = try await resolvedInputArtifact(jobID: jobID)
+      else {
         throw RuntimeDispatchFailure.failed(
           "flash host verification cannot resolve its typed imageBundleLease")
       }
       let board = RockchipFlashProfile.dayu200
-      let summary: GzipTarArchiveSummary
-      do {
-        summary = try GzipTarArchiveReader.summarize(
-          fileAt: resolved.fileURL,
-          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
-      } catch {
-        throw RuntimeDispatchFailure.failed(
-          "flash host verification cannot read the leased archive: \(error)")
-      }
-      guard summary.archiveSHA256 == resolved.sha256,
-        summary.archiveSizeBytes == Int64(resolved.byteCount)
-      else {
-        throw RuntimeDispatchFailure.failed(
-          "flash bundle bytes drifted from the leased hash/size")
-      }
       guard case .string(let profileReference)? =
-        jobs[jobID]?.record.request.inputs["deviceProfile"],
+        runtime.record.request.inputs["deviceProfile"],
         RockchipFlashProfile.board(reference: profileReference) != nil
       else {
         throw RuntimeDispatchFailure.failed(
           "flash request names no published DAYU200 board profile")
       }
-      // The bytes were just proven to be the leased ones. What remains is
-      // whether they are a usable images archive for this board — read, not
-      // recognised. The timeline records the build that was admitted, which is
-      // now a fact about the archive rather than a name from a list.
-      let build: RockchipImageBuildDescriptor
+      // `resolvedInputArtifact` has just revalidated the exact lease. Reuse
+      // the derived profile only after that fresh boundary; a cache miss reads
+      // the archive, and a daemon restart intentionally starts empty.
       let profile: RockchipFlashProfile
       do {
-        build = try RockchipImageArchiveIntrospection.describe(
-          summary: summary, board: board)
-        profile = try board.forBuild(build)
+        profile = try resolvedFlashArchiveProfile(
+          artifactLeaseID: artifactLeaseID, artifact: resolved, board: board)
       } catch {
         throw RuntimeDispatchFailure.failed(
           "flash bundle is not a usable DAYU200 images archive: \(error)")
@@ -4270,8 +4273,8 @@ public actor RuntimeJobEngine {
       appendTimeline(
         jobID: jobID,
         entry:
-          "\(step.stepID) profile=\(profileReference) build=\(build.runtimeBuildVersion) "
-          + "sha256=\(summary.archiveSHA256)")
+          "\(step.stepID) profile=\(profileReference) build=\(profile.runtimeBuildVersion) "
+          + "sha256=\(profile.archiveSHA256)")
       return
     }
     guard descriptor.reference == "deploy.native-library.app-owned@1" else {
@@ -4497,6 +4500,7 @@ public actor RuntimeJobEngine {
       }
     }
     let resolved: ProviderResolvedInputArtifact?
+    var resolvedArtifactLeaseID: String?
     let leaseInputName: String?
     let artifactLabel: String
     switch descriptor.reference {
@@ -4540,12 +4544,14 @@ public actor RuntimeJobEngine {
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
+        resolvedArtifactLeaseID = lease
       } catch {
         throw RuntimeJobEngineError.rejected(
           .invalidInput, "\(artifactLabel) Artifact lease is not resolvable: \(error)")
       }
     } else {
       resolved = nil
+      resolvedArtifactLeaseID = nil
     }
     // Multi-package: the additional leases are resolved and bound-checked
     // here too, so a lease belonging to another target is refused before
@@ -4583,7 +4589,6 @@ public actor RuntimeJobEngine {
     do {
       let runtimeTuning = try executionTuning(for: request)
       var materializedSteps: [MaterializedPlanStep] = []
-      var flashBuildVersionCache = RuntimeFlashBuildVersionCache()
       for step in selectedSteps {
         switch step.kind {
         case .preflightHostStorage, .postprocessArtifact, .finalizeSession, .hashFile,
@@ -4616,7 +4621,7 @@ public actor RuntimeJobEngine {
           campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved,
-            cache: &flashBuildVersionCache))
+            artifactLeaseID: resolvedArtifactLeaseID))
         let action = try provider.action(
           for: step, operation: descriptor, inputs: request.inputs,
           context: context)
@@ -4715,7 +4720,7 @@ public actor RuntimeJobEngine {
           campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved,
-            cache: &flashBuildVersionCache))
+            artifactLeaseID: resolvedArtifactLeaseID))
         let publishAction = try provider.action(
           for: publishStep, operation: descriptor, inputs: request.inputs,
           context: context)
@@ -6800,30 +6805,53 @@ public actor RuntimeJobEngine {
       arguments: arguments)
   }
 
+  private static func flashArtifactLeaseID(
+    in inputs: [String: JSONValue]?
+  ) -> String? {
+    guard case .string(let lease)? = inputs?["imageBundleLease"], !lease.isEmpty else {
+      return nil
+    }
+    return lease
+  }
+
+  /// Returns the complete board profile derived from one exact, already
+  /// resolved lease. Cache hits are possible only after the caller has gone
+  /// through `resolveLease` again; this helper never substitutes for fresh
+  /// Artifact validation.
+  private func resolvedFlashArchiveProfile(
+    artifactLeaseID: String,
+    artifact: ProviderResolvedInputArtifact,
+    board: RockchipFlashProfile
+  ) throws -> RockchipFlashProfile {
+    try flashArchiveProfileCache.resolve(
+      artifactLeaseID: artifactLeaseID, artifact: artifact, board: board
+    ) {
+      let summary = try GzipTarArchiveReader.summarize(
+        fileAt: artifact.fileURL,
+        derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
+      let build = try RockchipImageArchiveIntrospection.describe(
+        summary: summary, board: board)
+      return try board.forBuild(build)
+    }
+  }
+
   /// The build version the image bundle for this job declares, or nil when the
-  /// job does not carry one.
-  ///
-  /// Read here, where the Runtime already resolves leases from disk, so that a
-  /// step materializer stays a pure function of its typed inputs. The local
-  /// cache makes this one decompression pass per materialization or Job run,
-  /// without changing any existing fresh Artifact lease validation.
+  /// job does not carry one. Every caller supplies facts from a fresh lease
+  /// resolution; the daemon-lifetime cache only avoids repeating the expensive
+  /// archive description for that exact lease.
   private func declaredRuntimeBuildVersion(
     for descriptor: CatalogOperationDescriptor,
     artifact: ProviderResolvedInputArtifact?,
-    cache: inout RuntimeFlashBuildVersionCache
+    artifactLeaseID: String?
   ) -> String? {
-    guard descriptor.reference == "flash.dayu200", let artifact else { return nil }
-    return cache.resolve(artifact: artifact) {
-      let board = RockchipFlashProfile.dayu200
-      guard
-        let summary = try? GzipTarArchiveReader.summarize(
-          fileAt: artifact.fileURL,
-          derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board)),
-        let build = try? RockchipImageArchiveIntrospection.describe(
-          summary: summary, board: board)
-      else { return nil }
-      return build.runtimeBuildVersion
-    }
+    guard descriptor.reference == "flash.dayu200", let artifact,
+      let artifactLeaseID
+    else { return nil }
+    return try? resolvedFlashArchiveProfile(
+      artifactLeaseID: artifactLeaseID,
+      artifact: artifact,
+      board: RockchipFlashProfile.dayu200
+    ).runtimeBuildVersion
   }
 
 }

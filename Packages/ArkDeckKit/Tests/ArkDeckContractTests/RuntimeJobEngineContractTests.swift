@@ -7,59 +7,72 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class RuntimeJobEngineContractTests: XCTestCase {
-  func testFlashBuildVersionCacheReadsEachResolvedArtifactOnlyOnce() {
+  func testFlashArchiveProfileCacheReadsOneExactLeaseOnlyOnce() throws {
+    let board = RockchipFlashProfile.dayu200
     let first = ProviderResolvedInputArtifact(
       artifactID: "ART-flash",
       fileURL: URL(fileURLWithPath: "/tmp/arkdeck-flash.imgs"),
-      sha256: String(repeating: "a", count: 64),
-      byteCount: 731_180_594)
-    var cache = RuntimeFlashBuildVersionCache()
+      sha256: board.archiveSHA256,
+      byteCount: Int(board.archiveSizeBytes))
+    var cache = RuntimeFlashArchiveProfileCache()
     var reads = 0
 
-    let initial = cache.resolve(artifact: first) {
+    let initial = try cache.resolve(
+      artifactLeaseID: "lease-v1:import:ART-flash", artifact: first, board: board
+    ) {
       reads += 1
-      return "OpenHarmony-7.0.0.34"
+      return board
     }
-    let repeated = cache.resolve(artifact: first) {
+    let repeated = try cache.resolve(
+      artifactLeaseID: "lease-v1:import:ART-flash", artifact: first, board: board
+    ) {
       reads += 1
-      return "must-not-be-read"
+      XCTFail("an exact lease cache hit must not describe the archive again")
+      return board
     }
 
-    XCTAssertEqual(initial, "OpenHarmony-7.0.0.34")
-    XCTAssertEqual(repeated, initial)
+    XCTAssertEqual(initial.runtimeBuildVersion, board.runtimeBuildVersion)
+    XCTAssertEqual(repeated.archiveSHA256, initial.archiveSHA256)
     XCTAssertEqual(reads, 1)
 
-    let changedBytes = ProviderResolvedInputArtifact(
-      artifactID: first.artifactID,
-      fileURL: first.fileURL,
-      sha256: String(repeating: "b", count: 64),
-      byteCount: first.byteCount)
-    let refreshed = cache.resolve(artifact: changedBytes) {
+    let refreshed = try cache.resolve(
+      artifactLeaseID: "lease-v1:replacement:ART-flash",
+      artifact: first, board: board
+    ) {
       reads += 1
-      return "OpenHarmony-7.0.0.35"
+      return board
     }
-    XCTAssertEqual(refreshed, "OpenHarmony-7.0.0.35")
+    XCTAssertEqual(refreshed.archiveSHA256, board.archiveSHA256)
     XCTAssertEqual(reads, 2)
   }
 
-  func testFlashBuildVersionCacheAlsoCachesAnUnreadableDescription() {
+  func testFlashArchiveProfileCacheNeverStoresLeaseDrift() {
+    let board = RockchipFlashProfile.dayu200
     let artifact = ProviderResolvedInputArtifact(
       artifactID: "ART-invalid-flash",
       fileURL: URL(fileURLWithPath: "/tmp/invalid-flash.imgs"),
       sha256: String(repeating: "c", count: 64),
       byteCount: 64)
-    var cache = RuntimeFlashBuildVersionCache()
+    var cache = RuntimeFlashArchiveProfileCache()
     var reads = 0
 
-    XCTAssertNil(cache.resolve(artifact: artifact) {
-      reads += 1
-      return nil
-    })
-    XCTAssertNil(cache.resolve(artifact: artifact) {
-      reads += 1
-      return "must-not-be-read"
-    })
-    XCTAssertEqual(reads, 1)
+    for _ in 0..<2 {
+      XCTAssertThrowsError(
+        try cache.resolve(
+          artifactLeaseID: "lease-v1:import:ART-invalid-flash",
+          artifact: artifact, board: board
+        ) {
+          reads += 1
+          return board
+        }
+      ) { error in
+        guard case RuntimeDispatchFailure.failed(let detail) = error else {
+          return XCTFail("expected definite exact-lease refusal, got \(error)")
+        }
+        XCTAssertTrue(detail.contains("drifted from its exact Artifact lease"), detail)
+      }
+    }
+    XCTAssertEqual(reads, 2, "a drifted profile must never become a reusable cache entry")
   }
 
   private var stateDirectory: URL!
