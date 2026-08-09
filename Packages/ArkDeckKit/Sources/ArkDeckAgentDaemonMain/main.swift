@@ -503,6 +503,10 @@ Task.detached {
       traceRuntimeProbe: traceRuntimeProbe,
       agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
       nowUTC: utcNow)
+    let debugInvocationController = try RuntimeDebugInvocationController(
+      stateDirectory: resolvedStateDirectory,
+      driver: RuntimeJobEngineDebugAttemptDriver(engine: engine),
+      nowUTC: utcNow)
     let bootstrap = DeviceBootstrapMachine(
       observation: ProviderBootstrapObservation(
         provider: hdcProvider, dispatcher: hdcDispatcher),
@@ -623,6 +627,7 @@ Task.detached {
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
+      debugInvocationController: debugInvocationController,
       harnessCoordinator: harness)
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)

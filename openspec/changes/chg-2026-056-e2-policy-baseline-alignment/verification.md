@@ -127,7 +127,8 @@ requires another revision of this same change and maintainer review before imple
   #1178/#1181/#1183.
 - [x] r7 proposal/implementation are present on protected `main` through #1193/#1194.
 - [x] r9 proposal/implementation are present on protected `main` through #1206/#1207.
-- [ ] r10 is reviewed and merged by the human maintainer before candidate-backed device use.
+- [x] r10 was reviewed and merged by the human maintainer in #1217 before candidate-backed
+  device use; this is the protected-main policy boundary implemented by the follow-up product PR.
 - [ ] All canonical and change-local contract acceptance passes.
 - [ ] All host gates pass at the exact implementation head.
 - [ ] Real DAYU200 autonomous recovery/UI Flash/postflight passes with truthful V6 evidence.

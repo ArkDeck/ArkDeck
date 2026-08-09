@@ -842,6 +842,11 @@ public actor RuntimeJobEngine {
     let stableTargetIdentitySHA256: String?
     let bindingRevision: Int?
     let providerID: String
+    /// Present only for a Runtime-owned debug attempt. These pins make the
+    /// protected repair decision part of the authorized materialized plan;
+    /// ordinary Jobs retain their pre-r10 digest bytes.
+    let runtimeDebugInvocationID: String?
+    let runtimeDebugDecisionSHA256: String?
     let steps: [MaterializedPlanStep]
 
     enum CodingKeys: String, CodingKey {
@@ -852,6 +857,8 @@ public actor RuntimeJobEngine {
       case stableTargetIdentitySHA256
       case bindingRevision
       case providerID
+      case runtimeDebugInvocationID
+      case runtimeDebugDecisionSHA256
       case steps
     }
 
@@ -865,6 +872,10 @@ public actor RuntimeJobEngine {
         stableTargetIdentitySHA256, forKey: .stableTargetIdentitySHA256)
       try container.encodeIfPresent(bindingRevision, forKey: .bindingRevision)
       try container.encode(providerID, forKey: .providerID)
+      try container.encodeIfPresent(
+        runtimeDebugInvocationID, forKey: .runtimeDebugInvocationID)
+      try container.encodeIfPresent(
+        runtimeDebugDecisionSHA256, forKey: .runtimeDebugDecisionSHA256)
       try container.encode(steps, forKey: .steps)
     }
   }
@@ -1804,8 +1815,8 @@ public actor RuntimeJobEngine {
           resolvedFacts, record: jobs[jobID]?.record,
           providerID: descriptor.provider.rawValue)
       }
-      let campaignExecutionTuning = try campaignExecutionTuning(
-        for: jobs[jobID]?.record.request)
+      let campaignExecutionTuning = try executionTuning(
+        for: jobs[jobID]?.record.request).tuning
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
         targetID: targetID,
@@ -3229,6 +3240,35 @@ public actor RuntimeJobEngine {
       recoveryEpochID: indexes.establishedByJobID[record.jobID])
   }
 
+  /// Classifies one debug attempt from the Job plus the exact durable
+  /// RuntimeCapability lineage node. A failed Job is not assumed retryable:
+  /// only the provider's confirmed-not-executed outcome opens the next
+  /// ordinary destructive epoch.
+  public func runtimeDebugExecutionOutcome(
+    jobID: String
+  ) async throws -> RuntimeDebugExecutionOutcome {
+    let record = try recordForRead(jobID: jobID)
+    if record.state == JobState.succeeded.rawValue
+      || record.state == JobState.recovered.rawValue
+    {
+      return .succeeded
+    }
+    if record.outcomeUnknown || record.state == JobState.waitingForRecovery.rawValue {
+      return .outcomeUnknown
+    }
+    guard let capabilityID = record.admissionEvidence?.reference,
+      let capability = try await capabilityStore.inspect(capabilityID: capabilityID),
+      let use = capability.lineage.last(where: { $0.jobID == jobID })
+    else {
+      return .failedKnown
+    }
+    switch use.outcome {
+    case .safeToReflash: return .safeToReflash
+    case .outcomeUnknown, .pending, .legacyUnverified: return .outcomeUnknown
+    case .confirmed: return .failedKnown
+    }
+  }
+
   public func evidenceSnapshot(jobID: String) async throws -> RuntimeJobEvidenceSnapshot {
     let record = try recordForRead(jobID: jobID)
     let epochs = try await RuntimeSupersedingRecoveryStore(
@@ -4618,6 +4658,7 @@ public actor RuntimeJobEngine {
       }
     }
     do {
+      let runtimeTuning = try executionTuning(for: request)
       var materializedSteps: [MaterializedPlanStep] = []
       for step in selectedSteps {
         switch step.kind {
@@ -4648,6 +4689,7 @@ public actor RuntimeJobEngine {
           serverFacts: facts?.serverFacts ?? [:],
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
           additionalInputArtifacts: additionalResolved,
+          campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved))
         let action = try provider.action(
@@ -4745,6 +4787,7 @@ public actor RuntimeJobEngine {
           toolSHA256: facts.toolSHA256,
           serverFacts: facts.serverFacts,
           nowUTC: nowUTC(), resolvedInputArtifact: resolved,
+          campaignExecutionTuning: runtimeTuning.tuning,
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved))
         let publishAction = try provider.action(
@@ -4815,6 +4858,8 @@ public actor RuntimeJobEngine {
         stableTargetIdentitySHA256: stableIdentity,
         bindingRevision: bindingRevision,
         providerID: descriptor.provider.rawValue,
+        runtimeDebugInvocationID: runtimeTuning.debug?.invocationID,
+        runtimeDebugDecisionSHA256: runtimeTuning.debug?.decisionSHA256,
         steps: materializedSteps)
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -5213,10 +5258,35 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// Reads only the timing controls that the protected campaign broker copied
-  /// into this request's already-admitted reservation. The campaign CLI never
-  /// supplies these through operation inputs, so a caller cannot alter the
-  /// command/readback timing after the broker has reviewed the candidate.
+  private struct RuntimeExecutionTuningContext {
+    let tuning: AgentAuthorityCampaignExecutionTuning?
+    let debug: RuntimeDebugAttemptTuningRecord?
+  }
+
+  /// Resolves tuning only from a protected Runtime-owned attempt document or
+  /// a historical broker reservation. Neither route reads operation inputs,
+  /// and the two provenance kinds can never be combined.
+  private func executionTuning(
+    for request: RuntimeOperationRequest?
+  ) throws -> RuntimeExecutionTuningContext {
+    guard let request else {
+      return RuntimeExecutionTuningContext(tuning: nil, debug: nil)
+    }
+    let debug = try RuntimeDebugAttemptTuningStore.loadExact(
+      stateDirectory: configuration.stateDirectory, request: request,
+      nowUTC: nowUTC())
+    let campaign = try campaignExecutionTuning(for: request)
+    guard debug == nil || campaign == nil else {
+      throw RuntimeDispatchFailure.failed(
+        "a Runtime debug attempt cannot carry historical campaign tuning")
+    }
+    return RuntimeExecutionTuningContext(
+      tuning: debug?.tuning ?? campaign, debug: debug)
+  }
+
+  /// Reads only the timing controls that the protected historical campaign
+  /// broker copied into this request's already-admitted reservation. The
+  /// retired campaign CLI cannot create a new reservation.
   private func campaignExecutionTuning(
     for request: RuntimeOperationRequest?
   ) throws -> AgentAuthorityCampaignExecutionTuning? {
@@ -5531,6 +5601,29 @@ public actor RuntimeJobEngine {
     else {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: materialized plan or verified target binding is absent or drifted")
+    }
+    // Re-materialize the entire typed plan immediately before the external
+    // effect. This re-reads the immutable Artifact lease, target/binding/tool
+    // facts and Runtime-owned debug tuning. A candidate digest never stands
+    // in for this proof, and a changed lowering cannot consume the admitted
+    // capability merely because the earlier plan digest is still persisted.
+    let freshMaterialized: MaterializedAdmission
+    do {
+      freshMaterialized = try await materializeTypedPlanBeforeAuthorization(
+        request: runtime.record.request,
+        descriptor: descriptor,
+        jobID: Self.authorizationPlanJobID)
+    } catch {
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: fresh typed plan could not be materialized: \(error)")
+    }
+    guard freshMaterialized.planDigest == planDigest,
+      freshMaterialized.stableTargetIdentitySHA256
+        == runtime.record.materializedStableTargetIdentitySHA256,
+      freshMaterialized.bindingRevision == runtime.record.materializedBindingRevision
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "authorizationRequired: fresh typed plan, target or binding drifted before dispatch")
     }
     let resolvedArtifact = try await resolvedInputArtifact(jobID: jobID)
     let artifactFacts: [String: String] = resolvedArtifact.map {

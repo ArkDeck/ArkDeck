@@ -74,6 +74,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   private let debugRuntimeProbe: (any DebugRuntimeProbing)?
+  private let debugInvocationController: RuntimeDebugInvocationController?
   /// Absent means the harness plane is not configured in this composition;
   /// `task.*` then fails closed instead of half-existing.
   let harnessCoordinator: HarnessTaskCoordinator?
@@ -98,6 +99,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
+    debugInvocationController: RuntimeDebugInvocationController? = nil,
     harnessCoordinator: HarnessTaskCoordinator? = nil,
     methodObserver: (@Sendable (String) -> Void)? = nil
   ) {
@@ -113,6 +115,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
+      debugInvocationController: debugInvocationController,
       harnessCoordinator: harnessCoordinator,
       methodObserver: methodObserver)
   }
@@ -132,6 +135,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
+    debugInvocationController: RuntimeDebugInvocationController? = nil,
     harnessCoordinator: HarnessTaskCoordinator?,
     methodObserver: (@Sendable (String) -> Void)?
   ) {
@@ -147,6 +151,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.rockchipLoaderBindingCoordinator = rockchipLoaderBindingCoordinator
     self.traceRuntimeProbe = traceRuntimeProbe
     self.debugRuntimeProbe = debugRuntimeProbe
+    self.debugInvocationController = debugInvocationController
     self.harnessCoordinator = harnessCoordinator
     self.hapImports = HAPArtifactImportCoordinator()
     if let flashBundleImportDirectory {
@@ -508,6 +513,85 @@ public struct RuntimeControlPlaneHandler: Sendable {
         message:
           "RuntimeCapability administration is not an Agent-facing API; "
           + "the protected Runtime generates and consumes policy capabilities")
+
+    case "debug.start":
+      guard let debugInvocationController else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Runtime debug invocation is not configured")
+      }
+      guard let params = request.params, Set(params.keys) == ["requestJson"],
+        case .string(let requestJSON)? = params["requestJson"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "debug.start accepts exactly requestJson")
+      }
+      do {
+        let status = try await debugInvocationController.start(
+          seedRequestData: Data(requestJSON.utf8))
+        return success(id: request.id, result: try Self.encodeCodable(status))
+      } catch let error as RuntimeDebugInvocationError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "debug.evaluate":
+      guard let debugInvocationController else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Runtime debug invocation is not configured")
+      }
+      let expected = Set(["invocationId", "candidateJson", "sourceSha256", "buildSha256"])
+      guard let params = request.params, Set(params.keys) == expected,
+        case .string(let invocationID)? = params["invocationId"],
+        case .string(let candidateJSON)? = params["candidateJson"],
+        case .string(let sourceSHA256)? = params["sourceSha256"],
+        case .string(let buildSHA256)? = params["buildSha256"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message:
+            "debug.evaluate accepts exactly invocationId, candidateJson, sourceSha256 and buildSha256")
+      }
+      do {
+        let provenance = try RuntimeDebugCandidateProvenance(
+          sourceSHA256: sourceSHA256, buildSHA256: buildSHA256)
+        let status = try await debugInvocationController.evaluate(
+          invocationID: invocationID,
+          candidateData: Data(candidateJSON.utf8),
+          provenance: provenance)
+        return success(id: request.id, result: try Self.encodeCodable(status))
+      } catch let error as RuntimeDebugInvocationError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "debug.status":
+      guard let debugInvocationController else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Runtime debug invocation is not configured")
+      }
+      guard let params = request.params, Set(params.keys) == ["invocationId"],
+        case .string(let invocationID)? = params["invocationId"]
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "debug.status accepts exactly invocationId")
+      }
+      do {
+        return success(
+          id: request.id,
+          result: try await Self.encodeCodable(
+            debugInvocationController.status(invocationID: invocationID)))
+      } catch let error as RuntimeDebugInvocationError {
+        return failure(id: request.id, code: .notFound, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
 
     case "job.plan":
       guard case .string(let requestJson)? = request.params?["requestJson"] else {
@@ -1448,6 +1532,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "retryOutcomeUnknown": .bool(
         debt.retryOutcomeUnknown == true || debt.retryAttemptStartedAtUTC != nil),
     ])
+  }
+
+  private static func encodeCodable<T: Encodable>(_ value: T) throws -> JSONValue {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try JSONDecoder().decode(JSONValue.self, from: encoder.encode(value))
   }
 
   private static func encodeStatus(

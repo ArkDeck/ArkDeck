@@ -27,6 +27,8 @@ struct ArkDeckCommandLine {
         try runUpdateFeed(Array(arguments.dropFirst()))
       case "doctor":
         try RuntimeCLI.runDoctor(Array(arguments.dropFirst()))
+      case "debug":
+        try RuntimeCLI.runDebug(Array(arguments.dropFirst()))
       case "operation":
         try RuntimeCLI.runOperation(Array(arguments.dropFirst()))
       case "device":
@@ -1043,6 +1045,10 @@ struct ArkDeckCommandLine {
       [--expected-binding-revision <n>] [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
         arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
+        arkdeck debug start --request-file <flash-request.json> [--json]
+        arkdeck debug evaluate --invocation <id> --candidate-file <decision.json> \
+      --source-sha256 <sha256> --build-sha256 <sha256> [--json]
+        arkdeck debug status --invocation <id> [--json]
         arkdeck cleanup-debt list [--json]
         arkdeck cleanup-debt continue --job <id> (--remote-path <path> | --bundle <name>) [--json]
         arkdeck job submit --request-file <request.json> [--wait] [--json]
@@ -1076,7 +1082,7 @@ struct ArkDeckCommandLine {
       [--capability <CAP-RT-...>] [--json]
         arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
 
-      doctor/operation/device/job talk only to arkdeck-agentd over its user-private socket:
+      doctor/operation/device/job/debug talk only to arkdeck-agentd over its user-private socket:
       this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
 
       A human operator at a TTY gets a handoff whose commands they run personally. The Agent
