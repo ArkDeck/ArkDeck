@@ -354,6 +354,26 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertTrue(promotion.artifactIDs.contains("ART-RUNTIME"))
   }
 
+  func testEveryPromotionFailureHasAnExplicitAutonomousDebugDisposition() {
+    let retryable: [HarnessPromotionGateFailure] = [
+      .candidatePatchMissing,
+      .candidateArtifactMissing,
+      .buildNotPassed,
+      .buildArtifactMissing,
+      .testsNotPassed,
+      .deviceVerificationNotPassed,
+      .deviceEvidenceMissing,
+      .evaluationNotPassed,
+      .scopeCheckFailed("outside"),
+      .stalePatch,
+    ]
+    XCTAssertTrue(
+      retryable.allSatisfy { $0.coordinatorDisposition == .retryCandidate })
+    XCTAssertEqual(
+      HarnessPromotionGateFailure.evolutionPolicyMissing.coordinatorDisposition,
+      .evidenceIntegrityBlock)
+  }
+
   func testPolicyRejectsOutOfScopeOverBudgetAndStalePatches() throws {
     let base = String(repeating: "a", count: 64)
     let policy = try HarnessEvolutionPolicy(

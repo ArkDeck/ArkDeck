@@ -1290,6 +1290,59 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertTrue(attempts.contains { $0.outcome == .failed })
   }
 
+  func testModelTerminalAnswersCannotBypassThePatchRetryBudget() async throws {
+    let jobs = GatewayJobPort()
+    let gateway = ScriptedGateway(replies: [
+      .success(
+        encodeProposal([
+          "kind": .string("requestHuman"),
+          "hypothesis": .string("Ask a person to write the patch."),
+          "reasonCode": .string("producerGaveUp"),
+        ])),
+      .success(
+        encodeProposal([
+          "kind": .string("noSafeAction"),
+          "hypothesis": .string("There is no patch candidate."),
+          "reasonCode": .string("producerGaveUpAgain"),
+        ])),
+    ])
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, handlers: [PatchQuestionHandler()],
+      nowUTC: { "2026-07-31T00:00:00Z" }, decisionGateway: gateway,
+      egressPolicy: HarnessEgressPolicy(enabledProjects: ["demo-app"]))
+    let task = try await coordinator.submit(
+      HarnessTaskSubmission(
+        type: .debugCrash, projectRef: "demo-app",
+        target: HarnessTaskTargetReference(targetID: "TGT-1"),
+        goal: HarnessTaskGoal(summary: "repair the failure"),
+        budgets: HarnessTaskBudgets(
+          maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024,
+          maxE1Mutations: 0, maxModelCalls: 2),
+        policy: HarnessTaskPolicy(
+          allowedOperations: [DebugCrashTaskHandler.applyPatch])))
+
+    let first = try await coordinator.reconcile(task.htaskID)
+    let second = try await coordinator.reconcile(task.htaskID)
+    let exhausted = try await coordinator.reconcile(task.htaskID)
+
+    XCTAssertEqual(first.action, .proposalRetryScheduled)
+    XCTAssertEqual(second.action, .proposalRetryScheduled)
+    XCTAssertEqual(exhausted.action, .stoppedBudgetExhausted)
+    XCTAssertEqual(exhausted.reasonCode, "maxModelCallsExhausted")
+    XCTAssertEqual(exhausted.snapshot.consumedBudget.modelCalls, 2)
+    XCTAssertTrue(jobs.submittedOperations.isEmpty)
+    let humanActions = try await coordinator.humanActions(task.htaskID)
+    XCTAssertTrue(humanActions.isEmpty)
+    let runs = try await store.modelRuns(task.htaskID)
+    XCTAssertEqual(
+      runs.map(\.outcome.reasonCode).sorted(),
+      [
+        "rejected:terminalDecisionNotProposable:noSafeAction",
+        "rejected:terminalDecisionNotProposable:requestHuman",
+      ])
+  }
+
   func testAPreTransportPrivacyRefusalDoesNotBecomeAnAutomaticPatchRetry() async throws {
     let jobs = GatewayJobPort()
     let gateway = ScriptedGateway(replies: [])

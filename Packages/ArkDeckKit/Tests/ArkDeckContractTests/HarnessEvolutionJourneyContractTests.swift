@@ -47,6 +47,16 @@ private let journeyDiff = """
 
   """
 
+private let journeySecondDiff = """
+  diff --git a/Sources/App.txt b/Sources/App.txt
+  --- a/Sources/App.txt
+  +++ b/Sources/App.txt
+  @@ -1 +1 @@
+  -old
+  +newer
+
+  """
+
 /// Real empty-index bytes shape: the device answered and has nothing.
 private let journeyEmptyIndex = """
 
@@ -192,10 +202,25 @@ private final class JourneyArtifactPort: HarnessArtifactPort, @unchecked Sendabl
 /// Honest workspace fake: the live revision is the base tree until a patch is
 /// applied, the patch revision while it is applied, and the base tree again
 /// after the typed revert restored the checkpoint preimage.
-private struct JourneyRepairPort: HarnessRepairPort {
+private final class JourneyRepairPort: HarnessRepairPort, @unchecked Sendable {
+  private let lock = NSLock()
+  private var nextRevisionOverride: String?
+
+  func failNextRevisionRead() {
+    lock.withLock {
+      nextRevisionOverride = String(repeating: "d", count: 64)
+    }
+  }
+
   func currentWorkspaceRevision(
     relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
   ) async throws -> String {
+    if let overridden = lock.withLock({ () -> String? in
+      defer { nextRevisionOverride = nil }
+      return nextRevisionOverride
+    }) {
+      return overridden
+    }
     if let repair = task.repairAttempt, !repair.reverted,
       let revision = repair.patchRevision
     {
@@ -324,7 +349,11 @@ private final class JourneyGateway: HarnessDecisionGateway, @unchecked Sendable 
     guard context.availableOperations == [DebugCrashTaskHandler.applyPatch] else {
       throw HarnessDecisionGatewayError.unavailable("deterministicWake")
     }
-    lock.withLock { patchWakes += 1 }
+    let proposalOrdinal = lock.withLock {
+      patchWakes += 1
+      return patchWakes
+    }
+    let diff = proposalOrdinal == 1 ? journeyDiff : journeySecondDiff
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     return try encoder.encode(
@@ -333,8 +362,8 @@ private final class JourneyGateway: HarnessDecisionGateway, @unchecked Sendable 
         "hypothesis": .string("Replace the crashing branch inside the bounded scope."),
         "reasonCode": .string("patchModelProposal"),
         "baseWorkspaceRevision": .string(journeyBaseRevision),
-        "patchSha256": .string(journeySHA256(Data(journeyDiff.utf8))),
-        "unifiedDiff": .string(journeyDiff),
+        "patchSha256": .string(journeySHA256(Data(diff.utf8))),
+        "unifiedDiff": .string(diff),
         "touchedFiles": .array([.string("Sources/App.txt")]),
         "expectedChangedSymbols": .array([.string("App")]),
         "expectedObservation": .string("PATCH_APPLIED"),
@@ -388,6 +417,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let artifacts: JourneyArtifactPort
     let gateway: JourneyGateway
     let workspace: JourneyWorkspacePort
+    let repair: JourneyRepairPort
     let taskID: String
     let policy: HarnessEvolutionPolicy
   }
@@ -401,6 +431,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let artifacts = JourneyArtifactPort()
     let gateway = JourneyGateway()
     let workspace = JourneyWorkspacePort()
+    let repair = JourneyRepairPort()
     let evolutionPolicy = try HarnessEvolutionPolicy(
       baseRevision: journeyBaseRevision, allowedPaths: ["Sources/**"],
       maxAttempts: maxAttempts, maxChangedFiles: 4, maxDiffLines: 50,
@@ -411,7 +442,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       ])
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs, artifactPort: artifacts,
-      repairPort: JourneyRepairPort(),
+      repairPort: repair,
       evolutionWorkspacePort: workspace,
       nowUTC: { journeyNow },
       policyGuard: HarnessPolicyGuard(capabilities: JourneyCapabilityGrant()),
@@ -452,7 +483,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(workspace.preparedSourceProjects, ["demo-app"])
     return JourneyStack(
       coordinator: coordinator, store: store, jobs: jobs, artifacts: artifacts,
-      gateway: gateway, workspace: workspace,
+      gateway: gateway, workspace: workspace, repair: repair,
       taskID: task.htaskID, policy: evolutionPolicy)
   }
 
@@ -635,6 +666,40 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     return try XCTUnwrap(deployWake.dispatchedJobID)
   }
 
+  /// Finish one deployed candidate with exact verification evidence. A
+  /// passing promotion returns `evaluatedSucceeded`; a retryable promotion
+  /// rejection continues the same reconcile into the exact revert dispatch.
+  private func driveVerificationAndPromotion(
+    _ stack: JourneyStack,
+    captureJobID: String,
+    analyzerJobID: String,
+    forcePromotionDrift: Bool = false
+  ) async throws -> HarnessReconcileOutcome {
+    let capture = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(capture.action, .dispatched)
+    let captureRequest = try await latestRequest(stack)
+    XCTAssertEqual(
+      captureRequest.operation.reference, DebugCrashTaskHandler.captureDiagnostics)
+    XCTAssertEqual(
+      inputString(captureRequest, "expectedDeployedArtifactDigest"),
+      journeyBuildDigest)
+    stack.artifacts.stage(
+      jobID: captureJobID, name: HarnessObservationBuilder.crashIndexArtifact,
+      text: journeyOneEntryIndex)
+    await stack.jobs.finish(captureJobID)
+
+    let analyzer = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(analyzer.action, .dispatched)
+    let analyzerOperations = await stack.jobs.submittedOperations()
+    XCTAssertEqual(analyzerOperations.last, DebugCrashTaskHandler.analyzeCrashLedger)
+    try stageAnalyzerEnvelope(
+      stack, analyzerJobID: analyzerJobID, sourceJobID: captureJobID,
+      indexText: journeyOneEntryIndex)
+    await stack.jobs.finish(analyzerJobID)
+    if forcePromotionDrift { stack.repair.failNextRevisionRead() }
+    return try await stack.coordinator.reconcile(stack.taskID)
+  }
+
   // MARK: Gap 2 - the full journey to promotion
 
   func testEvolutionJourneyFromSubmitReachesPromotionThroughEveryTypedLeg() async throws {
@@ -743,6 +808,78 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let evaluation = try await stack.store.evaluation(
       stack.taskID, evaluationID: evaluationID)
     XCTAssertEqual(evaluation?.verdict, .pass)
+  }
+
+  func testRetryablePromotionDriftRollsBackAndConvergesWithANewCandidate() async throws {
+    let stack = try await makeJourneyStack(maxAttempts: 4, maxE1Mutations: 13)
+    let firstDeployJobID = try await driveToRepairDeployDispatch(stack)
+    await stack.jobs.finish(firstDeployJobID)
+
+    // The first candidate passes product evaluation, but its live isolated
+    // revision drifts at promotion. The same wake must continue into the
+    // exact published revert instead of ending `humanRequired`.
+    let rollback = try await driveVerificationAndPromotion(
+      stack, captureJobID: "JOB-12", analyzerJobID: "JOB-13",
+      forcePromotionDrift: true)
+    XCTAssertEqual(rollback.action, .dispatched)
+    let rollbackRequest = try await latestRequest(stack)
+    XCTAssertEqual(rollbackRequest.operation.reference, DebugCrashTaskHandler.revertPatch)
+    XCTAssertEqual(rollback.snapshot.status, .waiting)
+    XCTAssertEqual(rollback.snapshot.repairAttempt?.rollbackRequired, true)
+    XCTAssertNotNil(
+      rollback.snapshot.observedState[DebugCrashTaskHandler.promotionRetryReasonKey])
+    let humanActionsAfterDrift = try await stack.coordinator.humanActions(stack.taskID)
+    XCTAssertTrue(humanActionsAfterDrift.isEmpty)
+
+    // Revert readback closes the rejected Attempt. The coordinator then asks
+    // for a distinct patch in the same reconcile and checkpoints it before
+    // any apply effect.
+    await stack.jobs.finish("JOB-14")
+    let secondCheckpoint = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(
+      secondCheckpoint.action, .dispatched,
+      "second candidate did not dispatch: \(secondCheckpoint.reasonCode)")
+    let secondCheckpointRequest = try await latestRequest(stack)
+    XCTAssertEqual(
+      secondCheckpointRequest.operation.reference, DebugCrashTaskHandler.createCheckpoint)
+    XCTAssertEqual(stack.gateway.patchProposalWakes, 2)
+
+    await stack.jobs.finish("JOB-15")
+    let secondApply = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(
+      secondApply.dispatchedJobID, "JOB-16",
+      "second apply did not dispatch: \(secondApply.action)/\(secondApply.reasonCode)")
+    let afterSecondCheckpoint = try await stack.store.load(stack.taskID)
+    XCTAssertNil(
+      afterSecondCheckpoint.observedState[DebugCrashTaskHandler.promotionRetryReasonKey])
+    await stack.jobs.finish("JOB-16")
+    let secondBuild = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondBuild.dispatchedJobID, "JOB-17")
+    await stack.jobs.finish("JOB-17")
+    let secondTests = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondTests.dispatchedJobID, "JOB-18")
+    await stack.jobs.finish("JOB-18")
+    let secondDeploy = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondDeploy.dispatchedJobID, "JOB-19")
+    await stack.jobs.finish("JOB-19")
+
+    let promoted = try await driveVerificationAndPromotion(
+      stack, captureJobID: "JOB-20", analyzerJobID: "JOB-21")
+    XCTAssertEqual(promoted.action, .evaluatedSucceeded)
+    XCTAssertEqual(promoted.reasonCode, "promotionCandidateReady")
+    XCTAssertEqual(promoted.snapshot.status, .succeeded)
+    XCTAssertEqual(promoted.snapshot.consumedBudget.e1Mutations, 12)
+    let finalHumanActions = try await stack.coordinator.humanActions(stack.taskID)
+    XCTAssertTrue(finalHumanActions.isEmpty)
+
+    let attempts = try await stack.store.attempts(stack.taskID)
+    let strategies = attempts.filter { $0.strategy.hypothesisClass != "taskJourney" }
+    XCTAssertEqual(strategies.count, 2)
+    XCTAssertEqual(strategies.first?.outcome, .reverted)
+    XCTAssertEqual(strategies.last?.outcome, .succeeded)
+    XCTAssertNotEqual(
+      strategies.first?.strategy.patchFingerprint,
+      strategies.last?.strategy.patchFingerprint)
   }
 
   // MARK: Gap 1 - strategy attempt budget exhaustion

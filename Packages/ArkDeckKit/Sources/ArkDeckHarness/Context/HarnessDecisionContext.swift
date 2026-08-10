@@ -656,6 +656,10 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
   /// no-progress budget ran out.
   case operationNotOffered(String, offered: [String] = [])
   case operationNotExpected(String)
+  /// A model may propose a bounded operation or patch, but it cannot end the
+  /// task. Human escalation and the conclusion that no safe action remains
+  /// belong to the deterministic handler, policy guard and Runtime facts.
+  case terminalDecisionNotProposable(HarnessDecisionKind)
   /// The handler is mid-way through an orchestrated step and the route is not
   /// the producer's to change — including by escalating to a human.
   ///
@@ -683,6 +687,8 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
       let alternatives = offered.isEmpty ? "none" : offered.sorted().joined(separator: ",")
       return "operationNotOffered:\(reference):offered=\(alternatives)"
     case .operationNotExpected(let reference): return "operationNotExpected:\(reference)"
+    case .terminalDecisionNotProposable(let kind):
+      return "terminalDecisionNotProposable:\(kind.rawValue)"
     case .decisionNotYoursDuringOrchestratedStep(let proposed, let step):
       return "decisionNotYoursDuringOrchestratedStep:proposed=\(proposed):step=\(step)"
     case .rawCommandSurface(let field): return "rawCommandSurface:\(field)"
