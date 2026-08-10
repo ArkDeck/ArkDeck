@@ -367,11 +367,12 @@ final class DeviceBootstrapContractTests: XCTestCase {
         canonicalTargetID: canonical.targetID, connectKey: aliasConnectKey,
         identitySHA256: aliasIdentity,
         establishingFlashJobID: draft.establishingFlashJobID))
-    XCTAssertTrue(
+    XCTAssertFalse(
       try store.hasConflictingHDCAliasOwner(
         canonicalTargetID: canonical.targetID, connectKey: aliasConnectKey,
         identitySHA256: aliasIdentity,
-        establishingFlashJobID: "job-fedcba9876543210fedcba9876543210"))
+        establishingFlashJobID: "job-fedcba9876543210fedcba9876543210"),
+      "the exact durable identity relation survives a later successful Flash Job")
     XCTAssertThrowsError(
       try store.hasConflictingHDCAliasOwner(
         canonicalTargetID: canonical.targetID, connectKey: "another-address",

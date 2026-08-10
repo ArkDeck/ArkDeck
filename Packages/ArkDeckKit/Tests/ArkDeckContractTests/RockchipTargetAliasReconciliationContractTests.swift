@@ -42,6 +42,33 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     XCTAssertTrue(unknownBefore.outcomeUnknown)
     XCTAssertEqual(try fixture.reconciler.reconcileIfProven(), resolution)
 
+    let laterFlashJobID = "job-44444444444444444444444444444444"
+    try writeSuccessfulFlashJob(
+      state: fixture.stateDirectory, jobID: laterFlashJobID,
+      target: fixture.canonical,
+      startedAtUTC: "2026-08-08T00:30:00Z",
+      finishedAtUTC: "2026-08-08T00:35:00Z")
+    _ = try fixture.postFlashStore.publish(
+      RockchipPostFlashHDCBinding(
+        targetID: fixture.canonical.targetID,
+        bindingRevision: fixture.canonical.bindingRevision,
+        stableLoaderIdentitySHA256:
+          fixture.canonical.stablePhysicalIdentitySHA256,
+        previousHDCIdentitySHA256:
+          fixture.alias.stablePhysicalIdentitySHA256,
+        hdcIdentitySHA256: fixture.alias.stablePhysicalIdentitySHA256,
+        hdcConnectKey: fixture.alias.connectKey,
+        usbTopology: resolution.routedUSBTopology,
+        productModel: "ohos", buildVersion: "OpenHarmony-7.0.0.37",
+        jobID: laterFlashJobID,
+        establishedAtUTC: "2026-08-08T00:34:00Z"),
+      expectedPreviousHDCIdentitySHA256:
+        fixture.alias.stablePhysicalIdentitySHA256)
+    XCTAssertEqual(
+      try fixture.reconciler.reconcileIfProven(), resolution,
+      "a later Flash with the same exact identities must reuse the durable relation")
+    XCTAssertEqual(try fixture.targetStore.aliasResolutions(), [resolution])
+
     let admission = try RuntimeAdmissionService(stateDirectory: fixture.stateDirectory)
     _ = try admission.admit(
       record: unknownBefore, requestHash: String(repeating: "f", count: 64))
@@ -88,6 +115,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     let establishingFlashJobID: String
     let unknownJobDirectory: URL
     let stateDirectory: URL
+    let postFlashStore: RockchipPostFlashHDCBindingStore
   }
 
   private func makeFixture(unknownStepID: String) throws -> Fixture {
@@ -162,7 +190,8 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
         postFlashBindingStore: postFlashStore, stateDirectory: state),
       targetStore: targetStore, canonical: canonical, alias: alias,
       establishingFlashJobID: establishingFlashJobID,
-      unknownJobDirectory: unknownDirectory, stateDirectory: state)
+      unknownJobDirectory: unknownDirectory, stateDirectory: state,
+      postFlashStore: postFlashStore)
   }
 
   private func writeUnknownJob(

@@ -88,13 +88,17 @@ enum RuntimeCLI {
     switch subcommand {
     case "install", "update":
       let options = try CLIOptions(rest)
-      try options.validateAllowed(["--daemon", "--hdc"])
+      try options.validateAllowed([
+        "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
+        "--sensitive-evidence",
+      ])
+      let previousStatus = subcommand == "update" ? try? service.status() : nil
       let daemonPath = options.value("--daemon") ?? defaultAgentDaemonExecutablePath()
       let configuredHDC: String?
       if let supplied = options.value("--hdc") {
         configuredHDC = supplied
       } else if subcommand == "update" {
-        configuredHDC = try? service.status().hdcPath
+        configuredHDC = previousStatus?.hdcPath
       } else {
         configuredHDC = nil
       }
@@ -108,9 +112,46 @@ enum RuntimeCLI {
           exitCode: EX_USAGE,
           message: "agentd \(subcommand) requires an absolute arkdeck-agentd path")
       }
+      let workspaceProject =
+        options.value("--workspace-project") ?? previousStatus?.workspaceProjectPath
+      let devecoSDK = options.value("--deveco-sdk") ?? previousStatus?.devecoSDKPath
+      guard (workspaceProject == nil) == (devecoSDK == nil) else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "agentd \(subcommand) requires --workspace-project and --deveco-sdk together")
+      }
+      if let workspaceProject, !workspaceProject.hasPrefix("/") {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "--workspace-project must be an absolute path")
+      }
+      if let devecoSDK, !devecoSDK.hasPrefix("/") {
+        throw CLIError(exitCode: EX_USAGE, message: "--deveco-sdk must be an absolute path")
+      }
+      let workspace: LaunchAgentWorkspaceConfiguration?
+      if let workspaceProject, let devecoSDK {
+        workspace = LaunchAgentWorkspaceConfiguration(
+          projectRoot: URL(fileURLWithPath: workspaceProject),
+          devecoSDKRoot: URL(fileURLWithPath: devecoSDK))
+      } else {
+        workspace = nil
+      }
+      let harnessSensitiveEvidence: [String]
+      if let raw = options.value("--sensitive-evidence") {
+        if raw == "none" {
+          harnessSensitiveEvidence = []
+        } else {
+          harnessSensitiveEvidence = raw.split(
+            separator: ",", omittingEmptySubsequences: false
+          ).map { $0.trimmingCharacters(in: .whitespaces) }
+        }
+      } else {
+        harnessSensitiveEvidence = previousStatus?.harnessSensitiveEvidence ?? []
+      }
       let receipt = try service.install(
         daemonSource: URL(fileURLWithPath: daemonPath),
-        hdcExecutable: URL(fileURLWithPath: hdcPath))
+        hdcExecutable: URL(fileURLWithPath: hdcPath), workspace: workspace,
+        harnessSensitiveEvidence: harnessSensitiveEvidence)
       emit(try encodedJSON(receipt), json: json)
 
     case "status":

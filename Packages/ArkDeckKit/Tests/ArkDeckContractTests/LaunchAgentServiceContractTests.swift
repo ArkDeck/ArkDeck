@@ -102,9 +102,128 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       runner.commands,
       [
         ["print", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        // `update` reads the installed status first so optional workspace
+        // configuration survives when the caller only refreshes binaries.
+        ["print", "gui/501/\(ArkDeckLaunchAgent.label)"],
         ["bootout", "gui/501/\(ArkDeckLaunchAgent.label)"],
         ["bootstrap", "gui/501", paths.plist.path],
       ])
+  }
+
+  func testInstallPersistsValidatedWaterFlowWorkspaceForHeadlessGJ5AndUpdateKeepsIt()
+    throws
+  {
+    let project = root.appendingPathComponent("WaterFlowLayoutDemo", isDirectory: true)
+    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
+    let sdk = root.appendingPathComponent("DevEco/sdk", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: sdk.appendingPathComponent("default/openharmony", isDirectory: true),
+      withIntermediateDirectories: true)
+
+    let receipt = try service.install(
+      daemonSource: daemon, hdcExecutable: hdc,
+      workspace: LaunchAgentWorkspaceConfiguration(
+        projectRoot: project, devecoSDKRoot: sdk),
+      harnessSensitiveEvidence: ["hilog.txt", "crash-index.txt"])
+    XCTAssertEqual(receipt.workspaceProjectPath, project.path)
+    XCTAssertEqual(receipt.devecoSDKPath, sdk.path)
+    XCTAssertEqual(receipt.harnessSensitiveEvidence, ["crash-index.txt", "hilog.txt"])
+
+    var environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_ACTIVE_PROJECT"], "demo-app")
+    XCTAssertEqual(environment["ARKDECK_DEVECO_SDK_HOME"], sdk.path)
+    XCTAssertEqual(environment["ARKDECK_ANALYZER_PATH"], paths.installedDaemon.path)
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_INSPECTOR"], "/usr/bin/grep")
+    XCTAssertEqual(
+      environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"],
+      "crash-index.txt,hilog.txt")
+
+    try FileManager.default.createDirectory(
+      at: paths.stateDirectory, withIntermediateDirectories: true)
+    XCTAssertTrue(FileManager.default.createFile(atPath: paths.socket.path, contents: Data()))
+    var status = try service.status()
+    XCTAssertTrue(status.ready, "\(status.diagnostics)")
+    XCTAssertEqual(status.workspaceProjectPath, project.path)
+    XCTAssertEqual(status.devecoSDKPath, sdk.path)
+    XCTAssertEqual(status.harnessSensitiveEvidence, ["crash-index.txt", "hilog.txt"])
+
+    try makeExecutable(daemon, bytes: "daemon-v2")
+    try RuntimeCLI.runAgentDaemon(
+      ["update", "--daemon", daemon.path, "--json"], service: service)
+    environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
+    XCTAssertEqual(environment["ARKDECK_DEVECO_SDK_HOME"], sdk.path)
+    XCTAssertEqual(
+      environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"],
+      "crash-index.txt,hilog.txt")
+    status = try service.status()
+    XCTAssertEqual(status.workspaceProjectPath, project.path)
+    XCTAssertEqual(status.harnessSensitiveEvidence, ["crash-index.txt", "hilog.txt"])
+
+    try RuntimeCLI.runAgentDaemon(
+      ["update", "--daemon", daemon.path, "--sensitive-evidence", "none", "--json"],
+      service: service)
+    environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertNil(environment["ARKDECK_HARNESS_SENSITIVE_EVIDENCE"])
+    XCTAssertEqual(try service.status().harnessSensitiveEvidence, [])
+  }
+
+  func testWorkspaceConfigurationFailsClosedUnlessProjectAndSDKAreBothValid() throws {
+    XCTAssertThrowsError(
+      try RuntimeCLI.runAgentDaemon(
+        ["install", "--daemon", daemon.path, "--hdc", hdc.path,
+          "--workspace-project", root.path],
+        service: service)) { error in
+          XCTAssertTrue("\(error)".contains("--workspace-project and --deveco-sdk together"))
+        }
+
+    let missingProject = root.appendingPathComponent("missing-project", isDirectory: true)
+    let missingSDK = root.appendingPathComponent("missing-sdk", isDirectory: true)
+    XCTAssertThrowsError(
+      try service.install(
+        daemonSource: daemon, hdcExecutable: hdc,
+        workspace: LaunchAgentWorkspaceConfiguration(
+          projectRoot: missingProject, devecoSDKRoot: missingSDK)))
+
+    let protectedProject = paths.homeDirectory.appendingPathComponent(
+      "Downloads/WaterFlowLayoutDemo", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: protectedProject.appendingPathComponent("entry/src/main", isDirectory: true),
+      withIntermediateDirectories: true)
+    try Data("{}".utf8).write(
+      to: protectedProject.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(
+      to: protectedProject.appendingPathComponent("entry/src/main/module.json5"))
+    let validSDK = root.appendingPathComponent("valid-sdk", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: validSDK.appendingPathComponent("default/openharmony", isDirectory: true),
+      withIntermediateDirectories: true)
+    XCTAssertThrowsError(
+      try service.install(
+        daemonSource: daemon, hdcExecutable: hdc,
+        workspace: LaunchAgentWorkspaceConfiguration(
+          projectRoot: protectedProject, devecoSDKRoot: validSDK))) { error in
+          XCTAssertTrue("\(error)".contains("macOS privacy-managed"))
+          XCTAssertTrue("\(error)".contains("~/Developer"))
+        }
+    XCTAssertTrue(runner.commands.isEmpty)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
+
+    for invalid in [["../crash-index.txt"], ["hilog.txt", "hilog.txt"], [""]] {
+      XCTAssertThrowsError(
+        try service.install(
+          daemonSource: daemon, hdcExecutable: hdc,
+          harnessSensitiveEvidence: invalid)) { error in
+            XCTAssertTrue("\(error)".contains("unique safe artifact basenames"))
+          }
+    }
   }
 
   func testStatusNamesHDCIdentityDriftAndUninstallPreservesStateAndLogs() throws {

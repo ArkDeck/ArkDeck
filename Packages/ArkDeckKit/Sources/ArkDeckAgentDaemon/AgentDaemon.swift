@@ -895,14 +895,19 @@ public struct RuntimeControlPlaneHandler: Sendable {
         guard let currentTarget = try targetStore.find(targetID: completed.target.targetID),
           currentTarget.bindingRevision == completed.target.bindingRevision,
           currentTarget.stablePhysicalIdentitySHA256
-            == completed.target.stablePhysicalIdentitySHA256
+            == completed.target.stablePhysicalIdentitySHA256,
+          let hdcRoute = try targetStore.hdcExecutionRoute(targetID: currentTarget.targetID),
+          hdcRoute.bindingRevision == currentTarget.bindingRevision
         else {
           return failure(
             id: request.id, code: .conflict,
             message: "target binding changed during HAP import")
         }
+        let hdcStableIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
+          connectKey: hdcRoute.connectKey)
         let jobID =
           "input-hap-\(currentTarget.targetID)-r\(currentTarget.bindingRevision)-"
+          + String(hdcStableIdentity.prefix(16)) + "-"
           + String(completed.sha256.prefix(16))
         let metadata = try await artifactStore.publish(
           RuntimeArtifactPublicationRequest(
@@ -919,12 +924,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
               targetID: currentTarget.targetID,
               bindingRevision: currentTarget.bindingRevision,
               // A HAP is consumed by the HDC provider, whose identity is the
-              // connect-key derivation — after a Loader-mode flash the store's
-              // stablePhysicalIdentitySHA256 carries the campaign identity and
-              // a lease bound to it can never match a debug.hap
-              // materialization (GJ-2 re-run, 2026-08-05).
-              stableIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
-                connectKey: currentTarget.connectKey)),
+              // connect-key derivation. After Flash, the canonical target's
+              // original connect key is historical; bind to the same proven
+              // alias route used by plan materialization and execution.
+              stableIdentitySHA256: hdcStableIdentity),
             contents: completed.contents))
         let lease = try await artifactStore.leaseReference(
           jobID: metadata.jobID, artifactID: metadata.artifactID)
@@ -939,8 +942,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
             "sha256": .string(metadata.sha256),
             "targetId": .string(currentTarget.targetID),
             "bindingRevision": .integer(Int64(currentTarget.bindingRevision)),
-            "stableIdentitySha256": .string(
-              currentTarget.stablePhysicalIdentitySHA256),
+            "stableIdentitySha256": .string(hdcStableIdentity),
           ]))
       } catch let error as HAPArtifactImportError {
         return failure(id: request.id, code: .rejected, message: error.description)
@@ -1191,14 +1193,19 @@ public struct RuntimeControlPlaneHandler: Sendable {
           targetID: completed.target.targetID),
           currentTarget.bindingRevision == completed.target.bindingRevision,
           currentTarget.stablePhysicalIdentitySHA256
-            == completed.target.stablePhysicalIdentitySHA256
+            == completed.target.stablePhysicalIdentitySHA256,
+          let hdcRoute = try targetStore.hdcExecutionRoute(targetID: currentTarget.targetID),
+          hdcRoute.bindingRevision == currentTarget.bindingRevision
         else {
           return failure(
             id: request.id, code: .conflict,
             message: "target binding changed during native library import")
         }
+        let hdcStableIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
+          connectKey: hdcRoute.connectKey)
         let jobID =
           "input-so-\(currentTarget.targetID)-r\(currentTarget.bindingRevision)-"
+          + String(hdcStableIdentity.prefix(16)) + "-"
           + String(completed.sha256.prefix(16))
         let metadata = try await artifactStore.publish(
           RuntimeArtifactPublicationRequest(
@@ -1212,11 +1219,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
               targetID: currentTarget.targetID,
               bindingRevision: currentTarget.bindingRevision,
               // Consumed by the HDC provider: bind the lease to the
-              // connect-key derivation, like import-hap above. Only the flash
-              // bundle stays on the store identity — its consumer is the
-              // Rockchip provider, whose identity is that field.
-              stableIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
-                connectKey: currentTarget.connectKey)),
+              // same proven HDC route as plan materialization, like
+              // import-hap above. Only the flash bundle stays on the store
+              // identity — its consumer is the Rockchip provider.
+              stableIdentitySHA256: hdcStableIdentity),
             contents: completed.contents))
         let lease = try await artifactStore.leaseReference(
           jobID: metadata.jobID, artifactID: metadata.artifactID)
@@ -1237,8 +1243,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
             "targetId": .string(currentTarget.targetID),
             "bindingRevision": .integer(
               Int64(currentTarget.bindingRevision)),
-            "stableIdentitySha256": .string(
-              currentTarget.stablePhysicalIdentitySHA256),
+            "stableIdentitySha256": .string(hdcStableIdentity),
           ]))
       } catch let error as NativeLibraryArtifactImportError {
         return failure(id: request.id, code: .rejected, message: error.description)

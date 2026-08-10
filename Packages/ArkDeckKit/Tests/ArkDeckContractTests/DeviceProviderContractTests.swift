@@ -166,6 +166,67 @@ final class DeviceProviderContractTests: XCTestCase {
     }
   }
 
+  func testInstallSurfacesBoundedPackageManagerRejectionButStillRequiresReadbackForSuccess()
+    throws
+  {
+    let artifactID = "ART-0123456789abcdef0123456789abcdef"
+    let staged = try hdc.mintStagedArtifact(
+      jobID: "job-1", stepID: "send-hap",
+      artifactLeaseID: "lease-v1:job-input:\(artifactID)",
+      expectedSHA256: String(repeating: "c", count: 64))
+    let bundle = try HDCBundleReference(bundleName: "com.example.demo")
+    let action = TypedProviderAction.hdc(.installPackage(staged, bundle: bundle))
+
+    let rejected = ProviderProcessReceipt(
+      exitStatus: 0,
+      stdout: Data("error: install failed: incompatible api".utf8),
+      stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .failed(let code, let detail) = try hdc.verify(
+      receipt: rejected, action: action, context: context)
+    else {
+      return XCTFail("package-manager rejection must fail before readback")
+    }
+    XCTAssertEqual(code, "installRejected")
+    XCTAssertTrue(detail.contains("outBytes=39"), detail)
+    XCTAssertTrue(detail.contains("outHex=6572726f723a"), detail)
+    XCTAssertFalse(detail.contains("incompatible api"), detail)
+
+    let unauthorized = ProviderProcessReceipt(
+      exitStatus: 0,
+      stdout: Data(
+        "error: failed to install bundle.\ncode:9568423\n"
+          .appending("error: the device is unauthorized\n").utf8),
+      stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .failed(let authorizationCode, let authorizationDetail) = try hdc.verify(
+      receipt: unauthorized, action: action, context: context)
+    else {
+      return XCTFail("the registered device authorization rejection must be named")
+    }
+    XCTAssertEqual(authorizationCode, "deviceUDIDUnauthorized")
+    XCTAssertEqual(
+      authorizationDetail,
+      "package signing profile does not authorize the connected device (bm code 9568423)")
+
+    let accepted = ProviderProcessReceipt(
+      exitStatus: 0,
+      stdout: Data("install bundle successfully.".utf8),
+      stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .unknown = try hdc.verify(
+      receipt: accepted, action: action, context: context)
+    else {
+      return XCTFail("package-manager success still requires package readback")
+    }
+
+    let legacyEmpty = ProviderProcessReceipt(
+      exitStatus: 0, stdout: Data(), stderr: Data(),
+      stdoutTruncated: false, durationSeconds: 0.1)
+    guard case .unknown = try hdc.verify(
+      receipt: legacyEmpty, action: action, context: context)
+    else {
+      return XCTFail("registered empty-output shape must remain unknown")
+    }
+  }
+
   func testObserveServerUsesItsOwnShapeNotTheVersionShape() throws {
     // The `-v` output must NOT verify a server check: that conflation is
     // exactly what reached hardware and produced outcomeUnknown.

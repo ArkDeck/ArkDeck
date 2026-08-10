@@ -395,7 +395,9 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   /// selected target; it does not erase a second target record or authorize
   /// Runtime to guess that both records represent the same physical device.
   /// Callers must fail closed until that identity conflict is reconciled by a
-  /// separate, history-preserving mechanism.
+  /// separate, history-preserving mechanism. Once reconciled, the exact
+  /// identity relation remains valid across later successful Flash Jobs; a
+  /// new route Job ID alone is not a new physical-device identity.
   package func hasConflictingHDCAliasOwner(
     canonicalTargetID: String,
     connectKey: String,
@@ -413,7 +415,8 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       }
       let document = try load()
       let targets = document.targets
-      guard targets.filter({ $0.targetID == canonicalTargetID }).count == 1 else {
+      let canonicals = targets.filter { $0.targetID == canonicalTargetID }
+      guard canonicals.count == 1, let canonical = canonicals.first else {
         throw BootstrapError.storeFailure(
           "canonical target for HDC alias ownership is missing or ambiguous")
       }
@@ -425,9 +428,13 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       return conflicts.contains { conflict in
         !resolutions.contains {
           $0.aliasTargetID == conflict.targetID
+            && $0.aliasStableIdentitySHA256 == conflict.stablePhysicalIdentitySHA256
+            && $0.aliasBindingRevision == conflict.bindingRevision
             && $0.canonicalTargetID == canonicalTargetID
+            && $0.canonicalStableIdentitySHA256
+              == canonical.stablePhysicalIdentitySHA256
+            && $0.canonicalBindingRevision == canonical.bindingRevision
             && $0.routedHDCIdentitySHA256 == identitySHA256
-            && $0.establishingFlashJobID == establishingFlashJobID
         }
       }
     }

@@ -405,6 +405,13 @@ public actor RuntimeArtifactStore {
   private let redaction: ArtifactRedactionPolicy
   private let retentionPolicy: ArtifactRetentionPolicy
   private let nowUTC: @Sendable () -> String
+  /// Quota usage is derived from durable indexes on first use, then updated
+  /// only after an index mutation commits. A long-lived headless host can
+  /// retain thousands of immutable jobs; rescanning every historical index
+  /// for each small final Artifact made one diagnostics finalization take
+  /// almost a minute. The cache is process-local (so restart always rebuilds
+  /// from durable truth) and GC invalidates it before changing indexes.
+  private var cachedIndexedBytes: Int?
 
   public init(
     rootURL: URL,
@@ -418,6 +425,7 @@ public actor RuntimeArtifactStore {
     self.redaction = redaction
     self.retentionPolicy = retentionPolicy
     self.nowUTC = nowUTC
+    self.cachedIndexedBytes = nil
     do {
       try FileManager.default.createDirectory(
         at: rootURL, withIntermediateDirectories: true,
@@ -495,6 +503,7 @@ public actor RuntimeArtifactStore {
       try atomicWrite(payload, to: destination, directory: jobDirectory)
     }
     try upsert(metadata, jobID: request.jobID)
+    cachedIndexedBytes = used + metadata.byteCount
     return metadata
   }
 
@@ -575,10 +584,10 @@ public actor RuntimeArtifactStore {
     }
 
     let destination = jobDirectory.appendingPathComponent(artifactID)
+    let used = try totalBytesUsed()
     if FileManager.default.fileExists(atPath: destination.path) {
       _ = try validateStoredPayload(metadata, at: destination)
     } else {
-      let used = try totalBytesUsed()
       guard used + request.expectedByteCount <= quota.totalBytes else {
         throw RuntimeArtifactError.quotaExceeded(
           requestedBytes: request.expectedByteCount,
@@ -590,6 +599,7 @@ public actor RuntimeArtifactStore {
         destination: destination, directory: jobDirectory)
     }
     try upsert(metadata, jobID: request.jobID)
+    cachedIndexedBytes = used + metadata.byteCount
     return metadata
   }
 
@@ -689,10 +699,10 @@ public actor RuntimeArtifactStore {
     }
 
     let destination = jobDirectory.appendingPathComponent(metadata.artifactID)
+    let used = try totalBytesUsed()
     if FileManager.default.fileExists(atPath: destination.path) {
       _ = try validateStoredPayload(metadata, at: destination)
     } else {
-      let used = try totalBytesUsed()
       guard used + streamed.byteCount <= quota.totalBytes else {
         throw RuntimeArtifactError.quotaExceeded(
           requestedBytes: streamed.byteCount, remainingBytes: max(0, quota.totalBytes - used))
@@ -714,6 +724,7 @@ public actor RuntimeArtifactStore {
       }
     }
     try upsert(metadata, jobID: request.jobID)
+    cachedIndexedBytes = used + metadata.byteCount
     return metadata
   }
 
@@ -928,6 +939,7 @@ public actor RuntimeArtifactStore {
   }
 
   public func totalBytesUsed() throws -> Int {
+    if let cachedIndexedBytes { return cachedIndexedBytes }
     var total = 0
     for entry in try jobDirectories() {
       let index = try loadIndex(jobID: entry.lastPathComponent)
@@ -935,6 +947,7 @@ public actor RuntimeArtifactStore {
         $0 + $1.byteCount
       }
     }
+    cachedIndexedBytes = total
     return total
   }
 
@@ -960,6 +973,11 @@ public actor RuntimeArtifactStore {
         }
       }
       if kept.count != index.artifacts.count {
+        // If persistence succeeds but a later unlink fails, the durable
+        // indexes have already changed. Invalidating before that boundary
+        // ensures the next quota check rebuilds the exact indexed total in
+        // either outcome.
+        cachedIndexedBytes = nil
         // Remove the index references first. A later unlink failure leaves
         // an unreferenced owned file, never an index that points at missing
         // evidence.

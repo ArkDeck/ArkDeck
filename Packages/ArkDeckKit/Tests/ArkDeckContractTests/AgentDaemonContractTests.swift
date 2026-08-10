@@ -1572,6 +1572,32 @@ final class AgentDaemonContractTests: XCTestCase {
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
       nowUTC: "2026-07-29T00:00:00Z").record
+    let aliasConnectKey = "150100424a544e4600-post-flash"
+    let aliasIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
+      connectKey: aliasConnectKey)
+    let alias = try targetStore.adopt(
+      stableIdentitySHA256: aliasIdentity,
+      connectKey: aliasConnectKey,
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-29T00:01:00Z").record
+    _ = try targetStore.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: alias.targetID,
+        aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: alias.bindingRevision,
+        canonicalTargetID: target.targetID,
+        canonicalStableIdentitySHA256: target.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: target.bindingRevision,
+        routedHDCIdentitySHA256: aliasIdentity,
+        routedUSBTopology: "42",
+        establishingFlashJobID: "job-hap-alias-0123456789abcdef",
+        establishingFlashPlanDigestSHA256: String(repeating: "f", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [],
+        establishedAtUTC: "2026-07-29T00:02:00Z"))
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -1624,13 +1650,16 @@ final class AgentDaemonContractTests: XCTestCase {
       case .string(let lease)? = fields["lease"],
       case .string(let returnedDigest)? = fields["sha256"],
       case .string(let returnedTarget)? = fields["targetId"],
-      case .integer(let returnedRevision)? = fields["bindingRevision"]
+      case .integer(let returnedRevision)? = fields["bindingRevision"],
+      case .string(let returnedIdentity)? = fields["stableIdentitySha256"]
     else {
       return XCTFail("commit must return the Artifact identity and lease")
     }
     XCTAssertEqual(returnedDigest, digest)
     XCTAssertEqual(returnedTarget, target.targetID)
     XCTAssertEqual(returnedRevision, Int64(target.bindingRevision))
+    XCTAssertEqual(returnedIdentity, aliasIdentity)
+    XCTAssertTrue(jobID.contains(String(aliasIdentity.prefix(16))))
     XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
     XCTAssertFalse(lease.contains(stateDirectory.path))
 
@@ -1638,15 +1667,18 @@ final class AgentDaemonContractTests: XCTestCase {
       jobID: jobID, artifactID: artifactID)
     XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
     XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
-    // The lease binds the HDC (connect-key) identity, not the store identity:
-    // after a Loader-mode flash the store field carries the campaign identity
-    // and a lease bound to it can never match a debug.hap materialization.
+    // The lease binds the HDC provider's proven post-Flash route, not the
+    // canonical target's historical connect key or store identity.
     XCTAssertEqual(
       metadata.bindingSnapshot.stableIdentitySHA256,
-      HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey))
+      aliasIdentity)
     XCTAssertNotEqual(
       metadata.bindingSnapshot.stableIdentitySHA256, stableIdentity,
       "the store identity must not leak into an HDC-consumed lease")
+    XCTAssertNotEqual(
+      metadata.bindingSnapshot.stableIdentitySHA256,
+      HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey),
+      "the canonical target's historical address must not override a proven alias route")
     XCTAssertEqual(metadata.mediaType, "application/vnd.openharmony.hap")
     let resolution = try await artifactStore.resolveLease(lease)
     XCTAssertEqual(resolution.sha256, digest)
@@ -1666,8 +1698,7 @@ final class AgentDaemonContractTests: XCTestCase {
       inspectFields["bindingRevision"], .integer(Int64(target.bindingRevision)))
     XCTAssertEqual(
       inspectFields["stableIdentitySha256"],
-      .string(
-        HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey)))
+      .string(aliasIdentity))
   }
 
   func testHAPImportRejectsUnknownTargetAndInvalidContainerWithoutPublication() async throws {
@@ -1732,6 +1763,9 @@ final class AgentDaemonContractTests: XCTestCase {
 
     let expectedJob =
       "input-hap-\(target.targetID)-r\(target.bindingRevision)-"
+      + String(
+        HDCObservationProviderAdapter.stableIdentitySHA256(
+          connectKey: target.connectKey).prefix(16)) + "-"
       + String(digest.prefix(16))
     let artifacts = try await artifactStore.list(jobID: expectedJob)
     XCTAssertTrue(artifacts.isEmpty)
@@ -1966,6 +2000,32 @@ final class AgentDaemonContractTests: XCTestCase {
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
       nowUTC: "2026-07-30T00:00:00Z").record
+    let aliasConnectKey = "150100424a544e4600-post-flash-native"
+    let aliasIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
+      connectKey: aliasConnectKey)
+    let alias = try targetStore.adopt(
+      stableIdentitySHA256: aliasIdentity,
+      connectKey: aliasConnectKey,
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-07-30T00:01:00Z").record
+    _ = try targetStore.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: alias.targetID,
+        aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: alias.bindingRevision,
+        canonicalTargetID: target.targetID,
+        canonicalStableIdentitySHA256: target.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: target.bindingRevision,
+        routedHDCIdentitySHA256: aliasIdentity,
+        routedUSBTopology: "43",
+        establishingFlashJobID: "job-native-alias-0123456789abcdef",
+        establishingFlashPlanDigestSHA256: String(repeating: "e", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [],
+        establishedAtUTC: "2026-07-30T00:02:00Z"))
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appendingPathComponent(
         "artifacts-native", isDirectory: true),
@@ -2011,6 +2071,8 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(fields["abi"], .string("arm64-v8a"))
     XCTAssertEqual(fields["buildId"], .string(NativeLibraryTestFixture.buildID))
     XCTAssertEqual(fields["sha256"], .string(digest))
+    XCTAssertEqual(fields["stableIdentitySha256"], .string(aliasIdentity))
+    XCTAssertTrue(jobID.contains(String(aliasIdentity.prefix(16))))
     XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
     XCTAssertFalse(lease.contains(stateDirectory.path))
     let metadata = try await artifactStore.inspect(
@@ -2018,11 +2080,11 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(metadata.mediaType, "application/x-elf")
     XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
     XCTAssertEqual(metadata.bindingSnapshot.bindingRevision, target.bindingRevision)
-    // Consumed by the HDC provider: the lease binds the connect-key identity,
-    // like the HAP import above.
+    // Consumed by the HDC provider: the lease binds the same proven route as
+    // plan materialization, like the HAP import above.
     XCTAssertEqual(
       metadata.bindingSnapshot.stableIdentitySHA256,
-      HDCObservationProviderAdapter.stableIdentitySHA256(connectKey: target.connectKey))
+      aliasIdentity)
 
     let invalid = Data(repeating: 0x41, count: 128)
     let invalidDigest = NativeLibraryTestFixture.sha256(invalid)

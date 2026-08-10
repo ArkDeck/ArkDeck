@@ -127,12 +127,13 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
   }
 
   private final class NativeDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
-    enum Mode {
+    enum Mode: Equatable {
       case success
       case loaderFailure
       case publishOutcomeUnknown
       case cleanupFailure
       case cleanupContinuation
+      case targetAbsent
     }
 
     let mode: Mode
@@ -248,6 +249,15 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
         ])
       case .inspectNativeLibrary(_, .stagingMatchesArtifact):
         return receipt([sub("\(newHash)  staging\n"), sub("-rw------- staging\n")])
+      case .backupNativeLibrary where mode == .targetAbsent:
+        return receipt([
+          absent("app-owned/libs/arm"), absent("app-owned/libs/arm/libarkdeck_gj.so"),
+          absent("app-owned/libs/arm/libarkdeck_gj.so"), sub(),
+          absent("app-owned/libs/arm/libarkdeck_gj.so"),
+          absent("app-owned/libs/arm/.libarkdeck_gj.so.backup"),
+          absent("app-owned/libs/arm/.libarkdeck_gj.so.backup"),
+          absent("app-owned/libs"),
+        ])
       case .backupNativeLibrary:
         return receipt([
           sub("drwx------ native\n"), sub("-rw------- target\n"),
@@ -802,6 +812,21 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertEqual(
       result.dispatcher.actionNames().filter { $0 == "publish" }.count, 1)
     XCTAssertFalse(result.dispatcher.actionNames().contains("rollback"))
+  }
+
+  func testMissingInstalledBundleHasOneBoundedActionableFailure() async throws {
+    let result = try await runNative(
+      mode: .targetAbsent, suffix: "target-absent")
+    XCTAssertEqual(result.status.state, "failed")
+    let failure = try XCTUnwrap(
+      result.status.timeline.first {
+        $0.contains("nativeAppOwnedDirectoryMissing")
+      },
+      "timeline: \(result.status.timeline)")
+    XCTAssertTrue(failure.contains("install the signed application"))
+    XCTAssertFalse(failure.contains("outHex="))
+    XCTAssertFalse(result.status.outcomeUnknown)
+    XCTAssertFalse(result.dispatcher.actionNames().contains("publish"))
   }
 
   func testRestartReconcilesExactPublishIntentWithoutResend() async throws {

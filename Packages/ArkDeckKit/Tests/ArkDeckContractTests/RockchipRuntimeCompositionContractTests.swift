@@ -1521,6 +1521,26 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(resolvedFacts.executionConnectKey, nextHDC)
     let connectKeysAfterResolution = await probe.observedConnectKeys()
     XCTAssertEqual(connectKeysAfterResolution, [nextHDC, nextHDC])
+
+    _ = try postFlashStore.publish(
+      RockchipPostFlashHDCBinding(
+        targetID: target.targetID, bindingRevision: target.bindingRevision,
+        stableLoaderIdentitySHA256: loaderDigest,
+        previousHDCIdentitySHA256: nextDigest,
+        hdcIdentitySHA256: nextDigest, hdcConnectKey: nextHDC,
+        usbTopology: "42",
+        productModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        buildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        jobID: "job-later-flash", establishedAtUTC: "2026-08-08T00:20:00Z"),
+      expectedPreviousHDCIdentitySHA256: nextDigest)
+    let laterFlashFacts = try await port.currentFacts(targetID: target.targetID)
+    XCTAssertEqual(laterFlashFacts.executionConnectKey, nextHDC)
+    XCTAssertEqual(
+      laterFlashFacts.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey],
+      nextDigest)
+    let connectKeysAfterLaterFlash = await probe.observedConnectKeys()
+    XCTAssertEqual(connectKeysAfterLaterFlash, [nextHDC, nextHDC, nextHDC])
   }
 
   func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {

@@ -275,7 +275,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           subprocesses: [sub("")] + set.packages.map { _ in sub("FileTransfer finish") })
       case .installPackageSet:
         note("installPackageSet")
-        return receipt("install bundle", exit: script.installExit)
+        return receipt("install bundle successfully.", exit: script.installExit)
       case .cleanupStagedPackageSet(let set):
         note("cleanupPackageSet")
         func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
@@ -308,7 +308,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       case .installPackage:
         note("installPackage")
         // Clean exit either way: the readback is what decides.
-        return receipt("install bundle", exit: script.installExit)
+        return receipt("install bundle successfully.", exit: script.installExit)
       case .queryPackageReadback(let bundle):
         note("packageReadback")
         return receipt(

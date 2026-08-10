@@ -1684,14 +1684,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       ])
 
     case .installPackageSet:
-      // Same rule as the single-package install: the readback decides.
-      guard let exitStatus = receipt.exitStatus else {
-        return .unknown(reason: "install produced no process result")
-      }
-      guard exitStatus == 0 else {
-        return .failed(code: "installFailed", detail: "install process reported failure")
-      }
-      return .unknown(reason: "install requires package readback before it can be believed")
+      return installDispatchOutcome(receipt)
 
     case .cleanupStagedPackageSet(let set):
       // `ls -d` on the directory is the evidence: absent means the whole
@@ -1733,6 +1726,18 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     case .backupNativeLibrary(let deployment):
       guard receipt.subprocesses.count == 8 else {
         return .unknown(reason: "native backup did not produce its complete readback sequence")
+      }
+      if pathPresence(
+        exitStatus: receipt.subprocesses[0].exitStatus,
+        stdout: receipt.subprocesses[0].stdout,
+        stderr: receipt.subprocesses[0].stderr,
+        stdoutTruncated: receipt.subprocesses[0].stdoutTruncated) == false
+      {
+        return .failed(
+          code: "nativeAppOwnedDirectoryMissing",
+          detail:
+            "the target bundle has no app-owned native library directory; "
+            + "install the signed application before deploying its library")
       }
       let observedTargetHash = sha256(receipt.subprocesses[2])
       let observedBackupHash = sha256(receipt.subprocesses[5])
@@ -1942,13 +1947,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       // readback, and hardware has shown `hdc install` exiting zero
       // without installing. The orchestration requires the paired
       // queryPackageReadback step to decide.
-      guard let exitStatus = receipt.exitStatus else {
-        return .unknown(reason: "install produced no process result")
-      }
-      guard exitStatus == 0 else {
-        return .failed(code: "installFailed", detail: "install process reported failure")
-      }
-      return .unknown(reason: "install requires package readback before it can be believed")
+      return installDispatchOutcome(receipt)
 
     case .queryPackageReadback(let bundle):
       guard !receipt.stdoutTruncated else {
@@ -2463,6 +2462,51 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
   private func exitSummary(_ receipt: ProviderSubprocessReceipt) -> String {
     receipt.exitStatus.map(String.init) ?? "unknown"
+  }
+
+  /// `hdc shell` reports the transport client's status, so an exit status of
+  /// zero does not prove that `bm install` accepted the package. Preserve the
+  /// paired package readback as the only success proof, while surfacing a
+  /// bounded diagnostic when the package manager itself returned a definite
+  /// non-success response. Empty output remains unknown for older registered
+  /// tool shapes; arbitrary device text is never copied into the journal.
+  private func installDispatchOutcome(
+    _ receipt: ProviderProcessReceipt
+  ) -> ProviderSemanticOutcome {
+    guard let exitStatus = receipt.exitStatus else {
+      return .unknown(reason: "install produced no process result")
+    }
+    guard exitStatus == 0 else {
+      return .failed(
+        code: "installFailed",
+        detail: "install process reported failure; "
+          + boundedProcessDiagnostic(Self.soleSubprocess(of: receipt)))
+    }
+    guard !receipt.stdoutTruncated else {
+      return .failed(
+        code: "installOutputTruncated",
+        detail: boundedProcessDiagnostic(Self.soleSubprocess(of: receipt)))
+    }
+    if let text = String(data: receipt.stdout, encoding: .utf8) {
+      if text.localizedCaseInsensitiveContains("install bundle successfully") {
+        return .unknown(reason: "install requires package readback before it can be believed")
+      }
+      if text.contains("code:9568423"),
+        text.localizedCaseInsensitiveContains("device is unauthorized")
+      {
+        return .failed(
+          code: "deviceUDIDUnauthorized",
+          detail:
+            "package signing profile does not authorize the connected device "
+            + "(bm code 9568423)")
+      }
+    }
+    guard receipt.stdout.isEmpty, receipt.stderr.isEmpty else {
+      return .failed(
+        code: "installRejected",
+        detail: boundedProcessDiagnostic(Self.soleSubprocess(of: receipt)))
+    }
+    return .unknown(reason: "install requires package readback before it can be believed")
   }
 
   /// Provider diagnostics are persisted in job failures, so expose only a
