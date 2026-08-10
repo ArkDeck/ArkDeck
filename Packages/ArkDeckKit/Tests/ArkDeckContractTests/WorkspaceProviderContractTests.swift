@@ -73,6 +73,31 @@ final class WorkspaceProviderContractTests: XCTestCase {
       [URL(fileURLWithPath: profile.projectRoot)
         .appendingPathComponent("Sources/App.txt").path])
 
+    XCTAssertTrue(
+      WorkspaceProviderSupport.globMayMatchDescendant(
+        directory: "entry", glob: "entry/src/main/ets/**"))
+    XCTAssertTrue(
+      WorkspaceProviderSupport.globMayMatchDescendant(
+        directory: "entry/src/main/ets/pages",
+        glob: "entry/src/main/ets/**"))
+    XCTAssertFalse(
+      WorkspaceProviderSupport.globMayMatchDescendant(
+        directory: "entry/build", glob: "entry/src/main/ets/**"))
+    XCTAssertFalse(
+      WorkspaceProviderSupport.globMayMatchDescendant(
+        directory: "oh_modules", glob: "entry/src/main/ets/**"))
+    XCTAssertEqual(
+      WorkspaceProviderSupport.globEnumerationAnchor(
+        "entry/src/main/ets/**"),
+      "entry/src/main/ets")
+    XCTAssertEqual(
+      WorkspaceProviderSupport.globEnumerationAnchor("Sources/*.swift"),
+      "Sources")
+    XCTAssertEqual(
+      WorkspaceProviderSupport.globEnumerationAnchor("Sources/App.txt"),
+      "Sources")
+    XCTAssertNil(WorkspaceProviderSupport.globEnumerationAnchor("**/*.swift"))
+
     let build = try workspaceAction(
       "workspace.build-openharmony@1",
       inputs: [

@@ -5,6 +5,14 @@ import Foundation
 public enum ArkDeckLaunchAgent {
   public static let label = "com.arkdeck.agentd"
   public static let hdcEnvironmentKey = "ARKDECK_HDC_PATH"
+  public static let workspaceProjectsEnvironmentKey = "ARKDECK_WORKSPACE_PROJECTS"
+  public static let workspaceActiveProjectEnvironmentKey = "ARKDECK_WORKSPACE_ACTIVE_PROJECT"
+  public static let devecoSDKEnvironmentKey = "ARKDECK_DEVECO_SDK_HOME"
+  public static let analyzerEnvironmentKey = "ARKDECK_ANALYZER_PATH"
+  public static let workspaceInspectorEnvironmentKey = "ARKDECK_WORKSPACE_INSPECTOR"
+  public static let harnessSensitiveEvidenceEnvironmentKey =
+    "ARKDECK_HARNESS_SENSITIVE_EVIDENCE"
+  public static let waterFlowProjectRef = "demo-app"
 }
 
 public struct LaunchAgentCommandResult: Sendable, Equatable {
@@ -80,10 +88,16 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
   public let daemonSHA256: String
   public let hdcPath: String
   public let hdcSHA256: String
+  public let workspaceProjectPath: String?
+  public let devecoSDKPath: String?
+  /// Optional keeps receipts written before this setting was productized
+  /// decodable; new receipts always write a (possibly empty) sorted array.
+  public let harnessSensitiveEvidence: [String]?
 
   public init(
     installedAtUTC: String, daemonPath: String, daemonSHA256: String,
-    hdcPath: String, hdcSHA256: String
+    hdcPath: String, hdcSHA256: String, workspaceProjectPath: String? = nil,
+    devecoSDKPath: String? = nil, harnessSensitiveEvidence: [String] = []
   ) {
     self.schemaVersion = "arkdeck-launchagent-install/v1"
     self.installedAtUTC = installedAtUTC
@@ -91,6 +105,19 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
     self.daemonSHA256 = daemonSHA256
     self.hdcPath = hdcPath
     self.hdcSHA256 = hdcSHA256
+    self.workspaceProjectPath = workspaceProjectPath
+    self.devecoSDKPath = devecoSDKPath
+    self.harnessSensitiveEvidence = harnessSensitiveEvidence
+  }
+}
+
+public struct LaunchAgentWorkspaceConfiguration: Sendable, Equatable {
+  public let projectRoot: URL
+  public let devecoSDKRoot: URL
+
+  public init(projectRoot: URL, devecoSDKRoot: URL) {
+    self.projectRoot = projectRoot
+    self.devecoSDKRoot = devecoSDKRoot
   }
 }
 
@@ -103,6 +130,9 @@ public struct LaunchAgentStatus: Codable, Sendable, Equatable {
   public let daemonSHA256: String?
   public let hdcPath: String?
   public let hdcSHA256: String?
+  public let workspaceProjectPath: String?
+  public let devecoSDKPath: String?
+  public let harnessSensitiveEvidence: [String]
   public let socketPath: String
   public let socketPresent: Bool
   public let standardOutputPath: String
@@ -164,9 +194,15 @@ public final class LaunchAgentService: @unchecked Sendable {
   public var launchDomain: String { "gui/\(uid)" }
 
   @discardableResult
-  public func install(daemonSource: URL, hdcExecutable: URL) throws -> LaunchAgentInstallReceipt {
+  public func install(
+    daemonSource: URL, hdcExecutable: URL,
+    workspace: LaunchAgentWorkspaceConfiguration? = nil,
+    harnessSensitiveEvidence: [String] = []
+  ) throws -> LaunchAgentInstallReceipt {
     let daemonSource = try validatedExecutable(daemonSource, name: "arkdeck-agentd")
     let hdcExecutable = try validatedExecutable(hdcExecutable, name: "HDC")
+    let workspace = try workspace.map(validatedWorkspace)
+    let harnessSensitiveEvidence = try validatedSensitiveEvidence(harnessSensitiveEvidence)
     let daemonSHA256 = try sha256(daemonSource)
     let hdcSHA256 = try sha256(hdcExecutable)
 
@@ -195,14 +231,19 @@ public final class LaunchAgentService: @unchecked Sendable {
       daemonPath: paths.installedDaemon.path,
       hdcPath: hdcExecutable.path,
       stdoutPath: paths.standardOutput.path,
-      stderrPath: paths.standardError.path)
+      stderrPath: paths.standardError.path,
+      workspace: workspace,
+      harnessSensitiveEvidence: harnessSensitiveEvidence)
     try renderedPlist.write(to: paths.plist, options: .atomic)
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.plist.path)
 
     let receipt = LaunchAgentInstallReceipt(
       installedAtUTC: nowUTC(), daemonPath: paths.installedDaemon.path,
       daemonSHA256: daemonSHA256, hdcPath: hdcExecutable.path,
-      hdcSHA256: hdcSHA256)
+      hdcSHA256: hdcSHA256,
+      workspaceProjectPath: workspace?.projectRoot.path,
+      devecoSDKPath: workspace?.devecoSDKRoot.path,
+      harnessSensitiveEvidence: harnessSensitiveEvidence)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     try encoder.encode(receipt).write(to: paths.receipt, options: .atomic)
@@ -235,12 +276,18 @@ public final class LaunchAgentService: @unchecked Sendable {
     var hdcPath: String?
     var daemonSHA256: String?
     var hdcSHA256: String?
+    var workspaceProjectPath: String?
+    var devecoSDKPath: String?
+    var harnessSensitiveEvidence: [String] = []
 
     if installed {
       do {
         let configuration = try configuredPaths()
         daemonPath = configuration.daemon
         hdcPath = configuration.hdc
+        workspaceProjectPath = configuration.workspace?.projectRoot.path
+        devecoSDKPath = configuration.workspace?.devecoSDKRoot.path
+        harnessSensitiveEvidence = configuration.harnessSensitiveEvidence
         if configuration.daemon != paths.installedDaemon.path {
           diagnostics.append("ProgramArguments does not name the ArkDeck-managed daemon path")
         }
@@ -280,6 +327,14 @@ public final class LaunchAgentService: @unchecked Sendable {
         if receipt.hdcPath != hdcPath || receipt.hdcSHA256 != hdcSHA256 {
           diagnostics.append("HDC identity drifted since installation")
         }
+        if receipt.workspaceProjectPath != workspaceProjectPath
+          || receipt.devecoSDKPath != devecoSDKPath
+        {
+          diagnostics.append("workspace configuration drifted since installation")
+        }
+        if (receipt.harnessSensitiveEvidence ?? []) != harnessSensitiveEvidence {
+          diagnostics.append("Harness sensitive-evidence opt-in drifted since installation")
+        }
       } catch {
         diagnostics.append("install receipt is unavailable or invalid: \(error)")
       }
@@ -299,6 +354,8 @@ public final class LaunchAgentService: @unchecked Sendable {
       installed: installed, loaded: loaded, launchDomain: launchDomain,
       plistPath: paths.plist.path, daemonPath: daemonPath,
       daemonSHA256: daemonSHA256, hdcPath: hdcPath, hdcSHA256: hdcSHA256,
+      workspaceProjectPath: workspaceProjectPath, devecoSDKPath: devecoSDKPath,
+      harnessSensitiveEvidence: harnessSensitiveEvidence,
       socketPath: paths.socket.path, socketPresent: socketPresent,
       standardOutputPath: paths.standardOutput.path,
       standardErrorPath: paths.standardError.path,
@@ -306,7 +363,14 @@ public final class LaunchAgentService: @unchecked Sendable {
       ready: installed && loaded && socketPresent && diagnostics.isEmpty)
   }
 
-  private func configuredPaths() throws -> (daemon: String, hdc: String) {
+  private struct ConfiguredPaths {
+    let daemon: String
+    let hdc: String
+    let workspace: LaunchAgentWorkspaceConfiguration?
+    let harnessSensitiveEvidence: [String]
+  }
+
+  private func configuredPaths() throws -> ConfiguredPaths {
     let data = try Data(contentsOf: paths.plist)
     guard
       let document = try PropertyListSerialization.propertyList(
@@ -327,11 +391,42 @@ public final class LaunchAgentService: @unchecked Sendable {
         "plist must keep the user-session lifecycle, Mach service, log paths, "
           + "one daemon argument and an explicit ARKDECK_HDC_PATH")
     }
-    return (daemon, hdc)
+    let projectEntry = environment[ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey]
+    let activeProject = environment[ArkDeckLaunchAgent.workspaceActiveProjectEnvironmentKey]
+    let sdk = environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey]
+    let analyzer = environment[ArkDeckLaunchAgent.analyzerEnvironmentKey]
+    let inspector = environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey]
+    let harnessSensitiveEvidence = try validatedSensitiveEvidence(
+      environment[ArkDeckLaunchAgent.harnessSensitiveEvidenceEnvironmentKey].map {
+        $0.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+      } ?? [])
+    let workspaceValues = [projectEntry, activeProject, sdk, analyzer, inspector]
+    let workspace: LaunchAgentWorkspaceConfiguration?
+    if workspaceValues.allSatisfy({ $0 == nil }) {
+      workspace = nil
+    } else {
+      let prefix = ArkDeckLaunchAgent.waterFlowProjectRef + "="
+      guard let projectEntry, projectEntry.hasPrefix(prefix),
+        !String(projectEntry.dropFirst(prefix.count)).isEmpty,
+        activeProject == ArkDeckLaunchAgent.waterFlowProjectRef,
+        let sdk, analyzer == daemon, inspector == "/usr/bin/grep"
+      else {
+        throw LaunchAgentServiceError.configuration(
+          "workspace environment must be the closed demo-app ProjectProfile configuration")
+      }
+      workspace = try validatedWorkspace(
+        LaunchAgentWorkspaceConfiguration(
+          projectRoot: URL(fileURLWithPath: String(projectEntry.dropFirst(prefix.count))),
+          devecoSDKRoot: URL(fileURLWithPath: sdk)))
+    }
+    return ConfiguredPaths(
+      daemon: daemon, hdc: hdc, workspace: workspace,
+      harnessSensitiveEvidence: harnessSensitiveEvidence)
   }
 
   private func renderTemplate(
-    daemonPath: String, hdcPath: String, stdoutPath: String, stderrPath: String
+    daemonPath: String, hdcPath: String, stdoutPath: String, stderrPath: String,
+    workspace: LaunchAgentWorkspaceConfiguration?, harnessSensitiveEvidence: [String]
   ) throws -> Data {
     guard
       let template = Bundle.module.url(
@@ -354,6 +449,19 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     arguments[0] = daemonPath
     environment[ArkDeckLaunchAgent.hdcEnvironmentKey] = hdcPath
+    if let workspace {
+      environment[ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey] =
+        ArkDeckLaunchAgent.waterFlowProjectRef + "=" + workspace.projectRoot.path
+      environment[ArkDeckLaunchAgent.workspaceActiveProjectEnvironmentKey] =
+        ArkDeckLaunchAgent.waterFlowProjectRef
+      environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey] = workspace.devecoSDKRoot.path
+      environment[ArkDeckLaunchAgent.analyzerEnvironmentKey] = daemonPath
+      environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey] = "/usr/bin/grep"
+    }
+    if !harnessSensitiveEvidence.isEmpty {
+      environment[ArkDeckLaunchAgent.harnessSensitiveEvidenceEnvironmentKey] =
+        harnessSensitiveEvidence.joined(separator: ",")
+    }
     document["ProgramArguments"] = arguments
     document["EnvironmentVariables"] = environment
     document["StandardOutPath"] = stdoutPath
@@ -376,6 +484,79 @@ public final class LaunchAgentService: @unchecked Sendable {
         "\(name) is missing, is not a regular file, or is not executable: \(canonical.path)")
     }
     return canonical
+  }
+
+  private func validatedWorkspace(
+    _ configuration: LaunchAgentWorkspaceConfiguration
+  ) throws -> LaunchAgentWorkspaceConfiguration {
+    func directory(_ candidate: URL, name: String) throws -> URL {
+      guard candidate.path.hasPrefix("/") else {
+        throw LaunchAgentServiceError.configuration("\(name) path must be absolute")
+      }
+      let canonical = candidate.resolvingSymlinksInPath().standardizedFileURL
+      var isDirectory: ObjCBool = false
+      guard fileManager.fileExists(atPath: canonical.path, isDirectory: &isDirectory),
+        isDirectory.boolValue
+      else {
+        throw LaunchAgentServiceError.configuration("\(name) directory is absent")
+      }
+      return canonical
+    }
+    let project = try directory(configuration.projectRoot, name: "WaterFlow project")
+    let protectedRoots = ["Desktop", "Documents", "Downloads"].map {
+      paths.homeDirectory.appendingPathComponent($0, isDirectory: true)
+        .standardizedFileURL.path
+    }
+    guard !protectedRoots.contains(where: {
+      project.path == $0 || project.path.hasPrefix($0 + "/")
+    }) else {
+      throw LaunchAgentServiceError.configuration(
+        "WaterFlow project cannot be under macOS privacy-managed Desktop, "
+          + "Documents or Downloads; use an absolute path under ~/Developer "
+          + "or another LaunchAgent-readable directory")
+    }
+    guard !project.path.contains(","), !project.path.contains("=") else {
+      throw LaunchAgentServiceError.configuration(
+        "WaterFlow project path cannot contain ',' or '='")
+    }
+    guard fileManager.fileExists(
+      atPath: project.appendingPathComponent("build-profile.json5").path),
+      fileManager.fileExists(
+        atPath: project.appendingPathComponent("entry/src/main/module.json5").path)
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "WaterFlow project is missing build-profile.json5 or entry/src/main/module.json5")
+    }
+    let sdk = try directory(configuration.devecoSDKRoot, name: "DevEco SDK")
+    var openHarmonyIsDirectory: ObjCBool = false
+    guard fileManager.fileExists(
+      atPath: sdk.appendingPathComponent("default/openharmony").path,
+      isDirectory: &openHarmonyIsDirectory), openHarmonyIsDirectory.boolValue
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "DevEco SDK does not contain default/openharmony")
+    }
+    return LaunchAgentWorkspaceConfiguration(projectRoot: project, devecoSDKRoot: sdk)
+  }
+
+  private func validatedSensitiveEvidence(_ names: [String]) throws -> [String] {
+    guard names.count <= 16 else {
+      throw LaunchAgentServiceError.configuration(
+        "Harness sensitive-evidence opt-in accepts at most 16 artifact names")
+    }
+    let normalized = Array(Set(names)).sorted()
+    guard normalized.count == names.count,
+      normalized.allSatisfy({ name in
+        !name.isEmpty && name.utf8.count <= 128
+          && name.range(
+            of: #"^[A-Za-z0-9][A-Za-z0-9._-]*$"#,
+            options: .regularExpression) != nil
+      })
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "Harness sensitive-evidence opt-in must contain unique safe artifact basenames")
+    }
+    return normalized
   }
 
   private func sha256(_ url: URL) throws -> String {

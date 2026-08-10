@@ -7,7 +7,9 @@ HDC 执行路径。
 ## 首次准备与安装
 
 1. 安装 DevEco/OpenHarmony 工具，并在设备侧完成一次 USB 信任。需要系统授权时先在
-   登录用户会话中完成；LaunchAgent 不绕过 macOS 或设备授权。
+   登录用户会话中完成；调试 HAP 还必须把当前设备 UDID 加入其签名 profile。刷入新系统后
+   若包管理器报告 `9568423`，应重新完成设备授权并重新签名/构建 HAP。LaunchAgent 不绕过
+   macOS、设备信任或应用签名授权。
 2. 构建 `arkdeck` 与 `arkdeck-agentd`，确认 HDC 的真实绝对路径。不要传目录、相对路径
    或依赖 `PATH`。
 3. 从同一构建目录运行：
@@ -31,6 +33,41 @@ arkdeck agentd update
 ```
 
 HDC 路径变化时同时传 `--hdc /new/absolute/path/to/hdc`。
+
+要让内置 WaterFlow ProjectProfile、workspace operations 和本地 analyzer 在关闭 Terminal 后
+继续可用，安装时一次性传入两个受验证的绝对目录：
+
+```text
+arkdeck agentd install --hdc /absolute/path/to/hdc \
+  --workspace-project /absolute/path/to/WaterFlowLayoutDemo \
+  --deveco-sdk /Applications/DevEco-Studio.app/Contents/sdk
+```
+
+两项必须同时出现；project 必须包含 `build-profile.json5` 与
+`entry/src/main/module.json5`，SDK 必须包含 `default/openharmony`。安装器把现有
+`demo-app` profile、SDK、`/usr/bin/grep` inspector 和同一已安装 daemon 的 analyzer 路径
+固化进用户 LaunchAgent，并在 `status` 中检查配置漂移。`update` 未重述这两个参数时保留
+已安装值；不会从 `PATH`、当前目录或 Terminal 环境猜测。
+
+project 不得位于 `~/Desktop`、`~/Documents` 或 `~/Downloads`。这些目录由 macOS
+隐私/TCC 按可执行身份授权：Terminal 中可读不代表独立 LaunchAgent 可读，后台枚举还可能
+等待系统授权而无法返回。请先把工程放到例如
+`/Users/your-name/Developer/WaterFlowLayoutDemo`，再把这个绝对路径传给 `install`/`update`；
+无需管理员权限或 Full Disk Access。
+
+Harness 默认不读取 sensitive Artifact。GJ-5/debugCrash 的成功标准需要本机读取
+`crash-index.txt`（需要分析 HiLog 时再加入 `hilog.txt`），因此必须由操作者明确把所需的
+Artifact basename 固化到 LaunchAgent：
+
+```text
+arkdeck agentd update --sensitive-evidence crash-index.txt,hilog.txt
+```
+
+该设置只允许同一 daemon 内的 Harness 按 Artifact ID 读取这些精确名称；不会允许任意路径、
+不会开启 Artifact 导出，也不会开启模型网络 egress。`status --json` 与安装收据会显示并核对
+这份排序后的 allowlist。使用
+`arkdeck agentd update --sensitive-evidence none` 可撤销；默认值和撤销后均为空。无需 sensitive
+证据的任务不应启用此项。
 
 ## 锁屏运行与诊断
 

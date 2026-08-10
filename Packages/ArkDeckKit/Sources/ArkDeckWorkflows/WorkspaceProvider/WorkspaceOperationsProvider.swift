@@ -260,6 +260,17 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
     hvigorScriptPath: String
   ) throws -> WorkspaceProjectProfile {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+    let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+    let protectedRoots = ["Desktop", "Documents", "Downloads"].map {
+      home.appendingPathComponent($0, isDirectory: true).standardizedFileURL.path
+    }
+    guard !protectedRoots.contains(where: {
+      root == $0 || root.hasPrefix($0 + "/")
+    }) else {
+      throw DeviceProviderError.factsUnavailable(
+        "workspace.projectProfileUnavailable: project root is under a "
+          + "macOS privacy-managed user folder; configure a LaunchAgent-readable path")
+    }
     let canonicalScript = URL(fileURLWithPath: hvigorScriptPath)
       .resolvingSymlinksInPath().standardizedFileURL.path
     guard hvigorScriptPath.hasPrefix("/"),
@@ -1646,6 +1657,44 @@ package enum WorkspaceProviderSupport {
     return path.range(of: pattern, options: .regularExpression) != nil
   }
 
+  /// Whether an enumerated directory can contain a match for this glob.
+  /// Only the literal prefix before the first wildcard is used, so this may
+  /// deliberately keep extra directories but can never prune a possible
+  /// match. Narrow task scopes such as `entry/src/main/ets/**` therefore do
+  /// not walk unrelated build caches before admission.
+  package static func globMayMatchDescendant(
+    directory: String, glob: String
+  ) -> Bool {
+    guard isSafeGlob(glob), isSafeRelativePath(directory) else { return false }
+    let wildcard = glob.firstIndex { "*?[".contains($0) }
+    let prefix = String(glob[..<(wildcard ?? glob.endIndex)])
+      .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    guard !prefix.isEmpty else { return true }
+    return prefix == directory
+      || prefix.hasPrefix(directory + "/")
+      || directory.hasPrefix(prefix)
+  }
+
+  /// The narrowest directory that can be opened before recursively matching
+  /// a glob. `nil` means the project root. The returned path contains no
+  /// wildcard and is already covered by `isSafeGlob`'s traversal checks.
+  package static func globEnumerationAnchor(_ glob: String) -> String? {
+    guard isSafeGlob(glob) else { return nil }
+    guard let wildcard = glob.firstIndex(where: { "*?[".contains($0) }) else {
+      let components = glob.split(separator: "/")
+      guard components.count > 1 else { return nil }
+      return components.dropLast().joined(separator: "/")
+    }
+    let literal = String(glob[..<wildcard])
+    if literal.hasSuffix("/") {
+      let directory = String(literal.dropLast())
+      return directory.isEmpty ? nil : directory
+    }
+    guard let separator = literal.lastIndex(of: "/") else { return nil }
+    let directory = String(literal[..<separator])
+    return directory.isEmpty ? nil : directory
+  }
+
   package static func files(
     root: String, profileGlobs: [String], requestGlobs: [String]
   ) throws -> [String] {
@@ -1658,32 +1707,87 @@ package enum WorkspaceProviderSupport {
     let rootURL = URL(fileURLWithPath: root)
       .resolvingSymlinksInPath().standardizedFileURL
     let canonicalRoot = rootURL.path
-    guard
-      let enumerator = FileManager.default.enumerator(
-        at: rootURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-        options: [.skipsHiddenFiles, .skipsPackageDescendants])
-    else {
-      throw DeviceProviderError.factsUnavailable("workspace source tree cannot be enumerated")
-    }
-    var result: [String] = []
-    for case let fileURL as URL in enumerator {
-      let values = try fileURL.resourceValues(
-        forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-      guard values.isRegularFile == true, values.isSymbolicLink != true else { continue }
-      let canonicalFile = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
-      guard canonicalFile.hasPrefix(canonicalRoot + "/") else {
+    let anchors = Set(requestGlobs.map(globEnumerationAnchor))
+    var result: Set<String> = []
+    var visitedEntries = 0
+    for anchor in anchors.sorted(by: { ($0 ?? "") < ($1 ?? "") }) {
+      let anchorURL = anchor.map { rootURL.appendingPathComponent($0, isDirectory: true) }
+        ?? rootURL
+      let lexicalAnchor = anchorURL.standardizedFileURL.path
+      guard lexicalAnchor == canonicalRoot || lexicalAnchor.hasPrefix(canonicalRoot + "/") else {
         throw DeviceProviderError.factsUnavailable(
-          "workspace source path escapes the canonical project root")
+          "workspace enumeration anchor escapes the canonical project root")
       }
-      let relative = String(canonicalFile.dropFirst(canonicalRoot.count + 1))
-      if profileGlobs.contains(where: { matches(relative, glob: $0) }),
-        requestGlobs.contains(where: { matches(relative, glob: $0) })
-      {
-        result.append(canonicalFile)
-        guard result.count <= 2_000 else {
+      guard FileManager.default.fileExists(atPath: lexicalAnchor) else { continue }
+      let anchorValues = try anchorURL.resourceValues(
+        forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+      guard anchorValues.isDirectory == true, anchorValues.isSymbolicLink != true else {
+        continue
+      }
+      var enumerationError: Error?
+      guard
+        let enumerator = FileManager.default.enumerator(
+          at: anchorURL,
+          includingPropertiesForKeys: [
+            .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey,
+          ],
+          options: [.skipsHiddenFiles, .skipsPackageDescendants],
+          errorHandler: { _, error in
+            enumerationError = error
+            return false
+          })
+      else {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace source scope cannot be enumerated")
+      }
+      for case let fileURL as URL in enumerator {
+        visitedEntries += 1
+        guard visitedEntries <= 20_000 else {
           throw DeviceProviderError.unsupportedAction(
-            "workspace inspection scope exceeds 2000 files")
+            "workspace inspection enumeration exceeds 20000 entries")
         }
+        let values = try fileURL.resourceValues(
+          forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey])
+        let lexicalFile = fileURL.standardizedFileURL.path
+        guard lexicalFile.hasPrefix(canonicalRoot + "/") else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace source path escapes the canonical project root")
+        }
+        let lexicalRelative = String(
+          lexicalFile.dropFirst(canonicalRoot.count + 1))
+        if values.isDirectory == true {
+          if values.isSymbolicLink == true
+            || !profileGlobs.contains(where: {
+              globMayMatchDescendant(directory: lexicalRelative, glob: $0)
+            })
+            || !requestGlobs.contains(where: {
+              globMayMatchDescendant(directory: lexicalRelative, glob: $0)
+            })
+          {
+            enumerator.skipDescendants()
+          }
+          continue
+        }
+        guard values.isRegularFile == true, values.isSymbolicLink != true else { continue }
+        let canonicalFile = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+        guard canonicalFile.hasPrefix(canonicalRoot + "/") else {
+          throw DeviceProviderError.factsUnavailable(
+            "workspace source path escapes the canonical project root")
+        }
+        let relative = String(canonicalFile.dropFirst(canonicalRoot.count + 1))
+        if profileGlobs.contains(where: { matches(relative, glob: $0) }),
+          requestGlobs.contains(where: { matches(relative, glob: $0) })
+        {
+          result.insert(canonicalFile)
+          guard result.count <= 2_000 else {
+            throw DeviceProviderError.unsupportedAction(
+              "workspace inspection scope exceeds 2000 files")
+          }
+        }
+      }
+      if enumerationError != nil {
+        throw DeviceProviderError.factsUnavailable(
+          "workspace source scope enumeration failed")
       }
     }
     return result.sorted()

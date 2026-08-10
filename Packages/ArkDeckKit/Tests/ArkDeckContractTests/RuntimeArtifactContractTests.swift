@@ -457,6 +457,44 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertFalse(firstBytes.isEmpty)
   }
 
+  func testQuotaUsageStaysExactAcrossIncrementalPublicationGCAndRestart() async throws {
+    let store = try makeStore(quota: ArtifactQuota(totalBytes: 100))
+    _ = try await store.publish(
+      request(jobID: "job-cache-a", contents: String(repeating: "a", count: 30)))
+    let firstUsage = try await store.totalBytesUsed()
+    XCTAssertEqual(firstUsage, 30)
+    _ = try await store.publish(
+      request(jobID: "job-cache-b", contents: String(repeating: "b", count: 20)))
+    let incrementalUsage = try await store.totalBytesUsed()
+    XCTAssertEqual(
+      incrementalUsage, 50,
+      "subsequent publications must update the process-local quota total")
+
+    let removed = try await store.collectGarbage(
+      activeJobIDs: [], nowUTC: "2027-01-01T00:00:00Z")
+    XCTAssertEqual(removed.count, 2)
+    let usageAfterGC = try await store.totalBytesUsed()
+    XCTAssertEqual(
+      usageAfterGC, 0,
+      "GC invalidates and rebuilds usage from the committed durable indexes")
+
+    _ = try await store.publish(
+      request(jobID: "job-after-gc", contents: String(repeating: "c", count: 90)))
+    let usageAfterRepublish = try await store.totalBytesUsed()
+    XCTAssertEqual(usageAfterRepublish, 90)
+
+    let reopened = try makeStore(quota: ArtifactQuota(totalBytes: 100))
+    let reopenedUsage = try await reopened.totalBytesUsed()
+    XCTAssertEqual(
+      reopenedUsage, 90,
+      "a new daemon process must rebuild quota usage from durable truth")
+    await XCTAssertThrowsErrorAsync(
+      try await reopened.publish(
+        request(
+          jobID: "job-over-restart-quota", name: "binding-snapshot.json",
+          contents: String(repeating: "d", count: 11))))
+  }
+
   func testGarbageCollectionSparesActiveAndPinnedArtifacts() async throws {
     let store = try makeStore()
     _ = try await store.publish(request(jobID: "job-active"))

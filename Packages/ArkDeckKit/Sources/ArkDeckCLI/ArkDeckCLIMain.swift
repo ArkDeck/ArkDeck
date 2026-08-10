@@ -1041,8 +1041,12 @@ struct ArkDeckCommandLine {
         arkdeck update-feed assemble --payload <payload.json> --signature <signature.bin> \
       --out <feed.json>
         arkdeck doctor [--socket <path>] [--json]
-        arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] [--json]
-        arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] [--json]
+        arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] \
+      [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
+      [--sensitive-evidence <artifact-name,...|none>] [--json]
+        arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
+      [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
+      [--sensitive-evidence <artifact-name,...|none>] [--json]
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
         arkdeck agentd uninstall [--json]

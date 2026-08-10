@@ -69,6 +69,26 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
         "post-flash HDC alias has ambiguous or advanced durable ownership")
     }
 
+    // The relation is about exact durable device identities, not about one
+    // particular Flash invocation. A later successful Flash publishes a new
+    // route receipt with a new Job ID even when the canonical target, binding
+    // revision and HDC identity are unchanged. Reuse the already validated,
+    // append-only relation only when every identity-bearing field still
+    // matches; any drift continues through the full proof path and fails
+    // closed rather than rewriting history.
+    if let existing = try targetStore.aliasResolutions().first(where: {
+      $0.aliasTargetID == alias.targetID
+        && $0.aliasStableIdentitySHA256 == alias.stablePhysicalIdentitySHA256
+        && $0.aliasBindingRevision == alias.bindingRevision
+        && $0.canonicalTargetID == canonical.targetID
+        && $0.canonicalStableIdentitySHA256 == canonical.stablePhysicalIdentitySHA256
+        && $0.canonicalBindingRevision == canonical.bindingRevision
+        && $0.routedHDCIdentitySHA256 == route.hdcIdentitySHA256
+        && $0.routedUSBTopology == route.usbTopology
+    }) {
+      return existing
+    }
+
     let establishingFlashDirectory = jobDirectory(route.jobID)
     let establishingFlash = try RuntimeJobRecord.load(from: establishingFlashDirectory)
     let replay = try DurableJournalRecovery.inspect(
