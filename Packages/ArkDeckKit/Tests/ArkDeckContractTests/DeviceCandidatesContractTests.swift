@@ -173,6 +173,14 @@ final class DeviceCandidatesContractTests: XCTestCase {
       return XCTFail("target.list must return an array")
     }
     XCTAssertEqual(targets.count, 1, "the alias remains durable but is not independently selectable")
+
+    let doctor = await handler.handleFrame(frame("doctor"))
+    guard case .object(let report)? = doctor.result else {
+      return XCTFail("doctor must return a report")
+    }
+    XCTAssertEqual(
+      report["adoptedTargetCount"], .integer(1),
+      "doctor must count selectable targets rather than retained alias history")
   }
 
   func testMissingBootstrapFailsLoudInsteadOfReturningAnEmptyList() async throws {
