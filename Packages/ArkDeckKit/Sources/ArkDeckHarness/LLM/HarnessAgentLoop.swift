@@ -296,13 +296,19 @@ public actor HarnessAgentSession {
     let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { throw HarnessAgentSessionError.emptyUserMessage }
     context.messages.append(.user(text))
+    // The model/tool loop budget bounds one user turn, matching the unit that
+    // can be aborted and retried. Durable device/task budgets live in the
+    // typed tools and Runtime; making these counters session-lifetime would
+    // permanently disable tools after a few ordinary multi-turn exchanges.
+    var turnModelCalls = 0
+    var turnToolCalls = 0
 
     while true {
       if Task.isCancelled {
         emit(.turnEnded(.aborted))
         return
       }
-      if modelCalls >= limits.maximumModelCalls {
+      if turnModelCalls >= limits.maximumModelCalls {
         emit(.turnEnded(.budgetExhausted))
         return
       }
@@ -311,12 +317,13 @@ public actor HarnessAgentSession {
         maximumEncodedBytes: limits.maximumContextBytes)
       if dropped > 0 { emit(.contextCompacted(droppedMessages: dropped)) }
 
+      turnModelCalls += 1
       modelCalls += 1
       var assistantText = ""
       var proposedCalls: [HarnessAgentToolCall] = []
       var completion: HarnessAgentModelStopReason?
       do {
-        let advertisedTools = toolCalls >= limits.maximumToolCalls ? [] : tools
+        let advertisedTools = turnToolCalls >= limits.maximumToolCalls ? [] : tools
         var assistantBytes = 0
         for try await event in gateway.stream(context: context, tools: advertisedTools) {
           if Task.isCancelled {
@@ -389,11 +396,12 @@ public actor HarnessAgentSession {
         if Task.isCancelled {
           modelResult = "error: aborted"
           displayResult = modelResult
-        } else if toolCalls >= limits.maximumToolCalls {
+        } else if turnToolCalls >= limits.maximumToolCalls {
           modelResult = "error: ArkDeck Agent tool-call budget exhausted"
           displayResult = modelResult
           rejectedForBudget = true
         } else if case .object = call.input {
+          turnToolCalls += 1
           toolCalls += 1
           if let tool = toolMap[call.name] {
             do {
