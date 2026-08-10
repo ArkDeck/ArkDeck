@@ -1417,6 +1417,10 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
   /// Present when the plan was host-managed: an opaque reference to the
   /// provider-owned durable record (e.g. Rockchip session manifest ID).
   public let hostManagedRecordID: String?
+  /// Semantic fields emitted by the product-owned host only after its
+  /// durable typed receipt has been written. The provider still validates
+  /// these fields; operation callers never construct process receipts.
+  public let hostManagedSummary: [String: String]
   /// Present when the plan declared a `hostLanding` and the dispatcher found
   /// a file there. Measured, never assumed.
   public let landedArtifact: ProviderLandedArtifact?
@@ -1431,6 +1435,7 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
     stdoutTruncated: Bool,
     durationSeconds: Double,
     hostManagedRecordID: String? = nil,
+    hostManagedSummary: [String: String] = [:],
     landedArtifact: ProviderLandedArtifact? = nil,
     subprocesses: [ProviderSubprocessReceipt] = []
   ) {
@@ -1440,6 +1445,7 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
     self.stdoutTruncated = stdoutTruncated
     self.durationSeconds = durationSeconds
     self.hostManagedRecordID = hostManagedRecordID
+    self.hostManagedSummary = hostManagedSummary
     self.landedArtifact = landedArtifact
     self.subprocesses = subprocesses
   }

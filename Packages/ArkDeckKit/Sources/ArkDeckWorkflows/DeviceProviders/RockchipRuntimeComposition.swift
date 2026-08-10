@@ -564,6 +564,7 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
         $0 + $1.durationSeconds
       },
       hostManagedRecordID: recordID,
+      hostManagedSummary: result.summary,
       subprocesses: result.subprocesses)
   }
 }

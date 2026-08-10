@@ -1944,6 +1944,83 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     }
   }
 
+  /// Projects only the already-confirmed Flash postflight receipt. This is a
+  /// read-only compatibility path because the generic Job record carries
+  /// preflight observations, while Flash proves these facts after reboot. It
+  /// never dispatches or repairs an action and returns nil on correlation drift.
+  func flashPostflightObservation(
+    for record: RuntimeJobRecord
+  ) -> RuntimeEvidenceObservation? {
+    let stepID = "rebind-and-verify-build"
+    guard record.operationReference == "flash.dayu200",
+      record.providerID == "rockchip",
+      ["succeeded", "recovered"].contains(record.state),
+      !record.outcomeUnknown,
+      let bindingRevision = record.request.target.expectedBindingRevision,
+      bindingRevision == record.materializedBindingRevision,
+      let stableIdentitySHA256 = record.materializedStableTargetIdentitySHA256,
+      let confirmedAtUTC = record.finishedAtUTC,
+      !confirmedAtUTC.isEmpty
+    else { return nil }
+
+    do {
+      try validateComponent(record.jobID, field: "jobID")
+      let directory = rootURL
+        .appendingPathComponent(record.jobID, isDirectory: true)
+        .appendingPathComponent(stepID, isDirectory: true)
+      let intent = try read(
+        RockchipRuntimeHostIntentRecord.self,
+        from: directory.appendingPathComponent("intent.json"))
+      let receipt = try read(
+        RockchipRuntimeHostReceiptRecord.self,
+        from: directory.appendingPathComponent("receipt.json"))
+      let materializedAction = try intent.action.materialize()
+      guard intent.schemaVersion == "1.0.0",
+        intent.jobID == record.jobID,
+        intent.stepID == stepID,
+        intent.targetID == record.request.target.targetID,
+        intent.bindingRevision == bindingRevision,
+        intent.stableIdentitySHA256 == stableIdentitySHA256,
+        receipt.schemaVersion == intent.schemaVersion,
+        receipt.jobID == intent.jobID,
+        receipt.stepID == intent.stepID,
+        receipt.targetID == intent.targetID,
+        receipt.bindingRevision == intent.bindingRevision,
+        receipt.stableIdentitySHA256 == intent.stableIdentitySHA256,
+        receipt.providerExecutableSHA256 == intent.providerExecutableSHA256,
+        receipt.actionSHA256 == intent.actionSHA256,
+        receipt.isWellFormed,
+        case .rockchip(
+          .verifyBoundBuild(
+            let expectation, let expectedProductModel, let expectedBuildVersion)
+        ) = materializedAction,
+        receipt.summary["model"] == expectedProductModel,
+        receipt.summary["firmware"] == expectedBuildVersion,
+        receipt.summary["verification"] == "exact-published-profile-and-bound-hdc",
+        receipt.summary["usbTopology"] == expectation.usbTopology,
+        let hdcIdentitySHA256 = receipt.summary["hdcIdentitySha256"],
+        hdcIdentitySHA256.count == 64,
+        hdcIdentitySHA256.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+      else { return nil }
+
+      return RuntimeEvidenceObservation(
+        targetID: record.request.target.targetID,
+        bindingRevision: bindingRevision,
+        stableIdentitySHA256: stableIdentitySHA256,
+        model: expectedProductModel,
+        firmware: expectedBuildVersion,
+        transport: "usb",
+        providerID: record.providerID,
+        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolSHA256: receipt.providerExecutableSHA256,
+        confirmedAtUTC: confirmedAtUTC,
+        confirmationMethod: "machinePostflightReadback",
+        preflightSteps: [])
+    } catch {
+      return nil
+    }
+  }
+
   fileprivate func prepare(
     descriptor: HostManagedProcessDescriptor,
     action: TypedProviderAction

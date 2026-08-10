@@ -3,6 +3,7 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -89,6 +90,37 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           atPath: actionDirectory.appendingPathComponent("intent.json").path))
       throw RuntimeDispatchFailure.outcomeUnknown(
         "fixture interrupted after durable host intent")
+    }
+  }
+
+  private struct PostflightActionExecutor: RockchipRuntimeActionExecuting {
+    func unavailableReason() -> String? { nil }
+
+    func execute(
+      action _: RockchipProviderAction,
+      descriptor _: HostManagedProcessDescriptor,
+      rockchipExecutable _: ResolvedExecutable,
+      actionDirectory _: URL
+    ) async throws -> RockchipRuntimeActionExecutionResult {
+      RockchipRuntimeActionExecutionResult(
+        summary: [
+          "model": RockchipFlashProfile.dayu200.runtimeProductModel,
+          "firmware": RockchipFlashProfile.dayu200.runtimeBuildVersion,
+          "hdcIdentitySha256": String(repeating: "d", count: 64),
+          "usbTopology": "42",
+          "verification": "exact-published-profile-and-bound-hdc",
+        ],
+        stdout: Data("ohos\nOpenHarmony-7.0.0.37\n".utf8),
+        stderr: Data(),
+        stdoutTruncated: false,
+        subprocesses: [
+          ProviderSubprocessReceipt(
+            exitStatus: 0,
+            stdout: Data("ohos\nOpenHarmony-7.0.0.37\n".utf8),
+            stderr: Data(),
+            stdoutTruncated: false,
+            durationSeconds: 0)
+        ])
     }
   }
 
@@ -2192,6 +2224,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         nowUTC: "2026-07-31T00:00:00Z"))
     let receipt = try await dispatcher.dispatch(signedPlan)
     XCTAssertNotNil(receipt.hostManagedRecordID)
+    XCTAssertEqual(receipt.hostManagedSummary["semantic"], "verified")
     let signedSnapshot = await actionLog.snapshot()
     XCTAssertEqual(signedSnapshot.0.count, 1)
 
@@ -2217,6 +2250,87 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
     let legacySnapshot = await actionLog.snapshot()
     XCTAssertEqual(legacySnapshot.0.count, 1)
+  }
+
+  func testSucceededFlashProjectsPostflightFromCorrelatedDurableReceipt() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let recordRoot = root.appendingPathComponent("rockchip-runtime", isDirectory: true)
+    let component = ResolvedExecutable(
+      path: "/product/Contents/MacOS/rkdeveloptool",
+      sha256: Self.reviewedSignedComponentSHA256)
+    let expectation = RockchipHDCReconnectExpectation(
+      previousConnectKey: "device-1",
+      previousIdentitySHA256: SHA256.hash(data: Data("device-1".utf8))
+        .map { String(format: "%02x", $0) }.joined(),
+      usbTopology: "42")
+    let action = RockchipProviderAction.verifyBoundBuild(
+      expectation: expectation,
+      expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+      expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    let plan = try rockchipPlan(
+      action: action,
+      stepID: "rebind-and-verify-build",
+      toolSHA256: component.sha256)
+    let dispatcher = BundledRockchipRuntimeDispatcher(
+      resolver: FixedExecutableResolver(table: ["rockchip": component]),
+      host: DurableRockchipRuntimeActionHost(
+        executor: PostflightActionExecutor(),
+        records: RockchipRuntimeActionRecordStore(rootURL: recordRoot)))
+
+    let receipt = try await dispatcher.dispatch(plan)
+    XCTAssertEqual(
+      receipt.hostManagedSummary["firmware"],
+      RockchipFlashProfile.dayu200.runtimeBuildVersion)
+
+    let request = try RuntimeOperationRequest(
+      requestID: "req-postflight-observation",
+      idempotencyKey: "idem-postflight-observation",
+      target: DurableTargetReference(
+        targetID: "TGT-HOST", expectedBindingRevision: 7),
+      operation: RuntimeOperationReference(id: "flash.dayu200"),
+      inputs: [
+        "imageBundleLease": .string(
+          "lease-v1:input-flash:ART-0123456789abcdef0123456789abcdef"),
+        "deviceProfile": .string("dayu200"),
+        "partitionPlan": .array(
+          RockchipFlashProfile.dayu200.mappedPartitions.map {
+            .string($0.partitionName)
+          }),
+        "postFlashVerification": .string("full"),
+      ],
+      authorization: RuntimeCapabilityReference(
+        capabilityID: "CAP-RT-POSTFLIGHT-OBSERVATION"))
+    var record = RuntimeJobRecord(
+      jobID: "job-host",
+      request: request,
+      operationReference: "flash.dayu200",
+      catalogDigest: String(repeating: "f", count: 64),
+      providerID: "rockchip",
+      createdAtUTC: "2026-08-10T01:21:29Z",
+      actualEffect: "destructive",
+      admissionEvidence: nil,
+      materializedPlanDigest: String(repeating: "b", count: 64),
+      materializedStableTargetIdentitySHA256: String(repeating: "a", count: 64),
+      materializedBindingRevision: 7)
+    record.state = "succeeded"
+    record.finishedAtUTC = "2026-08-10T01:27:29Z"
+
+    let store = RockchipRuntimeActionRecordStore(rootURL: recordRoot)
+    let observation = try XCTUnwrap(store.flashPostflightObservation(for: record))
+    XCTAssertEqual(observation.targetID, "TGT-HOST")
+    XCTAssertEqual(observation.bindingRevision, 7)
+    XCTAssertEqual(
+      observation.firmware,
+      RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    XCTAssertEqual(observation.model, RockchipFlashProfile.dayu200.runtimeProductModel)
+    XCTAssertEqual(observation.transport, "usb")
+    XCTAssertEqual(observation.confirmationMethod, "machinePostflightReadback")
+
+    record.state = "failed"
+    XCTAssertNil(
+      store.flashPostflightObservation(for: record),
+      "a durable receipt must not upgrade a non-successful Job")
   }
 
   func testReviewedProductComponentMakesFlashAvailableWithoutWeakeningE2()

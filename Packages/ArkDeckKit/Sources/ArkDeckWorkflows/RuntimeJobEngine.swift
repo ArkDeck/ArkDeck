@@ -3168,6 +3168,11 @@ public actor RuntimeJobEngine {
     let epochs = try await RuntimeSupersedingRecoveryStore(
       stateDirectory: configuration.stateDirectory).list()
     let recoveryEpoch = epochs.last(where: { $0.recoveryJobID == record.jobID })
+    let observation = record.evidenceObservation
+      ?? RockchipRuntimeActionRecordStore(
+        rootURL: configuration.stateDirectory.appendingPathComponent(
+          "rockchip-runtime", isDirectory: true)
+      ).flashPostflightObservation(for: record)
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
       operationReference: record.operationReference,
@@ -3177,7 +3182,7 @@ public actor RuntimeJobEngine {
       providerID: record.providerID,
       actualEffect: record.actualEffect,
       authority: record.admissionEvidence,
-      observation: record.evidenceObservation,
+      observation: observation,
       actualStepKinds: record.actualStepKinds ?? [],
       executionMode: "execute",
       terminalState: record.outcomeUnknown ? "outcomeUnknown" : record.state,
