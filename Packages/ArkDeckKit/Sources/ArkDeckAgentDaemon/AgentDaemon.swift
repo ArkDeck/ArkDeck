@@ -809,7 +809,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         "targetStore": .string(targetStore == nil ? "unavailable" : "ready"),
         "bootstrap": .string(bootstrap == nil ? "unavailable" : "ready"),
       ]
-      if let targetStore, let targets = try? targetStore.list() {
+      if let targetStore, let targets = try? targetStore.listActive() {
         report["adoptedTargetCount"] = .integer(Int64(targets.count))
       }
       return success(id: request.id, result: .object(report))
