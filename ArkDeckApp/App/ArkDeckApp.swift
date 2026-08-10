@@ -43,6 +43,7 @@ struct ArkDeckApp: App {
         deviceList: deviceList
       )
       .task {
+        ApplicationIconChoice.applyStoredSelection()
         hdcDiagnostics.refresh()
         overviewCapabilities.refresh()
         autoUpdate.startup()

@@ -72,12 +72,17 @@ struct SettingsRootView<UpdatesContent: View>: View {
 
 private struct GeneralSettingsPane: View {
   @ObservedObject var model: SettingsWorkspaceViewModel
+  @AppStorage(ApplicationIconChoice.persistenceKey)
+  private var applicationIconChoice = ApplicationIconChoice.defaultChoice.rawValue
 
   var body: some View {
     SettingsPaneContainer {
       SettingsPaneHeader(
         title: settingsText("settings.general.title"),
         subtitle: settingsText("settings.general.subtitle"))
+      GroupBox(settingsText("settings.general.appIcon")) {
+        ApplicationIconPicker(selection: $applicationIconChoice)
+      }
       if let general = model.presentation?.general {
         GroupBox(settingsText("settings.general.build")) {
           SettingsValueGrid(rows: [
@@ -104,6 +109,152 @@ private struct GeneralSettingsPane: View {
         }
       }
     }
+  }
+}
+
+enum ApplicationIconChoice: String, CaseIterable, Hashable, Identifiable {
+  case keycap
+  case waveform
+
+  static let persistenceKey = "ArkDeck.applicationIcon.v1"
+  static let defaultChoice = ApplicationIconChoice.waveform
+
+  var id: String { rawValue }
+
+  var imageAssetName: String {
+    switch self {
+    case .keycap: "ArkDeckKeycapIcon"
+    case .waveform: "ArkDeckWaveformIcon"
+    }
+  }
+
+  var title: String {
+    switch self {
+    case .keycap: settingsText("settings.general.appIcon.keycap")
+    case .waveform: settingsText("settings.general.appIcon.waveform")
+    }
+  }
+
+  var image: NSImage? {
+    NSImage(named: NSImage.Name(imageAssetName))
+  }
+
+  @MainActor
+  func apply() {
+    guard let image else { return }
+    NSApplication.shared.applicationIconImage = image
+  }
+
+  @MainActor
+  static func applyStoredSelection() {
+    let rawValue = UserDefaults.standard.string(forKey: persistenceKey)
+    (rawValue.flatMap(ApplicationIconChoice.init(rawValue:)) ?? defaultChoice).apply()
+  }
+}
+
+private struct ApplicationIconPicker: View {
+  @Binding var selection: String
+  @FocusState private var focusedChoice: ApplicationIconChoice?
+
+  private var selectedChoice: ApplicationIconChoice {
+    ApplicationIconChoice(rawValue: selection) ?? .defaultChoice
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(settingsText("settings.general.appIcon.detail"))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      HStack(spacing: 12) {
+        ForEach(ApplicationIconChoice.allCases) { choice in
+          option(choice)
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func option(_ choice: ApplicationIconChoice) -> some View {
+    let isSelected = choice == selectedChoice
+    let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+
+    return Button {
+      selection = choice.rawValue
+      choice.apply()
+    } label: {
+      HStack(spacing: 12) {
+        ApplicationIconPreview(choice: choice)
+        VStack(alignment: .leading, spacing: 6) {
+          Text(choice.title)
+            .font(.headline)
+          if isSelected {
+            Label(
+              settingsText("settings.general.appIcon.selected"),
+              systemImage: "checkmark.circle.fill"
+            )
+            .font(.callout)
+            .foregroundStyle(.tint)
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .padding(12)
+      .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+      .background(
+        isSelected ? Color.accentColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor),
+        in: shape
+      )
+      .overlay(
+        shape.stroke(
+          isSelected ? Color.accentColor : Color.primary.opacity(0.12),
+          lineWidth: isSelected ? 2 : 1)
+      )
+      .contentShape(shape)
+    }
+    .buttonStyle(.plain)
+    .focused($focusedChoice, equals: choice)
+    .overlay {
+      if focusedChoice == choice {
+        shape
+          .stroke(Color.accentColor, lineWidth: 2)
+          .padding(-3)
+      }
+    }
+    .padding(4)
+    .accessibilityLabel(choice.title)
+    .accessibilityValue(
+      isSelected ? settingsText("settings.general.appIcon.selected") : ""
+    )
+    .accessibilityHint(settingsText("settings.general.appIcon.detail"))
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+    .accessibilityIdentifier("settings.general.appIcon.\(choice.rawValue)")
+  }
+}
+
+private struct ApplicationIconPreview: View {
+  let choice: ApplicationIconChoice
+
+  var body: some View {
+    Group {
+      if let image = choice.image {
+        Image(nsImage: image)
+          .resizable()
+          .interpolation(.high)
+      } else {
+        Image(systemName: "app.dashed")
+          .resizable()
+          .scaledToFit()
+          .padding(14)
+      }
+    }
+    .frame(width: 64, height: 64)
+    .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 14))
+    .overlay(
+      RoundedRectangle(cornerRadius: 14)
+        .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+    )
+    .accessibilityHidden(true)
   }
 }
 
