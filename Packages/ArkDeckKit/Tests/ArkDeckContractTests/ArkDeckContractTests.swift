@@ -74,7 +74,7 @@ final class ArkDeckContractTests: XCTestCase {
         "ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition",
         [
           "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckHarness",
-          "ArkDeckWorkflows",
+          "ArkDeckWorkflows", "ArkDeckAgentClient",
         ]
       ))
     for (target, path, allowed) in scans {
