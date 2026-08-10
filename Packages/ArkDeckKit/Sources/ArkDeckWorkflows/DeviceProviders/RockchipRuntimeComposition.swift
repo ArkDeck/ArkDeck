@@ -288,6 +288,15 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
           if let routed = try postFlashHDCBindingStore?.loadIfPresent(),
             try routed.covers(target: target, binding: binding)
           {
+            guard
+              try !targetStore.hasConflictingHDCAliasOwner(
+                canonicalTargetID: target.targetID,
+                connectKey: routed.hdcConnectKey,
+                identitySHA256: routed.hdcIdentitySHA256)
+            else {
+              throw DeviceProviderError.factsUnavailable(
+                "verified post-flash HDC alias is owned by another adopted target")
+            }
             executionConnectKey = routed.hdcConnectKey
             alias = (routed.hdcIdentitySHA256, routed.usbTopology)
           }

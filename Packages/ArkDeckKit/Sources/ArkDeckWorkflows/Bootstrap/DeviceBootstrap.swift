@@ -157,6 +157,37 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     try queue.sync { try load().targets.first { $0.targetID == targetID } }
   }
 
+  /// Reports whether a freshly verified HDC alias is already owned by a
+  /// different durable target. A post-flash route proves how to address the
+  /// selected target; it does not erase a second target record or authorize
+  /// Runtime to guess that both records represent the same physical device.
+  /// Callers must fail closed until that identity conflict is reconciled by a
+  /// separate, history-preserving mechanism.
+  package func hasConflictingHDCAliasOwner(
+    canonicalTargetID: String,
+    connectKey: String,
+    identitySHA256: String
+  ) throws -> Bool {
+    try queue.sync {
+      guard !canonicalTargetID.isEmpty,
+        !connectKey.isEmpty,
+        Self.isCanonicalSHA256(identitySHA256)
+      else {
+        throw BootstrapError.storeFailure("invalid HDC alias ownership query")
+      }
+      let targets = try load().targets
+      guard targets.filter({ $0.targetID == canonicalTargetID }).count == 1 else {
+        throw BootstrapError.storeFailure(
+          "canonical target for HDC alias ownership is missing or ambiguous")
+      }
+      return targets.contains {
+        $0.targetID != canonicalTargetID
+          && ($0.connectKey == connectKey
+            || $0.stablePhysicalIdentitySHA256 == identitySHA256)
+      }
+    }
+  }
+
   /// Idempotent adoption keyed by stable physical identity: re-adopting
   /// the same device returns the existing record untouched.
   public func adopt(

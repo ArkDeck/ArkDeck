@@ -465,12 +465,6 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let priorAlias = try XCTUnwrap(binding.confirmedHDCNormalAlias())
     let nextHDC = hdcIdentity(
       serial: "post-flash-hdc-connect-key", topology: priorAlias.usbTopology)
-    let duplicate = try fixture.targets.adopt(
-      stableIdentitySHA256: digest(nextHDC.serial),
-      connectKey: nextHDC.serial,
-      toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:20:00Z").record
-    XCTAssertNotEqual(duplicate.targetID, original.targetID)
     let routedStore = RockchipPostFlashHDCBindingStore(rootURL: fixture.bindings.rootURL)
     _ = try routedStore.publish(
       RockchipPostFlashHDCBinding(
@@ -496,17 +490,57 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     XCTAssertEqual(status.disposition, .exactBoundTarget)
     XCTAssertEqual(status.targetID, original.targetID)
     XCTAssertEqual(status.bindingRevision, original.bindingRevision)
+  }
 
-    let wrongTopology = hdcIdentity(
-      serial: nextHDC.serial, topology: "19791872")
-    let rejected = try observer(
+  func testVerifiedPostFlashHDCAliasOwnedByAnotherTargetIsAmbiguous() throws {
+    let fixture = try makeCurrentFixture()
+    let coordinator = ProductRockchipLoaderBindingCoordinator(
+      targetStore: fixture.targets,
+      bindingStore: fixture.bindings,
+      usbProbe: RockchipProductUSBProbe(identitySource: { [fixture.currentLoader] }))
+    _ = try coordinator.bindCurrentLoader(
+      targetID: fixture.target.targetID,
+      expectedBindingRevision: fixture.target.bindingRevision)
+    let original = try XCTUnwrap(
+      fixture.targets.find(targetID: fixture.target.targetID))
+    let binding = try fixture.bindings.loadExisting()
+    let priorAlias = try XCTUnwrap(binding.confirmedHDCNormalAlias())
+    let nextHDC = hdcIdentity(
+      serial: "conflicting-post-flash-hdc-connect-key",
+      topology: priorAlias.usbTopology)
+    let duplicate = try fixture.targets.adopt(
+      stableIdentitySHA256: digest(nextHDC.serial),
+      connectKey: nextHDC.serial,
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:20:00Z").record
+    XCTAssertNotEqual(duplicate.targetID, original.targetID)
+    let routedStore = RockchipPostFlashHDCBindingStore(rootURL: fixture.bindings.rootURL)
+    _ = try routedStore.publish(
+      RockchipPostFlashHDCBinding(
+        targetID: original.targetID,
+        bindingRevision: original.bindingRevision,
+        stableLoaderIdentitySHA256: original.stablePhysicalIdentitySHA256,
+        previousHDCIdentitySHA256: priorAlias.identitySHA256,
+        hdcIdentitySHA256: digest(nextHDC.serial),
+        hdcConnectKey: nextHDC.serial,
+        usbTopology: nextHDC.topology,
+        productModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        buildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        jobID: "job-post-flash-conflict",
+        establishedAtUTC: "2026-08-08T00:19:00Z"),
+      expectedPreviousHDCIdentitySHA256: priorAlias.identitySHA256)
+
+    let status = try observer(
       targets: fixture.targets,
       bindings: fixture.bindings,
       postFlashBindings: routedStore,
-      identities: [wrongTopology]
+      identities: [nextHDC]
     ).observeBootloaderStatus()
-    XCTAssertEqual(rejected.disposition, .targetBindingUnprepared)
-    XCTAssertEqual(rejected.targetID, duplicate.targetID)
+    XCTAssertEqual(status.disposition, .ambiguous)
+    XCTAssertEqual(status.observationCount, 1)
+    XCTAssertEqual(status.mode, "hdcNormal")
+    XCTAssertNil(status.targetID)
+    XCTAssertNil(status.bindingRevision)
   }
 
   func testHistoricalSameRevisionBindingIsRejectedWithoutRewrite() throws {
