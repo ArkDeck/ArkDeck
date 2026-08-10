@@ -9,67 +9,86 @@
 <h1 align="center">ArkDeck</h1>
 
 <p align="center">
-  面向真实 OpenHarmony 设备的本地优先 typed 自动化运行时。
+  用 macOS 应用、CLI 或 AI Agent，调试、跟踪、刷写真实的 OpenHarmony 设备。
 </p>
 
-> [!IMPORTANT]
-> ArkDeck 目前是持续开发中的预览版本。当前 Host 目标为 Apple 芯片上的 macOS 14 及更高版本，App 版本为 `0.1.0`。首个稳定版本发布前，接口和配置方式仍可能调整。
+<p align="center">
+  <a href="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml"><img src="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml/badge.svg" alt="Swift CI"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20Apple%20silicon-blue" alt="平台：Apple 芯片上的 macOS 14+">
+  <img src="https://img.shields.io/badge/status-0.1.0%20preview-orange" alt="状态：0.1.0 预览版">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="协议：MIT"></a>
+</p>
 
-ArkDeck 为工程师和 AI Agent 提供一条受控路径，用于观察、调试、恢复和迭代 OpenHarmony 设备。调用方只提交版本化 Operation、typed inputs、目标设备和有界预算；可执行文件、参数、远端路径、安全检查与恢复行为均由 Runtime 决定，而不是由调用方自由指定。
+<!-- TODO: 截图占位——有应用截图后放在这里，
+     例如 <p align="center"><img src="docs/assets/app-debug.png" width="760" alt="ArkDeck Debug 工作区"></p> -->
 
-## ArkDeck 能做什么
+ArkDeck 是一个面向 OpenHarmony 开发板的工作台。插上设备，你就可以安装和调试 HAP，采集日志、截图、UI Dump 和 Trace，部署 native 库；板子起不来的时候，还能把 DAYU200 刷回一个已知可用的镜像。
 
-- 发现并接管精确的 HDC 设备，在 Runtime 重启后继续保留 durable binding。
-- 在不暴露 raw HDC 命令的前提下，读取设备、固件、工具和 binding 事实。
-- 完成 HAP 端到端调试：校验 Artifact lease、传输、安装或替换、启动、状态回读、诊断采集和清理。
-- 采集有界 HiLog、ArkUI UI Dump、截图、组件树、Trace 和崩溃记录，并写入结构化本地 Artifact Store。
-- 原子部署 App-owned native library，校验 ABI、Hash 和 Build ID，并按声明的策略执行回滚。
-- 使用已验证镜像包刷写已绑定的 DAYU200（RK3568），随后重启、重新绑定并完成刷机后检查。
-- 运行有界 AI 修复循环：分析证据、在隔离 Workspace 中修改、构建和测试、通过 typed Operation 部署，并在成功或触发安全边界时停止。
+它不寻常的地方在于和设备打交道的方式。ArkDeck 中没有任何环节会替你执行裸 `hdc` 或 shell 命令：调用方从版本化的操作目录里提交类型化操作（typed operation），由本地守护进程决定实际的可执行文件、参数和设备路径，先核对设备身份，一旦对不上就拒绝继续。正因为如此，把 AI Agent 放到真实硬件上反复调试才是一件可以放心的事：一个犯糊涂的 Agent 最多也就是提交一个会被运行时拒绝的操作。
 
-## 产品入口
+## 它能做什么
 
-| 入口 | 用途 |
+- 按身份接管一台确定的设备，而不是碰巧插在 USB 口上的那台；绑定关系在重启后依然保留。
+- 端到端地安装、启动和检查 HAP，结果统一收进本地产物库（artifact store）。
+- 按需采集 HiLog、截图、ArkUI 组件树、Trace 和崩溃记录。
+- 原子化部署应用自有的 native 库，校验失败时自动回滚。
+- 用已验证的镜像包刷写 DAYU200（RK3568），随后重启并重新接管。
+- 运行 AI 调试循环：读取证据、在隔离工作区中修改，再经由同样的类型化操作重新部署验证，直到成功或触及声明的预算上限。
+
+三个入口共用同一个运行时：
+
+| 入口 | 是什么 |
 | --- | --- |
-| macOS App | 设备配置、Flash、Debug、UI Dump、Trace、Automation、History 和 Settings 工作区 |
-| `arkdeck` | 配置 daemon、接管设备、提交 Operation、管理 Job、Artifact 和 Harness Task 的 typed CLI |
-| `arkdeck-agentd` | 用户级本地 daemon，负责 Runtime 执行、durable recovery 和私有控制 socket |
-| Operation Catalog | 对输入、effect、step、Artifact、预算与支持 profile 进行版本化定义 |
+| macOS 应用 | 设备配置、Flash、Debug、UI Dump、Trace、Automation、History 和 Settings 工作区 |
+| `arkdeck` | 命令行工具：配置守护进程、接管设备、提交操作、管理任务和产物 |
+| `arkdeck-agentd` | 用户级本地守护进程：负责实际执行、故障恢复和私有控制 socket |
 
-## 安全模型
+## 为什么这样设计
 
-- **先确认精确目标。** 传输地址不等于设备身份；任何 mutation 都要求已确认并持久化的 binding。
-- **只允许 typed effect。** App、CLI 和 Agent surface 不接受 raw shell、raw HDC 参数或由调用方指定的远端路径。
-- **不确定时 fail closed。** 身份漂移、事实过期、副作用结果未知或缺少验证时，Runtime 停止后续 mutation。
-- **持久且可审计。** 外部 effect 前先写 intent；outcome、cleanup debt 与 recovery 状态在 daemon 重启后仍保留。
-- **Artifact 默认留在本机。** Raw Artifact 不可原地修改；导出必须显式触发，敏感数据保持分类标记。
-- **Destructive 工作有严格边界。** Flash 只消费 Runtime 为精确 target、inputs、plan 和 toolchain 生成的短期 capability。
+开发板往往毁于无心之失：刷机刷错了序列号、清理时删掉了别的目录、某一步悄悄失败之后脚本还在往下跑。ArkDeck 的做法是把责任从调用方挪进运行时：
+
+- 任何写操作都要求已确认并持久化的设备绑定，传输地址本身从不被当作设备身份。
+- 每个外部副作用之前先落盘意图，守护进程崩溃或重启后仍然知道刚才做到了哪一步。
+- 刷机只能通过一个短时效的能力（capability）执行，它绑定唯一的设备、计划和工具链。
+- 事实过期或结果未知时，运行时选择停下，而不是猜。
+
+原始产物始终留在本机，写入后不可修改；导出永远是一个显式动作。
+
+## 当前状态
+
+ArkDeck 目前是早期预览版（`0.1.0`）。已知的边界：
+
+- 唯一支持的宿主环境是 Apple 芯片上的 macOS 14 及以上。
+- 刷机目前只支持一块板子：DAYU200（RK3568）。
+- 首个稳定版发布前，接口、目录 schema 和配置步骤都可能变化。
+
+进度以五条必须在真机上跑通的旅程来衡量（仓库里称为 Golden Journey）：设备观察、HAP 调试、native 库部署、刷机恢复、自主 AI 调试循环。Mock 和模拟器都不算数。定义与当前状态见 [PRODUCT-LOOP.md](./PRODUCT-LOOP.md)。
 
 ## 架构
 
 ```mermaid
 flowchart LR
-    APP["macOS App"] --> DAEMON["arkdeck-agentd"]
+    APP["macOS 应用"] --> DAEMON["arkdeck-agentd"]
     CLIENT["CLI / AI Client"] --> DAEMON
-    CATALOG["版本化 Operation Catalog"] --> RUNTIME["Typed Runtime"]
+    CATALOG["操作目录"] --> RUNTIME["类型化运行时"]
     DAEMON --> RUNTIME
     RUNTIME --> PROVIDERS["HDC / Rockchip Provider"]
     PROVIDERS --> DEVICE["已绑定的 OpenHarmony 设备"]
-    RUNTIME --> STORE["Durable Job 与本地 Artifact"]
+    RUNTIME --> STORE["持久任务与本地产物"]
 ```
 
 详细模块边界见 [Architecture Rules](./docs/ArchitectureRules.md)。
 
 ## 从源码构建
 
-### 环境要求
+你需要：
 
 - Apple 芯片上的 macOS 14 或更高版本
-- 支持 Swift 6 的 Xcode toolchain
-- 真实设备工作流需要兼容的 OpenHarmony HDC 可执行文件
-- USB 连接的设备，并已完成首次信任与必要的平台授权
+- 带 Swift 6 工具链的 Xcode
+- 一个 OpenHarmony `hdc` 可执行文件（真机工作流需要）
+- 一台已完成首次信任授权的 USB 直连设备
 
-克隆仓库并构建 Swift Package：
+构建并测试 Swift Package：
 
 ```bash
 git clone https://github.com/ArkDeck/ArkDeck.git
@@ -78,51 +97,39 @@ swift build --package-path Packages/ArkDeckKit
 swift test --package-path Packages/ArkDeckKit --parallel
 ```
 
-在 Xcode 中打开桌面 App：
+桌面应用方面，用 Xcode 打开 `ArkDeck.xcodeproj`，运行共享的 `ArkDeck` scheme。Debug 配置足够进行应用和运行时开发；真正刷写 DAYU200 还需要经过评审的 Rockchip 组件和 Release 打包路径。
+
+### 启动运行时
+
+安装用户级守护进程，并把它指向你的 `hdc`：
 
 ```bash
-open ArkDeck.xcodeproj
+Packages/ArkDeckKit/.build/debug/arkdeck agentd install --hdc /absolute/path/to/hdc
 ```
 
-选择共享的 `ArkDeck` Scheme 后运行。Debug 配置可用于 App 和 Runtime 开发；真实 DAYU200 刷机还需要经过 review 的 Rockchip 组件与 Release 打包路径。
-
-### 启动本地 Runtime
-
-构建完成后，使用 HDC 的 canonical 绝对路径安装用户级 daemon：
+然后确认一切就绪：
 
 ```bash
-Packages/ArkDeckKit/.build/debug/arkdeck agentd install \
-  --hdc /absolute/path/to/hdc
-
 Packages/ArkDeckKit/.build/debug/arkdeck agentd status
 Packages/ArkDeckKit/.build/debug/arkdeck doctor
-Packages/ArkDeckKit/.build/debug/arkdeck operation list
 Packages/ArkDeckKit/.build/debug/arkdeck device list
 ```
 
-安装命令会校验并固定 daemon 与 HDC executable。Workspace、本地 HAP 签名、模型 producer、诊断和卸载方式见[无头 Runtime 配置说明](./Packages/ArkDeckKit/LaunchAgents/README.md)。
-
-## 产品里程碑
-
-ArkDeck 只用五条真实设备 Golden Journey 衡量进度。Schema、Mock 或 Simulation 通过都不能代替真实设备完成。
-
-1. **Device Observe** — 发现、信任、接管、观察、采集有界诊断，并在 daemon 重启后读回结果。
-2. **HAP Debug** — 导入、传输、安装、启动、验证、采集、停止并清理 HAP。
-3. **Native Debug** — 校验并发布 native library，重启和观察目标，失败时回滚。
-4. **Flash Recovery** — 校验身份和精确计划，刷机、重启、重新绑定并回到正常 Debug Runtime。
-5. **Bounded AI Debug Loop** — 观察、分析、修改、构建、部署与复验，直到成功或命中声明的停止条件。
-
-权威定义与汇报规则见 [PRODUCT-LOOP.md](./PRODUCT-LOOP.md)。
+`agentd install` 会校验并固定守护进程和 `hdc` 二进制。工作区布局、本地 HAP 签名、诊断与卸载方式见[无头运行时指南](./Packages/ArkDeckKit/LaunchAgents/README.md)。
 
 ## 仓库结构
 
 - [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI 桌面应用
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Runtime、Provider、Storage、Daemon、CLI 与 Harness
-- [`Catalog/`](./Catalog/) — 已发布 Operation、Profile、Schema 与生成矩阵
-- [`docs/`](./docs/) — 架构、ADR、产品设计与发布文档
-- [`openspec/`](./openspec/) — 产品 contract、安全不变量与历史 change 记录
-- [`scripts/`](./scripts/) — 仓库检查与限定范围的产品工具
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 运行时、Provider、存储、守护进程、CLI 与 Harness
+- [`Catalog/`](./Catalog/) — 已发布的操作、Profile 与 Schema
+- [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
+- [`openspec/`](./openspec/) — 产品契约、安全不变量与变更历史
+- [`scripts/`](./scripts/) — 仓库检查与工具脚本
 
 ## 参与贡献
 
-修改仓库前请先阅读 [AGENTS.md](./AGENTS.md)。产品工作围绕“一个垂直问题 + 一条 Golden Journey”组织，同时 Constitution 的安全不变量不可放宽。交付改动前，请运行该文件规定的本地检查。
+先读 [AGENTS.md](./AGENTS.md)：它说明了工作如何组织、交付前要跑哪些检查。[`openspec/`](./openspec/) 下的安全不变量是契约而不是建议，削弱它们的改动不会被合入。
+
+## 协议
+
+本项目以 [MIT](./LICENSE) 协议开源。
