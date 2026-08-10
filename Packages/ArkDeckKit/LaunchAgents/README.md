@@ -55,6 +55,27 @@ project 不得位于 `~/Desktop`、`~/Documents` 或 `~/Downloads`。这些目�
 `/Users/your-name/Developer/WaterFlowLayoutDemo`，再把这个绝对路径传给 `install`/`update`；
 无需管理员权限或 Full Disk Access。
 
+### 无 UI 的签名准备
+
+上游 [`deveco-cli`](https://gitcode.com/openharmony-sig/deveco-cli) 提供
+`devecocli signature generate`，命令本身不要求启动 DevEco Studio。但是它的自动签名实现会
+直接枚举 HDC target、读取设备 UDID/类型，并调用账号侧证书与 Provision 服务。ArkDeck 不把
+这条链嵌进 Agent/LaunchAgent：那会形成绕过 durable target/binding、Runtime admission 与
+Artifact lease 的第二条设备路径。
+
+对 OpenHarmony 开发板，可使用 SDK 随附的 OpenHarmony 签名材料和开源
+[`hapsigner`](https://gitcode.com/openharmony/developtools_hapsigner/tree/master) 在 host 上生成
+与 bundleName 精确匹配的 release profile，并把绝对的 keystore、certificate、profile 路径写入
+工程 `build-profile.json5`。这些步骤不访问设备；私钥和口令材料应放在用户私有目录，不复制进
+ArkDeck 仓库，也不写进 LaunchAgent plist。完成后由现有 `workspace.build-openharmony@1`
+构建，且仅把产出的 signed HAP 经 `arkdeck artifact import-hap` 导入，再由
+`debug.hap@1` 安装和 readback。签名工具不得自行调用 HDC，产物文件名也不构成签名有效性或
+真机通过证明。
+
+HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony release profile 不是
+绕过 HarmonyOS 授权的通用方案。无论哪一种签名来源，设备信任、签名身份和 profile 漂移都
+必须 fail closed。
+
 Harness 默认不读取 sensitive Artifact。GJ-5/debugCrash 的成功标准需要本机读取
 `crash-index.txt`（需要分析 HiLog 时再加入 `hilog.txt`），因此必须由操作者明确把所需的
 Artifact basename 固化到 LaunchAgent：
@@ -69,6 +90,31 @@ arkdeck agentd update --sensitive-evidence crash-index.txt,hilog.txt
 `arkdeck agentd update --sensitive-evidence none` 可撤销；默认值和撤销后均为空。无需 sensitive
 证据的任务不应启用此项。
 
+GJ-5 需要模型 producer 提出 bounded patch 时，前台 Terminal 的临时环境不会被 LaunchAgent
+继承。应把一个**已经登录**的本地 CLI 显式装进同一服务配置：
+
+```text
+arkdeck agentd update \
+  --harness-model-provider claude-code \
+  --harness-model-name sonnet \
+  --harness-cli /absolute/canonical/path/to/claude \
+  --harness-cli-timeout-seconds 900
+```
+
+provider 只允许 `codex` 或 `claude-code`，两者都使用代码中固定的无交互、只读 argv profile；
+安装器不接受 shell 字符串、额外 argv、API key 或 endpoint。CLI 必须是可执行的 canonical
+绝对路径（不要传会随自动升级漂移的 symlink）；安装收据和 `status` 会记录并核对 SHA-256。
+workdir 和 model egress 自动收窄到已验证的 `demo-app` workspace，不能借此访问另一工程。
+`update` 未重述这些参数时会保留原配置；运行
+
+```text
+arkdeck agentd update --harness-model-provider none
+```
+
+可完整撤销 producer/egress 配置。CLI 自己的登录凭据仍由其原生凭据存储管理，不会复制到
+plist 或 ArkDeck receipt。未配置 producer 时，Harness 会如实停在
+`producerProposalRequired`，不会把确定性 fallback 伪装成 AI 修复。
+
 ## 锁屏运行与诊断
 
 在登录用户仍处于登录状态时，CLI 或 Agent 可继续通过默认 socket 提交 published typed
@@ -82,8 +128,8 @@ arkdeck operation list
 arkdeck agentd verify --target <target-id> --json
 ```
 
-状态命令会核对 plist、launchd load 状态、daemon/HDC 当前 SHA-256、安装收据、socket 和
-daemon health。`verify` 进一步固定走完整的无头产品链：identity-checked LaunchAgent → 默认
+状态命令会核对 plist、launchd load 状态、daemon/HDC/本地模型 CLI 当前 SHA-256、安装收据、
+socket 和 daemon health。`verify` 进一步固定走完整的无头产品链：identity-checked LaunchAgent → 默认
 用户私有 UDS → native Agent executor → published `observe.device@1` → daemon-owned terminal
 receipt → immutable Artifact inventory 与 Runtime postflight。它不接受自定义 socket、raw HDC、
 argv 或 capability 管理参数；多台已采用设备时必须显式传 `--target`，不会猜测设备。

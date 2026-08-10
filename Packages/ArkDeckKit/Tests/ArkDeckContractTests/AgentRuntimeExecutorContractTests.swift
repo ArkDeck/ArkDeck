@@ -507,8 +507,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     }
     XCTAssertTrue(
       called.allSatisfy { method in
-        ["health", "target.list", "target.adopt", "job.submit", "job.run", "job.status",
-          "artifact.list", "job.evidence"].contains(method)
+        ["health", "operation.describe", "target.list", "target.adopt", "job.submit", "job.run",
+          "job.status", "artifact.list", "job.evidence"].contains(method)
       },
       "the agent may only use the published runtime surface: \(called)")
 
@@ -518,6 +518,32 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       operationID: "debug.hap", operationVersion: 1,
       capabilityReference: "CAP-RT-EXAMPLE-001")
     XCTAssertEqual(request.capabilityReference, "CAP-RT-EXAMPLE-001")
+  }
+
+  func testHostOnlyAgentRequestDoesNotAdoptOrPinADevice() throws {
+    let recorder = try startRecordingDaemon()
+    let outcome = try executor(recorder.client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "workspace.build-openharmony", operationVersion: 1,
+        inputs: [
+          "projectRef": .string("demo-app"),
+          "buildPresetRef": .string("waterflow-debug"),
+        ],
+        executionID: "host-only-workspace-001"))
+    guard case .failed(let reason, let receipt) = outcome else {
+      return XCTFail("the unregistered fixture provider must reject the host operation")
+    }
+
+    XCTAssertEqual(receipt.targetID, "demo-app")
+    XCTAssertNil(receipt.bindingRevision)
+    XCTAssertFalse(
+      reason.contains("is host-only"),
+      "the Agent must not manufacture the binding-revision defect: \(reason)")
+    let called = recorder.observedMethods()
+    XCTAssertTrue(called.contains("operation.describe"))
+    XCTAssertTrue(called.contains("job.submit"))
+    XCTAssertFalse(called.contains("target.list"), "host-only runs do not need a device")
+    XCTAssertFalse(called.contains("target.adopt"), "host-only runs must never adopt a device")
   }
 
   /// A daemon whose handler records which methods were invoked.

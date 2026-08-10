@@ -90,7 +90,8 @@ enum RuntimeCLI {
       let options = try CLIOptions(rest)
       try options.validateAllowed([
         "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
-        "--sensitive-evidence",
+        "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
+        "--harness-cli", "--harness-cli-timeout-seconds",
       ])
       let previousStatus = subcommand == "update" ? try? service.status() : nil
       let daemonPath = options.value("--daemon") ?? defaultAgentDaemonExecutablePath()
@@ -148,10 +149,66 @@ enum RuntimeCLI {
       } else {
         harnessSensitiveEvidence = previousStatus?.harnessSensitiveEvidence ?? []
       }
+      let harnessModel: LaunchAgentHarnessModelConfiguration?
+      let suppliedProvider = options.value("--harness-model-provider")
+      let suppliedModel = options.value("--harness-model-name")
+      let suppliedCLI = options.value("--harness-cli")
+      let suppliedTimeout = options.value("--harness-cli-timeout-seconds")
+      if suppliedProvider == "none" {
+        guard suppliedModel == nil, suppliedCLI == nil, suppliedTimeout == nil else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "--harness-model-provider none cannot be combined with model CLI options")
+        }
+        harnessModel = nil
+      } else if let suppliedProvider {
+        guard let suppliedModel, let suppliedCLI, suppliedCLI.hasPrefix("/") else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message:
+              "local Harness model setup requires --harness-model-name and an absolute "
+              + "--harness-cli")
+        }
+        let timeout: Int
+        if let suppliedTimeout {
+          guard let parsed = Int(suppliedTimeout), (1...900).contains(parsed) else {
+            throw CLIError(
+              exitCode: EX_USAGE,
+              message: "--harness-cli-timeout-seconds must be between 1 and 900")
+          }
+          timeout = parsed
+        } else {
+          timeout = 600
+        }
+        guard let workspaceProject else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "local Harness model setup requires the demo-app workspace")
+        }
+        harnessModel = LaunchAgentHarnessModelConfiguration(
+          provider: suppliedProvider, modelName: suppliedModel,
+          cliExecutable: URL(fileURLWithPath: suppliedCLI),
+          cliWorkingDirectory: URL(fileURLWithPath: workspaceProject),
+          cliTimeoutSeconds: timeout)
+      } else {
+        guard suppliedModel == nil, suppliedCLI == nil, suppliedTimeout == nil else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "Harness model CLI options require --harness-model-provider")
+        }
+        harnessModel = previousStatus?.harnessModel.map {
+          LaunchAgentHarnessModelConfiguration(
+            provider: $0.provider, modelName: $0.modelName,
+            cliExecutable: URL(fileURLWithPath: $0.cliPath),
+            cliWorkingDirectory: URL(fileURLWithPath: $0.cliWorkingDirectory),
+            cliTimeoutSeconds: $0.cliTimeoutSeconds)
+        }
+      }
       let receipt = try service.install(
         daemonSource: URL(fileURLWithPath: daemonPath),
         hdcExecutable: URL(fileURLWithPath: hdcPath), workspace: workspace,
-        harnessSensitiveEvidence: harnessSensitiveEvidence)
+        harnessSensitiveEvidence: harnessSensitiveEvidence,
+        harnessModel: harnessModel)
       emit(try encodedJSON(receipt), json: json)
 
     case "status":
