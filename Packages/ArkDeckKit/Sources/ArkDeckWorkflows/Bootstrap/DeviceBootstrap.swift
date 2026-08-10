@@ -102,6 +102,17 @@ public struct RuntimeTargetRecord: Sendable, Equatable, Codable {
   }
 }
 
+/// Provider-facing HDC route for an active durable target. Target identity
+/// and revision remain canonical; only the address may come from an
+/// append-only alias resolution whose Flash/postflight proof has already
+/// passed validation.
+package struct RuntimeTargetHDCRoute: Sendable, Equatable {
+  package let targetID: String
+  package let bindingRevision: Int
+  package let toolVersion: String
+  package let connectKey: String
+}
+
 /// A single, already-proven cross-mode identity transition. The Rockchip
 /// binding store constructs this value from its owner-only lineage evidence;
 /// the target store only applies the exact previous -> current edge. Keeping
@@ -257,6 +268,45 @@ public final class RuntimeTargetStore: @unchecked Sendable {
         throw BootstrapError.storeFailure("resolved candidate canonical target is missing")
       }
       return canonical
+    }
+  }
+
+  /// Resolves the address the HDC provider must use without rewriting the
+  /// canonical target record. A target with no proven alias uses its adopted
+  /// connect key. Multiple routes are refused: ordering or recency cannot
+  /// substitute for an exact durable identity proof.
+  package func hdcExecutionRoute(targetID: String) throws -> RuntimeTargetHDCRoute? {
+    try queue.sync {
+      let document = try load()
+      let targets = document.targets.filter { $0.targetID == targetID }
+      guard targets.count <= 1 else {
+        throw BootstrapError.storeFailure("HDC execution target is ambiguous")
+      }
+      guard let target = targets.first else { return nil }
+      let resolutions = (document.aliasResolutions ?? []).filter {
+        $0.canonicalTargetID == targetID
+      }
+      guard resolutions.count <= 1 else {
+        throw BootstrapError.storeFailure("HDC execution route is ambiguous")
+      }
+      let connectKey: String
+      if let resolution = resolutions.first {
+        let aliases = document.targets.filter { $0.targetID == resolution.aliasTargetID }
+        guard aliases.count == 1, let alias = aliases.first,
+          alias.stablePhysicalIdentitySHA256 == resolution.aliasStableIdentitySHA256,
+          alias.bindingRevision == resolution.aliasBindingRevision,
+          Self.sha256(alias.connectKey) == resolution.routedHDCIdentitySHA256
+        else {
+          throw BootstrapError.storeFailure(
+            "HDC execution route lacks its proven alias target")
+        }
+        connectKey = alias.connectKey
+      } else {
+        connectKey = target.connectKey
+      }
+      return RuntimeTargetHDCRoute(
+        targetID: target.targetID, bindingRevision: target.bindingRevision,
+        toolVersion: target.toolVersion, connectKey: connectKey)
     }
   }
 

@@ -62,6 +62,11 @@ final class DeviceBootstrapContractTests: XCTestCase {
     let phase = await machine.phase
     XCTAssertEqual(phase, .handedOff)
     XCTAssertEqual(try store.list().count, 1)
+    XCTAssertEqual(
+      try store.hdcExecutionRoute(targetID: record.targetID),
+      RuntimeTargetHDCRoute(
+        targetID: record.targetID, bindingRevision: record.bindingRevision,
+        toolVersion: record.toolVersion, connectKey: record.connectKey))
   }
 
   func testMultipleCandidatesRequireExplicitSelection() async throws {
@@ -346,6 +351,12 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(try store.list().count, 2, "historical target identities remain immutable")
     XCTAssertEqual(try store.listActive(), [canonical])
     XCTAssertEqual(try store.candidateTarget(connectKey: aliasConnectKey), canonical)
+    XCTAssertEqual(
+      try store.hdcExecutionRoute(targetID: canonical.targetID),
+      RuntimeTargetHDCRoute(
+        targetID: canonical.targetID, bindingRevision: canonical.bindingRevision,
+        toolVersion: canonical.toolVersion, connectKey: aliasConnectKey),
+      "the HDC provider must use only the proven alias route while preserving canonical identity")
     XCTAssertEqual(
       try store.adopt(
         stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
