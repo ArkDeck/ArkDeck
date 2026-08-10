@@ -14,6 +14,12 @@ Agent / CLI
   → existing debug.hap@1
 ```
 
+The GJ-5 repair route uses this path by default: the WaterFlow build profile
+publishes the unsigned Hvigor product, then the deterministic Harness route
+inserts the typed signing operation after tests and before `debug.hap@1`.
+The durable repair attempt distinguishes unsigned from verify-app-confirmed
+output, so recovery cannot skip signing or infer it from a filename.
+
 `deveco-cli`、raw hapsigner shell、raw HDC 与工程脚本都不在 production composition 中。
 
 ## Public operation shape

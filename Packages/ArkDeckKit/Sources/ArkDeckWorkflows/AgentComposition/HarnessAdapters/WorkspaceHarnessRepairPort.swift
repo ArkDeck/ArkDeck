@@ -312,6 +312,49 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     return digest
   }
 
+  public func signedHAPReadback(
+    jobID: String,
+    unsignedArtifactLease: String,
+    task: HarnessTaskSnapshot
+  ) async throws -> HarnessSignedHAPReadback {
+    let source = try await artifacts.resolveLease(unsignedArtifactLease)
+    guard source.bindingSnapshot.targetID == task.target.targetID,
+      source.bindingSnapshot.bindingRevision == task.target.expectedBindingRevision,
+      source.bindingSnapshot.stableIdentitySHA256?.count == 64
+    else {
+      throw HarnessRepairPortError.stageGateMismatch(
+        stage: "signingSourceTargetBinding",
+        expected:
+          "\(task.target.targetID)@\(task.target.expectedBindingRevision.map(String.init) ?? "-")",
+        actual:
+          "\(source.bindingSnapshot.targetID)@"
+          + "\(source.bindingSnapshot.bindingRevision.map(String.init) ?? "-")")
+    }
+
+    let inventory = try await artifacts.list(jobID: jobID)
+    guard let signed = inventory.first(where: {
+      $0.name == "signed.hap" && $0.status.isPublished
+        && $0.sourceOperation == "workspace.sign-openharmony-hap@1"
+        && $0.providerID == "workspace"
+        && $0.mediaType == "application/vnd.openharmony.hap"
+    }),
+      inventory.contains(where: {
+        $0.name == "signing-report.json" && $0.status.isPublished
+          && $0.sourceOperation == "workspace.sign-openharmony-hap@1"
+          && $0.providerID == "workspace"
+          && $0.mediaType == "application/json"
+          && $0.bindingSnapshot == source.bindingSnapshot
+      }),
+      signed.bindingSnapshot == source.bindingSnapshot
+    else {
+      throw HarnessRepairPortError.malformedReadback("signed.hap")
+    }
+    let lease = try await artifacts.leaseReference(
+      jobID: jobID, artifactID: signed.artifactID)
+    return HarnessSignedHAPReadback(
+      outputDigest: signed.sha256, outputArtifactLease: lease)
+  }
+
   public func reconcileUnknownPatch(
     jobID: String, proposal: HarnessPatchProposal
   ) async throws -> HarnessPatchApplicationReadback {

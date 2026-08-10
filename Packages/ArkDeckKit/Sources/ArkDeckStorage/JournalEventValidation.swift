@@ -382,6 +382,10 @@ enum JournalEventSemanticValidator {
       guard nextState == "resumeAtConfirmedSafeBoundary", certainty == "confirmed", safe,
         event.bindingRevision.map({ $0 > 0 }) == true
       else { throw payload(event, "resume evidence is inconsistent") }
+    case "resumeHostOnlyAtConfirmedSafeBoundary":
+      guard nextState == "resumeAtConfirmedSafeBoundary", certainty == "confirmed", safe,
+        event.bindingRevision == nil
+      else { throw payload(event, "host-only resume evidence is inconsistent") }
     case "waitingForRecovery":
       guard nextState == "waitingForRecovery",
         certainty == "confirmed" || certainty == "outcomeUnknown"
@@ -391,6 +395,12 @@ enum JournalEventSemanticValidator {
         event.bindingRevision.map({ $0 > 0 }) == true
       else {
         throw payload(event, "confirmed failure result is inconsistent")
+      }
+    case "finalizeHostOnlyConfirmedFailure":
+      guard nextState == "finalizing", certainty == "confirmed", safe,
+        event.bindingRevision == nil
+      else {
+        throw payload(event, "host-only confirmed failure result is inconsistent")
       }
     case "noAction":
       guard nextState == "waitingForRecovery" else {

@@ -63,6 +63,7 @@ class RealCatalogTests(unittest.TestCase):
                 "workspace.read-source-range@1",
                 "workspace.revert-patch@1",
                 "workspace.run-tests@1",
+                "workspace.sign-openharmony-hap@1",
                 "workspace.symbolize-crash@1",
             ],
         )

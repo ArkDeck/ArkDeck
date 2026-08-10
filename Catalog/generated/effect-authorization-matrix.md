@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `4041944428d12e97b1d373cc54d25f9fe8de07937208f9be40a751a9543a759e`
+Catalog digest: `fd68536c229194cb7211a5056a8ede2b83d2c3e7ffea37ed7f34fd41714eaf17`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -27,6 +27,7 @@ Catalog digest: `4041944428d12e97b1d373cc54d25f9fe8de07937208f9be40a751a9543a759
 | `workspace.read-source-range@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.revert-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.run-tests@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |
+| `workspace.sign-openharmony-hap@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 600 | 134217728 |
 | `workspace.symbolize-crash@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 300 | 67108864 |
 
 ## Profiles
@@ -35,4 +36,4 @@ Catalog digest: `4041944428d12e97b1d373cc54d25f9fe8de07937208f9be40a751a9543a759
 | --- | --- | --- |
 | `dayu200` | rockchip | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1`, `flash.dayu200` |
 | `openharmony-standard@1` | hdc | `observe.device@1`, `capture.diagnostics@1`, `debug.hap@1`, `deploy.native-library.app-owned@1`, `deploy.native-library.system@1` |
-| `workspace-host@1` | workspace | `workspace.inspect-source@1`, `workspace.apply-patch@1`, `workspace.build-openharmony@1`, `workspace.run-tests@1`, `workspace.symbolize-crash@1`, `workspace.revert-patch@1` |
+| `workspace-host@1` | workspace | `workspace.inspect-source@1`, `workspace.apply-patch@1`, `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1`, `workspace.run-tests@1`, `workspace.symbolize-crash@1`, `workspace.revert-patch@1` |

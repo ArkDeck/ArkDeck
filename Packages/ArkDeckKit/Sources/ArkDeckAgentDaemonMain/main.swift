@@ -356,6 +356,10 @@ Task.detached {
           return (parts[0], parts[1])
         })
     let configuredInspector = ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_INSPECTOR"]
+    let signingPresetStore = OpenHarmonySigningPresetStore()
+    let signingAttemptStore = try OpenHarmonySigningAttemptStore(
+      rootURL: resolvedStateDirectory.appendingPathComponent(
+        "workspace-signing-attempts", isDirectory: true))
     var workspaceTool: WorkspaceInspectorTool?
     var inspectorExecutable: ResolvedExecutable?
     var workspaceDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
@@ -435,7 +439,8 @@ Task.detached {
           profileRegistry: profiles)
         workspaceOperations = WorkspaceOperationsProvider(
           profile: profile, profileRegistry: profiles,
-          attemptStore: attempts, nowUTC: utcNow)
+          attemptStore: attempts, signingPresetStore: signingPresetStore,
+          signingAttemptStore: signingAttemptStore, nowUTC: utcNow)
         workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
         workspaceRepairConfiguration = (profile, profiles, attempts, evolution)
       } catch {
@@ -457,6 +462,8 @@ Task.detached {
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
     }
+    workspaceDispatcher = OpenHarmonySigningWorkspaceDispatcher(
+      fallback: workspaceDispatcher, presetStore: signingPresetStore)
     // No analyzer is configured by default. A host declares the pinned
     // executable explicitly; an absent analyzer is unavailable, never
     // improvised.  The shipped daemon can serve the closed one-shot mode,

@@ -330,7 +330,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
       testPresets: [tests.presetID: tests],
       symbolPresets: [:],
       buildProducts: [
-        build.presetID: "entry/build/default/outputs/default/entry-default-signed.hap"
+        build.presetID: "entry/build/default/outputs/default/entry-default-unsigned.hap"
       ])
   }
 
@@ -561,6 +561,8 @@ extension WorkspaceProviderAction {
     switch self {
     case .inspectSource:
       return nil
+    case .signOpenHarmonyHap:
+      return nil
     case .buildOpenHarmony(let value), .runTests(let value),
       .symbolizeCrash(let value), .inspectGitStatus(let value), .inspectDiff(let value),
       .readSourceRange(let value), .createCheckpoint(let value):
@@ -760,16 +762,22 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
   private let profile: WorkspaceProjectProfile
   private let profileRegistry: WorkspaceProjectProfileRegistry
   private let attempts: WorkspacePatchAttemptStore
+  private let signingPresets: OpenHarmonySigningPresetStore?
+  private let signingAttempts: OpenHarmonySigningAttemptStore?
   private let nowUTC: @Sendable () -> String
 
   public init(
     profile: WorkspaceProjectProfile,
     attemptStore: WorkspacePatchAttemptStore,
+    signingPresetStore: OpenHarmonySigningPresetStore? = nil,
+    signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.profile = profile
     self.profileRegistry = WorkspaceProjectProfileRegistry(profile: profile)
     self.attempts = attemptStore
+    self.signingPresets = signingPresetStore
+    self.signingAttempts = signingAttemptStore
     self.nowUTC = nowUTC
   }
 
@@ -777,11 +785,15 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     profile: WorkspaceProjectProfile,
     profileRegistry: WorkspaceProjectProfileRegistry,
     attemptStore: WorkspacePatchAttemptStore,
+    signingPresetStore: OpenHarmonySigningPresetStore? = nil,
+    signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.profile = profile
     self.profileRegistry = profileRegistry
     self.attempts = attemptStore
+    self.signingPresets = signingPresetStore
+    self.signingAttempts = signingAttemptStore
     self.nowUTC = nowUTC
   }
 
@@ -797,6 +809,12 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       hasPreset = true
     case "workspace.build-openharmony@1":
       hasPreset = !profile.buildPresets.isEmpty
+    case OpenHarmonyLocalSigning.operationReference:
+      guard let signingPresets else {
+        return .unavailable(reason: "workspace.signingPresetUnavailable")
+      }
+      let status = signingPresets.status()
+      hasPreset = status.ready && status.projectRef == profile.projectRef
     case "workspace.run-tests@1":
       hasPreset = !profile.testPresets.isEmpty
     case "workspace.symbolize-crash@1":
@@ -849,7 +867,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       }
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
-        attemptStore: attempts, nowUTC: nowUTC
+        attemptStore: attempts, signingPresetStore: signingPresets,
+        signingAttemptStore: signingAttempts, nowUTC: nowUTC
       ).workspaceAuthorizationFacts(for: operation, inputs: inputs)
     }
     return WorkspaceAuthorizationFacts(
@@ -886,7 +905,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       }
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
-        attemptStore: attempts, nowUTC: nowUTC
+        attemptStore: attempts, signingPresetStore: signingPresets,
+        signingAttemptStore: signingAttempts, nowUTC: nowUTC
       ).action(for: step, operation: operation, inputs: inputs, context: context)
     }
     guard projectRef == profile.projectRef else {
@@ -971,6 +991,44 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
           resolved(
             operation: operation.reference, preset: preset,
             arguments: preset.fixedArguments)))
+
+    case (OpenHarmonyLocalSigning.operationReference, .signWorkspaceOpenHarmonyHap):
+      guard let artifact = context.resolvedInputArtifact else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace unsigned HAP Artifact lease was not resolved before materialization")
+      }
+      let presetID = try string("signingPresetRef", in: inputs)
+      guard let signingPresets, let signingAttempts else {
+        throw DeviceProviderError.unsupportedAction("workspace.signingPresetUnavailable")
+      }
+      let preset: OpenHarmonySigningPresetReceipt
+      do {
+        preset = try signingPresets.loadValidated(presetID: presetID)
+      } catch {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.signingPresetUnavailable:\(error)")
+      }
+      guard preset.projectRef == projectRef else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.signingPresetProjectMismatch")
+      }
+      let handle = try FileHandle(forReadingFrom: artifact.fileURL)
+      defer { try? handle.close() }
+      let bytes = try handle.read(upToCount: 4)
+      guard artifact.byteCount > 0, artifact.byteCount <= 64 * 1_024 * 1_024,
+        bytes == Data([0x50, 0x4b, 0x03, 0x04])
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace unsigned HAP is not a bounded ZIP container")
+      }
+      return .workspace(
+        .signOpenHarmonyHap(
+          WorkspaceOpenHarmonySigningAction(
+            jobID: context.jobID, projectRef: projectRef, preset: preset,
+            inputArtifactID: artifact.artifactID,
+            inputFilePath: artifact.fileURL.path,
+            inputSHA256: artifact.sha256, inputByteCount: artifact.byteCount,
+            output: signingAttempts.paths(jobID: context.jobID))))
 
     case ("workspace.run-tests@1", .runWorkspaceTests):
       let presetID = try string("testPresetRef", in: inputs)
@@ -1134,6 +1192,23 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
+    if case .workspace(.signOpenHarmonyHap(let signing)) = action {
+      guard signing.output == signingAttempts?.paths(jobID: context.jobID),
+        signing.jobID == context.jobID,
+        signing.projectRef == profile.projectRef
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace signing action is not owned by this Job/Profile")
+      }
+      try OpenHarmonySigningPresetStore.remeasureForDispatch(signing.preset)
+      return TypedProcessPlan(
+        action: action,
+        kind: .process(
+          executableSHA256: signing.preset.javaExecutable.sha256,
+          argumentSummary: signing.signArguments,
+          timeoutSeconds: 600),
+        workingDirectory: signing.output.directory)
+    }
     if case .workspace(let workspace) = action,
       let invocation = workspace.operationInvocation,
       invocation.projectRef != profile.projectRef
@@ -1144,7 +1219,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       }
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
-        attemptStore: attempts, nowUTC: nowUTC
+        attemptStore: attempts, signingPresetStore: signingPresets,
+        signingAttemptStore: signingAttempts, nowUTC: nowUTC
       ).lower(action: action, context: context)
     }
     guard case .workspace(let workspace) = action,
@@ -1188,6 +1264,32 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> ProviderSemanticOutcome {
+    if case .workspace(.signOpenHarmonyHap(let signing)) = action {
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+        receipt.hostManagedRecordID == signing.output.resultRecord,
+        let landed = receipt.landedArtifact, let landedSHA = landed.sha256
+      else {
+        return .failed(
+          code: "workspace.signingPostflightMissing",
+          detail: "signing receipt has no exact verified output")
+      }
+      do {
+        let durable = try OpenHarmonySigningWorkspaceDispatcher.readVerifiedResult(
+          action: signing)
+        guard durable == receipt.hostManagedSummary,
+          durable["signedHapSha256"] == landedSHA,
+          durable["signedHapByteCount"] == String(landed.byteCount)
+        else {
+          return .failed(
+            code: "workspace.signingPostflightDrift",
+            detail: "signing result, output and process receipt disagree")
+        }
+        return .verified(summary: durable)
+      } catch {
+        return .failed(
+          code: "workspace.signingPostflightInvalid", detail: "\(error)")
+      }
+    }
     if case .workspace(let workspace) = action,
       let invocation = workspace.operationInvocation,
       invocation.projectRef != profile.projectRef
@@ -1198,7 +1300,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       }
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
-        attemptStore: attempts, nowUTC: nowUTC
+        attemptStore: attempts, signingPresetStore: signingPresets,
+        signingAttemptStore: signingAttempts, nowUTC: nowUTC
       ).verify(receipt: receipt, action: action, context: context)
     }
     guard case .workspace(let workspace) = action else {
@@ -1210,6 +1313,10 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
         detail: "bounded output was truncated; semantic result is incomplete")
     }
     switch workspace {
+    case .signOpenHarmonyHap:
+      return .failed(
+        code: "workspace.signingRoutingFailed",
+        detail: "signing verification did not use the closed signing receipt")
     case .inspectSource:
       return .unsupported(reason: "inspection belongs to TASK-HTP-007 provider path")
     case .inspectGitStatus:
@@ -1372,6 +1479,27 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome {
+    if case .workspace(.signOpenHarmonyHap(let signing)) = intent.action {
+      let hasOutput = FileManager.default.fileExists(atPath: signing.output.signedHAP)
+      let hasResult = FileManager.default.fileExists(atPath: signing.output.resultRecord)
+      if !hasOutput, !hasResult { return .confirmedNotExecuted }
+      guard hasOutput else {
+        return .stillUnknown(reason: "signing result exists without its exact output")
+      }
+      do {
+        let summary: [String: String]
+        if hasResult {
+          summary = try OpenHarmonySigningWorkspaceDispatcher.readVerifiedResult(
+            action: signing)
+        } else {
+          summary = try await OpenHarmonySigningWorkspaceDispatcher.verifyAndRecord(
+            action: signing)
+        }
+        return .confirmedCompleted(summary: summary)
+      } catch {
+        return .stillUnknown(reason: "signing output cannot be verified: \(error)")
+      }
+    }
     if case .workspace(let workspace) = intent.action,
       let invocation = workspace.operationInvocation,
       invocation.projectRef != profile.projectRef
@@ -1382,7 +1510,8 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
       }
       return try await WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
-        attemptStore: attempts, nowUTC: nowUTC
+        attemptStore: attempts, signingPresetStore: signingPresets,
+        signingAttemptStore: signingAttempts, nowUTC: nowUTC
       ).reconcile(intent: intent, context: context)
     }
     guard case .workspace(let workspace) = intent.action else {
@@ -1456,7 +1585,13 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     case .buildOpenHarmony, .runTests, .symbolizeCrash:
       return .stillUnknown(
         reason: "read/build process completion is not inferable after receipt loss")
+    case .signOpenHarmonyHap:
+      return .stillUnknown(reason: "signing recovery routing failed")
     }
+  }
+
+  package func cleanupTerminalJob(jobID: String) {
+    signingAttempts?.cleanup(jobID: jobID)
   }
 
   private func resolved(

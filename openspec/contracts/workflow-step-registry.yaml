@@ -58,6 +58,7 @@ steps:
   - { kind: inspectWorkspaceSource, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
   - { kind: applyWorkspacePatch, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
   - { kind: buildWorkspaceOpenHarmony, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: signWorkspaceOpenHarmonyHap, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
   - { kind: runWorkspaceTests, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
   - { kind: symbolizeWorkspaceCrash, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
   - { kind: revertWorkspacePatch, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }

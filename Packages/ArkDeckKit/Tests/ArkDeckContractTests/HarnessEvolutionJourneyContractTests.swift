@@ -13,7 +13,7 @@
 //    The journey test starts at intake and crosses every leg the production
 //    loop crosses: observe -> capture -> pinned analyzer -> baseline fixture
 //    injection -> crash evidence -> model PROPOSE_PATCH -> checkpoint ->
-//    apply -> build -> tests -> deploy -> verification capture -> analyzer ->
+//    apply -> build -> tests -> local sign -> deploy -> verification capture -> analyzer ->
 //    promotion.
 //
 // Per PRODUCT-LOOP §11 the fake surfaces assert the real typed shapes: every
@@ -36,6 +36,7 @@ private let journeyNow = "2026-08-02T00:00:00Z"
 private let journeyBaseRevision = String(repeating: "a", count: 64)
 private let journeyPatchRevision = String(repeating: "b", count: 64)
 private let journeyBuildDigest = String(repeating: "c", count: 64)
+private let journeySignedDigest = String(repeating: "d", count: 64)
 
 private let journeyDiff = """
   diff --git a/Sources/App.txt b/Sources/App.txt
@@ -276,7 +277,18 @@ private final class JourneyRepairPort: HarnessRepairPort, @unchecked Sendable {
   }
 
   func deployedArtifactDigest(jobID: String) async throws -> String {
-    journeyBuildDigest
+    journeySignedDigest
+  }
+
+  func signedHAPReadback(
+    jobID: String, unsignedArtifactLease: String, task: HarnessTaskSnapshot
+  ) async throws -> HarnessSignedHAPReadback {
+    guard unsignedArtifactLease == "lease-v1:build:ART-BUILD" else {
+      throw HarnessRepairPortError.malformedReadback("unsignedHapArtifactLease")
+    }
+    return HarnessSignedHAPReadback(
+      outputDigest: journeySignedDigest,
+      outputArtifactLease: "lease-v1:sign:ART-SIGNED")
   }
 
   func reconcileUnknownPatch(
@@ -376,7 +388,8 @@ private final class JourneyGateway: HarnessDecisionGateway, @unchecked Sendable 
 private struct JourneyCapabilityGrant: HarnessCapabilityPort {
   static let covered: Set<String> = [
     DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
-    DebugCrashTaskHandler.buildOpenHarmony, DebugCrashTaskHandler.runTests,
+    DebugCrashTaskHandler.buildOpenHarmony, DebugCrashTaskHandler.signOpenHarmonyHAP,
+    DebugCrashTaskHandler.runTests,
     DebugCrashTaskHandler.revertPatch, DebugCrashTaskHandler.deployHAP,
   ]
 
@@ -437,7 +450,8 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       maxAttempts: maxAttempts, maxChangedFiles: 4, maxDiffLines: 50,
       allowedOperations: [
         DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
-        DebugCrashTaskHandler.buildOpenHarmony, DebugCrashTaskHandler.runTests,
+        DebugCrashTaskHandler.buildOpenHarmony, DebugCrashTaskHandler.signOpenHarmonyHAP,
+        DebugCrashTaskHandler.runTests,
         DebugCrashTaskHandler.revertPatch, DebugCrashTaskHandler.deployHAP,
       ])
     let coordinator = HarnessTaskCoordinator(
@@ -655,14 +669,30 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(inputString(testsRequest, "testPresetRef"), "demo-tests")
     await stack.jobs.finish("JOB-10")
 
-    // Wake 11: deploy only the digest-gated build output.
+    // Wake 11: sign the immutable unsigned build Artifact through the
+    // published host-only operation. The preset identity is fixed by ArkDeck.
+    let signingWake = try await coordinator.reconcile(taskID)
+    XCTAssertEqual(signingWake.action, .dispatched)
+    let signingRequest = try await latestRequest(stack)
+    XCTAssertEqual(
+      signingRequest.operation.reference, DebugCrashTaskHandler.signOpenHarmonyHAP)
+    XCTAssertEqual(
+      inputString(signingRequest, "unsignedHapArtifactLease"),
+      "lease-v1:build:ART-BUILD")
+    XCTAssertEqual(
+      inputString(signingRequest, "signingPresetRef"),
+      DebugCrashTaskHandler.defaultSigningPreset)
+    XCTAssertNil(signingRequest.authorization)
+    await stack.jobs.finish("JOB-11")
+
+    // Wake 12: deploy only the verify-app-confirmed signed Artifact.
     let deployWake = try await coordinator.reconcile(taskID)
     XCTAssertEqual(deployWake.action, .dispatched)
     let deployRequest = try await latestRequest(stack)
     XCTAssertEqual(deployRequest.operation.reference, DebugCrashTaskHandler.deployHAP)
     XCTAssertEqual(
-      inputString(deployRequest, "hapArtifactLease"), "lease-v1:build:ART-BUILD",
-      "the repair deployment must carry the build-output lease, not the fixture lease")
+      inputString(deployRequest, "hapArtifactLease"), "lease-v1:sign:ART-SIGNED",
+      "the repair deployment must carry the signed-output lease, not the unsigned build")
     return try XCTUnwrap(deployWake.dispatchedJobID)
   }
 
@@ -682,7 +712,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       captureRequest.operation.reference, DebugCrashTaskHandler.captureDiagnostics)
     XCTAssertEqual(
       inputString(captureRequest, "expectedDeployedArtifactDigest"),
-      journeyBuildDigest)
+      journeySignedDigest)
     stack.artifacts.stage(
       jobID: captureJobID, name: HarnessObservationBuilder.crashIndexArtifact,
       text: journeyOneEntryIndex)
@@ -707,13 +737,13 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let deployJobID = try await driveToRepairDeployDispatch(stack)
     await stack.jobs.finish(deployJobID)
 
-    // Wake 12: the deployment readback matches the build digest, a fresh
+    // Wake 13: the deployment readback matches the signed digest, a fresh
     // verification epoch begins, and only the device-local watermark survives.
     let verifyCaptureWake = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(verifyCaptureWake.action, .dispatched)
     XCTAssertEqual(verifyCaptureWake.snapshot.phase, .verifying)
     XCTAssertEqual(
-      verifyCaptureWake.snapshot.repairAttempt?.deployedDigest, journeyBuildDigest)
+      verifyCaptureWake.snapshot.repairAttempt?.deployedDigest, journeySignedDigest)
     XCTAssertEqual(
       verifyCaptureWake.snapshot.observed.measurements[
         HarnessObservationBuilder.watermarkMetric],
@@ -725,24 +755,24 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       verifyCaptureRequest.operation.reference, DebugCrashTaskHandler.captureDiagnostics)
     XCTAssertEqual(
       inputString(verifyCaptureRequest, "expectedDeployedArtifactDigest"),
-      journeyBuildDigest,
+      journeySignedDigest,
       "verification evidence must bind to the exact deployed artifact digest")
     stack.artifacts.stage(
-      jobID: "JOB-12", name: HarnessObservationBuilder.crashIndexArtifact,
+      jobID: "JOB-13", name: HarnessObservationBuilder.crashIndexArtifact,
       text: journeyOneEntryIndex)
-    await stack.jobs.finish("JOB-12")
+    await stack.jobs.finish("JOB-13")
 
-    // Wake 13: verification evidence takes the same pinned-analyzer route.
+    // Wake 14: verification evidence takes the same pinned-analyzer route.
     let verifyAnalyzerWake = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(verifyAnalyzerWake.action, .dispatched)
     let verifyAnalyzerOperations = await stack.jobs.submittedOperations()
     XCTAssertEqual(verifyAnalyzerOperations.last, DebugCrashTaskHandler.analyzeCrashLedger)
     try stageAnalyzerEnvelope(
-      stack, analyzerJobID: "JOB-13", sourceJobID: "JOB-12",
+      stack, analyzerJobID: "JOB-14", sourceJobID: "JOB-13",
       indexText: journeyOneEntryIndex)
-    await stack.jobs.finish("JOB-13")
+    await stack.jobs.finish("JOB-14")
 
-    // Wake 14: PASS evaluation, promotion gate, success.
+    // Wake 15: PASS evaluation, promotion gate, success.
     let promoted = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(promoted.action, .evaluatedSucceeded)
     XCTAssertEqual(promoted.reasonCode, "promotionCandidateReady")
@@ -767,6 +797,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
         DebugCrashTaskHandler.applyPatch,
         DebugCrashTaskHandler.buildOpenHarmony,
         DebugCrashTaskHandler.runTests,
+        DebugCrashTaskHandler.signOpenHarmonyHAP,
         DebugCrashTaskHandler.deployHAP,
         DebugCrashTaskHandler.captureDiagnostics,
         DebugCrashTaskHandler.analyzeCrashLedger,
@@ -781,7 +812,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(strategyAttempt.outcome, .succeeded)
     XCTAssertNil(strategyAttempt.review)
     XCTAssertEqual(strategyAttempt.candidatePatch?.metadataArtifactID, "ART-CANDIDATE")
-    XCTAssertEqual(strategyAttempt.buildArtifactIDs, ["ART-BUILD"])
+    XCTAssertEqual(strategyAttempt.buildArtifactIDs, ["ART-BUILD", "ART-SIGNED"])
     let promotion = try XCTUnwrap(strategyAttempt.promotionCandidate)
     XCTAssertEqual(promotion.disposition, "READY_FOR_NORMAL_PR")
     XCTAssertEqual(promotion.baseRevision, stack.policy.baseRevision)
@@ -791,6 +822,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertTrue(promotion.artifactIDs.contains("ART-DIFF"))
     XCTAssertTrue(promotion.artifactIDs.contains("ART-CANDIDATE"))
     XCTAssertTrue(promotion.artifactIDs.contains("ART-BUILD"))
+    XCTAssertTrue(promotion.artifactIDs.contains("ART-SIGNED"))
     XCTAssertTrue(
       Set(promoted.snapshot.artifactRefs).isSuperset(of: Set(promotion.artifactIDs)),
       "the succeeded task must carry every promotion artifact reference")
@@ -819,7 +851,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     // revision drifts at promotion. The same wake must continue into the
     // exact published revert instead of ending `humanRequired`.
     let rollback = try await driveVerificationAndPromotion(
-      stack, captureJobID: "JOB-12", analyzerJobID: "JOB-13",
+      stack, captureJobID: "JOB-13", analyzerJobID: "JOB-14",
       forcePromotionDrift: true)
     XCTAssertEqual(rollback.action, .dispatched)
     let rollbackRequest = try await latestRequest(stack)
@@ -834,7 +866,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     // Revert readback closes the rejected Attempt. The coordinator then asks
     // for a distinct patch in the same reconcile and checkpoints it before
     // any apply effect.
-    await stack.jobs.finish("JOB-14")
+    await stack.jobs.finish("JOB-15")
     let secondCheckpoint = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(
       secondCheckpoint.action, .dispatched,
@@ -844,27 +876,34 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       secondCheckpointRequest.operation.reference, DebugCrashTaskHandler.createCheckpoint)
     XCTAssertEqual(stack.gateway.patchProposalWakes, 2)
 
-    await stack.jobs.finish("JOB-15")
+    await stack.jobs.finish("JOB-16")
     let secondApply = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(
-      secondApply.dispatchedJobID, "JOB-16",
+      secondApply.dispatchedJobID, "JOB-17",
       "second apply did not dispatch: \(secondApply.action)/\(secondApply.reasonCode)")
     let afterSecondCheckpoint = try await stack.store.load(stack.taskID)
     XCTAssertNil(
       afterSecondCheckpoint.observedState[DebugCrashTaskHandler.promotionRetryReasonKey])
-    await stack.jobs.finish("JOB-16")
-    let secondBuild = try await stack.coordinator.reconcile(stack.taskID)
-    XCTAssertEqual(secondBuild.dispatchedJobID, "JOB-17")
     await stack.jobs.finish("JOB-17")
-    let secondTests = try await stack.coordinator.reconcile(stack.taskID)
-    XCTAssertEqual(secondTests.dispatchedJobID, "JOB-18")
+    let secondBuild = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondBuild.dispatchedJobID, "JOB-18")
     await stack.jobs.finish("JOB-18")
-    let secondDeploy = try await stack.coordinator.reconcile(stack.taskID)
-    XCTAssertEqual(secondDeploy.dispatchedJobID, "JOB-19")
+    let secondTests = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondTests.dispatchedJobID, "JOB-19")
     await stack.jobs.finish("JOB-19")
+    let secondSigning = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondSigning.dispatchedJobID, "JOB-20")
+    let secondSigningRequest = try await latestRequest(stack)
+    XCTAssertEqual(
+      secondSigningRequest.operation.reference,
+      DebugCrashTaskHandler.signOpenHarmonyHAP)
+    await stack.jobs.finish("JOB-20")
+    let secondDeploy = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(secondDeploy.dispatchedJobID, "JOB-21")
+    await stack.jobs.finish("JOB-21")
 
     let promoted = try await driveVerificationAndPromotion(
-      stack, captureJobID: "JOB-20", analyzerJobID: "JOB-21")
+      stack, captureJobID: "JOB-22", analyzerJobID: "JOB-23")
     XCTAssertEqual(promoted.action, .evaluatedSucceeded)
     XCTAssertEqual(promoted.reasonCode, "promotionCandidateReady")
     XCTAssertEqual(promoted.snapshot.status, .succeeded)

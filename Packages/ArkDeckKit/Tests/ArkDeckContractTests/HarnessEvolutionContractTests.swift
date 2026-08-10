@@ -338,7 +338,8 @@ final class HarnessEvolutionContractTests: XCTestCase {
       proposal: proposal, checkpointJobID: "JOB-CHECKPOINT",
       patchAttemptRef: "patch-attempt", patchRevision: patchRevision,
       buildSourceRevision: patchRevision, buildOutputDigest: buildDigest,
-      buildOutputArtifactLease: "lease-v1:build:ART-BUILD", testsPassed: true,
+      buildOutputArtifactLease: "lease-v1:build:ART-BUILD", buildOutputSigned: true,
+      testsPassed: true,
       deployedDigest: buildDigest)
     let snapshot = try taskSnapshot(
       baseRevision: base, policy: policy,

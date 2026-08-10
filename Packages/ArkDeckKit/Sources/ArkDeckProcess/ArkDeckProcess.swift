@@ -259,7 +259,7 @@ package final class ProcessAtomicLaunchGate: @unchecked Sendable {
 package final class ProcessPreparedIdentityBoundLaunch: @unchecked Sendable {
   package let request: ProcessIdentityBoundRequest
   package let executableIdentity: ProcessExecutableIdentityReceipt
-  fileprivate let executable: VerifiedExecutableDescriptor
+  package let executable: VerifiedExecutableDescriptor
   private let lock = NSLock()
   private var consumed = false
 
@@ -272,7 +272,7 @@ package final class ProcessPreparedIdentityBoundLaunch: @unchecked Sendable {
     self.executable = executable
   }
 
-  fileprivate func consume() throws {
+  package func consume() throws {
     try lock.withLock {
       guard !consumed else {
         throw ProcessExecutionError.launchAuthorizationInvalidated
@@ -490,6 +490,18 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       request, gate: gate, captureLimit: captureLimit, onOutput: onOutput)
   }
 
+  package func executeIdentityBound(
+    _ request: ProcessIdentityBoundRequest,
+    verifiedResources: [VerifiedRegularFileDescriptor],
+    captureLimit: Int = 64 * 1024,
+    onOutput: @escaping ProcessOutputHandler = { _ in }
+  ) async throws -> ProcessIdentityBoundExecutionResult {
+    let prepared = try prepareIdentityBoundLaunch(request)
+    return try await executePreparedIdentityBoundLaunchImpl(
+      prepared, gate: nil, captureLimit: captureLimit,
+      verifiedResources: verifiedResources, onOutput: onOutput)
+  }
+
   public func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
     _ request: ProcessIdentityBoundRequest,
     evaluating evaluator: Evaluator,
@@ -603,6 +615,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     _ prepared: ProcessPreparedIdentityBoundLaunch,
     gate: ProcessAtomicLaunchGate?,
     captureLimit: Int,
+    verifiedResources: [VerifiedRegularFileDescriptor] = [],
     onOutput: @escaping ProcessOutputHandler
   ) async throws -> ProcessIdentityBoundExecutionResult {
     let control = ProcessControl()
@@ -616,6 +629,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
           gate: gate,
           captureLimit: max(0, captureLimit),
           control: control,
+          verifiedResources: verifiedResources,
           onOutput: onOutput)
       },
       onCancel: {
@@ -693,6 +707,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     gate: ProcessAtomicLaunchGate?,
     captureLimit: Int,
     control: ProcessControl,
+    verifiedResources: [VerifiedRegularFileDescriptor],
     onOutput: @escaping ProcessOutputHandler
   ) async throws -> ProcessIdentityBoundExecutionResult {
     guard !control.hasStopRequest else {
@@ -709,6 +724,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
 
     let launch = {
       try executable.revalidate(path: prepared.request.process.executable)
+      for resource in verifiedResources { try resource.revalidate() }
       guard !control.hasStopRequest else {
         throw ProcessExecutionError.launchAuthorizationInvalidated
       }
@@ -996,7 +1012,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
   }
 }
 
-private final class VerifiedExecutableDescriptor {
+package final class VerifiedExecutableDescriptor {
   private(set) var fileDescriptor: Int32
   private var hashDescriptor: Int32
   let receipt: ProcessExecutableIdentityReceipt
@@ -1022,7 +1038,7 @@ private final class VerifiedExecutableDescriptor {
     self.openedInode = openedInode
   }
 
-  static func open(path: URL, expectedSHA256: String) throws -> VerifiedExecutableDescriptor {
+  package static func open(path: URL, expectedSHA256: String) throws -> VerifiedExecutableDescriptor {
     var pathMetadata = stat()
     guard path.path.withCString({ lstat($0, &pathMetadata) }) == 0 else {
       throw ProcessExecutionError.executableOpenFailed(path.path, errno)
@@ -1114,7 +1130,7 @@ private final class VerifiedExecutableDescriptor {
     }
   }
 
-  func revalidate(path: URL) throws {
+  package func revalidate(path: URL) throws {
     guard fileDescriptor >= 0, hashDescriptor >= 0 else {
       throw ProcessExecutionError.executableDescriptorInvalid
     }
@@ -1154,7 +1170,7 @@ private final class VerifiedExecutableDescriptor {
     }
   }
 
-  func close() {
+  package func close() {
     if fileDescriptor >= 0 {
       Darwin.close(fileDescriptor)
       fileDescriptor = -1

@@ -49,8 +49,14 @@
 
 ## Result gate
 
-- [ ] OHS-AC-1..7 passed
-- [ ] OHS-AC-8 real-device passed，或给出可复查且不伪造的外部环境 blocker
-- [ ] 四条本地门与 preflight passed
-- [ ] secret scan passed，零敏感数据进入 evidence
-- [ ] Task 状态与 verification 结论随同一个实现 PR 如实更新
+- [ ] OHS-AC-1..7 passed（AC-1..4/6/7 的产品级契约通过；AC-5 因未安装真实 preset/
+  Keychain secret 而未执行，不用 fake signer 顶替）
+- [x] OHS-AC-8 real-device passed，或给出可复查且不伪造的外部环境 blocker（当前为后者：
+  已安装 LaunchAgent 健康但仍是 proposal 前 Catalog，签名 preset 未安装；零 raw hapsigner/HDC）
+- [x] 四条本地门与 final-commit `check_pr_paths --preflight` passed
+- [x] secret scan passed，零敏感数据进入 evidence
+- [x] Task 状态与 verification 结论随同一个实现 PR 如实更新
+
+实现候选的逐项结果、命令与 Catalog digest 见
+`evidence/runs/TASK-OHS-001/run-implementation-2026-08-10.md`。当前结论是
+`IMPLEMENTING`，不是 `REAL_DEVICE_PASS`。

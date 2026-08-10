@@ -598,6 +598,8 @@ final class WorkflowStepContractTests: XCTestCase {
       arguments["targetMode"] = .string("normal")
     case .finalizeSession:
       arguments["publicationPolicy"] = .string("atomicAfterValidation")
+    case .signWorkspaceOpenHarmonyHap:
+      arguments["signingPresetRef"] = .string("openharmony-release@1")
     default:
       break
     }

@@ -51,6 +51,7 @@
         "inspectWorkspaceSource",
         "applyWorkspacePatch",
         "buildWorkspaceOpenHarmony",
+        "signWorkspaceOpenHarmonyHap",
         "runWorkspaceTests",
         "symbolizeWorkspaceCrash",
         "revertWorkspacePatch",
@@ -2540,6 +2541,25 @@
           "if": {
             "properties": {
               "kind": {
+                "const": "signWorkspaceOpenHarmonyHap"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/workspaceSignOpenHarmonyHapArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
                 "const": "runWorkspaceTests"
               }
             },
@@ -3112,6 +3132,30 @@
         },
         "buildPresetRef": {
           "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "workspaceSignOpenHarmonyHapArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectRef",
+        "signingPresetRef",
+        "inputArtifactId",
+        "inputSha256"
+      ],
+      "properties": {
+        "projectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "signingPresetRef": {
+          "const": "openharmony-release@1"
+        },
+        "inputArtifactId": {
+          "$ref": "#/$defs/id"
+        },
+        "inputSha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     },

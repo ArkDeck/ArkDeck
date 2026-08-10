@@ -623,7 +623,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(context.availableOperations.count, 1)
     XCTAssertEqual(context.goalSummary.count, 16)
     XCTAssertTrue(context.trimmed.contains("attempts:kept1of4"))
-    XCTAssertTrue(context.trimmed.contains("operations:kept1of9"))
+    XCTAssertTrue(context.trimmed.contains("operations:kept1of10"))
   }
 
   // MARK: - Excerpts: what the model may now read, and what it still may not

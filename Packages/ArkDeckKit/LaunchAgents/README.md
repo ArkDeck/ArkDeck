@@ -55,7 +55,7 @@ project 不得位于 `~/Desktop`、`~/Documents` 或 `~/Downloads`。这些目�
 `/Users/your-name/Developer/WaterFlowLayoutDemo`，再把这个绝对路径传给 `install`/`update`；
 无需管理员权限或 Full Disk Access。
 
-### 无 UI 的签名准备
+### ArkDeck 默认的无 UI 本地签名
 
 上游 [`deveco-cli`](https://gitcode.com/openharmony-sig/deveco-cli) 提供
 `devecocli signature generate`，命令本身不要求启动 DevEco Studio。但是它的自动签名实现会
@@ -63,14 +63,74 @@ project 不得位于 `~/Desktop`、`~/Documents` 或 `~/Downloads`。这些目�
 这条链嵌进 Agent/LaunchAgent：那会形成绕过 durable target/binding、Runtime admission 与
 Artifact lease 的第二条设备路径。
 
-对 OpenHarmony 开发板，可使用 SDK 随附的 OpenHarmony 签名材料和开源
-[`hapsigner`](https://gitcode.com/openharmony/developtools_hapsigner/tree/master) 在 host 上生成
-与 bundleName 精确匹配的 release profile，并把绝对的 keystore、certificate、profile 路径写入
-工程 `build-profile.json5`。这些步骤不访问设备；私钥和口令材料应放在用户私有目录，不复制进
-ArkDeck 仓库，也不写进 LaunchAgent plist。完成后由现有 `workspace.build-openharmony@1`
-构建，且仅把产出的 signed HAP 经 `arkdeck artifact import-hap` 导入，再由
-`debug.hap@1` 安装和 readback。签名工具不得自行调用 HDC，产物文件名也不构成签名有效性或
-真机通过证明。
+对 OpenHarmony 开发板，ArkDeck 的默认路径是 published
+`workspace.sign-openharmony-hap@1`，不再要求把口令写入工程或人工运行 hapsigner。先准备一份
+与 bundleName 精确匹配的 keystore、app certificate 与 signed profile，并找到 SDK 的
+`hap-sign-tool.jar` 和 Java 的 canonical 绝对路径；这些材料仍由操作者一次性取得，ArkDeck
+不生成私钥、证书或 Provision profile。keystore 必须属于当前用户且权限为 `0600`。
+
+在真实 Terminal 中安装唯一的 closed preset；两个密码只从无回显 TTY prompt 进入登录用户
+Keychain，不接受 password flag、环境变量或管道 stdin：
+
+```text
+arkdeck signing install \
+  --java /absolute/path/to/java \
+  --jar /absolute/path/to/hap-sign-tool.jar \
+  --keystore /absolute/private/path/release.p12 \
+  --certificate /absolute/path/release.cer \
+  --profile /absolute/path/release.p7b \
+  --key-alias <alias> \
+  --project-ref demo-app
+arkdeck signing status --json
+arkdeck operation list --json
+```
+
+`status` 显示非秘密路径、SHA-256、Keychain item 是否存在及漂移诊断，不返回密码。daemon
+在每次 Job 前重测 Java/JAR/keystore/certificate/profile；任一文件缺失、权限或摘要漂移，或
+Keychain 不可读时，operation 都会 `UNAVAILABLE`/fail closed，不会猜 `PATH`、默认口令或
+DevEco 安装位置。
+
+安装 preset 后，本地签名也是 GJ-5 repair route 的默认方式：WaterFlow profile 固定读取
+Hvigor 的 `entry-default-unsigned.hap`，Harness 在 tests 与 `debug.hap@1` 之间自动提交
+`workspace.sign-openharmony-hap@1`，并把 verify-app 确认的 `signed.hap` lease 交给 debug。
+该进度持久化在 repair attempt 中；daemon 重启不会把 unsigned lease 当成已签名产物，也不会
+跳过 Runtime 直接调用工具。下面的手动 typed sign 命令保留给独立签名诊断和非 Harness 调用。
+
+把 Hvigor 产生的 unsigned HAP 导入同一个 Runtime Artifact store，记录命令返回的 lease，
+再用同一个 UDS 运行 typed sign（JSON 中只能出现这三个 published inputs）：
+
+```text
+arkdeck artifact import-hap --target <target-id> --file <unsigned.hap> --json
+
+# signing-inputs.json
+{
+  "projectRef": "demo-app",
+  "signingPresetRef": "openharmony-release@1",
+  "unsignedHapArtifactLease": "<import 返回的 lease-v1:...>"
+}
+
+arkdeck agent run \
+  --operation workspace.sign-openharmony-hap@1 \
+  --target <target-id> \
+  --inputs-file /absolute/path/to/signing-inputs.json \
+  --json
+```
+
+只有 pinned hapsigner 的 `verify-app` 同时产出非空 certificate-chain/profile readback 后，Runtime
+才发布 `signed.hap` 与 `signing-report.json`。signed lease 精确继承 unsigned lease 的 target、
+binding revision 与 stable identity，然后作为现有 `debug.hap@1` 的 `hapArtifactLease` 输入；
+设备重绑或 identity 漂移会在 HDC dispatch 前拒绝。锁屏后只要登录用户会话、LaunchAgent 和
+Keychain 权限仍可用，这条签名→debug 路径不依赖 SwiftUI 或 Terminal 前台；Keychain 被锁定时
+会如实失败，不弹出或伪造人工批准。
+
+签名配置可逆撤销：
+
+```text
+arkdeck signing remove --json
+```
+
+该命令只删除 ArkDeck receipt 与两项 Keychain secret，保留原始 keystore/certificate/profile。
+签名 lane 不调用 HDC；产物文件名、fake/simulation 或 `sign-app` exit 0 都不构成真机通过证明。
 
 HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony release profile 不是
 绕过 HarmonyOS 授权的通用方案。无论哪一种签名来源，设备信任、签名身份和 profile 漂移都

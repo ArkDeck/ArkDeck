@@ -5,7 +5,10 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-OHS-001 — Typed OpenHarmony local signing vertical slice
 
-- Status:ready（proposal merge 后生效）
+- Status:in-progress（产品实现、契约测试和四条本地门已完成；仅在本实现 PR 经维护者
+  review/merge 后成为 protected-main 能力。真实 SDK host signing 与真机链因当前用户尚未
+  安装 preset/Keychain secret，且已安装 LaunchAgent 仍运行 proposal 前 daemon 而保持
+  environment-blocked；不以 fake signer 或旧真机记录翻 `done`。）
 - Golden Journey:GJ-2、GJ-5
 - Platform:macos
 - Requirements:`OHS-REQ-001`、`OHS-REQ-002`、`OHS-REQ-003`

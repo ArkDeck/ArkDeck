@@ -221,7 +221,8 @@ extension HarnessTaskCoordinator {
     let orchestrated: Set<String> = [
       DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
       DebugCrashTaskHandler.buildOpenHarmony,
-      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
+      DebugCrashTaskHandler.signOpenHarmonyHAP, DebugCrashTaskHandler.runTests,
+      DebugCrashTaskHandler.revertPatch,
       DebugCrashTaskHandler.deployHAP, DebugCrashTaskHandler.analyzeCrashLedger,
     ]
     if deterministic.kind == .invokeOperation,

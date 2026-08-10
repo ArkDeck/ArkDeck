@@ -42,6 +42,8 @@ struct ArkDeckCommandLine {
         try await RuntimeCLI.runAgent(Array(arguments.dropFirst()))
       case "agentd":
         try RuntimeCLI.runAgentDaemon(Array(arguments.dropFirst()))
+      case "signing":
+        try RuntimeCLI.runSigning(Array(arguments.dropFirst()))
       case "capability":
         try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
       case "artifact":
@@ -1056,6 +1058,11 @@ struct ArkDeckCommandLine {
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
         arkdeck agentd uninstall [--json]
+        arkdeck signing install --java <absolute-java-path> --jar <absolute-hapsigntool-jar> \
+      --keystore <absolute-p12-or-jks> --certificate <absolute-pem-or-cer> \
+      --profile <absolute-p7b> --key-alias <alias> [--project-ref <demo-app>] [--json]
+        arkdeck signing status [--json]
+        arkdeck signing remove [--json]
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
@@ -1072,7 +1079,7 @@ struct ArkDeckCommandLine {
         arkdeck job submit --request-file <request.json> [--wait] [--json]
         arkdeck capability list [--json]
         arkdeck capability inspect --capability <id> [--json]
-        arkdeck artifact import-hap --target <id> --file <signed.hap> [--json]
+        arkdeck artifact import-hap --target <id> --file <unsigned-or-signed.hap> [--json]
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
       [--device-profile <dayu200>] [--json]
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]

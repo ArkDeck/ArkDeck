@@ -68,6 +68,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let createCheckpoint = "workspace.create-checkpoint@1"
   public static let applyPatch = "workspace.apply-patch@1"
   public static let buildOpenHarmony = "workspace.build-openharmony@1"
+  public static let signOpenHarmonyHAP = "workspace.sign-openharmony-hap@1"
+  public static let defaultSigningPreset = "openharmony-release@1"
   public static let runTests = "workspace.run-tests@1"
   public static let revertPatch = "workspace.revert-patch@1"
   public static let deployHAP = "debug.hap@1"
@@ -122,7 +124,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     [
       Self.observeDevice, Self.captureDiagnostics, Self.applyPatch,
       Self.createCheckpoint,
-      Self.buildOpenHarmony, Self.runTests, Self.revertPatch, Self.deployHAP,
+      Self.buildOpenHarmony, Self.signOpenHarmonyHAP, Self.runTests,
+      Self.revertPatch, Self.deployHAP,
       Self.analyzeCrashLedger,
     ]
   }
@@ -163,6 +166,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       guard repairRouteBudgetAvailable(snapshot) else { return [] }
       if repair.buildSourceRevision == nil { return [Self.buildOpenHarmony] }
       if !repair.testsPassed { return [Self.runTests] }
+      if !repair.buildOutputSigned { return [Self.signOpenHarmonyHAP] }
       return [Self.deployHAP]
     case .deploying:
       return []
@@ -419,6 +423,26 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           hypothesis: "Run the declared tests against the same patch revision before deployment.",
           reasonCode: "testPatchedWorkspace", phaseOnDispatch: nil)
       }
+      if !repair.buildOutputSigned {
+        guard let lease = repair.buildOutputArtifactLease else {
+          return noSafeAction(
+            snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+            reasonCode: "unsignedBuildArtifactUnavailable",
+            hypothesis:
+              "The immutable unsigned HAP lease is required before local signing can run.")
+        }
+        return invoke(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+          operation: Self.signOpenHarmonyHAP,
+          inputs: [
+            "projectRef": .string(snapshot.executionProjectRef ?? ""),
+            "signingPresetRef": .string(Self.defaultSigningPreset),
+            "unsignedHapArtifactLease": .string(lease),
+          ],
+          hypothesis:
+            "Use the installed ArkDeck preset to sign and verify the immutable build Artifact.",
+          reasonCode: "signVerifiedBuildOutput", phaseOnDispatch: nil)
+      }
       guard let lease = repair.buildOutputArtifactLease,
         let bundle = desiredString("bundleName", snapshot),
         let ability = desiredString("abilityName", snapshot)
@@ -631,6 +655,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       route.append(Self.applyPatch)
       if allowed.contains(Self.buildOpenHarmony) { route.append(Self.buildOpenHarmony) }
       if allowed.contains(Self.runTests) { route.append(Self.runTests) }
+      if allowed.contains(Self.signOpenHarmonyHAP) { route.append(Self.signOpenHarmonyHAP) }
       if allowed.contains(Self.deployHAP) { route.append(Self.deployHAP) }
       if allowed.contains(Self.revertPatch) { route.append(Self.revertPatch) }
     }
@@ -682,6 +707,9 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     }
     if repair?.testsPassed != true, allowed.contains(Self.runTests) {
       route.append(Self.runTests)
+    }
+    if repair?.buildOutputSigned != true, allowed.contains(Self.signOpenHarmonyHAP) {
+      route.append(Self.signOpenHarmonyHAP)
     }
     if repair?.deployedDigest == nil, allowed.contains(Self.deployHAP) {
       route.append(Self.deployHAP)
