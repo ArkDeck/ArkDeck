@@ -39,6 +39,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
   public let finishedAtUTC: String?
   public let supersededByRecoveryEpochID: String?
   public let recoveryEpochID: String?
+  public let resolvedByTargetAliasResolutionID: String?
 
   public init(
     id: String, operationReference: String, targetID: String, state: String,
@@ -46,7 +47,8 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     timeline: [String], executionMode: String? = nil, sessionID: String? = nil,
     actualEffect: String? = nil,
     createdAtUTC: String? = nil, startedAtUTC: String? = nil, finishedAtUTC: String? = nil,
-    supersededByRecoveryEpochID: String? = nil, recoveryEpochID: String? = nil
+    supersededByRecoveryEpochID: String? = nil, recoveryEpochID: String? = nil,
+    resolvedByTargetAliasResolutionID: String? = nil
   ) {
     self.id = id
     self.operationReference = operationReference
@@ -64,12 +66,14 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     self.finishedAtUTC = finishedAtUTC
     self.supersededByRecoveryEpochID = supersededByRecoveryEpochID
     self.recoveryEpochID = recoveryEpochID
+    self.resolvedByTargetAliasResolutionID = resolvedByTargetAliasResolutionID
   }
 
   /// An unknown outcome is never folded into a terminal state: it is the one
   /// condition a reader must not mistake for "finished".
   public var needsAttention: Bool {
-    (outcomeUnknown && supersededByRecoveryEpochID == nil) || waitingForHuman
+    (outcomeUnknown && supersededByRecoveryEpochID == nil
+      && resolvedByTargetAliasResolutionID == nil) || waitingForHuman
   }
 }
 
@@ -509,7 +513,9 @@ enum RuntimeHistoryResponseDecoding {
           startedAtUTC: entry["startedAtUtc"] as? String,
           finishedAtUTC: entry["finishedAtUtc"] as? String,
           supersededByRecoveryEpochID: entry["supersededByRecoveryEpochId"] as? String,
-          recoveryEpochID: entry["recoveryEpochId"] as? String))
+          recoveryEpochID: entry["recoveryEpochId"] as? String,
+          resolvedByTargetAliasResolutionID: entry[
+            "resolvedByTargetAliasResolutionId"] as? String))
     }
     return RuntimeHistoryPresentation(availability: .available, jobs: jobs)
   }

@@ -1500,6 +1500,27 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(
       connectKeysAfterConflict, [nextHDC],
       "the conflicting alias must be rejected before another device probe")
+
+    _ = try targetStore.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: duplicate.targetID,
+        aliasStableIdentitySHA256: duplicate.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: duplicate.bindingRevision,
+        canonicalTargetID: target.targetID,
+        canonicalStableIdentitySHA256: target.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: target.bindingRevision,
+        routedHDCIdentitySHA256: nextDigest, routedUSBTopology: "42",
+        establishingFlashJobID: "job-flash",
+        establishingFlashPlanDigestSHA256: String(repeating: "f", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [], establishedAtUTC: "2026-08-08T00:10:00Z"))
+    let resolvedFacts = try await port.currentFacts(targetID: target.targetID)
+    XCTAssertEqual(resolvedFacts.executionConnectKey, nextHDC)
+    let connectKeysAfterResolution = await probe.observedConnectKeys()
+    XCTAssertEqual(connectKeysAfterResolution, [nextHDC, nextHDC])
   }
 
   func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {

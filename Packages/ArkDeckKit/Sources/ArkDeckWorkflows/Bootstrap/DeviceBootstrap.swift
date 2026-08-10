@@ -126,9 +126,80 @@ package struct RuntimeTargetBindingLineageAdvance: Sendable, Equatable {
   }
 }
 
+package struct RuntimeTargetAliasCoveredIntent: Codable, Sendable, Equatable {
+  package let jobID: String
+  package let intentEventID: String
+  package let stepID: String
+  package let effect: String
+}
+
+package struct RuntimeTargetAliasResolutionDraft: Sendable, Equatable {
+  package let aliasTargetID: String
+  package let aliasStableIdentitySHA256: String
+  package let aliasBindingRevision: Int
+  package let canonicalTargetID: String
+  package let canonicalStableIdentitySHA256: String
+  package let canonicalBindingRevision: Int
+  package let routedHDCIdentitySHA256: String
+  package let routedUSBTopology: String
+  package let establishingFlashJobID: String
+  package let establishingFlashPlanDigestSHA256: String
+  package let confirmedStepIDs: [String]
+  package let coveredUnknownIntents: [RuntimeTargetAliasCoveredIntent]
+  package let establishedAtUTC: String
+}
+
+package struct RuntimeTargetAliasResolution: Codable, Sendable, Equatable {
+  package let resolutionID: String
+  package let aliasTargetID: String
+  package let aliasStableIdentitySHA256: String
+  package let aliasBindingRevision: Int
+  package let canonicalTargetID: String
+  package let canonicalStableIdentitySHA256: String
+  package let canonicalBindingRevision: Int
+  package let routedHDCIdentitySHA256: String
+  package let routedUSBTopology: String
+  package let establishingFlashJobID: String
+  package let establishingFlashPlanDigestSHA256: String
+  package let confirmedStepIDs: [String]
+  package let coveredUnknownIntents: [RuntimeTargetAliasCoveredIntent]
+  package let establishedAtUTC: String
+  package let previousResolutionSHA256: String?
+  package let resolutionSHA256: String
+}
+
+private struct RuntimeTargetAliasResolutionMaterial: Codable {
+  let resolutionID: String
+  let aliasTargetID: String
+  let aliasStableIdentitySHA256: String
+  let aliasBindingRevision: Int
+  let canonicalTargetID: String
+  let canonicalStableIdentitySHA256: String
+  let canonicalBindingRevision: Int
+  let routedHDCIdentitySHA256: String
+  let routedUSBTopology: String
+  let establishingFlashJobID: String
+  let establishingFlashPlanDigestSHA256: String
+  let confirmedStepIDs: [String]
+  let coveredUnknownIntents: [RuntimeTargetAliasCoveredIntent]
+  let establishedAtUTC: String
+  let previousResolutionSHA256: String?
+}
+
 private struct TargetStoreDocument: Codable, Equatable {
   var schemaVersion: String
   var targets: [RuntimeTargetRecord]
+  var aliasResolutions: [RuntimeTargetAliasResolution]?
+
+  init(
+    schemaVersion: String,
+    targets: [RuntimeTargetRecord],
+    aliasResolutions: [RuntimeTargetAliasResolution]? = nil
+  ) {
+    self.schemaVersion = schemaVersion
+    self.targets = targets
+    self.aliasResolutions = aliasResolutions
+  }
 }
 
 /// Durable, flock-guarded target registry in the daemon state directory.
@@ -157,6 +228,118 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     try queue.sync { try load().targets.first { $0.targetID == targetID } }
   }
 
+  /// Historical aliases remain in `list()` so old Job identity never changes.
+  /// New selection surfaces use only the canonical records returned here.
+  public func listActive() throws -> [RuntimeTargetRecord] {
+    try queue.sync {
+      let document = try load()
+      let aliases = Set((document.aliasResolutions ?? []).map(\.aliasTargetID))
+      return document.targets.filter { !aliases.contains($0.targetID) }
+    }
+  }
+
+  /// Resolves one currently observed address only through a durable alias
+  /// relation. Singleton presence and similar IDs are never sufficient.
+  package func candidateTarget(connectKey: String) throws -> RuntimeTargetRecord? {
+    try queue.sync {
+      let document = try load()
+      let matches = document.targets.filter { $0.connectKey == connectKey }
+      guard matches.count <= 1 else {
+        throw BootstrapError.storeFailure("candidate connect key has ambiguous target owners")
+      }
+      guard let direct = matches.first else { return nil }
+      guard let resolution = (document.aliasResolutions ?? []).first(where: {
+        $0.aliasTargetID == direct.targetID
+      }) else { return direct }
+      guard let canonical = document.targets.first(where: {
+        $0.targetID == resolution.canonicalTargetID
+      }) else {
+        throw BootstrapError.storeFailure("resolved candidate canonical target is missing")
+      }
+      return canonical
+    }
+  }
+
+  package func aliasResolutions() throws -> [RuntimeTargetAliasResolution] {
+    try queue.sync { try load().aliasResolutions ?? [] }
+  }
+
+  /// Appends one mechanically proven identity relation without editing either
+  /// target or any Job. Repeating the exact proof is idempotent.
+  @discardableResult
+  package func appendAliasResolution(
+    _ draft: RuntimeTargetAliasResolutionDraft
+  ) throws -> RuntimeTargetAliasResolution {
+    try queue.sync {
+      var document = try load()
+      try Self.validate(draft, targets: document.targets)
+      let existing = document.aliasResolutions ?? []
+      if let resolution = existing.first(where: {
+        $0.aliasTargetID == draft.aliasTargetID
+          || $0.canonicalTargetID == draft.aliasTargetID
+      }) {
+        guard Self.draft(from: resolution) == draft else {
+          throw BootstrapError.storeFailure(
+            "target alias already has a different durable resolution")
+        }
+        return resolution
+      }
+      guard !existing.contains(where: { $0.aliasTargetID == draft.canonicalTargetID }) else {
+        throw BootstrapError.storeFailure("target alias resolution chains are forbidden")
+      }
+      let existingIntentKeys = Set(existing.flatMap {
+        $0.coveredUnknownIntents.map { "\($0.jobID)\n\($0.intentEventID)" }
+      })
+      let newIntentKeys = Set(draft.coveredUnknownIntents.map {
+        "\($0.jobID)\n\($0.intentEventID)"
+      })
+      guard existingIntentKeys.isDisjoint(with: newIntentKeys),
+        !existing.contains(where: {
+          $0.establishingFlashJobID == draft.establishingFlashJobID
+        })
+      else {
+        throw BootstrapError.storeFailure(
+          "target alias resolution reuses durable Flash or intent proof")
+      }
+      let material = RuntimeTargetAliasResolutionMaterial(
+        resolutionID: Self.resolutionID(for: draft),
+        aliasTargetID: draft.aliasTargetID,
+        aliasStableIdentitySHA256: draft.aliasStableIdentitySHA256,
+        aliasBindingRevision: draft.aliasBindingRevision,
+        canonicalTargetID: draft.canonicalTargetID,
+        canonicalStableIdentitySHA256: draft.canonicalStableIdentitySHA256,
+        canonicalBindingRevision: draft.canonicalBindingRevision,
+        routedHDCIdentitySHA256: draft.routedHDCIdentitySHA256,
+        routedUSBTopology: draft.routedUSBTopology,
+        establishingFlashJobID: draft.establishingFlashJobID,
+        establishingFlashPlanDigestSHA256: draft.establishingFlashPlanDigestSHA256,
+        confirmedStepIDs: draft.confirmedStepIDs,
+        coveredUnknownIntents: draft.coveredUnknownIntents,
+        establishedAtUTC: draft.establishedAtUTC,
+        previousResolutionSHA256: existing.last?.resolutionSHA256)
+      let resolution = RuntimeTargetAliasResolution(
+        resolutionID: material.resolutionID,
+        aliasTargetID: material.aliasTargetID,
+        aliasStableIdentitySHA256: material.aliasStableIdentitySHA256,
+        aliasBindingRevision: material.aliasBindingRevision,
+        canonicalTargetID: material.canonicalTargetID,
+        canonicalStableIdentitySHA256: material.canonicalStableIdentitySHA256,
+        canonicalBindingRevision: material.canonicalBindingRevision,
+        routedHDCIdentitySHA256: material.routedHDCIdentitySHA256,
+        routedUSBTopology: material.routedUSBTopology,
+        establishingFlashJobID: material.establishingFlashJobID,
+        establishingFlashPlanDigestSHA256: material.establishingFlashPlanDigestSHA256,
+        confirmedStepIDs: material.confirmedStepIDs,
+        coveredUnknownIntents: material.coveredUnknownIntents,
+        establishedAtUTC: material.establishedAtUTC,
+        previousResolutionSHA256: material.previousResolutionSHA256,
+        resolutionSHA256: try Self.digest(material))
+      document.aliasResolutions = existing + [resolution]
+      try persist(document)
+      return resolution
+    }
+  }
+
   /// Reports whether a freshly verified HDC alias is already owned by a
   /// different durable target. A post-flash route proves how to address the
   /// selected target; it does not erase a second target record or authorize
@@ -166,24 +349,36 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   package func hasConflictingHDCAliasOwner(
     canonicalTargetID: String,
     connectKey: String,
-    identitySHA256: String
+    identitySHA256: String,
+    establishingFlashJobID: String
   ) throws -> Bool {
     try queue.sync {
       guard !canonicalTargetID.isEmpty,
         !connectKey.isEmpty,
-        Self.isCanonicalSHA256(identitySHA256)
+        Self.isCanonicalSHA256(identitySHA256),
+        Self.sha256(connectKey) == identitySHA256,
+        !establishingFlashJobID.isEmpty
       else {
         throw BootstrapError.storeFailure("invalid HDC alias ownership query")
       }
-      let targets = try load().targets
+      let document = try load()
+      let targets = document.targets
       guard targets.filter({ $0.targetID == canonicalTargetID }).count == 1 else {
         throw BootstrapError.storeFailure(
           "canonical target for HDC alias ownership is missing or ambiguous")
       }
-      return targets.contains {
+      let conflicts = targets.filter {
         $0.targetID != canonicalTargetID
-          && ($0.connectKey == connectKey
-            || $0.stablePhysicalIdentitySHA256 == identitySHA256)
+          && ($0.connectKey == connectKey || $0.stablePhysicalIdentitySHA256 == identitySHA256)
+      }
+      let resolutions = document.aliasResolutions ?? []
+      return conflicts.contains { conflict in
+        !resolutions.contains {
+          $0.aliasTargetID == conflict.targetID
+            && $0.canonicalTargetID == canonicalTargetID
+            && $0.routedHDCIdentitySHA256 == identitySHA256
+            && $0.establishingFlashJobID == establishingFlashJobID
+        }
       }
     }
   }
@@ -198,9 +393,24 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   ) throws -> (record: RuntimeTargetRecord, created: Bool) {
     try queue.sync {
       var document = try load()
+      if let resolution = (document.aliasResolutions ?? []).first(where: {
+        $0.aliasStableIdentitySHA256 == stableIdentitySHA256
+          || $0.routedHDCIdentitySHA256 == stableIdentitySHA256
+      }), let canonical = document.targets.first(where: {
+        $0.targetID == resolution.canonicalTargetID
+      }) {
+        return (canonical, false)
+      }
       if let existing = document.targets.first(where: {
         $0.stablePhysicalIdentitySHA256 == stableIdentitySHA256
       }) {
+        if let resolution = (document.aliasResolutions ?? []).first(where: {
+          $0.aliasTargetID == existing.targetID
+        }), let canonical = document.targets.first(where: {
+          $0.targetID == resolution.canonicalTargetID
+        }) {
+          return (canonical, false)
+        }
         return (existing, false)
       }
       // Identity alone is not enough to recognise an already-adopted device.
@@ -322,10 +532,142 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       return TargetStoreDocument(schemaVersion: "1.0.0", targets: [])
     }
     do {
-      return try JSONDecoder().decode(TargetStoreDocument.self, from: Data(contentsOf: url))
+      let document = try JSONDecoder().decode(
+        TargetStoreDocument.self, from: Data(contentsOf: url))
+      try Self.validate(document)
+      return document
     } catch {
       throw BootstrapError.storeFailure("undecodable target store: \(error)")
     }
+  }
+
+  private static let requiredAliasEstablishingFlashSteps: Set<String> = [
+    "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+  ]
+
+  private static func validate(_ document: TargetStoreDocument) throws {
+    guard document.schemaVersion == "1.0.0" else {
+      throw BootstrapError.storeFailure("unsupported target store schema")
+    }
+    var previous: String?
+    var aliases: Set<String> = []
+    var establishingFlashJobs: Set<String> = []
+    var coveredIntentKeys: Set<String> = []
+    for resolution in document.aliasResolutions ?? [] {
+      let draft = draft(from: resolution)
+      try validate(draft, targets: document.targets)
+      guard aliases.insert(resolution.aliasTargetID).inserted,
+        establishingFlashJobs.insert(resolution.establishingFlashJobID).inserted,
+        resolution.resolutionID == resolutionID(for: draft),
+        resolution.coveredUnknownIntents.allSatisfy({
+          coveredIntentKeys.insert("\($0.jobID)\n\($0.intentEventID)").inserted
+        }),
+        resolution.previousResolutionSHA256 == previous
+      else {
+        throw BootstrapError.storeFailure("target alias resolution chain is ambiguous")
+      }
+      let material = RuntimeTargetAliasResolutionMaterial(
+        resolutionID: resolution.resolutionID,
+        aliasTargetID: resolution.aliasTargetID,
+        aliasStableIdentitySHA256: resolution.aliasStableIdentitySHA256,
+        aliasBindingRevision: resolution.aliasBindingRevision,
+        canonicalTargetID: resolution.canonicalTargetID,
+        canonicalStableIdentitySHA256: resolution.canonicalStableIdentitySHA256,
+        canonicalBindingRevision: resolution.canonicalBindingRevision,
+        routedHDCIdentitySHA256: resolution.routedHDCIdentitySHA256,
+        routedUSBTopology: resolution.routedUSBTopology,
+        establishingFlashJobID: resolution.establishingFlashJobID,
+        establishingFlashPlanDigestSHA256: resolution.establishingFlashPlanDigestSHA256,
+        confirmedStepIDs: resolution.confirmedStepIDs,
+        coveredUnknownIntents: resolution.coveredUnknownIntents,
+        establishedAtUTC: resolution.establishedAtUTC,
+        previousResolutionSHA256: resolution.previousResolutionSHA256)
+      guard resolution.resolutionSHA256 == (try digest(material)) else {
+        throw BootstrapError.storeFailure("target alias resolution hash chain is invalid")
+      }
+      previous = resolution.resolutionSHA256
+    }
+    let canonicals = Set((document.aliasResolutions ?? []).map(\.canonicalTargetID))
+    guard aliases.isDisjoint(with: canonicals) else {
+      throw BootstrapError.storeFailure("target alias resolution chains are forbidden")
+    }
+  }
+
+  private static func validate(
+    _ draft: RuntimeTargetAliasResolutionDraft,
+    targets: [RuntimeTargetRecord]
+  ) throws {
+    let alias = targets.filter { $0.targetID == draft.aliasTargetID }
+    let canonical = targets.filter { $0.targetID == draft.canonicalTargetID }
+    let intentKeys = draft.coveredUnknownIntents.map { "\($0.jobID)\n\($0.intentEventID)" }
+    guard draft.aliasTargetID != draft.canonicalTargetID,
+      alias.count == 1, canonical.count == 1,
+      alias[0].stablePhysicalIdentitySHA256 == draft.aliasStableIdentitySHA256,
+      alias[0].bindingRevision == draft.aliasBindingRevision,
+      canonical[0].stablePhysicalIdentitySHA256 == draft.canonicalStableIdentitySHA256,
+      canonical[0].bindingRevision == draft.canonicalBindingRevision,
+      draft.aliasStableIdentitySHA256 == draft.routedHDCIdentitySHA256,
+      sha256(alias[0].connectKey) == draft.routedHDCIdentitySHA256,
+      isCanonicalSHA256(draft.canonicalStableIdentitySHA256),
+      isCanonicalSHA256(draft.establishingFlashPlanDigestSHA256),
+      !draft.establishingFlashJobID.isEmpty,
+      !draft.routedUSBTopology.isEmpty,
+      draft.routedUSBTopology.utf8.allSatisfy({ (48...57).contains($0) }),
+      Set(draft.confirmedStepIDs).isSuperset(of: requiredAliasEstablishingFlashSteps),
+      Set(draft.confirmedStepIDs).count == draft.confirmedStepIDs.count,
+      Set(intentKeys).count == intentKeys.count,
+      draft.coveredUnknownIntents.allSatisfy({
+        !$0.jobID.isEmpty && !$0.intentEventID.isEmpty
+          && $0.stepID == "enter-loader-mode" && $0.effect == "deviceMutation"
+      }),
+      ISO8601DateFormatter().date(from: draft.establishedAtUTC) != nil
+    else {
+      throw BootstrapError.storeFailure(
+        "target alias resolution lacks exact identity, history or postflight proof")
+    }
+  }
+
+  private static func draft(
+    from resolution: RuntimeTargetAliasResolution
+  ) -> RuntimeTargetAliasResolutionDraft {
+    RuntimeTargetAliasResolutionDraft(
+      aliasTargetID: resolution.aliasTargetID,
+      aliasStableIdentitySHA256: resolution.aliasStableIdentitySHA256,
+      aliasBindingRevision: resolution.aliasBindingRevision,
+      canonicalTargetID: resolution.canonicalTargetID,
+      canonicalStableIdentitySHA256: resolution.canonicalStableIdentitySHA256,
+      canonicalBindingRevision: resolution.canonicalBindingRevision,
+      routedHDCIdentitySHA256: resolution.routedHDCIdentitySHA256,
+      routedUSBTopology: resolution.routedUSBTopology,
+      establishingFlashJobID: resolution.establishingFlashJobID,
+      establishingFlashPlanDigestSHA256: resolution.establishingFlashPlanDigestSHA256,
+      confirmedStepIDs: resolution.confirmedStepIDs,
+      coveredUnknownIntents: resolution.coveredUnknownIntents,
+      establishedAtUTC: resolution.establishedAtUTC)
+  }
+
+  private static func digest(_ material: RuntimeTargetAliasResolutionMaterial) throws -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return sha256(try encoder.encode(material))
+  }
+
+  private static func resolutionID(
+    for draft: RuntimeTargetAliasResolutionDraft
+  ) -> String {
+    let seed = sha256(
+      [draft.aliasTargetID, draft.canonicalTargetID, draft.establishingFlashJobID]
+        .joined(separator: "\n"))
+    return "target-alias-resolution-\(seed.prefix(32))"
+  }
+
+  private static func sha256(_ text: String) -> String {
+    sha256(Data(text.utf8))
+  }
+
+  private static func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
   private func persist(_ document: TargetStoreDocument) throws {

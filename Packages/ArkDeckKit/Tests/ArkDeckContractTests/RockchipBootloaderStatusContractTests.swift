@@ -541,6 +541,33 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     XCTAssertEqual(status.mode, "hdcNormal")
     XCTAssertNil(status.targetID)
     XCTAssertNil(status.bindingRevision)
+
+    _ = try fixture.targets.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: duplicate.targetID,
+        aliasStableIdentitySHA256: duplicate.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: duplicate.bindingRevision,
+        canonicalTargetID: original.targetID,
+        canonicalStableIdentitySHA256: original.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: original.bindingRevision,
+        routedHDCIdentitySHA256: digest(nextHDC.serial),
+        routedUSBTopology: nextHDC.topology,
+        establishingFlashJobID: "job-post-flash-conflict",
+        establishingFlashPlanDigestSHA256: String(repeating: "f", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [], establishedAtUTC: "2026-08-08T00:19:00Z"))
+    let resolved = try observer(
+      targets: fixture.targets,
+      bindings: fixture.bindings,
+      postFlashBindings: routedStore,
+      identities: [nextHDC]
+    ).observeBootloaderStatus()
+    XCTAssertEqual(resolved.disposition, .exactBoundTarget)
+    XCTAssertEqual(resolved.targetID, original.targetID)
+    XCTAssertEqual(resolved.bindingRevision, original.bindingRevision)
   }
 
   func testHistoricalSameRevisionBindingIsRejectedWithoutRewrite() throws {

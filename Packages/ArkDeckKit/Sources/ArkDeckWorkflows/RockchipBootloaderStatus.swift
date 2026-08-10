@@ -97,7 +97,8 @@ public struct ProductRockchipBootloaderStatusObserver:
         try !targetStore.hasConflictingHDCAliasOwner(
           canonicalTargetID: target.targetID,
           connectKey: routed.hdcConnectKey,
-          identitySHA256: routed.hdcIdentitySHA256)
+          identitySHA256: routed.hdcIdentitySHA256,
+          establishingFlashJobID: routed.jobID)
       else {
         return RockchipBootloaderStatus(
           disposition: .ambiguous,

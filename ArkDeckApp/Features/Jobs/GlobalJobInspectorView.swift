@@ -339,13 +339,18 @@ struct GlobalJobInspectorView: View {
   }
 
   private func priority(of job: RuntimeJobSummaryPresentation) -> Int {
-    if job.outcomeUnknown { return 0 }
+    if job.needsAttention { return 0 }
     if job.waitingForHuman { return 1 }
     if isActive(job) { return 2 }
     return 3
   }
 
   private func isActive(_ job: RuntimeJobSummaryPresentation) -> Bool {
+    if job.supersededByRecoveryEpochID != nil
+      || job.resolvedByTargetAliasResolutionID != nil
+    {
+      return false
+    }
     guard let state = JobState(rawValue: job.state) else { return false }
     return !state.isTerminal
   }

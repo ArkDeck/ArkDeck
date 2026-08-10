@@ -214,6 +214,8 @@ Task.detached {
     // request, so all three use one identity/revision snapshot. Custom test
     // state directories never consult the user's production binding.
     let rockchipRoot = resolvedStateDirectory.deletingLastPathComponent()
+    let postFlashHDCBindingStore = RockchipPostFlashHDCBindingStore(
+      rootURL: rockchipRoot)
     if resolvedStateDirectory.lastPathComponent == "Agentd",
       rockchipRoot.lastPathComponent == "ArkDeck",
       let binding = try RockchipProductBindingStore(rootURL: rockchipRoot).loadIfPresent()
@@ -237,6 +239,24 @@ Task.detached {
         // migrate it from a fresh, unique Loader observation.
         print("Rockchip binding requires Runtime Loader onboarding: \(error)")
       }
+    }
+
+    // A complete historical Flash may prove that an HDC address adopted as a
+    // second target is actually the post-flash face of the Loader-bound
+    // target. Reconcile only from owner-only terminal history. Failure keeps
+    // the alias conflict gate closed and must not prevent read-only diagnosis.
+    do {
+      if let resolution = try ProductRockchipTargetAliasReconciler(
+        targetStore: targetStore,
+        applicationSupportRoot: rockchipRoot,
+        stateDirectory: resolvedStateDirectory
+      ).reconcileIfProven() {
+        print(
+          "resolved historical target alias \(resolution.aliasTargetID) to "
+            + "\(resolution.canonicalTargetID) via \(resolution.resolutionID)")
+      }
+    } catch {
+      print("Rockchip target alias remains fail-closed: \(error)")
     }
 
     // The HDC executable is supplied explicitly (no PATH search, no guess):
@@ -287,8 +307,6 @@ Task.detached {
     // composed. Without a descriptor-bound HDC there is no read-only surface
     // to measure the target's mode on, and a mode asserted without one is
     // exactly the fabrication #992 removed — so the port stays record-only.
-    let postFlashHDCBindingStore = RockchipPostFlashHDCBindingStore(
-      rootURL: rockchipRoot)
     var rockchipProber: (any RockchipLiveModeProbing)?
     if let hdcExecutableResolver, let toolWorkingDirectory = rockchipToolWorkingDirectory {
       rockchipDispatcher = BundledRockchipRuntimeDispatcher(
