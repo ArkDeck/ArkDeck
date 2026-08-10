@@ -3111,7 +3111,9 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     guard case .rockchip = action else {
       throw DeviceProviderError.unsupportedAction("non-Rockchip action given to rockchip provider")
     }
-    return .verified(summary: ["recordId": recordID])
+    var summary = receipt.hostManagedSummary
+    summary["recordId"] = recordID
+    return .verified(summary: summary)
   }
 
   public func reconcile(

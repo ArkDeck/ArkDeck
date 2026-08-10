@@ -215,13 +215,15 @@ final class DeviceProviderContractTests: XCTestCase {
     }
     let withRecord = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false, durationSeconds: 1,
-      hostManagedRecordID: "manifest-1")
+      hostManagedRecordID: "manifest-1",
+      hostManagedSummary: ["firmware": "OpenHarmony-7.0.0.37"])
     guard case .verified(let summary) = try rockchip.verify(
       receipt: withRecord, action: action, context: context)
     else {
       return XCTFail("host-managed record must verify")
     }
     XCTAssertEqual(summary["recordId"], "manifest-1")
+    XCTAssertEqual(summary["firmware"], "OpenHarmony-7.0.0.37")
   }
 
   func testReconcileSemantics() async throws {
