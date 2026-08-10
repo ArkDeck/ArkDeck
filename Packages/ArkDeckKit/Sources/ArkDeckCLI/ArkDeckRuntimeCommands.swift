@@ -110,13 +110,13 @@ enum RuntimeCLI {
   }
 
   /// `arkdeck agent chat|run|resume` - the Device Runtime Agent entry point.
-  /// Chat delegates conversation and tool-loop state to pi, while every
-  /// device action still enters through this CLI's typed Runtime executor.
+  /// Chat keeps conversation and tool-loop state inside ArkDeck, while every
+  /// device action still enters through the typed Runtime executor.
   /// A persisted resume token keeps physical assistance inside the same
   /// execution instead of asking a maintainer to restart host commands.
-  static func runAgent(_ arguments: [String]) throws {
+  static func runAgent(_ arguments: [String]) async throws {
     if arguments.first == "chat" {
-      try PiAgentChat.run(Array(arguments.dropFirst()))
+      try await AgentChatCLI.run(Array(arguments.dropFirst()))
       return
     }
     guard let subcommand = arguments.first, subcommand == "run" || subcommand == "resume" else {

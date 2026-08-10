@@ -66,7 +66,7 @@ let package = Package(
       name: "ArkDeckAgentComposition",
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
-        "ArkDeckHarness", "ArkDeckWorkflows",
+        "ArkDeckHarness", "ArkDeckWorkflows", "ArkDeckAgentClient",
       ],
       path: "Sources/ArkDeckWorkflows/AgentComposition"),
     .target(
@@ -79,9 +79,6 @@ let package = Package(
       dependencies: [
         "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
         "ArkDeckAgentClient",
-      ],
-      resources: [
-        .copy("Resources/Pi")
       ]
     ),
     .target(
