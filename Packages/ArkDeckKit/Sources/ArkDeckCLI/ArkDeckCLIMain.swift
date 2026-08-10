@@ -1078,12 +1078,19 @@ struct ArkDeckCommandLine {
         arkdeck task promotion --task <HTASK-id> [--destination <directory>] [--json]
         arkdeck artifact list|inspect|read|export --job <id> [--artifact <id>] \
       [--destination <directory>] [--allow-sensitive]
+        arkdeck agent chat [--prompt <text>] [--pi-path <absolute-path>] [--socket <path>] \
+      [--allow-sensitive-artifacts]
         arkdeck agent run --operation <reference> [--target <id>] [--inputs-file <path>] \
       [--capability <CAP-RT-...>] [--json]
         arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
 
       doctor/operation/device/job/debug talk only to arkdeck-agentd over its user-private socket:
       this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
+
+      agent chat uses pi for the conversation and tool loop. Pi's built-in file and shell tools
+      are disabled; its ArkDeck extension can only call the typed Runtime operations published
+      by this binary. Sensitive Artifact text stays local unless you explicitly pass
+      --allow-sensitive-artifacts for that chat session.
 
       A human operator at a TTY gets a handoff whose commands they run personally. The Agent
       surface defaults to a bounded campaign confirmation and separately accepts a protected-main
