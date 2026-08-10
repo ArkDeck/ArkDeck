@@ -158,6 +158,26 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(presentation.jobs.first?.outstandingResidueCount, 2)
   }
 
+  func testTargetAliasResolutionKeepsUnknownOutcomeButSettlesCurrentEpochAttention() throws {
+    let presentation = decode(
+      """
+      {"ok":true,"id":"x","result":[
+        {"jobId":"job-unknown","operation":"flash.dayu200","targetId":"t-alias",
+         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
+         "outstandingResidueCount":1,"timeline":["running","waitingForRecovery"],
+         "resolvedByTargetAliasResolutionId":"target-alias-resolution-0123456789abcdef"}]}
+      """)
+
+    let job = try XCTUnwrap(presentation.jobs.first)
+    XCTAssertTrue(job.outcomeUnknown, "the historical outcome is never rewritten")
+    XCTAssertEqual(
+      job.resolvedByTargetAliasResolutionID,
+      "target-alias-resolution-0123456789abcdef")
+    XCTAssertFalse(
+      job.needsAttention,
+      "a later complete Flash established the current epoch without settling the old outcome")
+  }
+
   func testCompleteEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {
     let evidence = try response([
       "jobId": "job-1",

@@ -300,6 +300,117 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(try store.find(targetID: adopted.targetID), adopted)
   }
 
+  func testProvenAliasResolutionPreservesHistoryAndSelectsOnlyCanonicalTarget() throws {
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let originalIdentity = String(repeating: "a", count: 64)
+    let loaderIdentity = String(repeating: "b", count: 64)
+    let aliasConnectKey = "post-flash-hdc-address"
+    let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(
+      serial: aliasConnectKey)
+    let adopted = try store.adopt(
+      stableIdentitySHA256: originalIdentity, connectKey: "original-hdc-address",
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+    let canonical = try store.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
+        currentStableIdentitySHA256: loaderIdentity, currentRevision: 2)
+    ).record
+    let alias = try store.adopt(
+      stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+    XCTAssertNotEqual(alias.targetID, adopted.targetID)
+
+    let draft = RuntimeTargetAliasResolutionDraft(
+      aliasTargetID: alias.targetID,
+      aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+      aliasBindingRevision: alias.bindingRevision,
+      canonicalTargetID: canonical.targetID,
+      canonicalStableIdentitySHA256: canonical.stablePhysicalIdentitySHA256,
+      canonicalBindingRevision: canonical.bindingRevision,
+      routedHDCIdentitySHA256: aliasIdentity,
+      routedUSBTopology: "18874368",
+      establishingFlashJobID: "job-0123456789abcdef0123456789abcdef",
+      establishingFlashPlanDigestSHA256: String(repeating: "c", count: 64),
+      confirmedStepIDs: [
+        "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+        "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+      ],
+      coveredUnknownIntents: [
+        RuntimeTargetAliasCoveredIntent(
+          jobID: "job-unknown", intentEventID: "intent-enter-loader",
+          stepID: "enter-loader-mode", effect: "deviceMutation")
+      ],
+      establishedAtUTC: "2026-08-08T00:10:00Z")
+    let resolution = try store.appendAliasResolution(draft)
+    XCTAssertEqual(try store.appendAliasResolution(draft), resolution)
+    XCTAssertEqual(try store.list().count, 2, "historical target identities remain immutable")
+    XCTAssertEqual(try store.listActive(), [canonical])
+    XCTAssertEqual(try store.candidateTarget(connectKey: aliasConnectKey), canonical)
+    XCTAssertEqual(
+      try store.adopt(
+        stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
+        toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:20:00Z").record,
+      canonical)
+    XCTAssertFalse(
+      try store.hasConflictingHDCAliasOwner(
+        canonicalTargetID: canonical.targetID, connectKey: aliasConnectKey,
+        identitySHA256: aliasIdentity,
+        establishingFlashJobID: draft.establishingFlashJobID))
+    XCTAssertTrue(
+      try store.hasConflictingHDCAliasOwner(
+        canonicalTargetID: canonical.targetID, connectKey: aliasConnectKey,
+        identitySHA256: aliasIdentity,
+        establishingFlashJobID: "job-fedcba9876543210fedcba9876543210"))
+    XCTAssertThrowsError(
+      try store.hasConflictingHDCAliasOwner(
+        canonicalTargetID: canonical.targetID, connectKey: "another-address",
+        identitySHA256: aliasIdentity,
+        establishingFlashJobID: draft.establishingFlashJobID))
+
+    let reopened = try RuntimeTargetStore(directoryURL: directory)
+    XCTAssertEqual(try reopened.listActive(), [canonical])
+    XCTAssertEqual(try reopened.aliasResolutions(), [resolution])
+  }
+
+  func testTargetAliasResolutionHashTamperFailsClosed() throws {
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let canonical = try store.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "canonical", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-08T00:00:00Z").record
+    let aliasKey = "alias"
+    let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasKey)
+    let alias = try store.adopt(
+      stableIdentitySHA256: aliasIdentity, connectKey: aliasKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+    _ = try store.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: alias.targetID,
+        aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: alias.bindingRevision,
+        canonicalTargetID: canonical.targetID,
+        canonicalStableIdentitySHA256: canonical.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: canonical.bindingRevision,
+        routedHDCIdentitySHA256: aliasIdentity, routedUSBTopology: "42",
+        establishingFlashJobID: "job-0123456789abcdef0123456789abcdef",
+        establishingFlashPlanDigestSHA256: String(repeating: "c", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [], establishedAtUTC: "2026-08-08T00:10:00Z"))
+
+    let url = directory.appendingPathComponent("targets.json")
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    var resolutions = try XCTUnwrap(document["aliasResolutions"] as? [[String: Any]])
+    resolutions[0]["resolutionSHA256"] = String(repeating: "f", count: 64)
+    document["aliasResolutions"] = resolutions
+    try JSONSerialization.data(withJSONObject: document).write(to: url)
+
+    XCTAssertThrowsError(try RuntimeTargetStore(directoryURL: directory).listActive())
+  }
+
   func testLegacyTargetRecordRemainsReadableWithoutCachedEvidenceFields() throws {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let legacy = Data(

@@ -93,6 +93,10 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let supersededByRecoveryEpochID: String?
   /// Present on the distinct recovery Job that established the epoch.
   public let recoveryEpochID: String?
+  /// A later complete Flash proved that this Job's historical target was an
+  /// HDC alias of the canonical Loader-bound target. The outcome remains
+  /// unknown; this independent relation proves only the current target epoch.
+  public let resolvedByTargetAliasResolutionID: String?
 
   public init(
     jobID: String,
@@ -110,7 +114,8 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     startedAtUTC: String? = nil,
     finishedAtUTC: String? = nil,
     supersededByRecoveryEpochID: String? = nil,
-    recoveryEpochID: String? = nil
+    recoveryEpochID: String? = nil,
+    resolvedByTargetAliasResolutionID: String? = nil
   ) {
     self.jobID = jobID
     self.operationReference = operationReference
@@ -128,6 +133,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     self.finishedAtUTC = finishedAtUTC
     self.supersededByRecoveryEpochID = supersededByRecoveryEpochID
     self.recoveryEpochID = recoveryEpochID
+    self.resolvedByTargetAliasResolutionID = resolvedByTargetAliasResolutionID
   }
 }
 
@@ -3117,7 +3123,8 @@ public actor RuntimeJobEngine {
     return status(
       of: record,
       supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
-      recoveryEpochID: indexes.establishedByJobID[record.jobID])
+      recoveryEpochID: indexes.establishedByJobID[record.jobID],
+      resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[record.jobID])
   }
 
   /// Classifies one debug attempt from the Job plus the exact durable
@@ -3242,7 +3249,8 @@ public actor RuntimeJobEngine {
         statuses[record.jobID] = status(
           of: record,
           supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
-          recoveryEpochID: indexes.establishedByJobID[record.jobID])
+          recoveryEpochID: indexes.establishedByJobID[record.jobID],
+          resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[record.jobID])
       }
     }
     // Active snapshots can contain timeline entries accumulated since their
@@ -3251,7 +3259,9 @@ public actor RuntimeJobEngine {
       statuses[runtime.record.jobID] = status(
         of: runtime.record,
         supersededByRecoveryEpochID: indexes.supersededByJobID[runtime.record.jobID],
-        recoveryEpochID: indexes.establishedByJobID[runtime.record.jobID])
+        recoveryEpochID: indexes.establishedByJobID[runtime.record.jobID],
+        resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[
+          runtime.record.jobID])
     }
     return statuses.values.sorted { $0.jobID < $1.jobID }
   }
@@ -3274,7 +3284,8 @@ public actor RuntimeJobEngine {
       return status(
         of: record,
         supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
-        recoveryEpochID: indexes.establishedByJobID[record.jobID])
+        recoveryEpochID: indexes.establishedByJobID[record.jobID],
+        resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[record.jobID])
     }
     return RuntimeJobStatusPage(jobs: statuses, nextCursor: page.nextCursor)
   }
@@ -6121,7 +6132,8 @@ public actor RuntimeJobEngine {
   private func status(
     of record: RuntimeJobRecord,
     supersededByRecoveryEpochID: String? = nil,
-    recoveryEpochID: String? = nil
+    recoveryEpochID: String? = nil,
+    resolvedByTargetAliasResolutionID: String? = nil
   ) -> RuntimeJobStatus {
     RuntimeJobStatus(
       jobID: record.jobID,
@@ -6142,24 +6154,38 @@ public actor RuntimeJobEngine {
       startedAtUTC: record.startedAtUTC,
       finishedAtUTC: record.finishedAtUTC,
       supersededByRecoveryEpochID: supersededByRecoveryEpochID,
-      recoveryEpochID: recoveryEpochID)
+      recoveryEpochID: recoveryEpochID,
+      resolvedByTargetAliasResolutionID: resolvedByTargetAliasResolutionID)
   }
 
   private struct RecoveryEpochIndexes {
     var supersededByJobID: [String: String] = [:]
     var establishedByJobID: [String: String] = [:]
+    var resolvedAliasByJobID: [String: String] = [:]
   }
 
   private func recoveryEpochIndexes() async -> RecoveryEpochIndexes {
-    guard let store = try? RuntimeSupersedingRecoveryStore(
+    var indexes = RecoveryEpochIndexes()
+    if let store = try? RuntimeSupersedingRecoveryStore(
       stateDirectory: configuration.stateDirectory),
       let epochs = try? await store.list()
-    else { return RecoveryEpochIndexes() }
-    var indexes = RecoveryEpochIndexes()
-    for epoch in epochs {
-      indexes.establishedByJobID[epoch.recoveryJobID] = epoch.epochID
-      for intent in epoch.coveredIntents {
-        indexes.supersededByJobID[intent.jobID] = epoch.epochID
+    {
+      for epoch in epochs {
+        indexes.establishedByJobID[epoch.recoveryJobID] = epoch.epochID
+        for intent in epoch.coveredIntents {
+          indexes.supersededByJobID[intent.jobID] = epoch.epochID
+        }
+      }
+    }
+    if let targetStore = try? RuntimeTargetStore(
+      directoryURL: configuration.stateDirectory.appendingPathComponent(
+        "targets", isDirectory: true)),
+      let resolutions = try? targetStore.aliasResolutions()
+    {
+      for resolution in resolutions {
+        for intent in resolution.coveredUnknownIntents {
+          indexes.resolvedAliasByJobID[intent.jobID] = resolution.resolutionID
+        }
       }
     }
     return indexes

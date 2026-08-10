@@ -292,7 +292,8 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
               try !targetStore.hasConflictingHDCAliasOwner(
                 canonicalTargetID: target.targetID,
                 connectKey: routed.hdcConnectKey,
-                identitySHA256: routed.hdcIdentitySHA256)
+                identitySHA256: routed.hdcIdentitySHA256,
+                establishingFlashJobID: routed.jobID)
             else {
               throw DeviceProviderError.factsUnavailable(
                 "verified post-flash HDC alias is owned by another adopted target")

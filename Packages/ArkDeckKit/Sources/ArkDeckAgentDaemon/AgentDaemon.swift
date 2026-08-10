@@ -1390,7 +1390,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id, code: .internalError, message: "target store is not configured")
       }
       do {
-        let targets = try targetStore.list()
+        let targets = try targetStore.listActive()
         return success(
           id: request.id,
           result: .array(
@@ -1420,17 +1420,38 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let candidates = try await bootstrap.enumerateCandidates()
-        let adopted = (try? targetStore?.list()) ?? []
+        var projected: [(candidate: BootstrapCandidate, target: RuntimeTargetRecord?)] = []
+        for candidate in candidates {
+          let target = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
+          if let target,
+            let index = projected.firstIndex(where: { $0.target?.targetID == target.targetID })
+          {
+            func rank(_ state: String) -> Int {
+              switch state {
+              case "Connected": return 3
+              case "Unauthorized": return 2
+              case "Offline": return 1
+              default: return 0
+              }
+            }
+            if rank(candidate.state) > rank(projected[index].candidate.state) {
+              projected[index] = (candidate, target)
+            }
+          } else {
+            projected.append((candidate, target))
+          }
+        }
         return success(
           id: request.id,
           result: .array(
-            candidates.map { candidate in
-              let record = adopted.first { $0.connectKey == candidate.connectKey }
+            projected.map { row in
               return .object([
-                "connectKey": .string(candidate.connectKey),
-                "state": .string(candidate.state),
-                "adoptedTargetId": record.map { .string($0.targetID) } ?? .null,
-                "bindingRevision": record.map { .integer(Int64($0.bindingRevision)) } ?? .null,
+                "connectKey": .string(row.candidate.connectKey),
+                "state": .string(row.candidate.state),
+                "adoptedTargetId": row.target.map { .string($0.targetID) } ?? .null,
+                "bindingRevision": row.target.map {
+                  .integer(Int64($0.bindingRevision))
+                } ?? .null,
               ])
             }))
       } catch {
@@ -1562,6 +1583,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "supersededByRecoveryEpochId": status.supersededByRecoveryEpochID
         .map(JSONValue.string) ?? .null,
       "recoveryEpochId": status.recoveryEpochID.map(JSONValue.string) ?? .null,
+      "resolvedByTargetAliasResolutionId": status.resolvedByTargetAliasResolutionID
+        .map(JSONValue.string) ?? .null,
     ])
   }
 

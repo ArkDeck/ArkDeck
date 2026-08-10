@@ -125,6 +125,56 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertEqual(try XCTUnwrap(unauthorizedRow)["adoptedTargetId"], .null)
   }
 
+  func testResolvedAliasCandidateCollapsesIntoTheCanonicalTarget() async throws {
+    let canonicalKey = "canonical-hdc-address"
+    let aliasKey = "post-flash-hdc-address"
+    let (handler, targetStore) = try makeHandler(candidates: [
+      BootstrapCandidate(connectKey: canonicalKey, state: "Offline"),
+      BootstrapCandidate(connectKey: aliasKey, state: "Connected"),
+    ])
+    let canonical = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: canonicalKey, toolVersion: "3.2.0f",
+      nowUTC: "2026-08-07T00:00:00Z").record
+    let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasKey)
+    let alias = try targetStore.adopt(
+      stableIdentitySHA256: aliasIdentity, connectKey: aliasKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-07T00:01:00Z").record
+    _ = try targetStore.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: alias.targetID,
+        aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: alias.bindingRevision,
+        canonicalTargetID: canonical.targetID,
+        canonicalStableIdentitySHA256: canonical.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: canonical.bindingRevision,
+        routedHDCIdentitySHA256: aliasIdentity, routedUSBTopology: "42",
+        establishingFlashJobID: "job-0123456789abcdef0123456789abcdef",
+        establishingFlashPlanDigestSHA256: String(repeating: "b", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [], establishedAtUTC: "2026-08-07T00:10:00Z"))
+
+    let candidates = await handler.handleFrame(frame("device.candidates"))
+    guard case .array(let rows)? = candidates.result else {
+      return XCTFail("device.candidates must return an array")
+    }
+    XCTAssertEqual(rows.count, 1, "two transport faces must not duplicate the same target")
+    guard case .object(let row) = rows[0] else { return XCTFail("row must be an object") }
+    XCTAssertEqual(row["connectKey"], .string(aliasKey))
+    XCTAssertEqual(row["state"], .string("Connected"))
+    XCTAssertEqual(row["adoptedTargetId"], .string(canonical.targetID))
+    XCTAssertEqual(row["bindingRevision"], .integer(Int64(canonical.bindingRevision)))
+
+    let targetList = await handler.handleFrame(frame("target.list"))
+    guard case .array(let targets)? = targetList.result else {
+      return XCTFail("target.list must return an array")
+    }
+    XCTAssertEqual(targets.count, 1, "the alias remains durable but is not independently selectable")
+  }
+
   func testMissingBootstrapFailsLoudInsteadOfReturningAnEmptyList() async throws {
     let (handler, _) = try makeHandler(candidates: [], bootstrapConfigured: false)
     let response = await handler.handleFrame(frame("device.candidates"))
