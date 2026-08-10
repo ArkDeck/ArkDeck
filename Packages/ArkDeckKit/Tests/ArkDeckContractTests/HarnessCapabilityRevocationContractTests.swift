@@ -189,6 +189,45 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
     XCTAssertTrue(held)
   }
 
+  /// A Runtime-default envelope is not a standing grant. It is tied to the
+  /// Catalog policy fingerprint that created it and may remain installed
+  /// after an agentd update. Naming it from a new Harness request bypasses
+  /// current issuance and is then (correctly) refused at the last safe
+  /// boundary when the current fingerprint is re-established.
+  func testRuntimeDefaultCapabilityIsNeverNamedAsAStandingGrant() async throws {
+    let (store, port) = try makePort()
+    let inputs: [String: JSONValue] = [
+      "bundleName": .string("com.example.waterflowdemo")
+    ]
+    try await store.install(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-POLICY-STALE-CATALOG-G1",
+        targetScope: .stablePhysicalIdentity(sha256: Self.deviceIdentity),
+        operationScope: [.init(operationID: "debug.hap", version: 1)],
+        effectCeiling: .deviceMutation,
+        inputConstraints: [
+          "bundleName": .exactString("com.example.waterflowdemo")
+        ],
+        exactInputs: inputs,
+        issuedAtUTC: "2026-07-01T00:00:00Z",
+        expiresAtUTC: "2026-12-31T00:00:00Z",
+        maximumUses: 10_000,
+        issuer: .init(
+          kind: .runtimeDefaultPolicy,
+          reference: "catalog:stale-digest:debug.hap@1"),
+        exactBindingRevision: 3))
+
+    let named = await port.standingCapabilityID(
+      operationReference: "debug.hap@1", targetID: "TGT-1",
+      expectedBindingRevision: 3, inputs: inputs)
+    XCTAssertNil(
+      named,
+      "the current Runtime must issue its own policy envelope for the new request")
+    let held = await port.hasStandingCapability(
+      operationReference: "debug.hap@1", targetID: "TGT-1")
+    XCTAssertFalse(held)
+  }
+
   /// The guard asks "is there one?" and the dispatcher then asks "which one?".
   /// The defect this file exists for is what happens when those two answers
   /// disagree, so they may never be computed by two independent scans.

@@ -72,6 +72,16 @@ public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
     let now = nowUTC()
     return installed
       .filter { status in
+        // Runtime-default envelopes are an internal admission product, not
+        // standing grants the harness may carry into a later request. In
+        // particular, one left by an older Catalog digest can still match
+        // target, revision and exact inputs, but the current Runtime must
+        // issue/select its own envelope so its policy fingerprint is current.
+        // Treating that internal record as caller authority makes the request
+        // fail at the final pre-dispatch fingerprint check.
+        guard status.capability.issuer.kind == .maintainerMergedPR else {
+          return false
+        }
         // Revocation is checked first because it is the one condition the
         // remaining fields cannot express: a revoked grant keeps its uses,
         // its lineage and its expiry, so every other test here still passes
