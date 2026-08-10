@@ -187,7 +187,8 @@ extension WorkspaceProviderAction {
     case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch,
       .createCheckpoint, .createArchiveCheckpoint:
       return true
-    case .inspectSource, .symbolizeCrash, .inspectGitStatus, .inspectDiff, .readSourceRange:
+    case .inspectSource, .signOpenHarmonyHap, .symbolizeCrash, .inspectGitStatus,
+      .inspectDiff, .readSourceRange:
       return false
     }
   }
@@ -222,6 +223,7 @@ package enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectSource(WorkspaceSourceInspection)
   case applyPatch(WorkspacePatchIntent)
   case buildOpenHarmony(WorkspaceResolvedInvocation)
+  case signOpenHarmonyHap(WorkspaceOpenHarmonySigningAction)
   case runTests(WorkspaceResolvedInvocation)
   case symbolizeCrash(WorkspaceResolvedInvocation)
   case revertPatch(WorkspaceRevertIntent)
@@ -1652,9 +1654,15 @@ package protocol DeviceProvider: Sendable {
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts?
 
+  /// Removes provider-owned temporary state only after Runtime has durably
+  /// closed a known terminal. Unknown outcomes deliberately retain readback
+  /// material and never pass through this hook.
+  func cleanupTerminalJob(jobID: String)
+
 }
 
 extension DeviceProvider {
+  package func cleanupTerminalJob(jobID _: String) {}
   public func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {

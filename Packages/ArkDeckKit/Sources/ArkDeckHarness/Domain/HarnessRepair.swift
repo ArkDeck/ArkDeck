@@ -274,6 +274,11 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
   public let buildSourceRevision: String?
   public let buildOutputDigest: String?
   public let buildOutputArtifactLease: String?
+  /// True only after the published local-signing operation has produced a
+  /// verified `signed.hap` Artifact. Historical attempts decode as false, so
+  /// a daemon restart can never mistake an unsigned build readback for a
+  /// deployable package.
+  public let buildOutputSigned: Bool
   public let testsPassed: Bool
   public let deployedDigest: String?
   public let rollbackRequired: Bool
@@ -287,6 +292,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
     buildSourceRevision: String? = nil,
     buildOutputDigest: String? = nil,
     buildOutputArtifactLease: String? = nil,
+    buildOutputSigned: Bool = false,
     testsPassed: Bool = false,
     deployedDigest: String? = nil,
     rollbackRequired: Bool = false,
@@ -299,6 +305,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
     self.buildSourceRevision = buildSourceRevision
     self.buildOutputDigest = buildOutputDigest
     self.buildOutputArtifactLease = buildOutputArtifactLease
+    self.buildOutputSigned = buildOutputSigned
     self.testsPassed = testsPassed
     self.deployedDigest = deployedDigest
     self.rollbackRequired = rollbackRequired
@@ -312,6 +319,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
       "unifiedDiff": .string(proposal.unifiedDiff),
       "touchedFiles": .array(proposal.touchedFiles.map(JSONValue.string)),
       "expectedChangedSymbols": .array(proposal.expectedChangedSymbols.map(JSONValue.string)),
+      "buildOutputSigned": .bool(buildOutputSigned),
       "testsPassed": .bool(testsPassed),
       "rollbackRequired": .bool(rollbackRequired),
       "reverted": .bool(reverted),
@@ -348,6 +356,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
       buildSourceRevision: string("buildSourceRevision"),
       buildOutputDigest: string("buildOutputDigest"),
       buildOutputArtifactLease: string("buildOutputArtifactLease"),
+      buildOutputSigned: boolean("buildOutputSigned"),
       testsPassed: boolean("testsPassed"),
       deployedDigest: string("deployedDigest"),
       rollbackRequired: boolean("rollbackRequired"),
@@ -361,6 +370,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
     buildSourceRevision: String? = nil,
     buildOutputDigest: String? = nil,
     buildOutputArtifactLease: String? = nil,
+    buildOutputSigned: Bool? = nil,
     testsPassed: Bool? = nil,
     deployedDigest: String? = nil,
     rollbackRequired: Bool? = nil,
@@ -374,6 +384,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
       buildSourceRevision: buildSourceRevision ?? self.buildSourceRevision,
       buildOutputDigest: buildOutputDigest ?? self.buildOutputDigest,
       buildOutputArtifactLease: buildOutputArtifactLease ?? self.buildOutputArtifactLease,
+      buildOutputSigned: buildOutputSigned ?? self.buildOutputSigned,
       testsPassed: testsPassed ?? self.testsPassed,
       deployedDigest: deployedDigest ?? self.deployedDigest,
       rollbackRequired: rollbackRequired ?? self.rollbackRequired,

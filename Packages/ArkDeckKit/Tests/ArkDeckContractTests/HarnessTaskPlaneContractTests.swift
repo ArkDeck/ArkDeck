@@ -955,6 +955,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         .string("analyzer.extract-crash-signature@1"),
         .string("capture.diagnostics@1"), .string("debug.hap@1"),
         .string("observe.device@1"),
+        .string("workspace.sign-openharmony-hap@1"),
       ]))
 
     let reconciled = try await call("task.reconcile", ["htaskId": .string(taskID)])

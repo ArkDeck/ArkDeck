@@ -1798,7 +1798,8 @@ public actor HarnessTaskCoordinator {
     if [
       DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
       DebugCrashTaskHandler.buildOpenHarmony,
-      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.deployHAP,
+      DebugCrashTaskHandler.signOpenHarmonyHAP, DebugCrashTaskHandler.runTests,
+      DebugCrashTaskHandler.deployHAP,
       DebugCrashTaskHandler.revertPatch,
     ].contains(operationReference),
       let decision = try await store.decision(snapshot.htaskID, round: snapshot.activeRound)
@@ -2039,6 +2040,28 @@ public actor HarnessTaskCoordinator {
             actual: snapshot.repairAttempt?.buildSourceRevision ?? "-")
         }
         nextAttempt = current.updating(testsPassed: true)
+
+      case DebugCrashTaskHandler.signOpenHarmonyHAP:
+        guard let current = snapshot.repairAttempt,
+          current.testsPassed,
+          !current.buildOutputSigned,
+          case .string(let unsignedLease)? = decision.inputs["unsignedHapArtifactLease"],
+          unsignedLease == current.buildOutputArtifactLease
+        else {
+          throw HarnessRepairPortError.malformedReadback("signingAttempt")
+        }
+        let readback = try await repairPort.signedHAPReadback(
+          jobID: observation.jobID, unsignedArtifactLease: unsignedLease, task: snapshot)
+        nextAttempt = current.updating(
+          buildOutputDigest: readback.outputDigest,
+          buildOutputArtifactLease: readback.outputArtifactLease,
+          buildOutputSigned: true)
+        let leaseParts = readback.outputArtifactLease.split(
+          separator: ":", omittingEmptySubsequences: false)
+        if leaseParts.count == 3 {
+          try await recordAttemptBuildArtifacts(
+            [String(leaseParts[2])], taskID: snapshot.htaskID)
+        }
 
       case DebugCrashTaskHandler.deployHAP:
         guard let current = snapshot.repairAttempt,
@@ -2790,7 +2813,8 @@ public actor HarnessTaskCoordinator {
     if [
       DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
       DebugCrashTaskHandler.buildOpenHarmony,
-      DebugCrashTaskHandler.runTests, DebugCrashTaskHandler.revertPatch,
+      DebugCrashTaskHandler.signOpenHarmonyHAP, DebugCrashTaskHandler.runTests,
+      DebugCrashTaskHandler.revertPatch,
     ].contains(operationReference) {
       observations.append((.workspaceReady, .trueValue, admitted))
     }
@@ -2809,6 +2833,8 @@ public actor HarnessTaskCoordinator {
       ]
     case DebugCrashTaskHandler.buildOpenHarmony:
       observations.append((.patchApplied, .trueValue, "patchReadbackMatched"))
+    case DebugCrashTaskHandler.signOpenHarmonyHAP:
+      observations.append((.buildOutputsReady, .trueValue, "unsignedBuildArtifactResolved"))
     case DebugCrashTaskHandler.runTests:
       observations.append((.buildOutputsReady, .trueValue, "buildReadbackMatched"))
     case DebugCrashTaskHandler.deployHAP:
@@ -2874,6 +2900,12 @@ public actor HarnessTaskCoordinator {
         (.workspaceReady, .trueValue, "buildReadbackMatched"),
         (.patchApplied, .trueValue, "buildSourceRevisionMatched"),
         (.buildOutputsReady, .trueValue, "buildOutputPublished"),
+      ]
+    case DebugCrashTaskHandler.signOpenHarmonyHAP:
+      observations = [
+        (.workspaceReady, .trueValue, "signingPresetVerified"),
+        (.buildPassed, .trueValue, "testsPassed"),
+        (.buildOutputsReady, .trueValue, "signedBuildOutputVerified"),
       ]
     case DebugCrashTaskHandler.runTests:
       observations = [

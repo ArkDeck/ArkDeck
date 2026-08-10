@@ -148,6 +148,10 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   case inspectWorkspaceSource
   case applyWorkspacePatch
   case buildWorkspaceOpenHarmony
+  /// Host-only local signing of one Runtime-owned HAP Artifact. Tool and
+  /// signing-material identities come from an installed ArkDeck preset;
+  /// callers cannot provide paths, argv or credentials.
+  case signWorkspaceOpenHarmonyHap
   case runWorkspaceTests
   case symbolizeWorkspaceCrash
   case revertWorkspacePatch
@@ -366,6 +370,10 @@ public enum WorkflowStepRegistry {
         ])
     case .buildWorkspaceOpenHarmony:
       host(required: ["projectRef", "buildPresetRef"])
+    case .signWorkspaceOpenHarmonyHap:
+      metadata(
+        .hostOnly, .atSafeBoundary, .none,
+        required: ["projectRef", "signingPresetRef", "inputArtifactId", "inputSha256"])
     case .runWorkspaceTests:
       host(required: ["projectRef", "testPresetRef"])
     case .symbolizeWorkspaceCrash:
@@ -1184,6 +1192,11 @@ private enum WorkflowStepValidator {
     case .buildWorkspaceOpenHarmony:
       try reader.identifier("projectRef")
       try reader.identifier("buildPresetRef")
+    case .signWorkspaceOpenHarmonyHap:
+      try reader.identifier("projectRef")
+      try reader.constant("signingPresetRef", value: "openharmony-release@1")
+      try reader.identifier("inputArtifactId")
+      try reader.sha256("inputSha256")
     case .runWorkspaceTests:
       try reader.identifier("projectRef")
       try reader.identifier("testPresetRef")

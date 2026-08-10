@@ -1324,7 +1324,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record)
+        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       case .confirmedNotExecuted(let reason),
         .confirmedNotExecutedWithDiagnostic(let reason, _):
         // The state graph routes every terminal outcome through
@@ -1339,7 +1339,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .safeToReflash,
           state: JobState.failed.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record)
+        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       case .failed(let reason):
         try transition(&current, from: executionState, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
@@ -1349,7 +1349,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record)
+        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       }
     } catch let failure as RuntimeArtifactPublicationFailure {
       var current = jobs[jobID] ?? runtime
@@ -1365,7 +1365,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: current.record, outcome: .confirmed,
         state: JobState.failed.rawValue)
-      return statusAndReleaseTerminalRuntime(current.record)
+      return statusAndReleaseTerminalRuntime(current.record, provider: provider)
     }
 
     var current = jobs[jobID] ?? runtime
@@ -1397,7 +1397,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record)
+        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       }
       current = jobs[jobID] ?? current
       if current.record.admissionEvidence?.completeOverwriteRecovery != nil {
@@ -1421,7 +1421,7 @@ public actor RuntimeJobEngine {
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
     return statusAndReleaseTerminalRuntime(
-      current.record, recoveryEpochID: establishedRecoveryEpochID)
+      current.record, recoveryEpochID: establishedRecoveryEpochID, provider: provider)
   }
 
   /// A selected trace leg is bracketed by two Runtime-owned read snapshots.
@@ -1667,6 +1667,7 @@ public actor RuntimeJobEngine {
                 || step.kind == .runApprovedRemoteRead))
             || step.kind == .flashPartition
             || step.kind == .applyWorkspacePatch
+            || step.kind == .signWorkspaceOpenHarmonyHap
             || step.kind == .symbolizeWorkspaceCrash
             || step.kind == .runDeterministicAnalyzer
             || descriptor.reference == "flash.dayu200"
@@ -2883,7 +2884,23 @@ public actor RuntimeJobEngine {
       }
       return
     }
-    let binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
+    let binding: ArtifactBindingSnapshot
+    if descriptor.reference == OpenHarmonyLocalSigning.operationReference,
+      case .string(let sourceLease)? =
+        runtime.record.request.inputs["unsignedHapArtifactLease"]
+    {
+      // Signing is host-only, but its product remains the exact immutable
+      // device-bound build product that entered the signer. Preserve that
+      // provenance instead of relabelling the HAP as an unbound host file.
+      let source = try await artifactStore.resolveLease(sourceLease)
+      guard source.bindingSnapshot.targetID == runtime.record.request.target.targetID else {
+        throw RuntimeArtifactPublicationFailure(
+          detail: "signed HAP source target no longer matches the request")
+      }
+      binding = source.bindingSnapshot
+    } else {
+      binding = RuntimeArtifactService.bindingSnapshot(for: runtime.record)
+    }
     for name in mapping {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
@@ -3689,9 +3706,12 @@ public actor RuntimeJobEngine {
       try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
       return status(of: record)
     }
+    guard let provider = providers.provider(id: runtime.record.providerID) else {
+      throw RuntimeJobEngineError.internalFailure("provider vanished for \(jobID)")
+    }
     guard runtime.record.outcomeUnknown else {
       try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
-      return statusAndReleaseTerminalRuntime(runtime.record)
+      return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
     }
     let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
     var inspection = try DurableJournalRecovery.inspect(url: journalURL)
@@ -3740,7 +3760,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: runtime.record, outcome: .safeToReflash,
         state: JobState.failed.rawValue)
-      return statusAndReleaseTerminalRuntime(runtime.record)
+      return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
     }
     guard inspection.unknownOutcomes.isEmpty else {
       runtime.record.timeline.append(
@@ -3748,9 +3768,6 @@ public actor RuntimeJobEngine {
       try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       return status(of: runtime.record)
-    }
-    guard let provider = providers.provider(id: runtime.record.providerID) else {
-      throw RuntimeJobEngineError.internalFailure("provider vanished for \(jobID)")
     }
     guard let stepID = runtime.record.recoveryStepID,
       let persistedAction = runtime.record.recoveryAction,
@@ -3813,34 +3830,44 @@ public actor RuntimeJobEngine {
       inspection = try DurableJournalRecovery.inspect(url: journalURL)
     }
 
-    // Host-only jobs are not reconciled against a device: there is no readback
-    // to perform and no device outcome to confirm, so asking a provider for
-    // facts here would be asking it to invent them.
-    if let hostOnlyDescriptor = RuntimeOperationCatalog.descriptor(
-      reference: runtime.record.request.operation.reference),
-      hostOnlyDescriptor.binding == .none
-    {
-      throw RuntimeJobEngineError.jobNotRunnable(
-        "\(jobID) is host-only: it has no device outcome to reconcile")
+    guard let descriptor = RuntimeOperationCatalog.descriptor(
+      reference: runtime.record.request.operation.reference)
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "catalog operation vanished for \(jobID)")
     }
-    let facts = try await providers.resolveFacts(
-      providerID: runtime.record.providerID,
-      targetID: runtime.record.request.target.targetID)
-    try Self.validateEvidenceFacts(
-      facts,
-      targetID: runtime.record.request.target.targetID,
-      bindingRevision: runtime.record.request.target.expectedBindingRevision,
-      providerID: runtime.record.providerID)
+    // Host-only reconciliation asks the provider to inspect only its durable
+    // Job-owned output; it must not invent device facts. Device-bound actions
+    // retain the existing fresh-facts gate.
+    let facts: ProviderFacts?
+    if descriptor.binding == .none {
+      facts = nil
+    } else {
+      let resolved = try await providers.resolveFacts(
+        providerID: runtime.record.providerID,
+        targetID: runtime.record.request.target.targetID)
+      try Self.validateEvidenceFacts(
+        resolved,
+        targetID: runtime.record.request.target.targetID,
+        bindingRevision: runtime.record.request.target.expectedBindingRevision,
+        providerID: runtime.record.providerID)
+      facts = resolved
+    }
+    let reconciledInputArtifact = try await resolvedInputArtifact(jobID: jobID)
     let context = ProviderExecutionContext(
       jobID: jobID, stepID: stepID,
       targetID: runtime.record.request.target.targetID,
       bindingRevision: runtime.record.request.target.expectedBindingRevision,
-      connectKey: facts.executionConnectKey,
-      expectedIdentitySHA256: facts.deviceIdentitySHA256,
-      toolVersion: facts.toolVersion,
-      toolSHA256: facts.toolSHA256,
-      serverFacts: facts.serverFacts,
-      nowUTC: nowUTC())
+      connectKey: facts?.executionConnectKey,
+      expectedIdentitySHA256: facts?.deviceIdentitySHA256,
+      toolVersion: facts?.toolVersion,
+      toolSHA256: facts?.toolSHA256,
+      serverFacts: facts?.serverFacts ?? [:],
+      nowUTC: nowUTC(), resolvedInputArtifact: reconciledInputArtifact,
+      expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
+        for: descriptor, artifact: reconciledInputArtifact,
+        artifactLeaseID: Self.flashArtifactLeaseID(
+          in: runtime.record.request.inputs)))
     let action = try persistedAction.materialize()
     let reference = ProviderDurableIntentReference(
       jobID: jobID, stepID: stepID,
@@ -3885,7 +3912,7 @@ public actor RuntimeJobEngine {
             runtime: &runtime, inspection: inspection,
             intentEventID: intentEventID, stepID: stepID,
             recoveryAttemptID: recoveryAttemptID, outcome: outcome,
-            bindingRevision: facts.bindingRevision)
+            bindingRevision: facts?.bindingRevision, provider: provider)
         }
         guard readback.action.effect <= .readOnly else {
           throw RuntimeJobEngineError.internalFailure(
@@ -3901,11 +3928,28 @@ public actor RuntimeJobEngine {
     } else {
       outcome = try await provider.reconcile(intent: reference, context: context)
     }
+    if case .workspace(.signOpenHarmonyHap(let signingAction)) = action,
+      case .confirmedCompleted = outcome
+    {
+      // A reconciled producer must republish the exact verified bytes before
+      // its step is marked complete. Otherwise resume would skip the step and
+      // finalize a Job with no signed lease.
+      let recovered = try await OpenHarmonySigningWorkspaceDispatcher.recoveredReceipt(
+        action: signingAction)
+      guard let step = descriptor.steps.first(where: { $0.stepID == stepID }) else {
+        throw RuntimeJobEngineError.internalFailure(
+          "reconciled signing step vanished from the catalog")
+      }
+      try await publishDeclaredArtifacts(
+        jobID: jobID, step: step, summary: recovered.summary,
+        receipt: recovered.receipt)
+      outcome = .confirmedCompleted(summary: recovered.summary)
+    }
     return try await finishReconcile(
       runtime: &runtime, inspection: inspection,
       intentEventID: intentEventID, stepID: stepID,
       recoveryAttemptID: recoveryAttemptID, outcome: outcome,
-      bindingRevision: facts.bindingRevision)
+      bindingRevision: facts?.bindingRevision, provider: provider)
   }
 
   private func finishReconcile(
@@ -3915,7 +3959,8 @@ public actor RuntimeJobEngine {
     stepID: String,
     recoveryAttemptID: String,
     outcome: ProviderReconcileOutcome,
-    bindingRevision: Int?
+    bindingRevision: Int?,
+    provider: any DeviceProvider
   ) async throws -> RuntimeJobStatus {
     let jobID = runtime.record.jobID
     let hasDurableResolution = inspection.events.contains { event in
@@ -3948,7 +3993,10 @@ public actor RuntimeJobEngine {
         runtime.nextSequence += 1
       }
       nextState = .resumeAtConfirmedSafeBoundary
-      reconcileResult = "resumeAtConfirmedSafeBoundary"
+      reconcileResult =
+        bindingRevision == nil
+        ? "resumeHostOnlyAtConfirmedSafeBoundary"
+        : "resumeAtConfirmedSafeBoundary"
       certainty = .confirmed
       safeBoundary = true
       reconcileBindingRevision = bindingRevision
@@ -3982,7 +4030,10 @@ public actor RuntimeJobEngine {
       // An unknown action is never resent automatically, even when it was
       // read-only. A confirmed non-execution is a definitive failed step.
       nextState = .finalizing
-      reconcileResult = "finalizeConfirmedFailure"
+      reconcileResult =
+        bindingRevision == nil
+        ? "finalizeHostOnlyConfirmedFailure"
+        : "finalizeConfirmedFailure"
       certainty = .confirmed
       safeBoundary = true
       reconcileBindingRevision = bindingRevision
@@ -4055,7 +4106,7 @@ public actor RuntimeJobEngine {
       // remaining plan before its lineage node can authorize another Job.
       break
     }
-    return statusAndReleaseTerminalRuntime(runtime.record)
+    return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
   }
 
   /// A confirmed-not-executed decision and terminal Job record become durable
@@ -4417,6 +4468,11 @@ public actor RuntimeJobEngine {
         runtime.record.request.inputs["dumpArtifactRef"]
       else { return nil }
       lease = value
+    case OpenHarmonyLocalSigning.operationReference:
+      guard case .string(let value)? =
+        runtime.record.request.inputs["unsignedHapArtifactLease"]
+      else { return nil }
+      lease = value
     case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
       "analyzer.summarize-trace@1":
       guard case .string(let value)? =
@@ -4431,7 +4487,9 @@ public actor RuntimeJobEngine {
       resolved.bindingSnapshot, request: runtime.record.request,
       materializedStableIdentitySHA256:
         runtime.record.materializedStableTargetIdentitySHA256,
-      allowDeviceBoundAnalyzerSource: runtime.record.providerID == CatalogProvider.analyzer.rawValue)
+      allowDeviceBoundHostSource:
+        runtime.record.providerID == CatalogProvider.analyzer.rawValue
+        || runtime.record.operationReference == OpenHarmonyLocalSigning.operationReference)
     return ProviderResolvedInputArtifact(
       artifactID: resolved.artifactID, fileURL: resolved.fileURL,
       sha256: resolved.sha256, byteCount: resolved.byteCount)
@@ -4441,13 +4499,13 @@ public actor RuntimeJobEngine {
     _ binding: ArtifactBindingSnapshot,
     request: RuntimeOperationRequest,
     materializedStableIdentitySHA256: String?,
-    allowDeviceBoundAnalyzerSource: Bool = false
+    allowDeviceBoundHostSource: Bool = false
   ) throws {
-    if allowDeviceBoundAnalyzerSource,
+    if allowDeviceBoundHostSource,
       request.target.expectedBindingRevision == nil,
       binding.targetID == request.target.targetID
     {
-      // The analyzer is host-only and cannot act on the device. It may read
+      // These operations are host-only and cannot act on the device. They may read
       // an immutable Artifact that was collected from that exact target;
       // the source's binding revision and identity remain in its provenance
       // rather than being erased to make the host-only request look bound.
@@ -4555,6 +4613,9 @@ public actor RuntimeJobEngine {
     case "workspace.symbolize-crash@1":
       leaseInputName = "dumpArtifactRef"
       artifactLabel = "workspace crash dump"
+    case OpenHarmonyLocalSigning.operationReference:
+      leaseInputName = "unsignedHapArtifactLease"
+      artifactLabel = "unsigned HAP"
     case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
       "analyzer.summarize-trace@1":
       leaseInputName = "sourceArtifactRef"
@@ -4576,7 +4637,9 @@ public actor RuntimeJobEngine {
         try Self.validateArtifactBinding(
           artifact.bindingSnapshot, request: request,
           materializedStableIdentitySHA256: facts?.deviceIdentitySHA256,
-          allowDeviceBoundAnalyzerSource: descriptor.provider == .analyzer)
+          allowDeviceBoundHostSource:
+            descriptor.provider == .analyzer
+            || descriptor.reference == OpenHarmonyLocalSigning.operationReference)
         resolved = ProviderResolvedInputArtifact(
           artifactID: artifact.artifactID, fileURL: artifact.fileURL,
           sha256: artifact.sha256, byteCount: artifact.byteCount)
@@ -6135,6 +6198,17 @@ public actor RuntimeJobEngine {
     return jobStatus
   }
 
+  private func statusAndReleaseTerminalRuntime(
+    _ record: RuntimeJobRecord,
+    recoveryEpochID: String? = nil,
+    provider: any DeviceProvider
+  ) -> RuntimeJobStatus {
+    if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
+      provider.cleanupTerminalJob(jobID: record.jobID)
+    }
+    return statusAndReleaseTerminalRuntime(record, recoveryEpochID: recoveryEpochID)
+  }
+
   /// Terminal history is read from its durable SQLite projection after the
   /// in-memory runtime has been released.  A missing or malformed projection
   /// is never guessed at as a status because doing so could hide an unknown
@@ -6806,6 +6880,19 @@ public actor RuntimeJobEngine {
       arguments = [
         "projectRef": .string(projectRef),
         "buildPresetRef": .string(preset),
+      ]
+    case .signWorkspaceOpenHarmonyHap:
+      guard case .workspace(.signOpenHarmonyHap(let signing))? = action,
+        let resolvedInputArtifact
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed OpenHarmony signing action")
+      }
+      arguments = [
+        "projectRef": .string(signing.projectRef),
+        "signingPresetRef": .string(signing.preset.presetID),
+        "inputArtifactId": .string(resolvedInputArtifact.artifactID),
+        "inputSha256": .string(resolvedInputArtifact.sha256),
       ]
     case .runWorkspaceTests:
       guard case .string(let projectRef)? = inputs["projectRef"],

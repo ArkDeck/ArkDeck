@@ -254,6 +254,10 @@ final class HarnessRepairContractTests: XCTestCase {
         inputs: capture.merging(["traceCategories": .array([.string("sched")])]) {
           _, new in new
         }))
+    XCTAssertFalse(
+      HarnessTaskCoordinator.consumesHarnessE1Budget(
+        DebugCrashTaskHandler.signOpenHarmonyHAP, inputs: [:]),
+      "local signing is host-only and must not consume device mutation budget")
     for operation in [
       DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
       DebugCrashTaskHandler.buildOpenHarmony,
@@ -438,7 +442,8 @@ final class HarnessRepairContractTests: XCTestCase {
       patchRevision: String(repeating: "a", count: 64),
       buildSourceRevision: String(repeating: "a", count: 64),
       buildOutputDigest: expected,
-      buildOutputArtifactLease: "lease-v1:build:ART-build", testsPassed: true)
+      buildOutputArtifactLease: "lease-v1:build:ART-build", buildOutputSigned: true,
+      testsPassed: true)
     let snapshot = makeSnapshot(
       phase: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
       consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
@@ -472,7 +477,8 @@ final class HarnessRepairContractTests: XCTestCase {
       patchRevision: String(repeating: "a", count: 64),
       buildSourceRevision: String(repeating: "a", count: 64),
       buildOutputDigest: digest,
-      buildOutputArtifactLease: "lease-v1:build:ART-build", testsPassed: true,
+      buildOutputArtifactLease: "lease-v1:build:ART-build", buildOutputSigned: true,
+      testsPassed: true,
       deployedDigest: digest)
     let snapshot = makeSnapshot(
       phase: .verifying, activeJobID: nil, repair: attempt,
@@ -508,7 +514,8 @@ final class HarnessRepairContractTests: XCTestCase {
       patchRevision: String(repeating: "a", count: 64),
       buildSourceRevision: String(repeating: "a", count: 64),
       buildOutputDigest: digest,
-      buildOutputArtifactLease: "lease-v1:build:ART-build", testsPassed: true)
+      buildOutputArtifactLease: "lease-v1:build:ART-build", buildOutputSigned: true,
+      testsPassed: true)
     var failedEpoch = HarnessObservedState(
       measurements: [
         "matchingCrashCount": .integer(1),
@@ -617,7 +624,8 @@ final class HarnessRepairContractTests: XCTestCase {
     let ready = HarnessRepairAttempt(
       proposal: patch, patchAttemptRef: "patch-fixture", patchRevision: revision,
       buildSourceRevision: revision, buildOutputDigest: String(repeating: "b", count: 64),
-      buildOutputArtifactLease: "lease-v1:build:ART-build", testsPassed: true)
+      buildOutputArtifactLease: "lease-v1:build:ART-build", buildOutputSigned: true,
+      testsPassed: true)
     let exact = makeSnapshot(
       phase: .building, activeJobID: nil, repair: ready,
       consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 4), maxE1Mutations: 6)

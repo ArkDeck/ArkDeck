@@ -318,6 +318,124 @@ enum RuntimeCLI {
     }
   }
 
+  /// Installs the single published OpenHarmony signing preset. Passwords are
+  /// accepted only from an interactive terminal with echo disabled; neither
+  /// argv nor the LaunchAgent environment can become a secret transport.
+  static func runSigning(
+    _ arguments: [String],
+    store: OpenHarmonySigningPresetStore = OpenHarmonySigningPresetStore()
+  ) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing signing subcommand (install|status|remove)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    rest.removeAll { $0 == "--json" }
+    switch subcommand {
+    case "install":
+      let options = try CLIOptions(rest)
+      try options.validateAllowed([
+        "--java", "--jar", "--keystore", "--certificate", "--profile",
+        "--key-alias", "--project-ref",
+      ])
+      func required(_ name: String) throws -> String {
+        guard let value = options.value(name), !value.isEmpty else {
+          throw CLIError(exitCode: EX_USAGE, message: "signing install requires \(name)")
+        }
+        return value
+      }
+      let java = try required("--java")
+      let jar = try required("--jar")
+      let keystore = try required("--keystore")
+      let certificate = try required("--certificate")
+      let profile = try required("--profile")
+      for (name, value) in [
+        ("--java", java), ("--jar", jar), ("--keystore", keystore),
+        ("--certificate", certificate), ("--profile", profile),
+      ] where !value.hasPrefix("/") {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "signing install \(name) must be an absolute path")
+      }
+      var keystorePassword = try readTTYSecret(prompt: "Keystore password: ")
+      defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
+      var keyPassword = try readTTYSecret(prompt: "Key password: ")
+      defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
+      let receipt = try store.install(
+        configuration: OpenHarmonySigningPresetConfiguration(
+          projectRef: options.value("--project-ref")
+            ?? OpenHarmonyLocalSigning.defaultProjectRef,
+          javaExecutable: URL(fileURLWithPath: java),
+          signerJAR: URL(fileURLWithPath: jar),
+          keystore: URL(fileURLWithPath: keystore),
+          appCertificate: URL(fileURLWithPath: certificate),
+          signedProfile: URL(fileURLWithPath: profile),
+          keyAlias: try required("--key-alias")),
+        keystorePassword: keystorePassword,
+        keyPassword: keyPassword)
+      emit(try encodedJSON(receipt), json: json)
+
+    case "status":
+      guard rest.isEmpty else {
+        throw CLIError(exitCode: EX_USAGE, message: "signing status accepts only --json")
+      }
+      emit(try encodedJSON(store.status()), json: json)
+
+    case "remove":
+      guard rest.isEmpty else {
+        throw CLIError(exitCode: EX_USAGE, message: "signing remove accepts only --json")
+      }
+      emit(try encodedJSON(store.remove()), json: json)
+
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported signing subcommand")
+    }
+  }
+
+  private static func readTTYSecret(prompt: String) throws -> Data {
+    guard isatty(STDIN_FILENO) == 1 else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "signing passwords require an interactive TTY")
+    }
+    FileHandle.standardError.write(Data(prompt.utf8))
+    var original = termios()
+    guard tcgetattr(STDIN_FILENO, &original) == 0 else {
+      throw CLIError(exitCode: 1, message: "could not read terminal attributes")
+    }
+    var hidden = original
+    hidden.c_lflag &= ~tcflag_t(ECHO)
+    guard tcsetattr(STDIN_FILENO, TCSAFLUSH, &hidden) == 0 else {
+      throw CLIError(exitCode: 1, message: "could not disable terminal echo")
+    }
+    defer {
+      _ = tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
+      FileHandle.standardError.write(Data("\n".utf8))
+    }
+    var secret = Data()
+    while secret.count <= 1_024 {
+      var byte: UInt8 = 0
+      let count = Darwin.read(STDIN_FILENO, &byte, 1)
+      if count == 0 { break }
+      if count < 0 {
+        if errno == EINTR { continue }
+        throw CLIError(exitCode: 1, message: "could not read signing password")
+      }
+      if byte == 10 || byte == 13 { break }
+      guard byte >= 32, byte != 127 else {
+        throw CLIError(exitCode: EX_USAGE, message: "signing password contains control bytes")
+      }
+      secret.append(byte)
+    }
+    guard !secret.isEmpty, secret.count <= 1_024 else {
+      secret.resetBytes(in: 0..<secret.count)
+      throw CLIError(exitCode: EX_USAGE, message: "signing password is empty or too long")
+    }
+    return secret
+  }
+
   private static func defaultAgentDaemonExecutablePath() -> String {
     guard let executable = Bundle.main.executableURL else { return "arkdeck-agentd" }
     return executable.deletingLastPathComponent()
@@ -571,7 +689,8 @@ enum RuntimeCLI {
       else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "artifact import-hap requires --target <id> --file <signed.hap>")
+          message:
+            "artifact import-hap requires --target <id> --file <unsigned-or-signed.hap>")
       }
       let targetID = rest[targetIndex + 1]
       let payload = try readHAPImportPayload(path: rest[fileIndex + 1])

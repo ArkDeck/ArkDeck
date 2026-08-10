@@ -84,6 +84,16 @@ public struct HarnessBuildReadback: Equatable, Sendable {
   }
 }
 
+public struct HarnessSignedHAPReadback: Equatable, Sendable {
+  public let outputDigest: String
+  public let outputArtifactLease: String
+
+  public init(outputDigest: String, outputArtifactLease: String) {
+    self.outputDigest = outputDigest
+    self.outputArtifactLease = outputArtifactLease
+  }
+}
+
 public enum HarnessPatchApplicationReadback: Equatable, Sendable {
   case patchApplied(HarnessAppliedPatchReadback)
   case patchNotApplied
@@ -146,6 +156,15 @@ public protocol HarnessRepairPort: Sendable {
     task: HarnessTaskSnapshot
   ) async throws -> HarnessBuildReadback
 
+  /// Reads the Runtime-published, verify-app-confirmed signing product. The
+  /// coordinator never opens provider-owned paths and never treats a process
+  /// exit status as signing proof.
+  func signedHAPReadback(
+    jobID: String,
+    unsignedArtifactLease: String,
+    task: HarnessTaskSnapshot
+  ) async throws -> HarnessSignedHAPReadback
+
   func deployedArtifactDigest(jobID: String) async throws -> String
 
   func reconcileUnknownPatch(
@@ -154,6 +173,12 @@ public protocol HarnessRepairPort: Sendable {
 }
 
 extension HarnessRepairPort {
+  public func signedHAPReadback(
+    jobID: String, unsignedArtifactLease: String, task: HarnessTaskSnapshot
+  ) async throws -> HarnessSignedHAPReadback {
+    throw HarnessRepairPortError.unavailable("signedHAPReadback")
+  }
+
   public func readableSourceFiles(
     projectRef: String,
     task: HarnessTaskSnapshot,

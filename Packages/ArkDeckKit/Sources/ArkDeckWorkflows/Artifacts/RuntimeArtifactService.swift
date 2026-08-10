@@ -15,7 +15,9 @@ enum RuntimeArtifactService {
   /// than from a captured stream. They publish from the host file the
   /// dispatcher measured, and a missing file is a recorded absence — there
   /// is no path from "the step ran" to a published trace.
-  static let fileBackedArtifacts: Set<String> = ["trace.htrace", "screenshot.png"]
+  static let fileBackedArtifacts: Set<String> = [
+    "trace.htrace", "screenshot.png", "signed.hap",
+  ]
 
   /// A confirmed process failure still owns useful bounded diagnostics.
   /// Publishing those bytes does not turn the Job into success; it prevents
@@ -31,6 +33,7 @@ enum RuntimeArtifactService {
     "workspace.create-checkpoint@1",
     "workspace.revert-patch@1",
     "workspace.run-tests@1",
+    OpenHarmonyLocalSigning.operationReference,
     "workspace.symbolize-crash@1",
   ]
 
@@ -57,6 +60,9 @@ enum RuntimeArtifactService {
     ],
     "workspace.build-openharmony@1": [
       "build-project": ["build.log"]
+    ],
+    OpenHarmonyLocalSigning.operationReference: [
+      "sign-workspace-hap": ["signed.hap", "signing-report.json"]
     ],
     "workspace.create-checkpoint@1": [
       "create-checkpoint": ["checkpoint.txt"]

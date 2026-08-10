@@ -231,7 +231,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     XCTAssertEqual(tests.fixedArguments[1], "test")
     XCTAssertEqual(
       production.buildProducts[build.presetID],
-      "entry/build/default/outputs/default/entry-default-signed.hap")
+      "entry/build/default/outputs/default/entry-default-unsigned.hap")
     XCTAssertEqual(
       production.allowedFileGlobs,
       [

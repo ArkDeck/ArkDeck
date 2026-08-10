@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "4041944428d12e97b1d373cc54d25f9fe8de07937208f9be40a751a9543a759e"
+  public static let catalogDigest = "fd68536c229194cb7211a5056a8ede2b83d2c3e7ffea37ed7f34fd41714eaf17"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -738,6 +738,38 @@ extension RuntimeOperationCatalog {
       preflightAttempts: 1,
       artifacts: [
         CatalogArtifactDescriptor(name: "test-output.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.sign-openharmony-hap",
+      version: 1,
+      title: "Sign an immutable OpenHarmony HAP with the installed local preset",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "signingPresetRef", type: .string, isRequired: true, maxLength: 128),
+        CatalogFieldDescriptor(name: "unsignedHapArtifactLease", type: .artifactLease, isRequired: true)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "signedHap", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "signingReport", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "sign-workspace-hap", kind: .signWorkspaceOpenHarmonyHap, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 600,
+      outputByteBudget: 134217728,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "signed.hap", role: .derived, mediaType: "application/vnd.openharmony.hap", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified),
+        CatalogArtifactDescriptor(name: "signing-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
       ],
       profiles: ["workspace-host@1"]
     ),

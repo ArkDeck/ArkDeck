@@ -192,7 +192,7 @@ public struct WorkspaceProvider: DeviceProvider {
           timeoutSeconds: 120))
     case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch,
       .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint,
-      .createArchiveCheckpoint:
+      .createArchiveCheckpoint, .signOpenHarmonyHap:
       guard let operations else {
         throw DeviceProviderError.unsupportedAction(
           "workspace operation presets are unavailable")
@@ -240,7 +240,7 @@ public struct WorkspaceProvider: DeviceProvider {
       }
     case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch,
       .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint,
-      .createArchiveCheckpoint:
+      .createArchiveCheckpoint, .signOpenHarmonyHap:
       guard let operations else {
         return .unsupported(reason: "workspace operation presets are unavailable")
       }
@@ -263,12 +263,16 @@ public struct WorkspaceProvider: DeviceProvider {
       return .confirmedNotExecuted
     case .applyPatch, .buildOpenHarmony, .runTests, .symbolizeCrash, .revertPatch,
       .inspectGitStatus, .inspectDiff, .readSourceRange, .createCheckpoint,
-      .createArchiveCheckpoint:
+      .createArchiveCheckpoint, .signOpenHarmonyHap:
       guard let operations else {
         return .stillUnknown(reason: "workspace operation presets are unavailable")
       }
       return try await operations.reconcile(intent: intent, context: context)
     }
+  }
+
+  package func cleanupTerminalJob(jobID: String) {
+    operations?.cleanupTerminalJob(jobID: jobID)
   }
 
   /// No readback plan: there is no device state to read back, and inventing a

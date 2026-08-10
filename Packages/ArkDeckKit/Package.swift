@@ -25,6 +25,7 @@ let package = Package(
     .executable(name: "ArkDeckFakeRockchipFixture", targets: ["ArkDeckFakeRockchipFixture"]),
     .executable(name: "ArkDeckEngineCrashFixture", targets: ["ArkDeckEngineCrashFixture"]),
     .executable(name: "ArkDeckRuntimeSoakFixture", targets: ["ArkDeckRuntimeSoakFixture"]),
+    .executable(name: "ArkDeckFakeHapSignerFixture", targets: ["ArkDeckFakeHapSignerFixture"]),
   ],
   targets: [
     .target(name: "ArkDeckCore"),
@@ -56,7 +57,8 @@ let package = Package(
       exclude: ["AgentComposition"],
       resources: [
         .copy("Resources/OpenHarmonyNativeCodeSign")
-      ]),
+      ],
+      linkerSettings: [.linkedFramework("Security")]),
     // Harness <-> runtime glue: harness port adapters, the evolution workspace
     // and campaign hosts, and the LLM gateway composition (including the
     // process-executing Codex CLI transport). This is the only library target
@@ -134,6 +136,10 @@ let package = Package(
       ],
       path: "Tests/ArkDeckRuntimeSoakFixture"
     ),
+    .executableTarget(
+      name: "ArkDeckFakeHapSignerFixture",
+      path: "Tests/ArkDeckFakeHapSignerFixture"
+    ),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(
       name: "ArkDeckContractTests",
@@ -156,6 +162,7 @@ let package = Package(
         "ArkDeckCLI",
         "ArkDeckFakeHDCFixture",
         "ArkDeckFakeRockchipFixture",
+        "ArkDeckFakeHapSignerFixture",
       ],
       resources: [
         // Golden resource declaration is owned by TASK-I5-001 (CHG-2026-005). `.copy` preserves

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.sign-openharmony-hap",
+  "version": 1,
+  "title": "Sign an immutable OpenHarmony HAP with the installed local preset",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "maxLength": 128
+      },
+      "signingPresetRef": {
+        "type": "string",
+        "required": true,
+        "maxLength": 128,
+        "description": "Closed ArkDeck signing preset identity; it is not a path or key alias."
+      },
+      "unsignedHapArtifactLease": {
+        "type": "artifactLease",
+        "required": true,
+        "description": "Immutable ZIP-based unsigned HAP resolved by the Runtime Artifact store."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "signedHap": {
+        "type": "artifactReference",
+        "required": true
+      },
+      "signingReport": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "sign-workspace-hap",
+      "kind": "signWorkspaceOpenHarmonyHap",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "The provider owns Java/JAR/material paths and the output directory; secrets come only from Keychain through the bounded PTY protocol."
+    }
+  ],
+  "timeoutSeconds": 600,
+  "outputByteBudget": 134217728,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "signed.hap",
+      "role": "derived",
+      "mediaType": "application/vnd.openharmony.hap",
+      "privacy": "standard",
+      "required": true,
+      "retentionClass": "pinnedUntilVerified"
+    },
+    {
+      "name": "signing-report.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true,
+      "retentionClass": "pinnedUntilVerified"
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ]
+}
