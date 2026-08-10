@@ -1479,6 +1479,27 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let observedStableIdentities = await probe.observedStableIdentities()
     XCTAssertEqual(observedConnectKeys, [nextHDC])
     XCTAssertEqual(observedStableIdentities, [loaderDigest])
+
+    let duplicate = try targetStore.adopt(
+      stableIdentitySHA256: nextDigest, connectKey: nextHDC,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:12:00Z"
+    ).record
+    XCTAssertNotEqual(duplicate.targetID, target.targetID)
+    do {
+      _ = try await port.currentFacts(targetID: target.targetID)
+      XCTFail("a post-flash alias owned by another target must fail closed")
+    } catch let error as DeviceProviderError {
+      guard case .factsUnavailable(let reason) = error else {
+        return XCTFail("unexpected provider failure: \(error)")
+      }
+      XCTAssertEqual(
+        reason,
+        "verified post-flash HDC alias is owned by another adopted target")
+    }
+    let connectKeysAfterConflict = await probe.observedConnectKeys()
+    XCTAssertEqual(
+      connectKeysAfterConflict, [nextHDC],
+      "the conflicting alias must be rejected before another device probe")
   }
 
   func testFactsReportProbedModeBuildAndExactPublishedProfile() async throws {

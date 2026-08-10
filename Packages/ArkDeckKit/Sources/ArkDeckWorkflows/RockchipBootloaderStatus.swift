@@ -93,6 +93,19 @@ public struct ProductRockchipBootloaderStatusObserver:
       routed.hdcIdentitySHA256 == digest,
       routed.usbTopology == identity.topology
     {
+      guard
+        try !targetStore.hasConflictingHDCAliasOwner(
+          canonicalTargetID: target.targetID,
+          connectKey: routed.hdcConnectKey,
+          identitySHA256: routed.hdcIdentitySHA256)
+      else {
+        return RockchipBootloaderStatus(
+          disposition: .ambiguous,
+          observationCount: 1,
+          mode: Self.mode(of: identity),
+          targetID: nil,
+          bindingRevision: nil)
+      }
       return RockchipBootloaderStatus(
         disposition: .exactBoundTarget,
         observationCount: 1,
