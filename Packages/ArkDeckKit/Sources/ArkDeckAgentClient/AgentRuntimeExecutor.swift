@@ -276,6 +276,17 @@ public struct AgentRuntimeExecutor: Sendable {
   ) throws -> RuntimeAgentExecutionOutcome {
     let target: Target
     if let selectedTarget {
+      if let expectedTargetID = request.targetID,
+        selectedTarget.targetID != expectedTargetID
+      {
+        return try pause(
+          request: request, kind: .physicalReconnect,
+          prompt:
+            "The selected physical device is not the requested target; "
+            + "reconnect the requested target before resuming this execution.",
+          mode: .reconnectTarget, catalogDigest: catalogDigest,
+          startedAtUTC: startedAtUTC, humanActions: humanActions)
+      }
       target = selectedTarget
     } else if let explicitTargetID = request.targetID {
       let listed = try listTargets(deadline: deadline)

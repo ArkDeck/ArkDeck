@@ -519,6 +519,7 @@ Task.detached {
       capabilityStore: capabilityStore,
       artifactStore: artifactStore,
       traceRuntimeProbe: traceRuntimeProbe,
+      powerActivityController: PowerActivityController(),
       agentUsageLedger: try AgentAuthorityUsageLedger(root: usageRoot),
       nowUTC: utcNow)
     let debugInvocationController = try RuntimeDebugInvocationController(

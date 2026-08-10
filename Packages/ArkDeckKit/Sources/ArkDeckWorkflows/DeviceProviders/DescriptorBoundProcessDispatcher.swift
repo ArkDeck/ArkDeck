@@ -55,10 +55,22 @@ public struct FixedExecutableResolver: RuntimeExecutableResolving {
   }
 
   public static func hashing(path: String, providerID: String) throws -> FixedExecutableResolver {
-    let data = try Data(contentsOf: URL(fileURLWithPath: path))
+    guard path.hasPrefix("/") else {
+      throw RuntimeDispatchFailure.failed(
+        "provider executable path must be explicit and absolute")
+    }
+    let executable = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+    let attributes = try FileManager.default.attributesOfItem(atPath: executable.path)
+    guard attributes[.type] as? FileAttributeType == .typeRegular,
+      FileManager.default.isExecutableFile(atPath: executable.path)
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "provider executable must be a regular executable file: \(executable.path)")
+    }
+    let data = try Data(contentsOf: executable)
     let sha = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     return FixedExecutableResolver(
-      table: [providerID: ResolvedExecutable(path: path, sha256: sha)])
+      table: [providerID: ResolvedExecutable(path: executable.path, sha256: sha)])
   }
 
   public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {

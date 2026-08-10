@@ -8,6 +8,7 @@
 
 import ArkDeckAgentClient
 import ArkDeckCore
+import ArkDeckLaunchAgent
 import ArkDeckRuntime
 import ArkDeckWorkflows
 import CryptoKit
@@ -68,6 +69,165 @@ enum RuntimeCLI {
     let json = rest.contains("--json")
     let client = client(&rest)
     emit(try client.request(method: "doctor"), json: json)
+  }
+
+  /// Installs and diagnoses the one production daemon as a user-domain
+  /// LaunchAgent. This surface invokes only `/bin/launchctl`; all device work
+  /// still crosses the daemon's typed UDS/XPC control plane.
+  static func runAgentDaemon(
+    _ arguments: [String], service: LaunchAgentService = LaunchAgentService()
+  ) throws {
+    guard let subcommand = arguments.first else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "missing agentd subcommand (install|update|status|verify|uninstall)")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    rest.removeAll { $0 == "--json" }
+    switch subcommand {
+    case "install", "update":
+      let options = try CLIOptions(rest)
+      try options.validateAllowed(["--daemon", "--hdc"])
+      let daemonPath = options.value("--daemon") ?? defaultAgentDaemonExecutablePath()
+      let configuredHDC: String?
+      if let supplied = options.value("--hdc") {
+        configuredHDC = supplied
+      } else if subcommand == "update" {
+        configuredHDC = try? service.status().hdcPath
+      } else {
+        configuredHDC = nil
+      }
+      guard let hdcPath = configuredHDC, hdcPath.hasPrefix("/") else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "agentd \(subcommand) requires --hdc with an absolute executable path")
+      }
+      guard daemonPath.hasPrefix("/") else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "agentd \(subcommand) requires an absolute arkdeck-agentd path")
+      }
+      let receipt = try service.install(
+        daemonSource: URL(fileURLWithPath: daemonPath),
+        hdcExecutable: URL(fileURLWithPath: hdcPath))
+      emit(try encodedJSON(receipt), json: json)
+
+    case "status":
+      guard rest.isEmpty else {
+        throw CLIError(exitCode: EX_USAGE, message: "agentd status accepts only --json")
+      }
+      let status = try service.status()
+      let health: JSONValue
+      if status.socketPresent {
+        do {
+          health = try AgentClient(socketPath: status.socketPath).request(method: "health")
+        } catch {
+          health = .object([
+            "status": .string("unreachable"),
+            "detail": .string("\(error)"),
+          ])
+        }
+      } else {
+        health = .object(["status": .string("socket_absent")])
+      }
+      emit(
+        .object([
+          "launchAgent": try encodedJSON(status),
+          "daemonHealth": health,
+        ]),
+        json: json)
+
+    case "verify":
+      let options = try CLIOptions(rest)
+      try options.validateAllowed(["--target", "--maximum-wait-seconds", "--execution-id"])
+      let maximumWaitSeconds: Int
+      if let raw = options.value("--maximum-wait-seconds") {
+        guard let parsed = Int(raw), (1...300).contains(parsed) else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "agentd verify --maximum-wait-seconds must be between 1 and 300")
+        }
+        maximumWaitSeconds = parsed
+      } else {
+        maximumWaitSeconds = 90
+      }
+
+      // A socket-shaped path is not enough. The verifier is deliberately
+      // anchored to the installed, loaded and identity-checked LaunchAgent,
+      // then opens exactly the UDS that service owns.
+      let status = try service.status()
+      guard status.ready else {
+        emit(
+          .object([
+            "launchAgent": try encodedJSON(status),
+            "runtime": .null,
+            "runtimeVerified": .bool(false),
+          ]),
+          json: json)
+        throw CLIError(
+          exitCode: 69,
+          message: "LaunchAgent is not ready: \(status.diagnostics.joined(separator: "; "))")
+      }
+
+      let verifier = RuntimeHeadlessVerifier(
+        client: AgentClient(socketPath: status.socketPath), nowUTC: utcNow)
+      let outcome = try verifier.verifyObserveDevice(
+        targetID: options.value("--target"),
+        maximumWaitSeconds: maximumWaitSeconds,
+        executionID: options.value("--execution-id") ?? UUID().uuidString.lowercased())
+      switch outcome {
+      case .verified(let report):
+        emit(
+          .object([
+            "launchAgent": try encodedJSON(status),
+            "runtime": try encodedJSON(report),
+            "runtimeVerified": .bool(true),
+          ]),
+          json: json)
+      case .awaitingHumanAction(let action, let receipt):
+        emit(
+          .object([
+            "humanAction": try encodedJSON(action),
+            "launchAgent": try encodedJSON(status),
+            "runtimeReceipt": try encodedJSON(receipt),
+            "runtimeVerified": .bool(false),
+          ]),
+          json: json)
+        FileHandle.standardError.write(
+          Data(
+            "resume with: arkdeck agent resume --resume-token \(action.resumeToken)\n".utf8))
+        throw CLIError(exitCode: 75, message: "paused for physical assistance")
+      case .failed(let reason, let report):
+        emit(
+          .object([
+            "launchAgent": try encodedJSON(status),
+            "runtime": try encodedJSON(report),
+            "runtimeVerified": .bool(false),
+          ]),
+          json: json)
+        throw CLIError(exitCode: 1, message: reason)
+      }
+
+    case "uninstall":
+      guard rest.isEmpty else {
+        throw CLIError(exitCode: EX_USAGE, message: "agentd uninstall accepts only --json")
+      }
+      emit(try encodedJSON(service.uninstall()), json: json)
+
+    default:
+      throw CLIError(exitCode: EX_USAGE, message: "unsupported agentd subcommand")
+    }
+  }
+
+  private static func defaultAgentDaemonExecutablePath() -> String {
+    guard let executable = Bundle.main.executableURL else { return "arkdeck-agentd" }
+    return executable.deletingLastPathComponent()
+      .appendingPathComponent("arkdeck-agentd").path
+  }
+
+  private static func encodedJSON<T: Encodable>(_ value: T) throws -> JSONValue {
+    try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
   }
 
   static func runOperation(_ arguments: [String]) throws {

@@ -16,6 +16,7 @@ let package = Package(
     .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
     .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
+    .library(name: "ArkDeckLaunchAgent", targets: ["ArkDeckLaunchAgent"]),
     .executable(name: "arkdeck-agentd", targets: ["ArkDeckAgentDaemonMain"]),
     .executable(name: "ArkDeckEvolutionCandidate", targets: ["ArkDeckEvolutionCandidate"]),
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
@@ -78,7 +79,7 @@ let package = Package(
       name: "ArkDeckCLI",
       dependencies: [
         "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
-        "ArkDeckAgentClient",
+        "ArkDeckAgentClient", "ArkDeckLaunchAgent",
       ]
     ),
     .target(
@@ -88,6 +89,12 @@ let package = Package(
     .target(
       name: "ArkDeckAgentClient",
       dependencies: ["ArkDeckCore"]
+    ),
+    .target(
+      name: "ArkDeckLaunchAgent",
+      path: "LaunchAgents",
+      exclude: ["README.md"],
+      resources: [.copy("com.arkdeck.agentd.plist")]
     ),
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",
@@ -141,6 +148,7 @@ let package = Package(
         "ArkDeckStorage",
         "ArkDeckAgentDaemon",
         "ArkDeckAgentClient",
+        "ArkDeckLaunchAgent",
         // The engine-lane campaign dispatcher lives in the CLI composition
         // root (it needs the campaign protocol and the daemon transport, and
         // ArkDeckWorkflows must not gain a client edge). Its mapping is

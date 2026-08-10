@@ -1,5 +1,6 @@
 import ArkDeckAgentComposition
 import ArkDeckCore
+import ArkDeckLaunchAgent
 import ArkDeckWorkflows
 import CryptoKit
 import Darwin
@@ -39,6 +40,8 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runCleanupDebt(Array(arguments.dropFirst()))
       case "agent":
         try await RuntimeCLI.runAgent(Array(arguments.dropFirst()))
+      case "agentd":
+        try RuntimeCLI.runAgentDaemon(Array(arguments.dropFirst()))
       case "capability":
         try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
       case "artifact":
@@ -1038,6 +1041,11 @@ struct ArkDeckCommandLine {
         arkdeck update-feed assemble --payload <payload.json> --signature <signature.bin> \
       --out <feed.json>
         arkdeck doctor [--socket <path>] [--json]
+        arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] [--json]
+        arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] [--json]
+        arkdeck agentd status [--json]
+        arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
+        arkdeck agentd uninstall [--json]
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
         arkdeck job plan --request-file <request.json> [--socket <path>] [--json]

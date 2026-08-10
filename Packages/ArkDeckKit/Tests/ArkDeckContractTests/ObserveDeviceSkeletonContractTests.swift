@@ -14,6 +14,36 @@ import XCTest
 /// device itself is substituted; the hardware legs (BER-HW-001/002) remain
 /// a maintainer device window.
 final class ObserveDeviceSkeletonContractTests: XCTestCase {
+  func testFixedExecutableResolverRequiresAnAbsoluteExecutableIdentity() throws {
+    XCTAssertThrowsError(
+      try FixedExecutableResolver.hashing(path: "relative/hdc", providerID: "hdc")
+    ) { error in
+      XCTAssertTrue("\(error)".contains("explicit and absolute"))
+    }
+
+    let nonExecutable = FileManager.default.temporaryDirectory
+      .appendingPathComponent("arkdeck-non-executable-\(UUID().uuidString)")
+    try Data("not executable".utf8).write(to: nonExecutable)
+    defer { try? FileManager.default.removeItem(at: nonExecutable) }
+    XCTAssertThrowsError(
+      try FixedExecutableResolver.hashing(path: nonExecutable.path, providerID: "hdc")
+    ) { error in
+      XCTAssertTrue("\(error)".contains("regular executable file"))
+    }
+
+    let symlink = FileManager.default.temporaryDirectory
+      .appendingPathComponent("arkdeck-hdc-link-\(UUID().uuidString)")
+    try FileManager.default.createSymbolicLink(
+      at: symlink, withDestinationURL: URL(fileURLWithPath: "/bin/ls"))
+    defer { try? FileManager.default.removeItem(at: symlink) }
+    let resolver = try FixedExecutableResolver.hashing(path: symlink.path, providerID: "hdc")
+    let resolved = try resolver.resolveExecutable(providerID: "hdc")
+    XCTAssertEqual(
+      resolved.path,
+      URL(fileURLWithPath: "/bin/ls").resolvingSymlinksInPath().standardizedFileURL.path)
+    XCTAssertEqual(resolved.sha256.count, 64)
+  }
+
   private var stateDirectory: URL!
   private var toolURL: URL!
   private var server: AgentDaemonServer?
