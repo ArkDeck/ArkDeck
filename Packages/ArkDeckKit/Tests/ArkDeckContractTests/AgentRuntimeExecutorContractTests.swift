@@ -382,6 +382,37 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       "resume must submit exactly one Job after the target is reachable")
   }
 
+  func testExplicitTargetUsesExactDaemonCandidateOwnershipWithoutHumanSelection() throws {
+    let requestedConnectKey = "AAA"
+    let client = try startDaemon(
+      candidates: [
+        BootstrapCandidate(connectKey: requestedConnectKey, state: "Connected"),
+        BootstrapCandidate(connectKey: "BBB", state: "Connected"),
+      ],
+      preAdoptedConnectKey: requestedConnectKey)
+    guard case .array(let targets) = try client.request(method: "target.list"),
+      case .object(let requested)? = targets.first,
+      case .string(let requestedTargetID)? = requested["targetId"]
+    else {
+      return XCTFail("pre-adopted requested target must be listed")
+    }
+
+    let outcome = try executor(client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "observe.device", operationVersion: 1,
+        targetID: requestedTargetID,
+        executionID: "explicit-target-exact-owner-001"))
+    guard case .completed(let receipt) = outcome else {
+      return XCTFail("exact daemon candidate ownership must close headlessly: \(outcome)")
+    }
+    XCTAssertEqual(receipt.targetID, requestedTargetID)
+    XCTAssertTrue(receipt.humanActions.isEmpty)
+    guard case .array(let jobs) = try client.request(method: "job.list") else {
+      return XCTFail("job.list must answer")
+    }
+    XCTAssertEqual(jobs.count, 1, "the exact route must submit one typed Runtime Job")
+  }
+
   func testAmbiguousCandidatesAskForSelectionRatherThanGuessing() throws {
     let client = try startDaemon(candidates: [
       BootstrapCandidate(connectKey: "AAA", state: "Connected"),
@@ -425,7 +456,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(jobs.count, 1, "resume must not duplicate runtime jobs")
   }
 
-  func testExplicitTargetNeverDispatchesAfterSelectingAnotherVisibleCandidate() throws {
+  func testExplicitTargetNeverOffersUnownedCandidatesOrDispatches() throws {
     let client = try startDaemon(
       candidates: [
         BootstrapCandidate(connectKey: "BBB", state: "Connected"),
@@ -445,19 +476,14 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         operationID: "observe.device", operationVersion: 1,
         targetID: requestedTargetID,
         executionID: "explicit-target-candidate-mismatch-001"))
-    guard case .awaitingHumanAction(let selection, _) = paused else {
-      return XCTFail("ambiguous physical candidates must pause: \(paused)")
-    }
-    XCTAssertEqual(selection.kind, .selectTarget)
-    XCTAssertEqual(selection.selectionOptions, ["BBB", "CCC"])
-
-    let mismatched = try executor.resume(
-      resumeToken: selection.resumeToken, selection: "BBB")
-    guard case .awaitingHumanAction(let reconnect, let receipt) = mismatched else {
-      return XCTFail("a different physical target must not continue: \(mismatched)")
+    guard case .awaitingHumanAction(let reconnect, let receipt) = paused else {
+      return XCTFail("unowned physical candidates must pause: \(paused)")
     }
     XCTAssertEqual(reconnect.kind, .physicalReconnect)
-    XCTAssertTrue(reconnect.prompt.contains("not the requested target"))
+    XCTAssertNil(
+      reconnect.selectionOptions,
+      "raw connect keys that are not owned by the requested target are not valid choices")
+    XCTAssertTrue(reconnect.prompt.contains("Reconnect"))
     XCTAssertNil(receipt.jobID)
     guard case .array(let jobs) = try client.request(method: "job.list") else {
       return XCTFail("job.list must answer")

@@ -138,6 +138,15 @@ public struct AgentRuntimeExecutor: Sendable {
     let bindingRevision: Int
   }
 
+  /// Read-only daemon projection joining a currently visible transport face
+  /// to its durable target. The executor uses this only to refresh an
+  /// explicitly requested target; it never infers identity from presence or
+  /// exposes an unrelated connect key as a safe selection.
+  private struct CandidateBinding: Sendable, Equatable {
+    let connectKey: String
+    let target: Target?
+  }
+
   private enum ResumeMode: String, Codable, Sendable {
     case retryAdoption
     case adoptedTarget
@@ -298,10 +307,25 @@ public struct AgentRuntimeExecutor: Sendable {
           startedAtUTC: startedAtUTC, humanActions: humanActions)
       }
       // A durable target record proves identity, not current reachability.
-      // Refresh through the typed bootstrap port before submit so an offline
-      // device pauses the same execution without creating a doomed Job.
+      // Join current candidates through the daemon-owned durable target map,
+      // then refresh only the exact matching transport face through the typed
+      // bootstrap port. Presence, ordering and similar IDs are never enough.
+      let matchingCandidates = try listCandidateBindings(deadline: deadline).filter {
+        $0.target?.targetID == explicitTargetID
+      }
+      guard matchingCandidates.count == 1, let candidate = matchingCandidates.first else {
+        let prompt =
+          matchingCandidates.isEmpty
+          ? "Reconnect the selected target before resuming this execution."
+          : "The selected target has ambiguous physical routes; disconnect duplicate routes "
+            + "before resuming this execution."
+        return try pause(
+          request: request, kind: .physicalReconnect, prompt: prompt,
+          mode: .reconnectTarget, catalogDigest: catalogDigest,
+          startedAtUTC: startedAtUTC, humanActions: humanActions)
+      }
       switch try adopt(
-        request: request, candidate: nil, catalogDigest: catalogDigest,
+        request: request, candidate: candidate.connectKey, catalogDigest: catalogDigest,
         startedAtUTC: startedAtUTC, humanActions: humanActions,
         deadline: deadline)
       {
@@ -605,6 +629,45 @@ public struct AgentRuntimeExecutor: Sendable {
           "target.list contains malformed binding")
       }
       return Target(targetID: targetID, bindingRevision: revision)
+    }
+  }
+
+  private func listCandidateBindings(deadline: ExecutionDeadline) throws
+    -> [CandidateBinding]
+  {
+    let listed = try call(method: "device.candidates", deadline: deadline)
+    guard case .array(let rows) = listed else {
+      throw RuntimeAgentExecutorError.malformedResponse(
+        "device.candidates is not an array")
+    }
+    return try rows.map { row in
+      guard case .object(let fields) = row,
+        case .string(let connectKey)? = fields["connectKey"],
+        Self.isSafeSelection(connectKey),
+        case .string(let state)? = fields["state"],
+        Self.isSafeSelection(state)
+      else {
+        throw RuntimeAgentExecutorError.malformedResponse(
+          "device.candidates contains malformed transport facts")
+      }
+
+      switch (fields["adoptedTargetId"], fields["bindingRevision"]) {
+      case (.string(let targetID)?, let revisionValue):
+        guard Self.isSafeIdentifier(targetID),
+          let revision = Self.exactInt(revisionValue), revision > 0
+        else {
+          throw RuntimeAgentExecutorError.malformedResponse(
+            "device.candidates contains malformed target ownership")
+        }
+        return CandidateBinding(
+          connectKey: connectKey,
+          target: Target(targetID: targetID, bindingRevision: revision))
+      case (.null?, .null?):
+        return CandidateBinding(connectKey: connectKey, target: nil)
+      default:
+        throw RuntimeAgentExecutorError.malformedResponse(
+          "device.candidates contains incomplete target ownership")
+      }
     }
   }
 

@@ -76,7 +76,7 @@ struct TargetStoreFactsPort: HDCObservationFactsPort {
   let executableSHA256: String
 
   func currentFacts(targetID: String) async throws -> ProviderFacts {
-    guard let record = try targetStore.find(targetID: targetID) else {
+    guard let route = try targetStore.hdcExecutionRoute(targetID: targetID) else {
       throw DeviceProviderError.factsUnavailable("target \(targetID) has not been adopted")
     }
     // The HDC facts identity is derived from the connect key — the same
@@ -88,16 +88,18 @@ struct TargetStoreFactsPort: HDCObservationFactsPort {
     // device-bound operation fail `targetIdentityMismatch` from binding
     // revision 2 onward. The Rockchip provider keeps publishing the store
     // identity; each provider's identity closes over its own address surface.
+    // A proven post-Flash alias may supply that HDC address without changing
+    // the canonical target identity or revision.
     return ProviderFacts(
       providerID: "hdc",
-      toolVersion: record.toolVersion,
+      toolVersion: route.toolVersion,
       toolSHA256: executableSHA256,
       serverFacts: [:],
-      targetID: record.targetID,
-      bindingRevision: record.bindingRevision,
+      targetID: route.targetID,
+      bindingRevision: route.bindingRevision,
       deviceIdentitySHA256: HDCObservationProviderAdapter.stableIdentitySHA256(
-        connectKey: record.connectKey),
-      executionConnectKey: record.connectKey,
+        connectKey: route.connectKey),
+      executionConnectKey: route.connectKey,
       deviceMode: "hdc",
       buildFingerprint: nil,
       profileID: "openharmony-standard@1",

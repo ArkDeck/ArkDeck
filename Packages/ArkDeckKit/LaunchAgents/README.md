@@ -50,6 +50,9 @@ daemon health。`verify` 进一步固定走完整的无头产品链：identity-c
 用户私有 UDS → native Agent executor → published `observe.device@1` → daemon-owned terminal
 receipt → immutable Artifact inventory 与 Runtime postflight。它不接受自定义 socket、raw HDC、
 argv 或 capability 管理参数；多台已采用设备时必须显式传 `--target`，不会猜测设备。
+显式 target 只会使用 daemon 当前 `device.candidates` 中与该 durable target 精确关联的唯一
+transport face；Flash 后的 HDC 地址变化也必须已有 Runtime 写入的完整 alias proof。映射缺失
+或歧义时命令会要求重新连接且不创建 Job，不会把其他设备的 connect key 当作可选捷径。
 daemon 启动时会先恢复 durable Job；更新后第一次 `status` 若只报告 socket 尚未出现，可再次
 运行 `status`，持续不就绪再查看错误日志。
 
