@@ -121,6 +121,34 @@ final class AppShellUITests: XCTestCase {
         residue: "有 2 项未清理残留。"))
   }
 
+  func testApplicationIconSwitchesFromSettings() {
+    let app = launch(arguments: ["-AppleLanguages", "(en)"])
+
+    openGeneralSettings(in: app)
+    let keycapIcon = app.buttons["settings.general.appIcon.keycap"]
+    let waveformIcon = app.buttons["settings.general.appIcon.waveform"]
+    XCTAssertTrue(keycapIcon.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(waveformIcon.exists)
+
+    keycapIcon.click()
+    XCTAssertEqual(
+      keycapIcon.value as? String, "Selected",
+      "Selecting an icon must expose its state")
+
+    app.terminate()
+    let reopened = launch(arguments: ["-AppleLanguages", "(en)"])
+    openGeneralSettings(in: reopened)
+    let persistedKeycap = reopened.buttons["settings.general.appIcon.keycap"]
+    XCTAssertTrue(persistedKeycap.waitForExistenceFast(timeout: 10))
+    XCTAssertEqual(
+      persistedKeycap.value as? String, "Selected",
+      "The selected icon must persist across launches")
+
+    let restoredWaveform = reopened.buttons["settings.general.appIcon.waveform"]
+    restoredWaveform.click()
+    XCTAssertEqual(restoredWaveform.value as? String, "Selected")
+  }
+
   private struct Overview {
     let server: String
     let trust: String
@@ -1150,5 +1178,12 @@ final class AppShellUITests: XCTestCase {
         app.windows.firstMatch.waitForExistenceFast(timeout: 5), "ArkDeck must create a test window")
     }
     return app
+  }
+
+  private func openGeneralSettings(in app: XCUIApplication) {
+    app.typeKey(",", modifierFlags: .command)
+    let generalPane = app.buttons["General"]
+    XCTAssertTrue(generalPane.waitForExistenceFast(timeout: 10))
+    generalPane.click()
   }
 }
