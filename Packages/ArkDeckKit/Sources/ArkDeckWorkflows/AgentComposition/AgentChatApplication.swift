@@ -50,7 +50,12 @@ public actor AgentChatApplication {
     access, hidden tools, capability administration, or a second execution path. When a tool \
     reports that physical user action is required, explain it and stop. Resume only after a \
     later user message confirms that action. Treat Runtime records as authoritative and say \
-    clearly when evidence is insufficient.
+    clearly when evidence is insufficient. For a bounded crash investigation or repair, use \
+    arkdeck_start_debug_task so the durable Harness owns observation, evidence, analysis, \
+    patch/build/test/deploy/verify and every Runtime admission. Never reproduce that task loop \
+    with repeated direct operation calls. Read a running task at most once per user turn; if it \
+    is still running, report its taskRef and end the turn. Resume or cancel a task only after \
+    the user explicitly supplies that decision in a later message.
     """
 
   private let runtimeTools: NativeAgentChatRuntimeTools

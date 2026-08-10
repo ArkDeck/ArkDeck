@@ -8,6 +8,7 @@
 import ArkDeckAgentClient
 import ArkDeckCore
 import ArkDeckHarness
+import CryptoKit
 import Foundation
 
 public protocol AgentChatRuntimePort: Sendable {
@@ -68,6 +69,10 @@ public actor NativeAgentChatRuntimeTools {
     "arkdeck_capture_diagnostics",
     "arkdeck_read_artifact",
     "arkdeck_resume_after_user_action",
+    "arkdeck_start_debug_task",
+    "arkdeck_debug_task_status",
+    "arkdeck_resume_debug_task",
+    "arkdeck_cancel_debug_task",
   ]
 
   public static let maximumOperationRuns = 8
@@ -81,10 +86,16 @@ public actor NativeAgentChatRuntimeTools {
   public static let maximumArtifactReadBytes = 4 * 1_024 * 1_024
   public static let maximumModelArtifactTextBytes = 256 * 1_024
   public static let captureArtifactBudgetBytes = 8 * 1_024 * 1_024
+  public static let maximumTaskStarts = 1
 
   private struct PendingPause: Sendable {
     let resumeToken: String
     let selections: [String: String]
+    let userTurn: Int
+  }
+
+  private struct PendingTaskPause: Sendable {
+    let taskID: String
     let userTurn: Int
   }
 
@@ -102,6 +113,11 @@ public actor NativeAgentChatRuntimeTools {
   private var targetReferencesByID: [String: String] = [:]
   private var selectionReferencesByExactValue: [String: String] = [:]
   private var currentChatArtifacts: [String: Set<String>] = [:]
+  private var taskStarts = 0
+  private var taskIDsByReference: [String: String] = [:]
+  private var taskReferencesByID: [String: String] = [:]
+  private var pendingTaskPause: PendingTaskPause?
+  private var taskStatusReadTurnByID: [String: Int] = [:]
 
   public init(
     port: any AgentChatRuntimePort,
@@ -169,10 +185,63 @@ public actor NativeAgentChatRuntimeTools {
             ])
           ], required: []),
         execute: { [self] arguments in try await resumeAfterUserAction(arguments) }),
+      HarnessAgentTool(
+        name: "arkdeck_start_debug_task",
+        description:
+          "Start one durable bounded debug task owned by ArkDeck Harness. The daemon auto-drives "
+          + "observation, evidence, analysis, and—only when an explicit isolated workspace policy "
+          + "and positive E1 budget are supplied—patch/build/test/deploy/verify. Use values stated "
+          + "by the user or returned by ArkDeck; never invent project, revision, path, preset, "
+          + "application, Artifact lease, or device profile values.",
+        parameters: Self.debugTaskStartSchema,
+        execute: { [self] arguments in try await startDebugTask(arguments) }),
+      HarnessAgentTool(
+        name: "arkdeck_debug_task_status",
+        description:
+          "Read one bounded snapshot of a durable Harness debug task. Do not poll repeatedly in "
+          + "one user turn: if it is still running, report that and end the turn.",
+        parameters: Self.objectSchema(
+          properties: [
+            "taskRef": Self.taskReferenceSchema(
+              description: "Pseudonymous task reference returned by ArkDeck")
+          ], required: ["taskRef"]),
+        execute: { [self] arguments in try await debugTaskStatus(arguments) }),
+      HarnessAgentTool(
+        name: "arkdeck_resume_debug_task",
+        description:
+          "Resume the exact durable Harness task after a later user message resolves its reported "
+          + "human action. This cannot widen task policy or budgets.",
+        parameters: Self.objectSchema(
+          properties: [
+            "taskRef": Self.taskReferenceSchema(
+              description: "Pseudonymous task reference returned by ArkDeck"),
+            "resolution": .object([
+              "type": .string("string"), "minLength": .integer(1),
+              "maxLength": .integer(512),
+              "description": .string("User-provided resolution of the reported human action"),
+            ]),
+          ], required: ["taskRef", "resolution"]),
+        execute: { [self] arguments in try await resumeDebugTask(arguments) }),
+      HarnessAgentTool(
+        name: "arkdeck_cancel_debug_task",
+        description:
+          "Request typed cancellation of a durable Harness task. Use only when the user explicitly "
+          + "asks to stop that task; cancellation creates no replacement task or authority.",
+        parameters: Self.objectSchema(
+          properties: [
+            "taskRef": Self.taskReferenceSchema(
+              description: "Pseudonymous task reference returned by ArkDeck")
+          ], required: ["taskRef"]),
+        execute: { [self] arguments in try await cancelDebugTask(arguments) }),
     ]
   }
 
-  public func beginUserTurn() { userTurn += 1 }
+  public func beginUserTurn() {
+    // Human boundaries are learned only from explicit tool results already
+    // shown to the model. An invisible pre-turn refresh could otherwise let a
+    // generic user message resume an action the user was never asked to take.
+    userTurn += 1
+  }
 
   private func runtimeOverview(_ arguments: JSONValue) throws -> HarnessAgentToolResult {
     _ = try strictObject(arguments, allowed: [])
@@ -180,11 +249,14 @@ public actor NativeAgentChatRuntimeTools {
       let doctor = try port.request(method: "doctor", params: nil)
       let operations = try port.request(method: "operation.list", params: nil)
       let targets = try port.request(method: "target.list", params: nil)
+      let tasks = try port.request(method: "task.list", params: nil)
       registerTargets(targets)
+      registerTasks(tasks)
       let value = JSONValue.object([
         "doctor": project(doctor),
         "operations": project(operations),
         "targets": project(targets),
+        "debugTasks": taskListProjection(tasks),
         "budget": budgetValue(),
       ])
       return try result(value, display: "ArkDeck Runtime overview updated")
@@ -390,6 +462,229 @@ public actor NativeAgentChatRuntimeTools {
     }
   }
 
+  private func startDebugTask(_ arguments: JSONValue) throws -> HarnessAgentToolResult {
+    let fields = try strictObject(
+      arguments,
+      allowed: [
+        "targetRef", "goal", "intake", "crashSignature", "bundleName", "abilityName",
+        "processName", "baselineHapArtifactLease", "projectRef", "baseWorkspaceRevision",
+        "workspaceAllowedPaths", "buildPresetRef", "testPresetRef", "deviceProfile",
+        "component", "maxRounds", "maxWallClockSeconds", "maxE1Mutations",
+        "maxModelCalls", "maxAttempts", "maxChangedFiles", "maxDiffLines",
+        "expectedBindingRevision",
+      ])
+    guard taskStarts < Self.maximumTaskStarts else {
+      throw AgentChatRuntimeToolError.blocked(
+        "This chat already used its one durable debug-task start budget. Inspect or resume that task instead.")
+    }
+    guard let targetReference = requiredText(fields, "targetRef", maximumBytes: 64),
+      let targetID = try resolveTargetReference(targetReference)
+    else {
+      throw AgentChatRuntimeToolError.invalidArguments(
+        "targetRef must come from arkdeck_runtime_overview")
+    }
+    guard let goal = requiredText(fields, "goal", maximumBytes: 2_048) else {
+      throw AgentChatRuntimeToolError.invalidArguments("goal must contain 1...2048 UTF-8 bytes")
+    }
+
+    var params: [String: JSONValue] = [
+      "targetId": .string(targetID),
+      "goal": .string(goal),
+    ]
+    try copyText(
+      from: fields, to: &params, key: "intake", maximumBytes: 4_096,
+      validator: Self.isBoundedText)
+    try copyText(
+      from: fields, to: &params, key: "crashSignature", maximumBytes: 512,
+      validator: Self.isBoundedText)
+    try copyText(
+      from: fields, to: &params, key: "bundleName", maximumBytes: 200,
+      validator: Self.isBundleName)
+    try copyText(
+      from: fields, to: &params, key: "abilityName", maximumBytes: 200,
+      validator: { Self.isTypedName($0, allowsColon: false) })
+    try copyText(
+      from: fields, to: &params, key: "processName", maximumBytes: 200,
+      validator: { Self.isTypedName($0, allowsColon: true) })
+    try copyText(
+      from: fields, to: &params, key: "baselineHapArtifactLease", maximumBytes: 384,
+      validator: Self.isArtifactLeaseReference)
+    try copyText(
+      from: fields, to: &params, key: "projectRef", maximumBytes: 128,
+      validator: Self.isWireIdentifier)
+    try copyText(
+      from: fields, to: &params, key: "baseWorkspaceRevision", maximumBytes: 64,
+      validator: Self.isLowercaseSHA256)
+    for key in ["buildPresetRef", "testPresetRef", "deviceProfile"] {
+      try copyText(
+        from: fields, to: &params, key: key, maximumBytes: 128,
+        validator: Self.isWireIdentifier)
+    }
+    try copyText(
+      from: fields, to: &params, key: "component", maximumBytes: 256,
+      validator: Self.isBoundedText)
+
+    if params["abilityName"] != nil, params["bundleName"] == nil {
+      throw AgentChatRuntimeToolError.invalidArguments("abilityName requires bundleName")
+    }
+    if params["processName"] != nil, params["bundleName"] == nil {
+      throw AgentChatRuntimeToolError.invalidArguments("processName requires bundleName")
+    }
+    if params["baselineHapArtifactLease"] != nil,
+      params["bundleName"] == nil || params["abilityName"] == nil
+    {
+      throw AgentChatRuntimeToolError.invalidArguments(
+        "baselineHapArtifactLease requires bundleName and abilityName")
+    }
+
+    if let value = fields["workspaceAllowedPaths"] {
+      guard case .array(let entries) = value, (1...32).contains(entries.count) else {
+        throw AgentChatRuntimeToolError.invalidArguments(
+          "workspaceAllowedPaths must contain 1...32 bounded path patterns")
+      }
+      let paths = try entries.map { entry -> JSONValue in
+        guard case .string(let path) = entry, Self.isWorkspacePathPattern(path) else {
+          throw AgentChatRuntimeToolError.invalidArguments(
+            "workspaceAllowedPaths contains an invalid path pattern")
+        }
+        return .string(path)
+      }
+      guard params["projectRef"] != nil, params["baseWorkspaceRevision"] != nil,
+        let e1 = integer(fields["maxE1Mutations"]), e1 > 0
+      else {
+        throw AgentChatRuntimeToolError.invalidArguments(
+          "workspace repair requires projectRef, baseWorkspaceRevision, and a positive maxE1Mutations")
+      }
+      params["workspaceAllowedPaths"] = .array(paths)
+    } else if params["baseWorkspaceRevision"] != nil || fields["maxAttempts"] != nil
+      || fields["maxChangedFiles"] != nil || fields["maxDiffLines"] != nil
+      || (integer(fields["maxE1Mutations"]) ?? 0) > 0
+    {
+      throw AgentChatRuntimeToolError.invalidArguments(
+        "workspace repair bounds require workspaceAllowedPaths")
+    }
+
+    try copyInteger(
+      from: fields, to: &params, key: "maxRounds", range: 1...32)
+    try copyInteger(
+      from: fields, to: &params, key: "maxWallClockSeconds", range: 60...7_200)
+    try copyInteger(
+      from: fields, to: &params, key: "maxE1Mutations", range: 0...16)
+    try copyInteger(
+      from: fields, to: &params, key: "maxModelCalls", range: 0...64)
+    try copyInteger(
+      from: fields, to: &params, key: "maxAttempts", range: 1...8)
+    try copyInteger(
+      from: fields, to: &params, key: "maxChangedFiles", range: 1...50)
+    try copyInteger(
+      from: fields, to: &params, key: "maxDiffLines", range: 1...5_000)
+    try copyInteger(
+      from: fields, to: &params, key: "expectedBindingRevision", range: 1...Int.max)
+
+    // Creating a durable task is the effect of this tool. Charge before the
+    // request so an uncertain transport result cannot be retried into a
+    // duplicate task by the same chat.
+    taskStarts += 1
+    do {
+      let submitted = try port.request(method: "task.submit", params: params)
+      guard case .object(let values) = submitted,
+        case .string(let taskID)? = values["htaskId"], Self.isSafeTaskIdentifier(taskID)
+      else {
+        throw AgentChatRuntimeToolError.malformedRuntimeResponse(
+          "task.submit returned no safe Harness task id")
+      }
+      let reference = taskReference(for: taskID)
+      updateTaskPause(from: submitted, taskID: taskID, observedAtTurn: userTurn)
+      let value = taskStatusProjection(submitted, taskID: taskID)
+      return try result(
+        value,
+        display: "Started durable Harness debug task \(reference); daemon auto-drive owns progress")
+    } catch let error as AgentChatRuntimeToolError {
+      throw error
+    } catch {
+      throw AgentChatRuntimeToolError.runtimeFailure(sanitize("\(error)"))
+    }
+  }
+
+  private func debugTaskStatus(_ arguments: JSONValue) throws -> HarnessAgentToolResult {
+    let fields = try strictObject(arguments, allowed: ["taskRef"])
+    let taskID = try resolveTaskReference(fields["taskRef"])
+    guard taskStatusReadTurnByID[taskID] != userTurn else {
+      throw AgentChatRuntimeToolError.blocked(
+        "This task was already read in the current user turn. Report its last status and wait for the next message.")
+    }
+    // Charge before transport: a failed read is still not a reason for the
+    // model to spin on the local daemon in the same conversational turn.
+    taskStatusReadTurnByID[taskID] = userTurn
+    do {
+      let status = try port.request(
+        method: "task.status", params: ["htaskId": .string(taskID)])
+      let actions = try port.request(
+        method: "task.humanActions", params: ["htaskId": .string(taskID)])
+      updateTaskPause(from: status, taskID: taskID, observedAtTurn: userTurn)
+      let projected = JSONValue.object([
+        "task": taskStatusProjection(status, taskID: taskID),
+        "openHumanAction": openHumanActionProjection(actions),
+      ])
+      let lifecycle = taskLifecycle(status) ?? "unknown"
+      let stage = taskStage(status) ?? "unknown"
+      return try result(
+        projected,
+        display: "\(taskReference(for: taskID)) → \(lifecycle), stage=\(stage)")
+    } catch let error as AgentChatRuntimeToolError {
+      throw error
+    } catch {
+      throw AgentChatRuntimeToolError.runtimeFailure(sanitize("\(error)"))
+    }
+  }
+
+  private func resumeDebugTask(_ arguments: JSONValue) throws -> HarnessAgentToolResult {
+    let fields = try strictObject(arguments, allowed: ["taskRef", "resolution"])
+    let taskID = try resolveTaskReference(fields["taskRef"])
+    guard let resolution = requiredText(fields, "resolution", maximumBytes: 512) else {
+      throw AgentChatRuntimeToolError.invalidArguments(
+        "resolution must contain 1...512 UTF-8 bytes")
+    }
+    guard let pause = pendingTaskPause, pause.taskID == taskID else {
+      throw AgentChatRuntimeToolError.blocked(
+        "This task has no human action observed by ArkDeck in this chat. Read its status first.")
+    }
+    guard userTurn > pause.userTurn else {
+      throw AgentChatRuntimeToolError.blocked(
+        "Wait for the user's next message before resuming this Harness task.")
+    }
+    do {
+      let resumed = try port.request(
+        method: "task.resume",
+        params: ["htaskId": .string(taskID), "resolution": .string(resolution)])
+      pendingTaskPause = nil
+      return try result(
+        taskStatusProjection(resumed, taskID: taskID),
+        display: "Resumed \(taskReference(for: taskID)) through its typed human-action transition")
+    } catch let error as AgentChatRuntimeToolError {
+      throw error
+    } catch {
+      throw AgentChatRuntimeToolError.runtimeFailure(sanitize("\(error)"))
+    }
+  }
+
+  private func cancelDebugTask(_ arguments: JSONValue) throws -> HarnessAgentToolResult {
+    let fields = try strictObject(arguments, allowed: ["taskRef"])
+    let taskID = try resolveTaskReference(fields["taskRef"])
+    do {
+      let cancelled = try port.request(
+        method: "task.cancel", params: ["htaskId": .string(taskID)])
+      if pendingTaskPause?.taskID == taskID { pendingTaskPause = nil }
+      return try result(
+        taskStatusProjection(cancelled, taskID: taskID),
+        display: "Typed cancellation requested for \(taskReference(for: taskID))")
+    } catch let error as AgentChatRuntimeToolError {
+      throw error
+    } catch {
+      throw AgentChatRuntimeToolError.runtimeFailure(sanitize("\(error)"))
+    }
+  }
+
   private func runTypedOperation(
     operationID: String,
     version: Int,
@@ -537,6 +832,161 @@ public actor NativeAgentChatRuntimeTools {
     ])
   }
 
+  private func registerTasks(_ value: JSONValue) {
+    guard case .array(let tasks) = value else { return }
+    for task in tasks.prefix(32) {
+      guard case .object(let fields) = task,
+        case .string(let taskID)? = fields["htaskId"], Self.isSafeTaskIdentifier(taskID)
+      else { continue }
+      _ = taskReference(for: taskID)
+    }
+  }
+
+  private func taskListProjection(_ value: JSONValue) -> JSONValue {
+    guard case .array(let tasks) = value else {
+      return .object(["error": .string("task.list was not an array")])
+    }
+    return .array(
+      tasks.prefix(32).compactMap { task -> JSONValue? in
+        guard case .object(let fields) = task,
+          case .string(let taskID)? = fields["htaskId"], Self.isSafeTaskIdentifier(taskID)
+        else { return nil }
+        return taskStatusProjection(task, taskID: taskID)
+      })
+  }
+
+  private func taskStatusProjection(_ value: JSONValue, taskID: String) -> JSONValue {
+    guard case .object(let fields) = value else {
+      return .object([
+        "taskRef": .string(taskReference(for: taskID)),
+        "error": .string("task status was not an object"),
+      ])
+    }
+    var summary: [String: JSONValue] = [
+      "taskRef": .string(taskReference(for: taskID))
+    ]
+    for key in [
+      "type", "lifecycle", "stage", "waitReason", "conditions", "status", "phase",
+      "activeRound", "activeJobId", "cancelRequested", "version", "updatedAtUtc", "budgets",
+      "consumedBudget", "allowedOperations", "result",
+    ] {
+      if let child = fields[key] { summary[key] = project(child) }
+    }
+    return .object(summary)
+  }
+
+  private func openHumanActionProjection(_ value: JSONValue) -> JSONValue {
+    guard case .array(let actions) = value else { return .null }
+    guard let open = actions.reversed().first(where: { action in
+      guard case .object(let fields) = action else { return false }
+      return fields["resolvedAtUtc"] == nil || fields["resolvedAtUtc"] == .null
+    }), case .object(let fields) = open
+    else { return .null }
+    var summary: [String: JSONValue] = [:]
+    for key in [
+      "block", "reasonCode", "round", "resumeStatus", "resumePhase", "evidenceRefs",
+      "generatedAtUtc",
+    ] {
+      if let child = fields[key] { summary[key] = project(child) }
+    }
+    return .object(summary)
+  }
+
+  private func updateTaskPause(
+    from value: JSONValue,
+    taskID: String,
+    observedAtTurn: Int
+  ) {
+    if taskLifecycle(value) == "humanRequired" {
+      if pendingTaskPause?.taskID != taskID {
+        pendingTaskPause = PendingTaskPause(taskID: taskID, userTurn: observedAtTurn)
+      }
+    } else if pendingTaskPause?.taskID == taskID {
+      pendingTaskPause = nil
+    }
+  }
+
+  private func taskLifecycle(_ value: JSONValue) -> String? {
+    guard case .object(let fields) = value else { return nil }
+    if case .string(let lifecycle)? = fields["lifecycle"] { return lifecycle }
+    if case .string(let status)? = fields["status"] { return status }
+    return nil
+  }
+
+  private func taskStage(_ value: JSONValue) -> String? {
+    guard case .object(let fields) = value else { return nil }
+    if case .string(let stage)? = fields["stage"] { return stage }
+    if case .string(let phase)? = fields["phase"] { return phase }
+    return nil
+  }
+
+  private func taskReference(for taskID: String) -> String {
+    if let existing = taskReferencesByID[taskID] { return existing }
+    let digest = SHA256.hash(data: Data("arkdeck-chat-task|\(taskID)".utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let base = "task-\(digest.prefix(12))"
+    var reference = base
+    var suffix = 2
+    while let existing = taskIDsByReference[reference], existing != taskID {
+      reference = "\(base)-\(suffix)"
+      suffix += 1
+    }
+    taskReferencesByID[taskID] = reference
+    taskIDsByReference[reference] = taskID
+    return reference
+  }
+
+  private func resolveTaskReference(_ value: JSONValue?) throws -> String {
+    guard case .string(let reference) = value,
+      let taskID = taskIDsByReference[reference]
+    else {
+      throw AgentChatRuntimeToolError.invalidArguments(
+        "taskRef is unknown; refresh arkdeck_runtime_overview")
+    }
+    return taskID
+  }
+
+  private func requiredText(
+    _ fields: [String: JSONValue],
+    _ key: String,
+    maximumBytes: Int
+  ) -> String? {
+    guard case .string(let text)? = fields[key], text.utf8.count <= maximumBytes,
+      Self.isBoundedText(text)
+    else { return nil }
+    return text
+  }
+
+  private func copyText(
+    from fields: [String: JSONValue],
+    to params: inout [String: JSONValue],
+    key: String,
+    maximumBytes: Int,
+    validator: (String) -> Bool
+  ) throws {
+    guard let raw = fields[key] else { return }
+    guard case .string(let text) = raw, text.utf8.count <= maximumBytes,
+      validator(text)
+    else {
+      throw AgentChatRuntimeToolError.invalidArguments("\(key) is malformed")
+    }
+    params[key] = .string(text)
+  }
+
+  private func copyInteger(
+    from fields: [String: JSONValue],
+    to params: inout [String: JSONValue],
+    key: String,
+    range: ClosedRange<Int>
+  ) throws {
+    guard let raw = fields[key] else { return }
+    guard let value = integer(raw), range.contains(value) else {
+      throw AgentChatRuntimeToolError.invalidArguments(
+        "\(key) must be an integer in \(range.lowerBound)...\(range.upperBound)")
+    }
+    params[key] = .integer(Int64(value))
+  }
+
   private func registerTargets(_ value: JSONValue) {
     guard case .array(let targets) = value else { return }
     for target in targets {
@@ -604,6 +1054,10 @@ public actor NativeAgentChatRuntimeTools {
           projected[key] = .object(safeAuthority)
         } else if normalized == "targetid", case .string(let targetID) = child {
           projected["targetRef"] = .string(targetReference(for: targetID))
+        } else if normalized == "htaskid", case .string(let taskID) = child,
+          Self.isSafeTaskIdentifier(taskID)
+        {
+          projected["taskRef"] = .string(taskReference(for: taskID))
         } else {
           projected[key] = project(child)
         }
@@ -613,6 +1067,7 @@ public actor NativeAgentChatRuntimeTools {
     case .string(let text):
       if let selection = selectionReferencesByExactValue[text] { return .string(selection) }
       if let target = targetReferencesByID[text] { return .string(target) }
+      if let task = taskReferencesByID[text] { return .string(task) }
       return .string(sanitize(text))
     default: return value
     }
@@ -624,6 +1079,11 @@ public actor NativeAgentChatRuntimeTools {
       $0.key.utf8.count > $1.key.utf8.count
     }) {
       sanitized = sanitized.replacingOccurrences(of: targetID, with: reference)
+    }
+    for (taskID, reference) in taskReferencesByID.sorted(by: {
+      $0.key.utf8.count > $1.key.utf8.count
+    }) {
+      sanitized = sanitized.replacingOccurrences(of: taskID, with: reference)
     }
     for (exact, reference) in selectionReferencesByExactValue.sorted(by: {
       $0.key.utf8.count > $1.key.utf8.count
@@ -734,6 +1194,46 @@ public actor NativeAgentChatRuntimeTools {
     }
   }
 
+  private static func isBoundedText(_ value: String) -> Bool {
+    !value.isEmpty
+      && !value.unicodeScalars.contains(where: {
+        CharacterSet.controlCharacters.contains($0)
+      })
+  }
+
+  private static func isWireIdentifier(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.count <= 128
+      && value.unicodeScalars.allSatisfy {
+        $0.isASCII
+          && (CharacterSet.alphanumerics.contains($0) || "._:@-".unicodeScalars.contains($0))
+      }
+  }
+
+  private static func isArtifactLeaseReference(_ value: String) -> Bool {
+    let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+    return parts.count == 3 && parts[0] == "lease-v1"
+      && parts.dropFirst().allSatisfy { isWireIdentifier(String($0)) }
+  }
+
+  private static func isLowercaseSHA256(_ value: String) -> Bool {
+    value.utf8.count == 64
+      && value.utf8.allSatisfy { byte in
+        (48...57).contains(byte) || (97...102).contains(byte)
+      }
+  }
+
+  private static func isWorkspacePathPattern(_ value: String) -> Bool {
+    guard value.utf8.count <= 256, isBoundedText(value),
+      !value.hasPrefix("/"), !value.hasPrefix("~"), !value.contains("\\")
+    else { return false }
+    return !value.split(separator: "/", omittingEmptySubsequences: false).contains("..")
+  }
+
+  private static func isSafeTaskIdentifier(_ value: String) -> Bool {
+    guard value.hasPrefix("HTASK-") else { return false }
+    return isSafeIdentifier(value)
+  }
+
   private static func objectSchema(
     properties: [String: JSONValue], required: [String]
   ) -> JSONValue {
@@ -750,6 +1250,68 @@ public actor NativeAgentChatRuntimeTools {
       "type": .string("string"),
       "description": .string(description),
       "pattern": .string("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"),
+    ])
+  }
+
+  private static func taskReferenceSchema(description: String) -> JSONValue {
+    .object([
+      "type": .string("string"),
+      "description": .string(description),
+      "pattern": .string("^task-[a-f0-9]{12}(-[0-9]+)?$"),
+    ])
+  }
+
+  private static let debugTaskStartSchema: JSONValue = objectSchema(
+    properties: [
+      "targetRef": .object([
+        "type": .string("string"), "pattern": .string("^target-[a-f0-9]{12}(-[0-9]+)?$"),
+      ]),
+      "goal": .object([
+        "type": .string("string"), "minLength": .integer(1), "maxLength": .integer(2_048),
+      ]),
+      "intake": .object(["type": .string("string"), "maxLength": .integer(4_096)]),
+      "crashSignature": .object([
+        "type": .string("string"), "maxLength": .integer(512),
+      ]),
+      "bundleName": .object(["type": .string("string"), "maxLength": .integer(200)]),
+      "abilityName": .object(["type": .string("string"), "maxLength": .integer(200)]),
+      "processName": .object(["type": .string("string"), "maxLength": .integer(200)]),
+      "baselineHapArtifactLease": .object([
+        "type": .string("string"), "maxLength": .integer(384),
+      ]),
+      "projectRef": .object(["type": .string("string"), "maxLength": .integer(128)]),
+      "baseWorkspaceRevision": .object([
+        "type": .string("string"), "pattern": .string("^[a-f0-9]{64}$"),
+      ]),
+      "workspaceAllowedPaths": .object([
+        "type": .string("array"), "minItems": .integer(1), "maxItems": .integer(32),
+        "items": .object(["type": .string("string"), "maxLength": .integer(256)]),
+      ]),
+      "buildPresetRef": .object([
+        "type": .string("string"), "maxLength": .integer(128),
+      ]),
+      "testPresetRef": .object([
+        "type": .string("string"), "maxLength": .integer(128),
+      ]),
+      "deviceProfile": .object([
+        "type": .string("string"), "maxLength": .integer(128),
+      ]),
+      "component": .object(["type": .string("string"), "maxLength": .integer(256)]),
+      "maxRounds": integerSchema(minimum: 1, maximum: 32),
+      "maxWallClockSeconds": integerSchema(minimum: 60, maximum: 7_200),
+      "maxE1Mutations": integerSchema(minimum: 0, maximum: 16),
+      "maxModelCalls": integerSchema(minimum: 0, maximum: 64),
+      "maxAttempts": integerSchema(minimum: 1, maximum: 8),
+      "maxChangedFiles": integerSchema(minimum: 1, maximum: 50),
+      "maxDiffLines": integerSchema(minimum: 1, maximum: 5_000),
+      "expectedBindingRevision": integerSchema(minimum: 1, maximum: Int.max),
+    ], required: ["targetRef", "goal"])
+
+  private static func integerSchema(minimum: Int, maximum: Int) -> JSONValue {
+    .object([
+      "type": .string("integer"),
+      "minimum": .integer(Int64(minimum)),
+      "maximum": .integer(Int64(maximum)),
     ])
   }
 
