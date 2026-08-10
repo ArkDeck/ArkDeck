@@ -79,6 +79,9 @@ let package = Package(
       dependencies: [
         "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
         "ArkDeckAgentClient",
+      ],
+      resources: [
+        .copy("Resources/Pi")
       ]
     ),
     .target(
