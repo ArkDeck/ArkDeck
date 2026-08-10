@@ -1043,10 +1043,16 @@ struct ArkDeckCommandLine {
         arkdeck doctor [--socket <path>] [--json]
         arkdeck agentd install --hdc <absolute-hdc-path> [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
-      [--sensitive-evidence <artifact-name,...|none>] [--json]
+      [--sensitive-evidence <artifact-name,...|none>] \
+      [--harness-model-provider <codex|claude-code|none> \
+       --harness-model-name <name> --harness-cli <absolute-cli-path> \
+       --harness-cli-timeout-seconds <1...900>] [--json]
         arkdeck agentd update [--hdc <absolute-hdc-path>] [--daemon <absolute-agentd-path>] \
       [--workspace-project <absolute-waterflow-path> --deveco-sdk <absolute-sdk-path>] \
-      [--sensitive-evidence <artifact-name,...|none>] [--json]
+      [--sensitive-evidence <artifact-name,...|none>] \
+      [--harness-model-provider <codex|claude-code|none> \
+       --harness-model-name <name> --harness-cli <absolute-cli-path> \
+       --harness-cli-timeout-seconds <1...900>] [--json]
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
         arkdeck agentd uninstall [--json]

@@ -135,7 +135,12 @@ public struct AgentRuntimeExecutor: Sendable {
 
   private struct Target: Codable, Sendable, Equatable {
     let targetID: String
-    let bindingRevision: Int
+    let bindingRevision: Int?
+  }
+
+  private struct OperationScope: Sendable, Equatable {
+    let binding: String
+    let provider: String
   }
 
   /// Read-only daemon projection joining a currently visible transport face
@@ -283,88 +288,127 @@ public struct AgentRuntimeExecutor: Sendable {
     selectedTarget: Target?,
     deadline: ExecutionDeadline
   ) throws -> RuntimeAgentExecutionOutcome {
-    let target: Target
-    if let selectedTarget {
-      if let expectedTargetID = request.targetID,
-        selectedTarget.targetID != expectedTargetID
-      {
-        return try pause(
-          request: request, kind: .physicalReconnect,
-          prompt:
-            "The selected physical device is not the requested target; "
-            + "reconnect the requested target before resuming this execution.",
-          mode: .reconnectTarget, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions)
+    let scope = try operationScope(request, deadline: deadline)
+    let target: Target?
+    if scope.binding == "none" {
+      guard selectedTarget == nil else {
+        return .failed(
+          reason: "\(request.reference) resumed with an invalid device selection",
+          receipt: receipt(
+            request: request, digest: catalogDigest, startedAtUTC: startedAtUTC,
+            actions: humanActions, jobID: nil, target: nil, state: "rejected"))
       }
-      target = selectedTarget
-    } else if let explicitTargetID = request.targetID {
-      let listed = try listTargets(deadline: deadline)
-      guard listed.contains(where: { $0.targetID == explicitTargetID }) else {
-        return try pause(
-          request: request, kind: .physicalReconnect,
-          prompt: "Reconnect the selected target before resuming this execution.",
-          mode: .reconnectTarget, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions)
-      }
-      // A durable target record proves identity, not current reachability.
-      // Join current candidates through the daemon-owned durable target map,
-      // then refresh only the exact matching transport face through the typed
-      // bootstrap port. Presence, ordering and similar IDs are never enough.
-      let matchingCandidates = try listCandidateBindings(deadline: deadline).filter {
-        $0.target?.targetID == explicitTargetID
-      }
-      guard matchingCandidates.count == 1, let candidate = matchingCandidates.first else {
-        let prompt =
-          matchingCandidates.isEmpty
-          ? "Reconnect the selected target before resuming this execution."
-          : "The selected target has ambiguous physical routes; disconnect duplicate routes "
-            + "before resuming this execution."
-        return try pause(
-          request: request, kind: .physicalReconnect, prompt: prompt,
-          mode: .reconnectTarget, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions)
-      }
-      switch try adopt(
-        request: request, candidate: candidate.connectKey, catalogDigest: catalogDigest,
-        startedAtUTC: startedAtUTC, humanActions: humanActions,
-        deadline: deadline)
-      {
-      case .target(let refreshed) where refreshed.targetID == explicitTargetID:
-        target = refreshed
-      case .target:
-        return try pause(
-          request: request, kind: .physicalReconnect,
-          prompt:
-            "The selected target is not the connected physical device; "
-            + "reconnect the selected target before resuming this execution.",
-          mode: .reconnectTarget, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions)
-      case .paused(let outcome):
-        return outcome
-      }
-    } else {
-      let listed = try listTargets(deadline: deadline)
-      if listed.count == 1 {
-        target = listed[0]
-      } else if listed.count > 1 {
-        return try pause(
-          request: request, kind: .selectTarget,
-          prompt: "Multiple adopted targets are available; select one target ID.",
-          mode: .adoptedTarget, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions,
-          selectionOptions: listed.map(\.targetID))
+      let declaredProject: String?
+      if case .string(let projectRef)? = request.inputs["projectRef"] {
+        declaredProject = projectRef
       } else {
+        declaredProject = nil
+      }
+      if let requestedTarget = request.targetID, let declaredProject,
+        requestedTarget != declaredProject
+      {
+        return .failed(
+          reason:
+            "\(request.reference) host scope \(requestedTarget) does not match "
+            + "projectRef \(declaredProject)",
+          receipt: receipt(
+            request: request, digest: catalogDigest, startedAtUTC: startedAtUTC,
+            actions: humanActions, jobID: nil, target: nil, state: "rejected"))
+      }
+      let hostTargetID = request.targetID ?? declaredProject ?? "\(scope.provider)-host"
+      guard Self.isSafeIdentifier(hostTargetID) else {
+        return .failed(
+          reason: "\(request.reference) resolved an unsafe host scope",
+          receipt: receipt(
+            request: request, digest: catalogDigest, startedAtUTC: startedAtUTC,
+            actions: humanActions, jobID: nil, target: nil, state: "rejected"))
+      }
+      target = Target(targetID: hostTargetID, bindingRevision: nil)
+    } else {
+      let resolvedTarget: Target
+      if let selectedTarget {
+        if let expectedTargetID = request.targetID,
+          selectedTarget.targetID != expectedTargetID
+        {
+          return try pause(
+            request: request, kind: .physicalReconnect,
+            prompt:
+              "The selected physical device is not the requested target; "
+              + "reconnect the requested target before resuming this execution.",
+            mode: .reconnectTarget, catalogDigest: catalogDigest,
+            startedAtUTC: startedAtUTC, humanActions: humanActions)
+        }
+        resolvedTarget = selectedTarget
+      } else if let explicitTargetID = request.targetID {
+        let listed = try listTargets(deadline: deadline)
+        guard listed.contains(where: { $0.targetID == explicitTargetID }) else {
+          return try pause(
+            request: request, kind: .physicalReconnect,
+            prompt: "Reconnect the selected target before resuming this execution.",
+            mode: .reconnectTarget, catalogDigest: catalogDigest,
+            startedAtUTC: startedAtUTC, humanActions: humanActions)
+        }
+        // A durable target record proves identity, not current reachability.
+        // Join current candidates through the daemon-owned durable target map,
+        // then refresh only the exact matching transport face through the typed
+        // bootstrap port. Presence, ordering and similar IDs are never enough.
+        let matchingCandidates = try listCandidateBindings(deadline: deadline).filter {
+          $0.target?.targetID == explicitTargetID
+        }
+        guard matchingCandidates.count == 1, let candidate = matchingCandidates.first else {
+          let prompt =
+            matchingCandidates.isEmpty
+            ? "Reconnect the selected target before resuming this execution."
+            : "The selected target has ambiguous physical routes; disconnect duplicate routes "
+              + "before resuming this execution."
+          return try pause(
+            request: request, kind: .physicalReconnect, prompt: prompt,
+            mode: .reconnectTarget, catalogDigest: catalogDigest,
+            startedAtUTC: startedAtUTC, humanActions: humanActions)
+        }
         switch try adopt(
-          request: request, candidate: nil, catalogDigest: catalogDigest,
+          request: request, candidate: candidate.connectKey, catalogDigest: catalogDigest,
           startedAtUTC: startedAtUTC, humanActions: humanActions,
           deadline: deadline)
         {
-        case .target(let adopted):
-          target = adopted
+        case .target(let refreshed) where refreshed.targetID == explicitTargetID:
+          resolvedTarget = refreshed
+        case .target:
+          return try pause(
+            request: request, kind: .physicalReconnect,
+            prompt:
+              "The selected target is not the connected physical device; "
+              + "reconnect the selected target before resuming this execution.",
+            mode: .reconnectTarget, catalogDigest: catalogDigest,
+            startedAtUTC: startedAtUTC, humanActions: humanActions)
         case .paused(let outcome):
           return outcome
         }
+      } else {
+        let listed = try listTargets(deadline: deadline)
+        if listed.count == 1 {
+          resolvedTarget = listed[0]
+        } else if listed.count > 1 {
+          return try pause(
+            request: request, kind: .selectTarget,
+            prompt: "Multiple adopted targets are available; select one target ID.",
+            mode: .adoptedTarget, catalogDigest: catalogDigest,
+            startedAtUTC: startedAtUTC, humanActions: humanActions,
+            selectionOptions: listed.map(\.targetID))
+        } else {
+          switch try adopt(
+            request: request, candidate: nil, catalogDigest: catalogDigest,
+            startedAtUTC: startedAtUTC, humanActions: humanActions,
+            deadline: deadline)
+          {
+          case .target(let adopted):
+            resolvedTarget = adopted
+          case .paused(let outcome):
+            return outcome
+          }
+        }
       }
+      target = resolvedTarget
     }
 
     var operation: [String: JSONValue] = ["id": .string(request.operationID)]
@@ -376,12 +420,15 @@ public struct AgentRuntimeExecutor: Sendable {
       "schemaVersion": .string("2.0.0"),
       "requestId": .string("agent-request-\(request.executionID)"),
       "idempotencyKey": .string("agent-execution-\(request.executionID)"),
-      "target": .object([
-        "targetId": .string(target.targetID),
-        "expectedBindingRevision": .integer(Int64(target.bindingRevision)),
-      ]),
       "operation": .object(operation),
     ]
+    if let target {
+      var targetFields: [String: JSONValue] = ["targetId": .string(target.targetID)]
+      if let revision = target.bindingRevision {
+        targetFields["expectedBindingRevision"] = .integer(Int64(revision))
+      }
+      payload["target"] = .object(targetFields)
+    }
     if !request.inputs.isEmpty { payload["inputs"] = .object(request.inputs) }
     if let capability = request.capabilityReference {
       payload["authorization"] = .object(["capabilityId": .string(capability)])
@@ -612,6 +659,39 @@ public struct AgentRuntimeExecutor: Sendable {
       throw RuntimeAgentExecutorError.malformedResponse("health lacks catalog digest")
     }
     return digest
+  }
+
+  /// Resolves the published descriptor through the daemon before selecting a
+  /// target. A host-only operation still carries its declared host/project
+  /// scope, but must not adopt a physical device or pin a binding revision;
+  /// doing either turns an otherwise valid typed workspace request into a
+  /// request the Runtime is required to reject.
+  private func operationScope(
+    _ request: RuntimeAgentExecutionRequest,
+    deadline: ExecutionDeadline
+  ) throws -> OperationScope {
+    let described: JSONValue
+    do {
+      described = try call(
+        method: "operation.describe",
+        params: ["reference": .string(request.reference)],
+        deadline: deadline)
+    } catch let error as AgentClientError {
+      if case .daemonError(_, let message) = error {
+        throw RuntimeAgentExecutorError.operationRejected(message)
+      }
+      throw RuntimeAgentExecutorError.daemonUnavailable("\(error)")
+    }
+    guard case .object(let fields) = described,
+      case .string(let binding)? = fields["binding"],
+      binding == "none" || binding == "confirmedDevice",
+      case .string(let provider)? = fields["provider"],
+      Self.isSafeIdentifier(provider)
+    else {
+      throw RuntimeAgentExecutorError.malformedResponse(
+        "operation.describe returned no recognized operation scope")
+    }
+    return OperationScope(binding: binding, provider: provider)
   }
 
   private func listTargets(deadline: ExecutionDeadline) throws -> [Target] {

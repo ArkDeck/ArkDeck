@@ -297,7 +297,24 @@ hdc -t <k> shell rm -f <remote.png>
   `--product` 不带 `--modules` = 整产品 `assembleApp`(产物 `.app`);依赖模块按
   `oh-package.json5` 的本地 `file:` 依赖递归收集,`har` 不进安装集。
 
-## 9.1 hitrace tag 表 `[R]`
+## 9.1 无 UI 签名边界 `[S][R]`
+
+- `devecocli signature generate` 是 CLI 命令,不需要启动 DevEco Studio UI。上游
+  `9b25c8683d5f64164ea774f7811d418b5f4483c3` 的实现同时证明它并非纯 host 工具:
+  `src/signature/device-manager.ts` 会执行 `hdc list targets`、按 serial 读取 `bm get -u`
+  与设备类型;`generate-certificate.ts` / `generate-profile.ts` 会创建并下载账号侧证书和
+  Provision。ArkDeck 只借用这项事实,**不复用其直连 HDC 路径**。
+- OpenHarmony SDK 的本地 release 签名链可由开源
+  `developtools_hapsigner` 在 host 上完成,不需要设备 UDID。2026-08-10 的 DAYU200
+  真机窗口 `[R]` 中,以该链为 `com.example.waterflowdemo` 生成 profile、签名并先做
+  `verify-app`,随后 signed HAP 经 UDS import 与 published `debug.hap@1` 成功安装、启动和
+  readback。此结论只覆盖 OpenHarmony 开发板,不覆盖 HarmonyOS 商用 Provision。
+- 产品边界不变:签名材料不进入 Catalog input,签名工具不获 HDC,产物必须先成为绑定 target
+  与 digest 的 Artifact lease,设备副作用仍只由 Runtime dispatch。若将来要把签名本身变成
+  published operation,它是新增 operation,必须另走适用的 OpenSpec/PR 审批,不能在 workspace
+  provider 里暗加 shell 表面。
+
+## 9.2 hitrace tag 表 `[R]`
 
 `traceCategories` 的取值必须来自设备侧 `hitrace --list_categories`,**不要照抄
 仓内 fixture**。2026-07-31 DAYU200(OH 3.2)实测:`ability`、`app`、`ace`、
@@ -331,7 +348,8 @@ hdc -t <k> shell rm -f <remote.png>
 ## 11. 明确不适用(不要抄进来)
 
 - 模拟器全家(`emulator *`)与 `127.0.0.1:<port>` 目标假设:ArkDeck 目标是真机 DAYU200。
-- 华为账号 / AGC 云证书 / `signature generate` / provision 配额:HarmonyOS 商用侧。
+- 华为账号 / AGC 云证书 / `signature generate` / provision 配额属于 HarmonyOS 商用侧;
+  其 CLI 能力与 ArkDeck 的边界见 §9.1,不得把直连 HDC 的实现抄进来。
 - `check compat`(arkanalyzer-apiscan)、`docs`、`skills`、MCP/LSP:与 ArkDeck 无关。
 - `bm quickfix` / hqf 增量:依赖 DevEco ≥6.1.1 的 hvigor 任务,OH 3.2 侧不保证存在。
 - deveco 的 hdc **输出解析器实现**:按 hdc 26 系写的,ArkDeck pin 3.2.0d/f;
