@@ -16,7 +16,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum RuntimeArtifactError: Error, Equatable, Sendable {
+package enum RuntimeArtifactError: Error, Equatable, Sendable {
   case ioFailure(String)
   case indexCorrupted(String)
   case artifactNotFound(String)
@@ -27,21 +27,21 @@ public enum RuntimeArtifactError: Error, Equatable, Sendable {
   case evidenceVerificationFailed(String)
 }
 
-public enum ArtifactStatus: Sendable, Equatable, Codable {
+package enum ArtifactStatus: Sendable, Equatable, Codable {
   case published
   case missing(reason: String)
   case truncated(atBytes: Int)
 
-  public var isPublished: Bool {
+  package var isPublished: Bool {
     if case .published = self { return true }
     return false
   }
 }
 
-public struct ArtifactBindingSnapshot: Sendable, Equatable, Codable {
+package struct ArtifactBindingSnapshot: Sendable, Equatable, Codable {
   public let targetID: String
   public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
+  package let stableIdentitySHA256: String?
 
   public init(targetID: String, bindingRevision: Int?, stableIdentitySHA256: String?) {
     self.targetID = targetID
@@ -50,9 +50,9 @@ public struct ArtifactBindingSnapshot: Sendable, Equatable, Codable {
   }
 }
 
-public struct ArtifactRetention: Sendable, Equatable, Codable {
-  public let retentionClass: CatalogArtifactRetentionClass
-  public let deadlineUTC: String?
+package struct ArtifactRetention: Sendable, Equatable, Codable {
+  package let retentionClass: CatalogArtifactRetentionClass
+  package let deadlineUTC: String?
   public let pinned: Bool
 
   public init(
@@ -64,8 +64,8 @@ public struct ArtifactRetention: Sendable, Equatable, Codable {
   }
 }
 
-public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
-  public let artifactID: String
+package struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
+  package let artifactID: String
   public let jobID: String
   public let sessionID: String
   public let stepID: String
@@ -76,20 +76,20 @@ public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   public let createdAtUTC: String
   public let providerID: String
   public let sourceOperation: String
-  public let bindingSnapshot: ArtifactBindingSnapshot
+  package let bindingSnapshot: ArtifactBindingSnapshot
   public let privacy: CatalogArtifactPrivacy
   public let retention: ArtifactRetention
   public let status: ArtifactStatus
-  public let redactionApplied: Bool
+  package let redactionApplied: Bool
 }
 
-public struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
+package struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
   public let reference: String
   public let sha256: String
   public let jobID: String
   public let targetID: String
   public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
+  package let stableIdentitySHA256: String?
   public let providerID: String
   public let byteCount: Int
 
@@ -123,8 +123,8 @@ private struct ArtifactIndexDocument: Codable, Equatable {
 /// Default redaction for text products. Deliberately conservative and
 /// cheap: it removes the shapes that must never leave the host, and marks
 /// that it ran so evidence can state it plainly.
-public struct ArtifactRedactionPolicy: Sendable {
-  public let homeDirectory: String
+package struct ArtifactRedactionPolicy: Sendable {
+  package let homeDirectory: String
 
   public init(homeDirectory: String = NSHomeDirectory()) {
     self.homeDirectory = homeDirectory
@@ -133,7 +133,7 @@ public struct ArtifactRedactionPolicy: Sendable {
   private static let secretKeyPattern =
     "(?i)(token|secret|password|passwd|api[_-]?key|authorization)([\"'\\s:=]+)([^\\s\"',}]{6,})"
 
-  public func redact(_ data: Data, mediaType: String) -> (data: Data, applied: Bool) {
+  package func redact(_ data: Data, mediaType: String) -> (data: Data, applied: Bool) {
     guard mediaType.hasPrefix("text/") || mediaType == "application/json",
       var text = String(data: data, encoding: .utf8)
     else {
@@ -153,17 +153,17 @@ public struct ArtifactRedactionPolicy: Sendable {
 /// Storage quota. The rule is "refuse new work, never damage existing
 /// artifacts": approaching the limit rejects a publication instead of
 /// evicting something already recorded.
-public struct ArtifactQuota: Sendable, Equatable {
-  public let totalBytes: Int
+package struct ArtifactQuota: Sendable, Equatable {
+  package let totalBytes: Int
 
   public init(totalBytes: Int = 8 * 1024 * 1024 * 1024) {
     self.totalBytes = totalBytes
   }
 }
 
-public struct ArtifactRetentionPolicy: Sendable, Equatable {
-  public let defaultLifetimeSeconds: TimeInterval
-  public let shortLivedLifetimeSeconds: TimeInterval
+package struct ArtifactRetentionPolicy: Sendable, Equatable {
+  package let defaultLifetimeSeconds: TimeInterval
+  package let shortLivedLifetimeSeconds: TimeInterval
 
   public init(
     defaultLifetimeSeconds: TimeInterval = 7 * 24 * 60 * 60,
@@ -201,18 +201,18 @@ public struct ArtifactRetentionPolicy: Sendable, Equatable {
   }
 }
 
-public struct RuntimeArtifactPublicationRequest: Sendable {
+package struct RuntimeArtifactPublicationRequest: Sendable {
   public let jobID: String
   public let sessionID: String
   public let stepID: String
   public let name: String
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  public let retentionClass: CatalogArtifactRetentionClass
+  package let retentionClass: CatalogArtifactRetentionClass
   public let sourceOperation: String
   public let providerID: String
-  public let bindingSnapshot: ArtifactBindingSnapshot
-  public let contents: Data
+  package let bindingSnapshot: ArtifactBindingSnapshot
+  package let contents: Data
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
@@ -240,20 +240,20 @@ public struct RuntimeArtifactPublicationRequest: Sendable {
 /// declared immutable facts; the store re-opens it without following
 /// symlinks, hashes it through the descriptor, and copies it into the
 /// product-owned Artifact root.
-public struct RuntimeArtifactFilePublicationRequest: Sendable {
+package struct RuntimeArtifactFilePublicationRequest: Sendable {
   public let jobID: String
   public let sessionID: String
   public let stepID: String
   public let name: String
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  public let retentionClass: CatalogArtifactRetentionClass
+  package let retentionClass: CatalogArtifactRetentionClass
   public let sourceOperation: String
   public let providerID: String
-  public let bindingSnapshot: ArtifactBindingSnapshot
-  public let sourceFileURL: URL
-  public let expectedByteCount: Int
-  public let expectedSHA256: String
+  package let bindingSnapshot: ArtifactBindingSnapshot
+  package let sourceFileURL: URL
+  package let expectedByteCount: Int
+  package let expectedSHA256: String
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
@@ -283,18 +283,18 @@ public struct RuntimeArtifactFilePublicationRequest: Sendable {
 /// private staging file, then atomically publishes only the redacted bytes.
 /// No expected digest is accepted because the immutable artifact identity is
 /// derived from the post-redaction stream rather than the untrusted source.
-public struct RuntimeArtifactTextFilePublicationRequest: Sendable {
+package struct RuntimeArtifactTextFilePublicationRequest: Sendable {
   public let jobID: String
   public let sessionID: String
   public let stepID: String
   public let name: String
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  public let retentionClass: CatalogArtifactRetentionClass
+  package let retentionClass: CatalogArtifactRetentionClass
   public let sourceOperation: String
   public let providerID: String
-  public let bindingSnapshot: ArtifactBindingSnapshot
-  public let sourceFileURL: URL
+  package let bindingSnapshot: ArtifactBindingSnapshot
+  package let sourceFileURL: URL
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
@@ -316,12 +316,12 @@ public struct RuntimeArtifactTextFilePublicationRequest: Sendable {
   }
 }
 
-public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
-  public let artifactID: String
-  public let fileURL: URL
+package struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
+  package let artifactID: String
+  package let fileURL: URL
   public let sha256: String
   public let byteCount: Int
-  public let bindingSnapshot: ArtifactBindingSnapshot
+  package let bindingSnapshot: ArtifactBindingSnapshot
 
   public init(
     artifactID: String,
@@ -345,7 +345,7 @@ public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
 /// ran without taking effect (CHG-2026-049 r3). Both are recorded, queried
 /// and settled through one ledger — the asymmetry between them was the
 /// whole of D12.
-public enum CleanupResidue: Sendable, Equatable {
+package enum CleanupResidue: Sendable, Equatable {
   case remotePath(String)
   case installedBundle(String)
 
@@ -367,20 +367,20 @@ public enum CleanupResidue: Sendable, Equatable {
   }
 }
 
-public struct CleanupDebtRecord: Sendable, Equatable, Codable {
+package struct CleanupDebtRecord: Sendable, Equatable, Codable {
   public let jobID: String
   public let stepID: String
   /// The path case's identity. Empty when the residue is not a path —
   /// kept under this name so records written before r3 decode unchanged.
-  public let remotePath: String
+  package let remotePath: String
   /// Set only for a bundle residue. Absent in every pre-r3 record, which
   /// is what makes those records decode as the path case.
   public var bundleName: String?
   public let reason: String
-  public let recordedAtUTC: String
-  public var settledAtUTC: String?
-  public var retryAttemptStartedAtUTC: String?
-  public var retryOutcomeUnknown: Bool?
+  package let recordedAtUTC: String
+  package var settledAtUTC: String?
+  package var retryAttemptStartedAtUTC: String?
+  package var retryOutcomeUnknown: Bool?
   var persistedAction: PersistedTypedProviderAction?
 
   public var residue: CleanupResidue {
@@ -391,7 +391,7 @@ public struct CleanupDebtRecord: Sendable, Equatable, Codable {
   public var identity: String { residue.identity }
 }
 
-public actor RuntimeArtifactStore {
+package actor RuntimeArtifactStore {
   private static let maximumReadBytes = 4 * 1024 * 1024
 
   private let rootURL: URL
@@ -505,7 +505,7 @@ public actor RuntimeArtifactStore {
   /// `Data`. Source identity is checked before and after both the hash pass
   /// and descriptor-to-descriptor copy. The destination is made visible
   /// only after its bytes are synchronized and its digest is confirmed.
-  public func publishFile(
+  package func publishFile(
     _ request: RuntimeArtifactFilePublicationRequest
   ) throws -> RuntimeArtifactMetadata {
     guard request.sourceFileURL.isFileURL,
@@ -601,7 +601,7 @@ public actor RuntimeArtifactStore {
   /// The source is never materialized as one `Data` value: each bounded
   /// chunk is transformed, hashed and written directly to a private staging
   /// inode.  The artifact ID is bound to those redacted bytes only.
-  public func publishTextFile(
+  package func publishTextFile(
     _ request: RuntimeArtifactTextFilePublicationRequest
   ) throws -> RuntimeArtifactMetadata {
     guard request.sourceFileURL.isFileURL,
@@ -724,7 +724,7 @@ public actor RuntimeArtifactStore {
 
   /// Records a declared-but-absent product. This is how a partial capture
   /// stays honest: the artifact exists in the index with a reason.
-  public func recordMissing(
+  package func recordMissing(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
     privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
     sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
@@ -767,7 +767,7 @@ public actor RuntimeArtifactStore {
   /// closed. An optional product omitted by the persisted materialized
   /// request remains visible in the Artifact index but is not itself an
   /// evidence-bearing artifact.
-  public func verifiedEvidenceArtifacts(
+  package func verifiedEvidenceArtifacts(
     jobID: String,
     intentionallyOmittedNames: Set<String> = []
   ) throws -> [RuntimeVerifiedArtifactEvidence] {
@@ -891,7 +891,7 @@ public actor RuntimeArtifactStore {
   /// Produces and resolves an ID-only Artifact lease. The reference carries
   /// no host path, and resolution revalidates index metadata plus the
   /// symlink-free immutable payload before returning a provider-only URL.
-  public func leaseReference(jobID: String, artifactID: String) throws -> String {
+  package func leaseReference(jobID: String, artifactID: String) throws -> String {
     let metadata = try inspect(jobID: jobID, artifactID: artifactID)
     guard metadata.status.isPublished else {
       throw RuntimeArtifactError.artifactNotFound("\(artifactID) has no leaseable bytes")
@@ -900,7 +900,7 @@ public actor RuntimeArtifactStore {
     return "lease-v1:\(jobID):\(artifactID)"
   }
 
-  public func resolveLease(_ reference: String) throws -> RuntimeArtifactLeaseResolution {
+  package func resolveLease(_ reference: String) throws -> RuntimeArtifactLeaseResolution {
     let parts = reference.split(separator: ":", omittingEmptySubsequences: false)
     guard parts.count == 3, parts[0] == "lease-v1" else {
       throw RuntimeArtifactError.artifactNotFound("malformed Artifact lease")
@@ -919,7 +919,7 @@ public actor RuntimeArtifactStore {
 
   // MARK: - Lifecycle
 
-  public func preflightAdditionalBytes(_ requestedBytes: Int) throws {
+  package func preflightAdditionalBytes(_ requestedBytes: Int) throws {
     guard requestedBytes >= 0 else {
       throw RuntimeArtifactError.ioFailure("artifact preflight byte count must be nonnegative")
     }
@@ -931,7 +931,7 @@ public actor RuntimeArtifactStore {
     }
   }
 
-  public func totalBytesUsed() throws -> Int {
+  package func totalBytesUsed() throws -> Int {
     if let cachedIndexedBytes { return cachedIndexedBytes }
     var total = 0
     for entry in try jobDirectories() {
@@ -946,7 +946,7 @@ public actor RuntimeArtifactStore {
 
   /// Collects artifacts whose retention has lapsed. Active jobs and pinned
   /// artifacts are skipped - GC never removes something still referenced.
-  public func collectGarbage(
+  package func collectGarbage(
     activeJobIDs: Set<String>, nowUTC currentUTC: String
   ) throws -> [String] {
     var removed: [String] = []
@@ -1027,11 +1027,11 @@ public actor RuntimeArtifactStore {
       reason: reason, action: action)
   }
 
-  public func outstandingCleanupDebt() throws -> [CleanupDebtRecord] {
+  package func outstandingCleanupDebt() throws -> [CleanupDebtRecord] {
     try loadCleanupDebt().filter { $0.settledAtUTC == nil }
   }
 
-  public func settleCleanupDebt(jobID: String, identity: String) throws {
+  package func settleCleanupDebt(jobID: String, identity: String) throws {
     var debts = try loadCleanupDebt()
     for index in debts.indices
     where debts[index].jobID == jobID && debts[index].identity == identity

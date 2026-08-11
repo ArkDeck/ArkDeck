@@ -12,10 +12,10 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public struct HarnessPatchLimits: Equatable, Sendable, Codable {
-  public let maxPatchBytes: Int
-  public let maxTouchedFiles: Int
-  public let maxExpectedChangedSymbols: Int
+package struct HarnessPatchLimits: Equatable, Sendable, Codable {
+  package let maxPatchBytes: Int
+  package let maxTouchedFiles: Int
+  package let maxExpectedChangedSymbols: Int
 
   public init(
     maxPatchBytes: Int = 256 * 1024,
@@ -30,7 +30,7 @@ public struct HarnessPatchLimits: Equatable, Sendable, Codable {
   public static let `default` = HarnessPatchLimits()
 }
 
-public enum HarnessPatchProposalError: Error, Equatable, Sendable {
+package enum HarnessPatchProposalError: Error, Equatable, Sendable {
   case missingField(String)
   case invalidField(String)
   case patchTooLarge(actual: Int, limit: Int)
@@ -54,12 +54,12 @@ public enum HarnessPatchProposalError: Error, Equatable, Sendable {
   }
 }
 
-public struct HarnessPatchProposal: Equatable, Sendable, Codable {
-  public let baseWorkspaceRevision: String
+package struct HarnessPatchProposal: Equatable, Sendable, Codable {
+  package let baseWorkspaceRevision: String
   public let patchSHA256: String
-  public let unifiedDiff: String
-  public let touchedFiles: [String]
-  public let expectedChangedSymbols: [String]
+  package let unifiedDiff: String
+  package let touchedFiles: [String]
+  package let expectedChangedSymbols: [String]
 
   enum CodingKeys: String, CodingKey {
     case baseWorkspaceRevision
@@ -260,28 +260,28 @@ public struct HarnessPatchProposal: Equatable, Sendable, Codable {
 /// Durable, evidence-derived progress for one source repair.  It is encoded
 /// inside `observedState`, whose reducer already restricts writers to job
 /// observation/evaluation paths.
-public struct HarnessRepairAttempt: Equatable, Sendable {
-  public static let observedStateKey = "repairAttempt"
+package struct HarnessRepairAttempt: Equatable, Sendable {
+  package static let observedStateKey = "repairAttempt"
 
-  public let proposal: HarnessPatchProposal
+  package let proposal: HarnessPatchProposal
   /// The succeeded checkpoint ActionRun that made the following patch
   /// application eligible. `nil` remains readable for historical attempts
   /// that predate the explicit checkpoint leg.
-  public let checkpointJobID: String?
+  package let checkpointJobID: String?
   public let patchAttemptRef: String?
-  public let patchRevision: String?
-  public let buildSourceRevision: String?
-  public let buildOutputDigest: String?
-  public let buildOutputArtifactLease: String?
+  package let patchRevision: String?
+  package let buildSourceRevision: String?
+  package let buildOutputDigest: String?
+  package let buildOutputArtifactLease: String?
   /// True only after the published local-signing operation has produced a
   /// verified `signed.hap` Artifact. Historical attempts decode as false, so
   /// a daemon restart can never mistake an unsigned build readback for a
   /// deployable package.
-  public let buildOutputSigned: Bool
-  public let testsPassed: Bool
-  public let deployedDigest: String?
-  public let rollbackRequired: Bool
-  public let reverted: Bool
+  package let buildOutputSigned: Bool
+  package let testsPassed: Bool
+  package let deployedDigest: String?
+  package let rollbackRequired: Bool
+  package let reverted: Bool
 
   public init(
     proposal: HarnessPatchProposal,
@@ -362,7 +362,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
       reverted: boolean("reverted"))
   }
 
-  public func updating(
+  package func updating(
     checkpointJobID: String? = nil,
     patchAttemptRef: String? = nil,
     patchRevision: String? = nil,
@@ -392,7 +392,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
 }
 
 extension HarnessTaskSnapshot {
-  public var repairAttempt: HarnessRepairAttempt? {
+  package var repairAttempt: HarnessRepairAttempt? {
     observedState[HarnessRepairAttempt.observedStateKey].flatMap(HarnessRepairAttempt.init(json:))
   }
 }

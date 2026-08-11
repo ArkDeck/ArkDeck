@@ -20,7 +20,7 @@ import Foundation
 /// family; MU-3 (T10) completes the E0 pack. Every payload is a validated
 /// typed request - extension is a catalog + provider decision, never a
 /// caller-supplied string. Reboot deliberately stays outside E0.
-public enum HDCProviderAction: Sendable, Equatable {
+package enum HDCProviderAction: Sendable, Equatable {
   case observeTool
   case observeServer
   case listDeviceCandidates
@@ -89,13 +89,13 @@ public enum HDCProviderAction: Sendable, Equatable {
 /// Engine-resolved flash input. The URL is not supplied by a Runtime
 /// request: it is the descriptor-backed file owned by the Artifact store
 /// after the lease, target identity and binding revision have all matched.
-public struct RockchipRuntimeFlashBundle: Sendable, Equatable {
-  public let artifactLeaseID: String
-  public let artifactID: String
-  public let fileURL: URL
+package struct RockchipRuntimeFlashBundle: Sendable, Equatable {
+  package let artifactLeaseID: String
+  package let artifactID: String
+  package let fileURL: URL
   public let sha256: String
   public let byteCount: Int
-  public let partitionNames: [String]
+  package let partitionNames: [String]
 
   public init(
     artifactLeaseID: String,
@@ -118,10 +118,10 @@ public struct RockchipRuntimeFlashBundle: Sendable, Equatable {
 /// deliberately absent: the Runtime consumes its exact capability immediately
 /// before the first mutation and the Provider cannot request a second,
 /// legacy authorization token.
-public struct RockchipHDCReconnectExpectation: Sendable, Equatable, Codable {
-  public let previousConnectKey: String
-  public let previousIdentitySHA256: String
-  public let usbTopology: String
+package struct RockchipHDCReconnectExpectation: Sendable, Equatable, Codable {
+  package let previousConnectKey: String
+  package let previousIdentitySHA256: String
+  package let usbTopology: String
 
   public init(
     previousConnectKey: String,
@@ -134,7 +134,7 @@ public struct RockchipHDCReconnectExpectation: Sendable, Equatable, Codable {
   }
 }
 
-public enum RockchipProviderAction: Sendable, Equatable {
+package enum RockchipProviderAction: Sendable, Equatable {
   case enterLoader(connectKey: String)
   case observeHDCNormalUSB(connectKey: String)
   case waitForHDCDisconnect(connectKey: String)
@@ -159,11 +159,11 @@ public enum RockchipProviderAction: Sendable, Equatable {
 /// One host-only action family (CHG-2026-054 TASK-HTP-007). It carries a
 /// resolved project root, never a caller-supplied path, and a glob that the
 /// provider validated before it became part of an action.
-public struct WorkspaceSourceInspection: Sendable, Equatable, Codable {
-  public let projectRef: String
-  public let projectRoot: String
+package struct WorkspaceSourceInspection: Sendable, Equatable, Codable {
+  package let projectRef: String
+  package let projectRoot: String
   public let symbol: String
-  public let fileScope: String
+  package let fileScope: String
 
   public init(projectRef: String, projectRoot: String, symbol: String, fileScope: String) {
     self.projectRef = projectRef
@@ -182,7 +182,7 @@ extension WorkspaceProviderAction {
   /// the wire vocabulary would break journals for no safety gain. What it
   /// buys here is real: these five now require a capability, and the
   /// read-only workspace family still does not.
-  public var mutatesWorkspace: Bool {
+  package var mutatesWorkspace: Bool {
     switch self {
     case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch,
       .createCheckpoint, .createArchiveCheckpoint:
@@ -197,16 +197,16 @@ extension WorkspaceProviderAction {
 /// What a workspace-scoped capability is matched against (CHG-2026-055,
 /// TASK-HFA-009 r2). The provider owns all three: the engine cannot compute
 /// them and must not guess.
-public struct WorkspaceAuthorizationFacts: Sendable, Equatable {
-  public let identitySHA256: String
+package struct WorkspaceAuthorizationFacts: Sendable, Equatable {
+  package let identitySHA256: String
   public let revision: String
-  public let fileScopesDigest: String
+  package let fileScopesDigest: String
   /// True when this workspace is a task-owned isolated copy rather than a
   /// tree a person works in. It is the difference between "the agent edits
   /// its own scratch copy, and anything reaching the repository still goes
   /// through a pull request" and "the agent edits your checkout", which is
   /// why authorization treats the two differently.
-  public let isolatedTaskCopy: Bool
+  package let isolatedTaskCopy: Bool
 
   public init(
     identitySHA256: String, revision: String, fileScopesDigest: String,
@@ -239,7 +239,7 @@ package enum WorkspaceProviderAction: Sendable, Equatable, Codable {
 extension DeviceProvider {
   /// Default: this provider has no workspace to authorize. Admission then
   /// refuses rather than matching a capability against absent facts.
-  public func workspaceAuthorizationFacts(
+  package func workspaceAuthorizationFacts(
     for operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts? { nil }
@@ -1121,32 +1121,32 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
 
 // MARK: - Facts, plans, receipts, outcomes
 
-public struct ProviderFacts: Sendable, Equatable {
+package struct ProviderFacts: Sendable, Equatable {
   public let providerID: String
   public let toolVersion: String
-  public let toolSHA256: String
-  public let serverFacts: [String: String]
+  package let toolSHA256: String
+  package let serverFacts: [String: String]
   /// Correlation fields are optional for compatibility with pre-V3 fact
   /// producers. Hardware evidence treats every absent field as
   /// incomplete; the runtime never fills one from a target ID or caller
   /// input.
   public let targetID: String?
   public let bindingRevision: Int?
-  public let deviceIdentitySHA256: String?
+  package let deviceIdentitySHA256: String?
   /// Private execution routing material. This type is deliberately not
   /// Codable so a raw device key cannot leak into a job record, receipt or
   /// evidence artifact by accidental serialization.
-  public let executionConnectKey: String?
-  public let deviceModel: String?
-  public let deviceMode: String?
-  public let buildFingerprint: String?
+  package let executionConnectKey: String?
+  package let deviceModel: String?
+  package let deviceMode: String?
+  package let buildFingerprint: String?
   public let transport: String?
-  public let profileID: String
-  public let collectedAtUTC: String
+  package let profileID: String
+  package let collectedAtUTC: String
   /// Time at which the device facts themselves were read. This is
   /// deliberately separate from `collectedAtUTC`: reopening a cached
   /// target record "now" must not make an old observation fresh.
-  public let sourceObservedAtUTC: String?
+  package let sourceObservedAtUTC: String?
 
   public init(
     providerID: String,
@@ -1189,10 +1189,10 @@ public struct ProviderFacts: Sendable, Equatable {
 /// Construction is package-only: clients cannot mint plans.
 package struct TypedProcessInvocation: Sendable, Equatable {
   public let arguments: [String]
-  public let timeoutSeconds: Int?
+  package let timeoutSeconds: Int?
   /// A mutating command can report non-zero after partially taking effect.
   /// Those invocations must still reach their dedicated readback.
-  public let continueAfterNonZero: Bool
+  package let continueAfterNonZero: Bool
 
   package init(
     arguments: [String],
@@ -1209,19 +1209,19 @@ package struct TypedProcessInvocation: Sendable, Equatable {
 /// comes from the same target facts and typed action that were materialized
 /// before Runtime capability admission; callers cannot construct or mutate
 /// this value outside ArkDeckWorkflows.
-public struct HostManagedProcessDescriptor: Sendable, Equatable {
+package struct HostManagedProcessDescriptor: Sendable, Equatable {
   public let identifier: String
   public let jobID: String
   public let stepID: String
   public let targetID: String
   public let bindingRevision: Int
   public let connectKey: String
-  public let expectedIdentitySHA256: String
-  public let providerExecutableSHA256: String
-  public let actionSHA256: String
+  package let expectedIdentitySHA256: String
+  package let providerExecutableSHA256: String
+  package let actionSHA256: String
   /// Candidate timing controls copied only from an admitted Evolution
   /// reservation. Request inputs cannot construct this descriptor.
-  public let executionTuning: AgentAuthorityCampaignExecutionTuning?
+  package let executionTuning: AgentAuthorityCampaignExecutionTuning?
 
   package init(
     identifier: String,
@@ -1255,15 +1255,15 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
 ///
 /// The declaration is the provider's; reading the disk is the dispatcher's.
 /// Nothing here describes what *should* have landed as though it had.
-public struct HostLandingExpectation: Sendable, Equatable {
+package struct HostLandingExpectation: Sendable, Equatable {
   /// Absolute host path the argv names as the transfer destination.
   public let destination: URL
   /// Refuse anything larger rather than hash an unbounded file.
-  public let maximumBytes: Int
+  package let maximumBytes: Int
   /// Pinned content hash when one is known before the transfer. Today's
   /// trace leg has none (nothing computes a device-side digest first), so
   /// this is `nil` in production and exercised by contract tests.
-  public let expectedSHA256: String?
+  package let expectedSHA256: String?
 
   public init(destination: URL, maximumBytes: Int, expectedSHA256: String? = nil) {
     self.destination = destination
@@ -1274,7 +1274,7 @@ public struct HostLandingExpectation: Sendable, Equatable {
   /// Creates the destination directory and clears any stale file at the
   /// destination. Without the removal a leftover file from an earlier
   /// attempt could be inspected as though this transfer had produced it.
-  public func prepareDestination() throws {
+  package func prepareDestination() throws {
     try FileManager.default.createDirectory(
       at: destination.deletingLastPathComponent(),
       withIntermediateDirectories: true,
@@ -1289,7 +1289,7 @@ public struct HostLandingExpectation: Sendable, Equatable {
   /// verdict — the landing path of `hdc file recv` is not guaranteed across
   /// versions (see `DEVICE-COMMAND-FACTS.md` §4), so absence here means the
   /// outcome is unknown, never that the transfer failed.
-  public func inspectLanded() -> ProviderLandedArtifact? {
+  package func inspectLanded() -> ProviderLandedArtifact? {
     let descriptor = Darwin.open(destination.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
     guard descriptor >= 0 else { return nil }
     defer { Darwin.close(descriptor) }
@@ -1333,15 +1333,15 @@ public struct HostLandingExpectation: Sendable, Equatable {
 
 /// Bytes observed on the host after a transfer. Every field is measured
 /// from the file, never copied from the request that asked for it.
-public struct ProviderLandedArtifact: Sendable, Equatable {
-  public let localURL: URL
+package struct ProviderLandedArtifact: Sendable, Equatable {
+  package let localURL: URL
   public let byteCount: Int
   /// Absent when the file was empty or over budget, i.e. when it was
   /// deliberately not hashed.
   public let sha256: String?
   /// The first bytes as they are on disk, so a format check needs no
   /// second read and cannot be satisfied by anything but the real file.
-  public let leadingBytes: Data
+  package let leadingBytes: Data
 
   public init(localURL: URL, byteCount: Int, sha256: String?, leadingBytes: Data = Data()) {
     self.localURL = localURL
@@ -1351,7 +1351,7 @@ public struct ProviderLandedArtifact: Sendable, Equatable {
   }
 }
 
-public struct TypedProcessPlan: Sendable, Equatable {
+package struct TypedProcessPlan: Sendable, Equatable {
   package enum Kind: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
     case processSequence(executableSHA256: String, invocations: [TypedProcessInvocation])
@@ -1363,13 +1363,13 @@ public struct TypedProcessPlan: Sendable, Equatable {
   /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
   /// It is included in the materialized plan digest and never selects the
   /// executable descriptor.
-  public let argumentZero: String?
+  package let argumentZero: String?
   /// Optional canonical child working directory. It is provider-owned plan
   /// data and participates in the materialized plan digest.
-  public let workingDirectory: String?
+  package let workingDirectory: String?
   /// Set only by plans whose product is a host file. The dispatcher honours
   /// it; no other plan gains host filesystem reach by declaring one.
-  public let hostLanding: HostLandingExpectation?
+  package let hostLanding: HostLandingExpectation?
 
   package init(
     action: TypedProviderAction,
@@ -1386,11 +1386,11 @@ public struct TypedProcessPlan: Sendable, Equatable {
   }
 }
 
-public struct ProviderSubprocessReceipt: Sendable, Equatable {
-  public let exitStatus: Int32?
+package struct ProviderSubprocessReceipt: Sendable, Equatable {
+  package let exitStatus: Int32?
   public let stdout: Data
   public let stderr: Data
-  public let stdoutTruncated: Bool
+  package let stdoutTruncated: Bool
   public let durationSeconds: Double
 
   public init(
@@ -1408,25 +1408,25 @@ public struct ProviderSubprocessReceipt: Sendable, Equatable {
   }
 }
 
-public struct ProviderProcessReceipt: Sendable, Equatable {
-  public let exitStatus: Int32?
+package struct ProviderProcessReceipt: Sendable, Equatable {
+  package let exitStatus: Int32?
   public let stdout: Data
   public let stderr: Data
-  public let stdoutTruncated: Bool
+  package let stdoutTruncated: Bool
   public let durationSeconds: Double
   /// Present when the plan was host-managed: an opaque reference to the
   /// provider-owned durable record (e.g. Rockchip session manifest ID).
-  public let hostManagedRecordID: String?
+  package let hostManagedRecordID: String?
   /// Semantic fields emitted by the product-owned host only after its
   /// durable typed receipt has been written. The provider still validates
   /// these fields; operation callers never construct process receipts.
-  public let hostManagedSummary: [String: String]
+  package let hostManagedSummary: [String: String]
   /// Present when the plan declared a `hostLanding` and the dispatcher found
   /// a file there. Measured, never assumed.
-  public let landedArtifact: ProviderLandedArtifact?
+  package let landedArtifact: ProviderLandedArtifact?
   /// Ordered receipts for a provider-owned command/readback sequence. Empty
   /// for the existing single-process surface.
-  public let subprocesses: [ProviderSubprocessReceipt]
+  package let subprocesses: [ProviderSubprocessReceipt]
 
   public init(
     exitStatus: Int32?,
@@ -1453,20 +1453,20 @@ public struct ProviderProcessReceipt: Sendable, Equatable {
 
 /// Closed semantic verdicts. `verified` requires a parsed summary - the
 /// type system offers no path from a bare exit code to success.
-public enum ProviderSemanticOutcome: Sendable, Equatable {
+package enum ProviderSemanticOutcome: Sendable, Equatable {
   case verified(summary: [String: String])
   case failed(code: String, detail: String)
   case unknown(reason: String)
   case unsupported(reason: String)
 }
 
-public enum ProviderReconcileOutcome: Sendable, Equatable {
+package enum ProviderReconcileOutcome: Sendable, Equatable {
   case confirmedCompleted(summary: [String: String])
   case confirmedNotExecuted
   case stillUnknown(reason: String)
 }
 
-public struct ProviderExecutionContext: Sendable, Equatable {
+package struct ProviderExecutionContext: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
   public let targetID: String
@@ -1474,22 +1474,22 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   /// Provider-private routing and correlation facts resolved from the
   /// adopted target. They never originate in request inputs.
   public let connectKey: String?
-  public let expectedIdentitySHA256: String?
+  package let expectedIdentitySHA256: String?
   public let toolVersion: String?
-  public let toolSHA256: String?
+  package let toolSHA256: String?
   /// Provider-owned facts resolved alongside the target. Request inputs have
   /// no route to this dictionary; closed provider adapters may consume only
   /// their registered keys when materializing an action.
-  public let serverFacts: [String: String]
-  public let nowUTC: String
-  public let resolvedInputArtifact: ProviderResolvedInputArtifact?
+  package let serverFacts: [String: String]
+  package let nowUTC: String
+  package let resolvedInputArtifact: ProviderResolvedInputArtifact?
   /// Further packages of a multi-package install, in the caller's order.
   /// Empty for every single-package request, which is what keeps those
   /// plans byte-identical (CHG-2026-049 r4).
-  public let additionalInputArtifacts: [ProviderResolvedInputArtifact]
+  package let additionalInputArtifacts: [ProviderResolvedInputArtifact]
   /// Present only when the Runtime re-read an admitted campaign reservation
   /// and found its broker-recorded bounded tuning controls.
-  public let campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning?
+  package let campaignExecutionTuning: AgentAuthorityCampaignExecutionTuning?
   /// The build version declared by the image bundle this job will write, read
   /// from the bundle's system image when the Runtime resolved it.
   ///
@@ -1498,7 +1498,7 @@ public struct ProviderExecutionContext: Sendable, Equatable {
   /// job. A step materializer that opened a 730 MB archive to answer this
   /// would make materialization depend on I/O, which is what it stopped doing
   /// when the per-build pins were removed (CHG-2026-056 r4).
-  public let expectedRuntimeBuildVersion: String?
+  package let expectedRuntimeBuildVersion: String?
 
   public init(
     jobID: String,
@@ -1536,9 +1536,9 @@ public struct ProviderExecutionContext: Sendable, Equatable {
 /// Host-side bytes resolved from an Artifact lease by the engine. Providers
 /// can consume this typed value, but operation input can never supply a
 /// local path directly.
-public struct ProviderResolvedInputArtifact: Sendable, Equatable {
-  public let artifactID: String
-  public let fileURL: URL
+package struct ProviderResolvedInputArtifact: Sendable, Equatable {
+  package let artifactID: String
+  package let fileURL: URL
   public let sha256: String
   public let byteCount: Int
 
@@ -1550,10 +1550,10 @@ public struct ProviderResolvedInputArtifact: Sendable, Equatable {
   }
 }
 
-public struct ProviderDurableIntentReference: Sendable, Equatable {
+package struct ProviderDurableIntentReference: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
-  public let intentEventID: String
+  package let intentEventID: String
   package let action: TypedProviderAction
 
   package init(jobID: String, stepID: String, intentEventID: String, action: TypedProviderAction) {
@@ -1564,7 +1564,7 @@ public struct ProviderDurableIntentReference: Sendable, Equatable {
   }
 }
 
-public enum DeviceProviderError: Error, Equatable, Sendable {
+package enum DeviceProviderError: Error, Equatable, Sendable {
   case unsupportedAction(String)
   case unsupportedStepKind(String)
   case factsUnavailable(String)
@@ -1572,7 +1572,7 @@ public enum DeviceProviderError: Error, Equatable, Sendable {
 
 // MARK: - The provider protocol
 
-public enum ProviderOperationAvailability: Sendable, Equatable {
+package enum ProviderOperationAvailability: Sendable, Equatable {
   case available
   case unavailable(reason: String)
 }
@@ -1661,7 +1661,7 @@ package protocol DeviceProvider: Sendable {
 
 extension DeviceProvider {
   package func cleanupTerminalJob(jobID _: String) {}
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     .unavailable(
@@ -1685,14 +1685,14 @@ extension DeviceProvider {
     try action(for: step, operation: operation, inputs: inputs)
   }
 
-  public func reconciliationReadback(
+  package func reconciliationReadback(
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan? {
     nil
   }
 
-  public func verifyReconciliationReadback(
+  package func verifyReconciliationReadback(
     receipt: ProviderProcessReceipt,
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
@@ -1702,7 +1702,7 @@ extension DeviceProvider {
 }
 
 /// Closed provider registry keyed by providerID ("hdc", "rockchip").
-public struct DeviceProviderRegistry: Sendable {
+package struct DeviceProviderRegistry: Sendable {
   private let providers: [String: any DeviceProvider]
 
   package init(providers: [any DeviceProvider]) {
@@ -1717,7 +1717,7 @@ public struct DeviceProviderRegistry: Sendable {
     providers[id]
   }
 
-  public func resolveFacts(
+  package func resolveFacts(
     providerID: String, targetID: String
   ) async throws -> ProviderFacts {
     guard let provider = providers[providerID] else {
@@ -1726,7 +1726,7 @@ public struct DeviceProviderRegistry: Sendable {
     return try await provider.resolveFacts(targetID: targetID)
   }
 
-  public var registeredProviderIDs: [String] {
+  package var registeredProviderIDs: [String] {
     providers.keys.sorted()
   }
 }

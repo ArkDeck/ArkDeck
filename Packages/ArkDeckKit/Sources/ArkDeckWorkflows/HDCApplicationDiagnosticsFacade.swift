@@ -6,7 +6,7 @@ import Foundation
 /// App-facing aliases keep OpenHarmony implementation types behind the
 /// Workflows product boundary. The App links and imports Workflows only.
 public typealias HDCDiagnosticsPresentation = ArkDeckOpenHarmony.HDCDiagnosticsPresentation
-public typealias HDCDeviceObservationPresentationKind =
+package typealias HDCDeviceObservationPresentationKind =
   ArkDeckOpenHarmony.HDCDeviceObservationPresentationKind
 public typealias HDCDeviceObservationPresentationEvent =
   ArkDeckOpenHarmony.HDCDeviceObservationPresentationEvent

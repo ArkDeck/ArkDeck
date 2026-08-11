@@ -1,7 +1,7 @@
 import ArkDeckCore
 import Foundation
 
-public enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
+package enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
   case physicalConnection
   case deviceTrustPrompt
   case osPermission
@@ -12,13 +12,13 @@ public enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
   case governanceApproval
 }
 
-public enum HumanActionStatus: String, CaseIterable, Codable, Sendable {
+package enum HumanActionStatus: String, CaseIterable, Codable, Sendable {
   case waiting
   case resolvedByFreshProbe
   case expired
 }
 
-public enum HumanActionResumeProbeOperation: String, CaseIterable, Codable, Sendable {
+package enum HumanActionResumeProbeOperation: String, CaseIterable, Codable, Sendable {
   case observeDevice
   case probeHostConfiguration
   case probeImpactApproval
@@ -26,7 +26,7 @@ public enum HumanActionResumeProbeOperation: String, CaseIterable, Codable, Send
   case probeGovernanceApproval
 }
 
-public enum HumanActionProhibitedAutomation: String, CaseIterable, Codable, Sendable {
+package enum HumanActionProhibitedAutomation: String, CaseIterable, Codable, Sendable {
   case physicalActuation
   case trustPromptAcceptance
   case privilegeEscalation
@@ -38,10 +38,10 @@ public enum HumanActionProhibitedAutomation: String, CaseIterable, Codable, Send
   case selfApproval
 }
 
-public struct HumanActionFreshProbeResolution: Equatable, Sendable, Codable {
-  public let probeOperationID: HumanActionResumeProbeOperation
-  public let probeReceiptID: String
-  public let observedAtUTC: String
+package struct HumanActionFreshProbeResolution: Equatable, Sendable, Codable {
+  package let probeOperationID: HumanActionResumeProbeOperation
+  package let probeReceiptID: String
+  package let observedAtUTC: String
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case probeOperationID = "probeOperationId"
@@ -72,28 +72,28 @@ public struct HumanActionFreshProbeResolution: Equatable, Sendable, Codable {
   }
 }
 
-public enum HumanActionRequiredError: Error, Equatable, Sendable {
+package enum HumanActionRequiredError: Error, Equatable, Sendable {
   case malformed(path: String)
   case invalidMapping(category: HumanActionCategory)
   case invalidTransition
 }
 
-public struct HumanActionRequired: Equatable, Sendable, Codable {
+package struct HumanActionRequired: Equatable, Sendable, Codable {
   public static let documentType = "humanActionRequired"
   public static let schemaVersion = "1.0.0"
 
   public let actionID: String
   public let jobID: String
   public let stepID: String?
-  public let category: HumanActionCategory
+  package let category: HumanActionCategory
   public let reasonCode: String
-  public let minimumActionKey: String
-  public let prohibitedAutomation: [HumanActionProhibitedAutomation]
-  public let resumeProbeOperationID: HumanActionResumeProbeOperation
-  public let generatedAtUTC: String
+  package let minimumActionKey: String
+  package let prohibitedAutomation: [HumanActionProhibitedAutomation]
+  package let resumeProbeOperationID: HumanActionResumeProbeOperation
+  package let generatedAtUTC: String
   public let expiresAtUTC: String?
   public let status: HumanActionStatus
-  public let resolution: HumanActionFreshProbeResolution?
+  package let resolution: HumanActionFreshProbeResolution?
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case documentType
@@ -300,7 +300,7 @@ package struct HumanActionFreshProbeReceipt: Equatable, Sendable {
   }
 }
 
-public enum HumanActionRequiredCodec {
+package enum HumanActionRequiredCodec {
   public static func decode(_ data: Data) throws -> HumanActionRequired {
     do {
       var duplicateValidator = StrictJSONDuplicateValidator(data: data)

@@ -9,15 +9,15 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-public enum AgentClientError: Error, Equatable, Sendable {
+package enum AgentClientError: Error, Equatable, Sendable {
   case connectFailed(String)
   case transport(String)
   case malformedResponse(String)
   case daemonError(code: String, message: String)
 }
 
-public struct AgentClient: Sendable {
-  public let socketPath: String
+package struct AgentClient: Sendable {
+  package let socketPath: String
 
   public init(socketPath: String) {
     self.socketPath = socketPath

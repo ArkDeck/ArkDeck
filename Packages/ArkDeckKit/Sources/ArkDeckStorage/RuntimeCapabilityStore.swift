@@ -20,7 +20,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum RuntimeCapabilityStoreError: Error, Equatable, Sendable {
+package enum RuntimeCapabilityStoreError: Error, Equatable, Sendable {
   case ioFailure(String)
   case storeCorrupted(String)
   case capabilityNotFound(String)
@@ -31,7 +31,7 @@ public enum RuntimeCapabilityStoreError: Error, Equatable, Sendable {
   case denied(RuntimeCapabilityDenial)
 }
 
-public enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
+package enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
   /// The use was durably reserved but the owning Job has not reached a
   /// confirmed terminal outcome.
   case pending
@@ -45,61 +45,61 @@ public enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
   case outcomeUnknown
 }
 
-public struct RuntimeCapabilityOutcomeRecord: Equatable, Sendable, Codable {
+package struct RuntimeCapabilityOutcomeRecord: Equatable, Sendable, Codable {
   public let jobID: String
   public let outcome: RuntimeCapabilityUseOutcome
   public let terminalState: String
   public let recordedAtUTC: String
-  public let previousRecordSHA256: String
-  public let recordSHA256: String
+  package let previousRecordSHA256: String
+  package let recordSHA256: String
 }
 
-public struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
+package struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
   public let ordinal: Int
   public let reservationID: String
   public let jobID: String
-  public let consumedAtUTC: String
+  package let consumedAtUTC: String
   public let operationReference: String
   public let effect: String
   public let targetStableIdentitySHA256: String?
   public let bindingRevision: Int?
   public let materializedPlanDigest: String?
-  public let authorizationScopeFingerprintSHA256: String?
-  public let queryFingerprintSHA256: String
-  public let remainingUsesAfter: Int
-  public let previousLineageSHA256: String?
-  public let receiptSHA256: String
-  public let outcomeHistory: [RuntimeCapabilityOutcomeRecord]
+  package let authorizationScopeFingerprintSHA256: String?
+  package let queryFingerprintSHA256: String
+  package let remainingUsesAfter: Int
+  package let previousLineageSHA256: String?
+  package let receiptSHA256: String
+  package let outcomeHistory: [RuntimeCapabilityOutcomeRecord]
 
   public var outcome: RuntimeCapabilityUseOutcome {
     outcomeHistory.last?.outcome ?? .pending
   }
 
-  public var lineageTipSHA256: String {
+  package var lineageTipSHA256: String {
     outcomeHistory.last?.recordSHA256 ?? receiptSHA256
   }
 }
 
-public struct RuntimeCapabilityStatus: Equatable, Sendable, Codable {
+package struct RuntimeCapabilityStatus: Equatable, Sendable, Codable {
   public let capability: RuntimeCapability
-  public let remainingUses: Int
-  public let consumptionCount: Int
-  public let lineageAllowsNewExecution: Bool
-  public let lineageBlocker: String?
-  public let lineage: [RuntimeCapabilityLineageEntry]
+  package let remainingUses: Int
+  package let consumptionCount: Int
+  package let lineageAllowsNewExecution: Bool
+  package let lineageBlocker: String?
+  package let lineage: [RuntimeCapabilityLineageEntry]
 }
 
-public struct RuntimeCapabilityConsumptionReceipt: Equatable, Sendable, Codable {
+package struct RuntimeCapabilityConsumptionReceipt: Equatable, Sendable, Codable {
   public let capabilityID: String
   public let ordinal: Int
   public let reservationID: String
   public let jobID: String
-  public let consumedAtUTC: String
+  package let consumedAtUTC: String
   public let operationReference: String
-  public let queryFingerprintSHA256: String
-  public let remainingUsesAfter: Int
-  public let previousLineageSHA256: String?
-  public let receiptSHA256: String
+  package let queryFingerprintSHA256: String
+  package let remainingUsesAfter: Int
+  package let previousLineageSHA256: String?
+  package let receiptSHA256: String
 }
 
 private struct StoredOutcomeRecord: Equatable, Codable {
@@ -153,7 +153,7 @@ private struct StoreVersionHeader: Decodable {
   let schemaVersion: String
 }
 
-public actor RuntimeCapabilityStore {
+package actor RuntimeCapabilityStore {
   private let directoryURL: URL
   private let documentURL: URL
   private let lockURL: URL
@@ -213,7 +213,7 @@ public actor RuntimeCapabilityStore {
   /// durable lineage without reserving a use. Submit uses this after the
   /// complete typed plan materializes, so a scope or recovery blocker is
   /// reported before a Job can reach mutation dispatch.
-  public func validateNewExecution(
+  package func validateNewExecution(
     capabilityID: String,
     query: RuntimeCapabilityAuthorizationQuery,
     nowUTC: String
@@ -231,7 +231,7 @@ public actor RuntimeCapabilityStore {
     }
   }
 
-  public func revoke(capabilityID: String, atUTC: String, reason: String) throws {
+  package func revoke(capabilityID: String, atUTC: String, reason: String) throws {
     try withExclusiveLock {
       var document = try loadDocument()
       guard
@@ -356,7 +356,7 @@ public actor RuntimeCapabilityStore {
   /// later advance to `confirmed` or `safeToReflash` after dedicated
   /// readback, but a confirmed record is immutable and no other transition
   /// can widen authority.
-  public func recordOutcome(
+  package func recordOutcome(
     capabilityID: String,
     reservationID: String,
     jobID: String,

@@ -4,7 +4,7 @@ public protocol AuditClock: Sendable {
   var nowUTC: Date { get }
 }
 
-public protocol MonotonicRuntimeClock: Sendable {
+package protocol MonotonicRuntimeClock: Sendable {
   var nowNanoseconds: Int64 { get }
 }
 
@@ -15,7 +15,7 @@ public struct SystemAuditClock: AuditClock {
 }
 
 /// `PORT-CLOCK-ELAPSED-001`: continues across system sleep.
-public final class ContinuousElapsedClock: MonotonicRuntimeClock, @unchecked Sendable {
+package final class ContinuousElapsedClock: MonotonicRuntimeClock, @unchecked Sendable {
   private let clock = ContinuousClock()
   private let origin: ContinuousClock.Instant
 
@@ -23,13 +23,13 @@ public final class ContinuousElapsedClock: MonotonicRuntimeClock, @unchecked Sen
     origin = clock.now
   }
 
-  public var nowNanoseconds: Int64 {
+  package var nowNanoseconds: Int64 {
     durationNanoseconds(origin.duration(to: clock.now))
   }
 }
 
 /// `PORT-CLOCK-ACTIVE-001`: suspends while the system is asleep.
-public final class SuspendingActiveClock: MonotonicRuntimeClock, @unchecked Sendable {
+package final class SuspendingActiveClock: MonotonicRuntimeClock, @unchecked Sendable {
   private let clock = SuspendingClock()
   private let origin: SuspendingClock.Instant
 
@@ -37,15 +37,15 @@ public final class SuspendingActiveClock: MonotonicRuntimeClock, @unchecked Send
     origin = clock.now
   }
 
-  public var nowNanoseconds: Int64 {
+  package var nowNanoseconds: Int64 {
     durationNanoseconds(origin.duration(to: clock.now))
   }
 }
 
-public struct RuntimeDurationSample: Equatable, Sendable {
-  public let auditUTC: Date
-  public let elapsedDurationNanoseconds: Int64
-  public let activeDurationNanoseconds: Int64
+package struct RuntimeDurationSample: Equatable, Sendable {
+  package let auditUTC: Date
+  package let elapsedDurationNanoseconds: Int64
+  package let activeDurationNanoseconds: Int64
 
   public init(
     auditUTC: Date,
@@ -60,7 +60,7 @@ public struct RuntimeDurationSample: Equatable, Sendable {
 
 /// Captures process-local origins and exposes only accumulated durations. The
 /// origins are intentionally not Codable and cannot enter restart snapshots.
-public final class RuntimeClockPair: @unchecked Sendable {
+package final class RuntimeClockPair: @unchecked Sendable {
   private let lock = NSLock()
   private let auditClock: any AuditClock
   private let elapsedClock: any MonotonicRuntimeClock
@@ -86,7 +86,7 @@ public final class RuntimeClockPair: @unchecked Sendable {
     accumulatedActive = max(0, accumulatedActiveDurationNanoseconds)
   }
 
-  public func sample() throws -> RuntimeDurationSample {
+  package func sample() throws -> RuntimeDurationSample {
     lock.lock()
     defer { lock.unlock() }
     let elapsedNow = elapsedClock.nowNanoseconds
@@ -108,13 +108,13 @@ public final class RuntimeClockPair: @unchecked Sendable {
   }
 }
 
-public enum RuntimeClockError: Error, Equatable, Sendable {
+package enum RuntimeClockError: Error, Equatable, Sendable {
   case monotonicClockRegressed
 }
 
-public struct ElapsedDeadline: Equatable, Sendable {
-  public let startElapsedDurationNanoseconds: Int64
-  public let timeoutNanoseconds: Int64
+package struct ElapsedDeadline: Equatable, Sendable {
+  package let startElapsedDurationNanoseconds: Int64
+  package let timeoutNanoseconds: Int64
 
   public init(startElapsedDurationNanoseconds: Int64, timeoutNanoseconds: Int64) throws {
     guard startElapsedDurationNanoseconds >= 0, timeoutNanoseconds > 0 else {
@@ -124,11 +124,11 @@ public struct ElapsedDeadline: Equatable, Sendable {
     self.timeoutNanoseconds = timeoutNanoseconds
   }
 
-  public func isExpired(atElapsedDurationNanoseconds elapsed: Int64) -> Bool {
+  package func isExpired(atElapsedDurationNanoseconds elapsed: Int64) -> Bool {
     remainingNanoseconds(atElapsedDurationNanoseconds: elapsed) == 0
   }
 
-  public func remainingNanoseconds(atElapsedDurationNanoseconds elapsed: Int64) -> Int64 {
+  package func remainingNanoseconds(atElapsedDurationNanoseconds elapsed: Int64) -> Int64 {
     guard elapsed >= startElapsedDurationNanoseconds else { return 0 }
     let consumed = elapsed - startElapsedDurationNanoseconds
     return consumed >= timeoutNanoseconds ? 0 : timeoutNanoseconds - consumed
@@ -137,12 +137,12 @@ public struct ElapsedDeadline: Equatable, Sendable {
 
 /// The only timing form permitted to cross a process boundary. There is no
 /// field for a monotonic instant, tick, boot time, or clock origin.
-public struct RestartSafeTimingSnapshot: Equatable, Sendable {
-  public let accumulatedElapsedDurationNanoseconds: Int64
-  public let accumulatedActiveDurationNanoseconds: Int64
-  public let configuredOverallTimeoutNanoseconds: Int64?
-  public let configuredDeadlineUTC: Date?
-  public let snapshotUTC: Date
+package struct RestartSafeTimingSnapshot: Equatable, Sendable {
+  package let accumulatedElapsedDurationNanoseconds: Int64
+  package let accumulatedActiveDurationNanoseconds: Int64
+  package let configuredOverallTimeoutNanoseconds: Int64?
+  package let configuredDeadlineUTC: Date?
+  package let snapshotUTC: Date
 
   public init(
     accumulatedElapsedDurationNanoseconds: Int64,
@@ -168,22 +168,22 @@ public struct RestartSafeTimingSnapshot: Equatable, Sendable {
   }
 }
 
-public enum RuntimeTimingError: Error, Equatable, Sendable {
+package enum RuntimeTimingError: Error, Equatable, Sendable {
   case invalidDuration
 }
 
-public enum RestartDeadlineFailure: String, Equatable, Sendable {
+package enum RestartDeadlineFailure: String, Equatable, Sendable {
   case invalidOrMissingEvidence
   case wallClockRollback
   case deadlineReached
 }
 
-public enum RestartDeadlineEvaluation: Equatable, Sendable {
+package enum RestartDeadlineEvaluation: Equatable, Sendable {
   case notExpired(remainingNanoseconds: Int64)
   case expired(RestartDeadlineFailure)
 }
 
-public enum RestartDeadlineEvaluator {
+package enum RestartDeadlineEvaluator {
   public static func evaluate(
     snapshot: RestartSafeTimingSnapshot?,
     currentUTC: Date

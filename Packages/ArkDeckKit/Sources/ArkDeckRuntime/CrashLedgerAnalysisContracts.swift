@@ -22,14 +22,14 @@ import Foundation
 /// `<kind>-<bundle>-<uid>-<yyyyMMddHHmmss>` and are *not* file names: on
 /// disk each carries trailing milliseconds and `.log` that the listing
 /// omits.
-public struct HarnessFaultLogEntry: Codable, Equatable, Sendable {
+package struct HarnessFaultLogEntry: Codable, Equatable, Sendable {
   public let name: String
   /// `jscrash`, `cppcrash`, `appfreeze`, … Taken from the name rather than
   /// guessed from the body: the kinds carry different judging fields and
   /// nothing may assume there is only one.
   public let kind: String
   public let bundle: String
-  public let uid: String
+  package let uid: String
   /// `yyyyMMddHHmmss`, device-local. Fixed width, so lexicographic order is
   /// chronological order and no date parsing (or timezone) is needed.
   public let timestamp: String
@@ -47,7 +47,7 @@ public struct HarnessFaultLogEntry: Codable, Equatable, Sendable {
 /// wraps these bytes with source-artifact provenance before publishing the
 /// derived Artifact; the harness consumes this structure and no longer has
 /// to parse the raw ledger listing in-process (TASK-HFA-005).
-public struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
+package struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
   public static let analyzerRef = "crash-signature@1"
   public static let analyzerVersion = "arkdeck-fault-log-ledger@1"
@@ -62,7 +62,7 @@ public struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
   public let analyzerVersion: String
   public let status: Status
   public let entries: [HarnessFaultLogEntry]
-  public let unreadableReason: String?
+  package let unreadableReason: String?
 
   public init(
     status: Status,
@@ -83,15 +83,15 @@ public struct HarnessCrashLedgerAnalysis: Codable, Equatable, Sendable {
 /// that the runtime verified.  Downstream code validates both before using
 /// `result`, so a structured-looking document cannot be detached from the
 /// bytes and tool that produced it.
-public struct HarnessCrashLedgerDerivedArtifact: Codable, Equatable, Sendable {
+package struct HarnessCrashLedgerDerivedArtifact: Codable, Equatable, Sendable {
   public let schemaVersion: String
   public let analyzerRef: String
   public let analyzerVersion: String
   public let sourceArtifactID: String
   public let sourceSHA256: String
   public let sourceByteCount: Int
-  public let analyzerOutputSHA256: String
-  public let analyzerOutputByteCount: Int
+  package let analyzerOutputSHA256: String
+  package let analyzerOutputByteCount: Int
   public let result: HarnessCrashLedgerAnalysis
 
   public init(

@@ -19,14 +19,14 @@
 import ArkDeckCore
 import Foundation
 
-public enum HarnessEvaluationVerdict: String, CaseIterable, Codable, Sendable {
+package enum HarnessEvaluationVerdict: String, CaseIterable, Codable, Sendable {
   case pass
   case fail
   case inconclusive
   case error
 }
 
-public enum HarnessInconclusivePolicy: String, CaseIterable, Codable, Sendable {
+package enum HarnessInconclusivePolicy: String, CaseIterable, Codable, Sendable {
   /// Spend another round collecting evidence, budget permitting.
   case collectMoreEvidence
   /// Stop and ask a human; more of the same evidence will not decide it.
@@ -37,21 +37,21 @@ public enum HarnessInconclusivePolicy: String, CaseIterable, Codable, Sendable {
 
 /// How a metric accumulates across rounds. Declared per metric so the
 /// merge is a table, not a guess at the call site.
-public enum HarnessMetricKind: String, CaseIterable, Codable, Sendable {
+package enum HarnessMetricKind: String, CaseIterable, Codable, Sendable {
   /// Summed across rounds: crash counts, fatal counts.
   case counter
   /// Replaced by the newest observation: liveness, latest signature.
   case latest
 }
 
-public struct HarnessCriterionResult: Equatable, Sendable, Codable {
-  public let criterionID: String
+package struct HarnessCriterionResult: Equatable, Sendable, Codable {
+  package let criterionID: String
   public let verdict: HarnessEvaluationVerdict
-  public let metric: String
+  package let metric: String
   public let observed: JSONValue?
   public let expected: JSONValue
-  public let samples: Int
-  public let requiredSamples: Int
+  package let samples: Int
+  package let requiredSamples: Int
   public let blockers: [String]
 
   enum CodingKeys: String, CodingKey {
@@ -89,7 +89,7 @@ public struct HarnessCriterionResult: Equatable, Sendable, Codable {
 /// One verified artifact as the evaluator sees it. `verified` means the
 /// bytes were read in full and their SHA-256 matched what the artifact
 /// store recorded - not that a file exists.
-public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
+package struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
   public let byteCount: Int
@@ -101,7 +101,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   /// maintainer can tell "the evaluator never saw these bytes" from "an
   /// operator allowed the evaluator to measure them", which are different
   /// claims about the same digest.
-  public let sensitiveOptIn: Bool
+  package let sensitiveOptIn: Bool
   /// The job whose artifact store holds these bytes. Recorded so a later
   /// reader — the decision context, which must show a model the evidence it
   /// is reasoning about — can address the artifact without guessing which
@@ -160,13 +160,13 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
 /// round adds per metric: a round whose evidence failed verification
 /// contributes none, which is why a corrupt capture cannot help a
 /// minimum-samples criterion pass.
-public struct HarnessRoundObservation: Equatable, Sendable, Codable {
+package struct HarnessRoundObservation: Equatable, Sendable, Codable {
   public let round: Int
-  public let measurements: [String: JSONValue]
-  public let sampleContribution: [String: Int]
+  package let measurements: [String: JSONValue]
+  package let sampleContribution: [String: Int]
   public let evidence: [HarnessEvidenceRecord]
-  public let integrityBlockers: [String]
-  public let collectionBlockers: [String]
+  package let integrityBlockers: [String]
+  package let collectionBlockers: [String]
 
   public init(
     round: Int,
@@ -184,7 +184,7 @@ public struct HarnessRoundObservation: Equatable, Sendable, Codable {
     self.collectionBlockers = collectionBlockers
   }
 
-  public var verifiedEvidenceNames: Set<String> {
+  package var verifiedEvidenceNames: Set<String> {
     Set(evidence.filter(\.verified).map(\.name))
   }
 }
@@ -192,18 +192,18 @@ public struct HarnessRoundObservation: Equatable, Sendable, Codable {
 /// Cumulative observed state, and the only writer of it is an observation
 /// or an evaluation (enforced by the reducer). A decision cannot describe
 /// the world into existence.
-public struct HarnessObservedState: Equatable, Sendable, Codable {
-  public static let measurementsKey = "measurements"
-  public static let samplesKey = "samples"
-  public static let verdictKey = "latestVerdict"
-  public static let blockersKey = "blockers"
-  public static let evidenceNamesKey = "latestVerifiedEvidence"
+package struct HarnessObservedState: Equatable, Sendable, Codable {
+  package static let measurementsKey = "measurements"
+  package static let samplesKey = "samples"
+  package static let verdictKey = "latestVerdict"
+  package static let blockersKey = "blockers"
+  package static let evidenceNamesKey = "latestVerifiedEvidence"
 
-  public let measurements: [String: JSONValue]
-  public let samples: [String: Int]
-  public let latestVerdict: HarnessEvaluationVerdict?
+  package let measurements: [String: JSONValue]
+  package let samples: [String: Int]
+  package let latestVerdict: HarnessEvaluationVerdict?
   public let blockers: [String]
-  public let latestVerifiedEvidence: [String]
+  package let latestVerifiedEvidence: [String]
 
   public init(
     measurements: [String: JSONValue] = [:],
@@ -230,7 +230,7 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
     }
   }
 
-  public func merging(_ observation: HarnessRoundObservation) -> HarnessObservedState {
+  package func merging(_ observation: HarnessRoundObservation) -> HarnessObservedState {
     var mergedMeasurements = measurements
     for (metric, value) in observation.measurements {
       switch Self.kind(of: metric) {
@@ -254,7 +254,7 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
       latestVerifiedEvidence: observation.verifiedEvidenceNames.sorted())
   }
 
-  public func recording(verdict: HarnessEvaluationVerdict, blockers: [String]) -> HarnessObservedState
+  package func recording(verdict: HarnessEvaluationVerdict, blockers: [String]) -> HarnessObservedState
   {
     HarnessObservedState(
       measurements: measurements, samples: samples, latestVerdict: verdict,
@@ -273,7 +273,7 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
   /// Projection into the task snapshot's free-form observed state. Keeping
   /// one encoder here means the wire shape cannot drift between writer and
   /// reader.
-  public var asJSON: [String: JSONValue] {
+  package var asJSON: [String: JSONValue] {
     var fields: [String: JSONValue] = [
       Self.measurementsKey: .object(measurements),
       Self.samplesKey: .object(samples.mapValues { .integer(Int64($0)) }),
@@ -313,19 +313,19 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessEvaluation: Equatable, Sendable, Codable {
+package struct HarnessEvaluation: Equatable, Sendable, Codable {
   public static let documentType = "harness-evaluation"
   public static let schemaVersion = "1.0.0"
 
   public let documentType: String
   public let schemaVersion: String
-  public let evaluationID: String
-  public let htaskID: String
+  package let evaluationID: String
+  package let htaskID: String
   public let round: Int
   public let verdict: HarnessEvaluationVerdict
-  public let criterionResults: [HarnessCriterionResult]
-  public let measurements: [String: JSONValue]
-  public let samples: [String: Int]
+  package let criterionResults: [HarnessCriterionResult]
+  package let measurements: [String: JSONValue]
+  package let samples: [String: Int]
   public let evidence: [HarnessEvidenceRecord]
   public let blockers: [String]
   public let createdAtUTC: String
@@ -375,7 +375,7 @@ public struct HarnessEvaluation: Equatable, Sendable, Codable {
 /// The criteria evaluator. Pure: criteria plus observed state in, verdict
 /// out. No clock, no store, no port - so a replay of the same evidence
 /// always produces the same answer.
-public enum HarnessCriteriaEvaluator {
+package enum HarnessCriteriaEvaluator {
   public static func evaluate(
     criteria: [HarnessSuccessCriterion],
     observed: HarnessObservedState,
@@ -419,7 +419,7 @@ public enum HarnessCriteriaEvaluator {
 
   /// The strictest inconclusive policy among criteria that came back
   /// inconclusive; nil when nothing was inconclusive.
-  public static func escalation(
+  package static func escalation(
     for evaluation: HarnessEvaluation,
     criteria: [HarnessSuccessCriterion]
   ) -> HarnessInconclusivePolicy? {

@@ -4,11 +4,11 @@ import Foundation
 
 /// Explicit inputs for ArkDeck's offline OpenHarmony SDK release preset.
 /// Nothing is searched through PATH or inferred from a mutable workspace.
-public struct OpenHarmonySDKReleasePresetConfiguration: Sendable, Equatable {
-  public let projectRef: String
+package struct OpenHarmonySDKReleasePresetConfiguration: Sendable, Equatable {
+  package let projectRef: String
   public let bundleName: String
-  public let javaExecutable: URL
-  public let sdkRoot: URL
+  package let javaExecutable: URL
+  package let sdkRoot: URL
 
   public init(
     projectRef: String = OpenHarmonyLocalSigning.defaultProjectRef,
@@ -28,7 +28,7 @@ public struct OpenHarmonySDKReleasePresetConfiguration: Sendable, Equatable {
 /// OpenHarmony SDK release profile has no device-UDID allowlist, so a generic
 /// OpenHarmony board does not need DevEco Studio or cloud-side registration.
 /// Runtime Jobs never call this maintenance boundary.
-public final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
+package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
   private static let appKeyAlias = "openharmony application release"
   private static let profileKeyAlias = "openharmony application profile release"
   private static let signingAlgorithm = "SHA256withECDSA"

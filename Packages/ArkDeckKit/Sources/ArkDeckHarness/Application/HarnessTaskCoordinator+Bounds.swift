@@ -306,7 +306,7 @@ extension HarnessTaskCoordinator {
     try await store.appendMemory(entry)
   }
 
-  public func taskMemory(_ taskID: String) async throws -> [HarnessMemoryEntry] {
+  package func taskMemory(_ taskID: String) async throws -> [HarnessMemoryEntry] {
     let snapshot = try await status(taskID)
     var entries = try await store.memory(scope: .task, key: taskID)
     if let projectRef = snapshot.projectRef {
@@ -316,11 +316,11 @@ extension HarnessTaskCoordinator {
     return HarnessMemorySelector.collapse(entries)
   }
 
-  public func projectMemory(_ projectRef: String) async throws -> [HarnessMemoryEntry] {
+  package func projectMemory(_ projectRef: String) async throws -> [HarnessMemoryEntry] {
     try await store.memory(scope: .project, key: projectRef)
   }
 
-  public func humanActions(_ taskID: String) async throws -> [HarnessStoredHumanAction] {
+  package func humanActions(_ taskID: String) async throws -> [HarnessStoredHumanAction] {
     _ = try await status(taskID)
     return try await store.humanActions(taskID)
   }

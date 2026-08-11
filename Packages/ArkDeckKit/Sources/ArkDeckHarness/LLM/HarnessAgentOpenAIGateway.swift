@@ -11,7 +11,7 @@ import Foundation
   import FoundationNetworking
 #endif
 
-public enum HarnessAgentGatewayError: Error, Equatable, Sendable {
+package enum HarnessAgentGatewayError: Error, Equatable, Sendable {
   case endpointMustBeHTTPS
   case transportFailed
   case httpStatus(Int)
@@ -25,7 +25,7 @@ public enum HarnessAgentGatewayError: Error, Equatable, Sendable {
   case streamEndedWithoutStopReason
 }
 
-public struct OpenAIHarnessAgentGateway: HarnessAgentModelGateway {
+package struct OpenAIHarnessAgentGateway: HarnessAgentModelGateway {
   private let credential: HarnessVendorCredential
   private let maximumOutputTokens: Int
 
@@ -37,7 +37,7 @@ public struct OpenAIHarnessAgentGateway: HarnessAgentModelGateway {
     self.maximumOutputTokens = max(256, maximumOutputTokens)
   }
 
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(
       provider: "openai-compatible", modelName: credential.modelName,
       adapterVersion: "openai-agent-stream@1")

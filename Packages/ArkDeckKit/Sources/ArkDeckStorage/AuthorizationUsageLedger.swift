@@ -79,7 +79,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     case confirmedAt
   }
 
-  public static func validatedReadyTask(
+  package static func validatedReadyTask(
     changeID: String,
     taskID: String,
     mainCommitOID: String,
@@ -99,7 +99,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       taskBlobOID: taskBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
-  public static func validatedDeviceCapability(
+  package static func validatedDeviceCapability(
     capabilityID: String,
     mainCommitOID: String,
     capabilityBlobOID: String,
@@ -116,7 +116,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       capabilityBlobOID: capabilityBlobOID, approvalPRNumber: approvalPRNumber)
   }
 
-  public static func validatedStandingAuthorization(
+  package static func validatedStandingAuthorization(
     authorizationID: String,
     mainCommitOID: String,
     authorizationBlobOID: String,
@@ -161,7 +161,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
       confirmedAt: confirmedAt)
   }
 
-  public static func validatedEvolutionCampaignConfirmation(
+  package static func validatedEvolutionCampaignConfirmation(
     campaignDigestSHA256: String,
     baseCommitOID: String,
     planDigestSHA256: String,
@@ -366,7 +366,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     }
   }
 
-  public var sourceIdentifier: String {
+  package var sourceIdentifier: String {
     switch self {
     case .readyTask(_, let taskID, _, _, _): taskID
     case .deviceCapability(let capabilityID, _, _, _): capabilityID
@@ -378,7 +378,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
     }
   }
 
-  public var legacyStandingAuthorizationReference: AuthorizationReference? {
+  package var legacyStandingAuthorizationReference: AuthorizationReference? {
     guard
       case .standingAuthorization(
         let authorizationID, let mainCommitOID, let authorizationBlobOID, let approvalPRNumber
@@ -534,11 +534,11 @@ private struct AgentAuthorityDynamicCodingKey: CodingKey {
   }
 }
 
-public struct AuthorizationReference: Codable, Equatable, Hashable, Sendable {
+package struct AuthorizationReference: Codable, Equatable, Hashable, Sendable {
   public let authorizationID: String
-  public let mainCommitOID: String
-  public let authorizationBlobOID: String
-  public let approvalPRNumber: Int
+  package let mainCommitOID: String
+  package let authorizationBlobOID: String
+  package let approvalPRNumber: Int
 
   enum CodingKeys: String, CodingKey {
     case authorizationID = "authorizationId"
@@ -619,7 +619,7 @@ public struct AuthorizationReference: Codable, Equatable, Hashable, Sendable {
 
 extension AuthorizationReference.CodingKeys: CaseIterable {}
 
-public enum AuthorizationUsageTerminalStatus: String, Codable, CaseIterable, Sendable {
+package enum AuthorizationUsageTerminalStatus: String, Codable, CaseIterable, Sendable {
   case succeeded
   case failed
   case cancelled
@@ -630,7 +630,7 @@ public enum AuthorizationUsageTerminalStatus: String, Codable, CaseIterable, Sen
 
 
 
-public enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
+package enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
   case invalidRecord(String)
   case reservationConflict(String)
   case usageLimitExceeded(authorizationID: String, maxRuns: Int)
@@ -642,14 +642,14 @@ public enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
 
 
 // Shared durable-write fault points injected by the campaign ledger below.
-public enum AuthorizationUsageLedgerFaultPoint: String, CaseIterable, Sendable {
+package enum AuthorizationUsageLedgerFaultPoint: String, CaseIterable, Sendable {
   case beforeTemporaryWrite
   case afterFileSync
   case afterReplace
   case beforeDirectorySync
 }
 
-public struct AuthorizationUsageLedgerFaultInjector: @unchecked Sendable {
+package struct AuthorizationUsageLedgerFaultInjector: @unchecked Sendable {
   private let body: (AuthorizationUsageLedgerFaultPoint) throws -> Void
 
   public init(_ body: @escaping (AuthorizationUsageLedgerFaultPoint) throws -> Void) {
@@ -661,16 +661,16 @@ public struct AuthorizationUsageLedgerFaultInjector: @unchecked Sendable {
   public static let none = AuthorizationUsageLedgerFaultInjector { _ in }
 }
 
-public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
+package struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   public let status: AuthorizationUsageTerminalStatus
-  public let closedAt: String
-  public let externalIntentEventIDs: [String]
+  package let closedAt: String
+  package let externalIntentEventIDs: [String]
   /// Mutation intents whose exact provider readback proved that their
   /// external effect did not happen. This is deliberately a subset of
   /// `externalIntentEventIDs`: retaining the intent preserves the audit
   /// trail, while the separate resolution lets a campaign distinguish a
   /// retry-safe no-effect failure from an unsafe partial mutation.
-  public let confirmedNotExecutedIntentEventIDs: [String]
+  package let confirmedNotExecutedIntentEventIDs: [String]
   /// Mutation intents whose step completed and was verified by its own
   /// provider verification (never by a paired readback that may have been
   /// skipped). Disjoint from `confirmedNotExecutedIntentEventIDs` by
@@ -679,7 +679,7 @@ public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   /// mutation has a proven outcome" — retry-safe — from a genuine partial
   /// write. Absent in ledgers written before 2026-08-04, which decodes as
   /// empty and keeps the strict partial-write reading.
-  public let completedIntentEventIDs: [String]
+  package let completedIntentEventIDs: [String]
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case status
@@ -784,7 +784,7 @@ public struct AgentAuthorityCampaignExecutionTuning: Codable, Equatable, Sendabl
   }
 }
 
-public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
+package struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
   public let candidateDigestSHA256: String
   /// Present only on historical review-bearing campaign records. New
   /// candidates never mint a review digest.
@@ -850,22 +850,22 @@ public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Send
   }
 }
 
-public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
+package struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   public let reservationID: String
-  public let authorizationRef: AgentExecutionAuthorityReference
+  package let authorizationRef: AgentExecutionAuthorityReference
   public let ordinal: Int
   public let maximumUses: Int
-  public let maximumConcurrentJobs: Int
+  package let maximumConcurrentJobs: Int
   public let jobID: String
-  public let operationDigestSHA256: String
-  public let targetDigestSHA256: String
+  package let operationDigestSHA256: String
+  package let targetDigestSHA256: String
   public let reservedAt: String
-  public let forwardLeaseExpiresAt: String
-  public let compensationLeaseExpiresAt: String
+  package let forwardLeaseExpiresAt: String
+  package let compensationLeaseExpiresAt: String
   /// Present only for reservations minted by the bounded campaign broker.
   /// Historical reservations may omit it and remain readable, but cannot be
   /// projected as complete V4 campaign hardware evidence.
-  public let campaignEvidenceProvenance: AgentAuthorityCampaignEvidenceProvenance?
+  package let campaignEvidenceProvenance: AgentAuthorityCampaignEvidenceProvenance?
   public let terminal: AgentAuthorityUsageTerminal?
 
   enum CodingKeys: String, CodingKey, CaseIterable {
@@ -884,7 +884,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     case terminal
   }
 
-  public static func canonicalReservationID(
+  package static func canonicalReservationID(
     authorizationRef: AgentExecutionAuthorityReference,
     jobID: String,
     operationDigestSHA256: String,
@@ -1057,13 +1057,13 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   }
 }
 
-public struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
+package struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
   public static let documentType = "agentAuthorityUsage"
   public static let schemaVersion = "1.0.0"
 
   public let documentType: String
   public let schemaVersion: String
-  public let reservations: [AgentAuthorityUsageReservation]
+  package let reservations: [AgentAuthorityUsageReservation]
 
   public init(reservations: [AgentAuthorityUsageReservation]) throws {
     documentType = Self.documentType
@@ -1075,9 +1075,9 @@ public struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
 
 /// Independent consume-on-reserve ledger for E1 capabilities and bounded Evolution campaigns.
 /// Historical chat-confirmation entries remain decodable but cannot create new reservations.
-public final class AgentAuthorityUsageLedger: @unchecked Sendable {
-  public static let ledgerFileName = "agent-authority-usage.json"
-  public static let lockFileName = ".agent-authority-usage.lock"
+package final class AgentAuthorityUsageLedger: @unchecked Sendable {
+  package static let ledgerFileName = "agent-authority-usage.json"
+  package static let lockFileName = ".agent-authority-usage.lock"
   public static let maximumBytes = 16 * 1_024 * 1_024
 
   public let root: URL

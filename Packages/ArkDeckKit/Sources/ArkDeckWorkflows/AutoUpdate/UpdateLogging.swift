@@ -22,7 +22,7 @@ public struct NoOpAutoUpdateEventLogger: AutoUpdateEventLogging, Sendable {
 
 /// Maps updater state to the existing bounded, redacted SystemLogger. No version, URL, path,
 /// request field, Team identifier, or error text enters diagnostics.
-public struct SystemAutoUpdateEventLogger: AutoUpdateEventLogging, Sendable {
+package struct SystemAutoUpdateEventLogger: AutoUpdateEventLogging, Sendable {
   private let logger: SystemLogger
   private let correlationID: DiagnosticCorrelationID
 

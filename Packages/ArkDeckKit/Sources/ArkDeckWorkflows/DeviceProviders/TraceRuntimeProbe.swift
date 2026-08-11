@@ -37,7 +37,7 @@ public struct TraceRuntimeToolObservation: Codable, Sendable, Equatable {
   public let tool: String
   public let disposition: TraceRuntimeToolDisposition
   public let family: String?
-  public let rawHelpSHA256: String?
+  package let rawHelpSHA256: String?
   public let detail: String?
 
   public init(
@@ -63,8 +63,8 @@ public struct TraceRuntimeProbeSnapshot: Codable, Sendable, Equatable {
   public let family: String?
   public let supportedTags: [String]
   public let rawHelp: String?
-  public let rawHelpSHA256: String?
-  public let tools: [TraceRuntimeToolObservation]
+  package let rawHelpSHA256: String?
+  package let tools: [TraceRuntimeToolObservation]
   public let parameters: [TraceRuntimeParameterObservation]
 
   public init(
@@ -94,7 +94,7 @@ public struct TraceRuntimeProbeSnapshot: Codable, Sendable, Equatable {
 
 /// Read-only target capability portrait. This never creates a mutation
 /// capability and cannot be used as a substitute for Runtime admission.
-public protocol TraceRuntimeProbing: Sendable {
+package protocol TraceRuntimeProbing: Sendable {
   func probeTraceRuntime(targetID: String) async throws -> TraceRuntimeProbeSnapshot
 }
 

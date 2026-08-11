@@ -6,7 +6,7 @@ public enum JobExecutionMode: String, CaseIterable, Codable, Sendable {
 public enum JobState: String, CaseIterable, Codable, Sendable {
   /// Version 1.0.0 remains the frozen agent-device-operation enum. Recovery
   /// dispositions are emitted only by the versioned recovery journal writer.
-  public static let schemaVersion = "2.0.0"
+  package static let schemaVersion = "2.0.0"
 
   case queued
   case preflight
@@ -39,7 +39,7 @@ public enum JobState: String, CaseIterable, Codable, Sendable {
   }
 }
 
-public enum WorkflowFailureClassification: String, CaseIterable, Codable, Sendable {
+package enum WorkflowFailureClassification: String, CaseIterable, Codable, Sendable {
   case preflight
   case process
   case semantic
@@ -50,7 +50,7 @@ public enum WorkflowFailureClassification: String, CaseIterable, Codable, Sendab
   case invariant
 }
 
-public struct WorkflowFailure: Error, Equatable, Sendable, Codable {
+package struct WorkflowFailure: Error, Equatable, Sendable, Codable {
   public let classification: WorkflowFailureClassification
   public let code: String
   public let summary: String
@@ -62,11 +62,11 @@ public struct WorkflowFailure: Error, Equatable, Sendable, Codable {
   }
 }
 
-public struct RecoveryResumeEvidence: Equatable, Sendable {
-  public let restartSafe: Bool
-  public let safeBoundaryConfirmed: Bool
-  public let outcomeConfirmed: Bool
-  public let bindingConfirmed: Bool
+package struct RecoveryResumeEvidence: Equatable, Sendable {
+  package let restartSafe: Bool
+  package let safeBoundaryConfirmed: Bool
+  package let outcomeConfirmed: Bool
+  package let bindingConfirmed: Bool
 
   public init(
     restartSafe: Bool,
@@ -80,25 +80,25 @@ public struct RecoveryResumeEvidence: Equatable, Sendable {
     self.bindingConfirmed = bindingConfirmed
   }
 
-  public var permitsResume: Bool {
+  package var permitsResume: Bool {
     restartSafe && safeBoundaryConfirmed && outcomeConfirmed && bindingConfirmed
   }
 }
 
-public enum ResumeMarkerDeviceIdentityEvidence: String, Codable, Sendable {
+package enum ResumeMarkerDeviceIdentityEvidence: String, Codable, Sendable {
   case confirmed
   case unknown
 }
 
-public enum ResumeMarkerExternalEffectOutcomesEvidence: String, Codable, Sendable {
+package enum ResumeMarkerExternalEffectOutcomesEvidence: String, Codable, Sendable {
   case allConfirmed
   case containsUnknown
 }
 
-public struct ResumeMarkerDecisionEvidence: Equatable, Sendable, Codable {
-  public let deviceIdentity: ResumeMarkerDeviceIdentityEvidence
-  public let externalEffectOutcomes: ResumeMarkerExternalEffectOutcomesEvidence
-  public let detectedFailure: WorkflowFailure?
+package struct ResumeMarkerDecisionEvidence: Equatable, Sendable, Codable {
+  package let deviceIdentity: ResumeMarkerDeviceIdentityEvidence
+  package let externalEffectOutcomes: ResumeMarkerExternalEffectOutcomesEvidence
+  package let detectedFailure: WorkflowFailure?
 
   public init(
     deviceIdentity: ResumeMarkerDeviceIdentityEvidence,
@@ -110,23 +110,23 @@ public struct ResumeMarkerDecisionEvidence: Equatable, Sendable, Codable {
     self.detectedFailure = detectedFailure
   }
 
-  public var hasUnknownIdentityOrOutcome: Bool {
+  package var hasUnknownIdentityOrOutcome: Bool {
     deviceIdentity == .unknown || externalEffectOutcomes == .containsUnknown
   }
 }
 
-public enum RecoveryDecision: Equatable, Sendable {
+package enum RecoveryDecision: Equatable, Sendable {
   case resume(RecoveryResumeEvidence)
   case confirmedFailure(WorkflowFailure)
   case remainsUncertain
 }
 
-public enum LaunchRecoveryFinding: Equatable, Sendable {
+package enum LaunchRecoveryFinding: Equatable, Sendable {
   case requiresReconciliation
   case missingDestructiveOutcome
 }
 
-public enum JobEvent: Equatable, Sendable {
+package enum JobEvent: Equatable, Sendable {
   case startPreflight
   case preflightPassed
   case waitForDevice
@@ -153,7 +153,7 @@ public enum JobEvent: Equatable, Sendable {
   case finalizationCompleted
 }
 
-public enum JobStateMachineDirective: String, Hashable, Sendable {
+package enum JobStateMachineDirective: String, Hashable, Sendable {
   case persistStateTransition
   case persistCancellationRequest
   case persistCancellationOutcomeAndSafeBoundary
@@ -164,7 +164,7 @@ public enum JobStateMachineDirective: String, Hashable, Sendable {
   case releaseResourcesAfterTerminalPersistence
 }
 
-public struct JobStateTransition: Equatable, Sendable {
+package struct JobStateTransition: Equatable, Sendable {
   public let from: JobState
   public let to: JobState
 
@@ -174,13 +174,13 @@ public struct JobStateTransition: Equatable, Sendable {
   }
 }
 
-public enum ResumeMarkerSemanticValidationError: Error, Equatable, Sendable {
+package enum ResumeMarkerSemanticValidationError: Error, Equatable, Sendable {
   case invalidSource(JobState)
   case destinationMismatch(expected: JobState, actual: JobState)
 }
 
-public enum ResumeMarkerSemanticValidator {
-  public static func requiredDestination(
+package enum ResumeMarkerSemanticValidator {
+  package static func requiredDestination(
     for evidence: ResumeMarkerDecisionEvidence,
     mode: JobExecutionMode
   ) -> JobState {
@@ -211,9 +211,9 @@ public enum ResumeMarkerSemanticValidator {
   }
 }
 
-public struct JobStateMachineOutcome: Equatable, Sendable {
-  public let transition: JobStateTransition
-  public let directives: Set<JobStateMachineDirective>
+package struct JobStateMachineOutcome: Equatable, Sendable {
+  package let transition: JobStateTransition
+  package let directives: Set<JobStateMachineDirective>
 
   public init(transition: JobStateTransition, directives: Set<JobStateMachineDirective>) {
     self.transition = transition
@@ -221,7 +221,7 @@ public struct JobStateMachineOutcome: Equatable, Sendable {
   }
 }
 
-public enum JobInvariantViolationKind: String, Codable, Sendable {
+package enum JobInvariantViolationKind: String, Codable, Sendable {
   case illegalTransition
   case terminalStepDispatch
   case planOnlyMutationDispatch
@@ -233,10 +233,10 @@ public enum JobInvariantViolationKind: String, Codable, Sendable {
   case resumeMarkerEvidenceMismatch
 }
 
-public struct JobInvariantViolation: Equatable, Sendable {
+package struct JobInvariantViolation: Equatable, Sendable {
   public let kind: JobInvariantViolationKind
   public let state: JobState
-  public let attemptedState: JobState?
+  package let attemptedState: JobState?
   public let detail: String
 
   public init(
@@ -252,15 +252,15 @@ public struct JobInvariantViolation: Equatable, Sendable {
   }
 }
 
-public enum JobStateMachineError: Error, Equatable, Sendable {
+package enum JobStateMachineError: Error, Equatable, Sendable {
   case invariantViolation(JobInvariantViolation)
 }
 
-public enum WorkflowStepDispatchAuthorization: Equatable, Sendable {
+package enum WorkflowStepDispatchAuthorization: Equatable, Sendable {
   case permitted
 }
 
-public struct AuthorizedWorkflowStep: Equatable, Sendable {
+package struct AuthorizedWorkflowStep: Equatable, Sendable {
   public let id: String
   public let kind: WorkflowStepKind
   public let effect: WorkflowEffect
@@ -274,7 +274,7 @@ public struct AuthorizedWorkflowStep: Equatable, Sendable {
   }
 }
 
-public struct JobStateMachine: Sendable {
+package struct JobStateMachine: Sendable {
   public let mode: JobExecutionMode
   public private(set) var state: JobState
   public private(set) var invariantViolations: [JobInvariantViolation]
@@ -547,7 +547,7 @@ public struct JobStateMachine: Sendable {
     return .immediate
   }
 
-  public static func isAllowedTransition(
+  package static func isAllowedTransition(
     from: JobState,
     to: JobState,
     mode: JobExecutionMode
@@ -555,7 +555,7 @@ public struct JobStateMachine: Sendable {
     allowedDestinations(from: from, mode: mode).contains(to)
   }
 
-  public static func allowedDestinations(from state: JobState, mode: JobExecutionMode) -> Set<
+  package static func allowedDestinations(from state: JobState, mode: JobExecutionMode) -> Set<
     JobState
   > {
     switch (mode, state) {
@@ -747,15 +747,15 @@ public struct JobStateMachine: Sendable {
   }
 }
 
-public enum CompensationTerminalPath: String, CaseIterable, Codable, Sendable {
+package enum CompensationTerminalPath: String, CaseIterable, Codable, Sendable {
   case success
   case failure
   case cancel
 }
 
-public struct CompletedStepCompensations: Equatable, Sendable {
-  public let sourceStepId: String
-  public let descriptors: [CompensationDescriptor]
+package struct CompletedStepCompensations: Equatable, Sendable {
+  package let sourceStepId: String
+  package let descriptors: [CompensationDescriptor]
 
   public init(sourceStepId: String, descriptors: [CompensationDescriptor]) {
     self.sourceStepId = sourceStepId
@@ -763,8 +763,8 @@ public struct CompletedStepCompensations: Equatable, Sendable {
   }
 }
 
-public struct PlannedCompensation: Equatable, Sendable {
-  public let sourceStepId: String
+package struct PlannedCompensation: Equatable, Sendable {
+  package let sourceStepId: String
   public let descriptor: CompensationDescriptor
 
   public init(sourceStepId: String, descriptor: CompensationDescriptor) {
@@ -773,7 +773,7 @@ public struct PlannedCompensation: Equatable, Sendable {
   }
 }
 
-public enum CompensationPlanner {
+package enum CompensationPlanner {
   public static func plan(
     completedStepsInExecutionOrder: [CompletedStepCompensations],
     terminalPath: CompensationTerminalPath
@@ -802,13 +802,13 @@ public enum CompensationPlanner {
   }
 }
 
-public enum CompensationOutcome: Equatable, Sendable {
+package enum CompensationOutcome: Equatable, Sendable {
   case succeeded
   case failed(WorkflowFailure)
 }
 
-public struct CompensationExecutionRecord: Equatable, Sendable {
-  public let plannedCompensation: PlannedCompensation
+package struct CompensationExecutionRecord: Equatable, Sendable {
+  package let plannedCompensation: PlannedCompensation
   public let outcome: CompensationOutcome
 
   public init(plannedCompensation: PlannedCompensation, outcome: CompensationOutcome) {
@@ -817,9 +817,9 @@ public struct CompensationExecutionRecord: Equatable, Sendable {
   }
 }
 
-public struct JobFinalizationReport: Equatable, Sendable {
-  public let originalFailure: WorkflowFailure?
-  public let compensationRecords: [CompensationExecutionRecord]
+package struct JobFinalizationReport: Equatable, Sendable {
+  package let originalFailure: WorkflowFailure?
+  package let compensationRecords: [CompensationExecutionRecord]
 
   public init(
     originalFailure: WorkflowFailure?,
@@ -829,7 +829,7 @@ public struct JobFinalizationReport: Equatable, Sendable {
     self.compensationRecords = compensationRecords
   }
 
-  public var compensationFailures: [WorkflowFailure] {
+  package var compensationFailures: [WorkflowFailure] {
     compensationRecords.compactMap { record in
       guard case .failed(let failure) = record.outcome else { return nil }
       return failure

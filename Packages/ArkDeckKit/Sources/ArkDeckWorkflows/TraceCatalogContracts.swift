@@ -12,9 +12,9 @@ public enum TracePresetID: String, CaseIterable, Codable, Equatable, Sendable {
 public struct TracePresetDefinition: Equatable, Sendable {
   public let id: TracePresetID
   public let logicalTags: [String]
-  public let historicalBufferValue: Int?
-  public let bufferUnitRequiresAdapterConfirmation: Bool
-  public let displaysResourceWarning: Bool
+  package let historicalBufferValue: Int?
+  package let bufferUnitRequiresAdapterConfirmation: Bool
+  package let displaysResourceWarning: Bool
 
   public init(
     id: TracePresetID,

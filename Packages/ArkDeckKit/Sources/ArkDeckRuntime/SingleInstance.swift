@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 /// The kernel-backed writer token for `PORT-INSTANCE-001`.
-public final class SingleInstanceGuard: @unchecked Sendable {
+package final class SingleInstanceGuard: @unchecked Sendable {
   private let fileDescriptor: Int32
 
   private init(fileDescriptor: Int32) {
@@ -13,7 +13,7 @@ public final class SingleInstanceGuard: @unchecked Sendable {
     Darwin.close(fileDescriptor)
   }
 
-  public static func acquire(at lockFile: URL) throws -> SingleInstanceGuard {
+  package static func acquire(at lockFile: URL) throws -> SingleInstanceGuard {
     guard lockFile.isFileURL, lockFile.path.hasPrefix("/") else {
       throw SingleInstanceGuardError.lockPathMustBeAbsolute(lockFile.path)
     }
@@ -87,7 +87,7 @@ public final class SingleInstanceGuard: @unchecked Sendable {
   }
 }
 
-public enum SingleInstanceGuardError: Error, Equatable, LocalizedError, Sendable {
+package enum SingleInstanceGuardError: Error, Equatable, LocalizedError, Sendable {
   case lockPathMustBeAbsolute(String)
   case alreadyHeld
   case unsafeLockDirectory
@@ -113,27 +113,27 @@ public enum SingleInstanceGuardError: Error, Equatable, LocalizedError, Sendable
   }
 }
 
-public protocol SingleInstanceGuardAcquiring: Sendable {
+package protocol SingleInstanceGuardAcquiring: Sendable {
   func acquire(at lockFile: URL) throws -> SingleInstanceGuard
 }
 
-public struct SystemSingleInstanceGuardAcquirer: SingleInstanceGuardAcquiring {
+package struct SystemSingleInstanceGuardAcquirer: SingleInstanceGuardAcquiring {
   public init() {}
 
-  public func acquire(at lockFile: URL) throws -> SingleInstanceGuard {
+  package func acquire(at lockFile: URL) throws -> SingleInstanceGuard {
     try SingleInstanceGuard.acquire(at: lockFile)
   }
 }
 
 /// Admission is the only runtime result available before Job, HDC, or Session
 /// writers may be constructed.
-public enum RuntimeInstanceAdmission: Sendable {
+package enum RuntimeInstanceAdmission: Sendable {
   case writer(SingleInstanceGuard)
   case secondary(ActivationDelivery)
   case readOnlyDiagnostics(String)
 }
 
-public struct RuntimeInstanceCoordinator: Sendable {
+package struct RuntimeInstanceCoordinator: Sendable {
   private let lockFile: URL
   private let guardAcquirer: any SingleInstanceGuardAcquiring
   private let activationSender: any ActivationRequestSending
@@ -148,7 +148,7 @@ public struct RuntimeInstanceCoordinator: Sendable {
     self.activationSender = activationSender
   }
 
-  public func admit() -> RuntimeInstanceAdmission {
+  package func admit() -> RuntimeInstanceAdmission {
     do {
       return .writer(try guardAcquirer.acquire(at: lockFile))
     } catch SingleInstanceGuardError.alreadyHeld {
@@ -161,7 +161,7 @@ public struct RuntimeInstanceCoordinator: Sendable {
   /// Runs writer-resource initialization only after kernel-backed writer
   /// admission. The closure is deliberately part of the admission boundary so
   /// secondary and uncertain paths cannot construct Job, HDC, or Session writers.
-  public func admit(
+  package func admit(
     initializingWriterResources initializeWriterResources: () throws -> Void
   ) rethrows -> RuntimeInstanceAdmission {
     let admission = admit()

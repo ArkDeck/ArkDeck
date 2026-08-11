@@ -22,7 +22,7 @@ import ArkDeckRuntime
 import CryptoKit
 import Foundation
 
-public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
+package enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
   case rounds
   case wallClock
   case artifactBytes
@@ -50,14 +50,14 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
 /// What a failure *is*, for the purpose of not repeating it. Deliberately
 /// excludes free text: two failures with different prose but the same
 /// operation, inputs, phase and error class are the same failure.
-public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
+package struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   public let operationReference: String
-  public let phase: HarnessTaskStage
+  package let phase: HarnessTaskStage
   public let providerID: String
-  public let targetProfile: String
-  public let normalizedInputsSHA256: String
-  public let errorClassification: String
-  public let semanticErrorCode: String
+  package let targetProfile: String
+  package let normalizedInputsSHA256: String
+  package let errorClassification: String
+  package let semanticErrorCode: String
 
   enum CodingKeys: String, CodingKey {
     case operationReference
@@ -102,7 +102,7 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   /// Semantic build/test/revision failures cannot become action retries. The
   /// same bytes or command against the same facts will not improve; the next
   /// decision must change strategy (TASK-HFA-003).
-  public var retryDisposition: HarnessFailureRetryDisposition {
+  package var retryDisposition: HarnessFailureRetryDisposition {
     switch errorClassification {
     case "BUILD_SEMANTIC_FAILURE", "TEST_FAILURE", "WORKSPACE_REVISION_CONFLICT":
       return .alternativeRequired
@@ -119,7 +119,7 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
 
   /// Typed next directions, never executable text. They explain what must
   /// change when the same action is not a valid retry.
-  public var alternativeHints: [String] {
+  package var alternativeHints: [String] {
     switch errorClassification {
     case "BUILD_SEMANTIC_FAILURE":
       return ["inspectBuildFailure", "changePatchStrategy", "changeToolchainPreset"]
@@ -139,7 +139,7 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   }
 }
 
-public enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Sendable {
+package enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Sendable {
   case actionRetryAllowed = "ACTION_RETRY_ALLOWED"
   case retryAfterBackoff = "RETRY_AFTER_BACKOFF"
   case retryAfterObservation = "RETRY_AFTER_OBSERVATION"
@@ -147,7 +147,7 @@ public enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Senda
   case doNotRetry = "DO_NOT_RETRY"
 }
 
-public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
+package enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
   /// First occurrence: the same strategy may be retried when the operation
   /// is retry-safe.
   case allowSameStrategy
@@ -157,7 +157,7 @@ public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
   /// Third and beyond: the harness stops. Repetition is not a plan.
   case prohibited
 
-  public static func stance(forOccurrences occurrences: Int) -> HarnessRetryStance {
+  package static func stance(forOccurrences occurrences: Int) -> HarnessRetryStance {
     switch occurrences {
     case ..<1: return .allowSameStrategy
     case 1: return .allowSameStrategy
@@ -167,21 +167,21 @@ public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
   }
 }
 
-public struct HarnessFailureRecord: Equatable, Sendable, Codable {
+package struct HarnessFailureRecord: Equatable, Sendable, Codable {
   public static let documentType = "harness-failure-memory"
 
   public let documentType: String
   public let digest: String
-  public let fingerprint: HarnessFailureFingerprint
-  public let occurrences: Int
-  public let firstSeenUTC: String
-  public let lastSeenUTC: String
-  public let lastReasonCode: String
-  public let retryDisposition: HarnessFailureRetryDisposition
-  public let alternativeHints: [String]
+  package let fingerprint: HarnessFailureFingerprint
+  package let occurrences: Int
+  package let firstSeenUTC: String
+  package let lastSeenUTC: String
+  package let lastReasonCode: String
+  package let retryDisposition: HarnessFailureRetryDisposition
+  package let alternativeHints: [String]
   /// Task ids that hit this failure. Cross-task on purpose: the second task
   /// to try the same doomed thing should not have to rediscover it.
-  public let observedByTasks: [String]
+  package let observedByTasks: [String]
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -241,11 +241,11 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
     self.observedByTasks = try container.decode([String].self, forKey: .observedByTasks)
   }
 
-  public var stance: HarnessRetryStance {
+  package var stance: HarnessRetryStance {
     HarnessRetryStance.stance(forOccurrences: occurrences)
   }
 
-  public func recording(taskID: String, reasonCode: String, atUTC: String) -> HarnessFailureRecord {
+  package func recording(taskID: String, reasonCode: String, atUTC: String) -> HarnessFailureRecord {
     HarnessFailureRecord(
       fingerprint: fingerprint,
       occurrences: occurrences + 1,
@@ -262,10 +262,10 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
 /// The identity of a *strategy*, used to answer "is this the same attempt
 /// again?". Hypothesis text is excluded by construction: rewording is not a
 /// new strategy.
-public struct HarnessStrategySignature: Equatable, Sendable, Codable {
+package struct HarnessStrategySignature: Equatable, Sendable, Codable {
   public let operationReference: String
-  public let inputsDigest: String
-  public let phase: HarnessTaskStage
+  package let inputsDigest: String
+  package let phase: HarnessTaskStage
 
   public init(operationReference: String, inputsDigest: String, phase: HarnessTaskStage) {
     self.operationReference = operationReference
@@ -275,15 +275,15 @@ public struct HarnessStrategySignature: Equatable, Sendable, Codable {
 }
 
 /// Did this round move anything? Computed from persisted state only.
-public struct HarnessProgressVector: Equatable, Sendable, Codable {
-  public let verdictChanged: Bool
-  public let evaluationRecorded: Bool
-  public let newVerifiedEvidenceCount: Int
-  public let sampleDelta: Int
-  public let phaseChanged: Bool
-  public let newFailureCount: Int
-  public let resolvedFailureCount: Int
-  public let workspaceRevisionChanged: Bool
+package struct HarnessProgressVector: Equatable, Sendable, Codable {
+  package let verdictChanged: Bool
+  package let evaluationRecorded: Bool
+  package let newVerifiedEvidenceCount: Int
+  package let sampleDelta: Int
+  package let phaseChanged: Bool
+  package let newFailureCount: Int
+  package let resolvedFailureCount: Int
+  package let workspaceRevisionChanged: Bool
 
   enum CodingKeys: String, CodingKey {
     case verdictChanged
@@ -334,13 +334,13 @@ public struct HarnessProgressVector: Equatable, Sendable, Codable {
   /// decision fingerprint is not progress. Only evidence, a changed verdict,
   /// a sample, an actually changed workspace revision, or a resolved failure
   /// moves the vector.
-  public var isProgress: Bool {
+  package var isProgress: Bool {
     verdictChanged || newVerifiedEvidenceCount > 0 || sampleDelta > 0
       || resolvedFailureCount > 0 || workspaceRevisionChanged
   }
 }
 
-public enum HarnessGuardRefusal: Equatable, Sendable {
+package enum HarnessGuardRefusal: Equatable, Sendable {
   case budgetExhausted(HarnessBudgetKind)
   case operationNotPermitted(String)
   case operationUnavailable(reference: String, reason: String)
@@ -376,7 +376,7 @@ public enum HarnessGuardRefusal: Equatable, Sendable {
 
   /// Whether the refusal is a stop for a human, and which human action it
   /// corresponds to. `nil` means the loop may still change strategy.
-  public var humanCategory: HarnessHumanBlock? {
+  package var humanCategory: HarnessHumanBlock? {
     switch self {
     case .authorizationRequired, .destructiveEffectNeverAutomated:
       return .authorizationApproval
@@ -395,7 +395,7 @@ public enum HarnessGuardRefusal: Equatable, Sendable {
 /// onto the closed `HumanActionRequired` category vocabulary; the rest carry
 /// a status and a reason code, because inventing a category would put an
 /// untrue minimum-action into an evidence-grade document.
-public enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
+package enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
   case authorizationApproval
   case outcomeUnknown
   case strategyExhausted
@@ -413,7 +413,7 @@ public enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
   case producerProposalRequired
 }
 
-public enum HarnessGuardVerdict: Equatable, Sendable {
+package enum HarnessGuardVerdict: Equatable, Sendable {
   case allow
   case refuse(HarnessGuardRefusal)
 }
@@ -421,7 +421,7 @@ public enum HarnessGuardVerdict: Equatable, Sendable {
 /// Raw-surface screen for typed inputs. The runtime rejects executable
 /// surfaces too; this is the earlier, cheaper refusal that also names the
 /// offending field in the task's own record (HTP-INV-11).
-public enum HarnessRawSurfaceScreen {
+package enum HarnessRawSurfaceScreen {
   static let forbiddenKeys: Set<String> = [
     "argv", "args", "command", "cmd", "executable", "exec", "shell", "script",
     "hdc", "remotepath", "path", "binary", "interpreter", "env",
@@ -446,7 +446,7 @@ public enum HarnessRawSurfaceScreen {
 
   /// Screening for strings a proposal carries as explanation rather than as
   /// execution input.
-  public static func screenProse(_ values: [String: JSONValue]) -> HarnessGuardRefusal? {
+  package static func screenProse(_ values: [String: JSONValue]) -> HarnessGuardRefusal? {
     screen(values, fragments: forbiddenValueFragments.filter { !proseExemptFragments.contains($0) })
   }
 

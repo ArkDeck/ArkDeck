@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum UpdateDownloadError: Error, Equatable, Sendable {
+package enum UpdateDownloadError: Error, Equatable, Sendable {
   case unsafeDirectory
   case fileOperationFailed(errno: Int32)
   case responseOverflow
@@ -16,12 +16,12 @@ public enum UpdateDownloadError: Error, Equatable, Sendable {
 public struct UpdateFileIdentity: Equatable, Sendable {
   public let device: UInt64
   public let inode: UInt64
-  public let byteLength: UInt64
+  package let byteLength: UInt64
   public let mode: UInt32
-  public let modifiedSeconds: Int64
-  public let modifiedNanoseconds: Int64
-  public let changedSeconds: Int64
-  public let changedNanoseconds: Int64
+  package let modifiedSeconds: Int64
+  package let modifiedNanoseconds: Int64
+  package let changedSeconds: Int64
+  package let changedNanoseconds: Int64
 
   public init(
     device: UInt64,
@@ -46,7 +46,7 @@ public struct UpdateFileIdentity: Equatable, Sendable {
 
 public struct DownloadedUpdateArtifact: Equatable, Sendable {
   public let url: URL
-  public let byteLength: UInt64
+  package let byteLength: UInt64
   public let sha256: String
   public let identity: UpdateFileIdentity
 
@@ -73,7 +73,7 @@ public struct UpdateArtifactStore: Sendable {
       directory: caches.appending(path: "ArkDeck-Updates", directoryHint: .isDirectory))
   }
 
-  public func removeOrphanPartials() throws {
+  package func removeOrphanPartials() throws {
     let directoryDescriptor = try openSecureDirectory()
     defer { Darwin.close(directoryDescriptor) }
     let names: [String]
@@ -91,7 +91,7 @@ public struct UpdateArtifactStore: Sendable {
     try fullSync(directoryDescriptor)
   }
 
-  public func writeVerified(
+  package func writeVerified(
     stream: AsyncThrowingStream<Data, any Error>,
     expectedLength: UInt64,
     expectedSHA256: String
@@ -160,7 +160,7 @@ public struct UpdateArtifactStore: Sendable {
     _ = Darwin.unlink(artifact.url.path)
   }
 
-  public static func verifyFile(
+  package static func verifyFile(
     at url: URL,
     expectedLength: UInt64,
     expectedSHA256: String

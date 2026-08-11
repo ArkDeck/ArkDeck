@@ -1,6 +1,6 @@
 import Foundation
 
-public enum UpdateNetworkError: Error, Equatable, Sendable {
+package enum UpdateNetworkError: Error, Equatable, Sendable {
   case invalidInitialURL
   case invalidRequest
   case invalidResponse
@@ -10,22 +10,22 @@ public enum UpdateNetworkError: Error, Equatable, Sendable {
   case redirectRejected
 }
 
-public enum UpdateNetworkContract {
-  public static let productionFeedURL =
+package enum UpdateNetworkContract {
+  package static let productionFeedURL =
     "https://github.com/ArkDeck/ArkDeck/releases/latest/download/"
     + "arkdeck-update-feed-v1.json"
-  public static let acceptHeader = "application/vnd.arkdeck.update-feed.v1+json"
-  public static let userAgentHeader = "ArkDeck-Update/1"
-  public static let maximumRedirects = 5
-  public static let allowedHosts: Set<String> = [
+  package static let acceptHeader = "application/vnd.arkdeck.update-feed.v1+json"
+  package static let userAgentHeader = "ArkDeck-Update/1"
+  package static let maximumRedirects = 5
+  package static let allowedHosts: Set<String> = [
     "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com",
   ]
-  public static let productQueryNames: Set<String> = ["appVersion", "osVersion", "arch"]
+  package static let productQueryNames: Set<String> = ["appVersion", "osVersion", "arch"]
 }
 
 public struct UpdateProductIdentity: Equatable, Sendable {
   public let appVersion: String
-  public let osVersion: String
+  package let osVersion: String
   public let architecture: String
 
   public init(appVersion: String, osVersion: String, architecture: String) {
@@ -35,8 +35,8 @@ public struct UpdateProductIdentity: Equatable, Sendable {
   }
 }
 
-public enum UpdateRequestFactory {
-  public static func feedRequest(identity: UpdateProductIdentity) throws -> URLRequest {
+package enum UpdateRequestFactory {
+  package static func feedRequest(identity: UpdateProductIdentity) throws -> URLRequest {
     guard var components = URLComponents(string: UpdateNetworkContract.productionFeedURL) else {
       throw UpdateNetworkError.invalidInitialURL
     }
@@ -49,7 +49,7 @@ public enum UpdateRequestFactory {
     return try request(url: url)
   }
 
-  public static func artifactRequest(signedURL: String) throws -> URLRequest {
+  package static func artifactRequest(signedURL: String) throws -> URLRequest {
     guard let url = URL(string: signedURL), url.absoluteString == signedURL else {
       throw UpdateNetworkError.invalidInitialURL
     }
@@ -70,8 +70,8 @@ public enum UpdateRequestFactory {
   }
 }
 
-public enum UpdateRedirectPolicy {
-  public static func redirectedRequest(
+package enum UpdateRedirectPolicy {
+  package static func redirectedRequest(
     proposed: URLRequest,
     redirectCount: Int
   ) throws -> URLRequest {
@@ -120,14 +120,14 @@ public protocol UpdateHTTPStreaming: Sendable {
 
 /// An ephemeral, cookie-free URLSession transport. The delegate validates every redirect before
 /// URLSession can follow it and emits bounded response chunks to the update state machine.
-public final class URLSessionUpdateHTTPStreamer: UpdateHTTPStreaming, @unchecked Sendable {
+package final class URLSessionUpdateHTTPStreamer: UpdateHTTPStreaming, @unchecked Sendable {
   private let protocolClasses: [AnyClass]?
 
   public init(protocolClasses: [AnyClass]? = nil) {
     self.protocolClasses = protocolClasses
   }
 
-  public func stream(
+  package func stream(
     for request: URLRequest,
     maximumBytes: UInt64
   ) -> AsyncThrowingStream<Data, any Error> {

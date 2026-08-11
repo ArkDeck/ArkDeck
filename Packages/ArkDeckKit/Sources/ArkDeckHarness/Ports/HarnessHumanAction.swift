@@ -21,9 +21,9 @@ import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
 
-public enum HarnessHumanActionFactory {
+package enum HarnessHumanActionFactory {
   /// The subset of harness blocks the closed category vocabulary covers.
-  public static func category(for block: HarnessHumanBlock) -> HumanActionCategory? {
+  package static func category(for block: HarnessHumanBlock) -> HumanActionCategory? {
     switch block {
     case .authorizationApproval: return .impactApproval
     case .outcomeUnknown: return .outcomeUnknownDecision

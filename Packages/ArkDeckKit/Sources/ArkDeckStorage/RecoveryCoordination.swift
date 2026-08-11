@@ -16,8 +16,8 @@ public struct SupersededRecoveryIntent: Codable, Equatable, Sendable {
   public let intentEventID: String
   public let operationReference: String
   public let profileReference: String
-  public let observedAtUTC: String
-  public let possibleEffects: [String]
+  package let observedAtUTC: String
+  package let possibleEffects: [String]
 
   public init(
     jobID: String, intentEventID: String, operationReference: String,
@@ -32,24 +32,24 @@ public struct SupersededRecoveryIntent: Codable, Equatable, Sendable {
   }
 }
 
-public struct SupersedingRecoveryEpochDraft: Equatable, Sendable {
+package struct SupersedingRecoveryEpochDraft: Equatable, Sendable {
   public let source: SupersedingRecoverySource
-  public let stableTargetIdentitySHA256: String
+  package let stableTargetIdentitySHA256: String
   public let bindingRevision: Int
-  public let coveredIntents: [SupersededRecoveryIntent]
-  public let uncertainEffectSetSHA256: String
-  public let coverageContractVersion: String
-  public let coveredEffectSetSHA256: String
-  public let recoveryJobID: String
-  public let recoveryIntentEventID: String
+  package let coveredIntents: [SupersededRecoveryIntent]
+  package let uncertainEffectSetSHA256: String
+  package let coverageContractVersion: String
+  package let coveredEffectSetSHA256: String
+  package let recoveryJobID: String
+  package let recoveryIntentEventID: String
   public let operationReference: String
   public let profileReference: String
-  public let materializedPlanDigestSHA256: String
+  package let materializedPlanDigestSHA256: String
   public let artifactSHA256: String
   public let providerExecutableSHA256: String
-  public let confirmedStepIDs: [String]
-  public let resultingTargetEpochSHA256: String
-  public let establishedAtUTC: String
+  package let confirmedStepIDs: [String]
+  package let resultingTargetEpochSHA256: String
+  package let establishedAtUTC: String
 
   public init(
     source: SupersedingRecoverySource,
@@ -95,26 +95,26 @@ public struct SupersedingRecoveryEpochDraft: Equatable, Sendable {
 /// journals; admission consults this independent relation instead of rewriting
 /// or guessing their historical result.
 public struct SupersedingRecoveryEpoch: Codable, Equatable, Sendable {
-  public let epochID: String
+  package let epochID: String
   public let source: SupersedingRecoverySource
-  public let stableTargetIdentitySHA256: String
+  package let stableTargetIdentitySHA256: String
   public let bindingRevision: Int
-  public let coveredIntents: [SupersededRecoveryIntent]
-  public let uncertainEffectSetSHA256: String
-  public let coverageContractVersion: String
-  public let coveredEffectSetSHA256: String
-  public let recoveryJobID: String
-  public let recoveryIntentEventID: String
+  package let coveredIntents: [SupersededRecoveryIntent]
+  package let uncertainEffectSetSHA256: String
+  package let coverageContractVersion: String
+  package let coveredEffectSetSHA256: String
+  package let recoveryJobID: String
+  package let recoveryIntentEventID: String
   public let operationReference: String
   public let profileReference: String
-  public let materializedPlanDigestSHA256: String
+  package let materializedPlanDigestSHA256: String
   public let artifactSHA256: String
   public let providerExecutableSHA256: String
-  public let confirmedStepIDs: [String]
-  public let resultingTargetEpochSHA256: String
-  public let establishedAtUTC: String
-  public let previousEpochSHA256: String?
-  public let epochSHA256: String
+  package let confirmedStepIDs: [String]
+  package let resultingTargetEpochSHA256: String
+  package let establishedAtUTC: String
+  package let previousEpochSHA256: String?
+  package let epochSHA256: String
 
   public func covers(
     jobID: String, intentEventID: String,
@@ -128,7 +128,7 @@ public struct SupersedingRecoveryEpoch: Codable, Equatable, Sendable {
   }
 }
 
-public enum SupersedingRecoveryStoreError: Error, Equatable, Sendable {
+package enum SupersedingRecoveryStoreError: Error, Equatable, Sendable {
   case corrupt(String)
   case invalidEpoch(String)
   case conflictingEpoch(String)
@@ -162,7 +162,7 @@ private struct SupersedingRecoveryEpochMaterial: Codable {
   let previousEpochSHA256: String?
 }
 
-public actor RuntimeSupersedingRecoveryStore {
+package actor RuntimeSupersedingRecoveryStore {
   private let documentURL: URL
   private let lockURL: URL
   private static let maximumDocumentBytes = 1_048_576
@@ -443,7 +443,7 @@ public actor RuntimeSupersedingRecoveryStore {
   }
 }
 
-public struct JournalAuditContext: @unchecked Sendable {
+package struct JournalAuditContext: @unchecked Sendable {
   private let eventIDBody: () -> String
   private let timestampBody: () -> String
 
@@ -455,17 +455,17 @@ public struct JournalAuditContext: @unchecked Sendable {
     timestampBody = timestamp
   }
 
-  public func nextEventID() -> String { eventIDBody() }
+  package func nextEventID() -> String { eventIDBody() }
   public func timestamp() -> String { timestampBody() }
 }
 
-public enum ProviderRecoveryDisposition: Equatable, Sendable {
+package enum ProviderRecoveryDisposition: Equatable, Sendable {
   case resume
   case confirmedFailure
   case uncertain
 }
 
-public struct ProviderRecoveryEvidence: Equatable, Sendable {
+package struct ProviderRecoveryEvidence: Equatable, Sendable {
   public let disposition: ProviderRecoveryDisposition
   public let restartSafe: Bool
   public let safeBoundaryConfirmed: Bool
@@ -487,7 +487,7 @@ public struct ProviderRecoveryEvidence: Equatable, Sendable {
   }
 }
 
-public struct RecoveryBindingEvidence: Equatable, Sendable {
+package struct RecoveryBindingEvidence: Equatable, Sendable {
   public let confirmed: Bool
   public let revision: Int?
   public let evidence: [String]
@@ -499,16 +499,16 @@ public struct RecoveryBindingEvidence: Equatable, Sendable {
   }
 }
 
-public struct ReconciliationResult: Equatable, Sendable {
+package struct ReconciliationResult: Equatable, Sendable {
   public let state: JobState
   public let outcomeCertainty: JournalOutcomeCertainty
-  public let durableEventSequences: [Int]
-  public let destructiveDispatchCount: Int
-  public let destructiveReplayCount: Int
-  public let guessCompensationCount: Int
+  package let durableEventSequences: [Int]
+  package let destructiveDispatchCount: Int
+  package let destructiveReplayCount: Int
+  package let guessCompensationCount: Int
 }
 
-public final class DeterministicRecoveryReconciler: @unchecked Sendable {
+package final class DeterministicRecoveryReconciler: @unchecked Sendable {
   private let journal: any DurableJournalAppending
   private let audit: JournalAuditContext
 
@@ -692,7 +692,7 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
   }
 }
 
-public enum ManagedProcessStopResult: String, Equatable, Sendable {
+package enum ManagedProcessStopResult: String, Equatable, Sendable {
   case notRunning
   case stoppedAtSafeBoundary
   case unconfirmed
@@ -700,44 +700,44 @@ public enum ManagedProcessStopResult: String, Equatable, Sendable {
   var permitsAbandonment: Bool { self == .notRunning || self == .stoppedAtSafeBoundary }
 }
 
-public protocol ManagedProcessStopping: Sendable {
+package protocol ManagedProcessStopping: Sendable {
   func stopForRecoveryAbandonment() throws -> ManagedProcessStopResult
 }
 
-public enum ResourceReleaseDisposition: Equatable, Sendable {
+package enum ResourceReleaseDisposition: Equatable, Sendable {
   case releasedNow
   case alreadyReleased
 }
 
-public protocol DeviceLaneReleasing: Sendable {
+package protocol DeviceLaneReleasing: Sendable {
   /// Idempotently confirms that the device lane is released.
   func ensureDeviceLaneReleased() throws -> ResourceReleaseDisposition
 }
 
-public protocol StorageClaimReleasing: Sendable {
+package protocol StorageClaimReleasing: Sendable {
   /// Idempotently confirms that the storage claim is released.
   func ensureStorageClaimReleased() throws -> ResourceReleaseDisposition
 }
 
-public enum RecoveryResourceReleaseError: Error, Equatable, Sendable {
+package enum RecoveryResourceReleaseError: Error, Equatable, Sendable {
   case releaseNotDurablyAuthorized
 }
 
-public enum RecoveryAbandonmentContinuationError: Error, Equatable, Sendable {
+package enum RecoveryAbandonmentContinuationError: Error, Equatable, Sendable {
   case noPendingAbandonment
   case identityMismatch
   case confirmationMismatch
 }
 
-public struct RecoveryAbandonmentRequest: Equatable, Sendable {
+package struct RecoveryAbandonmentRequest: Equatable, Sendable {
   public let sessionID: String
   public let jobID: String
-  public let nextSequence: Int
-  public let userConfirmationID: String
+  package let nextSequence: Int
+  package let userConfirmationID: String
   public let lastConfirmedStepID: String?
   public let outcomeCertainty: JournalOutcomeCertainty
-  public let managedProcessState: String
-  public let deviceHazards: [String]
+  package let managedProcessState: String
+  package let deviceHazards: [String]
 
   public init(
     sessionID: String,
@@ -760,17 +760,17 @@ public struct RecoveryAbandonmentRequest: Equatable, Sendable {
   }
 }
 
-public struct RecoveryAbandonmentResult: Equatable, Sendable {
+package struct RecoveryAbandonmentResult: Equatable, Sendable {
   public let state: JobState
-  public let durableEventSequences: [Int]
-  public let laneReleaseCount: Int
-  public let claimReleaseCount: Int
-  public let laneReleased: Bool
-  public let claimReleased: Bool
-  public let resourceReleasePending: Bool
+  package let durableEventSequences: [Int]
+  package let laneReleaseCount: Int
+  package let claimReleaseCount: Int
+  package let laneReleased: Bool
+  package let claimReleased: Bool
+  package let resourceReleasePending: Bool
 }
 
-public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
+package final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
   private let journal: any DurableJournalAppending
   private let stopper: any ManagedProcessStopping
   private let laneReleaser: any DeviceLaneReleasing
@@ -791,7 +791,7 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     self.audit = audit
   }
 
-  public func abandon(_ request: RecoveryAbandonmentRequest) -> RecoveryAbandonmentResult {
+  package func abandon(_ request: RecoveryAbandonmentRequest) -> RecoveryAbandonmentResult {
     var durableSequences: [Int] = []
     let intentID = audit.nextEventID()
     do {
@@ -849,7 +849,7 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     }
   }
 
-  public func resumeAbandonment(
+  package func resumeAbandonment(
     _ request: RecoveryAbandonmentRequest,
     from replay: JournalReplay
   ) throws -> RecoveryAbandonmentResult {
@@ -918,7 +918,7 @@ public final class AuditedRecoveryAbandonmentCoordinator: @unchecked Sendable {
     }
   }
 
-  public func retryAuthorizedResourceRelease(
+  package func retryAuthorizedResourceRelease(
     from replay: JournalReplay
   ) throws -> RecoveryAbandonmentResult {
     guard replay.resourceReleaseAuthorized, replay.currentState == .interrupted else {

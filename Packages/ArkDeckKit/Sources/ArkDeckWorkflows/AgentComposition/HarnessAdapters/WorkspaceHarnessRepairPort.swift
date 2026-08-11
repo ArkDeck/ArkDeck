@@ -7,7 +7,7 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
+package struct WorkspaceHarnessRepairPort: HarnessRepairPort {
   private let profile: WorkspaceProjectProfile
   private let profileRegistry: WorkspaceProjectProfileRegistry
   private let attempts: WorkspacePatchAttemptStore
@@ -36,7 +36,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     self.artifacts = artifactStore
   }
 
-  public func currentWorkspaceRevision(
+  package func currentWorkspaceRevision(
     relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
   ) async throws -> String {
     guard let profile = profileRegistry.profile(for: projectRef) else {
@@ -56,7 +56,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
   /// intersection the workspace already enforces: the profile's globs and the
   /// task's declared allowed paths. Nothing outside that is opened, so the
   /// model sees exactly the surface it is permitted to propose against.
-  public func readableSourceFiles(
+  package func readableSourceFiles(
     projectRef: String,
     task: HarnessTaskSnapshot,
     maximumFiles: Int,
@@ -87,7 +87,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     return files
   }
 
-  public func preparePatch(
+  package func preparePatch(
     _ proposal: HarnessPatchProposal,
     projectRef: String,
     task: HarnessTaskSnapshot,
@@ -164,7 +164,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       artifactID: metadata.artifactID)
   }
 
-  public func candidatePatch(
+  package func candidatePatch(
     proposal: HarnessPatchProposal,
     prepared: HarnessPreparedPatch,
     task: HarnessTaskSnapshot,
@@ -195,7 +195,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     return candidate.recordingMetadataArtifact(metadata.artifactID)
   }
 
-  public func appliedPatchReadback(
+  package func appliedPatchReadback(
     jobID: String, proposal: HarnessPatchProposal
   ) async throws -> HarnessAppliedPatchReadback {
     let fields = try await readJSONArtifact(named: "applied-patch.json", jobID: jobID)
@@ -225,7 +225,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       patchAttemptRef: reference, patchRevision: patchRevision)
   }
 
-  public func buildReadback(
+  package func buildReadback(
     jobID: String,
     attempt: HarnessRepairAttempt,
     buildPresetRef: String,
@@ -301,7 +301,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       outputArtifactLease: lease)
   }
 
-  public func deployedArtifactDigest(jobID: String) async throws -> String {
+  package func deployedArtifactDigest(jobID: String) async throws -> String {
     let fields = try await readJSONArtifact(named: "install-readback.json", jobID: jobID)
     guard case .string(let digest)? = fields["deployedArtifactSha256"],
       digest.count == 64
@@ -311,7 +311,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     return digest
   }
 
-  public func signedHAPReadback(
+  package func signedHAPReadback(
     jobID: String,
     unsignedArtifactLease: String,
     task: HarnessTaskSnapshot
@@ -354,7 +354,7 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       outputDigest: signed.sha256, outputArtifactLease: lease)
   }
 
-  public func reconcileUnknownPatch(
+  package func reconcileUnknownPatch(
     jobID: String, proposal: HarnessPatchProposal
   ) async throws -> HarnessPatchApplicationReadback {
     if let applied = try? await appliedPatchReadback(jobID: jobID, proposal: proposal) {

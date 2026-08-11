@@ -4,7 +4,7 @@ import Darwin
 import Dispatch
 import Foundation
 
-public enum DurabilityFaultPoint: String, CaseIterable, Sendable {
+package enum DurabilityFaultPoint: String, CaseIterable, Sendable {
   case journalAppend
   case journalWrite
   case journalFileSync
@@ -16,7 +16,7 @@ public enum DurabilityFaultPoint: String, CaseIterable, Sendable {
   case checkpointDirectorySync
 }
 
-public struct DurabilityFaultInjector: @unchecked Sendable {
+package struct DurabilityFaultInjector: @unchecked Sendable {
   private let body: (DurabilityFaultPoint) throws -> Void
 
   public init(_ body: @escaping (DurabilityFaultPoint) throws -> Void) {
@@ -28,7 +28,7 @@ public struct DurabilityFaultInjector: @unchecked Sendable {
   public static let none = DurabilityFaultInjector { _ in }
 }
 
-public enum DurableFileError: Error, Equatable, Sendable {
+package enum DurableFileError: Error, Equatable, Sendable {
   case pathMustBeAbsolute(String)
   case symbolicLinkRejected(String)
   case openFailed(path: String, errno: Int32)
@@ -50,8 +50,8 @@ public enum DurableFileError: Error, Equatable, Sendable {
 /// both a first publication and a replacement on the same volume.  The file
 /// and its parent directory are synchronised on either path, so a successful
 /// return makes the new name durable across a sudden process loss.
-public enum DurableFileWriter {
-  public static func createOrReplaceAtomically(destination: URL, data: Data) throws {
+package enum DurableFileWriter {
+  package static func createOrReplaceAtomically(destination: URL, data: Data) throws {
     try DurableFilePrimitives.requireAbsoluteFileURL(destination)
     let directory = destination.deletingLastPathComponent()
     try DurableFilePrimitives.createDirectoryIfNeeded(directory)
@@ -132,9 +132,9 @@ enum SessionTerminalPublicationLock {
   }
 }
 
-public struct JournalAbandonmentContext: Equatable, Sendable {
-  public let requiredHazards: [String]
-  public let requiresOutcomeUnknown: Bool
+package struct JournalAbandonmentContext: Equatable, Sendable {
+  package let requiredHazards: [String]
+  package let requiresOutcomeUnknown: Bool
 
   public init(requiredHazards: [String], requiresOutcomeUnknown: Bool) {
     self.requiredHazards = requiredHazards
@@ -142,7 +142,7 @@ public struct JournalAbandonmentContext: Equatable, Sendable {
   }
 }
 
-public protocol DurableJournalAppending: Sendable {
+package protocol DurableJournalAppending: Sendable {
   func appendAndSynchronize(_ event: JournalEvent) throws
   func abandonmentContext() throws -> JournalAbandonmentContext
 }
@@ -238,7 +238,7 @@ struct JournalAppendMeasurement: Equatable, Sendable {
   let totalAppendNanoseconds: UInt64
 }
 
-public final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
+package final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
   public let url: URL
   private let lock = NSLock()
   private let faultInjector: DurabilityFaultInjector
@@ -319,7 +319,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     boundInode = inspection.metadata.st_ino
   }
 
-  public func abandonmentContext() throws -> JournalAbandonmentContext {
+  package func abandonmentContext() throws -> JournalAbandonmentContext {
     lock.lock()
     defer { lock.unlock() }
     guard !poisoned else {
@@ -343,7 +343,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     return appendState.abandonmentContext
   }
 
-  public func appendAndSynchronize(_ event: JournalEvent) throws {
+  package func appendAndSynchronize(_ event: JournalEvent) throws {
     // The resource timings are a benchmark-only observation seam.  Do not
     // make every production journal append pay for clock reads when no test
     // has opted into those measurements.
@@ -457,7 +457,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
 
 }
 
-public final class WriteAheadIntentGate: @unchecked Sendable {
+package final class WriteAheadIntentGate: @unchecked Sendable {
   private let journal: any DurableJournalAppending
 
   public init(journal: any DurableJournalAppending) {
@@ -477,13 +477,13 @@ public final class WriteAheadIntentGate: @unchecked Sendable {
   }
 }
 
-public struct JournalCheckpoint: Codable, Equatable, Sendable {
+package struct JournalCheckpoint: Codable, Equatable, Sendable {
   public let schemaVersion: String
   public let sessionID: String
   public let jobID: String
-  public let journalSequence: Int
+  package let journalSequence: Int
   public let state: String
-  public let updatedAt: String
+  package let updatedAt: String
 
   public init(
     sessionID: String,
@@ -532,11 +532,11 @@ public struct JournalCheckpoint: Codable, Equatable, Sendable {
   }
 }
 
-public protocol JournalCheckpointSaving: Sendable {
+package protocol JournalCheckpointSaving: Sendable {
   func save(_ checkpoint: JournalCheckpoint) throws
 }
 
-public final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unchecked Sendable {
+package final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unchecked Sendable {
   public let url: URL
   private let lock = NSLock()
   private let faultInjector: DurabilityFaultInjector
@@ -601,7 +601,7 @@ public final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unche
   }
 }
 
-public final class DurableOutcomeCheckpointGate: @unchecked Sendable {
+package final class DurableOutcomeCheckpointGate: @unchecked Sendable {
   private let journal: any DurableJournalAppending
   private let checkpointStore: any JournalCheckpointSaving
 

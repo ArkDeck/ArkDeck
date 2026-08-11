@@ -9,7 +9,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public struct RockchipEvolutionCampaignPreview: Sendable, Equatable {
+package struct RockchipEvolutionCampaignPreview: Sendable, Equatable {
   public let assertion: RockchipEvolutionCampaignConfirmationAssertion
   public let deviceMutationDispatchCount: Int
 
@@ -22,7 +22,7 @@ public struct RockchipEvolutionCampaignPreview: Sendable, Equatable {
   }
 }
 
-public struct RockchipEvolutionCampaignExecutionResult: Sendable, Equatable {
+package struct RockchipEvolutionCampaignExecutionResult: Sendable, Equatable {
   public let campaignID: String
   public let attemptOrdinal: Int
   public let flash: RockchipFlashExecutionResult
@@ -34,7 +34,7 @@ public struct RockchipEvolutionCampaignExecutionResult: Sendable, Equatable {
   }
 }
 
-public protocol RockchipEvolutionFlashDispatching: Sendable {
+package protocol RockchipEvolutionFlashDispatching: Sendable {
   /// Non-nil when this dispatcher's executor cannot mint its own reservation.
   /// The engine lane is that case by #992's design — the engine re-verifies
   /// and closes an already open reservation but never reserves — so the host
@@ -49,7 +49,7 @@ public protocol RockchipEvolutionFlashDispatching: Sendable {
 }
 
 extension RockchipEvolutionFlashDispatching {
-  public var attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)? { nil }
+  package var attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)? { nil }
 }
 
 
@@ -61,7 +61,7 @@ extension RockchipEvolutionFlashDispatching {
 /// is never confirmed leaves a zero-event document that any later preview or
 /// admission sweeps away once `validUntil` passes, so unconfirmed previews
 /// accumulate no permanent campaign documents.
-public enum RockchipEvolutionCampaignPlanning {
+package enum RockchipEvolutionCampaignPlanning {
   public static func preview(
     archiveURL: URL,
     maxAttempts: Int,
@@ -115,15 +115,15 @@ public enum RockchipEvolutionCampaignPlanning {
 /// measured an unknown outcome and carried complete intent sets, and
 /// reconciliation that found no terminal at all and knows nothing — and until
 /// r17 the campaign document recorded the same word for both (TASK-AIN-020).
-public enum RockchipEvolutionAttemptClassification: Equatable, Sendable {
+package enum RockchipEvolutionAttemptClassification: Equatable, Sendable {
   case decided(RockchipEvolutionAttemptDisposition, basis: String)
   /// Only an engine-written `outcomeUnknown` reaches here. The readback is
   /// applied by the host, which owns the ports it needs.
   case requiresLoaderTransitionReadback(basis: String)
 }
 
-public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
-  public typealias AttemptClassification = RockchipEvolutionAttemptClassification
+package final class RockchipEvolutionCampaignHost: @unchecked Sendable {
+  package typealias AttemptClassification = RockchipEvolutionAttemptClassification
 
   /// A `safeToReflash` terminal proves no external effect occurred, but it
   /// does not make an unbounded sequence of materially identical proposals
@@ -192,7 +192,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
     self.nowUTC = nowUTC
   }
 
-  public func executeConfirmedCampaign(
+  package func executeConfirmedCampaign(
     confirmationDigestSHA256: String,
     archiveURL: URL,
     targetLocationSelector: String
@@ -219,7 +219,7 @@ public final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       targetLocationSelector: targetLocationSelector)
   }
 
-  public func continueCampaign(
+  package func continueCampaign(
     campaignID: String,
     archiveURL: URL,
     targetLocationSelector: String

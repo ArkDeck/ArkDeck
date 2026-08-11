@@ -71,7 +71,7 @@ private struct HarnessApplicationLivenessArtifact: Decodable {
   }
 }
 
-public struct HarnessCrashSignature: Equatable, Sendable {
+package struct HarnessCrashSignature: Equatable, Sendable {
   /// The ledger entry's kind (`cppcrash`, `jscrash`, `appfreeze`, …). Kept
   /// because the kinds carry different judging fields, and because a
   /// signature rendered without it reads as a native crash whatever it was.
@@ -79,9 +79,9 @@ public struct HarnessCrashSignature: Equatable, Sendable {
   /// The fault's reason token: a signal for `cppcrash`, an error name for
   /// `jscrash`. Never fabricated - an entry with no reason yields no
   /// signature at all.
-  public let signal: String
-  public let topFrame: String?
-  public let blockText: String
+  package let signal: String
+  package let topFrame: String?
+  package let blockText: String
 
   public init(kind: String, signal: String, topFrame: String?, blockText: String) {
     self.kind = kind
@@ -96,10 +96,10 @@ public struct HarnessCrashSignature: Equatable, Sendable {
   }
 }
 
-public struct HarnessObservationBuilder: Sendable {
+package struct HarnessObservationBuilder: Sendable {
   /// Read bound per artifact. Bigger evidence is not silently truncated: it
   /// becomes a blocker, because a hash over a prefix proves nothing.
-  public static let defaultEvaluationReadBytes = 1 << 20
+  package static let defaultEvaluationReadBytes = 1 << 20
 
   private let artifacts: any HarnessArtifactPort
   private let maximumEvaluationBytes: Int
@@ -128,17 +128,17 @@ public struct HarnessObservationBuilder: Sendable {
   }
 
   /// Artifact names `capture.diagnostics@1` publishes for the crash ledger.
-  public static let crashIndexArtifact = "crash-index.txt"
-  public static let crashLogArtifact = "crash-log.txt"
-  public static let applicationLivenessArtifact = "application-liveness.json"
+  package static let crashIndexArtifact = "crash-index.txt"
+  package static let crashLogArtifact = "crash-log.txt"
+  package static let applicationLivenessArtifact = "application-liveness.json"
   /// Measurement key carrying the device-local timestamp this task has
   /// already accounted for. See `measureCrashLedger` for why it exists.
-  public static let watermarkMetric = "crashLedgerWatermark"
+  package static let watermarkMetric = "crashLedgerWatermark"
   /// Measurement key carrying the newest un-accounted entry's name, which
   /// is what the next round passes as `crashLogName` to fetch its body.
-  public static let latestEntryMetric = "latestCrashEntryName"
+  package static let latestEntryMetric = "latestCrashEntryName"
 
-  public func observe(
+  package func observe(
     round: Int,
     jobID: String,
     declaredCrashSignature: String?,

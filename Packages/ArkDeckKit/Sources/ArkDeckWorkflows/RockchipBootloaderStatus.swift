@@ -35,14 +35,14 @@ public struct RockchipBootloaderStatus: Sendable, Equatable {
   }
 }
 
-public protocol RockchipBootloaderStatusObserving: Sendable {
+package protocol RockchipBootloaderStatusObserving: Sendable {
   func observeBootloaderStatus() throws -> RockchipBootloaderStatus
 }
 
 /// Product composition backed only by IOKit and owner-only durable stores.
 /// It cannot spawn a process, dispatch a device effect, adopt a target or
 /// advance a binding.
-public struct ProductRockchipBootloaderStatusObserver:
+package struct ProductRockchipBootloaderStatusObserver:
   RockchipBootloaderStatusObserving, Sendable
 {
   private let targetStore: RuntimeTargetStore
@@ -71,7 +71,7 @@ public struct ProductRockchipBootloaderStatusObserver:
     self.usbProbe = usbProbe
   }
 
-  public func observeBootloaderStatus() throws -> RockchipBootloaderStatus {
+  package func observeBootloaderStatus() throws -> RockchipBootloaderStatus {
     let identities = try usbProbe.registeredDAYU200Identities()
     guard identities.count == 1, let identity = identities.first else {
       return RockchipBootloaderStatus(
@@ -162,12 +162,12 @@ public struct ProductRockchipBootloaderStatusObserver:
   }
 }
 
-public struct RockchipLoaderBindingReceipt: Sendable, Equatable {
+package struct RockchipLoaderBindingReceipt: Sendable, Equatable {
   public let targetID: String
-  public let previousRevision: Int
-  public let currentRevision: Int
+  package let previousRevision: Int
+  package let currentRevision: Int
   public let updated: Bool
-  public let selectionEvidenceSHA256: String
+  package let selectionEvidenceSHA256: String
 
   public init(
     targetID: String,
@@ -184,7 +184,7 @@ public struct RockchipLoaderBindingReceipt: Sendable, Equatable {
   }
 }
 
-public protocol RockchipLoaderBindingCoordinating: Sendable {
+package protocol RockchipLoaderBindingCoordinating: Sendable {
   func bindCurrentLoader(
     targetID: String,
     expectedBindingRevision: Int
@@ -238,7 +238,7 @@ package protocol RockchipBindingReactivationProving: Sendable {
 /// identity/topology fact afresh, applies Core's manual USB rebind policy, and
 /// either activates an exact revision-1 target or advances the same target's
 /// HDC-to-Loader lineage.
-public struct ProductRockchipLoaderBindingCoordinator:
+package struct ProductRockchipLoaderBindingCoordinator:
   RockchipLoaderBindingCoordinating, Sendable
 {
   private let targetStore: RuntimeTargetStore

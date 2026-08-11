@@ -10,7 +10,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codable {
+package struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codable {
   public let path: String
   public let sha256: String
 
@@ -27,7 +27,7 @@ public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codabl
     self.sha256 = sha256
   }
 
-  public static func hashing(path: String) throws -> WorkspaceExecutableIdentity {
+  package static func hashing(path: String) throws -> WorkspaceExecutableIdentity {
     let canonical = URL(fileURLWithPath: path).standardizedFileURL.path
     let bytes = try Data(contentsOf: URL(fileURLWithPath: canonical))
     return try WorkspaceExecutableIdentity(
@@ -35,12 +35,12 @@ public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codabl
   }
 }
 
-public struct WorkspaceCommandPreset: Sendable, Equatable {
-  public let presetID: String
+package struct WorkspaceCommandPreset: Sendable, Equatable {
+  package let presetID: String
   public let executable: WorkspaceExecutableIdentity
-  public let argumentZero: String?
-  public let fixedArguments: [String]
-  public let timeoutSeconds: Int
+  package let argumentZero: String?
+  package let fixedArguments: [String]
+  package let timeoutSeconds: Int
 
   public init(
     presetID: String,
@@ -74,36 +74,36 @@ public struct WorkspaceCommandPreset: Sendable, Equatable {
   }
 }
 
-public enum WorkspaceProjectProfileKind: String, Sendable, Equatable {
+package enum WorkspaceProjectProfileKind: String, Sendable, Equatable {
   case primary
   case evolution
 }
 
-public struct WorkspaceProjectProfile: Sendable, Equatable {
-  public let profileID: String
-  public let projectRef: String
-  public let projectRoot: String
-  public let allowedFileGlobs: [String]
-  public let inspectionPreset: WorkspaceCommandPreset
+package struct WorkspaceProjectProfile: Sendable, Equatable {
+  package let profileID: String
+  package let projectRef: String
+  package let projectRoot: String
+  package let allowedFileGlobs: [String]
+  package let inspectionPreset: WorkspaceCommandPreset
   /// Pinned source-control tool. Absent means the read-only git operations
   /// report unavailable rather than falling back to whatever `git` is on
   /// PATH (CHG-2026-055, TASK-HFA-008).
-  public let sourceControlPreset: WorkspaceCommandPreset?
+  package let sourceControlPreset: WorkspaceCommandPreset?
   /// Pinned reader for bounded source ranges. Absent means the operation is
   /// unavailable rather than falling back to reading files in-process.
-  public let sourceReaderPreset: WorkspaceCommandPreset?
+  package let sourceReaderPreset: WorkspaceCommandPreset?
   /// Pinned archive writer for workspaces that are intentionally not Git
   /// checkouts. It can only seal exact, profile-scoped files into the
   /// provider-owned attempt store.
-  public let archiveCheckpointPreset: WorkspaceCommandPreset?
-  public let patchPreset: WorkspaceCommandPreset
-  public let buildPresets: [String: WorkspaceCommandPreset]
-  public let testPresets: [String: WorkspaceCommandPreset]
-  public let symbolPresets: [String: WorkspaceCommandPreset]
+  package let archiveCheckpointPreset: WorkspaceCommandPreset?
+  package let patchPreset: WorkspaceCommandPreset
+  package let buildPresets: [String: WorkspaceCommandPreset]
+  package let testPresets: [String: WorkspaceCommandPreset]
+  package let symbolPresets: [String: WorkspaceCommandPreset]
   /// A build preset may declare one deployable product whose bytes are read
   /// back after a successful build.  The path belongs to repository-managed
   /// configuration, never to a model proposal or task input.
-  public let buildProducts: [String: String]
+  package let buildProducts: [String: String]
   public let kind: WorkspaceProjectProfileKind
 
   public init(
@@ -163,7 +163,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
 
   /// Built-in profile for this repository. An explicit root override is
   /// configuration, not authority; the closed preset vocabulary stays here.
-  public static func arkDeck(rootURL: URL) throws -> WorkspaceProjectProfile {
+  package static func arkDeck(rootURL: URL) throws -> WorkspaceProjectProfile {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
@@ -253,7 +253,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
   /// Closed production profile for the real WaterFlow Golden Journey app.
   /// The project root is configured by the operator, but every tool, task,
   /// module, product and output path remains repository-owned vocabulary.
-  public static func waterFlowDemo(
+  package static func waterFlowDemo(
     rootURL: URL,
     projectRef: String = "demo-app",
     nodePath: String,
@@ -353,7 +353,7 @@ public struct WorkspaceProjectProfile: Sendable, Equatable {
 /// Thread-safe project identity registry shared by the existing Workspace
 /// provider and repair adapter. Evolution registers isolated profiles here;
 /// it does not create another provider, engine or daemon.
-public final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
+package final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
   private let lock = NSLock()
   private var profilesByRef: [String: WorkspaceProjectProfile]
 
@@ -380,7 +380,7 @@ public final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
     lock.withLock { profilesByRef[projectRef] }
   }
 
-  public func register(_ profile: WorkspaceProjectProfile) throws {
+  package func register(_ profile: WorkspaceProjectProfile) throws {
     try lock.withLock {
       if let existing = profilesByRef[profile.projectRef] {
         guard existing == profile else {
@@ -393,14 +393,14 @@ public final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
     }
   }
 
-  public func profiles() -> [WorkspaceProjectProfile] {
+  package func profiles() -> [WorkspaceProjectProfile] {
     lock.withLock { profilesByRef.values.sorted { $0.projectRef < $1.projectRef } }
   }
 
   /// Removes a derived evolution profile once its isolated tree is destroyed,
   /// so a stale reference fails at resolution instead of mid-operation. The
   /// primary profile is not removable through this seam.
-  public func unregisterEvolutionProfile(projectRef: String) {
+  package func unregisterEvolutionProfile(projectRef: String) {
     lock.withLock {
       guard profilesByRef[projectRef]?.kind == .evolution else { return }
       profilesByRef.removeValue(forKey: projectRef)
@@ -408,7 +408,7 @@ public final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
   }
 }
 
-public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
+package struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
   public let providerID = "workspace"
   private let reason: String
 
@@ -416,13 +416,13 @@ public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
     self.reason = reason
   }
 
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     .unavailable(reason: reason)
   }
 
-  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+  package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     throw DeviceProviderError.factsUnavailable(reason)
   }
 
@@ -459,31 +459,31 @@ public struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
 
 package struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
   public let operation: String
-  public let projectRef: String
-  public let projectRoot: String
-  public let presetID: String
+  package let projectRef: String
+  package let projectRoot: String
+  package let presetID: String
   public let executable: WorkspaceExecutableIdentity
-  public let argumentZero: String?
+  package let argumentZero: String?
   public let arguments: [String]
-  public let timeoutSeconds: Int
+  package let timeoutSeconds: Int
 }
 
-public struct WorkspaceFileSnapshot: Sendable, Equatable, Codable {
-  public let relativePath: String
+package struct WorkspaceFileSnapshot: Sendable, Equatable, Codable {
+  package let relativePath: String
   public let sha256: String?
 }
 
-public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
+package struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   package let invocation: WorkspaceResolvedInvocation
-  public let patchAttemptRef: String
-  public let patchArtifactID: String
-  public let patchFilePath: String
-  public let patchSHA256: String
-  public let allowedFileGlobs: [String]
+  package let patchAttemptRef: String
+  package let patchArtifactID: String
+  package let patchFilePath: String
+  package let patchSHA256: String
+  package let allowedFileGlobs: [String]
   public let before: [WorkspaceFileSnapshot]
   /// Evolution binds the patch to the complete policy-scoped tree rather
   /// than only the files the diff happens to touch.
-  public let previousWorkspaceRevision: String?
+  package let previousWorkspaceRevision: String?
 
   package init(
     invocation: WorkspaceResolvedInvocation,
@@ -506,12 +506,12 @@ public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   }
 }
 
-public struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
+package struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
   package let invocation: WorkspaceResolvedInvocation
   /// The path is derived from the runtime
   /// Job identity inside the provider-owned 0700 attempt store.
-  public let archivePath: String
-  public let sourceSnapshots: [WorkspaceFileSnapshot]
+  package let archivePath: String
+  package let sourceSnapshots: [WorkspaceFileSnapshot]
 
   package init(
     invocation: WorkspaceResolvedInvocation,
@@ -524,20 +524,20 @@ public struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
   }
 }
 
-public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
-  public let patchAttemptRef: String
-  public let projectRef: String
-  public let projectRoot: String
-  public let patchArtifactID: String
-  public let patchFilePath: String
-  public let patchSHA256: String
-  public let allowedFileGlobs: [String]
+package struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
+  package let patchAttemptRef: String
+  package let projectRef: String
+  package let projectRoot: String
+  package let patchArtifactID: String
+  package let patchFilePath: String
+  package let patchSHA256: String
+  package let allowedFileGlobs: [String]
   public let before: [WorkspaceFileSnapshot]
   public let after: [WorkspaceFileSnapshot]
-  public let workspaceRevisionBefore: String?
-  public let workspaceRevisionAfter: String?
-  public let appliedAtUTC: String
-  public let revertedAtUTC: String?
+  package let workspaceRevisionBefore: String?
+  package let workspaceRevisionAfter: String?
+  package let appliedAtUTC: String
+  package let revertedAtUTC: String?
 
   fileprivate func markingReverted(atUTC: String) -> WorkspacePatchAttempt {
     WorkspacePatchAttempt(
@@ -551,9 +551,9 @@ public struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
   }
 }
 
-public struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
+package struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
   package let invocation: WorkspaceResolvedInvocation
-  public let attempt: WorkspacePatchAttempt
+  package let attempt: WorkspacePatchAttempt
 }
 
 extension WorkspaceProviderAction {
@@ -577,7 +577,7 @@ extension WorkspaceProviderAction {
   }
 }
 
-public final class WorkspacePatchAttemptStore: @unchecked Sendable {
+package final class WorkspacePatchAttemptStore: @unchecked Sendable {
   private let rootURL: URL
   private let lock = NSLock()
 
@@ -617,7 +617,7 @@ public final class WorkspacePatchAttemptStore: @unchecked Sendable {
   /// Copies the leased patch bytes into the provider-owned attempt store.
   /// Artifact leases may expire after the apply Job finishes; revert must
   /// remain possible from the durable patchAttemptRef alone.
-  public func persistPatch(
+  package func persistPatch(
     reference: String, sourceURL: URL, expectedSHA256: String
   ) throws -> String {
     try lock.withLock {
@@ -648,7 +648,7 @@ public final class WorkspacePatchAttemptStore: @unchecked Sendable {
 
   /// Returns a provider-owned destination for one Job's pre-patch source
   /// archive. Hashing the opaque Job id keeps it from becoming a path surface.
-  public func checkpointArchiveURL(jobID: String) -> URL {
+  package func checkpointArchiveURL(jobID: String) -> URL {
     let digest = WorkspaceProviderSupport.sha256(Data(jobID.utf8))
     return rootURL.appendingPathComponent("checkpoint-\(digest).tar")
   }
@@ -675,14 +675,14 @@ public final class WorkspacePatchAttemptStore: @unchecked Sendable {
 /// Dispatcher resolver that accepts only executable identities in the same
 /// ProjectProfile as the provider. The executor performs the final identity
 /// check again atomically at spawn.
-public struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
+package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
   private let allowed: Set<WorkspaceExecutableIdentity>
 
   public init(profile: WorkspaceProjectProfile) {
     self.allowed = profile.executableIdentities
   }
 
-  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+  package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
     guard providerID == "workspace" else {
       throw RuntimeDispatchFailure.failed(
         "workspace resolver cannot serve provider \(providerID)")
@@ -720,7 +720,7 @@ public struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
 /// One dispatcher route serves both the TASK-HTP-007 inspector and the five
 /// ProjectProfile operations. Selection is made only from the exact typed
 /// action; callers cannot name an executable.
-public struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
+package struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
   private let inspector: ResolvedExecutable?
   private let operations: WorkspaceActionExecutableResolver
 
@@ -732,7 +732,7 @@ public struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
     self.operations = operations
   }
 
-  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+  package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
     guard providerID == "workspace" else {
       throw RuntimeDispatchFailure.failed(
         "workspace resolver cannot serve provider \(providerID)")
@@ -756,7 +756,7 @@ public struct CombinedWorkspaceExecutableResolver: RuntimeExecutableResolving {
   }
 }
 
-public struct WorkspaceOperationsProvider: DeviceProvider {
+package struct WorkspaceOperationsProvider: DeviceProvider {
   public let providerID = "workspace"
   private let profile: WorkspaceProjectProfile
   private let profileRegistry: WorkspaceProjectProfileRegistry
@@ -796,7 +796,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     self.nowUTC = nowUTC
   }
 
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard operation.provider == .workspace else {
@@ -843,7 +843,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
     }
   }
 
-  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+  package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     throw DeviceProviderError.factsUnavailable(
       "workspace provider is host-only: it has no device facts for \(targetID)")
   }
@@ -852,7 +852,7 @@ public struct WorkspaceOperationsProvider: DeviceProvider {
   /// (CHG-2026-055, TASK-HFA-009 r2). All are computed here, from files, at
   /// admission time — the engine cannot derive them and a stale value would
   /// be exactly the drift the grant exists to prevent.
-  public func workspaceAuthorizationFacts(
+  package func workspaceAuthorizationFacts(
     for operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts? {

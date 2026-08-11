@@ -1,7 +1,7 @@
 import ArkDeckCore
 import Foundation
 
-public struct RecoveryManifestHazard: Codable, Equatable, Sendable {
+package struct RecoveryManifestHazard: Codable, Equatable, Sendable {
   public let code: String
   public let summary: String
   public let severity: String
@@ -32,7 +32,7 @@ public struct RecoveryManifestHazard: Codable, Equatable, Sendable {
   }
 }
 
-public enum RecoveryManifestDeviceMode: Codable, Equatable, Sendable {
+package enum RecoveryManifestDeviceMode: Codable, Equatable, Sendable {
   case unknown
   case known(value: String, evidence: String)
 
@@ -73,9 +73,9 @@ public enum RecoveryManifestDeviceMode: Codable, Equatable, Sendable {
   }
 }
 
-public struct RecoveryManifestGuide: Codable, Equatable, Sendable {
+package struct RecoveryManifestGuide: Codable, Equatable, Sendable {
   public let providerIdentity: String
-  public let automaticRecoveryAvailable: Bool
+  package let automaticRecoveryAvailable: Bool
   public let summary: String
   public let steps: [String]
 
@@ -108,7 +108,7 @@ public struct RecoveryManifestGuide: Codable, Equatable, Sendable {
   }
 }
 
-public struct RecoveryManifestAbandonConfirmation: Codable, Equatable, Sendable {
+package struct RecoveryManifestAbandonConfirmation: Codable, Equatable, Sendable {
   public let confirmationID: String
   public let actor: String
   public let decision: String
@@ -142,19 +142,19 @@ public struct RecoveryManifestAbandonConfirmation: Codable, Equatable, Sendable 
   }
 }
 
-public struct RecoveryManifestRecord: Codable, Equatable, Sendable {
+package struct RecoveryManifestRecord: Codable, Equatable, Sendable {
   public let needsAttention: Bool
-  public let interruptedReason: String?
-  public let deviceHazards: [RecoveryManifestHazard]
-  public let abandonAuditEventIDs: [String]
+  package let interruptedReason: String?
+  package let deviceHazards: [RecoveryManifestHazard]
+  package let abandonAuditEventIDs: [String]
   public let lastConfirmedStepID: String?
-  public let lastDeviceMode: RecoveryManifestDeviceMode
-  public let managedHostProcessState: String
+  package let lastDeviceMode: RecoveryManifestDeviceMode
+  package let managedHostProcessState: String
   public let recoveryGuide: RecoveryManifestGuide
-  public let unexecutedCompensations: [CompensationDescriptor]
-  public let userConfirmation: RecoveryManifestAbandonConfirmation?
-  public let recoveryOfSessionID: String?
-  public let recoveryOfJobID: String?
+  package let unexecutedCompensations: [CompensationDescriptor]
+  package let userConfirmation: RecoveryManifestAbandonConfirmation?
+  package let recoveryOfSessionID: String?
+  package let recoveryOfJobID: String?
 
   public init(
     needsAttention: Bool,
@@ -258,12 +258,12 @@ public struct RecoveryManifestRecord: Codable, Equatable, Sendable {
   }
 }
 
-public enum RecoveryManifestContractError: Error, Equatable, Sendable {
+package enum RecoveryManifestContractError: Error, Equatable, Sendable {
   case unknownOrMissingFields
   case invalidField(String)
 }
 
-public enum RecoveryManifestCodec {
+package enum RecoveryManifestCodec {
   public static func encode(_ record: RecoveryManifestRecord) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(record)

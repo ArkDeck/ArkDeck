@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum ArtifactRole: String, Codable, CaseIterable, Sendable {
+package enum ArtifactRole: String, Codable, CaseIterable, Sendable {
   case raw
   case derived
   case log
@@ -12,7 +12,7 @@ public enum ArtifactRole: String, Codable, CaseIterable, Sendable {
   case partial
 }
 
-public struct ArtifactRecord: Codable, Equatable, Sendable {
+package struct ArtifactRecord: Codable, Equatable, Sendable {
   public let id: String
   public let role: ArtifactRole
   public let origin: String
@@ -20,7 +20,7 @@ public struct ArtifactRecord: Codable, Equatable, Sendable {
   public let size: UInt64
   public let sha256: String
   public let mediaType: String?
-  public let derivedFrom: [String]?
+  package let derivedFrom: [String]?
 
   public init(
     id: String,
@@ -106,15 +106,15 @@ private struct ArtifactRecordAnyCodingKey: CodingKey {
   }
 }
 
-public struct ArtifactPublicationRequest: Sendable {
+package struct ArtifactPublicationRequest: Sendable {
   public let artifactID: String
   public let role: ArtifactRole
-  public let publicationName: String
+  package let publicationName: String
   public let origin: String
   public let mediaType: String?
-  public let derivedFrom: [String]?
+  package let derivedFrom: [String]?
   public let expectedSHA256: String?
-  public let requiredPrefix: Data?
+  package let requiredPrefix: Data?
   let derivedSourceArtifacts: [ArtifactRecord]
 
   public init(
@@ -192,12 +192,12 @@ public struct ArtifactPublicationRequest: Sendable {
   }
 }
 
-public struct PublishedArtifact: Equatable, Sendable {
+package struct PublishedArtifact: Equatable, Sendable {
   public let record: ArtifactRecord
   public let url: URL
 }
 
-public struct PartialArtifact: Equatable, Sendable {
+package struct PartialArtifact: Equatable, Sendable {
   public let url: URL
   public let size: UInt64
 }
@@ -817,7 +817,7 @@ private struct ReusablePublicationPartial {
   let prefix: Data
 }
 
-public final class SessionArtifactStore: @unchecked Sendable {
+package final class SessionArtifactStore: @unchecked Sendable {
   public let layout: SessionLayout
   private let faultInjector: SessionStorageFaultInjector
   private let volumeIdentityResolver: any VolumeIdentityResolving
@@ -1564,7 +1564,7 @@ public final class SessionArtifactStore: @unchecked Sendable {
     }
   }
 
-  public func partialArtifacts() throws -> [PartialArtifact] {
+  package func partialArtifacts() throws -> [PartialArtifact] {
     try SessionStorageValidation.mappingDurableFileErrors {
       let directories = try AnchoredSessionArtifactDirectories(layout: layout)
       let names = try directories.entryNames(
@@ -1596,17 +1596,17 @@ public final class SessionArtifactStore: @unchecked Sendable {
   }
 }
 
-public struct InputImageReference: Codable, Equatable, Sendable {
+package struct InputImageReference: Codable, Equatable, Sendable {
   public let path: String
   public let size: UInt64
   public let sha256: String
   public let volumeIdentity: VolumeIdentity
-  public let fileSystemDevice: UInt64
-  public let fileSystemInode: UInt64
-  public let fileGeneration: UInt64
+  package let fileSystemDevice: UInt64
+  package let fileSystemInode: UInt64
+  package let fileGeneration: UInt64
 }
 
-public struct InputImageReferencer: Sendable {
+package struct InputImageReferencer: Sendable {
   private let resolver: any VolumeIdentityResolving
   private let faultInjector: SessionStorageFaultInjector
 
@@ -1688,13 +1688,13 @@ private func sameFileIdentityAndContent(_ lhs: stat, _ rhs: stat) -> Bool {
     && lhs.st_ctimespec.tv_nsec == rhs.st_ctimespec.tv_nsec
 }
 
-public struct DerivedArtifactProvenance: Codable, Equatable, Sendable {
-  public static let maximumCanonicalBytes = 16 * 1_024
+package struct DerivedArtifactProvenance: Codable, Equatable, Sendable {
+  package static let maximumCanonicalBytes = 16 * 1_024
 
   public let operation: String
-  public let inputHashes: [String]
+  package let inputHashes: [String]
   public let parameters: [String: String]
-  public let statistics: [String: Int64]
+  package let statistics: [String: Int64]
 
   public init(
     operation: String,
@@ -1748,7 +1748,7 @@ public struct DerivedArtifactProvenance: Codable, Equatable, Sendable {
       statistics: container.decode([String: Int64].self, forKey: .statistics))
   }
 
-  public func manifestOrigin() throws -> String {
+  package func manifestOrigin() throws -> String {
     let data = try SessionStorageValidation.canonicalData(self)
     guard data.count <= Self.maximumCanonicalBytes else {
       throw SessionStorageError.invalidArtifact("derived provenance exceeds bound")

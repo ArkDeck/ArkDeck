@@ -12,7 +12,7 @@ import Foundation
 // durably reserves an exact RuntimeCapability, belongs exclusively to the merged broker;
 // this Provider remains incapable of direct dispatch (POL-AGENT-002).
 
-public enum RockchipFlashProviderError: Error, Equatable, Sendable {
+package enum RockchipFlashProviderError: Error, Equatable, Sendable {
   case archiveNotValidated([RockchipArchiveViolation])
   case invalidPlanNonce(String)
   case planAssemblyFailed(String)
@@ -20,14 +20,14 @@ public enum RockchipFlashProviderError: Error, Equatable, Sendable {
 
 // MARK: - Probe (AC-FLASH-001-01)
 
-public struct RockchipProbeEvidence: Equatable, Sendable {
-  public static let rockUSBVendorID: UInt16 = 0x2207
-  public static let dayu200LoaderProductID: UInt16 = 0x350a
+package struct RockchipProbeEvidence: Equatable, Sendable {
+  package static let rockUSBVendorID: UInt16 = 0x2207
+  package static let dayu200LoaderProductID: UInt16 = 0x350a
 
-  public let usbVendorID: UInt16
-  public let usbProductID: UInt16
+  package let usbVendorID: UInt16
+  package let usbProductID: UInt16
   /// Mode string as reported by `rkdeveloptool ld`, e.g. "Loader" or "Maskrom".
-  public let reportedMode: String
+  package let reportedMode: String
 
   public init(usbVendorID: UInt16, usbProductID: UInt16, reportedMode: String) {
     self.usbVendorID = usbVendorID
@@ -36,7 +36,7 @@ public struct RockchipProbeEvidence: Equatable, Sendable {
   }
 }
 
-public enum RockchipProbeBlockReason: Equatable, Sendable, CustomStringConvertible {
+package enum RockchipProbeBlockReason: Equatable, Sendable, CustomStringConvertible {
   case deviceNotRockUSB(vendorID: UInt16, productID: UInt16)
   case maskromModeNotSupportedByThisProvider
   case unrecognizedDeviceMode(String)
@@ -56,11 +56,11 @@ public enum RockchipProbeBlockReason: Equatable, Sendable, CustomStringConvertib
   }
 }
 
-public enum RockchipProbeVerdict: Equatable, Sendable {
+package enum RockchipProbeVerdict: Equatable, Sendable {
   case applicableLoaderMode
   case blocked(RockchipProbeBlockReason)
 
-  public var blocksPreflight: Bool {
+  package var blocksPreflight: Bool {
     if case .blocked = self { return true }
     return false
   }
@@ -68,7 +68,7 @@ public enum RockchipProbeVerdict: Equatable, Sendable {
 
 // MARK: - Prerequisites (AC-FLASH-002-01)
 
-public struct RockchipPrerequisiteObservation: Equatable, Sendable {
+package struct RockchipPrerequisiteObservation: Equatable, Sendable {
   public let identifier: RockchipPrerequisiteIdentifier
   public let status: RockchipPrerequisiteStatus
 
@@ -78,7 +78,7 @@ public struct RockchipPrerequisiteObservation: Equatable, Sendable {
   }
 }
 
-public struct RockchipPrerequisiteViolation: Equatable, Sendable, CustomStringConvertible {
+package struct RockchipPrerequisiteViolation: Equatable, Sendable, CustomStringConvertible {
   public let identifier: RockchipPrerequisiteIdentifier
   public let requirement: RockchipPrerequisiteRequirement
   public let status: RockchipPrerequisiteStatus
@@ -89,12 +89,12 @@ public struct RockchipPrerequisiteViolation: Equatable, Sendable, CustomStringCo
   }
 }
 
-public enum RockchipPrerequisiteGateResult: Equatable, Sendable {
+package enum RockchipPrerequisiteGateResult: Equatable, Sendable {
   case cleared
   /// Blocks before the destructive confirmation is even offered (REQ-FLASH-002).
   case blockedBeforeDestructiveConfirmation([RockchipPrerequisiteViolation])
 
-  public var blocksExecuteBranch: Bool {
+  package var blocksExecuteBranch: Bool {
     if case .blockedBeforeDestructiveConfirmation = self { return true }
     return false
   }
@@ -108,7 +108,7 @@ public enum RockchipFlashExecutionMode: String, CaseIterable, Codable, Equatable
   case simulated
 }
 
-public enum RockchipPostFlashVerificationLevel: String, CaseIterable, Codable, Equatable,
+package enum RockchipPostFlashVerificationLevel: String, CaseIterable, Codable, Equatable,
   Sendable
 {
   case basic
@@ -117,33 +117,33 @@ public enum RockchipPostFlashVerificationLevel: String, CaseIterable, Codable, E
 
 // MARK: - Plan
 
-public struct RockchipFlashPlan: Equatable, Sendable {
+package struct RockchipFlashPlan: Equatable, Sendable {
   public let executionMode: RockchipFlashExecutionMode
   public let steps: [WorkflowStep]
-  public let confirmationID: String
-  public let destructiveStepIDs: [String]
+  package let confirmationID: String
+  package let destructiveStepIDs: [String]
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let archiveSHA256: String
   public let archiveSizeBytes: Int64
-  public let postFlashVerification: RockchipPostFlashVerificationLevel
+  package let postFlashVerification: RockchipPostFlashVerificationLevel
   public let dataImpact: [String]
 
-  public var containsDestructiveSteps: Bool { !destructiveStepIDs.isEmpty }
+  package var containsDestructiveSteps: Bool { !destructiveStepIDs.isEmpty }
 }
 
-public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
-  public static let schemaVersion = "1.0.0"
+package struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
+  package static let schemaVersion = "1.0.0"
 
   public let executionMode: RockchipFlashExecutionMode
-  public let providerIdentity: String
-  public let providerVersion: String
-  public let profileIdentity: String
-  public let profileVersion: String
-  public let targetDeviceModel: String
+  package let providerIdentity: String
+  package let providerVersion: String
+  package let profileIdentity: String
+  package let profileVersion: String
+  package let targetDeviceModel: String
   public let archiveSHA256: String
   public let archiveSizeBytes: Int64
-  public let postFlashVerification: RockchipPostFlashVerificationLevel
+  package let postFlashVerification: RockchipPostFlashVerificationLevel
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let dataImpact: [String]
@@ -202,7 +202,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     self.steps = steps
   }
 
-  public func encode(to encoder: any Encoder) throws {
+  package func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(Self.schemaVersion, forKey: .schemaVersion)
     try container.encode(executionMode, forKey: .executionMode)
@@ -220,7 +220,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
     try container.encode(steps, forKey: .steps)
   }
 
-  public func canonicalData() throws -> Data {
+  package func canonicalData() throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(self)
   }
@@ -245,10 +245,10 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
 
 // MARK: - Outcome assessment (AC-FLASH-012-01 / AC-FLASH-013-01)
 
-public struct RockchipPartitionWriteObservation: Equatable, Sendable {
+package struct RockchipPartitionWriteObservation: Equatable, Sendable {
   public let partitionName: String
-  public let toolExitCode: Int32
-  public let semanticOutput: String
+  package let toolExitCode: Int32
+  package let semanticOutput: String
 
   public init(partitionName: String, toolExitCode: Int32, semanticOutput: String) {
     self.partitionName = partitionName
@@ -257,12 +257,12 @@ public struct RockchipPartitionWriteObservation: Equatable, Sendable {
   }
 }
 
-public struct RockchipFlashRunObservation: Equatable, Sendable {
-  public let partitionWrites: [RockchipPartitionWriteObservation]
-  public let resetExitCode: Int32?
-  public let resetSemanticOutput: String?
-  public let reconnectedWithinDeadline: Bool
-  public let postflightProbeSemanticOutput: String?
+package struct RockchipFlashRunObservation: Equatable, Sendable {
+  package let partitionWrites: [RockchipPartitionWriteObservation]
+  package let resetExitCode: Int32?
+  package let resetSemanticOutput: String?
+  package let reconnectedWithinDeadline: Bool
+  package let postflightProbeSemanticOutput: String?
 
   public init(
     partitionWrites: [RockchipPartitionWriteObservation],
@@ -279,27 +279,27 @@ public struct RockchipFlashRunObservation: Equatable, Sendable {
   }
 }
 
-public enum RockchipOutcomeCertainty: String, Codable, Equatable, Sendable {
+package enum RockchipOutcomeCertainty: String, Codable, Equatable, Sendable {
   case confirmed
   case outcomeUnknown
 }
 
-public struct RockchipFlashOutcomeAssessment: Equatable, Sendable {
-  public let jobState: JobState
-  public let certainty: RockchipOutcomeCertainty
+package struct RockchipFlashOutcomeAssessment: Equatable, Sendable {
+  package let jobState: JobState
+  package let certainty: RockchipOutcomeCertainty
   public let failures: [String]
-  public let recoveryGuide: RockchipRecoveryGuide?
+  package let recoveryGuide: RockchipRecoveryGuide?
 
-  public var isSucceeded: Bool { jobState == .succeeded }
+  package var isSucceeded: Bool { jobState == .succeeded }
 }
 
 // MARK: - Recovery (AC-FLASH-013-01)
 
-public struct RockchipRecoveryContext: Equatable, Sendable {
-  public let currentPhase: String
-  public let lastConfirmedStepID: String?
+package struct RockchipRecoveryContext: Equatable, Sendable {
+  package let currentPhase: String
+  package let lastConfirmedStepID: String?
   /// "unknown" is an acceptable and honest value.
-  public let observedDeviceMode: String
+  package let observedDeviceMode: String
 
   public init(currentPhase: String, lastConfirmedStepID: String?, observedDeviceMode: String) {
     self.currentPhase = currentPhase
@@ -308,34 +308,34 @@ public struct RockchipRecoveryContext: Equatable, Sendable {
   }
 }
 
-public struct RockchipRecoveryGuide: Equatable, Sendable {
-  public let currentPhase: String
-  public let lastConfirmedStepID: String?
-  public let deviceMode: String
+package struct RockchipRecoveryGuide: Equatable, Sendable {
+  package let currentPhase: String
+  package let lastConfirmedStepID: String?
+  package let deviceMode: String
   /// The CHG-2026-016 verified Loader-mode wlx recovery route, for a human operator.
-  public let manualRecoverySteps: [String]
-  public let disclosures: [String]
+  package let manualRecoverySteps: [String]
+  package let disclosures: [String]
   /// Honesty invariant: ArkDeck never guarantees automatic recovery (REQ-FLASH-013).
-  public let automaticRecoveryGuaranteed: Bool
+  package let automaticRecoveryGuaranteed: Bool
 }
 
 // MARK: - Provider
 
-public struct RockchipRockUSBFlashProvider: Sendable {
-  public static let providerIdentity = "arkdeck.rockchip-rockusb-flash-provider"
-  public static let providerVersion = "1.0.0"
+package struct RockchipRockUSBFlashProvider: Sendable {
+  package static let providerIdentity = "arkdeck.rockchip-rockusb-flash-provider"
+  package static let providerVersion = "1.0.0"
 
   /// The entire rkdeveloptool vocabulary this Provider may put in front of a human.
   /// `db`/`gpt`/`ul` and every other Maskrom/miniloader-stage command are deliberately
   /// absent: on an inapplicable device the Provider blocks instead of trying anything
   /// similar (AC-FLASH-001-01; #218/#220 evidence).
-  public static let closedCommandSurface: [String] = ["ld", "ppt", "wlx", "wl", "rl", "rd"]
+  package static let closedCommandSurface: [String] = ["ld", "ppt", "wlx", "wl", "rl", "rd"]
 
-  public static let writeSuccessMarker = "Write LBA from file (100%)"
-  public static let resetSuccessMarker = "Reset Device OK."
-  public static let loaderCommandSubsetRejectionMarker =
+  package static let writeSuccessMarker = "Write LBA from file (100%)"
+  package static let resetSuccessMarker = "Reset Device OK."
+  package static let loaderCommandSubsetRejectionMarker =
     "The device does not support this operation!"
-  public static let postflightConnectedMarker = "Connected"
+  package static let postflightConnectedMarker = "Connected"
 
   public let profile: RockchipFlashProfile
 
@@ -364,7 +364,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
 
   // MARK: Prerequisites
 
-  public func evaluatePrerequisites(
+  package func evaluatePrerequisites(
     _ observations: [RockchipPrerequisiteObservation]
   ) -> RockchipPrerequisiteGateResult {
     var observedStatus: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteStatus] = [:]
@@ -393,7 +393,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
 
   // MARK: Plan
 
-  public func makePlan(
+  package func makePlan(
     mode: RockchipFlashExecutionMode,
     archiveValidation: RockchipArchiveValidationVerdict,
     postFlashVerification: RockchipPostFlashVerificationLevel = .full,
@@ -555,7 +555,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
       ])
   }
 
-  public func planDocument(for plan: RockchipFlashPlan) -> RockchipFlashPlanDocument {
+  package func planDocument(for plan: RockchipFlashPlan) -> RockchipFlashPlanDocument {
     RockchipFlashPlanDocument(
       executionMode: plan.executionMode,
       providerIdentity: Self.providerIdentity,
@@ -574,7 +574,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
 
   // MARK: Outcome
 
-  public func assessOutcome(
+  package func assessOutcome(
     plan: RockchipFlashPlan,
     observation: RockchipFlashRunObservation
   ) -> RockchipFlashOutcomeAssessment {
@@ -666,7 +666,7 @@ public struct RockchipRockUSBFlashProvider: Sendable {
 
   // MARK: Recovery
 
-  public func recover(context: RockchipRecoveryContext) -> RockchipRecoveryGuide {
+  package func recover(context: RockchipRecoveryContext) -> RockchipRecoveryGuide {
     RockchipRecoveryGuide(
       currentPhase: context.currentPhase,
       lastConfirmedStepID: context.lastConfirmedStepID,

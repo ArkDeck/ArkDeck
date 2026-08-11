@@ -16,15 +16,15 @@ import Foundation
 
 // MARK: - Wire protocol (v1)
 
-public enum AgentWireProtocol {
+package enum AgentWireProtocol {
   public static let version = ArkDeckAgentXPC.wireProtocolVersion
-  public static let requiredMajor = 1
+  package static let requiredMajor = 1
 
-  public struct Request: Codable, Sendable {
-    public let protocolVersion: String
+  package struct Request: Codable, Sendable {
+    package let protocolVersion: String
     public let id: String
     public let method: String
-    public let params: [String: JSONValue]?
+    package let params: [String: JSONValue]?
 
     public init(id: String, method: String, params: [String: JSONValue]? = nil) {
       self.protocolVersion = AgentWireProtocol.version
@@ -34,12 +34,12 @@ public enum AgentWireProtocol {
     }
   }
 
-  public struct WireError: Codable, Sendable, Equatable {
+  package struct WireError: Codable, Sendable, Equatable {
     public let code: String
     public let message: String
   }
 
-  public struct Response: Codable, Sendable {
+  package struct Response: Codable, Sendable {
     public let id: String
     public let ok: Bool
     public let result: JSONValue?
@@ -47,7 +47,7 @@ public enum AgentWireProtocol {
   }
 }
 
-public enum AgentDaemonErrorCode: String, Sendable {
+package enum AgentDaemonErrorCode: String, Sendable {
   case unsupportedProtocolVersion
   case malformedFrame
   case unknownMethod
@@ -61,7 +61,7 @@ public enum AgentDaemonErrorCode: String, Sendable {
 
 // MARK: - Handler (transport-free)
 
-public struct RuntimeControlPlaneHandler: Sendable {
+package struct RuntimeControlPlaneHandler: Sendable {
   private let engine: RuntimeJobEngine
   private let capabilityStore: RuntimeCapabilityStore
   private let providerIDs: [String]
@@ -166,7 +166,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.methodObserver = methodObserver
   }
 
-  public func handleLine(_ line: Data) async -> Data {
+  package func handleLine(_ line: Data) async -> Data {
     let response = await handleFrame(line)
     let encoder = CanonicalJSONEncoders.canonical()
     let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
@@ -1830,23 +1830,23 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
 // MARK: - Instance document
 
-public struct AgentDaemonInstance: Codable, Sendable, Equatable {
+package struct AgentDaemonInstance: Codable, Sendable, Equatable {
   public let pid: Int32
-  public let socketPath: String
-  public let protocolVersion: String
+  package let socketPath: String
+  package let protocolVersion: String
   public let startedAtUTC: String
 }
 
-public enum AgentDaemonStartResult: Sendable, Equatable {
+package enum AgentDaemonStartResult: Sendable, Equatable {
   case started
   case alreadyRunning(AgentDaemonInstance)
 }
 
 // MARK: - UDS server
 
-public final class AgentDaemonServer: @unchecked Sendable {
+package final class AgentDaemonServer: @unchecked Sendable {
   public let stateDirectory: URL
-  public let socketURL: URL
+  package let socketURL: URL
   private let handler: RuntimeControlPlaneHandler
   private let nowUTC: @Sendable () -> String
   private var listenerFD: Int32 = -1
@@ -1943,7 +1943,7 @@ public final class AgentDaemonServer: @unchecked Sendable {
   /// the instance lock.  A bounded deadline prevents one vanished client from
   /// making a supervisor wait forever; Runtime jobs still recover from their
   /// journal rather than being treated as completed.
-  public func drainAndStop(deadline: TimeInterval) {
+  package func drainAndStop(deadline: TimeInterval) {
     let cutoff = Date().addingTimeInterval(max(0, deadline))
     lifecycle.lock()
     guard !stopped else {
@@ -2127,6 +2127,6 @@ public final class AgentDaemonServer: @unchecked Sendable {
   }
 }
 
-public enum AgentDaemonError: Error, Equatable, Sendable {
+package enum AgentDaemonError: Error, Equatable, Sendable {
   case io(String)
 }

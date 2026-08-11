@@ -2,7 +2,7 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-public enum SessionRetentionCatalogError: Error, Equatable, Sendable {
+package enum SessionRetentionCatalogError: Error, Equatable, Sendable {
   case invalidRoot
   case invalidRetentionDays
   case metadataUnavailable
@@ -13,14 +13,14 @@ public enum SessionRetentionCatalogError: Error, Equatable, Sendable {
   case unsafeSession(String)
 }
 
-public enum SessionRetentionCatalogFaultPoint: String, CaseIterable, Sendable {
+package enum SessionRetentionCatalogFaultPoint: String, CaseIterable, Sendable {
   case beforeScan
   case beforeMeasurement
   case beforeMetadataRead
   case beforeMetadataReplace
 }
 
-public struct SessionRetentionCatalogFaultInjector: @unchecked Sendable {
+package struct SessionRetentionCatalogFaultInjector: @unchecked Sendable {
   private let body: @Sendable (SessionRetentionCatalogFaultPoint) throws -> Void
 
   public init(
@@ -48,13 +48,13 @@ public struct SessionCatalogRootIdentity: Equatable, Sendable {
 
 public struct SessionRetentionCatalogEntry: Equatable, Sendable {
   public let sessionID: String
-  public let completedAt: Date
+  package let completedAt: Date
   public let expiresAt: Date
-  public let isPinned: Bool
-  public let policyGeneration: UInt64
+  package let isPinned: Bool
+  package let policyGeneration: UInt64
 }
 
-public struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
+package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   public let catalogGeneration: UInt64?
   public let sessions: [RetainedSession]
   public let entries: [SessionRetentionCatalogEntry]
@@ -71,8 +71,8 @@ public struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   }
 }
 
-public struct SessionRetentionCatalog: Sendable {
-  public static let metadataFileName = ".arkdeck-retention-catalog.json"
+package struct SessionRetentionCatalog: Sendable {
+  package static let metadataFileName = ".arkdeck-retention-catalog.json"
   private static let lockFileName = ".arkdeck-retention-catalog.lock"
   private static let initializedLockMarker: UInt8 = 0xA5
   private static let maximumIdentityBytes = 4 * 1_024
@@ -108,7 +108,7 @@ public struct SessionRetentionCatalog: Sendable {
     }
   }
 
-  public func requireCurrentRoot(
+  package func requireCurrentRoot(
     identity expectedIdentity: SessionCatalogRootIdentity,
     volumeIdentity expectedVolumeIdentity: VolumeIdentity
   ) throws {
@@ -135,7 +135,7 @@ public struct SessionRetentionCatalog: Sendable {
     else { throw SessionRetentionCatalogError.invalidRoot }
   }
 
-  public func registerFinalizedSession(
+  package func registerFinalizedSession(
     sessionRoot: URL,
     retentionDays: UInt64,
     policyGeneration: UInt64

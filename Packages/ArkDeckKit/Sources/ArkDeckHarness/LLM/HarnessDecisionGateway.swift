@@ -18,7 +18,7 @@
 import ArkDeckCore
 import Foundation
 
-public enum HarnessEgressDecision: Equatable, Sendable {
+package enum HarnessEgressDecision: Equatable, Sendable {
   case denied(reason: String)
   case allowed(limits: HarnessDecisionContextLimits)
 }
@@ -26,7 +26,7 @@ public enum HarnessEgressDecision: Equatable, Sendable {
 /// Per-project egress policy. Absent configuration means denied: enabling
 /// egress is an explicit act, recorded in the composition root, never a
 /// default that a fresh install inherits.
-public struct HarnessEgressPolicy: Sendable, Equatable {
+package struct HarnessEgressPolicy: Sendable, Equatable {
   private let enabledProjects: Set<String>
   private let limits: HarnessDecisionContextLimits
 
@@ -38,7 +38,7 @@ public struct HarnessEgressPolicy: Sendable, Equatable {
     self.limits = limits
   }
 
-  public static let deniedByDefault = HarnessEgressPolicy()
+  package static let deniedByDefault = HarnessEgressPolicy()
 
   public func decide(projectRef: String?) -> HarnessEgressDecision {
     guard let projectRef else {
@@ -51,7 +51,7 @@ public struct HarnessEgressPolicy: Sendable, Equatable {
   }
 }
 
-public enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
+package enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
   case unavailable(String)
   case transportFailure(String)
   case contextTooLarge(bytes: Int, limit: Int)
@@ -59,7 +59,7 @@ public enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
 
 /// The port. Implementations return raw bytes; parsing and validation are
 /// the harness's job, so no adapter can widen what a decision may say.
-public protocol HarnessDecisionGateway: Sendable {
+package protocol HarnessDecisionGateway: Sendable {
   var producerID: String { get }
   /// What to record about the model behind this port (CHG-2026-055,
   /// TASK-HFA-002). The default says only what the port itself can know -
@@ -70,7 +70,7 @@ public protocol HarnessDecisionGateway: Sendable {
 }
 
 extension HarnessDecisionGateway {
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(provider: producerID)
   }
 }
@@ -90,7 +90,7 @@ extension HarnessDecisionGateway {
 
 /// Builds the bounded context. Trimming is explicit and recorded: a reader of
 /// the durable record can tell what the model was not shown.
-public struct HarnessDecisionContextAssembler: Sendable {
+package struct HarnessDecisionContextAssembler: Sendable {
   private let limits: HarnessDecisionContextLimits
 
   /// Desired-state fields that help a model reason about the product goal.
@@ -269,8 +269,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
 /// Screen for identity that must never leave the host, applied to the encoded
 /// context before it is handed to an adapter. Belt and braces: the assembler
 /// already omits these fields, and this catches a future field that forgets.
-public enum HarnessEgressScreen {
-  public static func violations(in context: HarnessDecisionContext, targetID: String) -> [String] {
+package enum HarnessEgressScreen {
+  package static func violations(in context: HarnessDecisionContext, targetID: String) -> [String] {
     let encoder = CanonicalJSONEncoders.canonical()
     guard let data = try? encoder.encode(context),
       let text = String(data: data, encoding: .utf8)

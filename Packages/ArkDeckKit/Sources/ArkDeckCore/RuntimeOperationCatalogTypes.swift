@@ -40,8 +40,8 @@ public enum CatalogStepCompensation: String, CaseIterable, Codable, Sendable {
 }
 
 public struct CatalogActionReference: Equatable, Sendable {
-  public let catalogID: String
-  public let actionID: String
+  package let catalogID: String
+  package let actionID: String
 
   public init(catalogID: String, actionID: String) {
     self.catalogID = catalogID
@@ -81,13 +81,13 @@ public enum CatalogArtifactRetentionClass: String, CaseIterable, Codable, Sendab
 public struct CatalogFieldDescriptor: Equatable, Sendable {
   public let name: String
   public let type: CatalogFieldType
-  public let isRequired: Bool
-  public let enumValues: [String]?
-  public let pattern: String?
+  package let isRequired: Bool
+  package let enumValues: [String]?
+  package let pattern: String?
   public let minimum: Int?
-  public let maximum: Int?
-  public let maxLength: Int?
-  public let maxItems: Int?
+  package let maximum: Int?
+  package let maxLength: Int?
+  package let maxItems: Int?
 
   public init(
     name: String,
@@ -119,8 +119,8 @@ public struct CatalogStepDescriptor: Equatable, Sendable {
   public let cancellation: WorkflowCancellationPolicy
   public let binding: WorkflowBindingRequirement
   public let isOptional: Bool
-  public let compensation: CatalogStepCompensation
-  public let actionReference: CatalogActionReference?
+  package let compensation: CatalogStepCompensation
+  package let actionReference: CatalogActionReference?
 
   public init(
     stepID: String,
@@ -148,8 +148,8 @@ public struct CatalogArtifactDescriptor: Equatable, Sendable {
   public let role: CatalogArtifactRole
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  public let isRequired: Bool
-  public let retentionClass: CatalogArtifactRetentionClass
+  package let isRequired: Bool
+  package let retentionClass: CatalogArtifactRetentionClass
 
   public init(
     name: String,
@@ -174,7 +174,7 @@ public struct CatalogArtifactDescriptor: Equatable, Sendable {
 /// argv, target, Artifact or caller-controlled proof surface.
 public struct CatalogCompleteOverwriteRecoveryProfileDescriptor: Equatable, Sendable {
   public let reference: String
-  public let coveredEffects: [String]
+  package let coveredEffects: [String]
 
   public init(reference: String, coveredEffects: [String]) {
     self.reference = reference
@@ -183,10 +183,10 @@ public struct CatalogCompleteOverwriteRecoveryProfileDescriptor: Equatable, Send
 }
 
 public struct CatalogCompleteOverwriteRecoveryDescriptor: Equatable, Sendable {
-  public let contractVersion: String
-  public let profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor]
-  public let overwriteStepID: String
-  public let verificationStepIDs: [String]
+  package let contractVersion: String
+  package let profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor]
+  package let overwriteStepID: String
+  package let verificationStepIDs: [String]
 
   public init(
     contractVersion: String,
@@ -215,20 +215,20 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
   public let title: String
   public let provider: CatalogProvider
   public let minimumEffect: WorkflowEffect
-  public let permittedEffects: [WorkflowEffect]
+  package let permittedEffects: [WorkflowEffect]
   public let authorization: [WorkflowEffect: RuntimeOperationAuthorizationPolicy]
-  public let defaultPolicyIssuanceEnabled: Bool
+  package let defaultPolicyIssuanceEnabled: Bool
   public let binding: WorkflowBindingRequirement
-  public let concurrencyKey: CatalogConcurrencyKey
+  package let concurrencyKey: CatalogConcurrencyKey
   public let inputs: [CatalogFieldDescriptor]
-  public let outputs: [CatalogFieldDescriptor]
+  package let outputs: [CatalogFieldDescriptor]
   public let steps: [CatalogStepDescriptor]
-  public let timeoutSeconds: Int
+  package let timeoutSeconds: Int
   public let outputByteBudget: Int
-  public let preflightAttempts: Int
+  package let preflightAttempts: Int
   public let artifacts: [CatalogArtifactDescriptor]
-  public let profiles: [String]
-  public let completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor?
+  package let profiles: [String]
+  package let completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor?
 
   public init(
     id: String,
@@ -301,10 +301,10 @@ public enum RuntimeOperationCatalog {
 /// Resolves the effect of the exact typed request the runtime will
 /// materialize. Keeping this rule in `ArkDeckCore` gives authorization,
 /// execution and higher-level bounded-budget accounting one source of truth.
-public enum CatalogOperationEffectResolver {
+package enum CatalogOperationEffectResolver {
   /// The maximum effect over the steps selected by these exact inputs.
   /// Optional steps that will not run do not raise the result.
-  public static func effectiveEffect(
+  package static func effectiveEffect(
     descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
   ) -> WorkflowEffect {
     var effect = descriptor.minimumEffect
@@ -317,7 +317,7 @@ public enum CatalogOperationEffectResolver {
   /// Whether a catalog step participates in the exact materialized plan.
   /// A step can be mandatory when selected yet switched off by a typed input;
   /// that is distinct from an optional step whose failure may be tolerated.
-  public static func stepIsSelected(
+  package static func stepIsSelected(
     _ step: CatalogStepDescriptor,
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -339,7 +339,7 @@ public enum CatalogOperationEffectResolver {
   /// Typed selection rules for published optional steps. Defaults mirror the
   /// catalog operation's input defaults and therefore fail closed with the
   /// same plan the runtime will execute.
-  public static func optionalStepIsSelected(
+  package static func optionalStepIsSelected(
     _ step: CatalogStepDescriptor,
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]

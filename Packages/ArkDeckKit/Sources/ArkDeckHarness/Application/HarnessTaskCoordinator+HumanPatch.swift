@@ -13,11 +13,11 @@ import ArkDeckCore
 import Foundation
 
 extension HarnessTaskCoordinator {
-  public static let humanPatchProducer = "human-operator"
-  public static let externalAgentPatchProducer = "external-agent"
+  package static let humanPatchProducer = "human-operator"
+  package static let externalAgentPatchProducer = "external-agent"
   /// The closed producer set for this entry. A label outside it is a
   /// configuration error, not a new kind of authority.
-  public static let typedPatchProducers: Set<String> = [
+  package static let typedPatchProducers: Set<String> = [
     humanPatchProducer, externalAgentPatchProducer,
   ]
   static let maximumHumanPatchProposalBytes = 512 * 1024
@@ -30,7 +30,7 @@ extension HarnessTaskCoordinator {
   /// grant, a semantically identical parsed proposal may be submitted again.
   /// The retry reuses the prepared inputs and that stage's decision/request/
   /// idempotency identity; it never republishes or replaces patch bytes.
-  public func proposePatch(
+  package func proposePatch(
     _ taskID: String,
     proposalJSON: Data,
     producer: String = HarnessTaskCoordinator.humanPatchProducer

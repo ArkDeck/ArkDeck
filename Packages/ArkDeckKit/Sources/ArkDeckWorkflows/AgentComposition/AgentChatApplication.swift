@@ -8,7 +8,7 @@ import ArkDeckCore
 import ArkDeckHarness
 import Foundation
 
-public enum AgentChatApplicationError: Error, Equatable, Sendable, CustomStringConvertible {
+package enum AgentChatApplicationError: Error, Equatable, Sendable, CustomStringConvertible {
   case providerRequired
   case unsupportedProvider(String)
   case missingCredential
@@ -31,7 +31,7 @@ public enum AgentChatApplicationError: Error, Equatable, Sendable, CustomStringC
   }
 }
 
-public enum AgentChatDisplayEvent: Equatable, Sendable {
+package enum AgentChatDisplayEvent: Equatable, Sendable {
   case assistantText(String)
   case toolCall(name: String, arguments: String)
   case toolResult(name: String, result: String)
@@ -39,8 +39,8 @@ public enum AgentChatDisplayEvent: Equatable, Sendable {
   case turnEnded(HarnessAgentTurnStopReason)
 }
 
-public actor AgentChatApplication {
-  public static let systemPrompt = """
+package actor AgentChatApplication {
+  package static let systemPrompt = """
     You are ArkDeck's Device Agent. Help the user inspect and diagnose an adopted OpenHarmony \
     device through the tools exposed in this session. ArkDeck owns this conversation, its \
     bounded model loop, and every tool definition. Never invent a target, operation result, \
@@ -93,7 +93,7 @@ public actor AgentChatApplication {
       allowSensitiveArtifacts: allowSensitiveArtifacts)
   }
 
-  public static func liveGateway(
+  package static func liveGateway(
     environment: [String: String]
   ) throws -> OpenAIHarnessAgentGateway {
     guard let rawProvider = nonempty(environment[HarnessVendorConfiguration.providerKey]) else {
@@ -130,7 +130,7 @@ public actor AgentChatApplication {
         apiKey: apiKey, endpoint: endpoint, modelName: model))
   }
 
-  public func runUserTurn(
+  package func runUserTurn(
     _ text: String,
     emit: @escaping @Sendable (AgentChatDisplayEvent) -> Void
   ) async throws {

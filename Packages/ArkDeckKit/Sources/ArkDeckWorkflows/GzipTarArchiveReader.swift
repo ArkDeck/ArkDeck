@@ -8,7 +8,7 @@ import Foundation
 // unvalidated archive, and hashing must be streaming (REQ-FLASH-011) because the pinned
 // archive holds multi-gigabyte members.
 
-public enum GzipTarArchiveReaderError: Error, Equatable, Sendable {
+package enum GzipTarArchiveReaderError: Error, Equatable, Sendable {
   case unreadableFile(String)
   case notGzip
   case unsupportedCompressionMethod
@@ -18,21 +18,21 @@ public enum GzipTarArchiveReaderError: Error, Equatable, Sendable {
   case corruptTarHeader(String)
 }
 
-public struct GzipTarMemberSummary: Equatable, Sendable {
+package struct GzipTarMemberSummary: Equatable, Sendable {
   public let name: String
-  public let sizeBytes: Int64
+  package let sizeBytes: Int64
   public let sha256: String
 }
 
-public struct GzipTarArchiveSummary: Equatable, Sendable {
+package struct GzipTarArchiveSummary: Equatable, Sendable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [GzipTarMemberSummary]
   /// Bytes of the members the caller asked to capture, bounded by the request.
   /// Empty unless a derivation was requested.
-  public let capturedMembers: [String: Data]
+  package let capturedMembers: [String: Data]
   /// The value found by the requested key scan, if any.
-  public let scannedValue: String?
+  package let scannedValue: String?
 
   public init(
     archiveSizeBytes: Int64,
@@ -48,7 +48,7 @@ public struct GzipTarArchiveSummary: Equatable, Sendable {
     self.scannedValue = scannedValue
   }
 
-  public func archiveObservation() -> RockchipImagesArchiveObservation {
+  package func archiveObservation() -> RockchipImagesArchiveObservation {
     RockchipImagesArchiveObservation(
       archiveSizeBytes: archiveSizeBytes,
       archiveSHA256: archiveSHA256,
@@ -65,15 +65,15 @@ public struct GzipTarArchiveSummary: Equatable, Sendable {
 /// tool, and it is never written out to disk to be read again. The bytes go
 /// past once, and everything that has to be known about them is learned on
 /// that pass.
-public struct GzipTarDerivationRequest: Equatable, Sendable {
+package struct GzipTarDerivationRequest: Equatable, Sendable {
   /// Members whose bytes are kept. Intended for small metadata members such as
   /// the partition table; a member larger than `captureByteLimit` is not kept
   /// and its absence is the caller's to notice.
-  public let captureMembers: Set<String>
-  public let captureByteLimit: Int
+  package let captureMembers: Set<String>
+  package let captureByteLimit: Int
   /// Member scanned for `scanKey` followed by a printable value run.
-  public let scanMember: String?
-  public let scanKey: String
+  package let scanMember: String?
+  package let scanKey: String
 
   public init(
     captureMembers: Set<String>,
@@ -88,13 +88,13 @@ public struct GzipTarDerivationRequest: Equatable, Sendable {
   }
 }
 
-public enum GzipTarArchiveReader {
+package enum GzipTarArchiveReader {
   static let chunkSizeBytes = 1 << 20
   /// Any sane gzip header (fixed part plus optional name/comment/extra) fits well within
   /// this bound; exceeding it is treated as corruption rather than buffered indefinitely.
   static let maximumGzipHeaderBytes = 1 << 16
 
-  public static func summarize(
+  package static func summarize(
     fileAt url: URL,
     derivation: GzipTarDerivationRequest? = nil
   ) throws -> GzipTarArchiveSummary {

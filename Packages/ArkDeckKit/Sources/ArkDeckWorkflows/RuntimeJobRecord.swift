@@ -10,7 +10,7 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-public struct RuntimeJobRecord: Codable, Sendable, Equatable {
+package struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let jobID: String
   public let request: RuntimeOperationRequest
   public let operationReference: String
@@ -18,28 +18,28 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let providerID: String
   public let createdAtUTC: String
   public let actualEffect: String?
-  public var admissionEvidence: RuntimeAdmissionEvidence?
-  public let materializedPlanDigest: String?
-  public let materializedStableTargetIdentitySHA256: String?
-  public let materializedBindingRevision: Int?
+  package var admissionEvidence: RuntimeAdmissionEvidence?
+  package let materializedPlanDigest: String?
+  package let materializedStableTargetIdentitySHA256: String?
+  package let materializedBindingRevision: Int?
   public var state: String = "queued"
   public var outcomeUnknown: Bool = false
-  public var recoveryStepID: String?
+  package var recoveryStepID: String?
   var recoveryAction: PersistedTypedProviderAction?
   var recoveryIntentEventID: String?
   public var timeline: [String] = []
-  public var evidencePreflight: RuntimeEvidencePreflightAccumulator?
-  public var evidenceObservation: RuntimeEvidenceObservation?
+  package var evidencePreflight: RuntimeEvidencePreflightAccumulator?
+  package var evidenceObservation: RuntimeEvidenceObservation?
   /// Runtime-owned snapshots surrounding one selected Trace leg. These are
   /// captured inside the target's mutation lane, so History never mistakes
   /// a later page refresh for facts belonging to this Job.
-  public var traceProbeBefore: TraceRuntimeProbeSnapshot?
-  public var traceProbeAfter: TraceRuntimeProbeSnapshot?
+  package var traceProbeBefore: TraceRuntimeProbeSnapshot?
+  package var traceProbeAfter: TraceRuntimeProbeSnapshot?
   public var actualStepKinds: [String]?
   public var startedAtUTC: String?
   public var firstEvidenceStepAtUTC: String?
   public var finishedAtUTC: String?
-  public var skipReasons: [String: String] = [:]
+  package var skipReasons: [String: String] = [:]
   public var outstandingResidueCount: Int?
 
   public var sessionID: String { "session-\(jobID)" }

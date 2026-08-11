@@ -16,7 +16,7 @@ import Foundation
 /// Ports the HDC adapter needs. Kept minimal and injectable so contract
 /// tests drive the adapter without a real tool; MU-3 supplies the
 /// production composition (discovery + supervisor + registered probes).
-public protocol HDCObservationFactsPort: Sendable {
+package protocol HDCObservationFactsPort: Sendable {
   func currentFacts(targetID: String) async throws -> ProviderFacts
 }
 
@@ -26,7 +26,7 @@ private struct HDCNativeFileIdentity: Equatable {
   let groupID: UInt32
 }
 
-public struct HDCObservationProviderAdapter: DeviceProvider {
+package struct HDCObservationProviderAdapter: DeviceProvider {
   /// The HDC provider's stable identity for a target, derived from the HDC
   /// connect key — the address the provider actually verifies against a live
   /// target row. This is the single source for both the daemon's facts port
@@ -41,7 +41,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   /// verification made every observe/debug operation fail with
   /// `targetIdentityMismatch` from binding revision 2 onward (GJ-1 re-run,
   /// 2026-08-05).
-  public static func stableIdentitySHA256(connectKey: String) -> String {
+  package static func stableIdentitySHA256(connectKey: String) -> String {
     SHA256Hex.string(of: Data(connectKey.lowercased().utf8))
   }
 
@@ -73,11 +73,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
         : .available)
   }
 
-  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+  package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     try await factsPort.currentFacts(targetID: targetID)
   }
 
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     switch operation.reference {
@@ -1317,7 +1317,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
   /// Mints a provider-owned staging path for an artifact lease. As with
   /// remote temp paths, the caller never supplies a device location.
-  public func mintStagedArtifact(
+  package func mintStagedArtifact(
     jobID: String, stepID: String, artifactLeaseID: String, expectedSHA256: String?
   ) throws -> HDCStagedArtifact {
     HDCStagedArtifact(
@@ -1327,7 +1327,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
   /// Mints a provider-owned remote temp path bound to job/step. The only
   /// construction point outside tests; callers cannot supply device paths.
-  public func mintOwnedRemotePath(jobID: String, stepID: String) throws -> HDCOwnedRemotePath {
+  package func mintOwnedRemotePath(jobID: String, stepID: String) throws -> HDCOwnedRemotePath {
     try HDCOwnedRemotePath(
       jobID: jobID, stepID: stepID, nonce: UUID().uuidString.prefix(8).lowercased())
   }
@@ -2734,7 +2734,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     return pids.contains { text.contains("/proc/\($0)/maps:") }
   }
 
-  public func reconciliationReadback(
+  package func reconciliationReadback(
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan? {
@@ -2781,7 +2781,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
     return try lower(action: readback, context: context)
   }
 
-  public func verifyReconciliationReadback(
+  package func verifyReconciliationReadback(
     receipt: ProviderProcessReceipt,
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
@@ -2895,11 +2895,11 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
 
 // MARK: - Rockchip adapter
 
-public protocol RockchipRuntimeFactsPort: Sendable {
+package protocol RockchipRuntimeFactsPort: Sendable {
   func currentFacts(targetID: String) async throws -> ProviderFacts
 }
 
-public struct RockchipFlashProviderAdapter: DeviceProvider {
+package struct RockchipFlashProviderAdapter: DeviceProvider {
   public let providerID = "rockchip"
   private let factsPort: (any RockchipRuntimeFactsPort)?
   private let availability: ProviderOperationAvailability
@@ -2913,7 +2913,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     self.availability = availability
   }
 
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard operation.reference == "flash.dayu200" else {
@@ -2923,7 +2923,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     return availability
   }
 
-  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+  package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     guard let factsPort else {
       throw DeviceProviderError.factsUnavailable(
         "production Rockchip target facts are not registered")
@@ -3164,7 +3164,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     return .stillUnknown(reason: "Rockchip mutation has no completed dedicated readback")
   }
 
-  public func reconciliationReadback(
+  package func reconciliationReadback(
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan? {
@@ -3199,7 +3199,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     return try lower(action: action, context: context)
   }
 
-  public func verifyReconciliationReadback(
+  package func verifyReconciliationReadback(
     receipt: ProviderProcessReceipt,
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext

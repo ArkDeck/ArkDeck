@@ -3,7 +3,7 @@ import ArkDeckProcess
 import ArkDeckStorage
 import Foundation
 
-public struct RockchipFlashExecutionRequest: Sendable, Equatable {
+package struct RockchipFlashExecutionRequest: Sendable, Equatable {
   enum Authority: Sendable, Equatable {
     case standingAuthorization(String)
     case evolutionCampaign(RockchipEvolutionCampaignAttemptPermit)
@@ -11,14 +11,14 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
 
   let authority: Authority
   public let archiveURL: URL
-  public let targetLocationSelector: String
+  package let targetLocationSelector: String
 
-  public var authorizationID: String? {
+  package var authorizationID: String? {
     guard case .standingAuthorization(let value) = authority else { return nil }
     return value
   }
 
-  public var evolutionCampaignID: String? {
+  package var evolutionCampaignID: String? {
     guard case .evolutionCampaign(let permit) = authority else { return nil }
     return permit.assertion.campaignID
   }
@@ -61,22 +61,22 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
   }
 }
 
-public enum RockchipFlashExecutionStatus: String, Sendable, Equatable {
+package enum RockchipFlashExecutionStatus: String, Sendable, Equatable {
   case succeeded
   case waitingForRecovery
 }
 
-public enum RockchipExecutionEvidenceClass: String, Sendable, Equatable {
+package enum RockchipExecutionEvidenceClass: String, Sendable, Equatable {
   case production
   case contractFake
 }
 
-public struct RockchipFlashExecutionResult: Sendable, Equatable {
+package struct RockchipFlashExecutionResult: Sendable, Equatable {
   public let sessionID: String
   public let jobID: String
   public let status: RockchipFlashExecutionStatus
-  public let evidenceClass: RockchipExecutionEvidenceClass
-  public let manifestURL: URL?
+  package let evidenceClass: RockchipExecutionEvidenceClass
+  package let manifestURL: URL?
 
   public init(
     sessionID: String,
@@ -97,7 +97,7 @@ public struct RockchipFlashExecutionResult: Sendable, Equatable {
 /// to have happened.  These values intentionally carry no process output,
 /// target identifier, or topology: they cross the engine-lane status boundary
 /// and become input to the bounded evolution repairer.
-public enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIterable {
+package enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIterable {
   /// The exact normal-mode readback proved no transition, while the HDC
   /// process itself had no clean completion receipt.
   case enterLoaderHDCNoCleanReceipt
@@ -106,12 +106,12 @@ public enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIte
   case enterLoaderCommandCleanLoaderNotObserved
 
   /// Bounded observation code accepted by the evolution campaign contract.
-  public var evolutionFailureCode: String {
+  package var evolutionFailureCode: String {
     "flash.\(rawValue)"
   }
 }
 
-public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedError {
+package enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedError {
   case invalidRequest(String)
   case productionConfigurationUnavailable(String)
   case admissionRejected(String)
@@ -132,7 +132,7 @@ public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedEr
   case postflightMismatch
   case cancelledAtSafeBoundary
 
-  public var errorDescription: String? {
+  package var errorDescription: String? {
     switch self {
     case .invalidRequest(let field): "invalid execution request: \(field)"
     case .productionConfigurationUnavailable(let detail):

@@ -3,26 +3,26 @@ import ArkDeckStorage
 import Darwin
 import Foundation
 
-public enum SessionRootSource: String, Codable, Equatable, Sendable {
+package enum SessionRootSource: String, Codable, Equatable, Sendable {
   case defaultApplicationSupport
   case userBookmark
 }
 
-public struct SessionSettingsSnapshot: Equatable, Sendable {
-  public static let schemaVersion = "1.0.0"
-  public static let defaultTotalQuotaBytes: UInt64 = 20 * 1_024 * 1_024 * 1_024
-  public static let defaultSafetyMarginBytes: UInt64 = 2 * 1_024 * 1_024 * 1_024
-  public static let defaultRetentionDays: UInt64 = 90
+package struct SessionSettingsSnapshot: Equatable, Sendable {
+  package static let schemaVersion = "1.0.0"
+  package static let defaultTotalQuotaBytes: UInt64 = 20 * 1_024 * 1_024 * 1_024
+  package static let defaultSafetyMarginBytes: UInt64 = 2 * 1_024 * 1_024 * 1_024
+  package static let defaultRetentionDays: UInt64 = 90
 
-  public let schemaVersion: String
+  package let schemaVersion: String
   public let generation: UInt64
   public let rootSource: SessionRootSource
-  public let expectedRootPath: String
+  package let expectedRootPath: String
   public let totalQuotaBytes: UInt64
   public let safetyMarginBytes: UInt64
   public let retentionDays: UInt64
 
-  public var sessionsRoot: URL {
+  package var sessionsRoot: URL {
     URL(filePath: expectedRootPath, directoryHint: .isDirectory).standardizedFileURL
   }
 
@@ -44,7 +44,7 @@ public struct SessionSettingsSnapshot: Equatable, Sendable {
   }
 }
 
-public enum SessionSettingsError: Error, Equatable, Sendable {
+package enum SessionSettingsError: Error, Equatable, Sendable {
   case configurationMissingFields
   case configurationWrongType
   case unsupportedSchemaVersion
@@ -57,12 +57,12 @@ public enum SessionSettingsError: Error, Equatable, Sendable {
   case requiresReselection
 }
 
-public enum SessionSettingsFaultPoint: String, CaseIterable, Sendable {
+package enum SessionSettingsFaultPoint: String, CaseIterable, Sendable {
   case beforePersistence
   case beforeRootWriteProbe
 }
 
-public struct SessionSettingsFaultInjector: @unchecked Sendable {
+package struct SessionSettingsFaultInjector: @unchecked Sendable {
   private let body: @Sendable (SessionSettingsFaultPoint) throws -> Void
 
   public init(
@@ -78,9 +78,9 @@ public struct SessionSettingsFaultInjector: @unchecked Sendable {
   public static let none = SessionSettingsFaultInjector { _ in }
 }
 
-public struct SessionBookmarkResolution: Equatable, Sendable {
+package struct SessionBookmarkResolution: Equatable, Sendable {
   public let url: URL
-  public let isStale: Bool
+  package let isStale: Bool
 
   public init(url: URL, isStale: Bool) {
     self.url = url
@@ -88,24 +88,24 @@ public struct SessionBookmarkResolution: Equatable, Sendable {
   }
 }
 
-public protocol SessionBookmarkAccessing: Sendable {
+package protocol SessionBookmarkAccessing: Sendable {
   func makeReadWriteBookmark(for url: URL) throws -> Data
   func resolveReadWriteBookmark(_ data: Data) throws -> SessionBookmarkResolution
   func startAccessing(_ url: URL) -> Bool
   func stopAccessing(_ url: URL)
 }
 
-public struct SystemSessionBookmarkAccess: SessionBookmarkAccessing {
+package struct SystemSessionBookmarkAccess: SessionBookmarkAccessing {
   public init() {}
 
-  public func makeReadWriteBookmark(for url: URL) throws -> Data {
+  package func makeReadWriteBookmark(for url: URL) throws -> Data {
     try url.bookmarkData(
       options: [.withSecurityScope],
       includingResourceValuesForKeys: nil,
       relativeTo: nil)
   }
 
-  public func resolveReadWriteBookmark(_ data: Data) throws -> SessionBookmarkResolution {
+  package func resolveReadWriteBookmark(_ data: Data) throws -> SessionBookmarkResolution {
     var stale = false
     let url = try URL(
       resolvingBookmarkData: data,
@@ -115,16 +115,16 @@ public struct SystemSessionBookmarkAccess: SessionBookmarkAccessing {
     return SessionBookmarkResolution(url: url, isStale: stale)
   }
 
-  public func startAccessing(_ url: URL) -> Bool {
+  package func startAccessing(_ url: URL) -> Bool {
     url.startAccessingSecurityScopedResource()
   }
 
-  public func stopAccessing(_ url: URL) {
+  package func stopAccessing(_ url: URL) {
     url.stopAccessingSecurityScopedResource()
   }
 }
 
-public final class SessionRootAccessLease: @unchecked Sendable {
+package final class SessionRootAccessLease: @unchecked Sendable {
   public let url: URL
   public let rootSource: SessionRootSource
   private let lock = NSLock()
@@ -151,9 +151,9 @@ public final class SessionRootAccessLease: @unchecked Sendable {
   }
 }
 
-public struct SessionRootAccessContext: Sendable {
+package struct SessionRootAccessContext: Sendable {
   public let settings: SessionSettingsSnapshot
-  public let lease: SessionRootAccessLease
+  package let lease: SessionRootAccessLease
 
   public init(settings: SessionSettingsSnapshot, lease: SessionRootAccessLease) {
     self.settings = settings
@@ -161,9 +161,9 @@ public struct SessionRootAccessContext: Sendable {
   }
 }
 
-public final class SessionSettingsStore: @unchecked Sendable {
+package final class SessionSettingsStore: @unchecked Sendable {
   public static let persistenceKey = "ArkDeck.SessionSettings.v1"
-  public let configurationEpoch: StorageConfigurationEpoch
+  package let configurationEpoch: StorageConfigurationEpoch
 
   private let defaults: UserDefaults
   private let defaultRootProvider: @Sendable () throws -> URL
@@ -219,7 +219,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
     }
   }
 
-  public func selectCustomRoot(
+  package func selectCustomRoot(
     _ url: URL,
     expectedGeneration: UInt64
   ) throws -> SessionSettingsSnapshot {
@@ -249,7 +249,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
     }
   }
 
-  public func resetRootToDefault(
+  package func resetRootToDefault(
     expectedGeneration: UInt64
   ) throws -> SessionSettingsSnapshot {
     try locked {
@@ -265,7 +265,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
     }
   }
 
-  public func acquireRoot(
+  package func acquireRoot(
     for expected: SessionSettingsSnapshot
   ) throws -> SessionRootAccessContext {
     try locked {
@@ -336,7 +336,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
     }
   }
 
-  public func requireCurrent(_ expected: SessionSettingsSnapshot) throws {
+  package func requireCurrent(_ expected: SessionSettingsSnapshot) throws {
     try locked {
       let actual = try loadEnvelope().snapshot
       guard actual == expected else {

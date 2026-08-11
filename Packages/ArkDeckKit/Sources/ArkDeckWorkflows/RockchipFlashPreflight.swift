@@ -21,14 +21,14 @@ import Foundation
 /// matters is *survival*, not success: `rkdeveloptool ld` with no device
 /// attached exits non-zero and has still proven the binary can run, while a
 /// child killed by a signal never executed its first instruction of work.
-public enum RockchipFlashToolAliveness: Sendable, Equatable {
+package enum RockchipFlashToolAliveness: Sendable, Equatable {
   case survivedSpawn(exitStatus: Int32?)
   case diedOnSignal(Int32)
   /// The tool could not be resolved, timed out, or was refused before spawn.
   case unavailable(String)
 }
 
-public struct RockchipFlashArchiveIdentity: Sendable, Equatable {
+package struct RockchipFlashArchiveIdentity: Sendable, Equatable {
   public let sha256: String
   public let byteCount: Int
 
@@ -42,7 +42,7 @@ public struct RockchipFlashArchiveIdentity: Sendable, Equatable {
 /// Identity and build remain separate facts so their agreement is checked at
 /// the product boundary, but production derives both from the same summary —
 /// never from two decompression passes over a large images bundle.
-public struct RockchipFlashArchiveSnapshot: Sendable, Equatable {
+package struct RockchipFlashArchiveSnapshot: Sendable, Equatable {
   public let identity: RockchipFlashArchiveIdentity
   public let build: RockchipImageBuildDescriptor
 
@@ -55,14 +55,14 @@ public struct RockchipFlashArchiveSnapshot: Sendable, Equatable {
   }
 }
 
-public enum RockchipFlashPreflightCheck: String, Sendable, CaseIterable {
+package enum RockchipFlashPreflightCheck: String, Sendable, CaseIterable {
   case rockUSBToolAliveness
   case hdcToolAliveness
   case archiveIntegrity
   case targetPresence
 }
 
-public struct RockchipFlashPreflightFinding: Sendable, Equatable {
+package struct RockchipFlashPreflightFinding: Sendable, Equatable {
   public let check: RockchipFlashPreflightCheck
   public let passed: Bool
   public let summary: String
@@ -84,23 +84,23 @@ public struct RockchipFlashPreflightFinding: Sendable, Equatable {
   }
 }
 
-public struct RockchipFlashPreflightReceipt: Sendable, Equatable {
-  public let findings: [RockchipFlashPreflightFinding]
+package struct RockchipFlashPreflightReceipt: Sendable, Equatable {
+  package let findings: [RockchipFlashPreflightFinding]
   /// Stated, not assumed: a preflight that ever dispatched a mutation would
   /// be a flash, and this receipt is printed before any confirmation exists.
-  public let deviceMutationDispatchCount = 0
+  package let deviceMutationDispatchCount = 0
 
   public init(findings: [RockchipFlashPreflightFinding]) {
     self.findings = findings
   }
 
-  public var isGreen: Bool { findings.allSatisfy(\.passed) }
+  package var isGreen: Bool { findings.allSatisfy(\.passed) }
 
-  public var failedChecks: [RockchipFlashPreflightCheck] {
+  package var failedChecks: [RockchipFlashPreflightCheck] {
     findings.filter { !$0.passed }.map(\.check)
   }
 
-  public func renderedLines() -> [String] {
+  package func renderedLines() -> [String] {
     var lines = ["flash preflight (device mutation dispatch: \(deviceMutationDispatchCount))"]
     for finding in findings {
       lines.append("  [\(finding.passed ? "ok" : "RED")] \(finding.check.rawValue): \(finding.summary)")
@@ -115,18 +115,18 @@ public struct RockchipFlashPreflightReceipt: Sendable, Equatable {
 /// The four read-only observations, as one injectable seam. Contract tests
 /// substitute closures so every branch is provable with zero spawn and zero
 /// device.
-public struct RockchipFlashPreflightProbes: Sendable {
-  public var rockUSBAliveness: @Sendable () async -> RockchipFlashToolAliveness
-  public var hdcAliveness: @Sendable () async -> RockchipFlashToolAliveness
+package struct RockchipFlashPreflightProbes: Sendable {
+  package var rockUSBAliveness: @Sendable () async -> RockchipFlashToolAliveness
+  package var hdcAliveness: @Sendable () async -> RockchipFlashToolAliveness
   /// Identity and build derived from one stream of the archive's bytes. A seam
   /// like every other observation here: the preflight decides what the answer
   /// means, and contract tests substitute it without a 730 MB file.
-  public var archiveSnapshot:
+  package var archiveSnapshot:
     @Sendable (URL, RockchipFlashProfile) throws -> RockchipFlashArchiveSnapshot
   /// The stable identity the durable binding names — what the target readback
   /// must match. Kept separate from the readback so the identity comparison
   /// stays in the preflight, where it is visible and testable.
-  public var boundTargetIdentitySHA256: @Sendable () throws -> String
+  package var boundTargetIdentitySHA256: @Sendable () throws -> String
   /// The one HDC-normal alias the binding's confirmed lineage accepts besides
   /// its current identity, or nil when the lineage carries no valid edge. A
   /// DAYU200 changes its USB serial between Loader and HDC-normal, and the
@@ -134,9 +134,9 @@ public struct RockchipFlashPreflightProbes: Sendable {
   /// only knows the current identity refuses the bound board in the very mode
   /// a flash is allowed to start from (observed 2026-08-04). Defaults to no
   /// alias, which is the fail-closed posture.
-  public var boundTargetHDCNormalAlias:
+  package var boundTargetHDCNormalAlias:
     @Sendable () throws -> (identitySHA256: String, usbTopology: String)?
-  public var targetReadback: @Sendable () throws -> RockchipEvolutionTargetReadback
+  package var targetReadback: @Sendable () throws -> RockchipEvolutionTargetReadback
 
   public init(
     rockUSBAliveness: @escaping @Sendable () async -> RockchipFlashToolAliveness,
@@ -159,7 +159,7 @@ public struct RockchipFlashPreflightProbes: Sendable {
   }
 }
 
-public struct RockchipFlashPreflight: Sendable {
+package struct RockchipFlashPreflight: Sendable {
   private let probes: RockchipFlashPreflightProbes
 
   public init(probes: RockchipFlashPreflightProbes = .production()) {
@@ -450,7 +450,7 @@ extension RockchipFlashPreflightProbes {
   }
 }
 
-public enum RockchipFlashPreflightError: Error, Sendable, Equatable, CustomStringConvertible {
+package enum RockchipFlashPreflightError: Error, Sendable, Equatable, CustomStringConvertible {
   case hdcPathUnset
 
   public var description: String {

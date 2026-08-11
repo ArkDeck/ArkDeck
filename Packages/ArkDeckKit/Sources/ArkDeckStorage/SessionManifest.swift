@@ -3,16 +3,16 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public struct SessionManifestConfirmation: Equatable, Sendable {
+package struct SessionManifestConfirmation: Equatable, Sendable {
   public let confirmationID: String
   public let kind: String
   public let scopeHash: String
   public let decision: String
   public let actor: String
-  public let actorAgentExecutionAuthorityReference: AgentExecutionAuthorityReference?
-  public let actorAuthorizationReference: AuthorizationReference?
-  public let decidedAt: String
-  public let relatedStepIDs: [String]
+  package let actorAgentExecutionAuthorityReference: AgentExecutionAuthorityReference?
+  package let actorAuthorizationReference: AuthorizationReference?
+  package let decidedAt: String
+  package let relatedStepIDs: [String]
 
   fileprivate init(object: [String: JSONValue], schemaVersion: String) throws {
     confirmationID = try object.manifestString("confirmationId")
@@ -59,11 +59,11 @@ public struct SessionManifestConfirmation: Equatable, Sendable {
   }
 }
 
-public struct SessionManifestAuthorization: Equatable, Sendable {
-  public let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
-  public let authorizationReference: AuthorizationReference?
-  public let usageReservationID: String?
-  public let externalIntentEventIDs: [String]
+package struct SessionManifestAuthorization: Equatable, Sendable {
+  package let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
+  package let authorizationReference: AuthorizationReference?
+  package let usageReservationID: String?
+  package let externalIntentEventIDs: [String]
   public let destructiveIntentEventIDs: [String]
 
   fileprivate init(object: [String: JSONValue], schemaVersion: String) throws {
@@ -127,8 +127,8 @@ public struct SessionManifestAuthorization: Equatable, Sendable {
   }
 }
 
-public struct SessionManifestDocument: Equatable, Sendable {
-  public static let maximumCanonicalBytes = 16 * 1_024 * 1_024
+package struct SessionManifestDocument: Equatable, Sendable {
+  package static let maximumCanonicalBytes = 16 * 1_024 * 1_024
   public let canonicalData: Data
   public let sha256: String
   public let schemaVersion: String
@@ -136,11 +136,11 @@ public struct SessionManifestDocument: Equatable, Sendable {
   public let jobID: String
   public let status: String
   public let executionMode: String
-  public let executionAuthority: String
-  public let completedAt: Date
+  package let executionAuthority: String
+  package let completedAt: Date
   public let authorization: SessionManifestAuthorization?
   public let artifacts: [ArtifactRecord]
-  public let confirmations: [SessionManifestConfirmation]
+  package let confirmations: [SessionManifestConfirmation]
 
   public init(data: Data) throws {
     var duplicateValidator = StrictJSONDuplicateValidator(data: data)
@@ -246,19 +246,19 @@ public struct SessionManifestDocument: Equatable, Sendable {
   }
 }
 
-public struct PublishedSessionManifest: Equatable, Sendable {
+package struct PublishedSessionManifest: Equatable, Sendable {
   public let url: URL
   public let sha256: String
 }
 
-public protocol SessionManifestPublishing: Sendable {
+package protocol SessionManifestPublishing: Sendable {
   var layout: SessionLayout { get }
   func storageVolumeIdentity(using resolver: any VolumeIdentityResolving) throws -> VolumeIdentity
   func publish(_ manifest: SessionManifestDocument) throws -> PublishedSessionManifest
   func load() throws -> SessionManifestDocument
 }
 
-public final class AtomicSessionManifestPublisher: SessionManifestPublishing, @unchecked Sendable {
+package final class AtomicSessionManifestPublisher: SessionManifestPublishing, @unchecked Sendable {
   public let layout: SessionLayout
   private let lock = NSLock()
   private let faultInjector: SessionStorageFaultInjector
@@ -271,7 +271,7 @@ public final class AtomicSessionManifestPublisher: SessionManifestPublishing, @u
     self.faultInjector = faultInjector
   }
 
-  public func storageVolumeIdentity(using resolver: any VolumeIdentityResolving) throws
+  package func storageVolumeIdentity(using resolver: any VolumeIdentityResolving) throws
     -> VolumeIdentity
   {
     try resolver.resolve(layout.root)

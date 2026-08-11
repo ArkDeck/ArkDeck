@@ -19,7 +19,7 @@ public enum UIDumpRecipeID: String, CaseIterable, Sendable {
 
 public struct UIDumpRecipeDefinition: Sendable, Equatable, Identifiable {
   public let id: UIDumpRecipeID
-  public let candidateArguments: [String]
+  package let candidateArguments: [String]
   public let requiresComponentID: Bool
 
   public init(
@@ -110,9 +110,9 @@ public struct UIDumpOperationPresentation: Sendable, Equatable {
   public let title: String
   public let availability: UIDumpRuntimeAvailability
   public let minimumEffect: String
-  public let permittedEffects: [String]
-  public let inputNames: [String]
-  public let artifactNames: [String]
+  package let permittedEffects: [String]
+  package let inputNames: [String]
+  package let artifactNames: [String]
   public let supportsWindowInventory: Bool
   public let supportsScreenComponentTree: Bool
   public let supportsCanonicalWindowRecipes: Bool

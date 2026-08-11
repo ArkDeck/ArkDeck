@@ -340,10 +340,10 @@ private struct DecodedRegistry: Decodable {
 
 // MARK: - Registered server identity/generation observation
 
-public struct HDCServerProcessIdentityReceipt: Sendable, Equatable {
+package struct HDCServerProcessIdentityReceipt: Sendable, Equatable {
   public let pid: Int32
-  public let startSeconds: UInt64
-  public let startMicroseconds: UInt64
+  package let startSeconds: UInt64
+  package let startMicroseconds: UInt64
   public let executablePath: URL
   public let executableSHA256: String
   public let endpoint: HDCServerEndpoint
@@ -633,7 +633,7 @@ package struct HDCRegisteredLifecyclePostDispatchProbe: Sendable {
   }
 }
 
-public enum HDCRegisteredServerObservationClassification: Sendable, Equatable {
+package enum HDCRegisteredServerObservationClassification: Sendable, Equatable {
   case observed(generation: Int, serverVersion: String)
   case unavailable(reason: String)
   case unknown(reason: String)
@@ -642,7 +642,7 @@ public enum HDCRegisteredServerObservationClassification: Sendable, Equatable {
   case unsupported(reason: String)
 }
 
-public struct HDCRegisteredServerObservationResult: Sendable, Equatable {
+package struct HDCRegisteredServerObservationResult: Sendable, Equatable {
   public let classification: HDCRegisteredServerObservationClassification
   public let identity: HDCServerProcessIdentityReceipt?
   public let execution: ProcessExecutionResult?
@@ -687,7 +687,7 @@ struct HDCSelectedDeviceAuthorizationRowParser {
   }
 }
 
-public struct HDCSelectedDeviceAuthorizationProbeResult: Sendable, Equatable {
+package struct HDCSelectedDeviceAuthorizationProbeResult: Sendable, Equatable {
   public let authorization: HDCAuthorizationState
   public let execution: ProcessExecutionResult?
 
@@ -697,7 +697,7 @@ public struct HDCSelectedDeviceAuthorizationProbeResult: Sendable, Equatable {
   }
 }
 
-public actor HDCSelectedDeviceAuthorizationProbe {
+package actor HDCSelectedDeviceAuthorizationProbe {
   private let registry: HDCReadOnlyProbeRegistry
   private let semanticProfile: HDCRegisteredSemanticProfile
   private let identityObserver: any HDCServerProcessIdentityObserving

@@ -15,7 +15,7 @@
 import ArkDeckCore
 import Foundation
 
-public struct HarnessJobAcceptance: Equatable, Sendable {
+package struct HarnessJobAcceptance: Equatable, Sendable {
   public let jobID: String
   /// True when the engine recognised the idempotency key and returned the
   /// existing job. Recovery depends on this: same key in, same job out,
@@ -28,7 +28,7 @@ public struct HarnessJobAcceptance: Equatable, Sendable {
   }
 }
 
-public struct HarnessJobObservation: Equatable, Sendable {
+package struct HarnessJobObservation: Equatable, Sendable {
   public let jobID: String
   public let state: String
   public let isTerminal: Bool
@@ -62,13 +62,13 @@ public struct HarnessJobObservation: Equatable, Sendable {
   }
 }
 
-public enum HarnessJobPortError: Error, Equatable, Sendable {
+package enum HarnessJobPortError: Error, Equatable, Sendable {
   case rejected(String)
   case unknownJob(String)
   case transportFailure(String)
 }
 
-public protocol HarnessRuntimeJobPort: Sendable {
+package protocol HarnessRuntimeJobPort: Sendable {
   /// Submit a fully typed v2 request. The harness passes bytes it built
   /// from the decision and the durable intent; the engine remains the
   /// validator and the admission authority.
@@ -87,7 +87,7 @@ public protocol HarnessRuntimeJobPort: Sendable {
   func requestCancel(jobID: String) async throws
 }
 
-public extension HarnessRuntimeJobPort {
+package extension HarnessRuntimeJobPort {
   func reconcile(jobID: String) async throws -> HarnessJobObservation {
     throw HarnessJobPortError.rejected("job reconciliation is unavailable for \(jobID)")
   }

@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-public enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
+package enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
   case runningApplicationUnsigned
   case invalidRunningApplicationTeam
   case staticCodeUnavailable
@@ -11,8 +11,8 @@ public enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
 }
 
 public struct ValidatedUpdateArtifact: Equatable, Sendable {
-  public let downloaded: DownloadedUpdateArtifact
-  public let teamIdentifier: String
+  package let downloaded: DownloadedUpdateArtifact
+  package let teamIdentifier: String
 
   public init(downloaded: DownloadedUpdateArtifact, teamIdentifier: String) {
     self.downloaded = downloaded
@@ -36,7 +36,7 @@ protocol UpdateCodeSigningChecking: Sendable {
 
 /// Uses the running product's Developer ID Application signature as the trust anchor. No Team
 /// identifier is hard-coded.
-public struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable {
+package struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable {
   private let codeSigning: any UpdateCodeSigningChecking
 
   public init() {

@@ -14,7 +14,7 @@ import Foundation
 
 // MARK: - Closed observation vocabulary
 
-public enum BootstrapObservationAction: Sendable, Equatable {
+package enum BootstrapObservationAction: Sendable, Equatable {
   case observeTool
   case observeServer
   case listCandidates
@@ -30,7 +30,7 @@ public enum BootstrapObservationAction: Sendable, Equatable {
   }
 }
 
-public enum BootstrapPhase: String, Sendable, Equatable, Codable {
+package enum BootstrapPhase: String, Sendable, Equatable, Codable {
   case discoverHostTools
   case observeHDCServer
   case enumerateDeviceCandidates
@@ -41,7 +41,7 @@ public enum BootstrapPhase: String, Sendable, Equatable, Codable {
   case handedOff
 }
 
-public struct BootstrapCandidate: Sendable, Equatable, Codable {
+package struct BootstrapCandidate: Sendable, Equatable, Codable {
   public let connectKey: String
   public let state: String
 
@@ -51,24 +51,24 @@ public struct BootstrapCandidate: Sendable, Equatable, Codable {
   }
 
   public var isAuthorized: Bool { state == "Connected" }
-  public var needsPhysicalTrust: Bool {
+  package var needsPhysicalTrust: Bool {
     state == "Unauthorized" || state == "Offline"
   }
 }
 
-public enum BootstrapHumanActionKind: String, Sendable, Equatable {
+package enum BootstrapHumanActionKind: String, Sendable, Equatable {
   case trustDevice
   case physicalReconnect
 }
 
-public enum BootstrapProgress: Sendable, Equatable {
+package enum BootstrapProgress: Sendable, Equatable {
   case adopted(RuntimeTargetRecord)
   case needsSelection([BootstrapCandidate])
   case waitingForHuman(kind: BootstrapHumanActionKind, prompt: String)
   case failed(reason: String)
 }
 
-public enum BootstrapError: Error, Equatable, Sendable {
+package enum BootstrapError: Error, Equatable, Sendable {
   case noCandidates
   case unknownCandidate(String)
   case observationFailed(String)
@@ -77,9 +77,9 @@ public enum BootstrapError: Error, Equatable, Sendable {
 
 // MARK: - Durable target store
 
-public struct RuntimeTargetRecord: Sendable, Equatable, Codable {
+package struct RuntimeTargetRecord: Sendable, Equatable, Codable {
   public let targetID: String
-  public let stablePhysicalIdentitySHA256: String
+  package let stablePhysicalIdentitySHA256: String
   public let bindingRevision: Int
   public let connectKey: String
   public let toolVersion: String
@@ -214,7 +214,7 @@ private struct TargetStoreDocument: Codable, Equatable {
 }
 
 /// Durable, flock-guarded target registry in the daemon state directory.
-public final class RuntimeTargetStore: @unchecked Sendable {
+package final class RuntimeTargetStore: @unchecked Sendable {
   private let url: URL
   private let lockURL: URL
   private let queue = DispatchQueue(label: "arkdeck.target-store")
@@ -241,7 +241,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 
   /// Historical aliases remain in `list()` so old Job identity never changes.
   /// New selection surfaces use only the canonical records returned here.
-  public func listActive() throws -> [RuntimeTargetRecord] {
+  package func listActive() throws -> [RuntimeTargetRecord] {
     try queue.sync {
       let document = try load()
       let aliases = Set((document.aliasResolutions ?? []).map(\.aliasTargetID))
@@ -760,7 +760,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 
 /// What bootstrap may do, and nothing else. The production implementation
 /// composes the HDC provider + dispatcher; fixtures fake it in tests.
-public protocol BootstrapObservationPort: Sendable {
+package protocol BootstrapObservationPort: Sendable {
   func observeToolVersion() async throws -> String
   func listCandidates() async throws -> [BootstrapCandidate]
   /// Returns the device's stable-identity source attributes (serial et al).
@@ -769,7 +769,7 @@ public protocol BootstrapObservationPort: Sendable {
 
 // MARK: - The machine
 
-public actor DeviceBootstrapMachine {
+package actor DeviceBootstrapMachine {
   public private(set) var phase: BootstrapPhase = .discoverHostTools
   private let observation: any BootstrapObservationPort
   private let targetStore: RuntimeTargetStore
@@ -790,14 +790,14 @@ public actor DeviceBootstrapMachine {
   /// App's device list consumes — unlike `advance`, which adopts outright
   /// when exactly one Connected candidate is present, this method is
   /// deliberately incapable of producing a binding.
-  public func enumerateCandidates() async throws -> [BootstrapCandidate] {
+  package func enumerateCandidates() async throws -> [BootstrapCandidate] {
     try await observation.listCandidates()
   }
 
   /// Runs the bootstrap to its next decision point. `selectedConnectKey`
   /// resolves a prior needsSelection; re-running after physical trust
   /// resumes automatically. Every path is observation-only.
-  public func advance(selectedConnectKey: String? = nil) async -> BootstrapProgress {
+  package func advance(selectedConnectKey: String? = nil) async -> BootstrapProgress {
     do {
       phase = .discoverHostTools
       let toolVersion = try await observation.observeToolVersion()

@@ -1,23 +1,23 @@
 import Foundation
 
-public protocol PowerActivityBackend: AnyObject, Sendable {
+package protocol PowerActivityBackend: AnyObject, Sendable {
   func beginIdleSleepPrevention(reason: String) throws -> AnyObject
   func endIdleSleepPrevention(_ activity: AnyObject)
 }
 
 /// `PORT-POWER-001` production backend. It prevents idle system sleep only;
 /// lid closure and explicit user sleep remain outside its guarantee.
-public final class ProcessInfoPowerActivityBackend: PowerActivityBackend, @unchecked Sendable {
+package final class ProcessInfoPowerActivityBackend: PowerActivityBackend, @unchecked Sendable {
   public init() {}
 
-  public func beginIdleSleepPrevention(reason: String) throws -> AnyObject {
+  package func beginIdleSleepPrevention(reason: String) throws -> AnyObject {
     ProcessInfo.processInfo.beginActivity(
       options: [.idleSystemSleepDisabled],
       reason: reason
     ) as AnyObject
   }
 
-  public func endIdleSleepPrevention(_ activity: AnyObject) {
+  package func endIdleSleepPrevention(_ activity: AnyObject) {
     guard let activity = activity as? NSObjectProtocol else { return }
     ProcessInfo.processInfo.endActivity(activity)
   }
@@ -25,7 +25,7 @@ public final class ProcessInfoPowerActivityBackend: PowerActivityBackend, @unche
 
 /// Reference-counts one underlying activity and balances it across explicit
 /// release, lease deinit, operation errors/cancellation, and controller deinit.
-public final class PowerActivityController: @unchecked Sendable {
+package final class PowerActivityController: @unchecked Sendable {
   private let lock = NSLock()
   private let backend: any PowerActivityBackend
   private var activeLeaseIDs: Set<UUID> = []
@@ -46,7 +46,7 @@ public final class PowerActivityController: @unchecked Sendable {
     }
   }
 
-  public func acquire(reason: String) throws -> PowerActivityLease {
+  package func acquire(reason: String) throws -> PowerActivityLease {
     let leaseID = UUID()
     lock.lock()
     do {
@@ -66,13 +66,13 @@ public final class PowerActivityController: @unchecked Sendable {
     }
   }
 
-  public func withActivity<T>(reason: String, operation: () throws -> T) throws -> T {
+  package func withActivity<T>(reason: String, operation: () throws -> T) throws -> T {
     let lease = try acquire(reason: reason)
     defer { lease.end() }
     return try operation()
   }
 
-  public func withActivity<T>(
+  package func withActivity<T>(
     reason: String,
     operation: () async throws -> T
   ) async throws -> T {
@@ -81,7 +81,7 @@ public final class PowerActivityController: @unchecked Sendable {
     return try await operation()
   }
 
-  public var activeLeaseCount: Int {
+  package var activeLeaseCount: Int {
     lock.lock()
     defer { lock.unlock() }
     return activeLeaseIDs.count
@@ -103,7 +103,7 @@ public final class PowerActivityController: @unchecked Sendable {
   }
 }
 
-public final class PowerActivityLease: @unchecked Sendable {
+package final class PowerActivityLease: @unchecked Sendable {
   private let lock = NSLock()
   private var release: (@Sendable () -> Void)?
 

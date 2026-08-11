@@ -10,7 +10,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public enum HarnessEvolutionPolicyError: Error, Equatable, Sendable {
+package enum HarnessEvolutionPolicyError: Error, Equatable, Sendable {
   case invalidBaseRevision
   case emptyAllowedPaths
   case unsafeAllowedPath(String)
@@ -28,8 +28,8 @@ public enum HarnessEvolutionPolicyError: Error, Equatable, Sendable {
 
 /// The exploration envelope.  It narrows an existing task policy; it is not
 /// a RuntimeCapability and can never authorize a device effect by itself.
-public struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
-  public let baseRevision: String
+package struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
+  package let baseRevision: String
   public let allowedPaths: [String]
   public let maxAttempts: Int
   public let maxChangedFiles: Int
@@ -212,13 +212,13 @@ public struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
 
 /// Opaque reference to a provider-owned isolated tree.  The host path never
 /// enters task JSON or model context.
-public struct HarnessEvolutionWorkspace: Equatable, Codable, Sendable {
-  public let workspaceID: String
-  public let htaskID: String
-  public let sourceProjectRef: String
+package struct HarnessEvolutionWorkspace: Equatable, Codable, Sendable {
+  package let workspaceID: String
+  package let htaskID: String
+  package let sourceProjectRef: String
   public let projectRef: String
-  public let baseRevision: String
-  public let allowedPathsDigest: String
+  package let baseRevision: String
+  package let allowedPathsDigest: String
   public let createdAtUTC: String
 
   public init(
@@ -240,7 +240,7 @@ public struct HarnessEvolutionWorkspace: Equatable, Codable, Sendable {
   }
 }
 
-public protocol HarnessEvolutionWorkspacePort: Sendable {
+package protocol HarnessEvolutionWorkspacePort: Sendable {
   /// Creates or idempotently reopens the task-owned isolated tree and returns
   /// only its opaque provider reference.  It must never return a host path.
   func prepareWorkspace(
@@ -281,7 +281,7 @@ public protocol HarnessEvolutionWorkspacePort: Sendable {
   ) async throws -> [HarnessEvolutionWorkspaceGCFinding]
 }
 
-public enum HarnessEvolutionWorkspaceRetentionError: Error, Equatable, Sendable {
+package enum HarnessEvolutionWorkspaceRetentionError: Error, Equatable, Sendable {
   case negativeBound(String)
   case malformedBound(String)
 }
@@ -289,14 +289,14 @@ public enum HarnessEvolutionWorkspaceRetentionError: Error, Equatable, Sendable 
 /// Bounds for the terminal-workspace sweep. The policy can only choose how
 /// long destroyed-eligible trees linger; it cannot widen the sweep to active
 /// or unknown workspaces.
-public struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable {
+package struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable {
   /// A terminal task's tree is destroyed only after its last transition is
   /// at least this old.
-  public let minimumTerminalAgeSeconds: Int
+  package let minimumTerminalAgeSeconds: Int
   /// The most recently terminal trees stay for post-mortem regardless of age.
-  public let retainLatestTerminalCount: Int
+  package let retainLatestTerminalCount: Int
   /// Report what would be destroyed without touching the filesystem.
-  public let dryRun: Bool
+  package let dryRun: Bool
 
   public init(
     minimumTerminalAgeSeconds: Int,
@@ -319,9 +319,9 @@ public struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable {
 /// authoritative lifecycle and its last transition time. Terminal lifecycles
 /// are absorbing, so a reference computed before the sweep cannot go stale in
 /// the destructive direction.
-public struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Sendable {
-  public let workspaceID: String
-  public let htaskID: String
+package struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Sendable {
+  package let workspaceID: String
+  package let htaskID: String
   public let lifecycle: HarnessTaskLifecycle
   public let updatedAtUTC: String
 
@@ -338,7 +338,7 @@ public struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Send
   }
 }
 
-public enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codable, Sendable {
+package enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codable, Sendable {
   /// The owning task is not terminal; recoverability is untouched.
   case activeRetained
   /// Terminal, but inside the retention window (age or latest-count).
@@ -354,13 +354,13 @@ public enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codabl
   case unknownTaskRetained
 }
 
-public struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable {
-  public let workspaceID: String
-  public let htaskID: String?
+package struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable {
+  package let workspaceID: String
+  package let htaskID: String?
   public let disposition: HarnessEvolutionWorkspaceGCDisposition
   /// Bytes removed by this sweep (or measured for `wouldDestroy`); zero for
   /// every retaining disposition.
-  public let reclaimedBytes: Int64
+  package let reclaimedBytes: Int64
 
   public init(
     workspaceID: String,
@@ -375,28 +375,28 @@ public struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable {
   }
 }
 
-public enum HarnessCandidatePatchCreator: String, Codable, Sendable {
+package enum HarnessCandidatePatchCreator: String, Codable, Sendable {
   case agent
   case human
 }
 
 /// Metadata Artifact for the immutable diff Artifact used by applyPatch.
-public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
+package struct HarnessCandidatePatch: Equatable, Codable, Sendable {
   public static let documentType = "harness-candidate-patch"
   public static let schemaVersion = "1.0.0"
 
   public let documentType: String
   public let schemaVersion: String
-  public let candidatePatchID: String
-  public let htaskID: String
+  package let candidatePatchID: String
+  package let htaskID: String
   public let attemptID: String
-  public let baseRevision: String
-  public let files: [String]
-  public let diffDigest: String
+  package let baseRevision: String
+  package let files: [String]
+  package let diffDigest: String
   public let changedLines: Int
-  public let createdBy: HarnessCandidatePatchCreator
+  package let createdBy: HarnessCandidatePatchCreator
   public let diffArtifactID: String
-  public let metadataArtifactID: String?
+  package let metadataArtifactID: String?
   public let createdAtUTC: String
 
   public init(
@@ -459,7 +459,7 @@ public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
       createdAtUTC: createdAtUTC)
   }
 
-  public func recordingMetadataArtifact(_ artifactID: String) -> HarnessCandidatePatch {
+  package func recordingMetadataArtifact(_ artifactID: String) -> HarnessCandidatePatch {
     HarnessCandidatePatch(
       candidatePatchID: candidatePatchID, htaskID: htaskID, attemptID: attemptID,
       baseRevision: baseRevision, files: files, diffDigest: diffDigest,
@@ -469,12 +469,12 @@ public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
   }
 
   /// True exactly when `text` is the immutable diff this metadata names.
-  public func namesDiff(_ text: String) -> Bool {
+  package func namesDiff(_ text: String) -> Bool {
     SHA256Hex.string(of: Data(text.utf8)) == diffDigest
   }
 }
 
-public enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
+package enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
   case evolutionPolicyMissing
   case candidatePatchMissing
   case candidateArtifactMissing
@@ -515,20 +515,20 @@ extension HarnessPromotionGateFailure {
   }
 }
 
-public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
+package struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   public static let documentType = "harness-promotion-candidate"
   public static let schemaVersion = "1.0.0"
 
   public let documentType: String
   public let schemaVersion: String
-  public let promotionCandidateID: String
-  public let htaskID: String
+  package let promotionCandidateID: String
+  package let htaskID: String
   public let attemptID: String
-  public let candidatePatchID: String
-  public let baseRevision: String
+  package let candidatePatchID: String
+  package let baseRevision: String
   public let workspaceRevision: String
-  public let evaluationID: String
-  public let artifactIDs: [String]
+  package let evaluationID: String
+  package let artifactIDs: [String]
   public let createdAtUTC: String
   /// Promotion produces a normal PR candidate. It is never a merge claim.
   public let disposition: String
@@ -559,7 +559,7 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   }
 }
 
-public enum HarnessPromotionGate {
+package enum HarnessPromotionGate {
   public static func evaluate(
     snapshot: HarnessTaskSnapshot,
     attempt: HarnessAttempt,

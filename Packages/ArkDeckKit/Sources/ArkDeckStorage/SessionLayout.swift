@@ -2,33 +2,33 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-public struct SessionLayout: Equatable, Sendable {
+package struct SessionLayout: Equatable, Sendable {
   public let sessionID: String
   public let jobID: String
   public let root: URL
 
-  public var journalURL: URL { root.appending(path: "journal.jsonl") }
-  public var snapshotURL: URL { root.appending(path: "snapshot.json") }
-  public var commandAuditURL: URL { root.appending(path: "audit/commands.jsonl") }
-  public var eventAuditURL: URL { root.appending(path: "audit/events.jsonl") }
-  public var sessionAuditURL: URL { root.appending(path: "audit/session.jsonl") }
-  public var identityURL: URL { root.appending(path: ".session-identity.json") }
-  public var rawDirectory: URL {
+  package var journalURL: URL { root.appending(path: "journal.jsonl") }
+  package var snapshotURL: URL { root.appending(path: "snapshot.json") }
+  package var commandAuditURL: URL { root.appending(path: "audit/commands.jsonl") }
+  package var eventAuditURL: URL { root.appending(path: "audit/events.jsonl") }
+  package var sessionAuditURL: URL { root.appending(path: "audit/session.jsonl") }
+  package var identityURL: URL { root.appending(path: ".session-identity.json") }
+  package var rawDirectory: URL {
     root.appending(path: "artifacts/raw", directoryHint: .isDirectory)
   }
-  public var derivedDirectory: URL {
+  package var derivedDirectory: URL {
     root.appending(path: "artifacts/derived", directoryHint: .isDirectory)
   }
-  public var partialDirectory: URL {
+  package var partialDirectory: URL {
     root.appending(path: "artifacts/partial", directoryHint: .isDirectory)
   }
   /// Shared with `SessionTerminalPublicationLock`/`FileDurableJournal`, which coordinate the
   /// journal and the write-once manifest through these session-root entry names.
-  public static let manifestFileName = "manifest.json"
+  package static let manifestFileName = "manifest.json"
   static let manifestLockFileName = ".manifest.lock"
 
   public var manifestURL: URL { root.appending(path: Self.manifestFileName) }
-  public var manifestLockURL: URL { root.appending(path: Self.manifestLockFileName) }
+  package var manifestLockURL: URL { root.appending(path: Self.manifestLockFileName) }
 
   public init(sessionID: String, jobID: String, root: URL) throws {
     try SessionStorageValidation.identifier(sessionID, field: "sessionId")
@@ -40,7 +40,7 @@ public struct SessionLayout: Equatable, Sendable {
   }
 }
 
-public struct SessionStore: Sendable {
+package struct SessionStore: Sendable {
   public let sessionsRoot: URL
   private let volumeIdentityResolver: any VolumeIdentityResolving
   private let faultInjector: SessionStorageFaultInjector
@@ -57,7 +57,7 @@ public struct SessionStore: Sendable {
     self.faultInjector = faultInjector
   }
 
-  public func createSession(
+  package func createSession(
     sessionID: String,
     jobID: String,
     createdAt: Date,
@@ -193,7 +193,7 @@ public struct SessionStore: Sendable {
     return layout
   }
 
-  public func openSession(sessionID: String, jobID: String, root: URL) throws -> SessionLayout {
+  package func openSession(sessionID: String, jobID: String, root: URL) throws -> SessionLayout {
     let layout = try SessionLayout(sessionID: sessionID, jobID: jobID, root: root)
     guard root.standardizedFileURL.lastPathComponent == sessionID else {
       throw SessionStorageError.invalidRecord("Session ID does not match its directory")

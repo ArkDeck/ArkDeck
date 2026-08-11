@@ -11,7 +11,7 @@
 
 import Foundation
 
-public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
+package struct RockchipProductionEvolutionCampaignAttemptAdmitter:
   RockchipEvolutionCampaignAttemptAdmitting
 {
   private let port: RockchipProductionAdmissionPort
@@ -35,7 +35,7 @@ public struct RockchipProductionEvolutionCampaignAttemptAdmitter:
     self.makeID = makeID
   }
 
-  public func admitAttempt(
+  package func admitAttempt(
     permit: RockchipEvolutionCampaignAttemptPermit,
     archiveURL: URL,
     targetLocationSelector: String

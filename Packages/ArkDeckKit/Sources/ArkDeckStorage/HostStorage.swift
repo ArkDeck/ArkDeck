@@ -21,7 +21,7 @@ public final class StorageConfigurationEpoch: @unchecked Sendable {
     return StorageConfigurationToken(value: value)
   }
 
-  public func performMutation<T>(_ body: () throws -> T) rethrows -> T {
+  package func performMutation<T>(_ body: () throws -> T) rethrows -> T {
     lock.lock()
     defer {
       value = UUID()
@@ -30,7 +30,7 @@ public final class StorageConfigurationEpoch: @unchecked Sendable {
     return try body()
   }
 
-  public func performIfCurrent<T>(
+  package func performIfCurrent<T>(
     _ token: StorageConfigurationToken,
     _ body: () throws -> T
   ) throws -> T {
@@ -54,12 +54,12 @@ public struct VolumeIdentity: Hashable, Codable, Sendable {
   }
 }
 
-public protocol VolumeIdentityResolving: Sendable {
+package protocol VolumeIdentityResolving: Sendable {
   func resolve(_ url: URL) throws -> VolumeIdentity
   func resolve(openFileDescriptor descriptor: Int32) throws -> VolumeIdentity
 }
 
-public struct SystemVolumeIdentityResolver: VolumeIdentityResolving {
+package struct SystemVolumeIdentityResolver: VolumeIdentityResolving {
   public init() {}
 
   public func resolve(_ url: URL) throws -> VolumeIdentity {
@@ -98,11 +98,11 @@ public struct SystemVolumeIdentityResolver: VolumeIdentityResolving {
   }
 }
 
-public struct HostStorageSnapshot: Equatable, Sendable {
+package struct HostStorageSnapshot: Equatable, Sendable {
   public let volumeIdentity: VolumeIdentity
   public let totalBytes: UInt64
-  public let availableBytes: UInt64
-  public let isReadOnly: Bool
+  package let availableBytes: UInt64
+  package let isReadOnly: Bool
 
   public init(
     volumeIdentity: VolumeIdentity,
@@ -117,11 +117,11 @@ public struct HostStorageSnapshot: Equatable, Sendable {
   }
 }
 
-public protocol HostStorageProbing: Sendable {
+package protocol HostStorageProbing: Sendable {
   func snapshot(for url: URL) throws -> HostStorageSnapshot
 }
 
-public struct SystemHostStorageProbe: HostStorageProbing {
+package struct SystemHostStorageProbe: HostStorageProbing {
   private let resolver: any VolumeIdentityResolving
 
   public init(resolver: any VolumeIdentityResolving = SystemVolumeIdentityResolver()) {
@@ -148,17 +148,17 @@ public struct SystemHostStorageProbe: HostStorageProbing {
   }
 }
 
-public enum StorageWriterClass: String, Codable, Sendable {
+package enum StorageWriterClass: String, Codable, Sendable {
   case heavy
   case light
   case unknown
 }
 
-public struct StorageBudget: Equatable, Sendable {
-  public let metadataHeadroomBytes: UInt64
-  public let finalizationHeadroomBytes: UInt64
-  public let remainingGrowthBytes: UInt64
-  public let writerClass: StorageWriterClass
+package struct StorageBudget: Equatable, Sendable {
+  package let metadataHeadroomBytes: UInt64
+  package let finalizationHeadroomBytes: UInt64
+  package let remainingGrowthBytes: UInt64
+  package let writerClass: StorageWriterClass
 
   public init(
     metadataHeadroomBytes: UInt64,
@@ -181,18 +181,18 @@ public struct StorageBudget: Equatable, Sendable {
     self.writerClass = writerClass
   }
 
-  public var totalSoftClaimBytes: UInt64 {
+  package var totalSoftClaimBytes: UInt64 {
     metadataHeadroomBytes + finalizationHeadroomBytes + remainingGrowthBytes
   }
 
-  public var abortsWhenGrowthExceedsBudget: Bool { true }
+  package var abortsWhenGrowthExceedsBudget: Bool { true }
 }
 
-public struct StorageClaimRequest: Equatable, Sendable {
-  public let claimID: String
+package struct StorageClaimRequest: Equatable, Sendable {
+  package let claimID: String
   public let jobID: String
   public let volumeIdentity: VolumeIdentity
-  public let budget: StorageBudget
+  package let budget: StorageBudget
 
   public init(
     claimID: String,
@@ -537,13 +537,13 @@ private final class StorageClaimPermit: @unchecked Sendable {
   }
 }
 
-public struct StorageClaim: Equatable, @unchecked Sendable {
-  public let claimID: String
+package struct StorageClaim: Equatable, @unchecked Sendable {
+  package let claimID: String
   public let jobID: String
   public let volumeIdentity: VolumeIdentity
-  public let writerClass: StorageWriterClass
-  public let metadataHeadroomBytes: UInt64
-  public let finalizationHeadroomBytes: UInt64
+  package let writerClass: StorageWriterClass
+  package let metadataHeadroomBytes: UInt64
+  package let finalizationHeadroomBytes: UInt64
   fileprivate let admissionGeneration: UUID
   fileprivate let permit: StorageClaimPermit
   fileprivate let configurationEpoch: StorageConfigurationEpoch?
@@ -566,13 +566,13 @@ public struct StorageClaim: Equatable, @unchecked Sendable {
     self.configurationToken = configurationToken
   }
 
-  public var remainingGrowthBytes: UInt64 { permit.remainingGrowth() }
+  package var remainingGrowthBytes: UInt64 { permit.remainingGrowth() }
 
-  public var totalSoftClaimBytes: UInt64 {
+  package var totalSoftClaimBytes: UInt64 {
     metadataHeadroomBytes + finalizationHeadroomBytes + remainingGrowthBytes
   }
 
-  public var finalizationOnly: Bool { permit.isFinalizationOnly() }
+  package var finalizationOnly: Bool { permit.isFinalizationOnly() }
 
   func requireOptionalWriteAuthorization(forJobID jobID: String) throws {
     guard self.jobID == jobID else {
@@ -690,24 +690,24 @@ public struct StorageClaim: Equatable, @unchecked Sendable {
   }
 }
 
-public enum StorageQueueReason: String, Equatable, Sendable {
+package enum StorageQueueReason: String, Equatable, Sendable {
   case waitingForStorage
   case insufficientHeadroom
   case volumeReadOnly
 }
 
-public enum StorageAdmission: Equatable, Sendable {
+package enum StorageAdmission: Equatable, Sendable {
   case admitted(StorageClaim)
   case queued(StorageQueueReason)
 }
 
-public struct ActiveStorageSessionSnapshot: Equatable, Sendable {
-  public let claimID: String
+package struct ActiveStorageSessionSnapshot: Equatable, Sendable {
+  package let claimID: String
   public let jobID: String
   public let sessionID: String
-  public let sessionRoot: URL
+  package let sessionRoot: URL
   public let volumeIdentity: VolumeIdentity
-  public let writerClass: StorageWriterClass
+  package let writerClass: StorageWriterClass
 
   fileprivate init(claim: StorageClaim, binding: StorageClaimSessionBinding) {
     claimID = claim.claimID
@@ -719,21 +719,21 @@ public struct ActiveStorageSessionSnapshot: Equatable, Sendable {
   }
 }
 
-public enum StorageRevalidationAction: Equatable, Sendable {
+package enum StorageRevalidationAction: Equatable, Sendable {
   case continueWriting
   case stopOptionalWritesAndFinalize
   case pauseForVolumeIdentityChange(expected: VolumeIdentity, actual: VolumeIdentity)
   case volumeUnavailable
 }
 
-public enum StorageClaimExecution<Value: Sendable>: Sendable {
+package enum StorageClaimExecution<Value: Sendable>: Sendable {
   case executed(Value)
   case queued(StorageQueueReason)
 }
 
-public struct StorageOperationFinalizationError: Error, @unchecked Sendable {
-  public let operationError: any Error
-  public let finalizationError: any Error
+package struct StorageOperationFinalizationError: Error, @unchecked Sendable {
+  package let operationError: any Error
+  package let finalizationError: any Error
 
   public init(operationError: any Error, finalizationError: any Error) {
     self.operationError = operationError
@@ -741,17 +741,17 @@ public struct StorageOperationFinalizationError: Error, @unchecked Sendable {
   }
 }
 
-public enum StorageTerminalDisposition: String, Equatable, Sendable {
+package enum StorageTerminalDisposition: String, Equatable, Sendable {
   case succeeded
   case failed
   case cancelled
 }
 
-public struct StorageTerminalPersistenceReceipt: Equatable, Sendable {
-  public let claimID: String
+package struct StorageTerminalPersistenceReceipt: Equatable, Sendable {
+  package let claimID: String
   public let jobID: String
   public let disposition: StorageTerminalDisposition
-  public let manifestSHA256: String
+  package let manifestSHA256: String
   fileprivate let admissionGeneration: UUID
   fileprivate let sessionID: String
   fileprivate let sessionRootPath: String
@@ -774,7 +774,7 @@ private final class RepairedTerminalStorageClaimReleaser: StorageClaimReleasing,
   }
 }
 
-public struct SessionStorageTerminalFinalizer: Sendable {
+package struct SessionStorageTerminalFinalizer: Sendable {
   private let audit: any DurableSessionAuditAppending
   private let manifestPublisher: any SessionManifestPublishing
   private let volumeIdentityResolver: any VolumeIdentityResolving

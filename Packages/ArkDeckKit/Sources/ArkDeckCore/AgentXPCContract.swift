@@ -16,54 +16,54 @@ import Foundation
 /// Method names shared by control-plane producers and consumers whose drift
 /// would otherwise be discovered only after a daemon request. Add entries
 /// here when a method crosses independently compiled product surfaces.
-public enum ArkDeckAgentMethod {
-  public static let taskContext = "task.context"
+package enum ArkDeckAgentMethod {
+  package static let taskContext = "task.context"
 }
 
 /// Shared filesystem layout for the CLI and daemon composition roots.
-public enum ArkDeckAgentFilesystemLayout {
-  public static let applicationSupportRelativeStateDirectory = "ArkDeck/Agentd"
-  public static let socketFilename = "agentd.sock"
+package enum ArkDeckAgentFilesystemLayout {
+  package static let applicationSupportRelativeStateDirectory = "ArkDeck/Agentd"
+  package static let socketFilename = "agentd.sock"
 
-  public static func defaultStateDirectory(
+  package static func defaultStateDirectory(
     fileManager: FileManager = .default
   ) -> URL {
     fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent(applicationSupportRelativeStateDirectory, isDirectory: true)
   }
 
-  public static func defaultSocketURL(fileManager: FileManager = .default) -> URL {
+  package static func defaultSocketURL(fileManager: FileManager = .default) -> URL {
     defaultStateDirectory(fileManager: fileManager)
       .appendingPathComponent(socketFilename)
   }
 }
 
-public enum ArkDeckEnvironmentKey {
-  public static let hdcPath = "ARKDECK_HDC_PATH"
+package enum ArkDeckEnvironmentKey {
+  package static let hdcPath = "ARKDECK_HDC_PATH"
 }
 
-public enum ArkDeckAgentClientName {
+package enum ArkDeckAgentClientName {
   public static let flashWorkspace = "ArkDeckApp.FlashWorkspace"
   public static let traceWorkspace = "ArkDeckApp.TraceWorkspace"
-  public static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
-  public static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
-  public static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
+  package static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
+  package static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
+  package static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
 }
 
 /// The global Mach service name the daemon vends and the App looks up. It is
 /// duplicated in the App's `mach-lookup` exception and in the LaunchAgent
 /// `MachServices` key; all three must agree or the lookup fails closed.
-public enum ArkDeckAgentXPC {
-  public static let machServiceName = "com.arkdeck.agentd"
+package enum ArkDeckAgentXPC {
+  package static let machServiceName = "com.arkdeck.agentd"
   /// The App's XPC door forwards the daemon's existing wire frame;
   /// keeping the version here prevents App clients from inventing a legacy
   /// key that passes the XPC allowlist but fails daemon decoding.
-  public static let wireProtocolVersion = "1.0.0"
+  package static let wireProtocolVersion = "1.0.0"
 
   /// Builds the single versioned request shape accepted by the daemon. Method
   /// admission remains in `AgentXPCEndpoint`; this only prevents App facades
   /// from drifting onto an obsolete or caller-shaped wire envelope.
-  public static func requestFrame(
+  package static func requestFrame(
     method: String,
     params: [String: JSONValue]? = nil,
     requestID: String = UUID().uuidString
@@ -93,7 +93,7 @@ public enum ArkDeckAgentXPC {
   /// adopts — so listing candidates over this transport cannot create,
   /// select or change a binding. Adoption itself stays on `target.adopt`,
   /// which remains refused here.
-  public static let forwardableReadOnlyMethods: Set<String> = [
+  package static let forwardableReadOnlyMethods: Set<String> = [
     "artifact.inspect",
     "artifact.list",
     "artifact.read",
@@ -114,7 +114,7 @@ public enum ArkDeckAgentXPC {
   /// Bundle ingestion is the stateless effectful part of the closed Flash
   /// workflow. Unlike the generic job method names below, each entry is
   /// intrinsically scoped to a Flash bundle.
-  public static let forwardableFlashBundleMethods: Set<String> = [
+  package static let forwardableFlashBundleMethods: Set<String> = [
     "artifact.importFlashBundle.abort",
     "artifact.importFlashBundle.append",
     "artifact.importFlashBundle.begin",
@@ -125,14 +125,14 @@ public enum ArkDeckAgentXPC {
   /// the explicitly selected adopted target. This method is not a device
   /// command and cannot dispatch Flash; the daemon applies Core rebind policy
   /// and persists the adjacent revision before returning.
-  public static let forwardableRockchipBindingMethods: Set<String> = [
+  package static let forwardableRockchipBindingMethods: Set<String> = [
     "flash.bind-current-loader"
   ]
 
   /// These names are generic in the daemon protocol. The XPC endpoint must
   /// additionally prove one of the closed App-owned typed requests and bind
   /// the returned Job identifier before forwarding run or cancel.
-  public static let gatedAppJobMethods: Set<String> = [
+  package static let gatedAppJobMethods: Set<String> = [
     "job.cancel",
     "job.run",
     "job.submit",
@@ -142,14 +142,14 @@ public enum ArkDeckAgentXPC {
   /// may list them and request only bounded lifecycle transitions; it cannot
   /// submit a new task, provide a human-resolution string, propose source,
   /// export promotion material, or administer a capability.
-  public static let forwardableAutomationMethods: Set<String> = [
+  package static let forwardableAutomationMethods: Set<String> = [
     "task.cancel",
     "task.list",
     "task.pause",
     "task.reconcile",
   ]
 
-  public static let forwardableMethods =
+  package static let forwardableMethods =
     forwardableReadOnlyMethods
     .union(forwardableFlashBundleMethods)
     .union(forwardableRockchipBindingMethods)
@@ -159,7 +159,7 @@ public enum ArkDeckAgentXPC {
   /// Reason codes returned to the client instead of a forwarded response.
   /// They are stable strings so the App can present an accurate cause rather
   /// than a generic failure.
-  public enum RefusalReason: String, Sendable {
+  package enum RefusalReason: String, Sendable {
     case malformedRequestFrame
     case methodNotAllowlisted
   }
@@ -174,7 +174,7 @@ public enum ArkDeckAgentXPC {
 
 /// The vended interface. `Data` in, `Data` out: one request frame, one
 /// response frame, both in the daemon's existing wire protocol.
-@objc public protocol ArkDeckAgentXPCProtocol {
+@objc package protocol ArkDeckAgentXPCProtocol {
   /// - Parameter reply: `(response, refusalReason)`. Exactly one is non-nil.
   ///   A refusal never reaches the daemon's request handler.
   func sendRequestFrame(

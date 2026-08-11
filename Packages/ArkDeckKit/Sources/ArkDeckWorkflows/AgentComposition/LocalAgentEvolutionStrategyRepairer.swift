@@ -19,7 +19,7 @@ import Foundation
 /// normalized failure code and prior closed strategies, then returns timing/mode values that the
 /// isolated candidate executable and merged broker both validate. The first attempt is the
 /// protected-main baseline and never needs a model call.
-public struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyRepairing {
+package struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStrategyRepairing {
   public let repairerID: String
   private let executablePath: String
   private let executableSHA256: String

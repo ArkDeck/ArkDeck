@@ -39,8 +39,8 @@ import Foundation
 /// Pure deterministic front-end used by the pinned analyzer executable and
 /// its contract tests.  Invalid input is a structured `unreadable` result,
 /// never an empty ledger: downstream evaluation therefore fails closed.
-public enum HarnessCrashLedgerDerivedAnalyzer {
-  public static func analyze(_ bytes: Data) throws -> Data {
+package enum HarnessCrashLedgerDerivedAnalyzer {
+  package static func analyze(_ bytes: Data) throws -> Data {
     let analysis: HarnessCrashLedgerAnalysis
     guard let text = String(data: bytes, encoding: .utf8) else {
       analysis = HarnessCrashLedgerAnalysis(
@@ -66,16 +66,16 @@ public enum HarnessCrashLedgerDerivedAnalyzer {
   }
 }
 
-public enum HarnessFaultLogLedger {
+package enum HarnessFaultLogLedger {
   /// The listing's header. Its presence is what distinguishes "the device
   /// answered and has nothing" from "we never got an answer" - a
   /// distinction the whole fail-closed story rests on, because only the
   /// first may ever support a verdict of "no crash".
-  public static let listHeader = "Fault log list:"
-  public static let emptyMarker = "No fault log exist."
+  package static let listHeader = "Fault log list:"
+  package static let emptyMarker = "No fault log exist."
   private static let entryFence = "******"
 
-  public enum IndexReading: Equatable, Sendable {
+  package enum IndexReading: Equatable, Sendable {
     /// The device answered. An empty array means an empty ledger, which is
     /// positive evidence.
     case answered([HarnessFaultLogEntry])
@@ -85,7 +85,7 @@ public enum HarnessFaultLogLedger {
     case unreadable(String)
   }
 
-  public static func readIndex(_ text: String) -> IndexReading {
+  package static func readIndex(_ text: String) -> IndexReading {
     guard text.contains(listHeader) else {
       return .unreadable("ledgerHeaderAbsent")
     }

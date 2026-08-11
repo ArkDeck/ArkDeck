@@ -2,7 +2,7 @@ import ArkDeckOpenHarmony
 import ArkDeckProcess
 import Foundation
 
-public enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
+package enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
   case serverDidNotBecomeReady(String)
 }
 
@@ -13,7 +13,7 @@ public enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
 /// client until that client reaches its timeout, leaving no listener behind.
 /// The supported foreground form gives launchd one real child lifecycle to
 /// own. No caller supplies argv, endpoint, executable path or environment.
-public final class HeadlessHDCServerHost: @unchecked Sendable {
+package final class HeadlessHDCServerHost: @unchecked Sendable {
   private final class Lifecycle: @unchecked Sendable {
     private let lock = NSLock()
     private var armed = false

@@ -8,10 +8,10 @@ import Foundation
 import IOKit
 import Security
 
-public struct RockchipToolInstallationReceipt: Sendable, Equatable {
+package struct RockchipToolInstallationReceipt: Sendable, Equatable {
   public let executableSHA256: String
-  public let codeTrust: RockchipPlatformCodeTrust
-  public let quarantinePresent: Bool
+  package let codeTrust: RockchipPlatformCodeTrust
+  package let quarantinePresent: Bool
 
   public init(
     executableSHA256: String,
@@ -24,7 +24,7 @@ public struct RockchipToolInstallationReceipt: Sendable, Equatable {
   }
 }
 
-public enum RockchipToolInstallation {
+package enum RockchipToolInstallation {
   /// Installs the pinned ordinary bookmark and records a fresh platform-trust assessment.
   /// A quarantined tool remains blocked; this entry point never removes quarantine implicitly.
   @discardableResult
@@ -35,7 +35,7 @@ public enum RockchipToolInstallation {
   /// Performs the explicit host trust transition for the one reviewed executable identity.
   /// The caller must repeat the full pinned digest; no arbitrary executable can be de-quarantined.
   @discardableResult
-  public static func trustAndInstall(
+  package static func trustAndInstall(
     executableURL: URL,
     expectedSHA256: String
   ) throws -> RockchipToolInstallationReceipt {
@@ -45,10 +45,10 @@ public enum RockchipToolInstallation {
   }
 }
 
-public struct RockchipDeviceBindingInstallationReceipt: Sendable, Equatable {
+package struct RockchipDeviceBindingInstallationReceipt: Sendable, Equatable {
   public let revision: Int
-  public let usbTopology: String
-  public let serialDigestSHA256: String
+  package let usbTopology: String
+  package let serialDigestSHA256: String
   public let created: Bool
 
   public init(
@@ -64,13 +64,13 @@ public struct RockchipDeviceBindingInstallationReceipt: Sendable, Equatable {
   }
 }
 
-public enum RockchipDeviceBindingInstallation {
+package enum RockchipDeviceBindingInstallation {
   /// Reads IOKit only, requires exactly one DAYU200 in registered HDC-normal or Loader mode,
   /// and durably adopts that cross-mode identity.  The HDC-normal branch does not reboot here:
   /// the transition remains inside the later authorized `enterUpdater` intent.
   /// This entry point never launches rkdeveloptool and has no device-mutation surface.
   @discardableResult
-  public static func installCurrentTarget() throws -> RockchipDeviceBindingInstallationReceipt {
+  package static func installCurrentTarget() throws -> RockchipDeviceBindingInstallationReceipt {
     let manager = FileManager.default
     let applicationSupport = try manager.url(
       for: .applicationSupportDirectory, in: .userDomainMask,

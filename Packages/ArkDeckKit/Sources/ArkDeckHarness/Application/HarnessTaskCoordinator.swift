@@ -21,7 +21,7 @@ import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
 
-public enum HarnessReconcileAction: String, Sendable, Codable {
+package enum HarnessReconcileAction: String, Sendable, Codable {
   case terminal
   case paused
   case awaitingHuman
@@ -50,10 +50,10 @@ public enum HarnessReconcileAction: String, Sendable, Codable {
   case staleDecision
 }
 
-public struct HarnessReconcileOutcome: Sendable, Equatable {
+package struct HarnessReconcileOutcome: Sendable, Equatable {
   public let snapshot: HarnessTaskSnapshot
   public let action: HarnessReconcileAction
-  public let dispatchedJobID: String?
+  package let dispatchedJobID: String?
   public let reasonCode: String
 
   public init(
@@ -69,7 +69,7 @@ public struct HarnessReconcileOutcome: Sendable, Equatable {
   }
 }
 
-public enum HarnessCoordinatorError: Error, Equatable, Sendable {
+package enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case unsupportedTaskType(HarnessTaskType)
   case notFound(String)
   case notPausable(HarnessTaskLifecycle)
@@ -87,7 +87,7 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case malformedRequest(String)
 }
 
-public actor HarnessTaskCoordinator {
+package actor HarnessTaskCoordinator {
   static let deploymentPreflightNotExecutedClassification =
     "DEPLOYMENT_PREFLIGHT_NOT_EXECUTED"
 
@@ -184,14 +184,14 @@ public actor HarnessTaskCoordinator {
     self.sensitiveEvidenceAllowList = sensitiveEvidenceAllowList
   }
 
-  public static func freshTaskID() -> String {
+  package static func freshTaskID() -> String {
     let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
     return "HTASK-\(hex.prefix(12))"
   }
 
   /// The closed operation set a task type permits when a submission does
   /// not narrow it. Narrowing is allowed; widening is not expressible.
-  public static func defaultPolicy(for type: HarnessTaskType) -> HarnessTaskPolicy {
+  package static func defaultPolicy(for type: HarnessTaskType) -> HarnessTaskPolicy {
     switch type {
     case .debugCrash:
       return HarnessTaskPolicy(
@@ -199,37 +199,37 @@ public actor HarnessTaskCoordinator {
     }
   }
 
-  public static func freshDecisionID() -> String {
+  package static func freshDecisionID() -> String {
     "dec-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
   }
 
-  public static func freshEvaluationID() -> String {
+  package static func freshEvaluationID() -> String {
     let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
     return "EVAL-\(hex.prefix(12))"
   }
 
-  public static func freshActionID() -> String {
+  package static func freshActionID() -> String {
     "har-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
   }
 
-  public static func freshMemoryID() -> String {
+  package static func freshMemoryID() -> String {
     "mem-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(12))"
   }
 
   /// Uppercase hex, like an evaluation id: the value becomes a file name,
   /// and the store's grammar check is what keeps it inside its own task
   /// directory (TASK-HFA-002).
-  public static func freshModelRunID() -> String {
+  package static func freshModelRunID() -> String {
     let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
     return "MRUN-\(hex.prefix(12))"
   }
 
-  public static func freshAttemptID() -> String {
+  package static func freshAttemptID() -> String {
     let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
     return "ATTEMPT-\(hex.prefix(12))"
   }
 
-  public static func freshPromotionCandidateID() -> String {
+  package static func freshPromotionCandidateID() -> String {
     let hex = UUID().uuidString.replacingOccurrences(of: "-", with: "").uppercased()
     return "PROMOTION-\(hex.prefix(12))"
   }
@@ -294,7 +294,7 @@ public actor HarnessTaskCoordinator {
   /// the workspaces the store can vouch for, and terminal lifecycles are
   /// absorbing, so nothing active can be swept. Audit metadata survives on
   /// the provider side; no host path enters or leaves this call.
-  public func sweepEvolutionWorkspaces(
+  package func sweepEvolutionWorkspaces(
     retention: HarnessEvolutionWorkspaceRetention
   ) async throws -> [HarnessEvolutionWorkspaceGCFinding] {
     guard let port = evolutionWorkspacePort else {
@@ -337,7 +337,7 @@ public actor HarnessTaskCoordinator {
   /// stage. A changed binding is deliberately UNKNOWN until an operator or
   /// runtime capability confirms it; the version increment also invalidates
   /// every decision made on the previous binding facts.
-  public func recordTargetObservation(
+  package func recordTargetObservation(
     _ taskID: String,
     currentBindingRevision: Int?,
     deviceReady: Bool,
@@ -513,7 +513,7 @@ public actor HarnessTaskCoordinator {
   /// workspace cannot stop the rest — and so a caller can say it at startup
   /// rather than let it surface as a stale decision several rounds later.
   @discardableResult
-  public func adoptPersistedEvolutionWorkspaces() async throws
+  package func adoptPersistedEvolutionWorkspaces() async throws
     -> [(htaskID: String, reason: String)]
   {
     guard let port = evolutionWorkspacePort else { return [] }
@@ -531,7 +531,7 @@ public actor HarnessTaskCoordinator {
     return unadopted
   }
 
-  public func recoverTasks() async throws -> [HarnessTaskSnapshot] {
+  package func recoverTasks() async throws -> [HarnessTaskSnapshot] {
     // Before any intent is resolved: resolving one may dispatch a workspace
     // operation, and that needs the isolated identity already restored.
     try await adoptPersistedEvolutionWorkspaces()

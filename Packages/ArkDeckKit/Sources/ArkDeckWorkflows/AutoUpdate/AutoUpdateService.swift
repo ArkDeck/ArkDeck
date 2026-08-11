@@ -37,11 +37,11 @@ public protocol AutoUpdatePreferenceStoring: Sendable {
   func recordCheckAttempt(_ date: Date)
 }
 
-public final class UserDefaultsAutoUpdatePreferences: AutoUpdatePreferenceStoring,
+package final class UserDefaultsAutoUpdatePreferences: AutoUpdatePreferenceStoring,
   @unchecked Sendable
 {
-  public static let enabledKey = "ArkDeck.AutoUpdate.AutomaticChecksEnabled"
-  public static let lastAttemptKey = "ArkDeck.AutoUpdate.LastCheckAttempt"
+  package static let enabledKey = "ArkDeck.AutoUpdate.AutomaticChecksEnabled"
+  package static let lastAttemptKey = "ArkDeck.AutoUpdate.LastCheckAttempt"
 
   private let defaults: UserDefaults
   private let lock = NSLock()
@@ -63,17 +63,17 @@ public final class UserDefaultsAutoUpdatePreferences: AutoUpdatePreferenceStorin
     lock.withLock { defaults.set(enabled, forKey: Self.enabledKey) }
   }
 
-  public func lastCheckAttempt() -> Date? {
+  package func lastCheckAttempt() -> Date? {
     lock.withLock { defaults.object(forKey: Self.lastAttemptKey) as? Date }
   }
 
-  public func recordCheckAttempt(_ date: Date) {
+  package func recordCheckAttempt(_ date: Date) {
     lock.withLock { defaults.set(date, forKey: Self.lastAttemptKey) }
   }
 }
 
 public actor AutoUpdateService {
-  public static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
+  package static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
 
   private let streamer: any UpdateHTTPStreaming
   private let verifier: UpdateFeedVerifier

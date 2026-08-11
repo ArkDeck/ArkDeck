@@ -10,7 +10,7 @@
 import ArkDeckHarness
 import Foundation
 
-public enum HarnessVendorConfigurationError: Error, Equatable, Sendable {
+package enum HarnessVendorConfigurationError: Error, Equatable, Sendable {
   case providerRequired
   case unsupportedProvider(String)
   case missingCredential
@@ -24,18 +24,18 @@ public enum HarnessVendorConfigurationError: Error, Equatable, Sendable {
 /// Turns explicit process configuration into exactly one vendor port. The
 /// credential is required only when a provider is selected and is never
 /// returned separately, logged or persisted.
-public enum HarnessVendorConfiguration {
-  public static let providerKey = "ARKDECK_HARNESS_MODEL_PROVIDER"
-  public static let apiKeyKey = "ARKDECK_HARNESS_MODEL_API_KEY"
-  public static let modelKey = "ARKDECK_HARNESS_MODEL_NAME"
-  public static let endpointKey = "ARKDECK_HARNESS_MODEL_ENDPOINT"
-  public static let cliPathKey = "ARKDECK_HARNESS_CLI_PATH"
-  public static let cliWorkingDirectoryKey = "ARKDECK_HARNESS_CLI_WORKDIR"
+package enum HarnessVendorConfiguration {
+  package static let providerKey = "ARKDECK_HARNESS_MODEL_PROVIDER"
+  package static let apiKeyKey = "ARKDECK_HARNESS_MODEL_API_KEY"
+  package static let modelKey = "ARKDECK_HARNESS_MODEL_NAME"
+  package static let endpointKey = "ARKDECK_HARNESS_MODEL_ENDPOINT"
+  package static let cliPathKey = "ARKDECK_HARNESS_CLI_PATH"
+  package static let cliWorkingDirectoryKey = "ARKDECK_HARNESS_CLI_WORKDIR"
   /// Seconds a local agent CLI may take for one decision. A CLI that reasons
   /// over evidence and source is minutes-scale work, not seconds-scale: too
   /// low and every round is spent as `gatewayUnavailable` while the loop
   /// silently falls back to the deterministic step.
-  public static let cliTimeoutKey = "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"
+  package static let cliTimeoutKey = "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"
 
   /// Keys that named one specific CLI back when only one was supported. They
   /// are refused rather than quietly ignored: a host that still sets them
@@ -47,11 +47,11 @@ public enum HarnessVendorConfiguration {
   /// need a credential, and the local agent CLIs, which need none because the
   /// CLI is already signed in. The CLI list is the closed profile set — no
   /// provider name maps to an argv fragment taken from the environment.
-  public static var supportedProviders: [String] {
+  package static var supportedProviders: [String] {
     ["claude", "openai", "gemini"] + HarnessLocalAgentCLIProfile.all.map(\.profileID)
   }
 
-  public static func gateway(
+  package static func gateway(
     environment: [String: String],
     transport: any HarnessModelTransport = URLSessionModelTransport(),
     cliTransport: any HarnessLocalAgentCLITransport = LocalAgentCLIProcessTransport()

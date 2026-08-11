@@ -18,7 +18,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
+package enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
   /// Intent persisted, nothing submitted yet. Safe to submit.
   case pending
   /// Submit was attempted; the outcome of the submit call itself is not
@@ -36,7 +36,7 @@ public enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
   case stale
 }
 
-public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
+package enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
   case invokeOperation
   case proposePatch
   case requestHuman
@@ -48,45 +48,45 @@ public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
 /// the same type. Either way a decision carries no status, no retry count,
 /// no raw command and no success claim - those fields do not exist here,
 /// which is what makes HTP-INV-1 structural instead of advisory.
-public struct HarnessDecision: Equatable, Sendable, Codable {
+package struct HarnessDecision: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision"
-  public static let envelopeVersion = "2.0.0"
+  package static let envelopeVersion = "2.0.0"
 
   public let documentType: String
-  public let envelopeVersion: String
-  public let decisionID: String
-  public let htaskID: String
+  package let envelopeVersion: String
+  package let decisionID: String
+  package let htaskID: String
   public let round: Int
   public let kind: HarnessDecisionKind
   public let operationReference: String?
   public let inputs: [String: JSONValue]
-  public let patchProposal: HarnessPatchProposal?
+  package let patchProposal: HarnessPatchProposal?
   /// Stable prerequisite identities and expected readback. They are data for
   /// strategy identity only; neither may carry bytes, paths or commands.
-  public let requiredArtifacts: [String]
-  public let expectedObservation: String?
-  public let hypothesis: String
+  package let requiredArtifacts: [String]
+  package let expectedObservation: String?
+  package let hypothesis: String
   public let reasonCode: String
-  public let producer: String
+  package let producer: String
   public let createdAtUTC: String
   /// The task state version the producer read (CHG-2026-055, TASK-HFA-002).
-  public let observedStateVersion: Int
+  package let observedStateVersion: Int
   /// Digest of `HarnessDecisionBasis` at proposal time. This describes the
   /// Harness facts used to plan. The digest of bytes a model actually received
   /// is `contextDigest`; the two answer different questions and never alias.
-  public let basisDigest: String
+  package let basisDigest: String
   /// Strategy identity is Harness-owned. `nil` is valid only before a repair
   /// strategy exists (for example the initial read-only target observation).
   public let attemptID: String?
   /// A model-backed decision links to the exact durable run and the digest of
   /// the bytes actually transmitted. Deterministic decisions carry neither.
-  public let modelRunID: String?
-  public let contextDigest: String?
+  package let modelRunID: String?
+  package let contextDigest: String?
   /// Explicit execution preconditions. Applicability is operation-specific;
   /// an unrelated dimension is represented by `nil`, not a wildcard string.
-  public let expectedWorkspaceRevision: String?
+  package let expectedWorkspaceRevision: String?
   public let expectedDeployedArtifactDigest: String?
-  public let expectedBindingRevision: Int?
+  package let expectedBindingRevision: Int?
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -201,7 +201,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   /// derivation rather than a mutable field so a producer cannot forge a
   /// basis it did not observe: the coordinator stamps it, from the snapshot
   /// it loaded, on the way out of planning.
-  public func stamped(
+  package func stamped(
     with basis: HarnessDecisionBasis,
     attemptID: String? = nil,
     expectedWorkspaceRevision: String? = nil,
@@ -234,23 +234,23 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
+package struct HarnessDispatchIntent: Equatable, Sendable, Codable {
   public static let documentType = "harness-dispatch-intent"
   public static let schemaVersion = "2.0.0"
 
   public let documentType: String
   public let schemaVersion: String
-  public let htaskID: String
+  package let htaskID: String
   public let round: Int
-  public let decisionID: String
+  package let decisionID: String
   public let attemptID: String?
-  public let modelRunID: String?
+  package let modelRunID: String?
   public let operationReference: String
   public let targetID: String
-  public let expectedBindingRevision: Int?
-  public let expectedWorkspaceRevision: String?
+  package let expectedBindingRevision: Int?
+  package let expectedWorkspaceRevision: String?
   public let expectedDeployedArtifactDigest: String?
-  public let inputsDigestSHA256: String
+  package let inputsDigestSHA256: String
   public let requestID: String
   public let idempotencyKey: String
   public let state: HarnessDispatchState
@@ -401,7 +401,7 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     schemaVersion == Self.schemaVersion
   }
 
-  public func withState(
+  package func withState(
     _ state: HarnessDispatchState,
     jobID: String? = nil,
     atUTC: String
@@ -427,14 +427,14 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
 /// indistinguishable from the first attempt to the engine's dedup path.
 /// A clock or a random suffix here would silently turn recovery into a
 /// second side effect.
-public enum HarnessRequestIdentity {
-  public static func inputsDigest(_ inputs: [String: JSONValue]) -> String {
+package enum HarnessRequestIdentity {
+  package static func inputsDigest(_ inputs: [String: JSONValue]) -> String {
     let encoder = CanonicalJSONEncoders.canonical()
     let data = (try? encoder.encode(inputs)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: data)
   }
 
-  public static func derive(
+  package static func derive(
     htaskID: String,
     round: Int,
     decisionID: String,
@@ -451,7 +451,7 @@ public enum HarnessRequestIdentity {
   }
 }
 
-public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
+package enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case malformedTargetID
   case emptyGoal
   case emptyAllowedOperations
@@ -471,16 +471,16 @@ public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
 
 /// Typed submission input. Natural language is admitted only as
 /// `intakeDescription`; everything the loop executes on is typed.
-public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
+package struct HarnessTaskSubmission: Equatable, Sendable, Codable {
   public let type: HarnessTaskType
-  public let intakeDescription: String?
+  package let intakeDescription: String?
   public let projectRef: String?
   public let target: HarnessTaskTargetReference
   public let goal: HarnessTaskGoal
-  public let successCriteria: [HarnessSuccessCriterion]
-  public let budgets: HarnessTaskBudgets
+  package let successCriteria: [HarnessSuccessCriterion]
+  package let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
-  public let evolutionPolicy: HarnessEvolutionPolicy?
+  package let evolutionPolicy: HarnessEvolutionPolicy?
 
   public init(
     type: HarnessTaskType,
@@ -506,7 +506,7 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
 
   /// Workspace isolation is a fact derived from the typed policy envelope. It is not a
   /// caller-selectable execution mode.
-  public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
+  package var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
 
   public func validate(permittedOperations: Set<String>) throws {
     let targetID = target.targetID

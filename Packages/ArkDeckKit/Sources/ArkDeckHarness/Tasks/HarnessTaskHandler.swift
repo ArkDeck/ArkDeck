@@ -17,11 +17,11 @@
 import ArkDeckCore
 import Foundation
 
-public struct HarnessPlannedStep: Equatable, Sendable {
+package struct HarnessPlannedStep: Equatable, Sendable {
   public let decision: HarnessDecision
   /// Phase the task moves into when this step is dispatched. `nil` keeps
   /// the current phase.
-  public let phaseOnDispatch: HarnessTaskStage?
+  package let phaseOnDispatch: HarnessTaskStage?
 
   public init(decision: HarnessDecision, phaseOnDispatch: HarnessTaskStage?) {
     self.decision = decision
@@ -29,7 +29,7 @@ public struct HarnessPlannedStep: Equatable, Sendable {
   }
 }
 
-public protocol HarnessTaskHandler: Sendable {
+package protocol HarnessTaskHandler: Sendable {
   var type: HarnessTaskType { get }
   /// The closed set of operation references this task type may submit.
   /// A submission may narrow it; nothing may widen it.
@@ -53,61 +53,61 @@ public protocol HarnessTaskHandler: Sendable {
 }
 
 extension HarnessTaskHandler {
-  public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+  package func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
     permittedOperations
   }
 
-  public func requiredE1MutationBudget(
+  package func requiredE1MutationBudget(
     goal: HarnessTaskGoal, policy: HarnessTaskPolicy
   ) -> Int { 0 }
 }
 
-public struct DebugCrashTaskHandler: HarnessTaskHandler {
-  public static let observeDevice = "observe.device@1"
+package struct DebugCrashTaskHandler: HarnessTaskHandler {
+  package static let observeDevice = "observe.device@1"
   public static let captureDiagnostics = "capture.diagnostics@1"
-  public static let createCheckpoint = "workspace.create-checkpoint@1"
-  public static let applyPatch = "workspace.apply-patch@1"
-  public static let buildOpenHarmony = "workspace.build-openharmony@1"
-  public static let signOpenHarmonyHAP = "workspace.sign-openharmony-hap@1"
-  public static let defaultSigningPreset = "openharmony-release@1"
-  public static let runTests = "workspace.run-tests@1"
-  public static let revertPatch = "workspace.revert-patch@1"
-  public static let deployHAP = "debug.hap@1"
-  public static let analyzeCrashLedger = "analyzer.extract-crash-signature@1"
+  package static let createCheckpoint = "workspace.create-checkpoint@1"
+  package static let applyPatch = "workspace.apply-patch@1"
+  package static let buildOpenHarmony = "workspace.build-openharmony@1"
+  package static let signOpenHarmonyHAP = "workspace.sign-openharmony-hap@1"
+  package static let defaultSigningPreset = "openharmony-release@1"
+  package static let runTests = "workspace.run-tests@1"
+  package static let revertPatch = "workspace.revert-patch@1"
+  package static let deployHAP = "debug.hap@1"
+  package static let analyzeCrashLedger = "analyzer.extract-crash-signature@1"
   /// A successful capture is not evaluated until its raw ledger has passed
   /// through the pinned analyzer. These ID-only facts survive a daemon
   /// restart without exposing the artifact's host path.
-  public static let pendingAnalysisSourceJobKey = "pendingCrashAnalysisSourceJobId"
-  public static let pendingAnalysisSourceArtifactKey = "pendingCrashAnalysisSourceArtifactId"
-  public static let pendingAnalysisSourceLeaseKey = "pendingCrashAnalysisSourceLease"
+  package static let pendingAnalysisSourceJobKey = "pendingCrashAnalysisSourceJobId"
+  package static let pendingAnalysisSourceArtifactKey = "pendingCrashAnalysisSourceArtifactId"
+  package static let pendingAnalysisSourceLeaseKey = "pendingCrashAnalysisSourceLease"
   // The durable value remains the historical spelling for persisted-task compatibility.
-  public static let pendingAnalysisReturnStageKey = "pendingCrashAnalysisReturnPhase"
+  package static let pendingAnalysisReturnStageKey = "pendingCrashAnalysisReturnPhase"
   /// Durable observation written only after the typed crash-fixture
   /// deployment succeeds. Phase alone cannot carry this fact because the
   /// following capture legitimately moves `reproducing` back to `collecting`.
-  public static let baselineDeploymentMarker = "baselineCrashFixtureDeployed"
+  package static let baselineDeploymentMarker = "baselineCrashFixtureDeployed"
   /// An evaluation may pass while its source candidate fails the final
   /// promotion gate (for example because the isolated tree drifted). The
   /// failure is durable evidence that a new candidate is needed; it is not a
   /// human-authority request and it must survive the exact rollback wake.
-  public static let promotionRetryReasonKey = "promotionCandidateRetryReason"
+  package static let promotionRetryReasonKey = "promotionCandidateRetryReason"
   /// Set only after the protected Runtime durably reconciles the previous
   /// repair deployment's target-confirmation preflight as not executed. It
   /// keeps the task in `deploying` while authorising the handler to propose a
   /// new bounded Job against fresh facts; it is never inferred from a failed
   /// or missing readback.
-  public static let deploymentPreflightRetryKey =
+  package static let deploymentPreflightRetryKey =
     "deploymentPreflightConfirmedNotExecuted"
   /// Bounded HiLog remains diagnostic context only. It proves neither a
   /// crash nor that the declared application is alive.
-  public static let hilogArtifact = "hilog.txt"
+  package static let hilogArtifact = "hilog.txt"
   /// Derived from the same capture Job's typed process readback. This is the
   /// only Artifact allowed to support DC-2.
-  public static let applicationLivenessArtifact = "application-liveness.json"
+  package static let applicationLivenessArtifact = "application-liveness.json"
   /// The device's Faultlogger ledger, which is where the crash detail
   /// actually is. The crash criteria name it, so a capture that did not
   /// publish it cannot support any verdict about crashes.
-  public static let crashIndexArtifact = HarnessObservationBuilder.crashIndexArtifact
+  package static let crashIndexArtifact = HarnessObservationBuilder.crashIndexArtifact
   /// `capture.diagnostics@1` declares `durationSeconds` **required**, so a
   /// step that omits it is refused at admission and the loop can never
   /// collect the evidence its own criteria demand. Twenty seconds is a
@@ -119,7 +119,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// effective effect to `deviceMutation`, and this task type declares
   /// `maxE1Mutations: 0` - an E0 task must not smuggle an E1 leg into its own
   /// evidence collection.
-  public static let captureDurationSeconds = 20
+  package static let captureDurationSeconds = 20
 
   public init() {}
 
@@ -128,7 +128,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// The repair leg remains closed: source changes use published workspace
   /// operations and the physical-device install uses the existing typed HAP
   /// deployment. Every E1 leg remains guarded by the runtime capability store.
-  public var permittedOperations: Set<String> {
+  package var permittedOperations: Set<String> {
     [
       Self.observeDevice, Self.captureDiagnostics, Self.applyPatch,
       Self.createCheckpoint,
@@ -138,7 +138,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     ]
   }
 
-  public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+  package func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
     if let repair = snapshot.repairAttempt, repair.patchAttemptRef != nil, !repair.reverted,
       repair.rollbackRequired
         || (repair.deployedDigest != nil && snapshot.observed.latestVerdict == .fail)
@@ -185,7 +185,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     }
   }
 
-  public func defaultSuccessCriteria() -> [HarnessSuccessCriterion] {
+  package func defaultSuccessCriteria() -> [HarnessSuccessCriterion] {
     [
       HarnessSuccessCriterion(
         criterionID: "DC-1-crash-signature-absent",
@@ -223,7 +223,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     ]
   }
 
-  public func requiredE1MutationBudget(
+  package func requiredE1MutationBudget(
     goal: HarnessTaskGoal, policy: HarnessTaskPolicy
   ) -> Int {
     Self.requiredE1MutationBudget(goal: goal, policy: policy)

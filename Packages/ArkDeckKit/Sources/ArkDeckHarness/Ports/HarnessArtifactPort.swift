@@ -14,7 +14,7 @@
 import ArkDeckCore
 import Foundation
 
-public struct HarnessArtifactDescriptor: Equatable, Sendable {
+package struct HarnessArtifactDescriptor: Equatable, Sendable {
   public let artifactID: String
   public let name: String
   public let mediaType: String
@@ -22,7 +22,7 @@ public struct HarnessArtifactDescriptor: Equatable, Sendable {
   public let sha256: String
   public let published: Bool
   public let sensitive: Bool
-  public let missingReason: String?
+  package let missingReason: String?
 
   public init(
     artifactID: String,
@@ -45,12 +45,12 @@ public struct HarnessArtifactDescriptor: Equatable, Sendable {
   }
 }
 
-public enum HarnessArtifactPortError: Error, Equatable, Sendable {
+package enum HarnessArtifactPortError: Error, Equatable, Sendable {
   case unavailable(String)
   case unreadable(String)
 }
 
-public protocol HarnessArtifactPort: Sendable {
+package protocol HarnessArtifactPort: Sendable {
   func inventory(jobID: String) async throws -> [HarnessArtifactDescriptor]
   func read(jobID: String, artifactID: String, maximumBytes: Int) async throws -> Data
   /// Mint the store's ID-only lease for a verified published Artifact.  The

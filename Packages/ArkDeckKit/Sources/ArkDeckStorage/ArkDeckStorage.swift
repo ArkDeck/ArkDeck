@@ -1,3 +1,3 @@
-public enum ArkDeckStorageModule {
+package enum ArkDeckStorageModule {
   public static let identifier = "ArkDeckStorage"
 }

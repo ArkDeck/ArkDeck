@@ -73,8 +73,8 @@ package struct EngineLaneRuntimeGateway: Sendable {
   }
 }
 
-public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatching {
-  public let attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)?
+package struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatching {
+  package let attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)?
   private let runtimeTargetID: String
   private let gateway: EngineLaneRuntimeGateway
 
@@ -252,14 +252,14 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
 /// Read-only, and deliberately strict — one unreadable entry refuses the whole
 /// answer rather than returning a shorter list, because a silently shortened
 /// list is exactly how a partition write would go unnoticed.
-public struct DaemonRockchipEvolutionAttemptIntents: RockchipEvolutionAttemptIntentReading {
+package struct DaemonRockchipEvolutionAttemptIntents: RockchipEvolutionAttemptIntentReading {
   private let client: AgentClient
 
   public init(socketPath: String) {
     client = AgentClient(socketPath: socketPath)
   }
 
-  public func journaledStepKinds(jobID: String) throws -> [String] {
+  package func journaledStepKinds(jobID: String) throws -> [String] {
     let response: JSONValue
     do {
       response = try client.request(

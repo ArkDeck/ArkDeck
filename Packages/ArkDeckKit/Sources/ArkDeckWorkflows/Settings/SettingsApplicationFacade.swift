@@ -84,7 +84,7 @@ public struct SettingsDiagnosticBundlePreview: Equatable, Sendable {
   public let includedEntries: [String]
   public let estimatedBytes: UInt64
   public let deviceRawExcluded: Bool
-  public let sensitiveDataWarning: String
+  package let sensitiveDataWarning: String
 
   public init(
     scopeSHA256: String,
@@ -101,7 +101,7 @@ public struct SettingsDiagnosticBundlePreview: Equatable, Sendable {
   }
 }
 
-public enum SettingsApplicationError: Error, Equatable, Sendable {
+package enum SettingsApplicationError: Error, Equatable, Sendable {
   case diagnosticsUnavailable
 }
 

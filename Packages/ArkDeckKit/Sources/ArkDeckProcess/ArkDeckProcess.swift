@@ -7,16 +7,16 @@ import Foundation
 ///
 /// The request intentionally has an executable URL and an argument array rather
 /// than a command string. This module never invokes a host shell.
-public enum ArkDeckProcessModule {
+package enum ArkDeckProcessModule {
   public static let identifier = "ArkDeckProcess"
 }
 
-public enum ProcessStream: String, Sendable, Equatable, Hashable {
+package enum ProcessStream: String, Sendable, Equatable, Hashable {
   case stdout
   case stderr
 }
 
-public struct ProcessOutputChunk: Sendable, Equatable {
+package struct ProcessOutputChunk: Sendable, Equatable {
   public let stream: ProcessStream
   public let bytes: Data
 
@@ -37,8 +37,8 @@ public struct ProcessOutputChunk: Sendable, Equatable {
 /// stream must never report as untruncated.
 public struct ProcessStreamCapture: Sendable, Equatable {
   public let data: Data
-  public let totalByteCount: Int64
-  public let wasTruncated: Bool
+  package let totalByteCount: Int64
+  package let wasTruncated: Bool
 
   public init(data: Data, totalByteCount: Int64, wasTruncated: Bool) {
     self.data = data
@@ -68,8 +68,8 @@ public enum ProcessGroupTerminationResult: Sendable, Equatable {
 }
 
 public struct ProcessExecutionResult: Sendable, Equatable {
-  public let termination: ProcessTermination
-  public let processGroupTermination: ProcessGroupTerminationResult
+  package let termination: ProcessTermination
+  package let processGroupTermination: ProcessGroupTerminationResult
   public let stdout: ProcessStreamCapture
   public let stderr: ProcessStreamCapture
 
@@ -89,7 +89,7 @@ public struct ProcessExecutionResult: Sendable, Equatable {
 /// A common result vocabulary for Adapter-owned semantic evaluators. Process
 /// exit status is intentionally not sufficient to construct one of these
 /// values; the Adapter decides after consuming the raw byte streams.
-public enum ProcessSemanticResult<Failure: Sendable & Equatable>: Sendable, Equatable {
+package enum ProcessSemanticResult<Failure: Sendable & Equatable>: Sendable, Equatable {
   case success
   case failure(Failure)
   case unknownOutput
@@ -97,16 +97,16 @@ public enum ProcessSemanticResult<Failure: Sendable & Equatable>: Sendable, Equa
 
 /// Streaming semantic classification supplied by a tool Adapter. Evaluators
 /// receive every stdout/stderr byte before retained capture is truncated.
-public protocol ProcessSemanticEvaluating: Sendable {
+package protocol ProcessSemanticEvaluating: Sendable {
   associatedtype SemanticResult: Sendable
 
   mutating func consume(_ chunk: ProcessOutputChunk)
   mutating func finish(execution: ProcessExecutionResult) -> SemanticResult
 }
 
-public struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Sendable {
+package struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Sendable {
   public let execution: ProcessExecutionResult
-  public let semantic: SemanticResult
+  package let semantic: SemanticResult
 
   public init(execution: ProcessExecutionResult, semantic: SemanticResult) {
     self.execution = execution
@@ -116,7 +116,7 @@ public struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Send
 
 extension SemanticallyEvaluatedProcessResult: Equatable where SemanticResult: Equatable {}
 
-public struct ProcessRequest: Sendable, Equatable {
+package struct ProcessRequest: Sendable, Equatable {
   public let executable: URL
   /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
   /// It never selects the executable: `executable` remains the identity-bound
@@ -155,7 +155,7 @@ public struct ProcessRequest: Sendable, Equatable {
 /// Expected immutable executable identity supplied by a durable Job intent.
 /// The Process port reopens and hashes the file itself; this value is not an
 /// authorization merely because a caller constructed it.
-public struct ProcessIdentityBoundRequest: Sendable, Equatable {
+package struct ProcessIdentityBoundRequest: Sendable, Equatable {
   public let process: ProcessRequest
   public let expectedSHA256: String
 
@@ -169,11 +169,11 @@ public struct ProcessIdentityBoundRequest: Sendable, Equatable {
 /// `authorizedPath` is diagnostic provenance; device/inode/hash identify the
 /// opened executable object and never come from a caller-provided snapshot.
 public struct ProcessExecutableIdentityReceipt: Sendable, Equatable, Codable {
-  public let authorizedPath: String
-  public let inodeLaunchPath: String
+  package let authorizedPath: String
+  package let inodeLaunchPath: String
   public let device: UInt64
   public let inode: UInt64
-  public let fileSize: Int64
+  package let fileSize: Int64
   public let mode: UInt32
   public let sha256: String
 
@@ -196,7 +196,7 @@ public struct ProcessExecutableIdentityReceipt: Sendable, Equatable, Codable {
   }
 }
 
-public struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
+package struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
   public let execution: ProcessExecutionResult
   public let executableIdentity: ProcessExecutableIdentityReceipt
 
@@ -209,9 +209,9 @@ public struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
   }
 }
 
-public struct SemanticallyEvaluatedIdentityBoundProcessResult<SemanticResult: Sendable>: Sendable {
+package struct SemanticallyEvaluatedIdentityBoundProcessResult<SemanticResult: Sendable>: Sendable {
   public let execution: ProcessExecutionResult
-  public let semantic: SemanticResult
+  package let semantic: SemanticResult
   public let executableIdentity: ProcessExecutableIdentityReceipt
 
   public init(
@@ -293,7 +293,7 @@ package enum ProcessIdentityBoundLaunchFault: Sendable {
   case closeDescriptorBeforeSpawn
 }
 
-public enum ProcessExecutionError: Error, Equatable, LocalizedError {
+package enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case executableMustBeAbsolute(String)
   case invalidExecutableContainsNUL
   case invalidArgumentContainsNUL
@@ -355,7 +355,7 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   }
 }
 
-public typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
+package typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
 
 /// A `posix_spawn` adapter with a dedicated process group, separate streamed
 /// stdout/stderr, and bounded in-memory captures. `onOutput` receives every
@@ -363,13 +363,13 @@ public typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
 /// memory grow with the output size. Timeout and cancellation signal only the
 /// spawned process group, which also prevents a descendant from surviving the
 /// parent process.
-public final class FoundationProcessExecutor: @unchecked Sendable {
+package final class FoundationProcessExecutor: @unchecked Sendable {
   /// The only parent-environment keys a child process ever inherits. The
   /// parent (arkdeck-agentd) carries credentials such as its model API key;
   /// spawning must not republish them to every tool child. A caller that
   /// needs any variable beyond this base names it in
   /// `ProcessRequest.environment` explicitly.
-  public static let baseChildEnvironmentKeys: Set<String> = [
+  package static let baseChildEnvironmentKeys: Set<String> = [
     "PATH", "HOME", "TMPDIR", "LANG",
   ]
 
@@ -471,7 +471,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
   /// hash, rechecks the pathname, then executes Darwin's stable
   /// `/.vol/<device>/<inode>` name while retaining the same descriptor through
   /// the `posix_spawn` syscall.
-  public func executeIdentityBound(
+  package func executeIdentityBound(
     _ request: ProcessIdentityBoundRequest,
     captureLimit: Int = 64 * 1024,
     onOutput: @escaping ProcessOutputHandler = { _ in }
@@ -502,7 +502,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       verifiedResources: verifiedResources, onOutput: onOutput)
   }
 
-  public func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
+  package func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
     _ request: ProcessIdentityBoundRequest,
     evaluating evaluator: Evaluator,
     captureLimit: Int = 64 * 1024,

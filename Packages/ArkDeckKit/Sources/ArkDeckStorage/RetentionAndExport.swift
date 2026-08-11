@@ -3,16 +3,16 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum SessionExportDeviceIdentifierPolicy: Equatable, Sendable {
+package enum SessionExportDeviceIdentifierPolicy: Equatable, Sendable {
   case redact
   case include
 }
 
-public struct SessionExportPlan: Equatable, Sendable {
-  public let includedRelativePaths: [String]
-  public let excludedDeviceDataRelativePaths: [String]
+package struct SessionExportPlan: Equatable, Sendable {
+  package let includedRelativePaths: [String]
+  package let excludedDeviceDataRelativePaths: [String]
   public let sensitiveDataWarning: String
-  public let deviceIdentifierPolicy: SessionExportDeviceIdentifierPolicy
+  package let deviceIdentifierPolicy: SessionExportDeviceIdentifierPolicy
 
   public init(
     includedRelativePaths: [String],
@@ -27,7 +27,7 @@ public struct SessionExportPlan: Equatable, Sendable {
   }
 }
 
-public struct SessionExportPlanner: Sendable {
+package struct SessionExportPlanner: Sendable {
   public init() {}
 
   public func plan(
@@ -60,7 +60,7 @@ public struct SessionExportPlanner: Sendable {
   }
 }
 
-public struct MaterializedSessionExport: Equatable, Sendable {
+package struct MaterializedSessionExport: Equatable, Sendable {
   public let root: URL
   public let plan: SessionExportPlan
 }
@@ -468,7 +468,7 @@ private final class AnchoredExportStaging {
   }
 }
 
-public struct SessionDiagnosticExporter: Sendable {
+package struct SessionDiagnosticExporter: Sendable {
   private static let maximumRedactedArtifactBytes = 64 * 1_024 * 1_024
   private static let minimumSubstringIdentifierBytes = 4
   private let volumeIdentityResolver: any VolumeIdentityResolving
@@ -1304,13 +1304,13 @@ public struct SessionDiagnosticExporter: Sendable {
   }
 }
 
-public struct RetainedSession: Equatable, Sendable {
+package struct RetainedSession: Equatable, Sendable {
   public let sessionID: String
   public let root: URL
   public let sizeBytes: UInt64
-  public let completedAt: Date
+  package let completedAt: Date
   public let expiresAt: Date?
-  public let isPinned: Bool
+  package let isPinned: Bool
 
   public init(
     sessionID: String,
@@ -1331,7 +1331,7 @@ public struct RetainedSession: Equatable, Sendable {
   }
 }
 
-public struct SessionRetentionPlan: Equatable, Sendable {
+package struct SessionRetentionPlan: Equatable, Sendable {
   public let deletionSessionIDs: [String]
   public let projectedBytes: UInt64
   public let safetyTargetBytes: UInt64
@@ -1339,7 +1339,7 @@ public struct SessionRetentionPlan: Equatable, Sendable {
   public let blocksNewHeavyWriters: Bool
 }
 
-public struct SessionRetentionController: Sendable {
+package struct SessionRetentionController: Sendable {
   private let faultInjector: SessionStorageFaultInjector
 
   public init(faultInjector: SessionStorageFaultInjector = .none) {

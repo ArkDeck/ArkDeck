@@ -23,21 +23,21 @@
 import ArkDeckCore
 import Foundation
 
-public enum WorkspaceProviderError: Error, Equatable, Sendable {
+package enum WorkspaceProviderError: Error, Equatable, Sendable {
   case unknownProject(String)
   case malformedScope(String)
 }
 
 /// Declared source workspaces this host may read. Registration is explicit:
 /// an unknown project reference is a refusal, never a guessed path.
-public struct WorkspaceProjectRegistry: Sendable, Equatable {
+package struct WorkspaceProjectRegistry: Sendable, Equatable {
   private let roots: [String: String]
 
   public init(roots: [String: String] = [:]) {
     self.roots = roots
   }
 
-  public var projectRefs: [String] { roots.keys.sorted() }
+  package var projectRefs: [String] { roots.keys.sorted() }
 
   public func root(for projectRef: String) throws -> String {
     guard let root = roots[projectRef] else {
@@ -47,8 +47,8 @@ public struct WorkspaceProjectRegistry: Sendable, Equatable {
   }
 }
 
-public struct WorkspaceInspectorTool: Sendable, Equatable {
-  public let executablePath: String
+package struct WorkspaceInspectorTool: Sendable, Equatable {
+  package let executablePath: String
   public let executableSHA256: String
 
   public init(executablePath: String, executableSHA256: String) {
@@ -57,8 +57,8 @@ public struct WorkspaceInspectorTool: Sendable, Equatable {
   }
 }
 
-public struct WorkspaceProvider: DeviceProvider {
-  public static let inspectSourceReference = "workspace.inspect-source@1"
+package struct WorkspaceProvider: DeviceProvider {
+  package static let inspectSourceReference = "workspace.inspect-source@1"
 
   private let registry: WorkspaceProjectRegistry
   /// Absent means the host has no configured inspector: the operation reports
@@ -84,7 +84,7 @@ public struct WorkspaceProvider: DeviceProvider {
 
   public var providerID: String { CatalogProvider.workspace.rawValue }
 
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard operation.reference == Self.inspectSourceReference else {
@@ -104,14 +104,14 @@ public struct WorkspaceProvider: DeviceProvider {
   /// A host-only provider has no device facts. Throwing is the honest answer:
   /// the engine's host-only admission never asks, and anything that does must
   /// fail rather than receive invented routing.
-  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+  package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     throw DeviceProviderError.factsUnavailable(
       "workspace provider is host-only: it has no device facts for \(targetID)")
   }
 
   /// Forwarded: the ProjectProfile that owns the tree lives in the operations
   /// provider, so it is the only thing that can answer.
-  public func workspaceAuthorizationFacts(
+  package func workspaceAuthorizationFacts(
     for operation: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) throws -> WorkspaceAuthorizationFacts? {
@@ -276,14 +276,14 @@ public struct WorkspaceProvider: DeviceProvider {
 
   /// No readback plan: there is no device state to read back, and inventing a
   /// probe here is exactly what CHG-2026-054 §15 forbids.
-  public func reconciliationReadback(
+  package func reconciliationReadback(
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan? {
     nil
   }
 
-  public func verifyReconciliationReadback(
+  package func verifyReconciliationReadback(
     receipt: ProviderProcessReceipt,
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext

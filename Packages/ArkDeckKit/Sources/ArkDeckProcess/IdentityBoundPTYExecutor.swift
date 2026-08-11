@@ -4,9 +4,9 @@ import Foundation
 /// One exact prompt/secret exchange for a descriptor-bound child process.
 /// The secret is never included in a process request, argv, environment or
 /// returned receipt. Callers must clear their copy after execution.
-public struct IdentityBoundPTYInteraction: Sendable, Equatable {
-  public let expectedPrompt: Data
-  public let secret: Data
+package struct IdentityBoundPTYInteraction: Sendable, Equatable {
+  package let expectedPrompt: Data
+  package let secret: Data
 
   public init(expectedPrompt: Data, secret: Data) {
     self.expectedPrompt = expectedPrompt
@@ -14,12 +14,12 @@ public struct IdentityBoundPTYInteraction: Sendable, Equatable {
   }
 }
 
-public struct IdentityBoundPTYExecutionResult: Sendable, Equatable {
-  public let termination: ProcessTermination
+package struct IdentityBoundPTYExecutionResult: Sendable, Equatable {
+  package let termination: ProcessTermination
   public let executableIdentity: ProcessExecutableIdentityReceipt
-  public let completedInteractions: Int
-  public let observedOutputByteCount: Int
-  public let failureCategory: IdentityBoundPTYFailureCategory
+  package let completedInteractions: Int
+  package let observedOutputByteCount: Int
+  package let failureCategory: IdentityBoundPTYFailureCategory
 
   public init(
     termination: ProcessTermination,
@@ -38,7 +38,7 @@ public struct IdentityBoundPTYExecutionResult: Sendable, Equatable {
 
 /// Closed signer failure vocabulary derived in memory from the PTY stream.
 /// No transcript, path, alias or secret is returned to the caller.
-public enum IdentityBoundPTYFailureCategory: String, Sendable, Equatable {
+package enum IdentityBoundPTYFailureCategory: String, Sendable, Equatable {
   case none
   case keystorePasswordRejected
   case keyPasswordRejected
@@ -57,7 +57,7 @@ public enum IdentityBoundPTYFailureCategory: String, Sendable, Equatable {
   case signerRejected
 }
 
-public enum IdentityBoundPTYError: Error, Equatable, Sendable {
+package enum IdentityBoundPTYError: Error, Equatable, Sendable {
   case invalidInteraction
   case ptyAllocationFailed(Int32)
   case launchFailed(String)
@@ -80,7 +80,7 @@ private final class PTYCancellationBox: @unchecked Sendable {
 /// Descriptor-bound PTY execution used by the OpenHarmony signer. It exposes
 /// no transcript: a password can therefore never reach a generic process
 /// receipt even if an upstream terminal implementation starts echoing input.
-public final class IdentityBoundPTYExecutor: @unchecked Sendable {
+package final class IdentityBoundPTYExecutor: @unchecked Sendable {
   public init() {}
 
   public func execute(

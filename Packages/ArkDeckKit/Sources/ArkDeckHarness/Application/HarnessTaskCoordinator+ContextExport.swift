@@ -25,10 +25,10 @@ import Foundation
 
 /// What `task.context` returns: the bounded context plus the digest an
 /// external producer can quote to say which facts its proposal stood on.
-public struct HarnessExportedDecisionContext: Sendable, Equatable {
+package struct HarnessExportedDecisionContext: Sendable, Equatable {
   public let context: HarnessDecisionContext
-  public let contextDigest: String
-  public let contextBytes: Int
+  package let contextDigest: String
+  package let contextBytes: Int
 
   public init(context: HarnessDecisionContext, contextDigest: String, contextBytes: Int) {
     self.context = context
@@ -41,7 +41,7 @@ extension HarnessTaskCoordinator {
   /// Assemble and screen the bounded decision context for an external
   /// producer. Available in every task status: a producer deciding whether
   /// to propose needs the same view mid-loop as at a human boundary.
-  public func decisionContext(_ taskID: String) async throws -> HarnessExportedDecisionContext {
+  package func decisionContext(_ taskID: String) async throws -> HarnessExportedDecisionContext {
     let snapshot = try await status(taskID)
     guard let handler = handlers[snapshot.type] else {
       throw HarnessCoordinatorError.unsupportedTaskType(snapshot.type)

@@ -8,32 +8,32 @@ import ArkDeckCore
 import Dispatch
 import Foundation
 
-public enum RuntimeExecutorKind: String, Codable, Sendable {
+package enum RuntimeExecutorKind: String, Codable, Sendable {
   case agent
   case human
 }
 
-public enum RuntimeHumanActionKind: String, Codable, Sendable {
+package enum RuntimeHumanActionKind: String, Codable, Sendable {
   case trustDevice
   case selectTarget
   case physicalReconnect
 }
 
-public struct RuntimeHumanActionReceipt: Codable, Sendable, Equatable {
+package struct RuntimeHumanActionReceipt: Codable, Sendable, Equatable {
   public let kind: RuntimeHumanActionKind
   public let prompt: String
-  public let resumeToken: String
+  package let resumeToken: String
   /// Exact typed values accepted by `--selection`, when this action is a
   /// choice. A human never has to run a separate host command to discover
   /// them.
-  public let selectionOptions: [String]?
-  public let raisedAtUTC: String
-  public var resolvedAtUTC: String?
+  package let selectionOptions: [String]?
+  package let raisedAtUTC: String
+  package var resolvedAtUTC: String?
 }
 
-public struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
+package struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
   public let executor: RuntimeExecutorKind
-  public let executorID: String
+  package let executorID: String
   public let operationReference: String
   public let jobID: String?
   public let targetID: String?
@@ -43,14 +43,14 @@ public struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
   public let executionMode: String
   public let actualEffect: RuntimeHardwareEvidenceEffectLevel?
   public let authority: RuntimeHardwareEvidenceAuthority?
-  public let stepKinds: [String]
+  package let stepKinds: [String]
   public let evidenceObservation: RuntimeHardwareEvidenceObservation?
   public let firstEvidenceStepAtUTC: String?
   public let outcomeUnknown: Bool
-  public let humanActions: [RuntimeHumanActionReceipt]
+  package let humanActions: [RuntimeHumanActionReceipt]
   public let terminalState: String
   public let artifacts: [RuntimeHardwareEvidenceArtifact]
-  public let evidenceBlockers: [String]
+  package let evidenceBlockers: [String]
   public let startedAtUTC: String
   public let finishedAtUTC: String
 
@@ -59,13 +59,13 @@ public struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
   }
 }
 
-public enum RuntimeAgentExecutionOutcome: Sendable, Equatable {
+package enum RuntimeAgentExecutionOutcome: Sendable, Equatable {
   case completed(RuntimeAgentExecutionReceipt)
   case awaitingHumanAction(RuntimeHumanActionReceipt, RuntimeAgentExecutionReceipt)
   case failed(reason: String, receipt: RuntimeAgentExecutionReceipt)
 }
 
-public enum RuntimeAgentExecutorError: Error, Equatable, Sendable {
+package enum RuntimeAgentExecutorError: Error, Equatable, Sendable {
   case daemonUnavailable(String)
   case malformedResponse(String)
   case operationRejected(String)
@@ -74,17 +74,17 @@ public enum RuntimeAgentExecutorError: Error, Equatable, Sendable {
   case timeout(String)
 }
 
-public struct RuntimeAgentExecutionRequest: Codable, Sendable, Equatable {
+package struct RuntimeAgentExecutionRequest: Codable, Sendable, Equatable {
   public let operationID: String
   public let operationVersion: Int?
   public let inputs: [String: JSONValue]
-  public let capabilityReference: String?
+  package let capabilityReference: String?
   public let targetID: String?
-  public let maximumWaitSeconds: Int
+  package let maximumWaitSeconds: Int
   /// Stable across a persisted physical-assistance pause. It is also the
   /// seed for request/idempotency identities, so resume cannot create a
   /// second runtime job.
-  public let executionID: String
+  package let executionID: String
 
   public init(
     operationID: String,
@@ -107,7 +107,7 @@ public struct RuntimeAgentExecutionRequest: Codable, Sendable, Equatable {
   var reference: String { operationVersion.map { "\(operationID)@\($0)" } ?? operationID }
 }
 
-public struct AgentRuntimeExecutor: Sendable {
+package struct AgentRuntimeExecutor: Sendable {
   private struct ExecutionDeadline: Sendable {
     private let startedNanoseconds: UInt64
     private let budgetNanoseconds: UInt64

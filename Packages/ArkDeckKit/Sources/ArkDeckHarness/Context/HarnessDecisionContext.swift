@@ -26,24 +26,24 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
+package struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
   public let maxAttempts: Int
-  public let maxFailures: Int
-  public let maxMemories: Int
-  public let maxArtifacts: Int
-  public let maxOperations: Int
-  public let maxSummaryCharacters: Int
+  package let maxFailures: Int
+  package let maxMemories: Int
+  package let maxArtifacts: Int
+  package let maxOperations: Int
+  package let maxSummaryCharacters: Int
   /// Per-excerpt ceiling for evidence and source text. A model that must
   /// write a unified diff needs the actual lines; a model that must read a
   /// crash needs the fault block. Both are bounded per item so one large
   /// artifact cannot crowd out everything else.
-  public let maxExcerptCharacters: Int
+  package let maxExcerptCharacters: Int
   /// How many source files may be excerpted into one context.
-  public let maxSourceFiles: Int
+  package let maxSourceFiles: Int
   /// Ceiling on the encoded context. Exceeding it trims, and the trim is
   /// recorded in the context itself - a silently shortened context is a
   /// context nobody can reason about afterwards.
-  public let maxEncodedBytes: Int
+  package let maxEncodedBytes: Int
 
   public init(
     maxAttempts: Int = 5,
@@ -74,7 +74,7 @@ public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
   public static let `default` = HarnessDecisionContextLimits()
 }
 
-public struct HarnessContextAttempt: Equatable, Sendable, Codable {
+package struct HarnessContextAttempt: Equatable, Sendable, Codable {
   public let round: Int
   public let operationReference: String
   public let outcome: String
@@ -88,15 +88,15 @@ public struct HarnessContextAttempt: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessContextFailure: Equatable, Sendable, Codable {
+package struct HarnessContextFailure: Equatable, Sendable, Codable {
   public let digest: String
   public let operationReference: String
-  public let occurrences: Int
-  public let stance: HarnessRetryStance
-  public let errorClassification: String
-  public let semanticErrorCode: String
-  public let retryDisposition: HarnessFailureRetryDisposition
-  public let alternativeHints: [String]
+  package let occurrences: Int
+  package let stance: HarnessRetryStance
+  package let errorClassification: String
+  package let semanticErrorCode: String
+  package let retryDisposition: HarnessFailureRetryDisposition
+  package let alternativeHints: [String]
 
   public init(
     digest: String,
@@ -122,7 +122,7 @@ public struct HarnessContextFailure: Equatable, Sendable, Codable {
 /// Facts split by authority. `current` may contain current evaluator PASS
 /// facts and in-scope VERIFIED memory. CANDIDATE memory remains advice in
 /// `relevantMemory` and never crosses this boundary.
-public struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
+package struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
   public let current: [String]
 
   public init(current: [String] = []) {
@@ -139,14 +139,14 @@ public struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
 /// prefix. It stays bounded and stays honest: `excerptTruncated` says when the
 /// artifact is longer than what is shown, and an artifact the operator has not
 /// allowed carries no excerpt at all rather than a redacted-looking one.
-public struct HarnessContextArtifact: Equatable, Sendable, Codable {
+package struct HarnessContextArtifact: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
   public let byteCount: Int
-  public let sha256Prefix: String
+  package let sha256Prefix: String
   public let verified: Bool
-  public let excerpt: String?
-  public let excerptTruncated: Bool
+  package let excerpt: String?
+  package let excerptTruncated: Bool
 
   enum CodingKeys: String, CodingKey {
     case artifactID = "artifactId"
@@ -198,7 +198,7 @@ public struct HarnessContextArtifact: Equatable, Sendable, Codable {
   /// Drops the excerpt while keeping identity, size and digest. Trimming a
   /// context shrinks what the model sees; it must never change what the
   /// context says an artifact *is*.
-  public func withoutExcerpt() -> Self {
+  package func withoutExcerpt() -> Self {
     HarnessContextArtifact(
       artifactID: artifactID, name: name, byteCount: byteCount,
       sha256Prefix: sha256Prefix, verified: verified)
@@ -258,12 +258,12 @@ extension HarnessDecisionContext {
 /// A file the task is allowed to change, as the model may see it. Without
 /// this a `proposePatch` is impossible in principle: a unified diff needs the
 /// exact lines it is diffing against.
-public struct HarnessContextSourceFile: Equatable, Sendable, Codable {
+package struct HarnessContextSourceFile: Equatable, Sendable, Codable {
   public let path: String
   public let byteCount: Int
-  public let sha256Prefix: String
-  public let excerpt: String
-  public let excerptTruncated: Bool
+  package let sha256Prefix: String
+  package let excerpt: String
+  package let excerptTruncated: Bool
 
   public init(
     path: String, byteCount: Int, sha256Prefix: String, excerpt: String,
@@ -281,15 +281,15 @@ public struct HarnessContextSourceFile: Equatable, Sendable, Codable {
 /// excludes free-form hypothesis prose, capability identifiers and ActionRun
 /// inputs: it describes which durable Attempt is active without turning the
 /// context into a second execution surface.
-public struct HarnessContextActiveAttemptSummary: Equatable, Sendable, Codable {
+package struct HarnessContextActiveAttemptSummary: Equatable, Sendable, Codable {
   public let attemptID: String
   public let ordinal: Int
-  public let strategyFingerprint: String
+  package let strategyFingerprint: String
   public let operationReference: String
   public let outcome: HarnessAttemptOutcome
-  public let baseWorkspaceRevision: String?
-  public let patchRevision: String?
-  public let expectedNextObservation: String
+  package let baseWorkspaceRevision: String?
+  package let patchRevision: String?
+  package let expectedNextObservation: String
 
   enum CodingKeys: String, CodingKey {
     case attemptID = "attemptId"
@@ -314,7 +314,7 @@ public struct HarnessContextActiveAttemptSummary: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable {
+package struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable {
   public let operationReference: String
   public let reasonCode: String
 
@@ -330,10 +330,10 @@ public struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
+package struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
   public let workspaceRevision: String?
-  public let deployedArtifactDigest: String?
-  public let deviceBindingRevision: Int?
+  package let deployedArtifactDigest: String?
+  package let deviceBindingRevision: Int?
 
   public init(
     workspaceRevision: String? = nil,
@@ -349,17 +349,17 @@ public struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
 /// A bounded semantic view of a deterministic analyzer output. Raw bytes do
 /// not travel; the source Artifact identity, pinned producer, applicable
 /// revision and full content digest do, so the summary remains auditable.
-public struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
+package struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
-  public let sourceArtifactIDs: [String]
-  public let analyzerReference: String
+  package let sourceArtifactIDs: [String]
+  package let analyzerReference: String
   public let analyzerVersion: String
-  public let revisionScope: HarnessContextRevisionScope
-  public let redactionStatus: String
-  public let contentSHA256: String
+  package let revisionScope: HarnessContextRevisionScope
+  package let redactionStatus: String
+  package let contentSHA256: String
   public let byteCount: Int
-  public let measurements: [String: JSONValue]
+  package let measurements: [String: JSONValue]
 
   enum CodingKeys: String, CodingKey {
     case artifactID = "artifactId"
@@ -402,17 +402,17 @@ public struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
 /// Facts whose authority lives outside the task snapshot but which are safe
 /// and useful in the outbound context. The coordinator rebuilds this value on
 /// every wake; it is never accepted from a model or persisted as task state.
-public struct HarnessContextExecutionState: Equatable, Sendable {
-  public let activeAttempt: HarnessAttempt?
-  public let currentWorkspaceRevision: String?
-  public let currentDeployedArtifactDigest: String?
-  public let currentDeviceBindingRevision: Int?
-  public let disprovedHypotheses: [String]
-  public let unavailableOperations: [HarnessContextUnavailableOperation]
-  public let authorizedOperationReferences: [String]
-  public let currentCapabilityEffectCeiling: WorkflowEffect?
-  public let allowedFileScopes: [String]
-  public let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
+package struct HarnessContextExecutionState: Equatable, Sendable {
+  package let activeAttempt: HarnessAttempt?
+  package let currentWorkspaceRevision: String?
+  package let currentDeployedArtifactDigest: String?
+  package let currentDeviceBindingRevision: Int?
+  package let disprovedHypotheses: [String]
+  package let unavailableOperations: [HarnessContextUnavailableOperation]
+  package let authorizedOperationReferences: [String]
+  package let currentCapabilityEffectCeiling: WorkflowEffect?
+  package let allowedFileScopes: [String]
+  package let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
 
   public init(
     activeAttempt: HarnessAttempt? = nil,
@@ -454,14 +454,14 @@ public struct HarnessContextExecutionState: Equatable, Sendable {
   }
 }
 
-public struct HarnessContextBudget: Equatable, Sendable, Codable {
-  public let roundsRemaining: Int
-  public let wallClockSecondsRemaining: Int
-  public let artifactBytesRemaining: Int
-  public let e1MutationsRemaining: Int
-  public let noProgressRoundsRemaining: Int
-  public let actionRetriesPerRun: Int
-  public let modelCallsRemaining: Int
+package struct HarnessContextBudget: Equatable, Sendable, Codable {
+  package let roundsRemaining: Int
+  package let wallClockSecondsRemaining: Int
+  package let artifactBytesRemaining: Int
+  package let e1MutationsRemaining: Int
+  package let noProgressRoundsRemaining: Int
+  package let actionRetriesPerRun: Int
+  package let modelCallsRemaining: Int
 
   public init(
     roundsRemaining: Int,
@@ -482,7 +482,7 @@ public struct HarnessContextBudget: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessDecisionContext: Equatable, Sendable, Codable {
+package struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision-context"
   public static let schemaVersion = "2.2.0"
 
@@ -490,50 +490,50 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public let schemaVersion: String
   /// Pseudonymous, stable within a task: enough to reason about "the same
   /// target as before", not enough to identify a device.
-  public let targetPseudonym: String
-  public let taskType: HarnessTaskType
+  package let targetPseudonym: String
+  package let taskType: HarnessTaskType
   public let status: HarnessTaskLifecycle
-  public let phase: HarnessTaskStage
+  package let phase: HarnessTaskStage
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
-  public let conditions: [HarnessTaskCondition]
+  package let conditions: [HarnessTaskCondition]
   public let round: Int
-  public let currentTaskStateVersion: Int
-  public let activeAttemptID: String?
-  public let activeAttemptSummary: HarnessContextActiveAttemptSummary?
-  public let currentWorkspaceRevision: String?
-  public let currentDeployedArtifactDigest: String?
-  public let currentDeviceBindingRevision: Int?
-  public let disprovedHypotheses: [String]
-  public let unavailableOperationsAndReasons: [HarnessContextUnavailableOperation]
-  public let currentCapabilityEffectCeiling: WorkflowEffect?
-  public let authorizedOperationRefs: [String]
-  public let allowedFileScopes: [String]
-  public let expectedNextObservation: String?
-  public let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
-  public let goalSummary: String
-  public let desiredState: [String: JSONValue]
-  public let observedMeasurements: [String: JSONValue]
-  public let observedSamples: [String: Int]
-  public let latestVerdict: HarnessEvaluationVerdict?
-  public let criterionResults: [HarnessCriterionResult]
-  public let recentAttempts: [HarnessContextAttempt]
-  public let unresolvedFailures: [HarnessContextFailure]
-  public let relevantMemory: [String]
-  public let confirmedFacts: HarnessContextConfirmedFacts
-  public let memorySelectionManifest: HarnessMemorySelectionManifest
+  package let currentTaskStateVersion: Int
+  package let activeAttemptID: String?
+  package let activeAttemptSummary: HarnessContextActiveAttemptSummary?
+  package let currentWorkspaceRevision: String?
+  package let currentDeployedArtifactDigest: String?
+  package let currentDeviceBindingRevision: Int?
+  package let disprovedHypotheses: [String]
+  package let unavailableOperationsAndReasons: [HarnessContextUnavailableOperation]
+  package let currentCapabilityEffectCeiling: WorkflowEffect?
+  package let authorizedOperationRefs: [String]
+  package let allowedFileScopes: [String]
+  package let expectedNextObservation: String?
+  package let derivedArtifactSummaries: [HarnessDerivedArtifactSummary]
+  package let goalSummary: String
+  package let desiredState: [String: JSONValue]
+  package let observedMeasurements: [String: JSONValue]
+  package let observedSamples: [String: Int]
+  package let latestVerdict: HarnessEvaluationVerdict?
+  package let criterionResults: [HarnessCriterionResult]
+  package let recentAttempts: [HarnessContextAttempt]
+  package let unresolvedFailures: [HarnessContextFailure]
+  package let relevantMemory: [String]
+  package let confirmedFacts: HarnessContextConfirmedFacts
+  package let memorySelectionManifest: HarnessMemorySelectionManifest
   public let artifacts: [HarnessContextArtifact]
   /// The files this task is allowed to change, with their current text.
-  public let sourceFiles: [HarnessContextSourceFile]
+  package let sourceFiles: [HarnessContextSourceFile]
   /// What this round is actually asking for. Without it a model can only
   /// infer the question from the phase, and the one round that matters most —
   /// "propose a patch" — looks indistinguishable from "pick an operation",
   /// which is how a model ends up trying to invoke apply-patch instead of
   /// writing the diff apply-patch would need.
-  public let requestedDecision: String?
-  public let availableOperations: [String]
-  public let budget: HarnessContextBudget
+  package let requestedDecision: String?
+  package let availableOperations: [String]
+  package let budget: HarnessContextBudget
   public let blockers: [String]
   /// What was left out, and why. A trimmed context says so.
   public let trimmed: [String]
@@ -618,22 +618,22 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   /// and unescaped slashes make it byte-stable, which is what lets
   /// `transmittedDigest` stand for "what the model received" rather than
   /// "what the harness intended to send".
-  public var transmittedBytes: Data {
+  package var transmittedBytes: Data {
     let encoder = CanonicalJSONEncoders.canonical()
     return (try? encoder.encode(self)) ?? Data("{}".utf8)
   }
 
   /// Computed over the trimmed, screened context - so the digest represents
   /// the bytes that left the host, after redaction, not before it.
-  public var transmittedDigest: String {
+  package var transmittedDigest: String {
     SHA256Hex.string(of: transmittedBytes)
   }
 
-  public var transmittedByteCount: Int { transmittedBytes.count }
+  package var transmittedByteCount: Int { transmittedBytes.count }
 
   /// Stable pseudonym for a target id. Deterministic so the same device reads
   /// as the same device across rounds, one-way so the id cannot be recovered.
-  public static func pseudonym(forTargetID targetID: String) -> String {
+  package static func pseudonym(forTargetID targetID: String) -> String {
     let hex = SHA256Hex.string(of: Data("arkdeck-harness-target|\(targetID)".utf8))
     return "target-\(hex.prefix(12))"
   }
@@ -641,7 +641,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
 
 // MARK: - Inbound proposal
 
-public enum HarnessDecisionRejection: Error, Equatable, Sendable {
+package enum HarnessDecisionRejection: Error, Equatable, Sendable {
   case malformedJSON
   case unknownField(String)
   case forbiddenField(String)
@@ -700,18 +700,18 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
 /// Strictly decoded model output. The allowed key set is closed and the
 /// forbidden set is explicit, because "ignore what you do not understand" is
 /// how a control plane ends up acting on a field it never agreed to.
-public struct HarnessDecisionProposal: Equatable, Sendable {
+package struct HarnessDecisionProposal: Equatable, Sendable {
   public let kind: HarnessDecisionKind
   public let operationReference: String?
   public let inputs: [String: JSONValue]
-  public let hypothesis: String
+  package let hypothesis: String
   public let reasonCode: String
-  public let confidence: Double?
-  public let patchProposal: HarnessPatchProposal?
-  public let requiredArtifacts: [String]
-  public let expectedObservation: String?
+  package let confidence: Double?
+  package let patchProposal: HarnessPatchProposal?
+  package let requiredArtifacts: [String]
+  package let expectedObservation: String?
 
-  public static let allowedFields: Set<String> = [
+  package static let allowedFields: Set<String> = [
     "kind", "operationRef", "operationReference", "inputs", "hypothesis", "reasonCode",
     "confidence", "requiredArtifacts", "expectedObservation",
     "baseWorkspaceRevision", "patchSha256", "unifiedDiff", "touchedFiles",
@@ -726,7 +726,7 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
   /// Keys a proposal may never carry. Each one is a decision the harness or
   /// the runtime owns, and accepting it - even as advice - would move that
   /// authority to the model.
-  public static let forbiddenFields: Set<String> = [
+  package static let forbiddenFields: Set<String> = [
     "status", "taskstatus", "phase", "jobstate", "jobstatus", "state", "result",
     "retrycount", "retries", "attempt", "attempts", "verdict", "evaluation", "succeeded",
     "success", "fixed", "authorization", "authorized", "capability", "capabilityid",

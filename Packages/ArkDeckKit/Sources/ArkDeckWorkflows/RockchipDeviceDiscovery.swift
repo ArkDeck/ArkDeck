@@ -4,9 +4,9 @@ import Foundation
 /// The closed RockUSB discovery family registered by CHG-2026-026/TASK-RKFUI-001.
 /// E0 production discovery accepts one hash-pinned upstream build and one read-only argv shape.
 /// The separately pinned destructive compatibility identity is not accepted by the default adapter.
-public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
+package struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
   /// The clean, non-quarantined build approved only for E0/read-only `ld` discovery.
-  public static let pinnedReadOnlyDiscovery = RockchipDiscoveryIntegrationProfile(
+  package static let pinnedReadOnlyDiscovery = RockchipDiscoveryIntegrationProfile(
     identifier: "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
     reportedToolVersion: "rkdeveloptool ver 1.32",
     executableSHA256: "bbd7bdc0fb121d414fb61085e77211cc1fdd9a3b6c6b285c54380f70e56c9923",
@@ -18,7 +18,7 @@ public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
   /// Compatibility identity consumed by the existing destructive Flash authorization,
   /// execution, and manifest surfaces. CHG-2026-026 r2 explicitly leaves this pin unchanged;
   /// read-only discovery must use `pinnedReadOnlyDiscovery`.
-  public static let pinnedProduction = RockchipDiscoveryIntegrationProfile(
+  package static let pinnedProduction = RockchipDiscoveryIntegrationProfile(
     identifier: "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0",
     reportedToolVersion: "rkdeveloptool ver 1.32",
     executableSHA256: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
@@ -28,10 +28,10 @@ public struct RockchipDiscoveryIntegrationProfile: Sendable, Equatable {
     accessPolicy: .installedOrdinaryBookmark)
 
   public let identifier: String
-  public let reportedToolVersion: String
+  package let reportedToolVersion: String
   public let executableSHA256: String
-  public let upstreamCommit: String
-  public let exactArguments: [String]
+  package let upstreamCommit: String
+  package let exactArguments: [String]
   public let timeout: TimeInterval
   let accessPolicy: RockchipToolAccessPolicy
 }
@@ -76,13 +76,13 @@ enum RockchipToolAccessPolicy: Sendable, Equatable {
   }
 }
 
-public enum RockchipToolPathSource: String, Sendable, Equatable {
+package enum RockchipToolPathSource: String, Sendable, Equatable {
   case userSelectedSecurityScopedBookmark
   case installedOrdinaryBookmark
   case explicitSupportPath
 }
 
-public enum RockchipPlatformCodeTrust: String, Sendable, Equatable {
+package enum RockchipPlatformCodeTrust: String, Sendable, Equatable {
   case developerID
   case adHoc
   case unsigned
@@ -92,9 +92,9 @@ public enum RockchipPlatformCodeTrust: String, Sendable, Equatable {
 
 /// Platform assessment is recorded independently from the registry's source/hash pin.
 /// A quarantined, rejected, unsigned, or unknown executable never reaches ProcessExecutor.
-public struct RockchipPlatformTrustReceipt: Sendable, Equatable {
-  public let codeTrust: RockchipPlatformCodeTrust
-  public let quarantinePresent: Bool?
+package struct RockchipPlatformTrustReceipt: Sendable, Equatable {
+  package let codeTrust: RockchipPlatformCodeTrust
+  package let quarantinePresent: Bool?
 
   public init(codeTrust: RockchipPlatformCodeTrust, quarantinePresent: Bool?) {
     self.codeTrust = codeTrust
@@ -106,11 +106,11 @@ public struct RockchipPlatformTrustReceipt: Sendable, Equatable {
   }
 }
 
-public struct RockchipSelectedDiscoveryTool: Sendable, Equatable {
-  public let executableURL: URL
-  public let pathSource: RockchipToolPathSource
-  public let bookmarkData: Data?
-  public let reportedVersion: String
+package struct RockchipSelectedDiscoveryTool: Sendable, Equatable {
+  package let executableURL: URL
+  package let pathSource: RockchipToolPathSource
+  package let bookmarkData: Data?
+  package let reportedVersion: String
   public let sha256: String
   public let platformTrust: RockchipPlatformTrustReceipt
 
@@ -152,21 +152,21 @@ public enum RockchipDeviceMode: String, Sendable, Equatable {
   case maskrom = "Maskrom"
 }
 
-public enum RockchipProviderBlockReason: Sendable, Equatable {
+package enum RockchipProviderBlockReason: Sendable, Equatable {
   case maskromNotSupported
   case deviceNotExpectedRockUSB
 }
 
-public enum RockchipProviderPreflightDisposition: Sendable, Equatable {
+package enum RockchipProviderPreflightDisposition: Sendable, Equatable {
   case applicableLoader
   case blocked(RockchipProviderBlockReason)
 }
 
-public struct RockchipDeviceObservation: Sendable, Equatable {
-  public let deviceNumber: UInt32
-  public let usbVendorID: UInt16
-  public let usbProductID: UInt16
-  public let locationID: UInt64
+package struct RockchipDeviceObservation: Sendable, Equatable {
+  package let deviceNumber: UInt32
+  package let usbVendorID: UInt16
+  package let usbProductID: UInt16
+  package let locationID: UInt64
   public let mode: RockchipDeviceMode
 
   public init(
@@ -183,7 +183,7 @@ public struct RockchipDeviceObservation: Sendable, Equatable {
     self.mode = mode
   }
 
-  public var providerPreflightDisposition: RockchipProviderPreflightDisposition {
+  package var providerPreflightDisposition: RockchipProviderPreflightDisposition {
     guard usbVendorID == 0x2207, usbProductID == 0x350a else {
       return .blocked(.deviceNotExpectedRockUSB)
     }
@@ -192,7 +192,7 @@ public struct RockchipDeviceObservation: Sendable, Equatable {
   }
 }
 
-public enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
+package enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
   case outputTooLarge
   case invalidUTF8
   case unexpectedCarriageReturn
@@ -213,23 +213,23 @@ public enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
   case unknownMode(line: Int, value: String)
 }
 
-public enum RockchipLDParseResult: Sendable, Equatable {
+package enum RockchipLDParseResult: Sendable, Equatable {
   case observations([RockchipDeviceObservation])
   case blocked(RockchipDiscoveryDiagnostic)
 }
 
 /// Consumes the complete registered `rkdeveloptool ld` stdout family. It never
 /// drops an unrecognized line or turns malformed output into an empty list.
-public enum RockchipLDOutputParser {
-  public static let maximumOutputBytes = 64 * 1024
-  public static let maximumDeviceCount = 64
+package enum RockchipLDOutputParser {
+  package static let maximumOutputBytes = 64 * 1024
+  package static let maximumDeviceCount = 64
 
   private static let lineExpression = try! NSRegularExpression(
     pattern:
       #"\ADevNo=([0-9]+)\tVid=0x([0-9A-Fa-f]{4}),Pid=0x([0-9A-Fa-f]{4}),LocationID=([0-9]+)\t([A-Za-z][A-Za-z0-9_-]{0,31})\z"#
   )
 
-  public static func parse(
+  package static func parse(
     stdout: Data,
     stderr: Data = Data(),
     termination: ProcessTermination = .exited(0)
@@ -427,7 +427,7 @@ public struct RockchipDeviceAccessAdvice: Sendable, Equatable {
   }
 }
 
-public enum RockchipDeviceAccessAdvisor {
+package enum RockchipDeviceAccessAdvisor {
   public static func verdict(for result: RockchipLDParseResult) -> RockchipDeviceAccessVerdict {
     switch result {
     case .observations(let observations):
@@ -485,12 +485,12 @@ public enum RockchipDeviceAccessAdvisor {
   }
 }
 
-public struct RockchipDeviceDiscoveryAttempt: Sendable, Equatable {
+package struct RockchipDeviceDiscoveryAttempt: Sendable, Equatable {
   public let observations: [RockchipDeviceObservation]
   public let diagnostic: RockchipDiscoveryDiagnostic?
   public let advice: RockchipDeviceAccessAdvice
   public let execution: ProcessExecutionResult?
-  public let executableIdentity: ProcessExecutableIdentityReceipt?
+  package let executableIdentity: ProcessExecutableIdentityReceipt?
 
   public init(
     observations: [RockchipDeviceObservation],
@@ -623,7 +623,7 @@ final class RockchipExecutableBookmarkAccess {
 
 /// Shell-free, identity-bound adapter. Callers cannot supply arguments; the
 /// profile fixes the only process request to the read-only `ld` operation.
-public actor RockchipDeviceDiscoveryAdapter {
+package actor RockchipDeviceDiscoveryAdapter {
   private let profile: RockchipDiscoveryIntegrationProfile
   private let executor: FoundationProcessExecutor
   /// Product-owned current directory for the `ld` child, prepared by
@@ -678,7 +678,7 @@ public actor RockchipDeviceDiscoveryAdapter {
       expectedSHA256: profile.executableSHA256)
   }
 
-  public func discover(using tool: RockchipSelectedDiscoveryTool) async
+  package func discover(using tool: RockchipSelectedDiscoveryTool) async
     -> RockchipDeviceDiscoveryAttempt
   {
     let request: ProcessIdentityBoundRequest

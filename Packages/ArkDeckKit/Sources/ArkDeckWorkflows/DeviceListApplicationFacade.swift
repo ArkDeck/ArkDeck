@@ -57,7 +57,7 @@ public struct DeviceCandidatePresentation: Sendable, Equatable, Identifiable {
 
   public var id: String { connectKey }
   public var isAuthorized: Bool { state == "Connected" }
-  public var needsPhysicalTrust: Bool { state == "Unauthorized" || state == "Offline" }
+  package var needsPhysicalTrust: Bool { state == "Unauthorized" || state == "Offline" }
   public var isAdopted: Bool { adoptedTargetID != nil }
 }
 

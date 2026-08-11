@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum UpdateFeedError: Error, Equatable, Sendable {
+package enum UpdateFeedError: Error, Equatable, Sendable {
   case feedTooLarge
   case payloadTooLarge
   case malformedEnvelope
@@ -33,14 +33,14 @@ public enum UpdateFeedError: Error, Equatable, Sendable {
 }
 
 public struct UpdateFeedTrust: Equatable, Sendable {
-  public static let productionKeyID = "arkdeck-update-2026-07-b949b102"
-  public static let productionRawPublicKeyBase64 =
+  package static let productionKeyID = "arkdeck-update-2026-07-b949b102"
+  package static let productionRawPublicKeyBase64 =
     "c5Ho0xkWFQ3Ovzjx98dQhF3n5sytJjffqD3a+ftgP8c="
-  public static let productionSPKISHA256 =
+  package static let productionSPKISHA256 =
     "b949b102c5eb266084c3d59ee2e05de45681947841a4864afa0fc4136a1e7ddf"
 
-  public let keyID: String
-  public let rawPublicKey: Data
+  package let keyID: String
+  package let rawPublicKey: Data
 
   public init(keyID: String, rawPublicKey: Data) throws {
     guard !keyID.isEmpty, rawPublicKey.count == 32,
@@ -62,9 +62,9 @@ public struct UpdateFeedTrust: Equatable, Sendable {
   }
 }
 
-public struct UpdateFeedEnvelope: Codable, Equatable, Sendable {
-  public let schemaVersion: UInt64
-  public let keyId: String
+package struct UpdateFeedEnvelope: Codable, Equatable, Sendable {
+  package let schemaVersion: UInt64
+  package let keyId: String
   public let payload: String
   public let signature: String
 
@@ -78,7 +78,7 @@ public struct UpdateFeedEnvelope: Codable, Equatable, Sendable {
 
 public struct UpdateArtifactDescriptor: Codable, Equatable, Sendable {
   public let url: String
-  public let byteLength: UInt64
+  package let byteLength: UInt64
   public let sha256: String
 
   public init(url: String, byteLength: UInt64, sha256: String) {
@@ -91,10 +91,10 @@ public struct UpdateArtifactDescriptor: Codable, Equatable, Sendable {
 public struct UpdateFeedPayload: Codable, Equatable, Sendable {
   public let sequence: UInt64
   public let version: String
-  public let minimumSystemVersion: String
-  public let architectures: [String]
-  public let issuedAt: String
-  public let expiresAt: String
+  package let minimumSystemVersion: String
+  package let architectures: [String]
+  package let issuedAt: String
+  package let expiresAt: String
   public let artifact: UpdateArtifactDescriptor
   public let releaseNotesSummary: String
 
@@ -119,10 +119,10 @@ public struct UpdateFeedPayload: Codable, Equatable, Sendable {
   }
 }
 
-public struct UpdateSemanticVersion: Codable, Comparable, Equatable, Sendable {
-  public let major: UInt64
-  public let minor: UInt64
-  public let patch: UInt64
+package struct UpdateSemanticVersion: Codable, Comparable, Equatable, Sendable {
+  package let major: UInt64
+  package let minor: UInt64
+  package let patch: UInt64
 
   public init?(_ value: String) {
     let parts = value.split(separator: ".", omittingEmptySubsequences: false)
@@ -146,17 +146,17 @@ public struct UpdateSemanticVersion: Codable, Comparable, Equatable, Sendable {
   public var string: String { "\(major).\(minor).\(patch)" }
 }
 
-public enum UpdateFeedCodec {
-  public static let maximumFeedBytes = 128 * 1_024
-  public static let maximumPayloadBytes = 64 * 1_024
+package enum UpdateFeedCodec {
+  package static let maximumFeedBytes = 128 * 1_024
+  package static let maximumPayloadBytes = 64 * 1_024
   private static let domain = Data("ArkDeck.UpdateFeed.v1".utf8)
 
-  public static func canonicalPayload(_ payload: UpdateFeedPayload) throws -> Data {
+  package static func canonicalPayload(_ payload: UpdateFeedPayload) throws -> Data {
     try validateCanonicalStrings(payload)
     return try canonicalJSON(payload)
   }
 
-  public static func signatureInput(payload: Data, keyID: String) throws -> Data {
+  package static func signatureInput(payload: Data, keyID: String) throws -> Data {
     guard payload.count <= maximumPayloadBytes,
       keyID.precomposedStringWithCanonicalMapping == keyID
     else { throw UpdateFeedError.invalidPayload }
@@ -168,7 +168,7 @@ public enum UpdateFeedCodec {
     return input
   }
 
-  public static func assemble(
+  package static func assemble(
     canonicalPayload payload: Data,
     signature: Data,
     keyID: String
@@ -185,7 +185,7 @@ public enum UpdateFeedCodec {
     return data
   }
 
-  public static func decodeAndVerify(
+  package static func decodeAndVerify(
     _ data: Data,
     trust: UpdateFeedTrust
   ) throws -> (payload: UpdateFeedPayload, canonicalPayload: Data) {
@@ -261,7 +261,7 @@ public enum UpdateFeedCodec {
 
 public struct UpdateReplayRecord: Codable, Equatable, Sendable {
   public let sequence: UInt64
-  public let payloadSHA256: String
+  package let payloadSHA256: String
   public let version: String
 
   public init(sequence: UInt64, payloadSHA256: String, version: String) {
@@ -278,8 +278,8 @@ public enum UpdateReplayDecision: Equatable, Sendable {
   case nonIncreasingRelease
 }
 
-public enum UpdateReplayPolicy {
-  public static func decision(
+package enum UpdateReplayPolicy {
+  package static func decision(
     previous: UpdateReplayRecord?,
     candidate: UpdateReplayRecord
   ) -> UpdateReplayDecision {
@@ -302,7 +302,7 @@ public protocol UpdateReplayStoring: Sendable {
 
 /// Serializes replay admission across both store instances and App processes, then persists the
 /// highest accepted record with an atomic same-directory rename and durable file/directory sync.
-public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
+package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
   private static let stateName = "replay-state-v1.json"
   private static let lockName = ".replay-state-v1.lock"
   private static let maximumStateBytes = 4 * 1_024
@@ -328,7 +328,7 @@ public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendab
     }
   }
 
-  public func validateAndCommit(
+  package func validateAndCommit(
     _ candidate: UpdateReplayRecord
   ) throws -> UpdateReplayDecision {
     guard Self.isValid(candidate) else { throw UpdateFeedError.replayStateWriteFailed }
@@ -342,7 +342,7 @@ public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendab
     }
   }
 
-  public func loadCurrentRecord() throws -> UpdateReplayRecord? {
+  package func loadCurrentRecord() throws -> UpdateReplayRecord? {
     try withExclusiveTransaction { directoryDescriptor in
       try Self.loadRecord(directoryDescriptor: directoryDescriptor)
     }
@@ -529,8 +529,8 @@ private final class UpdateReplayProcessLockRegistry: @unchecked Sendable {
 }
 
 public struct UpdateVerificationContext: Equatable, Sendable {
-  public let installedVersion: String
-  public let systemVersion: String
+  package let installedVersion: String
+  package let systemVersion: String
   public let architecture: String
 
   public init(installedVersion: String, systemVersion: String, architecture: String) {
@@ -542,8 +542,8 @@ public struct UpdateVerificationContext: Equatable, Sendable {
 
 public struct VerifiedUpdateFeed: Equatable, Sendable {
   public let payload: UpdateFeedPayload
-  public let canonicalPayload: Data
-  public let payloadSHA256: String
+  package let canonicalPayload: Data
+  package let payloadSHA256: String
 
   public init(payload: UpdateFeedPayload, canonicalPayload: Data, payloadSHA256: String) {
     self.payload = payload
@@ -564,7 +564,7 @@ public enum UpdateAvailability: Equatable, Sendable {
 }
 
 public struct UpdateFeedVerifier: Sendable {
-  public static let maximumValiditySeconds: TimeInterval = 30 * 24 * 60 * 60
+  package static let maximumValiditySeconds: TimeInterval = 30 * 24 * 60 * 60
 
   private let trust: UpdateFeedTrust
   private let replayStore: any UpdateReplayStoring
@@ -630,7 +630,7 @@ public struct UpdateFeedVerifier: Sendable {
   /// Validates every signed payload field that can be checked before the isolated maintainer
   /// environment signs it. Freshness against the client's current clock and replay state remain
   /// verification-time checks.
-  public static func validateUnsignedPayloadForSigning(_ payload: UpdateFeedPayload) throws {
+  package static func validateUnsignedPayloadForSigning(_ payload: UpdateFeedPayload) throws {
     _ = try validateStaticPayload(payload)
   }
 

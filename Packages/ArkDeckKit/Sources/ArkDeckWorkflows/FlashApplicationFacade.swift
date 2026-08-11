@@ -152,11 +152,11 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let target: FlashTargetPresentation?
   public let profileReference: String
   public let toolchainFingerprint: String
-  public let imageFileName: String
+  package let imageFileName: String
   public let runtimeBuildVersion: String
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
-  public let mappedPartitionCount: Int
+  package let mappedPartitionCount: Int
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let steps: [FlashPlanStepPresentation]

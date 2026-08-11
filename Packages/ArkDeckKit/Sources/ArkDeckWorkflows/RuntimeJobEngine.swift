@@ -14,7 +14,7 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-public enum RuntimeJobEngineError: Error, Equatable, Sendable {
+package enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case rejected(RuntimeOperationErrorCode, String)
   case idempotencyConflict(String)
   case jobNotFound(String)
@@ -23,7 +23,7 @@ public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case internalFailure(String)
 }
 
-public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
+package struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
   public let stepID: String
   public let kind: String
   public let effect: String
@@ -47,26 +47,26 @@ public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
 /// A fully materialized Runtime preview. It is deliberately not a Job or a
 /// capability document: producing it performs no admission, authorization
 /// consumption or provider dispatch, including for destructive operations.
-public struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
+package struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
   public let executionMode: String
   public let operationReference: String
   public let targetID: String
   public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
+  package let stableIdentitySHA256: String?
   public let providerID: String
   public let catalogDigest: String
-  public let requestFingerprintSHA256: String
-  public let materializedPlanDigest: String
+  package let requestFingerprintSHA256: String
+  package let materializedPlanDigest: String
   public let inputs: [String: JSONValue]
   public let steps: [RuntimePlanOnlyStep]
-  public let jobAdmitted: Bool
-  public let dispatchDisposition: String
+  package let jobAdmitted: Bool
+  package let dispatchDisposition: String
 }
 
 /// Presented status: the persisted JobStateMachine state plus the
 /// waitingForHuman view (open human action against a non-terminal job).
 /// The persisted 18-state graph is unchanged.
-public struct RuntimeJobStatus: Sendable, Equatable, Codable {
+package struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let jobID: String
   public let operationReference: String
   public let targetID: String
@@ -93,7 +93,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   /// without rewriting this Job's unknown outcome.
   public let supersededByRecoveryEpochID: String?
   /// Present on the distinct recovery Job that established the epoch.
-  public let recoveryEpochID: String?
+  package let recoveryEpochID: String?
   /// A later complete Flash proved that this Job's historical target was an
   /// HDC alias of the canonical Loader-bound target. The outcome remains
   /// unknown; this independent relation proves only the current target epoch.
@@ -138,12 +138,12 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   }
 }
 
-public struct RuntimeJobStatusPage: Sendable, Equatable {
+package struct RuntimeJobStatusPage: Sendable, Equatable {
   public let jobs: [RuntimeJobStatus]
-  public let nextCursor: String?
+  package let nextCursor: String?
 }
 
-public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
+package enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case defaultReadOnlyPolicy
   case runtimeCapability
   /// Historical evidence only. New Runtime admission never produces this
@@ -157,16 +157,16 @@ public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
 /// Campaign correlation copied only from the broker-owned durable reservation
 /// after its fresh pre-mutation verification. It is evidence provenance and
 /// cannot be converted into a live campaign capability.
-public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
-  public let campaignID: String
-  public let attemptID: String
-  public let attemptOrdinal: Int
+package struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
+  package let campaignID: String
+  package let attemptID: String
+  package let attemptOrdinal: Int
   public let planDigestSHA256: String
-  public let targetBindingDigestSHA256: String
-  public let candidateDigestSHA256: String
+  package let targetBindingDigestSHA256: String
+  package let candidateDigestSHA256: String
   /// Present only when projecting a historical review-bearing campaign.
-  public let reviewDigestSHA256: String?
-  public let brokerDigestSHA256: String
+  package let reviewDigestSHA256: String?
+  package let brokerDigestSHA256: String
 
   public init(
     campaignID: String,
@@ -207,13 +207,13 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
 
 /// Durable correlation for a Runtime-owned capability use. Optional on the
 /// admission envelope only so pre-V5 Job records remain decodable.
-public struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable {
-  public let reservationID: String
-  public let useOrdinal: Int
+package struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable {
+  package let reservationID: String
+  package let useOrdinal: Int
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
-  public let targetBindingDigestSHA256: String
-  public let artifactSHA256: String?
+  package let targetBindingDigestSHA256: String
+  package let artifactSHA256: String?
 
   public init(
     reservationID: String, useOrdinal: Int, planDigestSHA256: String,
@@ -241,16 +241,16 @@ struct RuntimeCompleteOverwriteRecoveryContext: Codable, Sendable, Equatable {
 /// The admission decision actually consumed by this job. This record is
 /// audit provenance only: reading or projecting it cannot mint an
 /// authority or reach the dispatch port.
-public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
+package struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   public let kind: RuntimeEvidenceAuthorityKind
   public let reference: String
-  public let admittedAtUTC: String
-  public let validUntilUTC: String?
-  public let consumptionFingerprintSHA256: String?
+  package let admittedAtUTC: String
+  package let validUntilUTC: String?
+  package let consumptionFingerprintSHA256: String?
   /// Optional only for old persisted jobs. New campaign admissions fill this
   /// exclusively from the protected broker reservation.
-  public let campaignCorrelation: RuntimeCampaignEvidenceCorrelation?
-  public let runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation?
+  package let campaignCorrelation: RuntimeCampaignEvidenceCorrelation?
+  package let runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation?
   /// Runtime-internal recovery proof captured at the last safe boundary.
   /// It remains inside the persisted admission envelope so old Job record
   /// schema stays frozen and a process restart cannot lose recovery identity.
@@ -278,10 +278,10 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   }
 }
 
-public struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
+package struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
   public let stepID: String
-  public let stepKind: String
-  public let outcomeAtUTC: String
+  package let stepKind: String
+  package let outcomeAtUTC: String
 
   public init(stepID: String, stepKind: String, outcomeAtUTC: String) {
     self.stepID = stepID
@@ -292,19 +292,19 @@ public struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
 
 /// Facts assembled only from the three independently journaled, verified
 /// typed preflight outcomes belonging to this same job.
-public struct RuntimeEvidenceObservation: Sendable, Equatable, Codable {
+package struct RuntimeEvidenceObservation: Sendable, Equatable, Codable {
   public let targetID: String?
   public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
+  package let stableIdentitySHA256: String?
   public let model: String?
   public let firmware: String?
   public let transport: String?
   public let providerID: String
   public let toolVersion: String
-  public let toolSHA256: String
+  package let toolSHA256: String
   public let confirmedAtUTC: String?
-  public let confirmationMethod: String
-  public let preflightSteps: [RuntimeEvidencePreflightStep]
+  package let confirmationMethod: String
+  package let preflightSteps: [RuntimeEvidencePreflightStep]
 
   public init(
     targetID: String?,
@@ -337,20 +337,20 @@ public struct RuntimeEvidenceObservation: Sendable, Equatable, Codable {
 
 /// Durable, job-local assembly state. It is never exported as evidence
 /// until all three fragments are present and correlated.
-public struct RuntimeEvidencePreflightAccumulator: Sendable, Equatable, Codable {
+package struct RuntimeEvidencePreflightAccumulator: Sendable, Equatable, Codable {
   public let targetID: String
   public let bindingRevision: Int
-  public let stableIdentitySHA256: String
+  package let stableIdentitySHA256: String
   public let providerID: String
   public let toolVersion: String
-  public let toolSHA256: String
+  package let toolSHA256: String
   public var transport: String?
   public var confirmedAtUTC: String?
   public var model: String?
   public var firmware: String?
   public var steps: [RuntimeEvidencePreflightStep]
 
-  public var isComplete: Bool {
+  package var isComplete: Bool {
     transport != nil && confirmedAtUTC != nil && model != nil && firmware != nil
       && steps.map(\.stepID)
         == ["confirm-evidence-target", "read-evidence-model", "read-evidence-firmware"]
@@ -360,7 +360,7 @@ public struct RuntimeEvidencePreflightAccumulator: Sendable, Equatable, Codable 
 /// Product-owned durable facts exposed through the daemon's read-only
 /// evidence query. It intentionally contains no claim metadata such as
 /// evidence ID or Acceptance IDs.
-public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
+package struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let jobID: String
   public let operationReference: String
   public let catalogDigest: String
@@ -377,26 +377,26 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let startedAtUTC: String?
   public let firstEvidenceStepAtUTC: String?
   public let finishedAtUTC: String?
-  public let recoveryEpoch: SupersedingRecoveryEpoch?
-  public var traceProbeBefore: TraceRuntimeProbeSnapshot? = nil
-  public var traceProbeAfter: TraceRuntimeProbeSnapshot? = nil
+  package let recoveryEpoch: SupersedingRecoveryEpoch?
+  package var traceProbeBefore: TraceRuntimeProbeSnapshot? = nil
+  package var traceProbeAfter: TraceRuntimeProbeSnapshot? = nil
   /// Persisted typed inputs for the read-only History parameter inspector.
   /// They remain structured JSON values; no executable or argv can be
   /// reconstructed from this projection.
   public var inputs: [String: JSONValue]? = nil
 }
 
-public struct RuntimeJobAcceptance: Sendable, Equatable {
+package struct RuntimeJobAcceptance: Sendable, Equatable {
   public let jobID: String
-  public let deduplicated: Bool
+  package let deduplicated: Bool
 }
 
-public enum RuntimeAvailabilityState: String, Sendable, Equatable {
+package enum RuntimeAvailabilityState: String, Sendable, Equatable {
   case available
   case unavailable
 }
 
-public struct RuntimeOperationAvailability: Sendable, Equatable {
+package struct RuntimeOperationAvailability: Sendable, Equatable {
   public let reference: String
   public let state: RuntimeAvailabilityState
   public let reasons: [String]
@@ -408,13 +408,13 @@ public struct RuntimeOperationAvailability: Sendable, Equatable {
   }
 }
 
-public enum RuntimeCleanupDebtState: String, Sendable, Equatable {
+package enum RuntimeCleanupDebtState: String, Sendable, Equatable {
   case outstanding
   case settled
   case outcomeUnknown
 }
 
-public struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
+package struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
   public let jobID: String
   /// The ledger key that was settled or left outstanding: a remote path,
   /// or `bundle:<name>` for an installed-bundle residue.
@@ -426,16 +426,16 @@ public struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
 /// Dispatch port: how a lowered process plan actually runs. Production
 /// binds the descriptor-verifying executor (MU-3); tests inject fakes,
 /// including crash and hang shapes.
-public protocol RuntimeProcessDispatching: Sendable {
+package protocol RuntimeProcessDispatching: Sendable {
   func unavailableReason(providerID: String) -> String?
   func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt
 }
 
 extension RuntimeProcessDispatching {
-  public func unavailableReason(providerID: String) -> String? { nil }
+  package func unavailableReason(providerID: String) -> String? { nil }
 }
 
-public enum RuntimeDispatchFailure: Error, Equatable, Sendable {
+package enum RuntimeDispatchFailure: Error, Equatable, Sendable {
   /// The dispatcher cannot say whether the external effect happened.
   case outcomeUnknown(String)
   /// Exact provider readback proved that the attempted external effect did
@@ -510,7 +510,7 @@ struct RuntimeFlashArchiveProfileCache {
 /// Crash-consistency test seam. Production uses `.none`; tests inject an
 /// error immediately after the named durable boundary, discard the engine and
 /// reopen it exactly as a process restart would.
-public enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
+package enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
   case beforeAdmission
   case afterAdmission
   case beforeJournalAppend
@@ -520,7 +520,7 @@ public enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
   case beforeResponse
 }
 
-public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
+package struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
   private let body: (RuntimeAdmissionFaultPoint) throws -> Void
 
   public init(_ body: @escaping (RuntimeAdmissionFaultPoint) throws -> Void) {
@@ -534,13 +534,13 @@ public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
 
 // MARK: - Engine
 
-public actor RuntimeJobEngine {
+package actor RuntimeJobEngine {
   private static let confirmedNotExecutedSemanticCode = "confirmedNotExecuted"
 
-  public struct Configuration: Sendable {
-    public let stateDirectory: URL
-    public let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
-    public let admissionFaultInjector: RuntimeAdmissionFaultInjector
+  package struct Configuration: Sendable {
+    package let stateDirectory: URL
+    package let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
+    package let admissionFaultInjector: RuntimeAdmissionFaultInjector
 
     public init(
       stateDirectory: URL,
@@ -717,7 +717,7 @@ public actor RuntimeJobEngine {
     self.admissionService = try RuntimeAdmissionService(stateDirectory: configuration.stateDirectory)
   }
 
-  public func operationAvailability() -> [RuntimeOperationAvailability] {
+  package func operationAvailability() -> [RuntimeOperationAvailability] {
     RuntimeOperationCatalog.operations.map { descriptor in
       guard let provider = providers.provider(id: descriptor.provider.rawValue) else {
         return RuntimeOperationAvailability(
@@ -2881,7 +2881,7 @@ public actor RuntimeJobEngine {
 
   // MARK: Cancel / status / recovery
 
-  public func requestCancel(jobID: String) throws {
+  package func requestCancel(jobID: String) throws {
     guard jobs[jobID] != nil else { throw RuntimeJobEngineError.jobNotFound(jobID) }
     cancellationRequests.insert(jobID)
   }
@@ -2900,7 +2900,7 @@ public actor RuntimeJobEngine {
   /// RuntimeCapability lineage node. A failed Job is not assumed retryable:
   /// only the provider's confirmed-not-executed outcome opens the next
   /// ordinary destructive epoch.
-  public func runtimeDebugExecutionOutcome(
+  package func runtimeDebugExecutionOutcome(
     jobID: String
   ) async throws -> RuntimeDebugExecutionOutcome {
     let record = try recordForRead(jobID: jobID)
@@ -2939,7 +2939,7 @@ public actor RuntimeJobEngine {
     }
   }
 
-  public func evidenceSnapshot(jobID: String) async throws -> RuntimeJobEvidenceSnapshot {
+  package func evidenceSnapshot(jobID: String) async throws -> RuntimeJobEvidenceSnapshot {
     let record = try recordForRead(jobID: jobID)
     let epochs = try await RuntimeSupersedingRecoveryStore(
       stateDirectory: configuration.stateDirectory).list()
@@ -2977,7 +2977,7 @@ public actor RuntimeJobEngine {
   /// is derived from the persisted typed inputs, not from artifact status
   /// text, so an artifact that was selected but failed remains an evidence
   /// blocker.
-  public func intentionallyOmittedArtifactNames(jobID: String) throws -> Set<String> {
+  package func intentionallyOmittedArtifactNames(jobID: String) throws -> Set<String> {
     let record = try recordForRead(jobID: jobID)
     guard
       let descriptor = RuntimeOperationCatalog.descriptor(
@@ -3007,7 +3007,7 @@ public actor RuntimeJobEngine {
   /// latter is projected from SQLite so callers keep the established `job.list`
   /// behaviour without forcing the daemon to retain a journal writer per
   /// completed job.
-  public func listJobs() async throws -> [RuntimeJobStatus] {
+  package func listJobs() async throws -> [RuntimeJobStatus] {
     let indexes = await recoveryEpochIndexes()
     var statuses: [String: RuntimeJobStatus] = [:]
     let persisted: [RuntimePersistedJob]
@@ -3041,7 +3041,7 @@ public actor RuntimeJobEngine {
   /// Reads compact terminal history from SQLite.  Active jobs still return
   /// their in-memory snapshots above; both views use the same typed status
   /// model and opaque cursor contract.
-  public func listJobs(
+  package func listJobs(
     pageSize: Int, cursor: String? = nil
   ) async throws -> RuntimeJobStatusPage {
     let indexes = await recoveryEpochIndexes()
@@ -3057,7 +3057,7 @@ public actor RuntimeJobEngine {
     return RuntimeJobStatusPage(jobs: statuses, nextCursor: page.nextCursor)
   }
 
-  public func listCleanupDebt() async throws -> [CleanupDebtRecord] {
+  package func listCleanupDebt() async throws -> [CleanupDebtRecord] {
     guard let artifactStore else {
       throw RuntimeJobEngineError.internalFailure("Artifact store is not configured")
     }
@@ -3071,7 +3071,7 @@ public actor RuntimeJobEngine {
   /// Explicitly continues one cleanup debt. The debt ledger is the WAL for
   /// this bounded retry. If the retry becomes unobservable, later calls may
   /// only run the read-only path judgement and must never resend cleanup.
-  public func continueCleanupDebt(
+  package func continueCleanupDebt(
     jobID: String, identity: String
   ) async throws -> RuntimeCleanupDebtContinuation {
     guard let artifactStore else {
@@ -3209,7 +3209,7 @@ public actor RuntimeJobEngine {
   /// Explicit full recovery for diagnostics and migration.  Production
   /// daemon launch uses `recoverActiveJobs()` so terminal history remains a
   /// SQLite query instead of thousands of journal replays.
-  public func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
+  package func recoverPersistedJobs() async throws -> [RuntimeJobStatus] {
     try await recover(records: try admissionService.allJobs())
   }
 
@@ -3217,7 +3217,7 @@ public actor RuntimeJobEngine {
   /// need a recovery decision, therefore terminal rows are not reopened,
   /// parsed, or retained in `jobs`.  `status` and `listJobs(pageSize:cursor:)`
   /// continue to project those records directly from SQLite.
-  public func recoverActiveJobs() async throws -> [RuntimeJobStatus] {
+  package func recoverActiveJobs() async throws -> [RuntimeJobStatus] {
     try await recover(records: try admissionService.activeJobs())
   }
 
@@ -3257,7 +3257,7 @@ public actor RuntimeJobEngine {
   /// intentionally stricter than ordinary reconciliation: an explicit
   /// outcomeUnknown row, a torn journal, a destructive intent or more than
   /// one candidate can never be converted into a confirmed transition.
-  public func loaderTransitionAwaitingBinding(
+  package func loaderTransitionAwaitingBinding(
     targetID: String,
     expectedBindingRevision: Int
   ) throws -> String? {
@@ -3287,7 +3287,7 @@ public actor RuntimeJobEngine {
   /// freshly observed, unique Loader personality. The old Job never resumes:
   /// it becomes a certain failed Job at a confirmed safe boundary, forcing a
   /// newly materialized plan against the new binding revision.
-  public func settleLoaderTransitionAfterBinding(
+  package func settleLoaderTransitionAfterBinding(
     jobID: String,
     targetID: String,
     previousBindingRevision: Int,

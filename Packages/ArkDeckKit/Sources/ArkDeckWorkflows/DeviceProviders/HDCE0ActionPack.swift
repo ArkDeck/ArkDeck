@@ -10,14 +10,14 @@
 import ArkDeckCore
 import Foundation
 
-public enum HDCE0RequestError: Error, Equatable, Sendable {
+package enum HDCE0RequestError: Error, Equatable, Sendable {
   case outOfBounds(field: String, detail: String)
   case malformed(field: String, detail: String)
 }
 
 /// Closed device-property allowlist. Extending it is a catalog/provider
 /// decision delivered by PR, never a caller-supplied key.
-public enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
+package enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
   case productModel = "const.product.model"
   case productName = "const.product.name"
   case softwareVersion = "const.product.software.version"
@@ -28,11 +28,11 @@ public enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
 
 /// Fixed-root free-space observation for Catalog preflightDeviceStorage.
 /// The request carries no caller-selected remote path.
-public struct HDCStoragePreflightRequest: Sendable, Equatable {
-  public static let remotePath = "/data/local/tmp"
-  public static let maximumRequiredBytes = 8 * 1024 * 1024 * 1024
+package struct HDCStoragePreflightRequest: Sendable, Equatable {
+  package static let remotePath = "/data/local/tmp"
+  package static let maximumRequiredBytes = 8 * 1024 * 1024 * 1024
 
-  public let requiredBytes: Int
+  package let requiredBytes: Int
 
   public init(requiredBytes: Int) throws {
     guard (1...Self.maximumRequiredBytes).contains(requiredBytes) else {
@@ -43,10 +43,10 @@ public struct HDCStoragePreflightRequest: Sendable, Equatable {
   }
 }
 
-public struct HDCHilogCaptureRequest: Sendable, Equatable {
-  public static let maximumDurationSeconds = 600
-  public static let maximumFilters = 16
-  public static let maximumByteBudget = 128 * 1024 * 1024
+package struct HDCHilogCaptureRequest: Sendable, Equatable {
+  package static let maximumDurationSeconds = 600
+  package static let maximumFilters = 16
+  package static let maximumByteBudget = 128 * 1024 * 1024
   /// `hilog -x` exits after draining the device's current rolling buffers,
   /// but that drain is not instantaneous. On the production DAYU200 an
   /// a roughly 600 KiB capture has completed in 30 seconds; the old
@@ -60,7 +60,7 @@ public struct HDCHilogCaptureRequest: Sendable, Equatable {
 
   public let durationSeconds: Int
   public let filters: [String]
-  public let byteBudget: Int
+  package let byteBudget: Int
 
   public init(
     durationSeconds: Int,
@@ -102,19 +102,19 @@ public struct HDCHilogCaptureRequest: Sendable, Equatable {
   }
 }
 
-public struct HDCUIDumpRequest: Sendable, Equatable {
+package struct HDCUIDumpRequest: Sendable, Equatable {
   /// Kept as an enum with one case on purpose: the wire form stays stable
   /// and the type keeps saying that a UI dump has a scope. `componentTree`
   /// is gone from it because that scope is not a stdout capture at all —
   /// it is the `captureComponentTree` file action (CHG-2026-053 r2). No
   /// persisted journal can name it: its lowering refused from the day it
   /// was introduced, so nothing was ever dispatched under it.
-  public enum Scope: String, CaseIterable, Sendable {
+  package enum Scope: String, CaseIterable, Sendable {
     case windowList
   }
 
   public let scope: Scope
-  public let byteBudget: Int
+  package let byteBudget: Int
 
   public init(scope: Scope = .windowList, byteBudget: Int = 8 * 1024 * 1024) throws {
     guard (1024...(64 * 1024 * 1024)).contains(byteBudget) else {
@@ -125,9 +125,9 @@ public struct HDCUIDumpRequest: Sendable, Equatable {
   }
 }
 
-public struct HDCTraceCaptureRequest: Sendable, Equatable {
-  public static let maximumCategories = 24
-  public static let maximumDurationSeconds = 120
+package struct HDCTraceCaptureRequest: Sendable, Equatable {
+  package static let maximumCategories = 24
+  package static let maximumDurationSeconds = 120
 
   public let durationSeconds: Int
   public let categories: [String]
@@ -166,12 +166,12 @@ public struct HDCTraceCaptureRequest: Sendable, Equatable {
 /// A provider-owned remote temporary path. Only this module can mint one
 /// (package init), the components make collisions structurally impossible,
 /// and cleanup actions accept only this type - never a raw string.
-public struct HDCOwnedRemotePath: Sendable, Equatable {
+package struct HDCOwnedRemotePath: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
-  public let nonce: String
+  package let nonce: String
   /// Full remote path under the provider's fixed staging root.
-  public let remotePath: String
+  package let remotePath: String
 
   package init(jobID: String, stepID: String, nonce: String) throws {
     let componentPattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
@@ -213,14 +213,14 @@ public struct HDCOwnedRemotePath: Sendable, Equatable {
 
 /// A provider-created remote artifact awaiting receive: the remote path is
 /// provider-owned and the expected content hash is pinned before receive.
-public struct HDCOwnedRemoteArtifact: Sendable, Equatable {
+package struct HDCOwnedRemoteArtifact: Sendable, Equatable {
   public let path: HDCOwnedRemotePath
-  public let expectedSHA256: String?
-  public let maximumBytes: Int
+  package let expectedSHA256: String?
+  package let maximumBytes: Int
   /// What the product's first bytes must be, when the format has a magic
   /// worth checking. A screenshot that is not a PNG is a failure, not an
   /// artifact — and the check is cheap enough to be unconditional.
-  public let expectedLeadingBytes: Data?
+  package let expectedLeadingBytes: Data?
 
   package init(
     path: HDCOwnedRemotePath,
@@ -246,7 +246,7 @@ public struct HDCOwnedRemoteArtifact: Sendable, Equatable {
 /// device. Enumerating types nobody has seen is the mistake this ledger
 /// exists to prevent, so the prefix stays open: a name the device does not
 /// have simply answers `invalid parameters.`
-public struct HDCFaultLogName: Sendable, Equatable {
+package struct HDCFaultLogName: Sendable, Equatable {
   public let value: String
 
   public init(_ value: String) throws {
@@ -261,9 +261,9 @@ public struct HDCFaultLogName: Sendable, Equatable {
   }
 }
 
-public enum HDCFileMagic {
+package enum HDCFileMagic {
   /// 89 50 4E 47 0D 0A 1A 0A — confirmed on a device-produced screenshot.
-  public static let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+  package static let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
 }
 
 // MARK: - E1 mutation surface (CHG-2026-049, T13)
@@ -271,10 +271,10 @@ public enum HDCFileMagic {
 /// A HAP staged under a provider-owned path. As with the E0 pack, the
 /// remote location is minted by the provider; a caller supplies only an
 /// artifact lease, never a device path.
-public struct HDCStagedArtifact: Sendable, Equatable {
+package struct HDCStagedArtifact: Sendable, Equatable {
   public let path: HDCOwnedRemotePath
-  public let artifactLeaseID: String
-  public let expectedSHA256: String?
+  package let artifactLeaseID: String
+  package let expectedSHA256: String?
 
   package init(path: HDCOwnedRemotePath, artifactLeaseID: String, expectedSHA256: String?) {
     self.path = path
@@ -287,11 +287,11 @@ public struct HDCStagedArtifact: Sendable, Equatable {
 /// `HDCOwnedRemotePath`: only this module can mint one, the job/step/nonce
 /// tuple makes collisions structurally impossible, and no caller can supply
 /// a device location.
-public struct HDCOwnedRemoteDirectory: Sendable, Equatable {
+package struct HDCOwnedRemoteDirectory: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
-  public let nonce: String
-  public let remotePath: String
+  package let nonce: String
+  package let remotePath: String
 
   package init(jobID: String, stepID: String, nonce: String) throws {
     let componentPattern = #"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"#
@@ -329,13 +329,13 @@ public struct HDCOwnedRemoteDirectory: Sendable, Equatable {
 /// One package inside a staged set. Its remote path is derived from the
 /// owning directory and the artifact ID — a lease cannot name a path
 /// component, and the type cannot be built outside this module.
-public struct HDCStagedPackage: Sendable, Equatable {
-  public let remotePath: String
-  public let artifactLeaseID: String
+package struct HDCStagedPackage: Sendable, Equatable {
+  package let remotePath: String
+  package let artifactLeaseID: String
   /// Absent while the plan is only being materialized for admission, which
   /// happens before any lease is resolved. `lower` refuses to send without
   /// it, so the nil case can never reach a device.
-  public let expectedSHA256: String?
+  package let expectedSHA256: String?
 
   package init(
     directory: HDCOwnedRemoteDirectory,
@@ -353,7 +353,7 @@ public struct HDCStagedPackage: Sendable, Equatable {
 /// the shape `bm install -p <dir>` requires for a multi-module application.
 /// A single-package install does not use this type at all, which is what
 /// keeps its plan unchanged (CHG-2026-049 r4).
-public struct HDCStagedPackageSet: Sendable, Equatable {
+package struct HDCStagedPackageSet: Sendable, Equatable {
   public let directory: HDCOwnedRemoteDirectory
   /// Entry package first, then the caller's order. Never fewer than two.
   public let packages: [HDCStagedPackage]
@@ -379,7 +379,7 @@ public struct HDCStagedPackageSet: Sendable, Equatable {
   }
 }
 
-public struct HDCBundleReference: Sendable, Equatable {
+package struct HDCBundleReference: Sendable, Equatable {
   public let bundleName: String
 
   public init(bundleName: String) throws {
@@ -399,7 +399,7 @@ public struct HDCBundleReference: Sendable, Equatable {
   }
 }
 
-public struct HDCAbilityReference: Sendable, Equatable {
+package struct HDCAbilityReference: Sendable, Equatable {
   public let bundle: HDCBundleReference
   public let abilityName: String
 
@@ -421,11 +421,11 @@ public struct HDCAbilityReference: Sendable, Equatable {
 /// The caller supplies identifiers, never a PID or argv. The provider owns
 /// the `pidof` lowering and derives the pseudonymous application reference
 /// that is published in the result Artifact.
-public struct HDCApplicationLivenessRequest: Sendable, Equatable {
+package struct HDCApplicationLivenessRequest: Sendable, Equatable {
   public let bundle: HDCBundleReference
   public let abilityName: String?
-  public let processName: String
-  public let expectedDeployedArtifactDigest: String?
+  package let processName: String
+  package let expectedDeployedArtifactDigest: String?
 
   public init(
     bundle: HDCBundleReference,
@@ -464,12 +464,12 @@ public struct HDCApplicationLivenessRequest: Sendable, Equatable {
   }
 }
 
-public enum HDCPortForwardDirection: String, Sendable, Equatable {
+package enum HDCPortForwardDirection: String, Sendable, Equatable {
   case forward
   case reverse
 }
 
-public struct HDCPortForwardSpec: Sendable, Equatable {
+package struct HDCPortForwardSpec: Sendable, Equatable {
   public let direction: HDCPortForwardDirection
   public let localPort: Int
   public let remotePort: Int

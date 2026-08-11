@@ -11,7 +11,7 @@ import ArkDeckHarness
 import CryptoKit
 import Foundation
 
-public protocol AgentChatRuntimePort: Sendable {
+package protocol AgentChatRuntimePort: Sendable {
   func request(method: String, params: [String: JSONValue]?) throws -> JSONValue
   func run(_ request: RuntimeAgentExecutionRequest) throws -> RuntimeAgentExecutionOutcome
   func resume(
@@ -19,7 +19,7 @@ public protocol AgentChatRuntimePort: Sendable {
   ) throws -> RuntimeAgentExecutionOutcome
 }
 
-public struct LiveAgentChatRuntimePort: AgentChatRuntimePort {
+package struct LiveAgentChatRuntimePort: AgentChatRuntimePort {
   private let client: AgentClient
   private let executor: AgentRuntimeExecutor
 
@@ -46,7 +46,7 @@ public struct LiveAgentChatRuntimePort: AgentChatRuntimePort {
   }
 }
 
-public enum AgentChatRuntimeToolError: Error, Equatable, Sendable, CustomStringConvertible {
+package enum AgentChatRuntimeToolError: Error, Equatable, Sendable, CustomStringConvertible {
   case invalidArguments(String)
   case blocked(String)
   case malformedRuntimeResponse(String)
@@ -62,8 +62,8 @@ public enum AgentChatRuntimeToolError: Error, Equatable, Sendable, CustomStringC
   }
 }
 
-public actor NativeAgentChatRuntimeTools {
-  public static let activeToolNames = [
+package actor NativeAgentChatRuntimeTools {
+  package static let activeToolNames = [
     "arkdeck_runtime_overview",
     "arkdeck_observe_device",
     "arkdeck_capture_diagnostics",
@@ -75,18 +75,18 @@ public actor NativeAgentChatRuntimeTools {
     "arkdeck_cancel_debug_task",
   ]
 
-  public static let maximumOperationRuns = 8
-  public static let maximumRounds = maximumOperationRuns
-  public static let maximumE1Mutations = 0
-  public static let allowedOperationReferences = [
+  package static let maximumOperationRuns = 8
+  package static let maximumRounds = maximumOperationRuns
+  package static let maximumE1Mutations = 0
+  package static let allowedOperationReferences = [
     "observe.device@1", "capture.diagnostics@1",
   ]
-  public static let maximumWallClockSeconds = 30 * 60
-  public static let maximumArtifactBytes = 64 * 1_024 * 1_024
-  public static let maximumArtifactReadBytes = 4 * 1_024 * 1_024
-  public static let maximumModelArtifactTextBytes = 256 * 1_024
-  public static let captureArtifactBudgetBytes = 8 * 1_024 * 1_024
-  public static let maximumTaskStarts = 1
+  package static let maximumWallClockSeconds = 30 * 60
+  package static let maximumArtifactBytes = 64 * 1_024 * 1_024
+  package static let maximumArtifactReadBytes = 4 * 1_024 * 1_024
+  package static let maximumModelArtifactTextBytes = 256 * 1_024
+  package static let captureArtifactBudgetBytes = 8 * 1_024 * 1_024
+  package static let maximumTaskStarts = 1
 
   private struct PendingPause: Sendable {
     let resumeToken: String
@@ -236,7 +236,7 @@ public actor NativeAgentChatRuntimeTools {
     ]
   }
 
-  public func beginUserTurn() {
+  package func beginUserTurn() {
     // Human boundaries are learned only from explicit tool results already
     // shown to the model. An invisible pre-turn refresh could otherwise let a
     // generic user message resume an action the user was never asked to take.
