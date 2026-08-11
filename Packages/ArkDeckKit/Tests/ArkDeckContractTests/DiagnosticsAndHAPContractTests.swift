@@ -74,6 +74,48 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     func arguments() -> [[String]] { seenArguments }
   }
 
+  private actor DebugRouteRunner: RockchipRuntimeCommandRunning {
+    private let connectKey: String
+    private var seenArguments: [[String]] = []
+
+    init(connectKey: String) {
+      self.connectKey = connectKey
+    }
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      seenArguments.append(arguments)
+      guard Array(arguments.prefix(2)) == ["-t", connectKey] else {
+        return receipt("[Fail] target not found\n")
+      }
+      switch Array(arguments.dropFirst(2)) {
+      case ["shell", "bm", "dump", "-a"]:
+        return receipt("com.example.alpha\ncom.example.beta\n")
+      case ["fport", "ls"]:
+        return receipt("tcp:9000 tcp:9001\n")
+      case ["rport", "ls"]:
+        return receipt("tcp:9100 tcp:9101\n")
+      case ["shell", "uptime"]:
+        return receipt("up 1 day\n")
+      default:
+        return receipt("[Fail] unsupported fixture command\n")
+      }
+    }
+
+    func arguments() -> [[String]] { seenArguments }
+
+    private func receipt(_ stdout: String) -> ProviderSubprocessReceipt {
+      ProviderSubprocessReceipt(
+        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.001)
+    }
+  }
+
   func testTraceProbeUsesTheProvenAliasExecutionRoute() async throws {
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
@@ -128,6 +170,71 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(snapshot.adapterDisposition, "unsupported")
     let calls = await runner.arguments()
     XCTAssertEqual(calls.count, 2 + TraceDebugParameterCatalog.definitions.count)
+    XCTAssertTrue(calls.allSatisfy { Array($0.prefix(2)) == ["-t", aliasConnectKey] })
+    XCTAssertFalse(calls.joined().contains("stale-canonical-address"))
+  }
+
+  func testDebugProbeAndTemplatesUseTheProvenAliasExecutionRoute() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+    let originalIdentity = String(repeating: "a", count: 64)
+    let loaderIdentity = String(repeating: "b", count: 64)
+    let aliasConnectKey = "post-flash-hdc-address"
+    let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasConnectKey)
+    let adopted = try targetStore.adopt(
+      stableIdentitySHA256: originalIdentity, connectKey: "stale-canonical-address",
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+    let canonical = try targetStore.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
+        currentStableIdentitySHA256: loaderIdentity, currentRevision: 2)
+    ).record
+    let alias = try targetStore.adopt(
+      stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+    XCTAssertEqual(adopted.targetID, canonical.targetID)
+    _ = try targetStore.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: alias.targetID,
+        aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: alias.bindingRevision,
+        canonicalTargetID: canonical.targetID,
+        canonicalStableIdentitySHA256: canonical.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: canonical.bindingRevision,
+        routedHDCIdentitySHA256: aliasIdentity,
+        routedUSBTopology: "18874368",
+        establishingFlashJobID: "job-0123456789abcdef0123456789abcdef",
+        establishingFlashPlanDigestSHA256: String(repeating: "c", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [], establishedAtUTC: "2026-08-08T00:10:00Z"))
+
+    let runner = DebugRouteRunner(connectKey: aliasConnectKey)
+    let probe = FoundationDebugRuntimeProbe(
+      targetStore: targetStore,
+      hdcResolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc"),
+      runner: runner)
+
+    let snapshot = try await probe.probeDebugRuntime(targetID: canonical.targetID)
+    XCTAssertEqual(snapshot.targetID, canonical.targetID)
+    XCTAssertEqual(snapshot.bindingRevision, canonical.bindingRevision)
+    XCTAssertEqual(snapshot.packages, ["com.example.alpha", "com.example.beta"])
+    XCTAssertEqual(snapshot.portRules.count, 2)
+    XCTAssertEqual(snapshot.warnings, [])
+
+    let template = try await probe.runDebugTemplate(
+      targetID: canonical.targetID, template: .uptime)
+    XCTAssertEqual(template.targetID, canonical.targetID)
+    XCTAssertEqual(template.bindingRevision, canonical.bindingRevision)
+    XCTAssertEqual(template.stdout, "up 1 day\n")
+    XCTAssertEqual(
+      template.argumentDisclosure,
+      ["-t", "<redacted-connect-key>", "shell", "uptime"])
+
+    let calls = await runner.arguments()
+    XCTAssertEqual(calls.count, 4)
     XCTAssertTrue(calls.allSatisfy { Array($0.prefix(2)) == ["-t", aliasConnectKey] })
     XCTAssertFalse(calls.joined().contains("stale-canonical-address"))
   }

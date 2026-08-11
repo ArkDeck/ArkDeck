@@ -133,7 +133,7 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
   package func probeDebugRuntime(
     targetID: String
   ) async throws -> DebugRuntimeProbeSnapshot {
-    let target = try requireTarget(targetID)
+    let route = try requireRoute(targetID)
     let hdc = try hdcResolver.resolveExecutable(providerID: "hdc")
     var packages: [String] = []
     var portRules: [DebugRuntimePortRule] = []
@@ -141,7 +141,8 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
 
     do {
       let receipt = try await run(
-        hdc, target: target, command: ["shell", "bm", "dump", "-a"], byteBudget: 2 * 1024 * 1024)
+        hdc, route: route, command: ["shell", "bm", "dump", "-a"],
+        byteBudget: 2 * 1024 * 1024)
       if receipt.exitStatus == 0, !receipt.stdoutTruncated {
         packages = Self.packageNames(receipt.stdout)
         if packages.isEmpty, !receipt.stdout.isEmpty {
@@ -160,7 +161,7 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
     ] {
       do {
         let receipt = try await run(
-          hdc, target: target, command: [verb, "ls"], byteBudget: 128 * 1024)
+          hdc, route: route, command: [verb, "ls"], byteBudget: 128 * 1024)
         if receipt.exitStatus == 0, !receipt.stdoutTruncated {
           portRules += Self.portRules(receipt.stdout, direction: direction)
         } else {
@@ -172,8 +173,8 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
     }
 
     return DebugRuntimeProbeSnapshot(
-      targetID: target.targetID,
-      bindingRevision: target.bindingRevision,
+      targetID: route.targetID,
+      bindingRevision: route.bindingRevision,
       packages: packages.sorted(),
       portRules: portRules,
       warnings: warnings)
@@ -183,7 +184,7 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
     targetID: String,
     template: DebugRuntimeCommandTemplate
   ) async throws -> DebugRuntimeCommandResult {
-    let target = try requireTarget(targetID)
+    let route = try requireRoute(targetID)
     let hdc = try hdcResolver.resolveExecutable(providerID: "hdc")
     let command: [String]
     let budget: Int
@@ -201,7 +202,7 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
       command = ["shell", "uptime"]
       budget = 16 * 1024
     }
-    let exactArguments = deviceArguments(target: target, command: command)
+    let exactArguments = deviceArguments(route: route, command: command)
     let receipt = try await runner.run(
       executable: hdc, arguments: exactArguments,
       timeoutSeconds: 30, outputByteBudget: budget,
@@ -220,8 +221,8 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
       ([hdc.sha256] + exactArguments).joined(separator: "\u{0}").utf8)
     let loweringSHA256 = SHA256Hex.string(of: loweringBytes)
     return DebugRuntimeCommandResult(
-      targetID: target.targetID,
-      bindingRevision: target.bindingRevision,
+      targetID: route.targetID,
+      bindingRevision: route.bindingRevision,
       templateID: template.rawValue,
       effect: "readOnly",
       executable: "hdc",
@@ -235,26 +236,26 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
       outputTruncated: receipt.stdoutTruncated)
   }
 
-  private func requireTarget(_ targetID: String) throws -> RuntimeTargetRecord {
-    guard let target = try targetStore.find(targetID: targetID) else {
+  private func requireRoute(_ targetID: String) throws -> RuntimeTargetHDCRoute {
+    guard let route = try targetStore.hdcExecutionRoute(targetID: targetID) else {
       throw DeviceProviderError.factsUnavailable("target \(targetID) has not been adopted")
     }
-    return target
+    return route
   }
 
-  private func deviceArguments(target: RuntimeTargetRecord, command: [String]) -> [String] {
-    ["-t", target.connectKey] + command
+  private func deviceArguments(route: RuntimeTargetHDCRoute, command: [String]) -> [String] {
+    ["-t", route.connectKey] + command
   }
 
   private func run(
     _ executable: ResolvedExecutable,
-    target: RuntimeTargetRecord,
+    route: RuntimeTargetHDCRoute,
     command: [String],
     byteBudget: Int
   ) async throws -> ProviderSubprocessReceipt {
     let receipt = try await runner.run(
       executable: executable,
-      arguments: deviceArguments(target: target, command: command),
+      arguments: deviceArguments(route: route, command: command),
       timeoutSeconds: 30,
       outputByteBudget: byteBudget,
       criticalNonInterruptible: false)
