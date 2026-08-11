@@ -1501,7 +1501,7 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing task subcommand (submit|list|status|result|events|evaluations|"
-          + "attempts|humanActions|memory|reconcile|propose-patch|promotion|pause|"
+          + "attempts|humanActions|memory|reconcile|context|propose-patch|promotion|pause|"
           + "resume|cancel|workspace-gc)")
     }
     var rest = Array(arguments.dropFirst())
@@ -1658,6 +1658,14 @@ enum RuntimeCLI {
       } else {
         emit(response, json: json)
       }
+    case "context":
+      // The bounded decision context, exactly as a producer would receive
+      // it: assembled, trimmed and identity-screened by the daemon. An
+      // external agent reads this, then answers via `task propose-patch`.
+      emit(
+        try client.request(
+          method: "task.context", params: ["htaskId": .string(try requiredTask())]),
+        json: json)
     case "propose-patch":
       let maximumProposalBytes = 512 * 1024
       guard let path = value("--proposal-file") else {
@@ -1677,13 +1685,16 @@ enum RuntimeCLI {
           message: "proposal must be a non-empty regular UTF-8 JSON file no larger than "
             + "\(maximumProposalBytes) bytes")
       }
+      var proposeParams: [String: JSONValue] = [
+        "htaskId": .string(try requiredTask()),
+        "proposalJson": .string(proposalJSON),
+      ]
+      // Optional ledger label; the daemon enforces the closed producer set.
+      if let producer = value("--producer") {
+        proposeParams["producer"] = .string(producer)
+      }
       emit(
-        try client.request(
-          method: "task.proposePatch",
-          params: [
-            "htaskId": .string(try requiredTask()),
-            "proposalJson": .string(proposalJSON),
-          ]),
+        try client.request(method: "task.proposePatch", params: proposeParams),
         json: json)
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported task subcommand")

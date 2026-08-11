@@ -1,15 +1,25 @@
-// Typed human PROPOSE_PATCH entry (TASK-HFA-005).
+// Typed PROPOSE_PATCH entry at the human boundary (TASK-HFA-005).
 //
 // A deterministic harness can identify that verified evidence needs a source
-// repair, but it cannot invent patch bytes. A human may supply that one bounded
-// decision. The coordinator still owns the operation, workspace lease,
-// capability check, idempotency identity and every later stage transition.
+// repair, but it cannot invent patch bytes. A human - or an external agent
+// the operator drives through the same typed CLI - may supply that one
+// bounded decision. The producer label is a closed set so the durable record
+// says truthfully who answered; it grants nothing, because both labels face
+// the identical parse, validation, budget and dispatch boundary. The
+// coordinator still owns the operation, workspace lease, capability check,
+// idempotency identity and every later stage transition.
 
 import ArkDeckCore
 import Foundation
 
 extension HarnessTaskCoordinator {
-  static let humanPatchProducer = "human-operator"
+  public static let humanPatchProducer = "human-operator"
+  public static let externalAgentPatchProducer = "external-agent"
+  /// The closed producer set for this entry. A label outside it is a
+  /// configuration error, not a new kind of authority.
+  public static let typedPatchProducers: Set<String> = [
+    humanPatchProducer, externalAgentPatchProducer,
+  ]
   static let maximumHumanPatchProposalBytes = 512 * 1024
 
   /// Accept one strict PROPOSE_PATCH document at the existing human boundary.
@@ -22,8 +32,13 @@ extension HarnessTaskCoordinator {
   /// idempotency identity; it never republishes or replaces patch bytes.
   public func proposePatch(
     _ taskID: String,
-    proposalJSON: Data
+    proposalJSON: Data,
+    producer: String = HarnessTaskCoordinator.humanPatchProducer
   ) async throws -> HarnessReconcileOutcome {
+    guard Self.typedPatchProducers.contains(producer) else {
+      throw HarnessCoordinatorError.malformedPatchProposal(
+        "unknownPatchProducer:\(producer)")
+    }
     guard proposalJSON.count <= Self.maximumHumanPatchProposalBytes else {
       throw HarnessCoordinatorError.malformedPatchProposal("patchProposalTooLarge")
     }
@@ -45,7 +60,8 @@ extension HarnessTaskCoordinator {
         reasonCode: "reconcileLeaseHeld")
     }
     do {
-      let outcome = try await proposePatchWithLease(taskID, proposalJSON: proposalJSON)
+      let outcome = try await proposePatchWithLease(
+        taskID, proposalJSON: proposalJSON, producer: producer)
       try? await store.releaseReconcileLease(
         taskID: taskID, holderID: reconcileLeaseHolderID)
       return outcome
@@ -58,7 +74,8 @@ extension HarnessTaskCoordinator {
 
   private func proposePatchWithLease(
     _ taskID: String,
-    proposalJSON: Data
+    proposalJSON: Data,
+    producer: String
   ) async throws -> HarnessReconcileOutcome {
     let blocked = try await status(taskID)
     guard blocked.status == .humanRequired, blocked.activeJobID == nil else {
@@ -108,7 +125,13 @@ extension HarnessTaskCoordinator {
       // it before stamping the operator decision. The live workspace read at
       // dispatch must still equal the proposal's exact base revision.
       try await ensureInitialJourneyAttempt(blocked)
-      let resumed = try await resume(taskID, resolution: "humanPatchProposalAccepted")
+      // The resolution names the producer so the event ledger and the
+      // resolved human-action record stay a truthful account of who answered
+      // at this boundary - a person, or an agent outside the daemon.
+      let resumed = try await resume(
+        taskID,
+        resolution: producer == Self.humanPatchProducer
+          ? "humanPatchProposalAccepted" : "externalAgentPatchProposalAccepted")
       guard let attemptID = try await activeAttempt(taskID)?.attemptID else {
         throw HarnessCoordinatorError.malformedRequest("missingActiveAttempt")
       }
@@ -120,7 +143,7 @@ extension HarnessTaskCoordinator {
         requiredArtifacts: proposal.requiredArtifacts,
         expectedObservation: proposal.expectedObservation,
         hypothesis: proposal.hypothesis, reasonCode: proposal.reasonCode,
-        producer: Self.humanPatchProducer, createdAtUTC: nowUTC()
+        producer: producer, createdAtUTC: nowUTC()
       )
       .stamped(
         with: basis, attemptID: attemptID,
@@ -196,8 +219,10 @@ extension HarnessTaskCoordinator {
     _ proposal: HarnessDecisionProposal,
     executableDecision: HarnessDecision
   ) -> Bool {
+    // Any typed-entry producer may retry a prepared decision; the restamp
+    // keeps the stored producer, so a retry can never relabel who proposed.
     executableDecision.kind == .proposePatch
-      && executableDecision.producer == humanPatchProducer
+      && typedPatchProducers.contains(executableDecision.producer)
       && executableDecision.operationReference.map {
         [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch]
           .contains($0)

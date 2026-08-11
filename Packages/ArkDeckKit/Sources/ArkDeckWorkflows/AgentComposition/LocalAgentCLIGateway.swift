@@ -13,6 +13,12 @@
 // place a concrete command line exists, the set of profiles is closed, and no
 // argv fragment is ever taken from the environment — so adding a second agent
 // CLI cannot become an operator-supplied raw command surface.
+//
+// This lane is for unattended operation only, and it is maintenance-frozen:
+// the primary decision producer is an external agent reading `task.context`
+// and answering at `task.proposePatch`, which needs none of this adapter's
+// output-scraping. New profiles and envelope extensions are not accepted
+// here; a producer need is met at the typed boundary instead.
 
 import ArkDeckCore
 import ArkDeckHarness

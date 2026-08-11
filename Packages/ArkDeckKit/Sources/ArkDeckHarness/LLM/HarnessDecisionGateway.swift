@@ -82,6 +82,11 @@ extension HarnessDecisionGateway {
 // handler's plan - free to drift, and (as the first draft of this file proved
 // by proposing a capture before the device had been observed) free to be
 // wrong. The port exists for producers the repository does not own.
+//
+// Nor is this port the primary way intelligence reaches the loop. An
+// attended loop's producer is an external agent that reads the same bounded
+// context via `task.context` and answers at `task.proposePatch`; adapters
+// behind this port serve the unattended case, where no such session exists.
 
 /// Builds the bounded context. Trimming is explicit and recorded: a reader of
 /// the durable record can tell what the model was not shown.

@@ -1,4 +1,6 @@
-// Typed human PROPOSE_PATCH contracts (TASK-HFA-005).
+// Typed PROPOSE_PATCH contracts at the human boundary (TASK-HFA-005), and
+// the external producer lane over the same boundary: `task.context` export
+// plus the closed producer label set.
 
 import CryptoKit
 import XCTest
@@ -587,6 +589,111 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertTrue(finalRequests.isEmpty)
   }
 
+  // MARK: - External producer lane
+
+  func testDecisionContextExportsWithoutGatewayOrEgress() async throws {
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = HumanPatchJobPort()
+    let (coordinator, store) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    let blocked = try await coordinator.reconcile(taskID)
+    XCTAssertEqual(blocked.reasonCode, "patchProposalRequired")
+    let versionBefore = try await coordinator.status(taskID).version
+    let eventsBefore = try await store.events(taskID).count
+
+    let export = try await coordinator.decisionContext(taskID)
+    XCTAssertEqual(export.context.requestedDecision, "proposePatch")
+    XCTAssertEqual(export.contextDigest, export.context.transmittedDigest)
+    XCTAssertEqual(export.contextBytes, export.context.transmittedByteCount)
+    XCTAssertEqual(
+      export.context.targetPseudonym,
+      HarnessDecisionContext.pseudonym(forTargetID: "TGT-1"))
+    let canonical = String(decoding: export.context.transmittedBytes, as: UTF8.self)
+    XCTAssertFalse(canonical.contains("TGT-1"))
+
+    // Exporting is a read: no state movement, no events, no budget charged.
+    let after = try await coordinator.status(taskID)
+    let eventsAfter = try await store.events(taskID).count
+    XCTAssertEqual(after.version, versionBefore)
+    XCTAssertEqual(eventsAfter, eventsBefore)
+    XCTAssertEqual(after.consumedBudget.modelCalls, 0)
+    XCTAssertEqual(after.status, .humanRequired)
+  }
+
+  func testDecisionContextRefusesIdentityMarkedContext() async throws {
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = HumanPatchJobPort()
+    let (coordinator, _) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant,
+      initialSnapshot: snapshot(
+        goalSummary: "repair crash logged under /Users/operator/logs"))
+
+    do {
+      _ = try await coordinator.decisionContext(taskID)
+      XCTFail("a context carrying a host path must not be exported")
+    } catch {
+      XCTAssertEqual(
+        error as? HarnessCoordinatorError, .contextNotExportable("/Users/"))
+    }
+  }
+
+  func testExternalAgentProducerIsRecordedOnEveryPreparedDecision() async throws {
+    let proposal = try makeProposal()
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = HumanPatchJobPort()
+    let (coordinator, store) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    let outcome = try await coordinator.proposePatch(
+      taskID, proposalJSON: proposalJSON(proposal),
+      producer: HarnessTaskCoordinator.externalAgentPatchProducer)
+    let storedCheckpoint = try await store.decision(taskID, round: 2)
+    let storedApply = try await store.decision(taskID, round: 3)
+    let events = try await store.events(taskID)
+    XCTAssertEqual(outcome.action, .dispatched)
+    // The label changes the ledger, never the validation chain or budgets.
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
+    XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 1)
+    XCTAssertEqual(
+      storedCheckpoint?.producer, HarnessTaskCoordinator.externalAgentPatchProducer)
+    XCTAssertEqual(
+      storedApply?.producer, HarnessTaskCoordinator.externalAgentPatchProducer)
+    XCTAssertTrue(
+      events.contains { $0.reasonCode == "externalAgentPatchProposalAccepted" },
+      "the resolution must say an external agent answered, not a person")
+  }
+
+  func testUnknownProducerIsRefusedBeforeAnyEffect() async throws {
+    let proposal = try makeProposal()
+    let repair = HumanPatchRepairPort()
+    let grant = HumanPatchGrant(enabled: true)
+    let jobs = HumanPatchJobPort()
+    let (coordinator, _) = try await makeStack(
+      jobs: jobs, repair: repair, capabilities: grant)
+
+    _ = try await coordinator.reconcile(taskID)
+    do {
+      _ = try await coordinator.proposePatch(
+        taskID, proposalJSON: proposalJSON(proposal), producer: "vendor-x")
+      XCTFail("a producer outside the closed set must be refused")
+    } catch {
+      XCTAssertEqual(
+        error as? HarnessCoordinatorError,
+        .malformedPatchProposal("unknownPatchProducer:vendor-x"))
+    }
+    let status = try await coordinator.status(taskID)
+    let prepareCount = await repair.preparations()
+    let requests = await jobs.requests()
+    XCTAssertEqual(status.status, .humanRequired)
+    XCTAssertEqual(prepareCount, 0)
+    XCTAssertTrue(requests.isEmpty)
+  }
+
   private func makeProposal() throws -> HarnessPatchProposal {
     let diff = """
       diff --git a/Sources/A.swift b/Sources/A.swift
@@ -639,14 +746,15 @@ final class HarnessHumanPatchContractTests: XCTestCase {
   private func snapshot(
     status: HarnessTaskStatus = .running,
     result: HarnessTaskResult? = nil,
-    createdAtUTC: String? = nil
+    createdAtUTC: String? = nil,
+    goalSummary: String = "repair crash"
   ) -> HarnessTaskSnapshot {
     HarnessTaskSnapshot(
       htaskID: taskID, type: .debugCrash, intakeDescription: nil,
       projectRef: "demo-app",
       target: HarnessTaskTargetReference(targetID: "TGT-1", expectedBindingRevision: 1),
       goal: HarnessTaskGoal(
-        summary: "repair crash",
+        summary: goalSummary,
         desiredState: [
           "buildPresetRef": .string("demo-build"),
           "testPresetRef": .string("demo-tests"),

@@ -19,6 +19,10 @@
 //
 // Egress remains denied by default. Configuring one of these does not enable
 // it; `HarnessEgressPolicy` does, per project, explicitly.
+//
+// Like the local agent CLI lane, these adapters exist for unattended
+// operation and are maintenance-frozen: an attended loop's producer is an
+// external agent at the `task.context` / `task.proposePatch` boundary.
 
 import ArkDeckCore
 import Foundation
