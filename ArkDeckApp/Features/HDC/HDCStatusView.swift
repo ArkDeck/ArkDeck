@@ -683,6 +683,7 @@ struct HDCStatusView: View {
   private var trustSummaryKey: String {
     switch presentation.authorization {
     case .ready: "overview.trust.ready"
+    case .unauthorizedWaitingForTrust: "overview.trust.waiting"
     case .denied: "overview.trust.denied"
     case .timedOut: "overview.trust.timedOut"
     case .cancelled: "overview.trust.cancelled"
@@ -694,7 +695,7 @@ struct HDCStatusView: View {
   private var trustTone: StatusTone {
     switch presentation.authorization {
     case .ready: .ok
-    case .timedOut, .cancelled, .unavailable: .warning
+    case .unauthorizedWaitingForTrust, .timedOut, .cancelled, .unavailable: .warning
     case .denied, .keyAccessDenied: .danger
     }
   }
@@ -716,6 +717,7 @@ struct HDCStatusView: View {
   private var authorizationText: String {
     switch presentation.authorization {
     case .ready: "ready"
+    case .unauthorizedWaitingForTrust: "unauthorized — unlock and trust the device, then retry"
     case .denied(let reason): "denied — \(reason); retry is non-destructive"
     case .timedOut: "timed out — retry is non-destructive"
     case .cancelled: "cancelled — retry is non-destructive"
@@ -734,6 +736,7 @@ struct HDCStatusView: View {
 
   private var subserverText: String {
     switch presentation.subserverCapability {
+    case .supportedReadOnly: "supported (read-only; no automatic spawn or migration)"
     case .unsupported: "unsupported"
     case .unknown(let reason): "unknown — \(reason)"
     }

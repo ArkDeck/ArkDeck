@@ -23,6 +23,7 @@ enum HDCAuthorizationProbeState: Sendable, Equatable {
 }
 
 public enum HDCAuthorizationState: Sendable, Equatable {
+  case unauthorizedWaitingForTrust
   case ready
   case denied(reason: String)
   case timedOut
@@ -33,7 +34,8 @@ public enum HDCAuthorizationState: Sendable, Equatable {
   public var hasNonDestructiveRetry: Bool {
     switch self {
     case .ready: false
-    case .denied, .timedOut, .cancelled, .keyAccessDenied, .unavailable:
+    case .unauthorizedWaitingForTrust, .denied, .timedOut, .cancelled, .keyAccessDenied,
+      .unavailable:
       true
     }
   }
@@ -192,6 +194,7 @@ public enum HDCChannelProtectionState: Sendable, Equatable {
 }
 
 public enum HDCSubserverCapability: Sendable, Equatable {
+  case supportedReadOnly
   case unsupported
   case unknown(reason: String)
 }

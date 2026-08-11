@@ -75,6 +75,10 @@ final class DeviceListViewModel: ObservableObject {
         self.authorizationWait = .idle
       case .unavailable(let reason), .denied(let reason), .keyAccessDenied(let reason):
         self.authorizationWait = .unavailable(connectKey: connectKey, reason: reason)
+      case .unauthorizedWaitingForTrust:
+        self.authorizationWait = .unavailable(
+          connectKey: connectKey,
+          reason: "Authorization wait ended without a terminal classification")
       }
     }
   }

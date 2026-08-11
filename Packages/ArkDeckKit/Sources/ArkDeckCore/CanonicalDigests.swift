@@ -22,39 +22,3 @@ package enum SHA256Hex {
   }
 }
 
-/// Factories for the two canonical `JSONEncoder` configurations used for
-/// digest input and durable documents. Sites that hash encoder output must
-/// take the encoder from here so the byte form (and therefore the digest)
-/// cannot drift between call sites. Callers may add further configuration
-/// (date strategies etc.) on the returned instance.
-package enum CanonicalJSONEncoders {
-  /// `[.sortedKeys, .withoutEscapingSlashes]` — the package-wide canonical form.
-  package static func canonical() -> JSONEncoder {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return encoder
-  }
-
-  /// The canonical form plus `.prettyPrinted`, for human-facing durable
-  /// documents whose digests are computed over the pretty bytes.
-  package static func canonicalPretty() -> JSONEncoder {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-    return encoder
-  }
-}
-
-/// Fallback parsing for the two ISO-8601 spellings ArkDeck reads back
-/// (with and without fractional seconds). The accepted set is identical
-/// regardless of probe order; a fresh formatter per call matches the
-/// pre-consolidation behaviour and keeps the API thread-safe.
-package enum ISO8601Timestamps {
-  package static func parse(_ value: String) -> Date? {
-    let fractional = ISO8601DateFormatter()
-    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = fractional.date(from: value) { return date }
-    let plain = ISO8601DateFormatter()
-    plain.formatOptions = [.withInternetDateTime]
-    return plain.date(from: value)
-  }
-}

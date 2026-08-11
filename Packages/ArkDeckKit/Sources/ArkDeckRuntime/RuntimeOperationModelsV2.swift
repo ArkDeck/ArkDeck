@@ -19,8 +19,10 @@ public enum RuntimeOperationErrorCode: String, Codable, Sendable, CaseIterable {
   case invalidRequest
   case unknownOperation
   case invalidInput
+  case targetNotFound
   case authorizationRequired
   case conflict
+  case unsupportedProfile
   case unsupportedVersion
   case governanceFieldRejected
   case requestTooLarge

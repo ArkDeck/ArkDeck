@@ -79,6 +79,7 @@ enum RockchipToolAccessPolicy: Sendable, Equatable {
 public enum RockchipToolPathSource: String, Sendable, Equatable {
   case userSelectedSecurityScopedBookmark
   case installedOrdinaryBookmark
+  case explicitSupportPath
 }
 
 public enum RockchipPlatformCodeTrust: String, Sendable, Equatable {

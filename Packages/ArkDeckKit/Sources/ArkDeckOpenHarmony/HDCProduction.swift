@@ -595,6 +595,7 @@ private func hdcRegisteredCommandFamily(arguments: [String]) -> HDCRegisteredCom
 
 public enum HDCServerProbeClassification: Sendable, Equatable {
   case healthy(serverVersion: String)
+  case mismatchUnverified(clientVersion: String, serverVersion: String)
   case unavailable(reason: String)
   case unknown(reason: String)
 }
@@ -752,6 +753,10 @@ public actor HDCServerProcessSupervisor {
       case .unavailable(let reason):
         await supervisor.recordUnverifiedServerProbeFailure(
           endpoint: endpoint.endpoint, reason: reason)
+      case .mismatchUnverified(let clientVersion, let serverVersion):
+        await supervisor.recordUnverifiedServerProbeFailure(
+          endpoint: endpoint.endpoint,
+          reason: "mismatchUnverified: client \(clientVersion), server \(serverVersion)")
       case .unknown(let reason):
         await supervisor.recordUnverifiedServerProbeFailure(
           endpoint: endpoint.endpoint, reason: reason)
