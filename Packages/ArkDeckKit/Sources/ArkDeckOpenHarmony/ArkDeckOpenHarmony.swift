@@ -319,6 +319,7 @@ public struct HDCSemanticOutputParser: Sendable {
     ("e000003", .unauthorized),
     ("offline", .offline),
     ("[fail]", .explicitFailure),
+    ("fail!", .explicitFailure),
     ("errorcode", .explicitFailure),
     ("[success]", .success),
   ]

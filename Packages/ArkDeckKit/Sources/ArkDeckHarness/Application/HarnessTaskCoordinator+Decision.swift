@@ -1,10 +1,11 @@
 // Where a proposal comes from (CHG-2026-054, TASK-HTP-004).
 //
-// One wake needs exactly one proposed step. It comes from the deterministic
-// handler unless *all* of these hold: the project has egress enabled, a
-// gateway adapter is configured, the bounded context assembles within its
-// byte ceiling, it passes the identity screen, and the returned bytes survive
-// the strict parser.
+// One wake needs exactly one proposed step. Mechanical typed steps always
+// come from the deterministic handler. A model is consulted only for the one
+// decision the handler cannot synthesize: patch bytes at the explicit
+// `patchProposalRequired` boundary. That bounded question additionally needs
+// project egress, a configured gateway, a context within its byte ceiling,
+// the identity screen and a response that survives the strict parser.
 //
 // Any failure along that chain records why and returns the deterministic
 // handler's step. If that step can make progress, the wake executes it. If it
@@ -45,10 +46,19 @@ extension HarnessTaskCoordinator {
   func plannedProposal(
     _ snapshot: HarnessTaskSnapshot,
     handler: any HarnessTaskHandler,
-    basis: HarnessDecisionBasis
+    basis: HarnessDecisionBasis,
+    deterministic: HarnessPlannedStep
   ) async -> PlannedProposal {
-    let deterministic = handler.plan(
-      for: snapshot, decisionID: decisionIDFactory(), nowUTC: nowUTC())
+    // Runtime orchestration already owns every mechanical typed step. Asking
+    // a model to echo observe/capture/analyze/build/test/sign/deploy adds no
+    // authority or useful choice, but does add one network round trip and a
+    // fresh model process per wake. Keep that entire route deterministic and
+    // do not even evaluate egress until the handler reaches the bounded patch
+    // question it cannot answer itself.
+    guard let requestedDecision = Self.requestedDecision(from: deterministic.decision) else {
+      return PlannedProposal(
+        step: deterministic, producer: deterministic.decision.producer, rejection: nil)
+    }
 
     guard let decisionGateway else {
       return PlannedProposal(
@@ -96,7 +106,7 @@ extension HarnessTaskCoordinator {
       do {
         let context = try await assembleContext(
           snapshot, handler: handler, limits: limits,
-          requestedDecision: Self.requestedDecision(from: deterministic.decision))
+          requestedDecision: requestedDecision)
         let violations = HarnessEgressScreen.violations(
           in: context, targetID: snapshot.target.targetID)
         guard violations.isEmpty else {

@@ -54,6 +54,84 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
   }
 
+  private actor TraceRouteRunner: RockchipRuntimeCommandRunning {
+    private var seenArguments: [[String]] = []
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      seenArguments.append(arguments)
+      return ProviderSubprocessReceipt(
+        exitStatus: 0,
+        stdout: Data("[Fail] fixture remains unsupported\n".utf8),
+        stderr: Data(), stdoutTruncated: false, durationSeconds: 0.001)
+    }
+
+    func arguments() -> [[String]] { seenArguments }
+  }
+
+  func testTraceProbeUsesTheProvenAliasExecutionRoute() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+    let originalIdentity = String(repeating: "a", count: 64)
+    let loaderIdentity = String(repeating: "b", count: 64)
+    let aliasConnectKey = "post-flash-hdc-address"
+    let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasConnectKey)
+    let adopted = try targetStore.adopt(
+      stableIdentitySHA256: originalIdentity, connectKey: "stale-canonical-address",
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+    let canonical = try targetStore.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
+        currentStableIdentitySHA256: loaderIdentity, currentRevision: 2)
+    ).record
+    let alias = try targetStore.adopt(
+      stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+    XCTAssertNotEqual(alias.targetID, adopted.targetID)
+    _ = try targetStore.appendAliasResolution(
+      RuntimeTargetAliasResolutionDraft(
+        aliasTargetID: alias.targetID,
+        aliasStableIdentitySHA256: alias.stablePhysicalIdentitySHA256,
+        aliasBindingRevision: alias.bindingRevision,
+        canonicalTargetID: canonical.targetID,
+        canonicalStableIdentitySHA256: canonical.stablePhysicalIdentitySHA256,
+        canonicalBindingRevision: canonical.bindingRevision,
+        routedHDCIdentitySHA256: aliasIdentity,
+        routedUSBTopology: "18874368",
+        establishingFlashJobID: "job-0123456789abcdef0123456789abcdef",
+        establishingFlashPlanDigestSHA256: String(repeating: "c", count: 64),
+        confirmedStepIDs: [
+          "enter-loader-mode", "flash-partitions", "verify-flash-readback",
+          "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+        ],
+        coveredUnknownIntents: [
+          RuntimeTargetAliasCoveredIntent(
+            jobID: "job-unknown", intentEventID: "intent-enter-loader",
+            stepID: "enter-loader-mode", effect: "deviceMutation")
+        ],
+        establishedAtUTC: "2026-08-08T00:10:00Z"))
+
+    let runner = TraceRouteRunner()
+    let probe = FoundationTraceRuntimeProbe(
+      targetStore: targetStore,
+      hdcResolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc"),
+      runner: runner)
+    let snapshot = try await probe.probeTraceRuntime(targetID: canonical.targetID)
+
+    XCTAssertEqual(snapshot.targetID, canonical.targetID)
+    XCTAssertEqual(snapshot.bindingRevision, canonical.bindingRevision)
+    XCTAssertEqual(snapshot.adapterDisposition, "unsupported")
+    let calls = await runner.arguments()
+    XCTAssertEqual(calls.count, 2 + TraceDebugParameterCatalog.definitions.count)
+    XCTAssertTrue(calls.allSatisfy { Array($0.prefix(2)) == ["-t", aliasConnectKey] })
+    XCTAssertFalse(calls.joined().contains("stale-canonical-address"))
+  }
+
   /// Scriptable dispatcher: each action family can be told to succeed, to
   /// fail, or - the case that matters most - to exit cleanly while the
   /// readback shows nothing happened.

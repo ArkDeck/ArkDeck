@@ -518,29 +518,35 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
 
   // MARK: - Replaceability and budget
 
-  func testSwappingAdaptersDoesNotChangeWhatTheStateMachineConcludes() async throws {
-    // Same reply, three vendors: same dispatched operation, same action.
+  func testSwappingAdaptersDoesNotAffectDeterministicTypedRouting() async throws {
+    // Mechanical routing does not consult any adapter. Swapping all three
+    // configured vendors therefore leaves the exact typed dispatch unchanged
+    // and sends no context off-host.
     let proposal =
       #"{"kind":"invokeOperation","operationRef":"observe.device@1","hypothesis":"Observe the target first.","reasonCode":"baselineTargetObservation"}"#
     var outcomes: [String] = []
     var dispatched: [[String]] = []
-    for gateway in [
-      try claude(replying: claudeReply(text: proposal)).0,
-      try openAI(replying: openAIReply(text: proposal)).0,
-      try gemini(replying: geminiReply(text: proposal)).0,
-    ] {
+    let adapters = [
+      try claude(replying: claudeReply(text: proposal)),
+      try openAI(replying: openAIReply(text: proposal)),
+      try gemini(replying: geminiReply(text: proposal)),
+    ]
+    for (gateway, transport) in adapters {
       let jobs = VendorJobPort()
       let (coordinator, _) = try makeStack(gateway: gateway, jobs: jobs)
       let task = try await coordinator.submit(submission())
       let outcome = try await coordinator.reconcile(task.htaskID)
       outcomes.append(outcome.action.rawValue)
       dispatched.append(await jobs.submittedOperations)
+      let requests = await transport.requests
+      XCTAssertTrue(requests.isEmpty)
+      XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
     }
     XCTAssertEqual(Set(outcomes), ["dispatched"])
     XCTAssertEqual(Set(dispatched.map { $0.joined() }), ["observe.device@1"])
   }
 
-  func testAnExhaustedModelBudgetStopsTheModelPathAndNotTheTask() async throws {
+  func testAnExhaustedModelBudgetDoesNotStopAMechanicalTypedStep() async throws {
     let jobs = VendorJobPort()
     let (gateway, transport) = try claude(
       replying: claudeReply(
@@ -548,13 +554,14 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
       ))
     // Zero calls allowed: the deterministic handler must still converge, so
     // this is a ceiling on spend, not a halt.
-    let (coordinator, _) = try makeStack(
-      gateway: gateway, jobs: jobs, budgets: budgets(maxModelCalls: 0))
+    let (coordinator, _) = try makeStack(gateway: gateway, jobs: jobs)
     let task = try await coordinator.submit(submission(maxModelCalls: 0))
     let outcome = try await coordinator.reconcile(task.htaskID)
 
-    XCTAssertEqual(outcome.action, .stoppedBudgetExhausted)
-    XCTAssertEqual(outcome.reasonCode, "maxModelCallsExhausted")
+    XCTAssertEqual(outcome.action, .dispatched)
+    let operations = await jobs.submittedOperations
+    XCTAssertEqual(operations, [DebugCrashTaskHandler.observeDevice])
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
     let requests = await transport.requests
     XCTAssertTrue(requests.isEmpty, "an exhausted budget must not reach the vendor")
   }
@@ -565,8 +572,8 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     // proposal - but the call happened and shipped a context.
     let (gateway, _) = try claude(
       replying: claudeReply(text: #"{"kind":"invokeOperation","verdict":"pass"}"#))
-    let (coordinator, store) = try makeStack(gateway: gateway, jobs: jobs)
-    let task = try await coordinator.submit(submission())
+    let (coordinator, store) = try makePatchStack(gateway: gateway, jobs: jobs)
+    let task = try await coordinator.submit(patchSubmission())
     let outcome = try await coordinator.reconcile(task.htaskID)
 
     XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 1)
@@ -673,6 +680,15 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
   }
 
+  private func patchSubmission(maxModelCalls: Int = 2) -> HarnessTaskSubmission {
+    HarnessTaskSubmission(
+      type: .debugCrash, projectRef: "demo-app",
+      target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7"),
+      goal: HarnessTaskGoal(summary: "Repair the bounded source failure"),
+      budgets: budgets(maxModelCalls: maxModelCalls),
+      policy: HarnessTaskPolicy(allowedOperations: [DebugCrashTaskHandler.applyPatch]))
+  }
+
   private func makeStack(
     gateway: any HarnessDecisionGateway,
     jobs: VendorJobPort,
@@ -682,6 +698,18 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:00Z" },
       decisionGateway: gateway,
+      egressPolicy: HarnessEgressPolicy(enabledProjects: ["demo-app"]))
+    return (coordinator, store)
+  }
+
+  private func makePatchStack(
+    gateway: any HarnessDecisionGateway,
+    jobs: VendorJobPort
+  ) throws -> (HarnessTaskCoordinator, HarnessTaskStore) {
+    let store = try HarnessTaskStore(rootURL: rootURL.appendingPathComponent(UUID().uuidString))
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, handlers: [PatchQuestionHandler()],
+      nowUTC: { "2026-07-31T00:00:00Z" }, decisionGateway: gateway,
       egressPolicy: HarnessEgressPolicy(enabledProjects: ["demo-app"]))
     return (coordinator, store)
   }

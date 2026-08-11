@@ -390,21 +390,10 @@ final class HarnessAttemptContractTests: XCTestCase {
     let patch = try proposal()
     let patchBytes = try proposalBytes(
       proposal: patch, hypothesis: "Change the failing branch.")
-    let buildBytes = try JSONEncoder().encode(
-      JSONValue.object([
-        "kind": .string("invokeOperation"),
-        "operationRef": .string(DebugCrashTaskHandler.buildOpenHarmony),
-        "inputs": .object([
-          "projectRef": .string("fixture-project"),
-          "buildPresetRef": .string("arkdeck-debug"),
-        ]),
-        "hypothesis": .string("Build the exact applied patch."),
-        "reasonCode": .string("buildPatchedWorkspace"),
-      ]))
     let rewordedBytes = try proposalBytes(
       proposal: patch,
       hypothesis: "Describe the same source edit with different prose.")
-    let gateway = AttemptGateway(responses: [patchBytes, buildBytes, rewordedBytes])
+    let gateway = AttemptGateway(responses: [patchBytes, rewordedBytes])
     let jobs = AttemptJobPort()
     let timestamp = now
     let coordinator = HarnessTaskCoordinator(
