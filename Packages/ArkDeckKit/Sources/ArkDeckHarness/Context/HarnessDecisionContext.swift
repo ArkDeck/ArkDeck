@@ -619,9 +619,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   /// `transmittedDigest` stand for "what the model received" rather than
   /// "what the harness intended to send".
   public var transmittedBytes: Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return (try? encoder.encode(self)) ?? Data("{}".utf8)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return (try? encoder.encode(self)) ?? Data("{}".utf8)
   }
 
   /// Computed over the trimmed, screened context - so the digest represents

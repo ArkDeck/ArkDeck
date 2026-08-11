@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Foundation
 
 public enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
@@ -302,12 +303,12 @@ package struct HumanActionFreshProbeReceipt: Equatable, Sendable {
 public enum HumanActionRequiredCodec {
   public static func decode(_ data: Data) throws -> HumanActionRequired {
     do {
-      var duplicateValidator = AgentStrictJSONDuplicateValidator(data: data)
+      var duplicateValidator = StrictJSONDuplicateValidator(data: data)
       try duplicateValidator.validate()
       return try JSONDecoder().decode(HumanActionRequired.self, from: data)
     } catch let error as HumanActionRequiredError {
       throw error
-    } catch let error as AgentStrictJSONError {
+    } catch let error as StrictJSONError {
       switch error {
       case .duplicateMemberName(let path):
         throw HumanActionRequiredError.malformed(path: path)
@@ -320,9 +321,8 @@ public enum HumanActionRequiredCodec {
   }
 
   public static func encode(_ value: HumanActionRequired) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(value)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try encoder.encode(value)
   }
 }
 
@@ -414,11 +414,6 @@ private enum HumanActionValidation {
   }
 
   static func date(_ value: String) -> Date {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions =
-      value.contains(".")
-      ? [.withInternetDateTime, .withFractionalSeconds]
-      : [.withInternetDateTime]
-    return formatter.date(from: value) ?? .distantPast
+    ISO8601Timestamps.parse(value) ?? .distantPast
   }
 }

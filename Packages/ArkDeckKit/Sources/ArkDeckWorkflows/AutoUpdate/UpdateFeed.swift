@@ -232,9 +232,8 @@ public enum UpdateFeedCodec {
   }
 
   private static func canonicalJSON<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    do {
+    let encoder = CanonicalJSONEncoders.canonical()
+        do {
       return try encoder.encode(value)
     } catch {
       throw UpdateFeedError.invalidPayload
@@ -483,9 +482,8 @@ public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendab
   }
 
   private static func canonicalData(_ record: UpdateReplayRecord) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(record)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try encoder.encode(record)
   }
 
   private static func isValid(_ record: UpdateReplayRecord) -> Bool {

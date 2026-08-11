@@ -3197,9 +3197,8 @@ public actor HarnessTaskCoordinator {
             "harnessRound": "\(intent.round)",
             "harnessDecisionId": decision.decisionID,
           ]))
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      return try encoder.encode(request)
+      let encoder = CanonicalJSONEncoders.canonical()
+            return try encoder.encode(request)
     } catch let error as HarnessCoordinatorError {
       throw error
     } catch {

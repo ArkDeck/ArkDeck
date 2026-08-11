@@ -775,9 +775,8 @@ public actor RuntimeJobEngine {
     try validateInputs(request.inputs, against: descriptor)
     try validateSupportedPlanInputs(request.inputs, descriptor: descriptor)
 
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let canonicalRequestData: Data
+    let encoder = CanonicalJSONEncoders.canonical()
+        let canonicalRequestData: Data
     do {
       canonicalRequestData = try encoder.encode(request)
     } catch {
@@ -836,9 +835,8 @@ public actor RuntimeJobEngine {
     // be rejected by the idempotency ledger.
     let canonicalRequestData: Data
     do {
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      canonicalRequestData = try encoder.encode(request)
+      let encoder = CanonicalJSONEncoders.canonical()
+            canonicalRequestData = try encoder.encode(request)
     } catch {
       throw RuntimeJobEngineError.internalFailure(
         "cannot canonicalize the typed request: \(error)")
@@ -4622,9 +4620,8 @@ public actor RuntimeJobEngine {
         runtimeDebugInvocationID: runtimeTuning.debug?.invocationID,
         runtimeDebugCandidateActionSHA256: runtimeTuning.debug?.candidateActionSHA256,
         steps: materializedSteps)
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      let encoded = try encoder.encode(document)
+      let encoder = CanonicalJSONEncoders.canonical()
+            let encoded = try encoder.encode(document)
       return MaterializedAdmission(
         stableTargetIdentitySHA256: stableIdentity,
         bindingRevision: bindingRevision,
@@ -6068,9 +6065,8 @@ public actor RuntimeJobEngine {
       "bindingRevision=\(query.targetBindingRevision.map(String.init) ?? "-")",
       "planDigest=\(query.planDigest ?? "-")",
     ]
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard
+    let encoder = CanonicalJSONEncoders.canonical()
+        guard
       let inputs = try? encoder.encode(query.inputs),
       let text = String(data: inputs, encoding: .utf8)
     else {

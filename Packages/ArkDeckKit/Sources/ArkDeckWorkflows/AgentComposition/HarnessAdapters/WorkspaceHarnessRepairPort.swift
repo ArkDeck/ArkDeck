@@ -179,9 +179,8 @@ public struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       proposal: proposal, diffArtifactID: diffArtifactID,
       htaskID: task.htaskID, attemptID: attemptID,
       createdBy: createdBy, createdAtUTC: createdAtUTC)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let bytes = try encoder.encode(candidate)
+    let encoder = CanonicalJSONEncoders.canonical()
+        let bytes = try encoder.encode(candidate)
     let metadata = try await artifacts.publish(
       RuntimeArtifactPublicationRequest(
         jobID: "hcandidate-\(attemptID.lowercased())", sessionID: task.htaskID,

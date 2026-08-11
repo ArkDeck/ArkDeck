@@ -234,9 +234,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
       conditions: snapshot.conditions,
       executionState: boundedExecutionState)
 
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    func encodedSize(_ value: HarnessDecisionContext) -> Int {
+    let encoder = CanonicalJSONEncoders.canonical()
+        func encodedSize(_ value: HarnessDecisionContext) -> Int {
       ((try? encoder.encode(value)) ?? Data()).count
     }
     var sized = context
@@ -272,9 +271,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
 /// already omits these fields, and this catches a future field that forgets.
 public enum HarnessEgressScreen {
   public static func violations(in context: HarnessDecisionContext, targetID: String) -> [String] {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(context),
+    let encoder = CanonicalJSONEncoders.canonical()
+        guard let data = try? encoder.encode(context),
       let text = String(data: data, encoding: .utf8)
     else { return ["contextNotEncodable"] }
     var found: [String] = []

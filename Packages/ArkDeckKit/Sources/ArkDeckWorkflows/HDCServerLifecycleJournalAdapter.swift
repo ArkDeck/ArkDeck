@@ -546,9 +546,8 @@ package actor DurableHDCServerLifecycleAuditStore:
       "failure": failure,
       "recovery": .null,
     ])
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try SessionManifestDocument(data: encoder.encode(manifest))
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try SessionManifestDocument(data: encoder.encode(manifest))
   }
 
   private func appendTerminalJournal(
@@ -1651,9 +1650,8 @@ package struct HDCApplicationDiagnosticsExecutionCatalog: Sendable {
       candidateSHA256: candidate.sha256,
       sessionID: sessionID,
       jobID: jobID)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    try encoder.encode(locator).write(to: locatorURL, options: .atomic)
+    let encoder = CanonicalJSONEncoders.canonical()
+        try encoder.encode(locator).write(to: locatorURL, options: .atomic)
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o600], ofItemAtPath: locatorURL.path)
     return HDCApplicationDiagnosticsExecutionIdentity(

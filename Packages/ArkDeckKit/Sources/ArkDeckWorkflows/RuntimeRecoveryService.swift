@@ -371,9 +371,8 @@ struct RuntimeRecoveryService {
           from: try Self.readOwnerOnlyRecord(
             directory.appendingPathComponent("receipt.json")))
       } catch { return nil }
-      let actionEncoder = JSONEncoder()
-      actionEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      guard let encodedAction = try? actionEncoder.encode(intent.action),
+      let actionEncoder = CanonicalJSONEncoders.canonical()
+            guard let encodedAction = try? actionEncoder.encode(intent.action),
         Self.sha256(encodedAction) == intent.actionSHA256
       else { return nil }
       guard intent.schemaVersion == "1.0.0", receipt.schemaVersion == "1.0.0",

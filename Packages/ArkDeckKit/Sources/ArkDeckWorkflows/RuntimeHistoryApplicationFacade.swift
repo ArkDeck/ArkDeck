@@ -975,9 +975,3 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
       ])
   }
 }
-
-/// NSXPCConnection is thread-safe by contract but predates `Sendable`.
-private final class XPCConnectionBox: @unchecked Sendable {
-  let connection: NSXPCConnection
-  init(_ connection: NSXPCConnection) { self.connection = connection }
-}

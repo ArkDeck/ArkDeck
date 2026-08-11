@@ -475,9 +475,8 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      let requestData = try encoder.encode(request)
+      let encoder = CanonicalJSONEncoders.canonical()
+            let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed Flash request")
       }
@@ -1030,7 +1029,7 @@ private enum FlashXPCTransport {
       return .failure(.transport("Could not compose a Runtime request"))
     }
     return await withCheckedContinuation { continuation in
-      let box = FlashXPCConnectionBox(
+      let box = XPCConnectionBox(
         NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
       let connection = box.connection
       connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
@@ -1065,10 +1064,4 @@ private enum FlashXPCTransport {
       }
     }
   }
-}
-
-/// NSXPCConnection is thread-safe by contract but predates `Sendable`.
-private final class FlashXPCConnectionBox: @unchecked Sendable {
-  let connection: NSXPCConnection
-  init(_ connection: NSXPCConnection) { self.connection = connection }
 }

@@ -71,9 +71,8 @@ public struct HarnessAgentContext: Equatable, Sendable, Codable {
   }
 
   public var encodedByteCount: Int {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return ((try? encoder.encode(self)) ?? Data()).count
+    let encoder = CanonicalJSONEncoders.canonical()
+        return ((try? encoder.encode(self)) ?? Data()).count
   }
 
   /// Deterministic context compaction. Execution state never lives in this

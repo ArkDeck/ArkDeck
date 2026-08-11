@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Darwin
 import Foundation
 import OSLog
@@ -379,9 +380,8 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
   }
 
   fileprivate func appendAndSynchronize(_ record: RedactedDiagnosticRecord) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    var bytes = try encoder.encode(record)
+    let encoder = CanonicalJSONEncoders.canonical()
+        var bytes = try encoder.encode(record)
     bytes.append(0x0A)
     guard bytes.count <= configuration.maximumRecordBytes else {
       throw SystemLoggerError.recordLimitExceeded

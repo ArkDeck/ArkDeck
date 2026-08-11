@@ -2192,9 +2192,8 @@ struct RockchipRuntimeActionRecordStore: Sendable {
   }
 
   private func write<T: Encodable>(_ value: T, to url: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let data = try encoder.encode(value)
+    let encoder = CanonicalJSONEncoders.canonical()
+        let data = try encoder.encode(value)
     let temporary = url.deletingLastPathComponent().appendingPathComponent(
       ".\(url.lastPathComponent).\(UUID().uuidString.lowercased()).tmp")
     let descriptor = Darwin.open(
@@ -2384,9 +2383,8 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
       throw RuntimeDispatchFailure.failed(
         "host-managed target/binding/executable correlation is incomplete or drifted")
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let encoded = try encoder.encode(try PersistedTypedProviderAction(action))
+    let encoder = CanonicalJSONEncoders.canonical()
+        let encoded = try encoder.encode(try PersistedTypedProviderAction(action))
     let digest = SHA256Hex.string(of: encoded)
     guard digest == descriptor.actionSHA256 else {
       throw RuntimeDispatchFailure.failed(

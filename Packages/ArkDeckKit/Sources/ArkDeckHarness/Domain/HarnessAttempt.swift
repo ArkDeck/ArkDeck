@@ -87,9 +87,8 @@ public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   /// Canonical JSON is the fingerprint material. No delimiter joining and
   /// no dictionary iteration order can make two distinct strategies collide.
   public var canonicalJSON: Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return (try? encoder.encode(self)) ?? Data("{}".utf8)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return (try? encoder.encode(self)) ?? Data("{}".utf8)
   }
 
   public var fingerprint: String {

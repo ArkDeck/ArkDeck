@@ -35,13 +35,23 @@ public actor HarnessTaskStore {
 
   /// `HTASK-` plus uppercase hex. No dot, no slash, no unicode: the id is
   /// the directory name, so a traversal or a symlink hop cannot be spelled.
-  public static func isWellFormed(taskID: String) -> Bool {
-    guard taskID.count >= 8, taskID.count <= 40, taskID.hasPrefix("HTASK-") else { return false }
-    let body = taskID.dropFirst("HTASK-".count)
+  /// One grammar for every store identifier: `PREFIX-` + 1...n uppercase-hex
+  /// characters, bounded to 40 total. `minimumCount` tightens task IDs whose
+  /// grammar predates the shared spelling.
+  private static func isWellFormedStoreID(
+    _ value: String, prefix: String, minimumCount: Int = 0
+  ) -> Bool {
+    guard value.count >= minimumCount, value.count <= 40, value.hasPrefix(prefix)
+    else { return false }
+    let body = value.dropFirst(prefix.count)
     guard !body.isEmpty else { return false }
     return body.allSatisfy { character in
       character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
     }
+  }
+
+  public static func isWellFormed(taskID: String) -> Bool {
+    isWellFormedStoreID(taskID, prefix: "HTASK-", minimumCount: 8)
   }
 
   // MARK: - Task lifecycle
@@ -114,12 +124,7 @@ public actor HarnessTaskStore {
   // MARK: - Strategy attempts (TASK-HFA-004)
 
   public static func isWellFormed(attemptID: String) -> Bool {
-    guard attemptID.hasPrefix("ATTEMPT-"), attemptID.count <= 40 else { return false }
-    let body = attemptID.dropFirst("ATTEMPT-".count)
-    guard !body.isEmpty else { return false }
-    return body.allSatisfy { character in
-      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
-    }
+    isWellFormedStoreID(attemptID, prefix: "ATTEMPT-")
   }
 
   /// Append an immutable attempt event. The event log is the truth; each
@@ -153,12 +158,7 @@ public actor HarnessTaskStore {
   /// the same reason an evaluation id does: a record cannot be written
   /// outside its own task directory (CHG-2026-055, TASK-HFA-002).
   public static func isWellFormed(modelRunID: String) -> Bool {
-    guard modelRunID.hasPrefix("MRUN-"), modelRunID.count <= 40 else { return false }
-    let body = modelRunID.dropFirst("MRUN-".count)
-    guard !body.isEmpty else { return false }
-    return body.allSatisfy { character in
-      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
-    }
+    isWellFormedStoreID(modelRunID, prefix: "MRUN-")
   }
 
   /// Several runs can belong to one round - a refused proposal is still a
@@ -183,12 +183,7 @@ public actor HarnessTaskStore {
   /// grammar excludes separators, so an evaluation cannot be written outside
   /// its own task directory.
   public static func isWellFormed(evaluationID: String) -> Bool {
-    guard evaluationID.hasPrefix("EVAL-"), evaluationID.count <= 40 else { return false }
-    let body = evaluationID.dropFirst("EVAL-".count)
-    guard !body.isEmpty else { return false }
-    return body.allSatisfy { character in
-      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
-    }
+    isWellFormedStoreID(evaluationID, prefix: "EVAL-")
   }
 
   public func putEvaluation(_ evaluation: HarnessEvaluation) throws {
@@ -280,12 +275,7 @@ public actor HarnessTaskStore {
   }
 
   public static func isWellFormed(failureDigest digest: String) -> Bool {
-    guard digest.hasPrefix("FAIL-"), digest.count <= 40 else { return false }
-    let body = digest.dropFirst("FAIL-".count)
-    guard !body.isEmpty else { return false }
-    return body.allSatisfy { character in
-      character.isASCII && (character.isNumber || ("A"..."F").contains(String(character)))
-    }
+    isWellFormedStoreID(digest, prefix: "FAIL-")
   }
 
   /// Full-text lookup is scoped before ranking. It cannot make project

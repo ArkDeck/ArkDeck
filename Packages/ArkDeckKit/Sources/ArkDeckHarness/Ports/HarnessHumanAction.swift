@@ -102,18 +102,16 @@ public enum HarnessHumanActionFactory {
   }
 
   static func encode(_ action: HumanActionRequired) -> JSONValue? {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(action),
+    let encoder = CanonicalJSONEncoders.canonical()
+        guard let data = try? encoder.encode(action),
       let projected = try? JSONDecoder().decode(JSONValue.self, from: data)
     else { return nil }
     return projected
   }
 
   static func decode(_ value: JSONValue) throws -> HumanActionRequired {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(value) else {
+    let encoder = CanonicalJSONEncoders.canonical()
+        guard let data = try? encoder.encode(value) else {
       throw HumanActionRequiredError.malformed(path: "$")
     }
     return try JSONDecoder().decode(HumanActionRequired.self, from: data)

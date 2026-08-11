@@ -3092,9 +3092,8 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       throw DeviceProviderError.factsUnavailable(
         "\(context.stepID) has no complete host-managed target/tool correlation")
     }
-    let actionEncoder = JSONEncoder()
-    actionEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let encodedAction = try actionEncoder.encode(
+    let actionEncoder = CanonicalJSONEncoders.canonical()
+        let encodedAction = try actionEncoder.encode(
       try PersistedTypedProviderAction(action))
     let actionSHA256 = SHA256Hex.string(of: encodedAction)
     return TypedProcessPlan(

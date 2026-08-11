@@ -245,9 +245,8 @@ public actor RuntimeSupersedingRecoveryStore {
         previousEpochSHA256: material.previousEpochSHA256,
         epochSHA256: Self.digest(material))
       document.epochs.append(epoch)
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-      try DurableFileWriter.createOrReplaceAtomically(
+      let encoder = CanonicalJSONEncoders.canonicalPretty()
+            try DurableFileWriter.createOrReplaceAtomically(
         destination: documentURL, data: try encoder.encode(document))
       return epoch
     }
@@ -432,9 +431,8 @@ public actor RuntimeSupersedingRecoveryStore {
   }
 
   private static func digest<T: Encodable>(_ value: T) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(value) else {
+    let encoder = CanonicalJSONEncoders.canonical()
+        guard let data = try? encoder.encode(value) else {
       preconditionFailure("recovery epoch material must encode")
     }
     return digest(data)

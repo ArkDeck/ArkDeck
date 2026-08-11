@@ -133,9 +133,8 @@ package enum HarnessVendorEnvelope {
   }
 
   static func json(_ value: [String: JSONValue]) -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return (try? encoder.encode(JSONValue.object(value))) ?? Data("{}".utf8)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return (try? encoder.encode(JSONValue.object(value))) ?? Data("{}".utf8)
   }
 
   /// Vendor envelopes differ; the failure modes do not. Anything that is not

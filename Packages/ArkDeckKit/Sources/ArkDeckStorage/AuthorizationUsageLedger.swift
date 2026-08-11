@@ -502,9 +502,8 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
   }
 
   var jsonValue: JSONValue {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return (try? JSONDecoder().decode(JSONValue.self, from: encoder.encode(self))) ?? .null
+    let encoder = CanonicalJSONEncoders.canonical()
+        return (try? JSONDecoder().decode(JSONValue.self, from: encoder.encode(self))) ?? .null
   }
 
   private static func validateCommon(
@@ -1279,9 +1278,8 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
     _ document: AgentAuthorityUsageLedgerDocument,
     rootDescriptor: Int32
   ) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let data = try encoder.encode(document)
+    let encoder = CanonicalJSONEncoders.canonical()
+        let data = try encoder.encode(document)
     guard !data.isEmpty, data.count <= Self.maximumBytes else {
       throw AuthorizationUsageLedgerError.invalidRecord(
         "Agent authority usage ledger exceeds size limit")
@@ -1587,10 +1585,7 @@ private enum AuthorizationUsageValidation {
   }
 
   static func date(_ value: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    if let date = formatter.date(from: value) { return date }
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.date(from: value)
+    ISO8601Timestamps.parse(value)
   }
 }
 

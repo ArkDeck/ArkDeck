@@ -290,9 +290,8 @@ enum RuntimeDebugAttemptPermitStore {
   }
 
   static func canonicalEncode<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(value)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try encoder.encode(value)
   }
 
   static func sha256(_ data: Data) -> String {

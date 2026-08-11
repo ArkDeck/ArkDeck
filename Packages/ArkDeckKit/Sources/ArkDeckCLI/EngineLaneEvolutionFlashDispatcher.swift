@@ -196,9 +196,8 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
       ],
       campaignReservation: RuntimeCampaignReservationReference(
         reservationID: admitted.reservationID))
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return String(decoding: try encoder.encode(request), as: UTF8.self)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return String(decoding: try encoder.encode(request), as: UTF8.self)
   }
 
   /// Terminal mapping. The one rule that matters: `outcomeUnknown` is never

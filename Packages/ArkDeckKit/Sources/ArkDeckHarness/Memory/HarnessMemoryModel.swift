@@ -427,9 +427,8 @@ public struct HarnessMemoryEntry: Equatable, Sendable, Codable {
   }
 
   public var contentDigest: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let bytes = (try? encoder.encode(self)) ?? Data("{}".utf8)
+    let encoder = CanonicalJSONEncoders.canonical()
+        let bytes = (try? encoder.encode(self)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: bytes)
   }
 
@@ -544,9 +543,8 @@ public struct HarnessMemoryQuery: Equatable, Sendable, Codable {
   }
 
   public var digest: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let bytes = (try? encoder.encode(self)) ?? Data("{}".utf8)
+    let encoder = CanonicalJSONEncoders.canonical()
+        let bytes = (try? encoder.encode(self)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: bytes)
   }
 

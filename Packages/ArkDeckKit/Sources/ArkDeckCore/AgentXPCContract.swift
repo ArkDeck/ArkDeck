@@ -68,9 +68,8 @@ public enum ArkDeckAgentXPC {
     params: [String: JSONValue]? = nil,
     requestID: String = UUID().uuidString
   ) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try encoder.encode(
       RequestFrame(
         protocolVersion: wireProtocolVersion,
         id: requestID,

@@ -221,9 +221,8 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
   }
 
   public func canonicalData() throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(self)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try encoder.encode(self)
   }
 
   private enum CodingKeys: String, CodingKey, CaseIterable {

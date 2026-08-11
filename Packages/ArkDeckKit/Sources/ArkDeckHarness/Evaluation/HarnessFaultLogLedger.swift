@@ -32,6 +32,7 @@
 // `ArkDeckRuntime/CrashLedgerAnalysisContracts.swift`: the schema is shared with
 // the analyzer provider and the runtime engine, which must not import the
 // harness plane. This file keeps the producer — parsing and judging.
+import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
 
@@ -60,9 +61,8 @@ public enum HarnessCrashLedgerDerivedAnalyzer {
   /// Keeping this encoder shared lets the evaluator recompute that digest
   /// instead of trusting a structured-looking result and a detached hash.
   public static func canonicalData(_ analysis: HarnessCrashLedgerAnalysis) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(analysis)
+    let encoder = CanonicalJSONEncoders.canonical()
+        return try encoder.encode(analysis)
   }
 }
 

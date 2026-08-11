@@ -705,9 +705,8 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   }
 
   private static func digest(_ material: RuntimeTargetAliasResolutionMaterial) throws -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return sha256(try encoder.encode(material))
+    let encoder = CanonicalJSONEncoders.canonical()
+        return sha256(try encoder.encode(material))
   }
 
   private static func resolutionID(

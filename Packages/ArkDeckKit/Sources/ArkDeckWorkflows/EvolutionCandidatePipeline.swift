@@ -645,8 +645,7 @@ public struct PublishedRockchipEvolutionStrategyRepairer:
 
 extension JSONEncoder {
   fileprivate static var sorted: JSONEncoder {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return encoder
+    let encoder = CanonicalJSONEncoders.canonical()
+        return encoder
   }
 }

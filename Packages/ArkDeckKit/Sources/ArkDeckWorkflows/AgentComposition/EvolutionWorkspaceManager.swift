@@ -449,9 +449,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
   }
 
   private static func parseUTC(_ value: String) -> Date? {
-    let fractional = ISO8601DateFormatter()
-    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    ISO8601Timestamps.parse(value)
   }
 
   /// One definition, shared by creation and adoption: two copies of this
@@ -581,8 +579,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
   }
 
   private static func write<T: Encodable>(_ value: T, to url: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-    try encoder.encode(value).write(to: url, options: [.atomic])
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
+        try encoder.encode(value).write(to: url, options: [.atomic])
   }
 }

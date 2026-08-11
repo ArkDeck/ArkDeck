@@ -507,10 +507,7 @@ enum JournalEventSemanticValidator {
   }
 
   private static func isDateTime(_ value: String) -> Bool {
-    let formatter = ISO8601DateFormatter()
-    if formatter.date(from: value) != nil { return true }
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.date(from: value) != nil
+    ISO8601Timestamps.parse(value) != nil
   }
 
   private static func payload(_ event: JournalEvent, _ detail: String)
