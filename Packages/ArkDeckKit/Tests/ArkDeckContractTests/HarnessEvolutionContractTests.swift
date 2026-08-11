@@ -556,38 +556,6 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
-  func testLegacyExecutionModeIsDecoderOnlyAndMustAgreeWithWorkspacePolicy() throws {
-    let base = String(repeating: "a", count: 64)
-    let policy = try HarnessEvolutionPolicy(
-      baseRevision: base, allowedPaths: ["Sources/**"],
-      allowedOperations: evolutionOperations)
-    let current = try taskSnapshot(baseRevision: base, policy: policy)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    let currentData = try encoder.encode(current)
-    var object = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: currentData) as? [String: Any])
-    XCTAssertNil(object["executionMode"])
-    XCTAssertEqual(object["schemaVersion"] as? String, "3.1.0")
-
-    object["schemaVersion"] = "3.0.0"
-    object["executionMode"] = "evolution"
-    let legacyData = try JSONSerialization.data(withJSONObject: object)
-    let decoded = try JSONDecoder().decode(HarnessTaskSnapshot.self, from: legacyData)
-    XCTAssertTrue(decoded.requiresWorkspaceIsolation)
-    let migrated = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: encoder.encode(decoded.migratedToCurrentSchema()))
-        as? [String: Any])
-    XCTAssertNil(migrated["executionMode"])
-    XCTAssertEqual(migrated["schemaVersion"] as? String, "3.1.0")
-
-    object["executionMode"] = "normal"
-    XCTAssertThrowsError(
-      try JSONDecoder().decode(
-        HarnessTaskSnapshot.self,
-        from: JSONSerialization.data(withJSONObject: object)))
-  }
-
   func testWorkspaceGCDestroysOnlyTerminalTreesAndKeepsAuditMetadata() async throws {
     let fixture = try gcFixture("gc-basic")
     let terminal = try await fixture.prepare("HTASK-GC0000000001")

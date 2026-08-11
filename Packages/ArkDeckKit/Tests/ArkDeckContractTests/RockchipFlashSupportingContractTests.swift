@@ -165,7 +165,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     let store = RockchipProductBindingStore(rootURL: root)
     let bootstrap = RockchipProductBindingBootstrap(probe: { identity }, store: store)
 
-    let first = try bootstrap.installCurrentLoader()
+    let first = try bootstrap.installCurrentTarget()
     XCTAssertTrue(first.created)
     XCTAssertEqual(first.revision, 1)
     XCTAssertEqual(first.usbTopology, identity.topology)
@@ -187,7 +187,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       topology: identity.topology)
     let second = try RockchipProductBindingBootstrap(
       probe: { loaderIdentity }, store: store
-    ).installCurrentLoader()
+    ).installCurrentTarget()
     XCTAssertFalse(second.created)
     XCTAssertEqual(second.serialDigestSHA256, first.serialDigestSHA256)
 
@@ -200,7 +200,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
           topology: "336592897", productName: identity.productName)
       },
       store: store)
-    XCTAssertThrowsError(try drifted.installCurrentLoader())
+    XCTAssertThrowsError(try drifted.installCurrentTarget())
     XCTAssertEqual(try store.loadExisting(), snapshot)
 
     let spoofedNormal = RockchipProductBindingBootstrap(
@@ -212,7 +212,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
           topology: identity.topology, productName: "Maskrom Device")
       },
       store: store)
-    XCTAssertThrowsError(try spoofedNormal.installCurrentLoader())
+    XCTAssertThrowsError(try spoofedNormal.installCurrentTarget())
   }
 
   func testRebindEvidenceProducesOneAdjacentRuntimeTargetLineageEdge() throws {

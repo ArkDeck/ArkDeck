@@ -760,63 +760,23 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     }
   }
 
-  func testV1ConsumptionMigratesAsLegacyUnverifiedAndCannotAuthorizeReuse() async throws {
-    let capability = try e1Capability(maximumUses: 2)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let capabilityJSON = try XCTUnwrap(
-      String(data: encoder.encode(capability), encoding: .utf8))
+  func testUnsupportedV1SchemaVersionFailsLoud() async throws {
     let legacy = """
-      {
-        "schemaVersion":"1.0.0",
-        "records":[{
-          "capability":\(capabilityJSON),
-          "remainingUses":1,
-          "consumptions":[{
-            "reservationID":"legacy-reservation",
-            "consumedAtUTC":"2026-07-15T00:00:00Z",
-            "operationReference":"debug.hap@1",
-            "queryFingerprintSHA256":"\(String(repeating: "b", count: 64))",
-            "remainingUsesAfter":1
-          }]
-        }]
-      }
+      {"schemaVersion":"1.0.0","records":[]}
       """
     try FileManager.default.createDirectory(
       at: directoryURL, withIntermediateDirectories: true)
     try Data(legacy.utf8).write(
       to: directoryURL.appendingPathComponent("runtime-capabilities.json"))
-    let store = try makeStore()
-    let inspected = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
-    let status = try XCTUnwrap(inspected)
-    XCTAssertEqual(status.lineage.first?.outcome, .legacyUnverified)
-    XCTAssertFalse(status.lineageAllowsNewExecution)
     do {
-      _ = try await store.consume(
-        capabilityID: "CAP-RT-STORE-001", reservationID: "new-reservation",
-        jobID: "new-job", query: query(), nowUTC: "2026-07-15T00:01:00Z")
-      XCTFail("legacy entries without outcomes must not authorize reuse")
+      _ = try await makeStore().list()
+      XCTFail("a v1 store document must be refused, not migrated")
     } catch let error as RuntimeCapabilityStoreError {
-      guard case .lineageBlocked = error else {
-        return XCTFail("expected lineageBlocked, got \(error)")
+      guard case .storeCorrupted(let detail) = error else {
+        return XCTFail("expected storeCorrupted, got \(error)")
       }
+      XCTAssertTrue(detail.contains("unsupported schema version 1.0.0"), detail)
     }
-
-    // A durable Job record recovered by the engine may resolve the old
-    // reservation. Until that exact recovery happens, the migrated row
-    // above remains fail-closed.
-    try await store.recordOutcome(
-      capabilityID: "CAP-RT-STORE-001",
-      reservationID: "legacy-reservation",
-      jobID: "job-recovered-from-durable-record",
-      outcome: .confirmed,
-      terminalState: "succeeded",
-      atUTC: "2026-07-15T00:02:00Z")
-    let resolved = try await store.inspect(capabilityID: "CAP-RT-STORE-001")
-    XCTAssertEqual(resolved?.lineage.first?.outcome, .confirmed)
-    XCTAssertEqual(
-      resolved?.lineage.first?.outcomeHistory.last?.jobID,
-      "job-recovered-from-durable-record")
   }
 
   func testUnknownCapabilityConsumeFails() async throws {

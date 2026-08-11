@@ -15,7 +15,6 @@
 		A100000000000000000000B6 /* DebugLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B3 /* DebugLocalizable.xcstrings */; };
 		A10000000000000000000012 /* ArkDeckCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000091 /* ArkDeckCore */; };
 		A10000000000000000000013 /* HDCStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* HDCStatusView.swift */; };
-		A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002F /* UnavailableFeatureView.swift */; };
 		D10000000000000000000001 /* DeviceWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* DeviceWorkspace.swift */; };
 		A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* RuntimeHistoryView.swift */; };
 		A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* FlashWorkspaceView.swift */; };
@@ -65,7 +64,6 @@
 		A1000000000000000000002B /* THIRD-PARTY-NOTICES.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = openspec/integrations/rockchip/bundled-component/1.0.0/THIRD-PARTY-NOTICES.txt; sourceTree = SOURCE_ROOT; };
 		A1000000000000000000002C /* source-distribution-manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json; sourceTree = SOURCE_ROOT; };
 		A1000000000000000000002D /* RockchipComponent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RockchipComponent.entitlements; sourceTree = "<group>"; };
-		A1000000000000000000002F /* UnavailableFeatureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnavailableFeatureView.swift; sourceTree = "<group>"; };
 		D10000000000000000000002 /* DeviceWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceWorkspace.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* RuntimeHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeHistoryView.swift; sourceTree = "<group>"; };
 		A1000000000000000000003C /* FlashWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashWorkspaceView.swift; sourceTree = "<group>"; };
@@ -270,7 +268,6 @@
 		A10000000000000000000039 /* Shared Features */ = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000002F /* UnavailableFeatureView.swift */,
 			);
 			path = Features/Shared;
 			sourceTree = "<group>";
@@ -434,7 +431,6 @@
 			files = (
 				A10000000000000000000010 /* ArkDeckApp.swift in Sources */,
 				A10000000000000000000013 /* HDCStatusView.swift in Sources */,
-				A1000000000000000000001E /* UnavailableFeatureView.swift in Sources */,
 				D10000000000000000000001 /* DeviceWorkspace.swift in Sources */,
 				A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */,
 				A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */,

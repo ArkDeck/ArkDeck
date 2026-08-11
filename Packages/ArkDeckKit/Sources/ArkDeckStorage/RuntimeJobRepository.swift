@@ -72,11 +72,47 @@ public final class RuntimeJobRepository: @unchecked Sendable {
       }
       try configure()
       try migrate()
-      try importLegacyIdempotencyEntriesIfNeeded(stateDirectory: stateDirectory)
+      try refuseUnconsumedLegacyLedger(stateDirectory: stateDirectory)
     } catch {
       sqlite3_close_v2(opened)
       handle = nil
       throw error
+    }
+  }
+
+  /// The pre-SQLite idempotency ledger generation is retired, and its importer
+  /// never deleted the file after consuming it — a surviving `idempotency.json`
+  /// on an upgraded store is normal residue. It stays acceptable exactly while
+  /// every key it names is represented in the SQLite admission table. A key
+  /// this table has never seen means unconsumed history (or a restored
+  /// backup): admitting requests past it could replay a used key as a fresh
+  /// device mutation, so the repository refuses to open instead.
+  private func refuseUnconsumedLegacyLedger(stateDirectory: URL) throws {
+    let ledgerURL = stateDirectory.appending(path: "idempotency.json")
+    guard FileManager.default.fileExists(atPath: ledgerURL.path) else { return }
+    struct LegacyLedger: Decodable {
+      struct Entry: Decodable { let idempotencyKey: String }
+      let entries: [Entry]
+    }
+    let ledger: LegacyLedger
+    do {
+      ledger = try JSONDecoder().decode(LegacyLedger.self, from: Data(contentsOf: ledgerURL))
+    } catch {
+      throw RuntimeJobRepositoryError.corrupt(
+        "retired ledger \(ledgerURL.path) is undecodable, so its keys cannot be "
+          + "proven consumed: \(error). Verify and remove the file to restore admission")
+    }
+    for entry in ledger.entries {
+      let known = try query(
+        "SELECT 1 AS present FROM runtime_job WHERE idempotency_key = ? LIMIT 1",
+        [.text(entry.idempotencyKey)])
+      guard !known.isEmpty else {
+        throw RuntimeJobRepositoryError.corrupt(
+          "retired ledger \(ledgerURL.path) names key \(entry.idempotencyKey) "
+            + "that \(Self.filename) has never admitted; this generation can no "
+            + "longer be imported and admitting past it could replay a used key. "
+            + "Verify the ledger's jobs, then remove the file to restore admission")
+      }
     }
   }
 
@@ -277,53 +313,6 @@ public final class RuntimeJobRepository: @unchecked Sendable {
         """
       )
       try execute("PRAGMA user_version=\(Self.schemaVersion)")
-    }
-  }
-
-  private struct LegacyDocument: Decodable {
-    let entries: [LegacyEntry]
-  }
-
-  private struct LegacyEntry: Decodable {
-    let idempotencyKey: String
-    let jobID: String
-    let requestFingerprintSHA256: String
-  }
-
-  /// Legacy entries are migration input only.  We import a mapping only when
-  /// its old job projections are already complete, so an old ghost entry is
-  /// not carried forward to block a safely retried request forever.
-  private func importLegacyIdempotencyEntriesIfNeeded(stateDirectory: URL) throws {
-    let legacyURL = stateDirectory.appending(path: "idempotency.json")
-    guard FileManager.default.fileExists(atPath: legacyURL.path) else { return }
-    let document: LegacyDocument
-    do {
-      document = try JSONDecoder().decode(LegacyDocument.self, from: Data(contentsOf: legacyURL))
-    } catch {
-      throw RuntimeJobRepositoryError.corrupt("cannot decode legacy idempotency ledger: \(error)")
-    }
-    for entry in document.entries {
-      let jobDirectory = stateDirectory
-        .appendingPathComponent("jobs", isDirectory: true)
-        .appendingPathComponent(entry.jobID, isDirectory: true)
-      let recordURL = jobDirectory.appendingPathComponent("job-record.json")
-      let journalURL = jobDirectory.appendingPathComponent("journal.jsonl")
-      guard
-        FileManager.default.fileExists(atPath: recordURL.path),
-        FileManager.default.fileExists(atPath: journalURL.path)
-      else { continue }
-      let record = try Data(contentsOf: recordURL)
-      _ = try transaction {
-        try run(
-          """
-          INSERT OR IGNORE INTO runtime_job(
-            job_id, idempotency_key, request_hash, state, created_at_utc,
-            updated_at_utc, version, initial_record_json
-          ) VALUES(?, ?, ?, 'legacy', 'legacy', 'legacy', 1, ?)
-          """,
-          [.text(entry.jobID), .text(entry.idempotencyKey),
-           .text(entry.requestFingerprintSHA256), .blob(record)])
-      }
     }
   }
 

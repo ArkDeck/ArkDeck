@@ -46,23 +46,6 @@ public enum HarnessTaskLifecycle: String, CaseIterable, Sendable {
     }
   }
 
-  public init(from decoder: any Decoder) throws {
-    let raw = try decoder.singleValueContainer().decode(String.self)
-    if raw == "paused" {
-      self = .waiting
-      return
-    }
-    guard let value = Self(rawValue: raw) else {
-      throw DecodingError.dataCorrupted(
-        .init(codingPath: decoder.codingPath, debugDescription: "unknown lifecycle \(raw)"))
-    }
-    self = value
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(rawValue)
-  }
 }
 
 extension HarnessTaskLifecycle: Codable {}
@@ -83,26 +66,6 @@ public enum HarnessTaskStage: String, CaseIterable, Sendable {
   case building
   case deploying
   case verifying
-
-  /// Legal successors, excluding "stays in the same phase" which every
-  /// phase allows.
-  public init(from decoder: any Decoder) throws {
-    let raw = try decoder.singleValueContainer().decode(String.self)
-    if raw == "deviceReady" {
-      self = .reproducing
-      return
-    }
-    guard let value = Self(rawValue: raw) else {
-      throw DecodingError.dataCorrupted(
-        .init(codingPath: decoder.codingPath, debugDescription: "unknown stage \(raw)"))
-    }
-    self = value
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(rawValue)
-  }
 }
 
 extension HarnessTaskStage: Codable {}
@@ -602,8 +565,6 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   enum CodingKeys: String, CodingKey {
     case lifecycle
     case stage
-    case status
-    case phase
     case waitReason
     case conditions
     case activeRound
@@ -654,71 +615,24 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    let lifecycleRaw =
-      try container.decodeIfPresent(String.self, forKey: .lifecycle)
-      ?? container.decode(String.self, forKey: .status)
-    if let canonical = try container.decodeIfPresent(String.self, forKey: .lifecycle),
-      let compatibility = try container.decodeIfPresent(String.self, forKey: .status),
-      (canonical == "paused" ? "waiting" : canonical)
-        != (compatibility == "paused" ? "waiting" : compatibility)
-    {
-      throw DecodingError.dataCorruptedError(
-        forKey: .lifecycle, in: container,
-        debugDescription: "lifecycle and status disagree")
-    }
-    let legacyPaused = lifecycleRaw == "paused"
-    guard legacyPaused || HarnessTaskLifecycle(rawValue: lifecycleRaw) != nil else {
-      throw DecodingError.dataCorruptedError(
-        forKey: .lifecycle, in: container,
-        debugDescription: "unknown lifecycle \(lifecycleRaw)")
-    }
-    let decodedLifecycle =
-      legacyPaused
-      ? HarnessTaskLifecycle.waiting : HarnessTaskLifecycle(rawValue: lifecycleRaw)!
-    let stageRaw =
-      try container.decodeIfPresent(String.self, forKey: .stage)
-      ?? container.decode(String.self, forKey: .phase)
-    if let canonical = try container.decodeIfPresent(String.self, forKey: .stage),
-      let compatibility = try container.decodeIfPresent(String.self, forKey: .phase),
-      (canonical == "deviceReady" ? "reproducing" : canonical)
-        != (compatibility == "deviceReady" ? "reproducing" : compatibility)
-    {
-      throw DecodingError.dataCorruptedError(
-        forKey: .stage, in: container,
-        debugDescription: "stage and phase disagree")
-    }
-    let legacyDeviceReady = stageRaw == "deviceReady"
-    guard legacyDeviceReady || HarnessTaskStage(rawValue: stageRaw) != nil else {
-      throw DecodingError.dataCorruptedError(
-        forKey: .stage, in: container,
-        debugDescription: "unknown stage \(stageRaw)")
-    }
+    let decodedLifecycle = try container.decode(HarnessTaskLifecycle.self, forKey: .lifecycle)
     self.activeRound = try container.decode(Int.self, forKey: .activeRound)
     self.activeJobID = try container.decodeIfPresent(String.self, forKey: .activeJobID)
     let encodedWaitReason = try container.decodeIfPresent(
       HarnessTaskWaitReason.self, forKey: .waitReason)
-    if container.contains(.lifecycle) {
-      if decodedLifecycle == .waiting, encodedWaitReason == nil {
-        throw DecodingError.dataCorruptedError(
-          forKey: .waitReason, in: container,
-          debugDescription: "waiting lifecycle requires waitReason")
-      }
-      if decodedLifecycle != .waiting, encodedWaitReason != nil {
-        throw DecodingError.dataCorruptedError(
-          forKey: .waitReason, in: container,
-          debugDescription: "waitReason is valid only while waiting")
-      }
+    if decodedLifecycle == .waiting, encodedWaitReason == nil {
+      throw DecodingError.dataCorruptedError(
+        forKey: .waitReason, in: container,
+        debugDescription: "waiting lifecycle requires waitReason")
     }
-    if decodedLifecycle == .running, activeJobID != nil,
-      !container.contains(.lifecycle)
-    {
-      self.status = .waiting
-      self.waitReason = .activeJob
-    } else {
-      self.status = decodedLifecycle
-      self.waitReason = encodedWaitReason ?? (legacyPaused ? .userSuspended : nil)
+    if decodedLifecycle != .waiting, encodedWaitReason != nil {
+      throw DecodingError.dataCorruptedError(
+        forKey: .waitReason, in: container,
+        debugDescription: "waitReason is valid only while waiting")
     }
-    self.phase = legacyDeviceReady ? .reproducing : HarnessTaskStage(rawValue: stageRaw)!
+    self.status = decodedLifecycle
+    self.waitReason = encodedWaitReason
+    self.phase = try container.decode(HarnessTaskStage.self, forKey: .stage)
     let decodedConditions = try container.decodeIfPresent(
       [HarnessTaskCondition].self, forKey: .conditions)
     self.conditions = HarnessTaskConditionSet.normalized(
@@ -742,8 +656,6 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(status, forKey: .lifecycle)
     try container.encode(phase, forKey: .stage)
-    try container.encode(status, forKey: .status)
-    try container.encode(phase, forKey: .phase)
     try container.encodeIfPresent(waitReason, forKey: .waitReason)
     try container.encode(conditions, forKey: .conditions)
     try container.encode(activeRound, forKey: .activeRound)
@@ -854,14 +766,10 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
     case atUTC = "atUtc"
     case causation
     case reasonCode
-    case fromLifecycle
-    case toLifecycle
-    case fromStage
-    case toStage
-    case fromStatus
-    case toStatus
-    case fromPhase
-    case toPhase
+    case fromStatus = "fromLifecycle"
+    case toStatus = "toLifecycle"
+    case fromPhase = "fromStage"
+    case toPhase = "toStage"
     case jobID = "jobId"
     case evaluationID = "evaluationId"
     case resulting
@@ -895,67 +803,6 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
     self.jobID = jobID
     self.evaluationID = evaluationID
     self.resulting = resulting
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.documentType = try container.decode(String.self, forKey: .documentType)
-    self.schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
-    self.htaskID = try container.decode(String.self, forKey: .htaskID)
-    self.sequence = try container.decode(Int.self, forKey: .sequence)
-    self.atUTC = try container.decode(String.self, forKey: .atUTC)
-    self.causation = try container.decode(HarnessTaskCausation.self, forKey: .causation)
-    self.reasonCode = try container.decode(String.self, forKey: .reasonCode)
-    let legacyFromLifecycle = try container.decode(
-      HarnessTaskLifecycle.self, forKey: .fromStatus)
-    let legacyToLifecycle = try container.decode(
-      HarnessTaskLifecycle.self, forKey: .toStatus)
-    let legacyFromStage = try container.decode(HarnessTaskStage.self, forKey: .fromPhase)
-    let legacyToStage = try container.decode(HarnessTaskStage.self, forKey: .toPhase)
-    self.fromStatus =
-      try container.decodeIfPresent(
-        HarnessTaskLifecycle.self, forKey: .fromLifecycle) ?? legacyFromLifecycle
-    self.toStatus =
-      try container.decodeIfPresent(
-        HarnessTaskLifecycle.self, forKey: .toLifecycle) ?? legacyToLifecycle
-    self.fromPhase =
-      try container.decodeIfPresent(
-        HarnessTaskStage.self, forKey: .fromStage) ?? legacyFromStage
-    self.toPhase =
-      try container.decodeIfPresent(
-        HarnessTaskStage.self, forKey: .toStage) ?? legacyToStage
-    guard fromStatus == legacyFromLifecycle, toStatus == legacyToLifecycle,
-      fromPhase == legacyFromStage, toPhase == legacyToStage
-    else {
-      throw DecodingError.dataCorruptedError(
-        forKey: .resulting, in: container,
-        debugDescription: "canonical and compatibility event axes disagree")
-    }
-    self.jobID = try container.decodeIfPresent(String.self, forKey: .jobID)
-    self.evaluationID = try container.decodeIfPresent(String.self, forKey: .evaluationID)
-    self.resulting = try container.decode(HarnessTaskProjection.self, forKey: .resulting)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(documentType, forKey: .documentType)
-    try container.encode(schemaVersion, forKey: .schemaVersion)
-    try container.encode(htaskID, forKey: .htaskID)
-    try container.encode(sequence, forKey: .sequence)
-    try container.encode(atUTC, forKey: .atUTC)
-    try container.encode(causation, forKey: .causation)
-    try container.encode(reasonCode, forKey: .reasonCode)
-    try container.encode(fromStatus, forKey: .fromLifecycle)
-    try container.encode(toStatus, forKey: .toLifecycle)
-    try container.encode(fromPhase, forKey: .fromStage)
-    try container.encode(toPhase, forKey: .toStage)
-    try container.encode(fromStatus, forKey: .fromStatus)
-    try container.encode(toStatus, forKey: .toStatus)
-    try container.encode(fromPhase, forKey: .fromPhase)
-    try container.encode(toPhase, forKey: .toPhase)
-    try container.encodeIfPresent(jobID, forKey: .jobID)
-    try container.encodeIfPresent(evaluationID, forKey: .evaluationID)
-    try container.encode(resulting, forKey: .resulting)
   }
 }
 
@@ -1007,8 +854,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case successCriteria
     case budgets
     case policy
-    // Decoder-only r8/r9 compatibility key. Current snapshots never encode it.
-    case executionMode
     case evolutionPolicy
     case evolutionWorkspace
     case observedState
@@ -1016,8 +861,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case updatedAtUTC = "updatedAtUtc"
     case lifecycle
     case stage
-    case status
-    case phase
     case waitReason
     case conditions
     case activeRound
@@ -1029,11 +872,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     case cancelRequested
     case result
     case version
-  }
-
-  private enum LegacyExecutionMode: String, Decodable {
-    case normal
-    case evolution
   }
 
   public init(
@@ -1100,10 +938,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    self.documentType =
-      try container.decodeIfPresent(String.self, forKey: .documentType) ?? Self.documentType
-    self.schemaVersion =
-      try container.decodeIfPresent(String.self, forKey: .schemaVersion) ?? "1.0.0"
+    self.documentType = try container.decode(String.self, forKey: .documentType)
+    self.schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
     self.htaskID = try container.decode(String.self, forKey: .htaskID)
     self.type = try container.decode(HarnessTaskType.self, forKey: .type)
     self.intakeDescription = try container.decodeIfPresent(
@@ -1115,20 +951,10 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
       try container.decodeIfPresent([HarnessSuccessCriterion].self, forKey: .successCriteria) ?? []
     self.budgets = try container.decode(HarnessTaskBudgets.self, forKey: .budgets)
     self.policy = try container.decode(HarnessTaskPolicy.self, forKey: .policy)
-    let legacyExecutionMode = try container.decodeIfPresent(
-      LegacyExecutionMode.self, forKey: .executionMode)
     self.evolutionPolicy = try container.decodeIfPresent(
       HarnessEvolutionPolicy.self, forKey: .evolutionPolicy)
     self.evolutionWorkspace = try container.decodeIfPresent(
       HarnessEvolutionWorkspace.self, forKey: .evolutionWorkspace)
-    if let legacyExecutionMode {
-      let legacyRequiresWorkspace = legacyExecutionMode == .evolution
-      guard legacyRequiresWorkspace == (evolutionPolicy != nil) else {
-        throw DecodingError.dataCorruptedError(
-          forKey: .executionMode, in: container,
-          debugDescription: "legacy executionMode disagrees with evolutionPolicy")
-      }
-    }
     guard (evolutionPolicy == nil) == (evolutionWorkspace == nil) else {
       throw DecodingError.dataCorruptedError(
         forKey: .evolutionWorkspace, in: container,
@@ -1139,71 +965,24 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
     self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
 
-    let lifecycleRaw =
-      try container.decodeIfPresent(String.self, forKey: .lifecycle)
-      ?? container.decode(String.self, forKey: .status)
-    if let canonical = try container.decodeIfPresent(String.self, forKey: .lifecycle),
-      let compatibility = try container.decodeIfPresent(String.self, forKey: .status),
-      (canonical == "paused" ? "waiting" : canonical)
-        != (compatibility == "paused" ? "waiting" : compatibility)
-    {
-      throw DecodingError.dataCorruptedError(
-        forKey: .lifecycle, in: container,
-        debugDescription: "lifecycle and status disagree")
-    }
-    let legacyPaused = lifecycleRaw == "paused"
-    guard legacyPaused || HarnessTaskLifecycle(rawValue: lifecycleRaw) != nil else {
-      throw DecodingError.dataCorruptedError(
-        forKey: .lifecycle, in: container,
-        debugDescription: "unknown lifecycle \(lifecycleRaw)")
-    }
-    let decodedLifecycle =
-      legacyPaused
-      ? HarnessTaskLifecycle.waiting : HarnessTaskLifecycle(rawValue: lifecycleRaw)!
-    let stageRaw =
-      try container.decodeIfPresent(String.self, forKey: .stage)
-      ?? container.decode(String.self, forKey: .phase)
-    if let canonical = try container.decodeIfPresent(String.self, forKey: .stage),
-      let compatibility = try container.decodeIfPresent(String.self, forKey: .phase),
-      (canonical == "deviceReady" ? "reproducing" : canonical)
-        != (compatibility == "deviceReady" ? "reproducing" : compatibility)
-    {
-      throw DecodingError.dataCorruptedError(
-        forKey: .stage, in: container,
-        debugDescription: "stage and phase disagree")
-    }
-    let legacyDeviceReady = stageRaw == "deviceReady"
-    guard legacyDeviceReady || HarnessTaskStage(rawValue: stageRaw) != nil else {
-      throw DecodingError.dataCorruptedError(
-        forKey: .stage, in: container,
-        debugDescription: "unknown stage \(stageRaw)")
-    }
-    self.phase = legacyDeviceReady ? .reproducing : HarnessTaskStage(rawValue: stageRaw)!
+    let decodedLifecycle = try container.decode(HarnessTaskLifecycle.self, forKey: .lifecycle)
+    self.phase = try container.decode(HarnessTaskStage.self, forKey: .stage)
     self.activeRound = try container.decode(Int.self, forKey: .activeRound)
     self.activeJobID = try container.decodeIfPresent(String.self, forKey: .activeJobID)
     let encodedWaitReason = try container.decodeIfPresent(
       HarnessTaskWaitReason.self, forKey: .waitReason)
-    if container.contains(.lifecycle) {
-      if decodedLifecycle == .waiting, encodedWaitReason == nil {
-        throw DecodingError.dataCorruptedError(
-          forKey: .waitReason, in: container,
-          debugDescription: "waiting lifecycle requires waitReason")
-      }
-      if decodedLifecycle != .waiting, encodedWaitReason != nil {
-        throw DecodingError.dataCorruptedError(
-          forKey: .waitReason, in: container,
-          debugDescription: "waitReason is valid only while waiting")
-      }
+    if decodedLifecycle == .waiting, encodedWaitReason == nil {
+      throw DecodingError.dataCorruptedError(
+        forKey: .waitReason, in: container,
+        debugDescription: "waiting lifecycle requires waitReason")
     }
-    if decodedLifecycle == .running, activeJobID != nil,
-      !container.contains(.lifecycle)
-    {
-      self.status = .waiting
-      self.waitReason = .activeJob
-    } else {
-      self.status = decodedLifecycle
-      self.waitReason = encodedWaitReason ?? (legacyPaused ? .userSuspended : nil)
+    if decodedLifecycle != .waiting, encodedWaitReason != nil {
+      throw DecodingError.dataCorruptedError(
+        forKey: .waitReason, in: container,
+        debugDescription: "waitReason is valid only while waiting")
     }
+    self.status = decodedLifecycle
+    self.waitReason = encodedWaitReason
     let decodedConditions = try container.decodeIfPresent(
       [HarnessTaskCondition].self, forKey: .conditions)
     self.conditions = HarnessTaskConditionSet.normalized(
@@ -1244,8 +1023,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     try container.encode(updatedAtUTC, forKey: .updatedAtUTC)
     try container.encode(status, forKey: .lifecycle)
     try container.encode(phase, forKey: .stage)
-    try container.encode(status, forKey: .status)
-    try container.encode(phase, forKey: .phase)
     try container.encodeIfPresent(waitReason, forKey: .waitReason)
     try container.encode(conditions, forKey: .conditions)
     try container.encode(activeRound, forKey: .activeRound)
@@ -1308,23 +1085,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
       conditions: projection.conditions)
   }
 
-  /// Materialise the in-memory forward migration without changing any task
-  /// conclusion or event sequence. The store uses this only for task.json;
-  /// events.jsonl is never rewritten.
-  public func migratedToCurrentSchema() -> HarnessTaskSnapshot {
-    HarnessTaskSnapshot(
-      htaskID: htaskID, type: type, intakeDescription: intakeDescription,
-      projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
-      budgets: budgets, policy: policy,
-      evolutionPolicy: evolutionPolicy, evolutionWorkspace: evolutionWorkspace,
-      observedState: observedState,
-      createdAtUTC: createdAtUTC, updatedAtUTC: updatedAtUTC, status: status,
-      phase: phase, activeRound: activeRound, activeJobID: activeJobID,
-      consumedBudget: consumedBudget, artifactRefs: artifactRefs,
-      latestEvaluationID: latestEvaluationID, noProgressRounds: noProgressRounds,
-      cancelRequested: cancelRequested, result: result, version: version,
-      waitReason: waitReason, conditions: conditions)
-  }
 }
 
 public enum HarnessTaskTransitionError: Error, Equatable, Sendable {

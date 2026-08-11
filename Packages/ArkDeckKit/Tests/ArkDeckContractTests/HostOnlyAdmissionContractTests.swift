@@ -232,25 +232,6 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       witness.askedTargets, [], "reconcile must not resolve device facts for a host-only job")
   }
 
-  func testDraftingACapabilityForAHostOnlyOperationIsRefused() async throws {
-    let engine = try makeEngine(witness: FactsWitness())
-    do {
-      _ = try await engine.draftCapability(
-        try request(), issuedAtUTC: "2026-07-31T00:00:00Z",
-        expiresAtUTC: "2026-08-01T00:00:00Z",
-        issuerReference: "https://example.invalid/pr/1")
-      XCTFail("a host-only operation is gated by the default read-only policy")
-    } catch let error as RuntimeJobEngineError {
-      guard case .rejected(_, let detail) = error else { return XCTFail("\(error)") }
-      // Refused by the external-administration boundary: only a mutation with
-      // an external standing policy could ever be drafted by this legacy API.
-      // Runtime-owned destructive admission and default-read-only operations
-      // have no caller-facing capability writer.
-      XCTAssertTrue(
-        detail.contains("mutation operations with an external standing policy"), detail)
-    }
-  }
-
   // MARK: - HTP-AC-21: the device path is unchanged
 
   func testDeviceBoundAdmissionStillRequiresCompleteFacts() async throws {

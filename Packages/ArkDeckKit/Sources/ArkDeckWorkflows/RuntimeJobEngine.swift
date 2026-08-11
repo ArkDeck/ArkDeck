@@ -390,100 +390,6 @@ public struct RuntimeJobAcceptance: Sendable, Equatable {
   public let deduplicated: Bool
 }
 
-/// A non-authoritative, non-installed capability proposal derived from the
-/// same fully materialized request that will later execute.
-public struct RuntimeCapabilityDraft: Sendable, Equatable, Codable {
-  public let capability: RuntimeCapability
-  public let requestID: String
-  public let idempotencyKey: String
-  public let requestFingerprintSHA256: String
-  public let operationReference: String
-  public let targetID: String
-  public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
-  public let workspaceIdentitySHA256: String?
-  public let workspaceRevision: String?
-  public let workspaceFileScopesDigest: String?
-  public let materializedPlanDigest: String
-  public let catalogDigest: String
-
-  public init(
-    capability: RuntimeCapability,
-    requestID: String,
-    idempotencyKey: String,
-    requestFingerprintSHA256: String,
-    operationReference: String,
-    targetID: String,
-    bindingRevision: Int?,
-    stableIdentitySHA256: String?,
-    workspaceIdentitySHA256: String? = nil,
-    workspaceRevision: String? = nil,
-    workspaceFileScopesDigest: String? = nil,
-    materializedPlanDigest: String,
-    catalogDigest: String
-  ) {
-    self.capability = capability
-    self.requestID = requestID
-    self.idempotencyKey = idempotencyKey
-    self.requestFingerprintSHA256 = requestFingerprintSHA256
-    self.operationReference = operationReference
-    self.targetID = targetID
-    self.bindingRevision = bindingRevision
-    self.stableIdentitySHA256 = stableIdentitySHA256
-    self.workspaceIdentitySHA256 = workspaceIdentitySHA256
-    self.workspaceRevision = workspaceRevision
-    self.workspaceFileScopesDigest = workspaceFileScopesDigest
-    self.materializedPlanDigest = materializedPlanDigest
-    self.catalogDigest = catalogDigest
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case capability, requestID, idempotencyKey, requestFingerprintSHA256
-    case operationReference, targetID, bindingRevision, stableIdentitySHA256
-    case workspaceIdentitySHA256, workspaceRevision, workspaceFileScopesDigest
-    case materializedPlanDigest, catalogDigest
-  }
-
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    capability = try container.decode(RuntimeCapability.self, forKey: .capability)
-    requestID = try container.decode(String.self, forKey: .requestID)
-    idempotencyKey = try container.decode(String.self, forKey: .idempotencyKey)
-    requestFingerprintSHA256 = try container.decode(
-      String.self, forKey: .requestFingerprintSHA256)
-    operationReference = try container.decode(String.self, forKey: .operationReference)
-    targetID = try container.decode(String.self, forKey: .targetID)
-    bindingRevision = try container.decodeIfPresent(Int.self, forKey: .bindingRevision)
-    stableIdentitySHA256 = try container.decodeIfPresent(
-      String.self, forKey: .stableIdentitySHA256)
-    workspaceIdentitySHA256 = try container.decodeIfPresent(
-      String.self, forKey: .workspaceIdentitySHA256)
-    workspaceRevision = try container.decodeIfPresent(String.self, forKey: .workspaceRevision)
-    workspaceFileScopesDigest = try container.decodeIfPresent(
-      String.self, forKey: .workspaceFileScopesDigest)
-    materializedPlanDigest = try container.decode(String.self, forKey: .materializedPlanDigest)
-    catalogDigest = try container.decode(String.self, forKey: .catalogDigest)
-  }
-
-  public func encode(to encoder: any Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(capability, forKey: .capability)
-    try container.encode(requestID, forKey: .requestID)
-    try container.encode(idempotencyKey, forKey: .idempotencyKey)
-    try container.encode(requestFingerprintSHA256, forKey: .requestFingerprintSHA256)
-    try container.encode(operationReference, forKey: .operationReference)
-    try container.encode(targetID, forKey: .targetID)
-    try container.encodeIfPresent(bindingRevision, forKey: .bindingRevision)
-    try container.encodeIfPresent(stableIdentitySHA256, forKey: .stableIdentitySHA256)
-    try container.encodeIfPresent(workspaceIdentitySHA256, forKey: .workspaceIdentitySHA256)
-    try container.encodeIfPresent(workspaceRevision, forKey: .workspaceRevision)
-    try container.encodeIfPresent(
-      workspaceFileScopesDigest, forKey: .workspaceFileScopesDigest)
-    try container.encode(materializedPlanDigest, forKey: .materializedPlanDigest)
-    try container.encode(catalogDigest, forKey: .catalogDigest)
-  }
-}
-
 public enum RuntimeAvailabilityState: String, Sendable, Equatable {
   case available
   case unavailable
@@ -903,180 +809,6 @@ public actor RuntimeJobEngine {
       },
       jobAdmitted: false,
       dispatchDisposition: "notDispatched")
-  }
-
-  /// Legacy repository-plane drafting for operations that still declare an
-  /// external standing policy. AgentDaemon and CLI do not expose it. Any
-  /// operation declaring Runtime-owned admission is rejected before target,
-  /// Artifact or provider materialization; protected Runtime creates that
-  /// capability only inside normal Job admission.
-  public func draftCapability(
-    _ requestData: Data,
-    issuedAtUTC: String,
-    expiresAtUTC: String,
-    issuerReference: String,
-    maximumUses: Int = 1
-  ) async throws -> RuntimeCapabilityDraft {
-    let request: RuntimeOperationRequest
-    do {
-      request = try RuntimeOperationCodec.decodeRequest(requestData)
-    } catch let rejection as RuntimeOperationRequestRejection {
-      throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
-    }
-    guard
-      let descriptor = RuntimeOperationCatalog.descriptor(
-        id: request.operation.id, version: request.operation.version)
-    else {
-      throw RuntimeJobEngineError.rejected(
-        .unknownOperation, "operation \(request.operation.reference) is not in the catalog")
-    }
-    try validateInputs(request.inputs, against: descriptor)
-    try validateSupportedPlanInputs(request.inputs, descriptor: descriptor)
-    let effect = Self.effectiveEffect(descriptor: descriptor, inputs: request.inputs)
-    guard effect == .deviceMutation || effect == .destructive else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "capability drafting is limited to mutation operations with an external standing policy")
-    }
-    guard descriptor.authorization[effect] != .runtimeCapability else {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "\(descriptor.reference) uses Runtime-owned capability admission; external drafting "
-          + "is unavailable")
-    }
-    guard (1...32).contains(maximumUses) else {
-      throw RuntimeJobEngineError.rejected(
-        .invalidInput, "authorization envelope maximumUses must be between 1 and 32")
-    }
-    if effect == .destructive {
-      // Refused before any materialization: the destructive envelope shape
-      // is not negotiable, so a bad request must not resolve facts first.
-      guard maximumUses == 1 else {
-        throw RuntimeJobEngineError.rejected(
-          .invalidInput,
-          "a destructive exact-plan capability envelope is single-use (maximumUses must be 1)")
-      }
-    }
-
-    var seed = requestData
-    seed.append(Data("\n\(issuedAtUTC)\n\(expiresAtUTC)\n\(maximumUses)".utf8))
-    let seedDigest = RuntimeJobRecord.sha256Hex(seed)
-    let timestamp = issuedAtUTC.filter {
-      $0.isASCII && ($0.isNumber || $0 == "T" || $0 == "Z")
-    }
-    let capabilityID =
-      "CAP-RT-AUTO-\(timestamp)-\(seedDigest.prefix(12).uppercased())"
-    let authorizedRequest: RuntimeOperationRequest
-    do {
-      authorizedRequest = try RuntimeOperationRequest(
-        requestID: request.requestID,
-        idempotencyKey: request.idempotencyKey,
-        target: request.target,
-        operation: request.operation,
-        inputs: request.inputs,
-        requestedOutputs: request.requestedOutputs,
-        authorization: RuntimeCapabilityReference(capabilityID: capabilityID),
-        clientContext: request.clientContext)
-    } catch let rejection as RuntimeOperationRequestRejection {
-      throw RuntimeJobEngineError.rejected(rejection.code, rejection.message)
-    }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let authorizedData: Data
-    do {
-      authorizedData = try encoder.encode(authorizedRequest)
-    } catch {
-      throw RuntimeJobEngineError.internalFailure(
-        "cannot encode the materialized authorization request: \(error)")
-    }
-    let requestFingerprint = Self.fingerprint(of: authorizedData)
-    let materialized = try await materializeTypedPlanBeforeAuthorization(
-      request: authorizedRequest, descriptor: descriptor,
-      jobID: Self.authorizationPlanJobID)
-    let query = try authorizationQuery(
-      request: authorizedRequest, descriptor: descriptor,
-      effect: effect, materialized: materialized)
-    let targetScope: RuntimeCapabilityTargetScope
-    let draftBindingRevision: Int?
-    let draftIdentity: String?
-    let workspaceIdentity: String?
-    let workspaceRevision: String?
-    let workspaceScopes: String?
-    if let identity = query.targetStableIdentitySHA256,
-      let bindingRevision = query.targetBindingRevision
-    {
-      targetScope = .stablePhysicalIdentity(sha256: identity)
-      draftBindingRevision = bindingRevision
-      draftIdentity = identity
-      workspaceIdentity = nil
-      workspaceRevision = nil
-      workspaceScopes = nil
-    } else if let identity = query.workspaceIdentitySHA256,
-      let revision = query.workspaceRevision,
-      let scopes = query.workspaceFileScopesDigest
-    {
-      guard effect != .destructive else {
-        throw RuntimeJobEngineError.rejected(
-          .invalidRequest,
-          "a destructive capability requires a stable physical device identity, "
-            + "not a workspace subject")
-      }
-      // A standing grant names the tree and its maximum writable scopes, but
-      // does not pin the tree to the revision at draft time: patch, build,
-      // test and revert each move it. The capability-draft payload still carries the
-      // observed revision below, and an operation request that declares
-      // `expectedWorkspaceRevision` remains exactly constrained by its typed
-      // input (TASK-HFA-009 r3).
-      targetScope = .workspaceIdentity(
-        sha256: identity, expectedWorkspaceRevision: "",
-        allowedFileScopesDigest: scopes)
-      draftBindingRevision = nil
-      draftIdentity = nil
-      workspaceIdentity = identity
-      workspaceRevision = revision
-      workspaceScopes = scopes
-    } else {
-      throw RuntimeJobEngineError.rejected(
-        .invalidRequest,
-        "\(descriptor.reference) has neither a device nor a workspace subject "
-          + "to scope a capability to")
-    }
-    let capability: RuntimeCapability
-    do {
-      capability = try RuntimeCapability(
-        capabilityID: capabilityID,
-        targetScope: targetScope,
-        operationScope: [
-          RuntimeCapabilityOperationScope(
-            operationID: descriptor.id, version: descriptor.version)
-        ],
-        effectCeiling: effect,
-        inputConstraints: Self.exactCapabilityConstraints(for: request.inputs),
-        issuedAtUTC: issuedAtUTC,
-        expiresAtUTC: expiresAtUTC,
-        maximumUses: maximumUses,
-        issuer: RuntimeCapabilityIssuer(
-          kind: .maintainerMergedPR, reference: issuerReference),
-        exactPlanDigest: effect == .destructive ? materialized.planDigest : nil,
-        exactBindingRevision: draftBindingRevision)
-    } catch {
-      throw RuntimeJobEngineError.rejected(
-        .invalidInput, "generated capability would be invalid: \(error)")
-    }
-    return RuntimeCapabilityDraft(
-      capability: capability,
-      requestID: request.requestID,
-      idempotencyKey: request.idempotencyKey,
-      requestFingerprintSHA256: requestFingerprint,
-      operationReference: descriptor.reference,
-      targetID: request.target.targetID,
-      bindingRevision: draftBindingRevision,
-      stableIdentitySHA256: draftIdentity,
-      workspaceIdentitySHA256: workspaceIdentity,
-      workspaceRevision: workspaceRevision,
-      workspaceFileScopesDigest: workspaceScopes,
-      materializedPlanDigest: materialized.planDigest,
-      catalogDigest: RuntimeOperationCatalog.catalogDigest)
   }
 
   // MARK: Submit
@@ -3202,7 +2934,7 @@ public actor RuntimeJobEngine {
     }
     switch use.outcome {
     case .safeToReflash: return .safeToReflash
-    case .outcomeUnknown, .pending, .legacyUnverified: return .outcomeUnknown
+    case .outcomeUnknown, .pending: return .outcomeUnknown
     case .confirmed: return .failedKnown
     }
   }
@@ -5399,7 +5131,7 @@ public actor RuntimeJobEngine {
             continue
           }
           switch terminal.outcome {
-          case .pending, .outcomeUnknown, .legacyUnverified:
+          case .pending, .outcomeUnknown:
             return RuntimeCapabilityReference(capabilityID: capabilityID)
           case .confirmed:
             guard terminal.terminalState == JobState.succeeded.rawValue
@@ -5518,7 +5250,7 @@ public actor RuntimeJobEngine {
   /// Prevents a caller from bypassing an unknown mutation by changing typed
   /// inputs and therefore selecting a different automatic capability scope.
   /// A crash-recovered pending reservation may continue only for its exact
-  /// original Job; outcomeUnknown and legacy-unverified nodes never do.
+  /// original Job; outcomeUnknown nodes never do.
   private func validateNoUnresolvedMutationLineage(
     stableIdentitySHA256: String,
     bindingRevision: Int,
@@ -5940,7 +5672,7 @@ public actor RuntimeJobEngine {
       status = .failed
     case .outcomeUnknown:
       status = .outcomeUnknown
-    case .pending, .legacyUnverified:
+    case .pending:
       return
     }
     let intents = try mutationIntentEvidence(
@@ -6063,8 +5795,6 @@ public actor RuntimeJobEngine {
       }
     }
     for (key, value) in inputs {
-      // Legacy adapter annotations are tolerated and ignored by execution.
-      if key.hasPrefix("legacy") { continue }
       guard let field = fieldTable[key] else {
         throw RuntimeJobEngineError.rejected(
           .invalidInput, "input \(key) is not declared by \(descriptor.reference)")

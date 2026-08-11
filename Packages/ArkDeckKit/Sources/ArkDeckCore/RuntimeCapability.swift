@@ -24,7 +24,6 @@ public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case destructiveRequiresMaintainerIssuer
   case runtimePolicyRequiresExactInputs
   case runtimePolicyRequiresExactArtifactFacts
-  case exactPlanDigestOnlyForDestructive
   case malformedPlanDigest(String)
   case malformedBindingRevision(Int)
   case malformedTimestamp(String)

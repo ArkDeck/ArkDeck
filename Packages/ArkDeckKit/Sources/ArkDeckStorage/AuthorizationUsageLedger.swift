@@ -642,8 +642,7 @@ public enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
 
 
 
-// Shared durable-write fault points. The legacy standing ledger was retired
-// (T25/W3); the campaign ledger below still injects at exactly these points.
+// Shared durable-write fault points injected by the campaign ledger below.
 public enum AuthorizationUsageLedgerFaultPoint: String, CaseIterable, Sendable {
   case beforeTemporaryWrite
   case afterFileSync

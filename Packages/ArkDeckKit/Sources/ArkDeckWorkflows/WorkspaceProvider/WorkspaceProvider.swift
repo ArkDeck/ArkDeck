@@ -26,7 +26,6 @@ import Foundation
 public enum WorkspaceProviderError: Error, Equatable, Sendable {
   case unknownProject(String)
   case malformedScope(String)
-  case noDeviceFacts
 }
 
 /// Declared source workspaces this host may read. Registration is explicit:

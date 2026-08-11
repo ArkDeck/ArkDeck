@@ -234,7 +234,6 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
         "trace.parameters.mode.temporaryRestore",
         "trace.parameters.mode.persistentChange",
       ]
-      + TraceWorkflowStage.allCases.map { "trace.stage.\($0.rawValue)" }
 
     for key in requiredKeys {
       let entry = try XCTUnwrap(strings[key] as? [String: Any], key)

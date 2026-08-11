@@ -645,38 +645,6 @@ final class HarnessConvergenceContractTests: XCTestCase {
     }
   }
 
-  func testCapabilityDraftDoesNotAskTheDeviceStoreForAWorkspaceSubject() throws {
-    var deviceBindingLookups = 0
-    let target = RuntimeOperationRequest.capabilityDraftTarget(
-      targetID: "demo-app",
-      operationID: "workspace.build-openharmony",
-      version: 1,
-      currentDeviceBindingRevision: {
-        deviceBindingLookups += 1
-        return 7
-      })
-    XCTAssertEqual(target.targetID, "demo-app")
-    XCTAssertNil(target.expectedBindingRevision)
-    XCTAssertEqual(
-      deviceBindingLookups, 0,
-      "a workspace project reference must not be looked up as an adopted device")
-  }
-
-  func testCapabilityDraftStillPinsADeviceSubjectToItsCurrentBinding() throws {
-    var deviceBindingLookups = 0
-    let target = RuntimeOperationRequest.capabilityDraftTarget(
-      targetID: "TGT-958780b2ffb7",
-      operationID: "debug.hap",
-      version: 1,
-      currentDeviceBindingRevision: {
-        deviceBindingLookups += 1
-        return 9
-      })
-    XCTAssertEqual(target.targetID, "TGT-958780b2ffb7")
-    XCTAssertEqual(target.expectedBindingRevision, 9)
-    XCTAssertEqual(deviceBindingLookups, 1)
-  }
-
   func testAnEvidenceRecordWrittenBeforeTheOptInDecodesAsNotOptedIn() throws {
     let legacy = """
       {"artifactId":"ART-1","name":"hilog.txt","byteCount":12,

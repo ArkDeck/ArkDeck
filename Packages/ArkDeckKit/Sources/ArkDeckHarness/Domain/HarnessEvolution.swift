@@ -475,42 +475,6 @@ public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
   }
 }
 
-public enum HarnessAdversarialReviewVerdict: String, CaseIterable, Codable, Sendable {
-  case pass = "PASS"
-  case reject = "REJECT"
-  case comment = "COMMENT"
-}
-
-public enum HarnessReviewIssueSeverity: String, CaseIterable, Codable, Sendable {
-  case low = "LOW"
-  case medium = "MEDIUM"
-  case high = "HIGH"
-  case critical = "CRITICAL"
-}
-
-public struct HarnessReviewIssue: Equatable, Codable, Sendable {
-  public let severity: HarnessReviewIssueSeverity
-  public let description: String
-}
-
-/// Historical review record retained solely for persisted-attempt decoding and
-/// promotion export. New attempts cannot create such a record.
-public struct HarnessAdversarialReview: Equatable, Codable, Sendable {
-  public static let documentType = "harness-adversarial-review"
-  public static let schemaVersion = "1.0.0"
-
-  public let documentType: String
-  public let schemaVersion: String
-  public let reviewID: String
-  public let reviewerID: String
-  public let candidatePatchID: String
-  public let evaluationID: String
-  public let result: HarnessAdversarialReviewVerdict
-  public let issues: [HarnessReviewIssue]
-  public let createdAtUTC: String
-
-}
-
 public enum HarnessPromotionGateFailure: Error, Equatable, Sendable {
   case evolutionPolicyMissing
   case candidatePatchMissing
@@ -565,8 +529,6 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   public let baseRevision: String
   public let workspaceRevision: String
   public let evaluationID: String
-  /// Present only when decoding a historical review-bearing promotion.
-  public let reviewID: String?
   public let artifactIDs: [String]
   public let createdAtUTC: String
   /// Promotion produces a normal PR candidate. It is never a merge claim.
@@ -592,7 +554,6 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
     self.baseRevision = baseRevision
     self.workspaceRevision = workspaceRevision
     self.evaluationID = evaluationID
-    self.reviewID = nil
     self.artifactIDs = Array(Set(artifactIDs)).sorted()
     self.createdAtUTC = createdAtUTC
     self.disposition = "READY_FOR_NORMAL_PR"

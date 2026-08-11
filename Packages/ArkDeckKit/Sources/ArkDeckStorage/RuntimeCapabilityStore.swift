@@ -7,9 +7,9 @@
 // instead authorize different typed operations and inputs inside its bounded
 // target, operation and input-constraint envelope. Every node still binds its
 // exact query and plan digest. A different reservation may consume the next
-// use only after the preceding node has a confirmed outcome. A pending,
-// legacy-unverified or outcomeUnknown node therefore fails closed, while
-// retrying the same reservation remains idempotent.
+// use only after the preceding node has a confirmed outcome. A pending or
+// outcomeUnknown node therefore fails closed, while retrying the same
+// reservation remains idempotent.
 //
 // All writes are atomic (temp + fsync + rename + directory sync) under an
 // exclusive flock, so a crash between any two syscalls leaves either the
@@ -43,9 +43,6 @@ public enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
   case safeToReflash
   /// Dispatch may have happened and dedicated readback has not resolved it.
   case outcomeUnknown
-  /// A v1 ledger entry had no outcome field. It remains queryable but can
-  /// never authorize a later use.
-  case legacyUnverified
 }
 
 public struct RuntimeCapabilityOutcomeRecord: Equatable, Sendable, Codable {
@@ -154,25 +151,6 @@ private struct StoreDocument: Equatable, Codable {
 
 private struct StoreVersionHeader: Decodable {
   let schemaVersion: String
-}
-
-private struct LegacyStoredConsumption: Decodable {
-  let reservationID: String
-  let consumedAtUTC: String
-  let operationReference: String
-  let queryFingerprintSHA256: String
-  let remainingUsesAfter: Int
-}
-
-private struct LegacyStoredRecord: Decodable {
-  let capability: RuntimeCapability
-  let remainingUses: Int
-  let consumptions: [LegacyStoredConsumption]
-}
-
-private struct LegacyStoreDocument: Decodable {
-  let schemaVersion: String
-  let records: [LegacyStoredRecord]
 }
 
 public actor RuntimeCapabilityStore {
@@ -415,10 +393,7 @@ public actor RuntimeCapabilityStore {
       }
       var use = document.records[recordIndex].consumptions[useIndex]
       let current = use.outcomes.last
-      let jobOwnsUse =
-        use.jobID == jobID
-        || (current?.jobID == jobID && current?.outcome != .legacyUnverified)
-        || current?.outcome == .legacyUnverified
+      let jobOwnsUse = use.jobID == jobID || current?.jobID == jobID
       guard jobOwnsUse else {
         throw RuntimeCapabilityStoreError.outcomeConflict(
           "outcome Job \(jobID) does not own reservation \(reservationID)")
@@ -430,8 +405,7 @@ public actor RuntimeCapabilityStore {
         let resolvesUnknown =
           current.outcome == .outcomeUnknown
           && (outcome == .confirmed || outcome == .safeToReflash)
-        let resolvesLegacy = current.outcome == .legacyUnverified
-        guard resolvesUnknown || resolvesLegacy else {
+        guard resolvesUnknown else {
           throw RuntimeCapabilityStoreError.outcomeConflict(
             "cannot change \(current.outcome.rawValue) to \(outcome.rawValue)")
         }
@@ -716,9 +690,6 @@ public actor RuntimeCapabilityStore {
       switch version {
       case StoreDocument.currentSchemaVersion:
         document = try JSONDecoder().decode(StoreDocument.self, from: data)
-      case "1.0.0":
-        document = try Self.migrate(
-          JSONDecoder().decode(LegacyStoreDocument.self, from: data))
       default:
         throw RuntimeCapabilityStoreError.storeCorrupted(
           "unsupported schema version \(version)")
@@ -730,77 +701,6 @@ public actor RuntimeCapabilityStore {
     }
     try Self.validate(document)
     return document
-  }
-
-  private static func migrate(_ legacy: LegacyStoreDocument) -> StoreDocument {
-    StoreDocument(
-      schemaVersion: StoreDocument.currentSchemaVersion,
-      records: legacy.records.map { legacyRecord in
-        var previousTip: String?
-        let consumptions = legacyRecord.consumptions.enumerated().map { offset, old in
-          let ordinal = offset + 1
-          let material = ReceiptMaterial(
-            capabilityID: legacyRecord.capability.capabilityID,
-            ordinal: ordinal,
-            reservationID: old.reservationID,
-            jobID: "legacy-\(old.reservationID)",
-            consumedAtUTC: old.consumedAtUTC,
-            operationReference: old.operationReference,
-            effect: legacyRecord.capability.effectCeiling.rawValue,
-            targetStableIdentitySHA256: {
-              if case .stablePhysicalIdentity(let sha) = legacyRecord.capability.targetScope {
-                return sha
-              }
-              return nil
-            }(),
-            bindingRevision: legacyRecord.capability.exactBindingRevision,
-            materializedPlanDigest: legacyRecord.capability.exactPlanDigest,
-            authorizationScopeFingerprintSHA256: nil,
-            queryFingerprintSHA256: old.queryFingerprintSHA256,
-            remainingUsesAfter: old.remainingUsesAfter,
-            previousLineageSHA256: previousTip)
-          let receiptSHA = digest(material)
-          let outcomeMaterial = OutcomeMaterial(
-            capabilityID: legacyRecord.capability.capabilityID,
-            ordinal: ordinal,
-            reservationID: old.reservationID,
-            jobID: material.jobID,
-            outcome: RuntimeCapabilityUseOutcome.legacyUnverified.rawValue,
-            terminalState: "legacy-unverified",
-            recordedAtUTC: old.consumedAtUTC,
-            previousRecordSHA256: receiptSHA)
-          let outcomeSHA = digest(outcomeMaterial)
-          previousTip = outcomeSHA
-          return StoredConsumption(
-            ordinal: ordinal,
-            reservationID: old.reservationID,
-            jobID: material.jobID,
-            consumedAtUTC: old.consumedAtUTC,
-            operationReference: old.operationReference,
-            effect: material.effect,
-            targetStableIdentitySHA256: material.targetStableIdentitySHA256,
-            bindingRevision: material.bindingRevision,
-            materializedPlanDigest: material.materializedPlanDigest,
-            authorizationScopeFingerprintSHA256: nil,
-            queryFingerprintSHA256: old.queryFingerprintSHA256,
-            remainingUsesAfter: old.remainingUsesAfter,
-            previousLineageSHA256: material.previousLineageSHA256,
-            receiptSHA256: receiptSHA,
-            outcomes: [
-              StoredOutcomeRecord(
-                jobID: material.jobID,
-                outcome: .legacyUnverified,
-                terminalState: "legacy-unverified",
-                recordedAtUTC: old.consumedAtUTC,
-                previousRecordSHA256: receiptSHA,
-                recordSHA256: outcomeSHA)
-            ])
-        }
-        return StoredRecord(
-          capability: legacyRecord.capability,
-          remainingUses: legacyRecord.remainingUses,
-          consumptions: consumptions)
-      })
   }
 
   private static func validate(_ document: StoreDocument) throws {
@@ -854,9 +754,6 @@ public actor RuntimeCapabilityStore {
             priorOutcome == .pending
             || (priorOutcome == .outcomeUnknown
               && (outcome.outcome == .confirmed || outcome.outcome == .safeToReflash))
-            || (priorOutcome == .legacyUnverified
-              && (outcome.outcome == .confirmed || outcome.outcome == .safeToReflash
-                || outcome.outcome == .outcomeUnknown))
           guard allowed,
             outcome.outcome != .pending,
             !outcome.jobID.isEmpty,
