@@ -285,7 +285,7 @@ public struct AnalyzerProvider: DeviceProvider {
   }
 
   static func sha256(_ bytes: Data) -> String {
-    SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: bytes)
   }
 }
 

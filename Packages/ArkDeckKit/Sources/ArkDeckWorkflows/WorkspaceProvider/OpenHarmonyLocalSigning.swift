@@ -367,7 +367,7 @@ public struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
     hasher.update(data: Data("arkdeck-keychain-trusted-application-v1\0".utf8))
     hasher.update(data: applicationIdentity)
     hasher.update(data: executableSHA256)
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   private static func streamedSHA256(_ url: URL) throws -> Data {
@@ -1229,7 +1229,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
     return OpenHarmonySigningFileIdentity(
       path: path,
-      sha256: SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined(),
+      sha256: SHA256Hex.string(of: bytes),
       byteCount: bytes.count)
   }
 
@@ -1291,8 +1291,7 @@ public final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
   }
 
   public func paths(jobID: String) -> OpenHarmonySigningAttemptPaths {
-    let digest = SHA256.hash(data: Data(jobID.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: Data(jobID.utf8))
     let directory = rootURL.appendingPathComponent(String(digest.prefix(32)), isDirectory: true)
     return OpenHarmonySigningAttemptPaths(
       directory: directory.path,
@@ -1651,7 +1650,7 @@ public struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching {
     }
     return (
       bytes.count,
-      SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined())
+      SHA256Hex.string(of: bytes))
   }
 
   private static func safePTYError(_ error: any Error) -> String {

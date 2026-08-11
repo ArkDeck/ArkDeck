@@ -933,8 +933,7 @@ public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
     }
     let input = (identity + [jobID, operationDigestSHA256, targetDigestSHA256])
       .joined(separator: "|")
-    let digest = SHA256.hash(data: Data(input.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: Data(input.utf8))
     return "\(identifierPrefix)-\(digest.prefix(32))"
   }
 

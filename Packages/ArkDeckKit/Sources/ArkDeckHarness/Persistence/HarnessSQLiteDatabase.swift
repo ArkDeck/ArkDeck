@@ -6,6 +6,7 @@
 // access, while SQLITE_OPEN_FULLMUTEX and task-level leases protect daemon
 // restarts and accidental second-process access.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 import SQLite3
@@ -213,7 +214,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
   }
 
   static func digest(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 
   private func configure() throws {

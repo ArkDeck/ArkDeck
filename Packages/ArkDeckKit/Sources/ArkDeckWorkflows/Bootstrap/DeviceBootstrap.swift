@@ -724,7 +724,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   }
 
   private static func sha256(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 
   private func persist(_ document: TargetStoreDocument) throws {
@@ -862,7 +862,6 @@ public actor DeviceBootstrapMachine {
   /// stable identity hashes only the normalized serial.
   static func stableIdentitySHA256(serial: String) -> String {
     let normalized = serial.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    return SHA256.hash(data: Data(normalized.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: Data(normalized.utf8))
   }
 }

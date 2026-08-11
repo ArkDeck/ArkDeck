@@ -93,7 +93,7 @@ public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   }
 
   public var fingerprint: String {
-    SHA256.hash(data: canonicalJSON).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: canonicalJSON)
   }
 
   private static func isSHA256(_ value: String) -> Bool {

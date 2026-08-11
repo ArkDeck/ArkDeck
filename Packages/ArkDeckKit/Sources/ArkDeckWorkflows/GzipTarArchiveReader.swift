@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Compression
 import CryptoKit
 import Foundation
@@ -145,7 +146,7 @@ public enum GzipTarArchiveReader {
       try tar.consume(produced)
     }
     let members = try tar.finish()
-    let archiveSHA256 = archiveHasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let archiveSHA256 = SHA256Hex.hexString(archiveHasher.finalize())
     return GzipTarArchiveSummary(
       archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256, members: members,
       capturedMembers: tar.capturedMembers, scannedValue: tar.scannedValue)
@@ -419,7 +420,7 @@ private struct TarStreamSummarizer {
       GzipTarMemberSummary(
         name: memberName,
         sizeBytes: memberSizeBytes,
-        sha256: memberHasher.finalize().map { String(format: "%02x", $0) }.joined()))
+        sha256: SHA256Hex.hexString(memberHasher.finalize())))
     // A member that overran the capture bound is not recorded at all: half a
     // partition table would parse into half a plan.
     if let captured = capturing, !capturingOverflowed {

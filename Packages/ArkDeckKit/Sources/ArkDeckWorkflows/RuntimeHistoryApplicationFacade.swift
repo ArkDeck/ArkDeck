@@ -312,7 +312,7 @@ private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding 
       try handle.synchronize()
       try handle.close()
       handleIsOpen = false
-      let actualSHA256 = digest.finalize().map { String(format: "%02x", $0) }.joined()
+      let actualSHA256 = SHA256Hex.hexString(digest.finalize())
       guard actualSHA256 == artifact.sha256 else {
         throw RuntimeArtifactExportFailure(
           message: "Exported Artifact SHA-256 does not match Runtime metadata")

@@ -1,3 +1,4 @@
+import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
@@ -249,7 +250,7 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
   }
 
   private static func sha256(_ value: String) -> String {
-    SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: Data(value.utf8))
   }
 
   private static func isSHA256(_ value: String) -> Bool {

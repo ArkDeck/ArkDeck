@@ -1,3 +1,4 @@
+import ArkDeckCore
 import ArkDeckWorkflows
 import CryptoKit
 import Foundation
@@ -139,8 +140,7 @@ actor NativeLibraryArtifactImportCoordinator {
       throw NativeLibraryArtifactImportError.incompleteUpload(
         expected: session.expectedByteCount, actual: session.contents.count)
     }
-    let digest = SHA256.hash(data: session.contents)
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: session.contents)
     guard digest == session.expectedSHA256 else {
       sessions.removeValue(forKey: uploadID)
       throw NativeLibraryArtifactImportError.digestMismatch
@@ -184,6 +184,6 @@ actor NativeLibraryArtifactImportCoordinator {
   }
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {
-    value.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
+    SHA256Hex.isLowercaseSHA256(value)
   }
 }

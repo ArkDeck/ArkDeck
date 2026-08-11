@@ -47,7 +47,6 @@ public enum WorkflowFailureClassification: String, CaseIterable, Codable, Sendab
   case cancellation
   case recovery
   case compensation
-  case invariant
 }
 
 public struct WorkflowFailure: Error, Equatable, Sendable, Codable {

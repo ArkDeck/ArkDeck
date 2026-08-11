@@ -923,8 +923,7 @@ public actor NativeAgentChatRuntimeTools {
 
   private func taskReference(for taskID: String) -> String {
     if let existing = taskReferencesByID[taskID] { return existing }
-    let digest = SHA256.hash(data: Data("arkdeck-chat-task|\(taskID)".utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: Data("arkdeck-chat-task|\(taskID)".utf8))
     let base = "task-\(digest.prefix(12))"
     var reference = base
     var suffix = 2
@@ -1217,10 +1216,7 @@ public actor NativeAgentChatRuntimeTools {
   }
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {
-    value.utf8.count == 64
-      && value.utf8.allSatisfy { byte in
-        (48...57).contains(byte) || (97...102).contains(byte)
-      }
+    SHA256Hex.isLowercaseSHA256(value)
   }
 
   private static func isWorkspacePathPattern(_ value: String) -> Bool {

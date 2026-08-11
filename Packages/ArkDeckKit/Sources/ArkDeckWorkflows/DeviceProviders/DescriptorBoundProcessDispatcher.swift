@@ -68,7 +68,7 @@ public struct FixedExecutableResolver: RuntimeExecutableResolving {
         "provider executable must be a regular executable file: \(executable.path)")
     }
     let data = try Data(contentsOf: executable)
-    let sha = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    let sha = SHA256Hex.string(of: data)
     return FixedExecutableResolver(
       table: [providerID: ResolvedExecutable(path: executable.path, sha256: sha)])
   }

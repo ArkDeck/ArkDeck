@@ -766,7 +766,7 @@ extension JSONValue {
 }
 
 extension String {
-  fileprivate var isLowercaseSHA256: Bool { matches(#"^[a-f0-9]{64}$"#) }
+  fileprivate var isLowercaseSHA256: Bool { SHA256Hex.isLowercaseSHA256(self) }
 
   fileprivate func matches(_ pattern: String) -> Bool {
     range(of: pattern, options: .regularExpression) == startIndex..<endIndex

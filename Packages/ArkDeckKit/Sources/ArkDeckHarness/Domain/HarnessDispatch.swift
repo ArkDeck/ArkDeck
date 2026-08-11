@@ -432,7 +432,7 @@ public enum HarnessRequestIdentity {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let data = (try? encoder.encode(inputs)) ?? Data("{}".utf8)
-    return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: data)
   }
 
   public static func derive(
@@ -445,8 +445,7 @@ public enum HarnessRequestIdentity {
   ) -> (requestID: String, idempotencyKey: String) {
     let material =
       "\(htaskID)|\(round)|\(decisionID)|\(operationReference)|\(targetID)|\(inputsDigest)"
-    let digest = SHA256.hash(data: Data(material.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: Data(material.utf8))
     // Both identifiers must satisfy the runtime wire grammar (ASCII
     // identifier, idempotency key >= 8 chars); a hex prefix always does.
     return ("htask-\(digest.prefix(24))", "htask-\(digest.prefix(48))")

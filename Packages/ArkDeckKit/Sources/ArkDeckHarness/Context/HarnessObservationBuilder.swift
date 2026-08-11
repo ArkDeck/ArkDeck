@@ -215,7 +215,7 @@ public struct HarnessObservationBuilder: Sendable {
           record(descriptor, verified: false, blocker: blocker, sensitiveOptIn: sensitiveOptIn))
         continue
       }
-      let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+      let digest = SHA256Hex.string(of: data)
       guard data.count == descriptor.byteCount, digest == descriptor.sha256 else {
         let blocker = "artifactHashMismatch:\(descriptor.name)"
         integrityBlockers.append(blocker)
@@ -400,7 +400,7 @@ public struct HarnessObservationBuilder: Sendable {
         envelope.sourceByteCount == index.descriptor.byteCount,
         envelope.analyzerOutputByteCount == analyzerOutput.count,
         envelope.analyzerOutputSHA256
-          == SHA256.hash(data: analyzerOutput).map({ String(format: "%02x", $0) }).joined(),
+          == SHA256Hex.string(of: analyzerOutput),
         expectedSourceArtifactID == nil
           || envelope.sourceArtifactID == expectedSourceArtifactID
       else {

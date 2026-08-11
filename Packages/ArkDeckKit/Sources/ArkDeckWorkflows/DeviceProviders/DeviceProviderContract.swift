@@ -771,8 +771,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       let previousConnectKey = try string("previousConnectKey")
       let previousIdentity = try string("previousIdentitySha256")
       let topology = try string("usbTopology")
-      let connectIdentity = SHA256.hash(data: Data(previousConnectKey.utf8))
-        .map { String(format: "%02x", $0) }.joined()
+      let connectIdentity = SHA256Hex.string(of: Data(previousConnectKey.utf8))
       guard !previousConnectKey.isEmpty,
         previousIdentity.count == 64,
         previousIdentity.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
@@ -1328,7 +1327,7 @@ public struct HostLandingExpectation: Sendable, Equatable {
     return ProviderLandedArtifact(
       localURL: destination,
       byteCount: byteCount,
-      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined(),
+      sha256: SHA256Hex.hexString(hasher.finalize()),
       leadingBytes: leading)
   }
 }

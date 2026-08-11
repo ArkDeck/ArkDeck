@@ -1256,7 +1256,7 @@ enum RuntimeCLI {
     }
     var after = stat()
     let digest =
-      hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      SHA256Hex.hexString(hasher.finalize())
     guard offset == Int(declaredByteCount),
       digest == declaredSHA256,
       fstat(descriptor, &after) == 0,
@@ -1345,8 +1345,7 @@ enum RuntimeCLI {
       throw CLIError(
         exitCode: EX_USAGE, message: "HAP is not a ZIP-based .hap container")
     }
-    let digest = SHA256.hash(data: contents)
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: contents)
     return HAPImportPayload(name: name, contents: contents, sha256: digest)
   }
 
@@ -1420,8 +1419,7 @@ enum RuntimeCLI {
         exitCode: EX_DATAERR,
         message: "native library failed ELF validation: \(error)")
     }
-    let digest = SHA256.hash(data: contents)
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: contents)
     return HAPImportPayload(name: name, contents: contents, sha256: digest)
   }
 
@@ -1981,8 +1979,7 @@ enum RuntimeCLI {
       throw AgentClientError.malformedResponse(
         "task.promotion returned a bundle without final.patch")
     }
-    let patchDigest = SHA256.hash(data: Data(patch.contents.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let patchDigest = SHA256Hex.string(of: Data(patch.contents.utf8))
     guard patchDigest == diffDigest else {
       throw AgentClientError.malformedResponse(
         "refusing to write final.patch: bytes hash to \(patchDigest) "
@@ -2061,7 +2058,7 @@ enum RuntimeCLI {
     guard lseek(descriptor, 0, SEEK_SET) == 0 else {
       throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")
     }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
 }

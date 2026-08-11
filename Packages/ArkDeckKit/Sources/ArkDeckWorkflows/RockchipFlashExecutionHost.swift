@@ -138,9 +138,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   package func runtimeTargetLineageAdvance()
     throws -> RuntimeTargetBindingLineageAdvance?
   {
-    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
+    let currentIdentity = SHA256Hex.string(of: Data(serial.utf8))
     let currentIdentities = values(prefix: "identity:serial-sha256=")
     guard currentIdentities == [currentIdentity] else {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
@@ -199,12 +197,8 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     _ identity: RockchipProductUSBIdentity
   ) throws -> Bool {
     guard identity.isRegisteredDAYU200Mode else { return false }
-    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
-    let liveIdentity = SHA256.hash(data: Data(identity.serial.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
+    let currentIdentity = SHA256Hex.string(of: Data(serial.utf8))
+    let liveIdentity = SHA256Hex.string(of: Data(identity.serial.utf8))
 
     // Validate the current evidence and, for revision > 1, the whole adjacent
     // edge before accepting either personality.  This prevents a malformed
@@ -295,9 +289,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   /// as a warning while still authorizing `enter-loader`.
   package func coversRuntimeTarget(_ target: RuntimeTargetRecord) throws -> Bool {
     _ = try runtimeTargetLineageAdvance()
-    let currentIdentity = SHA256.hash(data: Data(serial.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
+    let currentIdentity = SHA256Hex.string(of: Data(serial.utf8))
     guard target.stablePhysicalIdentitySHA256 == currentIdentity,
       target.bindingRevision == revision
     else { return false }
@@ -307,9 +299,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       return false
     }
 
-    let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
+    let connectIdentity = SHA256Hex.string(of: Data(target.connectKey.utf8))
     if connectIdentity == currentIdentity { return true }
     return try confirmedHDCNormalAlias()?.identitySHA256 == connectIdentity
   }
@@ -397,9 +387,7 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       RockchipStandingAuthorization.isCanonicalSHA256(routeReceipt),
       currentIntent != routeReceipt,
       RockchipStandingAuthorization.isCanonicalSHA256(replacedIdentity),
-      replacedIdentity != SHA256.hash(data: Data(serial.utf8)).map({
-        String(format: "%02x", $0)
-      }).joined(),
+      replacedIdentity != SHA256Hex.string(of: Data(serial.utf8)),
       RockchipStandingAuthorization.isCanonicalSHA256(selection),
       RockchipStandingAuthorization.isCanonicalSHA256(alias),
       !aliasTopology.isEmpty,
@@ -409,15 +397,15 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable binding reactivation evidence is invalid or ambiguous")
     }
-    let expectedSelection = SHA256.hash(data: Data([
+    let expectedSelection = SHA256Hex.string(of: Data([
       "rockchip-loader-user-selection",
       targetID,
       String(replacedRevision),
       String(revision),
       replacedIdentity,
-      SHA256.hash(data: Data(serial.utf8)).map { String(format: "%02x", $0) }.joined(),
+      SHA256Hex.string(of: Data(serial.utf8)),
       usbTopology,
-    ].joined(separator: "\n").utf8)).map { String(format: "%02x", $0) }.joined()
+    ].joined(separator: "\n").utf8))
     guard selection == expectedSelection else {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable binding reactivation selection digest does not match its exact facts")
@@ -570,8 +558,7 @@ package struct RockchipProductBindingStore: Sendable {
     expectedSerialSHA256: String,
     with candidate: RockchipProductBindingSnapshot
   ) throws -> RockchipProductBindingSnapshot {
-    let candidateIdentity = SHA256.hash(data: Data(candidate.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let candidateIdentity = SHA256Hex.string(of: Data(candidate.serial.utf8))
     guard candidate.revision == 1,
       candidateIdentity != expectedSerialSHA256,
       candidate.evidence.contains(where: { $0.hasPrefix("rebind:user-selection-sha256=") })
@@ -596,8 +583,7 @@ package struct RockchipProductBindingStore: Sendable {
     expectedSerialSHA256: String,
     with candidate: RockchipProductBindingSnapshot
   ) throws -> RockchipProductBindingSnapshot {
-    let candidateIdentity = SHA256.hash(data: Data(candidate.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let candidateIdentity = SHA256Hex.string(of: Data(candidate.serial.utf8))
     guard candidate.revision > 1,
       candidateIdentity != expectedSerialSHA256,
       try candidate.runtimeTargetLineageAdvance() == nil,
@@ -641,8 +627,7 @@ package struct RockchipProductBindingStore: Sendable {
     guard let existing = try load(rootDescriptor: rootDescriptor) else {
       throw configurationError("durable Rockchip binding is not installed")
     }
-    let existingDigest = SHA256.hash(data: Data(existing.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let existingDigest = SHA256Hex.string(of: Data(existing.serial.utf8))
     guard existing.revision == expectedRevision,
       existingDigest == expectedSerialSHA256,
       candidate.revision == requiredCandidateRevision
@@ -820,8 +805,7 @@ struct RockchipProductBindingBootstrap: Sendable {
       throw RockchipFlashExecutionError.admissionRejected(
         "the single USB identity is not a registered DAYU200 mode")
     }
-    let serialDigest = SHA256.hash(data: Data(identity.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let serialDigest = SHA256Hex.string(of: Data(identity.serial.utf8))
     let candidate = RockchipProductBindingSnapshot(
       revision: 1,
       serial: identity.serial,
@@ -832,8 +816,7 @@ struct RockchipProductBindingBootstrap: Sendable {
         "identity:serial-sha256=\(serialDigest)",
       ])
     let result = try store.install(candidate)
-    let storedDigest = SHA256.hash(data: Data(result.snapshot.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let storedDigest = SHA256Hex.string(of: Data(result.snapshot.serial.utf8))
     return RockchipDeviceBindingInstallationReceipt(
       revision: result.snapshot.revision,
       usbTopology: result.snapshot.usbTopology,
@@ -1544,8 +1527,7 @@ struct RockchipProductUSBProbe: Sendable {
       case .registeredDAYU200: modeMatches = identity.isRegisteredDAYU200Mode
       }
       guard modeMatches else { continue }
-      let digest = SHA256.hash(data: Data(identity.serial.utf8))
-        .map { String(format: "%02x", $0) }.joined()
+      let digest = SHA256Hex.string(of: Data(identity.serial.utf8))
       if (selector == nil || selector == identity.topology)
         && (serialDigestSHA256 == nil || serialDigestSHA256 == digest)
       {
@@ -1657,9 +1639,7 @@ private struct RockchipProductIdentityReadbackPort: RockchipIdentityReadbackFact
       deadlineMonotonicNanoseconds: reading.monotonicNanoseconds
         + RockchipAuthorizationFactCollector.maximumReadbackLifetimeNanoseconds,
       observedAtTimestamp: reading.auditTimestamp,
-      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8)).map {
-        String(format: "%02x", $0)
-      }.joined(),
+      serialDigestSHA256: SHA256Hex.string(of: Data(identity.serial.utf8)),
       usbVendorID: identity.vendorID, usbProductID: identity.productID,
       usbTopology: identity.topology)
   }
@@ -1828,7 +1808,7 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
   }
 
   private static func sha256Hex(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 }
 
@@ -1880,9 +1860,7 @@ final class RockchipProductionAdmissionPort: @unchecked Sendable,
     targetID: String
   ) async throws -> RockchipExecutionAdmission {
     let sequence: UInt64 = 1
-    let serialDigest = SHA256.hash(data: Data(binding.serial.utf8)).map {
-      String(format: "%02x", $0)
-    }.joined()
+    let serialDigest = SHA256Hex.string(of: Data(binding.serial.utf8))
     let liveIdentity = try usbProbe.singleDAYU200(
       selector: request.targetLocationSelector, binding: binding)
     let bindingPort = RockchipProductBindingPort(

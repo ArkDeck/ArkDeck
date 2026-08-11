@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Compression
 import CryptoKit
 import Darwin
@@ -228,7 +229,7 @@ enum RockchipFlashExecutionStager {
     guard archiveSize == profile.archiveSizeBytes else {
       throw RockchipFlashStagingError.archiveSizeMismatch
     }
-    let archiveHash = archiveHasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let archiveHash = SHA256Hex.hexString(archiveHasher.finalize())
     guard archiveHash == profile.archiveSHA256 else {
       throw RockchipFlashStagingError.archiveHashMismatch
     }
@@ -316,7 +317,7 @@ enum RockchipFlashExecutionStager {
       guard Darwin.read(descriptor, &trailing, 1) == 0 else {
         throw RockchipFlashStagingError.memberSizeMismatch(member.name)
       }
-      let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      let digest = SHA256Hex.hexString(hasher.finalize())
       guard digest == member.sha256 else {
         throw RockchipFlashStagingError.memberHashMismatch(member.name)
       }
@@ -646,7 +647,7 @@ private struct RockchipStagingTarConsumer {
 
   private mutating func finishMember() throws {
     guard let expectedMember else { throw RockchipFlashStagingError.corruptTarHeader }
-    let digest = currentHasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(currentHasher.finalize())
     guard digest == expectedMember.sha256 else {
       if currentDescriptor >= 0 {
         Darwin.close(currentDescriptor)

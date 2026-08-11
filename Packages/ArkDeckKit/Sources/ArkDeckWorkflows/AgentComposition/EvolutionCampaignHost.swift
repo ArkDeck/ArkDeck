@@ -80,8 +80,7 @@ public enum RockchipEvolutionCampaignPlanning {
     let plan = validatedPlan.plan
     let roots = try RockchipEvolutionProductRoots.load()
     let binding = try RockchipProductBindingStore(rootURL: roots.arkDeckRoot).loadExisting()
-    let stableIdentity = SHA256.hash(data: Data(binding.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let stableIdentity = SHA256Hex.string(of: Data(binding.serial.utf8))
     async let base =
       ProductRockchipEvolutionCandidateBuilder
       .currentProtectedMainBaseCommitOID()

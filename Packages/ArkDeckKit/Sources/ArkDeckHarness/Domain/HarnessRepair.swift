@@ -110,8 +110,7 @@ public struct HarnessPatchProposal: Equatable, Sendable, Codable {
     }) else {
       throw HarnessPatchProposalError.invalidField("expectedChangedSymbols")
     }
-    let actualDigest = SHA256.hash(data: patchBytes)
-      .map { String(format: "%02x", $0) }.joined()
+    let actualDigest = SHA256Hex.string(of: patchBytes)
     guard actualDigest == patchSHA256 else {
       throw HarnessPatchProposalError.digestMismatch
     }

@@ -627,7 +627,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   /// Computed over the trimmed, screened context - so the digest represents
   /// the bytes that left the host, after redaction, not before it.
   public var transmittedDigest: String {
-    SHA256.hash(data: transmittedBytes).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: transmittedBytes)
   }
 
   public var transmittedByteCount: Int { transmittedBytes.count }
@@ -635,8 +635,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   /// Stable pseudonym for a target id. Deterministic so the same device reads
   /// as the same device across rounds, one-way so the id cannot be recovered.
   public static func pseudonym(forTargetID targetID: String) -> String {
-    let hex = SHA256.hash(data: Data("arkdeck-harness-target|\(targetID)".utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let hex = SHA256Hex.string(of: Data("arkdeck-harness-target|\(targetID)".utf8))
     return "target-\(hex.prefix(12))"
   }
 }

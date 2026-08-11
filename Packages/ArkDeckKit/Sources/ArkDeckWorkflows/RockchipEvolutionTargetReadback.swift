@@ -7,6 +7,7 @@
 // E0: this port reads the USB registry and never spawns, never transitions and
 // never re-sends a mutation command.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 
@@ -84,8 +85,7 @@ public struct ProductRockchipEvolutionTargetReadback: RockchipEvolutionTargetRea
       mode = nil
     }
     return RockchipEvolutionTargetReadback(
-      stableIdentitySHA256: SHA256.hash(data: Data(identity.serial.utf8))
-        .map { String(format: "%02x", $0) }.joined(),
+      stableIdentitySHA256: SHA256Hex.string(of: Data(identity.serial.utf8)),
       registeredMode: mode,
       usbTopology: identity.topology)
   }

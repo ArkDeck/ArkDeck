@@ -306,6 +306,6 @@ public enum RockchipImageArchiveIntrospection {
     while let chunk = try? handle.read(upToCount: 4 * 1024 * 1024), !chunk.isEmpty {
       hasher.update(data: chunk)
     }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 }

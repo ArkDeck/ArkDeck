@@ -440,10 +440,10 @@ public actor RuntimeArtifactStore {
 
   public func publish(_ request: RuntimeArtifactPublicationRequest) throws -> RuntimeArtifactMetadata {
     let (payload, redacted) = redaction.redact(request.contents, mediaType: request.mediaType)
-    let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: payload)
     let identityInput = Data("\(request.jobID)\u{0}\(request.name)\u{0}\(digest)".utf8)
     let identity =
-      SHA256.hash(data: identityInput).map { String(format: "%02x", $0) }.joined()
+      SHA256Hex.string(of: identityInput)
     let artifactID = "ART-\(identity.prefix(32))"
     let createdAtUTC = nowUTC()
     let retention = try retentionPolicy.retention(
@@ -545,7 +545,7 @@ public actor RuntimeArtifactStore {
     let identityInput = Data(
       "\(request.jobID)\u{0}\(request.name)\u{0}\(digest)".utf8)
     let identity =
-      SHA256.hash(data: identityInput).map { String(format: "%02x", $0) }.joined()
+      SHA256Hex.string(of: identityInput)
     let artifactID = "ART-\(identity.prefix(32))"
     let createdAtUTC = nowUTC()
     let retention = try retentionPolicy.retention(
@@ -663,7 +663,7 @@ public actor RuntimeArtifactStore {
 
     let identityInput = Data(
       "\(request.jobID)\u{0}\(request.name)\u{0}\(streamed.sha256)".utf8)
-    let identity = SHA256.hash(data: identityInput).map { String(format: "%02x", $0) }.joined()
+    let identity = SHA256Hex.string(of: identityInput)
     let createdAtUTC = nowUTC()
     let metadata = RuntimeArtifactMetadata(
       artifactID: "ART-\(identity.prefix(32))",
@@ -737,8 +737,7 @@ public actor RuntimeArtifactStore {
     reason: String
   ) throws -> RuntimeArtifactMetadata {
     let missingIdentity =
-      SHA256.hash(data: Data("\(jobID)\u{0}\(name)\u{0}missing".utf8))
-      .map { String(format: "%02x", $0) }.joined()
+      SHA256Hex.string(of: Data("\(jobID)\u{0}\(name)\u{0}missing".utf8))
     let createdAtUTC = nowUTC()
     let retention = try retentionPolicy.retention(
       for: retentionClass, createdAtUTC: createdAtUTC)
@@ -805,7 +804,7 @@ public actor RuntimeArtifactStore {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) bytes cannot be read")
       }
-      let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+      let digest = SHA256Hex.string(of: bytes)
       guard digest == metadata.sha256, bytes.count == metadata.byteCount else {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) bytes/hash metadata mismatch")
@@ -1295,7 +1294,7 @@ public actor RuntimeArtifactStore {
     }
     var sourceAfter = stat()
     let copiedDigest =
-      hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      SHA256Hex.hexString(hasher.finalize())
     guard copied == expectedByteCount,
       copiedDigest == expectedSHA256,
       fstat(sourceFD, &sourceAfter) == 0,
@@ -1375,7 +1374,7 @@ public actor RuntimeArtifactStore {
     }
     return StreamedTextArtifact(
       byteCount: byteCount,
-      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined(),
+      sha256: SHA256Hex.hexString(hasher.finalize()),
       redactionApplied: pipeline.redactionApplied)
   }
 
@@ -1477,7 +1476,7 @@ public actor RuntimeArtifactStore {
     while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
       hasher.update(data: chunk)
     }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   private static func sameFileIdentityAndContent(_ lhs: stat, _ rhs: stat) -> Bool {

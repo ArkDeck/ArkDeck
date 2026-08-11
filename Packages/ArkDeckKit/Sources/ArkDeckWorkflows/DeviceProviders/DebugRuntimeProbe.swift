@@ -1,3 +1,4 @@
+import ArkDeckCore
 import CryptoKit
 import Foundation
 
@@ -217,8 +218,7 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
     }
     let loweringBytes = Data(
       ([hdc.sha256] + exactArguments).joined(separator: "\u{0}").utf8)
-    let loweringSHA256 = SHA256.hash(data: loweringBytes)
-      .map { String(format: "%02x", $0) }.joined()
+    let loweringSHA256 = SHA256Hex.string(of: loweringBytes)
     return DebugRuntimeCommandResult(
       targetID: target.targetID,
       bindingRevision: target.bindingRevision,

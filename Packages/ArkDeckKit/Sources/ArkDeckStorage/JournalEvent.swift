@@ -576,7 +576,7 @@ public enum JournalCanonicalJSON {
 
   public static func argumentsHash(_ arguments: [String: JSONValue]) throws -> String {
     let digest = SHA256.hash(data: try encoder.encode(arguments))
-    return digest.map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(digest)
   }
 
   fileprivate static func value<T: Encodable>(_ value: T) throws -> JSONValue {

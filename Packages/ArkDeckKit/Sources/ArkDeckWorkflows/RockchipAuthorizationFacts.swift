@@ -502,6 +502,6 @@ struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
   }
 
   private static func sha256Hex(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 }

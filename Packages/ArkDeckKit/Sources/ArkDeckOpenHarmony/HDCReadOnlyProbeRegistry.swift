@@ -112,8 +112,7 @@ struct HDCReadOnlyProbeRegistry: Sendable, Equatable {
   }
 
   init(registryData: Data) throws {
-    let actualHash = SHA256.hash(data: registryData)
-      .map { String(format: "%02x", $0) }.joined()
+    let actualHash = SHA256Hex.string(of: registryData)
     guard actualHash == Self.registrySHA256 else {
       throw HDCReadOnlyProbeRegistryError.registryHashMismatch(
         expected: Self.registrySHA256, actual: actualHash)
@@ -781,9 +780,7 @@ public actor HDCSelectedDeviceAuthorizationProbe {
         return HDCSelectedDeviceAuthorizationProbeResult(
           authorization: .cancelled, execution: evaluated.execution)
       }
-      let rawHash = SHA256.hash(data: evaluated.execution.stdout.data)
-        .map { String(format: "%02x", $0) }
-        .joined()
+      let rawHash = SHA256Hex.string(of: evaluated.execution.stdout.data)
       let row = HDCSelectedDeviceAuthorizationRowParser().parse(evaluated.execution.stdout.data)
       let rawKnown =
         row != nil && evaluated.execution.termination == .exited(0)

@@ -6,6 +6,7 @@
 // plan and the Runtime capability query. The historical external-tool pin remains
 // separate and cannot authorize this product-owned execution route.
 
+import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
@@ -133,7 +134,7 @@ public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
       throw BundledRockchipComponentError.notRegularExecutable
     }
     let data = try Data(contentsOf: componentURL, options: [.mappedIfSafe])
-    let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    let actual = SHA256Hex.string(of: data)
     switch trustPolicy {
     case .exactSHA256(let expectedSHA256):
       guard actual == expectedSHA256 else {
@@ -324,10 +325,8 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       live.deviceMode == "hdc",
       let binding = coveredBinding
     {
-      let connectIdentity = SHA256.hash(data: Data(executionConnectKey.utf8))
-        .map { String(format: "%02x", $0) }.joined()
-      let bindingIdentity = SHA256.hash(data: Data(binding.serial.utf8))
-        .map { String(format: "%02x", $0) }.joined()
+      let connectIdentity = SHA256Hex.string(of: Data(executionConnectKey.utf8))
+      let bindingIdentity = SHA256Hex.string(of: Data(binding.serial.utf8))
       if connectIdentity == bindingIdentity,
         !binding.usbTopology.isEmpty,
         binding.usbTopology.utf8.allSatisfy({ (48...57).contains($0) })

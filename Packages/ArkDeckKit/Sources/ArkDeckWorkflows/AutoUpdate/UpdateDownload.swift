@@ -1,3 +1,4 @@
+import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
@@ -131,7 +132,7 @@ public struct UpdateArtifactStore: Sendable {
     }
     if Task.isCancelled { throw UpdateDownloadError.cancelled }
     guard received == expectedLength else { throw UpdateDownloadError.truncated }
-    let actualDigest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let actualDigest = SHA256Hex.hexString(hasher.finalize())
     guard actualDigest == expectedSHA256 else { throw UpdateDownloadError.digestMismatch }
     try fullSync(descriptor)
     guard fchmod(descriptor, 0o400) == 0 else {
@@ -182,7 +183,7 @@ public struct UpdateArtifactStore: Sendable {
       if count == 0 { break }
       hasher.update(data: Data(buffer[0..<count]))
     }
-    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(hasher.finalize())
     guard digest == expectedSHA256 else { throw UpdateDownloadError.digestMismatch }
     let after = try identity(descriptor: descriptor)
     guard after == before, try identity(at: url) == before else {

@@ -91,7 +91,7 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let data = (try? encoder.encode(self)) ?? Data("{}".utf8)
-    return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: data)
   }
 }
 
