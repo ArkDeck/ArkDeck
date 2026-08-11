@@ -58,7 +58,7 @@ package struct RuntimeCapabilityDenial: Error, Equatable, Sendable {
   }
 }
 
-package enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
+public enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
   /// Any bound target. Never legal for a destructive ceiling.
   case anyTarget
   /// Exactly one physical device, addressed by its stable physical
@@ -100,7 +100,7 @@ package enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
     }
   }
 
-  package func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
     case .anyTarget:
@@ -117,7 +117,7 @@ package enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
   }
 }
 
-package struct RuntimeCapabilityOperationScope: Equatable, Sendable, Codable {
+public struct RuntimeCapabilityOperationScope: Equatable, Sendable, Codable {
   /// Exact catalog operation id, e.g. "debug.hap".
   package let operationID: String
   /// Exact catalog operation version when the operation publishes one.
@@ -135,7 +135,7 @@ package struct RuntimeCapabilityOperationScope: Equatable, Sendable, Codable {
 /// Closed input-constraint vocabulary. A constraint narrows what a request
 /// may pass for one typed input; it can never widen the catalog's own
 /// input schema.
-package enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
+public enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
   case exactString(String)
   case oneOfStrings([String])
   case integerRange(minimum: Int, maximum: Int)
@@ -166,7 +166,7 @@ package enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
     }
   }
 
-  package func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
     case .exactString(let value):
@@ -212,8 +212,8 @@ package enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
   }
 }
 
-package struct RuntimeCapabilityIssuer: Equatable, Sendable, Codable {
-  package enum Kind: String, Codable, Sendable {
+public struct RuntimeCapabilityIssuer: Equatable, Sendable, Codable {
+  public enum Kind: String, Codable, Sendable {
     /// Historical externally supplied capability. It remains decodable, but
     /// new Runtime-owned admission rejects it.
     case maintainerMergedPR
@@ -233,7 +233,7 @@ package struct RuntimeCapabilityIssuer: Equatable, Sendable, Codable {
   }
 }
 
-package enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
+public enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
   case active
   case revoked(atUTC: String, reason: String)
 
@@ -259,7 +259,7 @@ package enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
     }
   }
 
-  package func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
     case .active:
@@ -275,7 +275,7 @@ package enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
 /// One authorization question posed to a capability: may `operation` run at
 /// `effect` against `target` with `inputs` and any exact materialization
 /// pins carried by the capability?
-package struct RuntimeCapabilityAuthorizationQuery: Sendable {
+public struct RuntimeCapabilityAuthorizationQuery: Sendable {
   package let operationID: String
   package let operationVersion: Int?
   public let effect: WorkflowEffect
@@ -330,7 +330,7 @@ package struct RuntimeCapabilityAuthorizationQuery: Sendable {
   }
 }
 
-package struct RuntimeCapability: Equatable, Sendable, Codable {
+public struct RuntimeCapability: Equatable, Sendable, Codable {
   package let capabilityID: String
   package let targetScope: RuntimeCapabilityTargetScope
   package let operationScope: [RuntimeCapabilityOperationScope]
@@ -685,7 +685,7 @@ extension Character {
 
 /// The bounded default policy that admits E0 work without any capability.
 /// It can only ever say yes to read-only effects inside fixed budgets.
-package struct RuntimeDefaultReadOnlyPolicy: Sendable {
+public struct RuntimeDefaultReadOnlyPolicy: Sendable {
   package let maximumTimeoutSeconds: Int
   package let maximumOutputByteBudget: Int
 

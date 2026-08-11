@@ -80,7 +80,7 @@ package struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
   }
 }
 
-package struct RuntimeCapabilityStatus: Equatable, Sendable, Codable {
+public struct RuntimeCapabilityStatus: Equatable, Sendable, Codable {
   public let capability: RuntimeCapability
   package let remainingUses: Int
   package let consumptionCount: Int
@@ -89,7 +89,7 @@ package struct RuntimeCapabilityStatus: Equatable, Sendable, Codable {
   package let lineage: [RuntimeCapabilityLineageEntry]
 }
 
-package struct RuntimeCapabilityConsumptionReceipt: Equatable, Sendable, Codable {
+public struct RuntimeCapabilityConsumptionReceipt: Equatable, Sendable, Codable {
   public let capabilityID: String
   public let ordinal: Int
   public let reservationID: String
@@ -153,7 +153,7 @@ private struct StoreVersionHeader: Decodable {
   let schemaVersion: String
 }
 
-package actor RuntimeCapabilityStore {
+public actor RuntimeCapabilityStore {
   private let directoryURL: URL
   private let documentURL: URL
   private let lockURL: URL

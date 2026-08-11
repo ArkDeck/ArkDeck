@@ -27,7 +27,7 @@ package enum RuntimeArtifactError: Error, Equatable, Sendable {
   case evidenceVerificationFailed(String)
 }
 
-package enum ArtifactStatus: Sendable, Equatable, Codable {
+public enum ArtifactStatus: Sendable, Equatable, Codable {
   case published
   case missing(reason: String)
   case truncated(atBytes: Int)
@@ -38,7 +38,7 @@ package enum ArtifactStatus: Sendable, Equatable, Codable {
   }
 }
 
-package struct ArtifactBindingSnapshot: Sendable, Equatable, Codable {
+public struct ArtifactBindingSnapshot: Sendable, Equatable, Codable {
   public let targetID: String
   public let bindingRevision: Int?
   package let stableIdentitySHA256: String?
@@ -50,7 +50,7 @@ package struct ArtifactBindingSnapshot: Sendable, Equatable, Codable {
   }
 }
 
-package struct ArtifactRetention: Sendable, Equatable, Codable {
+public struct ArtifactRetention: Sendable, Equatable, Codable {
   package let retentionClass: CatalogArtifactRetentionClass
   package let deadlineUTC: String?
   public let pinned: Bool
@@ -64,7 +64,7 @@ package struct ArtifactRetention: Sendable, Equatable, Codable {
   }
 }
 
-package struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
+public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   package let artifactID: String
   public let jobID: String
   public let sessionID: String
@@ -83,7 +83,7 @@ package struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   package let redactionApplied: Bool
 }
 
-package struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
+public struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
   public let reference: String
   public let sha256: String
   public let jobID: String
@@ -123,7 +123,7 @@ private struct ArtifactIndexDocument: Codable, Equatable {
 /// Default redaction for text products. Deliberately conservative and
 /// cheap: it removes the shapes that must never leave the host, and marks
 /// that it ran so evidence can state it plainly.
-package struct ArtifactRedactionPolicy: Sendable {
+public struct ArtifactRedactionPolicy: Sendable {
   package let homeDirectory: String
 
   public init(homeDirectory: String = NSHomeDirectory()) {
@@ -153,7 +153,7 @@ package struct ArtifactRedactionPolicy: Sendable {
 /// Storage quota. The rule is "refuse new work, never damage existing
 /// artifacts": approaching the limit rejects a publication instead of
 /// evicting something already recorded.
-package struct ArtifactQuota: Sendable, Equatable {
+public struct ArtifactQuota: Sendable, Equatable {
   package let totalBytes: Int
 
   public init(totalBytes: Int = 8 * 1024 * 1024 * 1024) {
@@ -161,7 +161,7 @@ package struct ArtifactQuota: Sendable, Equatable {
   }
 }
 
-package struct ArtifactRetentionPolicy: Sendable, Equatable {
+public struct ArtifactRetentionPolicy: Sendable, Equatable {
   package let defaultLifetimeSeconds: TimeInterval
   package let shortLivedLifetimeSeconds: TimeInterval
 
@@ -201,7 +201,7 @@ package struct ArtifactRetentionPolicy: Sendable, Equatable {
   }
 }
 
-package struct RuntimeArtifactPublicationRequest: Sendable {
+public struct RuntimeArtifactPublicationRequest: Sendable {
   public let jobID: String
   public let sessionID: String
   public let stepID: String
@@ -391,7 +391,7 @@ package struct CleanupDebtRecord: Sendable, Equatable, Codable {
   public var identity: String { residue.identity }
 }
 
-package actor RuntimeArtifactStore {
+public actor RuntimeArtifactStore {
   private static let maximumReadBytes = 4 * 1024 * 1024
 
   private let rootURL: URL

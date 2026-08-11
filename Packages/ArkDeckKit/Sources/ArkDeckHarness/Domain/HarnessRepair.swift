@@ -12,7 +12,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package struct HarnessPatchLimits: Equatable, Sendable, Codable {
+public struct HarnessPatchLimits: Equatable, Sendable, Codable {
   package let maxPatchBytes: Int
   package let maxTouchedFiles: Int
   package let maxExpectedChangedSymbols: Int
@@ -54,7 +54,7 @@ package enum HarnessPatchProposalError: Error, Equatable, Sendable {
   }
 }
 
-package struct HarnessPatchProposal: Equatable, Sendable, Codable {
+public struct HarnessPatchProposal: Equatable, Sendable, Codable {
   package let baseWorkspaceRevision: String
   public let patchSHA256: String
   package let unifiedDiff: String
@@ -260,7 +260,7 @@ package struct HarnessPatchProposal: Equatable, Sendable, Codable {
 /// Durable, evidence-derived progress for one source repair.  It is encoded
 /// inside `observedState`, whose reducer already restricts writers to job
 /// observation/evaluation paths.
-package struct HarnessRepairAttempt: Equatable, Sendable {
+public struct HarnessRepairAttempt: Equatable, Sendable {
   package static let observedStateKey = "repairAttempt"
 
   package let proposal: HarnessPatchProposal

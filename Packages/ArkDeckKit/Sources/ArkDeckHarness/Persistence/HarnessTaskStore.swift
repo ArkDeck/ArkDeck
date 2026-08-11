@@ -17,7 +17,7 @@ package enum HarnessTaskStoreError: Error, Equatable, Sendable {
   case corrupt(String)
 }
 
-package actor HarnessTaskStore {
+public actor HarnessTaskStore {
   private let repository: HarnessSQLiteRepository
 
   public init(rootURL: URL) throws {

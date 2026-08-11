@@ -26,7 +26,7 @@ package enum RuntimeDebugInvocationError: Error, Equatable, Sendable {
   case persistenceFailure(String)
 }
 
-package enum RuntimeDebugExecutionOutcome: String, Codable, Equatable, Sendable {
+public enum RuntimeDebugExecutionOutcome: String, Codable, Equatable, Sendable {
   case succeeded
   case safeToReflash
   case outcomeUnknown
@@ -34,7 +34,7 @@ package enum RuntimeDebugExecutionOutcome: String, Codable, Equatable, Sendable 
   case refused
 }
 
-package struct RuntimeDebugDriverResult: Codable, Equatable, Sendable {
+public struct RuntimeDebugDriverResult: Codable, Equatable, Sendable {
   public let jobID: String?
   public let outcome: RuntimeDebugExecutionOutcome
   public let detail: String
@@ -49,7 +49,7 @@ package struct RuntimeDebugDriverResult: Codable, Equatable, Sendable {
 /// Testable seam at the protected Runtime boundary. Production uses
 /// RuntimeJobEngineDebugAttemptDriver; fake implementations are mechanical
 /// contract evidence and can never be reported as device evidence.
-package protocol RuntimeDebugAttemptDriving: Sendable {
+public protocol RuntimeDebugAttemptDriving: Sendable {
   func prepare(_ requestData: Data) async throws -> RuntimePlanOnlyPreview
   func execute(_ requestData: Data) async -> RuntimeDebugDriverResult
 }
@@ -180,7 +180,7 @@ package struct RuntimeDebugEvaluation: Codable, Equatable, Sendable {
   public let observation: RuntimeDebugObservation?
 }
 
-package struct RuntimeDebugInvocationStatus: Codable, Equatable, Sendable {
+public struct RuntimeDebugInvocationStatus: Codable, Equatable, Sendable {
   package let invocationID: String
   public let state: String
   public let operationReference: String
@@ -313,7 +313,7 @@ private struct RuntimeDebugInvocationDocument: Codable, Equatable, Sendable {
   var evaluations: [RuntimeDebugEvaluation]
 }
 
-package actor RuntimeDebugInvocationController {
+public actor RuntimeDebugInvocationController {
   package static let maximumDestructiveEpochs = 16
   package static let maximumDurationSeconds: TimeInterval = 4 * 60 * 60
 

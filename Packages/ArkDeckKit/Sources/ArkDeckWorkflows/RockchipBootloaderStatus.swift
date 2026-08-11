@@ -35,7 +35,7 @@ public struct RockchipBootloaderStatus: Sendable, Equatable {
   }
 }
 
-package protocol RockchipBootloaderStatusObserving: Sendable {
+public protocol RockchipBootloaderStatusObserving: Sendable {
   func observeBootloaderStatus() throws -> RockchipBootloaderStatus
 }
 
@@ -162,7 +162,7 @@ package struct ProductRockchipBootloaderStatusObserver:
   }
 }
 
-package struct RockchipLoaderBindingReceipt: Sendable, Equatable {
+public struct RockchipLoaderBindingReceipt: Sendable, Equatable {
   public let targetID: String
   package let previousRevision: Int
   package let currentRevision: Int
@@ -184,7 +184,7 @@ package struct RockchipLoaderBindingReceipt: Sendable, Equatable {
   }
 }
 
-package protocol RockchipLoaderBindingCoordinating: Sendable {
+public protocol RockchipLoaderBindingCoordinating: Sendable {
   func bindCurrentLoader(
     targetID: String,
     expectedBindingRevision: Int

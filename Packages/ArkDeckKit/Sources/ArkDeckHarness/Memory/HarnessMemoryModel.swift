@@ -38,7 +38,7 @@ package enum HarnessMemoryConfidence: String, CaseIterable, Codable, Sendable {
 /// harness may still use it. Keeping the two separate prevents an old
 /// `evaluated` statement from remaining current after it was superseded or
 /// invalidated.
-package enum HarnessMemoryLifecycle: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemoryLifecycle: String, CaseIterable, Codable, Sendable {
   case candidate = "CANDIDATE"
   case verified = "VERIFIED"
   case superseded = "SUPERSEDED"
@@ -553,13 +553,13 @@ package struct HarnessMemoryQuery: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessMemorySelectionReason: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemorySelectionReason: String, CaseIterable, Codable, Sendable {
   case taskCandidate = "TASK_CANDIDATE"
   case taskVerified = "TASK_VERIFIED"
   case exactProjectScope = "EXACT_PROJECT_SCOPE"
 }
 
-package struct HarnessMemorySelectionRecord: Equatable, Sendable, Codable {
+public struct HarnessMemorySelectionRecord: Equatable, Sendable, Codable {
   package let memoryID: String
   public let lifecycle: HarnessMemoryLifecycle
   package let contentDigest: String
@@ -575,7 +575,7 @@ package struct HarnessMemorySelectionRecord: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessMemorySelectionManifest: Equatable, Sendable, Codable {
+public struct HarnessMemorySelectionManifest: Equatable, Sendable, Codable {
   package static let currentTaskEvidenceScore = 1_000
 
   package let queryDigest: String

@@ -30,7 +30,7 @@ package enum BootstrapObservationAction: Sendable, Equatable {
   }
 }
 
-package enum BootstrapPhase: String, Sendable, Equatable, Codable {
+public enum BootstrapPhase: String, Sendable, Equatable, Codable {
   case discoverHostTools
   case observeHDCServer
   case enumerateDeviceCandidates
@@ -41,7 +41,7 @@ package enum BootstrapPhase: String, Sendable, Equatable, Codable {
   case handedOff
 }
 
-package struct BootstrapCandidate: Sendable, Equatable, Codable {
+public struct BootstrapCandidate: Sendable, Equatable, Codable {
   public let connectKey: String
   public let state: String
 
@@ -77,7 +77,7 @@ package enum BootstrapError: Error, Equatable, Sendable {
 
 // MARK: - Durable target store
 
-package struct RuntimeTargetRecord: Sendable, Equatable, Codable {
+public struct RuntimeTargetRecord: Sendable, Equatable, Codable {
   public let targetID: String
   package let stablePhysicalIdentitySHA256: String
   public let bindingRevision: Int
@@ -214,7 +214,7 @@ private struct TargetStoreDocument: Codable, Equatable {
 }
 
 /// Durable, flock-guarded target registry in the daemon state directory.
-package final class RuntimeTargetStore: @unchecked Sendable {
+public final class RuntimeTargetStore: @unchecked Sendable {
   private let url: URL
   private let lockURL: URL
   private let queue = DispatchQueue(label: "arkdeck.target-store")
@@ -760,7 +760,7 @@ package final class RuntimeTargetStore: @unchecked Sendable {
 
 /// What bootstrap may do, and nothing else. The production implementation
 /// composes the HDC provider + dispatcher; fixtures fake it in tests.
-package protocol BootstrapObservationPort: Sendable {
+public protocol BootstrapObservationPort: Sendable {
   func observeToolVersion() async throws -> String
   func listCandidates() async throws -> [BootstrapCandidate]
   /// Returns the device's stable-identity source attributes (serial et al).
@@ -769,7 +769,7 @@ package protocol BootstrapObservationPort: Sendable {
 
 // MARK: - The machine
 
-package actor DeviceBootstrapMachine {
+public actor DeviceBootstrapMachine {
   public private(set) var phase: BootstrapPhase = .discoverHostTools
   private let observation: any BootstrapObservationPort
   private let targetStore: RuntimeTargetStore

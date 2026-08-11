@@ -16,8 +16,8 @@ package enum AgentClientError: Error, Equatable, Sendable {
   case daemonError(code: String, message: String)
 }
 
-package struct AgentClient: Sendable {
-  package let socketPath: String
+public struct AgentClient: Sendable {
+  public let socketPath: String
 
   public init(socketPath: String) {
     self.socketPath = socketPath

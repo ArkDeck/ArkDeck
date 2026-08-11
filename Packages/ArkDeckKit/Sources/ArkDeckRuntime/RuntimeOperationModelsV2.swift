@@ -15,7 +15,7 @@
 import ArkDeckCore
 import Foundation
 
-package enum RuntimeOperationErrorCode: String, Codable, Sendable, CaseIterable {
+public enum RuntimeOperationErrorCode: String, Codable, Sendable, CaseIterable {
   case invalidRequest
   case unknownOperation
   case invalidInput

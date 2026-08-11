@@ -68,7 +68,7 @@ package enum RockchipProbeVerdict: Equatable, Sendable {
 
 // MARK: - Prerequisites (AC-FLASH-002-01)
 
-package struct RockchipPrerequisiteObservation: Equatable, Sendable {
+public struct RockchipPrerequisiteObservation: Equatable, Sendable {
   public let identifier: RockchipPrerequisiteIdentifier
   public let status: RockchipPrerequisiteStatus
 

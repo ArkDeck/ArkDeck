@@ -395,7 +395,7 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
 /// measures. It does not participate in admission and it never upgrades an
 /// unobservable condition: the protected Runtime repeats its own fresh probe
 /// before a destructive dispatch.
-package protocol RockchipFlashPrerequisiteObserving: Sendable {
+public protocol RockchipFlashPrerequisiteObserving: Sendable {
   func observePrerequisites(targetID: String) async throws
     -> [RockchipPrerequisiteObservation]
 }

@@ -23,7 +23,7 @@ package enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case internalFailure(String)
 }
 
-package struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
+public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
   public let stepID: String
   public let kind: String
   public let effect: String
@@ -47,7 +47,7 @@ package struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
 /// A fully materialized Runtime preview. It is deliberately not a Job or a
 /// capability document: producing it performs no admission, authorization
 /// consumption or provider dispatch, including for destructive operations.
-package struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
+public struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
   public let executionMode: String
   public let operationReference: String
   public let targetID: String
@@ -66,7 +66,7 @@ package struct RuntimePlanOnlyPreview: Sendable, Equatable, Codable {
 /// Presented status: the persisted JobStateMachine state plus the
 /// waitingForHuman view (open human action against a non-terminal job).
 /// The persisted 18-state graph is unchanged.
-package struct RuntimeJobStatus: Sendable, Equatable, Codable {
+public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let jobID: String
   public let operationReference: String
   public let targetID: String
@@ -143,7 +143,7 @@ package struct RuntimeJobStatusPage: Sendable, Equatable {
   package let nextCursor: String?
 }
 
-package enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
+public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case defaultReadOnlyPolicy
   case runtimeCapability
   /// Historical evidence only. New Runtime admission never produces this
@@ -157,7 +157,7 @@ package enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable 
 /// Campaign correlation copied only from the broker-owned durable reservation
 /// after its fresh pre-mutation verification. It is evidence provenance and
 /// cannot be converted into a live campaign capability.
-package struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
+public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
   package let campaignID: String
   package let attemptID: String
   package let attemptOrdinal: Int
@@ -207,7 +207,7 @@ package struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable 
 
 /// Durable correlation for a Runtime-owned capability use. Optional on the
 /// admission envelope only so pre-V5 Job records remain decodable.
-package struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable {
+public struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable {
   package let reservationID: String
   package let useOrdinal: Int
   public let planDigestSHA256: String
@@ -241,7 +241,7 @@ struct RuntimeCompleteOverwriteRecoveryContext: Codable, Sendable, Equatable {
 /// The admission decision actually consumed by this job. This record is
 /// audit provenance only: reading or projecting it cannot mint an
 /// authority or reach the dispatch port.
-package struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
+public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   public let kind: RuntimeEvidenceAuthorityKind
   public let reference: String
   package let admittedAtUTC: String
@@ -386,7 +386,7 @@ package struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public var inputs: [String: JSONValue]? = nil
 }
 
-package struct RuntimeJobAcceptance: Sendable, Equatable {
+public struct RuntimeJobAcceptance: Sendable, Equatable {
   public let jobID: String
   package let deduplicated: Bool
 }
@@ -426,7 +426,7 @@ package struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
 /// Dispatch port: how a lowered process plan actually runs. Production
 /// binds the descriptor-verifying executor (MU-3); tests inject fakes,
 /// including crash and hang shapes.
-package protocol RuntimeProcessDispatching: Sendable {
+public protocol RuntimeProcessDispatching: Sendable {
   func unavailableReason(providerID: String) -> String?
   func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt
 }
@@ -510,7 +510,7 @@ struct RuntimeFlashArchiveProfileCache {
 /// Crash-consistency test seam. Production uses `.none`; tests inject an
 /// error immediately after the named durable boundary, discard the engine and
 /// reopen it exactly as a process restart would.
-package enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
+public enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
   case beforeAdmission
   case afterAdmission
   case beforeJournalAppend
@@ -520,7 +520,7 @@ package enum RuntimeAdmissionFaultPoint: String, CaseIterable, Sendable {
   case beforeResponse
 }
 
-package struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
+public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
   private let body: (RuntimeAdmissionFaultPoint) throws -> Void
 
   public init(_ body: @escaping (RuntimeAdmissionFaultPoint) throws -> Void) {
@@ -534,10 +534,10 @@ package struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
 
 // MARK: - Engine
 
-package actor RuntimeJobEngine {
+public actor RuntimeJobEngine {
   private static let confirmedNotExecutedSemanticCode = "confirmedNotExecuted"
 
-  package struct Configuration: Sendable {
+  public struct Configuration: Sendable {
     package let stateDirectory: URL
     package let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
     package let admissionFaultInjector: RuntimeAdmissionFaultInjector

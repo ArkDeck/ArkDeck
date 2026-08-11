@@ -17,7 +17,7 @@
 import ArkDeckCore
 import Foundation
 
-package struct HarnessPlannedStep: Equatable, Sendable {
+public struct HarnessPlannedStep: Equatable, Sendable {
   public let decision: HarnessDecision
   /// Phase the task moves into when this step is dispatched. `nil` keeps
   /// the current phase.
@@ -29,7 +29,7 @@ package struct HarnessPlannedStep: Equatable, Sendable {
   }
 }
 
-package protocol HarnessTaskHandler: Sendable {
+public protocol HarnessTaskHandler: Sendable {
   var type: HarnessTaskType { get }
   /// The closed set of operation references this task type may submit.
   /// A submission may narrow it; nothing may widen it.
@@ -62,7 +62,7 @@ extension HarnessTaskHandler {
   ) -> Int { 0 }
 }
 
-package struct DebugCrashTaskHandler: HarnessTaskHandler {
+public struct DebugCrashTaskHandler: HarnessTaskHandler {
   package static let observeDevice = "observe.device@1"
   public static let captureDiagnostics = "capture.diagnostics@1"
   package static let createCheckpoint = "workspace.create-checkpoint@1"
@@ -128,7 +128,7 @@ package struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// The repair leg remains closed: source changes use published workspace
   /// operations and the physical-device install uses the existing typed HAP
   /// deployment. Every E1 leg remains guarded by the runtime capability store.
-  package var permittedOperations: Set<String> {
+  public var permittedOperations: Set<String> {
     [
       Self.observeDevice, Self.captureDiagnostics, Self.applyPatch,
       Self.createCheckpoint,
@@ -138,7 +138,7 @@ package struct DebugCrashTaskHandler: HarnessTaskHandler {
     ]
   }
 
-  package func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+  public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
     if let repair = snapshot.repairAttempt, repair.patchAttemptRef != nil, !repair.reverted,
       repair.rollbackRequired
         || (repair.deployedDigest != nil && snapshot.observed.latestVerdict == .fail)
@@ -185,7 +185,7 @@ package struct DebugCrashTaskHandler: HarnessTaskHandler {
     }
   }
 
-  package func defaultSuccessCriteria() -> [HarnessSuccessCriterion] {
+  public func defaultSuccessCriteria() -> [HarnessSuccessCriterion] {
     [
       HarnessSuccessCriterion(
         criterionID: "DC-1-crash-signature-absent",
@@ -223,7 +223,7 @@ package struct DebugCrashTaskHandler: HarnessTaskHandler {
     ]
   }
 
-  package func requiredE1MutationBudget(
+  public func requiredE1MutationBudget(
     goal: HarnessTaskGoal, policy: HarnessTaskPolicy
   ) -> Int {
     Self.requiredE1MutationBudget(goal: goal, policy: policy)

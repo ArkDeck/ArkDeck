@@ -444,7 +444,7 @@ package enum WorkflowStepRegistry {
   }
 }
 
-package enum CompensationTrigger: String, CaseIterable, Codable, Sendable {
+public enum CompensationTrigger: String, CaseIterable, Codable, Sendable {
   case onSuccess
   case onFailure
   case onCancel
@@ -470,7 +470,7 @@ package enum WorkflowStepValidationError: Error, Equatable, Sendable {
   case duplicateJSONMemberName(path: String)
 }
 
-package struct CompensationDescriptor: Equatable, Sendable, Codable {
+public struct CompensationDescriptor: Equatable, Sendable, Codable {
   package static let allowedKinds: Set<WorkflowStepKind> = [
     .stopRemoteCapture,
     .restoreParameter,
@@ -540,7 +540,7 @@ package struct CompensationDescriptor: Equatable, Sendable, Codable {
   }
 }
 
-package struct WorkflowStep: Equatable, Sendable, Codable {
+public struct WorkflowStep: Equatable, Sendable, Codable {
   public let id: String
   public let kind: WorkflowStepKind
   public let effect: WorkflowEffect

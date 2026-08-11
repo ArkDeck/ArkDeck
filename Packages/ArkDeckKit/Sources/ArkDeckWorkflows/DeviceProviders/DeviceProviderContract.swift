@@ -1121,7 +1121,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
 
 // MARK: - Facts, plans, receipts, outcomes
 
-package struct ProviderFacts: Sendable, Equatable {
+public struct ProviderFacts: Sendable, Equatable {
   public let providerID: String
   public let toolVersion: String
   package let toolSHA256: String
@@ -1333,7 +1333,7 @@ package struct HostLandingExpectation: Sendable, Equatable {
 
 /// Bytes observed on the host after a transfer. Every field is measured
 /// from the file, never copied from the request that asked for it.
-package struct ProviderLandedArtifact: Sendable, Equatable {
+public struct ProviderLandedArtifact: Sendable, Equatable {
   package let localURL: URL
   public let byteCount: Int
   /// Absent when the file was empty or over budget, i.e. when it was
@@ -1351,7 +1351,7 @@ package struct ProviderLandedArtifact: Sendable, Equatable {
   }
 }
 
-package struct TypedProcessPlan: Sendable, Equatable {
+public struct TypedProcessPlan: Sendable, Equatable {
   package enum Kind: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
     case processSequence(executableSHA256: String, invocations: [TypedProcessInvocation])
@@ -1386,7 +1386,7 @@ package struct TypedProcessPlan: Sendable, Equatable {
   }
 }
 
-package struct ProviderSubprocessReceipt: Sendable, Equatable {
+public struct ProviderSubprocessReceipt: Sendable, Equatable {
   package let exitStatus: Int32?
   public let stdout: Data
   public let stderr: Data
@@ -1408,7 +1408,7 @@ package struct ProviderSubprocessReceipt: Sendable, Equatable {
   }
 }
 
-package struct ProviderProcessReceipt: Sendable, Equatable {
+public struct ProviderProcessReceipt: Sendable, Equatable {
   package let exitStatus: Int32?
   public let stdout: Data
   public let stderr: Data
@@ -1702,7 +1702,7 @@ extension DeviceProvider {
 }
 
 /// Closed provider registry keyed by providerID ("hdc", "rockchip").
-package struct DeviceProviderRegistry: Sendable {
+public struct DeviceProviderRegistry: Sendable {
   private let providers: [String: any DeviceProvider]
 
   package init(providers: [any DeviceProvider]) {

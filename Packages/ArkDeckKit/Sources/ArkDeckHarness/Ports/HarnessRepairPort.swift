@@ -46,7 +46,7 @@ package enum HarnessRepairStageGate {
   }
 }
 
-package struct HarnessPreparedPatch: Equatable, Sendable {
+public struct HarnessPreparedPatch: Equatable, Sendable {
   public let inputs: [String: JSONValue]
   package let artifactLease: String
   /// Immutable diff Artifact identity. Historical/fake adapters may omit it;
@@ -62,7 +62,7 @@ package struct HarnessPreparedPatch: Equatable, Sendable {
   }
 }
 
-package struct HarnessAppliedPatchReadback: Equatable, Sendable {
+public struct HarnessAppliedPatchReadback: Equatable, Sendable {
   public let patchAttemptRef: String
   package let patchRevision: String
 
@@ -72,7 +72,7 @@ package struct HarnessAppliedPatchReadback: Equatable, Sendable {
   }
 }
 
-package struct HarnessBuildReadback: Equatable, Sendable {
+public struct HarnessBuildReadback: Equatable, Sendable {
   package let sourceRevision: String
   package let outputDigest: String
   package let outputArtifactLease: String
@@ -84,7 +84,7 @@ package struct HarnessBuildReadback: Equatable, Sendable {
   }
 }
 
-package struct HarnessSignedHAPReadback: Equatable, Sendable {
+public struct HarnessSignedHAPReadback: Equatable, Sendable {
   package let outputDigest: String
   package let outputArtifactLease: String
 
@@ -94,14 +94,14 @@ package struct HarnessSignedHAPReadback: Equatable, Sendable {
   }
 }
 
-package enum HarnessPatchApplicationReadback: Equatable, Sendable {
+public enum HarnessPatchApplicationReadback: Equatable, Sendable {
   case patchApplied(HarnessAppliedPatchReadback)
   case patchNotApplied
   case stillUnknown
   case partiallyApplied
 }
 
-package protocol HarnessRepairPort: Sendable {
+public protocol HarnessRepairPort: Sendable {
   /// Reload the exact live workspace fact used by a Decision immediately
   /// before a pending intent may be submitted.
   func currentWorkspaceRevision(

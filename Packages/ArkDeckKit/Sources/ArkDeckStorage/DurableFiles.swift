@@ -4,7 +4,7 @@ import Darwin
 import Dispatch
 import Foundation
 
-package enum DurabilityFaultPoint: String, CaseIterable, Sendable {
+public enum DurabilityFaultPoint: String, CaseIterable, Sendable {
   case journalAppend
   case journalWrite
   case journalFileSync
@@ -16,7 +16,7 @@ package enum DurabilityFaultPoint: String, CaseIterable, Sendable {
   case checkpointDirectorySync
 }
 
-package struct DurabilityFaultInjector: @unchecked Sendable {
+public struct DurabilityFaultInjector: @unchecked Sendable {
   private let body: (DurabilityFaultPoint) throws -> Void
 
   public init(_ body: @escaping (DurabilityFaultPoint) throws -> Void) {
@@ -238,7 +238,7 @@ struct JournalAppendMeasurement: Equatable, Sendable {
   let totalAppendNanoseconds: UInt64
 }
 
-package final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
+public final class FileDurableJournal: DurableJournalAppending, @unchecked Sendable {
   public let url: URL
   private let lock = NSLock()
   private let faultInjector: DurabilityFaultInjector
@@ -623,7 +623,7 @@ package final class DurableOutcomeCheckpointGate: @unchecked Sendable {
   }
 }
 
-package enum DurableFilePrimitives {
+public enum DurableFilePrimitives {
   package static func requireAbsoluteFileURL(_ url: URL) throws {
     guard url.isFileURL, url.path.hasPrefix("/") else {
       throw DurableFileError.pathMustBeAbsolute(url.path)

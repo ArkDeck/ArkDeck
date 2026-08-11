@@ -18,7 +18,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
+public enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
   /// Intent persisted, nothing submitted yet. Safe to submit.
   case pending
   /// Submit was attempted; the outcome of the submit call itself is not
@@ -36,7 +36,7 @@ package enum HarnessDispatchState: String, CaseIterable, Codable, Sendable {
   case stale
 }
 
-package enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
+public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
   case invokeOperation
   case proposePatch
   case requestHuman
@@ -48,7 +48,7 @@ package enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
 /// the same type. Either way a decision carries no status, no retry count,
 /// no raw command and no success claim - those fields do not exist here,
 /// which is what makes HTP-INV-1 structural instead of advisory.
-package struct HarnessDecision: Equatable, Sendable, Codable {
+public struct HarnessDecision: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision"
   package static let envelopeVersion = "2.0.0"
 
@@ -234,7 +234,7 @@ package struct HarnessDecision: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessDispatchIntent: Equatable, Sendable, Codable {
+public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
   public static let documentType = "harness-dispatch-intent"
   public static let schemaVersion = "2.0.0"
 
@@ -471,7 +471,7 @@ package enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
 
 /// Typed submission input. Natural language is admitted only as
 /// `intakeDescription`; everything the loop executes on is typed.
-package struct HarnessTaskSubmission: Equatable, Sendable, Codable {
+public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
   public let type: HarnessTaskType
   package let intakeDescription: String?
   public let projectRef: String?

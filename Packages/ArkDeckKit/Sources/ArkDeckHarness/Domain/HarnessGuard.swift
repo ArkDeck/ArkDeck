@@ -22,7 +22,7 @@ import ArkDeckRuntime
 import CryptoKit
 import Foundation
 
-package enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
+public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
   case rounds
   case wallClock
   case artifactBytes
@@ -50,7 +50,7 @@ package enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
 /// What a failure *is*, for the purpose of not repeating it. Deliberately
 /// excludes free text: two failures with different prose but the same
 /// operation, inputs, phase and error class are the same failure.
-package struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
+public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   public let operationReference: String
   package let phase: HarnessTaskStage
   public let providerID: String
@@ -139,7 +139,7 @@ package struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Sendable {
+public enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Sendable {
   case actionRetryAllowed = "ACTION_RETRY_ALLOWED"
   case retryAfterBackoff = "RETRY_AFTER_BACKOFF"
   case retryAfterObservation = "RETRY_AFTER_OBSERVATION"
@@ -147,7 +147,7 @@ package enum HarnessFailureRetryDisposition: String, CaseIterable, Codable, Send
   case doNotRetry = "DO_NOT_RETRY"
 }
 
-package enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
+public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
   /// First occurrence: the same strategy may be retried when the operation
   /// is retry-safe.
   case allowSameStrategy
@@ -167,7 +167,7 @@ package enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
   }
 }
 
-package struct HarnessFailureRecord: Equatable, Sendable, Codable {
+public struct HarnessFailureRecord: Equatable, Sendable, Codable {
   public static let documentType = "harness-failure-memory"
 
   public let documentType: String
@@ -262,7 +262,7 @@ package struct HarnessFailureRecord: Equatable, Sendable, Codable {
 /// The identity of a *strategy*, used to answer "is this the same attempt
 /// again?". Hypothesis text is excluded by construction: rewording is not a
 /// new strategy.
-package struct HarnessStrategySignature: Equatable, Sendable, Codable {
+public struct HarnessStrategySignature: Equatable, Sendable, Codable {
   public let operationReference: String
   package let inputsDigest: String
   package let phase: HarnessTaskStage
@@ -340,7 +340,7 @@ package struct HarnessProgressVector: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessGuardRefusal: Equatable, Sendable {
+public enum HarnessGuardRefusal: Equatable, Sendable {
   case budgetExhausted(HarnessBudgetKind)
   case operationNotPermitted(String)
   case operationUnavailable(reference: String, reason: String)
@@ -413,7 +413,7 @@ package enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
   case producerProposalRequired
 }
 
-package enum HarnessGuardVerdict: Equatable, Sendable {
+public enum HarnessGuardVerdict: Equatable, Sendable {
   case allow
   case refuse(HarnessGuardRefusal)
 }

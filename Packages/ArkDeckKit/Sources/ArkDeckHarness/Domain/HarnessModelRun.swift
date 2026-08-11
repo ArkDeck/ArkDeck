@@ -19,8 +19,8 @@
 import ArkDeckCore
 import Foundation
 
-package struct HarnessModelDescriptor: Equatable, Sendable, Codable {
-  package static let unspecified = "unspecified"
+public struct HarnessModelDescriptor: Equatable, Sendable, Codable {
+  public static let unspecified = "unspecified"
 
   public let provider: String
   package let modelName: String
@@ -42,7 +42,7 @@ package struct HarnessModelDescriptor: Equatable, Sendable, Codable {
 
 /// Outcome of the strict parse, which is the only thing that turns returned
 /// bytes into a proposal.
-package enum HarnessModelRunOutcome: Equatable, Sendable, Codable {
+public enum HarnessModelRunOutcome: Equatable, Sendable, Codable {
   case accepted(decisionID: String)
   case rejected(reasonCode: String)
   case transportFailed(reasonCode: String)

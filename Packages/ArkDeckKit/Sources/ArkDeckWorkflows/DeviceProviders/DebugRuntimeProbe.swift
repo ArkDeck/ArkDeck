@@ -2,7 +2,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum DebugRuntimeCommandTemplate: String, Codable, CaseIterable, Sendable {
+public enum DebugRuntimeCommandTemplate: String, Codable, CaseIterable, Sendable {
   case packageInventory = "device.packageInventory"
   case debugParameterRead = "device.debugParameterRead"
   case windowInventory = "device.windowInventory"
@@ -97,7 +97,7 @@ public struct DebugRuntimeCommandResult: Codable, Sendable, Equatable {
 /// A target-bound, read-only Debug portrait. The caller can choose only one
 /// of the closed templates above; executable discovery, connect key and argv
 /// lowering remain daemon-owned. It never creates a RuntimeCapability.
-package protocol DebugRuntimeProbing: Sendable {
+public protocol DebugRuntimeProbing: Sendable {
   func probeDebugRuntime(targetID: String) async throws -> DebugRuntimeProbeSnapshot
   func runDebugTemplate(
     targetID: String, template: DebugRuntimeCommandTemplate

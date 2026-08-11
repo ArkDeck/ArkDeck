@@ -593,7 +593,7 @@ private func hdcRegisteredCommandFamily(arguments: [String]) -> HDCRegisteredCom
   }
 }
 
-package enum HDCServerProbeClassification: Sendable, Equatable {
+public enum HDCServerProbeClassification: Sendable, Equatable {
   case healthy(serverVersion: String)
   case mismatchUnverified(clientVersion: String, serverVersion: String)
   case unavailable(reason: String)

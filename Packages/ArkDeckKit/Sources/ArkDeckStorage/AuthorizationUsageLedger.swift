@@ -619,7 +619,7 @@ package struct AuthorizationReference: Codable, Equatable, Hashable, Sendable {
 
 extension AuthorizationReference.CodingKeys: CaseIterable {}
 
-package enum AuthorizationUsageTerminalStatus: String, Codable, CaseIterable, Sendable {
+public enum AuthorizationUsageTerminalStatus: String, Codable, CaseIterable, Sendable {
   case succeeded
   case failed
   case cancelled
@@ -642,14 +642,14 @@ package enum AuthorizationUsageLedgerError: Error, Equatable, Sendable {
 
 
 // Shared durable-write fault points injected by the campaign ledger below.
-package enum AuthorizationUsageLedgerFaultPoint: String, CaseIterable, Sendable {
+public enum AuthorizationUsageLedgerFaultPoint: String, CaseIterable, Sendable {
   case beforeTemporaryWrite
   case afterFileSync
   case afterReplace
   case beforeDirectorySync
 }
 
-package struct AuthorizationUsageLedgerFaultInjector: @unchecked Sendable {
+public struct AuthorizationUsageLedgerFaultInjector: @unchecked Sendable {
   private let body: (AuthorizationUsageLedgerFaultPoint) throws -> Void
 
   public init(_ body: @escaping (AuthorizationUsageLedgerFaultPoint) throws -> Void) {
@@ -661,7 +661,7 @@ package struct AuthorizationUsageLedgerFaultInjector: @unchecked Sendable {
   public static let none = AuthorizationUsageLedgerFaultInjector { _ in }
 }
 
-package struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
+public struct AgentAuthorityUsageTerminal: Codable, Equatable, Sendable {
   public let status: AuthorizationUsageTerminalStatus
   package let closedAt: String
   package let externalIntentEventIDs: [String]
@@ -784,7 +784,7 @@ public struct AgentAuthorityCampaignExecutionTuning: Codable, Equatable, Sendabl
   }
 }
 
-package struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
+public struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sendable {
   public let candidateDigestSHA256: String
   /// Present only on historical review-bearing campaign records. New
   /// candidates never mint a review digest.
@@ -850,7 +850,7 @@ package struct AgentAuthorityCampaignEvidenceProvenance: Codable, Equatable, Sen
   }
 }
 
-package struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
+public struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   public let reservationID: String
   package let authorizationRef: AgentExecutionAuthorityReference
   public let ordinal: Int
@@ -1057,7 +1057,7 @@ package struct AgentAuthorityUsageReservation: Codable, Equatable, Sendable {
   }
 }
 
-package struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
+public struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
   public static let documentType = "agentAuthorityUsage"
   public static let schemaVersion = "1.0.0"
 
@@ -1075,7 +1075,7 @@ package struct AgentAuthorityUsageLedgerDocument: Codable, Equatable, Sendable {
 
 /// Independent consume-on-reserve ledger for E1 capabilities and bounded Evolution campaigns.
 /// Historical chat-confirmation entries remain decodable but cannot create new reservations.
-package final class AgentAuthorityUsageLedger: @unchecked Sendable {
+public final class AgentAuthorityUsageLedger: @unchecked Sendable {
   package static let ledgerFileName = "agent-authority-usage.json"
   package static let lockFileName = ".agent-authority-usage.lock"
   public static let maximumBytes = 16 * 1_024 * 1_024

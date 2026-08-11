@@ -61,7 +61,7 @@ package enum AgentDaemonErrorCode: String, Sendable {
 
 // MARK: - Handler (transport-free)
 
-package struct RuntimeControlPlaneHandler: Sendable {
+public struct RuntimeControlPlaneHandler: Sendable {
   private let engine: RuntimeJobEngine
   private let capabilityStore: RuntimeCapabilityStore
   private let providerIDs: [String]
@@ -1830,23 +1830,23 @@ package struct RuntimeControlPlaneHandler: Sendable {
 
 // MARK: - Instance document
 
-package struct AgentDaemonInstance: Codable, Sendable, Equatable {
+public struct AgentDaemonInstance: Codable, Sendable, Equatable {
   public let pid: Int32
   package let socketPath: String
   package let protocolVersion: String
   public let startedAtUTC: String
 }
 
-package enum AgentDaemonStartResult: Sendable, Equatable {
+public enum AgentDaemonStartResult: Sendable, Equatable {
   case started
   case alreadyRunning(AgentDaemonInstance)
 }
 
 // MARK: - UDS server
 
-package final class AgentDaemonServer: @unchecked Sendable {
+public final class AgentDaemonServer: @unchecked Sendable {
   public let stateDirectory: URL
-  package let socketURL: URL
+  public let socketURL: URL
   private let handler: RuntimeControlPlaneHandler
   private let nowUTC: @Sendable () -> String
   private var listenerFD: Int32 = -1
@@ -1943,7 +1943,7 @@ package final class AgentDaemonServer: @unchecked Sendable {
   /// the instance lock.  A bounded deadline prevents one vanished client from
   /// making a supervisor wait forever; Runtime jobs still recover from their
   /// journal rather than being treated as completed.
-  package func drainAndStop(deadline: TimeInterval) {
+  public func drainAndStop(deadline: TimeInterval) {
     let cutoff = Date().addingTimeInterval(max(0, deadline))
     lifecycle.lock()
     guard !stopped else {

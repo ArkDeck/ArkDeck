@@ -34,13 +34,13 @@ package enum HarnessTaskWireField {
   package static let legacyPhase = "phase"
 }
 
-package enum HarnessTaskType: String, CaseIterable, Codable, Sendable {
+public enum HarnessTaskType: String, CaseIterable, Codable, Sendable {
   /// The only implemented handler. New types arrive as code plus tests,
   /// never as a user-supplied workflow document (no JSON workflow DSL).
   case debugCrash
 }
 
-package enum HarnessTaskLifecycle: String, CaseIterable, Sendable {
+public enum HarnessTaskLifecycle: String, CaseIterable, Sendable {
   case created
   case running
   case waiting
@@ -63,7 +63,7 @@ extension HarnessTaskLifecycle: Codable {}
 /// Debug stage inside `running`. The graph is deliberately small and
 /// acyclic apart from the analysis/evidence loop the bounded debug journey
 /// actually needs.
-package enum HarnessTaskStage: String, CaseIterable, Sendable {
+public enum HarnessTaskStage: String, CaseIterable, Sendable {
   case initializing
   case reproducing
   case collecting
@@ -76,7 +76,7 @@ package enum HarnessTaskStage: String, CaseIterable, Sendable {
 
 extension HarnessTaskStage: Codable {}
 
-package enum HarnessTaskWaitReason: String, CaseIterable, Codable, Sendable {
+public enum HarnessTaskWaitReason: String, CaseIterable, Codable, Sendable {
   case userSuspended = "USER_SUSPENDED"
   case activeJob = "ACTIVE_JOB"
   case retryBackoff = "RETRY_BACKOFF"
@@ -84,13 +84,13 @@ package enum HarnessTaskWaitReason: String, CaseIterable, Codable, Sendable {
   case observationWindow = "OBSERVATION_WINDOW"
 }
 
-package enum HarnessTriState: String, CaseIterable, Codable, Sendable {
+public enum HarnessTriState: String, CaseIterable, Codable, Sendable {
   case trueValue = "TRUE"
   case falseValue = "FALSE"
   case unknown = "UNKNOWN"
 }
 
-package enum HarnessTaskConditionName: String, CaseIterable, Codable, Sendable {
+public enum HarnessTaskConditionName: String, CaseIterable, Codable, Sendable {
   case targetResolved = "TargetResolved"
   case deviceBound = "DeviceBound"
   case deviceReady = "DeviceReady"
@@ -107,7 +107,7 @@ package enum HarnessTaskConditionName: String, CaseIterable, Codable, Sendable {
   case criteriaSatisfied = "CriteriaSatisfied"
 }
 
-package struct HarnessTaskCondition: Equatable, Codable, Sendable {
+public struct HarnessTaskCondition: Equatable, Codable, Sendable {
   public let name: HarnessTaskConditionName
   public let state: HarnessTriState
   public let reasonCode: String
@@ -152,7 +152,7 @@ package struct HarnessTaskCondition: Equatable, Codable, Sendable {
   }
 }
 
-package enum HarnessTaskConditionSet {
+public enum HarnessTaskConditionSet {
   public static func unknown(reasonCode: String = "notObserved") -> [HarnessTaskCondition] {
     HarnessTaskConditionName.allCases.map {
       HarnessTaskCondition.unknown($0, reasonCode: reasonCode)
@@ -258,7 +258,7 @@ package enum HarnessTaskStageGates {
   }
 }
 
-package enum HarnessCriterionComparator: String, CaseIterable, Codable, Sendable {
+public enum HarnessCriterionComparator: String, CaseIterable, Codable, Sendable {
   case equalTo
   case atMost
   case atLeast
@@ -270,7 +270,7 @@ package enum HarnessCriterionComparator: String, CaseIterable, Codable, Sendable
 /// persists these; the evaluator that reads them is TASK-HTP-002, so a
 /// task carrying criteria cannot yet be judged - it stops honestly instead
 /// of being called successful.
-package struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
+public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
   package let criterionID: String
   package let metric: String
   package let comparator: HarnessCriterionComparator
@@ -332,7 +332,7 @@ package struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessTaskGoal: Equatable, Sendable, Codable {
+public struct HarnessTaskGoal: Equatable, Sendable, Codable {
   public let summary: String
   package let desiredState: [String: JSONValue]
 
@@ -342,7 +342,7 @@ package struct HarnessTaskGoal: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessTaskTargetReference: Equatable, Sendable, Codable {
+public struct HarnessTaskTargetReference: Equatable, Sendable, Codable {
   public let targetID: String
   /// Present means: execute against exactly this binding revision. The
   /// runtime, not the harness, enforces it; the harness only carries the
@@ -360,7 +360,7 @@ package struct HarnessTaskTargetReference: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessTaskBudgets: Equatable, Sendable, Codable {
+public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
   package let maxRounds: Int
   package let maxWallClockSeconds: Int
   package let maxArtifactBytes: Int
@@ -430,7 +430,7 @@ package struct HarnessTaskBudgets: Equatable, Sendable, Codable {
     maxModelCalls: 128)
 }
 
-package struct HarnessConsumedBudget: Equatable, Sendable, Codable {
+public struct HarnessConsumedBudget: Equatable, Sendable, Codable {
   package let rounds: Int
   package let wallClockSeconds: Int
   package let artifactBytes: Int
@@ -471,7 +471,7 @@ package struct HarnessConsumedBudget: Equatable, Sendable, Codable {
 /// failure memory, raw-command rejection) is TASK-HTP-003; what lands here
 /// is the part the reducer and the coordinator cannot run without: the
 /// closed set of operation references this task may ever submit.
-package struct HarnessTaskPolicy: Equatable, Sendable, Codable {
+public struct HarnessTaskPolicy: Equatable, Sendable, Codable {
   public let allowedOperations: [String]
 
   public init(allowedOperations: [String]) {
@@ -479,7 +479,7 @@ package struct HarnessTaskPolicy: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessTaskResult: Equatable, Sendable, Codable {
+public struct HarnessTaskResult: Equatable, Sendable, Codable {
   public let outcome: HarnessTaskLifecycle
   public let reasonCode: String
   public let summary: String
@@ -509,7 +509,7 @@ package struct HarnessTaskResult: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessTaskCausation: String, CaseIterable, Codable, Sendable {
+public enum HarnessTaskCausation: String, CaseIterable, Codable, Sendable {
   case submitted
   case admitted
   case recovery
@@ -540,7 +540,7 @@ package enum HarnessTaskCausation: String, CaseIterable, Codable, Sendable {
 /// The reducer-owned part of a task: everything a transition may change.
 /// Persisted inside every event so the event log alone can rebuild a
 /// snapshot after a crash between the two writes.
-package struct HarnessTaskProjection: Equatable, Sendable, Codable {
+public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
@@ -733,7 +733,7 @@ package struct HarnessTaskTransition: Equatable, Sendable {
   }
 }
 
-package struct HarnessTaskEvent: Equatable, Sendable, Codable {
+public struct HarnessTaskEvent: Equatable, Sendable, Codable {
   public static let documentType = "harness-task-event"
   public static let schemaVersion = "2.0.0"
 
@@ -800,7 +800,7 @@ package struct HarnessTaskEvent: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
+public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public static let documentType = "harness-task"
   public static let schemaVersion = "3.1.0"
 

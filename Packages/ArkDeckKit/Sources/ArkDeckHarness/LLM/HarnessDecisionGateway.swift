@@ -18,7 +18,7 @@
 import ArkDeckCore
 import Foundation
 
-package enum HarnessEgressDecision: Equatable, Sendable {
+public enum HarnessEgressDecision: Equatable, Sendable {
   case denied(reason: String)
   case allowed(limits: HarnessDecisionContextLimits)
 }
@@ -26,7 +26,7 @@ package enum HarnessEgressDecision: Equatable, Sendable {
 /// Per-project egress policy. Absent configuration means denied: enabling
 /// egress is an explicit act, recorded in the composition root, never a
 /// default that a fresh install inherits.
-package struct HarnessEgressPolicy: Sendable, Equatable {
+public struct HarnessEgressPolicy: Sendable, Equatable {
   private let enabledProjects: Set<String>
   private let limits: HarnessDecisionContextLimits
 
@@ -38,7 +38,7 @@ package struct HarnessEgressPolicy: Sendable, Equatable {
     self.limits = limits
   }
 
-  package static let deniedByDefault = HarnessEgressPolicy()
+  public static let deniedByDefault = HarnessEgressPolicy()
 
   public func decide(projectRef: String?) -> HarnessEgressDecision {
     guard let projectRef else {
@@ -59,7 +59,7 @@ package enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
 
 /// The port. Implementations return raw bytes; parsing and validation are
 /// the harness's job, so no adapter can widen what a decision may say.
-package protocol HarnessDecisionGateway: Sendable {
+public protocol HarnessDecisionGateway: Sendable {
   var producerID: String { get }
   /// What to record about the model behind this port (CHG-2026-055,
   /// TASK-HFA-002). The default says only what the port itself can know -

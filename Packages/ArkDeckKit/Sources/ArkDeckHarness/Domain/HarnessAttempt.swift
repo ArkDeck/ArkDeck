@@ -17,7 +17,7 @@ package enum HarnessStrategyDescriptorError: Error, Equatable, Sendable {
 /// Target, toolchain and expected readback are one of the seven canonical
 /// strategy elements. They are grouped so the top-level fingerprint shape
 /// remains the reviewed seven-element shape while retaining each exact fact.
-package struct HarnessStrategyExecutionExpectation: Equatable, Sendable, Codable {
+public struct HarnessStrategyExecutionExpectation: Equatable, Sendable, Codable {
   package let targetProfile: String
   package let toolchainProfile: String
   package let expectedNextObservation: String
@@ -37,7 +37,7 @@ package struct HarnessStrategyExecutionExpectation: Equatable, Sendable, Codable
 ///
 /// `hypothesis` prose is deliberately absent. `hypothesisClass` is the
 /// stable machine reason (for example `modelProposal`), not model prose.
-package struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
+public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   /// Explicit non-applicability marker for a task-journey Attempt that exists
   /// before any source-repair strategy. It is a non-claim, never a fabricated
   /// patch or workspace revision.
@@ -103,7 +103,7 @@ package struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessAttemptOutcome: String, CaseIterable, Codable, Sendable {
+public enum HarnessAttemptOutcome: String, CaseIterable, Codable, Sendable {
   case active
   case succeeded
   case failed
@@ -116,7 +116,7 @@ package enum HarnessAttemptOutcome: String, CaseIterable, Codable, Sendable {
   package var isClosed: Bool { self != .active }
 }
 
-package struct HarnessAttempt: Equatable, Sendable, Codable {
+public struct HarnessAttempt: Equatable, Sendable, Codable {
   public static let documentType = "harness-attempt"
   public static let schemaVersion = "2.0.0"
 

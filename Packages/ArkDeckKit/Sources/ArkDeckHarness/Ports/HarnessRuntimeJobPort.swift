@@ -15,7 +15,7 @@
 import ArkDeckCore
 import Foundation
 
-package struct HarnessJobAcceptance: Equatable, Sendable {
+public struct HarnessJobAcceptance: Equatable, Sendable {
   public let jobID: String
   /// True when the engine recognised the idempotency key and returned the
   /// existing job. Recovery depends on this: same key in, same job out,
@@ -28,7 +28,7 @@ package struct HarnessJobAcceptance: Equatable, Sendable {
   }
 }
 
-package struct HarnessJobObservation: Equatable, Sendable {
+public struct HarnessJobObservation: Equatable, Sendable {
   public let jobID: String
   public let state: String
   public let isTerminal: Bool
@@ -68,7 +68,7 @@ package enum HarnessJobPortError: Error, Equatable, Sendable {
   case transportFailure(String)
 }
 
-package protocol HarnessRuntimeJobPort: Sendable {
+public protocol HarnessRuntimeJobPort: Sendable {
   /// Submit a fully typed v2 request. The harness passes bytes it built
   /// from the decision and the durable intent; the engine remains the
   /// validator and the admission authority.

@@ -1,23 +1,23 @@
 import Foundation
 
-package protocol PowerActivityBackend: AnyObject, Sendable {
+public protocol PowerActivityBackend: AnyObject, Sendable {
   func beginIdleSleepPrevention(reason: String) throws -> AnyObject
   func endIdleSleepPrevention(_ activity: AnyObject)
 }
 
 /// `PORT-POWER-001` production backend. It prevents idle system sleep only;
 /// lid closure and explicit user sleep remain outside its guarantee.
-package final class ProcessInfoPowerActivityBackend: PowerActivityBackend, @unchecked Sendable {
+public final class ProcessInfoPowerActivityBackend: PowerActivityBackend, @unchecked Sendable {
   public init() {}
 
-  package func beginIdleSleepPrevention(reason: String) throws -> AnyObject {
+  public func beginIdleSleepPrevention(reason: String) throws -> AnyObject {
     ProcessInfo.processInfo.beginActivity(
       options: [.idleSystemSleepDisabled],
       reason: reason
     ) as AnyObject
   }
 
-  package func endIdleSleepPrevention(_ activity: AnyObject) {
+  public func endIdleSleepPrevention(_ activity: AnyObject) {
     guard let activity = activity as? NSObjectProtocol else { return }
     ProcessInfo.processInfo.endActivity(activity)
   }
@@ -25,7 +25,7 @@ package final class ProcessInfoPowerActivityBackend: PowerActivityBackend, @unch
 
 /// Reference-counts one underlying activity and balances it across explicit
 /// release, lease deinit, operation errors/cancellation, and controller deinit.
-package final class PowerActivityController: @unchecked Sendable {
+public final class PowerActivityController: @unchecked Sendable {
   private let lock = NSLock()
   private let backend: any PowerActivityBackend
   private var activeLeaseIDs: Set<UUID> = []

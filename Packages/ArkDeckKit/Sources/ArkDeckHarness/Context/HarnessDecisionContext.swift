@@ -26,7 +26,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
+public struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
   public let maxAttempts: Int
   package let maxFailures: Int
   package let maxMemories: Int
@@ -74,7 +74,7 @@ package struct HarnessDecisionContextLimits: Equatable, Sendable, Codable {
   public static let `default` = HarnessDecisionContextLimits()
 }
 
-package struct HarnessContextAttempt: Equatable, Sendable, Codable {
+public struct HarnessContextAttempt: Equatable, Sendable, Codable {
   public let round: Int
   public let operationReference: String
   public let outcome: String
@@ -88,7 +88,7 @@ package struct HarnessContextAttempt: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessContextFailure: Equatable, Sendable, Codable {
+public struct HarnessContextFailure: Equatable, Sendable, Codable {
   public let digest: String
   public let operationReference: String
   package let occurrences: Int
@@ -122,7 +122,7 @@ package struct HarnessContextFailure: Equatable, Sendable, Codable {
 /// Facts split by authority. `current` may contain current evaluator PASS
 /// facts and in-scope VERIFIED memory. CANDIDATE memory remains advice in
 /// `relevantMemory` and never crosses this boundary.
-package struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
+public struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
   public let current: [String]
 
   public init(current: [String] = []) {
@@ -139,7 +139,7 @@ package struct HarnessContextConfirmedFacts: Equatable, Sendable, Codable {
 /// prefix. It stays bounded and stays honest: `excerptTruncated` says when the
 /// artifact is longer than what is shown, and an artifact the operator has not
 /// allowed carries no excerpt at all rather than a redacted-looking one.
-package struct HarnessContextArtifact: Equatable, Sendable, Codable {
+public struct HarnessContextArtifact: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
   public let byteCount: Int
@@ -258,7 +258,7 @@ extension HarnessDecisionContext {
 /// A file the task is allowed to change, as the model may see it. Without
 /// this a `proposePatch` is impossible in principle: a unified diff needs the
 /// exact lines it is diffing against.
-package struct HarnessContextSourceFile: Equatable, Sendable, Codable {
+public struct HarnessContextSourceFile: Equatable, Sendable, Codable {
   public let path: String
   public let byteCount: Int
   package let sha256Prefix: String
@@ -314,7 +314,7 @@ package struct HarnessContextActiveAttemptSummary: Equatable, Sendable, Codable 
   }
 }
 
-package struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable {
+public struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable {
   public let operationReference: String
   public let reasonCode: String
 
@@ -330,7 +330,7 @@ package struct HarnessContextUnavailableOperation: Equatable, Sendable, Codable 
   }
 }
 
-package struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
+public struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
   public let workspaceRevision: String?
   package let deployedArtifactDigest: String?
   package let deviceBindingRevision: Int?
@@ -349,7 +349,7 @@ package struct HarnessContextRevisionScope: Equatable, Sendable, Codable {
 /// A bounded semantic view of a deterministic analyzer output. Raw bytes do
 /// not travel; the source Artifact identity, pinned producer, applicable
 /// revision and full content digest do, so the summary remains auditable.
-package struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
+public struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
   package let sourceArtifactIDs: [String]
@@ -402,7 +402,7 @@ package struct HarnessDerivedArtifactSummary: Equatable, Sendable, Codable {
 /// Facts whose authority lives outside the task snapshot but which are safe
 /// and useful in the outbound context. The coordinator rebuilds this value on
 /// every wake; it is never accepted from a model or persisted as task state.
-package struct HarnessContextExecutionState: Equatable, Sendable {
+public struct HarnessContextExecutionState: Equatable, Sendable {
   package let activeAttempt: HarnessAttempt?
   package let currentWorkspaceRevision: String?
   package let currentDeployedArtifactDigest: String?
@@ -454,7 +454,7 @@ package struct HarnessContextExecutionState: Equatable, Sendable {
   }
 }
 
-package struct HarnessContextBudget: Equatable, Sendable, Codable {
+public struct HarnessContextBudget: Equatable, Sendable, Codable {
   package let roundsRemaining: Int
   package let wallClockSecondsRemaining: Int
   package let artifactBytesRemaining: Int
@@ -482,7 +482,7 @@ package struct HarnessContextBudget: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessDecisionContext: Equatable, Sendable, Codable {
+public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision-context"
   public static let schemaVersion = "2.2.0"
 

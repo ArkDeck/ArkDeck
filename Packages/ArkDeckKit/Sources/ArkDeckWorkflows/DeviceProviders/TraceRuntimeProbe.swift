@@ -94,7 +94,7 @@ public struct TraceRuntimeProbeSnapshot: Codable, Sendable, Equatable {
 
 /// Read-only target capability portrait. This never creates a mutation
 /// capability and cannot be used as a substitute for Runtime admission.
-package protocol TraceRuntimeProbing: Sendable {
+public protocol TraceRuntimeProbing: Sendable {
   func probeTraceRuntime(targetID: String) async throws -> TraceRuntimeProbeSnapshot
 }
 

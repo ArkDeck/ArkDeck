@@ -28,7 +28,7 @@ package enum HarnessEvolutionPolicyError: Error, Equatable, Sendable {
 
 /// The exploration envelope.  It narrows an existing task policy; it is not
 /// a RuntimeCapability and can never authorize a device effect by itself.
-package struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
+public struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
   package let baseRevision: String
   public let allowedPaths: [String]
   public let maxAttempts: Int
@@ -212,7 +212,7 @@ package struct HarnessEvolutionPolicy: Equatable, Codable, Sendable {
 
 /// Opaque reference to a provider-owned isolated tree.  The host path never
 /// enters task JSON or model context.
-package struct HarnessEvolutionWorkspace: Equatable, Codable, Sendable {
+public struct HarnessEvolutionWorkspace: Equatable, Codable, Sendable {
   package let workspaceID: String
   package let htaskID: String
   package let sourceProjectRef: String
@@ -240,7 +240,7 @@ package struct HarnessEvolutionWorkspace: Equatable, Codable, Sendable {
   }
 }
 
-package protocol HarnessEvolutionWorkspacePort: Sendable {
+public protocol HarnessEvolutionWorkspacePort: Sendable {
   /// Creates or idempotently reopens the task-owned isolated tree and returns
   /// only its opaque provider reference.  It must never return a host path.
   func prepareWorkspace(
@@ -289,7 +289,7 @@ package enum HarnessEvolutionWorkspaceRetentionError: Error, Equatable, Sendable
 /// Bounds for the terminal-workspace sweep. The policy can only choose how
 /// long destroyed-eligible trees linger; it cannot widen the sweep to active
 /// or unknown workspaces.
-package struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable {
+public struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable {
   /// A terminal task's tree is destroyed only after its last transition is
   /// at least this old.
   package let minimumTerminalAgeSeconds: Int
@@ -319,7 +319,7 @@ package struct HarnessEvolutionWorkspaceRetention: Equatable, Codable, Sendable 
 /// authoritative lifecycle and its last transition time. Terminal lifecycles
 /// are absorbing, so a reference computed before the sweep cannot go stale in
 /// the destructive direction.
-package struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Sendable {
+public struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Sendable {
   package let workspaceID: String
   package let htaskID: String
   public let lifecycle: HarnessTaskLifecycle
@@ -338,7 +338,7 @@ package struct HarnessEvolutionWorkspaceGCTaskReference: Equatable, Codable, Sen
   }
 }
 
-package enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codable, Sendable {
+public enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codable, Sendable {
   /// The owning task is not terminal; recoverability is untouched.
   case activeRetained
   /// Terminal, but inside the retention window (age or latest-count).
@@ -354,7 +354,7 @@ package enum HarnessEvolutionWorkspaceGCDisposition: String, CaseIterable, Codab
   case unknownTaskRetained
 }
 
-package struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable {
+public struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable {
   package let workspaceID: String
   package let htaskID: String?
   public let disposition: HarnessEvolutionWorkspaceGCDisposition
@@ -375,13 +375,13 @@ package struct HarnessEvolutionWorkspaceGCFinding: Equatable, Codable, Sendable 
   }
 }
 
-package enum HarnessCandidatePatchCreator: String, Codable, Sendable {
+public enum HarnessCandidatePatchCreator: String, Codable, Sendable {
   case agent
   case human
 }
 
 /// Metadata Artifact for the immutable diff Artifact used by applyPatch.
-package struct HarnessCandidatePatch: Equatable, Codable, Sendable {
+public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
   public static let documentType = "harness-candidate-patch"
   public static let schemaVersion = "1.0.0"
 
@@ -515,7 +515,7 @@ extension HarnessPromotionGateFailure {
   }
 }
 
-package struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
+public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   public static let documentType = "harness-promotion-candidate"
   public static let schemaVersion = "1.0.0"
 

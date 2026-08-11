@@ -10,7 +10,7 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-package struct RuntimeJobRecord: Codable, Sendable, Equatable {
+public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let jobID: String
   public let request: RuntimeOperationRequest
   public let operationReference: String

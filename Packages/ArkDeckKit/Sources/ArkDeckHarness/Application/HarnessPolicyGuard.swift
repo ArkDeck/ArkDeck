@@ -21,12 +21,12 @@
 import ArkDeckCore
 import Foundation
 
-package protocol HarnessOperationAvailabilityPort: Sendable {
+public protocol HarnessOperationAvailabilityPort: Sendable {
   /// Machine-readable availability for one operation reference.
   func availability(of reference: String) async -> (available: Bool, reason: String)
 }
 
-package protocol HarnessCapabilityPort: Sendable {
+public protocol HarnessCapabilityPort: Sendable {
   /// Is there an installed, unexpired capability that covers this operation
   /// on this target? The harness never mints, drafts or installs one - it
   /// only asks (HTP-INV-6).
@@ -64,7 +64,7 @@ extension HarnessCapabilityPort {
   ) async -> String? { nil }
 }
 
-package struct HarnessGuardInput: Sendable {
+public struct HarnessGuardInput: Sendable {
   public let snapshot: HarnessTaskSnapshot
   public let operationReference: String
   public let inputs: [String: JSONValue]
@@ -98,7 +98,7 @@ package struct HarnessGuardInput: Sendable {
   }
 }
 
-package struct HarnessPolicyGuard: Sendable {
+public struct HarnessPolicyGuard: Sendable {
   private let availability: (any HarnessOperationAvailabilityPort)?
   private let capabilities: (any HarnessCapabilityPort)?
 

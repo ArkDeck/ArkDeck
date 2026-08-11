@@ -19,14 +19,14 @@
 import ArkDeckCore
 import Foundation
 
-package enum HarnessEvaluationVerdict: String, CaseIterable, Codable, Sendable {
+public enum HarnessEvaluationVerdict: String, CaseIterable, Codable, Sendable {
   case pass
   case fail
   case inconclusive
   case error
 }
 
-package enum HarnessInconclusivePolicy: String, CaseIterable, Codable, Sendable {
+public enum HarnessInconclusivePolicy: String, CaseIterable, Codable, Sendable {
   /// Spend another round collecting evidence, budget permitting.
   case collectMoreEvidence
   /// Stop and ask a human; more of the same evidence will not decide it.
@@ -37,14 +37,14 @@ package enum HarnessInconclusivePolicy: String, CaseIterable, Codable, Sendable 
 
 /// How a metric accumulates across rounds. Declared per metric so the
 /// merge is a table, not a guess at the call site.
-package enum HarnessMetricKind: String, CaseIterable, Codable, Sendable {
+public enum HarnessMetricKind: String, CaseIterable, Codable, Sendable {
   /// Summed across rounds: crash counts, fatal counts.
   case counter
   /// Replaced by the newest observation: liveness, latest signature.
   case latest
 }
 
-package struct HarnessCriterionResult: Equatable, Sendable, Codable {
+public struct HarnessCriterionResult: Equatable, Sendable, Codable {
   package let criterionID: String
   public let verdict: HarnessEvaluationVerdict
   package let metric: String
@@ -89,7 +89,7 @@ package struct HarnessCriterionResult: Equatable, Sendable, Codable {
 /// One verified artifact as the evaluator sees it. `verified` means the
 /// bytes were read in full and their SHA-256 matched what the artifact
 /// store recorded - not that a file exists.
-package struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
+public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   public let artifactID: String
   public let name: String
   public let byteCount: Int
@@ -192,7 +192,7 @@ package struct HarnessRoundObservation: Equatable, Sendable, Codable {
 /// Cumulative observed state, and the only writer of it is an observation
 /// or an evaluation (enforced by the reducer). A decision cannot describe
 /// the world into existence.
-package struct HarnessObservedState: Equatable, Sendable, Codable {
+public struct HarnessObservedState: Equatable, Sendable, Codable {
   package static let measurementsKey = "measurements"
   package static let samplesKey = "samples"
   package static let verdictKey = "latestVerdict"
@@ -313,7 +313,7 @@ package struct HarnessObservedState: Equatable, Sendable, Codable {
   }
 }
 
-package struct HarnessEvaluation: Equatable, Sendable, Codable {
+public struct HarnessEvaluation: Equatable, Sendable, Codable {
   public static let documentType = "harness-evaluation"
   public static let schemaVersion = "1.0.0"
 
