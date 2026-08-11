@@ -59,7 +59,7 @@ package struct AnalyzerProfile: Sendable, Equatable {
   }
 }
 
-package struct AnalyzerInvocation: Sendable, Equatable, Codable {
+public struct AnalyzerInvocation: Sendable, Equatable, Codable {
   package let analyzerRef: String
   package let analyzerVersion: String
   public let executableSHA256: String
@@ -70,7 +70,7 @@ package struct AnalyzerInvocation: Sendable, Equatable, Codable {
   package let sourceByteCount: Int
 }
 
-package enum AnalyzerProviderAction: Sendable, Equatable, Codable {
+public enum AnalyzerProviderAction: Sendable, Equatable, Codable {
   case analyze(AnalyzerInvocation)
 }
 

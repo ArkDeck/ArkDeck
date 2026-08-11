@@ -50,43 +50,43 @@ public enum HarnessDecisionKind: String, CaseIterable, Codable, Sendable {
 /// which is what makes HTP-INV-1 structural instead of advisory.
 public struct HarnessDecision: Equatable, Sendable, Codable {
   public static let documentType = "harness-decision"
-  package static let envelopeVersion = "2.0.0"
+  public static let envelopeVersion = "2.0.0"
 
   public let documentType: String
-  package let envelopeVersion: String
-  package let decisionID: String
-  package let htaskID: String
+  public let envelopeVersion: String
+  public let decisionID: String
+  public let htaskID: String
   public let round: Int
   public let kind: HarnessDecisionKind
   public let operationReference: String?
   public let inputs: [String: JSONValue]
-  package let patchProposal: HarnessPatchProposal?
+  public let patchProposal: HarnessPatchProposal?
   /// Stable prerequisite identities and expected readback. They are data for
   /// strategy identity only; neither may carry bytes, paths or commands.
-  package let requiredArtifacts: [String]
-  package let expectedObservation: String?
-  package let hypothesis: String
+  public let requiredArtifacts: [String]
+  public let expectedObservation: String?
+  public let hypothesis: String
   public let reasonCode: String
-  package let producer: String
+  public let producer: String
   public let createdAtUTC: String
   /// The task state version the producer read (CHG-2026-055, TASK-HFA-002).
-  package let observedStateVersion: Int
+  public let observedStateVersion: Int
   /// Digest of `HarnessDecisionBasis` at proposal time. This describes the
   /// Harness facts used to plan. The digest of bytes a model actually received
   /// is `contextDigest`; the two answer different questions and never alias.
-  package let basisDigest: String
+  public let basisDigest: String
   /// Strategy identity is Harness-owned. `nil` is valid only before a repair
   /// strategy exists (for example the initial read-only target observation).
   public let attemptID: String?
   /// A model-backed decision links to the exact durable run and the digest of
   /// the bytes actually transmitted. Deterministic decisions carry neither.
-  package let modelRunID: String?
-  package let contextDigest: String?
+  public let modelRunID: String?
+  public let contextDigest: String?
   /// Explicit execution preconditions. Applicability is operation-specific;
   /// an unrelated dimension is represented by `nil`, not a wildcard string.
-  package let expectedWorkspaceRevision: String?
+  public let expectedWorkspaceRevision: String?
   public let expectedDeployedArtifactDigest: String?
-  package let expectedBindingRevision: Int?
+  public let expectedBindingRevision: Int?
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -201,7 +201,7 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   /// derivation rather than a mutable field so a producer cannot forge a
   /// basis it did not observe: the coordinator stamps it, from the snapshot
   /// it loaded, on the way out of planning.
-  package func stamped(
+  public func stamped(
     with basis: HarnessDecisionBasis,
     attemptID: String? = nil,
     expectedWorkspaceRevision: String? = nil,
@@ -240,17 +240,17 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let schemaVersion: String
-  package let htaskID: String
+  public let htaskID: String
   public let round: Int
-  package let decisionID: String
+  public let decisionID: String
   public let attemptID: String?
-  package let modelRunID: String?
+  public let modelRunID: String?
   public let operationReference: String
   public let targetID: String
-  package let expectedBindingRevision: Int?
-  package let expectedWorkspaceRevision: String?
+  public let expectedBindingRevision: Int?
+  public let expectedWorkspaceRevision: String?
   public let expectedDeployedArtifactDigest: String?
-  package let inputsDigestSHA256: String
+  public let inputsDigestSHA256: String
   public let requestID: String
   public let idempotencyKey: String
   public let state: HarnessDispatchState
@@ -397,11 +397,11 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
   }
 
-  package var isExecutableUnderCurrentSchema: Bool {
+  public var isExecutableUnderCurrentSchema: Bool {
     schemaVersion == Self.schemaVersion
   }
 
-  package func withState(
+  public func withState(
     _ state: HarnessDispatchState,
     jobID: String? = nil,
     atUTC: String
@@ -451,7 +451,7 @@ package enum HarnessRequestIdentity {
   }
 }
 
-package enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
+public enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
   case malformedTargetID
   case emptyGoal
   case emptyAllowedOperations
@@ -473,14 +473,14 @@ package enum HarnessTaskSubmissionError: Error, Equatable, Sendable {
 /// `intakeDescription`; everything the loop executes on is typed.
 public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
   public let type: HarnessTaskType
-  package let intakeDescription: String?
+  public let intakeDescription: String?
   public let projectRef: String?
   public let target: HarnessTaskTargetReference
   public let goal: HarnessTaskGoal
-  package let successCriteria: [HarnessSuccessCriterion]
-  package let budgets: HarnessTaskBudgets
+  public let successCriteria: [HarnessSuccessCriterion]
+  public let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
-  package let evolutionPolicy: HarnessEvolutionPolicy?
+  public let evolutionPolicy: HarnessEvolutionPolicy?
 
   public init(
     type: HarnessTaskType,
@@ -506,7 +506,7 @@ public struct HarnessTaskSubmission: Equatable, Sendable, Codable {
 
   /// Workspace isolation is a fact derived from the typed policy envelope. It is not a
   /// caller-selectable execution mode.
-  package var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
+  public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
 
   public func validate(permittedOperations: Set<String>) throws {
     let targetID = target.targetID

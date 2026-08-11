@@ -9,7 +9,7 @@ import Foundation
 // `partition-mapping.json` (`965e3bf3…`) and FA-001 §2; they are pinned data, not policy
 // this file may relax.
 
-package enum RockchipFlashProfileError: Error, Equatable, Sendable {
+public enum RockchipFlashProfileError: Error, Equatable, Sendable {
   case invalidProfileDefinition(String)
 }
 
@@ -339,7 +339,7 @@ package struct RockchipImagesArchiveObservation: Equatable, Sendable {
   }
 }
 
-package enum RockchipArchiveViolation: Equatable, Sendable, CustomStringConvertible {
+public enum RockchipArchiveViolation: Equatable, Sendable, CustomStringConvertible {
   case archiveSizeMismatch(expected: Int64, observed: Int64)
   case archiveHashMismatch(expected: String, observed: String)
   case duplicateMember(name: String)

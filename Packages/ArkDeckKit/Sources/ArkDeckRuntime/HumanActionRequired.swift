@@ -1,7 +1,7 @@
 import ArkDeckCore
 import Foundation
 
-package enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
+public enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
   case physicalConnection
   case deviceTrustPrompt
   case osPermission
@@ -12,7 +12,7 @@ package enum HumanActionCategory: String, CaseIterable, Codable, Sendable {
   case governanceApproval
 }
 
-package enum HumanActionStatus: String, CaseIterable, Codable, Sendable {
+public enum HumanActionStatus: String, CaseIterable, Codable, Sendable {
   case waiting
   case resolvedByFreshProbe
   case expired
@@ -38,7 +38,7 @@ package enum HumanActionProhibitedAutomation: String, CaseIterable, Codable, Sen
   case selfApproval
 }
 
-package struct HumanActionFreshProbeResolution: Equatable, Sendable, Codable {
+public struct HumanActionFreshProbeResolution: Equatable, Sendable, Codable {
   package let probeOperationID: HumanActionResumeProbeOperation
   package let probeReceiptID: String
   package let observedAtUTC: String
@@ -72,13 +72,13 @@ package struct HumanActionFreshProbeResolution: Equatable, Sendable, Codable {
   }
 }
 
-package enum HumanActionRequiredError: Error, Equatable, Sendable {
+public enum HumanActionRequiredError: Error, Equatable, Sendable {
   case malformed(path: String)
   case invalidMapping(category: HumanActionCategory)
   case invalidTransition
 }
 
-package struct HumanActionRequired: Equatable, Sendable, Codable {
+public struct HumanActionRequired: Equatable, Sendable, Codable {
   public static let documentType = "humanActionRequired"
   public static let schemaVersion = "1.0.0"
 

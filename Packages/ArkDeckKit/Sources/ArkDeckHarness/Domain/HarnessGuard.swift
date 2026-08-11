@@ -52,12 +52,12 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
 /// operation, inputs, phase and error class are the same failure.
 public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   public let operationReference: String
-  package let phase: HarnessTaskStage
+  public let phase: HarnessTaskStage
   public let providerID: String
-  package let targetProfile: String
-  package let normalizedInputsSHA256: String
-  package let errorClassification: String
-  package let semanticErrorCode: String
+  public let targetProfile: String
+  public let normalizedInputsSHA256: String
+  public let errorClassification: String
+  public let semanticErrorCode: String
 
   enum CodingKeys: String, CodingKey {
     case operationReference
@@ -102,7 +102,7 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   /// Semantic build/test/revision failures cannot become action retries. The
   /// same bytes or command against the same facts will not improve; the next
   /// decision must change strategy (TASK-HFA-003).
-  package var retryDisposition: HarnessFailureRetryDisposition {
+  public var retryDisposition: HarnessFailureRetryDisposition {
     switch errorClassification {
     case "BUILD_SEMANTIC_FAILURE", "TEST_FAILURE", "WORKSPACE_REVISION_CONFLICT":
       return .alternativeRequired
@@ -119,7 +119,7 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
 
   /// Typed next directions, never executable text. They explain what must
   /// change when the same action is not a valid retry.
-  package var alternativeHints: [String] {
+  public var alternativeHints: [String] {
     switch errorClassification {
     case "BUILD_SEMANTIC_FAILURE":
       return ["inspectBuildFailure", "changePatchStrategy", "changeToolchainPreset"]
@@ -157,7 +157,7 @@ public enum HarnessRetryStance: String, CaseIterable, Codable, Sendable {
   /// Third and beyond: the harness stops. Repetition is not a plan.
   case prohibited
 
-  package static func stance(forOccurrences occurrences: Int) -> HarnessRetryStance {
+  public static func stance(forOccurrences occurrences: Int) -> HarnessRetryStance {
     switch occurrences {
     case ..<1: return .allowSameStrategy
     case 1: return .allowSameStrategy
@@ -172,16 +172,16 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let digest: String
-  package let fingerprint: HarnessFailureFingerprint
-  package let occurrences: Int
-  package let firstSeenUTC: String
-  package let lastSeenUTC: String
-  package let lastReasonCode: String
-  package let retryDisposition: HarnessFailureRetryDisposition
-  package let alternativeHints: [String]
+  public let fingerprint: HarnessFailureFingerprint
+  public let occurrences: Int
+  public let firstSeenUTC: String
+  public let lastSeenUTC: String
+  public let lastReasonCode: String
+  public let retryDisposition: HarnessFailureRetryDisposition
+  public let alternativeHints: [String]
   /// Task ids that hit this failure. Cross-task on purpose: the second task
   /// to try the same doomed thing should not have to rediscover it.
-  package let observedByTasks: [String]
+  public let observedByTasks: [String]
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -241,11 +241,11 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
     self.observedByTasks = try container.decode([String].self, forKey: .observedByTasks)
   }
 
-  package var stance: HarnessRetryStance {
+  public var stance: HarnessRetryStance {
     HarnessRetryStance.stance(forOccurrences: occurrences)
   }
 
-  package func recording(taskID: String, reasonCode: String, atUTC: String) -> HarnessFailureRecord {
+  public func recording(taskID: String, reasonCode: String, atUTC: String) -> HarnessFailureRecord {
     HarnessFailureRecord(
       fingerprint: fingerprint,
       occurrences: occurrences + 1,
@@ -264,8 +264,8 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
 /// new strategy.
 public struct HarnessStrategySignature: Equatable, Sendable, Codable {
   public let operationReference: String
-  package let inputsDigest: String
-  package let phase: HarnessTaskStage
+  public let inputsDigest: String
+  public let phase: HarnessTaskStage
 
   public init(operationReference: String, inputsDigest: String, phase: HarnessTaskStage) {
     self.operationReference = operationReference
@@ -376,7 +376,7 @@ public enum HarnessGuardRefusal: Equatable, Sendable {
 
   /// Whether the refusal is a stop for a human, and which human action it
   /// corresponds to. `nil` means the loop may still change strategy.
-  package var humanCategory: HarnessHumanBlock? {
+  public var humanCategory: HarnessHumanBlock? {
     switch self {
     case .authorizationRequired, .destructiveEffectNeverAutomated:
       return .authorizationApproval
@@ -395,7 +395,7 @@ public enum HarnessGuardRefusal: Equatable, Sendable {
 /// onto the closed `HumanActionRequired` category vocabulary; the rest carry
 /// a status and a reason code, because inventing a category would put an
 /// untrue minimum-action into an evidence-grade document.
-package enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
+public enum HarnessHumanBlock: String, CaseIterable, Codable, Sendable {
   case authorizationApproval
   case outcomeUnknown
   case strategyExhausted

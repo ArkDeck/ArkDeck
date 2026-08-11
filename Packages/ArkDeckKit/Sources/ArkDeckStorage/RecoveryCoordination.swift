@@ -16,8 +16,8 @@ public struct SupersededRecoveryIntent: Codable, Equatable, Sendable {
   public let intentEventID: String
   public let operationReference: String
   public let profileReference: String
-  package let observedAtUTC: String
-  package let possibleEffects: [String]
+  public let observedAtUTC: String
+  public let possibleEffects: [String]
 
   public init(
     jobID: String, intentEventID: String, operationReference: String,
@@ -95,26 +95,26 @@ package struct SupersedingRecoveryEpochDraft: Equatable, Sendable {
 /// journals; admission consults this independent relation instead of rewriting
 /// or guessing their historical result.
 public struct SupersedingRecoveryEpoch: Codable, Equatable, Sendable {
-  package let epochID: String
+  public let epochID: String
   public let source: SupersedingRecoverySource
-  package let stableTargetIdentitySHA256: String
+  public let stableTargetIdentitySHA256: String
   public let bindingRevision: Int
-  package let coveredIntents: [SupersededRecoveryIntent]
-  package let uncertainEffectSetSHA256: String
-  package let coverageContractVersion: String
-  package let coveredEffectSetSHA256: String
-  package let recoveryJobID: String
-  package let recoveryIntentEventID: String
+  public let coveredIntents: [SupersededRecoveryIntent]
+  public let uncertainEffectSetSHA256: String
+  public let coverageContractVersion: String
+  public let coveredEffectSetSHA256: String
+  public let recoveryJobID: String
+  public let recoveryIntentEventID: String
   public let operationReference: String
   public let profileReference: String
-  package let materializedPlanDigestSHA256: String
+  public let materializedPlanDigestSHA256: String
   public let artifactSHA256: String
   public let providerExecutableSHA256: String
-  package let confirmedStepIDs: [String]
-  package let resultingTargetEpochSHA256: String
-  package let establishedAtUTC: String
-  package let previousEpochSHA256: String?
-  package let epochSHA256: String
+  public let confirmedStepIDs: [String]
+  public let resultingTargetEpochSHA256: String
+  public let establishedAtUTC: String
+  public let previousEpochSHA256: String?
+  public let epochSHA256: String
 
   public func covers(
     jobID: String, intentEventID: String,
@@ -128,7 +128,7 @@ public struct SupersedingRecoveryEpoch: Codable, Equatable, Sendable {
   }
 }
 
-package enum SupersedingRecoveryStoreError: Error, Equatable, Sendable {
+public enum SupersedingRecoveryStoreError: Error, Equatable, Sendable {
   case corrupt(String)
   case invalidEpoch(String)
   case conflictingEpoch(String)
@@ -719,11 +719,11 @@ package protocol StorageClaimReleasing: Sendable {
   func ensureStorageClaimReleased() throws -> ResourceReleaseDisposition
 }
 
-package enum RecoveryResourceReleaseError: Error, Equatable, Sendable {
+public enum RecoveryResourceReleaseError: Error, Equatable, Sendable {
   case releaseNotDurablyAuthorized
 }
 
-package enum RecoveryAbandonmentContinuationError: Error, Equatable, Sendable {
+public enum RecoveryAbandonmentContinuationError: Error, Equatable, Sendable {
   case noPendingAbandonment
   case identityMismatch
   case confirmationMismatch

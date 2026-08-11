@@ -1,6 +1,6 @@
 import Foundation
 
-package enum UpdateNetworkError: Error, Equatable, Sendable {
+public enum UpdateNetworkError: Error, Equatable, Sendable {
   case invalidInitialURL
   case invalidRequest
   case invalidResponse
@@ -25,7 +25,7 @@ package enum UpdateNetworkContract {
 
 public struct UpdateProductIdentity: Equatable, Sendable {
   public let appVersion: String
-  package let osVersion: String
+  public let osVersion: String
   public let architecture: String
 
   public init(appVersion: String, osVersion: String, architecture: String) {

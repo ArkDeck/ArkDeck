@@ -6,7 +6,7 @@ import Foundation
 // MaintainerMergedAuthorizationResolver can combine them with protected-main provenance and
 // mint a VerifiedAuthorizationGrant.
 
-package enum RockchipStandingAuthorizationParseError: Error, Equatable, Sendable {
+public enum RockchipStandingAuthorizationParseError: Error, Equatable, Sendable {
   case invalidJSON(String)
   case unsupportedSchemaVersion(String)
   case closedShapeViolation(String)

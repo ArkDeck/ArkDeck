@@ -10,13 +10,13 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum HarnessMemoryScope: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemoryScope: String, CaseIterable, Codable, Sendable {
   case task
   case project
   case failure
 }
 
-package enum HarnessMemoryKind: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemoryKind: String, CaseIterable, Codable, Sendable {
   case fact
   case attempt
   case observation
@@ -26,7 +26,7 @@ package enum HarnessMemoryKind: String, CaseIterable, Codable, Sendable {
 
 /// Where a memory came from. Project memory requires `evaluated` or
 /// `humanConfirmed`; nothing else may be promoted.
-package enum HarnessMemoryConfidence: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemoryConfidence: String, CaseIterable, Codable, Sendable {
   case observed
   case evaluated
   case humanConfirmed
@@ -45,12 +45,12 @@ public enum HarnessMemoryLifecycle: String, CaseIterable, Codable, Sendable {
   case invalidated = "INVALIDATED"
 }
 
-package enum HarnessMemoryVerificationSource: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemoryVerificationSource: String, CaseIterable, Codable, Sendable {
   case evaluatorPass = "EVALUATOR_PASS"
   case humanConfirmation = "HUMAN_CONFIRMATION"
 }
 
-package struct HarnessMemoryVerification: Equatable, Sendable, Codable {
+public struct HarnessMemoryVerification: Equatable, Sendable, Codable {
   public let source: HarnessMemoryVerificationSource
   /// A required, durable evaluation or human-action identity. Free text is
   /// never a promotion receipt.
@@ -77,7 +77,7 @@ package struct HarnessMemoryVerification: Equatable, Sendable, Codable {
 /// Exact revisions in which a memory is valid. An empty set is deliberately
 /// unusable rather than a wildcard: missing revision evidence cannot grant a
 /// cross-revision fact.
-package struct HarnessMemoryRevisionScope: Equatable, Sendable, Codable {
+public struct HarnessMemoryRevisionScope: Equatable, Sendable, Codable {
   package let exactRevisions: [String]
 
   public init(exactRevisions: [String]) {
@@ -99,7 +99,7 @@ package struct HarnessMemoryRevisionScope: Equatable, Sendable, Codable {
 /// Closed applicability dimensions. Filtering is conjunctive: every
 /// non-empty dimension on a project memory must find an exact match in the
 /// current query before ranking begins.
-package struct HarnessMemoryApplicability: Equatable, Sendable, Codable {
+public struct HarnessMemoryApplicability: Equatable, Sendable, Codable {
   public let component: String?
   public let symbols: [String]
   package let filePaths: [String]
@@ -140,7 +140,7 @@ package struct HarnessMemoryApplicability: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessMemoryInvalidationKind: String, CaseIterable, Codable, Sendable {
+public enum HarnessMemoryInvalidationKind: String, CaseIterable, Codable, Sendable {
   case revisionLeavesScope = "REVISION_LEAVES_SCOPE"
   case deviceProfileLeavesScope = "DEVICE_PROFILE_LEAVES_SCOPE"
   case toolchainProfileLeavesScope = "TOOLCHAIN_PROFILE_LEAVES_SCOPE"
@@ -148,7 +148,7 @@ package enum HarnessMemoryInvalidationKind: String, CaseIterable, Codable, Senda
   case manualRevocation = "MANUAL_REVOCATION"
 }
 
-package struct HarnessMemoryInvalidationCondition: Equatable, Sendable, Codable {
+public struct HarnessMemoryInvalidationCondition: Equatable, Sendable, Codable {
   public let kind: HarnessMemoryInvalidationKind
   package let expectedValues: [String]
 
@@ -158,7 +158,7 @@ package struct HarnessMemoryInvalidationCondition: Equatable, Sendable, Codable 
   }
 }
 
-package struct HarnessMemoryEvidence: Equatable, Sendable, Codable {
+public struct HarnessMemoryEvidence: Equatable, Sendable, Codable {
   package let jobIDs: [String]
   /// Durable dispatch-intent request identities. A refused admission produces
   /// no job and no artifact, but the intent record is real evidence - and
@@ -230,7 +230,7 @@ package struct HarnessMemoryEvidence: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessMemoryError: Error, Equatable, Sendable {
+public enum HarnessMemoryError: Error, Equatable, Sendable {
   case evidenceRequired(HarnessMemoryScope)
   case promotionRequiresVerifiedConfidence(HarnessMemoryConfidence)
   case projectScopeRequiresProjectRef
@@ -241,7 +241,7 @@ package enum HarnessMemoryError: Error, Equatable, Sendable {
   case lifecycleTransitionNotAllowed(from: HarnessMemoryLifecycle, to: HarnessMemoryLifecycle)
 }
 
-package struct HarnessMemoryEntry: Equatable, Sendable, Codable {
+public struct HarnessMemoryEntry: Equatable, Sendable, Codable {
   public static let documentType = "harness-memory-entry"
   public static let schemaVersion = "2.0.0"
 
@@ -560,10 +560,10 @@ public enum HarnessMemorySelectionReason: String, CaseIterable, Codable, Sendabl
 }
 
 public struct HarnessMemorySelectionRecord: Equatable, Sendable, Codable {
-  package let memoryID: String
+  public let memoryID: String
   public let lifecycle: HarnessMemoryLifecycle
-  package let contentDigest: String
-  package let score: Int
+  public let contentDigest: String
+  public let score: Int
   public let reason: HarnessMemorySelectionReason
 
   enum CodingKeys: String, CodingKey {
@@ -576,14 +576,14 @@ public struct HarnessMemorySelectionRecord: Equatable, Sendable, Codable {
 }
 
 public struct HarnessMemorySelectionManifest: Equatable, Sendable, Codable {
-  package static let currentTaskEvidenceScore = 1_000
+  public static let currentTaskEvidenceScore = 1_000
 
-  package let queryDigest: String
-  package let currentEvidenceScore: Int
+  public let queryDigest: String
+  public let currentEvidenceScore: Int
   public let selected: [HarnessMemorySelectionRecord]
-  package let excludedLifecycleCount: Int
-  package let excludedScopeCount: Int
-  package let trimmedCount: Int
+  public let excludedLifecycleCount: Int
+  public let excludedScopeCount: Int
+  public let trimmedCount: Int
 
   public init(
     queryDigest: String,

@@ -8,7 +8,7 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-package enum HarnessTaskStoreError: Error, Equatable, Sendable {
+public enum HarnessTaskStoreError: Error, Equatable, Sendable {
   case malformedTaskID(String)
   case ioFailure(String)
   case notFound(String)
@@ -50,7 +50,7 @@ public actor HarnessTaskStore {
     }
   }
 
-  package static func isWellFormed(taskID: String) -> Bool {
+  public static func isWellFormed(taskID: String) -> Bool {
     isWellFormedStoreID(taskID, prefix: "HTASK-", minimumCount: 8)
   }
 
@@ -88,7 +88,7 @@ public actor HarnessTaskStore {
 
   // MARK: - Round records
 
-  package func putDecision(_ decision: HarnessDecision) throws {
+  public func putDecision(_ decision: HarnessDecision) throws {
     try ensureSQLiteTask(decision.htaskID)
     try repository.putDecision(decision)
   }
@@ -98,7 +98,7 @@ public actor HarnessTaskStore {
     return try repository.decision(taskID, round: round)
   }
 
-  package func putIntent(_ intent: HarnessDispatchIntent) throws {
+  public func putIntent(_ intent: HarnessDispatchIntent) throws {
     try ensureSQLiteTask(intent.htaskID)
     try repository.putIntent(intent)
   }
@@ -108,7 +108,7 @@ public actor HarnessTaskStore {
     return try repository.intent(taskID, round: round)
   }
 
-  package func intents(_ taskID: String) throws -> [HarnessDispatchIntent] {
+  public func intents(_ taskID: String) throws -> [HarnessDispatchIntent] {
     try ensureSQLiteTask(taskID)
     return try repository.intents(taskID)
   }
@@ -117,20 +117,20 @@ public actor HarnessTaskStore {
   /// anything new. `rejected` is excluded on purpose: the engine refused
   /// it, zero side effect happened, and re-submitting an identical request
   /// would be refused again.
-  package func unresolvedIntents(_ taskID: String) throws -> [HarnessDispatchIntent] {
+  public func unresolvedIntents(_ taskID: String) throws -> [HarnessDispatchIntent] {
     try intents(taskID).filter { $0.state == .pending || $0.state == .submitted }
   }
 
   // MARK: - Strategy attempts (TASK-HFA-004)
 
-  package static func isWellFormed(attemptID: String) -> Bool {
+  public static func isWellFormed(attemptID: String) -> Bool {
     isWellFormedStoreID(attemptID, prefix: "ATTEMPT-")
   }
 
   /// Append an immutable attempt event. The event log is the truth; each
   /// event carries the complete resulting Attempt, so a torn final append is
   /// ignored and no separate mutable cache can diverge from it.
-  package func recordAttempt(
+  public func recordAttempt(
     _ attempt: HarnessAttempt,
     kind: HarnessAttemptEventKind,
     reasonCode: String
@@ -142,7 +142,7 @@ public actor HarnessTaskStore {
     try repository.recordAttempt(attempt, kind: kind, reasonCode: reasonCode)
   }
 
-  package func attemptEvents(_ taskID: String) throws -> [HarnessAttemptEvent] {
+  public func attemptEvents(_ taskID: String) throws -> [HarnessAttemptEvent] {
     try ensureSQLiteTask(taskID)
     return try repository.attemptEvents(taskID)
   }
@@ -157,14 +157,14 @@ public actor HarnessTaskStore {
   /// A model run id is a file name, so its grammar excludes separators for
   /// the same reason an evaluation id does: a record cannot be written
   /// outside its own task directory (CHG-2026-055, TASK-HFA-002).
-  package static func isWellFormed(modelRunID: String) -> Bool {
+  public static func isWellFormed(modelRunID: String) -> Bool {
     isWellFormedStoreID(modelRunID, prefix: "MRUN-")
   }
 
   /// Several runs can belong to one round - a refused proposal is still a
   /// call that happened - so they are files under the round, not one file
   /// per round that a later run would overwrite.
-  package func putModelRun(_ run: HarnessModelRun) throws {
+  public func putModelRun(_ run: HarnessModelRun) throws {
     guard Self.isWellFormed(modelRunID: run.modelRunID) else {
       throw HarnessTaskStoreError.corrupt("malformed model run id \(run.modelRunID)")
     }
@@ -172,7 +172,7 @@ public actor HarnessTaskStore {
     try repository.putModelRun(run)
   }
 
-  package func modelRuns(_ taskID: String) throws -> [HarnessModelRun] {
+  public func modelRuns(_ taskID: String) throws -> [HarnessModelRun] {
     try ensureSQLiteTask(taskID)
     return try repository.modelRuns(taskID)
   }
@@ -182,11 +182,11 @@ public actor HarnessTaskStore {
   /// Evaluations are immutable records: the id is the file name and its
   /// grammar excludes separators, so an evaluation cannot be written outside
   /// its own task directory.
-  package static func isWellFormed(evaluationID: String) -> Bool {
+  public static func isWellFormed(evaluationID: String) -> Bool {
     isWellFormedStoreID(evaluationID, prefix: "EVAL-")
   }
 
-  package func putEvaluation(_ evaluation: HarnessEvaluation) throws {
+  public func putEvaluation(_ evaluation: HarnessEvaluation) throws {
     guard Self.isWellFormed(evaluationID: evaluation.evaluationID) else {
       throw HarnessTaskStoreError.corrupt("malformed evaluation id \(evaluation.evaluationID)")
     }
@@ -194,7 +194,7 @@ public actor HarnessTaskStore {
     try repository.putEvaluation(evaluation)
   }
 
-  package func evaluation(_ taskID: String, evaluationID: String) throws -> HarnessEvaluation? {
+  public func evaluation(_ taskID: String, evaluationID: String) throws -> HarnessEvaluation? {
     guard Self.isWellFormed(evaluationID: evaluationID) else {
       throw HarnessTaskStoreError.corrupt("malformed evaluation id \(evaluationID)")
     }
@@ -212,14 +212,14 @@ public actor HarnessTaskStore {
   /// Failure memory is cross-task on purpose: the second task to attempt the
   /// same doomed thing must inherit the first one's evidence. The record is
   /// named after the fingerprint digest, whose grammar has no separators.
-  package func failureRecord(digest: String) throws -> HarnessFailureRecord? {
+  public func failureRecord(digest: String) throws -> HarnessFailureRecord? {
     guard Self.isWellFormed(failureDigest: digest) else {
       throw HarnessTaskStoreError.corrupt("malformed failure digest \(digest)")
     }
     return try repository.failureRecord(digest: digest)
   }
 
-  package func putFailureRecord(_ record: HarnessFailureRecord) throws {
+  public func putFailureRecord(_ record: HarnessFailureRecord) throws {
     guard Self.isWellFormed(failureDigest: record.digest) else {
       throw HarnessTaskStoreError.corrupt("malformed failure digest \(record.digest)")
     }
@@ -228,11 +228,11 @@ public actor HarnessTaskStore {
 
   /// Every failure record, so a decision context can carry "these approaches
   /// are already known bad" instead of letting a producer rediscover them.
-  package func failureRecords() throws -> [HarnessFailureRecord] {
+  public func failureRecords() throws -> [HarnessFailureRecord] {
     try repository.failureRecords()
   }
 
-  package func appendMemory(_ entry: HarnessMemoryEntry) throws {
+  public func appendMemory(_ entry: HarnessMemoryEntry) throws {
     switch entry.scope {
     case .task:
       break
@@ -251,11 +251,11 @@ public actor HarnessTaskStore {
     try repository.appendMemory(entry)
   }
 
-  package func memory(scope: HarnessMemoryScope, key: String) throws -> [HarnessMemoryEntry] {
+  public func memory(scope: HarnessMemoryScope, key: String) throws -> [HarnessMemoryEntry] {
     try repository.memory(scope: scope, key: key)
   }
 
-  package func memoryHistory(
+  public func memoryHistory(
     scope: HarnessMemoryScope,
     key: String
   ) throws -> [HarnessMemoryEntry] {
@@ -264,24 +264,24 @@ public actor HarnessTaskStore {
 
   /// Human actions live under the task they block, so reading a task's state
   /// and reading why it is blocked never diverge.
-  package func putHumanAction(_ action: HarnessStoredHumanAction) throws {
+  public func putHumanAction(_ action: HarnessStoredHumanAction) throws {
     try ensureSQLiteTask(action.htaskID)
     try repository.putHumanAction(action)
   }
 
-  package func humanActions(_ taskID: String) throws -> [HarnessStoredHumanAction] {
+  public func humanActions(_ taskID: String) throws -> [HarnessStoredHumanAction] {
     try ensureSQLiteTask(taskID)
     return try repository.humanActions(taskID)
   }
 
-  package static func isWellFormed(failureDigest digest: String) -> Bool {
+  public static func isWellFormed(failureDigest digest: String) -> Bool {
     isWellFormedStoreID(digest, prefix: "FAIL-")
   }
 
   /// Full-text lookup is scoped before ranking. It cannot make project
   /// memory applicable by itself; callers still run the typed exact-scope
   /// selector over these candidates.
-  package func searchMemory(
+  public func searchMemory(
     scope: HarnessMemoryScope,
     key: String,
     query: String,
@@ -293,7 +293,7 @@ public actor HarnessTaskStore {
   /// A database lease complements the actor-local reentrancy gate. It keeps
   /// two daemon processes from reconciling the same task concurrently and
   /// expires after a crash.
-  package func acquireReconcileLease(
+  public func acquireReconcileLease(
     taskID: String,
     holderID: String,
     now: Date = Date(),
@@ -304,7 +304,7 @@ public actor HarnessTaskStore {
       taskID: taskID, holderID: holderID, now: now, ttl: ttl)
   }
 
-  package func releaseReconcileLease(taskID: String, holderID: String) throws {
+  public func releaseReconcileLease(taskID: String, holderID: String) throws {
     try repository.releaseReconcileLease(taskID: taskID, holderID: holderID)
   }
 

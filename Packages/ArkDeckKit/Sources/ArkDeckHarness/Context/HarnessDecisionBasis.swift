@@ -23,7 +23,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package struct HarnessDecisionBasis: Equatable, Sendable, Codable {
+public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
   package let htaskID: String
   package let stateVersion: Int
   public let status: HarnessTaskLifecycle

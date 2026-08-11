@@ -12,7 +12,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum HarnessRepairPortError: Error, Equatable, Sendable {
+public enum HarnessRepairPortError: Error, Equatable, Sendable {
   case unavailable(String)
   case proposalRejected(String)
   case workspaceRevisionConflict(expected: String, actual: String)
@@ -48,7 +48,7 @@ package enum HarnessRepairStageGate {
 
 public struct HarnessPreparedPatch: Equatable, Sendable {
   public let inputs: [String: JSONValue]
-  package let artifactLease: String
+  public let artifactLease: String
   /// Immutable diff Artifact identity. Historical/fake adapters may omit it;
   /// production Evolution promotion requires an exact Artifact id.
   public let artifactID: String?
@@ -64,7 +64,7 @@ public struct HarnessPreparedPatch: Equatable, Sendable {
 
 public struct HarnessAppliedPatchReadback: Equatable, Sendable {
   public let patchAttemptRef: String
-  package let patchRevision: String
+  public let patchRevision: String
 
   public init(patchAttemptRef: String, patchRevision: String) {
     self.patchAttemptRef = patchAttemptRef
@@ -73,9 +73,9 @@ public struct HarnessAppliedPatchReadback: Equatable, Sendable {
 }
 
 public struct HarnessBuildReadback: Equatable, Sendable {
-  package let sourceRevision: String
-  package let outputDigest: String
-  package let outputArtifactLease: String
+  public let sourceRevision: String
+  public let outputDigest: String
+  public let outputArtifactLease: String
 
   public init(sourceRevision: String, outputDigest: String, outputArtifactLease: String) {
     self.sourceRevision = sourceRevision
@@ -85,8 +85,8 @@ public struct HarnessBuildReadback: Equatable, Sendable {
 }
 
 public struct HarnessSignedHAPReadback: Equatable, Sendable {
-  package let outputDigest: String
-  package let outputArtifactLease: String
+  public let outputDigest: String
+  public let outputArtifactLease: String
 
   public init(outputDigest: String, outputArtifactLease: String) {
     self.outputDigest = outputDigest

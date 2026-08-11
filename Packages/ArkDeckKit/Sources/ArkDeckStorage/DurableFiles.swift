@@ -28,7 +28,7 @@ public struct DurabilityFaultInjector: @unchecked Sendable {
   public static let none = DurabilityFaultInjector { _ in }
 }
 
-package enum DurableFileError: Error, Equatable, Sendable {
+public enum DurableFileError: Error, Equatable, Sendable {
   case pathMustBeAbsolute(String)
   case symbolicLinkRejected(String)
   case openFailed(path: String, errno: Int32)
@@ -132,7 +132,7 @@ enum SessionTerminalPublicationLock {
   }
 }
 
-package struct JournalAbandonmentContext: Equatable, Sendable {
+public struct JournalAbandonmentContext: Equatable, Sendable {
   package let requiredHazards: [String]
   package let requiresOutcomeUnknown: Bool
 
@@ -319,7 +319,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     boundInode = inspection.metadata.st_ino
   }
 
-  package func abandonmentContext() throws -> JournalAbandonmentContext {
+  public func abandonmentContext() throws -> JournalAbandonmentContext {
     lock.lock()
     defer { lock.unlock() }
     guard !poisoned else {
@@ -343,7 +343,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     return appendState.abandonmentContext
   }
 
-  package func appendAndSynchronize(_ event: JournalEvent) throws {
+  public func appendAndSynchronize(_ event: JournalEvent) throws {
     // The resource timings are a benchmark-only observation seam.  Do not
     // make every production journal append pay for clock reads when no test
     // has opted into those measurements.
@@ -624,24 +624,24 @@ package final class DurableOutcomeCheckpointGate: @unchecked Sendable {
 }
 
 public enum DurableFilePrimitives {
-  package static func requireAbsoluteFileURL(_ url: URL) throws {
+  public static func requireAbsoluteFileURL(_ url: URL) throws {
     guard url.isFileURL, url.path.hasPrefix("/") else {
       throw DurableFileError.pathMustBeAbsolute(url.path)
     }
   }
 
-  package static func createDirectoryIfNeeded(_ url: URL) throws {
+  public static func createDirectoryIfNeeded(_ url: URL) throws {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
   }
 
-  package static func rejectSymbolicLink(_ url: URL) throws {
+  public static func rejectSymbolicLink(_ url: URL) throws {
     var status = stat()
     if lstat(url.path, &status) == 0, status.st_mode & S_IFMT == S_IFLNK {
       throw DurableFileError.symbolicLinkRejected(url.path)
     }
   }
 
-  package static func writeAll(_ data: Data, descriptor: Int32, path: String) throws {
+  public static func writeAll(_ data: Data, descriptor: Int32, path: String) throws {
     try data.withUnsafeBytes { rawBuffer in
       guard let base = rawBuffer.baseAddress else { return }
       var offset = 0
@@ -657,7 +657,7 @@ public enum DurableFilePrimitives {
     }
   }
 
-  package static func fullSync(_ descriptor: Int32, path: String) throws {
+  public static func fullSync(_ descriptor: Int32, path: String) throws {
     guard Darwin.fsync(descriptor) == 0 else {
       throw DurableFileError.syncFailed(path: path, errno: errno)
     }
@@ -666,7 +666,7 @@ public enum DurableFilePrimitives {
     }
   }
 
-  package static func discardTornTail(
+  public static func discardTornTail(
     at url: URL,
     descriptor: Int32,
     durableRecordCount: Int
@@ -693,7 +693,7 @@ public enum DurableFilePrimitives {
     try syncDirectory(url.deletingLastPathComponent())
   }
 
-  package static func syncDirectory(_ url: URL) throws {
+  public static func syncDirectory(_ url: URL) throws {
     let descriptor = Darwin.open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
     guard descriptor >= 0 else { throw DurableFileError.openFailed(path: url.path, errno: errno) }
     defer { Darwin.close(descriptor) }

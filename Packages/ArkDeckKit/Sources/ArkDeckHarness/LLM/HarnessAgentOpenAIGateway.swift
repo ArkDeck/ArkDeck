@@ -11,7 +11,7 @@ import Foundation
   import FoundationNetworking
 #endif
 
-package enum HarnessAgentGatewayError: Error, Equatable, Sendable {
+public enum HarnessAgentGatewayError: Error, Equatable, Sendable {
   case endpointMustBeHTTPS
   case transportFailed
   case httpStatus(Int)

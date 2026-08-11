@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-package enum VerifiedRegularFileError: Error, Equatable {
+public enum VerifiedRegularFileError: Error, Equatable {
   case invalidPath
   case openFailed(Int32)
   case unsafeFile
@@ -17,7 +17,7 @@ package enum VerifiedRegularFileError: Error, Equatable {
 /// put `inodePath` in argv instead of the mutable pathname; the descriptor is
 /// held until the child completes and is revalidated in the final pre-spawn
 /// critical section.
-package final class VerifiedRegularFileDescriptor: @unchecked Sendable {
+public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
   package let authorizedPath: String
   package let inodePath: String
   package let sha256: String

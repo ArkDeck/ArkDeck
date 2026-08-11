@@ -42,7 +42,7 @@ public enum HDCApplicationDiagnosticsFacade {
   /// virtual wait. The App still receives the process-isolated implementation
   /// above, while tests avoid turning a state assertion into a ten-second
   /// wall-clock assertion.
-  package static func makeFixtureForTesting(
+  public static func makeFixtureForTesting(
     arguments: [String],
     delayedRefreshWait: @escaping @Sendable () async -> Void
   ) -> any HDCApplicationDiagnosticsProviding {

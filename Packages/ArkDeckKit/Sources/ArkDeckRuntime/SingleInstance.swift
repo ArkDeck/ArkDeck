@@ -87,7 +87,7 @@ package final class SingleInstanceGuard: @unchecked Sendable {
   }
 }
 
-package enum SingleInstanceGuardError: Error, Equatable, LocalizedError, Sendable {
+public enum SingleInstanceGuardError: Error, Equatable, LocalizedError, Sendable {
   case lockPathMustBeAbsolute(String)
   case alreadyHeld
   case unsafeLockDirectory

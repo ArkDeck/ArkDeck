@@ -451,7 +451,7 @@ public enum CompensationTrigger: String, CaseIterable, Codable, Sendable {
   case onAnyTerminal
 }
 
-package enum WorkflowStepValidationError: Error, Equatable, Sendable {
+public enum WorkflowStepValidationError: Error, Equatable, Sendable {
   case unsupportedKind(rawKind: String, assumedEffect: WorkflowEffect)
   case unsupportedCompensationKind(WorkflowStepKind)
   case invalidIdentifier(String)
@@ -471,7 +471,7 @@ package enum WorkflowStepValidationError: Error, Equatable, Sendable {
 }
 
 public struct CompensationDescriptor: Equatable, Sendable, Codable {
-  package static let allowedKinds: Set<WorkflowStepKind> = [
+  public static let allowedKinds: Set<WorkflowStepKind> = [
     .stopRemoteCapture,
     .restoreParameter,
     .cleanupOwnedRemotePath,
@@ -483,10 +483,10 @@ public struct CompensationDescriptor: Equatable, Sendable, Codable {
   public let kind: WorkflowStepKind
   public let effect: WorkflowEffect
   public let cancellation: WorkflowCancellationPolicy
-  package let bindingRequirement: WorkflowBindingRequirement
-  package let trigger: CompensationTrigger
+  public let bindingRequirement: WorkflowBindingRequirement
+  public let trigger: CompensationTrigger
   public let arguments: [String: JSONValue]
-  package let argumentsHash: String
+  public let argumentsHash: String
 
   public init(
     id: String,
@@ -545,9 +545,9 @@ public struct WorkflowStep: Equatable, Sendable, Codable {
   public let kind: WorkflowStepKind
   public let effect: WorkflowEffect
   public let cancellation: WorkflowCancellationPolicy
-  package let bindingRequirement: WorkflowBindingRequirement
+  public let bindingRequirement: WorkflowBindingRequirement
   public let arguments: [String: JSONValue]
-  package let compensationDescriptors: [CompensationDescriptor]
+  public let compensationDescriptors: [CompensationDescriptor]
 
   public init(
     id: String,

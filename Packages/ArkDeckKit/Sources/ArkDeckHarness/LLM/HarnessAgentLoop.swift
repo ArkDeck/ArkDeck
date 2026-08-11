@@ -240,7 +240,7 @@ package struct HarnessAgentLoopLimits: Equatable, Sendable {
   }
 }
 
-package enum HarnessAgentSessionError: Error, Equatable, Sendable {
+public enum HarnessAgentSessionError: Error, Equatable, Sendable {
   case duplicateTool(String)
   case emptyUserMessage
   case contextTooLarge(bytes: Int, limit: Int)

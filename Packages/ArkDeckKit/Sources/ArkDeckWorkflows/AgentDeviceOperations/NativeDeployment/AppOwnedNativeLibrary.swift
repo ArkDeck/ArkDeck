@@ -2,7 +2,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum HDCNativeLibraryABI: String, Sendable, Equatable, Codable {
+public enum HDCNativeLibraryABI: String, Sendable, Equatable, Codable {
   case arm64 = "arm64-v8a"
   case arm32 = "armeabi-v7a"
   case x86_64
@@ -55,7 +55,7 @@ package struct HDCNativeLibraryCodeSignFacts: Sendable, Equatable {
   }
 }
 
-package enum NativeLibraryArtifactValidationError: Error, Equatable, CustomStringConvertible {
+public enum NativeLibraryArtifactValidationError: Error, Equatable, CustomStringConvertible {
   case invalidELF
   case unsupportedEncoding
   case unsupportedMachine(UInt16)
@@ -400,7 +400,7 @@ package enum HDCNativeRollbackPolicy: String, Sendable, Equatable, Codable {
   case retainBackup
 }
 
-package enum HDCNativeLibraryInspection: String, Sendable, Equatable, Codable {
+public enum HDCNativeLibraryInspection: String, Sendable, Equatable, Codable {
   case stagingMatchesArtifact
   case backupMatchesTarget
   case targetMatchesArtifact
@@ -468,7 +468,7 @@ package struct HDCNativeCodeSignHelperFacts: Sendable, Equatable {
 /// Fully provider-owned app profile. Inputs select only a bundle and logical
 /// library name; the canonical remote namespace is derived here and can never
 /// be supplied by a runtime caller.
-package struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
+public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
   package static let entryAbility = "EntryAbility"
   package static let userID = 100
   package static let moduleName = "entry"

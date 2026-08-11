@@ -23,9 +23,9 @@ public struct HarnessModelDescriptor: Equatable, Sendable, Codable {
   public static let unspecified = "unspecified"
 
   public let provider: String
-  package let modelName: String
-  package let modelRevision: String?
-  package let adapterVersion: String
+  public let modelName: String
+  public let modelRevision: String?
+  public let adapterVersion: String
 
   public init(
     provider: String,
@@ -55,13 +55,13 @@ public enum HarnessModelRunOutcome: Equatable, Sendable, Codable {
     }
   }
 
-  package var decisionID: String? {
+  public var decisionID: String? {
     if case .accepted(let decisionID) = self { return decisionID }
     return nil
   }
 }
 
-package struct HarnessModelRun: Equatable, Sendable, Codable {
+public struct HarnessModelRun: Equatable, Sendable, Codable {
   public static let documentType = "harness-model-run"
   public static let schemaVersion = "1.0.0"
 

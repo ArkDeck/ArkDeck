@@ -219,7 +219,7 @@ private struct HDCRegisteredSemanticBinding: Sendable, Equatable {
 /// for the registered uninstall command's byte-exact stdout capture. Marker
 /// fragments never promote an unregistered command or raw output to success.
 package struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
-  package typealias SemanticResult = HDCCommandSemanticResult
+  public typealias SemanticResult = HDCCommandSemanticResult
 
   private let binding: HDCRegisteredSemanticBinding?
   private var baselineParser = HDCSemanticOutputParser()
@@ -1067,7 +1067,7 @@ package protocol HDCServerLifecycleDispatchAuthorizing: Sendable {
 /// The result that proves a lifecycle mutation. Exit status and raw command
 /// output alone are deliberately insufficient because no kill/restart success
 /// byte family is registered in the integration profile.
-package enum HDCServerLifecyclePostDispatchObservation: Sendable, Equatable {
+public enum HDCServerLifecyclePostDispatchObservation: Sendable, Equatable {
   case generation(Int)
   case unavailable
 }
@@ -1077,7 +1077,7 @@ package enum HDCServerLifecyclePostDispatchObservation: Sendable, Equatable {
 /// recorded before the child process starts. Automatic paths retain no
 /// reference to it. The tests inject the local fake executable, and this type
 /// performs no discovery or PATH lookup.
-package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
+public actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
   package typealias PostDispatchProbe =
     @Sendable (HDCServerLifecycleStep) async
     -> HDCServerLifecyclePostDispatchObservation?
@@ -1492,15 +1492,15 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
   /// renamed into an automatic value.
   public let automaticLifecycleDispatchCount: Int
   public let automaticSubserverDispatchCount: Int
-  package let confirmedLifecycleDispatchCount: Int
-  package let managedStartDispatchCount: Int
+  public let confirmedLifecycleDispatchCount: Int
+  public let managedStartDispatchCount: Int
   /// The endpoint selection source as originally selected; nil when no
   /// selection has been established for this presentation.
   public let endpointSource: HDCServerEndpointSource?
   /// Sorted names of environment keys injected into ArkDeck-owned child
   /// processes only. Values are deliberately not exposed; the parent process
   /// environment is never modified.
-  package let childEnvironmentInjectionKeys: [String]
+  public let childEnvironmentInjectionKeys: [String]
   /// Per-evidence ownership classification basis for the presented endpoint.
   public let ownershipBasis: HDCServerOwnershipBasis?
   /// Bounded App-facing history produced by the registered read-only device
@@ -1575,7 +1575,7 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
   /// Package-only immutable overlay used by Workflows after one explicit
   /// observation refresh. It copies the complete diagnostics value and cannot
   /// manufacture a source, runner, argv, or lifecycle capability.
-  package func overlayingDeviceEvents(
+  public func overlayingDeviceEvents(
     _ events: [HDCDeviceObservationPresentationEvent]
   ) -> HDCDiagnosticsPresentation {
     HDCDiagnosticsPresentation(
@@ -1607,7 +1607,7 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
       deviceEvents: events)
   }
 
-  package static let unprobed = HDCDiagnosticsPresentation(
+  public static let unprobed = HDCDiagnosticsPresentation(
     absolutePath: "unknown", source: "unknown", hash: "unverified",
     platformTrust: "unverified", clientVersion: "unknown", serverVersion: "unknown",
     daemonVersion: "unknown", endpoint: "unknown", generation: "unknown", ownership: .unknown,
@@ -1845,7 +1845,7 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     return await presentation()
   }
 
-  package func applyLifecycleDispatchResult(_ result: HDCServerLifecycleDispatchResult) async {
+  public func applyLifecycleDispatchResult(_ result: HDCServerLifecycleDispatchResult) async {
     switch result {
     case .completed(.succeeded(let generation)):
       lifecycleRecovery = .unavailable(
@@ -1868,7 +1868,7 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   /// Applies only the result of the registered selected-device authorization
   /// probe. Callers cannot set authorization from UI state or an unbound
   /// device row.
-  package func applyRegisteredAuthorization(_ state: HDCAuthorizationState) {
+  public func applyRegisteredAuthorization(_ state: HDCAuthorizationState) {
     authorization = state
   }
 

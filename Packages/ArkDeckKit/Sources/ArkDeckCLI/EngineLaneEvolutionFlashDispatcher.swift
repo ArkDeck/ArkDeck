@@ -41,10 +41,10 @@ package struct EngineLaneJobTerminal: Sendable, Equatable {
 /// minted, so nothing can have been dispatched. Only an authored daemon
 /// rejection may produce this; transport failures must not, because they
 /// cannot prove the daemon did not accept the request.
-package struct EngineLaneSubmissionRefusal: Error, Equatable {
-  package let detail: String
+public struct EngineLaneSubmissionRefusal: Error, Equatable {
+  public let detail: String
 
-  package init(detail: String) {
+  public init(detail: String) {
     self.detail = detail
   }
 }

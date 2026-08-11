@@ -12,7 +12,7 @@ import Foundation
 // durably reserves an exact RuntimeCapability, belongs exclusively to the merged broker;
 // this Provider remains incapable of direct dispatch (POL-AGENT-002).
 
-package enum RockchipFlashProviderError: Error, Equatable, Sendable {
+public enum RockchipFlashProviderError: Error, Equatable, Sendable {
   case archiveNotValidated([RockchipArchiveViolation])
   case invalidPlanNonce(String)
   case planAssemblyFailed(String)

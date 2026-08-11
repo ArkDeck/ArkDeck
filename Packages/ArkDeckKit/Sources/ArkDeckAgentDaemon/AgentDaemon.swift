@@ -166,7 +166,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.methodObserver = methodObserver
   }
 
-  package func handleLine(_ line: Data) async -> Data {
+  public func handleLine(_ line: Data) async -> Data {
     let response = await handleFrame(line)
     let encoder = CanonicalJSONEncoders.canonical()
     let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
@@ -1832,8 +1832,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
 public struct AgentDaemonInstance: Codable, Sendable, Equatable {
   public let pid: Int32
-  package let socketPath: String
-  package let protocolVersion: String
+  public let socketPath: String
+  public let protocolVersion: String
   public let startedAtUTC: String
 }
 
@@ -2127,6 +2127,6 @@ public final class AgentDaemonServer: @unchecked Sendable {
   }
 }
 
-package enum AgentDaemonError: Error, Equatable, Sendable {
+public enum AgentDaemonError: Error, Equatable, Sendable {
   case io(String)
 }

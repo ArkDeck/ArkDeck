@@ -8,7 +8,7 @@ import ArkDeckCore
 import ArkDeckHarness
 import Foundation
 
-package enum AgentChatApplicationError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum AgentChatApplicationError: Error, Equatable, Sendable, CustomStringConvertible {
   case providerRequired
   case unsupportedProvider(String)
   case missingCredential

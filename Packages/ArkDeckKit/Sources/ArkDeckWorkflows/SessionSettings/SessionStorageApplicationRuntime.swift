@@ -1,7 +1,7 @@
 import ArkDeckStorage
 import Foundation
 
-package enum SessionRetentionRuntimeError: Error, Equatable, Sendable {
+public enum SessionRetentionRuntimeError: Error, Equatable, Sendable {
   case retentionBlocked
   case catalogGenerationUnavailable
   case stalePreview

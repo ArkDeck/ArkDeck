@@ -18,7 +18,7 @@ struct RockchipEvolutionDynamicCodingKey: CodingKey {
   init?(intValue: Int) { return nil }
 }
 
-package enum RockchipEvolutionCampaignError: Error, Equatable, Sendable,
+public enum RockchipEvolutionCampaignError: Error, Equatable, Sendable,
   LocalizedError
 {
   case invalidAssertion(String)
@@ -31,7 +31,7 @@ package enum RockchipEvolutionCampaignError: Error, Equatable, Sendable,
   case admissionRejected(String)
   case persistenceRejected(String)
 
-  package var errorDescription: String? {
+  public var errorDescription: String? {
     switch self {
     case .invalidAssertion(let field): "invalid evolution campaign assertion: \(field)"
     case .confirmationDigestMismatch: "campaign confirmation digest does not match its envelope"

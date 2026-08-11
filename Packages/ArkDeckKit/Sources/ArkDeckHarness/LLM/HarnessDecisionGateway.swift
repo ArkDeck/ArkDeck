@@ -51,7 +51,7 @@ public struct HarnessEgressPolicy: Sendable, Equatable {
   }
 }
 
-package enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
+public enum HarnessDecisionGatewayError: Error, Equatable, Sendable {
   case unavailable(String)
   case transportFailure(String)
   case contextTooLarge(bytes: Int, limit: Int)

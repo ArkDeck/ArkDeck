@@ -40,8 +40,8 @@ public enum CatalogStepCompensation: String, CaseIterable, Codable, Sendable {
 }
 
 public struct CatalogActionReference: Equatable, Sendable {
-  package let catalogID: String
-  package let actionID: String
+  public let catalogID: String
+  public let actionID: String
 
   public init(catalogID: String, actionID: String) {
     self.catalogID = catalogID
@@ -81,13 +81,13 @@ public enum CatalogArtifactRetentionClass: String, CaseIterable, Codable, Sendab
 public struct CatalogFieldDescriptor: Equatable, Sendable {
   public let name: String
   public let type: CatalogFieldType
-  package let isRequired: Bool
-  package let enumValues: [String]?
-  package let pattern: String?
+  public let isRequired: Bool
+  public let enumValues: [String]?
+  public let pattern: String?
   public let minimum: Int?
-  package let maximum: Int?
-  package let maxLength: Int?
-  package let maxItems: Int?
+  public let maximum: Int?
+  public let maxLength: Int?
+  public let maxItems: Int?
 
   public init(
     name: String,
@@ -119,8 +119,8 @@ public struct CatalogStepDescriptor: Equatable, Sendable {
   public let cancellation: WorkflowCancellationPolicy
   public let binding: WorkflowBindingRequirement
   public let isOptional: Bool
-  package let compensation: CatalogStepCompensation
-  package let actionReference: CatalogActionReference?
+  public let compensation: CatalogStepCompensation
+  public let actionReference: CatalogActionReference?
 
   public init(
     stepID: String,
@@ -148,8 +148,8 @@ public struct CatalogArtifactDescriptor: Equatable, Sendable {
   public let role: CatalogArtifactRole
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  package let isRequired: Bool
-  package let retentionClass: CatalogArtifactRetentionClass
+  public let isRequired: Bool
+  public let retentionClass: CatalogArtifactRetentionClass
 
   public init(
     name: String,
@@ -174,7 +174,7 @@ public struct CatalogArtifactDescriptor: Equatable, Sendable {
 /// argv, target, Artifact or caller-controlled proof surface.
 public struct CatalogCompleteOverwriteRecoveryProfileDescriptor: Equatable, Sendable {
   public let reference: String
-  package let coveredEffects: [String]
+  public let coveredEffects: [String]
 
   public init(reference: String, coveredEffects: [String]) {
     self.reference = reference
@@ -183,10 +183,10 @@ public struct CatalogCompleteOverwriteRecoveryProfileDescriptor: Equatable, Send
 }
 
 public struct CatalogCompleteOverwriteRecoveryDescriptor: Equatable, Sendable {
-  package let contractVersion: String
-  package let profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor]
-  package let overwriteStepID: String
-  package let verificationStepIDs: [String]
+  public let contractVersion: String
+  public let profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor]
+  public let overwriteStepID: String
+  public let verificationStepIDs: [String]
 
   public init(
     contractVersion: String,
@@ -215,20 +215,20 @@ public struct CatalogOperationDescriptor: Equatable, Sendable {
   public let title: String
   public let provider: CatalogProvider
   public let minimumEffect: WorkflowEffect
-  package let permittedEffects: [WorkflowEffect]
+  public let permittedEffects: [WorkflowEffect]
   public let authorization: [WorkflowEffect: RuntimeOperationAuthorizationPolicy]
-  package let defaultPolicyIssuanceEnabled: Bool
+  public let defaultPolicyIssuanceEnabled: Bool
   public let binding: WorkflowBindingRequirement
-  package let concurrencyKey: CatalogConcurrencyKey
+  public let concurrencyKey: CatalogConcurrencyKey
   public let inputs: [CatalogFieldDescriptor]
-  package let outputs: [CatalogFieldDescriptor]
+  public let outputs: [CatalogFieldDescriptor]
   public let steps: [CatalogStepDescriptor]
-  package let timeoutSeconds: Int
+  public let timeoutSeconds: Int
   public let outputByteBudget: Int
-  package let preflightAttempts: Int
+  public let preflightAttempts: Int
   public let artifacts: [CatalogArtifactDescriptor]
-  package let profiles: [String]
-  package let completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor?
+  public let profiles: [String]
+  public let completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor?
 
   public init(
     id: String,

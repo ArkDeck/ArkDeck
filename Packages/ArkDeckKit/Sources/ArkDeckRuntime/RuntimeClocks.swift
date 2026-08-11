@@ -108,7 +108,7 @@ package final class RuntimeClockPair: @unchecked Sendable {
   }
 }
 
-package enum RuntimeClockError: Error, Equatable, Sendable {
+public enum RuntimeClockError: Error, Equatable, Sendable {
   case monotonicClockRegressed
 }
 
@@ -168,7 +168,7 @@ package struct RestartSafeTimingSnapshot: Equatable, Sendable {
   }
 }
 
-package enum RuntimeTimingError: Error, Equatable, Sendable {
+public enum RuntimeTimingError: Error, Equatable, Sendable {
   case invalidDuration
 }
 

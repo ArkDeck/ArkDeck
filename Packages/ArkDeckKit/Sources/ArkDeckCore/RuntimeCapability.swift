@@ -12,7 +12,7 @@
 // Callers can neither create nor install the capability consumed by the
 // protected Runtime.
 
-package enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
+public enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case malformedCapabilityID(String)
   case unsupportedEffectCeiling(WorkflowEffect)
   case emptyOperationScope
@@ -34,7 +34,7 @@ package enum RuntimeCapabilityValidationError: Error, Equatable, Sendable {
   case emptyInputConstraint(String)
 }
 
-package enum RuntimeCapabilityDenialReason: String, Codable, Equatable, Sendable {
+public enum RuntimeCapabilityDenialReason: String, Codable, Equatable, Sendable {
   case revoked
   case expired
   case notYetValid
@@ -48,7 +48,7 @@ package enum RuntimeCapabilityDenialReason: String, Codable, Equatable, Sendable
   case targetIdentityRequired
 }
 
-package struct RuntimeCapabilityDenial: Error, Equatable, Sendable {
+public struct RuntimeCapabilityDenial: Error, Equatable, Sendable {
   public let reason: RuntimeCapabilityDenialReason
   public let detail: String
 
@@ -119,7 +119,7 @@ public enum RuntimeCapabilityTargetScope: Equatable, Sendable, Codable {
 
 public struct RuntimeCapabilityOperationScope: Equatable, Sendable, Codable {
   /// Exact catalog operation id, e.g. "debug.hap".
-  package let operationID: String
+  public let operationID: String
   /// Exact catalog operation version when the operation publishes one.
   /// Ranges are deliberately not expressible.
   public let version: Int?
@@ -182,7 +182,7 @@ public enum RuntimeCapabilityInputConstraint: Equatable, Sendable, Codable {
     }
   }
 
-  package func permits(_ value: JSONValue) -> Bool {
+  public func permits(_ value: JSONValue) -> Bool {
     switch (self, value) {
     case (.exactString(let expected), .string(let actual)):
       return expected == actual
@@ -276,26 +276,26 @@ public enum RuntimeCapabilityRevocation: Equatable, Sendable, Codable {
 /// `effect` against `target` with `inputs` and any exact materialization
 /// pins carried by the capability?
 public struct RuntimeCapabilityAuthorizationQuery: Sendable {
-  package let operationID: String
-  package let operationVersion: Int?
+  public let operationID: String
+  public let operationVersion: Int?
   public let effect: WorkflowEffect
-  package let targetStableIdentitySHA256: String?
-  package let targetBindingRevision: Int?
-  package let planDigest: String?
+  public let targetStableIdentitySHA256: String?
+  public let targetBindingRevision: Int?
+  public let planDigest: String?
   public let inputs: [String: JSONValue]
   /// Runtime-resolved Artifact IDs and content digests. Caller lease strings
   /// alone are not trusted enough for a destructive envelope.
-  package let artifactFacts: [String: String]
+  public let artifactFacts: [String: String]
   /// Workspace facts, present only for a host-bound workspace plan. A device
   /// query leaves them absent, so a workspace-scoped capability fails closed
   /// against it instead of matching by omission.
-  package let workspaceIdentitySHA256: String?
-  package let workspaceRevision: String?
-  package let workspaceFileScopesDigest: String?
+  public let workspaceIdentitySHA256: String?
+  public let workspaceRevision: String?
+  public let workspaceFileScopesDigest: String?
   /// Whether that workspace is a task-owned isolated copy. It decides who may
   /// authorize a change to it, not what the change may be: the scope, the
   /// revision and the exact inputs are pinned identically either way.
-  package let workspaceIsIsolatedTaskCopy: Bool
+  public let workspaceIsIsolatedTaskCopy: Bool
 
   public init(
     operationID: String,
@@ -331,25 +331,25 @@ public struct RuntimeCapabilityAuthorizationQuery: Sendable {
 }
 
 public struct RuntimeCapability: Equatable, Sendable, Codable {
-  package let capabilityID: String
-  package let targetScope: RuntimeCapabilityTargetScope
-  package let operationScope: [RuntimeCapabilityOperationScope]
-  package let effectCeiling: WorkflowEffect
-  package let inputConstraints: [String: RuntimeCapabilityInputConstraint]
+  public let capabilityID: String
+  public let targetScope: RuntimeCapabilityTargetScope
+  public let operationScope: [RuntimeCapabilityOperationScope]
+  public let effectCeiling: WorkflowEffect
+  public let inputConstraints: [String: RuntimeCapabilityInputConstraint]
   /// Exact typed-input map for a runtime-issued E1 envelope. This also binds
   /// optional-field absence, which per-field constraints cannot express.
-  package let exactInputs: [String: JSONValue]?
+  public let exactInputs: [String: JSONValue]?
   /// Exact Runtime-resolved Artifact identity/content pins. Optional for
   /// historical and non-artifact capabilities; required for a newly issued
   /// destructive Runtime policy capability.
-  package let exactArtifactFacts: [String: String]?
-  package let issuedAtUTC: String
-  package let expiresAtUTC: String
-  package let maximumUses: Int
-  package let issuer: RuntimeCapabilityIssuer
-  package let exactPlanDigest: String?
-  package let exactBindingRevision: Int?
-  package let revocation: RuntimeCapabilityRevocation
+  public let exactArtifactFacts: [String: String]?
+  public let issuedAtUTC: String
+  public let expiresAtUTC: String
+  public let maximumUses: Int
+  public let issuer: RuntimeCapabilityIssuer
+  public let exactPlanDigest: String?
+  public let exactBindingRevision: Int?
+  public let revocation: RuntimeCapabilityRevocation
 
   public init(
     capabilityID: String,
@@ -543,7 +543,7 @@ public struct RuntimeCapability: Equatable, Sendable, Codable {
 
   /// Pure authorization check. `remainingUses` and `nowUTC` come from the
   /// durable store; the model never consults a wall clock itself.
-  package func authorizes(
+  public func authorizes(
     _ query: RuntimeCapabilityAuthorizationQuery,
     nowUTC: String,
     remainingUses: Int
@@ -686,22 +686,22 @@ extension Character {
 /// The bounded default policy that admits E0 work without any capability.
 /// It can only ever say yes to read-only effects inside fixed budgets.
 public struct RuntimeDefaultReadOnlyPolicy: Sendable {
-  package let maximumTimeoutSeconds: Int
-  package let maximumOutputByteBudget: Int
+  public let maximumTimeoutSeconds: Int
+  public let maximumOutputByteBudget: Int
 
   public init(maximumTimeoutSeconds: Int = 900, maximumOutputByteBudget: Int = 1 << 29) {
     self.maximumTimeoutSeconds = maximumTimeoutSeconds
     self.maximumOutputByteBudget = maximumOutputByteBudget
   }
 
-  package enum Decision: Equatable, Sendable {
+  public enum Decision: Equatable, Sendable {
     case allowed
     case deniedEffectRequiresCapability(WorkflowEffect)
     case deniedTimeoutAboveLimit(requested: Int, limit: Int)
     case deniedBudgetAboveLimit(requested: Int, limit: Int)
   }
 
-  package func evaluate(
+  public func evaluate(
     effect: WorkflowEffect,
     timeoutSeconds: Int,
     outputByteBudget: Int

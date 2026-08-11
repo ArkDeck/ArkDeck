@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-package enum DeviceTargetingValidationError: Error, Equatable, Sendable {
+public enum DeviceTargetingValidationError: Error, Equatable, Sendable {
   case emptyField(String)
   case emptyIdentitySnapshot
   case nonFiniteIdentityNumber
@@ -302,7 +302,7 @@ package enum DeviceIdentityDisposition: Equatable, Sendable {
   case ambiguous(candidateIDs: [String])
 }
 
-package enum DeviceEffectGateRejection: Error, Equatable, Sendable {
+public enum DeviceEffectGateRejection: Error, Equatable, Sendable {
   case identityUnconfirmed
   case identityAmbiguous
   case bindingNotDurable
@@ -438,7 +438,7 @@ package struct DeviceRebindContext: Equatable, Sendable {
   }
 }
 
-package enum DeviceRebindAwaitingReason: String, Codable, Equatable, Sendable {
+public enum DeviceRebindAwaitingReason: String, Codable, Equatable, Sendable {
   case noCandidate
   case ambiguousCandidates
   case coreEvidenceInsufficient
@@ -457,7 +457,7 @@ package enum DeviceRebindDecision: Equatable, Sendable {
   )
 }
 
-package enum DeviceRebindAuthorizationError: Error, Equatable, Sendable {
+public enum DeviceRebindAuthorizationError: Error, Equatable, Sendable {
   case selectedCandidateNotPresent
   case candidateTransportMismatch
   case corePolicyNotEligible(DeviceRebindAwaitingReason)
@@ -581,7 +581,7 @@ package enum DeviceMutationLaneRequestState: Equatable, Sendable {
   case queued(reason: DeviceMutationLaneReason)
 }
 
-package enum DeviceMutationLaneError: Error, Equatable, Sendable {
+public enum DeviceMutationLaneError: Error, Equatable, Sendable {
   case cancelled
   case duplicateRequest(String)
   case leaseInUse(String)

@@ -19,8 +19,8 @@ public struct DebugOperationPresentation: Sendable, Equatable, Identifiable {
   public let reference: String
   public let title: String
   public let minimumEffect: String
-  package let permittedEffects: [String]
-  package let timeoutSeconds: Int
+  public let permittedEffects: [String]
+  public let timeoutSeconds: Int
   public let outputByteBudget: Int
   public let availability: DebugRuntimeAvailability
   public let fields: [DebugFieldPresentation]
@@ -57,8 +57,8 @@ public struct DebugOperationPresentation: Sendable, Equatable, Identifiable {
 public struct DebugFieldPresentation: Sendable, Equatable, Identifiable {
   public let name: String
   public let type: String
-  package let isRequired: Bool
-  package let constraintSummary: String
+  public let isRequired: Bool
+  public let constraintSummary: String
 
   public var id: String { name }
 
@@ -75,7 +75,7 @@ public struct DebugStepPresentation: Sendable, Equatable, Identifiable {
   public let kind: String
   public let effect: String
   public let isOptional: Bool
-  package let actionReference: String?
+  public let actionReference: String?
 
   public init(
     id: String, kind: String, effect: String, isOptional: Bool, actionReference: String?
@@ -93,7 +93,7 @@ public struct DebugArtifactPresentation: Sendable, Equatable, Identifiable {
   public let role: String
   public let mediaType: String
   public let privacy: String
-  package let isRequired: Bool
+  public let isRequired: Bool
 
   public var id: String { name }
 
@@ -202,7 +202,7 @@ public struct DebugWorkspacePresentation: Sendable, Equatable {
 public struct DebugCommandTemplatePresentation: Sendable, Equatable, Identifiable {
   public let id: String
   public let effect: String
-  package let parameterNames: [String]
+  public let parameterNames: [String]
   public let isRunnable: Bool
 
   public init(
@@ -336,8 +336,8 @@ public protocol DebugApplicationProviding: Sendable {
 public enum DebugApplicationFacade {
   public static let debugHAPReference = "debug.hap@1"
   public static let captureDiagnosticsReference = "capture.diagnostics@1"
-  package static let createPortForwardReference = "port-forward.create@1"
-  package static let removePortForwardReference = "port-forward.remove@1"
+  public static let createPortForwardReference = "port-forward.create@1"
+  public static let removePortForwardReference = "port-forward.remove@1"
 
   static let descriptors: [CatalogOperationDescriptor] = [
     RuntimeOperationCatalog.descriptor(reference: captureDiagnosticsReference),

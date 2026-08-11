@@ -8,7 +8,7 @@ import Foundation
 // unvalidated archive, and hashing must be streaming (REQ-FLASH-011) because the pinned
 // archive holds multi-gigabyte members.
 
-package enum GzipTarArchiveReaderError: Error, Equatable, Sendable {
+public enum GzipTarArchiveReaderError: Error, Equatable, Sendable {
   case unreadableFile(String)
   case notGzip
   case unsupportedCompressionMethod

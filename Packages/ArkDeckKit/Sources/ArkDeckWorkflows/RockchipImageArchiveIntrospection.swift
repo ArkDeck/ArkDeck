@@ -28,7 +28,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum RockchipArchiveIntrospectionFailure: Error, Equatable, Sendable {
+public enum RockchipArchiveIntrospectionFailure: Error, Equatable, Sendable {
   case partitionTableMissing
   case partitionTableUnparsable(String)
   case systemImageMissing(String)

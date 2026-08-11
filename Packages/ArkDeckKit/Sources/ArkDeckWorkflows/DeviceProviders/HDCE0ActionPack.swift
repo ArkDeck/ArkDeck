@@ -10,14 +10,14 @@
 import ArkDeckCore
 import Foundation
 
-package enum HDCE0RequestError: Error, Equatable, Sendable {
+public enum HDCE0RequestError: Error, Equatable, Sendable {
   case outOfBounds(field: String, detail: String)
   case malformed(field: String, detail: String)
 }
 
 /// Closed device-property allowlist. Extending it is a catalog/provider
 /// decision delivered by PR, never a caller-supplied key.
-package enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
+public enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
   case productModel = "const.product.model"
   case productName = "const.product.name"
   case softwareVersion = "const.product.software.version"
@@ -28,7 +28,7 @@ package enum HDCAllowlistedProperty: String, CaseIterable, Sendable, Codable {
 
 /// Fixed-root free-space observation for Catalog preflightDeviceStorage.
 /// The request carries no caller-selected remote path.
-package struct HDCStoragePreflightRequest: Sendable, Equatable {
+public struct HDCStoragePreflightRequest: Sendable, Equatable {
   package static let remotePath = "/data/local/tmp"
   package static let maximumRequiredBytes = 8 * 1024 * 1024 * 1024
 
@@ -43,7 +43,7 @@ package struct HDCStoragePreflightRequest: Sendable, Equatable {
   }
 }
 
-package struct HDCHilogCaptureRequest: Sendable, Equatable {
+public struct HDCHilogCaptureRequest: Sendable, Equatable {
   package static let maximumDurationSeconds = 600
   package static let maximumFilters = 16
   package static let maximumByteBudget = 128 * 1024 * 1024
@@ -102,14 +102,14 @@ package struct HDCHilogCaptureRequest: Sendable, Equatable {
   }
 }
 
-package struct HDCUIDumpRequest: Sendable, Equatable {
+public struct HDCUIDumpRequest: Sendable, Equatable {
   /// Kept as an enum with one case on purpose: the wire form stays stable
   /// and the type keeps saying that a UI dump has a scope. `componentTree`
   /// is gone from it because that scope is not a stdout capture at all —
   /// it is the `captureComponentTree` file action (CHG-2026-053 r2). No
   /// persisted journal can name it: its lowering refused from the day it
   /// was introduced, so nothing was ever dispatched under it.
-  package enum Scope: String, CaseIterable, Sendable {
+  public enum Scope: String, CaseIterable, Sendable {
     case windowList
   }
 
@@ -125,7 +125,7 @@ package struct HDCUIDumpRequest: Sendable, Equatable {
   }
 }
 
-package struct HDCTraceCaptureRequest: Sendable, Equatable {
+public struct HDCTraceCaptureRequest: Sendable, Equatable {
   package static let maximumCategories = 24
   package static let maximumDurationSeconds = 120
 
@@ -166,7 +166,7 @@ package struct HDCTraceCaptureRequest: Sendable, Equatable {
 /// A provider-owned remote temporary path. Only this module can mint one
 /// (package init), the components make collisions structurally impossible,
 /// and cleanup actions accept only this type - never a raw string.
-package struct HDCOwnedRemotePath: Sendable, Equatable {
+public struct HDCOwnedRemotePath: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
   package let nonce: String
@@ -213,7 +213,7 @@ package struct HDCOwnedRemotePath: Sendable, Equatable {
 
 /// A provider-created remote artifact awaiting receive: the remote path is
 /// provider-owned and the expected content hash is pinned before receive.
-package struct HDCOwnedRemoteArtifact: Sendable, Equatable {
+public struct HDCOwnedRemoteArtifact: Sendable, Equatable {
   public let path: HDCOwnedRemotePath
   package let expectedSHA256: String?
   package let maximumBytes: Int
@@ -246,7 +246,7 @@ package struct HDCOwnedRemoteArtifact: Sendable, Equatable {
 /// device. Enumerating types nobody has seen is the mistake this ledger
 /// exists to prevent, so the prefix stays open: a name the device does not
 /// have simply answers `invalid parameters.`
-package struct HDCFaultLogName: Sendable, Equatable {
+public struct HDCFaultLogName: Sendable, Equatable {
   public let value: String
 
   public init(_ value: String) throws {
@@ -271,7 +271,7 @@ package enum HDCFileMagic {
 /// A HAP staged under a provider-owned path. As with the E0 pack, the
 /// remote location is minted by the provider; a caller supplies only an
 /// artifact lease, never a device path.
-package struct HDCStagedArtifact: Sendable, Equatable {
+public struct HDCStagedArtifact: Sendable, Equatable {
   public let path: HDCOwnedRemotePath
   package let artifactLeaseID: String
   package let expectedSHA256: String?
@@ -287,7 +287,7 @@ package struct HDCStagedArtifact: Sendable, Equatable {
 /// `HDCOwnedRemotePath`: only this module can mint one, the job/step/nonce
 /// tuple makes collisions structurally impossible, and no caller can supply
 /// a device location.
-package struct HDCOwnedRemoteDirectory: Sendable, Equatable {
+public struct HDCOwnedRemoteDirectory: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
   package let nonce: String
@@ -329,7 +329,7 @@ package struct HDCOwnedRemoteDirectory: Sendable, Equatable {
 /// One package inside a staged set. Its remote path is derived from the
 /// owning directory and the artifact ID — a lease cannot name a path
 /// component, and the type cannot be built outside this module.
-package struct HDCStagedPackage: Sendable, Equatable {
+public struct HDCStagedPackage: Sendable, Equatable {
   package let remotePath: String
   package let artifactLeaseID: String
   /// Absent while the plan is only being materialized for admission, which
@@ -353,7 +353,7 @@ package struct HDCStagedPackage: Sendable, Equatable {
 /// the shape `bm install -p <dir>` requires for a multi-module application.
 /// A single-package install does not use this type at all, which is what
 /// keeps its plan unchanged (CHG-2026-049 r4).
-package struct HDCStagedPackageSet: Sendable, Equatable {
+public struct HDCStagedPackageSet: Sendable, Equatable {
   public let directory: HDCOwnedRemoteDirectory
   /// Entry package first, then the caller's order. Never fewer than two.
   public let packages: [HDCStagedPackage]
@@ -379,7 +379,7 @@ package struct HDCStagedPackageSet: Sendable, Equatable {
   }
 }
 
-package struct HDCBundleReference: Sendable, Equatable {
+public struct HDCBundleReference: Sendable, Equatable {
   public let bundleName: String
 
   public init(bundleName: String) throws {
@@ -399,7 +399,7 @@ package struct HDCBundleReference: Sendable, Equatable {
   }
 }
 
-package struct HDCAbilityReference: Sendable, Equatable {
+public struct HDCAbilityReference: Sendable, Equatable {
   public let bundle: HDCBundleReference
   public let abilityName: String
 
@@ -421,7 +421,7 @@ package struct HDCAbilityReference: Sendable, Equatable {
 /// The caller supplies identifiers, never a PID or argv. The provider owns
 /// the `pidof` lowering and derives the pseudonymous application reference
 /// that is published in the result Artifact.
-package struct HDCApplicationLivenessRequest: Sendable, Equatable {
+public struct HDCApplicationLivenessRequest: Sendable, Equatable {
   public let bundle: HDCBundleReference
   public let abilityName: String?
   package let processName: String
@@ -464,12 +464,12 @@ package struct HDCApplicationLivenessRequest: Sendable, Equatable {
   }
 }
 
-package enum HDCPortForwardDirection: String, Sendable, Equatable {
+public enum HDCPortForwardDirection: String, Sendable, Equatable {
   case forward
   case reverse
 }
 
-package struct HDCPortForwardSpec: Sendable, Equatable {
+public struct HDCPortForwardSpec: Sendable, Equatable {
   public let direction: HDCPortForwardDirection
   public let localPort: Int
   public let remotePort: Int

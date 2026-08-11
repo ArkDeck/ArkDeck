@@ -11,12 +11,12 @@ package enum ArkDeckProcessModule {
   public static let identifier = "ArkDeckProcess"
 }
 
-package enum ProcessStream: String, Sendable, Equatable, Hashable {
+public enum ProcessStream: String, Sendable, Equatable, Hashable {
   case stdout
   case stderr
 }
 
-package struct ProcessOutputChunk: Sendable, Equatable {
+public struct ProcessOutputChunk: Sendable, Equatable {
   public let stream: ProcessStream
   public let bytes: Data
 
@@ -37,8 +37,8 @@ package struct ProcessOutputChunk: Sendable, Equatable {
 /// stream must never report as untruncated.
 public struct ProcessStreamCapture: Sendable, Equatable {
   public let data: Data
-  package let totalByteCount: Int64
-  package let wasTruncated: Bool
+  public let totalByteCount: Int64
+  public let wasTruncated: Bool
 
   public init(data: Data, totalByteCount: Int64, wasTruncated: Bool) {
     self.data = data
@@ -68,8 +68,8 @@ public enum ProcessGroupTerminationResult: Sendable, Equatable {
 }
 
 public struct ProcessExecutionResult: Sendable, Equatable {
-  package let termination: ProcessTermination
-  package let processGroupTermination: ProcessGroupTerminationResult
+  public let termination: ProcessTermination
+  public let processGroupTermination: ProcessGroupTerminationResult
   public let stdout: ProcessStreamCapture
   public let stderr: ProcessStreamCapture
 
@@ -97,14 +97,14 @@ package enum ProcessSemanticResult<Failure: Sendable & Equatable>: Sendable, Equ
 
 /// Streaming semantic classification supplied by a tool Adapter. Evaluators
 /// receive every stdout/stderr byte before retained capture is truncated.
-package protocol ProcessSemanticEvaluating: Sendable {
+public protocol ProcessSemanticEvaluating: Sendable {
   associatedtype SemanticResult: Sendable
 
   mutating func consume(_ chunk: ProcessOutputChunk)
   mutating func finish(execution: ProcessExecutionResult) -> SemanticResult
 }
 
-package struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Sendable {
+public struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Sendable {
   public let execution: ProcessExecutionResult
   package let semantic: SemanticResult
 
@@ -116,7 +116,7 @@ package struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Sen
 
 extension SemanticallyEvaluatedProcessResult: Equatable where SemanticResult: Equatable {}
 
-package struct ProcessRequest: Sendable, Equatable {
+public struct ProcessRequest: Sendable, Equatable {
   public let executable: URL
   /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
   /// It never selects the executable: `executable` remains the identity-bound
@@ -155,7 +155,7 @@ package struct ProcessRequest: Sendable, Equatable {
 /// Expected immutable executable identity supplied by a durable Job intent.
 /// The Process port reopens and hashes the file itself; this value is not an
 /// authorization merely because a caller constructed it.
-package struct ProcessIdentityBoundRequest: Sendable, Equatable {
+public struct ProcessIdentityBoundRequest: Sendable, Equatable {
   public let process: ProcessRequest
   public let expectedSHA256: String
 
@@ -169,11 +169,11 @@ package struct ProcessIdentityBoundRequest: Sendable, Equatable {
 /// `authorizedPath` is diagnostic provenance; device/inode/hash identify the
 /// opened executable object and never come from a caller-provided snapshot.
 public struct ProcessExecutableIdentityReceipt: Sendable, Equatable, Codable {
-  package let authorizedPath: String
-  package let inodeLaunchPath: String
+  public let authorizedPath: String
+  public let inodeLaunchPath: String
   public let device: UInt64
   public let inode: UInt64
-  package let fileSize: Int64
+  public let fileSize: Int64
   public let mode: UInt32
   public let sha256: String
 
@@ -196,7 +196,7 @@ public struct ProcessExecutableIdentityReceipt: Sendable, Equatable, Codable {
   }
 }
 
-package struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
+public struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
   public let execution: ProcessExecutionResult
   public let executableIdentity: ProcessExecutableIdentityReceipt
 
@@ -209,7 +209,7 @@ package struct ProcessIdentityBoundExecutionResult: Sendable, Equatable {
   }
 }
 
-package struct SemanticallyEvaluatedIdentityBoundProcessResult<SemanticResult: Sendable>: Sendable {
+public struct SemanticallyEvaluatedIdentityBoundProcessResult<SemanticResult: Sendable>: Sendable {
   public let execution: ProcessExecutionResult
   package let semantic: SemanticResult
   public let executableIdentity: ProcessExecutableIdentityReceipt
@@ -231,7 +231,7 @@ where SemanticResult: Equatable {}
 /// One-shot state gate shared with the package-owned Supervisor. Invalidation
 /// and the `posix_spawn` syscall use the same lock, so a state change cannot
 /// land between final gate validation and the kernel launch attempt.
-package final class ProcessAtomicLaunchGate: @unchecked Sendable {
+public final class ProcessAtomicLaunchGate: @unchecked Sendable {
   private let lock = NSLock()
   private var invalidated = false
   private var consumed = false
@@ -256,7 +256,7 @@ package final class ProcessAtomicLaunchGate: @unchecked Sendable {
 /// Package-owned, one-shot authorization retaining the exact verified
 /// executable descriptors between durable receipt persistence and spawn.
 /// Callers can inspect the receipt but cannot construct or reuse the token.
-package final class ProcessPreparedIdentityBoundLaunch: @unchecked Sendable {
+public final class ProcessPreparedIdentityBoundLaunch: @unchecked Sendable {
   package let request: ProcessIdentityBoundRequest
   package let executableIdentity: ProcessExecutableIdentityReceipt
   package let executable: VerifiedExecutableDescriptor
@@ -288,12 +288,12 @@ package final class ProcessPreparedIdentityBoundLaunch: @unchecked Sendable {
   deinit { executable.close() }
 }
 
-package enum ProcessIdentityBoundLaunchFault: Sendable {
+public enum ProcessIdentityBoundLaunchFault: Sendable {
   case none
   case closeDescriptorBeforeSpawn
 }
 
-package enum ProcessExecutionError: Error, Equatable, LocalizedError {
+public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case executableMustBeAbsolute(String)
   case invalidExecutableContainsNUL
   case invalidArgumentContainsNUL
@@ -355,7 +355,7 @@ package enum ProcessExecutionError: Error, Equatable, LocalizedError {
   }
 }
 
-package typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
+public typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
 
 /// A `posix_spawn` adapter with a dedicated process group, separate streamed
 /// stdout/stderr, and bounded in-memory captures. `onOutput` receives every
@@ -363,13 +363,13 @@ package typealias ProcessOutputHandler = @Sendable (ProcessOutputChunk) -> Void
 /// memory grow with the output size. Timeout and cancellation signal only the
 /// spawned process group, which also prevents a descendant from surviving the
 /// parent process.
-package final class FoundationProcessExecutor: @unchecked Sendable {
+public final class FoundationProcessExecutor: @unchecked Sendable {
   /// The only parent-environment keys a child process ever inherits. The
   /// parent (arkdeck-agentd) carries credentials such as its model API key;
   /// spawning must not republish them to every tool child. A caller that
   /// needs any variable beyond this base names it in
   /// `ProcessRequest.environment` explicitly.
-  package static let baseChildEnvironmentKeys: Set<String> = [
+  public static let baseChildEnvironmentKeys: Set<String> = [
     "PATH", "HOME", "TMPDIR", "LANG",
   ]
 
@@ -400,7 +400,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
     identityBoundSpawnObserver = { _, _, _ in }
   }
 
-  package init(
+  public init(
     identityBoundPreSpawnHook:
       @escaping @Sendable (ProcessExecutableIdentityReceipt) throws
       -> Void,
@@ -419,11 +419,11 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
     self.identityBoundSpawnObserver = identityBoundSpawnObserver
   }
 
-  /// In-package entry point for exercising the execution core (argv
+  /// In-public entry point for exercising the execution core (argv
   /// isolation, stream capture, process-group control) without identity
   /// binding. Production callers spawn exclusively through
   /// `executeIdentityBound`; this must never become public again.
-  package func execute(
+  public func execute(
     _ request: ProcessRequest,
     captureLimit: Int = 64 * 1024,
     onOutput: @escaping ProcessOutputHandler = { _ in }
@@ -448,9 +448,9 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
 
   /// Runs a process while allowing an Adapter to classify the complete raw
   /// byte stream. The semantic result remains independent from the process
-  /// termination status, including the exit-zero case. In-package only, as
+  /// termination status, including the exit-zero case. In-public only, as
   /// with the non-evaluating overload above.
-  package func execute<Evaluator: ProcessSemanticEvaluating>(
+  public func execute<Evaluator: ProcessSemanticEvaluating>(
     _ request: ProcessRequest,
     evaluating evaluator: Evaluator,
     captureLimit: Int = 64 * 1024,
@@ -471,7 +471,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
   /// hash, rechecks the pathname, then executes Darwin's stable
   /// `/.vol/<device>/<inode>` name while retaining the same descriptor through
   /// the `posix_spawn` syscall.
-  package func executeIdentityBound(
+  public func executeIdentityBound(
     _ request: ProcessIdentityBoundRequest,
     captureLimit: Int = 64 * 1024,
     onOutput: @escaping ProcessOutputHandler = { _ in }
@@ -480,7 +480,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
       request, gate: nil, captureLimit: captureLimit, onOutput: onOutput)
   }
 
-  package func executeIdentityBound(
+  public func executeIdentityBound(
     _ request: ProcessIdentityBoundRequest,
     gate: ProcessAtomicLaunchGate,
     captureLimit: Int = 64 * 1024,
@@ -490,7 +490,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
       request, gate: gate, captureLimit: captureLimit, onOutput: onOutput)
   }
 
-  package func executeIdentityBound(
+  public func executeIdentityBound(
     _ request: ProcessIdentityBoundRequest,
     verifiedResources: [VerifiedRegularFileDescriptor],
     captureLimit: Int = 64 * 1024,
@@ -502,7 +502,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
       verifiedResources: verifiedResources, onOutput: onOutput)
   }
 
-  package func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
+  public func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
     _ request: ProcessIdentityBoundRequest,
     evaluating evaluator: Evaluator,
     captureLimit: Int = 64 * 1024,
@@ -519,7 +519,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
       executableIdentity: result.executableIdentity)
   }
 
-  package func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
+  public func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
     _ request: ProcessIdentityBoundRequest,
     gate: ProcessAtomicLaunchGate,
     evaluating evaluator: Evaluator,
@@ -539,7 +539,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
       executableIdentity: result.executableIdentity)
   }
 
-  package func prepareIdentityBoundLaunch(
+  public func prepareIdentityBoundLaunch(
     _ request: ProcessIdentityBoundRequest
   ) throws -> ProcessPreparedIdentityBoundLaunch {
     try validate(request.process)
@@ -561,7 +561,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
     }
   }
 
-  package func executePreparedIdentityBoundLaunch<Evaluator: ProcessSemanticEvaluating>(
+  public func executePreparedIdentityBoundLaunch<Evaluator: ProcessSemanticEvaluating>(
     _ prepared: ProcessPreparedIdentityBoundLaunch,
     evaluating evaluator: Evaluator,
     captureLimit: Int = 64 * 1024,
@@ -580,7 +580,7 @@ package final class FoundationProcessExecutor: @unchecked Sendable {
       executableIdentity: result.executableIdentity)
   }
 
-  package func executePreparedIdentityBoundLaunch<Evaluator: ProcessSemanticEvaluating>(
+  public func executePreparedIdentityBoundLaunch<Evaluator: ProcessSemanticEvaluating>(
     _ prepared: ProcessPreparedIdentityBoundLaunch,
     gate: ProcessAtomicLaunchGate,
     evaluating evaluator: Evaluator,

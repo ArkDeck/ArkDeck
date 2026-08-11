@@ -112,7 +112,7 @@ public struct HarnessTaskCondition: Equatable, Codable, Sendable {
   public let state: HarnessTriState
   public let reasonCode: String
   public let message: String?
-  package let evidenceArtifactIDs: [String]
+  public let evidenceArtifactIDs: [String]
   public let observedAt: String?
   public let observedRevision: Int?
 
@@ -159,7 +159,7 @@ public enum HarnessTaskConditionSet {
     }
   }
 
-  package static func normalized(
+  public static func normalized(
     _ conditions: [HarnessTaskCondition],
     missingReasonCode: String = "notObserved"
   ) -> [HarnessTaskCondition] {
@@ -169,7 +169,7 @@ public enum HarnessTaskConditionSet {
     }
   }
 
-  package static func replacing(
+  public static func replacing(
     _ conditions: [HarnessTaskCondition],
     with replacements: [HarnessTaskCondition]
   ) -> [HarnessTaskCondition] {
@@ -271,16 +271,16 @@ public enum HarnessCriterionComparator: String, CaseIterable, Codable, Sendable 
 /// task carrying criteria cannot yet be judged - it stops honestly instead
 /// of being called successful.
 public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
-  package let criterionID: String
-  package let metric: String
-  package let comparator: HarnessCriterionComparator
+  public let criterionID: String
+  public let metric: String
+  public let comparator: HarnessCriterionComparator
   public let expected: JSONValue
-  package let mandatory: Bool
-  package let minimumSamples: Int
+  public let mandatory: Bool
+  public let minimumSamples: Int
   /// Artifact names whose bytes must verify before this criterion may be
   /// judged at all. Absent evidence is inconclusive, never a pass.
-  package let evidenceRequirements: [String]
-  package let inconclusivePolicy: HarnessInconclusivePolicy
+  public let evidenceRequirements: [String]
+  public let inconclusivePolicy: HarnessInconclusivePolicy
 
   enum CodingKeys: String, CodingKey {
     case criterionID = "criterionId"
@@ -334,7 +334,7 @@ public struct HarnessSuccessCriterion: Equatable, Sendable, Codable {
 
 public struct HarnessTaskGoal: Equatable, Sendable, Codable {
   public let summary: String
-  package let desiredState: [String: JSONValue]
+  public let desiredState: [String: JSONValue]
 
   public init(summary: String, desiredState: [String: JSONValue] = [:]) {
     self.summary = summary
@@ -347,7 +347,7 @@ public struct HarnessTaskTargetReference: Equatable, Sendable, Codable {
   /// Present means: execute against exactly this binding revision. The
   /// runtime, not the harness, enforces it; the harness only carries the
   /// operator's intent forward across rounds.
-  package let expectedBindingRevision: Int?
+  public let expectedBindingRevision: Int?
 
   enum CodingKeys: String, CodingKey {
     case targetID = "targetId"
@@ -361,21 +361,21 @@ public struct HarnessTaskTargetReference: Equatable, Sendable, Codable {
 }
 
 public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
-  package let maxRounds: Int
-  package let maxWallClockSeconds: Int
-  package let maxArtifactBytes: Int
-  package let maxE1Mutations: Int
+  public let maxRounds: Int
+  public let maxWallClockSeconds: Int
+  public let maxArtifactBytes: Int
+  public let maxE1Mutations: Int
   /// Consecutive evidence rounds that may make no measurable progress before
   /// the active strategy is closed. This is task data, not a process-global
   /// constant, so restart and daemon composition cannot change the bound.
-  package let maxNoProgressRounds: Int
+  public let maxNoProgressRounds: Int
   /// Confirmed retries of one identical ActionRun. The first dispatch is not
   /// a retry; crash recovery reuses it and therefore does not consume this.
-  package let maxActionRetriesPerRun: Int
+  public let maxActionRetriesPerRun: Int
   /// Ceiling on model calls (CHG-2026-055, TASK-HFA-011). Zero means the
   /// loop may not call a model at all, which is a legitimate configuration:
   /// the deterministic handler converges without one.
-  package let maxModelCalls: Int
+  public let maxModelCalls: Int
 
   enum CodingKeys: String, CodingKey {
     case maxRounds
@@ -424,18 +424,18 @@ public struct HarnessTaskBudgets: Equatable, Sendable, Codable {
   /// Ceilings are part of the model, not of a caller's judgement: an
   /// unattended loop with an unbounded budget is the failure mode this
   /// whole plane exists to prevent.
-  package static let ceiling = HarnessTaskBudgets(
+  public static let ceiling = HarnessTaskBudgets(
     maxRounds: 64, maxWallClockSeconds: 24 * 3600, maxArtifactBytes: 2 << 30,
     maxE1Mutations: 32, maxNoProgressRounds: 32, maxActionRetriesPerRun: 16,
     maxModelCalls: 128)
 }
 
 public struct HarnessConsumedBudget: Equatable, Sendable, Codable {
-  package let rounds: Int
-  package let wallClockSeconds: Int
-  package let artifactBytes: Int
-  package let e1Mutations: Int
-  package let modelCalls: Int
+  public let rounds: Int
+  public let wallClockSeconds: Int
+  public let artifactBytes: Int
+  public let e1Mutations: Int
+  public let modelCalls: Int
 
   public init(
     rounds: Int = 0,
@@ -483,8 +483,8 @@ public struct HarnessTaskResult: Equatable, Sendable, Codable {
   public let outcome: HarnessTaskLifecycle
   public let reasonCode: String
   public let summary: String
-  package let evaluationID: String?
-  package let artifactRefs: [String]
+  public let evaluationID: String?
+  public let artifactRefs: [String]
 
   enum CodingKeys: String, CodingKey {
     case outcome
@@ -544,18 +544,18 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
-  package let conditions: [HarnessTaskCondition]
+  public let conditions: [HarnessTaskCondition]
   public let activeRound: Int
   public let activeJobID: String?
-  package let consumedBudget: HarnessConsumedBudget
-  package let artifactRefs: [String]
+  public let consumedBudget: HarnessConsumedBudget
+  public let artifactRefs: [String]
   /// Cumulative observed state. Only an observation or an evaluation may
   /// write it (validated below), so a decision cannot describe the world.
-  package let observedState: [String: JSONValue]
-  package let latestEvaluationID: String?
+  public let observedState: [String: JSONValue]
+  public let latestEvaluationID: String?
   /// Consecutive rounds that changed nothing measurable. Durable because a
   /// restart must not reset the loop's patience.
-  package let noProgressRounds: Int
+  public let noProgressRounds: Int
   /// A cancel that arrived while an effectful job was still in flight.
   /// Cancellation completes only once that job is observed terminal: the
   /// harness never reports a task cancelled while a side effect it started
@@ -739,18 +739,18 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let schemaVersion: String
-  package let htaskID: String
+  public let htaskID: String
   public let sequence: Int
-  package let atUTC: String
-  package let causation: HarnessTaskCausation
+  public let atUTC: String
+  public let causation: HarnessTaskCausation
   public let reasonCode: String
-  package let fromLifecycle: HarnessTaskLifecycle
-  package let toLifecycle: HarnessTaskLifecycle
-  package let fromStage: HarnessTaskStage
-  package let toStage: HarnessTaskStage
+  public let fromLifecycle: HarnessTaskLifecycle
+  public let toLifecycle: HarnessTaskLifecycle
+  public let fromStage: HarnessTaskStage
+  public let toStage: HarnessTaskStage
   public let jobID: String?
-  package let evaluationID: String?
-  package let resulting: HarnessTaskProjection
+  public let evaluationID: String?
+  public let resulting: HarnessTaskProjection
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -806,32 +806,32 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let schemaVersion: String
-  package let htaskID: String
+  public let htaskID: String
   public let type: HarnessTaskType
   /// Free text is admitted here and nowhere else: it never reaches
   /// execution, admission or a comparison.
-  package let intakeDescription: String?
+  public let intakeDescription: String?
   public let projectRef: String?
   public let target: HarnessTaskTargetReference
   public let goal: HarnessTaskGoal
-  package let successCriteria: [HarnessSuccessCriterion]
-  package let budgets: HarnessTaskBudgets
+  public let successCriteria: [HarnessSuccessCriterion]
+  public let budgets: HarnessTaskBudgets
   public let policy: HarnessTaskPolicy
-  package let evolutionPolicy: HarnessEvolutionPolicy?
-  package let evolutionWorkspace: HarnessEvolutionWorkspace?
-  package let observedState: [String: JSONValue]
+  public let evolutionPolicy: HarnessEvolutionPolicy?
+  public let evolutionWorkspace: HarnessEvolutionWorkspace?
+  public let observedState: [String: JSONValue]
   public let createdAtUTC: String
   public let updatedAtUTC: String
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
-  package let conditions: [HarnessTaskCondition]
+  public let conditions: [HarnessTaskCondition]
   public let activeRound: Int
   public let activeJobID: String?
-  package let consumedBudget: HarnessConsumedBudget
-  package let artifactRefs: [String]
-  package let latestEvaluationID: String?
-  package let noProgressRounds: Int
+  public let consumedBudget: HarnessConsumedBudget
+  public let artifactRefs: [String]
+  public let latestEvaluationID: String?
+  public let noProgressRounds: Int
   public let cancelRequested: Bool
   public let result: HarnessTaskResult?
   public let version: Int
@@ -1032,10 +1032,10 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
   /// The current product has no normal/evolution switch. A workspace policy is the single
   /// source of truth for isolation, validation and promotion behavior.
-  package var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
+  public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
   /// Source project identity remains stable for memory/egress. Typed
   /// workspace operations use the isolated provider reference in Evolution.
-  package var executionProjectRef: String? {
+  public var executionProjectRef: String? {
     evolutionWorkspace?.projectRef ?? projectRef
   }
 
@@ -1060,7 +1060,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   /// Rebuild a snapshot from an event's resulting projection. Used by the
   /// store when a crash landed between the event append and the snapshot
   /// replace: the log is the truth, the snapshot is a cache.
-  package func applying(_ projection: HarnessTaskProjection, atUTC: String) -> HarnessTaskSnapshot {
+  public func applying(_ projection: HarnessTaskProjection, atUTC: String) -> HarnessTaskSnapshot {
     HarnessTaskSnapshot(
       htaskID: htaskID, type: type, intakeDescription: intakeDescription,
       projectRef: projectRef, target: target, goal: goal, successCriteria: successCriteria,
@@ -1079,7 +1079,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
 }
 
-package enum HarnessTaskTransitionError: Error, Equatable, Sendable {
+public enum HarnessTaskTransitionError: Error, Equatable, Sendable {
   case terminal(HarnessTaskLifecycle)
   case illegalLifecycle(
     from: HarnessTaskLifecycle, to: HarnessTaskLifecycle, causation: HarnessTaskCausation)

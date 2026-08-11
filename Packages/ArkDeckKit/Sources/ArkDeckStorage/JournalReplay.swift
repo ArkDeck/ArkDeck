@@ -3,23 +3,23 @@ import Darwin
 import Foundation
 
 public struct OutstandingJournalIntent: Equatable, Sendable {
-  package let eventID: String
+  public let eventID: String
   public let stepID: String
   public let attempt: Int
   public let effect: WorkflowEffect
   public let bindingRevision: Int?
-  package let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
-  package let authorizationReference: AuthorizationReference?
-  package let usageReservationID: String?
+  public let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
+  public let authorizationReference: AuthorizationReference?
+  public let usageReservationID: String?
 }
 
 public struct UnknownJournalOutcome: Equatable, Sendable {
-  package let eventID: String
-  package let correlatedIntentEventID: String
+  public let eventID: String
+  public let correlatedIntentEventID: String
   public let stepID: String
   public let attempt: Int
   public let effect: WorkflowEffect
-  package let isCompensation: Bool
+  public let isCompensation: Bool
 }
 
 struct PendingReconcileTransition: Equatable, Sendable {
@@ -28,13 +28,13 @@ struct PendingReconcileTransition: Equatable, Sendable {
   let nextState: JobState
 }
 
-package enum RecoveryAbandonmentPhase: String, CaseIterable, Equatable, Sendable {
+public enum RecoveryAbandonmentPhase: String, CaseIterable, Equatable, Sendable {
   case intentDurable
   case requested
   case outcomeDurable
 }
 
-package struct PendingRecoveryAbandonment: Equatable, Sendable {
+public struct PendingRecoveryAbandonment: Equatable, Sendable {
   public let intentEventID: String
   package let phase: RecoveryAbandonmentPhase
   package let outcomeEventID: String?
@@ -43,7 +43,7 @@ package struct PendingRecoveryAbandonment: Equatable, Sendable {
   public let outcomeCertainty: JournalOutcomeCertainty
 }
 
-package struct JournalReplay: Equatable, Sendable {
+public struct JournalReplay: Equatable, Sendable {
   public let events: [JournalEvent]
   public let hasTornTail: Bool
   public let schemaVersion: String?

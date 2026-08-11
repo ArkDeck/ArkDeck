@@ -2,7 +2,7 @@ import ArkDeckOpenHarmony
 import ArkDeckProcess
 import Foundation
 
-package enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
+public enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
   case serverDidNotBecomeReady(String)
 }
 

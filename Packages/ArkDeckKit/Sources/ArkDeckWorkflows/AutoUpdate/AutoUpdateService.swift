@@ -73,7 +73,7 @@ package final class UserDefaultsAutoUpdatePreferences: AutoUpdatePreferenceStori
 }
 
 public actor AutoUpdateService {
-  package static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
+  public static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
 
   private let streamer: any UpdateHTTPStreaming
   private let verifier: UpdateFeedVerifier

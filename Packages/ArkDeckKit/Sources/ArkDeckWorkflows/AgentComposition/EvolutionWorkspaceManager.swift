@@ -10,7 +10,7 @@ import ArkDeckWorkflows
 import CryptoKit
 import Foundation
 
-package enum EvolutionWorkspaceError: Error, Equatable, Sendable {
+public enum EvolutionWorkspaceError: Error, Equatable, Sendable {
   case malformedTaskID
   case sourceProfileUnavailable(String)
   case policyScopeOutsideProfile(String)

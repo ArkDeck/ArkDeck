@@ -46,7 +46,7 @@ package struct LiveAgentChatRuntimePort: AgentChatRuntimePort {
   }
 }
 
-package enum AgentChatRuntimeToolError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum AgentChatRuntimeToolError: Error, Equatable, Sendable, CustomStringConvertible {
   case invalidArguments(String)
   case blocked(String)
   case malformedRuntimeResponse(String)

@@ -10,7 +10,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codable {
+public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codable {
   public let path: String
   public let sha256: String
 
@@ -457,7 +457,7 @@ package struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
   }
 }
 
-package struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
+public struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
   public let operation: String
   package let projectRef: String
   package let projectRoot: String
@@ -468,12 +468,12 @@ package struct WorkspaceResolvedInvocation: Sendable, Equatable, Codable {
   package let timeoutSeconds: Int
 }
 
-package struct WorkspaceFileSnapshot: Sendable, Equatable, Codable {
+public struct WorkspaceFileSnapshot: Sendable, Equatable, Codable {
   package let relativePath: String
   public let sha256: String?
 }
 
-package struct WorkspacePatchIntent: Sendable, Equatable, Codable {
+public struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   package let invocation: WorkspaceResolvedInvocation
   package let patchAttemptRef: String
   package let patchArtifactID: String
@@ -506,7 +506,7 @@ package struct WorkspacePatchIntent: Sendable, Equatable, Codable {
   }
 }
 
-package struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
+public struct WorkspaceArchiveCheckpointIntent: Sendable, Equatable, Codable {
   package let invocation: WorkspaceResolvedInvocation
   /// The path is derived from the runtime
   /// Job identity inside the provider-owned 0700 attempt store.
@@ -551,7 +551,7 @@ package struct WorkspacePatchAttempt: Sendable, Equatable, Codable {
   }
 }
 
-package struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
+public struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
   package let invocation: WorkspaceResolvedInvocation
   package let attempt: WorkspacePatchAttempt
 }

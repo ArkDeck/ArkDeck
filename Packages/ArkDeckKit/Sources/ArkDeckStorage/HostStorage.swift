@@ -21,7 +21,7 @@ public final class StorageConfigurationEpoch: @unchecked Sendable {
     return StorageConfigurationToken(value: value)
   }
 
-  package func performMutation<T>(_ body: () throws -> T) rethrows -> T {
+  public func performMutation<T>(_ body: () throws -> T) rethrows -> T {
     lock.lock()
     defer {
       value = UUID()
@@ -30,7 +30,7 @@ public final class StorageConfigurationEpoch: @unchecked Sendable {
     return try body()
   }
 
-  package func performIfCurrent<T>(
+  public func performIfCurrent<T>(
     _ token: StorageConfigurationToken,
     _ body: () throws -> T
   ) throws -> T {
@@ -731,9 +731,9 @@ package enum StorageClaimExecution<Value: Sendable>: Sendable {
   case queued(StorageQueueReason)
 }
 
-package struct StorageOperationFinalizationError: Error, @unchecked Sendable {
-  package let operationError: any Error
-  package let finalizationError: any Error
+public struct StorageOperationFinalizationError: Error, @unchecked Sendable {
+  public let operationError: any Error
+  public let finalizationError: any Error
 
   public init(operationError: any Error, finalizationError: any Error) {
     self.operationError = operationError

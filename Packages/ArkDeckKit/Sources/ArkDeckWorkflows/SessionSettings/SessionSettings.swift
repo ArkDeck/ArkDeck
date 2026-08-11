@@ -44,7 +44,7 @@ package struct SessionSettingsSnapshot: Equatable, Sendable {
   }
 }
 
-package enum SessionSettingsError: Error, Equatable, Sendable {
+public enum SessionSettingsError: Error, Equatable, Sendable {
   case configurationMissingFields
   case configurationWrongType
   case unsupportedSchemaVersion

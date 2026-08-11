@@ -62,7 +62,7 @@ public struct HarnessJobObservation: Equatable, Sendable {
   }
 }
 
-package enum HarnessJobPortError: Error, Equatable, Sendable {
+public enum HarnessJobPortError: Error, Equatable, Sendable {
   case rejected(String)
   case unknownJob(String)
   case transportFailure(String)

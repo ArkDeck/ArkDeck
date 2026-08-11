@@ -31,7 +31,7 @@ public enum HDCAuthorizationState: Sendable, Equatable {
   case keyAccessDenied(reason: String)
   case unavailable(reason: String)
 
-  package var hasNonDestructiveRetry: Bool {
+  public var hasNonDestructiveRetry: Bool {
     switch self {
     case .ready: false
     case .unauthorizedWaitingForTrust, .denied, .timedOut, .cancelled, .keyAccessDenied,

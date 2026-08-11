@@ -23,7 +23,7 @@
 import ArkDeckCore
 import Foundation
 
-package enum WorkspaceProviderError: Error, Equatable, Sendable {
+public enum WorkspaceProviderError: Error, Equatable, Sendable {
   case unknownProject(String)
   case malformedScope(String)
 }

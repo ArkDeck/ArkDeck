@@ -53,7 +53,7 @@ public enum HarnessReconcileAction: String, Sendable, Codable {
 public struct HarnessReconcileOutcome: Sendable, Equatable {
   public let snapshot: HarnessTaskSnapshot
   public let action: HarnessReconcileAction
-  package let dispatchedJobID: String?
+  public let dispatchedJobID: String?
   public let reasonCode: String
 
   public init(
@@ -69,7 +69,7 @@ public struct HarnessReconcileOutcome: Sendable, Equatable {
   }
 }
 
-package enum HarnessCoordinatorError: Error, Equatable, Sendable {
+public enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case unsupportedTaskType(HarnessTaskType)
   case notFound(String)
   case notPausable(HarnessTaskLifecycle)

@@ -2,7 +2,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum JournalEventKind: String, CaseIterable, Codable, Sendable {
+public enum JournalEventKind: String, CaseIterable, Codable, Sendable {
   case jobCreated
   case stateTransition
   case stepIntent
@@ -24,12 +24,12 @@ package enum JournalEventKind: String, CaseIterable, Codable, Sendable {
   case finalized
 }
 
-package enum JournalOutcomeCertainty: String, Codable, Sendable {
+public enum JournalOutcomeCertainty: String, Codable, Sendable {
   case confirmed
   case outcomeUnknown
 }
 
-package enum JournalEventValidationError: Error, Equatable, Sendable {
+public enum JournalEventValidationError: Error, Equatable, Sendable {
   case malformedEnvelope(String)
   case malformedPayload(kind: JournalEventKind, detail: String)
   case canonicalArgumentsHashMismatch(stepID: String)
@@ -61,7 +61,7 @@ struct JournalSchemaCapabilities: Sendable {
   }
 }
 
-package struct JournalEvent: Equatable, Sendable {
+public struct JournalEvent: Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
   package static let authorizedAgentSchemaVersion = "2.0.0"
   package static let rockchipAuthorizedAgentSchemaVersion = "2.1.0"

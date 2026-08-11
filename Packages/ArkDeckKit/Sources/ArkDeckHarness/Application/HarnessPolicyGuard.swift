@@ -68,12 +68,12 @@ public struct HarnessGuardInput: Sendable {
   public let snapshot: HarnessTaskSnapshot
   public let operationReference: String
   public let inputs: [String: JSONValue]
-  package let inputsDigest: String
-  package let permittedOperations: Set<String>
-  package let failureRecord: HarnessFailureRecord?
-  package let previousStrategy: HarnessStrategySignature?
-  package let consecutiveNoProgressRounds: Int
-  package let elapsedSeconds: Int?
+  public let inputsDigest: String
+  public let permittedOperations: Set<String>
+  public let failureRecord: HarnessFailureRecord?
+  public let previousStrategy: HarnessStrategySignature?
+  public let consecutiveNoProgressRounds: Int
+  public let elapsedSeconds: Int?
 
   public init(
     snapshot: HarnessTaskSnapshot,
@@ -107,7 +107,7 @@ public struct HarnessPolicyGuard: Sendable {
   /// leaves a window where a grant expires in between; the engine closes it
   /// by re-validating scope, revision and expiry at consumption, so a stale
   /// id is refused there rather than acted on.
-  package var capabilityPort: (any HarnessCapabilityPort)? { capabilities }
+  public var capabilityPort: (any HarnessCapabilityPort)? { capabilities }
 
   public init(
     availability: (any HarnessOperationAvailabilityPort)? = nil,
@@ -140,7 +140,7 @@ public struct HarnessPolicyGuard: Sendable {
   /// are different: their ceiling is checked only when the deterministic
   /// handler reaches `patchProposalRequired`, so exhausting that optional
   /// resource cannot block a mechanical typed step.
-  package static func budgetRefusal(
+  public static func budgetRefusal(
     _ snapshot: HarnessTaskSnapshot,
     elapsedSeconds: Int?
   ) -> HarnessGuardRefusal? {

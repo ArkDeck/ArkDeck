@@ -17,7 +17,7 @@ public enum HDCServerEndpointSource: String, Sendable, Equatable {
   case `default`
 }
 
-package enum HDCServerEndpointSelectionError: Error, Sendable, Equatable {
+public enum HDCServerEndpointSelectionError: Error, Sendable, Equatable {
   case invalidExplicitEndpoint(String)
   case invalidInheritedPort(String)
 }

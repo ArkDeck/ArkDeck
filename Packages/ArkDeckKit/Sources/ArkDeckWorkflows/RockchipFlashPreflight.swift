@@ -450,7 +450,7 @@ extension RockchipFlashPreflightProbes {
   }
 }
 
-package enum RockchipFlashPreflightError: Error, Sendable, Equatable, CustomStringConvertible {
+public enum RockchipFlashPreflightError: Error, Sendable, Equatable, CustomStringConvertible {
   case hdcPathUnset
 
   public var description: String {

@@ -9,7 +9,7 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-package enum AgentClientError: Error, Equatable, Sendable {
+public enum AgentClientError: Error, Equatable, Sendable {
   case connectFailed(String)
   case transport(String)
   case malformedResponse(String)

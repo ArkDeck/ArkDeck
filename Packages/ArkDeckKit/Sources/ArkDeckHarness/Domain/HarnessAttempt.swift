@@ -9,7 +9,7 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-package enum HarnessStrategyDescriptorError: Error, Equatable, Sendable {
+public enum HarnessStrategyDescriptorError: Error, Equatable, Sendable {
   case emptyField(String)
   case invalidDigest(String)
 }
@@ -18,9 +18,9 @@ package enum HarnessStrategyDescriptorError: Error, Equatable, Sendable {
 /// strategy elements. They are grouped so the top-level fingerprint shape
 /// remains the reviewed seven-element shape while retaining each exact fact.
 public struct HarnessStrategyExecutionExpectation: Equatable, Sendable, Codable {
-  package let targetProfile: String
-  package let toolchainProfile: String
-  package let expectedNextObservation: String
+  public let targetProfile: String
+  public let toolchainProfile: String
+  public let expectedNextObservation: String
 
   public init(
     targetProfile: String,
@@ -41,15 +41,15 @@ public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   /// Explicit non-applicability marker for a task-journey Attempt that exists
   /// before any source-repair strategy. It is a non-claim, never a fabricated
   /// patch or workspace revision.
-  package static let notApplicableDigest = String(repeating: "0", count: 64)
+  public static let notApplicableDigest = String(repeating: "0", count: 64)
 
-  package let hypothesisClass: String
-  package let selectedOperationFamily: String
-  package let patchFingerprint: String
-  package let baseWorkspaceRevision: String
-  package let artifactSourceSet: [String]
-  package let prerequisiteSet: [String]
-  package let executionExpectation: HarnessStrategyExecutionExpectation
+  public let hypothesisClass: String
+  public let selectedOperationFamily: String
+  public let patchFingerprint: String
+  public let baseWorkspaceRevision: String
+  public let artifactSourceSet: [String]
+  public let prerequisiteSet: [String]
+  public let executionExpectation: HarnessStrategyExecutionExpectation
 
   public init(
     hypothesisClass: String,
@@ -86,12 +86,12 @@ public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
 
   /// Canonical JSON is the fingerprint material. No delimiter joining and
   /// no dictionary iteration order can make two distinct strategies collide.
-  package var canonicalJSON: Data {
+  public var canonicalJSON: Data {
     let encoder = CanonicalJSONEncoders.canonical()
     return (try? encoder.encode(self)) ?? Data("{}".utf8)
   }
 
-  package var fingerprint: String {
+  public var fingerprint: String {
     SHA256Hex.string(of: canonicalJSON)
   }
 
@@ -113,7 +113,7 @@ public enum HarnessAttemptOutcome: String, CaseIterable, Codable, Sendable {
   case humanRequired
   case cancelled
 
-  package var isClosed: Bool { self != .active }
+  public var isClosed: Bool { self != .active }
 }
 
 public struct HarnessAttempt: Equatable, Sendable, Codable {
@@ -123,31 +123,31 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
   public let documentType: String
   public let schemaVersion: String
   public let attemptID: String
-  package let htaskID: String
+  public let htaskID: String
   public let ordinal: Int
-  package let hypothesis: String
+  public let hypothesis: String
   public let strategy: HarnessStrategyDescriptor
-  package let strategyFingerprint: String
-  package let baseRevision: String
-  package let patchRevision: String?
+  public let strategyFingerprint: String
+  public let baseRevision: String
+  public let patchRevision: String?
   public let outcome: HarnessAttemptOutcome
-  package let failureFingerprint: String?
-  package let actionRunIDs: [String]
-  package let evaluationIDs: [String]
-  package let confirmedFacts: [String]
-  package let disprovedFacts: [String]
+  public let failureFingerprint: String?
+  public let actionRunIDs: [String]
+  public let evaluationIDs: [String]
+  public let confirmedFacts: [String]
+  public let disprovedFacts: [String]
   /// Evolution-only facts remain on the existing strategy Attempt.  A
   /// second attempt model would make retry/deduplication semantics diverge.
-  package let evolutionWorkspace: HarnessEvolutionWorkspace?
-  package let candidatePatch: HarnessCandidatePatch?
-  package let buildArtifactIDs: [String]
-  package let runtimeArtifactIDs: [String]
-  package let latestEvaluationVerdict: HarnessEvaluationVerdict?
-  package let promotionCandidate: HarnessPromotionCandidate?
+  public let evolutionWorkspace: HarnessEvolutionWorkspace?
+  public let candidatePatch: HarnessCandidatePatch?
+  public let buildArtifactIDs: [String]
+  public let runtimeArtifactIDs: [String]
+  public let latestEvaluationVerdict: HarnessEvaluationVerdict?
+  public let promotionCandidate: HarnessPromotionCandidate?
   public let createdAtUTC: String
   public let updatedAtUTC: String
 
-  package var applicableBaseRevision: String? {
+  public var applicableBaseRevision: String? {
     baseRevision == HarnessStrategyDescriptor.notApplicableDigest ? nil : baseRevision
   }
 
@@ -269,39 +269,39 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
   }
 
-  package func recordingActionRun(_ actionRunID: String, atUTC: String) -> HarnessAttempt {
+  public func recordingActionRun(_ actionRunID: String, atUTC: String) -> HarnessAttempt {
     derived(actionRunIDs: actionRunIDs + [actionRunID], updatedAtUTC: atUTC)
   }
 
-  package func recordingPatchRevision(_ revision: String, atUTC: String) -> HarnessAttempt {
+  public func recordingPatchRevision(_ revision: String, atUTC: String) -> HarnessAttempt {
     derived(patchRevision: revision, updatedAtUTC: atUTC)
   }
 
-  package func recordingCandidatePatch(
+  public func recordingCandidatePatch(
     _ candidatePatch: HarnessCandidatePatch, atUTC: String
   ) -> HarnessAttempt {
     derived(candidatePatch: candidatePatch, updatedAtUTC: atUTC)
   }
 
-  package func recordingBuildArtifacts(
+  public func recordingBuildArtifacts(
     _ artifactIDs: [String], atUTC: String
   ) -> HarnessAttempt {
     derived(buildArtifactIDs: buildArtifactIDs + artifactIDs, updatedAtUTC: atUTC)
   }
 
-  package func recordingRuntimeArtifacts(
+  public func recordingRuntimeArtifacts(
     _ artifactIDs: [String], atUTC: String
   ) -> HarnessAttempt {
     derived(runtimeArtifactIDs: runtimeArtifactIDs + artifactIDs, updatedAtUTC: atUTC)
   }
 
-  package func recordingPromotion(
+  public func recordingPromotion(
     _ candidate: HarnessPromotionCandidate, atUTC: String
   ) -> HarnessAttempt {
     derived(promotionCandidate: candidate, updatedAtUTC: atUTC)
   }
 
-  package func recordingFailure(
+  public func recordingFailure(
     _ fingerprint: String,
     outcome: HarnessAttemptOutcome = .failed,
     atUTC: String
@@ -309,7 +309,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
     derived(outcome: outcome, failureFingerprint: fingerprint, updatedAtUTC: atUTC)
   }
 
-  package func recordingEvaluation(
+  public func recordingEvaluation(
     _ evaluationID: String,
     confirmedFacts: [String],
     disprovedFacts: [String],
@@ -326,7 +326,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
       updatedAtUTC: atUTC)
   }
 
-  package func closing(_ outcome: HarnessAttemptOutcome, atUTC: String) -> HarnessAttempt {
+  public func closing(_ outcome: HarnessAttemptOutcome, atUTC: String) -> HarnessAttempt {
     derived(outcome: outcome, updatedAtUTC: atUTC)
   }
 
@@ -370,7 +370,7 @@ public struct HarnessAttempt: Equatable, Sendable, Codable {
   }
 }
 
-package enum HarnessAttemptEventKind: String, CaseIterable, Codable, Sendable {
+public enum HarnessAttemptEventKind: String, CaseIterable, Codable, Sendable {
   case created
   case actionRunRecorded
   case patchRevisionObserved
@@ -384,7 +384,7 @@ package enum HarnessAttemptEventKind: String, CaseIterable, Codable, Sendable {
   case closed
 }
 
-package struct HarnessAttemptEvent: Equatable, Sendable, Codable {
+public struct HarnessAttemptEvent: Equatable, Sendable, Codable {
   public static let documentType = "harness-attempt-event"
   public static let schemaVersion = "1.0.0"
 

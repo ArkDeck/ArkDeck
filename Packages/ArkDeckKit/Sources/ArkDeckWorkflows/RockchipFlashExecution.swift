@@ -97,7 +97,7 @@ package struct RockchipFlashExecutionResult: Sendable, Equatable {
 /// to have happened.  These values intentionally carry no process output,
 /// target identifier, or topology: they cross the engine-lane status boundary
 /// and become input to the bounded evolution repairer.
-package enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIterable {
+public enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIterable {
   /// The exact normal-mode readback proved no transition, while the HDC
   /// process itself had no clean completion receipt.
   case enterLoaderHDCNoCleanReceipt
@@ -111,7 +111,7 @@ package enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIt
   }
 }
 
-package enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedError {
+public enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedError {
   case invalidRequest(String)
   case productionConfigurationUnavailable(String)
   case admissionRejected(String)
@@ -132,7 +132,7 @@ package enum RockchipFlashExecutionError: Error, Sendable, Equatable, LocalizedE
   case postflightMismatch
   case cancelledAtSafeBoundary
 
-  package var errorDescription: String? {
+  public var errorDescription: String? {
     switch self {
     case .invalidRequest(let field): "invalid execution request: \(field)"
     case .productionConfigurationUnavailable(let detail):

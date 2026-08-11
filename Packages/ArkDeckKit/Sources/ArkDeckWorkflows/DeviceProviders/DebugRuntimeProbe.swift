@@ -61,7 +61,7 @@ public struct DebugRuntimeCommandResult: Codable, Sendable, Equatable {
   public let durationMilliseconds: Int
   public let stdout: String
   public let stderr: String
-  package let outputTruncated: Bool
+  public let outputTruncated: Bool
 
   public init(
     targetID: String,

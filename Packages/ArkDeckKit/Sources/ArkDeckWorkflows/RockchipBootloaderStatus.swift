@@ -164,10 +164,10 @@ package struct ProductRockchipBootloaderStatusObserver:
 
 public struct RockchipLoaderBindingReceipt: Sendable, Equatable {
   public let targetID: String
-  package let previousRevision: Int
-  package let currentRevision: Int
+  public let previousRevision: Int
+  public let currentRevision: Int
   public let updated: Bool
-  package let selectionEvidenceSHA256: String
+  public let selectionEvidenceSHA256: String
 
   public init(
     targetID: String,

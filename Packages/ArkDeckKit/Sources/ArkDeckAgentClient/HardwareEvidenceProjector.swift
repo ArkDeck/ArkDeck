@@ -370,8 +370,8 @@ package struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
     public let jobId: String
     public let catalogDigest: String
     public let terminalState: String
-    package let startedAt: String
-    package let finishedAt: String
+    public let startedAt: String
+    public let finishedAt: String
   }
 
   package struct TargetConfirmation: Codable, Sendable, Equatable {
@@ -401,53 +401,53 @@ package struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
 
   public struct Recovery: Codable, Sendable, Equatable {
     public let disposition: String
-    package let epochId: String
+    public let epochId: String
     public let source: String
-    package let coveredIntents: [CoveredIntent]
-    package let uncertainEffectSetDigest: String
-    package let coverageContractVersion: String
-    package let coveredEffectSetDigest: String
-    package let recoveryJobId: String
-    package let recoveryIntentEventId: String
+    public let coveredIntents: [CoveredIntent]
+    public let uncertainEffectSetDigest: String
+    public let coverageContractVersion: String
+    public let coveredEffectSetDigest: String
+    public let recoveryJobId: String
+    public let recoveryIntentEventId: String
     public let operationReference: String
     public let profileReference: String
     public let planDigest: String
-    package let artifactDigest: String
-    package let providerExecutableDigest: String
+    public let artifactDigest: String
+    public let providerExecutableDigest: String
     public let target: RecoveryTarget
     public let capability: RecoveryCapability?
-    package let confirmedStepIds: [String]
+    public let confirmedStepIds: [String]
     public let postflight: RecoveryPostflight
-    package let resultingTargetEpochDigest: String
-    package let originalOutcomesRemainUnknown: Bool
-    package let originalJobsSucceeded: Bool
+    public let resultingTargetEpochDigest: String
+    public let originalOutcomesRemainUnknown: Bool
+    public let originalJobsSucceeded: Bool
 
-    package struct CoveredIntent: Codable, Sendable, Equatable {
+    public struct CoveredIntent: Codable, Sendable, Equatable {
       public let jobId: String
-      package let intentEventId: String
+      public let intentEventId: String
       public let operationReference: String
       public let profileReference: String
-      package let possibleEffects: [String]
+      public let possibleEffects: [String]
     }
 
-    package struct RecoveryTarget: Codable, Sendable, Equatable {
+    public struct RecoveryTarget: Codable, Sendable, Equatable {
       public let stableIdentitySHA256: String
       public let bindingRevision: Int
       public let confirmationMethod: String
       public let confirmedAt: String
     }
 
-    package struct RecoveryCapability: Codable, Sendable, Equatable {
+    public struct RecoveryCapability: Codable, Sendable, Equatable {
       public let reference: String
-      package let reservationId: String
+      public let reservationId: String
       public let useOrdinal: Int
     }
 
-    package struct RecoveryPostflight: Codable, Sendable, Equatable {
-      package let flashReadbackConfirmed: Bool
-      package let rebootConfirmed: Bool
-      package let rebindConfirmed: Bool
-      package let runtimeBuildConfirmed: Bool
+    public struct RecoveryPostflight: Codable, Sendable, Equatable {
+      public let flashReadbackConfirmed: Bool
+      public let rebootConfirmed: Bool
+      public let rebindConfirmed: Bool
+      public let runtimeBuildConfirmed: Bool
     }
   }
 }

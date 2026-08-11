@@ -194,7 +194,7 @@ package struct RockchipFlashOrphanedReservation: Sendable, Equatable {
 
 
 
-package enum RockchipFlashSessionReconcileError: Error, Equatable, Sendable {
+public enum RockchipFlashSessionReconcileError: Error, Equatable, Sendable {
   case sessionNotFound(String)
   case sessionsRootUnavailable(String)
 }

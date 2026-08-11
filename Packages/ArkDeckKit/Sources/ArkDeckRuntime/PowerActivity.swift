@@ -46,7 +46,7 @@ public final class PowerActivityController: @unchecked Sendable {
     }
   }
 
-  package func acquire(reason: String) throws -> PowerActivityLease {
+  public func acquire(reason: String) throws -> PowerActivityLease {
     let leaseID = UUID()
     lock.lock()
     do {
@@ -66,13 +66,13 @@ public final class PowerActivityController: @unchecked Sendable {
     }
   }
 
-  package func withActivity<T>(reason: String, operation: () throws -> T) throws -> T {
+  public func withActivity<T>(reason: String, operation: () throws -> T) throws -> T {
     let lease = try acquire(reason: reason)
     defer { lease.end() }
     return try operation()
   }
 
-  package func withActivity<T>(
+  public func withActivity<T>(
     reason: String,
     operation: () async throws -> T
   ) async throws -> T {
@@ -81,7 +81,7 @@ public final class PowerActivityController: @unchecked Sendable {
     return try await operation()
   }
 
-  package var activeLeaseCount: Int {
+  public var activeLeaseCount: Int {
     lock.lock()
     defer { lock.unlock() }
     return activeLeaseIDs.count
@@ -103,7 +103,7 @@ public final class PowerActivityController: @unchecked Sendable {
   }
 }
 
-package final class PowerActivityLease: @unchecked Sendable {
+public final class PowerActivityLease: @unchecked Sendable {
   private let lock = NSLock()
   private var release: (@Sendable () -> Void)?
 

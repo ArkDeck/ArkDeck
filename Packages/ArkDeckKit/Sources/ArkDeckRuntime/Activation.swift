@@ -266,7 +266,7 @@ private struct BoundedRequestIDFilter {
   }
 }
 
-package enum ActivationListenerError: Error, Equatable, Sendable {
+public enum ActivationListenerError: Error, Equatable, Sendable {
   case endpointUnavailable
 }
 

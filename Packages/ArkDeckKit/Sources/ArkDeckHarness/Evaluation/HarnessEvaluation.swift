@@ -45,13 +45,13 @@ public enum HarnessMetricKind: String, CaseIterable, Codable, Sendable {
 }
 
 public struct HarnessCriterionResult: Equatable, Sendable, Codable {
-  package let criterionID: String
+  public let criterionID: String
   public let verdict: HarnessEvaluationVerdict
-  package let metric: String
+  public let metric: String
   public let observed: JSONValue?
   public let expected: JSONValue
-  package let samples: Int
-  package let requiredSamples: Int
+  public let samples: Int
+  public let requiredSamples: Int
   public let blockers: [String]
 
   enum CodingKeys: String, CodingKey {
@@ -101,7 +101,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
   /// maintainer can tell "the evaluator never saw these bytes" from "an
   /// operator allowed the evaluator to measure them", which are different
   /// claims about the same digest.
-  package let sensitiveOptIn: Bool
+  public let sensitiveOptIn: Bool
   /// The job whose artifact store holds these bytes. Recorded so a later
   /// reader — the decision context, which must show a model the evidence it
   /// is reasoning about — can address the artifact without guessing which
@@ -160,7 +160,7 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
 /// round adds per metric: a round whose evidence failed verification
 /// contributes none, which is why a corrupt capture cannot help a
 /// minimum-samples criterion pass.
-package struct HarnessRoundObservation: Equatable, Sendable, Codable {
+public struct HarnessRoundObservation: Equatable, Sendable, Codable {
   public let round: Int
   package let measurements: [String: JSONValue]
   package let sampleContribution: [String: Int]
@@ -193,17 +193,17 @@ package struct HarnessRoundObservation: Equatable, Sendable, Codable {
 /// or an evaluation (enforced by the reducer). A decision cannot describe
 /// the world into existence.
 public struct HarnessObservedState: Equatable, Sendable, Codable {
-  package static let measurementsKey = "measurements"
-  package static let samplesKey = "samples"
-  package static let verdictKey = "latestVerdict"
-  package static let blockersKey = "blockers"
-  package static let evidenceNamesKey = "latestVerifiedEvidence"
+  public static let measurementsKey = "measurements"
+  public static let samplesKey = "samples"
+  public static let verdictKey = "latestVerdict"
+  public static let blockersKey = "blockers"
+  public static let evidenceNamesKey = "latestVerifiedEvidence"
 
-  package let measurements: [String: JSONValue]
-  package let samples: [String: Int]
-  package let latestVerdict: HarnessEvaluationVerdict?
+  public let measurements: [String: JSONValue]
+  public let samples: [String: Int]
+  public let latestVerdict: HarnessEvaluationVerdict?
   public let blockers: [String]
-  package let latestVerifiedEvidence: [String]
+  public let latestVerifiedEvidence: [String]
 
   public init(
     measurements: [String: JSONValue] = [:],
@@ -230,7 +230,7 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
     }
   }
 
-  package func merging(_ observation: HarnessRoundObservation) -> HarnessObservedState {
+  public func merging(_ observation: HarnessRoundObservation) -> HarnessObservedState {
     var mergedMeasurements = measurements
     for (metric, value) in observation.measurements {
       switch Self.kind(of: metric) {
@@ -254,7 +254,7 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
       latestVerifiedEvidence: observation.verifiedEvidenceNames.sorted())
   }
 
-  package func recording(verdict: HarnessEvaluationVerdict, blockers: [String]) -> HarnessObservedState
+  public func recording(verdict: HarnessEvaluationVerdict, blockers: [String]) -> HarnessObservedState
   {
     HarnessObservedState(
       measurements: measurements, samples: samples, latestVerdict: verdict,
@@ -273,7 +273,7 @@ public struct HarnessObservedState: Equatable, Sendable, Codable {
   /// Projection into the task snapshot's free-form observed state. Keeping
   /// one encoder here means the wire shape cannot drift between writer and
   /// reader.
-  package var asJSON: [String: JSONValue] {
+  public var asJSON: [String: JSONValue] {
     var fields: [String: JSONValue] = [
       Self.measurementsKey: .object(measurements),
       Self.samplesKey: .object(samples.mapValues { .integer(Int64($0)) }),
@@ -319,13 +319,13 @@ public struct HarnessEvaluation: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let schemaVersion: String
-  package let evaluationID: String
-  package let htaskID: String
+  public let evaluationID: String
+  public let htaskID: String
   public let round: Int
   public let verdict: HarnessEvaluationVerdict
-  package let criterionResults: [HarnessCriterionResult]
-  package let measurements: [String: JSONValue]
-  package let samples: [String: Int]
+  public let criterionResults: [HarnessCriterionResult]
+  public let measurements: [String: JSONValue]
+  public let samples: [String: Int]
   public let evidence: [HarnessEvidenceRecord]
   public let blockers: [String]
   public let createdAtUTC: String

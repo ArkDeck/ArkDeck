@@ -128,7 +128,7 @@ public struct DiagnosticRedactionPolicy: Sendable {
   }
 }
 
-package enum SystemLoggerError: Error, Equatable, Sendable {
+public enum SystemLoggerError: Error, Equatable, Sendable {
   case invalidConfiguration
   case invalidFieldPrivacy
   case invalidPublicFieldValue
@@ -144,13 +144,13 @@ package enum SystemLoggerError: Error, Equatable, Sendable {
 
 public struct RedactedDiagnosticRecord: Encodable, Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
-  package static let maximumFieldCount = 64
-  package static let maximumFieldValueBytes = 4 * 1_024
+  public static let maximumFieldCount = 64
+  public static let maximumFieldValueBytes = 4 * 1_024
 
   public let timestamp: String
   public let level: SystemLogLevel
-  package let category: SystemLogCategory
-  package let eventName: String
+  public let category: SystemLogCategory
+  public let eventName: String
   public let correlationID: String
   public let fields: [String: String]
 
@@ -245,9 +245,9 @@ public struct UnifiedSystemDiagnosticLogger: UnifiedDiagnosticLogging, Sendable 
 }
 
 public struct StructuredDiagnosticLogConfiguration: Equatable, Sendable {
-  package let quotaBytes: Int
-  package let segmentBytes: Int
-  package let maximumRecordBytes: Int
+  public let quotaBytes: Int
+  public let segmentBytes: Int
+  public let maximumRecordBytes: Int
 
   public init(
     quotaBytes: Int = 16 * 1_024 * 1_024,
@@ -274,7 +274,7 @@ public struct StructuredDiagnosticSnapshotFile: Equatable, Sendable {
 }
 
 public struct StructuredDiagnosticLogSnapshot: Equatable, Sendable {
-  package let files: [StructuredDiagnosticSnapshotFile]
+  public let files: [StructuredDiagnosticSnapshotFile]
   public let totalBytes: Int
 
   public init(files: [StructuredDiagnosticSnapshotFile], totalBytes: Int) {
@@ -428,13 +428,13 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
     return StructuredDiagnosticLogSnapshot(files: files, totalBytes: total)
   }
 
-  package var retainedBytes: Int {
+  public var retainedBytes: Int {
     lock.lock()
     defer { lock.unlock() }
     return segments.reduce(0) { $0 + $1.size }
   }
 
-  package var segmentCount: Int {
+  public var segmentCount: Int {
     lock.lock()
     defer { lock.unlock() }
     return segments.count

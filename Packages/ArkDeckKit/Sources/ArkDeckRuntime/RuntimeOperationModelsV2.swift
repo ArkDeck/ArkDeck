@@ -28,7 +28,7 @@ public enum RuntimeOperationErrorCode: String, Codable, Sendable, CaseIterable {
   case requestTooLarge
 }
 
-package struct RuntimeOperationRequestRejection: Error, Equatable, Sendable {
+public struct RuntimeOperationRequestRejection: Error, Equatable, Sendable {
   public let code: RuntimeOperationErrorCode
   public let path: String
   public let message: String
@@ -44,7 +44,7 @@ public struct DurableTargetReference: Equatable, Sendable, Codable {
   public let targetID: String
   /// When present, execution must observe exactly this binding revision;
   /// any other current revision is a conflict, never a silent rebind.
-  package let expectedBindingRevision: Int?
+  public let expectedBindingRevision: Int?
 
   enum CodingKeys: String, CodingKey {
     case targetID = "targetId"
@@ -159,10 +159,10 @@ public struct RuntimeCapabilityReference: Equatable, Sendable, Codable {
 }
 
 public struct RuntimeClientContext: Equatable, Sendable, Codable {
-  package let clientName: String?
+  public let clientName: String?
   /// Display/audit annotations only. The runtime never derives authority,
   /// scope or identity from provenance entries.
-  package let provenance: [String: String]?
+  public let provenance: [String: String]?
 
   public init(clientName: String? = nil, provenance: [String: String]? = nil) {
     self.clientName = clientName
@@ -198,14 +198,14 @@ public struct RuntimeClientContext: Equatable, Sendable, Codable {
 public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   public static let documentType = "runtime-operation-request"
   public static let schemaVersion = "2.0.0"
-  package static let requiredMajorVersion = 2
+  public static let requiredMajorVersion = 2
 
   public let requestID: String
   public let idempotencyKey: String
   public let target: DurableTargetReference
   public let operation: RuntimeOperationReference
   public let inputs: [String: JSONValue]
-  package let requestedOutputs: [RuntimeRequestedOutput]
+  public let requestedOutputs: [RuntimeRequestedOutput]
   public let authorization: RuntimeCapabilityReference?
   /// Campaign-lane E2 authority: names an OPEN usage-ledger reservation the
   /// bounded-campaign admission service made after its own nine-gate check.
@@ -215,8 +215,8 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   /// with `authorization`: a request carries exactly one E2 authority kind.
   /// Schema 2.x minor addition — old decoders ignore it, old wire decodes
   /// with it absent.
-  package let campaignReservation: RuntimeCampaignReservationReference?
-  package let clientContext: RuntimeClientContext?
+  public let campaignReservation: RuntimeCampaignReservationReference?
+  public let clientContext: RuntimeClientContext?
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -270,7 +270,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   /// A host-only operation must *not* carry a revision: there is no binding to
   /// pin, and the engine refuses a host-only request that pins one
   /// (CHG-2026-054 HTP-AC-20).
-  package static func operatorFlagForm(
+  public static func operatorFlagForm(
     targetID: String,
     expectedBindingRevision: Int?,
     operationID: String,

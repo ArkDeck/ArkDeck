@@ -3,7 +3,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-package enum SessionStorageError: Error, Equatable, Sendable {
+public enum SessionStorageError: Error, Equatable, Sendable {
   case invalidIdentifier(String)
   case invalidTimestamp(String)
   case invalidRelativePath(String)

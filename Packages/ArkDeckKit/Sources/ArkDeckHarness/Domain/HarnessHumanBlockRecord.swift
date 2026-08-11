@@ -20,7 +20,7 @@ import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
 
-package struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
+public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
   public static let documentType = "harness-human-action"
 
   public let documentType: String

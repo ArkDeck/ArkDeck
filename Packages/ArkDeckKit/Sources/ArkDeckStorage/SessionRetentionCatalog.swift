@@ -2,7 +2,7 @@ import ArkDeckCore
 import Darwin
 import Foundation
 
-package enum SessionRetentionCatalogError: Error, Equatable, Sendable {
+public enum SessionRetentionCatalogError: Error, Equatable, Sendable {
   case invalidRoot
   case invalidRetentionDays
   case metadataUnavailable
@@ -48,10 +48,10 @@ public struct SessionCatalogRootIdentity: Equatable, Sendable {
 
 public struct SessionRetentionCatalogEntry: Equatable, Sendable {
   public let sessionID: String
-  package let completedAt: Date
+  public let completedAt: Date
   public let expiresAt: Date
-  package let isPinned: Bool
-  package let policyGeneration: UInt64
+  public let isPinned: Bool
+  public let policyGeneration: UInt64
 }
 
 package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {

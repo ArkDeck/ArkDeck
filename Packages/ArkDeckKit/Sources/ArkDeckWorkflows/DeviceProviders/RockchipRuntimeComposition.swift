@@ -20,7 +20,7 @@ package enum BundledRockchipComponent {
   package static let signingTeamIdentifier = "8AQTYW5FKR"
 }
 
-package enum BundledRockchipComponentError: Error, Equatable, Sendable,
+public enum BundledRockchipComponentError: Error, Equatable, Sendable,
   CustomStringConvertible
 {
   case mainExecutableUnavailable

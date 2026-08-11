@@ -24,18 +24,18 @@ public struct TraceOperationPresentation: Sendable, Equatable {
   public let title: String
   public let availability: TraceApplicationAvailability
   public let minimumEffect: String
-  package let permittedEffects: [String]
+  public let permittedEffects: [String]
   public let durationSecondsRange: ClosedRange<Int>?
   public let traceBufferKBRange: ClosedRange<Int>?
   public let maximumTraceTagCount: Int?
   public let traceStepCancellation: String?
-  package let artifactNames: [String]
+  public let artifactNames: [String]
   public let supportsTypedTraceCategories: Bool
   public let supportsRawTraceArtifact: Bool
   public let supportsFilteredTraceArtifact: Bool
   public let supportsCaptureLogArtifact: Bool
-  package let exposesAdapterCapabilityFacts: Bool
-  package let exposesParameterSnapshotFacts: Bool
+  public let exposesAdapterCapabilityFacts: Bool
+  public let exposesParameterSnapshotFacts: Bool
 
   public init(
     reference: String,
@@ -98,7 +98,7 @@ public struct TraceRelatedJobPresentation: Sendable, Equatable, Identifiable {
   public let waitingForHuman: Bool
   public let outcomeUnknown: Bool
   public let outstandingResidueCount: Int
-  package let traceLegSelectionKnown: Bool
+  public let traceLegSelectionKnown: Bool
 
   public var needsAttention: Bool {
     waitingForHuman || outcomeUnknown || outstandingResidueCount > 0

@@ -6,7 +6,7 @@ public enum JobExecutionMode: String, CaseIterable, Codable, Sendable {
 public enum JobState: String, CaseIterable, Codable, Sendable {
   /// Version 1.0.0 remains the frozen agent-device-operation enum. Recovery
   /// dispositions are emitted only by the versioned recovery journal writer.
-  package static let schemaVersion = "2.0.0"
+  public static let schemaVersion = "2.0.0"
 
   case queued
   case preflight
@@ -63,10 +63,10 @@ public struct WorkflowFailure: Error, Equatable, Sendable, Codable {
 }
 
 public struct RecoveryResumeEvidence: Equatable, Sendable {
-  package let restartSafe: Bool
-  package let safeBoundaryConfirmed: Bool
-  package let outcomeConfirmed: Bool
-  package let bindingConfirmed: Bool
+  public let restartSafe: Bool
+  public let safeBoundaryConfirmed: Bool
+  public let outcomeConfirmed: Bool
+  public let bindingConfirmed: Bool
 
   public init(
     restartSafe: Bool,
@@ -80,7 +80,7 @@ public struct RecoveryResumeEvidence: Equatable, Sendable {
     self.bindingConfirmed = bindingConfirmed
   }
 
-  package var permitsResume: Bool {
+  public var permitsResume: Bool {
     restartSafe && safeBoundaryConfirmed && outcomeConfirmed && bindingConfirmed
   }
 }
@@ -96,9 +96,9 @@ public enum ResumeMarkerExternalEffectOutcomesEvidence: String, Codable, Sendabl
 }
 
 public struct ResumeMarkerDecisionEvidence: Equatable, Sendable, Codable {
-  package let deviceIdentity: ResumeMarkerDeviceIdentityEvidence
-  package let externalEffectOutcomes: ResumeMarkerExternalEffectOutcomesEvidence
-  package let detectedFailure: WorkflowFailure?
+  public let deviceIdentity: ResumeMarkerDeviceIdentityEvidence
+  public let externalEffectOutcomes: ResumeMarkerExternalEffectOutcomesEvidence
+  public let detectedFailure: WorkflowFailure?
 
   public init(
     deviceIdentity: ResumeMarkerDeviceIdentityEvidence,
@@ -110,7 +110,7 @@ public struct ResumeMarkerDecisionEvidence: Equatable, Sendable, Codable {
     self.detectedFailure = detectedFailure
   }
 
-  package var hasUnknownIdentityOrOutcome: Bool {
+  public var hasUnknownIdentityOrOutcome: Bool {
     deviceIdentity == .unknown || externalEffectOutcomes == .containsUnknown
   }
 }
@@ -174,7 +174,7 @@ public struct JobStateTransition: Equatable, Sendable {
   }
 }
 
-package enum ResumeMarkerSemanticValidationError: Error, Equatable, Sendable {
+public enum ResumeMarkerSemanticValidationError: Error, Equatable, Sendable {
   case invalidSource(JobState)
   case destinationMismatch(expected: JobState, actual: JobState)
 }
@@ -212,8 +212,8 @@ package enum ResumeMarkerSemanticValidator {
 }
 
 public struct JobStateMachineOutcome: Equatable, Sendable {
-  package let transition: JobStateTransition
-  package let directives: Set<JobStateMachineDirective>
+  public let transition: JobStateTransition
+  public let directives: Set<JobStateMachineDirective>
 
   public init(transition: JobStateTransition, directives: Set<JobStateMachineDirective>) {
     self.transition = transition
@@ -236,7 +236,7 @@ public enum JobInvariantViolationKind: String, Codable, Sendable {
 public struct JobInvariantViolation: Equatable, Sendable {
   public let kind: JobInvariantViolationKind
   public let state: JobState
-  package let attemptedState: JobState?
+  public let attemptedState: JobState?
   public let detail: String
 
   public init(
@@ -252,7 +252,7 @@ public struct JobInvariantViolation: Equatable, Sendable {
   }
 }
 
-package enum JobStateMachineError: Error, Equatable, Sendable {
+public enum JobStateMachineError: Error, Equatable, Sendable {
   case invariantViolation(JobInvariantViolation)
 }
 
@@ -547,7 +547,7 @@ public struct JobStateMachine: Sendable {
     return .immediate
   }
 
-  package static func isAllowedTransition(
+  public static func isAllowedTransition(
     from: JobState,
     to: JobState,
     mode: JobExecutionMode
@@ -555,7 +555,7 @@ public struct JobStateMachine: Sendable {
     allowedDestinations(from: from, mode: mode).contains(to)
   }
 
-  package static func allowedDestinations(from state: JobState, mode: JobExecutionMode) -> Set<
+  public static func allowedDestinations(from state: JobState, mode: JobExecutionMode) -> Set<
     JobState
   > {
     switch (mode, state) {

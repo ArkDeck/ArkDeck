@@ -38,7 +38,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
   public let startedAtUTC: String?
   public let finishedAtUTC: String?
   public let supersededByRecoveryEpochID: String?
-  package let recoveryEpochID: String?
+  public let recoveryEpochID: String?
   public let resolvedByTargetAliasResolutionID: String?
 
   public init(
@@ -133,7 +133,7 @@ public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
   public let observedFirmware: String?
   public let observedTransport: String?
   public let observedBindingRevision: Int?
-  package let traceTags: [String]
+  public let traceTags: [String]
   public let traceParameters: [RuntimeTraceParameterPresentation]
   public let blockers: [String]
 }
@@ -150,7 +150,7 @@ public struct RuntimeArtifactPresentation: Sendable, Equatable, Identifiable {
   public let statusDetail: String?
   public let sourceOperation: String
   public let createdAtUTC: String
-  package let redactionApplied: Bool
+  public let redactionApplied: Bool
 }
 
 public struct RuntimeJobDetailPresentation: Sendable, Equatable {

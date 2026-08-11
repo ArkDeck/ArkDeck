@@ -86,7 +86,7 @@ extension JobToolchainEvidence: Codable {
   }
 }
 
-package enum JobToolchainIntentValidationError: Error, Sendable, Equatable {
+public enum JobToolchainIntentValidationError: Error, Sendable, Equatable {
   case invalidIdentifier(field: String)
   case executablePathMustBeAbsolute
   case invalidSHA256

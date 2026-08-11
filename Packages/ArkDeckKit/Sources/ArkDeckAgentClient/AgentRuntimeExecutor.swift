@@ -65,7 +65,7 @@ package enum RuntimeAgentExecutionOutcome: Sendable, Equatable {
   case failed(reason: String, receipt: RuntimeAgentExecutionReceipt)
 }
 
-package enum RuntimeAgentExecutorError: Error, Equatable, Sendable {
+public enum RuntimeAgentExecutorError: Error, Equatable, Sendable {
   case daemonUnavailable(String)
   case malformedResponse(String)
   case operationRejected(String)

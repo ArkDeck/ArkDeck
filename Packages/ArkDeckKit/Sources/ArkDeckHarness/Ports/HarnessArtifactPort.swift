@@ -22,7 +22,7 @@ public struct HarnessArtifactDescriptor: Equatable, Sendable {
   public let sha256: String
   public let published: Bool
   public let sensitive: Bool
-  package let missingReason: String?
+  public let missingReason: String?
 
   public init(
     artifactID: String,
@@ -45,7 +45,7 @@ public struct HarnessArtifactDescriptor: Equatable, Sendable {
   }
 }
 
-package enum HarnessArtifactPortError: Error, Equatable, Sendable {
+public enum HarnessArtifactPortError: Error, Equatable, Sendable {
   case unavailable(String)
   case unreadable(String)
 }

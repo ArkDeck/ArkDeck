@@ -10,7 +10,7 @@
 import ArkDeckHarness
 import Foundation
 
-package enum HarnessVendorConfigurationError: Error, Equatable, Sendable {
+public enum HarnessVendorConfigurationError: Error, Equatable, Sendable {
   case providerRequired
   case unsupportedProvider(String)
   case missingCredential

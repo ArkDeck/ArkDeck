@@ -20,7 +20,7 @@ package protocol RockchipEvolutionAttemptIntentReading: Sendable {
   func journaledStepKinds(jobID: String) throws -> [String]
 }
 
-package enum RockchipEvolutionAttemptIntentError: Error, Sendable, Equatable,
+public enum RockchipEvolutionAttemptIntentError: Error, Sendable, Equatable,
   CustomStringConvertible
 {
   case unavailable(String)

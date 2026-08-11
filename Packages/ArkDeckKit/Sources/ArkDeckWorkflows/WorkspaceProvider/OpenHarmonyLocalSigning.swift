@@ -37,7 +37,7 @@ package enum OpenHarmonyLocalSigning {
 
 }
 
-package enum OpenHarmonySigningError: Error, Equatable, CustomStringConvertible, Sendable {
+public enum OpenHarmonySigningError: Error, Equatable, CustomStringConvertible, Sendable {
   case invalidConfiguration(String)
   case unsafeFile(String)
   case identityDrift(String)
@@ -1305,7 +1305,7 @@ package final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
   }
 }
 
-package struct WorkspaceOpenHarmonySigningAction: Sendable, Equatable, Codable {
+public struct WorkspaceOpenHarmonySigningAction: Sendable, Equatable, Codable {
   let jobID: String
   let projectRef: String
   let preset: OpenHarmonySigningPresetReceipt

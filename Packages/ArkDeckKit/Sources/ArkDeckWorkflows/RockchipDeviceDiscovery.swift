@@ -192,7 +192,7 @@ package struct RockchipDeviceObservation: Sendable, Equatable {
   }
 }
 
-package enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
+public enum RockchipDiscoveryDiagnostic: Error, Sendable, Equatable {
   case outputTooLarge
   case invalidUTF8
   case unexpectedCarriageReturn

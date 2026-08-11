@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-package enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
+public enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
   case runningApplicationUnsigned
   case invalidRunningApplicationTeam
   case staticCodeUnavailable
@@ -11,8 +11,8 @@ package enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
 }
 
 public struct ValidatedUpdateArtifact: Equatable, Sendable {
-  package let downloaded: DownloadedUpdateArtifact
-  package let teamIdentifier: String
+  public let downloaded: DownloadedUpdateArtifact
+  public let teamIdentifier: String
 
   public init(downloaded: DownloadedUpdateArtifact, teamIdentifier: String) {
     self.downloaded = downloaded

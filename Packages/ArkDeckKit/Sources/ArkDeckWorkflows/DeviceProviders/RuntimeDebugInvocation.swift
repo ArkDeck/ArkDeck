@@ -13,7 +13,7 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-package enum RuntimeDebugInvocationError: Error, Equatable, Sendable {
+public enum RuntimeDebugInvocationError: Error, Equatable, Sendable {
   case invalidSeedRequest(String)
   case invalidCandidate(String)
   case invalidProvenance(String)
@@ -54,7 +54,7 @@ public protocol RuntimeDebugAttemptDriving: Sendable {
   func execute(_ requestData: Data) async -> RuntimeDebugDriverResult
 }
 
-package struct RuntimeDebugCandidateProvenance: Codable, Equatable, Sendable {
+public struct RuntimeDebugCandidateProvenance: Codable, Equatable, Sendable {
   package let sourceSHA256: String
   package let buildSHA256: String
 
@@ -83,7 +83,7 @@ package enum RuntimeDebugCandidateAction: Equatable, Sendable {
   case stop(reasonCode: String)
 }
 
-package enum RuntimeDebugCandidateActionError: Error, Equatable, Sendable {
+public enum RuntimeDebugCandidateActionError: Error, Equatable, Sendable {
   case invalidDocument
   case unsupportedSchemaVersion
   case unsupportedAction
@@ -154,7 +154,7 @@ package enum RuntimeDebugCandidateActionCodec {
   }
 }
 
-package struct RuntimeDebugObservation: Codable, Equatable, Sendable {
+public struct RuntimeDebugObservation: Codable, Equatable, Sendable {
   package let observationID: String
   package let materializedPlanDigest: String
   public let targetID: String
@@ -163,7 +163,7 @@ package struct RuntimeDebugObservation: Codable, Equatable, Sendable {
   package let dispatchDisposition: String
 }
 
-package struct RuntimeDebugEvaluation: Codable, Equatable, Sendable {
+public struct RuntimeDebugEvaluation: Codable, Equatable, Sendable {
   package let ordinal: Int
   package let destructiveEpoch: Int?
   package let candidateSourceSHA256: String
@@ -181,18 +181,18 @@ package struct RuntimeDebugEvaluation: Codable, Equatable, Sendable {
 }
 
 public struct RuntimeDebugInvocationStatus: Codable, Equatable, Sendable {
-  package let invocationID: String
+  public let invocationID: String
   public let state: String
   public let operationReference: String
   public let targetID: String
   public let bindingRevision: Int?
-  package let seedRequestFingerprintSHA256: String
-  package let baselineMaterializedPlanDigest: String
+  public let seedRequestFingerprintSHA256: String
+  public let baselineMaterializedPlanDigest: String
   public let createdAtUTC: String
-  package let expiresAtUTC: String
-  package let destructiveEpochsUsed: Int
-  package let maximumDestructiveEpochs: Int
-  package let evaluations: [RuntimeDebugEvaluation]
+  public let expiresAtUTC: String
+  public let destructiveEpochsUsed: Int
+  public let maximumDestructiveEpochs: Int
+  public let evaluations: [RuntimeDebugEvaluation]
 }
 
 /// Durable per-attempt provenance consumed by RuntimeJobEngine while it
@@ -314,8 +314,8 @@ private struct RuntimeDebugInvocationDocument: Codable, Equatable, Sendable {
 }
 
 public actor RuntimeDebugInvocationController {
-  package static let maximumDestructiveEpochs = 16
-  package static let maximumDurationSeconds: TimeInterval = 4 * 60 * 60
+  public static let maximumDestructiveEpochs = 16
+  public static let maximumDurationSeconds: TimeInterval = 4 * 60 * 60
 
   private let stateDirectory: URL
   private let driver: any RuntimeDebugAttemptDriving
@@ -396,7 +396,7 @@ public actor RuntimeDebugInvocationController {
     status(try load(invocationID))
   }
 
-  package func evaluate(
+  public func evaluate(
     invocationID: String,
     actionData: Data,
     provenance: RuntimeDebugCandidateProvenance

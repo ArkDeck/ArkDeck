@@ -37,7 +37,7 @@ public struct TraceRuntimeToolObservation: Codable, Sendable, Equatable {
   public let tool: String
   public let disposition: TraceRuntimeToolDisposition
   public let family: String?
-  package let rawHelpSHA256: String?
+  public let rawHelpSHA256: String?
   public let detail: String?
 
   public init(
@@ -63,8 +63,8 @@ public struct TraceRuntimeProbeSnapshot: Codable, Sendable, Equatable {
   public let family: String?
   public let supportedTags: [String]
   public let rawHelp: String?
-  package let rawHelpSHA256: String?
-  package let tools: [TraceRuntimeToolObservation]
+  public let rawHelpSHA256: String?
+  public let tools: [TraceRuntimeToolObservation]
   public let parameters: [TraceRuntimeParameterObservation]
 
   public init(

@@ -42,7 +42,7 @@ public struct HDCCandidate: Sendable, Equatable {
   public let path: URL
   public let source: HDCCandidateSource
   public let sha256: String
-  package let securityScopedBookmark: Data?
+  public let securityScopedBookmark: Data?
 
   public init(
     path: URL,
@@ -228,7 +228,7 @@ public struct HDCProbeDetails: Sendable, Equatable {
     self.serverGeneration = serverGeneration
   }
 
-  package static let unprobed = HDCProbeDetails(
+  public static let unprobed = HDCProbeDetails(
     platformTrust: .unknown(reason: "ToolTrustInspector has not run"),
     clientVersion: .unknown(reason: "HDC version probe has not run"),
     serverVersion: .unknown(reason: "HDC server probe has not run"),
@@ -542,7 +542,7 @@ public struct HDCServerState: Sendable, Equatable {
   /// A read-only `checkserver` result has no server identity and therefore
   /// must not make this value eligible for lifecycle confirmation.
   public let generation: Int
-  package let generationEvidence: HDCProbeValue<Int>
+  public let generationEvidence: HDCProbeValue<Int>
   public let ownership: HDCServerOwnership
 
   init(
@@ -746,7 +746,7 @@ public struct HDCServerRecipient: Hashable, Sendable, Equatable {
   }
 }
 
-package enum HDCServerCriticalState: Sendable, Equatable {
+public enum HDCServerCriticalState: Sendable, Equatable {
   case none
   case criticalNonInterruptible(stepID: String, safeBoundaryAction: String)
   case waitingForSafeBoundary(stepID: String, safeBoundaryAction: String)
@@ -755,7 +755,7 @@ package enum HDCServerCriticalState: Sendable, Equatable {
 public struct HDCServerCriticalJob: Sendable, Equatable {
   public let jobID: String
   public let stepID: String
-  package let safeBoundaryAction: String
+  public let safeBoundaryAction: String
 
   public init(jobID: String, stepID: String, safeBoundaryAction: String) {
     self.jobID = jobID
@@ -776,7 +776,7 @@ public enum HDCServerLifecycleAction: String, Sendable, Equatable {
   case restartConfirmedGeneration
 }
 
-package enum HDCServerExpectedOwnership: String, Sendable, Equatable {
+public enum HDCServerExpectedOwnership: String, Sendable, Equatable {
   case absent
   case arkDeckManaged
   case external
@@ -793,7 +793,7 @@ package enum HDCServerExpectedOwnership: String, Sendable, Equatable {
 
 /// This mirrors the Core `mutateHDCServerLifecycle` argument contract. It is a
 /// typed authorization object, not a command line and cannot contain argv.
-package struct HDCServerLifecycleStep: Sendable, Equatable {
+public struct HDCServerLifecycleStep: Sendable, Equatable {
   public let id: UUID
   package let auditID: UUID
   public let action: HDCServerLifecycleAction
@@ -932,7 +932,7 @@ private struct HDCServerImpactCanonicalScope: Encodable {
 
 public struct HDCServerLifecycleImpactPreview: Sendable, Equatable {
   public let id: UUID
-  package let auditID: UUID
+  public let auditID: UUID
   public let snapshot: HDCServerImpactSnapshot
 
   public init(id: UUID, auditID: UUID, snapshot: HDCServerImpactSnapshot) {
@@ -944,8 +944,8 @@ public struct HDCServerLifecycleImpactPreview: Sendable, Equatable {
 
 public struct HDCServerLifecycleConfirmation: Sendable, Equatable {
   public let id: UUID
-  package let auditID: UUID
-  package let previewID: UUID
+  public let auditID: UUID
+  public let previewID: UUID
   public let action: HDCServerLifecycleAction
   public let endpoint: HDCServerEndpoint
   public let generation: Int
@@ -964,7 +964,7 @@ public struct HDCServerLifecycleConfirmation: Sendable, Equatable {
   }
 }
 
-package enum HDCServerLifecycleExecutionOutcome: Sendable, Equatable {
+public enum HDCServerLifecycleExecutionOutcome: Sendable, Equatable {
   case succeeded(resultingGeneration: Int)
   /// A confirmed stop is only complete once a post-dispatch probe observes
   /// the selected endpoint unavailable. It must not be represented as a
@@ -978,7 +978,7 @@ package enum HDCServerLifecycleExecutionOutcome: Sendable, Equatable {
 /// durable lifecycle result. Optional state fields distinguish an absent
 /// endpoint from an unknown value; generation evidence is retained verbatim
 /// rather than collapsing unknown identity into a caller-supplied integer.
-package struct HDCServerLifecycleObservedScope: Sendable, Equatable {
+public struct HDCServerLifecycleObservedScope: Sendable, Equatable {
   public let action: HDCServerLifecycleAction
   public let endpoint: HDCServerEndpoint
   public let health: HDCServerHealth?
@@ -1032,7 +1032,7 @@ package struct HDCServerLifecycleObservedScope: Sendable, Equatable {
 /// when the Supervisor scope is unchanged. Recovery can therefore treat a
 /// success with no terminal record as `outcomeUnknown` instead of trusting an
 /// append that may have failed during re-entrant reconciliation.
-package struct HDCServerLifecycleReconciliation: Sendable, Equatable {
+public struct HDCServerLifecycleReconciliation: Sendable, Equatable {
   public let id: UUID
   public let stepID: UUID
   package let auditID: UUID
@@ -1144,7 +1144,7 @@ struct HDCServerLifecycleExecutorResult: Sendable, Equatable {
   }
 }
 
-package enum HDCServerLifecycleAuditEvent: Sendable, Equatable {
+public enum HDCServerLifecycleAuditEvent: Sendable, Equatable {
   case impactPreview(HDCServerLifecycleImpactPreview)
   case confirmation(HDCServerLifecycleConfirmation)
   case intent(HDCServerLifecycleStep)
@@ -1154,7 +1154,7 @@ package enum HDCServerLifecycleAuditEvent: Sendable, Equatable {
 
 /// Production wiring must provide durable storage. The prototype accepts this
 /// narrow sink so that a failed intent write can block an executor dispatch.
-package protocol HDCServerLifecycleAuditStore: Sendable {
+public protocol HDCServerLifecycleAuditStore: Sendable {
   func append(_ event: HDCServerLifecycleAuditEvent) async throws
   /// Commits the terminal interpretation without an actor suspension. The
   /// Supervisor calculates the final scope and applies the resulting endpoint
@@ -1190,7 +1190,7 @@ final class InMemoryHDCServerLifecycleAuditStore: HDCServerLifecycleAuditStore,
   }
 }
 
-package struct HDCServerGenerationChange: Sendable, Equatable {
+public struct HDCServerGenerationChange: Sendable, Equatable {
   public let endpoint: HDCServerEndpoint
   package let previousGeneration: Int
   package let currentGeneration: Int
@@ -1212,7 +1212,7 @@ package struct HDCServerGenerationChange: Sendable, Equatable {
   }
 }
 
-package struct HDCServerHealthChange: Sendable, Equatable {
+public struct HDCServerHealthChange: Sendable, Equatable {
   public let endpoint: HDCServerEndpoint
   public let generation: Int
   public let ownership: HDCServerOwnership
@@ -1237,7 +1237,7 @@ package struct HDCServerHealthChange: Sendable, Equatable {
   }
 }
 
-package struct HDCServerLifecycleBroadcast: Sendable, Equatable {
+public struct HDCServerLifecycleBroadcast: Sendable, Equatable {
   public let stepID: UUID
   package let auditID: UUID
   public let endpoint: HDCServerEndpoint
@@ -1259,7 +1259,7 @@ package struct HDCServerLifecycleBroadcast: Sendable, Equatable {
   }
 }
 
-package enum HDCServerEvent: Sendable, Equatable {
+public enum HDCServerEvent: Sendable, Equatable {
   case generationChanged(HDCServerGenerationChange)
   case healthChanged(HDCServerHealthChange)
   case lifecycleOutcome(HDCServerLifecycleBroadcast)
@@ -1279,7 +1279,7 @@ public enum HDCServerLifecycleDispatchBlock: Sendable, Equatable {
   case recoveryRequired(reason: String)
 }
 
-package enum HDCServerImpactPreviewResult: Sendable, Equatable {
+public enum HDCServerImpactPreviewResult: Sendable, Equatable {
   case ready(HDCServerLifecycleImpactPreview)
   case blocked(HDCServerLifecycleDispatchBlock)
 }
@@ -1289,7 +1289,7 @@ public enum HDCServerConfirmationResult: Sendable, Equatable {
   case blocked(HDCServerLifecycleDispatchBlock)
 }
 
-package enum HDCServerLifecycleDispatchResult: Sendable, Equatable {
+public enum HDCServerLifecycleDispatchResult: Sendable, Equatable {
   case completed(HDCServerLifecycleExecutionOutcome)
   case blocked(HDCServerLifecycleDispatchBlock)
 }
@@ -1356,7 +1356,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     permitsImplicitTestFixtureReliability = true
   }
 
-  package init(
+  public init(
     auditStore: any HDCServerLifecycleAuditStore,
     endpoint: HDCServerEndpoint,
     participantImpactReliable: Bool
@@ -1373,7 +1373,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     deliveredEvents[recipient] = deliveredEvents[recipient] ?? []
   }
 
-  package func updateCriticalState(
+  public func updateCriticalState(
     _ state: HDCServerCriticalState, for recipient: HDCServerRecipient
   ) {
     // Only a registered Job participates in the host-wide critical gate.
@@ -1384,7 +1384,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     recipients[recipient] = state
   }
 
-  package func setOtherClientDetection(
+  public func setOtherClientDetection(
     _ detection: HDCServerOtherClientDetection, for endpoint: HDCServerEndpoint
   ) {
     invalidateDispatchLeases(for: endpoint)
@@ -1403,7 +1403,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
   /// DeviceCoordinator/Job inventory. A verified server identity cannot make
   /// lifecycle impact reliable while that production participant feed is
   /// absent or incomplete.
-  package func setParticipantImpactReliability(
+  public func setParticipantImpactReliability(
     _ isReliable: Bool, for endpoint: HDCServerEndpoint
   ) {
     invalidateDispatchLeases(for: endpoint)
@@ -1414,7 +1414,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     endpoints[endpoint]
   }
 
-  package func takeDeliveredEvents(for recipient: HDCServerRecipient) -> [HDCServerEvent] {
+  public func takeDeliveredEvents(for recipient: HDCServerRecipient) -> [HDCServerEvent] {
     let events = deliveredEvents[recipient] ?? []
     deliveredEvents[recipient] = []
     return events
@@ -1422,7 +1422,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
 
   /// Automatic paths are diagnostics-only by construction. There is no
   /// executor parameter and therefore no reachable automatic kill/restart.
-  package func recordAutomaticDiagnosticFailure(endpoint: HDCServerEndpoint, reason: String) {
+  public func recordAutomaticDiagnosticFailure(endpoint: HDCServerEndpoint, reason: String) {
     broadcast(.diagnostic(endpoint: endpoint, reason: reason), endpoint: endpoint)
   }
 
@@ -1715,7 +1715,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     return true
   }
 
-  package func createImpactPreview(
+  public func createImpactPreview(
     action: HDCServerLifecycleAction,
     endpoint: HDCServerEndpoint
   ) async -> HDCServerImpactPreviewResult {
@@ -1769,7 +1769,7 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
       confirmationID: confirmationID, coreStep: coreStep, using: executor)
   }
 
-  package func dispatch(
+  public func dispatch(
     confirmationID: UUID,
     coreStep: WorkflowStep,
     using executor: HDCProcessLifecycleExecutor

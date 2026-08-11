@@ -57,7 +57,7 @@ package enum IdentityBoundPTYFailureCategory: String, Sendable, Equatable {
   case signerRejected
 }
 
-package enum IdentityBoundPTYError: Error, Equatable, Sendable {
+public enum IdentityBoundPTYError: Error, Equatable, Sendable {
   case invalidInteraction
   case ptyAllocationFailed(Int32)
   case launchFailed(String)

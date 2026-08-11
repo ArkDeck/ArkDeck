@@ -20,7 +20,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-package enum RuntimeCapabilityStoreError: Error, Equatable, Sendable {
+public enum RuntimeCapabilityStoreError: Error, Equatable, Sendable {
   case ioFailure(String)
   case storeCorrupted(String)
   case capabilityNotFound(String)
@@ -31,7 +31,7 @@ package enum RuntimeCapabilityStoreError: Error, Equatable, Sendable {
   case denied(RuntimeCapabilityDenial)
 }
 
-package enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
+public enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
   /// The use was durably reserved but the owning Job has not reached a
   /// confirmed terminal outcome.
   case pending
@@ -54,7 +54,7 @@ package struct RuntimeCapabilityOutcomeRecord: Equatable, Sendable, Codable {
   package let recordSHA256: String
 }
 
-package struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
+public struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
   public let ordinal: Int
   public let reservationID: String
   public let jobID: String
@@ -82,11 +82,11 @@ package struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
 
 public struct RuntimeCapabilityStatus: Equatable, Sendable, Codable {
   public let capability: RuntimeCapability
-  package let remainingUses: Int
-  package let consumptionCount: Int
-  package let lineageAllowsNewExecution: Bool
-  package let lineageBlocker: String?
-  package let lineage: [RuntimeCapabilityLineageEntry]
+  public let remainingUses: Int
+  public let consumptionCount: Int
+  public let lineageAllowsNewExecution: Bool
+  public let lineageBlocker: String?
+  public let lineage: [RuntimeCapabilityLineageEntry]
 }
 
 public struct RuntimeCapabilityConsumptionReceipt: Equatable, Sendable, Codable {
@@ -94,12 +94,12 @@ public struct RuntimeCapabilityConsumptionReceipt: Equatable, Sendable, Codable 
   public let ordinal: Int
   public let reservationID: String
   public let jobID: String
-  package let consumedAtUTC: String
+  public let consumedAtUTC: String
   public let operationReference: String
-  package let queryFingerprintSHA256: String
-  package let remainingUsesAfter: Int
-  package let previousLineageSHA256: String?
-  package let receiptSHA256: String
+  public let queryFingerprintSHA256: String
+  public let remainingUsesAfter: Int
+  public let previousLineageSHA256: String?
+  public let receiptSHA256: String
 }
 
 private struct StoredOutcomeRecord: Equatable, Codable {
@@ -213,7 +213,7 @@ public actor RuntimeCapabilityStore {
   /// durable lineage without reserving a use. Submit uses this after the
   /// complete typed plan materializes, so a scope or recovery blocker is
   /// reported before a Job can reach mutation dispatch.
-  package func validateNewExecution(
+  public func validateNewExecution(
     capabilityID: String,
     query: RuntimeCapabilityAuthorizationQuery,
     nowUTC: String
@@ -231,7 +231,7 @@ public actor RuntimeCapabilityStore {
     }
   }
 
-  package func revoke(capabilityID: String, atUTC: String, reason: String) throws {
+  public func revoke(capabilityID: String, atUTC: String, reason: String) throws {
     try withExclusiveLock {
       var document = try loadDocument()
       guard
@@ -356,7 +356,7 @@ public actor RuntimeCapabilityStore {
   /// later advance to `confirmed` or `safeToReflash` after dedicated
   /// readback, but a confirmed record is immutable and no other transition
   /// can widen authority.
-  package func recordOutcome(
+  public func recordOutcome(
     capabilityID: String,
     reservationID: String,
     jobID: String,
