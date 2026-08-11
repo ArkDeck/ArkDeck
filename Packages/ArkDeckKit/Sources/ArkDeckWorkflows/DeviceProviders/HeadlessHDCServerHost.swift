@@ -6,6 +6,31 @@ public enum HeadlessHDCServerHostError: Error, Equatable, Sendable {
   case serverDidNotBecomeReady(String)
 }
 
+/// Immutable, path-free facts established before the daemon opens either of
+/// its client transports. The App can consume this projection without gaining
+/// an executable locator, argv surface, or lifecycle handle.
+public struct HDCManagedRuntimeDiagnostics: Sendable, Equatable {
+  public let executableSHA256: String
+  public let clientVersion: String
+  public let serverVersion: String
+  public let endpoint: String
+  public let endpointSource: String
+
+  public init(
+    executableSHA256: String,
+    clientVersion: String,
+    serverVersion: String,
+    endpoint: String,
+    endpointSource: String
+  ) {
+    self.executableSHA256 = executableSHA256
+    self.clientVersion = clientVersion
+    self.serverVersion = serverVersion
+    self.endpoint = endpoint
+    self.endpointSource = endpointSource
+  }
+}
+
 /// Owns the loopback HDC server needed by a login-session LaunchAgent.
 ///
 /// HDC's ordinary client-side background bootstrap is not durable under the
@@ -44,10 +69,15 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
 
   private let task: Task<Void, Never>
   private let lifecycle: Lifecycle
+  package let diagnostics: HDCManagedRuntimeDiagnostics
 
-  private init(task: Task<Void, Never>, lifecycle: Lifecycle) {
+  private init(
+    task: Task<Void, Never>, lifecycle: Lifecycle,
+    diagnostics: HDCManagedRuntimeDiagnostics
+  ) {
     self.task = task
     self.lifecycle = lifecycle
+    self.diagnostics = diagnostics
   }
 
   public static func start(
@@ -64,16 +94,25 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
         onUnexpectedExit()
       }
     }
-    let host = HeadlessHDCServerHost(task: task, lifecycle: lifecycle)
     do {
-      try await awaitReadiness(executable: executable, endpoint: selection)
+      let check = try await awaitReadiness(executable: executable, endpoint: selection)
+      let host = HeadlessHDCServerHost(
+        task: task, lifecycle: lifecycle,
+        diagnostics: HDCManagedRuntimeDiagnostics(
+          executableSHA256: executable.sha256,
+          clientVersion: check.clientVersion,
+          serverVersion: check.serverVersion,
+          endpoint: selection.endpoint.rawValue,
+          endpointSource: selection.source.rawValue))
       guard lifecycle.arm() else {
         throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
           "foreground HDC server exited during readiness")
       }
       return host
     } catch {
-      await host.stop()
+      lifecycle.requestStop()
+      task.cancel()
+      _ = await task.result
       throw error
     }
   }
@@ -115,7 +154,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
   private static func awaitReadiness(
     executable: ResolvedExecutable,
     endpoint: HDCServerEndpointSelection
-  ) async throws {
+  ) async throws -> HDCParsedServerCheck {
     let resolver = FixedExecutableResolver(table: ["hdc": executable])
     let dispatcher = DescriptorBoundProcessDispatcher(
       resolver: resolver, childEnvironment: endpoint.childEnvironment)
@@ -133,7 +172,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
             truncated: receipt.stdoutTruncated),
           check.versionsAgree
         {
-          return
+          return check
         }
         lastReason =
           "checkserver exit=\(receipt.exitStatus.map(String.init) ?? "unknown") "

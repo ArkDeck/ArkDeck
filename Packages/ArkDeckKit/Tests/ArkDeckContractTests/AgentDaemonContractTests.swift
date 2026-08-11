@@ -155,6 +155,7 @@ final class AgentDaemonContractTests: XCTestCase {
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
+    hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
@@ -176,6 +177,7 @@ final class AgentDaemonContractTests: XCTestCase {
       nowUTC: { "2026-07-29T00:00:00Z" },
       targetStore: targetStore,
       bootstrap: nil,
+      hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: stateDirectory.appendingPathComponent(
         "flash-bundle-imports-\(UUID().uuidString)", isDirectory: true),
@@ -292,6 +294,46 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("describe must include availability reasons")
     }
     XCTAssertFalse(reasons.isEmpty)
+  }
+
+  func testManagedHDCRuntimeStatusIsPathFreeReadOnlyAndClosed() async throws {
+    let diagnostics = HDCManagedRuntimeDiagnostics(
+      executableSHA256: String(repeating: "a", count: 64),
+      clientVersion: "3.2.0f",
+      serverVersion: "3.2.0f",
+      endpoint: "127.0.0.1:8710",
+      endpointSource: "default")
+    let (handler, _) = try makeStack(hdcRuntimeDiagnostics: diagnostics)
+
+    let response = try await request(handler, method: "runtime.hdc-status")
+    guard case .object(let result)? = response.result else {
+      return XCTFail("runtime.hdc-status must return an object")
+    }
+    XCTAssertTrue(response.ok)
+    XCTAssertEqual(result["availability"], .string("ready"))
+    XCTAssertEqual(result["source"], .string("runtimeManaged"))
+    XCTAssertEqual(result["toolSha256"], .string(String(repeating: "a", count: 64)))
+    XCTAssertEqual(result["clientVersion"], .string("3.2.0f"))
+    XCTAssertEqual(result["serverVersion"], .string("3.2.0f"))
+    XCTAssertEqual(result["endpoint"], .string("127.0.0.1:8710"))
+    XCTAssertEqual(result["serverHealth"], .string("healthy"))
+    XCTAssertEqual(result["ownership"], .string("arkDeckManaged"))
+    XCTAssertNil(result["path"])
+    XCTAssertNil(result["executable"])
+    XCTAssertNil(result["arguments"])
+    XCTAssertNil(result["argv"])
+
+    let invalid = try await request(
+      handler, method: "runtime.hdc-status", params: ["path": .string("/tmp/hdc")])
+    XCTAssertFalse(invalid.ok)
+    XCTAssertEqual(invalid.error?.code, "invalidParams")
+
+    let (unconfigured, _) = try makeStack()
+    let unavailable = try await request(unconfigured, method: "runtime.hdc-status")
+    guard case .object(let unavailableResult)? = unavailable.result else {
+      return XCTFail("unconfigured runtime status must still be structured")
+    }
+    XCTAssertEqual(unavailableResult["availability"], .string("unavailable"))
   }
 
   func testFlashPrerequisitesAreReadOnlyTargetBoundRuntimeFacts() async throws {

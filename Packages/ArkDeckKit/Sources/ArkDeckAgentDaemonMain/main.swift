@@ -659,6 +659,7 @@ Task.detached {
       nowUTC: utcNow,
       targetStore: targetStore,
       bootstrap: bootstrap,
+      hdcRuntimeDiagnostics: startedHDCServerHost?.diagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: resolvedStateDirectory.appendingPathComponent(
         "flash-bundle-imports", isDirectory: true),

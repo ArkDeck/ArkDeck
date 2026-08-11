@@ -189,7 +189,7 @@ struct HDCStatusView: View {
         field(
           "overview.field.platformTrust", presentation.platformTrust, id: "hdc.toolchain.trust")
       }
-      if onSelectUserConfiguredExecutable != nil {
+      if onSelectUserConfiguredExecutable != nil && !presentation.isRuntimeManaged {
         Button("overview.action.chooseExecutable") { isSelectingExecutable = true }
           .accessibilityIdentifier("hdc.toolchain.chooseExecutable")
           .disabled(isRefreshInFlight)
