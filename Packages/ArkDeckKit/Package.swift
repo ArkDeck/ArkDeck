@@ -33,9 +33,10 @@ let package = Package(
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
     // Dependency direction is load-bearing (see ArchitectureBoundaryContractTests):
-    // the harness plane decides, the runtime plane executes, and only the
-    // composition target below may see both. ArkDeckHarness deliberately does
-    // not depend on ArkDeckProcess — the harness cannot spawn a process.
+    // the harness plane decides, the runtime plane executes, and only
+    // ArkDeckAgentComposition plus ArkDeckAgentDaemon may see both as library
+    // targets. ArkDeckHarness deliberately does not depend on ArkDeckProcess —
+    // the harness cannot spawn a process.
     .target(
       name: "ArkDeckHarness",
       dependencies: ["ArkDeckCore", "ArkDeckRuntime"],

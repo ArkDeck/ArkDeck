@@ -97,7 +97,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       "Automation may control existing typed tasks but cannot create or widen them")
   }
 
-  func testOnlyTheTypedFlashUISubmitAndItsJobShapeReachTheGate() throws {
+  func testOnlyPublishedTypedAppSubmitsAndTheirJobShapeReachTheGate() throws {
     XCTAssertEqual(
       AgentXPCEndpoint.admission(of: try submitFrame()),
       .appSubmit(requestID: "contract-submit", kind: .flash))
@@ -114,6 +114,22 @@ final class AgentXPCTransportContractTests: XCTestCase {
           operationVersion: 1,
           clientName: ArkDeckAgentClientName.debugLogsWorkspace)),
       .appSubmit(requestID: "contract-submit", kind: .debugLogs))
+    XCTAssertEqual(
+      AgentXPCEndpoint.admission(
+        of: try submitFrame(
+          operationID: "debug.hap",
+          operationVersion: 1,
+          clientName: ArkDeckAgentClientName.debugAppsWorkspace)),
+      .appSubmit(requestID: "contract-submit", kind: .debugHAP))
+    for operationID in ["port-forward.create", "port-forward.remove"] {
+      XCTAssertEqual(
+        AgentXPCEndpoint.admission(
+          of: try submitFrame(
+            operationID: operationID,
+            operationVersion: 1,
+            clientName: ArkDeckAgentClientName.debugNetworkWorkspace)),
+        .appSubmit(requestID: "contract-submit", kind: .debugPorts))
+    }
     XCTAssertNil(
       AgentXPCEndpoint.admission(
         of: try submitFrame(operationVersion: 1)),

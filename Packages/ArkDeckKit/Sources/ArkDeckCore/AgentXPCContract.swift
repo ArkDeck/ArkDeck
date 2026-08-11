@@ -46,6 +46,7 @@ public enum ArkDeckAgentClientName {
   public static let flashWorkspace = "ArkDeckApp.FlashWorkspace"
   public static let traceWorkspace = "ArkDeckApp.TraceWorkspace"
   public static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
+  public static let debugAppsWorkspace = "ArkDeckApp.DebugWorkspace.Apps"
   public static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
 }
 

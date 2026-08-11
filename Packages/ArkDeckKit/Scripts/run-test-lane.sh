@@ -1,6 +1,6 @@
 #!/bin/sh
 # macOS Runtime test lanes.  The full suite remains the merge gate; this
-# runner gives local development and scheduled CI explicit fast/medium/slow
+# runner gives local development and future CI explicit fast/medium/slow
 # feedback without hiding a slow durability check behind a larger timeout.
 
 set -eu
