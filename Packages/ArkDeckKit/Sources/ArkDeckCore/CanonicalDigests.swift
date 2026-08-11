@@ -21,4 +21,3 @@ package enum SHA256Hex {
       && value.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) }
   }
 }
-
