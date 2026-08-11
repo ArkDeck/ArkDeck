@@ -1164,8 +1164,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   }
 
   private func write(_ receipt: OpenHarmonySigningPresetReceipt) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
     let bytes = try encoder.encode(receipt)
     let temporary = rootURL.appendingPathComponent(".preset-\(UUID().uuidString).tmp")
     defer { try? fileManager.removeItem(at: temporary) }
@@ -1549,8 +1548,7 @@ public struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching {
     ]
     let record = OpenHarmonySigningResultRecord(
       schemaVersion: "arkdeck-openharmony-signing-result/v1", summary: summary)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
     let bytes = try encoder.encode(record)
     let temporary = URL(fileURLWithPath: action.output.directory)
       .appendingPathComponent(".signing-result-\(UUID().uuidString).tmp")

@@ -592,8 +592,7 @@ public enum JournalCanonicalJSON {
   }
 
   private static var encoder: JSONEncoder {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return encoder
   }
 }

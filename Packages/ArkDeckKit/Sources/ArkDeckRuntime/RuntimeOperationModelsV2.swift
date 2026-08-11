@@ -526,7 +526,7 @@ public enum RuntimeOperationCodec {
         path: "$",
         message: "request exceeds \(maximumRequestBytes) bytes")
     }
-    var validator = AgentStrictJSONDuplicateValidator(data: data)
+    var validator = StrictJSONDuplicateValidator(data: data)
     do {
       try validator.validate()
     } catch {
@@ -592,8 +592,7 @@ public enum RuntimeOperationCodec {
   }
 
   public static func encodeRequest(_ request: RuntimeOperationRequest) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(request)
   }
 
@@ -602,7 +601,7 @@ public enum RuntimeOperationCodec {
       throw RuntimeOperationRequestRejection(
         code: .requestTooLarge, path: "$", message: "manifest exceeds size cap")
     }
-    var validator = AgentStrictJSONDuplicateValidator(data: data)
+    var validator = StrictJSONDuplicateValidator(data: data)
     do {
       try validator.validate()
     } catch {
@@ -622,8 +621,7 @@ public enum RuntimeOperationCodec {
   public static func encodeBundleManifest(
     _ manifest: PublishedOperationBundleManifest
   ) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(manifest)
   }
 }

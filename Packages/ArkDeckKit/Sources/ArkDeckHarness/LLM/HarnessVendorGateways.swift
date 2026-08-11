@@ -133,8 +133,7 @@ package enum HarnessVendorEnvelope {
   }
 
   static func json(_ value: [String: JSONValue]) -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return (try? encoder.encode(JSONValue.object(value))) ?? Data("{}".utf8)
   }
 

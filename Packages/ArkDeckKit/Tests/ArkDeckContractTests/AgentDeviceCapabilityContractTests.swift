@@ -560,7 +560,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
           url.standardizedFileURL.path.hasPrefix(Self.repositoryRoot.standardizedFileURL.path))
         let bytes = try Data(contentsOf: url)
         XCTAssertEqual(sha256(bytes), expectedHash, "\(version) \(pair.0)")
-        var duplicateValidator = StrictJSONDuplicateValidator(data: bytes)
+        var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: bytes)
         try duplicateValidator.validate()
         let parsed = try XCTUnwrap(
           JSONSerialization.jsonObject(with: bytes) as? [String: Any])
@@ -595,9 +595,9 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
   func testDuplicateMembersIncludingUnicodeEscapesFailClosed() throws {
     for name in ["duplicate-capability.json", "duplicate-capability-escaped.json"] {
       let data = try Data(contentsOf: Self.runRoot.appendingPathComponent(name))
-      var validator = StrictJSONDuplicateValidator(data: data)
+      var validator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
       XCTAssertThrowsError(try validator.validate(), name) { error in
-        guard case StrictJSONError.duplicateMemberName(let path) = error else {
+        guard case ArkDeckCore.StrictJSONError.duplicateMemberName(let path) = error else {
           return XCTFail("\(name): unexpected error \(error)")
         }
         XCTAssertEqual(path, "$.capabilityId")
@@ -611,7 +611,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
 
   private func loadJSONObject(_ url: URL) throws -> [String: Any] {
     let data = try Data(contentsOf: url)
-    var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+    var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
     try duplicateValidator.validate()
     return try XCTUnwrap(
       JSONSerialization.jsonObject(with: data, options: []) as? [String: Any])
@@ -621,7 +621,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
     let data = try Data(
       contentsOf: Self.contractRoot.appendingPathComponent(
         "agent-device-operation-registry.v1-draft.json"))
-    var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+    var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
     try duplicateValidator.validate()
     let registry = try JSONDecoder().decode(Registry.self, from: data)
     let profiles = registry.operations.flatMap { operation in

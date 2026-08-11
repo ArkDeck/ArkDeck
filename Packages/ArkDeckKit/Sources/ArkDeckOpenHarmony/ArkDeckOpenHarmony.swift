@@ -879,8 +879,7 @@ public struct HDCServerImpactSnapshot: Sendable, Equatable {
   }
 
   public var scopeHash: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     guard let canonical = try? encoder.encode(HDCServerImpactCanonicalScope(self)) else {
       preconditionFailure("The fixed HDC impact scope schema must be JSON encodable")
     }

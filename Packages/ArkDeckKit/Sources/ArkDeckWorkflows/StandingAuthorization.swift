@@ -63,11 +63,17 @@ public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
   public let maxRuns: Int
 
   public static func parse(_ data: Data) throws -> RockchipStandingAuthorization {
-    var duplicateValidator = StandingAuthorizationDuplicateValidator(data: data)
+    var duplicateValidator = StrictJSONDuplicateValidator(data: data)
     do {
       try duplicateValidator.validate()
-    } catch {
-      throw RockchipStandingAuthorizationParseError.invalidJSON(String(describing: error))
+    } catch let error as StrictJSONError {
+      switch error {
+      case .duplicateMemberName(let path):
+        throw RockchipStandingAuthorizationParseError.invalidJSON(
+          "duplicate JSON member at \(path)")
+      case .malformed(let reason):
+        throw RockchipStandingAuthorizationParseError.invalidJSON(reason)
+      }
     }
 
     let root: JSONValue
@@ -160,193 +166,5 @@ public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
       throw RockchipStandingAuthorizationParseError.closedShapeViolation(
         "authorization document contains unknown or missing members")
     }
-  }
-}
-
-private enum StandingAuthorizationStrictJSONError: Error, CustomStringConvertible {
-  case duplicateMember(String)
-  case malformed(String)
-
-  var description: String {
-    switch self {
-    case .duplicateMember(let path): "duplicate JSON member at \(path)"
-    case .malformed(let reason): reason
-    }
-  }
-}
-
-/// Local duplicate-key validator because the storage target's equivalent parser is intentionally
-/// not part of its public API. JSONDecoder alone accepts duplicate members and therefore cannot
-/// protect an authorization carrier.
-private struct StandingAuthorizationDuplicateValidator {
-  private let bytes: [UInt8]
-  private var index = 0
-
-  init(data: Data) { bytes = Array(data) }
-
-  mutating func validate() throws {
-    skipWhitespace()
-    try parseValue(path: "$", depth: 0)
-    skipWhitespace()
-    guard index == bytes.count else {
-      throw StandingAuthorizationStrictJSONError.malformed("unexpected trailing JSON data")
-    }
-  }
-
-  private mutating func parseValue(path: String, depth: Int) throws {
-    guard depth <= 256, let byte = currentByte else {
-      throw StandingAuthorizationStrictJSONError.malformed("missing or over-nested JSON value")
-    }
-    switch byte {
-    case UInt8(ascii: "{"): try parseObject(path: path, depth: depth)
-    case UInt8(ascii: "["): try parseArray(path: path, depth: depth)
-    case UInt8(ascii: "\""): _ = try parseString()
-    case UInt8(ascii: "-"), UInt8(ascii: "0")...UInt8(ascii: "9"): try parseNumber()
-    case UInt8(ascii: "t"): try parseLiteral(Array("true".utf8))
-    case UInt8(ascii: "f"): try parseLiteral(Array("false".utf8))
-    case UInt8(ascii: "n"): try parseLiteral(Array("null".utf8))
-    default: throw StandingAuthorizationStrictJSONError.malformed("unexpected JSON byte")
-    }
-  }
-
-  private mutating func parseObject(path: String, depth: Int) throws {
-    try consume(UInt8(ascii: "{"))
-    skipWhitespace()
-    if consumeIfPresent(UInt8(ascii: "}")) { return }
-    var names = Set<String>()
-    while true {
-      let name = try parseString()
-      let memberPath = "\(path).\(name)"
-      guard names.insert(name).inserted else {
-        throw StandingAuthorizationStrictJSONError.duplicateMember(memberPath)
-      }
-      skipWhitespace()
-      try consume(UInt8(ascii: ":"))
-      skipWhitespace()
-      try parseValue(path: memberPath, depth: depth + 1)
-      skipWhitespace()
-      if consumeIfPresent(UInt8(ascii: "}")) { return }
-      try consume(UInt8(ascii: ","))
-      skipWhitespace()
-    }
-  }
-
-  private mutating func parseArray(path: String, depth: Int) throws {
-    try consume(UInt8(ascii: "["))
-    skipWhitespace()
-    if consumeIfPresent(UInt8(ascii: "]")) { return }
-    var element = 0
-    while true {
-      try parseValue(path: "\(path)[\(element)]", depth: depth + 1)
-      element += 1
-      skipWhitespace()
-      if consumeIfPresent(UInt8(ascii: "]")) { return }
-      try consume(UInt8(ascii: ","))
-      skipWhitespace()
-    }
-  }
-
-  private mutating func parseString() throws -> String {
-    let start = index
-    try consume(UInt8(ascii: "\""))
-    while let byte = currentByte {
-      switch byte {
-      case UInt8(ascii: "\""):
-        index += 1
-        do { return try JSONDecoder().decode(String.self, from: Data(bytes[start..<index])) } catch
-        { throw StandingAuthorizationStrictJSONError.malformed("invalid JSON string") }
-      case UInt8(ascii: "\\"):
-        index += 1
-        guard let escaped = currentByte else {
-          throw StandingAuthorizationStrictJSONError.malformed("unterminated JSON escape")
-        }
-        if escaped == UInt8(ascii: "u") {
-          index += 1
-          for _ in 0..<4 {
-            guard let hex = currentByte, Self.isHexDigit(hex) else {
-              throw StandingAuthorizationStrictJSONError.malformed("invalid Unicode escape")
-            }
-            index += 1
-          }
-        } else {
-          let simple: Set<UInt8> = [
-            UInt8(ascii: "\""), UInt8(ascii: "\\"), UInt8(ascii: "/"),
-            UInt8(ascii: "b"), UInt8(ascii: "f"), UInt8(ascii: "n"),
-            UInt8(ascii: "r"), UInt8(ascii: "t"),
-          ]
-          guard simple.contains(escaped) else {
-            throw StandingAuthorizationStrictJSONError.malformed("invalid JSON escape")
-          }
-          index += 1
-        }
-      case 0x00...0x1F:
-        throw StandingAuthorizationStrictJSONError.malformed("JSON control character")
-      default: index += 1
-      }
-    }
-    throw StandingAuthorizationStrictJSONError.malformed("unterminated JSON string")
-  }
-
-  private mutating func parseLiteral(_ literal: [UInt8]) throws {
-    let end = index + literal.count
-    guard end <= bytes.count, bytes[index..<end].elementsEqual(literal) else {
-      throw StandingAuthorizationStrictJSONError.malformed("invalid JSON literal")
-    }
-    index = end
-  }
-
-  private mutating func parseNumber() throws {
-    if consumeIfPresent(UInt8(ascii: "-")), currentByte == nil {
-      throw StandingAuthorizationStrictJSONError.malformed("invalid JSON number")
-    }
-    if consumeIfPresent(UInt8(ascii: "0")) {
-      guard currentByte.map(Self.isDigit) != true else {
-        throw StandingAuthorizationStrictJSONError.malformed("leading JSON number zero")
-      }
-    } else {
-      guard let byte = currentByte, (UInt8(ascii: "1")...UInt8(ascii: "9")).contains(byte)
-      else { throw StandingAuthorizationStrictJSONError.malformed("invalid JSON integer") }
-      repeat { index += 1 } while currentByte.map(Self.isDigit) == true
-    }
-    if consumeIfPresent(UInt8(ascii: ".")) {
-      guard currentByte.map(Self.isDigit) == true else {
-        throw StandingAuthorizationStrictJSONError.malformed("invalid JSON fraction")
-      }
-      repeat { index += 1 } while currentByte.map(Self.isDigit) == true
-    }
-    if currentByte == UInt8(ascii: "e") || currentByte == UInt8(ascii: "E") {
-      index += 1
-      if currentByte == UInt8(ascii: "+") || currentByte == UInt8(ascii: "-") { index += 1 }
-      guard currentByte.map(Self.isDigit) == true else {
-        throw StandingAuthorizationStrictJSONError.malformed("invalid JSON exponent")
-      }
-      repeat { index += 1 } while currentByte.map(Self.isDigit) == true
-    }
-  }
-
-  private mutating func consume(_ expected: UInt8) throws {
-    guard consumeIfPresent(expected) else {
-      throw StandingAuthorizationStrictJSONError.malformed("unexpected JSON token")
-    }
-  }
-
-  private mutating func consumeIfPresent(_ expected: UInt8) -> Bool {
-    guard currentByte == expected else { return false }
-    index += 1
-    return true
-  }
-
-  private mutating func skipWhitespace() {
-    let whitespace: Set<UInt8> = [0x20, 0x09, 0x0A, 0x0D]
-    while let byte = currentByte, whitespace.contains(byte) { index += 1 }
-  }
-
-  private var currentByte: UInt8? { index < bytes.count ? bytes[index] : nil }
-  private static func isDigit(_ byte: UInt8) -> Bool {
-    (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(byte)
-  }
-  private static func isHexDigit(_ byte: UInt8) -> Bool {
-    isDigit(byte) || (UInt8(ascii: "a")...UInt8(ascii: "f")).contains(byte)
-      || (UInt8(ascii: "A")...UInt8(ascii: "F")).contains(byte)
   }
 }

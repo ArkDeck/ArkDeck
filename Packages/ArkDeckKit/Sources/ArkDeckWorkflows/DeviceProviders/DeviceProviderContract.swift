@@ -397,8 +397,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "fileScope": .string(inspection.fileScope),
         ])
     case .workspace(let workspace):
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let encoder = CanonicalJSONEncoders.canonical()
       self.init(
         kind: "workspace.action",
         arguments: [

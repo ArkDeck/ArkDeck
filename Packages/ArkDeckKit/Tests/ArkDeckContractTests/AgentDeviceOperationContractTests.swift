@@ -252,9 +252,9 @@ final class AgentDeviceOperationContractTests: XCTestCase {
   func testDuplicateMembersIncludingEscapedNamesFailClosed() throws {
     for name in ["duplicate-request.json", "duplicate-request-escaped.json"] {
       let data = try Data(contentsOf: Self.runRoot.appendingPathComponent(name))
-      var validator = StrictJSONDuplicateValidator(data: data)
+      var validator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
       XCTAssertThrowsError(try validator.validate(), name) { error in
-        guard case StrictJSONError.duplicateMemberName(let path) = error else {
+        guard case ArkDeckCore.StrictJSONError.duplicateMemberName(let path) = error else {
           return XCTFail("\(name): unexpected error \(error)")
         }
         XCTAssertEqual(path, "$.requestId")
@@ -276,14 +276,14 @@ final class AgentDeviceOperationContractTests: XCTestCase {
     let url = Self.contractRoot.appendingPathComponent(
       "agent-device-operation-registry.v1-draft.json")
     let data = try Data(contentsOf: url)
-    var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+    var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
     try duplicateValidator.validate()
     return try JSONDecoder().decode(Registry.self, from: data)
   }
 
   private func loadJSONObject(_ url: URL) throws -> [String: Any] {
     let data = try Data(contentsOf: url)
-    var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+    var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
     try duplicateValidator.validate()
     return try XCTUnwrap(
       JSONSerialization.jsonObject(with: data, options: []) as? [String: Any])

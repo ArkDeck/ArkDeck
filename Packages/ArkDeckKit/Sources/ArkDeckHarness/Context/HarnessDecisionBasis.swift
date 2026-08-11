@@ -88,8 +88,7 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
   /// Canonical digest: sorted keys, no escaped slashes, no clock. Same
   /// persisted facts in, same digest out - on this process or the next one.
   public var digest: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     let data = (try? encoder.encode(self)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: data)
   }

@@ -290,8 +290,7 @@ enum RuntimeDebugAttemptPermitStore {
   }
 
   static func canonicalEncode<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(value)
   }
 

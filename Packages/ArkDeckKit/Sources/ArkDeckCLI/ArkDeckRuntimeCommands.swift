@@ -31,8 +31,7 @@ enum RuntimeCLI {
 
   static func emit(_ value: JSONValue, json: Bool) {
     if json {
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+      let encoder = CanonicalJSONEncoders.canonicalPretty()
       if let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8) {
         print(text)
         return
@@ -810,9 +809,7 @@ enum RuntimeCLI {
           capabilityReference: capability, targetID: target,
           executionID: executionID ?? UUID().uuidString.lowercased()))
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
     switch outcome {
     case .completed(let receipt):
       if json, let data = try? encoder.encode(receipt),

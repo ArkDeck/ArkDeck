@@ -546,8 +546,7 @@ package actor DurableHDCServerLifecycleAuditStore:
       "failure": failure,
       "recovery": .null,
     ])
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try SessionManifestDocument(data: encoder.encode(manifest))
   }
 
@@ -1651,8 +1650,7 @@ package struct HDCApplicationDiagnosticsExecutionCatalog: Sendable {
       candidateSHA256: candidate.sha256,
       sessionID: sessionID,
       jobID: jobID)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     try encoder.encode(locator).write(to: locatorURL, options: .atomic)
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o600], ofItemAtPath: locatorURL.path)

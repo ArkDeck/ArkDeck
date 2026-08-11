@@ -249,15 +249,13 @@ package enum HarnessPromotionExport {
 
   private static func compactJSON(_ value: JSONValue?) -> String {
     guard let value else { return "-" }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     guard let data = try? encoder.encode(value) else { return "-" }
     return String(decoding: data, as: UTF8.self)
   }
 
   private static func prettyJSON<T: Encodable>(_ value: T) throws -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
     return String(decoding: try encoder.encode(value), as: UTF8.self) + "\n"
   }
 }

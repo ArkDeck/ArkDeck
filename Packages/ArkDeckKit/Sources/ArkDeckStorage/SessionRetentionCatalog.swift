@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Darwin
 import Foundation
 
@@ -941,8 +942,7 @@ public struct SessionRetentionCatalog: Sendable {
   }
 
   private func canonicalData<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(value)
   }
 

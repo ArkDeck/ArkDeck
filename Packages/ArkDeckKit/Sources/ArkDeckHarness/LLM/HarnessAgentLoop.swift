@@ -71,8 +71,7 @@ public struct HarnessAgentContext: Equatable, Sendable, Codable {
   }
 
   public var encodedByteCount: Int {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return ((try? encoder.encode(self)) ?? Data()).count
   }
 

@@ -196,8 +196,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
   var lastInsertedRowID: Int64 { sqlite3_last_insert_rowid(requiredHandle()) }
 
   static func canonicalData<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     do {
       return try encoder.encode(value)
     } catch {

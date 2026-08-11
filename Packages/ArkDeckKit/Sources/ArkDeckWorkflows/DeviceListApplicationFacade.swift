@@ -431,7 +431,7 @@ private enum DeviceListXPCReadTransport {
       return .failure(.transport("Could not compose a Runtime request"))
     }
     return await withCheckedContinuation { continuation in
-      let box = DeviceListXPCConnectionBox(
+      let box = XPCConnectionBox(
         NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
       let connection = box.connection
       connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
@@ -468,10 +468,4 @@ private enum DeviceListXPCReadTransport {
       }
     }
   }
-}
-
-/// NSXPCConnection is thread-safe by contract but predates `Sendable`.
-private final class DeviceListXPCConnectionBox: @unchecked Sendable {
-  let connection: NSXPCConnection
-  init(_ connection: NSXPCConnection) { self.connection = connection }
 }

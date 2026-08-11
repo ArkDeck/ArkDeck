@@ -656,8 +656,7 @@ package struct HarnessTaskMethodService: Sendable {
   /// Documents already carry a stable, reviewed JSON shape; re-deriving it
   /// by hand here would be a second contract to keep in step.
   static func encode<T: Encodable>(_ value: T) -> JSONValue {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     guard let data = try? encoder.encode(value),
       let projected = try? JSONDecoder().decode(JSONValue.self, from: data)
     else { return .null }

@@ -196,8 +196,7 @@ public struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatch
       ],
       campaignReservation: RuntimeCampaignReservationReference(
         reservationID: admitted.reservationID))
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return String(decoding: try encoder.encode(request), as: UTF8.self)
   }
 

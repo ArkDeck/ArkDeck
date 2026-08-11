@@ -1,16 +1,16 @@
 import Foundation
 
-package enum AgentStrictJSONError: Error, Equatable, Sendable {
+package enum StrictJSONError: Error, Equatable, Sendable {
   case duplicateMemberName(path: String)
   case malformed(String)
 }
 
-package struct AgentStrictJSONDuplicateValidator {
+package struct StrictJSONDuplicateValidator {
   private let bytes: [UInt8]
   private var index = 0
 
   package init(data: Data) {
-    bytes = Array(data)
+    self.bytes = Array(data)
   }
 
   package mutating func validate() throws {
@@ -18,13 +18,14 @@ package struct AgentStrictJSONDuplicateValidator {
     try parseValue(path: "$", depth: 0)
     skipWhitespace()
     guard index == bytes.count else {
-      throw AgentStrictJSONError.malformed("unexpected trailing data")
+      throw StrictJSONError.malformed("unexpected trailing data at byte offset \(index)")
     }
   }
 
   private mutating func parseValue(path: String, depth: Int) throws {
     guard depth <= 256, let byte = currentByte else {
-      throw AgentStrictJSONError.malformed("missing or excessively nested JSON value")
+      throw StrictJSONError.malformed(
+        depth > 256 ? "JSON nesting exceeds 256 levels" : "missing JSON value")
     }
     switch byte {
     case Self.objectStart:
@@ -42,37 +43,38 @@ package struct AgentStrictJSONDuplicateValidator {
     case Self.lowercaseN:
       try parseLiteral(Array("null".utf8))
     default:
-      throw AgentStrictJSONError.malformed("unexpected JSON byte")
+      throw StrictJSONError.malformed("unexpected byte at byte offset \(index)")
     }
   }
 
   private mutating func parseObject(path: String, depth: Int) throws {
-    try consume(Self.objectStart)
+    try consume(Self.objectStart, expectation: "object start")
     skipWhitespace()
     if consumeIfPresent(Self.objectEnd) { return }
+
     var names: Set<String> = []
     while true {
       guard currentByte == Self.quote else {
-        throw AgentStrictJSONError.malformed("object member name must be a string")
+        throw StrictJSONError.malformed("object member name must be a string")
       }
       let name = try parseString()
       let memberPath = "\(path).\(name)"
       guard names.insert(name).inserted else {
-        throw AgentStrictJSONError.duplicateMemberName(path: memberPath)
+        throw StrictJSONError.duplicateMemberName(path: memberPath)
       }
       skipWhitespace()
-      try consume(Self.nameSeparator)
+      try consume(Self.nameSeparator, expectation: "colon after member name")
       skipWhitespace()
       try parseValue(path: memberPath, depth: depth + 1)
       skipWhitespace()
       if consumeIfPresent(Self.objectEnd) { return }
-      try consume(Self.valueSeparator)
+      try consume(Self.valueSeparator, expectation: "comma between object members")
       skipWhitespace()
     }
   }
 
   private mutating func parseArray(path: String, depth: Int) throws {
-    try consume(Self.arrayStart)
+    try consume(Self.arrayStart, expectation: "array start")
     skipWhitespace()
     if consumeIfPresent(Self.arrayEnd) { return }
     var elementIndex = 0
@@ -81,76 +83,76 @@ package struct AgentStrictJSONDuplicateValidator {
       elementIndex += 1
       skipWhitespace()
       if consumeIfPresent(Self.arrayEnd) { return }
-      try consume(Self.valueSeparator)
+      try consume(Self.valueSeparator, expectation: "comma between array elements")
       skipWhitespace()
     }
   }
 
   private mutating func parseString() throws -> String {
     let start = index
-    try consume(Self.quote)
+    try consume(Self.quote, expectation: "string opening quote")
     while let byte = currentByte {
       switch byte {
       case Self.quote:
         index += 1
-        guard
-          let value = try? JSONDecoder().decode(
-            String.self, from: Data(bytes[start..<index]))
-        else { throw AgentStrictJSONError.malformed("invalid JSON string") }
-        return value
+        do {
+          return try JSONDecoder().decode(String.self, from: Data(bytes[start..<index]))
+        } catch {
+          throw StrictJSONError.malformed("invalid JSON string")
+        }
       case Self.escape:
         index += 1
         guard let escaped = currentByte else {
-          throw AgentStrictJSONError.malformed("unterminated JSON escape")
+          throw StrictJSONError.malformed("unterminated JSON escape")
         }
         if escaped == Self.lowercaseU {
           index += 1
           for _ in 0..<4 {
             guard let hex = currentByte, Self.isHexDigit(hex) else {
-              throw AgentStrictJSONError.malformed("invalid Unicode escape")
+              throw StrictJSONError.malformed("invalid Unicode escape")
             }
             index += 1
           }
         } else {
           guard Self.simpleEscapes.contains(escaped) else {
-            throw AgentStrictJSONError.malformed("invalid JSON escape")
+            throw StrictJSONError.malformed("invalid JSON escape")
           }
           index += 1
         }
       case 0x00...0x1F:
-        throw AgentStrictJSONError.malformed("unescaped control character")
+        throw StrictJSONError.malformed("unescaped control character in JSON string")
       default:
         index += 1
       }
     }
-    throw AgentStrictJSONError.malformed("unterminated JSON string")
+    throw StrictJSONError.malformed("unterminated JSON string")
   }
 
   private mutating func parseLiteral(_ literal: [UInt8]) throws {
     let end = index + literal.count
     guard end <= bytes.count, bytes[index..<end].elementsEqual(literal) else {
-      throw AgentStrictJSONError.malformed("invalid JSON literal")
+      throw StrictJSONError.malformed("invalid JSON literal")
     }
     index = end
   }
 
   private mutating func parseNumber() throws {
     if consumeIfPresent(Self.minus), currentByte == nil {
-      throw AgentStrictJSONError.malformed("invalid JSON number")
+      throw StrictJSONError.malformed("minus must be followed by a number")
     }
     if consumeIfPresent(Self.zero) {
-      guard currentByte.map(Self.isDigit) != true else {
-        throw AgentStrictJSONError.malformed("leading zero")
+      if let byte = currentByte, Self.isDigit(byte) {
+        throw StrictJSONError.malformed("leading zero in JSON number")
       }
     } else {
       guard let byte = currentByte, Self.one...Self.nine ~= byte else {
-        throw AgentStrictJSONError.malformed("invalid JSON integer")
+        throw StrictJSONError.malformed("invalid JSON integer")
       }
       repeat { index += 1 } while currentByte.map(Self.isDigit) == true
     }
     if consumeIfPresent(Self.decimalPoint) {
       guard currentByte.map(Self.isDigit) == true else {
-        throw AgentStrictJSONError.malformed("invalid fraction")
+        throw StrictJSONError.malformed("fraction requires a digit")
       }
       repeat { index += 1 } while currentByte.map(Self.isDigit) == true
     }
@@ -158,15 +160,15 @@ package struct AgentStrictJSONDuplicateValidator {
       index += 1
       if currentByte == Self.plus || currentByte == Self.minus { index += 1 }
       guard currentByte.map(Self.isDigit) == true else {
-        throw AgentStrictJSONError.malformed("invalid exponent")
+        throw StrictJSONError.malformed("exponent requires a digit")
       }
       repeat { index += 1 } while currentByte.map(Self.isDigit) == true
     }
   }
 
-  private mutating func consume(_ expected: UInt8) throws {
+  private mutating func consume(_ expected: UInt8, expectation: String) throws {
     guard consumeIfPresent(expected) else {
-      throw AgentStrictJSONError.malformed("unexpected JSON structure")
+      throw StrictJSONError.malformed("expected \(expectation) at byte offset \(index)")
     }
   }
 
@@ -181,6 +183,7 @@ package struct AgentStrictJSONDuplicateValidator {
   }
 
   private var currentByte: UInt8? { index < bytes.count ? bytes[index] : nil }
+
   private static func isDigit(_ byte: UInt8) -> Bool { zero...nine ~= byte }
   private static func isHexDigit(_ byte: UInt8) -> Bool {
     isDigit(byte) || lowercaseA...lowercaseF ~= byte || uppercaseA...uppercaseF ~= byte

@@ -2192,8 +2192,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
   }
 
   private func write<T: Encodable>(_ value: T, to url: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     let data = try encoder.encode(value)
     let temporary = url.deletingLastPathComponent().appendingPathComponent(
       ".\(url.lastPathComponent).\(UUID().uuidString.lowercased()).tmp")
@@ -2384,8 +2383,7 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
       throw RuntimeDispatchFailure.failed(
         "host-managed target/binding/executable correlation is incomplete or drifted")
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     let encoded = try encoder.encode(try PersistedTypedProviderAction(action))
     let digest = SHA256Hex.string(of: encoded)
     guard digest == descriptor.actionSHA256 else {

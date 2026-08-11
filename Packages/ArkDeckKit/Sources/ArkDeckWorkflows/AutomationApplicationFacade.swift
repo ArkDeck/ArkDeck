@@ -118,7 +118,7 @@ private enum AutomationXPCTransport {
       return .failure("Could not compose an Automation Runtime request")
     }
     return await withCheckedContinuation { continuation in
-      let box = AutomationXPCConnectionBox(
+      let box = XPCConnectionBox(
         NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
       let connection = box.connection
       connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
@@ -152,11 +152,6 @@ private enum AutomationXPCTransport {
       }
     }
   }
-}
-
-private final class AutomationXPCConnectionBox: @unchecked Sendable {
-  let connection: NSXPCConnection
-  init(_ connection: NSXPCConnection) { self.connection = connection }
 }
 
 enum AutomationResponseDecoding {

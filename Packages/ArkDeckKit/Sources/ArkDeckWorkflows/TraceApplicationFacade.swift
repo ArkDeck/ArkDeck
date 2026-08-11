@@ -338,8 +338,7 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.traceWorkspace))
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let encoder = CanonicalJSONEncoders.canonical()
       let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed Trace request")
@@ -680,7 +679,7 @@ private enum TraceXPCReadTransport {
       return .failure(.transport("Could not compose a Runtime request"))
     }
     return await withCheckedContinuation { continuation in
-      let box = TraceXPCConnectionBox(
+      let box = XPCConnectionBox(
         NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
       let connection = box.connection
       connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
@@ -718,10 +717,4 @@ private enum TraceXPCReadTransport {
       }
     }
   }
-}
-
-/// NSXPCConnection is thread-safe by contract but predates `Sendable`.
-private final class TraceXPCConnectionBox: @unchecked Sendable {
-  let connection: NSXPCConnection
-  init(_ connection: NSXPCConnection) { self.connection = connection }
 }

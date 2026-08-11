@@ -168,8 +168,7 @@ private enum DiagnosticLogExportSanitizer {
           }
           try validateField(key: key, value: value)
         }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let encoder = CanonicalJSONEncoders.canonical()
         let canonical = try encoder.encode(JSONValue.object(root))
         guard canonical.count < RedactedDiagnosticLogFile.maximumBytes,
           output.count <= RedactedDiagnosticLogFile.maximumBytes - canonical.count - 1
@@ -1036,8 +1035,7 @@ public struct LocalDiagnosticBundleExporter: Sendable {
   }
 
   private static func canonicalData<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(value)
   }
 

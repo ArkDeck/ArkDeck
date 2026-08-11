@@ -316,8 +316,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
   }
 
   static func canonicalData(_ object: [String: JSONValue]) -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return (try? encoder.encode(JSONValue.object(object))) ?? Data()
   }
 
@@ -336,9 +335,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
   }
 
   static func date(_ value: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    ISO8601Timestamps.parse(value)
   }
 }
 
@@ -464,8 +461,7 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
   }
 
   public var digestSHA256: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return RockchipEvolutionCampaignConfirmationAssertion.sha256(
       (try? encoder.encode(self)) ?? Data())
   }
@@ -587,8 +583,7 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
   /// Stable identity of the complete immutable candidate record, including
   /// its source, diff, build and test artifact pins.
   public var digestSHA256: String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return RockchipEvolutionCampaignConfirmationAssertion.sha256(
       (try? encoder.encode(self)) ?? Data())
   }

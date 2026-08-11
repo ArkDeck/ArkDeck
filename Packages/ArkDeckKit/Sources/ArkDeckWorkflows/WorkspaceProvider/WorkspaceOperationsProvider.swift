@@ -597,8 +597,7 @@ public final class WorkspacePatchAttemptStore: @unchecked Sendable {
 
   public func save(_ attempt: WorkspacePatchAttempt) throws {
     try lock.withLock {
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+      let encoder = CanonicalJSONEncoders.canonicalPretty()
       let data = try encoder.encode(attempt)
       let destination = try url(for: attempt.patchAttemptRef)
       let temporary = rootURL.appendingPathComponent(

@@ -429,8 +429,7 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
 /// second side effect.
 public enum HarnessRequestIdentity {
   public static func inputsDigest(_ inputs: [String: JSONValue]) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     let data = (try? encoder.encode(inputs)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: data)
   }

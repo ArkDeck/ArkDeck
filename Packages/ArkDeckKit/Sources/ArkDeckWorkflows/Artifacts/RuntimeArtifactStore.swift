@@ -181,14 +181,7 @@ public struct ArtifactRetentionPolicy: Sendable, Equatable {
       return ArtifactRetention(
         retentionClass: retentionClass, deadlineUTC: nil, pinned: true)
     }
-    let parser = ISO8601DateFormatter()
-    parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    let created =
-      parser.date(from: createdAtUTC)
-      ?? {
-        parser.formatOptions = [.withInternetDateTime]
-        return parser.date(from: createdAtUTC)
-      }()
+    let created = ISO8601Timestamps.parse(createdAtUTC)
     guard let created else {
       throw RuntimeArtifactError.ioFailure(
         "cannot derive retention from invalid UTC timestamp \(createdAtUTC)")
@@ -199,10 +192,11 @@ public struct ArtifactRetentionPolicy: Sendable, Equatable {
     guard lifetime > 0 else {
       throw RuntimeArtifactError.ioFailure("artifact retention lifetime must be positive")
     }
-    parser.formatOptions = [.withInternetDateTime]
+    let deadlineFormatter = ISO8601DateFormatter()
+    deadlineFormatter.formatOptions = [.withInternetDateTime]
     return ArtifactRetention(
       retentionClass: retentionClass,
-      deadlineUTC: parser.string(from: created.addingTimeInterval(lifetime)),
+      deadlineUTC: deadlineFormatter.string(from: created.addingTimeInterval(lifetime)),
       pinned: false)
   }
 }
@@ -1493,11 +1487,7 @@ public actor RuntimeArtifactStore {
   private static func isExpired(deadlineUTC: String?, currentUTC: String) throws -> Bool {
     guard let deadlineUTC else { return false }
     func parse(_ value: String) -> Date? {
-      let parser = ISO8601DateFormatter()
-      parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-      if let date = parser.date(from: value) { return date }
-      parser.formatOptions = [.withInternetDateTime]
-      return parser.date(from: value)
+      ISO8601Timestamps.parse(value)
     }
     guard let deadline = parse(deadlineUTC), let current = parse(currentUTC) else {
       throw RuntimeArtifactError.indexCorrupted(

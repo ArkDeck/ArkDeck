@@ -560,8 +560,7 @@ public actor RuntimeCapabilityStore {
     if includePlan {
       components.append("plan=\(query.planDigest ?? "-")")
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     if let inputs = try? encoder.encode(query.inputs),
       let text = String(data: inputs, encoding: .utf8)
     {
@@ -652,8 +651,7 @@ public actor RuntimeCapabilityStore {
   }
 
   private static func digest<T: Encodable>(_ value: T) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     guard let data = try? encoder.encode(value) else {
       preconditionFailure("internal capability lineage material must encode")
     }
@@ -784,8 +782,7 @@ public actor RuntimeCapabilityStore {
   }
 
   private func persist(_ document: StoreDocument) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonicalPretty()
     let data: Data
     do {
       data = try encoder.encode(document)

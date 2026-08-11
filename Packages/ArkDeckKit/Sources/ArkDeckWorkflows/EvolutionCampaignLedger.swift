@@ -1,5 +1,6 @@
 // Append-only Evolution campaign ledger (CHG-2026-025 r8, TASK-AIN-019).
 
+import ArkDeckCore
 import ArkDeckStorage
 import Darwin
 import Foundation
@@ -640,8 +641,7 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   private func persistLocked(
     _ document: RockchipEvolutionCampaignDocument, rootDescriptor: Int32
   ) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     let data = try encoder.encode(document)
     guard !data.isEmpty, data.count <= Self.maximumBytes else {
       throw RockchipEvolutionCampaignError.persistenceRejected("ledgerSize")

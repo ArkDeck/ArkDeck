@@ -159,8 +159,7 @@ public actor AgentChatApplication {
   }
 
   private static func jsonText(_ value: JSONValue) -> String {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     guard let data = try? encoder.encode(value),
       let text = String(data: data, encoding: .utf8)
     else { return "{}" }

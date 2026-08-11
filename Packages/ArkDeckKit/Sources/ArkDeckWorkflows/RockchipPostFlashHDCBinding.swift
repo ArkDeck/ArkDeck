@@ -125,8 +125,7 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
       else { throw failure("post-flash binding changed before verified alias publication") }
     }
 
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     var data = try encoder.encode(candidate)
     data.append(0x0A)
     guard data.count <= Self.maximumBytes else {

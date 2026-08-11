@@ -443,8 +443,7 @@ public struct AgentRuntimeExecutor: Sendable {
     if let capability = request.capabilityReference {
       payload["authorization"] = .object(["capabilityId": .string(capability)])
     }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     guard let requestJSON = try? encoder.encode(JSONValue.object(payload)),
       let requestText = String(data: requestJSON, encoding: .utf8)
     else {
@@ -512,8 +511,7 @@ public struct AgentRuntimeExecutor: Sendable {
       let evidence = try call(
         method: "job.evidence", params: ["jobId": .string(jobID)],
         deadline: deadline)
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+      let encoder = CanonicalJSONEncoders.canonical()
       let data = try encoder.encode(evidence)
       trustedFacts = try JSONDecoder().decode(
         RuntimeHardwareEvidenceTrustedFacts.self, from: data)

@@ -1,3 +1,4 @@
+import ArkDeckCore
 import ArkDeckStorage
 import Darwin
 import Foundation
@@ -499,8 +500,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
   }
 
   private func canonicalData<T: Encodable>(_ value: T) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(value)
   }
 
