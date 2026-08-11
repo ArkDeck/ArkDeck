@@ -34,6 +34,8 @@ struct ArkDeckCommandLine {
         try RuntimeCLI.runOperation(Array(arguments.dropFirst()))
       case "device":
         try RuntimeCLI.runDevice(Array(arguments.dropFirst()))
+      case "trace":
+        try RuntimeCLI.runTrace(Array(arguments.dropFirst()))
       case "job":
         try RuntimeCLI.runJob(Array(arguments.dropFirst()))
       case "cleanup-debt":
@@ -1073,6 +1075,7 @@ struct ArkDeckCommandLine {
         arkdeck signing remove [--json]
         arkdeck operation list [--socket <path>] [--json]
         arkdeck device list|show|adopt [--candidate <connect-key>] [--socket <path>] [--json]
+        arkdeck trace probe --target <id> [--socket <path>] [--json]
         arkdeck job plan --request-file <request.json> [--socket <path>] [--json]
         arkdeck job submit --target <id> --operation <reference> \
       [--expected-binding-revision <n>] [--wait] [--json]
@@ -1117,7 +1120,7 @@ struct ArkDeckCommandLine {
       [--capability <CAP-RT-...>] [--json]
         arkdeck agent resume --resume-token <token> [--selection <target-or-candidate>] [--json]
 
-      doctor/operation/device/job/debug talk only to arkdeck-agentd over its user-private socket:
+      doctor/operation/device/trace/job/debug talk only to arkdeck-agentd over its user-private socket:
       this CLI holds no HDC or Rockchip executor and cannot build a device command itself.
 
       agent chat uses ArkDeck's native bounded conversation and typed-tool loop. Configure its

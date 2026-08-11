@@ -700,6 +700,32 @@ enum RuntimeCLI {
     }
   }
 
+  /// Read-only Trace capability portrait from the daemon's protected
+  /// provider. The CLI supplies only a durable target ID; executable
+  /// selection, connect-key binding and every HDC argv remain Runtime-owned.
+  static func runTrace(_ arguments: [String]) throws {
+    guard arguments.first == "probe" else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "usage: arkdeck trace probe --target <id> [--socket <path>] [--json]")
+    }
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    rest.removeAll { $0 == "--json" }
+    let client = client(&rest)
+    guard let targetIndex = rest.firstIndex(of: "--target"), targetIndex + 1 < rest.count else {
+      throw CLIError(exitCode: EX_USAGE, message: "trace probe requires --target <id>")
+    }
+    let targetID = rest[targetIndex + 1]
+    rest.removeSubrange(targetIndex...(targetIndex + 1))
+    guard rest.isEmpty else {
+      throw CLIError(exitCode: EX_USAGE, message: "trace probe received unsupported arguments")
+    }
+    emit(
+      try client.request(method: "trace.probe", params: ["targetId": .string(targetID)]),
+      json: json)
+  }
+
   /// `arkdeck agent chat|run|resume` - the Device Runtime Agent entry point.
   /// Chat keeps conversation and tool-loop state inside ArkDeck, while every
   /// device action still enters through the typed Runtime executor.

@@ -110,9 +110,11 @@ private struct GatewayCapabilities: HarnessCapabilityPort {
 /// A narrow fixture for the one decision a deterministic handler cannot
 /// synthesize: source patch bytes. It starts at that question so retry
 /// behavior can be tested without manufacturing device evidence.
-private struct PatchQuestionHandler: HarnessTaskHandler {
+struct PatchQuestionHandler: HarnessTaskHandler {
   let type = HarnessTaskType.debugCrash
-  let permittedOperations: Set<String> = [DebugCrashTaskHandler.applyPatch]
+  let permittedOperations: Set<String> = [
+    DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+  ]
 
   func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
     [DebugCrashTaskHandler.applyPatch]
@@ -215,6 +217,34 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
       budgets: HarnessTaskBudgets(
         maxRounds: 6, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
+    return (coordinator, store, submission)
+  }
+
+  private func makePatchStack(
+    gateway: (any HarnessDecisionGateway)?,
+    egress: HarnessEgressPolicy,
+    jobs: GatewayJobPort,
+    projectRef: String? = "demo-app",
+    desiredState: [String: JSONValue] = [:],
+    goalSummary: String = "Repair the bounded source failure",
+    expectedBindingRevision: Int? = nil,
+    policyGuard: HarnessPolicyGuard = HarnessPolicyGuard()
+  ) throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSubmission) {
+    let store = try HarnessTaskStore(rootURL: rootURL)
+    let coordinator = HarnessTaskCoordinator(
+      store: store, jobPort: jobs, handlers: [PatchQuestionHandler()],
+      nowUTC: { "2026-07-31T00:00:00Z" }, policyGuard: policyGuard,
+      decisionGateway: gateway, egressPolicy: egress)
+    let submission = HarnessTaskSubmission(
+      type: .debugCrash, projectRef: projectRef,
+      target: HarnessTaskTargetReference(
+        targetID: "TGT-958780b2ffb7",
+        expectedBindingRevision: expectedBindingRevision),
+      goal: HarnessTaskGoal(summary: goalSummary, desiredState: desiredState),
+      budgets: HarnessTaskBudgets(
+        maxRounds: 6, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
+        maxE1Mutations: 0, maxModelCalls: 2),
+      policy: HarnessTaskPolicy(allowedOperations: [DebugCrashTaskHandler.applyPatch]))
     return (coordinator, store, submission)
   }
 
@@ -501,24 +531,19 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
   func testEgressIsDeniedByDefaultAndNoContextLeavesTheHost() async throws {
     let jobs = GatewayJobPort()
     let gateway = ScriptedGateway(replies: [])
-    let (coordinator, store, submission) = try makeStack(
+    let (coordinator, store, submission) = try makePatchStack(
       gateway: gateway, egress: .deniedByDefault, jobs: jobs)
     let task = try await coordinator.submit(submission)
 
     let outcome = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(outcome.action, .dispatched, "the loop still runs with egress denied")
+    XCTAssertEqual(outcome.action, .stoppedForHuman)
     XCTAssertEqual(
       gateway.seenContexts.count, 0, "no context may leave the host without an opt-in")
-    XCTAssertTrue(outcome.reasonCode.contains("egressDenied:egressNotEnabledForProject"))
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
 
-    // The fallback is recorded, not silent.
-    let memory = try await store.memory(scope: .task, key: task.htaskID)
-    XCTAssertTrue(
-      memory.contains {
-        $0.summary.contains("fell back") && $0.summary.contains("egressDenied")
-      })
     let decision = try await store.decision(task.htaskID, round: 1)
-    XCTAssertEqual(decision?.producer, "debug-crash-handler@1")
+    XCTAssertEqual(decision?.producer, "patch-question-handler@1")
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
   }
 
   func testEgressWithoutAProjectRefIsDenied() {
@@ -535,17 +560,12 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
   func testAnEnabledContextIsBoundedPseudonymousAndFreeOfDeviceIdentity() async throws {
     let jobs = GatewayJobPort()
     let gateway = ScriptedGateway(replies: [
-      .success(
-        encodeProposal([
-          "kind": .string("invokeOperation"),
-          "operationRef": .string(DebugCrashTaskHandler.observeDevice),
-          "hypothesis": .string("Observe the target before collecting anything."),
-        ]))
+      .success(encodeProposal(["kind": .string("noSafeAction"), "hypothesis": .string("x")]))
     ])
     let repairTail =
       "patchSha256=6b45f926b558c6075aa78fe533ca422574d982cd71d3c4cf3974186e36571c98"
     let boundedRepairGoal = String(repeating: "bounded repair context ", count: 30) + repairTail
-    let (coordinator, _, submission) = try makeStack(
+    let (coordinator, _, submission) = try makePatchStack(
       gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs,
       desiredState: [
         "crashSignature": .string("jscrash:com.example.waterflowdemo"),
@@ -556,8 +576,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let task = try await coordinator.submit(submission)
 
     let outcome = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(outcome.action, .dispatched)
-    XCTAssertEqual(jobs.submittedOperations, [DebugCrashTaskHandler.observeDevice])
+    XCTAssertEqual(outcome.action, .proposalRetryScheduled)
+    XCTAssertTrue(jobs.submittedOperations.isEmpty)
 
     let context = try XCTUnwrap(gateway.seenContexts.first)
     XCTAssertEqual(
@@ -580,7 +600,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertTrue(
       context.goalSummary.hasSuffix(repairTail),
       "the exact patch digest at the end of a bounded repair goal must reach the model")
-    XCTAssertEqual(Set(context.availableOperations), [DebugCrashTaskHandler.observeDevice])
+    XCTAssertEqual(Set(context.availableOperations), [DebugCrashTaskHandler.applyPatch])
+    XCTAssertEqual(context.requestedDecision, "proposePatch")
     XCTAssertEqual(context.budget.roundsRemaining, 6)
     XCTAssertEqual(context.budget.e1MutationsRemaining, 0)
 
@@ -972,9 +993,9 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
       policyGuard: HarnessPolicyGuard(availability: availability))
     let task = try await coordinator.submit(submission)
 
-    _ = try await coordinator.reconcile(task.htaskID)
-    let context = try XCTUnwrap(gateway.seenContexts.first)
-    XCTAssertEqual(context.currentTaskStateVersion, 2)
+    let context = try await coordinator.assembleContext(
+      task, handler: DebugCrashTaskHandler(), limits: .default)
+    XCTAssertEqual(context.currentTaskStateVersion, task.version)
     XCTAssertEqual(context.currentDeviceBindingRevision, 7)
     XCTAssertTrue(context.availableOperations.isEmpty)
     XCTAssertEqual(
@@ -985,6 +1006,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
           reasonCode: "providerUnavailable")
       ])
     XCTAssertFalse(context.authorizedOperationRefs.contains(DebugCrashTaskHandler.observeDevice))
+    _ = try await coordinator.reconcile(task.htaskID)
+    XCTAssertTrue(gateway.seenContexts.isEmpty, "mechanical steps never consult the gateway")
     XCTAssertTrue(jobs.submittedOperations.isEmpty, "an unavailable operation must reach zero dispatch")
   }
 
@@ -1016,10 +1039,11 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let first = try await coordinator.reconcile(task.htaskID)
     let firstJob = try XCTUnwrap(first.snapshot.activeJobID)
     jobs.finish(firstJob)
-    _ = try await coordinator.reconcile(task.htaskID)
+    let observed = try await coordinator.reconcile(task.htaskID)
+    let context = try await coordinator.assembleContext(
+      observed.snapshot, handler: DebugCrashTaskHandler(), limits: .default)
     _ = try await coordinator.reconcile(task.htaskID)
 
-    let context = try XCTUnwrap(gateway.seenContexts.last)
     XCTAssertEqual(context.availableOperations, [DebugCrashTaskHandler.captureDiagnostics])
     XCTAssertEqual(context.currentCapabilityEffectCeiling, .deviceMutation)
     XCTAssertEqual(
@@ -1027,6 +1051,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let wire = try XCTUnwrap(String(data: context.transmittedBytes, encoding: .utf8))
     XCTAssertFalse(wire.localizedCaseInsensitiveContains("capabilityId"))
     XCTAssertFalse(wire.contains("CAP-"))
+    XCTAssertTrue(gateway.seenContexts.isEmpty, "mechanical steps never consult the gateway")
   }
 
   func testAnOversizedContextIsRefusedInsteadOfSent() async throws {
@@ -1034,7 +1059,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let gateway = ScriptedGateway(replies: [])
     let store = try HarnessTaskStore(rootURL: rootURL)
     let coordinator = HarnessTaskCoordinator(
-      store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:00Z" },
+      store: store, jobPort: jobs, handlers: [PatchQuestionHandler()],
+      nowUTC: { "2026-07-31T00:00:00Z" },
       decisionGateway: gateway,
       egressPolicy: HarnessEgressPolicy(
         enabledProjects: ["demo-app"],
@@ -1048,39 +1074,42 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         goal: HarnessTaskGoal(summary: "goal"),
         budgets: HarnessTaskBudgets(
           maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024, maxE1Mutations: 0),
-        policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash)))
+        policy: HarnessTaskPolicy(
+          allowedOperations: [DebugCrashTaskHandler.applyPatch])))
 
     let outcome = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(gateway.seenContexts.count, 0, "an oversized context is never handed over")
-    XCTAssertTrue(outcome.reasonCode.contains("gatewayUnavailable:contextTooLarge"))
-    XCTAssertEqual(outcome.action, .dispatched, "the deterministic strategy still runs")
+    XCTAssertEqual(outcome.action, .stoppedForHuman)
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
+    let modelRuns = try await store.modelRuns(task.htaskID)
+    XCTAssertTrue(modelRuns.isEmpty, "a pre-transport size refusal is not a model call")
   }
 
   // MARK: - HTP-AC-14: replaceable port, no session state
 
-  func testARejectedProposalFallsBackVisiblyAndChangesNothingElse() async throws {
+  func testARejectedPatchProposalFallsBackVisiblyAndChangesNothingElse() async throws {
     let jobs = GatewayJobPort()
     let gateway = ScriptedGateway(replies: [
-      // A model claiming the task is fixed: refused as a forbidden field, and
-      // the loop proceeds on the deterministic strategy.
+      // A model claiming the task is fixed at the explicit patch question is
+      // refused and charged without gaining task-lifecycle authority.
       .success(
         encodeProposal([
           "kind": .string("noSafeAction"), "hypothesis": .string("already fixed"),
           "status": .string("succeeded"),
         ]))
     ])
-    let (coordinator, store, submission) = try makeStack(
+    let (coordinator, store, submission) = try makePatchStack(
       gateway: gateway, egress: HarnessEgressPolicy(enabledProjects: ["demo-app"]), jobs: jobs)
     let task = try await coordinator.submit(submission)
 
     let outcome = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(outcome.action, .dispatched)
+    XCTAssertEqual(outcome.action, .proposalRetryScheduled)
     XCTAssertNotEqual(outcome.snapshot.lifecycle, .succeeded, "a model cannot declare success")
     XCTAssertTrue(outcome.reasonCode.contains("proposalRejected:forbiddenField:status"))
-    let decision = try await store.decision(task.htaskID, round: 1)
-    XCTAssertEqual(decision?.producer, "debug-crash-handler@1")
-    let memory = try await store.memory(scope: .task, key: task.htaskID)
-    XCTAssertTrue(memory.contains { $0.summary.contains("proposalRejected:forbiddenField:status") })
+    let modelRuns = try await store.modelRuns(task.htaskID)
+    XCTAssertEqual(modelRuns.count, 1)
+    XCTAssertEqual(modelRuns.first?.outcome.reasonCode, "rejected:forbiddenField:status")
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 1)
   }
 
   func testRepairOperationsArePhaseBoundAndCannotReplaceHandlerOwnedInputs() async throws {
@@ -1113,10 +1142,10 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let outcome = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(jobs.submittedOperations, [DebugCrashTaskHandler.observeDevice])
-    XCTAssertEqual(
-      Set(try XCTUnwrap(gateway.seenContexts.first).availableOperations),
-      [DebugCrashTaskHandler.observeDevice])
-    XCTAssertTrue(outcome.reasonCode.contains("operationNotOffered:workspace.apply-patch@1"))
+    XCTAssertTrue(
+      gateway.seenContexts.isEmpty,
+      "a patch reply must remain unread until the deterministic handler asks for patch bytes")
+    XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
 
     let deterministic = DebugCrashTaskHandler().plan(
       for: task, decisionID: "dec-fixture", nowUTC: "2026-07-31T00:00:00Z").decision
@@ -1387,11 +1416,17 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     let task = try await coordinator.submit(submission)
     _ = try await coordinator.reconcile(task.htaskID)
 
-    // The decision record names the producer; the task snapshot itself carries
-    // no conversation, no session id and no model output.
+    // Mechanical steps name the deterministic producer and never open a model
+    // session. The task snapshot itself carries no conversation, session id or
+    // model output.
     let loadedDecision = try await store.decision(task.htaskID, round: 1)
     let decision = try XCTUnwrap(loadedDecision)
-    XCTAssertEqual(decision.producer, "scripted-gateway@1")
+    XCTAssertEqual(decision.producer, "debug-crash-handler@1")
+    XCTAssertTrue(gateway.seenContexts.isEmpty)
+    let modelRuns = try await store.modelRuns(task.htaskID)
+    XCTAssertEqual(modelRuns.count, 0)
+    let durableSnapshot = try await store.load(task.htaskID)
+    XCTAssertEqual(durableSnapshot.consumedBudget.modelCalls, 0)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let reloaded = try await store.load(task.htaskID)

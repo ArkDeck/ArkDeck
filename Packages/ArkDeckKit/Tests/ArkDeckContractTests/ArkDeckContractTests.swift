@@ -344,6 +344,7 @@ final class ProcessAndHDCContractTests: XCTestCase {
       ("e000003", .failure(.unauthorized)),
       ("offline", .failure(.offline)),
       ("[fail]", .failure(.explicitFailureMarker)),
+      ("fail!", .failure(.explicitFailureMarker)),
       ("errorcode", .failure(.explicitFailureMarker)),
       ("[success]", .success),
     ]
@@ -398,7 +399,9 @@ final class ProcessAndHDCContractTests: XCTestCase {
     XCTAssertEqual(overlapping.finish(exitCode: 0), .failure(.unauthorized))
 
     var truncated = HDCSemanticOutputParser()
-    for fragment in ["unauthorize", "offlin", "[fail", "errorcod", "e00000", "[success"] {
+    for fragment in [
+      "unauthorize", "offlin", "[fail", "fail", "errorcod", "e00000", "[success",
+    ] {
       truncated.consume(ProcessOutputChunk(stream: .stdout, bytes: Data((fragment + "|").utf8)))
     }
     XCTAssertEqual(truncated.finish(exitCode: 0), .unknownOutput)

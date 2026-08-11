@@ -667,7 +667,17 @@ public actor HarnessTaskCoordinator {
     if let prepared = try await preparedPatchProposal(snapshot) {
       proposal = prepared
     } else {
-      proposal = await plannedProposal(snapshot, handler: handler, basis: basis)
+      let deterministic = handler.plan(
+        for: snapshot, decisionID: decisionIDFactory(), nowUTC: nowUTC())
+      if Self.requestedDecision(from: deterministic.decision) != nil,
+        snapshot.consumedBudget.modelCalls >= snapshot.budgets.maxModelCalls
+      {
+        return try await stop(
+          snapshot, refusal: .budgetExhausted(.modelCalls),
+          round: snapshot.activeRound, requestID: nil, jobID: nil)
+      }
+      proposal = await plannedProposal(
+        snapshot, handler: handler, basis: basis, deterministic: deterministic)
     }
     if let rejection = proposal.rejection,
       proposal.modelCallsSpent > 0,

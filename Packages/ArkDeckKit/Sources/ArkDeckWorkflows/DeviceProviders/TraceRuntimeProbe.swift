@@ -127,7 +127,7 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
   package func probeTraceRuntime(
     targetID: String
   ) async throws -> TraceRuntimeProbeSnapshot {
-    guard let target = try targetStore.find(targetID: targetID) else {
+    guard let route = try targetStore.hdcExecutionRoute(targetID: targetID) else {
       throw DeviceProviderError.factsUnavailable("target \(targetID) has not been adopted")
     }
     let hdc = try hdcResolver.resolveExecutable(providerID: "hdc")
@@ -138,7 +138,7 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
         let receipt = try await readAllowingNonZero(
           executable: hdc,
           arguments: deviceArguments(
-            connectKey: target.connectKey,
+            connectKey: route.connectKey,
             command: ["shell", probeTool.rawValue, "--help"]),
           byteBudget: 64 * 1024)
         let evaluation = TraceProbeAdapter.evaluateHelp(
@@ -183,7 +183,7 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
       let tagReceipt = try await read(
         executable: hdc,
         arguments: deviceArguments(
-          connectKey: target.connectKey, command: ["shell", "hitrace", "-l"]),
+          connectKey: route.connectKey, command: ["shell", "hitrace", "-l"]),
         byteBudget: 64 * 1024)
       let tagList = TraceProbeAdapter.evaluateTagList(
         tool: .hitrace, stdout: tagReceipt.stdout, stderr: tagReceipt.stderr)
@@ -203,7 +203,7 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
         let receipt = try await read(
           executable: hdc,
           arguments: deviceArguments(
-            connectKey: target.connectKey,
+            connectKey: route.connectKey,
             command: ["shell", "param", "get", definition.name]),
           byteBudget: 4 * 1024)
         parameters.append(Self.parameterObservation(definition.name, receipt: receipt))
@@ -216,8 +216,8 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
     }
 
     return TraceRuntimeProbeSnapshot(
-      targetID: target.targetID,
-      bindingRevision: target.bindingRevision,
+      targetID: route.targetID,
+      bindingRevision: route.bindingRevision,
       adapterDisposition: disposition,
       tool: tool,
       family: family,
@@ -262,11 +262,15 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
       executable: executable, arguments: arguments,
       timeoutSeconds: 15, outputByteBudget: byteBudget,
       criticalNonInterruptible: false)
-    try HDCReadOnlyProbeReceiptValidation.requireNoSemanticFailure(
-      receipt, context: "read-only HDC help probe failed")
     guard !receipt.stdoutTruncated else {
       throw DeviceProviderError.factsUnavailable("read-only HDC probe output was truncated")
     }
+    // Help is not an operation-success receipt. It can legitimately contain
+    // words such as `ErrorCode` while documenting failure output, so the
+    // generic HDC semantic parser would classify the documentation itself as
+    // a failed command. The exact TraceProbeAdapter byte family below remains
+    // the authority gate: a real [Fail]/offline/unknown response is retained
+    // for diagnosis and evaluates unsupported, never captureEligible.
     return receipt
   }
 

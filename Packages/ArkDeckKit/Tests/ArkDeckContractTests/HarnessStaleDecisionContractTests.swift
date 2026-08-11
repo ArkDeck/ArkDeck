@@ -20,6 +20,33 @@ import XCTest
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
+private let stalePatchBaseRevision = String(repeating: "1", count: 64)
+
+private func stalePatchReply(hypothesis: String) -> Data {
+  let diff = """
+    diff --git a/Sources/A.swift b/Sources/A.swift
+    --- a/Sources/A.swift
+    +++ b/Sources/A.swift
+    @@ -1 +1 @@
+    -let value = 0
+    +let value = 1
+    """
+  let digest = SHA256.hash(data: Data(diff.utf8))
+    .map { String(format: "%02x", $0) }.joined()
+  return (try? JSONEncoder().encode(
+    JSONValue.object([
+      "kind": .string("proposePatch"),
+      "hypothesis": .string(hypothesis),
+      "reasonCode": .string("patchModelProposal"),
+      "baseWorkspaceRevision": .string(stalePatchBaseRevision),
+      "patchSha256": .string(digest),
+      "unifiedDiff": .string(diff),
+      "touchedFiles": .array([.string("Sources/A.swift")]),
+      "expectedChangedSymbols": .array([.string("value")]),
+      "expectedObservation": .string("PATCH_APPLIED"),
+    ]))) ?? Data()
+}
+
 /// Runs `interference` while the coordinator waits for a proposal, then
 /// answers with a well-formed step the harness would otherwise dispatch.
 private actor InterferingGateway: HarnessDecisionGateway {
@@ -40,15 +67,7 @@ private actor InterferingGateway: HarnessDecisionGateway {
     interference = nil
     // The suspension the whole guard exists for.
     await pending?()
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return (try? encoder.encode(
-      JSONValue.object([
-        "kind": .string("invokeOperation"),
-        "operationRef": .string(DebugCrashTaskHandler.observeDevice),
-        "hypothesis": .string("Observe the target before collecting anything."),
-        "reasonCode": .string("baselineTargetObservation"),
-      ]))) ?? Data()
+    return stalePatchReply(hypothesis: "Change the bounded source branch.")
   }
 }
 
@@ -144,6 +163,60 @@ private struct DriftingWorkspacePort: HarnessRepairPort {
   }
 }
 
+private struct StalePatchRepairPort: HarnessRepairPort {
+  func currentWorkspaceRevision(
+    relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
+  ) async throws -> String { stalePatchBaseRevision }
+
+  func preparePatch(
+    _ proposal: HarnessPatchProposal, projectRef: String,
+    task: HarnessTaskSnapshot, decisionID: String
+  ) async throws -> HarnessPreparedPatch {
+    HarnessPreparedPatch(
+      inputs: [
+        "projectRef": .string(projectRef),
+        "patchArtifactRef": .string("lease-v1:patch:ART-stale"),
+        "allowedFileGlobs": .array(proposal.touchedFiles.map(JSONValue.string)),
+      ], artifactLease: "lease-v1:patch:ART-stale")
+  }
+
+  func appliedPatchReadback(
+    jobID: String, proposal: HarnessPatchProposal
+  ) async throws -> HarnessAppliedPatchReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func buildReadback(
+    jobID: String, attempt: HarnessRepairAttempt, buildPresetRef: String,
+    task: HarnessTaskSnapshot
+  ) async throws -> HarnessBuildReadback {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func deployedArtifactDigest(jobID: String) async throws -> String {
+    throw HarnessRepairPortError.unavailable("notExpected")
+  }
+
+  func reconcileUnknownPatch(
+    jobID: String, proposal: HarnessPatchProposal
+  ) async throws -> HarnessPatchApplicationReadback { .stillUnknown }
+}
+
+private struct StaleWorkspaceGrant: HarnessCapabilityPort {
+  func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
+    operationReference == DebugCrashTaskHandler.createCheckpoint
+      || operationReference == DebugCrashTaskHandler.applyPatch
+  }
+
+  func standingCapabilityID(
+    operationReference: String, targetID: String,
+    expectedBindingRevision: Int?, inputs: [String: JSONValue]
+  ) async -> String? {
+    await hasStandingCapability(operationReference: operationReference, targetID: targetID)
+      ? "CAP-RT-WORKSPACE-STALE-FIXTURE" : nil
+  }
+}
+
 final class HarnessStaleDecisionContractTests: XCTestCase {
   private var rootURL: URL!
 
@@ -163,20 +236,30 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
   private func makeStack(
     gateway: any HarnessDecisionGateway,
     jobs: CountingJobPort
-  ) throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSubmission) {
+  ) async throws -> (HarnessTaskCoordinator, HarnessTaskStore, HarnessTaskSnapshot) {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let coordinator = HarnessTaskCoordinator(
-      store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:00Z" },
+      store: store, jobPort: jobs, repairPort: StalePatchRepairPort(),
+      handlers: [PatchQuestionHandler()], nowUTC: { "2026-07-31T00:00:00Z" },
+      policyGuard: HarnessPolicyGuard(capabilities: StaleWorkspaceGrant()),
       decisionGateway: gateway,
       egressPolicy: HarnessEgressPolicy(enabledProjects: ["demo-app"]))
-    let submission = HarnessTaskSubmission(
-      type: .debugCrash, projectRef: "demo-app",
+    let task = HarnessTaskSnapshot(
+      htaskID: "HTASK-0123456789AB", type: .debugCrash,
+      intakeDescription: nil, projectRef: "demo-app",
       target: HarnessTaskTargetReference(targetID: "TGT-958780b2ffb7"),
       goal: HarnessTaskGoal(summary: "No WaterFlow SIGABRT"),
+      successCriteria: [],
       budgets: HarnessTaskBudgets(
-        maxRounds: 6, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20, maxE1Mutations: 0),
-      policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
-    return (coordinator, store, submission)
+        maxRounds: 6, maxWallClockSeconds: 900, maxArtifactBytes: 1 << 20,
+        maxE1Mutations: 2, maxModelCalls: 2),
+      policy: HarnessTaskPolicy(allowedOperations: [
+        DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch,
+      ]), observedState: [:],
+      createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
+      lifecycle: .running, stage: .analyzing, version: 1)
+    try await store.create(task)
+    return (coordinator, store, task)
   }
 
   private func snapshot(
@@ -253,8 +336,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
   func testAHumanResolutionDuringPlanningStopsTheDispatch() async throws {
     let jobs = CountingJobPort()
     let gateway = InterferingGateway()
-    let (coordinator, store, submission) = try makeStack(gateway: gateway, jobs: jobs)
-    let task = try await coordinator.submit(submission)
+    let (coordinator, store, task) = try await makeStack(gateway: gateway, jobs: jobs)
 
     // An operator pauses and resumes while the model is answering. Both are
     // legitimate; both move the state version the proposal was made on.
@@ -281,8 +363,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
   func testACancelDuringPlanningStopsTheDispatch() async throws {
     let jobs = CountingJobPort()
     let gateway = InterferingGateway()
-    let (coordinator, _, submission) = try makeStack(gateway: gateway, jobs: jobs)
-    let task = try await coordinator.submit(submission)
+    let (coordinator, _, task) = try await makeStack(gateway: gateway, jobs: jobs)
 
     await gateway.interfere {
       _ = try? await coordinator.cancel(task.htaskID)
@@ -362,8 +443,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
   func testAStaleWakeChargesNoFailureNoProgressAndNoBudget() async throws {
     let jobs = CountingJobPort()
     let gateway = InterferingGateway()
-    let (coordinator, store, submission) = try makeStack(gateway: gateway, jobs: jobs)
-    let task = try await coordinator.submit(submission)
+    let (coordinator, store, task) = try await makeStack(gateway: gateway, jobs: jobs)
 
     await gateway.interfere {
       _ = try? await coordinator.pause(task.htaskID)
@@ -385,9 +465,9 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     // And the loop is not poisoned: the next wake plans on current facts and
     // dispatches normally.
     let next = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(next.action, .dispatched)
+    XCTAssertEqual(next.action, .dispatched, next.reasonCode)
     let submitted = await jobs.submittedOperations
-    XCTAssertEqual(submitted, [DebugCrashTaskHandler.observeDevice])
+    XCTAssertEqual(submitted, [DebugCrashTaskHandler.createCheckpoint])
   }
 
   // MARK: - HFA-AC-5: reproducible basis, recorded model call
@@ -414,16 +494,11 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
   func testAnAcceptedProposalRecordsTheModelCallItCameFrom() async throws {
     let jobs = CountingJobPort()
     let gateway = FixedReplyGateway(
-      reply: Data(
-        """
-        {"kind":"invokeOperation","operationRef":"observe.device@1",\
-        "hypothesis":"Observe the target first.","reasonCode":"baselineTargetObservation"}
-        """.utf8))
-    let (coordinator, store, submission) = try makeStack(gateway: gateway, jobs: jobs)
-    let task = try await coordinator.submit(submission)
+      reply: stalePatchReply(hypothesis: "Change the bounded source branch."))
+    let (coordinator, store, task) = try await makeStack(gateway: gateway, jobs: jobs)
 
     let outcome = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(outcome.action, .dispatched)
+    XCTAssertEqual(outcome.action, .dispatched, outcome.reasonCode)
 
     let runs = try await store.modelRuns(task.htaskID)
     XCTAssertEqual(runs.count, 1)
@@ -461,12 +536,12 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
         {"kind":"invokeOperation","operationRef":"observe.device@1","verdict":"pass",\
         "hypothesis":"Already fixed.","reasonCode":"claimed"}
         """.utf8))
-    let (coordinator, store, submission) = try makeStack(gateway: gateway, jobs: jobs)
-    let task = try await coordinator.submit(submission)
+    let (coordinator, store, task) = try await makeStack(gateway: gateway, jobs: jobs)
 
     let outcome = try await coordinator.reconcile(task.htaskID)
-    // The deterministic handler carried the wake instead.
-    XCTAssertEqual(outcome.action, .dispatched)
+    // The malformed patch answer consumes one bounded call and schedules the
+    // next patch-proposal wake; it cannot fall through to a mechanical job.
+    XCTAssertEqual(outcome.action, .proposalRetryScheduled)
     XCTAssertTrue(outcome.reasonCode.contains("proposalRejected"))
 
     let runs = try await store.modelRuns(task.htaskID)

@@ -232,6 +232,11 @@ final class TraceAdapterGoldenTests: XCTestCase {
     XCTAssertEqual(withStderr.selection, .unsupported)
     XCTAssertEqual(withStderr.rawHelp, golden)
     XCTAssertEqual(withStderr.rawStderr, stderr)
+
+    let protocolFailure = Data("[Fail] ErrorCode: E000003 Unauthorized device\n".utf8)
+    let failed = TraceProbeAdapter.evaluateHelp(tool: .hitrace, stdout: protocolFailure)
+    XCTAssertEqual(failed.selection, .unsupported)
+    XCTAssertEqual(failed.rawHelp, protocolFailure)
   }
 
   func testRegisteredTagListsYieldOnlyExactParsedCapabilities() throws {
