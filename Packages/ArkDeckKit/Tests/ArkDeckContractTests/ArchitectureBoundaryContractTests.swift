@@ -18,8 +18,9 @@
 //   - ArkDeckWorkflows (runtime control plane + providers) cannot import
 //     ArkDeckHarness: the engine and providers must not understand the
 //     plane that drives them.
-//   - Only ArkDeckAgentComposition (harness<->runtime glue) and the
-//     executable composition roots may see both planes at once.
+//   - ArkDeckAgentComposition (harness<->runtime glue), ArkDeckAgentDaemon
+//     (service-side task adapter), and the executable composition roots may
+//     see both planes at once.
 //   - Storage and the artifact store know nothing about harness tasks.
 //
 // When one of these tests fails, the fix is almost never to edit the test:

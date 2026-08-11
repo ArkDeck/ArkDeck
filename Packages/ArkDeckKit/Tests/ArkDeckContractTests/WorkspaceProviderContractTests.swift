@@ -718,7 +718,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     } catch {
       XCTAssertTrue("\(error)".contains("workspace.toolchainUnavailable"))
     }
-    let jobs = await engine.listJobs()
+    let jobs = try await engine.listJobs()
     let capabilities = try await capabilityStore.list()
     XCTAssertTrue(jobs.isEmpty)
     XCTAssertTrue(capabilities.isEmpty)
@@ -972,7 +972,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     } catch {
       XCTAssertTrue("\(error)".contains("runtime.artifactStoreUnavailable"))
     }
-    let jobs = await engine.listJobs()
+    let jobs = try await engine.listJobs()
     XCTAssertTrue(jobs.isEmpty)
   }
 

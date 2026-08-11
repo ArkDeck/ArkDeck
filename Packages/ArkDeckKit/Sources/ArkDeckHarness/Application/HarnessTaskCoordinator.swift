@@ -1915,8 +1915,8 @@ public actor HarnessTaskCoordinator {
           observed[DebugCrashTaskHandler.pendingAnalysisSourceArtifactKey] =
             .string(source.artifactID)
           observed[DebugCrashTaskHandler.pendingAnalysisSourceLeaseKey] = .string(lease)
-          observed[DebugCrashTaskHandler.pendingAnalysisReturnPhaseKey] =
-            .string(Self.analysisReturnPhase(after: snapshot).rawValue)
+          observed[DebugCrashTaskHandler.pendingAnalysisReturnStageKey] =
+            .string(Self.analysisReturnStage(after: snapshot).rawValue)
           try await appendTaskMemory(
             snapshot, kind: .observation,
             summary: "captured crash ledger queued for deterministic analyzer",
@@ -1929,7 +1929,7 @@ public actor HarnessTaskCoordinator {
               snapshot, causation: .jobObserved,
               reasonCode: "crashLedgerAwaitingDerivedAnalysis",
               lifecycle: .running,
-              stage: handler.phase(
+              stage: handler.stage(
                 afterSuccessOf: operationReference, in: snapshot.stage),
               activeJob: .cleared,
               jobID: observation.jobID, observedState: observed,
@@ -1943,20 +1943,20 @@ public actor HarnessTaskCoordinator {
     }
     let sourceEvidenceJobID: String?
     let sourceArtifactID: String?
-    let analysisReturnPhase: HarnessTaskStage?
+    let analysisReturnStage: HarnessTaskStage?
     if operationReference == DebugCrashTaskHandler.analyzeCrashLedger {
       if case .string(let job)? = snapshot.observedState[
         DebugCrashTaskHandler.pendingAnalysisSourceJobKey],
         case .string(let artifact)? = snapshot.observedState[
           DebugCrashTaskHandler.pendingAnalysisSourceArtifactKey],
-        case .string(let rawPhase)? = snapshot.observedState[
-          DebugCrashTaskHandler.pendingAnalysisReturnPhaseKey],
-        let returnPhase = HarnessTaskStage(rawValue: rawPhase),
-        [.collecting, .analyzing, .verifying].contains(returnPhase)
+        case .string(let rawStage)? = snapshot.observedState[
+          DebugCrashTaskHandler.pendingAnalysisReturnStageKey],
+        let returnStage = HarnessTaskStage(rawValue: rawStage),
+        [.collecting, .analyzing, .verifying].contains(returnStage)
       {
         sourceEvidenceJobID = job
         sourceArtifactID = artifact
-        analysisReturnPhase = returnPhase
+        analysisReturnStage = returnStage
       } else {
         let reason = "analyzerSourceObservationUnavailable"
         let blocked = try await recordBlock(
@@ -1968,14 +1968,14 @@ public actor HarnessTaskCoordinator {
     } else {
       sourceEvidenceJobID = nil
       sourceArtifactID = nil
-      analysisReturnPhase = nil
+      analysisReturnStage = nil
     }
-    let nextPhase =
-      analysisReturnPhase
-      ?? handler.phase(afterSuccessOf: operationReference, in: snapshot.stage)
+    let nextStage =
+      analysisReturnStage
+      ?? handler.stage(afterSuccessOf: operationReference, in: snapshot.stage)
     try await appendTaskMemory(
       snapshot, kind: .observation,
-      summary: "\(operationReference) succeeded in phase \(snapshot.stage.rawValue)",
+      summary: "\(operationReference) succeeded in stage \(snapshot.stage.rawValue)",
       confidence: .observed,
       evidence: HarnessMemoryEvidence(
         jobIDs: [observation.jobID], artifactIDs: snapshot.artifactRefs))
@@ -1983,7 +1983,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .jobObserved, reasonCode: "operationSucceeded:\(operationReference)",
-        lifecycle: .running, stage: nextPhase, activeJob: .cleared, jobID: observation.jobID,
+        lifecycle: .running, stage: nextStage, activeJob: .cleared, jobID: observation.jobID,
         conditions: conditionsAfterSuccess(
           operationReference, snapshot: snapshot,
           evidenceArtifactIDs: sourceArtifactID.map { [$0] } ?? [])))
@@ -2040,7 +2040,7 @@ public actor HarnessTaskCoordinator {
     }
 
     var nextAttempt = snapshot.repairAttempt
-    var nextPhase = snapshot.stage
+    var nextStage = snapshot.stage
     do {
       switch operationReference {
       case DebugCrashTaskHandler.createCheckpoint:
@@ -2061,7 +2061,7 @@ public actor HarnessTaskCoordinator {
           // apply Decision is checked against the fact it was planned on;
           // the next verified deploy readback replaces this value.
           deployedDigest: snapshot.repairAttempt?.deployedDigest)
-        nextPhase = .patching
+        nextStage = .patching
 
       case DebugCrashTaskHandler.applyPatch:
         guard let proposal = decision.patchProposal,
@@ -2077,7 +2077,7 @@ public actor HarnessTaskCoordinator {
           patchRevision: readback.patchRevision)
         try await recordAttemptPatchRevision(
           readback.patchRevision, taskID: snapshot.htaskID)
-        nextPhase = .building
+        nextStage = .building
 
       case DebugCrashTaskHandler.buildOpenHarmony:
         guard let current = snapshot.repairAttempt,
@@ -2145,7 +2145,7 @@ public actor HarnessTaskCoordinator {
         try HarnessRepairStageGate.requireEqual(
           stage: "deploymentArtifactDigest", expected: expected, actual: actual)
         nextAttempt = current.updating(deployedDigest: actual)
-        nextPhase = .verifying
+        nextStage = .verifying
 
       case DebugCrashTaskHandler.revertPatch:
         guard let current = snapshot.repairAttempt else {
@@ -2155,7 +2155,7 @@ public actor HarnessTaskCoordinator {
         try await closeAttempt(
           snapshot.htaskID, outcome: .reverted,
           reason: "repairRollbackReadback")
-        nextPhase = .analyzing
+        nextStage = .analyzing
 
       default:
         throw HarnessRepairPortError.unavailable(operationReference)
@@ -2247,7 +2247,7 @@ public actor HarnessTaskCoordinator {
       transition(
         snapshot, causation: .jobObserved,
         reasonCode: "repairStageSucceeded:\(operationReference)",
-        lifecycle: .running, stage: nextPhase, activeJob: .cleared,
+        lifecycle: .running, stage: nextStage, activeJob: .cleared,
         jobID: observation.jobID, observedState: observed,
         noProgressRounds:
           operationReference == DebugCrashTaskHandler.applyPatch
@@ -2301,7 +2301,7 @@ public actor HarnessTaskCoordinator {
   /// fixture has been injected, its next conclusion belongs to repair
   /// analysis. After a verified repair deployment, every conclusion remains
   /// in `verifying` until the evaluator passes or stops safely.
-  private static func analysisReturnPhase(
+  private static func analysisReturnStage(
     after snapshot: HarnessTaskSnapshot
   ) -> HarnessTaskStage {
     if snapshot.stage == .verifying || snapshot.repairAttempt?.deployedDigest != nil {

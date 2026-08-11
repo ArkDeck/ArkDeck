@@ -13,6 +13,42 @@
 
 import Foundation
 
+/// Method names shared by control-plane producers and consumers whose drift
+/// would otherwise be discovered only after a daemon request. Add entries
+/// here when a method crosses independently compiled product surfaces.
+public enum ArkDeckAgentMethod {
+  public static let taskContext = "task.context"
+}
+
+/// Shared filesystem layout for the CLI and daemon composition roots.
+public enum ArkDeckAgentFilesystemLayout {
+  public static let applicationSupportRelativeStateDirectory = "ArkDeck/Agentd"
+  public static let socketFilename = "agentd.sock"
+
+  public static func defaultStateDirectory(
+    fileManager: FileManager = .default
+  ) -> URL {
+    fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent(applicationSupportRelativeStateDirectory, isDirectory: true)
+  }
+
+  public static func defaultSocketURL(fileManager: FileManager = .default) -> URL {
+    defaultStateDirectory(fileManager: fileManager)
+      .appendingPathComponent(socketFilename)
+  }
+}
+
+public enum ArkDeckEnvironmentKey {
+  public static let hdcPath = "ARKDECK_HDC_PATH"
+}
+
+public enum ArkDeckAgentClientName {
+  public static let flashWorkspace = "ArkDeckApp.FlashWorkspace"
+  public static let traceWorkspace = "ArkDeckApp.TraceWorkspace"
+  public static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
+  public static let debugNetworkWorkspace = "ArkDeckApp.DebugWorkspace.Network"
+}
+
 /// The global Mach service name the daemon vends and the App looks up. It is
 /// duplicated in the App's `mach-lookup` exception and in the LaunchAgent
 /// `MachServices` key; all three must agree or the lookup fails closed.

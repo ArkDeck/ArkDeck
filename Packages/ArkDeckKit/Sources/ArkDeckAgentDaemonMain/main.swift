@@ -6,6 +6,7 @@
 
 import ArkDeckAgentComposition
 import ArkDeckAgentDaemon
+import ArkDeckCore
 import ArkDeckHarness
 import ArkDeckRuntime
 import ArkDeckStorage
@@ -42,9 +43,7 @@ func utcNow() -> String {
   return formatter.string(from: Date())
 }
 
-let defaultStateDirectory = FileManager.default.urls(
-  for: .applicationSupportDirectory, in: .userDomainMask
-)[0].appendingPathComponent("ArkDeck/Agentd", isDirectory: true)
+let defaultStateDirectory = ArkDeckAgentFilesystemLayout.defaultStateDirectory()
 var stateDirectory = defaultStateDirectory
 
 var arguments = CommandLine.arguments.dropFirst()
@@ -264,9 +263,10 @@ Task.detached {
 
     // The HDC executable is supplied explicitly (no PATH search, no guess):
     // absent configuration means dispatch stays refused, never degraded.
-    let configuredHDC = ProcessInfo.processInfo.environment["ARKDECK_HDC_PATH"]
+    let configuredHDC = ProcessInfo.processInfo.environment[ArkDeckEnvironmentKey.hdcPath]
     var hdcDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
-      reason: "no HDC executable configured (set ARKDECK_HDC_PATH); dispatch stays fail-closed")
+      reason: "no HDC executable configured (set \(ArkDeckEnvironmentKey.hdcPath)); "
+        + "dispatch stays fail-closed")
     var hdcExecutableResolver: (any RuntimeExecutableResolving)?
     var traceRuntimeProbe: (any TraceRuntimeProbing)? = nil
     var debugRuntimeProbe: (any DebugRuntimeProbing)? = nil

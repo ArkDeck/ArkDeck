@@ -205,10 +205,10 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       case .string(let clientName)? = context["clientName"]
     else { return nil }
     switch (clientName, operationID) {
-    case ("ArkDeckApp.FlashWorkspace", "flash.dayu200"):
+    case (ArkDeckAgentClientName.flashWorkspace, "flash.dayu200"):
       guard operation["version"] == nil else { return nil }
       return .flash
-    case ("ArkDeckApp.TraceWorkspace", "capture.diagnostics"):
+    case (ArkDeckAgentClientName.traceWorkspace, "capture.diagnostics"):
       guard case .integer(1)? = operation["version"] else { return nil }
       return .trace
     case ("ArkDeckApp.DebugWorkspace.Logs", "capture.diagnostics"):

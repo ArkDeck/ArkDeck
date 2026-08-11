@@ -470,7 +470,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
           "redactionProfile": .string("standard"),
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.DebugWorkspace.Logs"))
+        clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugLogsWorkspace))
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
       let requestData = try encoder.encode(request)
@@ -543,7 +543,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
         ],
         requestedOutputs: [.derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(
-          clientName: "ArkDeckApp.DebugWorkspace.Network"))
+          clientName: ArkDeckAgentClientName.debugNetworkWorkspace))
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
       let requestData = try encoder.encode(request)

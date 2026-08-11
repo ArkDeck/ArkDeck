@@ -226,7 +226,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     // The engine's own gates ran on the real request: intent confirmed by the
     // reservation, then the reservation re-verified immediately before the
     // first mutation.
-    let jobs = await engine.listJobs()
+    let jobs = try await engine.listJobs()
     let job = try XCTUnwrap(jobs.first { $0.operationReference.hasPrefix("flash.dayu200") })
     XCTAssertEqual(job.state, "failed")
     XCTAssertFalse(job.outcomeUnknown)

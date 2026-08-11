@@ -902,12 +902,42 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       if case .string(let value)? = field(submitted, "htaskId") { return value }
       return nil
     }())
+    let contextExport = try await call(
+      ArkDeckAgentMethod.taskContext, ["htaskId": .string(taskID)])
+    guard case .object(let contextExportFields) = contextExport,
+      case .object(let contextFields)? = contextExportFields["context"]
+    else { return XCTFail("task.context must export its bounded context over the daemon wire") }
+    XCTAssertEqual(
+      contextFields[HarnessTaskWireField.lifecycle], .string(HarnessTaskLifecycle.created.rawValue))
+    XCTAssertEqual(
+      contextFields[HarnessTaskWireField.stage], .string(HarnessTaskStage.initializing.rawValue))
+    XCTAssertEqual(
+      contextFields[HarnessTaskWireField.legacyStatus],
+      contextFields[HarnessTaskWireField.lifecycle])
+    XCTAssertEqual(
+      contextFields[HarnessTaskWireField.legacyPhase],
+      contextFields[HarnessTaskWireField.stage])
+    XCTAssertNotEqual(contextExportFields["contextDigest"], .null)
     XCTAssertNil(field(submitted, "status"))
     XCTAssertEqual(field(submitted, "lifecycle"), .string("created"))
     XCTAssertEqual(field(submitted, "stage"), .string("initializing"))
     XCTAssertEqual(field(submitted, "waitReason"), .null)
     if case .array(let conditions)? = field(submitted, "conditions") {
-      XCTAssertEqual(conditions.count, HarnessTaskConditionName.allCases.count)
+      let names = Set(conditions.compactMap { condition -> String? in
+        guard case .object(let fields) = condition,
+          case .string(let name)? = fields["name"]
+        else { return nil }
+        return name
+      })
+      XCTAssertEqual(
+        names,
+        [
+          "TargetResolved", "DeviceBound", "DeviceReady", "WorkspaceReady",
+          "ReproductionConfirmed", "ArtifactsReady", "AnalysisReady", "PatchProposalReady",
+          "PatchApplied", "BuildPassed", "BuildOutputsReady", "DeploymentObserved",
+          "VerificationEvidenceReady", "CriteriaSatisfied",
+        ])
+      XCTAssertEqual(conditions.count, names.count, "every condition must have one unique name")
     } else {
       XCTFail("task.submit must expose the complete condition set")
     }

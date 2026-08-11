@@ -13,6 +13,7 @@
 // authority is minted, no reservation is taken and nothing here is an engine
 // admission gate: the nine gates keep their exact semantics behind it.
 
+import ArkDeckCore
 import CryptoKit
 import Foundation
 
@@ -369,7 +370,7 @@ extension RockchipFlashPreflightProbes {
       hdcAliveness: {
         await aliveness(
           resolve: {
-            guard let path = environment["ARKDECK_HDC_PATH"], !path.isEmpty else {
+            guard let path = environment[ArkDeckEnvironmentKey.hdcPath], !path.isEmpty else {
               throw RockchipFlashPreflightError.hdcPathUnset
             }
             return try FixedExecutableResolver.hashing(path: path, providerID: "hdc")

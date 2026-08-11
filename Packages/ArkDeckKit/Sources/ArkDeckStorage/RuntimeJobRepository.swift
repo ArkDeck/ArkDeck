@@ -71,7 +71,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
         throw RuntimeJobRepositoryError.ioFailure("cannot restrict Runtime job repository")
       }
       try configure()
-      try migrate()
+      try bootstrapSchemaIfNeeded()
       try refuseUnconsumedLegacyLedger(stateDirectory: stateDirectory)
     } catch {
       sqlite3_close_v2(opened)
@@ -288,7 +288,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
     try execute("PRAGMA synchronous=FULL")
   }
 
-  private func migrate() throws {
+  private func bootstrapSchemaIfNeeded() throws {
     let version = Int(try query("PRAGMA user_version").first?.integer("user_version") ?? 0)
     guard version <= Self.schemaVersion else {
       throw RuntimeJobRepositoryError.corrupt(

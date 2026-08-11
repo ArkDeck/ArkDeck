@@ -624,7 +624,3 @@ public enum HarnessPromotionGate {
       createdAtUTC: createdAtUTC)
   }
 }
-
-/// Public spelling requested by the Evolution design while retaining the
-/// single strategy-attempt model already used by the Harness.
-public typealias EvolutionAttempt = HarnessAttempt

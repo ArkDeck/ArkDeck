@@ -793,40 +793,11 @@ public actor RuntimeCapabilityStore {
     } catch {
       throw RuntimeCapabilityStoreError.ioFailure("cannot encode capability store: \(error)")
     }
-    let temporaryURL = directoryURL.appendingPathComponent(
-      ".runtime-capabilities.tmp.\(getpid())")
-    let fd = open(
-      temporaryURL.path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0o600)
-    guard fd >= 0 else {
-      throw RuntimeCapabilityStoreError.ioFailure("cannot open temp store file")
-    }
-    defer { close(fd) }
-    let written = data.withUnsafeBytes { buffer -> Int in
-      guard let base = buffer.baseAddress else { return 0 }
-      var total = 0
-      while total < buffer.count {
-        let result = write(fd, base + total, buffer.count - total)
-        if result <= 0 { return total }
-        total += result
-      }
-      return total
-    }
-    guard written == data.count else {
-      unlink(temporaryURL.path)
-      throw RuntimeCapabilityStoreError.ioFailure("short write to temp store file")
-    }
-    guard fsync(fd) == 0 else {
-      unlink(temporaryURL.path)
-      throw RuntimeCapabilityStoreError.ioFailure("fsync of temp store file failed")
-    }
-    guard rename(temporaryURL.path, documentURL.path) == 0 else {
-      unlink(temporaryURL.path)
-      throw RuntimeCapabilityStoreError.ioFailure("atomic rename of store document failed")
-    }
-    let dirFD = open(directoryURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-    if dirFD >= 0 {
-      _ = fsync(dirFD)
-      close(dirFD)
+    do {
+      try DurableFileWriter.createOrReplaceAtomically(destination: documentURL, data: data)
+    } catch {
+      throw RuntimeCapabilityStoreError.ioFailure(
+        "cannot durably persist capability store: \(error)")
     }
   }
 

@@ -47,8 +47,8 @@ public protocol HarnessTaskHandler: Sendable {
   /// same step out, so a replay after a crash proposes the same thing.
   func plan(for snapshot: HarnessTaskSnapshot, decisionID: String, nowUTC: String)
     -> HarnessPlannedStep
-  /// Phase after an operation completed successfully.
-  func phase(afterSuccessOf operationReference: String, in phase: HarnessTaskStage)
+  /// Stage after an operation completed successfully.
+  func stage(afterSuccessOf operationReference: String, in stage: HarnessTaskStage)
     -> HarnessTaskStage
 }
 
@@ -80,7 +80,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   public static let pendingAnalysisSourceJobKey = "pendingCrashAnalysisSourceJobId"
   public static let pendingAnalysisSourceArtifactKey = "pendingCrashAnalysisSourceArtifactId"
   public static let pendingAnalysisSourceLeaseKey = "pendingCrashAnalysisSourceLease"
-  public static let pendingAnalysisReturnPhaseKey = "pendingCrashAnalysisReturnPhase"
+  // The durable value remains the historical spelling for persisted-task compatibility.
+  public static let pendingAnalysisReturnStageKey = "pendingCrashAnalysisReturnPhase"
   /// Durable observation written only after the typed crash-fixture
   /// deployment succeeds. Phase alone cannot carry this fact because the
   /// following capture legitimately moves `reproducing` back to `collecting`.
@@ -550,17 +551,17 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       phaseOnDispatch: nil)
   }
 
-  public func phase(
+  public func stage(
     afterSuccessOf operationReference: String,
-    in phase: HarnessTaskStage
+    in stage: HarnessTaskStage
   ) -> HarnessTaskStage {
-    switch (operationReference, phase) {
+    switch (operationReference, stage) {
     case (Self.observeDevice, .initializing): return .reproducing
     case (Self.captureDiagnostics, .reproducing): return .collecting
     case (Self.applyPatch, .patching): return .building
     case (Self.deployHAP, .deploying): return .verifying
     case (Self.revertPatch, .deploying), (Self.revertPatch, .verifying): return .analyzing
-    default: return phase
+    default: return stage
     }
   }
 

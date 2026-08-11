@@ -18,7 +18,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
   private func submitFrame(
     operationID: String = "flash.dayu200",
     operationVersion: Int? = nil,
-    clientName: String = "ArkDeckApp.FlashWorkspace"
+    clientName: String = ArkDeckAgentClientName.flashWorkspace
   ) throws -> Data {
     let operationJSON = operationVersion.map {
       #"{"id":"\#(operationID)","version":\#($0)}"#
@@ -105,14 +105,14 @@ final class AgentXPCTransportContractTests: XCTestCase {
       AgentXPCEndpoint.admission(
         of: try submitFrame(
           operationID: "capture.diagnostics", operationVersion: 1,
-          clientName: "ArkDeckApp.TraceWorkspace")),
+          clientName: ArkDeckAgentClientName.traceWorkspace)),
       .appSubmit(requestID: "contract-submit", kind: .trace))
     XCTAssertEqual(
       AgentXPCEndpoint.admission(
         of: try submitFrame(
           operationID: "capture.diagnostics",
           operationVersion: 1,
-          clientName: "ArkDeckApp.DebugWorkspace.Logs")),
+          clientName: ArkDeckAgentClientName.debugLogsWorkspace)),
       .appSubmit(requestID: "contract-submit", kind: .debugLogs))
     XCTAssertNil(
       AgentXPCEndpoint.admission(
@@ -121,13 +121,13 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertNil(
       AgentXPCEndpoint.admission(
         of: try submitFrame(
-          operationID: "capture.diagnostics", clientName: "ArkDeckApp.TraceWorkspace")),
+          operationID: "capture.diagnostics", clientName: ArkDeckAgentClientName.traceWorkspace)),
       "versioned App operations must not omit their published version")
     XCTAssertNil(
       AgentXPCEndpoint.admission(
         of: try submitFrame(
           operationID: "capture.diagnostics", operationVersion: 2,
-          clientName: "ArkDeckApp.TraceWorkspace")),
+          clientName: ArkDeckAgentClientName.traceWorkspace)),
       "versioned App operations must remain pinned to their exact published version")
     XCTAssertNil(AgentXPCEndpoint.admission(of: try submitFrame(operationID: "debug.app")))
 

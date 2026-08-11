@@ -135,7 +135,7 @@ struct PatchQuestionHandler: HarnessTaskHandler {
       phaseOnDispatch: nil)
   }
 
-  func phase(
+  func stage(
     afterSuccessOf operationReference: String, in stage: HarnessTaskStage
   ) -> HarnessTaskStage { stage }
 }

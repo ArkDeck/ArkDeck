@@ -18,6 +18,7 @@ public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case rejected(RuntimeOperationErrorCode, String)
   case idempotencyConflict(String)
   case jobNotFound(String)
+  case jobRecordUnreadable(String)
   case jobNotRunnable(String)
   case internalFailure(String)
 }
@@ -3008,20 +3009,23 @@ public actor RuntimeJobEngine {
   /// latter is projected from SQLite so callers keep the established `job.list`
   /// behaviour without forcing the daemon to retain a journal writer per
   /// completed job.
-  public func listJobs() async -> [RuntimeJobStatus] {
+  public func listJobs() async throws -> [RuntimeJobStatus] {
     let indexes = await recoveryEpochIndexes()
     var statuses: [String: RuntimeJobStatus] = [:]
-    if let persisted = try? admissionService.allJobs() {
-      for row in persisted {
-        guard let data = row.initialRecordData,
-          let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
-        else { continue }
-        statuses[record.jobID] = status(
-          of: record,
-          supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
-          recoveryEpochID: indexes.establishedByJobID[record.jobID],
-          resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[record.jobID])
-      }
+    let persisted: [RuntimePersistedJob]
+    do {
+      persisted = try admissionService.allJobs()
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "Runtime job history index is unreadable: \(error)")
+    }
+    for row in persisted {
+      let record = try decodePersistedRecord(row)
+      statuses[record.jobID] = status(
+        of: record,
+        supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
+        recoveryEpochID: indexes.establishedByJobID[record.jobID],
+        resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[record.jobID])
     }
     // Active snapshots can contain timeline entries accumulated since their
     // last durable projection; they take precedence over the history index.
@@ -3045,12 +3049,7 @@ public actor RuntimeJobEngine {
     let indexes = await recoveryEpochIndexes()
     let page = try admissionService.listJobs(pageSize: pageSize, cursor: cursor)
     let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
-      guard let data = persisted.initialRecordData,
-        let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
-      else {
-        throw RuntimeJobEngineError.internalFailure(
-          "Runtime job history record \(persisted.jobID) is unreadable")
-      }
+      let record = try decodePersistedRecord(persisted)
       return status(
         of: record,
         supersededByRecoveryEpochID: indexes.supersededByJobID[record.jobID],
@@ -5946,11 +5945,24 @@ public actor RuntimeJobEngine {
   /// external-effect outcome.
   private func recordForRead(jobID: String) throws -> RuntimeJobRecord {
     if let runtime = jobs[jobID] { return runtime.record }
-    guard
-      let persisted = try admissionService.job(jobID: jobID),
-      let data = persisted.initialRecordData,
-      let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data)
-    else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    let persisted: RuntimePersistedJob?
+    do {
+      persisted = try admissionService.job(jobID: jobID)
+    } catch {
+      throw RuntimeJobEngineError.internalFailure(
+        "Runtime job history index is unreadable for \(jobID): \(error)")
+    }
+    guard let persisted else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    return try decodePersistedRecord(persisted)
+  }
+
+  private func decodePersistedRecord(_ persisted: RuntimePersistedJob) throws -> RuntimeJobRecord {
+    guard let data = persisted.initialRecordData,
+      let record = try? JSONDecoder().decode(RuntimeJobRecord.self, from: data),
+      record.jobID == persisted.jobID
+    else {
+      throw RuntimeJobEngineError.jobRecordUnreadable(persisted.jobID)
+    }
     return record
   }
 

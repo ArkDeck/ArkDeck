@@ -337,7 +337,7 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
           "redactionProfile": .string("standard"),
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.TraceWorkspace"))
+        clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.traceWorkspace))
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
       let requestData = try encoder.encode(request)
