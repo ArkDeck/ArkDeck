@@ -444,7 +444,7 @@ public struct AgentRuntimeExecutor: Sendable {
       payload["authorization"] = .object(["capabilityId": .string(capability)])
     }
     let encoder = CanonicalJSONEncoders.canonical()
-        guard let requestJSON = try? encoder.encode(JSONValue.object(payload)),
+    guard let requestJSON = try? encoder.encode(JSONValue.object(payload)),
       let requestText = String(data: requestJSON, encoding: .utf8)
     else {
       throw RuntimeAgentExecutorError.malformedResponse("cannot encode runtime request")
@@ -512,7 +512,7 @@ public struct AgentRuntimeExecutor: Sendable {
         method: "job.evidence", params: ["jobId": .string(jobID)],
         deadline: deadline)
       let encoder = CanonicalJSONEncoders.canonical()
-            let data = try encoder.encode(evidence)
+      let data = try encoder.encode(evidence)
       trustedFacts = try JSONDecoder().decode(
         RuntimeHardwareEvidenceTrustedFacts.self, from: data)
     } catch {

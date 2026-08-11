@@ -642,7 +642,7 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
     _ document: RockchipEvolutionCampaignDocument, rootDescriptor: Int32
   ) throws {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = try encoder.encode(document)
+    let data = try encoder.encode(document)
     guard !data.isEmpty, data.count <= Self.maximumBytes else {
       throw RockchipEvolutionCampaignError.persistenceRejected("ledgerSize")
     }

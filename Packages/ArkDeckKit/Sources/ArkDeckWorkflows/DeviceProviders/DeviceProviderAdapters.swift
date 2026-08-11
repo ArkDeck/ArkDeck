@@ -3093,7 +3093,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
         "\(context.stepID) has no complete host-managed target/tool correlation")
     }
     let actionEncoder = CanonicalJSONEncoders.canonical()
-        let encodedAction = try actionEncoder.encode(
+    let encodedAction = try actionEncoder.encode(
       try PersistedTypedProviderAction(action))
     let actionSHA256 = SHA256Hex.string(of: encodedAction)
     return TypedProcessPlan(

@@ -224,7 +224,7 @@ enum RuntimeArtifactService {
       payload["trace"] = .object(trace)
     }
     let encoder = CanonicalJSONEncoders.canonicalPretty()
-        return try encoder.encode(payload)
+    return try encoder.encode(payload)
   }
 
   private static func traceParameterJSON(
@@ -270,7 +270,7 @@ enum RuntimeArtifactService {
         "endedAtUtc": .string(summary["observedAtUtc"] ?? ""),
       ])
       let encoder = CanonicalJSONEncoders.canonicalPretty()
-            return (try? encoder.encode(fields)) ?? Data("{}".utf8)
+      return (try? encoder.encode(fields)) ?? Data("{}".utf8)
     case "source-inspection.txt", "symbolized-crash.txt":
       // The inspection itself is the Artifact, not a synthetic summary.
       return receipt.stdout
@@ -292,7 +292,7 @@ enum RuntimeArtifactService {
         sourceByteCount: sourceByteCount, analyzerOutputSHA256: outputSHA256,
         analyzerOutputByteCount: outputByteCount, result: result)
       let encoder = CanonicalJSONEncoders.canonical()
-            return (try? encoder.encode(envelope)) ?? Data("{}".utf8)
+      return (try? encoder.encode(envelope)) ?? Data("{}".utf8)
     case "build.log", "test-output.log":
       var output = receipt.stdout
       output.append(receipt.stderr)
@@ -331,7 +331,7 @@ enum RuntimeArtifactService {
       appendFlashArtifactLineage(to: &fields, record: record)
     }
     let encoder = CanonicalJSONEncoders.canonicalPretty()
-        return (try? encoder.encode(fields)) ?? Data("{}".utf8)
+    return (try? encoder.encode(fields)) ?? Data("{}".utf8)
   }
 
   static func bindingSnapshot(for record: RuntimeJobRecord) -> ArtifactBindingSnapshot {

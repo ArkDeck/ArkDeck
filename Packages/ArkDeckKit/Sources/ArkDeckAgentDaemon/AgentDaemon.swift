@@ -169,7 +169,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   public func handleLine(_ line: Data) async -> Data {
     let response = await handleFrame(line)
     let encoder = CanonicalJSONEncoders.canonical()
-        let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
+    let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
     return payload + Data("\n".utf8)
   }
 
@@ -1585,7 +1585,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
   private static func encodeCodable<T: Encodable>(_ value: T) throws -> JSONValue {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try JSONDecoder().decode(JSONValue.self, from: encoder.encode(value))
+    return try JSONDecoder().decode(JSONValue.self, from: encoder.encode(value))
   }
 
   private static func encodeStatus(

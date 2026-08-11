@@ -166,12 +166,12 @@ public struct OpenAIHarnessAgentGateway: HarnessAgentModelGateway {
     ]
     if !toolDefinitions.isEmpty { body["tools"] = .array(toolDefinitions) }
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(JSONValue.object(body))
+    return try encoder.encode(JSONValue.object(body))
   }
 
   private static func jsonText(_ value: JSONValue) throws -> String {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = try encoder.encode(value)
+    let data = try encoder.encode(value)
     guard let text = String(data: data, encoding: .utf8) else {
       throw HarnessAgentGatewayError.malformedEvent
     }

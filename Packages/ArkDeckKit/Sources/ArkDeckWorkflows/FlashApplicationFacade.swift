@@ -476,7 +476,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
       let encoder = CanonicalJSONEncoders.canonical()
-            let requestData = try encoder.encode(request)
+      let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed Flash request")
       }

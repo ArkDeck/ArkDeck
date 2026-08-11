@@ -250,7 +250,7 @@ package enum HarnessPromotionExport {
   private static func compactJSON(_ value: JSONValue?) -> String {
     guard let value else { return "-" }
     let encoder = CanonicalJSONEncoders.canonical()
-        guard let data = try? encoder.encode(value) else { return "-" }
+    guard let data = try? encoder.encode(value) else { return "-" }
     return String(decoding: data, as: UTF8.self)
   }
 

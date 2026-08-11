@@ -235,7 +235,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
       executionState: boundedExecutionState)
 
     let encoder = CanonicalJSONEncoders.canonical()
-        func encodedSize(_ value: HarnessDecisionContext) -> Int {
+    func encodedSize(_ value: HarnessDecisionContext) -> Int {
       ((try? encoder.encode(value)) ?? Data()).count
     }
     var sized = context
@@ -272,7 +272,7 @@ public struct HarnessDecisionContextAssembler: Sendable {
 public enum HarnessEgressScreen {
   public static func violations(in context: HarnessDecisionContext, targetID: String) -> [String] {
     let encoder = CanonicalJSONEncoders.canonical()
-        guard let data = try? encoder.encode(context),
+    guard let data = try? encoder.encode(context),
       let text = String(data: data, encoding: .utf8)
     else { return ["contextNotEncodable"] }
     var found: [String] = []

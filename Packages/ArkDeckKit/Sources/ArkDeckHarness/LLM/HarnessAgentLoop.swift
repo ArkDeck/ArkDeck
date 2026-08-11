@@ -72,7 +72,7 @@ public struct HarnessAgentContext: Equatable, Sendable, Codable {
 
   public var encodedByteCount: Int {
     let encoder = CanonicalJSONEncoders.canonical()
-        return ((try? encoder.encode(self)) ?? Data()).count
+    return ((try? encoder.encode(self)) ?? Data()).count
   }
 
   /// Deterministic context compaction. Execution state never lives in this

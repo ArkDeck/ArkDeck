@@ -317,7 +317,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
 
   static func canonicalData(_ object: [String: JSONValue]) -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return (try? encoder.encode(JSONValue.object(object))) ?? Data()
+    return (try? encoder.encode(JSONValue.object(object))) ?? Data()
   }
 
   package static func sha256(_ data: Data) -> String {
@@ -462,7 +462,7 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
 
   public var digestSHA256: String {
     let encoder = CanonicalJSONEncoders.canonical()
-        return RockchipEvolutionCampaignConfirmationAssertion.sha256(
+    return RockchipEvolutionCampaignConfirmationAssertion.sha256(
       (try? encoder.encode(self)) ?? Data())
   }
 }
@@ -584,7 +584,7 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
   /// its source, diff, build and test artifact pins.
   public var digestSHA256: String {
     let encoder = CanonicalJSONEncoders.canonical()
-        return RockchipEvolutionCampaignConfirmationAssertion.sha256(
+    return RockchipEvolutionCampaignConfirmationAssertion.sha256(
       (try? encoder.encode(self)) ?? Data())
   }
 }

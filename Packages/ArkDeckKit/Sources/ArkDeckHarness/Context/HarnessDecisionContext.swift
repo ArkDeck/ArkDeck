@@ -620,7 +620,7 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   /// "what the harness intended to send".
   public var transmittedBytes: Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return (try? encoder.encode(self)) ?? Data("{}".utf8)
+    return (try? encoder.encode(self)) ?? Data("{}".utf8)
   }
 
   /// Computed over the trimmed, screened context - so the digest represents

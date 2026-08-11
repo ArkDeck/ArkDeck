@@ -88,7 +88,7 @@ public struct HarnessStrategyDescriptor: Equatable, Sendable, Codable {
   /// no dictionary iteration order can make two distinct strategies collide.
   public var canonicalJSON: Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return (try? encoder.encode(self)) ?? Data("{}".utf8)
+    return (try? encoder.encode(self)) ?? Data("{}".utf8)
   }
 
   public var fingerprint: String {

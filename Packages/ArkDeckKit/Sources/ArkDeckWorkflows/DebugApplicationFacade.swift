@@ -472,7 +472,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugLogsWorkspace))
       let encoder = CanonicalJSONEncoders.canonical()
-            let requestData = try encoder.encode(request)
+      let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed HiLog request")
       }
@@ -544,7 +544,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
         clientContext: RuntimeClientContext(
           clientName: ArkDeckAgentClientName.debugNetworkWorkspace))
       let encoder = CanonicalJSONEncoders.canonical()
-            let requestData = try encoder.encode(request)
+      let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed port rule")
       }

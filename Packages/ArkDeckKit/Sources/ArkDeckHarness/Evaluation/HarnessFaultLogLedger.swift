@@ -62,7 +62,7 @@ public enum HarnessCrashLedgerDerivedAnalyzer {
   /// instead of trusting a structured-looking result and a detached hash.
   public static func canonicalData(_ analysis: HarnessCrashLedgerAnalysis) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(analysis)
+    return try encoder.encode(analysis)
   }
 }
 

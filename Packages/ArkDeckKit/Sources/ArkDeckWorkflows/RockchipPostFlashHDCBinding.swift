@@ -126,7 +126,7 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
     }
 
     let encoder = CanonicalJSONEncoders.canonical()
-        var data = try encoder.encode(candidate)
+    var data = try encoder.encode(candidate)
     data.append(0x0A)
     guard data.count <= Self.maximumBytes else {
       throw failure("post-flash binding document exceeds its limit")

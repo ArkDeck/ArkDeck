@@ -593,7 +593,7 @@ public enum RuntimeOperationCodec {
 
   public static func encodeRequest(_ request: RuntimeOperationRequest) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(request)
+    return try encoder.encode(request)
   }
 
   public static func decodeBundleManifest(_ data: Data) throws -> PublishedOperationBundleManifest {
@@ -622,6 +622,6 @@ public enum RuntimeOperationCodec {
     _ manifest: PublishedOperationBundleManifest
   ) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(manifest)
+    return try encoder.encode(manifest)
   }
 }

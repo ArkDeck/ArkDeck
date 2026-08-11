@@ -1118,7 +1118,7 @@ public actor NativeAgentChatRuntimeTools {
     _ value: JSONValue, display: String
   ) throws -> HarnessAgentToolResult {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = try encoder.encode(value)
+    let data = try encoder.encode(value)
     guard data.count <= 8 * 1_024 * 1_024,
       let text = String(data: data, encoding: .utf8)
     else {
@@ -1130,7 +1130,7 @@ public actor NativeAgentChatRuntimeTools {
 
   private func encodedValue<T: Encodable>(_ value: T) throws -> JSONValue {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = try encoder.encode(value)
+    let data = try encoder.encode(value)
     guard let decoded = try? JSONDecoder().decode(JSONValue.self, from: data) else {
       throw AgentChatRuntimeToolError.malformedRuntimeResponse("receipt is not JSON")
     }

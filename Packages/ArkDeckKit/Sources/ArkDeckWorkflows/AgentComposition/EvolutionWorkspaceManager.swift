@@ -580,6 +580,6 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
 
   private static func write<T: Encodable>(_ value: T, to url: URL) throws {
     let encoder = CanonicalJSONEncoders.canonicalPretty()
-        try encoder.encode(value).write(to: url, options: [.atomic])
+    try encoder.encode(value).write(to: url, options: [.atomic])
   }
 }

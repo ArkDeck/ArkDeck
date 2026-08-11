@@ -266,7 +266,7 @@ public enum RecoveryManifestContractError: Error, Equatable, Sendable {
 public enum RecoveryManifestCodec {
   public static func encode(_ record: RecoveryManifestRecord) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(record)
+    return try encoder.encode(record)
   }
 
   public static func decode(_ data: Data) throws -> RecoveryManifestRecord {

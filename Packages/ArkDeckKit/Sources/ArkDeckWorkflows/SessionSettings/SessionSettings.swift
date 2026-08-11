@@ -501,7 +501,7 @@ public final class SessionSettingsStore: @unchecked Sendable {
 
   private func canonicalData<T: Encodable>(_ value: T) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(value)
+    return try encoder.encode(value)
   }
 
   private func locked<T>(_ body: () throws -> T) rethrows -> T {

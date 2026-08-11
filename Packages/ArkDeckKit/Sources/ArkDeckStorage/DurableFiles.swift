@@ -551,7 +551,7 @@ public final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unche
 
   public func save(_ checkpoint: JournalCheckpoint) throws {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = try encoder.encode(checkpoint)
+    let data = try encoder.encode(checkpoint)
     let temporaryURL = url.deletingLastPathComponent().appending(
       path: ".\(url.lastPathComponent).\(UUID().uuidString).tmp")
 

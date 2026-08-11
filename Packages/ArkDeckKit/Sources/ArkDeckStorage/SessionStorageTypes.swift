@@ -192,12 +192,12 @@ enum SessionStorageValidation {
 
   static func canonicalData(_ value: JSONValue) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(value)
+    return try encoder.encode(value)
   }
 
   static func canonicalData<T: Encodable>(_ value: T) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(value)
+    return try encoder.encode(value)
   }
 
   static func secureDirectory(_ url: URL) throws {

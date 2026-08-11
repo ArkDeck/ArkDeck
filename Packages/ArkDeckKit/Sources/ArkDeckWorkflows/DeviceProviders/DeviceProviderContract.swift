@@ -398,7 +398,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
         ])
     case .workspace(let workspace):
       let encoder = CanonicalJSONEncoders.canonical()
-            self.init(
+      self.init(
         kind: "workspace.action",
         arguments: [
           "payload": .string(

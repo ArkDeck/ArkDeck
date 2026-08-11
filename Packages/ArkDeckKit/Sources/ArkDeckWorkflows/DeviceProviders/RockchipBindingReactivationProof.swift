@@ -254,7 +254,7 @@ package struct RockchipRuntimeBindingReactivationProofSource:
 
   private func validActionHash(_ intent: IntentRecord) throws -> Bool {
     let encoder = CanonicalJSONEncoders.canonical()
-        return Self.sha256(try encoder.encode(intent.action)) == intent.actionSHA256
+    return Self.sha256(try encoder.encode(intent.action)) == intent.actionSHA256
   }
 
   private func validateRootIfPresent() throws -> Bool {

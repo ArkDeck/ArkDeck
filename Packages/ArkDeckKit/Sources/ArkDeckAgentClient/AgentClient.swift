@@ -81,7 +81,7 @@ public struct AgentClient: Sendable {
     let wire = AgentWireRequest(
       protocolVersion: "1.0.0", id: id, method: method, params: params)
     let encoder = CanonicalJSONEncoders.canonical()
-        var payload = try encoder.encode(wire)
+    var payload = try encoder.encode(wire)
     payload.append(0x0A)
     var written = 0
     let sendOK: Bool = payload.withUnsafeBytes { raw in

@@ -322,7 +322,7 @@ public enum HumanActionRequiredCodec {
 
   public static func encode(_ value: HumanActionRequired) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(value)
+    return try encoder.encode(value)
   }
 }
 

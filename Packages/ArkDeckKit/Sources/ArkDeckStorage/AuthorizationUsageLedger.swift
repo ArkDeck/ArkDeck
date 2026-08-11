@@ -503,7 +503,7 @@ public enum AgentExecutionAuthorityReference: Equatable, Hashable, Sendable, Cod
 
   var jsonValue: JSONValue {
     let encoder = CanonicalJSONEncoders.canonical()
-        return (try? JSONDecoder().decode(JSONValue.self, from: encoder.encode(self))) ?? .null
+    return (try? JSONDecoder().decode(JSONValue.self, from: encoder.encode(self))) ?? .null
   }
 
   private static func validateCommon(
@@ -1279,7 +1279,7 @@ public final class AgentAuthorityUsageLedger: @unchecked Sendable {
     rootDescriptor: Int32
   ) throws {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = try encoder.encode(document)
+    let data = try encoder.encode(document)
     guard !data.isEmpty, data.count <= Self.maximumBytes else {
       throw AuthorizationUsageLedgerError.invalidRecord(
         "Agent authority usage ledger exceeds size limit")

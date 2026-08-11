@@ -32,7 +32,7 @@ enum RuntimeCLI {
   static func emit(_ value: JSONValue, json: Bool) {
     if json {
       let encoder = CanonicalJSONEncoders.canonicalPretty()
-            if let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8) {
+      if let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8) {
         print(text)
         return
       }

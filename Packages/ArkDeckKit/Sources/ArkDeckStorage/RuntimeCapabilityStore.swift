@@ -561,7 +561,7 @@ public actor RuntimeCapabilityStore {
       components.append("plan=\(query.planDigest ?? "-")")
     }
     let encoder = CanonicalJSONEncoders.canonical()
-        if let inputs = try? encoder.encode(query.inputs),
+    if let inputs = try? encoder.encode(query.inputs),
       let text = String(data: inputs, encoding: .utf8)
     {
       components.append("inputs=\(text)")
@@ -652,7 +652,7 @@ public actor RuntimeCapabilityStore {
 
   private static func digest<T: Encodable>(_ value: T) -> String {
     let encoder = CanonicalJSONEncoders.canonical()
-        guard let data = try? encoder.encode(value) else {
+    guard let data = try? encoder.encode(value) else {
       preconditionFailure("internal capability lineage material must encode")
     }
     return SHA256Digest.hex(of: data)
@@ -783,7 +783,7 @@ public actor RuntimeCapabilityStore {
 
   private func persist(_ document: StoreDocument) throws {
     let encoder = CanonicalJSONEncoders.canonicalPretty()
-        let data: Data
+    let data: Data
     do {
       data = try encoder.encode(document)
     } catch {

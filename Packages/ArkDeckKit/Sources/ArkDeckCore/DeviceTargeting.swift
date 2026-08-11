@@ -64,7 +64,7 @@ public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
 
   public func sha256() throws -> String {
     let encoder = CanonicalJSONEncoders.canonical()
-        let bytes = try encoder.encode(attributes)
+    let bytes = try encoder.encode(attributes)
     return SHA256Hex.string(of: bytes)
   }
 
@@ -79,7 +79,7 @@ public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
     let normalizedSerial = serial.trimmingCharacters(in: .whitespacesAndNewlines)
       .precomposedStringWithCanonicalMapping
     let encoder = CanonicalJSONEncoders.canonical()
-        let bytes = try encoder.encode(["serial": JSONValue.string(normalizedSerial)])
+    let bytes = try encoder.encode(["serial": JSONValue.string(normalizedSerial)])
     return SHA256Hex.string(of: bytes)
   }
 

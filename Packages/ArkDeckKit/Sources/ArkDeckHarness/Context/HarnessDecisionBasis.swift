@@ -89,7 +89,7 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
   /// persisted facts in, same digest out - on this process or the next one.
   public var digest: String {
     let encoder = CanonicalJSONEncoders.canonical()
-        let data = (try? encoder.encode(self)) ?? Data("{}".utf8)
+    let data = (try? encoder.encode(self)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: data)
   }
 }

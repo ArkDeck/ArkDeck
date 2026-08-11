@@ -467,7 +467,7 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertThrowsError(
       try JournalEventCodec.decode(JournalRecoveryFixtures.data(named: "duplicate-member.json"))
     ) { error in
-      guard case .duplicateMemberName = error as? StrictJSONError else {
+      guard case .duplicateMemberName = error as? ArkDeckStorage.StrictJSONError else {
         return XCTFail("duplicate member must be identified: \(error)")
       }
     }

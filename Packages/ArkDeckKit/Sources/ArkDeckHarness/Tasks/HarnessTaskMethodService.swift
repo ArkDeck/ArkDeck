@@ -657,7 +657,7 @@ package struct HarnessTaskMethodService: Sendable {
   /// by hand here would be a second contract to keep in step.
   static func encode<T: Encodable>(_ value: T) -> JSONValue {
     let encoder = CanonicalJSONEncoders.canonical()
-        guard let data = try? encoder.encode(value),
+    guard let data = try? encoder.encode(value),
       let projected = try? JSONDecoder().decode(JSONValue.self, from: data)
     else { return .null }
     return projected

@@ -339,7 +339,7 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
         clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.traceWorkspace))
       let encoder = CanonicalJSONEncoders.canonical()
-            let requestData = try encoder.encode(request)
+      let requestData = try encoder.encode(request)
       guard let requestJSON = String(data: requestData, encoding: .utf8) else {
         return .failed("Could not encode the typed Trace request")
       }

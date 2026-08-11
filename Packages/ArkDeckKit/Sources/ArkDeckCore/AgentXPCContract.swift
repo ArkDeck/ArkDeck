@@ -69,7 +69,7 @@ public enum ArkDeckAgentXPC {
     requestID: String = UUID().uuidString
   ) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(
+    return try encoder.encode(
       RequestFrame(
         protocolVersion: wireProtocolVersion,
         id: requestID,

@@ -593,7 +593,7 @@ public enum JournalCanonicalJSON {
 
   private static var encoder: JSONEncoder {
     let encoder = CanonicalJSONEncoders.canonical()
-        return encoder
+    return encoder
   }
 }
 

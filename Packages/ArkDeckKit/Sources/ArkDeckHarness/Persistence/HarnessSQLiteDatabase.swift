@@ -197,7 +197,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
 
   static func canonicalData<T: Encodable>(_ value: T) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        do {
+    do {
       return try encoder.encode(value)
     } catch {
       throw HarnessTaskStoreError.ioFailure("cannot encode canonical harness JSON: \(error)")

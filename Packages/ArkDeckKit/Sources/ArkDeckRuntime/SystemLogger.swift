@@ -381,7 +381,7 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
 
   fileprivate func appendAndSynchronize(_ record: RedactedDiagnosticRecord) throws {
     let encoder = CanonicalJSONEncoders.canonical()
-        var bytes = try encoder.encode(record)
+    var bytes = try encoder.encode(record)
     bytes.append(0x0A)
     guard bytes.count <= configuration.maximumRecordBytes else {
       throw SystemLoggerError.recordLimitExceeded

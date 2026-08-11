@@ -222,7 +222,7 @@ public struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
 
   public func canonicalData() throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
-        return try encoder.encode(self)
+    return try encoder.encode(self)
   }
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
