@@ -1,9 +1,6 @@
-// Typed SQLite repository and one-time durable-file importer (TASK-HFA-012).
+// Typed SQLite repository (TASK-HFA-012).
 //
-// SQLite is the only authoritative harness store after this repository opens.
-// The legacy `tasks/` and `memory/` trees are read as migration input and are
-// never deleted or rewritten by the importer. Keeping that boundary explicit
-// makes a failed or interrupted import safely retryable.
+// SQLite is the only authoritative harness store.
 
 import ArkDeckCore
 import Foundation
@@ -19,20 +16,42 @@ struct HarnessContextManifestRecord: Encodable, Equatable, Sendable {
 }
 
 final class HarnessSQLiteRepository: @unchecked Sendable {
-  private static let legacyImportKey = "legacy_file_import_v1"
+  /// Completion sentinel written by the retired one-time importer. It is
+  /// read-only now: the current code never writes it, but a database that
+  /// carries it has provably consumed its durable-file trees.
+  static let legacyImportCompletionKey = "legacy_file_import_v1"
 
   let database: HarnessSQLiteDatabase
-  private let rootURL: URL
-  private let tasksURL: URL
 
-  init(
-    rootURL: URL,
-    migrationFault: HarnessTaskStoreMigrationFault? = nil
-  ) throws {
-    self.rootURL = rootURL
-    self.tasksURL = rootURL.appendingPathComponent("tasks", isDirectory: true)
+  init(rootURL: URL) throws {
     self.database = try HarnessSQLiteDatabase(rootURL: rootURL)
-    try migrateLegacyFilesIfNeeded(fault: migrationFault)
+    // The durable-file generation (`tasks/`, `memory/`) is retired along with
+    // its one-time importer. Every pre-retirement release recreated `tasks/`
+    // on startup and kept mirroring into it, so a surviving tree on an
+    // upgraded store is normal residue — the importer's completion sentinel
+    // proves the database consumed it. Without that sentinel the tree is
+    // unimported history (or a restored backup); opening the store anyway
+    // would silently present an empty task list, so it refuses loudly.
+    let imported =
+      try database.query(
+        "SELECT value FROM storage_metadata WHERE key = ?",
+        [.text(Self.legacyImportCompletionKey)]
+      ).first?.text("value") == "complete"
+    guard !imported else { return }
+    for legacyTree in ["tasks", "memory"] {
+      let url = rootURL.appendingPathComponent(legacyTree, isDirectory: true)
+      var isDirectory: ObjCBool = false
+      if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+        isDirectory.boolValue
+      {
+        throw HarnessTaskStoreError.corrupt(
+          "retired durable-file tree present at \(url.path) and "
+            + "\(HarnessSQLiteDatabase.filename) carries no import-completion "
+            + "sentinel; this tree cannot be imported any more. Verify its records "
+            + "are represented in the database (or no longer needed), then remove "
+            + "the directory to reopen the store")
+      }
+    }
   }
 
   // MARK: - Task lifecycle
@@ -834,7 +853,7 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
       }
     case .actionRunRecorded, .patchRevisionObserved, .candidatePatchRecorded,
       .buildArtifactsRecorded, .runtimeArtifactsRecorded, .failureRecorded,
-      .evaluationRecorded, .reviewRecorded, .promotionRecorded, .resumed, .closed:
+      .evaluationRecorded, .promotionRecorded, .resumed, .closed:
       guard let current else {
         throw HarnessTaskStoreError.corrupt("unknown attempt \(attempt.attemptID)")
       }
@@ -853,7 +872,6 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
         current.evolutionWorkspace == nil
           || current.evolutionWorkspace == attempt.evolutionWorkspace,
         current.candidatePatch == nil || current.candidatePatch == attempt.candidatePatch,
-        current.review == nil || current.review == attempt.review,
         current.promotionCandidate == nil
           || current.promotionCandidate == attempt.promotionCandidate,
         !(current.outcome.isClosed && attempt.outcome == .active) || validHumanResume
@@ -862,249 +880,5 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
           "attempt \(attempt.attemptID) update regressed an immutable field")
       }
     }
-  }
-}
-
-// MARK: - Durable file import
-
-extension HarnessSQLiteRepository {
-  func importLegacyTaskIfPresent(_ taskID: String) throws -> Bool {
-    if try containsTask(taskID) { return true }
-    let directory = tasksURL.appendingPathComponent(taskID, isDirectory: true)
-    guard
-      FileManager.default.fileExists(
-        atPath: directory.appendingPathComponent("task.json").path)
-    else { return false }
-    try database.transaction {
-      try importLegacyTaskDirectory(directory)
-      try importLegacyMemory(taskFilter: taskID)
-    }
-    return true
-  }
-
-  private func migrateLegacyFilesIfNeeded(
-    fault: HarnessTaskStoreMigrationFault?
-  ) throws {
-    let completed =
-      try database.query(
-        "SELECT value FROM storage_metadata WHERE key = ?",
-        [.text(Self.legacyImportKey)]
-      ).first?.text("value") == "complete"
-    guard !completed else { return }
-
-    try database.transaction {
-      let names = (try? FileManager.default.contentsOfDirectory(atPath: tasksURL.path)) ?? []
-      for name in names.sorted() where HarnessTaskStore.isWellFormed(taskID: name) {
-        let directory = tasksURL.appendingPathComponent(name, isDirectory: true)
-        guard
-          FileManager.default.fileExists(
-            atPath: directory.appendingPathComponent("task.json").path)
-        else { continue }
-        if try containsTask(name) == false {
-          try importLegacyTaskDirectory(directory)
-        }
-      }
-      if let fault, fault == .afterTaskRows { throw fault }
-      try importLegacyMemory(taskFilter: nil)
-      if let fault, fault == .beforeActivation { throw fault }
-      try database.run(
-        "INSERT OR REPLACE INTO storage_metadata(key, value) VALUES(?, ?)",
-        [.text(Self.legacyImportKey), .text("complete")])
-    }
-  }
-
-  private func importLegacyTaskDirectory(_ directory: URL) throws {
-    let snapshotURL = directory.appendingPathComponent("task.json")
-    var snapshot = try decodeFile(HarnessTaskSnapshot.self, from: snapshotURL)
-    let events: [HarnessTaskEvent] = try decodeJSONLines(
-      HarnessTaskEvent.self, from: directory.appendingPathComponent("events.jsonl")
-    )
-    .sorted { $0.sequence < $1.sequence }
-    for (index, event) in events.enumerated() {
-      guard event.htaskID == snapshot.htaskID, event.sequence == index + 1 else {
-        throw HarnessTaskStoreError.corrupt(
-          "legacy task event identity or sequence is inconsistent")
-      }
-    }
-    for event in events where event.sequence >= snapshot.version {
-      guard event.sequence == snapshot.version else {
-        throw HarnessTaskStoreError.corrupt(
-          "event sequence \(event.sequence) does not follow version \(snapshot.version)")
-      }
-      snapshot = snapshot.applying(event.resulting, atUTC: event.atUTC)
-    }
-    snapshot = snapshot.migratedToCurrentSchema()
-    try insertTask(snapshot, replace: false)
-    for event in events {
-      let data = try canonical(event)
-      try database.run(
-        """
-        INSERT INTO task_event(task_id, sequence, event_json, event_digest, at_utc)
-        VALUES(?, ?, ?, ?, ?)
-        """,
-        [
-          .text(event.htaskID), .integer(Int64(event.sequence)), .blob(data),
-          .text(HarnessSQLiteDatabase.digest(data)), .text(event.atUTC),
-        ])
-      if let jobID = event.jobID {
-        try linkRuntimeJob(
-          taskID: event.htaskID, jobID: jobID, requestID: nil,
-          round: event.resulting.activeRound, atUTC: event.atUTC)
-      }
-    }
-
-    let attempts: [HarnessAttemptEvent] = try decodeJSONLines(
-      HarnessAttemptEvent.self,
-      from: directory.appendingPathComponent("attempt-events.jsonl"))
-    for (index, event) in attempts.enumerated() {
-      guard event.sequence == index + 1 else {
-        throw HarnessTaskStoreError.corrupt(
-          "attempt event sequence \(event.sequence) does not follow \(index)")
-      }
-      let attemptData = try canonical(event.resulting)
-      try database.run(
-        """
-        INSERT INTO attempt(task_id, attempt_id, ordinal, attempt_json, attempt_digest)
-        VALUES(?, ?, ?, ?, ?)
-        ON CONFLICT(task_id, attempt_id) DO UPDATE SET
-          ordinal=excluded.ordinal,
-          attempt_json=excluded.attempt_json,
-          attempt_digest=excluded.attempt_digest
-        """,
-        [
-          .text(event.resulting.htaskID), .text(event.resulting.attemptID),
-          .integer(Int64(event.resulting.ordinal)), .blob(attemptData),
-          .text(HarnessSQLiteDatabase.digest(attemptData)),
-        ])
-      let eventData = try canonical(event)
-      try database.run(
-        """
-        INSERT INTO attempt_event(task_id, attempt_id, sequence, event_json, event_digest)
-        VALUES(?, ?, ?, ?, ?)
-        """,
-        [
-          .text(event.resulting.htaskID), .text(event.resulting.attemptID),
-          .integer(Int64(event.sequence)), .blob(eventData),
-          .text(HarnessSQLiteDatabase.digest(eventData)),
-        ])
-      for actionRunID in event.resulting.actionRunIDs {
-        try database.run(
-          """
-          INSERT OR IGNORE INTO action_run(
-            task_id, action_run_id, attempt_id, recorded_at_utc
-          ) VALUES(?, ?, ?, ?)
-          """,
-          [
-            .text(event.resulting.htaskID), .text(actionRunID),
-            .text(event.resulting.attemptID), .text(event.resulting.updatedAtUTC),
-          ])
-      }
-    }
-
-    let roundsURL = directory.appendingPathComponent("rounds", isDirectory: true)
-    let roundNames = (try? FileManager.default.contentsOfDirectory(atPath: roundsURL.path)) ?? []
-    for round in roundNames.compactMap(Int.init).sorted() {
-      let roundURL = roundsURL.appendingPathComponent(String(round), isDirectory: true)
-      if let decision: HarnessDecision = try decodeOptionalFile(
-        from: roundURL.appendingPathComponent("decision.json"))
-      {
-        try putDecision(decision)
-      }
-      if let intent: HarnessDispatchIntent = try decodeOptionalFile(
-        from: roundURL.appendingPathComponent("dispatch-intent.json"))
-      {
-        try putIntent(intent)
-      }
-      let runsURL = roundURL.appendingPathComponent("model-runs", isDirectory: true)
-      let runNames = (try? FileManager.default.contentsOfDirectory(atPath: runsURL.path)) ?? []
-      for name in runNames.sorted() where name.hasSuffix(".json") {
-        let run = try decodeFile(HarnessModelRun.self, from: runsURL.appendingPathComponent(name))
-        try putModelRun(run)
-      }
-    }
-
-    let evaluationsURL = directory.appendingPathComponent("evaluations", isDirectory: true)
-    let evaluationNames =
-      (try? FileManager.default.contentsOfDirectory(atPath: evaluationsURL.path)) ?? []
-    for name in evaluationNames.sorted() where name.hasSuffix(".json") {
-      try putEvaluation(
-        decodeFile(HarnessEvaluation.self, from: evaluationsURL.appendingPathComponent(name)))
-    }
-
-    let actionsURL = directory.appendingPathComponent("humanActions", isDirectory: true)
-    let actionNames = (try? FileManager.default.contentsOfDirectory(atPath: actionsURL.path)) ?? []
-    for name in actionNames.sorted() where name.hasSuffix(".json") {
-      try putHumanAction(
-        decodeFile(HarnessStoredHumanAction.self, from: actionsURL.appendingPathComponent(name)))
-    }
-  }
-
-  private func importLegacyMemory(taskFilter: String?) throws {
-    let memoryRoot = rootURL.appendingPathComponent("memory", isDirectory: true)
-    for scope in [HarnessMemoryScope.task, HarnessMemoryScope.project] {
-      let directory = memoryRoot.appendingPathComponent(scope.rawValue, isDirectory: true)
-      let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-      for name in names.sorted() where name.hasSuffix(".jsonl") {
-        let entries: [HarnessMemoryEntry] = try decodeJSONLines(
-          HarnessMemoryEntry.self, from: directory.appendingPathComponent(name))
-        for entry in entries where taskFilter == nil || entry.htaskID == taskFilter {
-          let key = entry.scope == .task ? entry.htaskID : (entry.projectRef ?? "")
-          guard !key.isEmpty else {
-            throw HarnessTaskStoreError.corrupt("legacy project memory has no project ref")
-          }
-          let data = try canonical(entry)
-          let taskID = try containsTask(entry.htaskID) ? entry.htaskID : nil
-          try insertMemoryRow(
-            taskID: taskID, scope: entry.scope.rawValue, scopeKey: key,
-            memoryID: entry.memoryID, lifecycle: entry.lifecycle.rawValue,
-            summary: entry.summary, data: data, updatedAtUTC: entry.updatedAtUTC)
-        }
-      }
-    }
-
-    guard taskFilter == nil else { return }
-    let failureDirectory = memoryRoot.appendingPathComponent("failure", isDirectory: true)
-    let names = (try? FileManager.default.contentsOfDirectory(atPath: failureDirectory.path)) ?? []
-    for name in names.sorted() where name.hasSuffix(".json") {
-      try putFailureRecord(
-        decodeFile(HarnessFailureRecord.self, from: failureDirectory.appendingPathComponent(name)))
-    }
-  }
-
-  private func decodeOptionalFile<T: Decodable>(from url: URL) throws -> T? {
-    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-    return try decodeFile(T.self, from: url)
-  }
-
-  private func decodeFile<T: Decodable>(_ type: T.Type, from url: URL) throws -> T {
-    guard let data = FileManager.default.contents(atPath: url.path) else {
-      throw HarnessTaskStoreError.notFound(url.lastPathComponent)
-    }
-    do {
-      return try JSONDecoder().decode(type, from: data)
-    } catch {
-      throw HarnessTaskStoreError.corrupt(
-        "undecodable legacy \(url.lastPathComponent): \(error)")
-    }
-  }
-
-  private func decodeJSONLines<T: Decodable>(_ type: T.Type, from url: URL) throws -> [T] {
-    guard let data = FileManager.default.contents(atPath: url.path) else { return [] }
-    guard let text = String(data: data, encoding: .utf8) else {
-      throw HarnessTaskStoreError.corrupt("\(url.lastPathComponent) is not UTF-8")
-    }
-    let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
-    var values: [T] = []
-    for (index, line) in lines.enumerated() {
-      do {
-        values.append(try JSONDecoder().decode(type, from: Data(line.utf8)))
-      } catch {
-        guard index == lines.count - 1 else {
-          throw HarnessTaskStoreError.corrupt(
-            "undecodable line \(index) in \(url.lastPathComponent)")
-        }
-      }
-    }
-    return values
   }
 }

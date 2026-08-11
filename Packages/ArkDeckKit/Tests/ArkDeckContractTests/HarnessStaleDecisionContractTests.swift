@@ -298,9 +298,10 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     XCTAssertEqual(outcome.snapshot.status, .cancelled)
   }
 
-  func testADecisionWithoutABasisIsUnverifiableRatherThanFresh() throws {
-    // A decision written before this guard existed decodes, so history stays
-    // readable - but it cannot be acted on.
+  func testADecisionWithoutAnEnvelopeVersionIsRefused() throws {
+    // Pre-v2 decision records carry no envelope version, no observed state
+    // version and no basis digest. They are refused at decode instead of
+    // being admitted as unverifiable history.
     let legacy = Data(
       """
       {"documentType":"harness-decision","decisionId":"dec-legacy","htaskId":"HTASK-0123456789AB",\
@@ -308,13 +309,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       "hypothesis":"legacy record","reasonCode":"legacy","producer":"debug-crash-handler@1",\
       "createdAtUtc":"2026-07-30T00:00:00Z"}
       """.utf8)
-    let decoded = try JSONDecoder().decode(HarnessDecision.self, from: legacy)
-    XCTAssertEqual(decoded.observedStateVersion, 0)
-    XCTAssertEqual(decoded.basisDigest, "")
-
-    let basis = HarnessDecisionBasis(
-      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.observeDevice])
-    XCTAssertEqual(HarnessDecisionFreshness.staleness(of: decoded, against: basis), .unverifiable)
+    XCTAssertThrowsError(try JSONDecoder().decode(HarnessDecision.self, from: legacy))
   }
 
   func testAChangedBasisIsStaleEvenWhenTheVersionHeld() {
@@ -674,7 +669,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
         observed: "ATTEMPT-000000000001", current: "ATTEMPT-000000000002"))
   }
 
-  func testLegacyEnvelopeIsReadableQueryableAndNeverFresh() throws {
+  func testEnvelopeWithoutAVersionIsRefused() throws {
     let legacy = Data(
       """
       {"documentType":"harness-decision","decisionId":"dec-legacy-envelope",\
@@ -683,12 +678,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       "reasonCode":"legacy","producer":"legacy@1","createdAtUtc":"2026-07-30T00:00:00Z",\
       "observedStateVersion":3,"basisDigest":"\(String(repeating: "f", count: 64))"}
       """.utf8)
-    let decoded = try JSONDecoder().decode(HarnessDecision.self, from: legacy)
-    XCTAssertEqual(decoded.envelopeVersion, "1.0.0")
-    let current = HarnessDecisionBasis(
-      snapshot: snapshot(version: 3), offeredOperations: [DebugCrashTaskHandler.observeDevice])
-    XCTAssertEqual(
-      HarnessDecisionFreshness.staleness(of: decoded, against: current), .unverifiable)
+    XCTAssertThrowsError(try JSONDecoder().decode(HarnessDecision.self, from: legacy))
   }
 
   func testPendingWorkspaceDriftClosesIntentWithoutProviderE1OrNoProgress() async throws {

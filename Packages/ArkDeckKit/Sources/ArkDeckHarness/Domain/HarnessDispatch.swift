@@ -53,8 +53,6 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   public static let envelopeVersion = "2.0.0"
 
   public let documentType: String
-  /// Version 2 is the first executable decision envelope. Historical records
-  /// without this field remain queryable but are unverifiable.
   public let envelopeVersion: String
   public let decisionID: String
   public let htaskID: String
@@ -72,8 +70,6 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
   public let producer: String
   public let createdAtUTC: String
   /// The task state version the producer read (CHG-2026-055, TASK-HFA-002).
-  /// Zero means "written before the guard existed", which the freshness
-  /// check treats as unverifiable rather than fresh.
   public let observedStateVersion: Int
   /// Digest of `HarnessDecisionBasis` at proposal time. This describes the
   /// Harness facts used to plan. The digest of bytes a model actually received
@@ -166,14 +162,10 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.expectedBindingRevision = expectedBindingRevision
   }
 
-  /// Decisions written before TASK-HFA-002 carry neither field. They decode
-  /// to the unverifiable pair rather than failing to decode: history stays
-  /// readable, and the guard still refuses to act on them.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.documentType = try container.decode(String.self, forKey: .documentType)
-    self.envelopeVersion =
-      try container.decodeIfPresent(String.self, forKey: .envelopeVersion) ?? "1.0.0"
+    self.envelopeVersion = try container.decode(String.self, forKey: .envelopeVersion)
     self.decisionID = try container.decode(String.self, forKey: .decisionID)
     self.htaskID = try container.decode(String.self, forKey: .htaskID)
     self.round = try container.decode(Int.self, forKey: .round)
@@ -192,9 +184,8 @@ public struct HarnessDecision: Equatable, Sendable, Codable {
     self.reasonCode = try container.decode(String.self, forKey: .reasonCode)
     self.producer = try container.decode(String.self, forKey: .producer)
     self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
-    self.observedStateVersion =
-      try container.decodeIfPresent(Int.self, forKey: .observedStateVersion) ?? 0
-    self.basisDigest = try container.decodeIfPresent(String.self, forKey: .basisDigest) ?? ""
+    self.observedStateVersion = try container.decode(Int.self, forKey: .observedStateVersion)
+    self.basisDigest = try container.decode(String.self, forKey: .basisDigest)
     self.attemptID = try container.decodeIfPresent(String.self, forKey: .attemptID)
     self.modelRunID = try container.decodeIfPresent(String.self, forKey: .modelRunID)
     self.contextDigest = try container.decodeIfPresent(String.self, forKey: .contextDigest)
@@ -375,8 +366,7 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.documentType = try container.decode(String.self, forKey: .documentType)
-    self.schemaVersion =
-      try container.decodeIfPresent(String.self, forKey: .schemaVersion) ?? "1.0.0"
+    self.schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
     self.htaskID = try container.decode(String.self, forKey: .htaskID)
     self.round = try container.decode(Int.self, forKey: .round)
     self.decisionID = try container.decode(String.self, forKey: .decisionID)

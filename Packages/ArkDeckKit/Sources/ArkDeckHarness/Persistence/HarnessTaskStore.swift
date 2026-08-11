@@ -2,9 +2,7 @@
 //
 // SQLite is authoritative: event append and snapshot CAS share one
 // transaction, WAL and foreign keys are mandatory, and every typed document
-// is held as canonical JSON plus its digest. The old durable-file helpers at
-// the bottom remain only for one-time import and a non-authoritative mirror
-// consumed by older diagnostics. Import never deletes the legacy tree.
+// is held as canonical JSON plus its digest.
 
 import ArkDeckCore
 import Darwin
@@ -20,29 +18,17 @@ public enum HarnessTaskStoreError: Error, Equatable, Sendable {
 }
 
 public actor HarnessTaskStore {
-  private let rootURL: URL
-  private let tasksURL: URL
   private let repository: HarnessSQLiteRepository
 
   public init(rootURL: URL) throws {
-    try self.init(rootURL: rootURL, migrationFault: nil)
-  }
-
-  init(
-    rootURL: URL,
-    migrationFault: HarnessTaskStoreMigrationFault?
-  ) throws {
-    self.rootURL = rootURL
-    self.tasksURL = rootURL.appendingPathComponent("tasks", isDirectory: true)
     do {
       try FileManager.default.createDirectory(
-        at: tasksURL, withIntermediateDirectories: true,
+        at: rootURL, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
     } catch {
       throw HarnessTaskStoreError.ioFailure("cannot create harness task root: \(error)")
     }
-    self.repository = try HarnessSQLiteRepository(
-      rootURL: rootURL, migrationFault: migrationFault)
+    self.repository = try HarnessSQLiteRepository(rootURL: rootURL)
   }
 
   // MARK: - Task identity
@@ -58,41 +44,10 @@ public actor HarnessTaskStore {
     }
   }
 
-  private func directory(_ taskID: String) throws -> URL {
-    guard Self.isWellFormed(taskID: taskID) else {
-      throw HarnessTaskStoreError.malformedTaskID(taskID)
-    }
-    return tasksURL.appendingPathComponent(taskID, isDirectory: true)
-  }
-
-  /// Readers and writers of an existing task go through here so an unknown
-  /// id reports `notFound` instead of an io failure from locking a directory
-  /// that was never created.
-  private func existingDirectory(_ taskID: String) throws -> URL {
-    let url = try directory(taskID)
-    guard FileManager.default.fileExists(atPath: url.path) else {
-      throw HarnessTaskStoreError.notFound(taskID)
-    }
-    return url
-  }
-
   // MARK: - Task lifecycle
 
   public func create(_ snapshot: HarnessTaskSnapshot) throws {
     try repository.create(snapshot)
-    let directoryURL = try directory(snapshot.htaskID)
-    do {
-      try FileManager.default.createDirectory(
-        at: directoryURL.appendingPathComponent("rounds", isDirectory: true),
-        withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-    } catch {
-      // SQLite already committed. The legacy directory is only a mirror and
-      // cannot be allowed to redefine the durable outcome.
-      return
-    }
-    try? withLock(directoryURL) {
-      try writeSnapshot(snapshot, in: directoryURL)
-    }
   }
 
   public func load(_ taskID: String) throws -> HarnessTaskSnapshot {
@@ -101,16 +56,11 @@ public actor HarnessTaskStore {
   }
 
   public func list() throws -> [HarnessTaskSnapshot] {
-    let names = (try? FileManager.default.contentsOfDirectory(atPath: tasksURL.path)) ?? []
-    for name in names where Self.isWellFormed(taskID: name) {
-      try ensureSQLiteTask(name)
-    }
-    return try repository.list()
+    try repository.list()
   }
 
   /// Append the event and replace the snapshot with a CAS in one SQLite
-  /// transaction. The legacy durable-file mirror below is best-effort and
-  /// never authoritative.
+  /// transaction.
   public func commit(
     event: HarnessTaskEvent,
     snapshot: HarnessTaskSnapshot,
@@ -119,12 +69,6 @@ public actor HarnessTaskStore {
     try ensureSQLiteTask(snapshot.htaskID)
     try repository.commit(
       event: event, snapshot: snapshot, expectedVersion: expectedVersion)
-    if let directoryURL = try? existingDirectory(snapshot.htaskID) {
-      try? withLock(directoryURL) {
-        try appendEvent(event, in: directoryURL)
-        try writeSnapshot(snapshot, in: directoryURL)
-      }
-    }
   }
 
   public func events(_ taskID: String) throws -> [HarnessTaskEvent] {
@@ -398,180 +342,8 @@ public actor HarnessTaskStore {
     guard Self.isWellFormed(taskID: taskID) else {
       throw HarnessTaskStoreError.malformedTaskID(taskID)
     }
-    if try repository.containsTask(taskID) { return }
-
-    // This path exists for a legacy directory that appeared after store
-    // startup (including restore tools). Replaying through the old reducer
-    // first preserves the historical forward-migration behavior; the
-    // repository then imports the resulting typed state atomically.
-    let directoryURL = try existingDirectory(taskID)
-    _ = try withLock(directoryURL) {
-      try loadLocked(directoryURL, taskID: taskID)
-    }
-    guard try repository.importLegacyTaskIfPresent(taskID) else {
+    guard try repository.containsTask(taskID) else {
       throw HarnessTaskStoreError.notFound(taskID)
     }
-  }
-
-  // MARK: - Locked helpers
-
-  private func loadLocked(_ directoryURL: URL, taskID: String) throws -> HarnessTaskSnapshot {
-    let snapshotURL = directoryURL.appendingPathComponent("task.json")
-    guard FileManager.default.fileExists(atPath: snapshotURL.path) else {
-      throw HarnessTaskStoreError.notFound(taskID)
-    }
-    let snapshot = try readJSON(HarnessTaskSnapshot.self, from: snapshotURL)
-    let requiresForwardMigration = snapshot.schemaVersion != HarnessTaskSnapshot.schemaVersion
-    let events = try readEvents(in: directoryURL)
-    var rebuilt = snapshot
-    for event in events where event.sequence >= snapshot.version {
-      guard event.sequence == rebuilt.version else {
-        throw HarnessTaskStoreError.corrupt(
-          "event sequence \(event.sequence) does not follow version \(rebuilt.version)")
-      }
-      rebuilt = rebuilt.applying(event.resulting, atUTC: event.atUTC)
-    }
-    if requiresForwardMigration {
-      // Only the replaceable cache is migrated. The append-only timeline is
-      // the truth and its bytes are never opened for writing here.
-      rebuilt = rebuilt.migratedToCurrentSchema()
-      try writeSnapshot(rebuilt, in: directoryURL)
-    }
-    return rebuilt
-  }
-
-  private func readEvents(in directoryURL: URL) throws -> [HarnessTaskEvent] {
-    let url = directoryURL.appendingPathComponent("events.jsonl")
-    guard let data = FileManager.default.contents(atPath: url.path) else { return [] }
-    guard let text = String(data: data, encoding: .utf8) else {
-      throw HarnessTaskStoreError.corrupt("event log is not UTF-8")
-    }
-    let decoder = JSONDecoder()
-    let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
-    var events: [HarnessTaskEvent] = []
-    for (index, line) in lines.enumerated() {
-      guard let lineData = line.data(using: .utf8) else {
-        throw HarnessTaskStoreError.corrupt("event line is not UTF-8")
-      }
-      do {
-        events.append(try decoder.decode(HarnessTaskEvent.self, from: lineData))
-      } catch {
-        // A torn *final* line is the one corruption an append log can
-        // legitimately produce (write interrupted before fsync returned);
-        // anything earlier means the log itself is inconsistent and the
-        // task must not be resumed from it.
-        guard index == lines.count - 1 else {
-          throw HarnessTaskStoreError.corrupt("undecodable event line \(index): \(error)")
-        }
-      }
-    }
-    return events.sorted { $0.sequence < $1.sequence }
-  }
-
-  private func appendEvent(_ event: HarnessTaskEvent, in directoryURL: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let encoded = try? encoder.encode(event) else {
-      throw HarnessTaskStoreError.ioFailure("cannot encode task event")
-    }
-    let payload = encoded + Data("\n".utf8)
-    let url = directoryURL.appendingPathComponent("events.jsonl")
-    let fd = open(url.path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0o600)
-    guard fd >= 0 else {
-      throw HarnessTaskStoreError.ioFailure("cannot open task event log")
-    }
-    defer { close(fd) }
-    let written = payload.withUnsafeBytes { buffer -> Int in
-      guard let base = buffer.baseAddress else { return 0 }
-      var total = 0
-      while total < buffer.count {
-        let result = write(fd, base + total, buffer.count - total)
-        if result <= 0 { return total }
-        total += result
-      }
-      return total
-    }
-    guard written == payload.count else {
-      throw HarnessTaskStoreError.ioFailure("short write to task event log")
-    }
-    guard fsync(fd) == 0 else {
-      throw HarnessTaskStoreError.ioFailure("fsync of task event log failed")
-    }
-  }
-
-  private func writeSnapshot(_ snapshot: HarnessTaskSnapshot, in directoryURL: URL) throws {
-    try writeJSON(snapshot, to: directoryURL.appendingPathComponent("task.json"))
-  }
-
-  private func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(value) else {
-      throw HarnessTaskStoreError.ioFailure("cannot encode \(url.lastPathComponent)")
-    }
-    let temporaryURL = url.deletingLastPathComponent()
-      .appendingPathComponent(".\(url.lastPathComponent).tmp.\(getpid())")
-    let fd = open(
-      temporaryURL.path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0o600)
-    guard fd >= 0 else {
-      throw HarnessTaskStoreError.ioFailure("cannot open temp file for \(url.lastPathComponent)")
-    }
-    var closed = false
-    defer { if !closed { close(fd) } }
-    let written = data.withUnsafeBytes { buffer -> Int in
-      guard let base = buffer.baseAddress else { return 0 }
-      var total = 0
-      while total < buffer.count {
-        let result = write(fd, base + total, buffer.count - total)
-        if result <= 0 { return total }
-        total += result
-      }
-      return total
-    }
-    guard written == data.count else {
-      unlink(temporaryURL.path)
-      throw HarnessTaskStoreError.ioFailure("short write for \(url.lastPathComponent)")
-    }
-    guard fsync(fd) == 0 else {
-      unlink(temporaryURL.path)
-      throw HarnessTaskStoreError.ioFailure("fsync failed for \(url.lastPathComponent)")
-    }
-    close(fd)
-    closed = true
-    guard rename(temporaryURL.path, url.path) == 0 else {
-      unlink(temporaryURL.path)
-      throw HarnessTaskStoreError.ioFailure("atomic rename failed for \(url.lastPathComponent)")
-    }
-    let directoryFD = open(
-      url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-    if directoryFD >= 0 {
-      _ = fsync(directoryFD)
-      close(directoryFD)
-    }
-  }
-
-  private func readJSON<T: Decodable>(_ type: T.Type, from url: URL) throws -> T {
-    guard let data = FileManager.default.contents(atPath: url.path) else {
-      throw HarnessTaskStoreError.notFound(url.lastPathComponent)
-    }
-    do {
-      return try JSONDecoder().decode(type, from: data)
-    } catch {
-      throw HarnessTaskStoreError.corrupt("undecodable \(url.lastPathComponent): \(error)")
-    }
-  }
-
-  private func withLock<T>(_ directoryURL: URL, _ body: () throws -> T) throws -> T {
-    let lockURL = directoryURL.appendingPathComponent(".lock")
-    let fd = open(lockURL.path, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
-    guard fd >= 0 else {
-      throw HarnessTaskStoreError.ioFailure("cannot open task lock")
-    }
-    defer { close(fd) }
-    guard flock(fd, LOCK_EX) == 0 else {
-      throw HarnessTaskStoreError.ioFailure("cannot acquire task lock")
-    }
-    defer { flock(fd, LOCK_UN) }
-    return try body()
   }
 }

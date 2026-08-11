@@ -32,7 +32,6 @@ public enum JournalOutcomeCertainty: String, Codable, Sendable {
 public enum JournalEventValidationError: Error, Equatable, Sendable {
   case malformedEnvelope(String)
   case malformedPayload(kind: JournalEventKind, detail: String)
-  case invalidSequenceCorrelation(String)
   case canonicalArgumentsHashMismatch(stepID: String)
 }
 

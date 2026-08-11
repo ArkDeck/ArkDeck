@@ -1,5 +1,5 @@
-// HFA-AC-22: SQLite migration preserves historical harness truth and every
-// crash window is retryable without touching the legacy source directory.
+// SQLite is the only harness store. The retired durable-file generation
+// must refuse the store loudly rather than be silently shadowed.
 
 import Foundation
 import XCTest
@@ -36,141 +36,56 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
     let schemaMigrationCount = try await store.sqliteRowCount("schema_migration")
     let storageMetadataCount = try await store.sqliteRowCount("storage_metadata")
     XCTAssertEqual(schemaMigrationCount, 1)
-    XCTAssertEqual(storageMetadataCount, 1)
+    XCTAssertEqual(storageMetadataCount, 0)
   }
 
-  func testRealHFA005DirectoryMigratesWithByteEquivalentEventsAndResult() async throws {
-    let root = try makeRoot(copyHistoricalFixture: true)
-    let taskURL = root.appendingPathComponent("tasks/\(historicalTaskID)/task.json")
-    let eventsURL = root.appendingPathComponent("tasks/\(historicalTaskID)/events.jsonl")
-    let taskBytesBefore = try Data(contentsOf: taskURL)
-    let eventBytesBefore = try Data(contentsOf: eventsURL)
-    let historical = try JSONDecoder().decode(HarnessTaskSnapshot.self, from: taskBytesBefore)
-    let expectedEvents: [HarnessTaskEvent] = try decodeLines(eventBytesBefore)
-    let expectedEventWire = try canonicalLines(expectedEvents)
-    let expectedResultWire = try canonical(try XCTUnwrap(historical.result))
+  /// A `tasks/` or `memory/` tree that predates the retired importer (or came
+  /// back from a backup) must refuse the store: opening anyway would present
+  /// an empty task list and silently hide history.
+  func testUnconsumedDurableFileTreeRefusesStoreOpen() throws {
+    for legacyTree in ["tasks", "memory"] {
+      let root = try makeRoot()
+      try FileManager.default.createDirectory(
+        at: root.appendingPathComponent(legacyTree, isDirectory: true),
+        withIntermediateDirectories: true)
+      XCTAssertThrowsError(try HarnessTaskStore(rootURL: root)) { error in
+        guard case HarnessTaskStoreError.corrupt(let detail) = error else {
+          return XCTFail("expected corrupt for \(legacyTree), got \(error)")
+        }
+        XCTAssertTrue(detail.contains("retired durable-file tree"), detail)
+        XCTAssertTrue(detail.contains(legacyTree), detail)
+      }
+      try FileManager.default.removeItem(
+        at: root.appendingPathComponent(legacyTree, isDirectory: true))
+      XCTAssertNoThrow(try HarnessTaskStore(rootURL: root))
+    }
+  }
+
+  /// Upgrade regression for the previous release: every pre-retirement daemon
+  /// recreated `tasks/` on startup and kept mirroring into it, so a store the
+  /// retired importer already consumed (completion sentinel present) must open
+  /// normally with the residue still on disk.
+  func testMigratedStoreWithMirrorResidueStillOpens() async throws {
+    let root = try makeRoot()
+    do {
+      let repository = try HarnessSQLiteRepository(rootURL: root)
+      try repository.database.run(
+        "INSERT INTO storage_metadata(key, value) VALUES(?, ?)",
+        [
+          .text(HarnessSQLiteRepository.legacyImportCompletionKey),
+          .text("complete"),
+        ])
+    }
+    let mirrorTask = root.appendingPathComponent("tasks/HTASK-OLDMIRROR01", isDirectory: true)
+    try FileManager.default.createDirectory(at: mirrorTask, withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: mirrorTask.appendingPathComponent("task.json"))
+    try FileManager.default.createDirectory(
+      at: root.appendingPathComponent("memory", isDirectory: true),
+      withIntermediateDirectories: true)
 
     let store = try HarnessTaskStore(rootURL: root)
-    let migrated = try await store.load(historicalTaskID)
-    let migratedEvents = try await store.events(historicalTaskID)
-
-    XCTAssertEqual(migrated.schemaVersion, HarnessTaskSnapshot.schemaVersion)
-    XCTAssertEqual(try canonical(try XCTUnwrap(migrated.result)), expectedResultWire)
-    XCTAssertEqual(try canonicalLines(migratedEvents), expectedEventWire)
-    XCTAssertEqual(migratedEvents, expectedEvents)
-    XCTAssertEqual(try Data(contentsOf: taskURL), taskBytesBefore)
-    XCTAssertEqual(try Data(contentsOf: eventsURL), eventBytesBefore)
-
-    let decision = try await store.decision(historicalTaskID, round: 1)
-    let intents = try await store.intents(historicalTaskID)
-    let modelRuns = try await store.modelRuns(historicalTaskID)
-    let humanActions = try await store.humanActions(historicalTaskID)
-    let memoryHistory = try await store.memoryHistory(scope: .task, key: historicalTaskID)
-    let searchResults = try await store.searchMemory(
-      scope: .task, key: historicalTaskID, query: "observe", limit: 10)
-    XCTAssertEqual(decision?.decisionID, "dec-71040eac6601")
-    XCTAssertEqual(intents.count, 1)
-    XCTAssertEqual(modelRuns.count, 1)
-    XCTAssertEqual(humanActions.count, 1)
-    XCTAssertEqual(memoryHistory.count, 1)
-    XCTAssertEqual(searchResults.count, 1)
-    // JSON envelope evolution requires no lossy SQL rewrite: historical rows
-    // decode, remain queryable, and are explicitly non-executable when their
-    // v2 preconditions are absent.
-    XCTAssertEqual(decision?.envelopeVersion, "1.0.0")
-    XCTAssertEqual(intents.first?.schemaVersion, "1.0.0")
-    XCTAssertEqual(
-      intents.first?.withState(.linked, atUTC: "2026-07-31T00:00:00Z").schemaVersion,
-      "1.0.0")
-    if let decision {
-      let basis = HarnessDecisionBasis(
-        snapshot: migrated, offeredOperations: [decision.operationReference].compactMap { $0 })
-      XCTAssertEqual(
-        HarnessDecisionFreshness.staleness(of: decision, against: basis), .unverifiable)
-    }
-
-    let expectedCounts: [String: Int] = [
-      "harness_task": 1,
-      "task_event": 2,
-      "task_condition": HarnessTaskConditionName.allCases.count,
-      "model_run": 1,
-      "decision": 1,
-      "dispatch_intent": 1,
-      "human_action": 1,
-      "memory_entry": 1,
-      "memory_fts": 1,
-      "context_manifest": 1,
-    ]
-    for (table, count) in expectedCounts {
-      let actual = try await store.sqliteRowCount(table)
-      XCTAssertEqual(actual, count, table)
-    }
-
-    // Reopening sees the activation marker. No row is duplicated and the
-    // canonical JSON digest still covers the exact stored blob.
-    let reopened = try HarnessTaskStore(rootURL: root)
-    for (table, count) in expectedCounts {
-      let actual = try await reopened.sqliteRowCount(table)
-      XCTAssertEqual(actual, count, table)
-    }
-    let database = try HarnessSQLiteDatabase(rootURL: root)
-    for (table, jsonColumn, digestColumn) in [
-      ("harness_task", "snapshot_json", "snapshot_digest"),
-      ("task_event", "event_json", "event_digest"),
-      ("model_run", "run_json", "run_digest"),
-      ("context_manifest", "manifest_json", "manifest_digest"),
-    ] {
-      for row in try database.query(
-        "SELECT \(jsonColumn), \(digestColumn) FROM \(table)")
-      {
-        let bytes = try XCTUnwrap(row.blob(jsonColumn))
-        XCTAssertEqual(row.text(digestColumn), HarnessSQLiteDatabase.digest(bytes), table)
-      }
-    }
-  }
-
-  func testBothMigrationCrashWindowsRollBackAndReenterWithoutLegacyDamage() async throws {
-    for fault in [
-      HarnessTaskStoreMigrationFault.afterTaskRows,
-      HarnessTaskStoreMigrationFault.beforeActivation,
-    ] {
-      let root = try makeRoot(copyHistoricalFixture: true)
-      let taskURL = root.appendingPathComponent("tasks/\(historicalTaskID)/task.json")
-      let eventsURL = root.appendingPathComponent("tasks/\(historicalTaskID)/events.jsonl")
-      let taskBytes = try Data(contentsOf: taskURL)
-      let eventBytes = try Data(contentsOf: eventsURL)
-
-      XCTAssertThrowsError(
-        try HarnessTaskStore(rootURL: root, migrationFault: fault)
-      ) { error in
-        XCTAssertEqual(error as? HarnessTaskStoreMigrationFault, fault)
-      }
-      XCTAssertEqual(try Data(contentsOf: taskURL), taskBytes)
-      XCTAssertEqual(try Data(contentsOf: eventsURL), eventBytes)
-
-      let databaseAfterFault = try HarnessSQLiteDatabase(rootURL: root)
-      XCTAssertEqual(
-        try databaseAfterFault.query("SELECT COUNT(*) AS count FROM harness_task")
-          .first?.integer("count"),
-        0)
-      XCTAssertTrue(
-        try databaseAfterFault.query(
-          "SELECT value FROM storage_metadata WHERE key = ?",
-          [.text("legacy_file_import_v1")]
-        ).isEmpty)
-
-      let recovered = try HarnessTaskStore(rootURL: root)
-      let recoveredSnapshot = try await recovered.load(historicalTaskID)
-      let recoveredEvents = try await recovered.events(historicalTaskID)
-      let taskCount = try await recovered.sqliteRowCount("harness_task")
-      let eventCount = try await recovered.sqliteRowCount("task_event")
-      XCTAssertEqual(recoveredSnapshot.result?.reasonCode, "submissionRejected:rejected")
-      XCTAssertEqual(recoveredEvents.count, 2)
-      XCTAssertEqual(taskCount, 1)
-      XCTAssertEqual(eventCount, 2)
-      XCTAssertEqual(try Data(contentsOf: taskURL), taskBytes)
-      XCTAssertEqual(try Data(contentsOf: eventsURL), eventBytes)
-    }
+    let listed = try await store.list()
+    XCTAssertTrue(listed.isEmpty, "mirror residue must not surface as tasks")
   }
 
   func testEventAndSnapshotRollbackTogetherAndCASReportsThePersistedVersion() async throws {
@@ -268,18 +183,12 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
     XCTAssertTrue(acquireAfterRelease)
   }
 
-  private func makeRoot(copyHistoricalFixture: Bool) throws -> URL {
+  private func makeRoot(copyHistoricalFixture: Bool = false) throws -> URL {
     let parent = FileManager.default.temporaryDirectory
       .appendingPathComponent("arkdeck-hfa012-tests", isDirectory: true)
     try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
     let root = parent.appendingPathComponent(UUID().uuidString, isDirectory: true)
-    if copyHistoricalFixture {
-      let fixture = try XCTUnwrap(
-        Bundle.module.url(forResource: "HFA012", withExtension: nil))
-      try FileManager.default.copyItem(at: fixture, to: root)
-    } else {
-      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     roots.append(root)
     return root
   }

@@ -235,11 +235,6 @@ struct RockchipExecutionAdmission: @unchecked Sendable {
     }
   }
 
-  var legacyAuthorizationReference: AuthorizationReference? {
-    guard case .standingAuthorization(let reference) = authorityReference else { return nil }
-    return reference
-  }
-
   var agentAuthorizationReference: AgentExecutionAuthorityReference? {
     guard case .agent(let reference) = authorityReference else { return nil }
     return reference

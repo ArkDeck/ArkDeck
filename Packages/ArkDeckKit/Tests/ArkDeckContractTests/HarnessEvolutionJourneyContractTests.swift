@@ -927,7 +927,6 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(attempts.first?.outcome, .superseded)
     let strategyAttempt = try XCTUnwrap(attempts.last)
     XCTAssertEqual(strategyAttempt.outcome, .succeeded)
-    XCTAssertNil(strategyAttempt.review)
     XCTAssertEqual(strategyAttempt.candidatePatch?.metadataArtifactID, "ART-CANDIDATE")
     XCTAssertEqual(strategyAttempt.buildArtifactIDs, ["ART-BUILD", "ART-SIGNED"])
     let promotion = try XCTUnwrap(strategyAttempt.promotionCandidate)

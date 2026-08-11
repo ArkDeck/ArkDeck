@@ -35,8 +35,6 @@ package struct HarnessPromotionExportBundle: Equatable, Sendable {
   package let promotion: HarnessPromotionCandidate
   package let candidate: HarnessCandidatePatch
   package let evaluation: HarnessEvaluation
-  /// Historical promotion bundles can include a review. New bundles omit it.
-  package let review: HarnessAdversarialReview?
   package let unifiedDiff: String
   package let files: [HarnessPromotionExportFile]
 }
@@ -47,7 +45,6 @@ package enum HarnessPromotionExport {
   package static let promotionFileName = "promotion-candidate.json"
   package static let candidateFileName = "candidate-patch.json"
   package static let evaluationFileName = "evaluation.json"
-  package static let reviewFileName = "adversarial-review.json"
   package static let manifestFileName = "artifacts.json"
 
   package static func assemble(
@@ -71,14 +68,6 @@ package enum HarnessPromotionExport {
       candidate.attemptID == attempt.attemptID,
       candidate.baseRevision == promotion.baseRevision
     else { throw HarnessPromotionExportError.inconsistentFacts("candidatePatch") }
-    if let review = attempt.review {
-      guard review.reviewID == promotion.reviewID,
-        review.candidatePatchID == candidate.candidatePatchID,
-        review.result == .pass, review.issues.isEmpty
-      else { throw HarnessPromotionExportError.inconsistentFacts("review") }
-    } else if promotion.reviewID != nil {
-      throw HarnessPromotionExportError.inconsistentFacts("review")
-    }
     guard
       let evaluation = evaluations.first(where: {
         $0.evaluationID == promotion.evaluationID
@@ -102,7 +91,7 @@ package enum HarnessPromotionExport {
         name: summaryFileName,
         contents: summaryMarkdown(
           snapshot: snapshot, attempt: attempt, promotion: promotion,
-          candidate: candidate, evaluation: evaluation, review: attempt.review)),
+          candidate: candidate, evaluation: evaluation)),
       HarnessPromotionExportFile(name: patchFileName, contents: unifiedDiff),
       HarnessPromotionExportFile(
         name: promotionFileName, contents: try prettyJSON(promotion)),
@@ -117,13 +106,9 @@ package enum HarnessPromotionExport {
             promotion: promotion, candidate: candidate, attempt: attempt,
             evaluation: evaluation))),
     ]
-    if let review = attempt.review {
-      files.append(HarnessPromotionExportFile(
-        name: reviewFileName, contents: try prettyJSON(review)))
-    }
     return HarnessPromotionExportBundle(
       htaskID: snapshot.htaskID, attemptID: attempt.attemptID, promotion: promotion,
-      candidate: candidate, evaluation: evaluation, review: attempt.review,
+      candidate: candidate, evaluation: evaluation,
       unifiedDiff: unifiedDiff, files: files)
   }
 
@@ -173,8 +158,7 @@ package enum HarnessPromotionExport {
     attempt: HarnessAttempt,
     promotion: HarnessPromotionCandidate,
     candidate: HarnessCandidatePatch,
-    evaluation: HarnessEvaluation,
-    review: HarnessAdversarialReview?
+    evaluation: HarnessEvaluation
   ) -> String {
     var lines: [String] = []
     lines.append("# Promotion candidate \(promotion.promotionCandidateID)")
@@ -240,14 +224,6 @@ package enum HarnessPromotionExport {
           + "| \(evidence.verified) |")
     }
     lines.append("")
-    if let review {
-      lines.append("## Historical adversarial review")
-      lines.append("")
-      lines.append(
-        "`\(review.reviewID)` by `\(review.reviewerID)` verdict: "
-          + "**\(review.result.rawValue)** (no issues)")
-      lines.append("")
-    }
     lines.append("## Artifact references")
     lines.append("")
     lines.append(

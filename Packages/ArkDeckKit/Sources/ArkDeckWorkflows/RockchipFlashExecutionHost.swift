@@ -81,12 +81,6 @@ public enum RockchipDeviceBindingInstallation {
       store: RockchipProductBindingStore(rootURL: root)
     ).installCurrentTarget()
   }
-
-  /// Source-compatible name retained for clients built against the Loader-only bootstrap.
-  @discardableResult
-  public static func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
-    try installCurrentTarget()
-  }
 }
 
 /// Protected-main HDC tuple already registered by the Rockchip Loader-transition integration.
@@ -855,12 +849,6 @@ struct RockchipProductBindingBootstrap: Sendable {
       usbTopology: result.snapshot.usbTopology,
       serialDigestSHA256: storedDigest,
       created: result.created)
-  }
-
-  /// Compatibility seam retained for existing contracts and callers.  It now
-  /// has the same cross-mode behavior as the product entry point.
-  func installCurrentLoader() throws -> RockchipDeviceBindingInstallationReceipt {
-    try installCurrentTarget()
   }
 }
 

@@ -618,6 +618,59 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(expectedActiveIDs.count, expectedJobCount - expectedTerminalCount)
   }
 
+  /// Upgrade regression for the retired idempotency ledger generation. Its
+  /// importer never deleted the file, so residue whose keys the SQLite table
+  /// already carries must keep opening; a key the table has never admitted
+  /// means unconsumed history and must block admission outright — silently
+  /// ignoring it could replay a used key as a fresh device mutation.
+  func testRetiredIdempotencyLedgerBlocksOnlyUnconsumedKeys() throws {
+    let root = stateDirectory.appendingPathComponent(
+      "retired-ledger-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let ledgerURL = root.appendingPathComponent("idempotency.json")
+
+    // Consumed residue: the previous release imported this key into SQLite
+    // and left the file behind. The repository must keep opening.
+    do {
+      let repository = try RuntimeJobRepository(stateDirectory: root)
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: "job-legacy-1", idempotencyKey: "idem-legacy-1",
+          requestHash: "hash-1", initialState: JobState.preflight.rawValue,
+          createdAtUTC: "2026-08-11T00:00:00Z", initialRecordData: Data("{}".utf8)),
+        .admitted)
+    }
+    try Data(
+      #"{"entries":[{"idempotencyKey":"idem-legacy-1","jobID":"job-legacy-1","requestFingerprintSHA256":"hash-1"}]}"#
+        .utf8
+    ).write(to: ledgerURL)
+    XCTAssertNoThrow(try RuntimeJobRepository(stateDirectory: root))
+
+    // Unconsumed key: never admitted by this database. Must refuse to open.
+    try Data(
+      #"{"entries":[{"idempotencyKey":"idem-never-imported","jobID":"job-x","requestFingerprintSHA256":"hash-x"}]}"#
+        .utf8
+    ).write(to: ledgerURL)
+    XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: root)) { error in
+      guard case RuntimeJobRepositoryError.corrupt(let detail) = error else {
+        return XCTFail("expected corrupt, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("idem-never-imported"), detail)
+    }
+
+    // Undecodable ledger: consumption cannot be proven. Must refuse to open.
+    try Data("not json".utf8).write(to: ledgerURL)
+    XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: root)) { error in
+      guard case RuntimeJobRepositoryError.corrupt(let detail) = error else {
+        return XCTFail("expected corrupt, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("undecodable"), detail)
+    }
+
+    try FileManager.default.removeItem(at: ledgerURL)
+    XCTAssertNoThrow(try RuntimeJobRepository(stateDirectory: root))
+  }
+
   /// Startup must be driven by the active-job index, not by total terminal
   /// history.  Seeding the repository directly keeps this focused on the
   /// durable SQLite/recovery boundary: executing 10,000 provider plans would

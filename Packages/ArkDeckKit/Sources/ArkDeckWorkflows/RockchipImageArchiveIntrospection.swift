@@ -29,12 +29,10 @@ import CryptoKit
 import Foundation
 
 public enum RockchipArchiveIntrospectionFailure: Error, Equatable, Sendable {
-  case memberUnreadable(String)
   case partitionTableMissing
   case partitionTableUnparsable(String)
   case systemImageMissing(String)
   case runtimeBuildVersionUnreadable
-  case oversizedMember(name: String, sizeBytes: Int64)
 }
 
 /// One partition as the archive's own table declares it.

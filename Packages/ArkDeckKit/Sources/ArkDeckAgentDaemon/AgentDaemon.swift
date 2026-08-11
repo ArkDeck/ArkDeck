@@ -55,7 +55,6 @@ public enum AgentDaemonErrorCode: String, Sendable {
   case rejected
   case conflict
   case notFound
-  case notImplementedUntilMU3
   case internalError
 }
 
