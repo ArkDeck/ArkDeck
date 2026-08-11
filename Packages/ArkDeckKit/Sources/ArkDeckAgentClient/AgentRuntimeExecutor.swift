@@ -149,6 +149,7 @@ public struct AgentRuntimeExecutor: Sendable {
   /// exposes an unrelated connect key as a safe selection.
   private struct CandidateBinding: Sendable, Equatable {
     let connectKey: String
+    let state: String
     let target: Target?
   }
 
@@ -304,8 +305,11 @@ public struct AgentRuntimeExecutor: Sendable {
       } else {
         declaredProject = nil
       }
+      let preservesArtifactTargetScope =
+        request.reference == "workspace.sign-openharmony-hap@1"
+        && request.inputs["unsignedHapArtifactLease"] != nil
       if let requestedTarget = request.targetID, let declaredProject,
-        requestedTarget != declaredProject
+        requestedTarget != declaredProject, !preservesArtifactTargetScope
       {
         return .failed(
           reason:
@@ -366,24 +370,30 @@ public struct AgentRuntimeExecutor: Sendable {
             mode: .reconnectTarget, catalogDigest: catalogDigest,
             startedAtUTC: startedAtUTC, humanActions: humanActions)
         }
-        switch try adopt(
-          request: request, candidate: candidate.connectKey, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions,
-          deadline: deadline)
-        {
-        case .target(let refreshed) where refreshed.targetID == explicitTargetID:
-          resolvedTarget = refreshed
-        case .target:
+        guard candidate.state == "Connected" else {
+          let kind: RuntimeHumanActionKind =
+            candidate.state == "Unauthorized" ? .trustDevice : .physicalReconnect
+          let prompt =
+            candidate.state == "Unauthorized"
+            ? "Confirm the debugging trust prompt on the selected device, then resume this execution."
+            : "Reconnect the selected target until its transport reports Connected."
           return try pause(
-            request: request, kind: .physicalReconnect,
-            prompt:
-              "The selected target is not the connected physical device; "
-              + "reconnect the selected target before resuming this execution.",
+            request: request, kind: kind, prompt: prompt,
             mode: .reconnectTarget, catalogDigest: catalogDigest,
             startedAtUTC: startedAtUTC, humanActions: humanActions)
-        case .paused(let outcome):
-          return outcome
         }
+        guard let freshTarget = candidate.target else {
+          throw RuntimeAgentExecutorError.malformedResponse(
+            "connected candidate lost its durable target ownership")
+        }
+        // `device.candidates` just joined one live transport face to the
+        // daemon-owned durable binding. Re-running `target.adopt` here would
+        // duplicate tool/list/identity bootstrap reads and can consume the
+        // entire Agent deadline before the typed Job exists. Runtime
+        // admission and the operation's own evidence steps still re-read
+        // fresh target/tool facts before dispatch; this removes only the
+        // redundant metadata adoption pass.
+        resolvedTarget = freshTarget
       } else {
         let listed = try listTargets(deadline: deadline)
         if listed.count == 1 {
@@ -740,10 +750,10 @@ public struct AgentRuntimeExecutor: Sendable {
             "device.candidates contains malformed target ownership")
         }
         return CandidateBinding(
-          connectKey: connectKey,
+          connectKey: connectKey, state: state,
           target: Target(targetID: targetID, bindingRevision: revision))
       case (.null?, .null?):
-        return CandidateBinding(connectKey: connectKey, target: nil)
+        return CandidateBinding(connectKey: connectKey, state: state, target: nil)
       default:
         throw RuntimeAgentExecutorError.malformedResponse(
           "device.candidates contains incomplete target ownership")

@@ -384,12 +384,20 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
 
   func testExplicitTargetUsesExactDaemonCandidateOwnershipWithoutHumanSelection() throws {
     let requestedConnectKey = "AAA"
+    final class Log: @unchecked Sendable {
+      private let lock = NSLock()
+      private var methods: [String] = []
+      func record(_ method: String) { lock.withLock { methods.append(method) } }
+      func snapshot() -> [String] { lock.withLock { methods } }
+    }
+    let log = Log()
     let client = try startDaemon(
       candidates: [
         BootstrapCandidate(connectKey: requestedConnectKey, state: "Connected"),
         BootstrapCandidate(connectKey: "BBB", state: "Connected"),
       ],
-      preAdoptedConnectKey: requestedConnectKey)
+      preAdoptedConnectKey: requestedConnectKey,
+      observer: { log.record($0) })
     guard case .array(let targets) = try client.request(method: "target.list"),
       case .object(let requested)? = targets.first,
       case .string(let requestedTargetID)? = requested["targetId"]
@@ -407,6 +415,10 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     }
     XCTAssertEqual(receipt.targetID, requestedTargetID)
     XCTAssertTrue(receipt.humanActions.isEmpty)
+    XCTAssertTrue(log.snapshot().contains("device.candidates"))
+    XCTAssertFalse(
+      log.snapshot().contains("target.adopt"),
+      "an exact live-to-durable mapping must not repeat bootstrap adoption")
     guard case .array(let jobs) = try client.request(method: "job.list") else {
       return XCTFail("job.list must answer")
     }
@@ -544,6 +556,31 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertTrue(called.contains("job.submit"))
     XCTAssertFalse(called.contains("target.list"), "host-only runs do not need a device")
     XCTAssertFalse(called.contains("target.adopt"), "host-only runs must never adopt a device")
+  }
+
+  func testArtifactBoundSigningPreservesItsTargetWithoutAdoptingADevice() throws {
+    let recorder = try startRecordingDaemon()
+    let outcome = try executor(recorder.client).run(
+      RuntimeAgentExecutionRequest(
+        operationID: "workspace.sign-openharmony-hap", operationVersion: 1,
+        inputs: [
+          "projectRef": .string("demo-app"),
+          "signingPresetRef": .string("openharmony-release@1"),
+          "unsignedHapArtifactLease": .string("lease-v1:source:ART-INPUT"),
+        ],
+        targetID: "TGT-ARTIFACT-BOUND",
+        executionID: "artifact-bound-signing-001"))
+    guard case .failed(let reason, let receipt) = outcome else {
+      return XCTFail("the fixture lacks the workspace provider and must reject: \(outcome)")
+    }
+
+    XCTAssertEqual(receipt.targetID, "TGT-ARTIFACT-BOUND")
+    XCTAssertNil(receipt.bindingRevision)
+    XCTAssertFalse(reason.contains("does not match projectRef"), reason)
+    let called = recorder.observedMethods()
+    XCTAssertTrue(called.contains("job.submit"))
+    XCTAssertFalse(called.contains("target.list"), "host-only signing must not list devices")
+    XCTAssertFalse(called.contains("target.adopt"), "host-only signing must not adopt a device")
   }
 
   /// A daemon whose handler records which methods were invoked.

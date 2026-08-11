@@ -41,9 +41,11 @@ struct ArkDeckCommandLine {
       case "agent":
         try await RuntimeCLI.runAgent(Array(arguments.dropFirst()))
       case "agentd":
-        try RuntimeCLI.runAgentDaemon(Array(arguments.dropFirst()))
+        try RuntimeCLI.runAgentDaemon(
+          Array(arguments.dropFirst()),
+          beforeBootstrap: RuntimeCLI.refreshSigningAccessIfInstalled)
       case "signing":
-        try RuntimeCLI.runSigning(Array(arguments.dropFirst()))
+        try await RuntimeCLI.runSigningAsync(Array(arguments.dropFirst()))
       case "capability":
         try RuntimeCLI.runCapability(Array(arguments.dropFirst()))
       case "artifact":
@@ -1058,9 +1060,15 @@ struct ArkDeckCommandLine {
         arkdeck agentd status [--json]
         arkdeck agentd verify [--target <id>] [--maximum-wait-seconds <1...300>] [--json]
         arkdeck agentd uninstall [--json]
+        arkdeck signing install-sdk-release --sdk <absolute-openharmony-sdk-path> \
+      --java <absolute-java-path> --bundle-name <application-bundle-name> \
+      [--project-ref <demo-app>] [--json]
         arkdeck signing install --java <absolute-java-path> --jar <absolute-hapsigntool-jar> \
       --keystore <absolute-p12-or-jks> --certificate <absolute-pem-or-cer> \
       --profile <absolute-p7b> --key-alias <alias> [--project-ref <demo-app>] [--json]
+        arkdeck signing normalize [--json]
+        arkdeck signing migrate-deveco --build-profile <absolute-build-profile.json5> \
+      --daemon <absolute-agentd-path> [--key-alias <alias>] [--json]
         arkdeck signing status [--json]
         arkdeck signing remove [--json]
         arkdeck operation list [--socket <path>] [--json]
@@ -1069,7 +1077,7 @@ struct ArkDeckCommandLine {
         arkdeck job submit --target <id> --operation <reference> \
       [--expected-binding-revision <n>] [--wait] [--json]
         arkdeck job status --job <id> [--json] | arkdeck job list [--json]
-        arkdeck job run --job <id> [--json] | arkdeck job reconcile --job <id> [--json]
+        arkdeck job run|cancel|reconcile --job <id> [--json]
         arkdeck debug start --request-file <destructive-flash-request.json> [--json]
         arkdeck debug evaluate --invocation <id> --action-file <effect-action.json> \
       --source-sha256 <sha256> --build-sha256 <sha256> [--json]

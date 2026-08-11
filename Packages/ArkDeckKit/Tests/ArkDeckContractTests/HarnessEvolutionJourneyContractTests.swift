@@ -103,6 +103,7 @@ private actor JourneyJobPort: HarnessRuntimeJobPort {
   private var requests: [RuntimeOperationRequest] = []
   private var jobIDsByOrdinal: [String] = []
   private var nextOrdinal = 1
+  private var reconciledJobIDs: [String] = []
 
   func submit(requestJSON: Data) async throws -> HarnessJobAcceptance {
     let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: requestJSON)
@@ -127,6 +128,25 @@ private actor JourneyJobPort: HarnessRuntimeJobPort {
 
   func requestCancel(jobID: String) async throws {}
 
+  func reconcile(jobID: String) async throws -> HarnessJobObservation {
+    guard let current = observations[jobID],
+      current.state == JobState.waitingForRecovery.rawValue,
+      current.outcomeUnknown,
+      let effect = current.actualEffect,
+      effect <= .readOnly
+    else {
+      throw HarnessJobPortError.rejected("fixture job is not a recoverable read")
+    }
+    reconciledJobIDs.append(jobID)
+    let settled = HarnessJobObservation(
+      jobID: jobID, state: JobState.failed.rawValue, isTerminal: true,
+      succeeded: false, outcomeUnknown: false, waitingForHuman: false,
+      actualEffect: effect,
+      timeline: current.timeline + ["reconciled: confirmed not executed capture-hilog"])
+    observations[jobID] = settled
+    return settled
+  }
+
   func finish(_ jobID: String, state: String = "succeeded") {
     observations[jobID] = HarnessJobObservation(
       jobID: jobID, state: state, isTerminal: true, succeeded: state == "succeeded",
@@ -134,9 +154,41 @@ private actor JourneyJobPort: HarnessRuntimeJobPort {
       timeline: ["queued", "running", state])
   }
 
+  func finishWithConfirmedTargetPreflightNonExecution(_ jobID: String) {
+    observations[jobID] = HarnessJobObservation(
+      jobID: jobID, state: "failed", isTerminal: true, succeeded: false,
+      outcomeUnknown: false, waitingForHuman: false,
+      timeline: [
+        "queued", "running", "intent confirm-evidence-target",
+        "outcomeUnknown confirm-evidence-target; durable intent left outstanding",
+        "reconciled: confirmed not executed confirm-evidence-target",
+      ])
+  }
+
+  func parkUnknown(
+    _ jobID: String, effect: WorkflowEffect, priorReconcileAttempt: Bool = false
+  ) {
+    var timeline = [
+      "queued", "running", "intent capture-hilog",
+      "outcomeUnknown capture-hilog; durable intent left outstanding",
+    ]
+    if priorReconcileAttempt {
+      timeline += [
+        "reconcile started capture-hilog",
+        "reconciled: still unknown capture-hilog",
+      ]
+    }
+    observations[jobID] = HarnessJobObservation(
+      jobID: jobID, state: JobState.waitingForRecovery.rawValue,
+      isTerminal: false, succeeded: false, outcomeUnknown: true,
+      waitingForHuman: false, actualEffect: effect,
+      timeline: timeline)
+  }
+
   func submittedOperations() -> [String] { requests.map(\.operation.reference) }
   func submittedRequests() -> [RuntimeOperationRequest] { requests }
   func jobIDs() -> [String] { jobIDsByOrdinal }
+  func reconcileCalls() -> [String] { reconciledJobIDs }
 }
 
 private struct JourneyStagedArtifact {
@@ -677,6 +729,9 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(
       signingRequest.operation.reference, DebugCrashTaskHandler.signOpenHarmonyHAP)
     XCTAssertEqual(
+      inputString(signingRequest, "projectRef"), "demo-app",
+      "the signing preset belongs to the source profile, while the immutable unsigned HAP still comes from the isolated evolution workspace")
+    XCTAssertEqual(
       inputString(signingRequest, "unsignedHapArtifactLease"),
       "lease-v1:build:ART-BUILD")
     XCTAssertEqual(
@@ -694,6 +749,68 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       inputString(deployRequest, "hapArtifactLease"), "lease-v1:sign:ART-SIGNED",
       "the repair deployment must carry the signed-output lease, not the unsigned build")
     return try XCTUnwrap(deployWake.dispatchedJobID)
+  }
+
+  func testReadOnlyRecoveryIsMechanicallyReconciledWithoutReplayingUnknownIntent()
+    async throws
+  {
+    let stack = try await makeJourneyStack(maxAttempts: 2, maxE1Mutations: 8)
+
+    let observeWake = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(observeWake.dispatchedJobID, "JOB-1")
+    await stack.jobs.finish("JOB-1")
+
+    let captureWake = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(captureWake.dispatchedJobID, "JOB-2")
+    await stack.jobs.parkUnknown("JOB-2", effect: .readOnly)
+
+    let recovered = try await stack.coordinator.reconcile(stack.taskID)
+    let reconcileCalls = await stack.jobs.reconcileCalls()
+    XCTAssertEqual(reconcileCalls, ["JOB-2"])
+    XCTAssertEqual(recovered.snapshot.status, .failed)
+    XCTAssertNil(recovered.snapshot.activeJobID)
+    XCTAssertEqual(recovered.reasonCode, "operationFailed:capture.diagnostics@1:failed")
+    XCTAssertFalse(
+      recovered.snapshot.result?.reasonCode.contains("outcomeUnknown") ?? false,
+      "a Runtime-confirmed read failure must not become a human unknown-outcome stop")
+    let submittedOperations = await stack.jobs.submittedOperations()
+    XCTAssertEqual(
+      submittedOperations,
+      [DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics],
+      "reconciliation settles the existing intent and never submits a replacement in the same wake")
+  }
+
+  func testMutationRecoveryRemainsFailClosedAndIsNotAutomaticallyReconciled() async throws {
+    let stack = try await makeJourneyStack(maxAttempts: 2, maxE1Mutations: 8)
+
+    _ = try await stack.coordinator.reconcile(stack.taskID)
+    await stack.jobs.finish("JOB-1")
+    _ = try await stack.coordinator.reconcile(stack.taskID)
+    await stack.jobs.parkUnknown("JOB-2", effect: .deviceMutation)
+
+    let waiting = try await stack.coordinator.reconcile(stack.taskID)
+    let reconcileCalls = await stack.jobs.reconcileCalls()
+    XCTAssertTrue(reconcileCalls.isEmpty)
+    XCTAssertEqual(waiting.snapshot.status, .waiting)
+    XCTAssertEqual(waiting.snapshot.activeJobID, "JOB-2")
+    XCTAssertEqual(waiting.snapshot.waitReason, .observationWindow)
+  }
+
+  func testStillUnknownReadRecoveryIsNotRepeatedOnEveryWake() async throws {
+    let stack = try await makeJourneyStack(maxAttempts: 2, maxE1Mutations: 8)
+
+    _ = try await stack.coordinator.reconcile(stack.taskID)
+    await stack.jobs.finish("JOB-1")
+    _ = try await stack.coordinator.reconcile(stack.taskID)
+    await stack.jobs.parkUnknown(
+      "JOB-2", effect: .readOnly, priorReconcileAttempt: true)
+
+    let waiting = try await stack.coordinator.reconcile(stack.taskID)
+    let reconcileCalls = await stack.jobs.reconcileCalls()
+    XCTAssertTrue(reconcileCalls.isEmpty)
+    XCTAssertEqual(waiting.snapshot.status, .waiting)
+    XCTAssertEqual(waiting.snapshot.activeJobID, "JOB-2")
+    XCTAssertEqual(waiting.snapshot.waitReason, .observationWindow)
   }
 
   /// Finish one deployed candidate with exact verification evidence. A
@@ -840,6 +957,71 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let evaluation = try await stack.store.evaluation(
       stack.taskID, evaluationID: evaluationID)
     XCTAssertEqual(evaluation?.verdict, .pass)
+  }
+
+  func testConfirmedNonExecutedDeployPreflightRetainsSignedRepairAndRetriesWithNewJob()
+    async throws
+  {
+    let stack = try await makeJourneyStack(maxAttempts: 4, maxE1Mutations: 9)
+    let firstDeployJobID = try await driveToRepairDeployDispatch(stack)
+    await stack.jobs.finishWithConfirmedTargetPreflightNonExecution(firstDeployJobID)
+
+    // Runtime reconciliation, not a missing marker or a Harness guess,
+    // proves the read-only target preflight never ran. The already verified
+    // patch/build/test/sign state remains intact and no rollback is owed.
+    let retained = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(
+      retained.action, .dispatched,
+      "the same wake may observe the terminal proof and submit a new bounded Job")
+    XCTAssertTrue(retained.reasonCode.hasPrefix("deployVerifiedBuildOutput"))
+    XCTAssertEqual(retained.snapshot.status, .waiting)
+    XCTAssertEqual(retained.snapshot.phase, .deploying)
+    XCTAssertEqual(
+      retained.snapshot.observedState[DebugCrashTaskHandler.deploymentPreflightRetryKey],
+      .bool(true))
+    XCTAssertEqual(retained.snapshot.repairAttempt?.rollbackRequired, false)
+    XCTAssertEqual(retained.snapshot.repairAttempt?.buildOutputSigned, true)
+    XCTAssertEqual(
+      retained.snapshot.repairAttempt?.buildOutputArtifactLease,
+      "lease-v1:sign:ART-SIGNED")
+    XCTAssertNil(retained.snapshot.repairAttempt?.deployedDigest)
+
+    let attemptsAfterProof = try await stack.store.attempts(stack.taskID)
+    let strategyAttempt = try XCTUnwrap(attemptsAfterProof.last)
+    let failureDigest = try XCTUnwrap(strategyAttempt.failureFingerprint)
+    let storedFailure = try await stack.store.failureRecord(digest: failureDigest)
+    let failure = try XCTUnwrap(storedFailure)
+    XCTAssertEqual(
+      failure.fingerprint.errorClassification,
+      "DEPLOYMENT_PREFLIGHT_NOT_EXECUTED")
+
+    // The terminal-observation wake created a new ActionRun/Job. It must not
+    // dispatch the revert operation or reuse JOB-12.
+    XCTAssertNotEqual(retained.dispatchedJobID, firstDeployJobID)
+    let retryRequest = try await latestRequest(stack)
+    XCTAssertEqual(retryRequest.operation.reference, DebugCrashTaskHandler.deployHAP)
+    XCTAssertEqual(
+      inputString(retryRequest, "hapArtifactLease"), "lease-v1:sign:ART-SIGNED")
+    let operations = await stack.jobs.submittedOperations()
+    XCTAssertEqual(
+      operations.filter { $0 == DebugCrashTaskHandler.revertPatch }.count, 0)
+    XCTAssertEqual(
+      operations.filter { $0 == DebugCrashTaskHandler.deployHAP }.count, 3,
+      "fixture deploy, first repair deploy, and one proven-safe retry")
+
+    // The new Job can complete the normal transition into verification.
+    let retryJobID = try XCTUnwrap(retained.dispatchedJobID)
+    await stack.jobs.finish(retryJobID)
+    let verification = try await stack.coordinator.reconcile(stack.taskID)
+    XCTAssertEqual(verification.action, .dispatched)
+    XCTAssertEqual(verification.snapshot.phase, .verifying)
+    XCTAssertNil(
+      verification.snapshot.observedState[
+        DebugCrashTaskHandler.deploymentPreflightRetryKey])
+    let verificationOperations = await stack.jobs.submittedOperations()
+    XCTAssertEqual(
+      verificationOperations.last,
+      DebugCrashTaskHandler.captureDiagnostics)
   }
 
   func testRetryablePromotionDriftRollsBackAndConvergesWithANewCandidate() async throws {

@@ -75,7 +75,8 @@ enum RuntimeCLI {
   /// LaunchAgent. This surface invokes only `/bin/launchctl`; all device work
   /// still crosses the daemon's typed UDS/XPC control plane.
   static func runAgentDaemon(
-    _ arguments: [String], service: LaunchAgentService = LaunchAgentService()
+    _ arguments: [String], service: LaunchAgentService = LaunchAgentService(),
+    beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws {
     guard let subcommand = arguments.first else {
       throw CLIError(
@@ -208,7 +209,8 @@ enum RuntimeCLI {
         daemonSource: URL(fileURLWithPath: daemonPath),
         hdcExecutable: URL(fileURLWithPath: hdcPath), workspace: workspace,
         harnessSensitiveEvidence: harnessSensitiveEvidence,
-        harnessModel: harnessModel)
+        harnessModel: harnessModel,
+        beforeBootstrap: beforeBootstrap)
       emit(try encodedJSON(receipt), json: json)
 
     case "status":
@@ -318,17 +320,78 @@ enum RuntimeCLI {
     }
   }
 
+  static func refreshSigningAccessIfInstalled() throws {
+    let store = OpenHarmonySigningPresetStore(
+      secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    // `status()` proves value readability. Calling it from an ad-hoc rebuilt
+    // maintenance CLI can therefore ask legacy Keychain ACLs to authorize the
+    // CLI before we have compared the installed daemon's exact trusted-app
+    // identity. Receipt existence is the only fact needed to decide whether
+    // maintenance applies; the store then validates public identities without
+    // secrets. SDK-managed presets can create a fresh envelope from the
+    // official public password, while private presets read the old envelope
+    // only when an actual daemon-identity/access-schema migration is required.
+    guard FileManager.default.fileExists(atPath: store.receiptPath) else { return }
+    try store.refreshTrustedApplicationAccess()
+  }
+
   /// Installs the single published OpenHarmony signing preset. Passwords are
   /// accepted only from an interactive terminal with echo disabled; neither
   /// argv nor the LaunchAgent environment can become a secret transport.
+  static func runSigningAsync(
+    _ arguments: [String],
+    store suppliedStore: OpenHarmonySigningPresetStore? = nil,
+    materialParentURL: URL? = nil
+  ) async throws {
+    guard arguments.first == "install-sdk-release" else {
+      return try runSigning(arguments, store: suppliedStore)
+    }
+    let store = suppliedStore ?? OpenHarmonySigningPresetStore(
+      secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    var rest = Array(arguments.dropFirst())
+    let json = rest.contains("--json")
+    rest.removeAll { $0 == "--json" }
+    let options = try CLIOptions(rest)
+    try options.validateAllowed(["--sdk", "--java", "--bundle-name", "--project-ref"])
+    func required(_ name: String) throws -> String {
+      guard let value = options.value(name), !value.isEmpty else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "signing install-sdk-release requires \(name)")
+      }
+      return value
+    }
+    let sdk = try required("--sdk")
+    let java = try required("--java")
+    for (name, value) in [("--sdk", sdk), ("--java", java)] where !value.hasPrefix("/") {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "signing install-sdk-release \(name) must be an absolute path")
+    }
+    let installer = OpenHarmonySDKReleasePresetInstaller(
+      store: store,
+      materialParentURL: materialParentURL ?? OpenHarmonyLocalSigning.defaultRootURL())
+    let receipt = try await installer.install(
+      configuration: OpenHarmonySDKReleasePresetConfiguration(
+        projectRef: options.value("--project-ref")
+          ?? OpenHarmonyLocalSigning.defaultProjectRef,
+        bundleName: try required("--bundle-name"),
+        javaExecutable: URL(fileURLWithPath: java),
+        sdkRoot: URL(fileURLWithPath: sdk)))
+    emit(try encodedJSON(receipt), json: json)
+  }
+
   static func runSigning(
     _ arguments: [String],
-    store: OpenHarmonySigningPresetStore = OpenHarmonySigningPresetStore()
+    store suppliedStore: OpenHarmonySigningPresetStore? = nil
   ) throws {
+    let store = suppliedStore ?? OpenHarmonySigningPresetStore(
+      secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing signing subcommand (install|status|remove)")
+        message:
+          "missing signing subcommand (install-sdk-release|install|normalize|migrate-deveco|status|remove)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -363,25 +426,109 @@ enum RuntimeCLI {
       defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
       var keyPassword = try readTTYSecret(prompt: "Key password: ")
       defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
+      let keystoreURL = URL(fileURLWithPath: keystore)
+      var normalizedKeystorePassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        keystorePassword, keystore: keystoreURL)
+      defer {
+        normalizedKeystorePassword.resetBytes(in: 0..<normalizedKeystorePassword.count)
+      }
+      var normalizedKeyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        keyPassword, keystore: keystoreURL)
+      defer { normalizedKeyPassword.resetBytes(in: 0..<normalizedKeyPassword.count) }
       let receipt = try store.install(
         configuration: OpenHarmonySigningPresetConfiguration(
           projectRef: options.value("--project-ref")
             ?? OpenHarmonyLocalSigning.defaultProjectRef,
           javaExecutable: URL(fileURLWithPath: java),
           signerJAR: URL(fileURLWithPath: jar),
-          keystore: URL(fileURLWithPath: keystore),
+          keystore: keystoreURL,
           appCertificate: URL(fileURLWithPath: certificate),
           signedProfile: URL(fileURLWithPath: profile),
           keyAlias: try required("--key-alias")),
-        keystorePassword: keystorePassword,
-        keyPassword: keyPassword)
+        keystorePassword: normalizedKeystorePassword,
+        keyPassword: normalizedKeyPassword)
       emit(try encodedJSON(receipt), json: json)
+
+    case "normalize":
+      guard rest.isEmpty else {
+        throw CLIError(exitCode: EX_USAGE, message: "signing normalize accepts only --json")
+      }
+      emit(try encodedJSON(store.normalizeDevEcoSecrets()), json: json)
+
+    case "migrate-deveco":
+      let options = try CLIOptions(rest)
+      try options.validateAllowed(["--build-profile", "--daemon", "--key-alias"])
+      guard let buildProfilePath = options.value("--build-profile"),
+        let daemonPath = options.value("--daemon"),
+        buildProfilePath.hasPrefix("/"), daemonPath.hasPrefix("/")
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "signing migrate-deveco requires --build-profile and --daemon absolute paths")
+      }
+      let daemonURL = URL(fileURLWithPath: daemonPath)
+      if suppliedStore == nil {
+        let installedDaemon = OpenHarmonyLocalSigning.defaultAgentDaemonURL()
+        guard daemonURL.standardizedFileURL.path == installedDaemon.path,
+          daemonURL.resolvingSymlinksInPath().standardizedFileURL.path
+            == installedDaemon.path
+        else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message:
+              "signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon")
+        }
+      }
+      let migrationStore = suppliedStore ?? OpenHarmonySigningPresetStore(
+        secrets: LoginKeychainSigningSecretStore(
+          agentDaemonURL: daemonURL,
+          allowsUserInteraction: true))
+      let receipt = try migrationStore.loadValidated(requireSecrets: false)
+      var encrypted = try readDevEcoBuildProfileSigningMaterial(
+        at: URL(fileURLWithPath: buildProfilePath))
+      defer {
+        encrypted.keystore.resetBytes(in: 0..<encrypted.keystore.count)
+        encrypted.key.resetBytes(in: 0..<encrypted.key.count)
+      }
+      // The ciphertext is bound to the `material/` directory beside the
+      // build-profile's storeFile. Authenticate that storeFile as the exact
+      // keystore already installed in the preset before using its adjacent
+      // material. Otherwise a stale or repaired build-profile can supply a
+      // valid password for a different keystore and silently replace the
+      // Runtime credential envelope.
+      let materialAnchor = encrypted.storeFile
+      let sourceKeystore = try OpenHarmonySigningPresetStore.measure(
+        materialAnchor, role: "DevEco build-profile keystore", ownerPrivate: true)
+      guard sourceKeystore.sha256 == receipt.keystore.sha256,
+        sourceKeystore.byteCount == receipt.keystore.byteCount
+      else {
+        throw OpenHarmonySigningError.identityDrift(
+          "DevEco build-profile keystore does not match the installed preset")
+      }
+      var keystorePassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        encrypted.keystore, keystore: materialAnchor)
+      defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
+      var keyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        encrypted.key, keystore: materialAnchor)
+      defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
+      emit(
+        try encodedJSON(
+          migrationStore.migrateToSecretEnvelope(
+            keystorePassword: keystorePassword, keyPassword: keyPassword,
+            keyAlias: options.value("--key-alias"))),
+        json: json)
 
     case "status":
       guard rest.isEmpty else {
         throw CLIError(exitCode: EX_USAGE, message: "signing status accepts only --json")
       }
-      emit(try encodedJSON(store.status()), json: json)
+      // Status is a diagnostic probe, not an authorization ceremony. Match
+      // the LaunchAgent's fail-closed read contract so it can never summon a
+      // SecurityAgent dialog merely by checking readiness.
+      let statusStore = suppliedStore ?? OpenHarmonySigningPresetStore(
+        secrets: LoginKeychainSigningSecretStore())
+      emit(try encodedJSON(statusStore.status()), json: json)
 
     case "remove":
       guard rest.isEmpty else {
@@ -434,6 +581,74 @@ enum RuntimeCLI {
       throw CLIError(exitCode: EX_USAGE, message: "signing password is empty or too long")
     }
     return secret
+  }
+
+  private static func readDevEcoBuildProfileSigningMaterial(
+    at buildProfile: URL
+  ) throws -> (keystore: Data, key: Data, storeFile: URL) {
+    let path = buildProfile.standardizedFileURL.path
+    var before = stat()
+    guard buildProfile.isFileURL, buildProfile.path == path,
+      buildProfile.resolvingSymlinksInPath().standardizedFileURL.path == path,
+      path.withCString({ lstat($0, &before) }) == 0,
+      before.st_mode & S_IFMT == S_IFREG, before.st_mode & 0o022 == 0,
+      before.st_size > 0, before.st_size <= 1_048_576
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "DevEco build-profile is absent, mutable by another user, or unbounded")
+    }
+    let bytes = try Data(contentsOf: buildProfile, options: [.uncached])
+    var after = stat()
+    guard bytes.count == Int(before.st_size),
+      path.withCString({ lstat($0, &after) }) == 0,
+      before.st_ino == after.st_ino, before.st_size == after.st_size,
+      before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec,
+      before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec,
+      let document = String(data: bytes, encoding: .utf8)
+    else {
+      throw CLIError(exitCode: EX_USAGE, message: "DevEco build-profile identity drifted")
+    }
+    func exactHexField(_ name: String) throws -> Data {
+      let escaped = NSRegularExpression.escapedPattern(for: name)
+      let expression = try NSRegularExpression(
+        pattern: "[\\\"']?\(escaped)[\\\"']?\\s*:\\s*[\\\"']([0-9A-Fa-f]{32,2048})[\\\"']")
+      let range = NSRange(document.startIndex..<document.endIndex, in: document)
+      let matches = expression.matches(in: document, range: range)
+      guard matches.count == 1,
+        let valueRange = Range(matches[0].range(at: 1), in: document)
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "DevEco build-profile must contain exactly one \(name) ciphertext")
+      }
+      let value = String(document[valueRange])
+      guard value.utf8.count.isMultiple(of: 2) else {
+        throw CLIError(exitCode: EX_USAGE, message: "DevEco \(name) ciphertext is malformed")
+      }
+      return Data(value.utf8)
+    }
+    let storeFileExpression = try NSRegularExpression(
+      pattern: "[\\\"']?storeFile[\\\"']?\\s*:\\s*[\\\"']([^\\\"'\\r\\n]{1,4096})[\\\"']")
+    let documentRange = NSRange(document.startIndex..<document.endIndex, in: document)
+    let storeFileMatches = storeFileExpression.matches(in: document, range: documentRange)
+    guard storeFileMatches.count == 1,
+      let storeFileRange = Range(storeFileMatches[0].range(at: 1), in: document)
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "DevEco build-profile must contain exactly one storeFile path")
+    }
+    let storeFile = URL(fileURLWithPath: String(document[storeFileRange]))
+    guard storeFile.path.hasPrefix("/"),
+      storeFile.standardizedFileURL.path == storeFile.path
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "DevEco build-profile storeFile must be a canonical absolute path")
+    }
+    return (
+      try exactHexField("storePassword"), try exactHexField("keyPassword"), storeFile)
   }
 
   private static func defaultAgentDaemonExecutablePath() -> String {
@@ -1240,7 +1455,7 @@ enum RuntimeCLI {
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
-        message: "missing job subcommand (plan|submit|status|list|run|reconcile)")
+        message: "missing job subcommand (plan|submit|status|list|run|cancel|reconcile)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1306,6 +1521,14 @@ enum RuntimeCLI {
       }
       emit(
         try client.request(method: "job.run", params: ["jobId": .string(rest[index + 1])]),
+        json: json)
+    case "cancel":
+      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
+        throw CLIError(exitCode: EX_USAGE, message: "job cancel requires --job <id>")
+      }
+      emit(
+        try client.request(
+          method: "job.cancel", params: ["jobId": .string(rest[index + 1])]),
         json: json)
     case "reconcile":
       // The daemon has owned `job.reconcile` since MU-4; the CLI did not

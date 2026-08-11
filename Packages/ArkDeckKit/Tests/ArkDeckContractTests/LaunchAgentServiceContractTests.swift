@@ -46,6 +46,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(receipt.hdcPath, hdc.path)
     XCTAssertEqual(receipt.hdcSHA256, try digest(hdc))
     XCTAssertTrue(FileManager.default.isExecutableFile(atPath: paths.installedDaemon.path))
+    XCTAssertEqual(try permissions(paths.installedDaemon), 0o700)
 
     let document = try plist(at: paths.plist)
     XCTAssertEqual(document["Label"] as? String, ArkDeckLaunchAgent.label)
@@ -90,19 +91,37 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
     let oldReceipt = try JSONDecoder().decode(
       LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
+    // Foundation replacement can preserve this old destination mode. The
+    // update must restore the owner-only daemon contract before its ACL hook.
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o755], ofItemAtPath: paths.installedDaemon.path)
     try makeExecutable(daemon, bytes: "daemon-v2")
     try makeExecutable(hdc, bytes: "hdc-v2")
     runner.removeAllCommands()
+    let signingAccessRefresh = CallbackFlag()
+    let commandRunner = try XCTUnwrap(runner)
+    let installedDaemonPath = paths.installedDaemon.path
 
     try RuntimeCLI.runAgentDaemon(
       ["update", "--daemon", daemon.path, "--hdc", hdc.path, "--json"],
-      service: service)
+      service: service,
+      beforeBootstrap: {
+        XCTAssertFalse(
+          commandRunner.commands.contains { $0.first == "bootstrap" },
+          "signing Keychain ACL must refresh before the replacement daemon starts")
+        var installedInfo = stat()
+        XCTAssertEqual(
+          installedDaemonPath.withCString { lstat($0, &installedInfo) }, 0)
+        XCTAssertEqual(Int(installedInfo.st_mode & 0o777), 0o700)
+        signingAccessRefresh.mark()
+      })
 
     let refreshed = try JSONDecoder().decode(
       LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
     XCTAssertNotEqual(refreshed.daemonSHA256, oldReceipt.daemonSHA256)
     XCTAssertNotEqual(refreshed.hdcSHA256, oldReceipt.hdcSHA256)
     XCTAssertEqual(refreshed.daemonSHA256, try digest(paths.installedDaemon))
+    XCTAssertTrue(signingAccessRefresh.isMarked)
     XCTAssertEqual(
       runner.commands,
       [
@@ -113,6 +132,51 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         ["bootout", "gui/501/\(ArkDeckLaunchAgent.label)"],
         ["bootstrap", "gui/501", paths.plist.path],
       ])
+  }
+
+  func testIdenticalDaemonUpdateSkipsCredentialACLRefresh() throws {
+    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    runner.removeAllCommands()
+    let unexpectedRefresh = CallbackFlag()
+
+    _ = try service.install(
+      daemonSource: daemon, hdcExecutable: hdc,
+      beforeBootstrap: { unexpectedRefresh.mark() })
+
+    XCTAssertFalse(
+      unexpectedRefresh.isMarked,
+      "an identical daemon identity must not churn Keychain ACL ownership")
+    XCTAssertEqual(try permissions(paths.installedDaemon), 0o700)
+    XCTAssertEqual(
+      runner.commands,
+      [
+        ["print", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootout", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootstrap", "gui/501", paths.plist.path],
+      ])
+  }
+
+  func testCredentialRefreshFailureRestartsValidatedReplacementBeforeReturningError()
+    throws
+  {
+    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    try makeExecutable(daemon, bytes: "daemon-v2")
+    runner.removeAllCommands()
+
+    XCTAssertThrowsError(
+      try service.install(
+        daemonSource: daemon, hdcExecutable: hdc,
+        beforeBootstrap: { throw CredentialRefreshFixtureError.refused }))
+
+    XCTAssertEqual(
+      runner.commands,
+      [
+        ["print", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootout", "gui/501/\(ArkDeckLaunchAgent.label)"],
+        ["bootstrap", "gui/501", paths.plist.path],
+      ])
+    XCTAssertTrue(try service.status().loaded)
+    XCTAssertEqual(try digest(paths.installedDaemon), try digest(daemon))
   }
 
   func testInstallPersistsValidatedWaterFlowWorkspaceForHeadlessGJ5AndUpdateKeepsIt()
@@ -418,6 +482,23 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     SHA256.hash(data: try Data(contentsOf: url))
       .map { String(format: "%02x", $0) }.joined()
   }
+
+  private func permissions(_ url: URL) throws -> Int {
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    return try XCTUnwrap(attributes[.posixPermissions] as? NSNumber).intValue
+  }
+}
+
+private final class CallbackFlag: @unchecked Sendable {
+  private let lock = NSLock()
+  private var marked = false
+
+  var isMarked: Bool { lock.withLock { marked } }
+  func mark() { lock.withLock { marked = true } }
+}
+
+private enum CredentialRefreshFixtureError: Error {
+  case refused
 }
 
 private final class FakeLaunchAgentCommandRunner: LaunchAgentCommandRunning, @unchecked Sendable {

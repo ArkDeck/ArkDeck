@@ -88,6 +88,9 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
 }
 
 public actor HarnessTaskCoordinator {
+  static let deploymentPreflightNotExecutedClassification =
+    "DEPLOYMENT_PREFLIGHT_NOT_EXECUTED"
+
   /// Swift actors are reentrant at `await`: without an explicit gate, several
   /// concurrent wakes can all plan from the same version and submit distinct
   /// idempotency keys before only one wins the optimistic state commit.
@@ -607,7 +610,23 @@ public actor HarnessTaskCoordinator {
 
     // 2. An active job owns the round until it reaches a terminal state.
     if let activeJobID = snapshot.activeJobID {
-      let observation = try await jobPort.observe(jobID: activeJobID)
+      var observation = try await jobPort.observe(jobID: activeJobID)
+      // Runtime recovery is a mechanical proof path, not a new operation.
+      // Automatically use it only when Runtime itself persisted an exact
+      // hostOnly/readOnly effect. Unknown, mutation and destructive effects
+      // retain the existing waiting/fail-closed behavior, and no original
+      // intent is ever replayed through this port.
+      let isUnattemptedRecovery =
+        observation.state == JobState.waitingForRecovery.rawValue
+        && !observation.timeline.contains(where: { $0.hasPrefix("reconcile started ") })
+      let isInterruptedRecovery = observation.state == JobState.reconciling.rawValue
+      if (isUnattemptedRecovery || isInterruptedRecovery),
+        observation.outcomeUnknown,
+        let actualEffect = observation.actualEffect,
+        actualEffect <= .readOnly
+      {
+        observation = try await jobPort.reconcile(jobID: activeJobID)
+      }
       guard observation.isTerminal else {
         let waiting = try await recordRuntimeWait(observation, snapshot: snapshot)
         return HarnessReconcileOutcome(
@@ -1640,12 +1659,17 @@ public actor HarnessTaskCoordinator {
       // is what stops the same attempt from being made a third time, in this
       // task or the next one.
       let reason = "operationFailed:\(operationReference):\(observation.state)"
+      let deploymentPreflightNotExecuted =
+        operationReference == DebugCrashTaskHandler.deployHAP
+        && Self.isConfirmedDeploymentPreflightNonExecution(observation)
       let failureClassification: String
       switch operationReference {
       case DebugCrashTaskHandler.buildOpenHarmony:
         failureClassification = "BUILD_SEMANTIC_FAILURE"
       case DebugCrashTaskHandler.runTests:
         failureClassification = "TEST_FAILURE"
+      case DebugCrashTaskHandler.deployHAP where deploymentPreflightNotExecuted:
+        failureClassification = Self.deploymentPreflightNotExecutedClassification
       default:
         failureClassification = "operationFailed"
       }
@@ -1707,6 +1731,25 @@ public actor HarnessTaskCoordinator {
         return HarnessReconcileOutcome(
           snapshot: alternative, action: .observedJob,
           reasonCode: "\(classification):ALTERNATIVE_REQUIRED")
+      }
+      if operationReference == DebugCrashTaskHandler.deployHAP,
+        deploymentPreflightNotExecuted,
+        let repair = snapshot.repairAttempt
+      {
+        var observed = snapshot.observedState
+        observed[HarnessRepairAttempt.observedStateKey] =
+          repair.updating(rollbackRequired: false).json
+        observed[DebugCrashTaskHandler.deploymentPreflightRetryKey] = .bool(true)
+        let reason =
+          "\(Self.deploymentPreflightNotExecutedClassification):ACTION_RETRY_ALLOWED"
+        let retryable = try await commit(
+          snapshot,
+          transition(
+            snapshot, causation: .jobObserved, reasonCode: reason,
+            status: .running, activeJob: .cleared,
+            jobID: observation.jobID, observedState: observed))
+        return HarnessReconcileOutcome(
+          snapshot: retryable, action: .observedJob, reasonCode: reason)
       }
       if operationReference == DebugCrashTaskHandler.deployHAP,
         let repair = snapshot.repairAttempt
@@ -1956,6 +1999,24 @@ public actor HarnessTaskCoordinator {
     }
   }
 
+  /// Recognises only the protected Runtime's durable proof that the exact
+  /// read-only target-confirmation step did not execute. Absence of a success
+  /// marker is not proof: any capability consumption or install intent keeps
+  /// the ordinary rollback/fail-closed path in force.
+  static func isConfirmedDeploymentPreflightNonExecution(
+    _ observation: HarnessJobObservation
+  ) -> Bool {
+    guard observation.isTerminal, !observation.succeeded,
+      !observation.outcomeUnknown, !observation.waitingForHuman,
+      observation.timeline.contains(
+        "reconciled: confirmed not executed confirm-evidence-target")
+    else { return false }
+    return !observation.timeline.contains("capability consumed before first mutation")
+      && !observation.timeline.contains { event in
+        event == "intent install-hap" || event.hasPrefix("verified install-hap")
+      }
+  }
+
   private func applyRepairSuccess(
     _ observation: HarnessJobObservation,
     operationReference: String,
@@ -2164,6 +2225,9 @@ public actor HarnessTaskCoordinator {
       // must not steer a later build/test failure around the normal rollback
       // path.
       observed.removeValue(forKey: DebugCrashTaskHandler.promotionRetryReasonKey)
+    }
+    if operationReference == DebugCrashTaskHandler.deployHAP {
+      observed.removeValue(forKey: DebugCrashTaskHandler.deploymentPreflightRetryKey)
     }
     observed[HarnessRepairAttempt.observedStateKey] = nextAttempt.json
     try await appendTaskMemory(

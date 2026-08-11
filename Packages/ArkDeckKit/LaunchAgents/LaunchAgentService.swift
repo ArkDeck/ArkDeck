@@ -246,7 +246,8 @@ public final class LaunchAgentService: @unchecked Sendable {
     daemonSource: URL, hdcExecutable: URL,
     workspace: LaunchAgentWorkspaceConfiguration? = nil,
     harnessSensitiveEvidence: [String] = [],
-    harnessModel: LaunchAgentHarnessModelConfiguration? = nil
+    harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
+    beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
     let daemonSource = try validatedExecutable(daemonSource, name: "arkdeck-agentd")
     let hdcExecutable = try validatedExecutable(hdcExecutable, name: "HDC")
@@ -257,6 +258,10 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     let daemonSHA256 = try sha256(daemonSource)
     let hdcSHA256 = try sha256(hdcExecutable)
+    let installedDaemonSHA256 = try? sha256(paths.installedDaemon)
+    let previousReceipt = try? JSONDecoder().decode(
+      LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
+    let credentialIdentityChanged = previousReceipt?.daemonSHA256 != daemonSHA256
 
     try createOwnedDirectory(paths.plist.deletingLastPathComponent())
     try createOwnedDirectory(paths.installedDaemon.deletingLastPathComponent())
@@ -269,7 +274,9 @@ public final class LaunchAgentService: @unchecked Sendable {
         operation: "bootout")
     }
 
-    if daemonSource.path != paths.installedDaemon.path {
+    if daemonSource.path != paths.installedDaemon.path,
+      installedDaemonSHA256 != daemonSHA256
+    {
       let staging = paths.installedDaemon.deletingLastPathComponent()
         .appendingPathComponent(".arkdeck-agentd-\(UUID().uuidString)")
       defer { try? fileManager.removeItem(at: staging) }
@@ -277,7 +284,14 @@ public final class LaunchAgentService: @unchecked Sendable {
       try fileManager.setAttributes(
         [.posixPermissions: 0o700], ofItemAtPath: staging.path)
       try replaceItem(at: paths.installedDaemon, with: staging)
+      // `replaceItemAt` may preserve the destination's previous mode. Restore
+      // the installer contract on the final inode before credential ACLs are
+      // refreshed or launchd is allowed to execute it.
     }
+    // Reassert the final inode's owner-only contract even when an identical
+    // binary update avoids replacement and credential ACL churn.
+    try fileManager.setAttributes(
+      [.posixPermissions: 0o700], ofItemAtPath: paths.installedDaemon.path)
 
     let renderedPlist = try renderTemplate(
       daemonPath: paths.installedDaemon.path,
@@ -303,6 +317,26 @@ public final class LaunchAgentService: @unchecked Sendable {
     try encoder.encode(receipt).write(to: paths.receipt, options: .atomic)
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.receipt.path)
 
+    // Let the CLI compare the replacement's exact SecTrustedApplication
+    // binary identity with dependent user-domain credentials after the
+    // receipt is durable but before launchd starts the replacement executable.
+    if credentialIdentityChanged {
+      do {
+        try beforeBootstrap?()
+      } catch {
+        // Credential maintenance is allowed to fail closed for signing, but
+        // it must not strand the whole read-only Device Runtime offline after
+        // a successful bootout/copy. Start the fully validated replacement
+        // before surfacing the maintenance failure to the caller.
+        do {
+          try bootstrap()
+        } catch let recoveryError {
+          throw LaunchAgentServiceError.launchctl(
+            "credential refresh failed (\(error)); replacement daemon recovery failed (\(recoveryError))")
+        }
+        throw error
+      }
+    }
     try bootstrap()
     return receipt
   }

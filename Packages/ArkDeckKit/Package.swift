@@ -58,7 +58,10 @@ let package = Package(
       resources: [
         .copy("Resources/OpenHarmonyNativeCodeSign")
       ],
-      linkerSettings: [.linkedFramework("Security")]),
+      linkerSettings: [
+        .linkedFramework("Security"),
+        .linkedFramework("LocalAuthentication"),
+      ]),
     // Harness <-> runtime glue: harness port adapters, the evolution workspace
     // and campaign hosts, and the LLM gateway composition (including the
     // process-executing Codex CLI transport). This is the only library target

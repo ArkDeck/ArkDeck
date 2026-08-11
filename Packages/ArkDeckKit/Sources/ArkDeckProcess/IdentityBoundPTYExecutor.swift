@@ -19,18 +19,42 @@ public struct IdentityBoundPTYExecutionResult: Sendable, Equatable {
   public let executableIdentity: ProcessExecutableIdentityReceipt
   public let completedInteractions: Int
   public let observedOutputByteCount: Int
+  public let failureCategory: IdentityBoundPTYFailureCategory
 
   public init(
     termination: ProcessTermination,
     executableIdentity: ProcessExecutableIdentityReceipt,
     completedInteractions: Int,
-    observedOutputByteCount: Int
+    observedOutputByteCount: Int,
+    failureCategory: IdentityBoundPTYFailureCategory
   ) {
     self.termination = termination
     self.executableIdentity = executableIdentity
     self.completedInteractions = completedInteractions
     self.observedOutputByteCount = observedOutputByteCount
+    self.failureCategory = failureCategory
   }
+}
+
+/// Closed signer failure vocabulary derived in memory from the PTY stream.
+/// No transcript, path, alias or secret is returned to the caller.
+public enum IdentityBoundPTYFailureCategory: String, Sendable, Equatable {
+  case none
+  case keystorePasswordRejected
+  case keyPasswordRejected
+  case keyAliasRejected
+  case keyMaterialRejected
+  case keystoreRejected
+  case profileCertificateMismatch
+  case certificateChainRejected
+  case certificateRejected
+  case profileRejected
+  case inputArchiveUnreadable
+  case inputArchiveFormatRejected
+  case inputHAPIntegrityRejected
+  case inputDistributionRejected
+  case inputHAPRejected
+  case signerRejected
 }
 
 public enum IdentityBoundPTYError: Error, Equatable, Sendable {
@@ -203,7 +227,6 @@ public final class IdentityBoundPTYExecutor: @unchecked Sendable {
     var completed = 0
     var status: Int32 = 0
     var childExited = false
-    let promptMarker = Data("please input ".utf8)
 
     defer {
       if !childExited {
@@ -242,8 +265,15 @@ public final class IdentityBoundPTYExecutor: @unchecked Sendable {
             terminateProcessGroup(pid)
             throw IdentityBoundPTYError.secretEchoDetected
           }
-          let promptCount = occurrences(of: promptMarker, in: output)
-          guard promptCount <= interactions.count else {
+          // Only the exact, closed prompts are interactive protocol messages.
+          // hap-sign-tool also uses the prose "please input ..." in some
+          // terminal error diagnostics; treating that prose as a new prompt
+          // both hides the useful closed failure category and can strand a
+          // headless Job until timeout.
+          let promptOccurrences = interactions.map {
+            occurrences(of: $0.expectedPrompt, in: output)
+          }
+          guard promptOccurrences.allSatisfy({ $0 <= 1 }) else {
             terminateProcessGroup(pid)
             throw IdentityBoundPTYError.promptProtocolViolation
           }
@@ -254,7 +284,9 @@ public final class IdentityBoundPTYExecutor: @unchecked Sendable {
             try write(Data([10]), to: master)
             completed += 1
           }
-          if promptCount > completed {
+          if interactions.indices.contains(where: {
+            $0 > completed && promptOccurrences[$0] > 0
+          }) {
             terminateProcessGroup(pid)
             throw IdentityBoundPTYError.promptProtocolViolation
           }
@@ -288,7 +320,90 @@ public final class IdentityBoundPTYExecutor: @unchecked Sendable {
       termination: termination,
       executableIdentity: prepared.executableIdentity,
       completedInteractions: completed,
-      observedOutputByteCount: output.count)
+      observedOutputByteCount: output.count,
+      failureCategory: termination == .exited(0)
+        ? .none
+        : classifyFailure(output, interactions: interactions))
+  }
+
+  private static func classifyFailure(
+    _ output: Data,
+    interactions: [IdentityBoundPTYInteraction]
+  ) -> IdentityBoundPTYFailureCategory {
+    let diagnostic: Data
+    if let prompt = interactions.last?.expectedPrompt,
+      let range = output.range(of: prompt)
+    {
+      diagnostic = output.subdata(in: range.upperBound..<output.endIndex)
+    } else {
+      diagnostic = output
+    }
+    let text = String(decoding: diagnostic, as: UTF8.self).lowercased()
+    if text.contains("incorrect keystore password")
+      || text.contains("keystore password was incorrect")
+      || text.contains("keystore tampered with")
+    {
+      return .keystorePasswordRejected
+    }
+    if text.contains("key alias") && text.contains("password error")
+      || text.contains("unrecoverablekeyexception")
+      || text.contains("failed to decrypt safe contents entry")
+    {
+      return .keyPasswordRejected
+    }
+    if text.contains("key alias not found")
+      || text.contains("keyalias parameter is incorrect")
+      || text.contains("keyalias is not exist")
+    {
+      return .keyAliasRejected
+    }
+    if text.contains("profile certificate match failed")
+      || text.contains("input certificates do not match with profile")
+    {
+      return .profileCertificateMismatch
+    }
+    if text.contains("cert must a cert chain")
+      || text.contains("certificate must be a cert chain")
+    {
+      return .certificateChainRejected
+    }
+    if text.contains("certificate format is incorrect")
+      || text.contains("certificate check failed")
+      || text.contains("certificate in keystore is invalid")
+      || text.contains("certificate is incorrect")
+    {
+      return .certificateRejected
+    }
+    if text.contains("verify profile failed")
+      || text.contains("profile is invalid")
+      || text.contains("profile content invalid")
+    {
+      return .profileRejected
+    }
+    if text.contains("keystore") || text.contains("key store") {
+      return .keystoreRejected
+    }
+    if text.contains("keyalias") || text.contains("key alias")
+      || text.contains("private key") || text.contains("invalid key")
+    {
+      return .keyMaterialRejected
+    }
+    if text.contains("read zip file failed") { return .inputArchiveUnreadable }
+    if text.contains("zip format failed") || text.contains("hap format error")
+      || text.contains("hap parse error")
+    {
+      return .inputArchiveFormatRejected
+    }
+    if text.contains("verify input hap failed") { return .inputHAPIntegrityRejected }
+    if text.contains("input file is not an enterprise application")
+      || text.contains("unsupported application distribution type")
+    {
+      return .inputDistributionRejected
+    }
+    if text.contains("input hap") {
+      return .inputHAPRejected
+    }
+    return .signerRejected
   }
 
   private static func terminateProcessGroup(_ pid: pid_t) {
