@@ -99,6 +99,11 @@ public protocol TraceRuntimeProbing: Sendable {
 }
 
 package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
+  private enum ParameterReadOutcome {
+    case missing
+    case receipt(ProviderSubprocessReceipt)
+  }
+
   private let targetStore: RuntimeTargetStore
   private let hdcResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
@@ -200,13 +205,19 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
     var parameters: [TraceRuntimeParameterObservation] = []
     for definition in TraceDebugParameterCatalog.definitions {
       do {
-        let receipt = try await read(
+        let outcome = try await readParameter(
           executable: hdc,
           arguments: deviceArguments(
             connectKey: route.connectKey,
             command: ["shell", "param", "get", definition.name]),
-          byteBudget: 4 * 1024)
-        parameters.append(Self.parameterObservation(definition.name, receipt: receipt))
+          name: definition.name)
+        switch outcome {
+        case .missing:
+          parameters.append(
+            TraceRuntimeParameterObservation(name: definition.name, state: .missing))
+        case .receipt(let receipt):
+          parameters.append(Self.parameterObservation(definition.name, receipt: receipt))
+        }
       } catch {
         parameters.append(
           TraceRuntimeParameterObservation(
@@ -251,6 +262,46 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
       throw DeviceProviderError.factsUnavailable("read-only HDC probe output was truncated")
     }
     return receipt
+  }
+
+  private func readParameter(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    name: String
+  ) async throws -> ParameterReadOutcome {
+    let receipt = try await runner.run(
+      executable: executable, arguments: arguments,
+      timeoutSeconds: 15, outputByteBudget: 4 * 1024,
+      criticalNonInterruptible: false)
+    guard !receipt.stdoutTruncated else {
+      throw DeviceProviderError.factsUnavailable("read-only HDC probe output was truncated")
+    }
+    if Self.isExactMissingParameterReceipt(receipt, requestedName: name) {
+      return .missing
+    }
+    try HDCReadOnlyProbeReceiptValidation.requireNoSemanticFailure(
+      receipt, context: "read-only HDC probe failed")
+    guard receipt.exitStatus == 0 else {
+      throw DeviceProviderError.factsUnavailable(
+        "read-only HDC probe exited \(receipt.exitStatus.map(String.init) ?? "unknown")")
+    }
+    return .receipt(receipt)
+  }
+
+  private static func isExactMissingParameterReceipt(
+    _ receipt: ProviderSubprocessReceipt,
+    requestedName: String
+  ) -> Bool {
+    // OpenHarmony's `param get` reports an absent key as a zero-exit semantic
+    // failure. Promote only the exact, target-bound 106 form for the key this
+    // catalog probe requested; every noisy or mismatched form stays unreadable.
+    guard receipt.exitStatus == 0, receipt.stderr.isEmpty,
+      let stdout = String(data: receipt.stdout, encoding: .utf8)
+    else {
+      return false
+    }
+    let expected = "Get parameter \"\(requestedName)\" fail! errNum is:106!"
+    return stdout.trimmingCharacters(in: .whitespacesAndNewlines) == expected
   }
 
   private func readAllowingNonZero(

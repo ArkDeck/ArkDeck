@@ -116,6 +116,50 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
   }
 
+  private actor TraceParameterRunner: RockchipRuntimeCommandRunning {
+    private let parameterReceipts: [String: ProviderSubprocessReceipt]
+
+    init(parameterReceipts: [String: ProviderSubprocessReceipt]) {
+      self.parameterReceipts = parameterReceipts
+    }
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      let command = Array(arguments.suffix(4))
+      if command.count == 4, Array(command.prefix(3)) == ["shell", "param", "get"],
+        let receipt = parameterReceipts[command[3]]
+      {
+        return receipt
+      }
+      return ProviderSubprocessReceipt(
+        exitStatus: 0,
+        stdout: Data("[Fail] fixture remains unsupported\n".utf8),
+        stderr: Data(), stdoutTruncated: false, durationSeconds: 0.001)
+    }
+  }
+
+  private func makeTraceProbe(
+    runner: any RockchipRuntimeCommandRunning
+  ) throws -> (probe: FoundationTraceRuntimeProbe, targetID: String) {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true))
+    let adopted = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-11T00:00:00Z").record
+    return (
+      FoundationTraceRuntimeProbe(
+        targetStore: targetStore,
+        hdcResolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc"),
+        runner: runner),
+      adopted.targetID)
+  }
+
   func testTraceProbeUsesTheProvenAliasExecutionRoute() async throws {
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
@@ -237,6 +281,76 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(calls.count, 4)
     XCTAssertTrue(calls.allSatisfy { Array($0.prefix(2)) == ["-t", aliasConnectKey] })
     XCTAssertFalse(calls.joined().contains("stale-canonical-address"))
+  }
+
+  func testTraceProbeClassifiesExactOpenHarmonyMissingParameterReceipts() async throws {
+    let receipts = Dictionary(
+      uniqueKeysWithValues: TraceDebugParameterCatalog.definitions.map { definition in
+        (
+          definition.name,
+          ProviderSubprocessReceipt(
+            exitStatus: 0,
+            stdout: Data(
+              "Get parameter \"\(definition.name)\" fail! errNum is:106!\n".utf8),
+            stderr: Data(), stdoutTruncated: false, durationSeconds: 0.001)
+        )
+      })
+    let runner = TraceParameterRunner(parameterReceipts: receipts)
+    let fixture = try makeTraceProbe(runner: runner)
+
+    let snapshot = try await fixture.probe.probeTraceRuntime(targetID: fixture.targetID)
+
+    XCTAssertEqual(snapshot.parameters.map(\.name), TraceDebugParameterCatalog.definitions.map(\.name))
+    XCTAssertTrue(snapshot.parameters.allSatisfy { $0.state == .missing })
+    XCTAssertTrue(snapshot.parameters.allSatisfy { $0.value == nil && $0.detail == nil })
+  }
+
+  func testTraceProbeKeepsNonExactMissingParameterFailuresUnreadable() async throws {
+    let definitions = TraceDebugParameterCatalog.definitions
+    func receipt(
+      _ stdout: String,
+      stderr: String = "",
+      exitStatus: Int32? = 0,
+      truncated: Bool = false
+    ) -> ProviderSubprocessReceipt {
+      ProviderSubprocessReceipt(
+        exitStatus: exitStatus, stdout: Data(stdout.utf8), stderr: Data(stderr.utf8),
+        stdoutTruncated: truncated, durationSeconds: 0.001)
+    }
+    let receipts: [String: ProviderSubprocessReceipt] = [
+      definitions[0].name: receipt(
+        "Get parameter \"\(definitions[0].name)\" fail! errNum is:106!\n"),
+      definitions[1].name: receipt(
+        "Get parameter \"another.parameter\" fail! errNum is:106!\n"),
+      definitions[2].name: receipt(
+        "Get parameter \"\(definitions[2].name)\" fail! errNum is:105!\n"),
+      definitions[3].name: receipt(
+        "Get parameter \"\(definitions[3].name)\" fail! errNum is:106!\n",
+        stderr: "unexpected stderr\n"),
+      definitions[4].name: receipt(
+        "Get parameter \"\(definitions[4].name)\" fail! errNum is:106!\nextra output\n"),
+      definitions[5].name: receipt(
+        "Get parameter \"\(definitions[5].name)\" fail! errNum is:106!\n",
+        truncated: true),
+      definitions[6].name: receipt("false\n"),
+      definitions[7].name: receipt("\(definitions[7].name) = 1\n"),
+      definitions[8].name: receipt("", exitStatus: 1),
+    ]
+    let runner = TraceParameterRunner(parameterReceipts: receipts)
+    let fixture = try makeTraceProbe(runner: runner)
+
+    let snapshot = try await fixture.probe.probeTraceRuntime(targetID: fixture.targetID)
+    let byName = Dictionary(uniqueKeysWithValues: snapshot.parameters.map { ($0.name, $0) })
+
+    XCTAssertEqual(byName[definitions[0].name]?.state, .missing)
+    for definition in definitions[1...5] {
+      XCTAssertEqual(byName[definition.name]?.state, .unreadable)
+    }
+    XCTAssertEqual(byName[definitions[6].name]?.state, .value)
+    XCTAssertEqual(byName[definitions[6].name]?.value, "false")
+    XCTAssertEqual(byName[definitions[7].name]?.state, .value)
+    XCTAssertEqual(byName[definitions[7].name]?.value, "1")
+    XCTAssertEqual(byName[definitions[8].name]?.state, .unreadable)
   }
 
   /// Scriptable dispatcher: each action family can be told to succeed, to
