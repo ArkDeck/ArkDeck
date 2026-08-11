@@ -37,8 +37,8 @@ public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
   /// covers this block. Absent means: no closed category describes the human
   /// action, so none was fabricated.
   public let document: JSONValue?
-  public let resumeStatus: HarnessTaskStatus
-  public let resumePhase: HarnessTaskPhase
+  public let resumeStatus: HarnessTaskLifecycle
+  public let resumePhase: HarnessTaskStage
   public let evidenceRefs: [String]
   public let generatedAtUTC: String
   public let resolvedAtUTC: String?
@@ -71,8 +71,8 @@ public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
     jobID: String?,
     requestID: String?,
     document: JSONValue?,
-    resumeStatus: HarnessTaskStatus,
-    resumePhase: HarnessTaskPhase,
+    resumeStatus: HarnessTaskLifecycle,
+    resumePhase: HarnessTaskStage,
     evidenceRefs: [String],
     generatedAtUTC: String,
     resolvedAtUTC: String? = nil,

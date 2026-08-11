@@ -78,8 +78,8 @@ extension HarnessTaskCoordinator {
     producer: String
   ) async throws -> HarnessReconcileOutcome {
     let blocked = try await status(taskID)
-    guard blocked.status == .humanRequired, blocked.activeJobID == nil else {
-      throw HarnessCoordinatorError.patchProposalNotAllowed(blocked.status.rawValue)
+    guard blocked.lifecycle == .humanRequired, blocked.activeJobID == nil else {
+      throw HarnessCoordinatorError.patchProposalNotAllowed(blocked.lifecycle.rawValue)
     }
     guard let handler = handlers[blocked.type] else {
       throw HarnessCoordinatorError.unsupportedTaskType(blocked.type)

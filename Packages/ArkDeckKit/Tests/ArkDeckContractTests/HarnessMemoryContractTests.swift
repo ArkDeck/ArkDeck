@@ -368,7 +368,7 @@ final class HarnessMemoryContractTests: XCTestCase {
         maxE1Mutations: 0),
       policy: HarnessTaskPolicy(allowedOperations: ["workspace.inspect-diff@1"]),
       createdAtUTC: timestamp(0), updatedAtUTC: timestamp(1),
-      status: .running, phase: .analyzing, activeRound: 1)
+      lifecycle: .running, stage: .analyzing, activeRound: 1)
   }
 
   private func failureFingerprint(_ classification: String) -> HarnessFailureFingerprint {

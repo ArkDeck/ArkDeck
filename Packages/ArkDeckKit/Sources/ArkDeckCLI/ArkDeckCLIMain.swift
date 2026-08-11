@@ -361,7 +361,7 @@ struct ArkDeckCommandLine {
 
     let profile = try publishedProfile(for: plan)
     let provider = RockchipRockUSBFlashProvider(profile: profile)
-    let gate = RockchipFlashAuthorizationGate(profile: profile)
+    let gate = RockchipManualFlashFallbackGate(profile: profile)
     let monitor = RockchipFlashDispatchMonitor()
 
     guard authority == .humanOperator, let operatorIdentity else {
@@ -1125,12 +1125,11 @@ struct ArkDeckCommandLine {
       ARKDECK_HARNESS_MODEL_NAME and ARKDECK_HARNESS_MODEL_API_KEY. Sensitive Artifact text
       stays local unless you explicitly pass --allow-sensitive-artifacts for that chat session.
 
-      A human operator at a TTY gets a handoff whose commands they run personally. The Agent
-      surface defaults to a bounded campaign confirmation and separately accepts a protected-main
-      standing authorization ID, plus archive path and target-location selector; the product-owned
-      host performs fresh admission, durable usage reservation,
-      descriptor-bound typed execution and terminal persistence. Caller-provided authorization
-      files, fact/context documents, executables, argv and storage roots are rejected.
+      Flash execution is available only through the ArkDeck Flash UI or the typed Job API. The
+      historical campaign and standing-authorization records exposed by `flash status` and
+      `flash reconcile` are decode/export-only and cannot admit or dispatch a new operation.
+      Caller-provided authorization files, fact/context documents, executables, argv and storage
+      roots are rejected.
 
       update-feed never accepts or reads a private key. `prepare` emits deterministic public
       payload and signature-input files; an isolated maintainer signs the latter with local

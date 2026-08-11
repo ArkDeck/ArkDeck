@@ -160,7 +160,7 @@ final class HarnessBoundsContractTests: XCTestCase {
   // MARK: - Fixtures
 
   private func snapshot(
-    phase: HarnessTaskPhase = .reproducing,
+    stage: HarnessTaskStage = .reproducing,
     allowed: [String] = [
       DebugCrashTaskHandler.observeDevice, DebugCrashTaskHandler.captureDiagnostics,
     ],
@@ -178,7 +178,7 @@ final class HarnessBoundsContractTests: XCTestCase {
       policy: HarnessTaskPolicy(allowedOperations: allowed),
       evolutionPolicy: evolutionPolicy,
       createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
-      status: .running, phase: phase, activeRound: 1, activeJobID: activeJobID,
+      lifecycle: .running, stage: stage, activeRound: 1, activeJobID: activeJobID,
       consumedBudget: consumed, noProgressRounds: noProgressRounds)
   }
 
@@ -335,7 +335,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     let outcome = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(outcome.action, .stoppedBudgetExhausted)
     XCTAssertEqual(outcome.reasonCode, "maxWallClockExhausted")
-    XCTAssertEqual(outcome.snapshot.status, .failed)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .failed)
     XCTAssertEqual(jobs.submittedOperations, [], "an exhausted budget dispatches nothing")
   }
 
@@ -371,7 +371,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     XCTAssertEqual(charged.snapshot.consumedBudget.artifactBytes, byteBudget)
     XCTAssertEqual(charged.action, .stoppedBudgetExhausted)
     XCTAssertEqual(charged.reasonCode, "maxArtifactBytesExhausted")
-    XCTAssertEqual(charged.snapshot.status, .failed)
+    XCTAssertEqual(charged.snapshot.lifecycle, .failed)
     XCTAssertEqual(
       charged.snapshot.observed.samples["applicationLiveness"], 1,
       "the sample it did collect is still on the record")
@@ -450,12 +450,12 @@ final class HarnessBoundsContractTests: XCTestCase {
 
       if attempt < 3 {
         XCTAssertEqual(outcome.action, .stoppedJobFailed)
-        XCTAssertEqual(outcome.snapshot.status, .failed)
+        XCTAssertEqual(outcome.snapshot.lifecycle, .failed)
       } else {
         // Third occurrence of the same fingerprint: the loop stops for a
         // human instead of letting another task try it again.
         XCTAssertEqual(outcome.action, .stoppedForHuman)
-        XCTAssertEqual(outcome.snapshot.status, .humanRequired)
+        XCTAssertEqual(outcome.snapshot.lifecycle, .humanRequired)
         XCTAssertTrue(outcome.reasonCode.hasPrefix("repeatedFailureProhibited:"))
         let actions = try await coordinator.humanActions(task.htaskID)
         XCTAssertEqual(actions.last?.block, .strategyExhausted)
@@ -499,7 +499,7 @@ final class HarnessBoundsContractTests: XCTestCase {
       jobs.finish("JOB-\(round)")
     }
     let outcome = try XCTUnwrap(lastOutcome)
-    XCTAssertEqual(outcome.snapshot.status, .humanRequired)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .humanRequired)
     XCTAssertTrue(
       outcome.reasonCode.hasPrefix("noProgressRounds:"),
       "expected a no-progress stop, got \(outcome.reasonCode)")
@@ -519,7 +519,7 @@ final class HarnessBoundsContractTests: XCTestCase {
 
     let afterEvidence = before.applying(
       HarnessTaskProjection(
-        status: .running, phase: before.phase, activeRound: 2, activeJobID: nil,
+        lifecycle: .running, stage: before.stage, activeRound: 2, activeJobID: nil,
         consumedBudget: before.consumedBudget, artifactRefs: ["ART-1"],
         observedState: HarnessObservedState(samples: ["matchingCrashCount": 1]).asJSON,
         latestEvaluationID: "EVAL-000000000001", noProgressRounds: 0, cancelRequested: false,
@@ -543,14 +543,14 @@ final class HarnessBoundsContractTests: XCTestCase {
 
     let blocked = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(blocked.action, .stoppedForHuman)
-    XCTAssertEqual(blocked.snapshot.status, .humanRequired)
+    XCTAssertEqual(blocked.snapshot.lifecycle, .humanRequired)
     XCTAssertNil(blocked.snapshot.activeJobID)
 
     let actions = try await coordinator.humanActions(task.htaskID)
     let action = try XCTUnwrap(actions.last)
     XCTAssertEqual(action.block, .outcomeUnknown)
     XCTAssertEqual(action.jobID, "JOB-1")
-    XCTAssertEqual(action.resumePhase, blocked.snapshot.phase)
+    XCTAssertEqual(action.resumePhase, blocked.snapshot.stage)
     XCTAssertTrue(action.isOpen)
 
     // The typed document is the existing closed model, filled by the model's
@@ -578,8 +578,8 @@ final class HarnessBoundsContractTests: XCTestCase {
 
     let resumed = try await coordinator.resume(
       task.htaskID, resolution: "operator reconciled the job by hand and abandoned it")
-    XCTAssertEqual(resumed.status, .running)
-    XCTAssertEqual(resumed.phase, blocked.snapshot.phase, "a resolution does not rewind the phase")
+    XCTAssertEqual(resumed.lifecycle, .running)
+    XCTAssertEqual(resumed.stage, blocked.snapshot.stage, "a resolution does not rewind the phase")
     XCTAssertEqual(resumed.noProgressRounds, 0)
 
     let reopened = try await coordinator.humanActions(task.htaskID)
@@ -832,7 +832,7 @@ final class HarnessBoundsContractTests: XCTestCase {
 
     let outcome = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(outcome.action, .stoppedForHuman)
-    XCTAssertEqual(outcome.snapshot.status, .humanRequired)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .humanRequired)
 
     // A rejection produces no job and no artifact; the durable dispatch intent
     // is the evidence, and the memory must be readable because of it.
@@ -958,7 +958,7 @@ final class HarnessBoundsContractTests: XCTestCase {
     artifacts.stage(jobID: "JOB-3", name: "crash-index.txt", text: emptyLedgerBytes)
     jobs.finish("JOB-3")
     let succeeded = try await coordinator.reconcile(task.htaskID)
-    XCTAssertEqual(succeeded.snapshot.status, .succeeded)
+    XCTAssertEqual(succeeded.snapshot.lifecycle, .succeeded)
 
     let project = try await coordinator.projectMemory("demo-app")
     let entry = try XCTUnwrap(project.last)

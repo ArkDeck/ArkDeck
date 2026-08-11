@@ -97,9 +97,7 @@ package struct HarnessTaskMethodService: Sendable {
             "stage": .string(snapshot.stage.rawValue),
             "waitReason": snapshot.waitReason.map { .string($0.rawValue) } ?? .null,
             "conditions": .array(snapshot.conditions.map(Self.encode)),
-            "status": .string(snapshot.status.rawValue),
-            "phase": .string(snapshot.phase.rawValue),
-            // A result exists only when the task reached a terminal status
+            // A result exists only when the task reached a terminal lifecycle
             // or a human block. There is no "probably done" projection.
             "result": snapshot.result.map(Self.encode) ?? .null,
           ]))
@@ -606,8 +604,6 @@ package struct HarnessTaskMethodService: Sendable {
       "stage": .string(snapshot.stage.rawValue),
       "waitReason": snapshot.waitReason.map { .string($0.rawValue) } ?? .null,
       "conditions": .array(snapshot.conditions.map(encode)),
-      "status": .string(snapshot.status.rawValue),
-      "phase": .string(snapshot.phase.rawValue),
       "targetId": .string(snapshot.target.targetID),
       "goal": .string(snapshot.goal.summary),
       "projectRef": snapshot.projectRef.map(JSONValue.string) ?? .null,
@@ -641,7 +637,7 @@ package struct HarnessTaskMethodService: Sendable {
       "htaskId": .string(bundle.htaskID),
       "goal": .string(snapshot.goal.summary),
       "targetId": .string(snapshot.target.targetID),
-      "taskStatus": .string(snapshot.status.rawValue),
+      "taskLifecycle": .string(snapshot.lifecycle.rawValue),
       "attemptId": .string(bundle.attemptID),
       "promotionCandidateId": .string(bundle.promotion.promotionCandidateID),
       "disposition": .string(bundle.promotion.disposition),

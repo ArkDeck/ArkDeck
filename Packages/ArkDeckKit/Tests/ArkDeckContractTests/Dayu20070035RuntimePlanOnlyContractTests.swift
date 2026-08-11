@@ -315,7 +315,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       stepSetDigestSHA256: plan.stepSetDigestSHA256,
       confirmedAtTimestamp: "2026-08-01T00:00:00Z")
     let monitor = RockchipFlashDispatchMonitor()
-    let decision = await RockchipFlashAuthorizationGate(profile: profile).authorize(
+    let decision = await RockchipManualFlashFallbackGate(profile: profile).authorize(
       authority: .humanOperator,
       binding: .realDevice(binding),
       plan: plan,

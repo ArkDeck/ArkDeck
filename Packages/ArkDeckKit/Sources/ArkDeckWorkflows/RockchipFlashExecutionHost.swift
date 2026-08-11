@@ -124,16 +124,6 @@ enum RockchipProductionExecutionComposition {
   }
 }
 
-struct RockchipProductionStorageComposition: Sendable {
-  let context: SessionStorageExecutionContext
-
-  static func make(
-    runtime: SessionStorageApplicationRuntime = .production
-  ) throws -> RockchipProductionStorageComposition {
-    RockchipProductionStorageComposition(context: try runtime.makeExecutionContext())
-  }
-}
-
 package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   package let revision: Int
   package let serial: String

@@ -46,8 +46,8 @@ extension HarnessTaskCoordinator: HarnessAutoDriveTarget {
   public func drivableTaskIDs() async throws -> [String] {
     try await list()
       .filter {
-        $0.status == .created || $0.status == .running
-          || ($0.status == .waiting && $0.waitReason != .userSuspended)
+        $0.lifecycle == .created || $0.lifecycle == .running
+          || ($0.lifecycle == .waiting && $0.waitReason != .userSuspended)
       }
       .map(\.htaskID)
   }
@@ -160,9 +160,9 @@ public struct HarnessAutoDriveTicker: Sendable {
             log(
               "harness auto-drive \(htaskID): dispatched \(jobID) "
                 + "(\(outcome.reasonCode))")
-          } else if outcome.snapshot.status.isTerminal {
+          } else if outcome.snapshot.lifecycle.isTerminal {
             log(
-              "harness auto-drive \(htaskID): \(outcome.snapshot.status.rawValue) "
+              "harness auto-drive \(htaskID): \(outcome.snapshot.lifecycle.rawValue) "
                 + "(\(outcome.reasonCode))")
           }
         } catch {

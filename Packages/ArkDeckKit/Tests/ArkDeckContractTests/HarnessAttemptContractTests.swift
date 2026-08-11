@@ -215,7 +215,7 @@ final class HarnessAttemptContractTests: XCTestCase {
 
   func testHumanResolutionReactivatesTheSameAttemptWithoutLosingItsHistory() async throws {
     let store = try HarnessTaskStore(rootURL: rootURL)
-    let snapshot = taskSnapshot(status: .humanRequired)
+    let snapshot = taskSnapshot(lifecycle: .humanRequired)
     try await store.create(snapshot)
     let active = HarnessAttempt(
       attemptID: "ATTEMPT-000000000001", htaskID: snapshot.htaskID, ordinal: 1,
@@ -232,7 +232,7 @@ final class HarnessAttemptContractTests: XCTestCase {
 
     let resumed = try await coordinator.resume(
       snapshot.htaskID, resolution: "continue the same verified repair")
-    XCTAssertEqual(resumed.status, .running)
+    XCTAssertEqual(resumed.lifecycle, .running)
     let attempts = try await coordinator.attempts(snapshot.htaskID)
     let attempt = try XCTUnwrap(attempts.last)
     XCTAssertEqual(attempt.outcome, .active)
@@ -249,7 +249,7 @@ final class HarnessAttemptContractTests: XCTestCase {
     observed[HarnessRepairAttempt.observedStateKey] = HarnessRepairAttempt(
       proposal: patch, patchAttemptRef: "patch-fixture",
       deployedDigest: String(repeating: "d", count: 64)).json
-    let snapshot = taskSnapshot(phase: .verifying, observedState: observed)
+    let snapshot = taskSnapshot(stage: .verifying, observedState: observed)
     try await store.create(snapshot)
     let active = HarnessAttempt(
       attemptID: "ATTEMPT-000000000001", htaskID: snapshot.htaskID, ordinal: 1,
@@ -278,7 +278,7 @@ final class HarnessAttemptContractTests: XCTestCase {
 
   func testPendingIntentCrashWindowRestoresOriginalActionRunBeforeDispatch() async throws {
     let store = try HarnessTaskStore(rootURL: rootURL)
-    let snapshot = taskSnapshot(phase: .collecting)
+    let snapshot = taskSnapshot(stage: .collecting)
     try await store.create(snapshot)
     let attempt = HarnessAttempt(
       attemptID: "ATTEMPT-000000000001", htaskID: snapshot.htaskID, ordinal: 1,
@@ -493,9 +493,9 @@ final class HarnessAttemptContractTests: XCTestCase {
   }
 
   func testProgressIgnoresPlanningEvaluationAndPhaseButCountsANewPatchRevision() throws {
-    let before = taskSnapshot(phase: .collecting)
+    let before = taskSnapshot(stage: .collecting)
     let analysisOnly = taskSnapshot(
-      phase: .analyzing, latestEvaluationID: "EVAL-000000000001", version: 2)
+      stage: .analyzing, latestEvaluationID: "EVAL-000000000001", version: 2)
     let vector = HarnessTaskCoordinator.progress(
       before: before, after: analysisOnly, newFailures: 0)
     XCTAssertTrue(vector.phaseChanged)
@@ -504,7 +504,7 @@ final class HarnessAttemptContractTests: XCTestCase {
 
     let proposal = try proposal()
     let withPatch = taskSnapshot(
-      phase: .building,
+      stage: .building,
       observedState: [
         HarnessRepairAttempt.observedStateKey: HarnessRepairAttempt(
           proposal: proposal, patchRevision: String(repeating: "f", count: 64)).json
@@ -516,7 +516,7 @@ final class HarnessAttemptContractTests: XCTestCase {
     let sameRevision = HarnessTaskCoordinator.progress(
       before: withPatch,
       after: taskSnapshot(
-        phase: .analyzing, observedState: withPatch.observedState, version: 4),
+        stage: .analyzing, observedState: withPatch.observedState, version: 4),
       newFailures: 0)
     XCTAssertFalse(sameRevision.workspaceRevisionChanged)
     XCTAssertFalse(sameRevision.isProgress)
@@ -552,7 +552,7 @@ final class HarnessAttemptContractTests: XCTestCase {
     let digest = HarnessRequestIdentity.inputsDigest(inputs)
     let same = HarnessStrategySignature(
       operationReference: DebugCrashTaskHandler.captureDiagnostics,
-      inputsDigest: digest, phase: snapshot.phase)
+      inputsDigest: digest, phase: snapshot.stage)
     let guardrail = HarnessPolicyGuard()
     let refused = await guardrail.evaluate(
       HarnessGuardInput(
@@ -574,7 +574,7 @@ final class HarnessAttemptContractTests: XCTestCase {
         failureRecord: nil,
         previousStrategy: HarnessStrategySignature(
           operationReference: DebugCrashTaskHandler.observeDevice,
-          inputsDigest: digest, phase: snapshot.phase),
+          inputsDigest: digest, phase: snapshot.stage),
         consecutiveNoProgressRounds: snapshot.noProgressRounds,
         elapsedSeconds: 1))
     XCTAssertEqual(changed, .allow, "a genuinely different strategy may replace the closed one")
@@ -645,9 +645,9 @@ final class HarnessAttemptContractTests: XCTestCase {
   }
 
   private func taskSnapshot(
-    phase: HarnessTaskPhase = .analyzing,
+    stage: HarnessTaskStage = .analyzing,
     observedState: [String: JSONValue] = [:],
-    status: HarnessTaskStatus = .running,
+    lifecycle: HarnessTaskLifecycle = .running,
     latestEvaluationID: String? = nil,
     noProgressRounds: Int = 0,
     maxNoProgressRounds: Int = 2,
@@ -670,7 +670,7 @@ final class HarnessAttemptContractTests: XCTestCase {
         maxActionRetriesPerRun: 2),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
       observedState: observedState, createdAtUTC: now, updatedAtUTC: now,
-      status: status, phase: phase,
+      lifecycle: lifecycle, stage: stage,
       latestEvaluationID: latestEvaluationID, noProgressRounds: noProgressRounds,
       cancelRequested: false, version: version)
   }

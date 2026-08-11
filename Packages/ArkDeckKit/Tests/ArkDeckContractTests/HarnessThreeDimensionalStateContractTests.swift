@@ -75,7 +75,7 @@ final class HarnessThreeDimensionalStateContractTests: XCTestCase {
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
       createdAtUTC: "2026-07-31T00:00:00Z",
       updatedAtUTC: "2026-07-31T00:00:00Z",
-      status: lifecycle, phase: stage, result: result, version: version,
+      lifecycle: lifecycle, stage: stage, result: result, version: version,
       waitReason: lifecycle == .waiting ? .userSuspended : nil,
       conditions: conditions ?? allTrueConditions())
   }
@@ -141,7 +141,7 @@ final class HarnessThreeDimensionalStateContractTests: XCTestCase {
       let base = snapshot(stage: gate.from, conditions: allTrueConditions())
       let positive = HarnessTaskTransition(
         causation: .jobObserved, reasonCode: "positiveGateFixture",
-        status: .running, phase: gate.to, activeRound: base.activeRound,
+        lifecycle: .running, stage: gate.to, activeRound: base.activeRound,
         activeJobID: nil, consumedBudget: base.consumedBudget,
         artifactRefs: base.artifactRefs, cancelRequested: false,
         atUTC: "2026-07-31T00:00:02Z", conditions: base.conditions)
@@ -155,7 +155,7 @@ final class HarnessThreeDimensionalStateContractTests: XCTestCase {
             with: [condition(required, state, reason: "negativeGateFixture")])
           let transition = HarnessTaskTransition(
             causation: .jobObserved, reasonCode: "negativeGateFixture",
-            status: .running, phase: gate.to, activeRound: base.activeRound,
+            lifecycle: .running, stage: gate.to, activeRound: base.activeRound,
             activeJobID: nil, consumedBudget: base.consumedBudget,
             artifactRefs: base.artifactRefs, cancelRequested: false,
             atUTC: "2026-07-31T00:00:03Z", conditions: conditions)
@@ -198,8 +198,8 @@ final class HarnessThreeDimensionalStateContractTests: XCTestCase {
       withJSONObject: object, options: [.sortedKeys])
     XCTAssertThrowsError(try JSONDecoder().decode(HarnessTaskSnapshot.self, from: missingReason))
 
+    XCTAssertNil(object["status"])
     object["lifecycle"] = "running"
-    object["status"] = "running"
     object["waitReason"] = HarnessTaskWaitReason.activeJob.rawValue
     let reasonOutsideWaiting = try JSONSerialization.data(
       withJSONObject: object, options: [.sortedKeys])

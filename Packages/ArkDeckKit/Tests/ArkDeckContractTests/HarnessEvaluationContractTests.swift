@@ -812,12 +812,12 @@ final class HarnessEvaluationContractTests: XCTestCase {
         maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024, maxE1Mutations: 0),
       policy: HarnessTaskPolicy(allowedOperations: ["observe.device@1"]),
       createdAtUTC: "2026-07-30T00:00:00Z", updatedAtUTC: "2026-07-30T00:00:00Z",
-      status: .humanRequired, phase: .collecting)
+      lifecycle: .humanRequired, stage: .collecting)
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
         HarnessTaskTransition(
-          causation: .humanResolved, reasonCode: "operator says it is fixed", status: .running,
-          phase: .collecting, activeRound: 0, activeJobID: nil,
+          causation: .humanResolved, reasonCode: "operator says it is fixed", lifecycle: .running,
+          stage: .collecting, activeRound: 0, activeJobID: nil,
           consumedBudget: HarnessConsumedBudget(),
           observedState: ["measurements": .object(["matchingCrashCount": .integer(0)])],
           atUTC: "2026-07-30T00:01:00Z"),
@@ -913,7 +913,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
     jobs.finish("JOB-4")
     let succeeded = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(succeeded.action, .evaluatedSucceeded)
-    XCTAssertEqual(succeeded.snapshot.status, .succeeded)
+    XCTAssertEqual(succeeded.snapshot.lifecycle, .succeeded)
     let evaluationID = try XCTUnwrap(succeeded.snapshot.latestEvaluationID)
     XCTAssertEqual(succeeded.snapshot.result?.evaluationID, evaluationID)
     XCTAssertEqual(succeeded.snapshot.result?.reasonCode, "criteriaPassed")
@@ -929,10 +929,10 @@ final class HarnessEvaluationContractTests: XCTestCase {
     let events = try await coordinator.events(task.htaskID)
     let terminal = try XCTUnwrap(events.last)
     XCTAssertEqual(terminal.causation, .evaluation)
-    XCTAssertEqual(terminal.toStatus, .succeeded)
+    XCTAssertEqual(terminal.toLifecycle, .succeeded)
     XCTAssertEqual(terminal.evaluationID, evaluationID)
     XCTAssertEqual(
-      events.filter { $0.toStatus == .succeeded }.map(\.causation), [.evaluation],
+      events.filter { $0.toLifecycle == .succeeded }.map(\.causation), [.evaluation],
       "no other causation ever reaches succeeded")
   }
 
@@ -1000,7 +1000,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
     // engine decides. (It previously stopped for a human, which is what let a
     // superseded grant masquerade as this gate being satisfied.)
     XCTAssertEqual(evaluated.action, .dispatched)
-    XCTAssertEqual(evaluated.snapshot.phase, .reproducing)
+    XCTAssertEqual(evaluated.snapshot.stage, .reproducing)
     XCTAssertEqual(
       jobs.submittedOperations.last, DebugCrashTaskHandler.deployHAP,
       "the analyzed baseline must select and dispatch the fixture deployment")
@@ -1039,7 +1039,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
     let expected = "artifactSensitiveNotOptedIn:crash-index.txt"
     XCTAssertEqual(blocked.action, .stoppedForHuman)
     XCTAssertEqual(blocked.reasonCode, expected)
-    XCTAssertEqual(blocked.snapshot.status, .humanRequired)
+    XCTAssertEqual(blocked.snapshot.lifecycle, .humanRequired)
     XCTAssertEqual(blocked.snapshot.result?.reasonCode, expected)
     XCTAssertTrue(blocked.snapshot.result?.summary.contains(expected) == true)
     XCTAssertEqual(
@@ -1118,8 +1118,8 @@ final class HarnessEvaluationContractTests: XCTestCase {
     XCTAssertEqual(failed.snapshot.observed.measurements["matchingCrashCount"], .integer(1))
     XCTAssertEqual(failed.action, .stoppedForHuman)
     XCTAssertEqual(failed.reasonCode, "patchProposalRequired")
-    XCTAssertEqual(failed.snapshot.status, .humanRequired)
-    XCTAssertNotEqual(failed.snapshot.status, .succeeded)
+    XCTAssertEqual(failed.snapshot.lifecycle, .humanRequired)
+    XCTAssertNotEqual(failed.snapshot.lifecycle, .succeeded)
 
     let evaluations = try await store.evaluations(task.htaskID)
     XCTAssertEqual(evaluations.last?.verdict, .fail)
@@ -1138,13 +1138,13 @@ final class HarnessEvaluationContractTests: XCTestCase {
     for round in 1...6 {
       let outcome = try await coordinator.reconcile(task.htaskID)
       finalOutcome = outcome
-      if outcome.snapshot.status.isTerminal || outcome.action == .stoppedForHuman { break }
+      if outcome.snapshot.lifecycle.isTerminal || outcome.action == .stoppedForHuman { break }
       artifacts.stage(jobID: "JOB-\(round)", name: "hilog.txt", text: HilogFixture.clean)
       jobs.finish("JOB-\(round)")
     }
     let outcome = try XCTUnwrap(finalOutcome)
     XCTAssertEqual(outcome.action, .stoppedBudgetExhausted)
-    XCTAssertEqual(outcome.snapshot.status, .failed)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .failed)
     XCTAssertEqual(outcome.reasonCode, "maxRoundsExhausted")
     XCTAssertEqual(outcome.snapshot.observed.latestVerdict, .inconclusive)
     XCTAssertLessThan(outcome.snapshot.observed.samples["matchingCrashCount"] ?? 0, 5)
@@ -1167,7 +1167,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
 
     let blocked = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(blocked.action, .stoppedEvidenceIntegrity)
-    XCTAssertEqual(blocked.snapshot.status, .humanRequired)
+    XCTAssertEqual(blocked.snapshot.lifecycle, .humanRequired)
     XCTAssertTrue(blocked.reasonCode.hasPrefix("evidenceIntegrity:artifactHashMismatch"))
     let submittedBefore = jobs.submittedOperations.count
     let again = try await coordinator.reconcile(task.htaskID)

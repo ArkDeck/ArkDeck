@@ -391,7 +391,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let stopped = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(stopped.action, .stoppedForHuman)
     XCTAssertTrue(stopped.reasonCode.hasPrefix("outcomeUnknown:"))
-    XCTAssertEqual(stopped.snapshot.status, .humanRequired)
+    XCTAssertEqual(stopped.snapshot.lifecycle, .humanRequired)
     XCTAssertNil(stopped.snapshot.activeJobID)
 
     for _ in 0..<2 {
@@ -412,12 +412,12 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024, maxE1Mutations: 0),
       policy: HarnessTaskPolicy(allowedOperations: ["observe.device@1"]),
       createdAtUTC: "2026-07-30T00:00:00Z", updatedAtUTC: "2026-07-30T00:00:00Z",
-      status: .running, phase: .initializing)
+      lifecycle: .running, stage: .initializing)
 
     func transition(
       _ causation: HarnessTaskCausation,
-      status: HarnessTaskStatus,
-      phase: HarnessTaskPhase = .initializing,
+      lifecycle: HarnessTaskLifecycle,
+      stage: HarnessTaskStage = .initializing,
       activeJobID: String? = nil,
       jobID: String? = nil,
       evaluationID: String? = nil,
@@ -428,11 +428,11 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       result: HarnessTaskResult? = nil
     ) -> HarnessTaskTransition {
       HarnessTaskTransition(
-        causation: causation, reasonCode: "test", status: status, phase: phase,
+        causation: causation, reasonCode: "test", lifecycle: lifecycle, stage: stage,
         activeRound: round, activeJobID: activeJobID, consumedBudget: consumed, jobID: jobID,
         evaluationID: evaluationID, artifactRefs: artifactRefs,
         cancelRequested: cancelRequested, result: result, atUTC: "2026-07-30T00:01:00Z",
-        waitReason: status == .waiting
+        waitReason: lifecycle == .waiting
           ? (causation == .pauseRequested ? .userSuspended : .activeJob) : nil,
         conditions: base.conditions)
     }
@@ -442,7 +442,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
         transition(
-          .jobObserved, status: .succeeded,
+          .jobObserved, lifecycle: .succeeded,
           result: HarnessTaskResult(outcome: .succeeded, reasonCode: "fixed", summary: "done")),
         to: base)
     ) { error in
@@ -453,24 +453,24 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     // Phase graph: no jumping from initializing straight to verifying.
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
-        transition(.jobObserved, status: .running, phase: .verifying), to: base)
+        transition(.jobObserved, lifecycle: .running, stage: .verifying), to: base)
     ) { error in
       XCTAssertEqual(
         error as? HarnessTaskTransitionError,
-        .illegalPhase(from: .initializing, to: .verifying))
+        .illegalStage(from: .initializing, to: .verifying))
     }
 
     // A second effectful job while one is active.
     let busy = base.applying(
       HarnessTaskProjection(
-        status: .waiting, phase: .initializing, activeRound: 1, activeJobID: "JOB-1",
+        lifecycle: .waiting, stage: .initializing, activeRound: 1, activeJobID: "JOB-1",
         consumedBudget: HarnessConsumedBudget(rounds: 1), artifactRefs: [],
         cancelRequested: false, result: nil, version: 2, waitReason: .activeJob),
       atUTC: "2026-07-30T00:00:30Z")
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
         transition(
-          .jobDispatched, status: .waiting, activeJobID: "JOB-2", jobID: "JOB-2", round: 2,
+          .jobDispatched, lifecycle: .waiting, activeJobID: "JOB-2", jobID: "JOB-2", round: 2,
           consumed: HarnessConsumedBudget(rounds: 2)),
         to: busy)
     ) { error in
@@ -480,13 +480,13 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     // Budget and artifact records only move forward.
     let advanced = base.applying(
       HarnessTaskProjection(
-        status: .running, phase: .initializing, activeRound: 2,
+        lifecycle: .running, stage: .initializing, activeRound: 2,
         activeJobID: nil, consumedBudget: HarnessConsumedBudget(rounds: 2),
         artifactRefs: ["ART-1"], cancelRequested: false, result: nil, version: 2),
       atUTC: "2026-07-30T00:00:30Z")
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
-        transition(.jobObserved, status: .running, round: 2, artifactRefs: ["ART-1"]),
+        transition(.jobObserved, lifecycle: .running, round: 2, artifactRefs: ["ART-1"]),
         to: advanced)
     ) { error in
       XCTAssertEqual(error as? HarnessTaskTransitionError, .budgetRegressed)
@@ -494,7 +494,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
         transition(
-          .jobObserved, status: .running, round: 2, artifactRefs: [],
+          .jobObserved, lifecycle: .running, round: 2, artifactRefs: [],
           consumed: HarnessConsumedBudget(rounds: 2)),
         to: advanced)
     ) { error in
@@ -504,14 +504,14 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     // A recorded cancel cannot be withdrawn, and no dispatch may follow it.
     let cancelling = base.applying(
       HarnessTaskProjection(
-        status: .running, phase: .initializing, activeRound: 1, activeJobID: nil,
+        lifecycle: .running, stage: .initializing, activeRound: 1, activeJobID: nil,
         consumedBudget: HarnessConsumedBudget(rounds: 1), artifactRefs: [],
         cancelRequested: true, result: nil, version: 2),
       atUTC: "2026-07-30T00:00:30Z")
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
         transition(
-          .jobDispatched, status: .running, activeJobID: "JOB-9", jobID: "JOB-9", round: 2,
+          .jobDispatched, lifecycle: .running, activeJobID: "JOB-9", jobID: "JOB-9", round: 2,
           cancelRequested: true, consumed: HarnessConsumedBudget(rounds: 2)),
         to: cancelling)
     ) { error in
@@ -520,7 +520,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
         transition(
-          .jobObserved, status: .running, round: 1,
+          .jobObserved, lifecycle: .running, round: 1,
           consumed: HarnessConsumedBudget(rounds: 1)),
         to: cancelling)
     ) { error in
@@ -530,14 +530,14 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     // Terminal is terminal.
     let finished = base.applying(
       HarnessTaskProjection(
-        status: .failed, phase: .initializing, activeRound: 1, activeJobID: nil,
+        lifecycle: .failed, stage: .initializing, activeRound: 1, activeJobID: nil,
         consumedBudget: HarnessConsumedBudget(rounds: 1), artifactRefs: [],
         cancelRequested: false,
         result: HarnessTaskResult(outcome: .failed, reasonCode: "x", summary: "y"), version: 2),
       atUTC: "2026-07-30T00:00:30Z")
     XCTAssertThrowsError(
       try HarnessTaskStateReducer.apply(
-        transition(.humanResolved, status: .running, round: 1), to: finished)
+        transition(.humanResolved, lifecycle: .running, round: 1), to: finished)
     ) { error in
       XCTAssertEqual(error as? HarnessTaskTransitionError, .terminal(.failed))
     }
@@ -555,7 +555,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         maxE1Mutations: 3),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
       createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
-      status: .running, phase: .collecting,
+      lifecycle: .running, stage: .collecting,
       conditions: HarnessTaskConditionSet.replacing(
         HarnessTaskConditionSet.unknown(),
         with: [.targetResolved, .deviceBound, .deviceReady].map {
@@ -563,7 +563,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         }))
     let transition = HarnessTaskTransition(
       causation: .jobDispatched, reasonCode: "deployBaselineCrashFixture",
-      status: .waiting, phase: .reproducing, activeRound: 3,
+      lifecycle: .waiting, stage: .reproducing, activeRound: 3,
       activeJobID: "JOB-BASELINE", consumedBudget: HarnessConsumedBudget(
         rounds: 3, e1Mutations: 1), jobID: "JOB-BASELINE",
       artifactRefs: [], cancelRequested: false,
@@ -571,7 +571,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       conditions: base.conditions)
 
     let (advanced, _) = try HarnessTaskStateReducer.apply(transition, to: base)
-    XCTAssertEqual(advanced.phase, .reproducing)
+    XCTAssertEqual(advanced.stage, .reproducing)
     XCTAssertEqual(advanced.activeJobID, "JOB-BASELINE")
   }
 
@@ -584,7 +584,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
 
     let (updated, event) = try HarnessTaskStateReducer.apply(
       HarnessTaskTransition(
-        causation: .pauseRequested, reasonCode: "stale", status: .waiting, phase: current.phase,
+        causation: .pauseRequested, reasonCode: "stale", lifecycle: .waiting, stage: current.stage,
         activeRound: current.activeRound, activeJobID: current.activeJobID,
         consumedBudget: current.consumedBudget, artifactRefs: current.artifactRefs,
         cancelRequested: current.cancelRequested, atUTC: "2026-07-30T00:02:00Z",
@@ -669,7 +669,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let stopped = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(stopped.action, .stoppedBudgetExhausted)
     XCTAssertEqual(stopped.reasonCode, "maxRoundsExhausted")
-    XCTAssertEqual(stopped.snapshot.status, .failed)
+    XCTAssertEqual(stopped.snapshot.lifecycle, .failed)
     XCTAssertEqual(port.submittedRequests.count, 1)
     XCTAssertEqual(stopped.snapshot.result?.reasonCode, "maxRoundsExhausted")
   }
@@ -681,7 +681,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     _ = try await coordinator.reconcile(task.htaskID)
 
     let marked = try await coordinator.cancel(task.htaskID)
-    XCTAssertEqual(marked.status, .waiting, "a cancel cannot claim an in-flight effect stopped")
+    XCTAssertEqual(marked.lifecycle, .waiting, "a cancel cannot claim an in-flight effect stopped")
     XCTAssertEqual(marked.waitReason, .activeJob)
     XCTAssertTrue(marked.cancelRequested)
     XCTAssertEqual(port.cancelRequests, ["JOB-1"])
@@ -691,7 +691,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     port.finish("JOB-1", state: "cancelled")
     let finished = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(finished.action, .cancelled)
-    XCTAssertEqual(finished.snapshot.status, .cancelled)
+    XCTAssertEqual(finished.snapshot.lifecycle, .cancelled)
     XCTAssertEqual(port.submittedRequests.count, 1)
   }
 
@@ -708,7 +708,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertEqual(submittedBeforePause, 2)
 
     let paused = try await coordinator.pause(task.htaskID)
-    XCTAssertEqual(paused.status, .waiting)
+    XCTAssertEqual(paused.lifecycle, .waiting)
     XCTAssertEqual(paused.waitReason, .userSuspended)
     XCTAssertEqual(
       paused.activeJobID, "JOB-2",
@@ -726,7 +726,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       XCTAssertEqual(error as? HarnessCoordinatorError, .emptyResolution)
     }
     let resumed = try await coordinator.resume(task.htaskID, resolution: "operator resumed")
-    XCTAssertEqual(resumed.status, .waiting)
+    XCTAssertEqual(resumed.lifecycle, .waiting)
     XCTAssertEqual(resumed.waitReason, .activeJob)
     XCTAssertEqual(resumed.activeJobID, "JOB-2")
 
@@ -746,7 +746,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let stopped = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(stopped.action, .stoppedJobFailed)
     XCTAssertEqual(stopped.reasonCode, "operationFailed:observe.device@1:failed")
-    XCTAssertEqual(stopped.snapshot.status, .failed)
+    XCTAssertEqual(stopped.snapshot.lifecycle, .failed)
     XCTAssertEqual(port.submittedRequests.count, 1, "a failed operation is not retried blindly")
   }
 
@@ -902,7 +902,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       if case .string(let value)? = field(submitted, "htaskId") { return value }
       return nil
     }())
-    XCTAssertEqual(field(submitted, "status"), .string("created"))
+    XCTAssertNil(field(submitted, "status"))
     XCTAssertEqual(field(submitted, "lifecycle"), .string("created"))
     XCTAssertEqual(field(submitted, "stage"), .string("initializing"))
     XCTAssertEqual(field(submitted, "waitReason"), .null)
@@ -950,7 +950,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertEqual(field(reconciled, "action"), .string("dispatched"))
     XCTAssertEqual(field(reconciled, "dispatchedJobId"), .string("JOB-1"))
     let statusResult = try await call("task.status", ["htaskId": .string(taskID)])
-    XCTAssertEqual(field(statusResult, "phase"), .string("initializing"))
+    XCTAssertNil(field(statusResult, "phase"))
     XCTAssertEqual(field(statusResult, "lifecycle"), .string("waiting"))
     XCTAssertEqual(field(statusResult, "stage"), .string("initializing"))
     XCTAssertEqual(field(statusResult, "waitReason"), .string("ACTIVE_JOB"))

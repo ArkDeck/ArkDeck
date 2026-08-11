@@ -604,6 +604,37 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertEqual(replay.events.count, 1)
   }
 
+  func testReconcilerRejectsReplayWithoutExplicitSchemaVersionBeforeWriting() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let sessionDescriptor = descriptor(in: directory)
+    try Data().write(to: sessionDescriptor.journalURL)
+    let replay = try DurableJournalRecovery.inspect(url: sessionDescriptor.journalURL)
+    XCTAssertNil(replay.schemaVersion)
+    let session = ScannedRecoverySession(
+      descriptor: sessionDescriptor,
+      replay: replay,
+      state: .waitingForRecovery,
+      outcomeCertainty: .outcomeUnknown,
+      snapshotSource: .journalOnly,
+      nextSequence: 0)
+    let journal = RecordingJournal()
+
+    XCTAssertThrowsError(
+      try DeterministicRecoveryReconciler(journal: journal).reconcile(
+        session: session,
+        provider: ProviderRecoveryEvidence(
+          disposition: .uncertain, restartSafe: false, safeBoundaryConfirmed: false,
+          outcomeCertainty: .outcomeUnknown, evidence: []),
+        binding: RecoveryBindingEvidence(confirmed: false, revision: nil, evidence: []))
+    ) { error in
+      XCTAssertEqual(
+        error as? DurableFileError,
+        .sequenceViolation("reconcile requires an explicit journal schemaVersion"))
+    }
+    XCTAssertTrue(journal.events.isEmpty)
+  }
+
   func testTornTailIsDurablyRepairedForReconcileAndAuditedAbandonment() throws {
     let reconcileDirectory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: reconcileDirectory) }

@@ -35,6 +35,32 @@ public enum JournalEventValidationError: Error, Equatable, Sendable {
   case canonicalArgumentsHashMismatch(stepID: String)
 }
 
+enum JournalAuthorizationCorrelationShape: Sendable {
+  case none
+  case authorizationReference
+  case agentAuthorityReference
+}
+
+struct JournalSchemaCapabilities: Sendable {
+  let requiresAuthorizationCorrelation: Bool
+  let authorizationCorrelationShape: JournalAuthorizationCorrelationShape
+  let supportsCompleteOverwriteRecoveryStates: Bool
+
+  init(
+    requiresAuthorizationCorrelation: Bool,
+    authorizationCorrelationShape: JournalAuthorizationCorrelationShape,
+    supportsCompleteOverwriteRecoveryStates: Bool = false
+  ) {
+    precondition(
+      requiresAuthorizationCorrelation
+        == (authorizationCorrelationShape != .none),
+      "authorization correlation capability and shape must agree")
+    self.requiresAuthorizationCorrelation = requiresAuthorizationCorrelation
+    self.authorizationCorrelationShape = authorizationCorrelationShape
+    self.supportsCompleteOverwriteRecoveryStates = supportsCompleteOverwriteRecoveryStates
+  }
+}
+
 public struct JournalEvent: Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
   public static let authorizedAgentSchemaVersion = "2.0.0"
@@ -42,22 +68,45 @@ public struct JournalEvent: Equatable, Sendable {
   public static let agentAuthoritySchemaVersion = "2.2.0"
   public static let completeOverwriteRecoverySchemaVersion = "3.0.0"
 
+  /// Every accepted schema generation declares its security semantics here. Adding a version
+  /// therefore requires an explicit decision about authorization correlation instead of falling
+  /// through a version-name predicate. Versions without journal correlation remain readable, but
+  /// gain no execution authority from that absence; current Flash execution is admitted by the
+  /// RuntimeCapability store before its 3.0.0 journal is created.
+  private static let capabilitiesBySchemaVersion: [String: JournalSchemaCapabilities] = [
+    schemaVersion: JournalSchemaCapabilities(
+      requiresAuthorizationCorrelation: false,
+      authorizationCorrelationShape: .none),
+    authorizedAgentSchemaVersion: JournalSchemaCapabilities(
+      requiresAuthorizationCorrelation: true,
+      authorizationCorrelationShape: .authorizationReference),
+    rockchipAuthorizedAgentSchemaVersion: JournalSchemaCapabilities(
+      requiresAuthorizationCorrelation: true,
+      authorizationCorrelationShape: .authorizationReference),
+    agentAuthoritySchemaVersion: JournalSchemaCapabilities(
+      requiresAuthorizationCorrelation: true,
+      authorizationCorrelationShape: .agentAuthorityReference),
+    completeOverwriteRecoverySchemaVersion: JournalSchemaCapabilities(
+      requiresAuthorizationCorrelation: false,
+      authorizationCorrelationShape: .none,
+      supportsCompleteOverwriteRecoveryStates: true),
+  ]
+
+  static func capabilities(forSchemaVersion value: String) -> JournalSchemaCapabilities? {
+    capabilitiesBySchemaVersion[value]
+  }
+
   static func isSupportedSchemaVersion(_ value: String) -> Bool {
-    value == schemaVersion || value == completeOverwriteRecoverySchemaVersion
-      || supportsAuthorizationCorrelation(value)
+    capabilities(forSchemaVersion: value) != nil
   }
 
   static func supportsAuthorizationCorrelation(_ value: String) -> Bool {
-    value == authorizedAgentSchemaVersion || value == rockchipAuthorizedAgentSchemaVersion
-      || value == agentAuthoritySchemaVersion
+    capabilities(forSchemaVersion: value)?.requiresAuthorizationCorrelation == true
   }
 
   static func usesAgentAuthorityUnion(_ value: String) -> Bool {
-    value == agentAuthoritySchemaVersion
-  }
-
-  static func usesLegacyAuthorizationSemantics(_ value: String) -> Bool {
-    value == schemaVersion || value == completeOverwriteRecoverySchemaVersion
+    capabilities(forSchemaVersion: value)?.authorizationCorrelationShape
+      == .agentAuthorityReference
   }
 
   public let schemaVersion: String

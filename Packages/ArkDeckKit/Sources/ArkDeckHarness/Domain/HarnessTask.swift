@@ -13,8 +13,8 @@
 //     (CHG-2026-054 HTP-INV-12, PRODUCT-LOOP §13).
 //   * lifecycle, stage and conditions are orthogonal. `succeeded`/`failed`
 //     are lifecycle values, never stages, so a waiting or human-blocked task
-//     keeps the product stage it will resume into. `status`/`phase` remain as
-//     wire-compatible aliases for records written before schema 2.
+//     keeps the product stage it will resume into. The domain and wire both
+//     use these canonical names; there is no second lifecycle/stage vocabulary.
 //
 // Nothing here decides success: entering `succeeded` structurally requires
 // an evaluation causation plus an evaluation id, and no evaluation engine
@@ -50,11 +50,7 @@ public enum HarnessTaskLifecycle: String, CaseIterable, Sendable {
 
 extension HarnessTaskLifecycle: Codable {}
 
-/// Compatibility spelling retained for source and JSON clients during the
-/// forward migration. The represented axis is Lifecycle, not a second state.
-public typealias HarnessTaskStatus = HarnessTaskLifecycle
-
-/// Debug phase inside `running`. The graph is deliberately small and
+/// Debug stage inside `running`. The graph is deliberately small and
 /// acyclic apart from the analysis/evidence loop the bounded debug journey
 /// actually needs.
 public enum HarnessTaskStage: String, CaseIterable, Sendable {
@@ -69,8 +65,6 @@ public enum HarnessTaskStage: String, CaseIterable, Sendable {
 }
 
 extension HarnessTaskStage: Codable {}
-
-public typealias HarnessTaskPhase = HarnessTaskStage
 
 public enum HarnessTaskWaitReason: String, CaseIterable, Codable, Sendable {
   case userSuspended = "USER_SUSPENDED"
@@ -476,7 +470,7 @@ public struct HarnessTaskPolicy: Equatable, Sendable, Codable {
 }
 
 public struct HarnessTaskResult: Equatable, Sendable, Codable {
-  public let outcome: HarnessTaskStatus
+  public let outcome: HarnessTaskLifecycle
   public let reasonCode: String
   public let summary: String
   public let evaluationID: String?
@@ -491,7 +485,7 @@ public struct HarnessTaskResult: Equatable, Sendable, Codable {
   }
 
   public init(
-    outcome: HarnessTaskStatus,
+    outcome: HarnessTaskLifecycle,
     reasonCode: String,
     summary: String,
     evaluationID: String? = nil,
@@ -537,8 +531,8 @@ public enum HarnessTaskCausation: String, CaseIterable, Codable, Sendable {
 /// Persisted inside every event so the event log alone can rebuild a
 /// snapshot after a crash between the two writes.
 public struct HarnessTaskProjection: Equatable, Sendable, Codable {
-  public let status: HarnessTaskStatus
-  public let phase: HarnessTaskPhase
+  public let lifecycle: HarnessTaskLifecycle
+  public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
   public let conditions: [HarnessTaskCondition]
   public let activeRound: Int
@@ -560,8 +554,6 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   public let result: HarnessTaskResult?
   public let version: Int
 
-  public var lifecycle: HarnessTaskLifecycle { status }
-  public var stage: HarnessTaskStage { phase }
   enum CodingKeys: String, CodingKey {
     case lifecycle
     case stage
@@ -580,8 +572,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
   }
 
   public init(
-    status: HarnessTaskStatus,
-    phase: HarnessTaskPhase,
+    lifecycle: HarnessTaskLifecycle,
+    stage: HarnessTaskStage,
     activeRound: Int,
     activeJobID: String?,
     consumedBudget: HarnessConsumedBudget,
@@ -595,10 +587,10 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
     waitReason: HarnessTaskWaitReason? = nil,
     conditions: [HarnessTaskCondition] = HarnessTaskConditionSet.unknown()
   ) {
-    self.status = status
-    self.phase = phase
+    self.lifecycle = lifecycle
+    self.stage = stage
     self.waitReason =
-      status == .waiting
+      lifecycle == .waiting
       ? (waitReason ?? (activeJobID == nil ? .userSuspended : .activeJob)) : nil
     self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.activeRound = activeRound
@@ -630,9 +622,9 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
         forKey: .waitReason, in: container,
         debugDescription: "waitReason is valid only while waiting")
     }
-    self.status = decodedLifecycle
+    self.lifecycle = decodedLifecycle
     self.waitReason = encodedWaitReason
-    self.phase = try container.decode(HarnessTaskStage.self, forKey: .stage)
+    self.stage = try container.decode(HarnessTaskStage.self, forKey: .stage)
     let decodedConditions = try container.decodeIfPresent(
       [HarnessTaskCondition].self, forKey: .conditions)
     self.conditions = HarnessTaskConditionSet.normalized(
@@ -654,8 +646,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
 
   public func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(status, forKey: .lifecycle)
-    try container.encode(phase, forKey: .stage)
+    try container.encode(lifecycle, forKey: .lifecycle)
+    try container.encode(stage, forKey: .stage)
     try container.encodeIfPresent(waitReason, forKey: .waitReason)
     try container.encode(conditions, forKey: .conditions)
     try container.encode(activeRound, forKey: .activeRound)
@@ -676,8 +668,8 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
 public struct HarnessTaskTransition: Equatable, Sendable {
   public let causation: HarnessTaskCausation
   public let reasonCode: String
-  public let status: HarnessTaskStatus
-  public let phase: HarnessTaskPhase
+  public let lifecycle: HarnessTaskLifecycle
+  public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
   public let conditions: [HarnessTaskCondition]
   public let activeRound: Int
@@ -692,14 +684,11 @@ public struct HarnessTaskTransition: Equatable, Sendable {
   public let result: HarnessTaskResult?
   public let atUTC: String
 
-  public var lifecycle: HarnessTaskLifecycle { status }
-  public var stage: HarnessTaskStage { phase }
-
   public init(
     causation: HarnessTaskCausation,
     reasonCode: String,
-    status: HarnessTaskStatus,
-    phase: HarnessTaskPhase,
+    lifecycle: HarnessTaskLifecycle,
+    stage: HarnessTaskStage,
     activeRound: Int,
     activeJobID: String?,
     consumedBudget: HarnessConsumedBudget,
@@ -716,8 +705,8 @@ public struct HarnessTaskTransition: Equatable, Sendable {
   ) {
     self.causation = causation
     self.reasonCode = reasonCode
-    self.status = status
-    self.phase = phase
+    self.lifecycle = lifecycle
+    self.stage = stage
     self.waitReason = waitReason
     self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.activeRound = activeRound
@@ -745,18 +734,13 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
   public let atUTC: String
   public let causation: HarnessTaskCausation
   public let reasonCode: String
-  public let fromStatus: HarnessTaskStatus
-  public let toStatus: HarnessTaskStatus
-  public let fromPhase: HarnessTaskPhase
-  public let toPhase: HarnessTaskPhase
+  public let fromLifecycle: HarnessTaskLifecycle
+  public let toLifecycle: HarnessTaskLifecycle
+  public let fromStage: HarnessTaskStage
+  public let toStage: HarnessTaskStage
   public let jobID: String?
   public let evaluationID: String?
   public let resulting: HarnessTaskProjection
-
-  public var fromLifecycle: HarnessTaskLifecycle { fromStatus }
-  public var toLifecycle: HarnessTaskLifecycle { toStatus }
-  public var fromStage: HarnessTaskStage { fromPhase }
-  public var toStage: HarnessTaskStage { toPhase }
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -766,10 +750,10 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
     case atUTC = "atUtc"
     case causation
     case reasonCode
-    case fromStatus = "fromLifecycle"
-    case toStatus = "toLifecycle"
-    case fromPhase = "fromStage"
-    case toPhase = "toStage"
+    case fromLifecycle = "fromLifecycle"
+    case toLifecycle = "toLifecycle"
+    case fromStage = "fromStage"
+    case toStage = "toStage"
     case jobID = "jobId"
     case evaluationID = "evaluationId"
     case resulting
@@ -781,10 +765,10 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
     atUTC: String,
     causation: HarnessTaskCausation,
     reasonCode: String,
-    fromStatus: HarnessTaskStatus,
-    toStatus: HarnessTaskStatus,
-    fromPhase: HarnessTaskPhase,
-    toPhase: HarnessTaskPhase,
+    fromLifecycle: HarnessTaskLifecycle,
+    toLifecycle: HarnessTaskLifecycle,
+    fromStage: HarnessTaskStage,
+    toStage: HarnessTaskStage,
     jobID: String?,
     evaluationID: String?,
     resulting: HarnessTaskProjection
@@ -796,10 +780,10 @@ public struct HarnessTaskEvent: Equatable, Sendable, Codable {
     self.atUTC = atUTC
     self.causation = causation
     self.reasonCode = reasonCode
-    self.fromStatus = fromStatus
-    self.toStatus = toStatus
-    self.fromPhase = fromPhase
-    self.toPhase = toPhase
+    self.fromLifecycle = fromLifecycle
+    self.toLifecycle = toLifecycle
+    self.fromStage = fromStage
+    self.toStage = toStage
     self.jobID = jobID
     self.evaluationID = evaluationID
     self.resulting = resulting
@@ -828,8 +812,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
   public let observedState: [String: JSONValue]
   public let createdAtUTC: String
   public let updatedAtUTC: String
-  public let status: HarnessTaskStatus
-  public let phase: HarnessTaskPhase
+  public let lifecycle: HarnessTaskLifecycle
+  public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
   public let conditions: [HarnessTaskCondition]
   public let activeRound: Int
@@ -889,8 +873,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     observedState: [String: JSONValue] = [:],
     createdAtUTC: String,
     updatedAtUTC: String,
-    status: HarnessTaskStatus = .created,
-    phase: HarnessTaskPhase = .initializing,
+    lifecycle: HarnessTaskLifecycle = .created,
+    stage: HarnessTaskStage = .initializing,
     activeRound: Int = 0,
     activeJobID: String? = nil,
     consumedBudget: HarnessConsumedBudget = HarnessConsumedBudget(),
@@ -919,10 +903,10 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.observedState = observedState
     self.createdAtUTC = createdAtUTC
     self.updatedAtUTC = updatedAtUTC
-    self.status = status
-    self.phase = phase
+    self.lifecycle = lifecycle
+    self.stage = stage
     self.waitReason =
-      status == .waiting
+      lifecycle == .waiting
       ? (waitReason ?? (activeJobID == nil ? .userSuspended : .activeJob)) : nil
     self.conditions = HarnessTaskConditionSet.normalized(conditions)
     self.activeRound = activeRound
@@ -966,7 +950,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
 
     let decodedLifecycle = try container.decode(HarnessTaskLifecycle.self, forKey: .lifecycle)
-    self.phase = try container.decode(HarnessTaskStage.self, forKey: .stage)
+    self.stage = try container.decode(HarnessTaskStage.self, forKey: .stage)
     self.activeRound = try container.decode(Int.self, forKey: .activeRound)
     self.activeJobID = try container.decodeIfPresent(String.self, forKey: .activeJobID)
     let encodedWaitReason = try container.decodeIfPresent(
@@ -981,7 +965,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
         forKey: .waitReason, in: container,
         debugDescription: "waitReason is valid only while waiting")
     }
-    self.status = decodedLifecycle
+    self.lifecycle = decodedLifecycle
     self.waitReason = encodedWaitReason
     let decodedConditions = try container.decodeIfPresent(
       [HarnessTaskCondition].self, forKey: .conditions)
@@ -1021,8 +1005,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     try container.encode(observedState, forKey: .observedState)
     try container.encode(createdAtUTC, forKey: .createdAtUTC)
     try container.encode(updatedAtUTC, forKey: .updatedAtUTC)
-    try container.encode(status, forKey: .lifecycle)
-    try container.encode(phase, forKey: .stage)
+    try container.encode(lifecycle, forKey: .lifecycle)
+    try container.encode(stage, forKey: .stage)
     try container.encodeIfPresent(waitReason, forKey: .waitReason)
     try container.encode(conditions, forKey: .conditions)
     try container.encode(activeRound, forKey: .activeRound)
@@ -1036,8 +1020,6 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
     try container.encode(version, forKey: .version)
   }
 
-  public var lifecycle: HarnessTaskLifecycle { status }
-  public var stage: HarnessTaskStage { phase }
   /// The current product has no normal/evolution switch. A workspace policy is the single
   /// source of truth for isolation, validation and promotion behavior.
   public var requiresWorkspaceIsolation: Bool { evolutionPolicy != nil }
@@ -1053,7 +1035,7 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 
   public var projection: HarnessTaskProjection {
     HarnessTaskProjection(
-      status: status, phase: phase, activeRound: activeRound, activeJobID: activeJobID,
+      lifecycle: lifecycle, stage: stage, activeRound: activeRound, activeJobID: activeJobID,
       consumedBudget: consumedBudget, artifactRefs: artifactRefs, observedState: observedState,
       latestEvaluationID: latestEvaluationID, noProgressRounds: noProgressRounds,
       cancelRequested: cancelRequested, result: result, version: version,
@@ -1075,8 +1057,8 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
       budgets: budgets, policy: policy,
       evolutionPolicy: evolutionPolicy, evolutionWorkspace: evolutionWorkspace,
       observedState: projection.observedState,
-      createdAtUTC: createdAtUTC, updatedAtUTC: atUTC, status: projection.status,
-      phase: projection.phase, activeRound: projection.activeRound,
+      createdAtUTC: createdAtUTC, updatedAtUTC: atUTC, lifecycle: projection.lifecycle,
+      stage: projection.stage, activeRound: projection.activeRound,
       activeJobID: projection.activeJobID, consumedBudget: projection.consumedBudget,
       artifactRefs: projection.artifactRefs, latestEvaluationID: projection.latestEvaluationID,
       noProgressRounds: projection.noProgressRounds,
@@ -1088,17 +1070,17 @@ public struct HarnessTaskSnapshot: Equatable, Sendable, Codable {
 }
 
 public enum HarnessTaskTransitionError: Error, Equatable, Sendable {
-  case terminal(HarnessTaskStatus)
-  case illegalStatus(
-    from: HarnessTaskStatus, to: HarnessTaskStatus, causation: HarnessTaskCausation)
-  case illegalPhase(from: HarnessTaskPhase, to: HarnessTaskPhase)
-  case phaseChangeOutsideRunning(HarnessTaskStatus)
-  case dispatchRequiresRunning(HarnessTaskStatus)
+  case terminal(HarnessTaskLifecycle)
+  case illegalLifecycle(
+    from: HarnessTaskLifecycle, to: HarnessTaskLifecycle, causation: HarnessTaskCausation)
+  case illegalStage(from: HarnessTaskStage, to: HarnessTaskStage)
+  case stageChangeOutsideRunning(HarnessTaskLifecycle)
+  case dispatchRequiresRunning(HarnessTaskLifecycle)
   case jobAlreadyActive(String)
   case dispatchRequiresJobID
   case successRequiresEvaluation
-  case terminalRequiresResult(HarnessTaskStatus)
-  case resultOutcomeMismatch(HarnessTaskStatus)
+  case terminalRequiresResult(HarnessTaskLifecycle)
+  case resultOutcomeMismatch(HarnessTaskLifecycle)
   case roundRegressed(from: Int, to: Int)
   case budgetRegressed
   case artifactRefsShrank
@@ -1128,20 +1110,20 @@ public enum HarnessTaskStateReducer {
     _ transition: HarnessTaskTransition,
     to snapshot: HarnessTaskSnapshot
   ) throws -> (HarnessTaskSnapshot, HarnessTaskEvent) {
-    guard !snapshot.status.isTerminal else {
-      throw HarnessTaskTransitionError.terminal(snapshot.status)
+    guard !snapshot.lifecycle.isTerminal else {
+      throw HarnessTaskTransitionError.terminal(snapshot.lifecycle)
     }
-    try validateStatus(transition, snapshot)
+    try validateLifecycle(transition, snapshot)
     try validateConditions(transition, snapshot)
-    try validatePhase(transition, snapshot)
+    try validateStage(transition, snapshot)
     try validateJob(transition, snapshot)
     try validateProgress(transition, snapshot)
     try validateObservation(transition, snapshot)
     try validateResult(transition)
 
     let projection = HarnessTaskProjection(
-      status: transition.status,
-      phase: transition.phase,
+      lifecycle: transition.lifecycle,
+      stage: transition.stage,
       activeRound: transition.activeRound,
       activeJobID: transition.activeJobID,
       consumedBudget: transition.consumedBudget,
@@ -1163,22 +1145,22 @@ public enum HarnessTaskStateReducer {
       atUTC: transition.atUTC,
       causation: transition.causation,
       reasonCode: transition.reasonCode,
-      fromStatus: snapshot.status,
-      toStatus: transition.status,
-      fromPhase: snapshot.phase,
-      toPhase: transition.phase,
+      fromLifecycle: snapshot.lifecycle,
+      toLifecycle: transition.lifecycle,
+      fromStage: snapshot.stage,
+      toStage: transition.stage,
       jobID: transition.jobID,
       evaluationID: transition.evaluationID,
       resulting: projection)
     return (snapshot.applying(projection, atUTC: transition.atUTC), event)
   }
 
-  private static func validateStatus(
+  private static func validateLifecycle(
     _ transition: HarnessTaskTransition,
     _ snapshot: HarnessTaskSnapshot
   ) throws {
-    let allowed: Set<HarnessTaskStatus>
-    switch snapshot.status {
+    let allowed: Set<HarnessTaskLifecycle>
+    switch snapshot.lifecycle {
     case .created:
       allowed = [.created, .running, .waiting, .humanRequired, .failed, .cancelled]
     case .running:
@@ -1190,36 +1172,36 @@ public enum HarnessTaskStateReducer {
     case .succeeded, .failed, .cancelled:
       allowed = []
     }
-    guard allowed.contains(transition.status) else {
-      throw HarnessTaskTransitionError.illegalStatus(
-        from: snapshot.status, to: transition.status, causation: transition.causation)
+    guard allowed.contains(transition.lifecycle) else {
+      throw HarnessTaskTransitionError.illegalLifecycle(
+        from: snapshot.lifecycle, to: transition.lifecycle, causation: transition.causation)
     }
 
     // Causation is not decoration: it is how a caller proves it is allowed
     // to ask for this state. A decision that claims success without an
     // evaluation is rejected here, at the only write path.
-    switch transition.status {
+    switch transition.lifecycle {
     case .succeeded:
       guard transition.causation == .evaluation, transition.evaluationID != nil else {
         throw HarnessTaskTransitionError.successRequiresEvaluation
       }
-    case .running where snapshot.status == .waiting:
+    case .running where snapshot.lifecycle == .waiting:
       guard
         [.resumeRequested, .jobObserved, .recovery, .conditionObserved]
           .contains(transition.causation)
       else {
-        throw HarnessTaskTransitionError.illegalStatus(
-          from: snapshot.status, to: transition.status, causation: transition.causation)
+        throw HarnessTaskTransitionError.illegalLifecycle(
+          from: snapshot.lifecycle, to: transition.lifecycle, causation: transition.causation)
       }
-    case .running where snapshot.status == .humanRequired:
+    case .running where snapshot.lifecycle == .humanRequired:
       guard transition.causation == .humanResolved else {
-        throw HarnessTaskTransitionError.illegalStatus(
-          from: snapshot.status, to: transition.status, causation: transition.causation)
+        throw HarnessTaskTransitionError.illegalLifecycle(
+          from: snapshot.lifecycle, to: transition.lifecycle, causation: transition.causation)
       }
     case .waiting where transition.waitReason == .userSuspended:
       guard snapshot.waitReason == .userSuspended || transition.causation == .pauseRequested else {
-        throw HarnessTaskTransitionError.illegalStatus(
-          from: snapshot.status, to: transition.status, causation: transition.causation)
+        throw HarnessTaskTransitionError.illegalLifecycle(
+          from: snapshot.lifecycle, to: transition.lifecycle, causation: transition.causation)
       }
     case .cancelled:
       // Either the cancel arrived with no job in flight (cancelRequested)
@@ -1229,51 +1211,51 @@ public enum HarnessTaskStateReducer {
         snapshot.cancelRequested
         && [.jobObserved, .recovery].contains(transition.causation)
       guard transition.causation == .cancelRequested || finalisingPriorRequest else {
-        throw HarnessTaskTransitionError.illegalStatus(
-          from: snapshot.status, to: transition.status, causation: transition.causation)
+        throw HarnessTaskTransitionError.illegalLifecycle(
+          from: snapshot.lifecycle, to: transition.lifecycle, causation: transition.causation)
       }
     case .failed:
       guard
         [.budgetExhausted, .noSafeAction, .jobObserved, .evaluation, .humanBlocked, .recovery]
           .contains(transition.causation)
       else {
-        throw HarnessTaskTransitionError.illegalStatus(
-          from: snapshot.status, to: transition.status, causation: transition.causation)
+        throw HarnessTaskTransitionError.illegalLifecycle(
+          from: snapshot.lifecycle, to: transition.lifecycle, causation: transition.causation)
       }
     default:
       break
     }
 
-    if transition.status == .waiting, transition.waitReason == nil {
+    if transition.lifecycle == .waiting, transition.waitReason == nil {
       throw HarnessTaskTransitionError.waitingRequiresReason
     }
-    if transition.status != .waiting, let reason = transition.waitReason {
+    if transition.lifecycle != .waiting, let reason = transition.waitReason {
       throw HarnessTaskTransitionError.waitReasonOutsideWaiting(reason)
     }
   }
 
-  private static func validatePhase(
+  private static func validateStage(
     _ transition: HarnessTaskTransition,
     _ snapshot: HarnessTaskSnapshot
   ) throws {
-    guard transition.phase != snapshot.phase else { return }
+    guard transition.stage != snapshot.stage else { return }
     // Lifecycle waits preserve the stage. A stage may advance when an
     // admitted job starts waiting or when that job's readback returns.
-    let stageBearingLifecycle = transition.status == .running || transition.status == .waiting
+    let stageBearingLifecycle = transition.lifecycle == .running || transition.lifecycle == .waiting
     let stageBearingOrigin =
-      snapshot.status == .running || snapshot.status == .created
-      || (snapshot.status == .waiting && snapshot.activeJobID != nil)
+      snapshot.lifecycle == .running || snapshot.lifecycle == .created
+      || (snapshot.lifecycle == .waiting && snapshot.activeJobID != nil)
     guard stageBearingLifecycle, stageBearingOrigin else {
-      throw HarnessTaskTransitionError.phaseChangeOutsideRunning(transition.status)
+      throw HarnessTaskTransitionError.stageChangeOutsideRunning(transition.lifecycle)
     }
-    guard let gate = HarnessTaskStageGates.gate(from: snapshot.phase, to: transition.phase) else {
-      throw HarnessTaskTransitionError.illegalPhase(from: snapshot.phase, to: transition.phase)
+    guard let gate = HarnessTaskStageGates.gate(from: snapshot.stage, to: transition.stage) else {
+      throw HarnessTaskTransitionError.illegalStage(from: snapshot.stage, to: transition.stage)
     }
     for required in gate.requiredConditions {
       let actual = HarnessTaskConditionSet.value(required, in: transition.conditions).state
       guard actual == .trueValue else {
         throw HarnessTaskTransitionError.stageGateUnsatisfied(
-          from: snapshot.phase, to: transition.phase, condition: required, actual: actual)
+          from: snapshot.stage, to: transition.stage, condition: required, actual: actual)
       }
     }
   }
@@ -1304,7 +1286,7 @@ public enum HarnessTaskStateReducer {
           condition.name, from: from, to: to)
       }
     }
-    if transition.status == .succeeded {
+    if transition.lifecycle == .succeeded {
       let actual = HarnessTaskConditionSet.value(
         .criteriaSatisfied, in: transition.conditions
       ).state
@@ -1327,8 +1309,8 @@ public enum HarnessTaskStateReducer {
       guard !snapshot.cancelRequested else {
         throw HarnessTaskTransitionError.cancelPending
       }
-      guard transition.status == .waiting, transition.waitReason == .activeJob else {
-        throw HarnessTaskTransitionError.dispatchRequiresRunning(transition.status)
+      guard transition.lifecycle == .waiting, transition.waitReason == .activeJob else {
+        throw HarnessTaskTransitionError.dispatchRequiresRunning(transition.lifecycle)
       }
       if let active = snapshot.activeJobID {
         // One effectful active job per task, enforced in the state model
@@ -1339,7 +1321,7 @@ public enum HarnessTaskStateReducer {
         throw HarnessTaskTransitionError.dispatchRequiresJobID
       }
     }
-    if transition.activeJobID != nil, transition.status.isTerminal {
+    if transition.activeJobID != nil, transition.lifecycle.isTerminal {
       // Pausing or blocking on a human does not abandon an in-flight job -
       // the engine still owns it and the next wake observes it. A *terminal*
       // task claiming an active job would be the real inconsistency.
@@ -1379,12 +1361,12 @@ public enum HarnessTaskStateReducer {
   }
 
   private static func validateResult(_ transition: HarnessTaskTransition) throws {
-    if transition.status.isTerminal {
+    if transition.lifecycle.isTerminal {
       guard let result = transition.result else {
-        throw HarnessTaskTransitionError.terminalRequiresResult(transition.status)
+        throw HarnessTaskTransitionError.terminalRequiresResult(transition.lifecycle)
       }
-      guard result.outcome == transition.status else {
-        throw HarnessTaskTransitionError.resultOutcomeMismatch(transition.status)
+      guard result.outcome == transition.lifecycle else {
+        throw HarnessTaskTransitionError.resultOutcomeMismatch(transition.lifecycle)
       }
     }
   }

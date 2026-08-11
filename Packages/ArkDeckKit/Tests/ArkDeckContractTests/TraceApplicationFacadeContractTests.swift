@@ -218,7 +218,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     else { return XCTFail("binding drift must fail closed") }
   }
 
-  func testTraceLocalizationCoversClosedPresetsModesAndStagesInBothLanguages() throws {
+  func testTraceLocalizationCoversRuntimeKeysAndContainsNoOrphans() throws {
     let data = try Data(
       contentsOf: repository.appending(
         path: "ArkDeckApp/Resources/TraceLocalizable.xcstrings"))
@@ -235,7 +235,34 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
         "trace.parameters.mode.persistentChange",
       ]
 
-    for key in requiredKeys {
+    let featureRoot = repository.appending(path: "ArkDeckApp/Features/Trace")
+    let sources = try FileManager.default.contentsOfDirectory(
+      at: featureRoot, includingPropertiesForKeys: nil
+    ).filter { $0.pathExtension == "swift" }
+      .map { try String(contentsOf: $0, encoding: .utf8) }
+      .joined(separator: "\n")
+    let localizationSources = sources.split(separator: "\n").filter {
+      !$0.contains(".accessibilityIdentifier") && !$0.contains("identifier:")
+    }.joined(separator: "\n")
+    let literalExpression = try NSRegularExpression(
+      pattern: #"\"(trace\.[A-Za-z0-9_.-]+)\""#)
+    let sourceRange = NSRange(localizationSources.startIndex..., in: localizationSources)
+    var referencedKeys = Set(
+      literalExpression.matches(in: localizationSources, range: sourceRange).compactMap { match in
+        Range(match.range(at: 1), in: localizationSources).map {
+          String(localizationSources[$0])
+        }
+      })
+    referencedKeys.formUnion(requiredKeys)
+    referencedKeys.formUnion(
+      requiredKeys.filter { $0.hasPrefix("trace.parameters.mode.") }.map { "\($0).detail" })
+
+    let orphanedKeys = Set(strings.keys).subtracting(referencedKeys).sorted()
+    XCTAssertTrue(
+      orphanedKeys.isEmpty,
+      "TraceLocalizable contains keys with no Trace source consumer: \(orphanedKeys)")
+
+    for key in strings.keys.sorted() {
       let entry = try XCTUnwrap(strings[key] as? [String: Any], key)
       let localizations = try XCTUnwrap(
         entry["localizations"] as? [String: Any], key)

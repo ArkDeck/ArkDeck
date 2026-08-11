@@ -933,61 +933,6 @@ final class SessionSettingsContractTests: XCTestCase {
           .appending(path: "2024/01/session-root-drift-before-create").path))
   }
 
-  func testProductionStorageCompositionUsesValidatedRootAndSharedCoordinator() async throws {
-    let fixture = try SettingsFixture(label: "composition")
-    defer { fixture.cleanup() }
-    let runtime = SessionStorageApplicationRuntime(settingsStore: fixture.store)
-    let first = try RockchipProductionStorageComposition.make(runtime: runtime)
-    let second = try RockchipProductionStorageComposition.make(runtime: runtime)
-    XCTAssertEqual(
-      first.context.sessionStore.sessionsRoot.path,
-      fixture.defaultRoot.standardizedFileURL.path)
-    XCTAssertTrue(first.context.coordinator === runtime.coordinator)
-    XCTAssertTrue(second.context.coordinator === runtime.coordinator)
-
-    let catalog = try await first.context.prepareHeavyWriterAdmission()
-    await runtime.coordinator.setRetentionAdmission(
-      blocked: true, on: catalog.volumeIdentity)
-    let blockedRequest = try StorageClaimRequest(
-      claimID: "claim-blocked", jobID: "job-blocked",
-      volumeIdentity: catalog.volumeIdentity,
-      budget: StorageBudget(
-        metadataHeadroomBytes: 1, finalizationHeadroomBytes: 1,
-        remainingGrowthBytes: 1, writerClass: .heavy))
-    let snapshot = HostStorageSnapshot(
-      volumeIdentity: catalog.volumeIdentity,
-      totalBytes: 10_000, availableBytes: 10_000, isReadOnly: false)
-    let blockedAdmission = await runtime.coordinator.admit(
-      blockedRequest, snapshot: snapshot)
-    XCTAssertEqual(
-      blockedAdmission, .queued(.insufficientHeadroom))
-
-    await runtime.coordinator.setRetentionAdmission(
-      blocked: false, on: catalog.volumeIdentity)
-    let request = try StorageClaimRequest(
-      claimID: "claim-real-store", jobID: "job-real-store",
-      volumeIdentity: catalog.volumeIdentity,
-      budget: StorageBudget(
-        metadataHeadroomBytes: 1, finalizationHeadroomBytes: 1,
-        remainingGrowthBytes: 1, writerClass: .heavy))
-    guard
-      case .admitted(let claim) = await runtime.coordinator.admit(
-        request, snapshot: snapshot)
-    else { return XCTFail("shared coordinator should admit the first heavy writer") }
-    let layout = try first.context.sessionStore.createSession(
-      sessionID: "session-real-store", jobID: "job-real-store",
-      createdAt: Date(timeIntervalSince1970: 1_704_067_200), claim: claim)
-    XCTAssertTrue(layout.root.path.hasPrefix(fixture.defaultRoot.path + "/"))
-
-    _ = try fixture.store.savePolicy(
-      totalQuotaBytes: 8_192, safetyMarginBytes: 1_024,
-      retentionDays: 30, expectedGeneration: first.context.settings.generation)
-    XCTAssertThrowsError(try first.context.requireCurrentSettings()) {
-      guard case SessionSettingsError.staleGeneration = $0 else {
-        return XCTFail("expected settings-generation drift, got \($0)")
-      }
-    }
-  }
 }
 
 private enum SessionSettingsTestError: Error {

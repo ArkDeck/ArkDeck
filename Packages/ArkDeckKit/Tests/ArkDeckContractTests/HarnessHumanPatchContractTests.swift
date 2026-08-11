@@ -220,7 +220,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let storedApply = try await store.decision(taskID, round: 3)
     let prepareCount = await repair.preparations()
     XCTAssertEqual(outcome.action, .dispatched)
-    XCTAssertEqual(outcome.snapshot.phase, .patching)
+    XCTAssertEqual(outcome.snapshot.stage, .patching)
     XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
     XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 1)
     XCTAssertEqual(prepareCount, 1)
@@ -264,7 +264,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let prepareCount = await repair.preparations()
     let attempts = try await store.attempts(taskID)
     XCTAssertEqual(applied.action, .dispatched)
-    XCTAssertEqual(applied.snapshot.phase, .patching)
+    XCTAssertEqual(applied.snapshot.stage, .patching)
     XCTAssertEqual(applied.snapshot.consumedBudget.e1Mutations, 2)
     XCTAssertEqual(applied.snapshot.repairAttempt?.checkpointJobID, "JOB-HUMAN-SEQUENCE-1")
     XCTAssertNil(applied.snapshot.repairAttempt?.patchAttemptRef)
@@ -362,7 +362,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let grant = HumanPatchGrant(enabled: true)
     let jobs = HumanPatchJobPort()
     let historical = snapshot(
-      status: .humanRequired,
+      lifecycle: .humanRequired,
       result: HarnessTaskResult(
         outcome: .humanRequired, reasonCode: "patchProposalRequired",
         summary: "A bounded source patch must be supplied."))
@@ -387,7 +387,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let grant = HumanPatchGrant(enabled: true)
     let jobs = HumanPatchJobPort()
     let historical = snapshot(
-      status: .humanRequired,
+      lifecycle: .humanRequired,
       result: HarnessTaskResult(
         outcome: .humanRequired, reasonCode: "patchProposalRequired",
         summary: "A bounded source patch must be supplied."),
@@ -405,7 +405,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
 
     XCTAssertEqual(outcome.action, .stoppedBudgetExhausted)
     XCTAssertEqual(outcome.reasonCode, "maxWallClockExhausted")
-    XCTAssertEqual(outcome.snapshot.status, .failed)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .failed)
     XCTAssertEqual(prepareCount, 0)
     XCTAssertTrue(requests.isEmpty)
     XCTAssertNil(stored)
@@ -474,7 +474,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
 
     XCTAssertEqual(retried.action, .stoppedBudgetExhausted)
     XCTAssertEqual(retried.reasonCode, "maxWallClockExhausted")
-    XCTAssertEqual(retried.snapshot.status, .failed)
+    XCTAssertEqual(retried.snapshot.lifecycle, .failed)
     XCTAssertEqual(prepareCount, 1)
     XCTAssertTrue(requests.isEmpty)
     XCTAssertEqual(decisionAfter, decisionBefore)
@@ -584,7 +584,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let status = try await coordinator.status(taskID)
     let finalPrepareCount = await repair.preparations()
     let finalRequests = await jobs.requests()
-    XCTAssertEqual(status.status, .humanRequired)
+    XCTAssertEqual(status.lifecycle, .humanRequired)
     XCTAssertEqual(finalPrepareCount, 1)
     XCTAssertTrue(finalRequests.isEmpty)
   }
@@ -619,7 +619,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(after.version, versionBefore)
     XCTAssertEqual(eventsAfter, eventsBefore)
     XCTAssertEqual(after.consumedBudget.modelCalls, 0)
-    XCTAssertEqual(after.status, .humanRequired)
+    XCTAssertEqual(after.lifecycle, .humanRequired)
   }
 
   func testDecisionContextRefusesIdentityMarkedContext() async throws {
@@ -689,7 +689,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let status = try await coordinator.status(taskID)
     let prepareCount = await repair.preparations()
     let requests = await jobs.requests()
-    XCTAssertEqual(status.status, .humanRequired)
+    XCTAssertEqual(status.lifecycle, .humanRequired)
     XCTAssertEqual(prepareCount, 0)
     XCTAssertTrue(requests.isEmpty)
   }
@@ -744,7 +744,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
   }
 
   private func snapshot(
-    status: HarnessTaskStatus = .running,
+    lifecycle: HarnessTaskLifecycle = .running,
     result: HarnessTaskResult? = nil,
     createdAtUTC: String? = nil,
     goalSummary: String = "repair crash"
@@ -771,7 +771,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
         allowedOperations: DebugCrashTaskHandler().permittedOperations.sorted()),
       observedState: HarnessObservedState(latestVerdict: .fail).asJSON,
       createdAtUTC: createdAtUTC ?? now, updatedAtUTC: now,
-      status: status, phase: .analyzing,
+      lifecycle: lifecycle, stage: .analyzing,
       activeRound: 1, activeJobID: nil,
       consumedBudget: HarnessConsumedBudget(rounds: 1), result: result)
   }
