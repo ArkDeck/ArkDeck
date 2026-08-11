@@ -38,6 +38,53 @@ func readSecretWithoutEcho() -> Data? {
 }
 
 switch arguments[2] {
+case "sign-profile":
+  guard let input = value(after: "-inFile"), let output = value(after: "-outFile"),
+    let profileCertificate = value(after: "-profileCertFile"),
+    let keystoreFile = value(after: "-keystoreFile"),
+    input.hasSuffix(".json"), output.hasSuffix(".p7b"),
+    profileCertificate.hasSuffix(".pem"), keystoreFile.hasSuffix(".p12")
+  else {
+    exit(64)
+  }
+  writeOutput("please input KeystorePwd (timeout 30 seconds):")
+  guard let keystore = readSecretWithoutEcho(), !keystore.isEmpty else { exit(66) }
+  writeOutput("please input KeyPwd (timeout 30 seconds):")
+  guard let key = readSecretWithoutEcho(), !key.isEmpty else { exit(68) }
+  if mode == "sign-profile-failure" { exit(74) }
+  guard let bytes = try? Data(contentsOf: URL(fileURLWithPath: input)) else { exit(70) }
+  do {
+    try bytes.write(to: URL(fileURLWithPath: output), options: .withoutOverwriting)
+  } catch {
+    exit(71)
+  }
+  exit(0)
+
+case "verify-profile":
+  guard let input = value(after: "-inFile"), let output = value(after: "-outFile"),
+    input.hasSuffix(".p7b"), output.hasSuffix(".json"),
+    let bytes = try? Data(contentsOf: URL(fileURLWithPath: input)),
+    let content = try? JSONSerialization.jsonObject(with: bytes),
+    JSONSerialization.isValidJSONObject(content)
+  else { exit(72) }
+  if mode == "verify-profile-failure" { exit(73) }
+  if mode.hasPrefix("verify-profile-succeed-once:"),
+    let marker = mode.split(separator: ":", maxSplits: 1).last.map(String.init)
+  {
+    if FileManager.default.fileExists(atPath: marker) { exit(73) }
+    try? Data("verified-once".utf8).write(to: URL(fileURLWithPath: marker))
+  }
+  let result: [String: Any] = ["verifiedPassed": true, "content": content]
+  guard let encoded = try? JSONSerialization.data(
+    withJSONObject: result, options: [.sortedKeys])
+  else { exit(73) }
+  do {
+    try encoded.write(to: URL(fileURLWithPath: output), options: .withoutOverwriting)
+  } catch {
+    exit(71)
+  }
+  exit(0)
+
 case "sign-app":
   guard let input = value(after: "-inFile"), let output = value(after: "-outFile") else {
     exit(64)
@@ -60,6 +107,19 @@ case "sign-app":
     FileHandle.standardOutput.write(keystore)
     exit(69)
   }
+  if mode == "sign-failure" {
+    writeOutput(
+      "Incorrect keystore password, please input the correct plaintext password.")
+    exit(74)
+  }
+  if mode == "certificate-chain-failure" {
+    writeOutput("ERROR: 11013004 Profile cert must a cert chain")
+    exit(74)
+  }
+  guard input.hasSuffix(".hap") else {
+    writeOutput("Invalid file format.")
+    exit(75)
+  }
   guard var bytes = try? Data(contentsOf: URL(fileURLWithPath: input)) else { exit(70) }
   bytes.append(Data("arkdeck-signed-fixture".utf8))
   do {
@@ -71,7 +131,7 @@ case "sign-app":
 
 case "verify-app":
   guard let input = value(after: "-inFile"),
-    let certificate = value(after: "-outCertchain"),
+    let certificate = value(after: "-outCertChain"),
     let profile = value(after: "-outProfile"),
     let bytes = try? Data(contentsOf: URL(fileURLWithPath: input)),
     bytes.starts(with: [0x50, 0x4b, 0x03, 0x04])

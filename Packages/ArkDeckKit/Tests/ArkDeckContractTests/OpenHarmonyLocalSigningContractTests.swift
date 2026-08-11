@@ -1,9 +1,12 @@
 import CryptoKit
 import Darwin
 import Foundation
+import LocalAuthentication
+import Security
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckCLI
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
@@ -21,8 +24,267 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     if let root { try? FileManager.default.removeItem(at: root) }
   }
 
+  func testLoginKeychainReadsForbidBothModernAndLegacyAuthenticationUI() throws {
+    let options = LoginKeychainSigningSecretStore.nonInteractiveReadOptions()
+    let context = try XCTUnwrap(
+      options[kSecUseAuthenticationContext as String] as? LAContext)
+    XCTAssertTrue(context.interactionNotAllowed)
+    let authenticationUI = try XCTUnwrap(
+      options[kSecUseAuthenticationUI as String])
+    XCTAssertTrue(CFEqual(authenticationUI as CFTypeRef, kSecUseAuthenticationUIFail))
+  }
+
+  func testLoginKeychainPresenceProbeNeverRequestsSecretDataOrAuthenticationUI() throws {
+    let query = LoginKeychainSigningSecretStore.presenceQuery(account: "fixture-account")
+    XCTAssertEqual(query[kSecAttrAccount as String] as? String, "fixture-account")
+    XCTAssertEqual(query[kSecReturnAttributes as String] as? Bool, true)
+    XCTAssertEqual(query[kSecReturnData as String] as? Bool, false)
+    XCTAssertNil(query[kSecUseAuthenticationContext as String])
+    let authenticationUI = try XCTUnwrap(query[kSecUseAuthenticationUI as String])
+    XCTAssertTrue(CFEqual(authenticationUI as CFTypeRef, kSecUseAuthenticationUIFail))
+  }
+
+  func testExistingKeychainSecretUpdateDoesNotChurnACLIdentity() throws {
+    let value = Data("replacement".utf8)
+    let update = LoginKeychainSigningSecretStore.existingItemValueUpdate(value)
+    XCTAssertEqual(update.count, 1)
+    XCTAssertEqual(update[kSecValueData as String] as? Data, value)
+    XCTAssertNil(update[kSecAttrAccess as String])
+  }
+
+  func testTrustedApplicationFingerprintChangesWhenDaemonBytesChange() throws {
+    let opaqueIdentity = Data("same-designated-application".utf8)
+    let firstExecutable = Data(SHA256.hash(data: Data("daemon-v1".utf8)))
+    let secondExecutable = Data(SHA256.hash(data: Data("daemon-v2".utf8)))
+
+    let first = LoginKeychainSigningSecretStore.trustedApplicationFingerprint(
+      applicationIdentity: opaqueIdentity, executableSHA256: firstExecutable)
+    let repeated = LoginKeychainSigningSecretStore.trustedApplicationFingerprint(
+      applicationIdentity: opaqueIdentity, executableSHA256: firstExecutable)
+    let replacement = LoginKeychainSigningSecretStore.trustedApplicationFingerprint(
+      applicationIdentity: opaqueIdentity, executableSHA256: secondExecutable)
+
+    XCTAssertEqual(first, repeated)
+    XCTAssertNotEqual(
+      first, replacement,
+      "an unchanged SecTrustedApplication identity must not hide rebuilt daemon bytes")
+    XCTAssertEqual(first.utf8.count, 64)
+  }
+
+  func testSDKReleasePresetRebindsUpdatedDaemonWithoutReadingStaleACL() async throws {
+    let fixture = try makeSDKReleaseFixture(mode: "success")
+    fixture.secrets.trustedDaemonIdentity = "stable-installed-daemon"
+    let fixedNow = Date(timeIntervalSince1970: 1_786_406_400)
+    let installer = OpenHarmonySDKReleasePresetInstaller(
+      store: fixture.store, materialParentURL: fixture.presetRoot,
+      now: { fixedNow })
+    let configuration = OpenHarmonySDKReleasePresetConfiguration(
+      projectRef: "demo-app", bundleName: "com.example.waterflowdemo",
+      javaExecutable: fixture.java, sdkRoot: fixture.sdkRoot)
+
+    let first = try await installer.install(configuration: configuration)
+    XCTAssertEqual(first.presetID, OpenHarmonyLocalSigning.defaultPresetID)
+    XCTAssertEqual(first.projectRef, "demo-app")
+    XCTAssertEqual(first.keyAlias, "openharmony application release")
+    XCTAssertEqual(first.signingAlgorithm, "SHA256withECDSA")
+    XCTAssertEqual(
+      first.keychainAccessSchema, OpenHarmonyLocalSigning.keychainAccessSchema)
+    var runtimePair = try fixture.store.secretPair(for: first)
+    XCTAssertEqual(
+      runtimePair.keystore, OpenHarmonyLocalSigning.publicSDKReleasePassword())
+    XCTAssertEqual(runtimePair.key, OpenHarmonyLocalSigning.publicSDKReleasePassword())
+    XCTAssertEqual(
+      fixture.secrets.secretReadCount, 0,
+      "the official public SDK credential must not decrypt Keychain on the Runtime hot path")
+    runtimePair.keystore.resetBytes(in: 0..<runtimePair.keystore.count)
+    runtimePair.key.resetBytes(in: 0..<runtimePair.key.count)
+    let firstAccount = try XCTUnwrap(first.secretEnvelopeAccount)
+    let firstMaterial = URL(
+      fileURLWithPath: try XCTUnwrap(first.managedMaterialDirectory), isDirectory: true)
+    XCTAssertEqual(firstMaterial.deletingLastPathComponent().path, fixture.presetRoot.path)
+    XCTAssertEqual(try permissions(firstMaterial.path) & 0o777, 0o700)
+    for path in [first.keystore.path, first.appCertificate.path, first.signedProfile.path] {
+      XCTAssertEqual(try permissions(path) & 0o777, 0o600)
+      XCTAssertEqual(URL(fileURLWithPath: path).deletingLastPathComponent(), firstMaterial)
+    }
+    let applicationCertificateChain = try String(
+      contentsOf: URL(fileURLWithPath: first.appCertificate.path), encoding: .utf8)
+    XCTAssertEqual(
+      applicationCertificateChain.components(separatedBy: "-----BEGIN CERTIFICATE-----").count - 1,
+      3,
+      "the managed app certificate must be the complete SDK root/CA/application chain")
+    XCTAssertTrue(applicationCertificateChain.contains("fixture-application-root"))
+    XCTAssertTrue(applicationCertificateChain.contains("fixture-application-ca"))
+    XCTAssertTrue(applicationCertificateChain.contains("fixture-release-certificate"))
+    XCTAssertFalse(applicationCertificateChain.contains("fixture-profile-release"))
+    let profile = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: URL(
+        fileURLWithPath: first.signedProfile.path))) as? [String: Any])
+    XCTAssertEqual(profile["type"] as? String, "release")
+    XCTAssertNil(profile["debug-info"])
+    let bundle = try XCTUnwrap(profile["bundle-info"] as? [String: Any])
+    XCTAssertEqual(bundle["bundle-name"] as? String, "com.example.waterflowdemo")
+    let validity = try XCTUnwrap(profile["validity"] as? [String: Any])
+    XCTAssertEqual(
+      (validity["not-before"] as? NSNumber)?.int64Value,
+      Int64(fixedNow.timeIntervalSince1970) - 300)
+    XCTAssertEqual(
+      (validity["not-after"] as? NSNumber)?.int64Value,
+      Int64(fixedNow.timeIntervalSince1970) + 365 * 24 * 60 * 60)
+    XCTAssertTrue(fixture.store.status().ready)
+
+    let receiptURL = URL(fileURLWithPath: fixture.store.receiptPath)
+    var legacyDocument = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: Any])
+    legacyDocument["keychainAccessSchema"] = "trusted-applications-v2"
+    try JSONSerialization.data(
+      withJSONObject: legacyDocument, options: [.prettyPrinted, .sortedKeys]
+    ).write(to: receiptURL, options: .atomic)
+    XCTAssertFalse(
+      fixture.store.status().ready,
+      "ordinary Runtime readiness must not accept an obsolete ACL schema")
+
+    fixture.secrets.trustedDaemonIdentity = "replacement-installed-daemon"
+    try fixture.store.refreshTrustedApplicationAccess()
+    let rebound = try fixture.store.loadValidated()
+    let reboundAccount = try XCTUnwrap(rebound.secretEnvelopeAccount)
+    XCTAssertNotEqual(reboundAccount, firstAccount)
+    XCTAssertTrue(rebound.legacyPasswordAccounts?.contains(firstAccount) == true)
+    XCTAssertEqual(fixture.secrets.secretReadCount, 0)
+
+    let second = try await installer.install(configuration: configuration)
+    XCTAssertEqual(second.secretEnvelopeAccount, reboundAccount)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: firstMaterial.path))
+    let secondMaterial = try XCTUnwrap(second.managedMaterialDirectory)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: secondMaterial))
+
+    let removal = try fixture.store.remove()
+    XCTAssertTrue(removal.removedReceipt)
+    XCTAssertTrue(removal.removedKeystorePassword)
+    XCTAssertTrue(removal.removedKeyPassword)
+    XCTAssertTrue(removal.removedManagedMaterial)
+    XCTAssertTrue(removal.preservedSourcePaths.isEmpty)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: secondMaterial))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: fixture.sdkRoot.appendingPathComponent(
+          "toolchains/lib/OpenHarmony.p12").path),
+      "removing ArkDeck's preset must preserve the SDK source bundle")
+  }
+
+  func testSDKReleaseInstallMigratesLegacyACLReceiptToOneNewEnvelope() async throws {
+    let fixture = try makeSDKReleaseFixture(mode: "success")
+    fixture.secrets.trustedDaemonIdentity = "stable-installed-daemon"
+    let installer = OpenHarmonySDKReleasePresetInstaller(
+      store: fixture.store, materialParentURL: fixture.presetRoot)
+    let configuration = OpenHarmonySDKReleasePresetConfiguration(
+      bundleName: "com.example.waterflowdemo",
+      javaExecutable: fixture.java, sdkRoot: fixture.sdkRoot)
+    let first = try await installer.install(configuration: configuration)
+    let firstAccount = try XCTUnwrap(first.secretEnvelopeAccount)
+
+    // Forward-readable receipts written before the access schema marker may
+    // carry an ACL that exposes attributes to the CLI but denies value reads
+    // to the LaunchAgent. An explicit reinstall must not trust that markerless
+    // item merely because the daemon's designated requirement is unchanged.
+    let legacy = OpenHarmonySigningPresetReceipt(
+      schemaVersion: first.schemaVersion, installedAtUTC: first.installedAtUTC,
+      presetID: first.presetID, projectRef: first.projectRef,
+      javaExecutable: first.javaExecutable, signerJAR: first.signerJAR,
+      keystore: first.keystore, appCertificate: first.appCertificate,
+      signedProfile: first.signedProfile, keyAlias: first.keyAlias,
+      signingAlgorithm: first.signingAlgorithm,
+      keystorePasswordAccount: first.keystorePasswordAccount,
+      keyPasswordAccount: first.keyPasswordAccount,
+      secretEnvelopeAccount: first.secretEnvelopeAccount,
+      legacyPasswordAccounts: first.legacyPasswordAccounts,
+      trustedDaemonApplicationSHA256: first.trustedDaemonApplicationSHA256,
+      keychainAccessSchema: nil,
+      managedMaterialDirectory: first.managedMaterialDirectory)
+    try JSONEncoder().encode(legacy).write(
+      to: URL(fileURLWithPath: fixture.store.receiptPath), options: .atomic)
+
+    let migrated = try await installer.install(configuration: configuration)
+    XCTAssertNotEqual(migrated.secretEnvelopeAccount, firstAccount)
+    XCTAssertEqual(
+      migrated.keychainAccessSchema, OpenHarmonyLocalSigning.keychainAccessSchema)
+    XCTAssertTrue(migrated.legacyPasswordAccounts?.contains(firstAccount) == true)
+    XCTAssertTrue(fixture.store.status().ready)
+  }
+
+  func testSDKReleasePresetFailurePreservesPreviousReceiptAndMaterial() async throws {
+    let marker = root.appendingPathComponent("sdk-profile-verified-once")
+    let fixture = try makeSDKReleaseFixture(
+      mode: "verify-profile-succeed-once:\(marker.path)")
+    fixture.secrets.trustedDaemonIdentity = "stable-installed-daemon"
+    let installer = OpenHarmonySDKReleasePresetInstaller(
+      store: fixture.store, materialParentURL: fixture.presetRoot)
+    let configuration = OpenHarmonySDKReleasePresetConfiguration(
+      bundleName: "com.example.waterflowdemo",
+      javaExecutable: fixture.java, sdkRoot: fixture.sdkRoot)
+    let previous = try await installer.install(configuration: configuration)
+    let previousMaterial = try XCTUnwrap(previous.managedMaterialDirectory)
+
+    do {
+      _ = try await installer.install(configuration: configuration)
+      XCTFail("a failed exact profile readback must not replace the ready preset")
+    } catch {
+      XCTAssertTrue("\(error)".contains("verify-profile readback"), "\(error)")
+    }
+    XCTAssertEqual(try fixture.store.loadValidated(), previous)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: previousMaterial))
+    let managedDirectories = try FileManager.default.contentsOfDirectory(
+      at: fixture.presetRoot, includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.hasPrefix("sdk-release-") }
+    XCTAssertEqual(
+      managedDirectories.map { $0.resolvingSymlinksInPath().path },
+      [URL(fileURLWithPath: previousMaterial).resolvingSymlinksInPath().path])
+  }
+
+  func testSDKReleaseCLIRequiresExplicitAbsoluteSDKAndJavaPaths() async throws {
+    let fixture = try makeSDKReleaseFixture(mode: "success")
+    do {
+      try await RuntimeCLI.runSigningAsync(
+        [
+          "install-sdk-release", "--sdk", "relative-sdk",
+          "--java", fixture.java.path,
+          "--bundle-name", "com.example.waterflowdemo", "--json",
+        ], store: fixture.store, materialParentURL: fixture.presetRoot)
+      XCTFail("the maintenance CLI must not guess a relative SDK path")
+    } catch {
+      XCTAssertTrue("\(error)".contains("--sdk must be an absolute path"), "\(error)")
+    }
+    do {
+      try await RuntimeCLI.runSigningAsync(
+        [
+          "install-sdk-release", "--sdk", fixture.sdkRoot.path,
+          "--java", "java",
+          "--bundle-name", "com.example.waterflowdemo", "--json",
+        ], store: fixture.store, materialParentURL: fixture.presetRoot)
+      XCTFail("the maintenance CLI must not guess Java through PATH")
+    } catch {
+      XCTAssertTrue("\(error)".contains("--java must be an absolute path"), "\(error)")
+    }
+  }
+
+  func testDevEcoMigrationRejectsABuildDaemonPathBeforeKeychainAccess() throws {
+    XCTAssertThrowsError(
+      try RuntimeCLI.runSigning([
+        "migrate-deveco",
+        "--build-profile", root.appendingPathComponent("missing.json5").path,
+        "--daemon", root.appendingPathComponent("build/arkdeck-agentd").path,
+        "--json",
+      ])
+    ) { error in
+      XCTAssertTrue(
+        String(describing: error).contains("canonical installed LaunchAgent daemon"),
+        "unexpected error: \(error)")
+    }
+  }
+
   func testPresetInstallStatusDriftAndRemovalArePrivateAndReversible() throws {
     let fixture = try makeFixture(mode: "success")
+    fixture.secrets.trustedDaemonIdentity = "stable-daemon-v1"
     let receipt = try fixture.store.install(
       configuration: fixture.configuration,
       keystorePassword: Data("keystore-secret".utf8),
@@ -43,6 +305,26 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertFalse(receiptBytes.contains(Data("key-secret".utf8)))
     XCTAssertEqual(try permissions(status.receiptPath) & 0o777, 0o600)
     XCTAssertEqual(try permissions(root.appendingPathComponent("preset").path) & 0o777, 0o700)
+    let envelopeAccount = try XCTUnwrap(receipt.secretEnvelopeAccount)
+    XCTAssertTrue(fixture.secrets.contains(account: envelopeAccount))
+    XCTAssertFalse(fixture.secrets.contains(account: receipt.keystorePasswordAccount))
+    XCTAssertFalse(fixture.secrets.contains(account: receipt.keyPasswordAccount))
+    try fixture.store.refreshTrustedApplicationAccess()
+    XCTAssertTrue(fixture.secrets.refreshedAccounts.isEmpty)
+    XCTAssertEqual(fixture.secrets.secretReadCount, 0)
+    fixture.secrets.trustedDaemonIdentity = "stable-daemon-v2"
+    try fixture.store.refreshTrustedApplicationAccess()
+    let rebound = try fixture.store.loadValidated()
+    XCTAssertNotEqual(rebound.secretEnvelopeAccount, envelopeAccount)
+    XCTAssertTrue(rebound.legacyPasswordAccounts?.contains(envelopeAccount) == true)
+    XCTAssertTrue(fixture.secrets.refreshedAccounts.isEmpty)
+    XCTAssertEqual(fixture.secrets.secretReadCount, 1)
+    XCTAssertEqual(rebound.trustedDaemonApplicationSHA256, "stable-daemon-v2")
+    var reboundPair = try fixture.store.secretPair(for: rebound)
+    XCTAssertEqual(reboundPair.keystore, Data("keystore-secret".utf8))
+    XCTAssertEqual(reboundPair.key, Data("key-secret".utf8))
+    reboundPair.keystore.resetBytes(in: 0..<reboundPair.keystore.count)
+    reboundPair.key.resetBytes(in: 0..<reboundPair.key.count)
 
     try Data("drifted".utf8).write(to: URL(fileURLWithPath: receipt.signerJAR.path))
     let drifted = fixture.store.status()
@@ -53,10 +335,245 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertTrue(removal.removedReceipt)
     XCTAssertTrue(removal.removedKeystorePassword)
     XCTAssertTrue(removal.removedKeyPassword)
+    XCTAssertFalse(removal.removedManagedMaterial)
     for path in removal.preservedSourcePaths {
       XCTAssertTrue(FileManager.default.fileExists(atPath: path))
     }
     XCTAssertFalse(fixture.store.status().installed)
+  }
+
+  func testDevEcoEncryptedPasswordsDecodeOnlyAtInteractiveInstallBoundary() throws {
+    let config = root.appendingPathComponent("deveco-config", isDirectory: true)
+    let material = config.appendingPathComponent("material", isDirectory: true)
+    let fd = material.appendingPathComponent("fd", isDirectory: true)
+    let ac = material.appendingPathComponent("ac", isDirectory: true)
+    let ce = material.appendingPathComponent("ce", isDirectory: true)
+    for directory in [fd, ac, ce] {
+      try FileManager.default.createDirectory(
+        at: directory, withIntermediateDirectories: true)
+    }
+    let parts = [
+      Data(repeating: 0x11, count: 16),
+      Data(repeating: 0x42, count: 16),
+      Data(repeating: 0xA5, count: 16),
+    ]
+    for (index, part) in parts.enumerated() {
+      let slot = fd.appendingPathComponent("\(index)", isDirectory: true)
+      try FileManager.default.createDirectory(
+        at: slot, withIntermediateDirectories: false)
+      try part.write(to: slot.appendingPathComponent("part-\(index)"))
+    }
+    let salt = Data((0..<16).map(UInt8.init))
+    try salt.write(to: ac.appendingPathComponent("salt"))
+    let fixedComponent = Data([
+      49, 243, 9, 115, 214, 175, 91, 184,
+      211, 190, 177, 88, 101, 131, 192, 119,
+    ])
+    var combined = parts[0]
+    for part in parts.dropFirst() { xorTestBytes(part, into: &combined) }
+    xorTestBytes(fixedComponent, into: &combined)
+    let passwordMaterial = Data(String(decoding: combined, as: UTF8.self).utf8)
+    let rootKey = testPBKDF2SHA256(
+      password: passwordMaterial, salt: salt, iterations: 10_000,
+      outputByteCount: 16)
+    let workKey = Data((0..<16).map { UInt8(0xD0 + $0) })
+    try testDevEcoEnvelope(
+      workKey, key: rootKey, nonceByte: 0x21
+    ).write(to: ce.appendingPathComponent("work-key"))
+    let expected = Data("deveco-plaintext-password".utf8)
+    let encrypted = try testDevEcoEnvelope(
+      expected, key: workKey, nonceByte: 0x37)
+      .map { String(format: "%02x", $0) }.joined()
+    let keystore = config.appendingPathComponent("release.p12")
+    try Data("fixture".utf8).write(to: keystore)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: keystore.path)
+
+    XCTAssertEqual(
+      try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        Data(encrypted.utf8), keystore: keystore),
+      expected)
+    let ordinary = Data("ordinary-plaintext".utf8)
+    XCTAssertEqual(
+      try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        ordinary, keystore: keystore),
+      ordinary)
+    let longHexPlaintext = Data(String(repeating: "a", count: 64).utf8)
+    XCTAssertEqual(
+      try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        longHexPlaintext, keystore: keystore),
+      longHexPlaintext)
+
+    let jar = config.appendingPathComponent("hap-sign-tool.jar")
+    let certificate = config.appendingPathComponent("release.cer")
+    let profile = config.appendingPathComponent("release.p7b")
+    try Data("jar".utf8).write(to: jar)
+    try Data("certificate".utf8).write(to: certificate)
+    try Data("profile".utf8).write(to: profile)
+    let secrets = MemorySigningSecretStore()
+    let store = OpenHarmonySigningPresetStore(
+      rootURL: root.appendingPathComponent("normalized-preset"),
+      secrets: secrets,
+      nowUTC: { "2026-08-10T00:00:00Z" })
+    let receipt = try store.install(
+      configuration: OpenHarmonySigningPresetConfiguration(
+        javaExecutable: productsDirectory.appendingPathComponent(
+          "ArkDeckFakeHapSignerFixture").resolvingSymlinksInPath(),
+        signerJAR: jar, keystore: keystore,
+        appCertificate: certificate, signedProfile: profile,
+        keyAlias: "test-key"),
+      keystorePassword: Data(encrypted.utf8),
+      keyPassword: Data(encrypted.utf8))
+    let normalization = try store.normalizeDevEcoSecrets()
+    XCTAssertTrue(normalization.normalizedKeystorePassword)
+    XCTAssertTrue(normalization.normalizedKeyPassword)
+    var normalizedPair = try store.secretPair(for: store.loadValidated())
+    XCTAssertEqual(normalizedPair.keystore, expected)
+    XCTAssertEqual(normalizedPair.key, expected)
+    normalizedPair.keystore.resetBytes(in: 0..<normalizedPair.keystore.count)
+    normalizedPair.key.resetBytes(in: 0..<normalizedPair.key.count)
+    let repeated = try store.normalizeDevEcoSecrets()
+    XCTAssertFalse(repeated.normalizedKeystorePassword)
+    XCTAssertFalse(repeated.normalizedKeyPassword)
+
+    let buildProfile = config.appendingPathComponent("build-profile.json5")
+    try Data(
+      """
+      {
+        app: {
+          signingConfigs: [{
+            storePassword: "\(encrypted)",
+            keyPassword: "\(encrypted)",
+            storeFile: "\(keystore.path)"
+          }]
+        }
+      }
+      """.utf8
+    ).write(to: buildProfile, options: .atomic)
+    try RuntimeCLI.runSigning(
+      [
+        "migrate-deveco", "--build-profile", buildProfile.path,
+        "--daemon", productsDirectory.appendingPathComponent("arkdeck-agentd").path,
+        "--key-alias", "debugkey",
+        "--json",
+      ], store: store)
+    let migratedReceipt = try store.loadValidated()
+    XCTAssertEqual(migratedReceipt.keyAlias, "debugkey")
+    let envelopeAccount = try XCTUnwrap(migratedReceipt.secretEnvelopeAccount)
+    XCTAssertEqual(envelopeAccount, receipt.secretEnvelopeAccount)
+    XCTAssertTrue((migratedReceipt.legacyPasswordAccounts ?? []).isEmpty)
+    XCTAssertTrue(secrets.contains(account: envelopeAccount))
+    var migratedPair = try store.secretPair(for: migratedReceipt)
+    XCTAssertEqual(migratedPair.keystore, expected)
+    XCTAssertEqual(migratedPair.key, expected)
+    migratedPair.keystore.resetBytes(in: 0..<migratedPair.keystore.count)
+    migratedPair.key.resetBytes(in: 0..<migratedPair.key.count)
+    let migratedStatus = store.status()
+    XCTAssertTrue(migratedStatus.ready, migratedStatus.diagnostics.joined(separator: " | "))
+    XCTAssertTrue(migratedStatus.keystorePasswordPresent)
+    XCTAssertTrue(migratedStatus.keyPasswordPresent)
+    try store.refreshTrustedApplicationAccess()
+    XCTAssertTrue(secrets.refreshedAccounts.isEmpty)
+    XCTAssertEqual(try store.loadValidated().secretEnvelopeAccount, envelopeAccount)
+
+    try RuntimeCLI.runSigning(
+      [
+        "migrate-deveco", "--build-profile", buildProfile.path,
+        "--daemon", productsDirectory.appendingPathComponent("arkdeck-agentd").path,
+        "--json",
+      ], store: store)
+    XCTAssertEqual(try store.loadValidated().secretEnvelopeAccount, envelopeAccount)
+    XCTAssertEqual(try store.loadValidated().keyAlias, "debugkey")
+
+    let replacementMigration = try store.migrateToSecretEnvelope(
+      keystorePassword: Data("replacement-keystore-secret".utf8),
+      keyPassword: Data("replacement-key-secret".utf8))
+    XCTAssertFalse(replacementMigration.migrated)
+    XCTAssertEqual(replacementMigration.envelopeAccount, envelopeAccount)
+    var replacementPair = try store.secretPair(for: store.loadValidated())
+    XCTAssertEqual(replacementPair.keystore, Data("replacement-keystore-secret".utf8))
+    XCTAssertEqual(replacementPair.key, Data("replacement-key-secret".utf8))
+    replacementPair.keystore.resetBytes(in: 0..<replacementPair.keystore.count)
+    replacementPair.key.resetBytes(in: 0..<replacementPair.key.count)
+
+    XCTAssertThrowsError(
+      try store.migrateToSecretEnvelope(
+        keystorePassword: Data("replacement-keystore-secret".utf8),
+        keyPassword: Data("replacement-key-secret".utf8),
+        keyAlias: "invalid/alias"))
+    XCTAssertEqual(try store.loadValidated().keyAlias, "debugkey")
+
+    secrets.trustedDaemonIdentity = "installed-daemon-v2"
+    try RuntimeCLI.runSigning(
+      [
+        "migrate-deveco", "--build-profile", buildProfile.path,
+        "--daemon", productsDirectory.appendingPathComponent("arkdeck-agentd").path,
+        "--json",
+      ], store: store)
+    let reboundReceipt = try store.loadValidated()
+    XCTAssertNotEqual(reboundReceipt.secretEnvelopeAccount, envelopeAccount)
+    XCTAssertTrue(reboundReceipt.legacyPasswordAccounts?.contains(envelopeAccount) == true)
+    XCTAssertEqual(
+      reboundReceipt.trustedDaemonApplicationSHA256, "installed-daemon-v2")
+
+    let mismatchedKeystore = config.appendingPathComponent("mismatched.p12")
+    try Data("different-keystore".utf8).write(to: mismatchedKeystore)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: mismatchedKeystore.path)
+    let mismatchedProfile = config.appendingPathComponent("mismatched-build-profile.json5")
+    try Data(
+      """
+      {
+        app: {
+          signingConfigs: [{
+            storePassword: "\(encrypted)",
+            keyPassword: "\(encrypted)",
+            storeFile: "\(mismatchedKeystore.path)"
+          }]
+        }
+      }
+      """.utf8
+    ).write(to: mismatchedProfile, options: .atomic)
+    let receiptBeforeMismatch = try store.loadValidated()
+    XCTAssertThrowsError(
+      try RuntimeCLI.runSigning(
+        [
+          "migrate-deveco", "--build-profile", mismatchedProfile.path,
+          "--daemon", productsDirectory.appendingPathComponent("arkdeck-agentd").path,
+          "--json",
+        ], store: store)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("does not match the installed preset"), "\(error)")
+    }
+    XCTAssertEqual(try store.loadValidated(), receiptBeforeMismatch)
+    let missingProfile = config.appendingPathComponent("missing-build-profile.json5")
+    try Data(
+      """
+      {
+        app: {
+          signingConfigs: [{
+            storePassword: "\(encrypted)",
+            keyPassword: "\(encrypted)",
+            storeFile: "\(config.appendingPathComponent("missing.p12").path)"
+          }]
+        }
+      }
+      """.utf8
+    ).write(to: missingProfile, options: .atomic)
+    XCTAssertThrowsError(
+      try RuntimeCLI.runSigning(
+        [
+          "migrate-deveco", "--build-profile", missingProfile.path,
+          "--daemon", productsDirectory.appendingPathComponent("arkdeck-agentd").path,
+          "--json",
+        ], store: store))
+    XCTAssertEqual(try store.loadValidated(), receiptBeforeMismatch)
+
+    try Data(repeating: 0, count: 48).write(
+      to: ce.appendingPathComponent("work-key"), options: .atomic)
+    XCTAssertThrowsError(
+      try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
+        Data(encrypted.utf8), keystore: keystore))
   }
 
   func testPresetRejectsSymlinkAndPermissionWideningAndReceiptFieldDrift() throws {
@@ -112,12 +629,11 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
         configuration: fixture.configuration,
         keystorePassword: Data("replacement-keystore-secret".utf8),
         keyPassword: Data("replacement-key-secret".utf8)))
-    XCTAssertEqual(
-      try fixture.secrets.read(account: receipt.keystorePasswordAccount),
-      Data("old-keystore-secret".utf8))
-    XCTAssertEqual(
-      try fixture.secrets.read(account: receipt.keyPasswordAccount),
-      Data("old-key-secret".utf8))
+    var restored = try fixture.store.secretPair(for: receipt)
+    XCTAssertEqual(restored.keystore, Data("old-keystore-secret".utf8))
+    XCTAssertEqual(restored.key, Data("old-key-secret".utf8))
+    restored.keystore.resetBytes(in: 0..<restored.keystore.count)
+    restored.key.resetBytes(in: 0..<restored.key.count)
   }
 
   func testJARDriftAfterPlanMaterializationRefusesBeforeSpawn() async throws {
@@ -137,6 +653,11 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
         artifactID: "ART-INPUT", fileURL: input,
         sha256: sha256(bytes), byteCount: bytes.count))
     let action = try signingAction(provider: provider.provider, context: context)
+    guard case .workspace(.signOpenHarmonyHap(let signingAction)) = action else {
+      return XCTFail("expected signing action")
+    }
+    XCTAssertTrue(signingAction.verifyArguments.contains("-outCertChain"))
+    XCTAssertFalse(signingAction.verifyArguments.contains("-outCertchain"))
     let plan = try provider.provider.lower(action: action, context: context)
     try Data("drift-after-materialization".utf8).write(
       to: fixture.configuration.signerJAR)
@@ -153,6 +674,44 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     let paths = attempts.paths(jobID: context.jobID)
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.directory))
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.signedHAP))
+  }
+
+  func testSigningPlanUsesStandardHAPModeWithInteractivePasswordsOnly() throws {
+    let fixture = try makeFixture(mode: "success")
+    try installSecrets(in: fixture)
+    let attempts = try OpenHarmonySigningAttemptStore(
+      rootURL: root.appendingPathComponent("standard-hap-attempts"))
+    let provider = try makeProvider(
+      store: fixture.store,
+      attemptStore: attempts)
+    // Runtime Artifact payloads deliberately use only their Artifact ID and
+    // therefore do not carry the original `.hap` suffix.
+    let input = root.appendingPathComponent("ART-INPUT")
+    let bytes = Data([0x50, 0x4b, 0x03, 0x04]) + Data("input".utf8)
+    try bytes.write(to: input)
+    let context = ProviderExecutionContext(
+      jobID: "job-standard-hap", stepID: "sign-workspace-hap",
+      targetID: "TGT-SIGN", bindingRevision: nil,
+      nowUTC: "2026-08-10T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "ART-INPUT", fileURL: input,
+        sha256: sha256(bytes), byteCount: bytes.count))
+    let action = try signingAction(provider: provider.provider, context: context)
+    let plan = try provider.provider.lower(action: action, context: context)
+    guard case .process(_, let arguments, _) = plan.kind else {
+      return XCTFail("signing must lower to a closed process plan")
+    }
+    XCTAssertFalse(arguments.contains("-signCode"))
+    XCTAssertFalse(arguments.contains("-keyPwd"))
+    XCTAssertFalse(arguments.contains("-keystorePwd"))
+    let inputIndex = try XCTUnwrap(arguments.firstIndex(of: "-inFile"))
+    XCTAssertEqual(
+      arguments[inputIndex + 1],
+      attempts.paths(jobID: context.jobID).stagedUnsignedHAP)
+    XCTAssertTrue(
+      attempts.paths(jobID: context.jobID).certificateChainReadback.hasSuffix(".cer"),
+      "hapsigner verify-app only accepts a certificate-chain output with its supported .cer suffix")
+    XCTAssertEqual(Array(arguments.suffix(2)), ["-pwdInputMode", "1"])
   }
 
   func testSigningIsUnavailableBeforeAdmissionWithoutRuntimeArtifactStore() async throws {
@@ -369,6 +928,81 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.resultRecord))
   }
 
+  func testSignerNonzeroExitReportsOnlyClosedPTYDiagnostics() async throws {
+    let fixture = try makeFixture(mode: "sign-failure")
+    try installSecrets(in: fixture)
+    let attempts = try OpenHarmonySigningAttemptStore(
+      rootURL: root.appendingPathComponent("nonzero-attempts"))
+    let provider = try makeProvider(store: fixture.store, attemptStore: attempts)
+    let input = root.appendingPathComponent("nonzero-input.hap")
+    let bytes = Data([0x50, 0x4b, 0x03, 0x04]) + Data("input".utf8)
+    try bytes.write(to: input)
+    let context = ProviderExecutionContext(
+      jobID: "job-nonzero", stepID: "sign-workspace-hap",
+      targetID: "TGT-SIGN", bindingRevision: nil,
+      nowUTC: "2026-08-10T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "ART-INPUT", fileURL: input,
+        sha256: sha256(bytes), byteCount: bytes.count))
+    let action = try signingAction(provider: provider.provider, context: context)
+    let generic = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: provider.profile))
+    let dispatcher = OpenHarmonySigningWorkspaceDispatcher(
+      fallback: generic, presetStore: fixture.store)
+    do {
+      _ = try await dispatcher.dispatch(
+        try provider.provider.lower(action: action, context: context))
+      XCTFail("a signer nonzero exit must not verify")
+    } catch {
+      let message = "\(error)"
+      XCTAssertTrue(message.contains("termination=exit:74"), message)
+      XCTAssertTrue(message.contains("completedPrompts=2"), message)
+      XCTAssertTrue(message.contains("observedOutputBytes="), message)
+      XCTAssertTrue(message.contains("diagnosticCode=keystorePasswordRejected"), message)
+      XCTAssertFalse(message.contains("keystore-secret"), message)
+      XCTAssertFalse(message.contains("key-secret"), message)
+    }
+    let paths = attempts.paths(jobID: context.jobID)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.signedHAP))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.resultRecord))
+  }
+
+  func testSignerCertificateChainFailureUsesClosedDiagnostic() async throws {
+    let fixture = try makeFixture(mode: "certificate-chain-failure")
+    try installSecrets(in: fixture)
+    let attempts = try OpenHarmonySigningAttemptStore(
+      rootURL: root.appendingPathComponent("certificate-chain-attempts"))
+    let provider = try makeProvider(store: fixture.store, attemptStore: attempts)
+    let input = root.appendingPathComponent("certificate-chain-input.hap")
+    let bytes = Data([0x50, 0x4b, 0x03, 0x04]) + Data("input".utf8)
+    try bytes.write(to: input)
+    let context = ProviderExecutionContext(
+      jobID: "job-certificate-chain", stepID: "sign-workspace-hap",
+      targetID: "TGT-SIGN", bindingRevision: nil,
+      nowUTC: "2026-08-10T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "ART-INPUT", fileURL: input,
+        sha256: sha256(bytes), byteCount: bytes.count))
+    let action = try signingAction(provider: provider.provider, context: context)
+    let generic = DescriptorBoundProcessDispatcher(
+      resolver: WorkspaceActionExecutableResolver(profile: provider.profile))
+    let dispatcher = OpenHarmonySigningWorkspaceDispatcher(
+      fallback: generic, presetStore: fixture.store)
+    do {
+      _ = try await dispatcher.dispatch(
+        try provider.provider.lower(action: action, context: context))
+      XCTFail("an incomplete application certificate chain must not verify")
+    } catch {
+      let message = "\(error)"
+      XCTAssertTrue(message.contains("diagnosticCode=certificateChainRejected"), message)
+      XCTAssertFalse(message.contains("keystore-secret"), message)
+      XCTAssertFalse(message.contains("key-secret"), message)
+    }
+    let paths = attempts.paths(jobID: context.jobID)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.signedHAP))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.resultRecord))
+  }
+
   func testRecoveryVerifiesExistingOutputWithoutReplayingSign() async throws {
     let fixture = try makeFixture(mode: "success")
     try installSecrets(in: fixture)
@@ -397,10 +1031,23 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     }
     let original = try Data(contentsOf: URL(fileURLWithPath: signingAction.output.signedHAP))
     try FileManager.default.removeItem(atPath: signingAction.output.resultRecord)
+    let legacyOutput = OpenHarmonySigningAttemptPaths(
+      directory: signingAction.output.directory,
+      signedHAP: signingAction.output.signedHAP,
+      certificateChainReadback: URL(fileURLWithPath: signingAction.output.directory)
+        .appendingPathComponent("certificate-chain.pem").path,
+      profileReadback: signingAction.output.profileReadback,
+      resultRecord: signingAction.output.resultRecord)
+    let legacyAction = TypedProviderAction.workspace(.signOpenHarmonyHap(
+      WorkspaceOpenHarmonySigningAction(
+        jobID: signingAction.jobID, projectRef: signingAction.projectRef,
+        preset: signingAction.preset, inputArtifactID: signingAction.inputArtifactID,
+        inputFilePath: signingAction.inputFilePath, inputSHA256: signingAction.inputSHA256,
+        inputByteCount: signingAction.inputByteCount, output: legacyOutput)))
     let recovered = try await provider.provider.reconcile(
       intent: ProviderDurableIntentReference(
         jobID: context.jobID, stepID: context.stepID,
-        intentEventID: "intent-recovery", action: action),
+        intentEventID: "intent-recovery", action: legacyAction),
       context: context)
     guard case .confirmedCompleted(let summary) = recovered else {
       return XCTFail("verified existing output should recover: \(recovered)")
@@ -408,6 +1055,8 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertEqual(summary["verification"], "verified")
     XCTAssertEqual(
       try Data(contentsOf: URL(fileURLWithPath: signingAction.output.signedHAP)), original)
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: legacyOutput.supportedCertificateChainReadback))
     XCTAssertTrue(FileManager.default.fileExists(atPath: signingAction.output.resultRecord))
   }
 
@@ -493,6 +1142,14 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     let configuration: OpenHarmonySigningPresetConfiguration
   }
 
+  private struct SDKReleaseFixture {
+    let store: OpenHarmonySigningPresetStore
+    let secrets: MemorySigningSecretStore
+    let presetRoot: URL
+    let sdkRoot: URL
+    let java: URL
+  }
+
   private struct SigningProvider {
     let profile: WorkspaceProjectProfile
     let provider: WorkspaceOperationsProvider
@@ -524,6 +1181,59 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
         signerJAR: jar, keystore: keystore,
         appCertificate: certificate, signedProfile: profile,
         keyAlias: "test-key"))
+  }
+
+  private func makeSDKReleaseFixture(mode: String) throws -> SDKReleaseFixture {
+    let sdkRoot = root.appendingPathComponent(
+      "openharmony-sdk-\(UUID().uuidString)", isDirectory: true)
+    let library = sdkRoot.appendingPathComponent("toolchains/lib", isDirectory: true)
+    try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+    try Data(mode.utf8).write(to: library.appendingPathComponent("hap-sign-tool.jar"))
+    let keystore = library.appendingPathComponent("OpenHarmony.p12")
+    try Data("sdk-release-keystore-fixture".utf8).write(to: keystore)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: keystore.path)
+    let profileCertificate = """
+      -----BEGIN CERTIFICATE-----
+      fixture-application-root
+      -----END CERTIFICATE-----
+      -----BEGIN CERTIFICATE-----
+      fixture-application-ca
+      -----END CERTIFICATE-----
+      -----BEGIN CERTIFICATE-----
+      fixture-profile-release
+      -----END CERTIFICATE-----
+
+      """
+    try Data(profileCertificate.utf8).write(
+      to: library.appendingPathComponent("OpenHarmonyProfileRelease.pem"))
+    let certificate =
+      "-----BEGIN CERTIFICATE-----\nfixture-release-certificate\n-----END CERTIFICATE-----\n"
+    let template: [String: Any] = [
+      "type": "release",
+      "app-distribution-type": "os_integration",
+      "issuer": "pki_internal",
+      "bundle-info": [
+        "bundle-name": "com.example.replace",
+        "apl": "normal",
+        "app-feature": "hos_normal_app",
+        "distribution-certificate": certificate,
+      ],
+      "uuid": "00000000-0000-0000-0000-000000000000",
+      "validity": ["not-before": 0, "not-after": 1],
+    ]
+    try JSONSerialization.data(withJSONObject: template, options: [.sortedKeys]).write(
+      to: library.appendingPathComponent("UnsgnedReleasedProfileTemplate.json"))
+    let presetRoot = root.appendingPathComponent(
+      "sdk-release-preset-\(UUID().uuidString)", isDirectory: true)
+    let secrets = MemorySigningSecretStore()
+    return SDKReleaseFixture(
+      store: OpenHarmonySigningPresetStore(
+        rootURL: presetRoot, secrets: secrets,
+        nowUTC: { "2026-08-11T00:00:00Z" }),
+      secrets: secrets, presetRoot: presetRoot, sdkRoot: sdkRoot,
+      java: productsDirectory.appendingPathComponent(
+        "ArkDeckFakeHapSignerFixture").resolvingSymlinksInPath())
   }
 
   private func installSecrets(in fixture: SigningFixture) throws {
@@ -601,6 +1311,47 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
+  private func testDevEcoEnvelope(
+    _ plaintext: Data, key: Data, nonceByte: UInt8
+  ) throws -> Data {
+    let nonce = try AES.GCM.Nonce(data: Data(repeating: nonceByte, count: 12))
+    let sealed = try AES.GCM.seal(
+      plaintext, using: SymmetricKey(data: key), nonce: nonce)
+    var sealedCount = UInt32(sealed.ciphertext.count + sealed.tag.count).bigEndian
+    var result = Data()
+    withUnsafeBytes(of: &sealedCount) { result.append(contentsOf: $0) }
+    result.append(contentsOf: nonce)
+    result.append(sealed.ciphertext)
+    result.append(sealed.tag)
+    return result
+  }
+
+  private func testPBKDF2SHA256(
+    password: Data, salt: Data, iterations: Int, outputByteCount: Int
+  ) -> Data {
+    let key = SymmetricKey(data: password)
+    var derived = Data()
+    var block: UInt32 = 1
+    while derived.count < outputByteCount {
+      var bigEndian = block.bigEndian
+      var input = salt
+      withUnsafeBytes(of: &bigEndian) { input.append(contentsOf: $0) }
+      var u = Data(HMAC<SHA256>.authenticationCode(for: input, using: key))
+      var accumulated = u
+      for _ in 1..<iterations {
+        u = Data(HMAC<SHA256>.authenticationCode(for: u, using: key))
+        xorTestBytes(u, into: &accumulated)
+      }
+      derived.append(accumulated)
+      block += 1
+    }
+    return Data(derived.prefix(outputByteCount))
+  }
+
+  private func xorTestBytes(_ source: Data, into destination: inout Data) {
+    for index in destination.indices { destination[index] ^= source[index] }
+  }
+
   private var productsDirectory: URL {
     #if os(macOS)
       for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
@@ -616,6 +1367,12 @@ private final class MemorySigningSecretStore: OpenHarmonySigningSecretStoring,
 {
   private let lock = NSLock()
   private var values: [String: Data] = [:]
+  private var refreshed: [String] = []
+  private var reads = 0
+  var trustedDaemonIdentity: String?
+
+  var refreshedAccounts: [String] { lock.withLock { refreshed } }
+  var secretReadCount: Int { lock.withLock { reads } }
 
   func set(_ data: Data, account: String) throws {
     lock.withLock { values[account] = data }
@@ -623,6 +1380,7 @@ private final class MemorySigningSecretStore: OpenHarmonySigningSecretStoring,
 
   func read(account: String) throws -> Data {
     try lock.withLock {
+      reads += 1
       guard let value = values[account] else {
         throw OpenHarmonySigningError.secretUnavailable("missing test secret")
       }
@@ -632,6 +1390,14 @@ private final class MemorySigningSecretStore: OpenHarmonySigningSecretStoring,
 
   func contains(account: String) -> Bool {
     lock.withLock { values[account] != nil }
+  }
+
+  func refreshTrustedApplicationAccess(account: String) throws {
+    lock.withLock { refreshed.append(account) }
+  }
+
+  func trustedDaemonApplicationSHA256() throws -> String? {
+    lock.withLock { trustedDaemonIdentity }
   }
 
   @discardableResult

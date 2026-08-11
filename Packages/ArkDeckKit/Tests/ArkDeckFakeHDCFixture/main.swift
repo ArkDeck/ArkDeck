@@ -20,6 +20,7 @@ enum FixtureMode: String {
   case healthyFailureStderr
   case mismatch
   case managedServer
+  case headlessServer
   case selectedDeviceReady
   case subserver
 }
@@ -90,6 +91,14 @@ if endpointBoundArguments
   mode = .success
 } else if suppliedArguments.first == "managed-server" {
   mode = .managedServer
+} else if endpointBoundArguments == ["-m"] {
+  // Production owns HDC through its exact foreground shape. This fixture
+  // stays alive without binding the singleton production port so daemon
+  // composition tests remain hermetic when a real login-session agentd is
+  // already serving 127.0.0.1:8710 on the same test host. The separate host
+  // contract locks the argv, endpoint and closed environment; checkserver
+  // below supplies the registered semantic readiness receipt.
+  mode = .headlessServer
 } else if endpointBoundArguments == ["-v"] {
   mode = .version
 } else if endpointBoundArguments == ["list", "targets", "-v"] {
@@ -172,6 +181,8 @@ case .unknown:
   FileHandle.standardOutput.write(Data("unregistered fixture output\n".utf8))
 case .subserver:
   break
+case .headlessServer:
+  while true { RunLoop.current.run(until: Date(timeIntervalSinceNow: 1)) }
 case .managedServer:
   guard let endpointIndex = suppliedArguments.firstIndex(of: "-s"),
     suppliedArguments.indices.contains(endpointIndex + 1),

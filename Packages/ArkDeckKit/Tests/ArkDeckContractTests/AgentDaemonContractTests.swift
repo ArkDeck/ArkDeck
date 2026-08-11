@@ -1160,16 +1160,14 @@ final class AgentDaemonContractTests: XCTestCase {
     let shortState = URL(fileURLWithPath: NSHomeDirectory())
       .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: shortState) }
-    // A file, not a real HDC. The composition hashes the configured path to
-    // bind an executable identity and nothing runs it while answering
-    // operation.list, so what this case supplies is exactly what it is about:
-    // the presence of configuration.
-    let hdcFixture = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".arkdeck-test-hdc-\(UInt32.random(in: 0..<100_000))")
-    try Data("#!/bin/sh\nexit 0\n".utf8).write(to: hdcFixture)
-    try FileManager.default.setAttributes(
-      [.posixPermissions: 0o700], ofItemAtPath: hdcFixture.path)
-    defer { try? FileManager.default.removeItem(at: hdcFixture) }
+    // The production composition now establishes a real foreground server
+    // before opening UDS. Use the executable fixture so startup exercises the
+    // exact descriptor-bound `-s 127.0.0.1:8710 -m` plus typed checkserver
+    // readiness path instead of relying on a path-presence placeholder.
+    let hdcFixture = productsDirectory.appendingPathComponent("ArkDeckFakeHDCFixture")
+    guard FileManager.default.isExecutableFile(atPath: hdcFixture.path) else {
+      throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
+    }
 
     let process = try launchProductionDaemon(
       binary: binary, stateDirectory: shortState, hdcPath: hdcFixture.path)
@@ -2132,4 +2130,30 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
 
+}
+
+final class HeadlessHDCServerHostContractTests: XCTestCase {
+  func testForegroundHostUsesExactLoopbackEndpointAndClosedEnvironment() throws {
+    let executable = ResolvedExecutable(
+      path: "/Applications/DevEco-Studio.app/Contents/sdk/hdc",
+      sha256: String(repeating: "a", count: 64))
+    let endpoint = try HDCServerEndpointSelector.select(inheritedEnvironment: [:])
+
+    let request = HeadlessHDCServerHost.foregroundRequest(
+      executable: executable, endpoint: endpoint)
+    XCTAssertEqual(request.process.executable.path, executable.path)
+    XCTAssertEqual(request.expectedSHA256, executable.sha256)
+    XCTAssertEqual(request.process.arguments, ["-s", "127.0.0.1:8710", "-m"])
+    XCTAssertEqual(request.process.environment, ["OHOS_HDC_SERVER_PORT": "8710"])
+    XCTAssertNil(request.process.timeout, "the daemon owns this child until service shutdown")
+    XCTAssertFalse(request.process.arguments.contains { $0.contains("sh -c") })
+
+    let readiness = HeadlessHDCServerHost.readinessPlan(endpoint: endpoint)
+    guard case .process(_, let arguments, let timeout) = readiness.kind else {
+      return XCTFail("readiness must remain an exact descriptor-bound process")
+    }
+    XCTAssertEqual(arguments, ["-s", "127.0.0.1:8710", "checkserver"])
+    XCTAssertEqual(timeout, 2)
+    XCTAssertEqual(readiness.action, .hdc(.observeServer))
+  }
 }

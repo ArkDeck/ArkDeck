@@ -35,6 +35,10 @@ public struct HarnessJobObservation: Equatable, Sendable {
   public let succeeded: Bool
   public let outcomeUnknown: Bool
   public let waitingForHuman: Bool
+  /// Runtime's admitted effect, carried only so the harness can distinguish
+  /// a mechanically recoverable read from an unresolved mutation. A missing
+  /// or unknown value stays fail-closed and is never auto-reconciled.
+  public let actualEffect: WorkflowEffect?
   public let timeline: [String]
 
   public init(
@@ -44,6 +48,7 @@ public struct HarnessJobObservation: Equatable, Sendable {
     succeeded: Bool,
     outcomeUnknown: Bool,
     waitingForHuman: Bool,
+    actualEffect: WorkflowEffect? = nil,
     timeline: [String]
   ) {
     self.jobID = jobID
@@ -52,6 +57,7 @@ public struct HarnessJobObservation: Equatable, Sendable {
     self.succeeded = succeeded
     self.outcomeUnknown = outcomeUnknown
     self.waitingForHuman = waitingForHuman
+    self.actualEffect = actualEffect
     self.timeline = timeline
   }
 }
@@ -71,8 +77,18 @@ public protocol HarnessRuntimeJobPort: Sendable {
   /// execution has been handed over.
   func startRun(jobID: String) async throws
   func observe(jobID: String) async throws -> HarnessJobObservation
+  /// Ask Runtime to settle an existing durable unknown intent. Runtime owns
+  /// the exact typed action and may perform only its registered reconciliation
+  /// readback; this surface cannot redispatch or replace the original action.
+  func reconcile(jobID: String) async throws -> HarnessJobObservation
   /// Forward a cancel request to the engine. The engine decides where the
   /// safe boundary is; the harness only asks and then waits for a terminal
   /// observation.
   func requestCancel(jobID: String) async throws
+}
+
+public extension HarnessRuntimeJobPort {
+  func reconcile(jobID: String) async throws -> HarnessJobObservation {
+    throw HarnessJobPortError.rejected("job reconciliation is unavailable for \(jobID)")
+  }
 }

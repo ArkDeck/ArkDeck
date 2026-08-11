@@ -90,6 +90,13 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// failure is durable evidence that a new candidate is needed; it is not a
   /// human-authority request and it must survive the exact rollback wake.
   public static let promotionRetryReasonKey = "promotionCandidateRetryReason"
+  /// Set only after the protected Runtime durably reconciles the previous
+  /// repair deployment's target-confirmation preflight as not executed. It
+  /// keeps the task in `deploying` while authorising the handler to propose a
+  /// new bounded Job against fresh facts; it is never inferred from a failed
+  /// or missing readback.
+  public static let deploymentPreflightRetryKey =
+    "deploymentPreflightConfirmedNotExecuted"
   /// Bounded HiLog remains diagnostic context only. It proves neither a
   /// crash nor that the declared application is alive.
   public static let hilogArtifact = "hilog.txt"
@@ -169,7 +176,11 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
       if !repair.buildOutputSigned { return [Self.signOpenHarmonyHAP] }
       return [Self.deployHAP]
     case .deploying:
-      return []
+      guard snapshot.observedState[Self.deploymentPreflightRetryKey] == .bool(true),
+        snapshot.repairAttempt?.rollbackRequired == false,
+        snapshot.repairAttempt?.deployedDigest == nil
+      else { return [] }
+      return repairRouteBudgetAvailable(snapshot) ? [Self.deployHAP] : []
     }
   }
 
@@ -431,11 +442,19 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
             hypothesis:
               "The immutable unsigned HAP lease is required before local signing can run.")
         }
+        guard let sourceProjectRef = snapshot.projectRef, !sourceProjectRef.isEmpty else {
+          return noSafeAction(
+            snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+            reasonCode: "signingSourceProjectUnavailable",
+            hypothesis:
+              "The source project identity bound to the local signing preset is required before "
+              + "the isolated build Artifact can be signed.")
+        }
         return invoke(
           snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
           operation: Self.signOpenHarmonyHAP,
           inputs: [
-            "projectRef": .string(snapshot.executionProjectRef ?? ""),
+            "projectRef": .string(sourceProjectRef),
             "signingPresetRef": .string(Self.defaultSigningPreset),
             "unsignedHapArtifactLease": .string(lease),
           ],
@@ -443,41 +462,60 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
             "Use the installed ArkDeck preset to sign and verify the immutable build Artifact.",
           reasonCode: "signVerifiedBuildOutput", phaseOnDispatch: nil)
       }
-      guard let lease = repair.buildOutputArtifactLease,
-        let bundle = desiredString("bundleName", snapshot),
-        let ability = desiredString("abilityName", snapshot)
-      else {
-        return noSafeAction(
-          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
-          reasonCode: "deploymentInputsUnavailable",
-          hypothesis:
-            "The verified build output lease, bundle name and ability name are required for "
-            + "the typed deployment leg.")
-      }
-      guard snapshot.consumedBudget.e1Mutations + 2 <= snapshot.budgets.maxE1Mutations else {
-        return noSafeAction(
-          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
-          reasonCode: "deploymentRollbackBudgetUnavailable",
-          hypothesis:
-            "Deployment is not admitted unless the E1 budget can pay for both deployment and "
-            + "a possible rollback.")
-      }
-      return invoke(
-        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
-        operation: Self.deployHAP,
-        inputs: [
-          "hapArtifactLease": .string(lease), "bundleName": .string(bundle),
-          "abilityName": .string(ability), "cleanupPolicy": .string("retain"),
-          "postRunAbilityState": .string("running"),
-        ],
-        hypothesis: "Deploy only the immutable output whose digest passed the build gate.",
-        reasonCode: "deployVerifiedBuildOutput", phaseOnDispatch: .deploying)
+      return planVerifiedBuildDeployment(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC)
     case .deploying:
+      if snapshot.observedState[Self.deploymentPreflightRetryKey] == .bool(true),
+        snapshot.repairAttempt?.rollbackRequired == false,
+        snapshot.repairAttempt?.deployedDigest == nil
+      {
+        return planVerifiedBuildDeployment(
+          snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC)
+      }
       return noSafeAction(
         snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
         reasonCode: "deploymentReadbackUnavailable",
         hypothesis: "Deployment may advance only through an equal artifact-digest readback.")
     }
+  }
+
+  private func planVerifiedBuildDeployment(
+    _ snapshot: HarnessTaskSnapshot,
+    decisionID: String,
+    round: Int,
+    nowUTC: String
+  ) -> HarnessPlannedStep {
+    guard let repair = snapshot.repairAttempt,
+      repair.buildOutputSigned,
+      let lease = repair.buildOutputArtifactLease,
+      let bundle = desiredString("bundleName", snapshot),
+      let ability = desiredString("abilityName", snapshot)
+    else {
+      return noSafeAction(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        reasonCode: "deploymentInputsUnavailable",
+        hypothesis:
+          "The verified build output lease, bundle name and ability name are required for "
+          + "the typed deployment leg.")
+    }
+    guard snapshot.consumedBudget.e1Mutations + 2 <= snapshot.budgets.maxE1Mutations else {
+      return noSafeAction(
+        snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+        reasonCode: "deploymentRollbackBudgetUnavailable",
+        hypothesis:
+          "Deployment is not admitted unless the E1 budget can pay for both deployment and "
+          + "a possible rollback.")
+    }
+    return invoke(
+      snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
+      operation: Self.deployHAP,
+      inputs: [
+        "hapArtifactLease": .string(lease), "bundleName": .string(bundle),
+        "abilityName": .string(ability), "cleanupPolicy": .string("retain"),
+        "postRunAbilityState": .string("running"),
+      ],
+      hypothesis: "Deploy only the immutable output whose digest passed the build gate.",
+      reasonCode: "deployVerifiedBuildOutput", phaseOnDispatch: .deploying)
   }
 
   /// The one deterministic question a model may answer with source bytes.

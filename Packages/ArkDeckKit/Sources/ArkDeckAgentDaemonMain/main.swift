@@ -192,6 +192,7 @@ nonisolated(unsafe) var startupFailure: (any Error)?
 nonisolated(unsafe) var startedServer: AgentDaemonServer?
 nonisolated(unsafe) var startedXPCListener: AgentXPCListener?
 nonisolated(unsafe) var autoDriveTask: Task<Void, Never>?
+nonisolated(unsafe) var startedHDCServerHost: HeadlessHDCServerHost?
 
 // Detached on purpose: the top level is @MainActor-isolated, so a plain
 // `Task { }` would inherit the main actor and deadlock against the
@@ -272,7 +273,20 @@ Task.detached {
     var executableSHA = ""
     if let configuredHDC {
       let resolver = try FixedExecutableResolver.hashing(path: configuredHDC, providerID: "hdc")
-      executableSHA = try resolver.resolveExecutable(providerID: "hdc").sha256
+      let resolvedHDC = try resolver.resolveExecutable(providerID: "hdc")
+      executableSHA = resolvedHDC.sha256
+      // The login-session daemon owns a foreground, loopback-only server.
+      // This avoids depending on a Terminal parent or HDC's client-side
+      // background daemonisation, and cancellation tears down the dedicated
+      // process group during LaunchAgent update/uninstall.
+      startedHDCServerHost = try await HeadlessHDCServerHost.start(
+        executable: resolvedHDC,
+        onUnexpectedExit: {
+          // An unexpected server death is a daemon crash boundary: launchd
+          // KeepAlive restarts the service, Runtime recovers durable Jobs, and
+          // startup must re-establish typed HDC readiness before reopening UDS.
+          Darwin.exit(70)
+        })
       hdcExecutableResolver = resolver
       hdcDispatcher = DescriptorBoundProcessDispatcher.hdc(resolver: resolver)
       traceRuntimeProbe = FoundationTraceRuntimeProbe(
@@ -697,12 +711,22 @@ Task.detached {
         autoDriveTask = Task.detached { _ = await ticker.run() }
       }
     case .alreadyRunning(let instance):
+      // This candidate may have started a foreground HDC child before the
+      // instance lock proved that another daemon already owns the session.
+      // Release only this candidate's process group before the process exits;
+      // the serving daemon keeps ownership of its own server.
+      await startedHDCServerHost?.stop()
+      startedHDCServerHost = nil
       print(
         "arkdeck-agentd already running: pid \(instance.pid), socket \(instance.socketPath), "
           + "protocol \(instance.protocolVersion)")
       fflush(stdout)
     }
   } catch {
+    // Starting HDC precedes several fallible composition and UDS steps. A
+    // failed daemon startup must not orphan that foreground process group.
+    await startedHDCServerHost?.stop()
+    startedHDCServerHost = nil
     startupFailure = error
   }
 }
@@ -736,6 +760,7 @@ let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal
       // owns a Runtime durability boundary.  The 20-second cap is explicit:
       // an unresponsive client cannot block macOS service shutdown forever.
       server.drainAndStop(deadline: 20)
+      await startedHDCServerHost?.stop()
       print("arkdeck-agentd stopped")
       fflush(stdout)
       exit(0)

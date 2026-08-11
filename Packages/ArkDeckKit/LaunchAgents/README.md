@@ -24,7 +24,11 @@ HDC 执行路径。
 `~/Library/Application Support/ArkDeck/bin/arkdeck-agentd`，生成
 `~/Library/LaunchAgents/com.arkdeck.agentd.plist`，再用 `gui/$UID` 启动服务。plist
 明确传入 `ARKDECK_HDC_PATH`；Runtime 在启动时固定 HDC 摘要，并在每次 spawn 前重新验证
-文件身份，缺失或漂移都会 fail closed。
+文件身份，缺失或漂移都会 fail closed。daemon 会用同一份 identity-bound HDC 在
+`127.0.0.1:8710` 持有前台 server 子进程，先完成 typed `checkserver` 兼容性验证，再开放
+UDS；因此不需要 DevEco Studio、Terminal 或另一个后台脚本托管 HDC。更新、卸载或登录会话
+结束时，该子进程随 LaunchAgent 的进程组一起释放；ArkDeck 不修改系统级 HDC 或 `pmset`
+配置。
 
 指定另一份 daemon 可使用 `--daemon /absolute/path/to/arkdeck-agentd`。更新当前构建时运行：
 
@@ -57,20 +61,42 @@ project 不得位于 `~/Desktop`、`~/Documents` 或 `~/Downloads`。这些目�
 
 ### ArkDeck 默认的无 UI 本地签名
 
-上游 [`deveco-cli`](https://gitcode.com/openharmony-sig/deveco-cli) 提供
-`devecocli signature generate`，命令本身不要求启动 DevEco Studio。但是它的自动签名实现会
-直接枚举 HDC target、读取设备 UDID/类型，并调用账号侧证书与 Provision 服务。ArkDeck 不把
-这条链嵌进 Agent/LaunchAgent：那会形成绕过 durable target/binding、Runtime admission 与
-Artifact lease 的第二条设备路径。
+上游 [`deveco-cli`](https://gitcode.com/openharmony-sig/deveco-cli) 当前提供工程构建、运行、
+设备与文档等 CLI 能力，但没有可复用的本地 HAP 签名或 Provision profile 生成表面。ArkDeck
+不会为了补齐它而直接枚举 HDC、读取 raw UDID 或建立云账号侧的第二执行栈。
 
-对 OpenHarmony 开发板，ArkDeck 的默认路径是 published
-`workspace.sign-openharmony-hap@1`，不再要求把口令写入工程或人工运行 hapsigner。先准备一份
-与 bundleName 精确匹配的 keystore、app certificate 与 signed profile，并找到 SDK 的
-`hap-sign-tool.jar` 和 Java 的 canonical 绝对路径；这些材料仍由操作者一次性取得，ArkDeck
-不生成私钥、证书或 Provision profile。keystore 必须属于当前用户且权限为 `0600`。
+对标准 OpenHarmony 开发板，ArkDeck 首选官方 OpenHarmony SDK 随附的 release signing
+bundle。安装器只读取显式的 canonical SDK/Java 绝对路径，在 owner-private 目录生成当前有效、
+与 bundle name 精确绑定、无设备 UDID allowlist 的 release profile，用 SDK hapsigner 完成
+`sign-profile` 和精确 `verify-profile` readback，再安装为现有唯一 closed preset
+`openharmony-release@1`。整个维护步骤离线、不调用 HDC、不启动 DevEco Studio，也不把密码、
+shell 字符串或 mutable SDK 路径交给 Runtime Job：
 
-在真实 Terminal 中安装唯一的 closed preset；两个密码只从无回显 TTY prompt 进入登录用户
-Keychain，不接受 password flag、环境变量或管道 stdin：
+```text
+arkdeck signing install-sdk-release \
+  --sdk /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony \
+  --java /Applications/DevEco-Studio.app/Contents/jbr/Contents/Home/bin/java \
+  --bundle-name com.example.waterflowdemo \
+  --project-ref demo-app \
+  --json
+arkdeck signing status --json
+```
+
+ArkDeck 会复制并固定 SDK release keystore/profile material 的身份；SDK profile 模板只携带
+application leaf，安装器会从同一份已测量的 SDK profile certificate bundle 组装完整的
+root/application CA/application leaf 三证书链，避免 hapsigner 的 `11013004` 拒绝。SDK source
+保持不变，托管副本权限为 `0600`、目录为 `0700`。SDK 共享 keystore 的官方口令本身是公开值；
+ArkDeck 仍用登录 Keychain 单信封记录其可逆安装事实，但 Runtime 不再为该公开值解密 Keychain，
+而是在校验信封存在、receipt schema 与精确 daemon 二进制身份后，通过无回显 PTY 交给
+hapsigner；它不进入 argv、环境、receipt 或日志。macOS 的 `SecTrustedApplication` ACL 绑定精确二进制身份，daemon 内容变化后旧 ACL 不能
+可靠复用。对这个 SDK 默认 preset，`agentd update` 会使用官方公开口令直接建立一个绑定新
+daemon 的单一新信封，不读取旧 ACL，因此正常更新无需密码弹框；旧信封保留在 receipt 的可清理
+列表中，便于失败回滚和卸载。相同二进制更新不改信封。登录 Keychain 被锁定时 Runtime fail
+closed 且禁止弹 UI。
+
+已有自有证书/Provision profile 的安装仍可使用兼容入口。keystore 必须属于当前用户且权限为
+`0600`；两个密码只从真实 Terminal 的无回显 TTY prompt 输入，不接受 password flag、环境变量
+或管道 stdin：
 
 ```text
 arkdeck signing install \
@@ -85,7 +111,42 @@ arkdeck signing status --json
 arkdeck operation list --json
 ```
 
-`status` 显示非秘密路径、SHA-256、Keychain item 是否存在及漂移诊断，不返回密码。daemon
+DevEco Studio 写入 `build-profile.json5` 的 `storePassword`/`keyPassword` 可能是 76 字符的
+加密值。LaunchAgent 安装完成后，可让 ArkDeck 从受限的 build-profile 一次性迁移；它严格使用
+profile 自己的 `storeFile` 同级 `material/` 做认证解密，把两个明文合并进一个登录 Keychain
+信封，并把 ACL 绑定到最终安装位置的 daemon（不能传 SwiftPM build 软链）。该 `storeFile`
+必须存在、保持 owner-private，且内容身份与 ArkDeck preset 中已安装的 keystore 完全一致；
+缺失、陈旧或指向另一 keystore 的 profile 会在改写 Keychain 前 fail closed：
+
+```text
+arkdeck signing migrate-deveco \
+  --build-profile /absolute/project/build-profile.json5 \
+  --daemon "$HOME/Library/Application Support/ArkDeck/bin/arkdeck-agentd" \
+  --key-alias <actual-private-key-alias-if-profile-is-stale> \
+  --json
+```
+
+`--key-alias` 是可选的非秘密修复参数：仅当 DevEco profile 中的 alias 已陈旧、而实际
+PKCS#12 私钥 alias 已由只读诊断确认时提供。ArkDeck 会校验其闭合集合格式并原子更新 preset，
+复用已有 Keychain 信封与 ACL；错误 alias 仍会在签名时 fail closed 为 `keyAliasRejected`。
+
+Runtime Job 此后不再读取 DevEco material，也禁止唤起 Keychain UI；Keychain 锁定或可信应用
+身份漂移会立即 fail closed。私有 signing preset 继续只使用 Keychain：daemon 精确二进制身份
+变化时，`agentd update` 需要把旧私有信封内容迁入一个绑定新身份的信封，这个维护边界最多可能
+要求一次 macOS Keychain 授权；status 和 Runtime Job 永不弹框。若旧版 ArkDeck 已把密文原样
+存入两项 Keychain，可用上述命令迁移为单信封；`signing normalize` 仅保留给同一
+keystore/material 布局的旧安装修复。两条命令都只报告迁移状态，不返回密码。
+
+登录 Keychain 通常随用户登录自动解锁；若私有 preset 迁移返回 Keychain `-60008`，只在自己的
+Terminal 执行一次 `security unlock-keychain "$HOME/Library/Keychains/login.keychain-db"`，不要把
+密码放进 argv、配置或日志。SDK 默认 preset 的 daemon 更新不读取旧信封；私有 preset 只有在
+精确 daemon 身份变化时才进入一次显式维护读取。Runtime/status 始终使用禁止 UI 的 Keychain
+查询。开发期每次重建都会改变 trusted-application 的加密身份；长期宿主应只通过
+`agentd update` 原子安装最终 daemon，不要让 build 目录二进制直接读取生产信封。
+
+`status` 显示非秘密路径、SHA-256、Keychain item 是否存在及漂移诊断，不返回也不解密密码，
+因此健康检查不会触发 Keychain 授权。私有 preset 只在真实签名 Job 的 signer 启动前执行一次
+禁止 UI 的 Keychain value read；读取失败即在任何 signer 副作用前 fail closed。daemon
 在每次 Job 前重测 Java/JAR/keystore/certificate/profile；任一文件缺失、权限或摘要漂移，或
 Keychain 不可读时，operation 都会 `UNAVAILABLE`/fail closed，不会猜 `PATH`、默认口令或
 DevEco 安装位置。
@@ -123,13 +184,20 @@ binding revision 与 stable identity，然后作为现有 `debug.hap@1` 的 `hap
 Keychain 权限仍可用，这条签名→debug 路径不依赖 SwiftUI 或 Terminal 前台；Keychain 被锁定时
 会如实失败，不弹出或伪造人工批准。
 
+Runtime 不把 Artifact store 的无扩展名 payload path 直接交给 hapsigner，而是在 owner-only
+attempt 目录复制为 `unsigned.hap`，复制前后校验同一 SHA-256/大小并在 spawn 前再次核对文件
+身份；源 Artifact 与 lineage 不变。标准 `sign-app` 调用省略 `-signCode`（hapsigner 默认启用
+code signing），非零退出只发布闭合的无秘密诊断码，并要求 typed reconcile 后才能释放 lane。
+
 签名配置可逆撤销：
 
 ```text
 arkdeck signing remove --json
 ```
 
-该命令只删除 ArkDeck receipt 与两项 Keychain secret，保留原始 keystore/certificate/profile。
+该命令删除 ArkDeck receipt、当前单一 Keychain 信封及 receipt 记录的旧版 secret。SDK release
+默认方式还会删除 ArkDeck 的 owner-private 托管副本，但保留官方 SDK source；兼容手工安装则
+保留操作者提供的原始 keystore/certificate/profile。
 签名 lane 不调用 HDC；产物文件名、fake/simulation 或 `sign-app` exit 0 都不构成真机通过证明。
 
 HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony release profile 不是
@@ -189,7 +257,8 @@ arkdeck agentd verify --target <target-id> --json
 ```
 
 状态命令会核对 plist、launchd load 状态、daemon/HDC/本地模型 CLI 当前 SHA-256、安装收据、
-socket 和 daemon health。`verify` 进一步固定走完整的无头产品链：identity-checked LaunchAgent → 默认
+socket 和 daemon health。只有 loopback HDC server 已通过启动期 typed readiness，daemon 才会
+开放 socket；持续不就绪时查看下方日志，不要另起 raw HDC server。`verify` 进一步固定走完整的无头产品链：identity-checked LaunchAgent → 默认
 用户私有 UDS → native Agent executor → published `observe.device@1` → daemon-owned terminal
 receipt → immutable Artifact inventory 与 Runtime postflight。它不接受自定义 socket、raw HDC、
 argv 或 capability 管理参数；多台已采用设备时必须显式传 `--target`，不会猜测设备。

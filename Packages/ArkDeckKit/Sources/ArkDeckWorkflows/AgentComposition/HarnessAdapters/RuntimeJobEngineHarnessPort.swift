@@ -42,6 +42,16 @@ public struct RuntimeJobEngineHarnessPort: HarnessRuntimeJobPort {
     }
   }
 
+  public func reconcile(jobID: String) async throws -> HarnessJobObservation {
+    do {
+      return Self.observation(from: try await engine.reconcile(jobID: jobID))
+    } catch let error as RuntimeJobEngineError {
+      throw HarnessJobPortError.rejected("\(error)")
+    } catch {
+      throw HarnessJobPortError.transportFailure("\(error)")
+    }
+  }
+
   public func requestCancel(jobID: String) async throws {
     do {
       try await engine.requestCancel(jobID: jobID)
@@ -62,6 +72,7 @@ public struct RuntimeJobEngineHarnessPort: HarnessRuntimeJobPort {
       succeeded: state == .succeeded,
       outcomeUnknown: status.outcomeUnknown,
       waitingForHuman: status.waitingForHuman,
+      actualEffect: status.actualEffect.flatMap(WorkflowEffect.init(rawValue:)),
       timeline: status.timeline)
   }
 }

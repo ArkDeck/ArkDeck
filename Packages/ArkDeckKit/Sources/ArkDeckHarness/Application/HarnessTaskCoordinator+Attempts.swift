@@ -239,7 +239,10 @@ extension HarnessTaskCoordinator {
       candidateStrategyFingerprint: attempt.strategyFingerprint,
       identicalActionRunCount: identical.count,
       failure: failure,
-      retrySafe: Self.isActionRetrySafe(operationReference),
+      retrySafe:
+        Self.isActionRetrySafe(operationReference)
+        || Self.isConfirmedDeploymentPreflightRetry(
+          operationReference: operationReference, failure: failure),
       maxActionRetriesPerRun: snapshot.budgets.maxActionRetriesPerRun)
     switch route {
     case .continueAttempt, .actionRetry:
@@ -360,5 +363,19 @@ extension HarnessTaskCoordinator {
         DebugCrashTaskHandler.revertPatch, DebugCrashTaskHandler.deployHAP,
       ]
       .contains(operationReference)
+  }
+
+  /// A device mutation is not generally retry-safe. This one closed case is
+  /// different: the protected Runtime reconciled the previous Job to a
+  /// terminal, known outcome and durably proved that the target-confirmation
+  /// preflight did not execute. A subsequent ActionRun therefore is neither
+  /// a replay nor a continuation of unknown intent; it is a new bounded Job
+  /// admitted against fresh target facts.
+  static func isConfirmedDeploymentPreflightRetry(
+    operationReference: String,
+    failure: HarnessFailureFingerprint?
+  ) -> Bool {
+    operationReference == DebugCrashTaskHandler.deployHAP
+      && failure?.errorClassification == deploymentPreflightNotExecutedClassification
   }
 }
