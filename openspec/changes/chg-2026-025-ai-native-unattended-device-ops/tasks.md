@@ -3778,6 +3778,11 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   - `Packages/ArkDeckKit/**`
   - `docs/design/**`
   - `scripts/catalog_gen/**`
+  - `.github/workflows/swift-slow-lanes.yml`（单文件扩权:深度扫描 P2「慢车道有闸无人拉」
+    的 nightly 调度载体,与 `Packages/ArkDeckKit/Scripts/run-test-lane.sh` 的调用方注释
+    同车交付;非 merge gate 语义。维护者 review/合入本行即构成该路径扩权与 PR #1268
+    检视意见 5 所要求的「独立结构性变更」范围裁决,授权仅及此单文件,不含
+    `.github/workflows/**` 其余部分）
 - Forbidden paths:
   - `openspec/constitution.md`、`openspec/specs/**`、`openspec/contracts/**`、
     `openspec/verification/**`、`openspec/baselines/**`、`openspec/integrations/**`、
