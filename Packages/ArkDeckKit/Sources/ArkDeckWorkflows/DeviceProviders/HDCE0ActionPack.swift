@@ -47,6 +47,16 @@ public struct HDCHilogCaptureRequest: Sendable, Equatable {
   public static let maximumDurationSeconds = 600
   public static let maximumFilters = 16
   public static let maximumByteBudget = 128 * 1024 * 1024
+  /// `hilog -x` exits after draining the device's current rolling buffers,
+  /// but that drain is not instantaneous. On the production DAYU200 an
+  /// a roughly 600 KiB capture has completed in 30 seconds; the old
+  /// `durationSeconds + 15` timeout gave the common five-second request only
+  /// 20 seconds and intermittently turned a healthy drain into an unknown
+  /// outcome. This floor remains a real process timeout (not a success
+  /// classification) and only gives the typed command enough time to exit
+  /// naturally.
+  package static let minimumCommandTimeoutSeconds = 45
+  package static let commandStartupAndDrainGraceSeconds = 15
 
   public let durationSeconds: Int
   public let filters: [String]
@@ -83,6 +93,12 @@ public struct HDCHilogCaptureRequest: Sendable, Equatable {
     self.durationSeconds = durationSeconds
     self.filters = filters
     self.byteBudget = byteBudget
+  }
+
+  package var commandTimeoutSeconds: Int {
+    max(
+      Self.minimumCommandTimeoutSeconds,
+      durationSeconds + Self.commandStartupAndDrainGraceSeconds)
   }
 }
 

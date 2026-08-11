@@ -46,6 +46,32 @@ final class HDCE0ActionPackContractTests: XCTestCase {
     XCTAssertEqual(defaulted.byteBudget, 16 * 1024 * 1024, "budget has a bounded default")
   }
 
+  func testHilogLoweringAllowsMeasuredBufferDrainAndKeepsTimeoutFailClosed() throws {
+    let short = try HDCHilogCaptureRequest(durationSeconds: 5)
+    let shortPlan = try provider.lower(
+      action: .hdc(.captureHilog(short)), context: context)
+    guard case .process(_, let shortArguments, let shortTimeout) = shortPlan.kind else {
+      return XCTFail("HiLog capture must remain one descriptor-bound process")
+    }
+    XCTAssertEqual(
+      shortArguments,
+      ["-t", context.connectKey!, "shell", "hilog", "-x"])
+    XCTAssertEqual(shortTimeout, HDCHilogCaptureRequest.minimumCommandTimeoutSeconds)
+
+    let long = try HDCHilogCaptureRequest(durationSeconds: 600, filters: ["*:E"])
+    let longPlan = try provider.lower(
+      action: .hdc(.captureHilog(long)), context: context)
+    guard case .process(_, let longArguments, let longTimeout) = longPlan.kind else {
+      return XCTFail("HiLog capture must remain one descriptor-bound process")
+    }
+    XCTAssertEqual(
+      longArguments,
+      ["-t", context.connectKey!, "shell", "hilog", "-x", "*:E"])
+    XCTAssertEqual(
+      longTimeout,
+      long.durationSeconds + HDCHilogCaptureRequest.commandStartupAndDrainGraceSeconds)
+  }
+
   func testTraceAndUIDumpBounds() throws {
     XCTAssertNoThrow(try HDCTraceCaptureRequest(durationSeconds: 5, categories: ["ohos"]))
     XCTAssertThrowsError(try HDCTraceCaptureRequest(durationSeconds: 5, categories: []))
