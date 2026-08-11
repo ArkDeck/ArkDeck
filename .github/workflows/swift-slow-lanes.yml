@@ -1,0 +1,55 @@
+name: Swift slow lanes
+
+# Deep-scan report P2 (dimension 6): the four durability/scale tests behind
+# ARKDECK_RUN_LONG_JOURNAL_TESTS / ARKDECK_RUN_LONG_RUNTIME_TESTS /
+# ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS / ARKDECK_RUN_SLOW_ARTIFACT_TESTS
+# had exactly one entry point (run-test-lane.sh slow) and zero callers, so
+# scale regressions could only surface in production. This workflow is that
+# caller.
+#
+# Semantics: scheduled regression detection, NOT a merge gate. A red run
+# here never blocks a PR; it is a signal to file a product defect. The
+# required gate remains swift-ci.yml's full `swift test`.
+# Zero secrets; read-only permissions; same marketplace-independent checkout
+# as swift-ci.yml.
+
+on:
+  schedule:
+    # 18:00 UTC nightly (02:00 UTC+8), off the interactive working day.
+    - cron: "0 18 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-slow-lanes
+  cancel-in-progress: false
+
+jobs:
+  slow-lanes:
+    runs-on: macos-26
+    # Measured locally (warm build): the four lanes take ~170s total
+    # (artifact 73s, runtime 38s, history 3s, journal 52s; peak RSS ~1.2 GB).
+    # 30 minutes covers a cold CI build with the same margin swift-ci uses.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          git rev-parse HEAD
+      - name: Run the four slow durability lanes
+        run: |
+          set -eu
+          sh Packages/ArkDeckKit/Scripts/run-test-lane.sh slow
+      - name: Summary
+        if: always()
+        run: |
+          echo "Slow lanes cover: 10k-event journal cursor, 1,000-job runtime" >> "$GITHUB_STEP_SUMMARY"
+          echo "simulation, 10k terminal-history recovery, large-artifact" >> "$GITHUB_STEP_SUMMARY"
+          echo "redaction streaming. Red here = file a product defect; this" >> "$GITHUB_STEP_SUMMARY"
+          echo "job is not a merge gate." >> "$GITHUB_STEP_SUMMARY"
