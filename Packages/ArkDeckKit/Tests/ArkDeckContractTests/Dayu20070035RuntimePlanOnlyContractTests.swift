@@ -418,7 +418,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     XCTAssertFalse(preview.jobAdmitted)
     XCTAssertEqual(preview.dispatchDisposition, "notDispatched")
     let positiveDispatchCount = await dispatchLog.snapshot()
-    let positiveJobs = await engine.listJobs()
+    let positiveJobs = try await engine.listJobs()
     let positiveCapabilities = try await capabilityStore.list()
     XCTAssertEqual(positiveDispatchCount, 0)
     XCTAssertTrue(positiveJobs.isEmpty)
@@ -445,7 +445,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
               inputs: versioned))))
     }
     let negativeDispatchCount = await dispatchLog.snapshot()
-    let negativeJobs = await engine.listJobs()
+    let negativeJobs = try await engine.listJobs()
     let negativeCapabilities = try await capabilityStore.list()
     XCTAssertEqual(negativeDispatchCount, 0)
     XCTAssertTrue(negativeJobs.isEmpty)

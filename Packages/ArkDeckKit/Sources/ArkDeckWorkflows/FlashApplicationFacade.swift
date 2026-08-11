@@ -474,7 +474,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
           "postFlashVerification": .string("full"),
         ],
         requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
-        clientContext: RuntimeClientContext(clientName: "ArkDeckApp.FlashWorkspace"))
+        clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.flashWorkspace))
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
       let requestData = try encoder.encode(request)

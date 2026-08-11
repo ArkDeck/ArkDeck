@@ -4,6 +4,7 @@ import XCTest
 
 @testable import ArkDeckAgentComposition
 @testable import ArkDeckCLI
+@testable import ArkDeckCore
 @testable import ArkDeckLaunchAgent
 
 final class LaunchAgentServiceContractTests: XCTestCase {
@@ -34,6 +35,15 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     if let root { try? FileManager.default.removeItem(at: root) }
   }
 
+  func testCLIAndDaemonShareTheDefaultSocketLayout() {
+    XCTAssertEqual(
+      RuntimeCLI.defaultSocketPath(),
+      ArkDeckAgentFilesystemLayout.defaultSocketURL().path)
+    XCTAssertEqual(
+      ArkDeckAgentFilesystemLayout.defaultSocketURL().lastPathComponent,
+      ArkDeckAgentFilesystemLayout.socketFilename)
+  }
+
   func testInstallClosesTemplateExecutableHDCAndUserDomainLifecycle() throws {
     XCTAssertEqual(
       ArkDeckLaunchAgent.harnessLocalModelProviders,
@@ -53,7 +63,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(
       document["ProgramArguments"] as? [String], [paths.installedDaemon.path])
     XCTAssertEqual(
-      (document["EnvironmentVariables"] as? [String: String])?["ARKDECK_HDC_PATH"],
+      (document["EnvironmentVariables"] as? [String: String])?[ArkDeckEnvironmentKey.hdcPath],
       hdc.path)
     XCTAssertEqual(document["KeepAlive"] as? Bool, true)
     XCTAssertEqual(document["RunAtLoad"] as? Bool, true)

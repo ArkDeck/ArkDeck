@@ -1159,10 +1159,6 @@ public struct UnfinishedSessionDescriptor: Equatable, Sendable {
   }
 }
 
-public protocol UnfinishedSessionCatalog: Sendable {
-  func unfinishedSessions() throws -> [UnfinishedSessionDescriptor]
-}
-
 public enum RecoverySnapshotSource: String, Equatable, Sendable {
   case matchingCheckpoint
   case journalSupersedesCheckpoint
@@ -1184,10 +1180,6 @@ public struct ScannedRecoverySession: Equatable, Sendable {
 
 public struct SessionRecoveryScanner: Sendable {
   public init() {}
-
-  public func scan(catalog: any UnfinishedSessionCatalog) throws -> [ScannedRecoverySession] {
-    try catalog.unfinishedSessions().compactMap(scan)
-  }
 
   public func scan(_ descriptor: UnfinishedSessionDescriptor) throws -> ScannedRecoverySession? {
     let replay = try DurableJournalRecovery.inspect(url: descriptor.journalURL)

@@ -166,7 +166,7 @@ public actor HarnessTaskStore {
   /// per round that a later run would overwrite.
   public func putModelRun(_ run: HarnessModelRun) throws {
     guard Self.isWellFormed(modelRunID: run.modelRunID) else {
-      throw HarnessTaskStoreError.malformedTaskID(run.modelRunID)
+      throw HarnessTaskStoreError.corrupt("malformed model run id \(run.modelRunID)")
     }
     try ensureSQLiteTask(run.htaskID)
     try repository.putModelRun(run)

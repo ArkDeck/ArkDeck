@@ -33,9 +33,10 @@ let package = Package(
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
     // Dependency direction is load-bearing (see ArchitectureBoundaryContractTests):
-    // the harness plane decides, the runtime plane executes, and only the
-    // composition target below may see both. ArkDeckHarness deliberately does
-    // not depend on ArkDeckProcess — the harness cannot spawn a process.
+    // the harness plane decides, the runtime plane executes, and only
+    // ArkDeckAgentComposition plus ArkDeckAgentDaemon may see both as library
+    // targets. ArkDeckHarness deliberately does not depend on ArkDeckProcess —
+    // the harness cannot spawn a process.
     .target(
       name: "ArkDeckHarness",
       dependencies: ["ArkDeckCore", "ArkDeckRuntime"],
@@ -64,10 +65,12 @@ let package = Package(
       ]),
     // Harness <-> runtime glue: harness port adapters, the evolution workspace
     // and campaign hosts, and the LLM gateway composition (including the
-    // process-executing Codex CLI transport). This is the only library target
-    // allowed to import both ArkDeckHarness and ArkDeckWorkflows. It lives
-    // under Sources/ArkDeckWorkflows/AgentComposition (same carve-out pattern
-    // as ArkDeckEvolutionCandidate inside ArkDeckHarness).
+    // process-executing Codex CLI transport). This and ArkDeckAgentDaemon are
+    // the two library composition points allowed to import both
+    // ArkDeckHarness and ArkDeckWorkflows; the daemon owns the service-side
+    // task-method adapter. This target lives under
+    // Sources/ArkDeckWorkflows/AgentComposition (same carve-out pattern as
+    // ArkDeckEvolutionCandidate inside ArkDeckHarness).
     .target(
       name: "ArkDeckAgentComposition",
       dependencies: [
@@ -104,8 +107,8 @@ let package = Package(
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",
       dependencies: [
-        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckHarness", "ArkDeckRuntime",
-        "ArkDeckStorage", "ArkDeckWorkflows",
+        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore", "ArkDeckHarness",
+        "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckWorkflows",
       ]
     ),
     .executableTarget(
@@ -174,8 +177,6 @@ let package = Package(
         .copy("Fixtures/HDC/Golden"),
         .copy("Fixtures/HDC/Probes"),
         .copy("Fixtures/Rockchip"),
-        // Privacy-reviewed subset of a real HFA-005 harness directory. HFA-012
-        // migrates this checked-in historical payload in its crash/reentry contract matrix.
       ]
     ),
   ]

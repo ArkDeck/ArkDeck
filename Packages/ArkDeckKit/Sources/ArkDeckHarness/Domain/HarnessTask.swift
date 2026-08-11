@@ -24,6 +24,16 @@
 import ArkDeckCore
 import Foundation
 
+/// Canonical task projection keys shared by the Harness encoder and bounded
+/// consumers. The two legacy aliases remain read-only compatibility keys for
+/// decision-context documents; new task projections write lifecycle/stage.
+public enum HarnessTaskWireField {
+  public static let lifecycle = "lifecycle"
+  public static let stage = "stage"
+  public static let legacyStatus = "status"
+  public static let legacyPhase = "phase"
+}
+
 public enum HarnessTaskType: String, CaseIterable, Codable, Sendable {
   /// The only implemented handler. New types arrive as code plus tests,
   /// never as a user-supplied workflow document (no JSON workflow DSL).

@@ -449,7 +449,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(plan["jobAdmitted"], .bool(false))
     XCTAssertEqual(plan["dispatchDisposition"], .string("notDispatched"))
     XCTAssertNil(plan["capability"])
-    let jobsAfterPlan = await engine.listJobs()
+    let jobsAfterPlan = try await engine.listJobs()
     XCTAssertTrue(jobsAfterPlan.isEmpty)
 
     let drafted = try await request(
@@ -472,7 +472,7 @@ final class AgentDaemonContractTests: XCTestCase {
     }
     let statuses = try await request(handler, method: "capability.list")
     XCTAssertEqual(statuses.result, .array([]))
-    let jobsAfterRejections = await engine.listJobs()
+    let jobsAfterRejections = try await engine.listJobs()
     XCTAssertTrue(jobsAfterRejections.isEmpty)
   }
 
@@ -1440,6 +1440,60 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertNotEqual(statusFields["createdAtUtc"], .null)
     XCTAssertNotEqual(statusFields["startedAtUtc"], .null)
     XCTAssertNotEqual(statusFields["finishedAtUtc"], .null)
+  }
+
+  func testUnreadableJobRecordHasDistinctWireErrorFromMissingJob() async throws {
+    let jobID: String
+    do {
+      let (handler, _) = try makeStack()
+      let activeServer = try startServer(handler)
+      let client = AgentClient(socketPath: activeServer.socketURL.path)
+      let request = """
+        {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+        "requestId":"req-unreadable-wire","idempotencyKey":"idem-unreadable-wire-01",\
+        "target":{"targetId":"TGT-UNREADABLE-01","expectedBindingRevision":7},\
+        "operation":{"id":"observe.device","version":1}}
+        """
+      guard
+        case .object(let submitFields) = try client.request(
+          method: "job.submit", params: ["requestJson": .string(request)]),
+        case .string(let acceptedJobID)? = submitFields["jobId"]
+      else {
+        return XCTFail("submit must return a job id")
+      }
+      jobID = acceptedJobID
+      _ = try client.request(method: "job.run", params: ["jobId": .string(jobID)])
+      activeServer.stop()
+      self.server = nil
+    }
+    try RuntimeJobSQLiteTestSupport.replaceInitialRecord(
+      stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true),
+      jobID: jobID, data: Data("not-json".utf8))
+
+    let (freshHandler, _) = try makeStack()
+    let freshServer = try startServer(freshHandler)
+    let client = AgentClient(socketPath: freshServer.socketURL.path)
+    for (method, params) in [
+      ("job.status", ["jobId": JSONValue.string(jobID)]),
+      ("job.list", nil),
+      ("job.list-page", ["pageSize": JSONValue.integer(100)]),
+    ] as [(String, [String: JSONValue]?)] {
+      do {
+        _ = try client.request(method: method, params: params)
+        XCTFail("\(method) must fail loudly on a corrupt Runtime job record")
+      } catch AgentClientError.daemonError(let code, let message) {
+        XCTAssertEqual(code, AgentDaemonErrorCode.recordUnreadable.rawValue)
+        XCTAssertTrue(message.contains(jobID))
+      }
+    }
+
+    do {
+      _ = try client.request(
+        method: "job.status", params: ["jobId": .string("job-that-never-existed")])
+      XCTFail("a genuinely missing job must remain notFound")
+    } catch AgentClientError.daemonError(let code, _) {
+      XCTAssertEqual(code, AgentDaemonErrorCode.notFound.rawValue)
+    }
   }
 
   func testGracefulDrainCompletesInFlightJobBeforeReleasingTheDaemonLock() async throws {

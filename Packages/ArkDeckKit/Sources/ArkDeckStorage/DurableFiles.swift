@@ -624,25 +624,25 @@ public final class DurableOutcomeCheckpointGate: @unchecked Sendable {
   }
 }
 
-enum DurableFilePrimitives {
-  static func requireAbsoluteFileURL(_ url: URL) throws {
+package enum DurableFilePrimitives {
+  package static func requireAbsoluteFileURL(_ url: URL) throws {
     guard url.isFileURL, url.path.hasPrefix("/") else {
       throw DurableFileError.pathMustBeAbsolute(url.path)
     }
   }
 
-  static func createDirectoryIfNeeded(_ url: URL) throws {
+  package static func createDirectoryIfNeeded(_ url: URL) throws {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
   }
 
-  static func rejectSymbolicLink(_ url: URL) throws {
+  package static func rejectSymbolicLink(_ url: URL) throws {
     var status = stat()
     if lstat(url.path, &status) == 0, status.st_mode & S_IFMT == S_IFLNK {
       throw DurableFileError.symbolicLinkRejected(url.path)
     }
   }
 
-  static func writeAll(_ data: Data, descriptor: Int32, path: String) throws {
+  package static func writeAll(_ data: Data, descriptor: Int32, path: String) throws {
     try data.withUnsafeBytes { rawBuffer in
       guard let base = rawBuffer.baseAddress else { return }
       var offset = 0
@@ -658,7 +658,7 @@ enum DurableFilePrimitives {
     }
   }
 
-  static func fullSync(_ descriptor: Int32, path: String) throws {
+  package static func fullSync(_ descriptor: Int32, path: String) throws {
     guard Darwin.fsync(descriptor) == 0 else {
       throw DurableFileError.syncFailed(path: path, errno: errno)
     }
@@ -667,7 +667,7 @@ enum DurableFilePrimitives {
     }
   }
 
-  static func discardTornTail(
+  package static func discardTornTail(
     at url: URL,
     descriptor: Int32,
     durableRecordCount: Int
@@ -694,7 +694,7 @@ enum DurableFilePrimitives {
     try syncDirectory(url.deletingLastPathComponent())
   }
 
-  static func syncDirectory(_ url: URL) throws {
+  package static func syncDirectory(_ url: URL) throws {
     let descriptor = Darwin.open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
     guard descriptor >= 0 else { throw DurableFileError.openFailed(path: url.path, errno: errno) }
     defer { Darwin.close(descriptor) }

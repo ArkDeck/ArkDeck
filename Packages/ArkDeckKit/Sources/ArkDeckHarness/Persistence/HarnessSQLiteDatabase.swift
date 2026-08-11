@@ -73,7 +73,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
         throw HarnessTaskStoreError.ioFailure("cannot restrict harness sqlite permissions")
       }
       try configure()
-      try migrateSchema()
+      try bootstrapSchemaIfNeeded()
     } catch {
       sqlite3_close_v2(opened)
       self.handle = nil
@@ -231,7 +231,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
     try executeBatch("PRAGMA synchronous=FULL")
   }
 
-  private func migrateSchema() throws {
+  private func bootstrapSchemaIfNeeded() throws {
     let current = Int(try query("PRAGMA user_version").first?.integer("user_version") ?? 0)
     guard current <= Self.schemaVersion else {
       throw HarnessTaskStoreError.corrupt(

@@ -713,6 +713,35 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     XCTAssertEqual(retry.remainingUsesAfter, 2)
   }
 
+  func testCapabilityDocumentSymlinkIsRejectedWithoutReplacingItsTarget() async throws {
+    try FileManager.default.createDirectory(
+      at: directoryURL, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let external = directoryURL.deletingLastPathComponent()
+      .appendingPathComponent("external-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: external) }
+    let externalDocument = Data(#"{"records":[],"schemaVersion":"2.0.0"}"#.utf8)
+    try externalDocument.write(to: external)
+    let documentURL = directoryURL.appendingPathComponent("runtime-capabilities.json")
+    try FileManager.default.createSymbolicLink(at: documentURL, withDestinationURL: external)
+
+    let store = try makeStore()
+    do {
+      try await store.install(try e1Capability())
+      XCTFail("a capability document symlink must fail closed")
+    } catch let error as RuntimeCapabilityStoreError {
+      guard case .ioFailure(let detail) = error else {
+        return XCTFail("expected ioFailure, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("symbolicLinkRejected"))
+    }
+
+    XCTAssertEqual(try Data(contentsOf: external), externalDocument)
+    XCTAssertEqual(
+      try FileManager.default.destinationOfSymbolicLink(atPath: documentURL.path),
+      external.path)
+  }
+
   func testCorruptedStoreFailsClosed() async throws {
     do {
       let store = try makeStore()

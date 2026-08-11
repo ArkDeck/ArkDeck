@@ -17,8 +17,7 @@ import Foundation
 
 enum RuntimeCLI {
   static func defaultSocketPath() -> String {
-    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent("ArkDeck/Agentd/agentd.sock").path
+    ArkDeckAgentFilesystemLayout.defaultSocketURL().path
   }
 
   static func client(_ arguments: inout [String]) -> AgentClient {
@@ -1913,7 +1912,8 @@ enum RuntimeCLI {
       // external agent reads this, then answers via `task propose-patch`.
       emit(
         try client.request(
-          method: "task.context", params: ["htaskId": .string(try requiredTask())]),
+          method: ArkDeckAgentMethod.taskContext,
+          params: ["htaskId": .string(try requiredTask())]),
         json: json)
     case "propose-patch":
       let maximumProposalBytes = 512 * 1024

@@ -1625,7 +1625,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(
       dispatcher.dispatchedActions, ["observeDevice"],
       "only the journaled descriptor-bound target confirmation may dispatch")
-    let jobs = await engine.listJobs()
+    let jobs = try await engine.listJobs()
     XCTAssertEqual(jobs.map(\.jobID), [acceptance.jobID])
   }
 

@@ -143,7 +143,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(facade.contains("method: \"job.submit\""))
     XCTAssertTrue(facade.contains("method: \"job.run\""))
     XCTAssertTrue(facade.contains("method: \"job.cancel\""))
-    XCTAssertTrue(facade.contains("ArkDeckApp.TraceWorkspace"))
+    XCTAssertTrue(facade.contains("ArkDeckAgentClientName.traceWorkspace"))
     for forbidden in ["method: \"artifact.import\"", "method: \"artifact.export\""] {
       XCTAssertFalse(facade.contains(forbidden), forbidden)
     }

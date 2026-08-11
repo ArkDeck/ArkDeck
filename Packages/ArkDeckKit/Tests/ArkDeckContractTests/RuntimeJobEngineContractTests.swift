@@ -521,6 +521,50 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(status.state, "preflight")
   }
 
+  func testUnreadablePersistedRecordIsDistinctFromMissingAcrossHistoryReads() async throws {
+    let jobID: String
+    do {
+      let (engine, _) = try makeEngine(
+        dispatcher: ScriptedDispatcher(script: .observationHappy))
+      let accepted = try await engine.submit(
+        observeRequest(
+          idempotencyKey: "idem-unreadable-history-01",
+          requestID: "req-unreadable-history-01"))
+      jobID = accepted.jobID
+      let completion = try await engine.run(jobID: jobID)
+      XCTAssertEqual(completion.state, "succeeded")
+    }
+    try RuntimeJobSQLiteTestSupport.replaceInitialRecord(
+      stateDirectory: stateDirectory, jobID: jobID, data: Data("not-json".utf8))
+
+    let (reopened, _) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .observationHappy))
+    do {
+      _ = try await reopened.status(jobID: jobID)
+      XCTFail("a corrupt persisted record must not be presented as missing")
+    } catch let error as RuntimeJobEngineError {
+      XCTAssertEqual(error, .jobRecordUnreadable(jobID))
+    }
+    do {
+      _ = try await reopened.listJobs()
+      XCTFail("the unpaged history surface must fail loudly on a corrupt record")
+    } catch let error as RuntimeJobEngineError {
+      XCTAssertEqual(error, .jobRecordUnreadable(jobID))
+    }
+    do {
+      _ = try await reopened.listJobs(pageSize: 100)
+      XCTFail("the paged history surface must use the same corrupt-record error")
+    } catch let error as RuntimeJobEngineError {
+      XCTAssertEqual(error, .jobRecordUnreadable(jobID))
+    }
+    do {
+      _ = try await reopened.status(jobID: "job-that-never-existed")
+      XCTFail("a genuinely missing job must still use jobNotFound")
+    } catch let error as RuntimeJobEngineError {
+      XCTAssertEqual(error, .jobNotFound("job-that-never-existed"))
+    }
+  }
+
   func testDaemonRecoveryReopensOnlyActiveJobsWhileTerminalHistoryStaysQueryable() async throws {
     let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let terminal = try await engine.submit(
@@ -529,7 +573,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(terminalCompletion.state, "succeeded")
     let active = try await engine.submit(
       observeRequest(idempotencyKey: "idem-active-history-01", requestID: "req-active-history-01"))
-    let listedBeforeRestart = Set((await engine.listJobs()).map(\.jobID))
+    let listedBeforeRestart = Set((try await engine.listJobs()).map(\.jobID))
     XCTAssertEqual(listedBeforeRestart, Set([terminal.jobID, active.jobID]))
 
     let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
@@ -540,7 +584,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // Terminal history remains visible through the normal list surface, but
     // recovery above has reopened only the active job; the completed job was
     // never replayed or given a fresh JobRuntime allocation.
-    let listedJobs = await reopened.listJobs()
+    let listedJobs = try await reopened.listJobs()
     XCTAssertEqual(Set(listedJobs.map(\.jobID)), Set([terminal.jobID, active.jobID]))
     let terminalStatus = try await reopened.status(jobID: terminal.jobID)
     XCTAssertEqual(terminalStatus.state, "succeeded")

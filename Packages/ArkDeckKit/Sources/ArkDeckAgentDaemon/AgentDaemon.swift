@@ -55,6 +55,7 @@ public enum AgentDaemonErrorCode: String, Sendable {
   case rejected
   case conflict
   case notFound
+  case recordUnreadable
   case internalError
 }
 
@@ -631,12 +632,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let status = try await engine.run(jobID: jobID)
-        // `recovered` is a durable Runtime terminal with richer lineage, but
-        // legacy one-shot runners know only the successful transport terminal
-        // `succeeded`. Evidence and subsequent status/list calls keep the
-        // exact `recovered` state; only this synchronous completion response
-        // uses the compatibility terminal so automation does not cancel a
-        // completed recovery Job.
+        // `recovered` is a durable Runtime terminal with richer lineage. The
+        // synchronous client terminal set (see AgentRuntimeExecutor) uses
+        // `succeeded` for successful completion. Evidence and subsequent
+        // status/list calls keep the exact `recovered` state; only this
+        // completion response uses the transport terminal so automation does
+        // not cancel a completed recovery Job.
         let completionState =
           status.state == JobState.recovered.rawValue
           ? JobState.succeeded.rawValue : status.state
@@ -650,8 +651,16 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "job.list":
-      let statuses = await engine.listJobs()
-      return success(id: request.id, result: .array(statuses.map { Self.encodeStatus($0) }))
+      do {
+        let statuses = try await engine.listJobs()
+        return success(id: request.id, result: .array(statuses.map { Self.encodeStatus($0) }))
+      } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
+        return failure(
+          id: request.id, code: .recordUnreadable,
+          message: "Runtime job record \(jobID) is unreadable")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
 
     case "job.list-page":
       let pageSize: Int
@@ -680,6 +689,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
             "jobs": .array(page.jobs.map { Self.encodeStatus($0) }),
             "nextCursor": page.nextCursor.map(JSONValue.string) ?? .null,
           ]))
+      } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
+        return failure(
+          id: request.id, code: .recordUnreadable,
+          message: "Runtime job record \(jobID) is unreadable")
       } catch {
         return failure(id: request.id, code: .invalidParams, message: "\(error)")
       }
@@ -691,8 +704,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         let status = try await engine.status(jobID: jobID)
         return success(id: request.id, result: Self.encodeStatus(status))
-      } catch {
+      } catch RuntimeJobEngineError.jobNotFound {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
+      } catch RuntimeJobEngineError.jobRecordUnreadable {
+        return failure(
+          id: request.id, code: .recordUnreadable,
+          message: "Runtime job record \(jobID) is unreadable")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
     case "job.evidence":
@@ -718,8 +737,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id,
           result: Self.encodeEvidence(
             snapshot: snapshot, artifacts: artifacts, blockers: blockers))
-      } catch {
+      } catch RuntimeJobEngineError.jobNotFound {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
+      } catch RuntimeJobEngineError.jobRecordUnreadable {
+        return failure(
+          id: request.id, code: .recordUnreadable,
+          message: "Runtime job record \(jobID) is unreadable")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
     case "job.cancel":
@@ -1841,7 +1866,8 @@ public final class AgentDaemonServer: @unchecked Sendable {
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.stateDirectory = stateDirectory
-    self.socketURL = stateDirectory.appendingPathComponent("agentd.sock")
+    self.socketURL = stateDirectory.appendingPathComponent(
+      ArkDeckAgentFilesystemLayout.socketFilename)
     self.handler = handler
     self.nowUTC = nowUTC
   }

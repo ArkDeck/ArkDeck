@@ -866,7 +866,8 @@ public actor NativeAgentChatRuntimeTools {
       "taskRef": .string(taskReference(for: taskID))
     ]
     for key in [
-      "type", "lifecycle", "stage", "waitReason", "conditions", "status", "phase",
+      "type", HarnessTaskWireField.lifecycle, HarnessTaskWireField.stage, "waitReason",
+      "conditions", HarnessTaskWireField.legacyStatus, HarnessTaskWireField.legacyPhase,
       "activeRound", "activeJobId", "cancelRequested", "version", "updatedAtUtc", "budgets",
       "consumedBudget", "allowedOperations", "result",
     ] {
@@ -897,7 +898,7 @@ public actor NativeAgentChatRuntimeTools {
     taskID: String,
     observedAtTurn: Int
   ) {
-    if taskLifecycle(value) == "humanRequired" {
+    if taskLifecycle(value) == HarnessTaskLifecycle.humanRequired.rawValue {
       if pendingTaskPause?.taskID != taskID {
         pendingTaskPause = PendingTaskPause(taskID: taskID, userTurn: observedAtTurn)
       }
@@ -908,15 +909,15 @@ public actor NativeAgentChatRuntimeTools {
 
   private func taskLifecycle(_ value: JSONValue) -> String? {
     guard case .object(let fields) = value else { return nil }
-    if case .string(let lifecycle)? = fields["lifecycle"] { return lifecycle }
-    if case .string(let status)? = fields["status"] { return status }
+    if case .string(let lifecycle)? = fields[HarnessTaskWireField.lifecycle] { return lifecycle }
+    if case .string(let status)? = fields[HarnessTaskWireField.legacyStatus] { return status }
     return nil
   }
 
   private func taskStage(_ value: JSONValue) -> String? {
     guard case .object(let fields) = value else { return nil }
-    if case .string(let stage)? = fields["stage"] { return stage }
-    if case .string(let phase)? = fields["phase"] { return phase }
+    if case .string(let stage)? = fields[HarnessTaskWireField.stage] { return stage }
+    if case .string(let phase)? = fields[HarnessTaskWireField.legacyPhase] { return phase }
     return nil
   }
 

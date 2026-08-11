@@ -93,8 +93,8 @@ package struct HarnessTaskMethodService: Sendable {
           id: request.id,
           result: .object([
             "htaskId": .string(snapshot.htaskID),
-            "lifecycle": .string(snapshot.lifecycle.rawValue),
-            "stage": .string(snapshot.stage.rawValue),
+            HarnessTaskWireField.lifecycle: .string(snapshot.lifecycle.rawValue),
+            HarnessTaskWireField.stage: .string(snapshot.stage.rawValue),
             "waitReason": snapshot.waitReason.map { .string($0.rawValue) } ?? .null,
             "conditions": .array(snapshot.conditions.map(Self.encode)),
             // A result exists only when the task reached a terminal lifecycle
@@ -178,7 +178,7 @@ package struct HarnessTaskMethodService: Sendable {
             "task": Self.encodeTask(outcome.snapshot),
           ]))
 
-      case "task.context":
+      case ArkDeckAgentMethod.taskContext:
         guard let id = taskID() else {
           return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
         }
@@ -600,8 +600,8 @@ package struct HarnessTaskMethodService: Sendable {
     .object([
       "htaskId": .string(snapshot.htaskID),
       "type": .string(snapshot.type.rawValue),
-      "lifecycle": .string(snapshot.lifecycle.rawValue),
-      "stage": .string(snapshot.stage.rawValue),
+      HarnessTaskWireField.lifecycle: .string(snapshot.lifecycle.rawValue),
+      HarnessTaskWireField.stage: .string(snapshot.stage.rawValue),
       "waitReason": snapshot.waitReason.map { .string($0.rawValue) } ?? .null,
       "conditions": .array(snapshot.conditions.map(encode)),
       "targetId": .string(snapshot.target.targetID),
