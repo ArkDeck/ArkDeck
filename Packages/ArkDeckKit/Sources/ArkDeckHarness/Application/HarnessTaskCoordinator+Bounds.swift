@@ -55,7 +55,7 @@ extension HarnessTaskCoordinator {
       let stopped = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .budgetExhausted, reasonCode: reason, status: .failed,
+          snapshot, causation: .budgetExhausted, reasonCode: reason, lifecycle: .failed,
           activeJob: .cleared,
           result: HarnessTaskResult(
             outcome: .failed, reasonCode: reason,
@@ -67,7 +67,7 @@ extension HarnessTaskCoordinator {
       let stopped = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .noSafeAction, reasonCode: reason, status: .failed,
+          snapshot, causation: .noSafeAction, reasonCode: reason, lifecycle: .failed,
           activeJob: .cleared,
           result: HarnessTaskResult(
             outcome: .failed, reasonCode: reason,
@@ -105,7 +105,7 @@ extension HarnessTaskCoordinator {
     let updated = try await commit(
       snapshot,
       transition(
-        snapshot, causation: .humanBlocked, reasonCode: reasonCode, status: .humanRequired,
+        snapshot, causation: .humanBlocked, reasonCode: reasonCode, lifecycle: .humanRequired,
         activeJob: .cleared,
         consumedBudget: charging(
           snapshot.consumedBudget, modelCalls: modelCallsSpent),
@@ -138,7 +138,7 @@ extension HarnessTaskCoordinator {
   ) -> HarnessFailureFingerprint {
     HarnessFailureFingerprint(
       operationReference: operationReference,
-      phase: snapshot.phase,
+      phase: snapshot.stage,
       // The provider is the one the catalog binds this operation to; reading
       // it from the descriptor keeps the fingerprint honest when the same
       // operation id is served by a different provider in a later revision.
@@ -205,7 +205,7 @@ extension HarnessTaskCoordinator {
       evaluationRecorded: before.latestEvaluationID != after.latestEvaluationID,
       newVerifiedEvidenceCount: newEvidence,
       sampleDelta: sampleDelta,
-      phaseChanged: before.phase != after.phase,
+      phaseChanged: before.stage != after.stage,
       newFailureCount: newFailures,
       resolvedFailureCount: 0,
       workspaceRevisionChanged:

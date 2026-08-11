@@ -1327,8 +1327,9 @@ public actor RuntimeJobEngine {
         appendTimeline(jobID: jobID, entry: "host-step \(step.stepID)")
         continue
       case .requestConfirmation:
-        // This legacy-named Catalog step is now an in-plan witness that the
-        // protected Runtime generated an exact destructive capability. UI
+        // The published `requestConfirmation` identifier is retained on the wire. Its active
+        // behavior is an in-plan witness that the protected Runtime generated an exact
+        // destructive capability. UI
         // acknowledgement is UX only; no human/campaign authority is read.
         guard let record = jobs[jobID]?.record else {
           throw RuntimeDispatchFailure.failed("confirm step lost its job record")

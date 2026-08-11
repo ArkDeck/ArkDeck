@@ -767,7 +767,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let recovered = try await stack.coordinator.reconcile(stack.taskID)
     let reconcileCalls = await stack.jobs.reconcileCalls()
     XCTAssertEqual(reconcileCalls, ["JOB-2"])
-    XCTAssertEqual(recovered.snapshot.status, .failed)
+    XCTAssertEqual(recovered.snapshot.lifecycle, .failed)
     XCTAssertNil(recovered.snapshot.activeJobID)
     XCTAssertEqual(recovered.reasonCode, "operationFailed:capture.diagnostics@1:failed")
     XCTAssertFalse(
@@ -791,7 +791,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let waiting = try await stack.coordinator.reconcile(stack.taskID)
     let reconcileCalls = await stack.jobs.reconcileCalls()
     XCTAssertTrue(reconcileCalls.isEmpty)
-    XCTAssertEqual(waiting.snapshot.status, .waiting)
+    XCTAssertEqual(waiting.snapshot.lifecycle, .waiting)
     XCTAssertEqual(waiting.snapshot.activeJobID, "JOB-2")
     XCTAssertEqual(waiting.snapshot.waitReason, .observationWindow)
   }
@@ -808,7 +808,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let waiting = try await stack.coordinator.reconcile(stack.taskID)
     let reconcileCalls = await stack.jobs.reconcileCalls()
     XCTAssertTrue(reconcileCalls.isEmpty)
-    XCTAssertEqual(waiting.snapshot.status, .waiting)
+    XCTAssertEqual(waiting.snapshot.lifecycle, .waiting)
     XCTAssertEqual(waiting.snapshot.activeJobID, "JOB-2")
     XCTAssertEqual(waiting.snapshot.waitReason, .observationWindow)
   }
@@ -858,7 +858,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     // verification epoch begins, and only the device-local watermark survives.
     let verifyCaptureWake = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(verifyCaptureWake.action, .dispatched)
-    XCTAssertEqual(verifyCaptureWake.snapshot.phase, .verifying)
+    XCTAssertEqual(verifyCaptureWake.snapshot.stage, .verifying)
     XCTAssertEqual(
       verifyCaptureWake.snapshot.repairAttempt?.deployedDigest, journeySignedDigest)
     XCTAssertEqual(
@@ -893,7 +893,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let promoted = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(promoted.action, .evaluatedSucceeded)
     XCTAssertEqual(promoted.reasonCode, "promotionCandidateReady")
-    XCTAssertEqual(promoted.snapshot.status, .succeeded)
+    XCTAssertEqual(promoted.snapshot.lifecycle, .succeeded)
     XCTAssertEqual(promoted.snapshot.result?.reasonCode, "promotionCandidateReady")
     XCTAssertEqual(
       promoted.snapshot.consumedBudget.e1Mutations, 6,
@@ -973,8 +973,8 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       retained.action, .dispatched,
       "the same wake may observe the terminal proof and submit a new bounded Job")
     XCTAssertTrue(retained.reasonCode.hasPrefix("deployVerifiedBuildOutput"))
-    XCTAssertEqual(retained.snapshot.status, .waiting)
-    XCTAssertEqual(retained.snapshot.phase, .deploying)
+    XCTAssertEqual(retained.snapshot.lifecycle, .waiting)
+    XCTAssertEqual(retained.snapshot.stage, .deploying)
     XCTAssertEqual(
       retained.snapshot.observedState[DebugCrashTaskHandler.deploymentPreflightRetryKey],
       .bool(true))
@@ -1013,7 +1013,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     await stack.jobs.finish(retryJobID)
     let verification = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(verification.action, .dispatched)
-    XCTAssertEqual(verification.snapshot.phase, .verifying)
+    XCTAssertEqual(verification.snapshot.stage, .verifying)
     XCTAssertNil(
       verification.snapshot.observedState[
         DebugCrashTaskHandler.deploymentPreflightRetryKey])
@@ -1037,7 +1037,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(rollback.action, .dispatched)
     let rollbackRequest = try await latestRequest(stack)
     XCTAssertEqual(rollbackRequest.operation.reference, DebugCrashTaskHandler.revertPatch)
-    XCTAssertEqual(rollback.snapshot.status, .waiting)
+    XCTAssertEqual(rollback.snapshot.lifecycle, .waiting)
     XCTAssertEqual(rollback.snapshot.repairAttempt?.rollbackRequired, true)
     XCTAssertNotNil(
       rollback.snapshot.observedState[DebugCrashTaskHandler.promotionRetryReasonKey])
@@ -1087,7 +1087,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       stack, captureJobID: "JOB-22", analyzerJobID: "JOB-23")
     XCTAssertEqual(promoted.action, .evaluatedSucceeded)
     XCTAssertEqual(promoted.reasonCode, "promotionCandidateReady")
-    XCTAssertEqual(promoted.snapshot.status, .succeeded)
+    XCTAssertEqual(promoted.snapshot.lifecycle, .succeeded)
     XCTAssertEqual(promoted.snapshot.consumedBudget.e1Mutations, 12)
     let finalHumanActions = try await stack.coordinator.humanActions(stack.taskID)
     XCTAssertTrue(finalHumanActions.isEmpty)
@@ -1133,7 +1133,7 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     let exhausted = try await stack.coordinator.reconcile(stack.taskID)
     XCTAssertEqual(exhausted.action, .stoppedForHuman)
     XCTAssertEqual(exhausted.reasonCode, "maxEvolutionAttemptsExhausted:1")
-    XCTAssertEqual(exhausted.snapshot.status, .humanRequired)
+    XCTAssertEqual(exhausted.snapshot.lifecycle, .humanRequired)
     XCTAssertEqual(exhausted.snapshot.result?.reasonCode, "maxEvolutionAttemptsExhausted:1")
     XCTAssertEqual(
       stack.gateway.patchProposalWakes, 2,

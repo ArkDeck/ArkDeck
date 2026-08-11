@@ -62,21 +62,23 @@ public struct SessionRetentionApplyResult: Equatable, Sendable {
   public let previewAfterRescan: SessionRetentionPreview
 }
 
-public struct SessionHeavyWriterAdmission: Equatable, Sendable {
-  public let catalog: SessionRetentionCatalogSnapshot
+/// Package-only admission seam. It is intentionally not public until a production writer
+/// composition root consumes it end to end.
+package struct SessionHeavyWriterAdmission: Equatable, Sendable {
+  package let catalog: SessionRetentionCatalogSnapshot
   fileprivate let configurationToken: StorageConfigurationToken
 
-  public var volumeIdentity: VolumeIdentity { catalog.volumeIdentity }
-  public var rootIdentity: SessionCatalogRootIdentity { catalog.rootIdentity }
-  public var catalogGeneration: UInt64? { catalog.catalogGeneration }
+  package var volumeIdentity: VolumeIdentity { catalog.volumeIdentity }
+  package var rootIdentity: SessionCatalogRootIdentity { catalog.rootIdentity }
+  package var catalogGeneration: UInt64? { catalog.catalogGeneration }
 }
 
-public struct SessionStorageExecutionContext: Sendable {
-  public let settings: SessionSettingsSnapshot
-  public let rootLease: SessionRootAccessLease
-  public let sessionStore: SessionStore
-  public let coordinator: HostStorageCoordinator
-  public let catalog: SessionRetentionCatalog
+package struct SessionStorageExecutionContext: Sendable {
+  package let settings: SessionSettingsSnapshot
+  package let rootLease: SessionRootAccessLease
+  package let sessionStore: SessionStore
+  package let coordinator: HostStorageCoordinator
+  package let catalog: SessionRetentionCatalog
 
   private let settingsStore: SessionSettingsStore
   private let retentionController: SessionRetentionController
@@ -97,12 +99,12 @@ public struct SessionStorageExecutionContext: Sendable {
     self.retentionController = retentionController
   }
 
-  public func requireCurrentSettings() throws {
+  package func requireCurrentSettings() throws {
     try settingsStore.requireCurrent(settings)
   }
 
   @discardableResult
-  public func prepareHeavyWriterAdmission() async throws
+  package func prepareHeavyWriterAdmission() async throws
     -> SessionHeavyWriterAdmission
   {
     try requireCurrentSettings()
@@ -127,7 +129,7 @@ public struct SessionStorageExecutionContext: Sendable {
       catalog: snapshot, configurationToken: configurationToken)
   }
 
-  public func admitHeavyWriter(
+  package func admitHeavyWriter(
     _ request: StorageClaimRequest,
     snapshot: HostStorageSnapshot,
     admission: SessionHeavyWriterAdmission
@@ -147,7 +149,7 @@ public struct SessionStorageExecutionContext: Sendable {
       configurationToken: admission.configurationToken)
   }
 
-  public func createSession(
+  package func createSession(
     sessionID: String,
     jobID: String,
     createdAt: Date,
@@ -166,7 +168,7 @@ public struct SessionStorageExecutionContext: Sendable {
     }
   }
 
-  public func registerFinalizedSession(_ sessionRoot: URL) async {
+  package func registerFinalizedSession(_ sessionRoot: URL) async {
     do {
       try requireCurrentSettings()
       try catalog.registerFinalizedSession(
@@ -199,7 +201,7 @@ public struct SessionStorageExecutionContext: Sendable {
 
 public actor SessionStorageApplicationRuntime {
   public nonisolated let settingsStore: SessionSettingsStore
-  public nonisolated let coordinator: HostStorageCoordinator
+  package nonisolated let coordinator: HostStorageCoordinator
 
   private nonisolated let volumeIdentityResolver: any VolumeIdentityResolving
   private nonisolated let catalogFaultInjector: SessionRetentionCatalogFaultInjector
@@ -209,8 +211,17 @@ public actor SessionStorageApplicationRuntime {
 
   public static let production = SessionStorageApplicationRuntime()
 
-  public init(
-    settingsStore: SessionSettingsStore? = nil,
+  public init() {
+    let configurationEpoch = StorageConfigurationEpoch()
+    settingsStore = SessionSettingsStore(configurationEpoch: configurationEpoch)
+    coordinator = HostStorageCoordinator(configurationEpoch: configurationEpoch)
+    volumeIdentityResolver = SystemVolumeIdentityResolver()
+    catalogFaultInjector = .none
+    retentionController = SessionRetentionController()
+  }
+
+  package init(
+    settingsStore: SessionSettingsStore?,
     coordinator: HostStorageCoordinator? = nil,
     volumeIdentityResolver: any VolumeIdentityResolving = SystemVolumeIdentityResolver(),
     catalogFaultInjector: SessionRetentionCatalogFaultInjector = .none,
@@ -227,7 +238,7 @@ public actor SessionStorageApplicationRuntime {
     self.retentionController = retentionController
   }
 
-  public nonisolated func makeExecutionContext() throws -> SessionStorageExecutionContext {
+  package nonisolated func makeExecutionContext() throws -> SessionStorageExecutionContext {
     let settings = try settingsStore.load()
     let access = try settingsStore.acquireRoot(for: settings)
     let catalog = try SessionRetentionCatalog(

@@ -72,8 +72,8 @@ public struct HarnessReconcileOutcome: Sendable, Equatable {
 public enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case unsupportedTaskType(HarnessTaskType)
   case notFound(String)
-  case notPausable(HarnessTaskStatus)
-  case notResumable(HarnessTaskStatus)
+  case notPausable(HarnessTaskLifecycle)
+  case notResumable(HarnessTaskLifecycle)
   case emptyResolution
   case malformedPatchProposal(String)
   case patchProposalNotAllowed(String)
@@ -344,7 +344,7 @@ public actor HarnessTaskCoordinator {
     evidenceArtifactIDs: [String] = []
   ) async throws -> HarnessTaskSnapshot {
     let snapshot = try await load(taskID)
-    guard !snapshot.status.isTerminal, snapshot.status != .humanRequired else {
+    guard !snapshot.lifecycle.isTerminal, snapshot.lifecycle != .humanRequired else {
       return snapshot
     }
     let expected = snapshot.target.expectedBindingRevision
@@ -407,17 +407,17 @@ public actor HarnessTaskCoordinator {
         reasonCode: bindingMatches
           ? (deviceReady ? "deviceObservationReady" : "deviceObservationUnavailable")
           : "bindingRevisionUnconfirmed",
-        status: lifecycle, activeJob: .unchanged, waitReason: waitReason,
+        lifecycle: lifecycle, activeJob: .unchanged, waitReason: waitReason,
         conditions: conditions))
   }
 
   public func pause(_ taskID: String) async throws -> HarnessTaskSnapshot {
     let snapshot = try await load(taskID)
     guard
-      snapshot.status == .running || snapshot.status == .created
-        || (snapshot.status == .waiting && snapshot.waitReason != .userSuspended)
+      snapshot.lifecycle == .running || snapshot.lifecycle == .created
+        || (snapshot.lifecycle == .waiting && snapshot.waitReason != .userSuspended)
     else {
-      throw HarnessCoordinatorError.notPausable(snapshot.status)
+      throw HarnessCoordinatorError.notPausable(snapshot.lifecycle)
     }
     // Pausing does not abandon an in-flight job: it stops the harness from
     // starting anything new. The active job stays owned by the engine and
@@ -425,7 +425,7 @@ public actor HarnessTaskCoordinator {
     return try await commit(
       snapshot,
       transition(
-        snapshot, causation: .pauseRequested, reasonCode: "operatorPause", status: .waiting,
+        snapshot, causation: .pauseRequested, reasonCode: "operatorPause", lifecycle: .waiting,
         activeJob: .unchanged, waitReason: .userSuspended))
   }
 
@@ -433,13 +433,13 @@ public actor HarnessTaskCoordinator {
     let trimmed = resolution.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { throw HarnessCoordinatorError.emptyResolution }
     let snapshot = try await load(taskID)
-    switch snapshot.status {
+    switch snapshot.lifecycle {
     case .waiting where snapshot.waitReason == .userSuspended:
       return try await commit(
         snapshot,
         transition(
           snapshot, causation: .resumeRequested, reasonCode: trimmed,
-          status: snapshot.activeJobID == nil ? .running : .waiting,
+          lifecycle: snapshot.activeJobID == nil ? .running : .waiting,
           waitReason: snapshot.activeJobID == nil ? nil : .activeJob))
     case .humanRequired:
       // A typed resolution is the only way out of a human block. The open
@@ -457,18 +457,18 @@ public actor HarnessTaskCoordinator {
       return try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanResolved, reasonCode: trimmed, status: .running,
+          snapshot, causation: .humanResolved, reasonCode: trimmed, lifecycle: .running,
           // A human decision clears the patience counter: the next round is
           // acting on new information, not repeating the old one.
           noProgressRounds: 0))
     default:
-      throw HarnessCoordinatorError.notResumable(snapshot.status)
+      throw HarnessCoordinatorError.notResumable(snapshot.lifecycle)
     }
   }
 
   public func cancel(_ taskID: String) async throws -> HarnessTaskSnapshot {
     let snapshot = try await load(taskID)
-    if snapshot.status.isTerminal { return snapshot }
+    if snapshot.lifecycle.isTerminal { return snapshot }
     guard let activeJobID = snapshot.activeJobID else {
       try await closeAttempt(
         snapshot.htaskID, outcome: .cancelled, reason: "operatorCancel")
@@ -476,7 +476,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .cancelRequested, reasonCode: "operatorCancel",
-          status: .cancelled, activeJob: .cleared,
+          lifecycle: .cancelled, activeJob: .cleared,
           result: HarnessTaskResult(
             outcome: .cancelled, reasonCode: "operatorCancel",
             summary: "Cancelled with no runtime job in flight.",
@@ -490,7 +490,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .cancelRequested, reasonCode: "operatorCancelPendingActiveJob",
-        status: .waiting, activeJob: .set(activeJobID), cancelRequested: true,
+        lifecycle: .waiting, activeJob: .set(activeJobID), cancelRequested: true,
         waitReason: .activeJob))
     try? await jobPort.requestCancel(jobID: activeJobID)
     return marked
@@ -518,7 +518,7 @@ public actor HarnessTaskCoordinator {
   {
     guard let port = evolutionWorkspacePort else { return [] }
     var unadopted: [(htaskID: String, reason: String)] = []
-    for snapshot in try await store.list() where !snapshot.status.isTerminal {
+    for snapshot in try await store.list() where !snapshot.lifecycle.isTerminal {
       guard let workspace = snapshot.evolutionWorkspace,
         let policy = snapshot.evolutionPolicy
       else { continue }
@@ -536,7 +536,7 @@ public actor HarnessTaskCoordinator {
     // operation, and that needs the isolated identity already restored.
     try await adoptPersistedEvolutionWorkspaces()
     var recovered: [HarnessTaskSnapshot] = []
-    for snapshot in try await store.list() where !snapshot.status.isTerminal {
+    for snapshot in try await store.list() where !snapshot.lifecycle.isTerminal {
       let unresolved = try await store.unresolvedIntents(snapshot.htaskID)
       guard !unresolved.isEmpty else { continue }
       recovered.append(try await resolve(unresolved[0], snapshot: snapshot).snapshot)
@@ -578,27 +578,27 @@ public actor HarnessTaskCoordinator {
   private func reconcileWithLease(_ taskID: String) async throws -> HarnessReconcileOutcome {
     var snapshot = try await load(taskID)
 
-    if snapshot.status.isTerminal {
+    if snapshot.lifecycle.isTerminal {
       return HarnessReconcileOutcome(
-        snapshot: snapshot, action: .terminal, reasonCode: snapshot.status.rawValue)
+        snapshot: snapshot, action: .terminal, reasonCode: snapshot.lifecycle.rawValue)
     }
-    if snapshot.status == .waiting, snapshot.waitReason == .userSuspended {
+    if snapshot.lifecycle == .waiting, snapshot.waitReason == .userSuspended {
       return HarnessReconcileOutcome(
         snapshot: snapshot, action: .paused, reasonCode: "operatorPause")
     }
-    if snapshot.status == .humanRequired {
+    if snapshot.lifecycle == .humanRequired {
       // No automatic escape from a human block: a typed resolution has to
       // arrive through `resume`.
       return HarnessReconcileOutcome(
         snapshot: snapshot, action: .awaitingHuman,
         reasonCode: snapshot.result?.reasonCode ?? "humanActionRequired")
     }
-    if snapshot.status == .created {
+    if snapshot.lifecycle == .created {
       snapshot = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .admitted, reasonCode: "taskAdmitted", status: .running,
-          phase: .initializing))
+          snapshot, causation: .admitted, reasonCode: "taskAdmitted", lifecycle: .running,
+          stage: .initializing))
     }
 
     // 1. Recovery before anything new. An unresolved intent means a side
@@ -634,7 +634,7 @@ public actor HarnessTaskCoordinator {
       }
       let outcome = try await apply(observation, to: snapshot)
       snapshot = outcome.snapshot
-      if snapshot.status != .running {
+      if snapshot.lifecycle != .running {
         return outcome
       }
     }
@@ -735,7 +735,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .humanBlocked, reasonCode: step.decision.reasonCode,
-          status: .humanRequired, activeJob: .cleared,
+          lifecycle: .humanRequired, activeJob: .cleared,
           consumedBudget: charging(
             snapshot.consumedBudget, modelCalls: proposal.modelCallsSpent),
           result: HarnessTaskResult(
@@ -751,7 +751,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .noSafeAction, reasonCode: step.decision.reasonCode,
-          status: .failed, activeJob: .cleared,
+          lifecycle: .failed, activeJob: .cleared,
           consumedBudget: charging(
             snapshot.consumedBudget, modelCalls: proposal.modelCallsSpent),
           result: HarnessTaskResult(
@@ -804,7 +804,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .proposalRejected, reasonCode: reasonCode,
-        status: .running,
+        lifecycle: .running,
         consumedBudget: charging(
           snapshot.consumedBudget, modelCalls: modelCallsSpent)))
     return HarnessReconcileOutcome(
@@ -940,7 +940,7 @@ public actor HarnessTaskCoordinator {
       } ?? false
 
     let resumesPreparedRoute: Bool
-    switch snapshot.phase {
+    switch snapshot.stage {
     case .analyzing:
       resumesPreparedRoute =
         snapshot.observed.latestVerdict == .fail
@@ -1253,7 +1253,7 @@ public actor HarnessTaskCoordinator {
     let previousStrategy = previousIntent.map { intent in
       HarnessStrategySignature(
         operationReference: intent.operationReference, inputsDigest: intent.inputsDigestSHA256,
-        phase: snapshot.phase)
+        phase: snapshot.stage)
     }
     let verdict = await policyGuard.evaluate(
       HarnessGuardInput(
@@ -1343,7 +1343,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .jobDispatched, reasonCode: decision.reasonCode,
-          status: .waiting, phase: step.phaseOnDispatch ?? snapshot.phase,
+          lifecycle: .waiting, stage: step.phaseOnDispatch ?? snapshot.stage,
           activeRound: decision.round, activeJob: .set(accepted.jobID),
           consumedBudget: charging(
             HarnessConsumedBudget(
@@ -1377,7 +1377,7 @@ public actor HarnessTaskCoordinator {
     // The task may already have moved somewhere a transition is illegal -
     // a cancel that landed during planning leaves it terminal. There is
     // nothing to record on the task then; the refusal still stands.
-    guard snapshot.status == .running else {
+    guard snapshot.lifecycle == .running else {
       return HarnessReconcileOutcome(
         snapshot: snapshot, action: .staleDecision, reasonCode: staleness.reasonCode)
     }
@@ -1385,7 +1385,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .decisionStale, reasonCode: staleness.reasonCode,
-        status: .running,
+        lifecycle: .running,
         consumedBudget: charging(
           snapshot.consumedBudget, modelCalls: modelCallsSpent)))
     try await appendTaskMemory(
@@ -1466,9 +1466,9 @@ public actor HarnessTaskCoordinator {
     guard let decision = try await store.decision(snapshot.htaskID, round: intent.round) else {
       throw HarnessCoordinatorError.missingDecisionRecord(round: intent.round)
     }
-    let v2AssociationsMatch =
+    let currentAssociationsMatch =
       decision.envelopeVersion == HarnessDecision.envelopeVersion
-      && intent.schemaVersion == HarnessDispatchIntent.schemaVersion
+      && intent.isExecutableUnderCurrentSchema
       && decision.attemptID == intent.attemptID
       && decision.modelRunID == intent.modelRunID
       && decision.expectedBindingRevision == intent.expectedBindingRevision
@@ -1479,7 +1479,7 @@ public actor HarnessTaskCoordinator {
       decision.round == intent.round,
       decision.operationReference == intent.operationReference,
       HarnessRequestIdentity.inputsDigest(decision.inputs) == intent.inputsDigestSHA256,
-      v2AssociationsMatch
+      currentAssociationsMatch
     else {
       throw HarnessTaskStoreError.corrupt(
         "intent \(intent.requestID) no longer matches decision \(intent.decisionID)")
@@ -1556,7 +1556,7 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .jobDispatched,
           reasonCode: "recoveredDispatchIntent:\(accepted.deduplicated ? "deduplicated" : "fresh")",
-          status: .waiting, activeRound: max(snapshot.activeRound, intent.round),
+          lifecycle: .waiting, activeRound: max(snapshot.activeRound, intent.round),
           activeJob: .set(accepted.jobID),
           consumedBudget: HarnessConsumedBudget(
             rounds: max(snapshot.consumedBudget.rounds, intent.round),
@@ -1641,7 +1641,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .jobObserved, reasonCode: "cancelCompletedAfterActiveJob",
-          status: .cancelled, activeJob: .cleared, cancelRequested: true,
+          lifecycle: .cancelled, activeJob: .cleared, cancelRequested: true,
           jobID: observation.jobID,
           result: HarnessTaskResult(
             outcome: .cancelled, reasonCode: "operatorCancel",
@@ -1723,7 +1723,7 @@ public actor HarnessTaskCoordinator {
           transition(
             snapshot, causation: .jobObserved,
             reasonCode: "\(classification):ALTERNATIVE_REQUIRED",
-            status: .running, phase: .analyzing, activeJob: .cleared,
+            lifecycle: .running, stage: .analyzing, activeJob: .cleared,
             jobID: observation.jobID))
         return HarnessReconcileOutcome(
           snapshot: alternative, action: .observedJob,
@@ -1743,7 +1743,7 @@ public actor HarnessTaskCoordinator {
           snapshot,
           transition(
             snapshot, causation: .jobObserved, reasonCode: reason,
-            status: .running, activeJob: .cleared,
+            lifecycle: .running, activeJob: .cleared,
             jobID: observation.jobID, observedState: observed))
         return HarnessReconcileOutcome(
           snapshot: retryable, action: .observedJob, reasonCode: reason)
@@ -1761,7 +1761,7 @@ public actor HarnessTaskCoordinator {
           transition(
             snapshot, causation: .jobObserved,
             reasonCode: "deploymentFailed:rollbackRequired",
-            status: .running, activeJob: .cleared, jobID: observation.jobID,
+            lifecycle: .running, activeJob: .cleared, jobID: observation.jobID,
             observedState: observed))
         return HarnessReconcileOutcome(
           snapshot: rollbackPending, action: .observedJob,
@@ -1788,7 +1788,7 @@ public actor HarnessTaskCoordinator {
           transition(
             snapshot, causation: .jobObserved,
             reasonCode: "TRANSIENT:ACTION_RETRY_ALLOWED",
-            status: .running, activeJob: .cleared, jobID: observation.jobID))
+            lifecycle: .running, activeJob: .cleared, jobID: observation.jobID))
         return HarnessReconcileOutcome(
           snapshot: retryable, action: .observedJob,
           reasonCode: "TRANSIENT:ACTION_RETRY_ALLOWED")
@@ -1796,7 +1796,7 @@ public actor HarnessTaskCoordinator {
       let stopped = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .jobObserved, reasonCode: reason, status: .failed,
+          snapshot, causation: .jobObserved, reasonCode: reason, lifecycle: .failed,
           activeJob: .cleared, jobID: observation.jobID,
           result: HarnessTaskResult(
             outcome: .failed, reasonCode: reason,
@@ -1832,7 +1832,7 @@ public actor HarnessTaskCoordinator {
         transition(
           snapshot, causation: .jobObserved,
           reasonCode: "baselineCrashFixtureDeployed",
-          status: .running, phase: .reproducing, activeJob: .cleared,
+          lifecycle: .running, stage: .reproducing, activeJob: .cleared,
           jobID: observation.jobID, observedState: observed,
           conditions: conditionsAfterSuccess(
             operationReference, snapshot: snapshot)))
@@ -1918,9 +1918,9 @@ public actor HarnessTaskCoordinator {
             transition(
               snapshot, causation: .jobObserved,
               reasonCode: "crashLedgerAwaitingDerivedAnalysis",
-              status: .running,
-              phase: handler.phase(
-                afterSuccessOf: operationReference, in: snapshot.phase),
+              lifecycle: .running,
+              stage: handler.phase(
+                afterSuccessOf: operationReference, in: snapshot.stage),
               activeJob: .cleared,
               jobID: observation.jobID, observedState: observed,
               conditions: conditionsAfterSuccess(
@@ -1933,7 +1933,7 @@ public actor HarnessTaskCoordinator {
     }
     let sourceEvidenceJobID: String?
     let sourceArtifactID: String?
-    let analysisReturnPhase: HarnessTaskPhase?
+    let analysisReturnPhase: HarnessTaskStage?
     if operationReference == DebugCrashTaskHandler.analyzeCrashLedger {
       if case .string(let job)? = snapshot.observedState[
         DebugCrashTaskHandler.pendingAnalysisSourceJobKey],
@@ -1941,7 +1941,7 @@ public actor HarnessTaskCoordinator {
           DebugCrashTaskHandler.pendingAnalysisSourceArtifactKey],
         case .string(let rawPhase)? = snapshot.observedState[
           DebugCrashTaskHandler.pendingAnalysisReturnPhaseKey],
-        let returnPhase = HarnessTaskPhase(rawValue: rawPhase),
+        let returnPhase = HarnessTaskStage(rawValue: rawPhase),
         [.collecting, .analyzing, .verifying].contains(returnPhase)
       {
         sourceEvidenceJobID = job
@@ -1962,10 +1962,10 @@ public actor HarnessTaskCoordinator {
     }
     let nextPhase =
       analysisReturnPhase
-      ?? handler.phase(afterSuccessOf: operationReference, in: snapshot.phase)
+      ?? handler.phase(afterSuccessOf: operationReference, in: snapshot.stage)
     try await appendTaskMemory(
       snapshot, kind: .observation,
-      summary: "\(operationReference) succeeded in phase \(snapshot.phase.rawValue)",
+      summary: "\(operationReference) succeeded in phase \(snapshot.stage.rawValue)",
       confidence: .observed,
       evidence: HarnessMemoryEvidence(
         jobIDs: [observation.jobID], artifactIDs: snapshot.artifactRefs))
@@ -1973,7 +1973,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .jobObserved, reasonCode: "operationSucceeded:\(operationReference)",
-        status: .running, phase: nextPhase, activeJob: .cleared, jobID: observation.jobID,
+        lifecycle: .running, stage: nextPhase, activeJob: .cleared, jobID: observation.jobID,
         conditions: conditionsAfterSuccess(
           operationReference, snapshot: snapshot,
           evidenceArtifactIDs: sourceArtifactID.map { [$0] } ?? [])))
@@ -2030,7 +2030,7 @@ public actor HarnessTaskCoordinator {
     }
 
     var nextAttempt = snapshot.repairAttempt
-    var nextPhase = snapshot.phase
+    var nextPhase = snapshot.stage
     do {
       switch operationReference {
       case DebugCrashTaskHandler.createCheckpoint:
@@ -2176,7 +2176,7 @@ public actor HarnessTaskCoordinator {
           transition(
             snapshot, causation: .jobObserved,
             reasonCode: "\(classification):ALTERNATIVE_REQUIRED",
-            status: .running, phase: .analyzing, activeJob: .cleared,
+            lifecycle: .running, stage: .analyzing, activeJob: .cleared,
             jobID: observation.jobID))
         return HarnessReconcileOutcome(
           snapshot: alternative, action: .observedJob,
@@ -2195,7 +2195,7 @@ public actor HarnessTaskCoordinator {
           transition(
             snapshot, causation: .jobObserved,
             reasonCode: "\(error.reasonCode):rollbackRequired",
-            status: .running, activeJob: .cleared, jobID: observation.jobID,
+            lifecycle: .running, activeJob: .cleared, jobID: observation.jobID,
             observedState: observed))
         return HarnessReconcileOutcome(
           snapshot: rollbackPending, action: .observedJob,
@@ -2237,7 +2237,7 @@ public actor HarnessTaskCoordinator {
       transition(
         snapshot, causation: .jobObserved,
         reasonCode: "repairStageSucceeded:\(operationReference)",
-        status: .running, phase: nextPhase, activeJob: .cleared,
+        lifecycle: .running, stage: nextPhase, activeJob: .cleared,
         jobID: observation.jobID, observedState: observed,
         noProgressRounds:
           operationReference == DebugCrashTaskHandler.applyPatch
@@ -2293,8 +2293,8 @@ public actor HarnessTaskCoordinator {
   /// in `verifying` until the evaluator passes or stops safely.
   private static func analysisReturnPhase(
     after snapshot: HarnessTaskSnapshot
-  ) -> HarnessTaskPhase {
-    if snapshot.phase == .verifying || snapshot.repairAttempt?.deployedDigest != nil {
+  ) -> HarnessTaskStage {
+    if snapshot.stage == .verifying || snapshot.repairAttempt?.deployedDigest != nil {
       return .verifying
     }
     if snapshot.observedState[DebugCrashTaskHandler.baselineDeploymentMarker] == .bool(true) {
@@ -2324,14 +2324,14 @@ public actor HarnessTaskCoordinator {
       // Stop for a human at the point a verdict would be needed rather than
       // capturing on a loop until the round budget runs out - the reason a
       // task stopped has to be the real one.
-      guard [.collecting, .analyzing, .verifying].contains(snapshot.phase) else {
+      guard [.collecting, .analyzing, .verifying].contains(snapshot.stage) else {
         return .continues(snapshot)
       }
       let reason = "evaluationEngineUnavailable"
       let blocked = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .humanBlocked, reasonCode: reason, status: .humanRequired,
+          snapshot, causation: .humanBlocked, reasonCode: reason, lifecycle: .humanRequired,
           activeJob: .cleared,
           result: HarnessTaskResult(
             outcome: .humanRequired, reasonCode: reason,
@@ -2417,7 +2417,7 @@ public actor HarnessTaskCoordinator {
         snapshot,
         transition(
           snapshot, causation: .evaluation, reasonCode: "criteriaPassed",
-          status: .succeeded, activeJob: .cleared, consumedBudget: consumed,
+          lifecycle: .succeeded, activeJob: .cleared, consumedBudget: consumed,
           evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedStateJSON,
           noProgressRounds: 0,
@@ -2442,7 +2442,7 @@ public actor HarnessTaskCoordinator {
       let recorded = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .evaluation, reasonCode: reason, status: .running,
+          snapshot, causation: .evaluation, reasonCode: reason, lifecycle: .running,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedStateJSON,
           conditions: evaluationConditions))
@@ -2457,7 +2457,7 @@ public actor HarnessTaskCoordinator {
         for: evaluation, criteria: snapshot.successCriteria)
       switch escalation {
       case .requestHuman, .failTask:
-        let terminalStatus: HarnessTaskStatus = escalation == .failTask ? .failed : .humanRequired
+        let terminalStatus: HarnessTaskLifecycle = escalation == .failTask ? .failed : .humanRequired
         let reason = "inconclusive:\(escalation == .failTask ? "failTask" : "requestHuman")"
         try await recordAttemptEvaluation(
           taskID: snapshot.htaskID, evaluation: evaluation,
@@ -2465,7 +2465,7 @@ public actor HarnessTaskCoordinator {
         let stopped = try await commit(
           snapshot,
           transition(
-            snapshot, causation: .evaluation, reasonCode: reason, status: terminalStatus,
+            snapshot, causation: .evaluation, reasonCode: reason, lifecycle: terminalStatus,
             activeJob: .cleared, consumedBudget: consumed,
             evaluationID: evaluation.evaluationID,
             artifactRefs: artifactRefs, observedState: observedStateJSON,
@@ -2488,7 +2488,7 @@ public actor HarnessTaskCoordinator {
           snapshot,
           transition(
             snapshot, causation: .evaluation, reasonCode: "inconclusive:collectMoreEvidence",
-            status: .running, consumedBudget: consumed,
+            lifecycle: .running, consumedBudget: consumed,
             evaluationID: evaluation.evaluationID,
             artifactRefs: artifactRefs, observedState: observedStateJSON,
             noProgressRounds: noProgress, conditions: evaluationConditions))
@@ -2509,7 +2509,7 @@ public actor HarnessTaskCoordinator {
       let updated = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .evaluation, reasonCode: "criteriaFailed", status: .running,
+          snapshot, causation: .evaluation, reasonCode: "criteriaFailed", lifecycle: .running,
           consumedBudget: consumed, evaluationID: evaluation.evaluationID,
           artifactRefs: artifactRefs, observedState: observedStateJSON,
           noProgressRounds: noProgress, conditions: evaluationConditions))
@@ -2579,7 +2579,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .evaluation, reasonCode: "promotionCandidateReady",
-        status: .succeeded, activeJob: .cleared, consumedBudget: consumed,
+        lifecycle: .succeeded, activeJob: .cleared, consumedBudget: consumed,
         evaluationID: evaluation.evaluationID,
         artifactRefs: promotedArtifacts, observedState: observedState,
         noProgressRounds: 0,
@@ -2634,7 +2634,7 @@ public actor HarnessTaskCoordinator {
       let retrying = try await commit(
         snapshot,
         transition(
-          snapshot, causation: .evaluation, reasonCode: reason, status: .running,
+          snapshot, causation: .evaluation, reasonCode: reason, lifecycle: .running,
           activeJob: .cleared, consumedBudget: consumed,
           evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
           observedState: retryObserved, conditions: conditions))
@@ -2659,7 +2659,7 @@ public actor HarnessTaskCoordinator {
     let recorded = try await commit(
       snapshot,
       transition(
-        snapshot, causation: .evaluation, reasonCode: reasonCode, status: .running,
+        snapshot, causation: .evaluation, reasonCode: reasonCode, lifecycle: .running,
         activeJob: .cleared, consumedBudget: consumed,
         evaluationID: evaluation.evaluationID, artifactRefs: artifactRefs,
         observedState: observedState, conditions: conditions))
@@ -3069,7 +3069,7 @@ public actor HarnessTaskCoordinator {
       conditions = snapshot.conditions
     }
     guard
-      snapshot.status != .waiting || snapshot.waitReason != waitReason
+      snapshot.lifecycle != .waiting || snapshot.waitReason != waitReason
         || snapshot.conditions != conditions
     else {
       return snapshot
@@ -3078,7 +3078,7 @@ public actor HarnessTaskCoordinator {
       snapshot,
       transition(
         snapshot, causation: .jobObserved, reasonCode: observation.state,
-        status: .waiting, activeJob: .set(observation.jobID), jobID: observation.jobID,
+        lifecycle: .waiting, activeJob: .set(observation.jobID), jobID: observation.jobID,
         waitReason: waitReason, conditions: conditions))
   }
 
@@ -3086,8 +3086,8 @@ public actor HarnessTaskCoordinator {
     _ snapshot: HarnessTaskSnapshot,
     causation: HarnessTaskCausation,
     reasonCode: String,
-    status: HarnessTaskStatus,
-    phase: HarnessTaskPhase? = nil,
+    lifecycle: HarnessTaskLifecycle,
+    stage: HarnessTaskStage? = nil,
     activeRound: Int? = nil,
     activeJob: ActiveJobChange = .unchanged,
     consumedBudget: HarnessConsumedBudget? = nil,
@@ -3104,8 +3104,8 @@ public actor HarnessTaskCoordinator {
     HarnessTaskTransition(
       causation: causation,
       reasonCode: reasonCode,
-      status: status,
-      phase: phase ?? snapshot.phase,
+      lifecycle: lifecycle,
+      stage: stage ?? snapshot.stage,
       activeRound: activeRound ?? snapshot.activeRound,
       activeJobID: activeJob.resolve(snapshot.activeJobID),
       consumedBudget: consumedBudget ?? snapshot.consumedBudget,
@@ -3117,7 +3117,7 @@ public actor HarnessTaskCoordinator {
       cancelRequested: cancelRequested ?? snapshot.cancelRequested,
       result: result,
       atUTC: nowUTC(),
-      waitReason: status == .waiting ? (waitReason ?? snapshot.waitReason) : nil,
+      waitReason: lifecycle == .waiting ? (waitReason ?? snapshot.waitReason) : nil,
       conditions: conditions ?? snapshot.conditions)
   }
 

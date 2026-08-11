@@ -850,7 +850,10 @@ public struct SessionStorageTerminalFinalizer: Sendable {
   }
 }
 
-public actor HostStorageCoordinator {
+/// Package composition primitive for the storage/session implementation. This coordinator is
+/// not a product-facing quota service: no application composition root exposes claim admission,
+/// revalidation, or receipt accounting to clients outside ArkDeckKit.
+package actor HostStorageCoordinator {
   private var claims: [String: StorageClaim] = [:]
   private var completedTerminalReceipts: [String: StorageTerminalPersistenceReceipt] = [:]
   private var completedTerminalReceiptOrder: [String] = []
@@ -859,7 +862,7 @@ public actor HostStorageCoordinator {
   private var retentionBlockedVolumes: Set<VolumeIdentity> = []
   private var conservativeRetentionBlockedVolumes: Set<VolumeIdentity> = []
 
-  public init(
+  package init(
     completedReceiptCacheLimit: Int = 256,
     configurationEpoch: StorageConfigurationEpoch? = nil
   ) {
@@ -867,13 +870,13 @@ public actor HostStorageCoordinator {
     self.configurationEpoch = configurationEpoch
   }
 
-  public func admit(_ request: StorageClaimRequest, snapshot: HostStorageSnapshot)
+  package func admit(_ request: StorageClaimRequest, snapshot: HostStorageSnapshot)
     -> StorageAdmission
   {
     admitUnchecked(request, snapshot: snapshot, configurationToken: nil)
   }
 
-  public func admit(
+  package func admit(
     _ request: StorageClaimRequest,
     snapshot: HostStorageSnapshot,
     configurationToken: StorageConfigurationToken
@@ -941,7 +944,7 @@ public actor HostStorageCoordinator {
     return .admitted(claim)
   }
 
-  public func updateRemainingGrowth(claimID: String, remainingBytes: UInt64) throws {
+  package func updateRemainingGrowth(claimID: String, remainingBytes: UInt64) throws {
     purgeCompletedClaims()
     guard let claim = claims[claimID] else {
       throw SessionStorageError.invalidRecord("unknown claim: \(claimID)")
@@ -949,7 +952,7 @@ public actor HostStorageCoordinator {
     try claim.reduceRemainingGrowth(to: remainingBytes)
   }
 
-  public func cancelUnboundAdmission(_ claim: StorageClaim) {
+  package func cancelUnboundAdmission(_ claim: StorageClaim) {
     guard let current = claims[claim.claimID],
       current.admissionGeneration == claim.admissionGeneration,
       current.permit.cancelIfUnbound()
@@ -957,7 +960,7 @@ public actor HostStorageCoordinator {
     claims.removeValue(forKey: claim.claimID)
   }
 
-  public func revalidate(
+  package func revalidate(
     claimID: String,
     current snapshot: HostStorageSnapshot
   ) -> StorageRevalidationAction {
@@ -991,7 +994,7 @@ public actor HostStorageCoordinator {
     return .continueWriting
   }
 
-  public func reportWriteFailure(
+  package func reportWriteFailure(
     claimID: String,
     errno _: Int32,
     terminalDisposition: StorageTerminalDisposition? = nil
@@ -1007,14 +1010,14 @@ public actor HostStorageCoordinator {
     return .stopOptionalWritesAndFinalize
   }
 
-  public func updateRetentionAdmission(
+  package func updateRetentionAdmission(
     _ plan: SessionRetentionPlan,
     on volume: VolumeIdentity
   ) {
     setRetentionAdmission(blocked: plan.blocksNewHeavyWriters, on: volume)
   }
 
-  public func setRetentionAdmission(blocked: Bool, on volume: VolumeIdentity) {
+  package func setRetentionAdmission(blocked: Bool, on volume: VolumeIdentity) {
     if blocked {
       retentionBlockedVolumes.insert(volume)
     } else {
@@ -1023,7 +1026,7 @@ public actor HostStorageCoordinator {
   }
 
   @discardableResult
-  public func setRetentionAdmission(
+  package func setRetentionAdmission(
     blocked: Bool,
     on volume: VolumeIdentity,
     configurationToken: StorageConfigurationToken
@@ -1039,23 +1042,23 @@ public actor HostStorageCoordinator {
     }
   }
 
-  public func retentionAdmissionIsBlocked(on volume: VolumeIdentity) -> Bool {
+  package func retentionAdmissionIsBlocked(on volume: VolumeIdentity) -> Bool {
     retentionBlockedVolumes.contains(volume)
       || conservativeRetentionBlockedVolumes.contains(volume)
   }
 
-  public func requireConservativeRetentionBlock(on volume: VolumeIdentity) {
+  package func requireConservativeRetentionBlock(on volume: VolumeIdentity) {
     conservativeRetentionBlockedVolumes.insert(volume)
   }
 
-  public func clearConservativeRetentionBlockAfterSuccessfulRescan(
+  package func clearConservativeRetentionBlockAfterSuccessfulRescan(
     on volume: VolumeIdentity
   ) {
     conservativeRetentionBlockedVolumes.remove(volume)
   }
 
   @discardableResult
-  public func clearConservativeRetentionBlockAfterSuccessfulRescan(
+  package func clearConservativeRetentionBlockAfterSuccessfulRescan(
     on volume: VolumeIdentity,
     configurationToken: StorageConfigurationToken
   ) -> Bool {
@@ -1109,7 +1112,7 @@ public actor HostStorageCoordinator {
     completedTerminalReceiptOrder.append(claimID)
   }
 
-  public func performWithClaim<Value: Sendable>(
+  package func performWithClaim<Value: Sendable>(
     request: StorageClaimRequest,
     snapshot: HostStorageSnapshot,
     operation: @Sendable (StorageClaim) async throws -> Value,
@@ -1157,7 +1160,7 @@ public actor HostStorageCoordinator {
   /// Completes a retained finalization-only claim after terminal persistence has been repaired.
   /// The receipt is minted by `SessionStorageTerminalFinalizer`, and must match the claim's
   /// pending Job and terminal disposition before any headroom is released.
-  public func completeRecoveredFinalization(
+  package func completeRecoveredFinalization(
     _ receipt: StorageTerminalPersistenceReceipt
   ) throws -> ResourceReleaseDisposition {
     purgeCompletedClaims()
@@ -1188,7 +1191,7 @@ public actor HostStorageCoordinator {
   /// Bridges a repaired terminal receipt into the synchronous recovery release seam delivered by
   /// TASK-M1-003. The adapter remains idempotent; coordinator accounting purges its completed
   /// claim before the next admission, revalidation, or accounting observation.
-  public func recoveredFinalizationReleaser(
+  package func recoveredFinalizationReleaser(
     _ receipt: StorageTerminalPersistenceReceipt
   ) throws -> any StorageClaimReleasing {
     purgeCompletedClaims()
@@ -1214,13 +1217,13 @@ public actor HostStorageCoordinator {
     return RepairedTerminalStorageClaimReleaser(claim: claim, receipt: receipt)
   }
 
-  public func activeClaimCount(on volume: VolumeIdentity? = nil) -> Int {
+  package func activeClaimCount(on volume: VolumeIdentity? = nil) -> Int {
     purgeCompletedClaims()
     guard let volume else { return claims.count }
     return claims.values.filter { $0.volumeIdentity == volume }.count
   }
 
-  public func activeSessions(
+  package func activeSessions(
     on volume: VolumeIdentity? = nil
   ) -> [ActiveStorageSessionSnapshot] {
     purgeCompletedClaims()
@@ -1235,12 +1238,12 @@ public actor HostStorageCoordinator {
     }
   }
 
-  public func completedReceiptTombstoneCount() -> Int {
+  package func completedReceiptTombstoneCount() -> Int {
     purgeCompletedClaims()
     return completedTerminalReceipts.count
   }
 
-  public func reservedBytes(on volume: VolumeIdentity) -> UInt64 {
+  package func reservedBytes(on volume: VolumeIdentity) -> UInt64 {
     purgeCompletedClaims()
     return claims.values.filter { $0.volumeIdentity == volume }.reduce(UInt64(0)) {
       SessionStorageValidation.saturatingAdd($0, $1.totalSoftClaimBytes)

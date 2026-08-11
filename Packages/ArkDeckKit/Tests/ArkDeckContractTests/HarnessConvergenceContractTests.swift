@@ -237,8 +237,8 @@ private final class RecordingDriveTarget: HarnessAutoDriveTarget, @unchecked Sen
           policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
           createdAtUTC: "2026-07-31T00:00:00Z",
           updatedAtUTC: "2026-07-31T00:00:00Z",
-          status: .running,
-          phase: .collecting),
+          lifecycle: .running,
+          stage: .collecting),
         action: .waitedForActiveJob, reasonCode: "recorded")
     }
   }
@@ -302,7 +302,7 @@ final class HarnessConvergenceContractTests: XCTestCase {
     // The same shape as the host measurement: time passing is not a driver.
     let statusNow = try await harness.status(submitted.htaskID)
     let eventsNow = try await harness.events(submitted.htaskID)
-    XCTAssertEqual(statusNow.status, .created)
+    XCTAssertEqual(statusNow.lifecycle, .created)
     XCTAssertEqual(statusNow.activeRound, 0)
     XCTAssertEqual(
       eventsNow.count, 0,
@@ -325,11 +325,11 @@ final class HarnessConvergenceContractTests: XCTestCase {
 
     let final = try await harness.status(submitted.htaskID)
     XCTAssertEqual(
-      final.status, .succeeded,
+      final.lifecycle, .succeeded,
       "one submit plus auto-drive must reach a verdict with nobody poking reconcile")
     XCTAssertEqual(final.latestEvaluationID?.isEmpty, false)
     let events = try await harness.events(submitted.htaskID)
-    let terminal = events.filter { $0.toStatus == .succeeded }
+    let terminal = events.filter { $0.toLifecycle == .succeeded }
     XCTAssertEqual(
       terminal.map(\.causation), [.evaluation],
       "success still arrives only through the evaluator (HTP-INV-2)")
@@ -560,9 +560,9 @@ final class HarnessConvergenceContractTests: XCTestCase {
 
     let final = try await harness.status(submitted.htaskID)
     XCTAssertEqual(
-      final.status, .failed,
+      final.lifecycle, .failed,
       "this is the window failure: required evidence exists and cannot be measured")
-    XCTAssertNotEqual(final.status, .succeeded)
+    XCTAssertNotEqual(final.lifecycle, .succeeded)
     let events = try await harness.events(submitted.htaskID)
     let stop = try XCTUnwrap(events.last)
     XCTAssertEqual(stop.reasonCode, "maxRoundsExhausted")

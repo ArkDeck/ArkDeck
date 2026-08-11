@@ -95,7 +95,7 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
     try await store.create(base)
     let (paused, pauseEvent) = try HarnessTaskStateReducer.apply(
       transition(
-        from: base, causation: .pauseRequested, status: .waiting,
+        from: base, causation: .pauseRequested, lifecycle: .waiting,
         waitReason: .userSuspended, atUTC: "2026-08-01T00:00:01Z"),
       to: base)
 
@@ -116,7 +116,7 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
       event: pauseEvent, snapshot: paused, expectedVersion: base.version)
     let (resumed, resumeEvent) = try HarnessTaskStateReducer.apply(
       transition(
-        from: paused, causation: .resumeRequested, status: .running,
+        from: paused, causation: .resumeRequested, lifecycle: .running,
         waitReason: nil, atUTC: "2026-08-01T00:00:02Z"),
       to: paused)
     do {
@@ -206,19 +206,19 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
       policy: HarnessTaskPolicy(allowedOperations: ["observe.device@1"]),
       createdAtUTC: "2026-08-01T00:00:00Z",
       updatedAtUTC: "2026-08-01T00:00:00Z",
-      status: .running, phase: .initializing)
+      lifecycle: .running, stage: .initializing)
   }
 
   private func transition(
     from snapshot: HarnessTaskSnapshot,
     causation: HarnessTaskCausation,
-    status: HarnessTaskStatus,
+    lifecycle: HarnessTaskLifecycle,
     waitReason: HarnessTaskWaitReason?,
     atUTC: String
   ) -> HarnessTaskTransition {
     HarnessTaskTransition(
-      causation: causation, reasonCode: "sqliteContract", status: status,
-      phase: snapshot.phase, activeRound: snapshot.activeRound,
+      causation: causation, reasonCode: "sqliteContract", lifecycle: lifecycle,
+      stage: snapshot.stage, activeRound: snapshot.activeRound,
       activeJobID: snapshot.activeJobID, consumedBudget: snapshot.consumedBudget,
       artifactRefs: snapshot.artifactRefs, observedState: snapshot.observedState,
       noProgressRounds: snapshot.noProgressRounds,

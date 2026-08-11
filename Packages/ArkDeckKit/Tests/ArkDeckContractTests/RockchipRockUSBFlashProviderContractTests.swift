@@ -142,7 +142,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     let binding = realBinding()
     let monitor = RockchipFlashDispatchMonitor()
-    let decision = await RockchipFlashAuthorizationGate().authorize(
+    let decision = await RockchipManualFlashFallbackGate().authorize(
       authority: .humanOperator,
       binding: .realDevice(binding),
       plan: plan,
@@ -313,7 +313,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     let binding = realBinding()
     let monitor = RockchipFlashDispatchMonitor()
-    let decision = await RockchipFlashAuthorizationGate().authorize(
+    let decision = await RockchipManualFlashFallbackGate().authorize(
       authority: .humanOperator,
       binding: .realDevice(binding),
       plan: plan,
@@ -354,7 +354,6 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     XCTAssertEqual(record.disposition, .deferredUntilSafeBoundary)
     XCTAssertEqual(record.activeCriticalStepID, criticalStepID)
 
-    // Durable: the deferral is persisted through the session audit store and replayable.
     try auditStore.appendAndSynchronize(
       try record.auditRecord(sessionID: layout.sessionID, jobID: layout.jobID))
     let replayed = try auditStore.replay(correlationID: "rockusb-flash-run")
@@ -362,7 +361,6 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     XCTAssertEqual(replayed.first?.details["disposition"], .string("deferredUntilSafeBoundary"))
     XCTAssertEqual(replayed.first?.details["activeCriticalStepId"], .string(criticalStepID))
 
-    // The in-flight write is not killed and the exit waits for the safe boundary.
     let stillCritical = await boundary.activeCriticalStepID
     XCTAssertEqual(stillCritical, criticalStepID)
     let mayStartDuringCritical = await boundary.mayStartNextStep()
@@ -378,7 +376,6 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     } catch RockchipCriticalWriteBoundaryError.subsequentStepsBlocked {
     }
 
-    // Outside a critical section, an exit request is effective immediately.
     let idleBoundary = RockchipCriticalWriteBoundary()
     let idleRecord = await idleBoundary.requestExit(reason: "app-quit", timestamp: timestamp)
     XCTAssertEqual(idleRecord.disposition, .effectiveImmediately)
@@ -491,7 +488,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
 
     for authority in [RockchipExecutionAuthority.standardAgent, .ordinaryCI] {
       let monitor = RockchipFlashDispatchMonitor()
-      let decision = await RockchipFlashAuthorizationGate().authorize(
+      let decision = await RockchipManualFlashFallbackGate().authorize(
         authority: authority,
         binding: .realDevice(binding),
         plan: plan,
@@ -516,7 +513,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     for mode in [RockchipFlashExecutionMode.planOnly, .simulated] {
       let nonExecutePlan = try provider.makePlan(mode: mode, archiveValidation: .valid)
       let monitor = RockchipFlashDispatchMonitor()
-      let decision = await RockchipFlashAuthorizationGate().authorize(
+      let decision = await RockchipManualFlashFallbackGate().authorize(
         authority: .standardAgent,
         binding: .none,
         plan: nonExecutePlan,
@@ -539,10 +536,10 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
   {
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     let binding = realBinding()
-    let gate = RockchipFlashAuthorizationGate()
+    let gate = RockchipManualFlashFallbackGate()
 
     func decide(_ confirmation: RockchipManualFlashConfirmation?) async
-      -> RockchipAuthorizationDecision
+      -> RockchipManualFlashFallbackDecision
     {
       await gate.authorize(
         authority: .humanOperator,

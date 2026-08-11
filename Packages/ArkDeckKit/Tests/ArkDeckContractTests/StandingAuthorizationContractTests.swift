@@ -4,8 +4,8 @@ import XCTest
 
 @testable import ArkDeckWorkflows
 
-// TASK-AIN-006: strict carrier parsing and the public authorization-gate regression. Parsed JSON
-// remains inert data; only the internal provenance resolver may mint a grant.
+// TASK-AIN-006: strict historical-carrier parsing and the package-only manual handoff regression.
+// Parsed JSON remains inert data and cannot mint Runtime authority.
 final class StandingAuthorizationContractTests: XCTestCase {
   private let provider = RockchipRockUSBFlashProvider()
 
@@ -98,10 +98,10 @@ final class StandingAuthorizationContractTests: XCTestCase {
     }
   }
 
-  func testPublicGateKeepsAgentAndCIBlockedWithZeroDispatch() async throws {
+  func testPackageManualHandoffKeepsAgentAndCIBlockedWithZeroDispatch() async throws {
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     for authority in [RockchipExecutionAuthority.standardAgent, .ordinaryCI] {
-      let decision = await RockchipFlashAuthorizationGate().authorize(
+      let decision = await RockchipManualFlashFallbackGate().authorize(
         authority: authority,
         binding: .none,
         plan: plan,
@@ -112,14 +112,13 @@ final class StandingAuthorizationContractTests: XCTestCase {
       guard case .policyBlocked(let handoff) = decision.outcome else {
         return XCTFail("\(authority) must remain policyBlocked")
       }
-      XCTAssertTrue(handoff.confirmationRequirements.joined().contains("standing authorization"))
+      XCTAssertTrue(handoff.confirmationRequirements.joined().contains("Runtime capability"))
       XCTAssertEqual(decision.evidenceEligibility, .notEligible)
-      XCTAssertNil(decision.authorizationRef)
       XCTAssertEqual(decision.dispatchSnapshot.totalDispatchCount, 0)
     }
 
     let planOnly = try provider.makePlan(mode: .planOnly, archiveValidation: .valid)
-    let nonExecute = await RockchipFlashAuthorizationGate().authorize(
+    let nonExecute = await RockchipManualFlashFallbackGate().authorize(
       authority: .standardAgent,
       binding: .none,
       plan: planOnly,

@@ -1006,10 +1006,14 @@ private func validateAuthorizationCorrelation(
   authorizationReference: AuthorizationReference?,
   usageReservationID: String?
 ) throws {
-  // v1 remains a byte-for-byte compatible historical reader. Its authorization limitation is
-  // enforced by the locked v1 Manifest contract; later schemas add journal-level correlation.
-  if JournalEvent.usesLegacyAuthorizationSemantics(event.schemaVersion) { return }
-  if JournalEvent.usesAgentAuthorityUnion(event.schemaVersion) {
+  guard let schema = JournalEvent.capabilities(forSchemaVersion: event.schemaVersion) else {
+    throw DurableFileError.sequenceViolation("unsupported journal schemaVersion")
+  }
+  // A correlation-free schema never acquires authority from its missing fields. The v1 reader is
+  // historical; the 3.0 Flash writer is downstream of RuntimeCapability admission and keeps that
+  // authority in the capability store and Runtime job record rather than duplicating it here.
+  guard schema.requiresAuthorizationCorrelation else { return }
+  if schema.authorizationCorrelationShape == .agentAuthorityReference {
     if effect == .hostOnly {
       guard executionAuthority != "authorizedAgent",
         agentExecutionAuthorityReference == nil,

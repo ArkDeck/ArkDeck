@@ -21,9 +21,9 @@ public struct HarnessPlannedStep: Equatable, Sendable {
   public let decision: HarnessDecision
   /// Phase the task moves into when this step is dispatched. `nil` keeps
   /// the current phase.
-  public let phaseOnDispatch: HarnessTaskPhase?
+  public let phaseOnDispatch: HarnessTaskStage?
 
-  public init(decision: HarnessDecision, phaseOnDispatch: HarnessTaskPhase?) {
+  public init(decision: HarnessDecision, phaseOnDispatch: HarnessTaskStage?) {
     self.decision = decision
     self.phaseOnDispatch = phaseOnDispatch
   }
@@ -48,8 +48,8 @@ public protocol HarnessTaskHandler: Sendable {
   func plan(for snapshot: HarnessTaskSnapshot, decisionID: String, nowUTC: String)
     -> HarnessPlannedStep
   /// Phase after an operation completed successfully.
-  func phase(afterSuccessOf operationReference: String, in phase: HarnessTaskPhase)
-    -> HarnessTaskPhase
+  func phase(afterSuccessOf operationReference: String, in phase: HarnessTaskStage)
+    -> HarnessTaskStage
 }
 
 extension HarnessTaskHandler {
@@ -151,7 +151,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     if pendingAnalysisLease(snapshot) != nil {
       return [Self.analyzeCrashLedger]
     }
-    switch snapshot.phase {
+    switch snapshot.stage {
     case .initializing:
       return [Self.observeDevice]
     case .collecting where baselineDeploymentReady(snapshot):
@@ -277,7 +277,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           + "analyzer before any criterion consumes it.",
         reasonCode: "analyzeCapturedCrashLedger", phaseOnDispatch: .analyzing)
     }
-    switch snapshot.phase {
+    switch snapshot.stage {
     case .initializing:
       return invoke(
         snapshot, decisionID: decisionID, round: round, nowUTC: nowUTC,
@@ -341,7 +341,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
             "The declared criteria are not yet decidable on the evidence collected so far; "
             + "another bounded capture adds the missing sample.",
           reasonCode: "collectAdditionalSample",
-          phaseOnDispatch: snapshot.phase == .analyzing ? .collecting : nil)
+          phaseOnDispatch: snapshot.stage == .analyzing ? .collecting : nil)
       case .fail:
         // A model-backed producer may replace this deterministic fallback with
         // a strictly parsed PROPOSE_PATCH. Without patch bytes there is
@@ -360,7 +360,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
           operation: Self.captureDiagnostics,
           hypothesis: "No evidence has been evaluated yet for the declared criteria.",
           reasonCode: "collectDeclaredEvidence",
-          phaseOnDispatch: snapshot.phase == .analyzing ? .collecting : nil)
+          phaseOnDispatch: snapshot.stage == .analyzing ? .collecting : nil)
       case .pass:
         // Unreachable in practice: a passing evaluation ends the task before
         // planning runs. Fail closed rather than invent a next step.
@@ -552,8 +552,8 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
 
   public func phase(
     afterSuccessOf operationReference: String,
-    in phase: HarnessTaskPhase
-  ) -> HarnessTaskPhase {
+    in phase: HarnessTaskStage
+  ) -> HarnessTaskStage {
     switch (operationReference, phase) {
     case (Self.observeDevice, .initializing): return .reproducing
     case (Self.captureDiagnostics, .reproducing): return .collecting
@@ -653,7 +653,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
   /// this task. `repairAttempt == nil` separates this one-time reproduction
   /// deployment from the later verified-build deployment.
   private func baselineDeploymentReady(_ snapshot: HarnessTaskSnapshot) -> Bool {
-    guard snapshot.phase == .collecting, snapshot.repairAttempt == nil,
+    guard snapshot.stage == .collecting, snapshot.repairAttempt == nil,
       snapshot.observed.latestVerdict == .inconclusive,
       snapshot.observedState[Self.baselineDeploymentMarker] != .bool(true),
       desiredString("baselineHapArtifactLease", snapshot) != nil,
@@ -783,7 +783,7 @@ public struct DebugCrashTaskHandler: HarnessTaskHandler {
     inputs: [String: JSONValue]? = nil,
     hypothesis: String,
     reasonCode: String,
-    phaseOnDispatch: HarnessTaskPhase?
+    phaseOnDispatch: HarnessTaskStage?
   ) -> HarnessPlannedStep {
     HarnessPlannedStep(
       decision: HarnessDecision(

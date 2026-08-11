@@ -492,8 +492,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   /// target as before", not enough to identify a device.
   public let targetPseudonym: String
   public let taskType: HarnessTaskType
-  public let status: HarnessTaskStatus
-  public let phase: HarnessTaskPhase
+  public let status: HarnessTaskLifecycle
+  public let phase: HarnessTaskStage
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
@@ -541,8 +541,8 @@ public struct HarnessDecisionContext: Equatable, Sendable, Codable {
   public init(
     targetPseudonym: String,
     taskType: HarnessTaskType,
-    status: HarnessTaskStatus,
-    phase: HarnessTaskPhase,
+    status: HarnessTaskLifecycle,
+    phase: HarnessTaskStage,
     round: Int,
     currentTaskStateVersion: Int = 0,
     goalSummary: String,

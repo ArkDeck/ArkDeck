@@ -204,8 +204,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
     let context = HarnessDecisionContext(
       targetPseudonym: HarnessDecisionContext.pseudonym(forTargetID: snapshot.target.targetID),
       taskType: snapshot.type,
-      status: snapshot.status,
-      phase: snapshot.phase,
+      status: snapshot.lifecycle,
+      phase: snapshot.stage,
       round: snapshot.activeRound,
       currentTaskStateVersion: snapshot.version,
       goalSummary: String(snapshot.goal.summary.prefix(limits.maxSummaryCharacters)),

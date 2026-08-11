@@ -204,7 +204,7 @@ public struct HarnessPolicyGuard: Sendable {
       case .requireNewStrategy:
         let proposed = HarnessStrategySignature(
           operationReference: input.operationReference, inputsDigest: input.inputsDigest,
-          phase: snapshot.phase)
+          phase: snapshot.stage)
         if let previous = input.previousStrategy, previous == proposed {
           return .refuse(
             .repeatedFailureNeedsNewStrategy(
@@ -220,7 +220,7 @@ public struct HarnessPolicyGuard: Sendable {
     // task-declared patience is exhausted.
     let proposed = HarnessStrategySignature(
       operationReference: input.operationReference, inputsDigest: input.inputsDigest,
-      phase: snapshot.phase)
+      phase: snapshot.stage)
     if input.consecutiveNoProgressRounds >= snapshot.budgets.maxNoProgressRounds,
       input.previousStrategy == proposed
     {

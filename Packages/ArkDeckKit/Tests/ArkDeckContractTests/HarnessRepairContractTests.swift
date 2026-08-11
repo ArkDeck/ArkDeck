@@ -291,7 +291,7 @@ final class HarnessRepairContractTests: XCTestCase {
 
     for (index, item) in cases.enumerated() {
       let snapshot = makeSnapshot(
-        phase: .building, activeJobID: nil, repair: item.1,
+        stage: .building, activeJobID: nil, repair: item.1,
         consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: item.2))
       let store = try HarnessTaskStore(
         rootURL: rootURL.appendingPathComponent("accepted-e1-\(index)", isDirectory: true))
@@ -343,7 +343,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let port = WorkspaceHarnessRepairPort(
       profile: profile, attemptStore: attemptStore, artifactStore: artifactStore)
     let task = makeSnapshot(
-      phase: .analyzing, activeJobID: "JOB-X",
+      stage: .analyzing, activeJobID: "JOB-X",
       repair: HarnessRepairAttempt(proposal: try proposal()))
 
     let cases: [(String, HarnessPatchProposal)] = [
@@ -378,7 +378,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let proposal = try proposal()
     let attempt = HarnessRepairAttempt(proposal: proposal)
     let snapshot = makeSnapshot(
-      phase: .patching, activeJobID: "JOB-APPLY", repair: attempt,
+      stage: .patching, activeJobID: "JOB-APPLY", repair: attempt,
       consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
     let decision = HarnessDecision(
       decisionID: "dec-apply", htaskID: snapshot.htaskID, round: 1,
@@ -410,7 +410,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let attempt = HarnessRepairAttempt(
       proposal: proposal, patchAttemptRef: "patch-fixture", patchRevision: patchRevision)
     let snapshot = makeSnapshot(
-      phase: .building, activeJobID: "JOB-BUILD", repair: attempt)
+      stage: .building, activeJobID: "JOB-BUILD", repair: attempt)
     let decision = HarnessDecision(
       decisionID: "dec-build", htaskID: snapshot.htaskID, round: 1,
       kind: .invokeOperation, operationReference: DebugCrashTaskHandler.buildOpenHarmony,
@@ -428,7 +428,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let outcome = try await coordinator.reconcile(snapshot.htaskID)
     let submitted = await jobs.operations()
     let events = try await store.events(snapshot.htaskID)
-    XCTAssertNotEqual(outcome.snapshot.phase, .deploying)
+    XCTAssertNotEqual(outcome.snapshot.stage, .deploying)
     XCTAssertNil(outcome.snapshot.repairAttempt?.buildOutputDigest)
     XCTAssertFalse(submitted.contains(DebugCrashTaskHandler.runTests))
     XCTAssertTrue(events.contains { $0.reasonCode.contains("WORKSPACE_REVISION_CONFLICT") })
@@ -445,7 +445,7 @@ final class HarnessRepairContractTests: XCTestCase {
       buildOutputArtifactLease: "lease-v1:build:ART-build", buildOutputSigned: true,
       testsPassed: true)
     let snapshot = makeSnapshot(
-      phase: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
+      stage: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
       consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
     let decision = HarnessDecision(
       decisionID: "dec-deploy", htaskID: snapshot.htaskID, round: 1,
@@ -465,7 +465,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let submitted = await jobs.operations()
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(submitted, [DebugCrashTaskHandler.revertPatch])
-    XCTAssertEqual(outcome.snapshot.phase, .analyzing)
+    XCTAssertEqual(outcome.snapshot.stage, .analyzing)
     XCTAssertEqual(outcome.snapshot.consumedBudget.e1Mutations, 2)
   }
 
@@ -481,7 +481,7 @@ final class HarnessRepairContractTests: XCTestCase {
       testsPassed: true,
       deployedDigest: digest)
     let snapshot = makeSnapshot(
-      phase: .verifying, activeJobID: nil, repair: attempt,
+      stage: .verifying, activeJobID: nil, repair: attempt,
       consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
     let store = try HarnessTaskStore(rootURL: rootURL)
     try await store.create(snapshot)
@@ -529,7 +529,7 @@ final class HarnessRepairContractTests: XCTestCase {
       ], latestVerdict: .fail).asJSON
     failedEpoch[DebugCrashTaskHandler.baselineDeploymentMarker] = .bool(true)
     let snapshot = makeSnapshot(
-      phase: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
+      stage: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
       consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 2),
       observedState: failedEpoch)
     let decision = HarnessDecision(
@@ -549,7 +549,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let submittedOperations = await jobs.operations()
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(submittedOperations, [DebugCrashTaskHandler.captureDiagnostics])
-    XCTAssertEqual(outcome.snapshot.phase, .verifying)
+    XCTAssertEqual(outcome.snapshot.stage, .verifying)
     XCTAssertEqual(outcome.snapshot.observed.latestVerdict, nil)
     XCTAssertNil(outcome.snapshot.observed.measurements["matchingCrashCount"])
     XCTAssertNil(outcome.snapshot.observed.measurements["newFatalSignatureCount"])
@@ -566,7 +566,7 @@ final class HarnessRepairContractTests: XCTestCase {
 
   func testCrashFixtureDeploysOnlyAfterLedgerBaselineAndReservesRepairBudget() throws {
     let handler = DebugCrashTaskHandler()
-    let ready = baselineSnapshot(phase: .collecting, activeJobID: nil)
+    let ready = baselineSnapshot(stage: .collecting, activeJobID: nil)
     let planned = handler.plan(
       for: ready, decisionID: "dec-baseline", nowUTC: now)
     XCTAssertEqual(handler.offeredOperations(for: ready), [DebugCrashTaskHandler.deployHAP])
@@ -580,7 +580,7 @@ final class HarnessRepairContractTests: XCTestCase {
     XCTAssertEqual(planned.decision.inputs["diagnosticsDurationSeconds"], .integer(5))
 
     let underBudgeted = baselineSnapshot(
-      phase: .collecting, activeJobID: nil, maxE1Mutations: 6)
+      stage: .collecting, activeJobID: nil, maxE1Mutations: 6)
     let refused = handler.plan(
       for: underBudgeted, decisionID: "dec-no-budget", nowUTC: now)
     XCTAssertTrue(handler.offeredOperations(for: underBudgeted).isEmpty)
@@ -588,7 +588,7 @@ final class HarnessRepairContractTests: XCTestCase {
     XCTAssertEqual(refused.decision.reasonCode, "baselineDeploymentRepairBudgetUnavailable")
 
     let noWatermark = baselineSnapshot(
-      phase: .collecting, activeJobID: nil,
+      stage: .collecting, activeJobID: nil,
       observedState: HarnessObservedState(latestVerdict: .inconclusive).asJSON)
     XCTAssertEqual(
       handler.plan(for: noWatermark, decisionID: "dec-no-mark", nowUTC: now)
@@ -598,7 +598,7 @@ final class HarnessRepairContractTests: XCTestCase {
     var alreadyDeployedState = ready.observedState
     alreadyDeployedState[DebugCrashTaskHandler.baselineDeploymentMarker] = .bool(true)
     let alreadyDeployed = baselineSnapshot(
-      phase: .collecting, activeJobID: nil, observedState: alreadyDeployedState,
+      stage: .collecting, activeJobID: nil, observedState: alreadyDeployedState,
       consumed: HarnessConsumedBudget(rounds: 4, e1Mutations: 1))
     XCTAssertEqual(
       handler.plan(for: alreadyDeployed, decisionID: "dec-after-deploy", nowUTC: now)
@@ -609,7 +609,7 @@ final class HarnessRepairContractTests: XCTestCase {
   func testLegacyPositiveBudgetStopsBeforePatchAndDeploymentReserveIsExact() throws {
     let handler = DebugCrashTaskHandler()
     let underBudgetedRepair = baselineSnapshot(
-      phase: .analyzing, activeJobID: nil, maxE1Mutations: 3,
+      stage: .analyzing, activeJobID: nil, maxE1Mutations: 3,
       observedState: HarnessObservedState(latestVerdict: .fail).asJSON,
       consumed: HarnessConsumedBudget(rounds: 4, e1Mutations: 1))
     XCTAssertTrue(handler.offeredOperations(for: underBudgetedRepair).isEmpty)
@@ -627,7 +627,7 @@ final class HarnessRepairContractTests: XCTestCase {
       buildOutputArtifactLease: "lease-v1:build:ART-build", buildOutputSigned: true,
       testsPassed: true)
     let exact = makeSnapshot(
-      phase: .building, activeJobID: nil, repair: ready,
+      stage: .building, activeJobID: nil, repair: ready,
       consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 4), maxE1Mutations: 6)
     XCTAssertEqual(
       handler.plan(for: exact, decisionID: "dec-exact", nowUTC: now)
@@ -635,7 +635,7 @@ final class HarnessRepairContractTests: XCTestCase {
       DebugCrashTaskHandler.deployHAP)
 
     let short = makeSnapshot(
-      phase: .building, activeJobID: nil, repair: ready,
+      stage: .building, activeJobID: nil, repair: ready,
       consumed: HarnessConsumedBudget(rounds: 5, e1Mutations: 4), maxE1Mutations: 5)
     XCTAssertEqual(
       handler.plan(for: short, decisionID: "dec-short", nowUTC: now)
@@ -647,7 +647,7 @@ final class HarnessRepairContractTests: XCTestCase {
     async throws
   {
     let snapshot = baselineSnapshot(
-      phase: .reproducing, activeJobID: "JOB-BASELINE", activeRound: 1,
+      stage: .reproducing, activeJobID: "JOB-BASELINE", activeRound: 1,
       consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: 1))
     let decision = HarnessDecision(
       decisionID: "dec-baseline", htaskID: snapshot.htaskID, round: 1,
@@ -668,7 +668,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let events = try await store.events(snapshot.htaskID)
     XCTAssertEqual(outcome.action, .dispatched)
     XCTAssertEqual(submittedOperations, [DebugCrashTaskHandler.captureDiagnostics])
-    XCTAssertEqual(outcome.snapshot.phase, .reproducing)
+    XCTAssertEqual(outcome.snapshot.stage, .reproducing)
     XCTAssertNil(outcome.snapshot.repairAttempt)
     XCTAssertEqual(
       outcome.snapshot.observedState[DebugCrashTaskHandler.baselineDeploymentMarker],
@@ -719,7 +719,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let prepared = try await port.preparePatch(
       patch, projectRef: copy.projectRef,
       task: makeSnapshot(
-        phase: .patching, activeJobID: nil, repair: HarnessRepairAttempt(proposal: patch)),
+        stage: .patching, activeJobID: nil, repair: HarnessRepairAttempt(proposal: patch)),
       decisionID: "dec-evolution")
 
     XCTAssertEqual(prepared.inputs["expectedWorkspaceRevision"], JSONValue.string(revision))
@@ -779,7 +779,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let attempt = HarnessRepairAttempt(
       proposal: patch, patchAttemptRef: "patch-fixture", patchRevision: revision)
     let task = makeSnapshot(
-      phase: .building, activeJobID: nil, repair: attempt,
+      stage: .building, activeJobID: nil, repair: attempt,
       baselineLease: baselineLease)
 
     let prepared = try await port.preparePatch(
@@ -800,7 +800,7 @@ final class HarnessRepairContractTests: XCTestCase {
   // MARK: - Fixtures
 
   private func baselineSnapshot(
-    phase: HarnessTaskPhase,
+    stage: HarnessTaskStage,
     activeJobID: String?,
     activeRound: Int = 0,
     maxE1Mutations: Int = 7,
@@ -830,7 +830,7 @@ final class HarnessRepairContractTests: XCTestCase {
         maxE1Mutations: maxE1Mutations),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash),
       observedState: observed, createdAtUTC: now, updatedAtUTC: now,
-      status: .running, phase: phase, activeRound: activeRound,
+      lifecycle: .running, stage: stage, activeRound: activeRound,
       activeJobID: activeJobID, consumedBudget: consumed)
   }
 
@@ -911,7 +911,7 @@ final class HarnessRepairContractTests: XCTestCase {
   }
 
   private func makeSnapshot(
-    phase: HarnessTaskPhase,
+    stage: HarnessTaskStage,
     activeJobID: String?,
     repair: HarnessRepairAttempt,
     consumed: HarnessConsumedBudget = HarnessConsumedBudget(rounds: 1),
@@ -941,7 +941,7 @@ final class HarnessRepairContractTests: XCTestCase {
       policy: HarnessTaskPolicy(
         allowedOperations: DebugCrashTaskHandler().permittedOperations.sorted()),
       observedState: observed, createdAtUTC: now, updatedAtUTC: now,
-      status: .running, phase: phase, activeRound: 1, activeJobID: activeJobID,
+      lifecycle: .running, stage: stage, activeRound: 1, activeJobID: activeJobID,
       consumedBudget: consumed)
   }
 

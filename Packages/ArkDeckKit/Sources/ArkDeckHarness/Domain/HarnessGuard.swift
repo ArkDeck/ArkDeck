@@ -52,7 +52,7 @@ public enum HarnessBudgetKind: String, CaseIterable, Codable, Sendable {
 /// operation, inputs, phase and error class are the same failure.
 public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
   public let operationReference: String
-  public let phase: HarnessTaskPhase
+  public let phase: HarnessTaskStage
   public let providerID: String
   public let targetProfile: String
   public let normalizedInputsSHA256: String
@@ -71,7 +71,7 @@ public struct HarnessFailureFingerprint: Equatable, Sendable, Codable {
 
   public init(
     operationReference: String,
-    phase: HarnessTaskPhase,
+    phase: HarnessTaskStage,
     providerID: String,
     targetProfile: String,
     normalizedInputsSHA256: String,
@@ -265,9 +265,9 @@ public struct HarnessFailureRecord: Equatable, Sendable, Codable {
 public struct HarnessStrategySignature: Equatable, Sendable, Codable {
   public let operationReference: String
   public let inputsDigest: String
-  public let phase: HarnessTaskPhase
+  public let phase: HarnessTaskStage
 
-  public init(operationReference: String, inputsDigest: String, phase: HarnessTaskPhase) {
+  public init(operationReference: String, inputsDigest: String, phase: HarnessTaskStage) {
     self.operationReference = operationReference
     self.inputsDigest = inputsDigest
     self.phase = phase

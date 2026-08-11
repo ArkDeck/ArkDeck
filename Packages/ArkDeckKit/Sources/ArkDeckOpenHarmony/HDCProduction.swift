@@ -214,14 +214,14 @@ private struct HDCRegisteredSemanticBinding: Sendable, Equatable {
 }
 
 /// Integration-profile-registered command-result evaluator. It preserves the
-/// legacy parser's conservative failure precedence, then accepts success only
+/// baseline parser's conservative failure precedence, then accepts success only
 /// for the registered uninstall command's byte-exact stdout capture. Marker
 /// fragments never promote an unregistered command or raw output to success.
 public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
   public typealias SemanticResult = HDCCommandSemanticResult
 
   private let binding: HDCRegisteredSemanticBinding?
-  private var legacy = HDCSemanticOutputParser()
+  private var baselineParser = HDCSemanticOutputParser()
   private var stdoutHasher = SHA256()
   private var containsStderr = false
 
@@ -247,7 +247,7 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
   }
 
   public mutating func consume(_ chunk: ProcessOutputChunk) {
-    legacy.consume(chunk)
+    baselineParser.consume(chunk)
     switch chunk.stream {
     case .stdout:
       // The process layer retains a bounded raw capture.  The semantic gate
@@ -266,8 +266,8 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
       // failure classification without inventing a new parser family.
       return .failure(.explicitFailureMarker)
     }
-    let legacyResult = legacy.finish(exitCode: code)
-    if case .failure = legacyResult { return legacyResult }
+    let baselineResult = baselineParser.finish(exitCode: code)
+    if case .failure = baselineResult { return baselineResult }
     guard code == 0 else { return .failure(.nonZeroExit(code)) }
     guard let binding else { return .unknownOutput }
     switch binding.commandFamily {

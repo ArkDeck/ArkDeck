@@ -72,7 +72,7 @@ public enum HarnessHumanActionFactory {
       // Resuming returns the task to the phase it was blocked in: a human
       // decision does not rewind the debug journey.
       resumeStatus: .running,
-      resumePhase: snapshot.phase,
+      resumePhase: snapshot.stage,
       evidenceRefs: evidenceRefs,
       generatedAtUTC: nowUTC)
   }

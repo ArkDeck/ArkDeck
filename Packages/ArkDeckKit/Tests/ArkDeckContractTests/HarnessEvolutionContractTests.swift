@@ -958,6 +958,6 @@ final class HarnessEvolutionContractTests: XCTestCase {
         baseRevision: baseRevision, allowedPathsDigest: String(repeating: "d", count: 64),
         createdAtUTC: timestamp),
       observedState: observedState, createdAtUTC: timestamp, updatedAtUTC: timestamp,
-      status: .running, phase: .verifying)
+      lifecycle: .running, stage: .verifying)
   }
 }

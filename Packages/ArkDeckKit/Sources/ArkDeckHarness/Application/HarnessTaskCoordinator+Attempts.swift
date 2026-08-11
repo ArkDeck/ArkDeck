@@ -170,7 +170,7 @@ extension HarnessTaskCoordinator {
   func activeAttemptSupportsActionRetry(_ taskID: String) async throws -> Bool {
     guard let attempt = try await activeAttempt(taskID) else { return false }
     // The initial journey Attempt supplies the mandatory execution identity;
-    // it does not broaden the legacy retry policy for diagnostic operations.
+    // it does not broaden the established retry policy for diagnostic operations.
     return attempt.strategy.hypothesisClass != "taskJourney"
   }
 
@@ -213,7 +213,7 @@ extension HarnessTaskCoordinator {
     // new observation in the same repair Attempt, not a replay of a failed
     // ActionRun and not a second repair strategy.
     if operationReference == DebugCrashTaskHandler.captureDiagnostics,
-      snapshot.phase == .verifying,
+      snapshot.stage == .verifying,
       snapshot.repairAttempt?.deployedDigest != nil,
       snapshot.observed.latestVerdict == .inconclusive
     {

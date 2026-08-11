@@ -26,8 +26,8 @@ import Foundation
 public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
   public let htaskID: String
   public let stateVersion: Int
-  public let status: HarnessTaskStatus
-  public let phase: HarnessTaskPhase
+  public let status: HarnessTaskLifecycle
+  public let phase: HarnessTaskStage
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
@@ -68,8 +68,8 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
   public init(snapshot: HarnessTaskSnapshot, offeredOperations: [String]) {
     self.htaskID = snapshot.htaskID
     self.stateVersion = snapshot.version
-    self.status = snapshot.status
-    self.phase = snapshot.phase
+    self.status = snapshot.lifecycle
+    self.phase = snapshot.stage
     self.lifecycle = snapshot.lifecycle
     self.stage = snapshot.stage
     self.waitReason = snapshot.waitReason

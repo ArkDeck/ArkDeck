@@ -201,7 +201,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       observedState: observedState,
       createdAtUTC: "2026-07-31T00:00:00Z",
       updatedAtUTC: "2026-07-31T00:00:00Z",
-      status: .running,
+      lifecycle: .running,
       activeJobID: activeJobID,
       cancelRequested: cancelRequested,
       version: version)
@@ -295,7 +295,7 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     XCTAssertTrue(submitted.isEmpty)
     // A cancelled task is terminal: the refusal stands and nothing is
     // written on top of it.
-    XCTAssertEqual(outcome.snapshot.status, .cancelled)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .cancelled)
   }
 
   func testADecisionWithoutAnEnvelopeVersionIsRefused() throws {
@@ -679,6 +679,27 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       "observedStateVersion":3,"basisDigest":"\(String(repeating: "f", count: 64))"}
       """.utf8)
     XCTAssertThrowsError(try JSONDecoder().decode(HarnessDecision.self, from: legacy))
+  }
+
+  func testSchemaOneIntentDecodesForAuditButIsQuarantinedFromExecution() throws {
+    let current = HarnessDispatchIntent(
+      htaskID: "HTASK-0123456789AB", round: 1, decisionID: "decision-audit-only",
+      operationReference: DebugCrashTaskHandler.observeDevice,
+      targetID: "TGT-1", expectedBindingRevision: 7,
+      inputsDigestSHA256: String(repeating: "a", count: 64),
+      requestID: "request-audit-only", idempotencyKey: "idempotency-audit-only",
+      state: .submitted, jobID: nil, createdAtUTC: "2026-07-30T00:00:00Z",
+      updatedAtUTC: "2026-07-30T00:00:00Z")
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as? [String: Any])
+    object["schemaVersion"] = "1.0.0"
+    let historical = try JSONDecoder().decode(
+      HarnessDispatchIntent.self,
+      from: JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]))
+
+    XCTAssertEqual(historical.schemaVersion, "1.0.0")
+    XCTAssertFalse(historical.isExecutableUnderCurrentSchema)
+    XCTAssertTrue(current.isExecutableUnderCurrentSchema)
   }
 
   func testPendingWorkspaceDriftClosesIntentWithoutProviderE1OrNoProgress() async throws {

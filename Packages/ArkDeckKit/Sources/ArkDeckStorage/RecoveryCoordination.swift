@@ -524,7 +524,10 @@ public final class DeterministicRecoveryReconciler: @unchecked Sendable {
     provider: ProviderRecoveryEvidence,
     binding: RecoveryBindingEvidence
   ) throws -> ReconciliationResult {
-    let schemaVersion = session.replay.schemaVersion ?? JournalEvent.schemaVersion
+    guard let schemaVersion = session.replay.schemaVersion else {
+      throw DurableFileError.sequenceViolation(
+        "reconcile requires an explicit journal schemaVersion")
+    }
     if let pending = session.replay.pendingReconcileTransition {
       let transition = try JournalEvent.stateTransition(
         eventID: audit.nextEventID(),

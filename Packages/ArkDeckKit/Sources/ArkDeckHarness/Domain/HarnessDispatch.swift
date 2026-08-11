@@ -361,8 +361,16 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     self.updatedAtUTC = updatedAtUTC
   }
 
-  /// Schema-1 intents remain readable for audit and submitted-intent recovery.
-  /// Their associated legacy decision envelope decides executability.
+  /// Schema-1 intents are compatibility-quarantined. A record that spells
+  /// `"schemaVersion":"1.0.0"` explicitly still decodes for audit and export; a schema-1-era
+  /// record without the key fails decoding loudly (`schemaVersion` is required). Recovery that
+  /// reaches a quarantined intent fails loudly at the association check rather than skipping
+  /// it silently. Compatibility may reduce executability; it must never reduce the current
+  /// schema's association checks.
+  ///
+  /// Retirement criterion: remove the schema-1 quarantine after every supported production
+  /// store and migration fixture reports zero rows for:
+  /// `SELECT count(*) FROM dispatch_intent WHERE json_extract(intent_json, '$.schemaVersion') = '1.0.0'`.
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.documentType = try container.decode(String.self, forKey: .documentType)
@@ -387,6 +395,10 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     self.jobID = try container.decodeIfPresent(String.self, forKey: .jobID)
     self.createdAtUTC = try container.decode(String.self, forKey: .createdAtUTC)
     self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
+  }
+
+  package var isExecutableUnderCurrentSchema: Bool {
+    schemaVersion == Self.schemaVersion
   }
 
   public func withState(

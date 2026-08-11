@@ -134,8 +134,8 @@ private struct PatchQuestionHandler: HarnessTaskHandler {
   }
 
   func phase(
-    afterSuccessOf operationReference: String, in phase: HarnessTaskPhase
-  ) -> HarnessTaskPhase { phase }
+    afterSuccessOf operationReference: String, in stage: HarnessTaskStage
+  ) -> HarnessTaskStage { stage }
 }
 
 private struct RejectingPatchRepairPort: HarnessRepairPort {
@@ -604,7 +604,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024, maxE1Mutations: 0),
       policy: HarnessTaskPolicy(allowedOperations: Array(offered)),
       createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
-      status: .running, phase: .collecting, activeRound: 3)
+      lifecycle: .running, stage: .collecting, activeRound: 3)
 
     let context = try HarnessDecisionContextAssembler(limits: limits).assemble(
       snapshot: snapshot,
@@ -638,7 +638,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         maxRounds: 4, maxWallClockSeconds: 60, maxArtifactBytes: 1024, maxE1Mutations: 1),
       policy: HarnessTaskPolicy(allowedOperations: Array(offered)),
       createdAtUTC: "2026-07-31T00:00:00Z", updatedAtUTC: "2026-07-31T00:00:00Z",
-      status: .running, phase: .analyzing, activeRound: 3)
+      lifecycle: .running, stage: .analyzing, activeRound: 3)
   }
 
   /// Self-debugging is the point: a model asked for a unified diff has to see
@@ -877,7 +877,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
         maxE1Mutations: 4, maxModelCalls: 10),
       policy: HarnessTaskPolicy(allowedOperations: Array(offered)),
       createdAtUTC: "2026-08-01T00:00:00Z", updatedAtUTC: "2026-08-01T00:00:01Z",
-      status: .running, phase: .patching, activeRound: 4,
+      lifecycle: .running, stage: .patching, activeRound: 4,
       consumedBudget: HarnessConsumedBudget(
         rounds: 4, wallClockSeconds: 10, artifactBytes: 100, e1Mutations: 1,
         modelCalls: 3),
@@ -1075,7 +1075,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
 
     let outcome = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(outcome.action, .dispatched)
-    XCTAssertNotEqual(outcome.snapshot.status, .succeeded, "a model cannot declare success")
+    XCTAssertNotEqual(outcome.snapshot.lifecycle, .succeeded, "a model cannot declare success")
     XCTAssertTrue(outcome.reasonCode.contains("proposalRejected:forbiddenField:status"))
     let decision = try await store.decision(task.htaskID, round: 1)
     XCTAssertEqual(decision?.producer, "debug-crash-handler@1")
@@ -1276,7 +1276,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
 
     let loadedSnapshot = try await store.load(task.htaskID)
     let snapshot = try XCTUnwrap(loadedSnapshot)
-    XCTAssertEqual(snapshot.status, .failed)
+    XCTAssertEqual(snapshot.lifecycle, .failed)
     XCTAssertEqual(snapshot.result?.reasonCode, "maxModelCallsExhausted")
     XCTAssertEqual(snapshot.consumedBudget.modelCalls, 2)
     XCTAssertTrue(jobs.submittedOperations.isEmpty)
@@ -1363,7 +1363,7 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
 
     let outcome = try await coordinator.reconcile(task.htaskID)
     XCTAssertEqual(outcome.action, .stoppedForHuman)
-    XCTAssertEqual(outcome.snapshot.status, .humanRequired)
+    XCTAssertEqual(outcome.snapshot.lifecycle, .humanRequired)
     XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
     XCTAssertTrue(gateway.seenContexts.isEmpty)
     let modelRuns = try await store.modelRuns(task.htaskID)
