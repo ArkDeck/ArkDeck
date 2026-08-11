@@ -180,6 +180,31 @@ package struct HarnessTaskMethodService: Sendable {
             "task": Self.encodeTask(outcome.snapshot),
           ]))
 
+      case "task.context":
+        guard let id = taskID() else {
+          return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
+        }
+        let export = try await harness.decisionContext(id)
+        // The exported object is decoded from the same canonical bytes the
+        // digest is computed over, so what the caller reads is byte-for-byte
+        // what `contextDigest` stands for.
+        guard
+          let contextValue = try? JSONDecoder().decode(
+            JSONValue.self, from: export.context.transmittedBytes)
+        else {
+          return failure(
+            id: request.id, code: .internalError,
+            message: "decision context is not encodable")
+        }
+        return success(
+          id: request.id,
+          result: .object([
+            "htaskId": .string(id),
+            "contextDigest": .string(export.contextDigest),
+            "contextBytes": .integer(Int64(export.contextBytes)),
+            "context": contextValue,
+          ]))
+
       case "task.proposePatch":
         guard let id = taskID() else {
           return failure(id: request.id, code: .invalidParams, message: "htaskId is required")
@@ -191,8 +216,14 @@ package struct HarnessTaskMethodService: Sendable {
             id: request.id, code: .invalidParams,
             message: "proposalJson is required")
         }
+        // Producer is a ledger label from a closed set the coordinator
+        // enforces; absent means the human operator, exactly as before.
+        var producer = HarnessTaskCoordinator.humanPatchProducer
+        if case .string(let declared)? = request.params?["producer"] {
+          producer = declared
+        }
         let outcome = try await harness.proposePatch(
-          id, proposalJSON: Data(proposalJSON.utf8))
+          id, proposalJSON: Data(proposalJSON.utf8), producer: producer)
         return success(
           id: request.id,
           result: .object([

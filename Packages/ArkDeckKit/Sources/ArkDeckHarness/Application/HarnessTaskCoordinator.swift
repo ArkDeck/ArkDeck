@@ -78,6 +78,10 @@ public enum HarnessCoordinatorError: Error, Equatable, Sendable {
   case malformedPatchProposal(String)
   case patchProposalNotAllowed(String)
   case patchProposalMismatch
+  /// The assembled context failed the identity screen, so it may not be
+  /// handed to any producer - external ones included. Carries marker names,
+  /// never values.
+  case contextNotExportable(String)
   case evolutionWorkspaceUnavailable
   case missingDecisionRecord(round: Int)
   case malformedRequest(String)
