@@ -10,7 +10,6 @@ public enum DeviceTargetingValidationError: Error, Equatable, Sendable {
   case invalidInitialRevision(Int)
   case nonMonotonicRevision(expected: Int, actual: Int)
   case bindingDoesNotMatchOriginalTarget
-  case duplicateMutationRequest(String)
   case stablePhysicalIdentityMissing
 }
 

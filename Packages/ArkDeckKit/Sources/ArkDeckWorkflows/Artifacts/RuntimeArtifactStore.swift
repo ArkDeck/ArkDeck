@@ -472,7 +472,7 @@ public actor RuntimeArtifactStore {
     }
     if let existing, existing.status.isPublished {
       guard
-        (existing.artifactID == artifactID || Self.isLegacyArtifactID(existing.artifactID)),
+        existing.artifactID == artifactID,
         Self.sameImmutablePublication(existing, metadata)
       else {
         throw RuntimeArtifactError.artifactConflict(
@@ -573,7 +573,7 @@ public actor RuntimeArtifactStore {
       $0.name == request.name
     }), existing.status.isPublished {
       guard
-        existing.artifactID == artifactID || Self.isLegacyArtifactID(existing.artifactID),
+        existing.artifactID == artifactID,
         Self.sameImmutablePublication(existing, metadata)
       else {
         throw RuntimeArtifactError.artifactConflict(
@@ -688,7 +688,7 @@ public actor RuntimeArtifactStore {
       $0.name == request.name
     }), existing.status.isPublished {
       guard
-        (existing.artifactID == metadata.artifactID || Self.isLegacyArtifactID(existing.artifactID)),
+        existing.artifactID == metadata.artifactID,
         Self.sameImmutablePublication(existing, metadata)
       else {
         throw RuntimeArtifactError.artifactConflict(
@@ -1466,15 +1466,8 @@ public actor RuntimeArtifactStore {
 
   private static func isSafeArtifactID(_ value: String) -> Bool {
     value.range(
-      // 16-hex published IDs are read-only compatibility for the first
-      // merged MU-4 implementation. New publications always use 32 hex
-      // and bind job + declared name + content.
-      of: #"^ART-(?:MISSING-)?(?:[0-9a-f]{16}|[0-9a-f]{32})$"#,
+      of: #"^ART-(?:MISSING-)?[0-9a-f]{32}$"#,
       options: .regularExpression) != nil
-  }
-
-  private static func isLegacyArtifactID(_ value: String) -> Bool {
-    value.range(of: #"^ART-[0-9a-f]{16}$"#, options: .regularExpression) != nil
   }
 
   private static func sha256Hex(of url: URL) throws -> String {

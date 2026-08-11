@@ -302,32 +302,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
       operation: RuntimeOperationReference(id: operationID, version: version))
   }
 
-  /// Resolves the target carried by `arkdeck capability draft` without
-  /// pretending every E1 subject is a device. A device-bound operation asks
-  /// the caller for the current adopted binding revision; an unbound
-  /// workspace operation uses its project reference directly and must never
-  /// query the device target store (TASK-HFA-009 r3).
-  ///
-  /// Unknown operations deliberately remain unbound here so the daemon is
-  /// still the authority that reports `unknownOperation` after decoding the
-  /// complete typed request.
-  public static func capabilityDraftTarget(
-    targetID: String,
-    operationID: String,
-    version: Int?,
-    currentDeviceBindingRevision: () throws -> Int
-  ) rethrows -> DurableTargetReference {
-    let descriptor = RuntimeOperationCatalog.descriptor(id: operationID, version: version)
-    let revision: Int?
-    if descriptor?.binding == .confirmedDevice {
-      revision = try currentDeviceBindingRevision()
-    } else {
-      revision = nil
-    }
-    return DurableTargetReference(
-      targetID: targetID, expectedBindingRevision: revision)
-  }
-
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let documentType = try container.decodeIfPresent(String.self, forKey: .documentType)

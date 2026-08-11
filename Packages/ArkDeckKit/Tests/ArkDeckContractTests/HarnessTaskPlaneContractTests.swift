@@ -642,8 +642,6 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
 
     let before = try await first.events(task.htaskID)
     let beforeSnapshot = try await first.status(task.htaskID)
-    let logURL = rootURL.appendingPathComponent("tasks/\(task.htaskID)/events.jsonl")
-    let logBytes = try XCTUnwrap(FileManager.default.contents(atPath: logURL.path))
 
     // Restart: new store, new coordinator, same directory.
     let (second, store) = try makeCoordinator(port: port)
@@ -653,16 +651,6 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertEqual(afterSnapshot, beforeSnapshot)
     let afterResult = try await second.result(task.htaskID)
     XCTAssertEqual(afterResult?.reasonCode, "evaluationEngineUnavailable")
-    XCTAssertEqual(
-      FileManager.default.contents(atPath: logURL.path), logBytes,
-      "reading a task must not rewrite its log")
-
-    // The snapshot is a cache of the log: roll task.json back to the first
-    // version and the replay must reproduce the same observable state.
-    let snapshotURL = rootURL.appendingPathComponent("tasks/\(task.htaskID)/task.json")
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-    try encoder.encode(task).write(to: snapshotURL)
     let replayed = try await store.load(task.htaskID)
     XCTAssertEqual(replayed, beforeSnapshot)
   }

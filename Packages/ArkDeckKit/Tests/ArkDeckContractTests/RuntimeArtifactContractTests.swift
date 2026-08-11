@@ -554,31 +554,26 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertEqual(reopenedList, [published])
   }
 
-  func testLegacyShortArtifactIDRemainsReadableAndIdempotent() async throws {
+  func testShortArtifactIDInIndexFailsClosed() async throws {
     let store = try makeStore()
     let published = try await store.publish(request())
     let jobDirectory = root.appendingPathComponent("job-1", isDirectory: true)
-    let legacyID = "ART-\(published.sha256.prefix(16))"
+    let shortID = "ART-\(published.sha256.prefix(16))"
     try FileManager.default.moveItem(
       at: jobDirectory.appendingPathComponent(published.artifactID),
-      to: jobDirectory.appendingPathComponent(legacyID))
+      to: jobDirectory.appendingPathComponent(shortID))
     let indexURL = jobDirectory.appendingPathComponent("index.json")
     var index = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: indexURL))
         as? [String: Any])
     var artifacts = try XCTUnwrap(index["artifacts"] as? [[String: Any]])
-    artifacts[0]["artifactID"] = legacyID
+    artifacts[0]["artifactID"] = shortID
     index["artifacts"] = artifacts
     try JSONSerialization.data(withJSONObject: index, options: [.sortedKeys])
       .write(to: indexURL)
 
     let reopened = try makeStore()
-    let listed = try await reopened.list(jobID: "job-1")
-    XCTAssertEqual(listed.map(\.artifactID), [legacyID])
-    let bytes = try await reopened.read(jobID: "job-1", artifactID: legacyID)
-    XCTAssertFalse(bytes.isEmpty)
-    let idempotent = try await reopened.publish(request())
-    XCTAssertEqual(idempotent.artifactID, legacyID)
+    await XCTAssertThrowsErrorAsync(try await reopened.list(jobID: "job-1"))
   }
 
   func testEvidenceProjectionRehashesControlledArtifactBytes() async throws {

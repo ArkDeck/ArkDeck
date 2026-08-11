@@ -1455,15 +1455,12 @@ public actor HarnessTaskCoordinator {
       && decision.expectedBindingRevision == intent.expectedBindingRevision
       && decision.expectedWorkspaceRevision == intent.expectedWorkspaceRevision
       && decision.expectedDeployedArtifactDigest == intent.expectedDeployedArtifactDigest
-    let legacyAssociationsMatch =
-      decision.envelopeVersion != HarnessDecision.envelopeVersion
-      && intent.schemaVersion != HarnessDispatchIntent.schemaVersion
     guard decision.decisionID == intent.decisionID,
       decision.htaskID == intent.htaskID,
       decision.round == intent.round,
       decision.operationReference == intent.operationReference,
       HarnessRequestIdentity.inputsDigest(decision.inputs) == intent.inputsDigestSHA256,
-      v2AssociationsMatch || legacyAssociationsMatch
+      v2AssociationsMatch
     else {
       throw HarnessTaskStoreError.corrupt(
         "intent \(intent.requestID) no longer matches decision \(intent.decisionID)")

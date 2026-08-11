@@ -648,7 +648,6 @@ package struct HarnessTaskMethodService: Sendable {
       "promotionCandidate": encode(bundle.promotion),
       "candidatePatch": encode(bundle.candidate),
       "evaluation": encode(bundle.evaluation),
-      "review": encode(bundle.review),
       "diffDigest": .string(bundle.candidate.diffDigest),
       "artifactIds": .array(bundle.promotion.artifactIDs.map(JSONValue.string)),
       "files": .array(

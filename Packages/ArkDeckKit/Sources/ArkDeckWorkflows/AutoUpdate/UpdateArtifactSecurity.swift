@@ -8,8 +8,6 @@ public enum UpdateArtifactSecurityError: Error, Equatable, Sendable {
   case unsignedOrInvalidArtifact
   case differentTeam
   case artifactReplaced
-  case consentRequired
-  case handoffFailed
 }
 
 public struct ValidatedUpdateArtifact: Equatable, Sendable {

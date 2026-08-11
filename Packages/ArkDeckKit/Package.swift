@@ -173,7 +173,6 @@ let package = Package(
         .copy("Fixtures/Rockchip"),
         // Privacy-reviewed subset of a real HFA-005 harness directory. HFA-012
         // migrates this checked-in historical payload in its crash/reentry contract matrix.
-        .copy("Fixtures/Harness/HFA012"),
       ]
     ),
   ]

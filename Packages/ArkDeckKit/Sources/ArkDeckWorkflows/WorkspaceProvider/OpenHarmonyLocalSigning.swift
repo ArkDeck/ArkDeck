@@ -569,17 +569,6 @@ public final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
       resultRecord: directory.appendingPathComponent("signing-result.json").path)
   }
 
-  public func prepareFresh(jobID: String) throws -> OpenHarmonySigningAttemptPaths {
-    let paths = paths(jobID: jobID)
-    guard !fileManager.fileExists(atPath: paths.directory) else {
-      throw OpenHarmonySigningError.ioFailure("signing attempt directory already exists")
-    }
-    try fileManager.createDirectory(
-      atPath: paths.directory, withIntermediateDirectories: false,
-      attributes: [.posixPermissions: 0o700])
-    return paths
-  }
-
   public func cleanup(jobID: String) {
     try? fileManager.removeItem(atPath: paths(jobID: jobID).directory)
   }

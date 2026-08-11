@@ -72,7 +72,6 @@ public final class RuntimeJobRepository: @unchecked Sendable {
       }
       try configure()
       try migrate()
-      try importLegacyIdempotencyEntriesIfNeeded(stateDirectory: stateDirectory)
     } catch {
       sqlite3_close_v2(opened)
       handle = nil
@@ -277,53 +276,6 @@ public final class RuntimeJobRepository: @unchecked Sendable {
         """
       )
       try execute("PRAGMA user_version=\(Self.schemaVersion)")
-    }
-  }
-
-  private struct LegacyDocument: Decodable {
-    let entries: [LegacyEntry]
-  }
-
-  private struct LegacyEntry: Decodable {
-    let idempotencyKey: String
-    let jobID: String
-    let requestFingerprintSHA256: String
-  }
-
-  /// Legacy entries are migration input only.  We import a mapping only when
-  /// its old job projections are already complete, so an old ghost entry is
-  /// not carried forward to block a safely retried request forever.
-  private func importLegacyIdempotencyEntriesIfNeeded(stateDirectory: URL) throws {
-    let legacyURL = stateDirectory.appending(path: "idempotency.json")
-    guard FileManager.default.fileExists(atPath: legacyURL.path) else { return }
-    let document: LegacyDocument
-    do {
-      document = try JSONDecoder().decode(LegacyDocument.self, from: Data(contentsOf: legacyURL))
-    } catch {
-      throw RuntimeJobRepositoryError.corrupt("cannot decode legacy idempotency ledger: \(error)")
-    }
-    for entry in document.entries {
-      let jobDirectory = stateDirectory
-        .appendingPathComponent("jobs", isDirectory: true)
-        .appendingPathComponent(entry.jobID, isDirectory: true)
-      let recordURL = jobDirectory.appendingPathComponent("job-record.json")
-      let journalURL = jobDirectory.appendingPathComponent("journal.jsonl")
-      guard
-        FileManager.default.fileExists(atPath: recordURL.path),
-        FileManager.default.fileExists(atPath: journalURL.path)
-      else { continue }
-      let record = try Data(contentsOf: recordURL)
-      _ = try transaction {
-        try run(
-          """
-          INSERT OR IGNORE INTO runtime_job(
-            job_id, idempotency_key, request_hash, state, created_at_utc,
-            updated_at_utc, version, initial_record_json
-          ) VALUES(?, ?, ?, 'legacy', 'legacy', 'legacy', 1, ?)
-          """,
-          [.text(entry.jobID), .text(entry.idempotencyKey),
-           .text(entry.requestFingerprintSHA256), .blob(record)])
-      }
     }
   }
 

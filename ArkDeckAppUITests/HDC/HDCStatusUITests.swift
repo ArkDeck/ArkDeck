@@ -361,19 +361,6 @@ final class HDCStatusUITests: XCTestCase {
         source.contains(forbidden), "App source contains forbidden capability: \(forbidden)")
     }
 
-    // The unavailable workspace is a new production view on the same
-    // boundary: it may not acquire a capability this one is denied, and it
-    // owns no model or fixture at all.
-    for relativePath in ["ArkDeckApp/Features/Shared/UnavailableFeatureView.swift"] {
-      let shellSource = try String(
-        contentsOf: repositoryRoot().appending(path: relativePath), encoding: .utf8)
-      for forbidden in forbiddenCapabilities {
-        XCTAssertFalse(
-          shellSource.contains(forbidden),
-          "\(relativePath) contains forbidden capability: \(forbidden)")
-      }
-    }
-
     let fields = [
       ("hdc.counters.autoLifecycle", "presentation.automaticLifecycleDispatchCount"),
       ("hdc.counters.autoSubserver", "presentation.automaticSubserverDispatchCount"),

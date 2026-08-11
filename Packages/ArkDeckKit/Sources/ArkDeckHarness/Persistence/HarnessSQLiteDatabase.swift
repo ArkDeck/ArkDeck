@@ -49,11 +49,6 @@ struct HarnessSQLiteConfiguration: Equatable, Sendable {
   let tableNames: [String]
 }
 
-enum HarnessTaskStoreMigrationFault: String, Error, Sendable {
-  case afterTaskRows
-  case beforeActivation
-}
-
 final class HarnessSQLiteDatabase: @unchecked Sendable {
   static let schemaVersion = 1
   static let filename = "harness.sqlite3"
