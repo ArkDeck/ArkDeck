@@ -82,8 +82,7 @@ public struct ProductRockchipBootloaderStatusObserver:
         bindingRevision: nil)
     }
 
-    let digest = SHA256.hash(data: Data(identity.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: Data(identity.serial.utf8))
     let binding = try bindingStore.loadIfPresent()
     if identity.isHDCNormal,
       let binding,
@@ -292,11 +291,9 @@ public struct ProductRockchipLoaderBindingCoordinator:
       throw RockchipFlashExecutionError.admissionRejected(
         "exactly one registered DAYU200 USB identity is required for binding")
     }
-    let currentIdentity = SHA256.hash(data: Data(identity.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let currentIdentity = SHA256Hex.string(of: Data(identity.serial.utf8))
     let existing = try bindingStore.loadExisting()
-    let existingIdentity = SHA256.hash(data: Data(existing.serial.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let existingIdentity = SHA256Hex.string(of: Data(existing.serial.utf8))
 
     // A newly adopted board can coexist with an older board's singleton
     // active binding. Selecting that exact revision-1 target in the App is
@@ -309,8 +306,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
       currentIdentity != existingIdentity,
       currentIdentity == target.stablePhysicalIdentitySHA256
     {
-      let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
-        .map { String(format: "%02x", $0) }.joined()
+      let connectIdentity = SHA256Hex.string(of: Data(target.connectKey.utf8))
       let matchingTargets = try targetStore.list().filter {
         $0.bindingRevision == 1
           && $0.stablePhysicalIdentitySHA256 == currentIdentity
@@ -441,8 +437,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
         throw RockchipFlashExecutionError.admissionRejected(
           "selected historical target has no complete Runtime reactivation proof")
       }
-      let connectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
-        .map { String(format: "%02x", $0) }.joined()
+      let connectIdentity = SHA256Hex.string(of: Data(target.connectKey.utf8))
       guard proof.targetID == targetID,
         proof.bindingRevision == target.bindingRevision,
         proof.stableLoaderIdentitySHA256 == currentIdentity,
@@ -534,8 +529,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
       throw RockchipFlashExecutionError.admissionRejected(
         "selected target has no migratable HDC-to-Loader binding lineage")
     }
-    let targetConnectIdentity = SHA256.hash(data: Data(target.connectKey.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let targetConnectIdentity = SHA256Hex.string(of: Data(target.connectKey.utf8))
     guard targetConnectIdentity == hdcAlias.identitySHA256 else {
       throw RockchipFlashExecutionError.admissionRejected(
         "selected target connect key does not match its durable HDC-normal alias")
@@ -606,7 +600,7 @@ public struct ProductRockchipLoaderBindingCoordinator:
     currentIdentity: String,
     currentTopology: String
   ) -> String {
-    SHA256.hash(data: Data([
+    SHA256Hex.string(of: Data([
       "rockchip-loader-user-selection",
       targetID,
       String(previousRevision),
@@ -615,7 +609,6 @@ public struct ProductRockchipLoaderBindingCoordinator:
       currentIdentity,
       currentTopology,
     ].joined(separator: "\n").utf8))
-    .map { String(format: "%02x", $0) }.joined()
   }
 
   private static func authorizeSelectedTarget(

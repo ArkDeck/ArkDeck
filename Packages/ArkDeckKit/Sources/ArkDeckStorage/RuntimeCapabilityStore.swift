@@ -648,8 +648,7 @@ public actor RuntimeCapabilityStore {
   }
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {
-    value.count == 64
-      && value.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
+    SHA256Hex.isLowercaseSHA256(value)
   }
 
   private static func digest<T: Encodable>(_ value: T) -> String {
@@ -817,6 +816,6 @@ public actor RuntimeCapabilityStore {
 
 private enum SHA256Digest {
   static func hex(of data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 }

@@ -867,7 +867,7 @@ public enum HardwareEvidenceProjector {
 
   private static func effectSetDigest(_ effects: [String]) -> String {
     let bytes = Data(Array(Set(effects)).sorted().joined(separator: "\n").utf8)
-    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: bytes)
   }
 
   private static func validEvidenceID(_ value: String) -> Bool {

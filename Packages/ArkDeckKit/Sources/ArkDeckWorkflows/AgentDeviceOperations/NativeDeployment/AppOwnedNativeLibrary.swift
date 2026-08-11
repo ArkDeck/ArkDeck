@@ -1,3 +1,4 @@
+import ArkDeckCore
 import CryptoKit
 import Foundation
 
@@ -141,7 +142,7 @@ public enum NativeLibraryArtifactValidator {
     }
     let codeSign = try openHarmonyCodeSignFacts(
       in: data, required: requireOpenHarmonyCodeSignature)
-    let sha256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    let sha256 = SHA256Hex.string(of: data)
     return HDCNativeLibraryArtifactFacts(
       abi: abi,
       elfClassBits: elfClass == 2 ? 64 : 32,

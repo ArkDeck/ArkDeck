@@ -153,7 +153,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
       }
 
       let seed = Data("\(htaskID)|\(sourceProjectRef)|\(policy.baseRevision)".utf8)
-      let digest = SHA256.hash(data: seed).map { String(format: "%02x", $0) }.joined()
+      let digest = SHA256Hex.string(of: seed)
       let workspaceID = "evo-\(digest.prefix(24))"
       let projectRef = "evolution-\(digest.prefix(20))"
       let taskRoot = rootURL.appendingPathComponent(workspaceID, isDirectory: true)

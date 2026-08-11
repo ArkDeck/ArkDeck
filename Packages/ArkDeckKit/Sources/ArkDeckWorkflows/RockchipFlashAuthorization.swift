@@ -222,7 +222,6 @@ package enum RockchipManualFlashFallbackOutcome: Equatable, Sendable {
   case blockedTargetBindingUnconfirmed
   /// Pre-dispatch device identity readback is missing or does not match the authorized
   /// target (AC-FLASH-015-02, machine physical-target confirmation).
-  case blockedDeviceIdentityReadbackMismatch(fields: [String])
   case authorizedForHumanExecution(handoff: RockchipHumanHandoff)
 }
 

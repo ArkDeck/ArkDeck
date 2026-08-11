@@ -1,3 +1,4 @@
+import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
@@ -523,7 +524,7 @@ final class AnchoredManifestArtifactSnapshot {
       hasher.update(data: Data(buffer[0..<count]))
       offset += Int64(count)
     }
-    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(hasher.finalize())
     var final = stat()
     guard digest == record.sha256, fstat(fileDescriptor, &final) == 0,
       sameFileIdentityAndContent(current, final)
@@ -1012,7 +1013,7 @@ public final class SessionArtifactStore: @unchecked Sendable {
       }
       byteCount = writtenBytes
       prefix = capturedPrefix
-      digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+      digest = SHA256Hex.hexString(hasher.finalize())
     }
 
     try faultInjector.check(.artifactSourceValidation)
@@ -1519,7 +1520,7 @@ public final class SessionArtifactStore: @unchecked Sendable {
     }
     try validateStablePublicationSource(
       descriptor: descriptor, initialMetadata: initialMetadata, byteCount: UInt64(offset))
-    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(hasher.finalize())
     return (UInt64(offset), digest, prefix)
   }
 
@@ -1667,7 +1668,7 @@ public struct InputImageReferencer: Sendable {
       throw SessionStorageError.invalidArtifact(
         "input path no longer identifies the referenced file")
     }
-    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(hasher.finalize())
     return InputImageReference(
       path: url.path,
       size: byteCount,

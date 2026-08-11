@@ -283,9 +283,7 @@ enum HDCApplicationDiagnosticsSessionScope {
   /// `HDCApplicationDiagnosticsExecutionCatalog`.
   static func catalogIdentifier(for candidate: HDCCandidate) -> String {
     let canonicalPath = candidate.path.resolvingSymlinksInPath().standardizedFileURL.path
-    let pathDigest = SHA256.hash(data: Data(canonicalPath.utf8))
-      .map { String(format: "%02x", $0) }
-      .joined()
+    let pathDigest = SHA256Hex.string(of: Data(canonicalPath.utf8))
     return "app-hdc-\(candidate.sha256.prefix(24))-\(pathDigest.prefix(24))"
   }
 }

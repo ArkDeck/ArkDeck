@@ -2726,7 +2726,7 @@ public actor RuntimeJobEngine {
             // get published must be the bytes the dispatcher measured.
             let received = try Data(contentsOf: landed.localURL, options: [.uncached])
             guard received.count == landed.byteCount,
-              SHA256.hash(data: received).map({ String(format: "%02x", $0) }).joined()
+              SHA256Hex.string(of: received)
                 == landed.sha256
             else {
               throw RuntimeArtifactPublicationFailure(
@@ -4036,8 +4036,7 @@ public actor RuntimeJobEngine {
     originalStepID: String,
     recoveryAttemptID: String
   ) -> String {
-    let attemptDigest = SHA256.hash(data: Data(recoveryAttemptID.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let attemptDigest = SHA256Hex.string(of: Data(recoveryAttemptID.utf8))
     return
       "reconcile-\(originalStepID.prefix(72))-\(attemptDigest.prefix(32))"
   }
@@ -6130,10 +6129,7 @@ public actor RuntimeJobEngine {
   }
 
   private static func isLowercaseSHA256(_ value: String) -> Bool {
-    value.count == 64
-      && value.allSatisfy {
-        ("0"..."9").contains(String($0)) || ("a"..."f").contains(String($0))
-      }
+    SHA256Hex.isLowercaseSHA256(value)
   }
 
   /// Journal-grade WorkflowStep for the kinds the engine exercises in MU-2.

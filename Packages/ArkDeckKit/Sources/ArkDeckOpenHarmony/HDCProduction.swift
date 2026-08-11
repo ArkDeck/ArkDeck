@@ -1,3 +1,4 @@
+import ArkDeckCore
 import ArkDeckProcess
 import CryptoKit
 import Darwin
@@ -77,7 +78,7 @@ enum HDCRegisteredGoldenFingerprint {
     "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9"
 
   static func matches(_ data: Data, sha256: String) -> Bool {
-    matches(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(), sha256: sha256)
+    matches(SHA256Hex.string(of: data), sha256: sha256)
   }
 
   static func matches(_ actualSHA256: String, sha256: String) -> Bool {
@@ -274,14 +275,14 @@ public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
     case .uninstall:
       return !containsStderr
         && HDCRegisteredGoldenFingerprint.matches(
-          stdoutHasher.finalize().map { String(format: "%02x", $0) }.joined(),
+          SHA256Hex.hexString(stdoutHasher.finalize()),
           sha256: binding.expectedStdoutSHA256 ?? "")
         ? .success
         : .unknownOutput
     case .version:
       return !containsStderr
         && HDCRegisteredGoldenFingerprint.matches(
-          stdoutHasher.finalize().map { String(format: "%02x", $0) }.joined(),
+          SHA256Hex.hexString(stdoutHasher.finalize()),
           sha256: binding.expectedStdoutSHA256 ?? "")
         ? .success
         : .unknownOutput

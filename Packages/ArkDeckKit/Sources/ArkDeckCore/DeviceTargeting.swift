@@ -66,7 +66,7 @@ public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let bytes = try encoder.encode(attributes)
-    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: bytes)
   }
 
   /// Returns a lane key derived from the stable physical-device identity rather than the complete
@@ -82,7 +82,7 @@ public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let bytes = try encoder.encode(["serial": JSONValue.string(normalizedSerial)])
-    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: bytes)
   }
 
   private static func isCanonicalJSON(_ value: JSONValue) -> Bool {

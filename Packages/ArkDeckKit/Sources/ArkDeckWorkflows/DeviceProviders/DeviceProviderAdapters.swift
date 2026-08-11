@@ -42,8 +42,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
   /// `targetIdentityMismatch` from binding revision 2 onward (GJ-1 re-run,
   /// 2026-08-05).
   public static func stableIdentitySHA256(connectKey: String) -> String {
-    SHA256.hash(data: Data(connectKey.lowercased().utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: Data(connectKey.lowercased().utf8))
   }
 
   public let providerID = "hdc"
@@ -2005,8 +2004,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
       let identityMaterial = [
         request.bundle.bundleName, request.abilityName ?? "", request.processName,
       ].joined(separator: "|")
-      let applicationRef = SHA256.hash(data: Data(identityMaterial.utf8))
-        .map { String(format: "%02x", $0) }.joined()
+      let applicationRef = SHA256Hex.string(of: Data(identityMaterial.utf8))
       var summary: [String: String] = [
         "applicationRef": applicationRef,
         "abilityState": "UNKNOWN",
@@ -2952,8 +2950,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
       identity.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
       let connectKey = facts.executionConnectKey,
       !connectKey.isEmpty,
-      SHA256.hash(data: Data(connectKey.utf8))
-        .map({ String(format: "%02x", $0) }).joined() == identity,
+      SHA256Hex.string(of: Data(connectKey.utf8)) == identity,
       let topology = facts.serverFacts[
         TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
       !topology.isEmpty,
@@ -3099,8 +3096,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
     actionEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let encodedAction = try actionEncoder.encode(
       try PersistedTypedProviderAction(action))
-    let actionSHA256 = SHA256.hash(data: encodedAction)
-      .map { String(format: "%02x", $0) }.joined()
+    let actionSHA256 = SHA256Hex.string(of: encodedAction)
     return TypedProcessPlan(
       action: action,
       kind: .hostManaged(
@@ -3130,8 +3126,7 @@ public struct RockchipFlashProviderAdapter: DeviceProvider {
         TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
       !topology.isEmpty,
       topology.utf8.allSatisfy({ (48...57).contains($0) }),
-      SHA256.hash(data: Data(connectKey.utf8))
-        .map({ String(format: "%02x", $0) }).joined() == identity
+      SHA256Hex.string(of: Data(connectKey.utf8)) == identity
     else {
       throw DeviceProviderError.factsUnavailable(
         "post-flash HDC binding expectation is absent or malformed")

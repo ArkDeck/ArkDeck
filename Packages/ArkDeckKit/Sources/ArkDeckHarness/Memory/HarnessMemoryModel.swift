@@ -430,7 +430,7 @@ public struct HarnessMemoryEntry: Equatable, Sendable, Codable {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let bytes = (try? encoder.encode(self)) ?? Data("{}".utf8)
-    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: bytes)
   }
 
   public func promoting(
@@ -547,7 +547,7 @@ public struct HarnessMemoryQuery: Equatable, Sendable, Codable {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let bytes = (try? encoder.encode(self)) ?? Data("{}".utf8)
-    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: bytes)
   }
 
   private static func normalized(_ values: [String]) -> [String] {

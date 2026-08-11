@@ -847,7 +847,7 @@ struct ArkDeckCommandLine {
     else {
       throw CLIError(exitCode: 2, message: "artifact changed while being measured")
     }
-    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(hasher.finalize())
     return (measured, digest)
   }
 

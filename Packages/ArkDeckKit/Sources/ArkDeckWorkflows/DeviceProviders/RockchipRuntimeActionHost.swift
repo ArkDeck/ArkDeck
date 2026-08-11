@@ -5,6 +5,7 @@
 // it executes only the already-materialized closed action, binds every child
 // to a reviewed executable identity, and writes a job/step-correlated receipt.
 
+import ArkDeckCore
 import ArkDeckOpenHarmony
 import ArkDeckProcess
 import CryptoKit
@@ -268,8 +269,7 @@ struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
     let identity = try probe.singleLoader(
       stableIdentitySHA256: stableIdentitySHA256)
     return RockchipRuntimeLoaderIdentity(
-      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
-        .map { String(format: "%02x", $0) }.joined(),
+      serialDigestSHA256: SHA256Hex.string(of: Data(identity.serial.utf8)),
       topology: identity.topology)
   }
 
@@ -279,8 +279,7 @@ struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
     let identity = try probe.singleConnected(
       stableIdentitySHA256: stableIdentitySHA256)
     return RockchipRuntimeLoaderIdentity(
-      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
-        .map { String(format: "%02x", $0) }.joined(),
+      serialDigestSHA256: SHA256Hex.string(of: Data(identity.serial.utf8)),
       topology: identity.topology)
   }
 
@@ -290,8 +289,7 @@ struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
     let identity = try probe.singleConnected(selector: usbTopology)
     return RockchipRuntimeHDCIdentity(
       connectKey: identity.serial,
-      serialDigestSHA256: SHA256.hash(data: Data(identity.serial.utf8))
-        .map { String(format: "%02x", $0) }.joined(),
+      serialDigestSHA256: SHA256Hex.string(of: Data(identity.serial.utf8)),
       topology: identity.topology)
   }
 }
@@ -558,8 +556,7 @@ struct FoundationRockchipRuntimePartitionReadback:
       consumedSectors += sectors
       chunkIndex += 1
     }
-    let observed = hasher.finalize()
-      .map { String(format: "%02x", $0) }.joined()
+    let observed = SHA256Hex.hexString(hasher.finalize())
     guard observed == member.sha256 else {
       // The bytes are gone by now — each chunk is removed as soon as it is
       // hashed — so everything the next person needs has to be in this line.
@@ -1425,8 +1422,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     timeoutSeconds: Int,
     commandTimeoutSeconds: Int
   ) async throws -> (RockchipRuntimeHDCIdentity, [ProviderSubprocessReceipt]) {
-    let previousDigest = SHA256.hash(data: Data(expectation.previousConnectKey.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let previousDigest = SHA256Hex.string(of: Data(expectation.previousConnectKey.utf8))
     guard previousDigest == expectation.previousIdentitySHA256,
       !expectation.usbTopology.isEmpty,
       expectation.usbTopology.utf8.allSatisfy({ (48...57).contains($0) })
@@ -1455,8 +1451,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         if let identity = try? usbProbe.singleHDCNormal(
           usbTopology: expectation.usbTopology)
         {
-          let observedDigest = SHA256.hash(data: Data(identity.connectKey.utf8))
-            .map { String(format: "%02x", $0) }.joined()
+          let observedDigest = SHA256Hex.string(of: Data(identity.connectKey.utf8))
           guard identity.topology == expectation.usbTopology,
             identity.serialDigestSHA256 == observedDigest
           else {
@@ -1541,8 +1536,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private func exactHDCNormalIdentity(
     connectKey: String
   ) throws -> RockchipRuntimeLoaderIdentity {
-    let identity = SHA256.hash(data: Data(connectKey.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let identity = SHA256Hex.string(of: Data(connectKey.utf8))
     return try usbProbe.singleHDCNormal(stableIdentitySHA256: identity)
   }
 
@@ -2308,7 +2302,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
   }
 
   private static func sha256(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 }
 
@@ -2393,8 +2387,7 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let encoded = try encoder.encode(try PersistedTypedProviderAction(action))
-    let digest = SHA256.hash(data: encoded)
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: encoded)
     guard digest == descriptor.actionSHA256 else {
       throw RuntimeDispatchFailure.failed(
         "host-managed typed action digest drifted after materialization")

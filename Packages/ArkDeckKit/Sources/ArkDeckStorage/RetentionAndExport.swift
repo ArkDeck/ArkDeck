@@ -55,8 +55,7 @@ public struct SessionExportPlanner: Sendable {
   }
 
   private static func opaqueExcludedPath(_ relativePath: String) -> String {
-    let digest = SHA256.hash(data: Data(relativePath.utf8))
-      .map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: Data(relativePath.utf8))
     return "excluded-device-data/\(digest.prefix(24))"
   }
 }
@@ -390,7 +389,7 @@ private final class AnchoredExportStaging {
     guard fstat(descriptor, &metadata) == 0, metadata.st_size >= 0,
       UInt64(metadata.st_size) == size
     else { throw SessionStorageError.invalidRecord("exported file changed while hashing") }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   private func removeContents(of directory: Int32, displayPath: String) throws {
@@ -1221,7 +1220,7 @@ public struct SessionDiagnosticExporter: Sendable {
       throw SessionStorageError.writeFailed(path: target.path, errno: errno)
     }
     outputIsOpen = false
-    let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.hexString(hasher.finalize())
     return (byteCount, digest)
   }
 

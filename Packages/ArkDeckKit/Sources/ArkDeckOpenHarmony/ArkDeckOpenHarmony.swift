@@ -128,7 +128,7 @@ public enum HDCCandidateIdentityVerifier {
     while let bytes = try handle.read(upToCount: 64 * 1024), !bytes.isEmpty {
       hasher.update(data: bytes)
     }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   public static func matches(_ candidate: HDCCandidate) -> Bool {
@@ -884,7 +884,7 @@ public struct HDCServerImpactSnapshot: Sendable, Equatable {
     guard let canonical = try? encoder.encode(HDCServerImpactCanonicalScope(self)) else {
       preconditionFailure("The fixed HDC impact scope schema must be JSON encodable")
     }
-    return SHA256.hash(data: canonical).map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.string(of: canonical)
   }
 }
 

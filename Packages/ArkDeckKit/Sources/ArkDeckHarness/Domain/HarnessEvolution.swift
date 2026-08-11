@@ -445,7 +445,7 @@ public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
       }
     }
     let seed = Data("\(htaskID)|\(attemptID)|\(proposal.patchSHA256)".utf8)
-    let digest = SHA256.hash(data: seed).map { String(format: "%02x", $0) }.joined()
+    let digest = SHA256Hex.string(of: seed)
     return HarnessCandidatePatch(
       candidatePatchID: "candidate-\(digest.prefix(24))",
       htaskID: htaskID,
@@ -470,8 +470,7 @@ public struct HarnessCandidatePatch: Equatable, Codable, Sendable {
 
   /// True exactly when `text` is the immutable diff this metadata names.
   public func namesDiff(_ text: String) -> Bool {
-    SHA256.hash(data: Data(text.utf8))
-      .map { String(format: "%02x", $0) }.joined() == diffDigest
+    SHA256Hex.string(of: Data(text.utf8)) == diffDigest
   }
 }
 

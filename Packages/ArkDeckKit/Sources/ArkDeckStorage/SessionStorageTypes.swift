@@ -187,7 +187,7 @@ enum SessionStorageValidation {
   }
 
   static func lowercaseSHA256(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 
   static func canonicalData(_ value: JSONValue) throws -> Data {

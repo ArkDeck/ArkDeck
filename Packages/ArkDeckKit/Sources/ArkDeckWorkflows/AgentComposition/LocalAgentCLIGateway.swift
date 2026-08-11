@@ -432,8 +432,7 @@ public struct LocalAgentCLIDecisionGateway: HarnessDecisionGateway {
     }
     self.profile = profile
     self.executablePath = executable
-    self.executableSHA256 = SHA256.hash(data: bytes)
-      .map { String(format: "%02x", $0) }.joined()
+    self.executableSHA256 = SHA256Hex.string(of: bytes)
     self.modelName = modelName
     self.workingDirectory = workdir
     self.timeoutSeconds = timeoutSeconds

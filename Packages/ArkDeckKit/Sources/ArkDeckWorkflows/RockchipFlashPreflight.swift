@@ -397,8 +397,7 @@ extension RockchipFlashPreflightProbes {
         let binding = try RockchipProductBindingStore(
           rootURL: try applicationSupportArkDeckRoot()
         ).loadExisting()
-        return SHA256.hash(data: Data(binding.serial.utf8))
-          .map { String(format: "%02x", $0) }.joined()
+        return SHA256Hex.string(of: Data(binding.serial.utf8))
       },
       boundTargetHDCNormalAlias: {
         try RockchipProductBindingStore(

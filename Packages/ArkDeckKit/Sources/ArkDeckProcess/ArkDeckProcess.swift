@@ -1199,7 +1199,7 @@ package final class VerifiedExecutableDescriptor {
       hasher.update(data: Data(buffer.prefix(count)))
       offset += off_t(count)
     }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 }
 

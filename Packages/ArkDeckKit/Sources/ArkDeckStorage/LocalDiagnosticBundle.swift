@@ -714,11 +714,11 @@ private final class AnchoredDiagnosticBundleStaging {
       hasher.update(data: Data(buffer[0..<count]))
       offset += UInt64(count)
     }
-    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   private static func sha256(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 
   private static func fullSync(_ descriptor: Int32, path: String) throws {
@@ -1042,7 +1042,7 @@ public struct LocalDiagnosticBundleExporter: Sendable {
   }
 
   private static func sha256(_ data: Data) -> String {
-    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    SHA256Hex.string(of: data)
   }
 
   private static func timestamp() -> String {
