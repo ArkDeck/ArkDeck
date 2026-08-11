@@ -63,10 +63,10 @@ struct JournalSchemaCapabilities: Sendable {
 
 public struct JournalEvent: Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
-  public static let authorizedAgentSchemaVersion = "2.0.0"
-  public static let rockchipAuthorizedAgentSchemaVersion = "2.1.0"
-  public static let agentAuthoritySchemaVersion = "2.2.0"
-  public static let completeOverwriteRecoverySchemaVersion = "3.0.0"
+  package static let authorizedAgentSchemaVersion = "2.0.0"
+  package static let rockchipAuthorizedAgentSchemaVersion = "2.1.0"
+  package static let agentAuthoritySchemaVersion = "2.2.0"
+  package static let completeOverwriteRecoverySchemaVersion = "3.0.0"
 
   /// Every accepted schema generation declares its security semantics here. Adding a version
   /// therefore requires an explicit decision about authorization correlation instead of falling
@@ -110,13 +110,13 @@ public struct JournalEvent: Equatable, Sendable {
   }
 
   public let schemaVersion: String
-  public let eventID: String
+  package let eventID: String
   public let sequence: Int
   public let sessionID: String
   public let jobID: String
   public let timestamp: String
-  public let accumulatedElapsedDurationNanoseconds: Int?
-  public let accumulatedActiveDurationNanoseconds: Int?
+  package let accumulatedElapsedDurationNanoseconds: Int?
+  package let accumulatedActiveDurationNanoseconds: Int?
   public let kind: JournalEventKind
   public let stepID: String?
   public let attempt: Int?
@@ -160,7 +160,7 @@ public struct JournalEvent: Equatable, Sendable {
     try JournalEventSemanticValidator.validate(self)
   }
 
-  public var correlatedIntentEventID: String? {
+  package var correlatedIntentEventID: String? {
     switch kind {
     case .stepOutcome, .compensationOutcome:
       return payload.string("correlatesToIntentEventId")
@@ -169,19 +169,19 @@ public struct JournalEvent: Equatable, Sendable {
     }
   }
 
-  public var workflowStep: WorkflowStep? {
+  package var workflowStep: WorkflowStep? {
     guard kind == .stepIntent, let value = payload["step"] else { return nil }
     return try? JournalCanonicalJSON.decodeWorkflowStep(value)
   }
 
-  public var stepEffect: WorkflowEffect? { workflowStep?.effect }
+  package var stepEffect: WorkflowEffect? { workflowStep?.effect }
 
-  public var compensationEffect: WorkflowEffect? {
+  package var compensationEffect: WorkflowEffect? {
     guard kind == .compensationIntent, let value = payload["descriptor"] else { return nil }
     return try? JournalCanonicalJSON.decodeCompensation(value).effect
   }
 
-  public var externalEffect: WorkflowEffect? {
+  package var externalEffect: WorkflowEffect? {
     switch kind {
     case .stepIntent:
       stepEffect
@@ -192,7 +192,7 @@ public struct JournalEvent: Equatable, Sendable {
     }
   }
 
-  public var authorizationReference: AuthorizationReference? {
+  package var authorizationReference: AuthorizationReference? {
     if let reference = agentExecutionAuthorityReference {
       return reference.legacyStandingAuthorizationReference
     }
@@ -200,7 +200,7 @@ public struct JournalEvent: Equatable, Sendable {
     return try? AuthorizationReference(jsonValue: value, context: "journal.authorizationRef")
   }
 
-  public var agentExecutionAuthorityReference: AgentExecutionAuthorityReference? {
+  package var agentExecutionAuthorityReference: AgentExecutionAuthorityReference? {
     guard Self.usesAgentAuthorityUnion(schemaVersion),
       let value = payload["authorizationRef"]
     else { return nil }
@@ -208,9 +208,9 @@ public struct JournalEvent: Equatable, Sendable {
       jsonValue: value, context: "journal.authorizationRef")
   }
 
-  public var usageReservationID: String? { payload.string("usageReservationId") }
+  package var usageReservationID: String? { payload.string("usageReservationId") }
 
-  public var stateTransition: JobStateTransition? {
+  package var stateTransition: JobStateTransition? {
     guard kind == .stateTransition,
       let fromRaw = payload.string("from"), let from = JobState(rawValue: fromRaw),
       let toRaw = payload.string("to"), let to = JobState(rawValue: toRaw)
@@ -218,7 +218,7 @@ public struct JournalEvent: Equatable, Sendable {
     return JobStateTransition(from: from, to: to)
   }
 
-  public static func jobCreated(
+  package static func jobCreated(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -248,7 +248,7 @@ public struct JournalEvent: Equatable, Sendable {
       timestamp: timestamp, kind: .jobCreated, payload: payload)
   }
 
-  public static func stateTransition(
+  package static func stateTransition(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -270,7 +270,7 @@ public struct JournalEvent: Equatable, Sendable {
       timestamp: timestamp, kind: .stateTransition, payload: payload)
   }
 
-  public static func stepIntent(
+  package static func stepIntent(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -302,7 +302,7 @@ public struct JournalEvent: Equatable, Sendable {
       payload: payload)
   }
 
-  public static func stepOutcome(
+  package static func stepOutcome(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -338,7 +338,7 @@ public struct JournalEvent: Equatable, Sendable {
       payload: payload)
   }
 
-  public static func compensationIntent(
+  package static func compensationIntent(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -371,7 +371,7 @@ public struct JournalEvent: Equatable, Sendable {
       payload: payload)
   }
 
-  public static func compensationOutcome(
+  package static func compensationOutcome(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -441,7 +441,7 @@ public struct JournalEvent: Equatable, Sendable {
     }
   }
 
-  public static func reconcileStarted(
+  package static func reconcileStarted(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -465,7 +465,7 @@ public struct JournalEvent: Equatable, Sendable {
       ])
   }
 
-  public static func reconcileOutcome(
+  package static func reconcileOutcome(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -494,7 +494,7 @@ public struct JournalEvent: Equatable, Sendable {
       ])
   }
 
-  public static func abandonIntent(
+  package static func abandonIntent(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -518,7 +518,7 @@ public struct JournalEvent: Equatable, Sendable {
       ])
   }
 
-  public static func abandonOutcome(
+  package static func abandonOutcome(
     eventID: String,
     sequence: Int,
     sessionID: String,
@@ -541,11 +541,11 @@ public struct JournalEvent: Equatable, Sendable {
   }
 }
 
-public struct JournalTarget: Equatable, Sendable {
+package struct JournalTarget: Equatable, Sendable {
   public let scope: String
   public let targetID: String
   public let connectKey: String?
-  public let identitySnapshotHash: String?
+  package let identitySnapshotHash: String?
 
   public init(
     scope: String,
@@ -569,7 +569,7 @@ public struct JournalTarget: Equatable, Sendable {
   }
 }
 
-public enum JournalCanonicalJSON {
+package enum JournalCanonicalJSON {
   public static func encode(_ event: JournalEvent) throws -> Data {
     try encoder.encode(JSONValue.object(event.jsonObject))
   }
@@ -597,7 +597,7 @@ public enum JournalCanonicalJSON {
   }
 }
 
-public enum JournalEventCodec {
+package enum JournalEventCodec {
   public static func encode(_ event: JournalEvent) throws -> Data {
     try JournalCanonicalJSON.encode(event)
   }

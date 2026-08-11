@@ -170,14 +170,14 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   case runDeterministicAnalyzer
 }
 
-public struct WorkflowStepMetadata: Equatable, Sendable {
+package struct WorkflowStepMetadata: Equatable, Sendable {
   public let minimumEffect: WorkflowEffect
-  public let minimumCancellation: WorkflowCancellationPolicy
-  public let minimumBindingRequirement: WorkflowBindingRequirement
-  public let bindingIsExact: Bool
-  public let profileExposable: Bool
-  public let requiredArgumentKeys: Set<String>
-  public let allowedArgumentKeys: Set<String>
+  package let minimumCancellation: WorkflowCancellationPolicy
+  package let minimumBindingRequirement: WorkflowBindingRequirement
+  package let bindingIsExact: Bool
+  package let profileExposable: Bool
+  package let requiredArgumentKeys: Set<String>
+  package let allowedArgumentKeys: Set<String>
 
   fileprivate init(
     minimumEffect: WorkflowEffect,
@@ -198,13 +198,13 @@ public struct WorkflowStepMetadata: Equatable, Sendable {
   }
 }
 
-public enum WorkflowStepResolution: Equatable, Sendable {
+package enum WorkflowStepResolution: Equatable, Sendable {
   case supported(kind: WorkflowStepKind, metadata: WorkflowStepMetadata)
   case unsupported(rawKind: String, assumedEffect: WorkflowEffect)
 }
 
-public enum WorkflowStepRegistry {
-  public static let schemaIdentifier = "https://arkdeck.dev/schemas/workflow-step-1.0.0.json"
+package enum WorkflowStepRegistry {
+  package static let schemaIdentifier = "https://arkdeck.dev/schemas/workflow-step-1.0.0.json"
 
   public static func resolve(rawKind: String) -> WorkflowStepResolution {
     guard let kind = WorkflowStepKind(rawValue: rawKind) else {
@@ -604,12 +604,12 @@ public struct WorkflowStep: Equatable, Sendable, Codable {
   }
 }
 
-public enum WorkflowStepDecoder {
-  public static func decodeCoreOrProviderStep(_ data: Data) throws -> WorkflowStep {
+package enum WorkflowStepDecoder {
+  package static func decodeCoreOrProviderStep(_ data: Data) throws -> WorkflowStep {
     try decode(data, enforceProfileExposure: false)
   }
 
-  public static func decodeProfileStep(_ data: Data) throws -> WorkflowStep {
+  package static func decodeProfileStep(_ data: Data) throws -> WorkflowStep {
     try decode(data, enforceProfileExposure: true)
   }
 

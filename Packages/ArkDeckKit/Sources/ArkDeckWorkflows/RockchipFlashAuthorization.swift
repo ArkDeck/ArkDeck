@@ -364,7 +364,7 @@ package struct RockchipManualFlashFallbackGate: Sendable {
 
 /// Package-only safety primitive. The Runtime owns production cancellation coordination; this
 /// state machine remains a contract fixture until a product composition root consumes it.
-package enum RockchipCriticalWriteBoundaryError: Error, Equatable, Sendable {
+public enum RockchipCriticalWriteBoundaryError: Error, Equatable, Sendable {
   case criticalSectionAlreadyActive(String)
   case noActiveCriticalSection
   case mismatchedCriticalSection(expected: String, actual: String)

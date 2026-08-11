@@ -179,8 +179,8 @@ public enum ResumeMarkerSemanticValidationError: Error, Equatable, Sendable {
   case destinationMismatch(expected: JobState, actual: JobState)
 }
 
-public enum ResumeMarkerSemanticValidator {
-  public static func requiredDestination(
+package enum ResumeMarkerSemanticValidator {
+  package static func requiredDestination(
     for evidence: ResumeMarkerDecisionEvidence,
     mode: JobExecutionMode
   ) -> JobState {
@@ -747,15 +747,15 @@ public struct JobStateMachine: Sendable {
   }
 }
 
-public enum CompensationTerminalPath: String, CaseIterable, Codable, Sendable {
+package enum CompensationTerminalPath: String, CaseIterable, Codable, Sendable {
   case success
   case failure
   case cancel
 }
 
-public struct CompletedStepCompensations: Equatable, Sendable {
-  public let sourceStepId: String
-  public let descriptors: [CompensationDescriptor]
+package struct CompletedStepCompensations: Equatable, Sendable {
+  package let sourceStepId: String
+  package let descriptors: [CompensationDescriptor]
 
   public init(sourceStepId: String, descriptors: [CompensationDescriptor]) {
     self.sourceStepId = sourceStepId
@@ -763,8 +763,8 @@ public struct CompletedStepCompensations: Equatable, Sendable {
   }
 }
 
-public struct PlannedCompensation: Equatable, Sendable {
-  public let sourceStepId: String
+package struct PlannedCompensation: Equatable, Sendable {
+  package let sourceStepId: String
   public let descriptor: CompensationDescriptor
 
   public init(sourceStepId: String, descriptor: CompensationDescriptor) {
@@ -773,7 +773,7 @@ public struct PlannedCompensation: Equatable, Sendable {
   }
 }
 
-public enum CompensationPlanner {
+package enum CompensationPlanner {
   public static func plan(
     completedStepsInExecutionOrder: [CompletedStepCompensations],
     terminalPath: CompensationTerminalPath
@@ -802,13 +802,13 @@ public enum CompensationPlanner {
   }
 }
 
-public enum CompensationOutcome: Equatable, Sendable {
+package enum CompensationOutcome: Equatable, Sendable {
   case succeeded
   case failed(WorkflowFailure)
 }
 
-public struct CompensationExecutionRecord: Equatable, Sendable {
-  public let plannedCompensation: PlannedCompensation
+package struct CompensationExecutionRecord: Equatable, Sendable {
+  package let plannedCompensation: PlannedCompensation
   public let outcome: CompensationOutcome
 
   public init(plannedCompensation: PlannedCompensation, outcome: CompensationOutcome) {
@@ -817,9 +817,9 @@ public struct CompensationExecutionRecord: Equatable, Sendable {
   }
 }
 
-public struct JobFinalizationReport: Equatable, Sendable {
-  public let originalFailure: WorkflowFailure?
-  public let compensationRecords: [CompensationExecutionRecord]
+package struct JobFinalizationReport: Equatable, Sendable {
+  package let originalFailure: WorkflowFailure?
+  package let compensationRecords: [CompensationExecutionRecord]
 
   public init(
     originalFailure: WorkflowFailure?,
@@ -829,7 +829,7 @@ public struct JobFinalizationReport: Equatable, Sendable {
     self.compensationRecords = compensationRecords
   }
 
-  public var compensationFailures: [WorkflowFailure] {
+  package var compensationFailures: [WorkflowFailure] {
     compensationRecords.compactMap { record in
       guard case .failed(let failure) = record.outcome else { return nil }
       return failure

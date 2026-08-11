@@ -6,7 +6,7 @@ import Foundation
 /// App-facing aliases keep OpenHarmony implementation types behind the
 /// Workflows product boundary. The App links and imports Workflows only.
 public typealias HDCDiagnosticsPresentation = ArkDeckOpenHarmony.HDCDiagnosticsPresentation
-public typealias HDCDeviceObservationPresentationKind =
+package typealias HDCDeviceObservationPresentationKind =
   ArkDeckOpenHarmony.HDCDeviceObservationPresentationKind
 public typealias HDCDeviceObservationPresentationEvent =
   ArkDeckOpenHarmony.HDCDeviceObservationPresentationEvent
@@ -42,7 +42,7 @@ public enum HDCApplicationDiagnosticsFacade {
   /// virtual wait. The App still receives the process-isolated implementation
   /// above, while tests avoid turning a state assertion into a ten-second
   /// wall-clock assertion.
-  package static func makeFixtureForTesting(
+  public static func makeFixtureForTesting(
     arguments: [String],
     delayedRefreshWait: @escaping @Sendable () async -> Void
   ) -> any HDCApplicationDiagnosticsProviding {

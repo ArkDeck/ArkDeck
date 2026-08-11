@@ -45,37 +45,37 @@ public enum RuntimeCapabilityUseOutcome: String, Equatable, Sendable, Codable {
   case outcomeUnknown
 }
 
-public struct RuntimeCapabilityOutcomeRecord: Equatable, Sendable, Codable {
+package struct RuntimeCapabilityOutcomeRecord: Equatable, Sendable, Codable {
   public let jobID: String
   public let outcome: RuntimeCapabilityUseOutcome
   public let terminalState: String
   public let recordedAtUTC: String
-  public let previousRecordSHA256: String
-  public let recordSHA256: String
+  package let previousRecordSHA256: String
+  package let recordSHA256: String
 }
 
 public struct RuntimeCapabilityLineageEntry: Equatable, Sendable, Codable {
   public let ordinal: Int
   public let reservationID: String
   public let jobID: String
-  public let consumedAtUTC: String
+  package let consumedAtUTC: String
   public let operationReference: String
   public let effect: String
   public let targetStableIdentitySHA256: String?
   public let bindingRevision: Int?
   public let materializedPlanDigest: String?
-  public let authorizationScopeFingerprintSHA256: String?
-  public let queryFingerprintSHA256: String
-  public let remainingUsesAfter: Int
-  public let previousLineageSHA256: String?
-  public let receiptSHA256: String
-  public let outcomeHistory: [RuntimeCapabilityOutcomeRecord]
+  package let authorizationScopeFingerprintSHA256: String?
+  package let queryFingerprintSHA256: String
+  package let remainingUsesAfter: Int
+  package let previousLineageSHA256: String?
+  package let receiptSHA256: String
+  package let outcomeHistory: [RuntimeCapabilityOutcomeRecord]
 
   public var outcome: RuntimeCapabilityUseOutcome {
     outcomeHistory.last?.outcome ?? .pending
   }
 
-  public var lineageTipSHA256: String {
+  package var lineageTipSHA256: String {
     outcomeHistory.last?.recordSHA256 ?? receiptSHA256
   }
 }

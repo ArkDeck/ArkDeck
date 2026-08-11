@@ -4,28 +4,28 @@ import Foundation
 
 /// The complete integration-profile binding adopted by TASK-TR-003. These values may change
 /// only with a reviewed trace integration change and matching golden-resource closure.
-public enum TraceProbeAdapterProfile {
-  public static let integrationProfile = "OPENHARMONY-TOOLS@0.4.0"
-  public static let registryID = "OPENHARMONY-TRACE-PROBES"
-  public static let registryVersion = "1.0.0"
-  public static let registrySHA256 =
+package enum TraceProbeAdapterProfile {
+  package static let integrationProfile = "OPENHARMONY-TOOLS@0.4.0"
+  package static let registryID = "OPENHARMONY-TRACE-PROBES"
+  package static let registryVersion = "1.0.0"
+  package static let registrySHA256 =
     "5825db47f97dea3bddaede95b7c6401fa898bf9dd2c6c5c783628d9a89ffcde3"
-  public static let resourceManifestSHA256 =
+  package static let resourceManifestSHA256 =
     "6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879"
 
-  public static let hitraceHelpResourceSHA256 =
+  package static let hitraceHelpResourceSHA256 =
     "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39"
-  public static let bytraceHelpResourceSHA256 =
+  package static let bytraceHelpResourceSHA256 =
     "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd"
-  public static let hitraceTagListResourceSHA256 =
+  package static let hitraceTagListResourceSHA256 =
     "ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96"
-  public static let bytraceTagListResourceSHA256 =
+  package static let bytraceTagListResourceSHA256 =
     "c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810"
-  public static let rawFtraceHeaderResourceSHA256 =
+  package static let rawFtraceHeaderResourceSHA256 =
     "4b6433a1845d533dd466aeb3db965e273f4d4db582c94fe67cf1cb6e1a625ae0"
 
-  public static let hitraceHelpFamily = "hitrace.dayu200-oh7.text"
-  public static let bytraceHelpFamily = "bytrace.dayu200-oh7.text"
+  package static let hitraceHelpFamily = "hitrace.dayu200-oh7.text"
+  package static let bytraceHelpFamily = "bytrace.dayu200-oh7.text"
 
   static let helpResourceByteCount = 3_382
   static let tagListResourceByteCount = 3_604
@@ -43,22 +43,22 @@ public enum TraceProbeAdapterProfile {
     "d8475c07177f87f8640ef3a52382e0ccaed42115c6a1592ef42c99fffb18204a"
 }
 
-public enum TraceProbeTool: String, Equatable, Sendable {
+package enum TraceProbeTool: String, Equatable, Sendable {
   case hitrace
   case bytrace
 }
 
-public enum TraceProbeAdapterSelection: Equatable, Sendable {
+package enum TraceProbeAdapterSelection: Equatable, Sendable {
   case captureEligible(tool: TraceProbeTool, family: String)
   case probeOnlyNotCaptureEligible(tool: TraceProbeTool, family: String)
   case unsupported
 }
 
 /// Raw help is retained for diagnostics even when its family is unknown or drifted.
-public struct TraceProbeHelpEvaluation: Equatable, Sendable {
+package struct TraceProbeHelpEvaluation: Equatable, Sendable {
   public let selection: TraceProbeAdapterSelection
   public let rawHelp: Data
-  public let rawStderr: Data
+  package let rawStderr: Data
   public let rawHelpSHA256: String
 
   fileprivate init(
@@ -73,12 +73,12 @@ public struct TraceProbeHelpEvaluation: Equatable, Sendable {
   }
 }
 
-public struct TraceProbeTagEvaluation: Equatable, Sendable {
+package struct TraceProbeTagEvaluation: Equatable, Sendable {
   public let selection: TraceProbeAdapterSelection
   public let tags: [String]
-  public let rawTagList: Data
-  public let rawStderr: Data
-  public let rawTagListSHA256: String
+  package let rawTagList: Data
+  package let rawStderr: Data
+  package let rawTagListSHA256: String
 
   fileprivate init(
     selection: TraceProbeAdapterSelection,
@@ -94,10 +94,10 @@ public struct TraceProbeTagEvaluation: Equatable, Sendable {
   }
 }
 
-public enum TraceProbeAdapter {
+package enum TraceProbeAdapter {
   /// Evaluates only a registered byte family. Tool name, firmware, process exit status, and
   /// marker fragments are intentionally insufficient to create selection authority.
-  public static func evaluateHelp(
+  package static func evaluateHelp(
     tool: TraceProbeTool,
     stdout: Data,
     stderr: Data = Data()
@@ -139,7 +139,7 @@ public enum TraceProbeAdapter {
   /// Classifies and parses only the exact registered tag-list byte family.
   /// A partial marker match, an exit status, or a familiar tool name yields
   /// no tags and therefore no capture authority.
-  public static func evaluateTagList(
+  package static func evaluateTagList(
     tool: TraceProbeTool,
     stdout: Data,
     stderr: Data = Data()
@@ -221,7 +221,7 @@ public enum TraceProbeAdapter {
   }
 }
 
-public struct TraceRawArtifactSnapshot: Equatable, Sendable {
+package struct TraceRawArtifactSnapshot: Equatable, Sendable {
   public let bytes: Data
   public let sha256: String
 
@@ -231,19 +231,19 @@ public struct TraceRawArtifactSnapshot: Equatable, Sendable {
   }
 }
 
-public struct TraceFtraceFilterOptions: Equatable, Sendable {
-  public let removeCreateFileAssetLines: Bool
+package struct TraceFtraceFilterOptions: Equatable, Sendable {
+  package let removeCreateFileAssetLines: Bool
 
   public init(removeCreateFileAssetLines: Bool = false) {
     self.removeCreateFileAssetLines = removeCreateFileAssetLines
   }
 }
 
-public struct TraceDerivedFtraceArtifact: Equatable, Sendable {
+package struct TraceDerivedFtraceArtifact: Equatable, Sendable {
   public let bytes: Data
   public let sha256: String
-  public let removedLineCount: Int
-  public let removedByteCount: Int
+  package let removedLineCount: Int
+  package let removedByteCount: Int
 
   fileprivate init(bytes: Data, removedLineCount: Int, removedByteCount: Int) {
     self.bytes = bytes
@@ -253,12 +253,12 @@ public struct TraceDerivedFtraceArtifact: Equatable, Sendable {
   }
 }
 
-public enum TraceFtraceFilterDisposition: Equatable, Sendable {
+package enum TraceFtraceFilterDisposition: Equatable, Sendable {
   case derived(TraceDerivedFtraceArtifact)
   case unsupportedHeader
 }
 
-public struct TraceFtraceFilterEvaluation: Equatable, Sendable {
+package struct TraceFtraceFilterEvaluation: Equatable, Sendable {
   public let raw: TraceRawArtifactSnapshot
   public let disposition: TraceFtraceFilterDisposition
 
@@ -268,7 +268,7 @@ public struct TraceFtraceFilterEvaluation: Equatable, Sendable {
   }
 }
 
-public enum TraceFtracePostprocessor {
+package enum TraceFtracePostprocessor {
   private static let createFileAssetToken = Data("CreateFileAsset".utf8)
 
   /// Creates derived bytes only for the registered ftrace header. Header bytes are copied as one

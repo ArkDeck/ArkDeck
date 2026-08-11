@@ -67,24 +67,24 @@ public struct HarnessModelRun: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let schemaVersion: String
-  public let modelRunID: String
-  public let htaskID: String
+  package let modelRunID: String
+  package let htaskID: String
   public let round: Int
   public let descriptor: HarnessModelDescriptor
   /// The state version the context was assembled at, so a run can be joined
   /// to the decision it produced and to the facts both stood on.
-  public let observedStateVersion: Int
+  package let observedStateVersion: Int
   /// Digest of the exact bytes handed to the adapter, computed after
   /// redaction and trimming - so it represents what the model received,
   /// not what the harness knew.
-  public let contextDigest: String
-  public let contextBytes: Int
-  public let responseBytes: Int
+  package let contextDigest: String
+  package let contextBytes: Int
+  package let responseBytes: Int
   /// A bounded copy of a *refused* response. Only refusals carry it, and only
   /// so the next reader can see what was actually returned: a bare
   /// `malformedJson` with a byte count leaves a maintainer inferring the shape
   /// of a response nobody kept.
-  public let rejectedResponseExcerpt: String?
+  package let rejectedResponseExcerpt: String?
   public let outcome: HarnessModelRunOutcome
   public let startedAtUTC: String
   public let finishedAtUTC: String

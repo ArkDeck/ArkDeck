@@ -6,13 +6,13 @@ import Foundation
 /// its generated PKCS#12 material. This is used only by the interactive
 /// `arkdeck signing install` boundary: the decoded value is placed in the
 /// login Keychain, and Runtime Jobs never depend on mutable DevEco material.
-public enum OpenHarmonyDevEcoPasswordDecoder {
+package enum OpenHarmonyDevEcoPasswordDecoder {
   private static let component = Data([
     49, 243, 9, 115, 214, 175, 91, 184,
     211, 190, 177, 88, 101, 131, 192, 119,
   ])
 
-  public static func decodeIfNeeded(
+  package static func decodeIfNeeded(
     _ candidate: Data, keystore: URL,
     fileManager: FileManager = .default
   ) throws -> Data {

@@ -36,10 +36,10 @@ public enum RockchipArchiveIntrospectionFailure: Error, Equatable, Sendable {
 }
 
 /// One partition as the archive's own table declares it.
-public struct RockchipDeclaredPartition: Equatable, Sendable {
+package struct RockchipDeclaredPartition: Equatable, Sendable {
   public let name: String
-  public let sizeSectors: Int64
-  public let offsetSectors: Int64
+  package let sizeSectors: Int64
+  package let offsetSectors: Int64
 
   public init(name: String, sizeSectors: Int64, offsetSectors: Int64) {
     self.name = name
@@ -50,11 +50,11 @@ public struct RockchipDeclaredPartition: Equatable, Sendable {
 
 /// Everything the archive states about the build it carries. Derived at import
 /// and recorded on the Artifact lease; never carried by a device profile.
-public struct RockchipImageBuildDescriptor: Equatable, Sendable {
+package struct RockchipImageBuildDescriptor: Equatable, Sendable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [RockchipImagesArchiveMember]
-  public let declaredPartitions: [RockchipDeclaredPartition]
+  package let declaredPartitions: [RockchipDeclaredPartition]
   /// The value the flashed device will report for `const.ohos.fullname`.
   public let runtimeBuildVersion: String
 
@@ -83,7 +83,7 @@ public struct RockchipImageBuildDescriptor: Equatable, Sendable {
   }
 }
 
-public enum RockchipImageArchiveIntrospection {
+package enum RockchipImageArchiveIntrospection {
   /// A single member may not exceed this. The largest real member is a 2 GiB
   /// `system.img`; the bound exists so a malformed archive cannot make the
   /// host read without end, not because 4 GiB is meaningful.
@@ -91,7 +91,7 @@ public enum RockchipImageArchiveIntrospection {
 
   /// What a caller must ask the archive reader for so a build can be described
   /// in the single pass the archive is already making.
-  public static func derivationRequest(board: RockchipFlashProfile) -> GzipTarDerivationRequest {
+  package static func derivationRequest(board: RockchipFlashProfile) -> GzipTarDerivationRequest {
     GzipTarDerivationRequest(
       captureMembers: [RockchipFlashProfile.partitionTableMemberName],
       captureByteLimit: 1 << 20,

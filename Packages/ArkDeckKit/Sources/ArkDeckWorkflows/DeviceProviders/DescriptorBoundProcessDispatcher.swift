@@ -13,7 +13,7 @@ import ArkDeckProcess
 import CryptoKit
 import Foundation
 
-public struct ResolvedExecutable: Sendable, Equatable {
+package struct ResolvedExecutable: Sendable, Equatable {
   public let path: String
   public let sha256: String
 
@@ -47,14 +47,14 @@ extension RuntimeExecutableResolving {
   }
 }
 
-public struct FixedExecutableResolver: RuntimeExecutableResolving {
+package struct FixedExecutableResolver: RuntimeExecutableResolving {
   private let table: [String: ResolvedExecutable]
 
   public init(table: [String: ResolvedExecutable]) {
     self.table = table
   }
 
-  public static func hashing(path: String, providerID: String) throws -> FixedExecutableResolver {
+  package static func hashing(path: String, providerID: String) throws -> FixedExecutableResolver {
     guard path.hasPrefix("/") else {
       throw RuntimeDispatchFailure.failed(
         "provider executable path must be explicit and absolute")
@@ -73,7 +73,7 @@ public struct FixedExecutableResolver: RuntimeExecutableResolving {
       table: [providerID: ResolvedExecutable(path: executable.path, sha256: sha)])
   }
 
-  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+  package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
     guard let resolved = table[providerID] else {
       throw RuntimeDispatchFailure.failed("no executable registered for provider \(providerID)")
     }
@@ -81,7 +81,7 @@ public struct FixedExecutableResolver: RuntimeExecutableResolving {
   }
 }
 
-public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
+package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let outputByteBudget: Int
   private let childEnvironment: [String: String]
@@ -108,7 +108,7 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       childEnvironment: HDCServerEndpointSelector.inheritedPortChildEnvironment())
   }
 
-  public func unavailableReason(providerID: String) -> String? {
+  package func unavailableReason(providerID: String) -> String? {
     do {
       _ = try resolver.resolveExecutable(providerID: providerID)
       return nil
@@ -231,7 +231,7 @@ public struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
 /// on the host-managed descriptor's display text. This lets HDC and Rockchip
 /// have independent executable/host gates while the Runtime keeps one
 /// dispatch port.
-public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
+package struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
   private let hdc: any RuntimeProcessDispatching
   private let rockchip: any RuntimeProcessDispatching
   /// Absent means this composition has no host-only route: a workspace plan is
@@ -254,7 +254,7 @@ public struct RuntimeProcessDispatcherRouter: RuntimeProcessDispatching {
     self.analyzer = analyzer
   }
 
-  public func unavailableReason(providerID: String) -> String? {
+  package func unavailableReason(providerID: String) -> String? {
     switch providerID {
     case "hdc":
       return hdc.unavailableReason(providerID: providerID)

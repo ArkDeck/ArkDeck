@@ -12,7 +12,7 @@
 import ArkDeckCore
 import Foundation
 
-public final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
+package final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
   /// Re-exported so the daemon executable can report the vended name without
   /// taking a second import for one string.
   public static var machServiceName: String { ArkDeckAgentXPC.machServiceName }
@@ -37,11 +37,11 @@ public final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked
     listener.resume()
   }
 
-  public func invalidate() {
+  package func invalidate() {
     listener.invalidate()
   }
 
-  public func listener(
+  package func listener(
     _ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection
   ) -> Bool {
     connection.exportedInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)

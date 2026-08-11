@@ -12,7 +12,7 @@
 import ArkDeckCore
 import Foundation
 
-package enum HarnessPromotionExportError: Error, Equatable, Sendable {
+public enum HarnessPromotionExportError: Error, Equatable, Sendable {
   /// The task has no recorded promotion candidate to export.
   case promotionNotRecorded(String)
   /// Persisted facts no longer agree with each other. Export refuses to

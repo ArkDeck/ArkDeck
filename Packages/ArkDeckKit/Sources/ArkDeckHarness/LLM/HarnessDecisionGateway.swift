@@ -70,7 +70,7 @@ public protocol HarnessDecisionGateway: Sendable {
 }
 
 extension HarnessDecisionGateway {
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(provider: producerID)
   }
 }
@@ -90,7 +90,7 @@ extension HarnessDecisionGateway {
 
 /// Builds the bounded context. Trimming is explicit and recorded: a reader of
 /// the durable record can tell what the model was not shown.
-public struct HarnessDecisionContextAssembler: Sendable {
+package struct HarnessDecisionContextAssembler: Sendable {
   private let limits: HarnessDecisionContextLimits
 
   /// Desired-state fields that help a model reason about the product goal.
@@ -269,8 +269,8 @@ public struct HarnessDecisionContextAssembler: Sendable {
 /// Screen for identity that must never leave the host, applied to the encoded
 /// context before it is handed to an adapter. Belt and braces: the assembler
 /// already omits these fields, and this catches a future field that forgets.
-public enum HarnessEgressScreen {
-  public static func violations(in context: HarnessDecisionContext, targetID: String) -> [String] {
+package enum HarnessEgressScreen {
+  package static func violations(in context: HarnessDecisionContext, targetID: String) -> [String] {
     let encoder = CanonicalJSONEncoders.canonical()
     guard let data = try? encoder.encode(context),
       let text = String(data: data, encoding: .utf8)

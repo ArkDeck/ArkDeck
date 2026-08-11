@@ -22,12 +22,12 @@ public enum HDCServerEndpointSelectionError: Error, Sendable, Equatable {
   case invalidInheritedPort(String)
 }
 
-public struct HDCServerEndpointSelection: Sendable, Equatable {
-  public static let defaultPort = 8710
+package struct HDCServerEndpointSelection: Sendable, Equatable {
+  package static let defaultPort = 8710
 
   public let endpoint: HDCServerEndpoint
   public let source: HDCServerEndpointSource
-  public let childEnvironment: [String: String]
+  package let childEnvironment: [String: String]
 
   public init(
     endpoint: HDCServerEndpoint,
@@ -48,7 +48,7 @@ public struct HDCServerEndpointSelection: Sendable, Equatable {
   }
 }
 
-public enum HDCServerEndpointSelector {
+package enum HDCServerEndpointSelector {
   /// Explicit endpoint wins, followed by the inherited HDC port, then the
   /// documented default.  The inherited environment is an input snapshot, not
   /// a global process mutation.
@@ -92,7 +92,7 @@ public enum HDCServerEndpointSelector {
   /// the default server. An invalid inherited value is dropped, not
   /// forwarded: these callers must keep dispatching against the documented
   /// default rather than exporting a value the selector would reject.
-  public static func inheritedPortChildEnvironment(
+  package static func inheritedPortChildEnvironment(
     inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
   ) -> [String: String] {
     guard let inherited = inheritedEnvironment["OHOS_HDC_SERVER_PORT"],

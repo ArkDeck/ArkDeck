@@ -71,8 +71,8 @@ package enum RockchipFlashSessionRunLock {
   }
 }
 
-public struct RockchipFlashSessionFinding: Sendable, Equatable {
-  public enum AuthorityLane: String, Sendable {
+package struct RockchipFlashSessionFinding: Sendable, Equatable {
+  package enum AuthorityLane: String, Sendable {
     case agentCampaign
     /// Historical decode only. The standing lane was retired with its ledger
     /// (T25/W3): a journal that names one is still reported, and can no
@@ -81,7 +81,7 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
     case none
   }
 
-  public enum LedgerState: Sendable, Equatable {
+  package enum LedgerState: Sendable, Equatable {
     /// Campaign/agent reservation named by the journal is still open.
     case openAgentReservation(reservationID: String)
     /// The reservation named by the journal already carries a terminal.
@@ -94,34 +94,34 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
 
   public let sessionID: String
   public let jobID: String?
-  public let sessionRootPath: String
-  public let schemaVersion: String?
-  public let currentState: JobState?
-  public let finalized: Bool
-  public let hasTornTail: Bool
+  package let sessionRootPath: String
+  package let schemaVersion: String?
+  package let currentState: JobState?
+  package let finalized: Bool
+  package let hasTornTail: Bool
   /// A live process holds this session's run lock right now. Live sessions
   /// are never attention and never closable: the owner will write its own
   /// terminal, and closing under it would falsify a write-once record.
-  public let isLive: Bool
+  package let isLive: Bool
   /// Journal could not be replayed at all (corrupt beyond the torn-tail
   /// repair the durable format tolerates). Fail closed: treated as unknown.
-  public let journalError: String?
-  public let outstandingIntents: [OutstandingJournalIntent]
-  public let unknownOutcomes: [UnknownJournalOutcome]
-  public let lastConfirmedStepID: String?
+  package let journalError: String?
+  package let outstandingIntents: [OutstandingJournalIntent]
+  package let unknownOutcomes: [UnknownJournalOutcome]
+  package let lastConfirmedStepID: String?
   public let lane: AuthorityLane
   /// Campaign identity derived from the journal's confirmation reference,
   /// so an operator can be pointed at `flash continue --campaign-id …`.
-  public let campaignID: String?
-  public let ledgerState: LedgerState
+  package let campaignID: String?
+  package let ledgerState: LedgerState
 
   /// Every mutating intent whose outcome the journal confirmed — what the
   /// dead process's own successful closeUsage would have carried.
-  public let confirmedMutationIntentEventIDs: [String]
+  package let confirmedMutationIntentEventIDs: [String]
 
   /// Destructive/mutating intents with no confirmed outcome — the exact
   /// event IDs an honest ledger terminal must carry.
-  public var unresolvedMutationIntentEventIDs: [String] {
+  package var unresolvedMutationIntentEventIDs: [String] {
     var identifiers: [String] = []
     for intent in outstandingIntents where intent.effect >= .deviceMutation {
       identifiers.append(intent.eventID)
@@ -134,7 +134,7 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
   }
 
   /// True when the run cannot confirm its outcome from the journal alone.
-  public var journalUnresolved: Bool {
+  package var journalUnresolved: Bool {
     if journalError != nil { return true }
     if hasTornTail || !outstandingIntents.isEmpty || !unknownOutcomes.isEmpty { return true }
     if finalized { return false }
@@ -148,7 +148,7 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
   /// record never closed: a crash in the window between the durable
   /// terminal and `closeUsage`. The honest terminal is derivable from the
   /// journal, so this is closable debt — invisible before this field.
-  public var terminalWithOpenAuthority: Bool {
+  package var terminalWithOpenAuthority: Bool {
     guard !journalUnresolved else { return false }
     switch ledgerState {
     case .openAgentReservation: return true
@@ -158,7 +158,7 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
 
   /// The reservation this session's journal names, resolved or not — used
   /// to tell a ledger orphan from a reservation some session accounts for.
-  public var linkedReservationID: String? {
+  package var linkedReservationID: String? {
     switch ledgerState {
     case .openAgentReservation(let id), .closed(let id), .missing(let id):
       return id
@@ -170,7 +170,7 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
   /// True while there is still something actionable: an unresolved run —
   /// or a resolved run whose authority never closed — that a live owner is
   /// not about to settle itself.
-  public var requiresAttention: Bool {
+  package var requiresAttention: Bool {
     if isLive { return false }
     if terminalWithOpenAuthority { return true }
     guard journalUnresolved else { return false }
@@ -183,13 +183,13 @@ public struct RockchipFlashSessionFinding: Sendable, Equatable {
 /// the journal was GC'd, moved, or never survived the crash. Invisible to
 /// the session scan by construction, yet on the campaign lane it still
 /// blocks its target host-wide (one open reservation per target).
-public struct RockchipFlashOrphanedReservation: Sendable, Equatable {
-  public let reservationID: String
+package struct RockchipFlashOrphanedReservation: Sendable, Equatable {
+  package let reservationID: String
   public let jobID: String
-  public let reservedAt: String
+  package let reservedAt: String
   /// Campaign identity from the reservation's own authority reference, so
   /// the operator can still be pointed at `flash continue`.
-  public let campaignID: String?
+  package let campaignID: String?
 }
 
 
@@ -199,8 +199,8 @@ public enum RockchipFlashSessionReconcileError: Error, Equatable, Sendable {
   case sessionsRootUnavailable(String)
 }
 
-public struct RockchipFlashSessionReconciler {
-  public let sessionsRoot: URL
+package struct RockchipFlashSessionReconciler {
+  package let sessionsRoot: URL
   private let agentLedger: AgentAuthorityUsageLedger
   private let now: @Sendable () -> Date
 
@@ -233,7 +233,7 @@ public struct RockchipFlashSessionReconciler {
 
   /// Every session whose outcome is unresolved and whose authority record
   /// is still open. Read-only; zero device dispatch.
-  public func scan() throws -> [RockchipFlashSessionFinding] {
+  package func scan() throws -> [RockchipFlashSessionFinding] {
     try allSessionFindings().filter(\.requiresAttention)
   }
 
@@ -241,7 +241,7 @@ public struct RockchipFlashSessionReconciler {
   /// journal was GC'd, moved, or never survived. The session scan cannot
   /// see them; without this sweep they are permanent invisible debt (and,
   /// on the campaign lane, a permanent target block). Read-only.
-  public func orphanedReservations() throws -> [RockchipFlashOrphanedReservation] {
+  package func orphanedReservations() throws -> [RockchipFlashOrphanedReservation] {
     let linked = Set(try allSessionFindings().compactMap(\.linkedReservationID))
     var orphans: [RockchipFlashOrphanedReservation] = []
     for reservation in try agentLedger.load().reservations

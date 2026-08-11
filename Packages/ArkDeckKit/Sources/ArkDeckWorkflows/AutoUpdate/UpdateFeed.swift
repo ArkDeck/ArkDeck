@@ -62,9 +62,9 @@ public struct UpdateFeedTrust: Equatable, Sendable {
   }
 }
 
-public struct UpdateFeedEnvelope: Codable, Equatable, Sendable {
-  public let schemaVersion: UInt64
-  public let keyId: String
+package struct UpdateFeedEnvelope: Codable, Equatable, Sendable {
+  package let schemaVersion: UInt64
+  package let keyId: String
   public let payload: String
   public let signature: String
 
@@ -119,10 +119,10 @@ public struct UpdateFeedPayload: Codable, Equatable, Sendable {
   }
 }
 
-public struct UpdateSemanticVersion: Codable, Comparable, Equatable, Sendable {
-  public let major: UInt64
-  public let minor: UInt64
-  public let patch: UInt64
+package struct UpdateSemanticVersion: Codable, Comparable, Equatable, Sendable {
+  package let major: UInt64
+  package let minor: UInt64
+  package let patch: UInt64
 
   public init?(_ value: String) {
     let parts = value.split(separator: ".", omittingEmptySubsequences: false)
@@ -146,17 +146,17 @@ public struct UpdateSemanticVersion: Codable, Comparable, Equatable, Sendable {
   public var string: String { "\(major).\(minor).\(patch)" }
 }
 
-public enum UpdateFeedCodec {
-  public static let maximumFeedBytes = 128 * 1_024
-  public static let maximumPayloadBytes = 64 * 1_024
+package enum UpdateFeedCodec {
+  package static let maximumFeedBytes = 128 * 1_024
+  package static let maximumPayloadBytes = 64 * 1_024
   private static let domain = Data("ArkDeck.UpdateFeed.v1".utf8)
 
-  public static func canonicalPayload(_ payload: UpdateFeedPayload) throws -> Data {
+  package static func canonicalPayload(_ payload: UpdateFeedPayload) throws -> Data {
     try validateCanonicalStrings(payload)
     return try canonicalJSON(payload)
   }
 
-  public static func signatureInput(payload: Data, keyID: String) throws -> Data {
+  package static func signatureInput(payload: Data, keyID: String) throws -> Data {
     guard payload.count <= maximumPayloadBytes,
       keyID.precomposedStringWithCanonicalMapping == keyID
     else { throw UpdateFeedError.invalidPayload }
@@ -168,7 +168,7 @@ public enum UpdateFeedCodec {
     return input
   }
 
-  public static func assemble(
+  package static func assemble(
     canonicalPayload payload: Data,
     signature: Data,
     keyID: String
@@ -185,7 +185,7 @@ public enum UpdateFeedCodec {
     return data
   }
 
-  public static func decodeAndVerify(
+  package static func decodeAndVerify(
     _ data: Data,
     trust: UpdateFeedTrust
   ) throws -> (payload: UpdateFeedPayload, canonicalPayload: Data) {
@@ -278,8 +278,8 @@ public enum UpdateReplayDecision: Equatable, Sendable {
   case nonIncreasingRelease
 }
 
-public enum UpdateReplayPolicy {
-  public static func decision(
+package enum UpdateReplayPolicy {
+  package static func decision(
     previous: UpdateReplayRecord?,
     candidate: UpdateReplayRecord
   ) -> UpdateReplayDecision {
@@ -302,7 +302,7 @@ public protocol UpdateReplayStoring: Sendable {
 
 /// Serializes replay admission across both store instances and App processes, then persists the
 /// highest accepted record with an atomic same-directory rename and durable file/directory sync.
-public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
+package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
   private static let stateName = "replay-state-v1.json"
   private static let lockName = ".replay-state-v1.lock"
   private static let maximumStateBytes = 4 * 1_024
@@ -328,7 +328,7 @@ public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendab
     }
   }
 
-  public func validateAndCommit(
+  package func validateAndCommit(
     _ candidate: UpdateReplayRecord
   ) throws -> UpdateReplayDecision {
     guard Self.isValid(candidate) else { throw UpdateFeedError.replayStateWriteFailed }
@@ -342,7 +342,7 @@ public final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendab
     }
   }
 
-  public func loadCurrentRecord() throws -> UpdateReplayRecord? {
+  package func loadCurrentRecord() throws -> UpdateReplayRecord? {
     try withExclusiveTransaction { directoryDescriptor in
       try Self.loadRecord(directoryDescriptor: directoryDescriptor)
     }

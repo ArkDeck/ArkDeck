@@ -30,7 +30,7 @@ import Foundation
 /// diagnostics somewhere; the difference is whether the payload is separable
 /// from them by a file the CLI writes, or because the CLI prints the payload
 /// and nothing else.
-public enum HarnessLocalAgentResponseChannel: String, Sendable, Equatable {
+package enum HarnessLocalAgentResponseChannel: String, Sendable, Equatable {
   /// The CLI writes the final message to a path we pass it, and stdout is
   /// diagnostics we never read.
   case finalMessageFile
@@ -40,18 +40,18 @@ public enum HarnessLocalAgentResponseChannel: String, Sendable, Equatable {
 
 /// One concrete local agent CLI: how to invoke it for a single bounded,
 /// non-interactive answer, and how to read that answer back.
-public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
+package struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// Stable identifier; it names the producer in durable decision records, so
   /// it may not drift once a record exists.
   public let profileID: String
   /// Reported as the model provider in `HarnessModelDescriptor`.
-  public let providerLabel: String
-  public let responseChannel: HarnessLocalAgentResponseChannel
+  package let providerLabel: String
+  package let responseChannel: HarnessLocalAgentResponseChannel
   /// Parent-environment variables this CLI needs beyond the executor's
   /// fail-closed base (`PATH`, `HOME`, `TMPDIR`, `LANG`). Names only: the
   /// value is read from the parent at request time and is never a literal
   /// here, and a name that is absent in the parent is simply not passed.
-  public let inheritedEnvironmentKeys: [String]
+  package let inheritedEnvironmentKeys: [String]
   private let argumentBuilder:
     @Sendable (_ modelName: String, _ workingDirectory: String, _ prompt: String,
       _ finalMessagePath: String?) -> [String]
@@ -81,7 +81,7 @@ public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// OpenAI Codex CLI. `codex exec` emits session diagnostics on stdout even
   /// with `--color never`, so its explicit output file is what keeps those
   /// diagnostics from becoming JSON input.
-  public static let codex = HarnessLocalAgentCLIProfile(
+  package static let codex = HarnessLocalAgentCLIProfile(
     profileID: "codex",
     providerLabel: "openai-codex-cli",
     responseChannel: .finalMessageFile
@@ -110,7 +110,7 @@ public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// to route around its own approval gate and answer with prose about that
   /// instead of the decision (observed on device, 2026-08-05). The harness
   /// wants pure text-in/text-out reasoning here, not an agent with tools.
-  public static let claudeCode = HarnessLocalAgentCLIProfile(
+  package static let claudeCode = HarnessLocalAgentCLIProfile(
     profileID: "claude-code",
     providerLabel: "anthropic-claude-code-cli",
     responseChannel: .standardOutput,
@@ -132,11 +132,11 @@ public struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   }
 }
 
-public struct HarnessLocalAgentCLIRequest: Sendable, Equatable {
+package struct HarnessLocalAgentCLIRequest: Sendable, Equatable {
   public let executablePath: String
   public let executableSHA256: String
   public let profile: HarnessLocalAgentCLIProfile
-  public let modelName: String
+  package let modelName: String
   public let prompt: String
   public let workingDirectory: String
   public let timeoutSeconds: Int
@@ -160,11 +160,11 @@ public struct HarnessLocalAgentCLIRequest: Sendable, Equatable {
   }
 }
 
-public protocol HarnessLocalAgentCLITransport: Sendable {
+package protocol HarnessLocalAgentCLITransport: Sendable {
   func send(_ request: HarnessLocalAgentCLIRequest) async throws -> Data
 }
 
-public struct LocalAgentCLIProcessTransport: HarnessLocalAgentCLITransport {
+package struct LocalAgentCLIProcessTransport: HarnessLocalAgentCLITransport {
   private let executor: FoundationProcessExecutor
   private let captureLimit: Int
   private let parentEnvironment: [String: String]
@@ -398,7 +398,7 @@ extension LocalAgentCLIProcessTransport {
   }
 }
 
-public struct LocalAgentCLIDecisionGateway: HarnessDecisionGateway {
+package struct LocalAgentCLIDecisionGateway: HarnessDecisionGateway {
   private let executablePath: String
   private let executableSHA256: String
   private let profile: HarnessLocalAgentCLIProfile
@@ -441,7 +441,7 @@ public struct LocalAgentCLIDecisionGateway: HarnessDecisionGateway {
 
   public var producerID: String { "\(profile.profileID)-cli-gateway@1" }
 
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(
       provider: profile.providerLabel, modelName: modelName, adapterVersion: producerID)
   }

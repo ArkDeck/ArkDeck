@@ -5,7 +5,7 @@ import ArkDeckWorkflows
 import ArkDeckStorage
 import Foundation
 
-public struct RuntimeArtifactStoreHarnessPort: HarnessArtifactPort {
+package struct RuntimeArtifactStoreHarnessPort: HarnessArtifactPort {
   private let store: RuntimeArtifactStore
   /// The operator's sensitive-evidence opt-in, by artifact name, enforced here
   /// as well as in the observation builder.

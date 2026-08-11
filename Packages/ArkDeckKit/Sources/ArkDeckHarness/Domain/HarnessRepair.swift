@@ -392,7 +392,7 @@ public struct HarnessRepairAttempt: Equatable, Sendable {
 }
 
 extension HarnessTaskSnapshot {
-  public var repairAttempt: HarnessRepairAttempt? {
+  package var repairAttempt: HarnessRepairAttempt? {
     observedState[HarnessRepairAttempt.observedStateKey].flatMap(HarnessRepairAttempt.init(json:))
   }
 }

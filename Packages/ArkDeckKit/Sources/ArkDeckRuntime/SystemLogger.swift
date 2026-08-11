@@ -69,7 +69,7 @@ public struct DiagnosticCorrelationID: Equatable, Hashable, Sendable {
   }
 }
 
-public enum DiagnosticFieldPrivacy: String, CaseIterable, Sendable {
+package enum DiagnosticFieldPrivacy: String, CaseIterable, Sendable {
   case publicValue
   case deviceIdentifier
   case userPath

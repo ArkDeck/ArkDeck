@@ -16,15 +16,15 @@ import Foundation
 
 // MARK: - Wire protocol (v1)
 
-public enum AgentWireProtocol {
+package enum AgentWireProtocol {
   public static let version = ArkDeckAgentXPC.wireProtocolVersion
-  public static let requiredMajor = 1
+  package static let requiredMajor = 1
 
-  public struct Request: Codable, Sendable {
-    public let protocolVersion: String
+  package struct Request: Codable, Sendable {
+    package let protocolVersion: String
     public let id: String
     public let method: String
-    public let params: [String: JSONValue]?
+    package let params: [String: JSONValue]?
 
     public init(id: String, method: String, params: [String: JSONValue]? = nil) {
       self.protocolVersion = AgentWireProtocol.version
@@ -34,12 +34,12 @@ public enum AgentWireProtocol {
     }
   }
 
-  public struct WireError: Codable, Sendable, Equatable {
+  package struct WireError: Codable, Sendable, Equatable {
     public let code: String
     public let message: String
   }
 
-  public struct Response: Codable, Sendable {
+  package struct Response: Codable, Sendable {
     public let id: String
     public let ok: Bool
     public let result: JSONValue?
@@ -47,7 +47,7 @@ public enum AgentWireProtocol {
   }
 }
 
-public enum AgentDaemonErrorCode: String, Sendable {
+package enum AgentDaemonErrorCode: String, Sendable {
   case unsupportedProtocolVersion
   case malformedFrame
   case unknownMethod

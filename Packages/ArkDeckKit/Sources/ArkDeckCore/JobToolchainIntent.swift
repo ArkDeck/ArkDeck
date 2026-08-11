@@ -2,12 +2,12 @@ import Foundation
 
 /// The platform-neutral tool kind fixed by a Job intent. The closed vocabulary
 /// is deliberately separate from a process executable or argv surface.
-public enum JobToolchainKind: String, Codable, Sendable, Equatable {
+package enum JobToolchainKind: String, Codable, Sendable, Equatable {
   case hdc
 }
 
 /// Where the user-visible tool selection came from when the Job was created.
-public enum JobToolchainSource: String, Codable, Sendable, Equatable {
+package enum JobToolchainSource: String, Codable, Sendable, Equatable {
   case userConfigured
   case devecoSDK
   case openHarmonySDK
@@ -15,7 +15,7 @@ public enum JobToolchainSource: String, Codable, Sendable, Equatable {
 
 /// A diagnostic field never disappears merely because a probe cannot prove a
 /// value. Unknown and unverified values retain their reason in durable bytes.
-public enum JobToolchainEvidence<Value>: Sendable, Equatable
+package enum JobToolchainEvidence<Value>: Sendable, Equatable
 where Value: Codable & Sendable & Equatable {
   case known(Value)
   case unknown(reason: String)
@@ -69,7 +69,7 @@ extension JobToolchainEvidence: Codable {
     }
   }
 
-  public func encode(to encoder: any Encoder) throws {
+  package func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
     case .known(let value):
@@ -98,14 +98,14 @@ public enum JobToolchainIntentValidationError: Error, Sendable, Equatable {
 /// Immutable Core value persisted for a Job before a tool-backed typed Step is
 /// dispatched. It contains no bookmark, file descriptor, process handle, or
 /// argv and therefore cannot itself grant platform launch authority.
-public struct JobToolchainIntent: Codable, Sendable, Equatable {
-  public static let schemaVersion = "1.0.0"
+package struct JobToolchainIntent: Codable, Sendable, Equatable {
+  package static let schemaVersion = "1.0.0"
 
-  public let schemaVersion: String
+  package let schemaVersion: String
   public let id: UUID
   public let jobID: String
   public let kind: JobToolchainKind
-  public let executablePath: String
+  package let executablePath: String
   public let source: JobToolchainSource
   public let executableSHA256: String
   public let platformTrust: JobToolchainEvidence<String>
@@ -113,7 +113,7 @@ public struct JobToolchainIntent: Codable, Sendable, Equatable {
   public let serverVersion: JobToolchainEvidence<String>
   public let daemonVersion: JobToolchainEvidence<String>
   public let endpoint: String
-  public let serverGeneration: JobToolchainEvidence<Int>
+  package let serverGeneration: JobToolchainEvidence<Int>
 
   public init(
     id: UUID,
@@ -245,9 +245,9 @@ public struct JobToolchainIntent: Codable, Sendable, Equatable {
 /// Durable association between one immutable Job toolchain intent and an HDC
 /// tool-backed typed Step. Workflows persist this value before requesting any
 /// platform probe or launch authorization.
-public struct JobToolchainIntentBinding: Codable, Sendable, Equatable {
+package struct JobToolchainIntentBinding: Codable, Sendable, Equatable {
   public let jobID: String
-  public let intent: JobToolchainIntent
+  package let intent: JobToolchainIntent
   public let step: WorkflowStep
 
   public init(jobID: String, intent: JobToolchainIntent, step: WorkflowStep) throws {

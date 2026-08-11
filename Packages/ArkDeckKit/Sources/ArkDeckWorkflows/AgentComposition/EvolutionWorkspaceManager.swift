@@ -21,7 +21,7 @@ public enum EvolutionWorkspaceError: Error, Equatable, Sendable {
   case workspaceAlreadyDestroyed(String)
 }
 
-public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @unchecked Sendable {
+package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @unchecked Sendable {
   private struct Manifest: Codable, Equatable {
     let workspace: HarnessEvolutionWorkspace
   }
@@ -79,7 +79,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
   /// revision and refuses when it has moved, which is the right question when
   /// deciding whether to make a copy and the wrong one when deciding whether a
   /// copy that already exists is still itself. Adoption asks only the second.
-  public func adoptPersistedWorkspace(
+  package func adoptPersistedWorkspace(
     _ workspace: HarnessEvolutionWorkspace,
     policy: HarnessEvolutionPolicy
   ) async throws {
@@ -127,7 +127,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
     }
   }
 
-  public func prepareWorkspace(
+  package func prepareWorkspace(
     htaskID: String,
     sourceProjectRef: String,
     policy: HarnessEvolutionPolicy,
@@ -224,7 +224,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
     }
   }
 
-  public func prepareAttemptDirectory(
+  package func prepareAttemptDirectory(
     workspace: HarnessEvolutionWorkspace,
     attemptID: String,
     ordinal: Int,
@@ -265,7 +265,7 @@ public final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @un
     }
   }
 
-  public func sweepTerminalWorkspaces(
+  package func sweepTerminalWorkspaces(
     tasks: [HarnessEvolutionWorkspaceGCTaskReference],
     retention: HarnessEvolutionWorkspaceRetention,
     nowUTC: String

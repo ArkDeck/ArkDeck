@@ -31,12 +31,12 @@ package struct RockchipLiveModeObservation: Sendable, Equatable {
   }
 }
 
-package enum RockchipLiveModeProbeFailure: Error, Sendable, Equatable,
+public enum RockchipLiveModeProbeFailure: Error, Sendable, Equatable,
   CustomStringConvertible
 {
   case notObservable(String)
 
-  package var description: String {
+  public var description: String {
     switch self {
     case .notObservable(let detail):
       return "the bound Rockchip target is not observable: \(detail)"

@@ -2,14 +2,14 @@ import ArkDeckCore
 import CryptoKit
 import Foundation
 
-public enum RuntimeHardwareEvidenceEffectLevel: String, Codable, Sendable {
+package enum RuntimeHardwareEvidenceEffectLevel: String, Codable, Sendable {
   case hostOnly
   case readOnly
   case deviceMutation
   case destructive
 }
 
-public enum RuntimeHardwareEvidenceAuthorityKind: String, Codable, Sendable {
+package enum RuntimeHardwareEvidenceAuthorityKind: String, Codable, Sendable {
   case defaultReadOnlyPolicy
   case runtimeCapability
   case standingAuthorization
@@ -18,7 +18,7 @@ public enum RuntimeHardwareEvidenceAuthorityKind: String, Codable, Sendable {
   case evolutionCampaignConfirmation
 }
 
-public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
+package struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let kind: RuntimeHardwareEvidenceAuthorityKind
   public let reference: String
   public let admittedAtUTC: String
@@ -27,7 +27,7 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let reservationID: String?
   public let useOrdinal: Int?
   public let stepSetDigest: String?
-  public let artifactDigest: String?
+  package let artifactDigest: String?
   /// All campaign fields are daemon-owned durable correlation facts. They are
   /// optional only so older read-only snapshots remain decodable; a campaign
   /// record with any one missing is never published as hardware evidence.
@@ -35,10 +35,10 @@ public struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let attemptID: String?
   public let attemptOrdinal: Int?
   public let planDigest: String?
-  public let targetBindingDigest: String?
-  public let candidateDigest: String?
-  public let reviewDigest: String?
-  public let brokerDigest: String?
+  package let targetBindingDigest: String?
+  package let candidateDigest: String?
+  package let reviewDigest: String?
+  package let brokerDigest: String?
   /// Complete-overwrite lineage returned by the daemon with the consumed
   /// authority. Keeping it in an existing receipt field preserves the
   /// one-shot Agent runner's stable wire/storage shape.
@@ -112,13 +112,13 @@ extension RuntimeAgentExecutionReceipt {
   }
 }
 
-public enum RuntimeHardwareEvidenceTransport: String, Codable, Sendable {
+package enum RuntimeHardwareEvidenceTransport: String, Codable, Sendable {
   case usb
   case tcp
   case uart
 }
 
-public struct RuntimeHardwareEvidencePreflightStep: Codable, Sendable, Equatable {
+package struct RuntimeHardwareEvidencePreflightStep: Codable, Sendable, Equatable {
   public let stepID: String
   public let stepKind: String
   public let outcomeAtUTC: String
@@ -136,7 +136,7 @@ public struct RuntimeHardwareEvidencePreflightStep: Codable, Sendable, Equatable
   }
 }
 
-public struct RuntimeHardwareEvidenceObservation: Codable, Sendable, Equatable {
+package struct RuntimeHardwareEvidenceObservation: Codable, Sendable, Equatable {
   public let targetID: String?
   public let bindingRevision: Int?
   public let stableIdentitySHA256: String?
@@ -166,7 +166,7 @@ public struct RuntimeHardwareEvidenceObservation: Codable, Sendable, Equatable {
   }
 }
 
-public struct RuntimeHardwareEvidenceArtifact: Codable, Sendable, Equatable {
+package struct RuntimeHardwareEvidenceArtifact: Codable, Sendable, Equatable {
   public let reference: String
   public let sha256: String
   public let jobID: String
@@ -175,7 +175,7 @@ public struct RuntimeHardwareEvidenceArtifact: Codable, Sendable, Equatable {
   public let stableIdentitySHA256: String?
   public let providerID: String
   public let byteCount: Int
-  public let bytesVerified: Bool
+  package let bytesVerified: Bool
 
   enum CodingKeys: String, CodingKey {
     case reference
@@ -190,14 +190,14 @@ public struct RuntimeHardwareEvidenceArtifact: Codable, Sendable, Equatable {
   }
 }
 
-public struct RuntimeHardwareEvidenceRecoveryEpoch: Codable, Sendable, Equatable {
-  public struct CoveredIntent: Codable, Sendable, Equatable {
+package struct RuntimeHardwareEvidenceRecoveryEpoch: Codable, Sendable, Equatable {
+  package struct CoveredIntent: Codable, Sendable, Equatable {
     public let jobID: String
     public let intentEventID: String
     public let operationReference: String
     public let profileReference: String
-    public let observedAtUTC: String
-    public let possibleEffects: [String]
+    package let observedAtUTC: String
+    package let possibleEffects: [String]
 
     enum CodingKeys: String, CodingKey {
       case jobID = "jobId"
@@ -209,25 +209,25 @@ public struct RuntimeHardwareEvidenceRecoveryEpoch: Codable, Sendable, Equatable
     }
   }
 
-  public let epochID: String
+  package let epochID: String
   public let source: String
-  public let stableTargetIdentitySHA256: String
+  package let stableTargetIdentitySHA256: String
   public let bindingRevision: Int
-  public let coveredIntents: [CoveredIntent]
-  public let uncertainEffectSetSHA256: String
-  public let coverageContractVersion: String
-  public let coveredEffectSetSHA256: String
-  public let recoveryJobID: String
-  public let recoveryIntentEventID: String
+  package let coveredIntents: [CoveredIntent]
+  package let uncertainEffectSetSHA256: String
+  package let coverageContractVersion: String
+  package let coveredEffectSetSHA256: String
+  package let recoveryJobID: String
+  package let recoveryIntentEventID: String
   public let operationReference: String
   public let profileReference: String
-  public let materializedPlanDigestSHA256: String
+  package let materializedPlanDigestSHA256: String
   public let artifactSHA256: String
   public let providerExecutableSHA256: String
-  public let confirmedStepIDs: [String]
-  public let resultingTargetEpochSHA256: String
-  public let establishedAtUTC: String
-  public let epochSHA256: String
+  package let confirmedStepIDs: [String]
+  package let resultingTargetEpochSHA256: String
+  package let establishedAtUTC: String
+  package let epochSHA256: String
 
   enum CodingKeys: String, CodingKey {
     case epochID = "epochId"
@@ -252,7 +252,7 @@ public struct RuntimeHardwareEvidenceRecoveryEpoch: Codable, Sendable, Equatable
   }
 }
 
-public struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable {
+package struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable {
   public let jobID: String
   public let operationReference: String
   public let catalogDigest: String
@@ -298,11 +298,11 @@ public struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable 
 
 /// The only caller-supplied surface. None of these values can authorize or
 /// describe device execution.
-public struct HardwareEvidenceClaimMetadata: Sendable, Equatable {
-  public let evidenceID: String
-  public let acceptanceIDs: [String]
+package struct HardwareEvidenceClaimMetadata: Sendable, Equatable {
+  package let evidenceID: String
+  package let acceptanceIDs: [String]
   public let validUntilUTC: String?
-  public let notes: String?
+  package let notes: String?
 
   public init(
     evidenceID: String,
@@ -317,52 +317,52 @@ public struct HardwareEvidenceClaimMetadata: Sendable, Equatable {
   }
 }
 
-public struct HardwareEvidenceIncomplete: Sendable, Equatable {
+package struct HardwareEvidenceIncomplete: Sendable, Equatable {
   public let code = "evidenceIncomplete"
   public let reasons: [String]
-  public let publicationCount = 0
+  package let publicationCount = 0
 }
 
-public enum HardwareEvidenceProjectionResult: Sendable, Equatable {
+package enum HardwareEvidenceProjectionResult: Sendable, Equatable {
   case published(HardwareEvidenceV6Record)
   case evidenceIncomplete(HardwareEvidenceIncomplete)
 }
 
-public struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
+package struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
   public let schemaVersion: String
-  public let evidenceId: String
+  package let evidenceId: String
   public let executor: Executor
   public let runtime: Runtime
-  public let targetConfirmation: TargetConfirmation
+  package let targetConfirmation: TargetConfirmation
   public let device: Device
   public let toolchain: Toolchain
   public let transport: RuntimeHardwareEvidenceTransport
   public let provider: String
-  public let effectLevel: RuntimeHardwareEvidenceEffectLevel
-  public let stepKinds: [String]
-  public let acceptanceIds: [String]
-  public let executedAt: String
+  package let effectLevel: RuntimeHardwareEvidenceEffectLevel
+  package let stepKinds: [String]
+  package let acceptanceIds: [String]
+  package let executedAt: String
   public let validUntil: String?
   public let artifacts: [Artifact]
   public let recovery: Recovery?
-  public let deviations: [String]?
-  public let notes: String?
+  package let deviations: [String]?
+  package let notes: String?
 
-  public struct Executor: Codable, Sendable, Equatable {
+  package struct Executor: Codable, Sendable, Equatable {
     public let kind: RuntimeExecutorKind
     public let id: String
     public let authority: Authority?
   }
 
-  public struct Authority: Codable, Sendable, Equatable {
+  package struct Authority: Codable, Sendable, Equatable {
     public let kind: RuntimeHardwareEvidenceAuthorityKind
     public let reference: String
-    public let reservationId: String?
+    package let reservationId: String?
     public let useOrdinal: Int?
     public let planDigest: String?
     public let stepSetDigest: String?
-    public let targetBindingDigest: String?
-    public let artifactDigest: String?
+    package let targetBindingDigest: String?
+    package let artifactDigest: String?
   }
 
   public struct Runtime: Codable, Sendable, Equatable {
@@ -374,8 +374,8 @@ public struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
     public let finishedAt: String
   }
 
-  public struct TargetConfirmation: Codable, Sendable, Equatable {
-    public let confirmedDeviceIdentitySHA256: String
+  package struct TargetConfirmation: Codable, Sendable, Equatable {
+    package let confirmedDeviceIdentitySHA256: String
     public let bindingRevision: Int
     public let confirmedAt: String
     public let method: String
@@ -388,9 +388,9 @@ public struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
     public let bindingRevision: Int
   }
 
-  public struct Toolchain: Codable, Sendable, Equatable {
-    public let hdcVersion: String
-    public let hdcSHA256: String
+  package struct Toolchain: Codable, Sendable, Equatable {
+    package let hdcVersion: String
+    package let hdcSHA256: String
   }
 
   public struct Artifact: Codable, Sendable, Equatable {
@@ -454,8 +454,8 @@ public struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
 
 /// Pure projection: no daemon client, provider, capability store or
 /// dispatcher is reachable from this type.
-public enum HardwareEvidenceProjector {
-  public static func project(
+package enum HardwareEvidenceProjector {
+  package static func project(
     receipt: RuntimeAgentExecutionReceipt,
     claims: HardwareEvidenceClaimMetadata
   ) -> HardwareEvidenceProjectionResult {
@@ -937,8 +937,8 @@ public enum HardwareEvidenceProjector {
 
 /// Read-only compatibility discriminator. Historical V1-V5 bytes are returned
 /// untouched; the V6 writer never attempts to migrate or re-encode them.
-public enum HardwareEvidenceDocumentReader {
-  public enum Version: String, Sendable, Equatable {
+package enum HardwareEvidenceDocumentReader {
+  package enum Version: String, Sendable, Equatable {
     case legacyV1 = "1.0.0"
     case legacyV2 = "2.0.0"
     case legacyV3 = "3.0.0"

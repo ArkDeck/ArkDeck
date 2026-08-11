@@ -12,7 +12,7 @@
 
 import Foundation
 
-public protocol RockchipEvolutionAttemptIntentReading: Sendable {
+package protocol RockchipEvolutionAttemptIntentReading: Sendable {
   /// The workflow step kinds the job journaled a durable intent for, exactly
   /// as the runtime recorded them. Unrecognized raw values are returned
   /// verbatim so the caller can fail closed on them instead of silently
@@ -36,12 +36,12 @@ public enum RockchipEvolutionAttemptIntentError: Error, Sendable, Equatable,
 /// The default for a host that has not been wired to a runtime. It refuses
 /// rather than returning an empty set, because "no kinds" and "we could not
 /// ask" must not settle the same way: only the first could ever be a proof.
-public struct UnavailableRockchipEvolutionAttemptIntents:
+package struct UnavailableRockchipEvolutionAttemptIntents:
   RockchipEvolutionAttemptIntentReading
 {
   public init() {}
 
-  public func journaledStepKinds(jobID: String) throws -> [String] {
+  package func journaledStepKinds(jobID: String) throws -> [String] {
     throw RockchipEvolutionAttemptIntentError.unavailable(
       "this campaign host has no runtime evidence reader for job \(jobID)")
   }

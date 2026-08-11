@@ -14,7 +14,7 @@ import Foundation
 
 // MARK: - Closed observation vocabulary
 
-public enum BootstrapObservationAction: Sendable, Equatable {
+package enum BootstrapObservationAction: Sendable, Equatable {
   case observeTool
   case observeServer
   case listCandidates
@@ -106,7 +106,7 @@ public struct RuntimeTargetRecord: Sendable, Equatable, Codable {
 /// and revision remain canonical; only the address may come from an
 /// append-only alias resolution whose Flash/postflight proof has already
 /// passed validation.
-package struct RuntimeTargetHDCRoute: Sendable, Equatable {
+public struct RuntimeTargetHDCRoute: Sendable, Equatable {
   package let targetID: String
   package let bindingRevision: Int
   package let toolVersion: String
@@ -118,7 +118,7 @@ package struct RuntimeTargetHDCRoute: Sendable, Equatable {
 /// the target store only applies the exact previous -> current edge. Keeping
 /// the proof outside the generic store prevents a caller from advancing a
 /// target with an uncorrelated identity or a skipped revision.
-package struct RuntimeTargetBindingLineageAdvance: Sendable, Equatable {
+public struct RuntimeTargetBindingLineageAdvance: Sendable, Equatable {
   package let previousStableIdentitySHA256: String
   package let previousRevision: Int
   package let currentStableIdentitySHA256: String
@@ -144,7 +144,7 @@ package struct RuntimeTargetAliasCoveredIntent: Codable, Sendable, Equatable {
   package let effect: String
 }
 
-package struct RuntimeTargetAliasResolutionDraft: Sendable, Equatable {
+public struct RuntimeTargetAliasResolutionDraft: Sendable, Equatable {
   package let aliasTargetID: String
   package let aliasStableIdentitySHA256: String
   package let aliasBindingRevision: Int
@@ -160,7 +160,7 @@ package struct RuntimeTargetAliasResolutionDraft: Sendable, Equatable {
   package let establishedAtUTC: String
 }
 
-package struct RuntimeTargetAliasResolution: Codable, Sendable, Equatable {
+public struct RuntimeTargetAliasResolution: Codable, Sendable, Equatable {
   package let resolutionID: String
   package let aliasTargetID: String
   package let aliasStableIdentitySHA256: String
@@ -251,7 +251,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 
   /// Resolves one currently observed address only through a durable alias
   /// relation. Singleton presence and similar IDs are never sufficient.
-  package func candidateTarget(connectKey: String) throws -> RuntimeTargetRecord? {
+  public func candidateTarget(connectKey: String) throws -> RuntimeTargetRecord? {
     try queue.sync {
       let document = try load()
       let matches = document.targets.filter { $0.connectKey == connectKey }
@@ -275,7 +275,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   /// canonical target record. A target with no proven alias uses its adopted
   /// connect key. Multiple routes are refused: ordering or recency cannot
   /// substitute for an exact durable identity proof.
-  package func hdcExecutionRoute(targetID: String) throws -> RuntimeTargetHDCRoute? {
+  public func hdcExecutionRoute(targetID: String) throws -> RuntimeTargetHDCRoute? {
     try queue.sync {
       let document = try load()
       let targets = document.targets.filter { $0.targetID == targetID }
@@ -310,14 +310,14 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     }
   }
 
-  package func aliasResolutions() throws -> [RuntimeTargetAliasResolution] {
+  public func aliasResolutions() throws -> [RuntimeTargetAliasResolution] {
     try queue.sync { try load().aliasResolutions ?? [] }
   }
 
   /// Appends one mechanically proven identity relation without editing either
   /// target or any Job. Repeating the exact proof is idempotent.
   @discardableResult
-  package func appendAliasResolution(
+  public func appendAliasResolution(
     _ draft: RuntimeTargetAliasResolutionDraft
   ) throws -> RuntimeTargetAliasResolution {
     try queue.sync {
@@ -398,7 +398,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   /// separate, history-preserving mechanism. Once reconciled, the exact
   /// identity relation remains valid across later successful Flash Jobs; a
   /// new route Job ID alone is not a new physical-device identity.
-  package func hasConflictingHDCAliasOwner(
+  public func hasConflictingHDCAliasOwner(
     canonicalTargetID: String,
     connectKey: String,
     identitySHA256: String,
@@ -515,7 +515,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   ///
   /// This is idempotent for the exact current edge. Any missing, ambiguous,
   /// colliding or skipped lineage fails closed without changing the file.
-  package func advanceBindingLineage(
+  public func advanceBindingLineage(
     _ advance: RuntimeTargetBindingLineageAdvance
   ) throws -> (record: RuntimeTargetRecord, updated: Bool) {
     try queue.sync {

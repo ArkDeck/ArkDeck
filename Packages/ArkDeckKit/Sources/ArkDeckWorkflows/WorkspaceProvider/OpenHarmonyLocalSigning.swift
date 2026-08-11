@@ -6,10 +6,10 @@ import Foundation
 import LocalAuthentication
 import Security
 
-public enum OpenHarmonyLocalSigning {
+package enum OpenHarmonyLocalSigning {
   public static let operationReference = "workspace.sign-openharmony-hap@1"
-  public static let defaultPresetID = "openharmony-release@1"
-  public static let defaultProjectRef = "demo-app"
+  package static let defaultPresetID = "openharmony-release@1"
+  package static let defaultProjectRef = "demo-app"
   static let keychainService = "dev.arkdeck.openharmony-local-signing"
   /// Bumps only when ArkDeck changes how the Keychain item binds the
   /// interactive maintainer CLI and the installed LaunchAgent daemon. A
@@ -25,12 +25,12 @@ public enum OpenHarmonyLocalSigning {
     Data([49, 50, 51, 52, 53, 54])
   }
 
-  public static func defaultRootURL() -> URL {
+  package static func defaultRootURL() -> URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("ArkDeck/Signing/OpenHarmony", isDirectory: true)
   }
 
-  public static func defaultAgentDaemonURL() -> URL {
+  package static func defaultAgentDaemonURL() -> URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("ArkDeck/bin/arkdeck-agentd")
   }
@@ -57,7 +57,7 @@ public enum OpenHarmonySigningError: Error, Equatable, CustomStringConvertible, 
   }
 }
 
-public struct OpenHarmonySigningFileIdentity: Codable, Sendable, Equatable {
+package struct OpenHarmonySigningFileIdentity: Codable, Sendable, Equatable {
   public let path: String
   public let sha256: String
   public let byteCount: Int
@@ -69,17 +69,17 @@ public struct OpenHarmonySigningFileIdentity: Codable, Sendable, Equatable {
   }
 }
 
-public struct OpenHarmonySigningPresetConfiguration: Sendable, Equatable {
-  public let presetID: String
-  public let projectRef: String
-  public let javaExecutable: URL
-  public let signerJAR: URL
-  public let keystore: URL
-  public let appCertificate: URL
-  public let signedProfile: URL
-  public let keyAlias: String
-  public let signingAlgorithm: String
-  public let managedMaterialDirectory: URL?
+package struct OpenHarmonySigningPresetConfiguration: Sendable, Equatable {
+  package let presetID: String
+  package let projectRef: String
+  package let javaExecutable: URL
+  package let signerJAR: URL
+  package let keystore: URL
+  package let appCertificate: URL
+  package let signedProfile: URL
+  package let keyAlias: String
+  package let signingAlgorithm: String
+  package let managedMaterialDirectory: URL?
 
   public init(
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID,
@@ -106,25 +106,25 @@ public struct OpenHarmonySigningPresetConfiguration: Sendable, Equatable {
   }
 }
 
-public struct OpenHarmonySigningPresetReceipt: Codable, Sendable, Equatable {
-  public let schemaVersion: String
-  public let installedAtUTC: String
-  public let presetID: String
-  public let projectRef: String
-  public let javaExecutable: OpenHarmonySigningFileIdentity
-  public let signerJAR: OpenHarmonySigningFileIdentity
-  public let keystore: OpenHarmonySigningFileIdentity
-  public let appCertificate: OpenHarmonySigningFileIdentity
-  public let signedProfile: OpenHarmonySigningFileIdentity
-  public let keyAlias: String
-  public let signingAlgorithm: String
-  public let keystorePasswordAccount: String
-  public let keyPasswordAccount: String
-  public let secretEnvelopeAccount: String?
-  public let legacyPasswordAccounts: [String]?
-  public let trustedDaemonApplicationSHA256: String?
-  public let keychainAccessSchema: String?
-  public let managedMaterialDirectory: String?
+package struct OpenHarmonySigningPresetReceipt: Codable, Sendable, Equatable {
+  package let schemaVersion: String
+  package let installedAtUTC: String
+  package let presetID: String
+  package let projectRef: String
+  package let javaExecutable: OpenHarmonySigningFileIdentity
+  package let signerJAR: OpenHarmonySigningFileIdentity
+  package let keystore: OpenHarmonySigningFileIdentity
+  package let appCertificate: OpenHarmonySigningFileIdentity
+  package let signedProfile: OpenHarmonySigningFileIdentity
+  package let keyAlias: String
+  package let signingAlgorithm: String
+  package let keystorePasswordAccount: String
+  package let keyPasswordAccount: String
+  package let secretEnvelopeAccount: String?
+  package let legacyPasswordAccounts: [String]?
+  package let trustedDaemonApplicationSHA256: String?
+  package let keychainAccessSchema: String?
+  package let managedMaterialDirectory: String?
 
   public init(
     schemaVersion: String, installedAtUTC: String, presetID: String,
@@ -160,46 +160,46 @@ public struct OpenHarmonySigningPresetReceipt: Codable, Sendable, Equatable {
   }
 }
 
-public struct OpenHarmonySigningPresetStatus: Codable, Sendable, Equatable {
+package struct OpenHarmonySigningPresetStatus: Codable, Sendable, Equatable {
   public let installed: Bool
   public let ready: Bool
-  public let receiptPath: String
-  public let presetID: String?
-  public let projectRef: String?
-  public let javaPath: String?
-  public let javaSHA256: String?
-  public let signerJARPath: String?
-  public let signerJARSHA256: String?
-  public let keystorePath: String?
-  public let keystoreSHA256: String?
-  public let appCertificatePath: String?
-  public let appCertificateSHA256: String?
-  public let signedProfilePath: String?
-  public let signedProfileSHA256: String?
-  public let keystorePasswordPresent: Bool
-  public let keyPasswordPresent: Bool
+  package let receiptPath: String
+  package let presetID: String?
+  package let projectRef: String?
+  package let javaPath: String?
+  package let javaSHA256: String?
+  package let signerJARPath: String?
+  package let signerJARSHA256: String?
+  package let keystorePath: String?
+  package let keystoreSHA256: String?
+  package let appCertificatePath: String?
+  package let appCertificateSHA256: String?
+  package let signedProfilePath: String?
+  package let signedProfileSHA256: String?
+  package let keystorePasswordPresent: Bool
+  package let keyPasswordPresent: Bool
   public let diagnostics: [String]
 }
 
-public struct OpenHarmonySigningPresetRemoval: Codable, Sendable, Equatable {
-  public let removedReceipt: Bool
-  public let removedKeystorePassword: Bool
-  public let removedKeyPassword: Bool
-  public let removedManagedMaterial: Bool
-  public let preservedSourcePaths: [String]
+package struct OpenHarmonySigningPresetRemoval: Codable, Sendable, Equatable {
+  package let removedReceipt: Bool
+  package let removedKeystorePassword: Bool
+  package let removedKeyPassword: Bool
+  package let removedManagedMaterial: Bool
+  package let preservedSourcePaths: [String]
 }
 
-public struct OpenHarmonySigningSecretNormalization: Codable, Sendable, Equatable {
-  public let presetID: String
-  public let normalizedKeystorePassword: Bool
-  public let normalizedKeyPassword: Bool
+package struct OpenHarmonySigningSecretNormalization: Codable, Sendable, Equatable {
+  package let presetID: String
+  package let normalizedKeystorePassword: Bool
+  package let normalizedKeyPassword: Bool
 }
 
-public struct OpenHarmonySigningEnvelopeMigration: Codable, Sendable, Equatable {
-  public let presetID: String
-  public let migrated: Bool
-  public let envelopeAccount: String
-  public let legacyAccountCount: Int
+package struct OpenHarmonySigningEnvelopeMigration: Codable, Sendable, Equatable {
+  package let presetID: String
+  package let migrated: Bool
+  package let envelopeAccount: String
+  package let legacyAccountCount: Int
 }
 
 private struct OpenHarmonySigningSecretEnvelope: Codable {
@@ -208,7 +208,7 @@ private struct OpenHarmonySigningSecretEnvelope: Codable {
   var keyPassword: Data
 }
 
-public protocol OpenHarmonySigningSecretStoring: Sendable {
+package protocol OpenHarmonySigningSecretStoring: Sendable {
   func set(_ data: Data, account: String) throws
   func read(account: String) throws -> Data
   func contains(account: String) -> Bool
@@ -218,10 +218,10 @@ public protocol OpenHarmonySigningSecretStoring: Sendable {
 }
 
 extension OpenHarmonySigningSecretStoring {
-  public func trustedDaemonApplicationSHA256() throws -> String? { nil }
+  package func trustedDaemonApplicationSHA256() throws -> String? { nil }
 }
 
-public struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
+package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
   private let agentDaemonURL: URL
   private let allowsUserInteraction: Bool
 
@@ -315,7 +315,7 @@ public struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
     ]
   }
 
-  public func refreshTrustedApplicationAccess(account: String) throws {
+  package func refreshTrustedApplicationAccess(account: String) throws {
     let status = SecItemUpdate(
       query(account: account) as CFDictionary,
       [kSecAttrAccess as String: try trustedApplicationAccess()] as CFDictionary)
@@ -325,7 +325,7 @@ public struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
     }
   }
 
-  public func trustedDaemonApplicationSHA256() throws -> String? {
+  package func trustedDaemonApplicationSHA256() throws -> String? {
     let daemonApplication = try trustedApplications().daemon
     var staticCode: SecStaticCode?
     let createStatus = SecStaticCodeCreateWithPath(
@@ -446,7 +446,7 @@ public struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
   }
 }
 
-public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
+package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   private let rootURL: URL
   private let receiptURL: URL
   private let secrets: any OpenHarmonySigningSecretStoring
@@ -467,7 +467,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     self.nowUTC = nowUTC
   }
 
-  public var receiptPath: String { receiptURL.path }
+  package var receiptPath: String { receiptURL.path }
 
   public func install(
     configuration: OpenHarmonySigningPresetConfiguration,
@@ -600,7 +600,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
   }
 
-  public func loadValidated(
+  package func loadValidated(
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID,
     requireSecrets: Bool = true
   ) throws -> OpenHarmonySigningPresetReceipt {
@@ -613,7 +613,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   /// ArkDeck install into the plaintext expected by hapsigner. This is an
   /// explicit local maintenance boundary: Runtime Jobs never call it and
   /// never read the mutable DevEco material directory.
-  public func normalizeDevEcoSecrets(
+  package func normalizeDevEcoSecrets(
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID
   ) throws -> OpenHarmonySigningSecretNormalization {
     try lock.withLock {
@@ -688,7 +688,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
   }
 
-  public func migrateToSecretEnvelope(
+  package func migrateToSecretEnvelope(
     keystorePassword: Data, keyPassword: Data,
     keyAlias: String? = nil,
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID
@@ -782,7 +782,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   /// password windows for one maintenance action). A new envelope has one ACL
   /// creation boundary; the old item remains a receipt-tracked legacy item so
   /// a failed receipt write is reversible and removal still cleans it up.
-  public func refreshTrustedApplicationAccess(
+  package func refreshTrustedApplicationAccess(
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID
   ) throws {
     try lock.withLock {
@@ -838,7 +838,7 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
   }
 
-  public func secretPair(
+  package func secretPair(
     for receipt: OpenHarmonySigningPresetReceipt
   ) throws -> (keystore: Data, key: Data) {
     if Self.isManagedSDKReleasePreset(receipt) {
@@ -1244,23 +1244,23 @@ public final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
   }
 
-  public static func utcNow() -> String {
+  package static func utcNow() -> String {
     ISO8601DateFormatter().string(from: Date())
   }
 }
 
-public struct OpenHarmonySigningAttemptPaths: Codable, Sendable, Equatable {
+package struct OpenHarmonySigningAttemptPaths: Codable, Sendable, Equatable {
   public let directory: String
-  public let signedHAP: String
-  public let certificateChainReadback: String
-  public let profileReadback: String
-  public let resultRecord: String
+  package let signedHAP: String
+  package let certificateChainReadback: String
+  package let profileReadback: String
+  package let resultRecord: String
 
   /// Provider-owned typed staging path. Runtime Artifact payloads are named
   /// only by Artifact ID, but hap-sign-tool uses the `.hap` suffix while
   /// selecting its package/code-signing path. Keep this derived so durable
   /// actions written before this fix retain the same Codable shape.
-  public var stagedUnsignedHAP: String {
+  package var stagedUnsignedHAP: String {
     URL(fileURLWithPath: directory).appendingPathComponent("unsigned.hap").path
   }
 
@@ -1276,7 +1276,7 @@ public struct OpenHarmonySigningAttemptPaths: Codable, Sendable, Equatable {
   }
 }
 
-public final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
+package final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
   private let rootURL: URL
   private let fileManager: FileManager
 
@@ -1289,7 +1289,7 @@ public final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
     try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: self.rootURL.path)
   }
 
-  public func paths(jobID: String) -> OpenHarmonySigningAttemptPaths {
+  package func paths(jobID: String) -> OpenHarmonySigningAttemptPaths {
     let digest = SHA256Hex.string(of: Data(jobID.utf8))
     let directory = rootURL.appendingPathComponent(String(digest.prefix(32)), isDirectory: true)
     return OpenHarmonySigningAttemptPaths(
@@ -1305,7 +1305,7 @@ public final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
   }
 }
 
-package struct WorkspaceOpenHarmonySigningAction: Sendable, Equatable, Codable {
+public struct WorkspaceOpenHarmonySigningAction: Sendable, Equatable, Codable {
   let jobID: String
   let projectRef: String
   let preset: OpenHarmonySigningPresetReceipt
@@ -1347,7 +1347,7 @@ private struct OpenHarmonySigningResultRecord: Codable, Sendable, Equatable {
 
 /// Keeps ordinary workspace commands on the existing descriptor-bound route
 /// while giving only the closed signing action its PTY/Keychain protocol.
-public struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching {
+package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching {
   private let fallback: any RuntimeProcessDispatching
   private let presetStore: OpenHarmonySigningPresetStore
 
@@ -1359,7 +1359,7 @@ public struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching {
     self.presetStore = presetStore
   }
 
-  public func unavailableReason(providerID: String) -> String? {
+  package func unavailableReason(providerID: String) -> String? {
     fallback.unavailableReason(providerID: providerID)
   }
 

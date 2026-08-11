@@ -34,7 +34,7 @@ import Foundation
 /// What the ticker needs from the control plane. Narrow on purpose: it can
 /// ask which tasks are drivable and it can ask for one step. It has no way
 /// to submit, cancel or resolve anything.
-public protocol HarnessAutoDriveTarget: Sendable {
+package protocol HarnessAutoDriveTarget: Sendable {
   func drivableTaskIDs() async throws -> [String]
   func reconcile(_ htaskID: String) async throws -> HarnessReconcileOutcome
 }
@@ -43,7 +43,7 @@ extension HarnessTaskCoordinator: HarnessAutoDriveTarget {
   /// Freshly derived every wake: a task that reached a terminal state, was
   /// paused, or is waiting on a person drops out without the ticker keeping
   /// any state of its own.
-  public func drivableTaskIDs() async throws -> [String] {
+  package func drivableTaskIDs() async throws -> [String] {
     try await list()
       .filter {
         $0.lifecycle == .created || $0.lifecycle == .running
@@ -53,14 +53,14 @@ extension HarnessTaskCoordinator: HarnessAutoDriveTarget {
   }
 }
 
-public struct HarnessAutoDriveReport: Equatable, Sendable {
-  public let wakes: Int
-  public let reconciles: Int
-  public let dispatchedJobIDs: [String]
+package struct HarnessAutoDriveReport: Equatable, Sendable {
+  package let wakes: Int
+  package let reconciles: Int
+  package let dispatchedJobIDs: [String]
   /// Tasks whose scheduler call crossed the repeated-failure alert threshold
   /// and had not recovered by the end of this run. They are never dropped:
   /// the task's own durable budgets and terminal state remain the stop rule.
-  public let degradedTaskIDs: [String]
+  package let degradedTaskIDs: [String]
 
   public init(
     wakes: Int, reconciles: Int, dispatchedJobIDs: [String], degradedTaskIDs: [String]
@@ -72,18 +72,18 @@ public struct HarnessAutoDriveReport: Equatable, Sendable {
   }
 }
 
-public struct HarnessAutoDriveTicker: Sendable {
+package struct HarnessAutoDriveTicker: Sendable {
   /// Optional environment override. A missing value uses the product default;
   /// `off` or `0` explicitly disables scheduling for maintenance. Malformed
   /// values fail closed instead of silently selecting another cadence.
-  public static let intervalEnvironmentKey = "ARKDECK_HARNESS_AUTODRIVE_SECONDS"
-  public static let defaultIntervalSeconds = 1
-  public static let minimumIntervalSeconds = 1
-  public static let maximumIntervalSeconds = 3600
+  package static let intervalEnvironmentKey = "ARKDECK_HARNESS_AUTODRIVE_SECONDS"
+  package static let defaultIntervalSeconds = 1
+  package static let minimumIntervalSeconds = 1
+  package static let maximumIntervalSeconds = 3600
   /// Consecutive throwing reconciles before the scheduler emits a degraded
   /// alert. It keeps driving: an in-memory scheduler exception is not a new
   /// authority boundary and cannot replace the task's durable budgets.
-  public static let maximumConsecutiveFailures = 3
+  package static let maximumConsecutiveFailures = 3
 
   private let target: any HarnessAutoDriveTarget
   private let intervalSeconds: Int
@@ -107,7 +107,7 @@ public struct HarnessAutoDriveTicker: Sendable {
   /// Effective interval, or `nil` only when explicitly disabled or malformed.
   /// Out-of-range values are off rather than clamped: a run that asked for a
   /// cadence the product will not honour should say so, not silently get one.
-  public static func configuredIntervalSeconds(
+  package static func configuredIntervalSeconds(
     _ environment: [String: String]
   ) -> Int? {
     guard let configured = environment[intervalEnvironmentKey] else {

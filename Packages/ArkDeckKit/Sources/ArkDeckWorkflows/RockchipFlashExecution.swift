@@ -3,7 +3,7 @@ import ArkDeckProcess
 import ArkDeckStorage
 import Foundation
 
-public struct RockchipFlashExecutionRequest: Sendable, Equatable {
+package struct RockchipFlashExecutionRequest: Sendable, Equatable {
   enum Authority: Sendable, Equatable {
     case standingAuthorization(String)
     case evolutionCampaign(RockchipEvolutionCampaignAttemptPermit)
@@ -11,14 +11,14 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
 
   let authority: Authority
   public let archiveURL: URL
-  public let targetLocationSelector: String
+  package let targetLocationSelector: String
 
-  public var authorizationID: String? {
+  package var authorizationID: String? {
     guard case .standingAuthorization(let value) = authority else { return nil }
     return value
   }
 
-  public var evolutionCampaignID: String? {
+  package var evolutionCampaignID: String? {
     guard case .evolutionCampaign(let permit) = authority else { return nil }
     return permit.assertion.campaignID
   }
@@ -61,22 +61,22 @@ public struct RockchipFlashExecutionRequest: Sendable, Equatable {
   }
 }
 
-public enum RockchipFlashExecutionStatus: String, Sendable, Equatable {
+package enum RockchipFlashExecutionStatus: String, Sendable, Equatable {
   case succeeded
   case waitingForRecovery
 }
 
-public enum RockchipExecutionEvidenceClass: String, Sendable, Equatable {
+package enum RockchipExecutionEvidenceClass: String, Sendable, Equatable {
   case production
   case contractFake
 }
 
-public struct RockchipFlashExecutionResult: Sendable, Equatable {
+package struct RockchipFlashExecutionResult: Sendable, Equatable {
   public let sessionID: String
   public let jobID: String
   public let status: RockchipFlashExecutionStatus
-  public let evidenceClass: RockchipExecutionEvidenceClass
-  public let manifestURL: URL?
+  package let evidenceClass: RockchipExecutionEvidenceClass
+  package let manifestURL: URL?
 
   public init(
     sessionID: String,
@@ -106,7 +106,7 @@ public enum RockchipFlashRuntimeDiagnostic: String, Sendable, Equatable, CaseIte
   case enterLoaderCommandCleanLoaderNotObserved
 
   /// Bounded observation code accepted by the evolution campaign contract.
-  public var evolutionFailureCode: String {
+  package var evolutionFailureCode: String {
     "flash.\(rawValue)"
   }
 }

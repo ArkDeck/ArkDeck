@@ -13,7 +13,7 @@ public enum RockchipFlashProfileError: Error, Equatable, Sendable {
   case invalidProfileDefinition(String)
 }
 
-public enum RockchipArchiveMemberClassification: String, Codable, Equatable, Sendable {
+package enum RockchipArchiveMemberClassification: String, Codable, Equatable, Sendable {
   case mappedPartitionImage
   case orphanImageWriteForbidden
   case partitionTable
@@ -21,9 +21,9 @@ public enum RockchipArchiveMemberClassification: String, Codable, Equatable, Sen
   case nonPartitionMetadata
 }
 
-public struct RockchipImagesArchiveMember: Equatable, Sendable {
+package struct RockchipImagesArchiveMember: Equatable, Sendable {
   public let name: String
-  public let sizeBytes: Int64
+  package let sizeBytes: Int64
   public let sha256: String
   public let classification: RockchipArchiveMemberClassification
 
@@ -40,13 +40,13 @@ public struct RockchipImagesArchiveMember: Equatable, Sendable {
   }
 }
 
-public struct RockchipMappedPartition: Equatable, Sendable {
+package struct RockchipMappedPartition: Equatable, Sendable {
   public let writeOrder: Int
   public let partitionName: String
   public let imageMemberName: String
   /// FA-001 §2 sector offset. Doubles as the `wl <BeginSec>` fallback value so no human
   /// ever has to compute an address by hand (design §0).
-  public let offsetSectors: Int64
+  package let offsetSectors: Int64
 
   public init(writeOrder: Int, partitionName: String, imageMemberName: String, offsetSectors: Int64)
   {
@@ -76,18 +76,18 @@ public enum RockchipPrerequisiteStatus: String, Codable, Equatable, Sendable {
   case unknown
 }
 
-public struct RockchipFlashProfile: Equatable, Sendable {
-  public static let profileIdentity = "arkdeck.rockchip-rockusb-flash-profile.dayu200"
-  public static let profileVersion = "1.0.0"
-  public static let targetDeviceModel = "DAYU200 (RK3568)"
+package struct RockchipFlashProfile: Equatable, Sendable {
+  package static let profileIdentity = "arkdeck.rockchip-rockusb-flash-profile.dayu200"
+  package static let profileVersion = "1.0.0"
+  package static let targetDeviceModel = "DAYU200 (RK3568)"
   /// Readiness pin (TASK-RF-002 readiness review): rkdeveloptool 1.32, binary SHA-256.
-  public static let pinnedToolchainFingerprint =
+  package static let pinnedToolchainFingerprint =
     "rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
 
-  public let catalogReference: String
-  public let firmwareVersion: String
+  package let catalogReference: String
+  package let firmwareVersion: String
   /// Exact value expected from `param get const.product.model` after boot.
-  public let runtimeProductModel: String
+  package let runtimeProductModel: String
   /// Exact value expected from `param get const.ohos.fullname` after boot.
   /// It is pinned separately because legacy profiles predate a versioned
   /// archive identity, while current daily profiles require the full build pin.
@@ -95,10 +95,10 @@ public struct RockchipFlashProfile: Equatable, Sendable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [RockchipImagesArchiveMember]
-  public let mappedPartitions: [RockchipMappedPartition]
+  package let mappedPartitions: [RockchipMappedPartition]
   /// Partitions that exist on device but have no archive member; writing them is forbidden
   /// (FA-001 §2). Sector gaps are equally untouchable but have no name to list.
-  public let membershiplessPartitionsWriteForbidden: [String]
+  package let membershiplessPartitionsWriteForbidden: [String]
   public let prerequisites: [RockchipPrerequisiteIdentifier: RockchipPrerequisiteRequirement]
 
   public init(
@@ -308,14 +308,14 @@ public struct RockchipFlashProfile: Equatable, Sendable {
       && dayu200.archiveSizeBytes == Int64(byteCount) ? dayu200 : nil
   }
 
-  public var planDocumentVersion: String { Self.profileVersion }
+  package var planDocumentVersion: String { Self.profileVersion }
 }
 
 // MARK: - Archive validation (REQ-FLASH-003 face used by TASK-RF-002)
 
-public struct RockchipArchiveMemberObservation: Equatable, Sendable {
+package struct RockchipArchiveMemberObservation: Equatable, Sendable {
   public let name: String
-  public let sizeBytes: Int64
+  package let sizeBytes: Int64
   public let sha256: String
 
   public init(name: String, sizeBytes: Int64, sha256: String) {
@@ -325,7 +325,7 @@ public struct RockchipArchiveMemberObservation: Equatable, Sendable {
   }
 }
 
-public struct RockchipImagesArchiveObservation: Equatable, Sendable {
+package struct RockchipImagesArchiveObservation: Equatable, Sendable {
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   public let members: [RockchipArchiveMemberObservation]
@@ -370,11 +370,11 @@ public enum RockchipArchiveViolation: Equatable, Sendable, CustomStringConvertib
 
 /// Any violation blocks both the execute branch and planned-success (AC-FLASH-003-01):
 /// a plan built from an unvalidated archive must not exist at all.
-public enum RockchipArchiveValidationVerdict: Equatable, Sendable {
+package enum RockchipArchiveValidationVerdict: Equatable, Sendable {
   case valid
   case blocked([RockchipArchiveViolation])
 
-  public var blocksExecuteAndPlannedSuccess: Bool {
+  package var blocksExecuteAndPlannedSuccess: Bool {
     if case .blocked = self { return true }
     return false
   }
@@ -435,12 +435,12 @@ extension RockchipFlashProfile {
 
 extension RockchipFlashProfile {
   /// The loader is named by the vendor's own convention, not by this board.
-  public static let loaderMemberName = "MiniLoaderAll.bin"
+  package static let loaderMemberName = "MiniLoaderAll.bin"
   /// Rockchip's partition table always travels as this file.
-  public static let partitionTableMemberName = "parameter.txt"
+  package static let partitionTableMemberName = "parameter.txt"
   /// The partition whose image carries the value the booted device reports as
   /// its build version.
-  public var runtimeVersionPartitionName: String { "system" }
+  package var runtimeVersionPartitionName: String { "system" }
 
   /// What an archive member is, decided from board facts and the member's
   /// name alone.
@@ -480,7 +480,7 @@ extension RockchipFlashProfile {
   /// image, and every partition the archive's own table declares must be one
   /// this board knows. Byte integrity is the Artifact lease's and the
   /// exact-plan authority's (REQ-FLASH-017), not this function's.
-  public func conformance(of build: RockchipImageBuildDescriptor) -> [String] {
+  package func conformance(of build: RockchipImageBuildDescriptor) -> [String] {
     var violations: [String] = []
     let memberNames = Set(build.members.map(\.name))
     for mapped in mappedPartitions where !memberNames.contains(mapped.imageMemberName) {
@@ -516,7 +516,7 @@ extension RockchipFlashProfile {
   /// This is the whole cutover in one function. The comparisons downstream are
   /// unchanged and still fail closed; they now mean "these are the bytes this
   /// plan was built for" instead of "this is a build we shipped knowledge of".
-  public func forBuild(_ build: RockchipImageBuildDescriptor) throws -> RockchipFlashProfile {
+  package func forBuild(_ build: RockchipImageBuildDescriptor) throws -> RockchipFlashProfile {
     let violations = conformance(of: build)
     guard violations.isEmpty else {
       throw DeviceProviderError.unsupportedAction(
@@ -541,7 +541,7 @@ extension RockchipFlashProfile {
   /// One pass: decompress, hash, capture the partition table, scan the system
   /// image for the version. Nothing is extracted and nothing is compared
   /// against a list of builds.
-  public func forArchive(at url: URL) throws -> RockchipFlashProfile {
+  package func forArchive(at url: URL) throws -> RockchipFlashProfile {
     let summary = try GzipTarArchiveReader.summarize(
       fileAt: url,
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: self))
@@ -550,7 +550,7 @@ extension RockchipFlashProfile {
   }
 
   /// The one published DAYU200 reference resolves to the sole board profile.
-  public static func board(reference: String) -> RockchipFlashProfile? {
+  package static func board(reference: String) -> RockchipFlashProfile? {
     reference == dayu200.catalogReference ? dayu200 : nil
   }
 }

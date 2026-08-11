@@ -1,5 +1,5 @@
 import ArkDeckCore
 
-public enum ArkDeckWorkflowsModule {
+package enum ArkDeckWorkflowsModule {
   public static let identifier = "ArkDeckWorkflows"
 }

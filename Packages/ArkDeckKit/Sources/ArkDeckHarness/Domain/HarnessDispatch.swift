@@ -397,7 +397,7 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
     self.updatedAtUTC = try container.decode(String.self, forKey: .updatedAtUTC)
   }
 
-  package var isExecutableUnderCurrentSchema: Bool {
+  public var isExecutableUnderCurrentSchema: Bool {
     schemaVersion == Self.schemaVersion
   }
 
@@ -427,14 +427,14 @@ public struct HarnessDispatchIntent: Equatable, Sendable, Codable {
 /// indistinguishable from the first attempt to the engine's dedup path.
 /// A clock or a random suffix here would silently turn recovery into a
 /// second side effect.
-public enum HarnessRequestIdentity {
-  public static func inputsDigest(_ inputs: [String: JSONValue]) -> String {
+package enum HarnessRequestIdentity {
+  package static func inputsDigest(_ inputs: [String: JSONValue]) -> String {
     let encoder = CanonicalJSONEncoders.canonical()
     let data = (try? encoder.encode(inputs)) ?? Data("{}".utf8)
     return SHA256Hex.string(of: data)
   }
 
-  public static func derive(
+  package static func derive(
     htaskID: String,
     round: Int,
     decisionID: String,

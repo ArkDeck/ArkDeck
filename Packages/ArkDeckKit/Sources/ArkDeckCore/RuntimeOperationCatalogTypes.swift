@@ -301,10 +301,10 @@ public enum RuntimeOperationCatalog {
 /// Resolves the effect of the exact typed request the runtime will
 /// materialize. Keeping this rule in `ArkDeckCore` gives authorization,
 /// execution and higher-level bounded-budget accounting one source of truth.
-public enum CatalogOperationEffectResolver {
+package enum CatalogOperationEffectResolver {
   /// The maximum effect over the steps selected by these exact inputs.
   /// Optional steps that will not run do not raise the result.
-  public static func effectiveEffect(
+  package static func effectiveEffect(
     descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
   ) -> WorkflowEffect {
     var effect = descriptor.minimumEffect
@@ -317,7 +317,7 @@ public enum CatalogOperationEffectResolver {
   /// Whether a catalog step participates in the exact materialized plan.
   /// A step can be mandatory when selected yet switched off by a typed input;
   /// that is distinct from an optional step whose failure may be tolerated.
-  public static func stepIsSelected(
+  package static func stepIsSelected(
     _ step: CatalogStepDescriptor,
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
@@ -339,7 +339,7 @@ public enum CatalogOperationEffectResolver {
   /// Typed selection rules for published optional steps. Defaults mirror the
   /// catalog operation's input defaults and therefore fail closed with the
   /// same plan the runtime will execute.
-  public static func optionalStepIsSelected(
+  package static func optionalStepIsSelected(
     _ step: CatalogStepDescriptor,
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]

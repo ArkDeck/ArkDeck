@@ -3,7 +3,7 @@ import Foundation
 
 /// Metadata-only Artifact inventory returned after the Runtime has reached a
 /// terminal. Artifact contents never cross this verification surface.
-public struct RuntimeHeadlessArtifact: Codable, Sendable, Equatable {
+package struct RuntimeHeadlessArtifact: Codable, Sendable, Equatable {
   public let artifactID: String
   public let jobID: String
   public let name: String
@@ -29,30 +29,30 @@ public struct RuntimeHeadlessArtifact: Codable, Sendable, Equatable {
   }
 }
 
-public struct RuntimeHeadlessVerificationChecks: Codable, Sendable, Equatable {
-  public let udsHealthVerified: Bool
-  public let terminalReceiptVerified: Bool
-  public let trustedEvidenceVerified: Bool
-  public let artifactsVerified: Bool
-  public let runtimePostflightVerified: Bool
+package struct RuntimeHeadlessVerificationChecks: Codable, Sendable, Equatable {
+  package let udsHealthVerified: Bool
+  package let terminalReceiptVerified: Bool
+  package let trustedEvidenceVerified: Bool
+  package let artifactsVerified: Bool
+  package let runtimePostflightVerified: Bool
 }
 
 /// Closed-loop proof for one headless observation. `runtimeVerified` means the
 /// daemon-owned UDS receipt, immutable Artifact inventory and terminal
 /// postflight agree. It is intentionally not named `REAL_DEVICE_PASS`: test
 /// fixtures and simulations must never be promoted to hardware evidence.
-public struct RuntimeHeadlessVerificationReport: Codable, Sendable, Equatable {
+package struct RuntimeHeadlessVerificationReport: Codable, Sendable, Equatable {
   public let schemaVersion: String
   public let classification: String
-  public let daemonCatalogDigest: String
-  public let receipt: RuntimeAgentExecutionReceipt
-  public let artifactInventory: [RuntimeHeadlessArtifact]
+  package let daemonCatalogDigest: String
+  package let receipt: RuntimeAgentExecutionReceipt
+  package let artifactInventory: [RuntimeHeadlessArtifact]
   public let checks: RuntimeHeadlessVerificationChecks
   public let blockers: [String]
-  public let runtimeVerified: Bool
+  package let runtimeVerified: Bool
 }
 
-public enum RuntimeHeadlessVerificationOutcome: Sendable, Equatable {
+package enum RuntimeHeadlessVerificationOutcome: Sendable, Equatable {
   case verified(RuntimeHeadlessVerificationReport)
   case awaitingHumanAction(RuntimeHumanActionReceipt, RuntimeAgentExecutionReceipt)
   case failed(reason: String, report: RuntimeHeadlessVerificationReport)
@@ -64,7 +64,7 @@ public enum RuntimeHeadlessVerificationOutcome: Sendable, Equatable {
 ///
 /// This type owns no provider, process, argv or capability-administration
 /// surface. Device dispatch remains exclusively inside `arkdeck-agentd`.
-public struct RuntimeHeadlessVerifier: Sendable {
+package struct RuntimeHeadlessVerifier: Sendable {
   private static let operationReference = "observe.device@1"
   private static let requiredArtifactNames: Set<String> = [
     "binding-snapshot.json", "device-facts.json", "tool-facts.json",
@@ -86,7 +86,7 @@ public struct RuntimeHeadlessVerifier: Sendable {
       client: client, stateDirectory: stateDirectory, nowUTC: nowUTC)
   }
 
-  public func verifyObserveDevice(
+  package func verifyObserveDevice(
     targetID: String? = nil,
     maximumWaitSeconds: Int = 90,
     executionID: String = UUID().uuidString.lowercased()

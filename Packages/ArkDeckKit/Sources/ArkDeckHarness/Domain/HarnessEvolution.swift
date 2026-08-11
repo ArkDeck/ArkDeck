@@ -559,7 +559,7 @@ public struct HarnessPromotionCandidate: Equatable, Codable, Sendable {
   }
 }
 
-public enum HarnessPromotionGate {
+package enum HarnessPromotionGate {
   public static func evaluate(
     snapshot: HarnessTaskSnapshot,
     attempt: HarnessAttempt,

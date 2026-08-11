@@ -31,16 +31,16 @@ import ArkDeckRuntime
 import CryptoKit
 import Foundation
 
-public struct AnalyzerProfile: Sendable, Equatable {
+package struct AnalyzerProfile: Sendable, Equatable {
   /// Closed reference the step contract also enforces.
-  public let analyzerRef: String
+  package let analyzerRef: String
   /// The analyzer's own version, recorded on every derived artifact so a
   /// conclusion can be traced to the code that produced it.
-  public let analyzerVersion: String
-  public let executablePath: String
+  package let analyzerVersion: String
+  package let executablePath: String
   public let executableSHA256: String
-  public let fixedArguments: [String]
-  public let timeoutSeconds: Int
+  package let fixedArguments: [String]
+  package let timeoutSeconds: Int
 
   public init(
     analyzerRef: String,
@@ -59,30 +59,30 @@ public struct AnalyzerProfile: Sendable, Equatable {
   }
 }
 
-package struct AnalyzerInvocation: Sendable, Equatable, Codable {
-  public let analyzerRef: String
-  public let analyzerVersion: String
+public struct AnalyzerInvocation: Sendable, Equatable, Codable {
+  package let analyzerRef: String
+  package let analyzerVersion: String
   public let executableSHA256: String
   public let arguments: [String]
-  public let timeoutSeconds: Int
-  public let sourceArtifactID: String
-  public let sourceSHA256: String
-  public let sourceByteCount: Int
+  package let timeoutSeconds: Int
+  package let sourceArtifactID: String
+  package let sourceSHA256: String
+  package let sourceByteCount: Int
 }
 
-package enum AnalyzerProviderAction: Sendable, Equatable, Codable {
+public enum AnalyzerProviderAction: Sendable, Equatable, Codable {
   case analyze(AnalyzerInvocation)
 }
 
-public struct AnalyzerProvider: DeviceProvider {
-  public static let crashSignature = "analyzer.extract-crash-signature@1"
-  public static let hilogSummary = "analyzer.summarize-hilog@1"
-  public static let traceSummary = "analyzer.summarize-trace@1"
+package struct AnalyzerProvider: DeviceProvider {
+  package static let crashSignature = "analyzer.extract-crash-signature@1"
+  package static let hilogSummary = "analyzer.summarize-hilog@1"
+  package static let traceSummary = "analyzer.summarize-trace@1"
 
   /// Which analyzer each published operation is allowed to name. The mapping
   /// lives here rather than in the request: an operation cannot be pointed at
   /// a different analyzer by its caller.
-  public static let analyzerForOperation: [String: String] = [
+  package static let analyzerForOperation: [String: String] = [
     crashSignature: "crash-signature@1",
     hilogSummary: "hilog-summary@1",
     traceSummary: "trace-summary@1",
@@ -91,7 +91,7 @@ public struct AnalyzerProvider: DeviceProvider {
   /// The artifact each analyzer publishes. One table, used by both the
   /// descriptors and the engine's step materialization, so a rename cannot
   /// leave the two disagreeing about where the result landed.
-  public static func derivedArtifactName(_ analyzerRef: String) -> String {
+  package static func derivedArtifactName(_ analyzerRef: String) -> String {
     switch analyzerRef {
     case "crash-signature@1": return "crash-signature.json"
     case "hilog-summary@1": return "hilog-summary.json"
@@ -109,7 +109,7 @@ public struct AnalyzerProvider: DeviceProvider {
 
   public var providerID: String { CatalogProvider.analyzer.rawValue }
 
-  public func runtimeAvailability(
+  package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard let analyzerRef = Self.analyzerForOperation[operation.reference] else {
@@ -130,7 +130,7 @@ public struct AnalyzerProvider: DeviceProvider {
 
   /// Host-only: there is no device, and inventing facts for one is exactly
   /// what the host-only admission path exists to avoid.
-  public func resolveFacts(targetID: String) async throws -> ProviderFacts {
+  package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     throw DeviceProviderError.factsUnavailable(
       "analyzer provider is host-only: it has no device facts for \(targetID)")
   }
@@ -269,14 +269,14 @@ public struct AnalyzerProvider: DeviceProvider {
     return .confirmedNotExecuted
   }
 
-  public func reconciliationReadback(
+  package func reconciliationReadback(
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan? {
     nil
   }
 
-  public func verifyReconciliationReadback(
+  package func verifyReconciliationReadback(
     receipt: ProviderProcessReceipt,
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
@@ -292,7 +292,7 @@ public struct AnalyzerProvider: DeviceProvider {
 /// Resolves the pinned executable for an analysis plan. Identity is checked
 /// by the dispatcher against this table, so a drifted binary cannot run under
 /// a registered analyzer's name (CHG-2026-055, TASK-HFA-007).
-public struct AnalyzerExecutableResolver: RuntimeExecutableResolving {
+package struct AnalyzerExecutableResolver: RuntimeExecutableResolving {
   private let table: [String: ResolvedExecutable]
 
   /// One pinned binary per host, with each analyzer selecting its behaviour
@@ -309,7 +309,7 @@ public struct AnalyzerExecutableResolver: RuntimeExecutableResolving {
     ].compactMapValues { $0 }
   }
 
-  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+  package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
     guard let executable = table[providerID] else {
       throw DeviceProviderError.unsupportedAction("analyzer.executableUnavailable")
     }

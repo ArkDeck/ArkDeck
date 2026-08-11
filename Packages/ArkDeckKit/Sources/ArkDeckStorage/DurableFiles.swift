@@ -50,8 +50,8 @@ public enum DurableFileError: Error, Equatable, Sendable {
 /// both a first publication and a replacement on the same volume.  The file
 /// and its parent directory are synchronised on either path, so a successful
 /// return makes the new name durable across a sudden process loss.
-public enum DurableFileWriter {
-  public static func createOrReplaceAtomically(destination: URL, data: Data) throws {
+package enum DurableFileWriter {
+  package static func createOrReplaceAtomically(destination: URL, data: Data) throws {
     try DurableFilePrimitives.requireAbsoluteFileURL(destination)
     let directory = destination.deletingLastPathComponent()
     try DurableFilePrimitives.createDirectoryIfNeeded(directory)
@@ -133,8 +133,8 @@ enum SessionTerminalPublicationLock {
 }
 
 public struct JournalAbandonmentContext: Equatable, Sendable {
-  public let requiredHazards: [String]
-  public let requiresOutcomeUnknown: Bool
+  package let requiredHazards: [String]
+  package let requiresOutcomeUnknown: Bool
 
   public init(requiredHazards: [String], requiresOutcomeUnknown: Bool) {
     self.requiredHazards = requiredHazards
@@ -142,7 +142,7 @@ public struct JournalAbandonmentContext: Equatable, Sendable {
   }
 }
 
-public protocol DurableJournalAppending: Sendable {
+package protocol DurableJournalAppending: Sendable {
   func appendAndSynchronize(_ event: JournalEvent) throws
   func abandonmentContext() throws -> JournalAbandonmentContext
 }
@@ -457,7 +457,7 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
 
 }
 
-public final class WriteAheadIntentGate: @unchecked Sendable {
+package final class WriteAheadIntentGate: @unchecked Sendable {
   private let journal: any DurableJournalAppending
 
   public init(journal: any DurableJournalAppending) {
@@ -477,13 +477,13 @@ public final class WriteAheadIntentGate: @unchecked Sendable {
   }
 }
 
-public struct JournalCheckpoint: Codable, Equatable, Sendable {
+package struct JournalCheckpoint: Codable, Equatable, Sendable {
   public let schemaVersion: String
   public let sessionID: String
   public let jobID: String
-  public let journalSequence: Int
+  package let journalSequence: Int
   public let state: String
-  public let updatedAt: String
+  package let updatedAt: String
 
   public init(
     sessionID: String,
@@ -532,11 +532,11 @@ public struct JournalCheckpoint: Codable, Equatable, Sendable {
   }
 }
 
-public protocol JournalCheckpointSaving: Sendable {
+package protocol JournalCheckpointSaving: Sendable {
   func save(_ checkpoint: JournalCheckpoint) throws
 }
 
-public final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unchecked Sendable {
+package final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unchecked Sendable {
   public let url: URL
   private let lock = NSLock()
   private let faultInjector: DurabilityFaultInjector
@@ -601,7 +601,7 @@ public final class AtomicJournalCheckpointStore: JournalCheckpointSaving, @unche
   }
 }
 
-public final class DurableOutcomeCheckpointGate: @unchecked Sendable {
+package final class DurableOutcomeCheckpointGate: @unchecked Sendable {
   private let journal: any DurableJournalAppending
   private let checkpointStore: any JournalCheckpointSaving
 
@@ -623,25 +623,25 @@ public final class DurableOutcomeCheckpointGate: @unchecked Sendable {
   }
 }
 
-package enum DurableFilePrimitives {
-  package static func requireAbsoluteFileURL(_ url: URL) throws {
+public enum DurableFilePrimitives {
+  public static func requireAbsoluteFileURL(_ url: URL) throws {
     guard url.isFileURL, url.path.hasPrefix("/") else {
       throw DurableFileError.pathMustBeAbsolute(url.path)
     }
   }
 
-  package static func createDirectoryIfNeeded(_ url: URL) throws {
+  public static func createDirectoryIfNeeded(_ url: URL) throws {
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
   }
 
-  package static func rejectSymbolicLink(_ url: URL) throws {
+  public static func rejectSymbolicLink(_ url: URL) throws {
     var status = stat()
     if lstat(url.path, &status) == 0, status.st_mode & S_IFMT == S_IFLNK {
       throw DurableFileError.symbolicLinkRejected(url.path)
     }
   }
 
-  package static func writeAll(_ data: Data, descriptor: Int32, path: String) throws {
+  public static func writeAll(_ data: Data, descriptor: Int32, path: String) throws {
     try data.withUnsafeBytes { rawBuffer in
       guard let base = rawBuffer.baseAddress else { return }
       var offset = 0
@@ -657,7 +657,7 @@ package enum DurableFilePrimitives {
     }
   }
 
-  package static func fullSync(_ descriptor: Int32, path: String) throws {
+  public static func fullSync(_ descriptor: Int32, path: String) throws {
     guard Darwin.fsync(descriptor) == 0 else {
       throw DurableFileError.syncFailed(path: path, errno: errno)
     }
@@ -666,7 +666,7 @@ package enum DurableFilePrimitives {
     }
   }
 
-  package static func discardTornTail(
+  public static func discardTornTail(
     at url: URL,
     descriptor: Int32,
     durableRecordCount: Int
@@ -693,7 +693,7 @@ package enum DurableFilePrimitives {
     try syncDirectory(url.deletingLastPathComponent())
   }
 
-  package static func syncDirectory(_ url: URL) throws {
+  public static func syncDirectory(_ url: URL) throws {
     let descriptor = Darwin.open(url.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
     guard descriptor >= 0 else { throw DurableFileError.openFailed(path: url.path, errno: errno) }
     defer { Darwin.close(descriptor) }

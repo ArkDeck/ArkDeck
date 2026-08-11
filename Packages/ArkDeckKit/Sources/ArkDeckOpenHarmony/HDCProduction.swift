@@ -47,7 +47,7 @@ enum HDCProcessCommandError: Error, Sendable, Equatable {
 
 /// The command family is selected before a process starts.  A successful
 /// result cannot be borrowed by a different HDC command.
-public enum HDCRegisteredCommandFamily: Sendable, Equatable {
+package enum HDCRegisteredCommandFamily: Sendable, Equatable {
   case uninstall
   case checkserver
   case version
@@ -218,7 +218,7 @@ private struct HDCRegisteredSemanticBinding: Sendable, Equatable {
 /// baseline parser's conservative failure precedence, then accepts success only
 /// for the registered uninstall command's byte-exact stdout capture. Marker
 /// fragments never promote an unregistered command or raw output to success.
-public struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
+package struct HDCRegisteredSemanticEvaluator: ProcessSemanticEvaluating {
   public typealias SemanticResult = HDCCommandSemanticResult
 
   private let binding: HDCRegisteredSemanticBinding?
@@ -681,7 +681,7 @@ actor HDCClientVersionProcessProbe {
 /// runs the registered, read-only `checkserver` probe. It can observe health,
 /// but without a process/server identity it can never claim external or
 /// managed ownership and can never automatically restart this endpoint.
-public actor HDCServerProcessSupervisor {
+package actor HDCServerProcessSupervisor {
   private let supervisor: HDCServerSupervisor
   private let runner: HDCProcessCommandRunner
   private let clientVersionProbe: HDCClientVersionProcessProbe
@@ -797,7 +797,7 @@ public actor HDCServerProcessSupervisor {
   /// launched when the selected executable, exact loopback endpoint, or
   /// exactly-one-existing-listener precondition is missing.
   @discardableResult
-  public func observeRegisteredExistingServer(
+  package func observeRegisteredExistingServer(
     endpoint: HDCServerEndpointSelection,
     toolchain: HDCCandidate
   ) async -> HDCRegisteredServerObservationResult {
@@ -1077,7 +1077,7 @@ public enum HDCServerLifecyclePostDispatchObservation: Sendable, Equatable {
 /// recorded before the child process starts. Automatic paths retain no
 /// reference to it. The tests inject the local fake executable, and this type
 /// performs no discovery or PATH lookup.
-package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
+public actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
   package typealias PostDispatchProbe =
     @Sendable (HDCServerLifecycleStep) async
     -> HDCServerLifecyclePostDispatchObservation?
@@ -1282,19 +1282,19 @@ package actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
 }
 
 
-public enum HDCApplicationDiagnosticsConfiguration {
-  public static let userConfiguredPathsPreferenceKey = "ArkDeck.HDC.userConfiguredPaths"
-  public static let userConfiguredBookmarksPreferenceKey =
+package enum HDCApplicationDiagnosticsConfiguration {
+  package static let userConfiguredPathsPreferenceKey = "ArkDeck.HDC.userConfiguredPaths"
+  package static let userConfiguredBookmarksPreferenceKey =
     "ArkDeck.HDC.userConfiguredSecurityScopedBookmarks"
-  public static let devecoSDKPathsPreferenceKey = "ArkDeck.HDC.devecoSDKPaths"
-  public static let openHarmonySDKPathsPreferenceKey = "ArkDeck.HDC.openHarmonySDKPaths"
+  package static let devecoSDKPathsPreferenceKey = "ArkDeck.HDC.devecoSDKPaths"
+  package static let openHarmonySDKPathsPreferenceKey = "ArkDeck.HDC.openHarmonySDKPaths"
   /// A support/automation override for the same explicit candidate setting.
   /// It is intentionally singular and absolute-path-only; it never enables
   /// PATH discovery or a UI-test fixture provider.
-  public static let userConfiguredPathLaunchArgument = "--arkdeck-hdc-user-configured-path"
-  public static let userConfiguredPathEnvironmentKey = "ARKDECK_HDC_USER_CONFIGURED_PATH"
+  package static let userConfiguredPathLaunchArgument = "--arkdeck-hdc-user-configured-path"
+  package static let userConfiguredPathEnvironmentKey = "ARKDECK_HDC_USER_CONFIGURED_PATH"
 
-  public static func discoveryRequest(
+  package static func discoveryRequest(
     userDefaults: UserDefaults = .standard,
     arguments: [String] = ProcessInfo.processInfo.arguments,
     environment: [String: String] = ProcessInfo.processInfo.environment
@@ -1318,7 +1318,7 @@ public enum HDCApplicationDiagnosticsConfiguration {
 
   /// Called with a URL returned by the standard file importer. The bookmark,
   /// not the path string, is the persistent authority used after relaunch.
-  public static func persistUserConfiguredExecutable(
+  package static func persistUserConfiguredExecutable(
     _ url: URL,
     userDefaults: UserDefaults = .standard
   ) throws {
@@ -1339,7 +1339,7 @@ public enum HDCApplicationDiagnosticsConfiguration {
 
   /// Explicit UI-automation/support reset. It removes only ArkDeck's HDC
   /// selection metadata and bookmark; it never touches the selected file.
-  public static func clearUserConfiguredExecutable(
+  package static func clearUserConfiguredExecutable(
     userDefaults: UserDefaults = .standard
   ) {
     userDefaults.removeObject(forKey: userConfiguredBookmarksPreferenceKey)
@@ -1575,7 +1575,7 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
   /// Package-only immutable overlay used by Workflows after one explicit
   /// observation refresh. It copies the complete diagnostics value and cannot
   /// manufacture a source, runner, argv, or lifecycle capability.
-  package func overlayingDeviceEvents(
+  public func overlayingDeviceEvents(
     _ events: [HDCDeviceObservationPresentationEvent]
   ) -> HDCDiagnosticsPresentation {
     HDCDiagnosticsPresentation(
@@ -1630,7 +1630,7 @@ public struct HDCDiagnosticsPresentation: Sendable, Equatable {
 /// Session-backed supervisor.  It performs external-first discovery only; it
 /// never runs an HDC command, and reports that absence as a concrete state
 /// rather than leaving the UI permanently `unprobed`.
-public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
+package actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   private let discoveryRequest: HDCDiscoveryRequest
   private let inheritedEnvironment: [String: String]
 
@@ -1710,7 +1710,7 @@ public actor HDCReadOnlyDiagnosticsUseCase: HDCDiagnosticsStateProviding {
 /// the configured HDC candidate. Session bootstrap must explicitly attach the
 /// durable, supervisor-backed use case before preview/confirmation is enabled;
 /// attaching a UI fixture or a bare executor is impossible through this API.
-public actor HDCApplicationDiagnosticsProvider: HDCDiagnosticsStateProviding {
+package actor HDCApplicationDiagnosticsProvider: HDCDiagnosticsStateProviding {
   public static let shared = HDCApplicationDiagnosticsProvider()
 
   private var readOnlyDiagnostics: HDCReadOnlyDiagnosticsUseCase
@@ -1727,14 +1727,14 @@ public actor HDCApplicationDiagnosticsProvider: HDCDiagnosticsStateProviding {
 
   /// Called only by production Session bootstrap after it has constructed the
   /// supervisor and its durable lifecycle audit adapter.
-  public func attachSessionDiagnostics(_ useCase: HDCServerDiagnosticsUseCase) {
+  package func attachSessionDiagnostics(_ useCase: HDCServerDiagnosticsUseCase) {
     sessionDiagnostics = useCase
   }
 
   /// Rebuilds the read-only phase after the App stores a new user-selected
   /// bookmark. Existing Session confirmation state is detached so authority
   /// from the previous candidate cannot survive the selection change.
-  public func configure(
+  package func configure(
     discoveryRequest: HDCDiscoveryRequest,
     inheritedEnvironment: [String: String] = ProcessInfo.processInfo.environment
   ) {
@@ -1745,7 +1745,7 @@ public actor HDCApplicationDiagnosticsProvider: HDCDiagnosticsStateProviding {
 
   /// A finished or invalidated Session must not leave stale confirmation
   /// presentation reachable from a later App window.
-  public func detachSessionDiagnostics() {
+  package func detachSessionDiagnostics() {
     sessionDiagnostics = nil
   }
 
@@ -1845,7 +1845,7 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
     return await presentation()
   }
 
-  package func applyLifecycleDispatchResult(_ result: HDCServerLifecycleDispatchResult) async {
+  public func applyLifecycleDispatchResult(_ result: HDCServerLifecycleDispatchResult) async {
     switch result {
     case .completed(.succeeded(let generation)):
       lifecycleRecovery = .unavailable(
@@ -1868,7 +1868,7 @@ public actor HDCServerDiagnosticsUseCase: HDCDiagnosticsStateProviding {
   /// Applies only the result of the registered selected-device authorization
   /// probe. Callers cannot set authorization from UI state or an unbound
   /// device row.
-  package func applyRegisteredAuthorization(_ state: HDCAuthorizationState) {
+  public func applyRegisteredAuthorization(_ state: HDCAuthorizationState) {
     authorization = state
   }
 

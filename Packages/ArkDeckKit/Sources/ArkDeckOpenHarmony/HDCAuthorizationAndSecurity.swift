@@ -199,7 +199,7 @@ public enum HDCSubserverCapability: Sendable, Equatable {
   case unknown(reason: String)
 }
 
-public struct HDCSecurityPresentation: Sendable, Equatable {
+package struct HDCSecurityPresentation: Sendable, Equatable {
   public let authorization: HDCAuthorizationState
   public let protection: HDCChannelProtectionState
   public let tcpWarning: String?
@@ -239,7 +239,7 @@ public enum HDCLifecycleRecoveryPresentation: Sendable, Equatable {
 /// App-facing diagnostics use case.  It intentionally has no lifecycle
 /// executor parameter, so UI actions can create a durable preview and user
 /// confirmation but can never manufacture a `kill` or `kill -r` dispatch.
-public protocol HDCDiagnosticsStateProviding: Sendable {
+package protocol HDCDiagnosticsStateProviding: Sendable {
   func refresh() async -> HDCDiagnosticsPresentation
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation
   func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation

@@ -27,11 +27,11 @@ import Foundation
 /// Canonical task projection keys shared by the Harness encoder and bounded
 /// consumers. The two legacy aliases remain read-only compatibility keys for
 /// decision-context documents; new task projections write lifecycle/stage.
-public enum HarnessTaskWireField {
+package enum HarnessTaskWireField {
   public static let lifecycle = "lifecycle"
   public static let stage = "stage"
-  public static let legacyStatus = "status"
-  public static let legacyPhase = "phase"
+  package static let legacyStatus = "status"
+  package static let legacyPhase = "phase"
 }
 
 public enum HarnessTaskType: String, CaseIterable, Codable, Sendable {
@@ -184,10 +184,10 @@ public enum HarnessTaskConditionSet {
   }
 }
 
-public struct HarnessTaskStageGate: Equatable, Sendable {
+package struct HarnessTaskStageGate: Equatable, Sendable {
   public let from: HarnessTaskStage
   public let to: HarnessTaskStage
-  public let requiredConditions: [HarnessTaskConditionName]
+  package let requiredConditions: [HarnessTaskConditionName]
 
   public init(
     from: HarnessTaskStage,
@@ -204,7 +204,7 @@ public struct HarnessTaskStageGate: Equatable, Sendable {
 /// to contract tests, and every condition in a cell is enforced by the same
 /// reducer path. Recovery/fallback edges keep their stage semantics but have
 /// no positive gate: they retreat to analysis without claiming fresh facts.
-public enum HarnessTaskStageGates {
+package enum HarnessTaskStageGates {
   public static let all: [HarnessTaskStageGate] = [
     .init(
       from: .initializing, to: .reproducing,
@@ -675,24 +675,24 @@ public struct HarnessTaskProjection: Equatable, Sendable, Codable {
 
 /// One requested state change. Callers describe *what they observed* and
 /// *what it should mean*; the reducer decides whether that is legal.
-public struct HarnessTaskTransition: Equatable, Sendable {
-  public let causation: HarnessTaskCausation
+package struct HarnessTaskTransition: Equatable, Sendable {
+  package let causation: HarnessTaskCausation
   public let reasonCode: String
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
-  public let conditions: [HarnessTaskCondition]
+  package let conditions: [HarnessTaskCondition]
   public let activeRound: Int
   public let activeJobID: String?
-  public let consumedBudget: HarnessConsumedBudget
+  package let consumedBudget: HarnessConsumedBudget
   public let jobID: String?
-  public let evaluationID: String?
-  public let artifactRefs: [String]
-  public let observedState: [String: JSONValue]?
-  public let noProgressRounds: Int?
+  package let evaluationID: String?
+  package let artifactRefs: [String]
+  package let observedState: [String: JSONValue]?
+  package let noProgressRounds: Int?
   public let cancelRequested: Bool
   public let result: HarnessTaskResult?
-  public let atUTC: String
+  package let atUTC: String
 
   public init(
     causation: HarnessTaskCausation,
@@ -1115,7 +1115,7 @@ public enum HarnessTaskTransitionError: Error, Equatable, Sendable {
 /// It is pure: no clock, no storage, no runtime. Everything it needs is in
 /// the previous snapshot and the requested transition, which is what makes
 /// "no other write path exists" a checkable property rather than a habit.
-public enum HarnessTaskStateReducer {
+package enum HarnessTaskStateReducer {
   public static func apply(
     _ transition: HarnessTaskTransition,
     to snapshot: HarnessTaskSnapshot

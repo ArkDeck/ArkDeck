@@ -8,13 +8,13 @@
 import ArkDeckCore
 import Foundation
 
-public enum HarnessAgentMessageRole: String, Codable, Sendable {
+package enum HarnessAgentMessageRole: String, Codable, Sendable {
   case user
   case assistant
   case tool
 }
 
-public struct HarnessAgentToolCall: Equatable, Sendable, Codable {
+package struct HarnessAgentToolCall: Equatable, Sendable, Codable {
   public let id: String
   public let name: String
   public let input: JSONValue
@@ -26,11 +26,11 @@ public struct HarnessAgentToolCall: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessAgentMessage: Equatable, Sendable, Codable {
+package struct HarnessAgentMessage: Equatable, Sendable, Codable {
   public let role: HarnessAgentMessageRole
   public let text: String?
-  public let toolCalls: [HarnessAgentToolCall]
-  public let toolCallID: String?
+  package let toolCalls: [HarnessAgentToolCall]
+  package let toolCallID: String?
 
   public init(
     role: HarnessAgentMessageRole,
@@ -48,7 +48,7 @@ public struct HarnessAgentMessage: Equatable, Sendable, Codable {
     HarnessAgentMessage(role: .user, text: text)
   }
 
-  public static func assistant(
+  package static func assistant(
     _ text: String, toolCalls: [HarnessAgentToolCall]
   ) -> HarnessAgentMessage {
     HarnessAgentMessage(
@@ -61,16 +61,16 @@ public struct HarnessAgentMessage: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessAgentContext: Equatable, Sendable, Codable {
-  public let systemPrompt: String
-  public var messages: [HarnessAgentMessage]
+package struct HarnessAgentContext: Equatable, Sendable, Codable {
+  package let systemPrompt: String
+  package var messages: [HarnessAgentMessage]
 
   public init(systemPrompt: String, messages: [HarnessAgentMessage] = []) {
     self.systemPrompt = systemPrompt
     self.messages = messages
   }
 
-  public var encodedByteCount: Int {
+  package var encodedByteCount: Int {
     let encoder = CanonicalJSONEncoders.canonical()
     return ((try? encoder.encode(self)) ?? Data()).count
   }
@@ -142,11 +142,11 @@ public struct HarnessAgentContext: Equatable, Sendable, Codable {
   }
 }
 
-public struct HarnessAgentToolResult: Equatable, Sendable {
+package struct HarnessAgentToolResult: Equatable, Sendable {
   /// Bounded content sent back to the model.
-  public let modelContent: String
+  package let modelContent: String
   /// Smaller projection suitable for a terminal or UI event.
-  public let displayContent: String
+  package let displayContent: String
 
   public init(modelContent: String, displayContent: String) {
     self.modelContent = modelContent
@@ -154,7 +154,7 @@ public struct HarnessAgentToolResult: Equatable, Sendable {
   }
 }
 
-public struct HarnessAgentTool: Sendable {
+package struct HarnessAgentTool: Sendable {
   public let name: String
   public let description: String
   public let parameters: JSONValue
@@ -179,19 +179,19 @@ public struct HarnessAgentTool: Sendable {
   }
 }
 
-public enum HarnessAgentModelStopReason: String, Equatable, Sendable, Codable {
+package enum HarnessAgentModelStopReason: String, Equatable, Sendable, Codable {
   case endTurn
   case toolUse
   case maxTokens
 }
 
-public enum HarnessAgentModelEvent: Equatable, Sendable {
+package enum HarnessAgentModelEvent: Equatable, Sendable {
   case textDelta(String)
   case toolCall(HarnessAgentToolCall)
   case completed(HarnessAgentModelStopReason)
 }
 
-public protocol HarnessAgentModelGateway: Sendable {
+package protocol HarnessAgentModelGateway: Sendable {
   var modelDescriptor: HarnessModelDescriptor { get }
   func stream(
     context: HarnessAgentContext,
@@ -199,7 +199,7 @@ public protocol HarnessAgentModelGateway: Sendable {
   ) -> AsyncThrowingStream<HarnessAgentModelEvent, Error>
 }
 
-public enum HarnessAgentTurnStopReason: String, Equatable, Sendable, Codable {
+package enum HarnessAgentTurnStopReason: String, Equatable, Sendable, Codable {
   case endTurn
   case maxTokens
   case aborted
@@ -207,7 +207,7 @@ public enum HarnessAgentTurnStopReason: String, Equatable, Sendable, Codable {
   case budgetExhausted
 }
 
-public enum HarnessAgentEvent: Equatable, Sendable {
+package enum HarnessAgentEvent: Equatable, Sendable {
   case assistantText(String)
   case toolCall(HarnessAgentToolCall)
   case toolResult(id: String, name: String, displayContent: String)
@@ -215,13 +215,13 @@ public enum HarnessAgentEvent: Equatable, Sendable {
   case turnEnded(HarnessAgentTurnStopReason)
 }
 
-public struct HarnessAgentLoopLimits: Equatable, Sendable {
-  public let maximumModelCalls: Int
-  public let maximumToolCalls: Int
-  public let maximumMessages: Int
-  public let maximumContextBytes: Int
-  public let maximumAssistantBytes: Int
-  public let maximumToolResultBytes: Int
+package struct HarnessAgentLoopLimits: Equatable, Sendable {
+  package let maximumModelCalls: Int
+  package let maximumToolCalls: Int
+  package let maximumMessages: Int
+  package let maximumContextBytes: Int
+  package let maximumAssistantBytes: Int
+  package let maximumToolResultBytes: Int
 
   public init(
     maximumModelCalls: Int = 24,
@@ -250,8 +250,8 @@ public enum HarnessAgentSessionError: Error, Equatable, Sendable {
   case assistantOutputTooLarge(bytes: Int, limit: Int)
 }
 
-public actor HarnessAgentSession {
-  public let modelDescriptor: HarnessModelDescriptor
+package actor HarnessAgentSession {
+  package let modelDescriptor: HarnessModelDescriptor
 
   private let gateway: any HarnessAgentModelGateway
   private let tools: [HarnessAgentTool]
@@ -284,11 +284,11 @@ public actor HarnessAgentSession {
 
   public func snapshot() -> HarnessAgentContext { context }
 
-  public func consumedBudget() -> (modelCalls: Int, toolCalls: Int) {
+  package func consumedBudget() -> (modelCalls: Int, toolCalls: Int) {
     (modelCalls, toolCalls)
   }
 
-  public func runUserTurn(
+  package func runUserTurn(
     _ rawText: String,
     emit: @escaping @Sendable (HarnessAgentEvent) -> Void
   ) async throws {

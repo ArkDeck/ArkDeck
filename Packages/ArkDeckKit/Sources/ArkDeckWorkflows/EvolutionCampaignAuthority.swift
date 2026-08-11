@@ -49,39 +49,39 @@ public enum RockchipEvolutionCampaignError: Error, Equatable, Sendable,
 /// The exact delegated envelope shown to and confirmed by the user.  The
 /// digest is over every other field, so omission and optional-field drift are
 /// bound just as strongly as value drift.
-public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable,
+package struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable,
   Sendable
 {
-  public static let documentType = "rockchip-evolution-campaign-confirmation"
-  public static let schemaVersion = "1.0.0"
+  package static let documentType = "rockchip-evolution-campaign-confirmation"
+  package static let schemaVersion = "1.0.0"
   public static let operationReference = "flash.dayu200"
-  public static let candidateBuildTarget = "ArkDeckEvolutionCandidate"
-  public static let maximumAttemptLimit = 16
-  public static let maximumValiditySeconds: TimeInterval = 4 * 60 * 60
-  public static let maximumConcurrency = 1
+  package static let candidateBuildTarget = "ArkDeckEvolutionCandidate"
+  package static let maximumAttemptLimit = 16
+  package static let maximumValiditySeconds: TimeInterval = 4 * 60 * 60
+  package static let maximumConcurrency = 1
   public static let dataImpact = "ERASE-USERDATA"
-  public static let candidateSourceScope =
+  package static let candidateSourceScope =
     "Packages/ArkDeckKit/Sources/ArkDeckHarness/Candidate/**"
 
-  public let documentType: String
-  public let schemaVersion: String
-  public let confirmationDigestSHA256: String
-  public let baseCommitOID: String
-  public let candidateToolchainDigestSHA256: String
-  public let brokerExecutableDigestSHA256: String
-  public let allowedPaths: [String]
-  public let maxChangedFiles: Int
-  public let maxDiffLines: Int
+  package let documentType: String
+  package let schemaVersion: String
+  package let confirmationDigestSHA256: String
+  package let baseCommitOID: String
+  package let candidateToolchainDigestSHA256: String
+  package let brokerExecutableDigestSHA256: String
+  package let allowedPaths: [String]
+  package let maxChangedFiles: Int
+  package let maxDiffLines: Int
   public let planDigestSHA256: String
-  public let archiveDigestSHA256: String
+  package let archiveDigestSHA256: String
   public let stepSetDigestSHA256: String
-  public let targetStableIdentitySHA256: String
-  public let bindingLineageRootRevision: Int
-  public let maxAttempts: Int
-  public let maximumConcurrentAttempts: Int
+  package let targetStableIdentitySHA256: String
+  package let bindingLineageRootRevision: Int
+  package let maxAttempts: Int
+  package let maximumConcurrentAttempts: Int
   public let confirmedAt: String
-  public let validUntil: String
-  public let userdataImpact: String
+  package let validUntil: String
+  package let userdataImpact: String
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case documentType
@@ -149,7 +149,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
     }
   }
 
-  public static func draft(
+  package static func draft(
     baseCommitOID: String,
     candidateToolchainDigestSHA256: String,
     brokerExecutableDigestSHA256: String,
@@ -238,7 +238,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
     else { throw RockchipEvolutionCampaignError.invalidAssertion("schema") }
   }
 
-  public var campaignID: String {
+  package var campaignID: String {
     "ECAMP-\(confirmationDigestSHA256.prefix(24).uppercased())"
   }
 
@@ -255,7 +255,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
       maximumAttempts: maxAttempts)
   }
 
-  public func canonicalEnvelopeDigestSHA256() -> String {
+  package func canonicalEnvelopeDigestSHA256() -> String {
     Self.sha256(
       Self.canonicalData([
         "archiveDigestSHA256": .string(archiveDigestSHA256),
@@ -281,7 +281,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
       ]))
   }
 
-  public func isValid(at timestamp: String) -> Bool {
+  package func isValid(at timestamp: String) -> Bool {
     guard let now = Self.date(timestamp), let confirmed = Self.date(confirmedAt),
       let expiry = Self.date(validUntil)
     else { return false }
@@ -339,7 +339,7 @@ public struct RockchipEvolutionCampaignConfirmationAssertion: Equatable, Codable
   }
 }
 
-public enum RockchipEvolutionStartingMode: String, Codable, CaseIterable, Sendable {
+package enum RockchipEvolutionStartingMode: String, Codable, CaseIterable, Sendable {
   case hdcNormal
   case loader
 }
@@ -347,32 +347,32 @@ public enum RockchipEvolutionStartingMode: String, Codable, CaseIterable, Sendab
 /// The candidate's only output.  It can narrow which already-published entry
 /// modes are acceptable; it cannot describe a process, executable, argv,
 /// action, target, authority or new Catalog step.
-public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
+package struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
   /// DAYU200 can take longer than the original 45-second characterization to
   /// re-enumerate from HDC-normal to its already-bound Loader personality.
   /// A new campaign therefore spends the full pre-approved observation window
   /// before declaring the E1 transition outcome unknown. This changes no
   /// command or device effect; the timeout remains bounded by the closed
   /// 15...120 validation below.
-  public static let defaultLoaderDiscoveryTimeoutSeconds = 120
+  package static let defaultLoaderDiscoveryTimeoutSeconds = 120
   /// Strategies persisted before campaign timing was made explicit did not
   /// authorize a new wait duration. Keep decoding them at the historical
   /// value so their durable candidate semantics and fingerprints do not drift.
   private static let legacyLoaderDiscoveryTimeoutSeconds = 45
-  public static let defaultLoaderPollIntervalMilliseconds = 500
-  public static let defaultHDCCommandTimeoutSeconds = 20
-  public static let defaultReadOnlyCommandTimeoutSeconds = 15
+  package static let defaultLoaderPollIntervalMilliseconds = 500
+  package static let defaultHDCCommandTimeoutSeconds = 20
+  package static let defaultReadOnlyCommandTimeoutSeconds = 15
 
   public let operationReference: String
-  public let deviceProfileReference: String
-  public let archiveDigestSHA256: String
+  package let deviceProfileReference: String
+  package let archiveDigestSHA256: String
   public let stepSetDigestSHA256: String
-  public let allowedStartingModes: [RockchipEvolutionStartingMode]
-  public let loaderDiscoveryTimeoutSeconds: Int
-  public let loaderPollIntervalMilliseconds: Int
-  public let hdcCommandTimeoutSeconds: Int
-  public let readOnlyCommandTimeoutSeconds: Int
-  public let userdataImpact: String
+  package let allowedStartingModes: [RockchipEvolutionStartingMode]
+  package let loaderDiscoveryTimeoutSeconds: Int
+  package let loaderPollIntervalMilliseconds: Int
+  package let hdcCommandTimeoutSeconds: Int
+  package let readOnlyCommandTimeoutSeconds: Int
+  package let userdataImpact: String
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case operationReference
@@ -460,28 +460,28 @@ public struct RockchipEvolutionTypedStrategy: Equatable, Codable, Sendable {
       userdataImpact: container.decode(String.self, forKey: .userdataImpact))
   }
 
-  public var digestSHA256: String {
+  package var digestSHA256: String {
     let encoder = CanonicalJSONEncoders.canonical()
     return RockchipEvolutionCampaignConfirmationAssertion.sha256(
       (try? encoder.encode(self)) ?? Data())
   }
 }
 
-public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
-  public let candidateID: String
-  public let producerID: String
-  public let baseCommitOID: String
-  public let sourceTreeDigestSHA256: String
-  public let diffDigestSHA256: String
-  public let allowedPathSetDigestSHA256: String
-  public let executableDigestSHA256: String
-  public let toolchainDigestSHA256: String
-  public let changedFiles: [String]
-  public let changedLines: Int
-  public let diffArtifactID: String
-  public let buildEvidenceArtifactID: String
-  public let testEvidenceArtifactID: String
-  public let strategy: RockchipEvolutionTypedStrategy
+package struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
+  package let candidateID: String
+  package let producerID: String
+  package let baseCommitOID: String
+  package let sourceTreeDigestSHA256: String
+  package let diffDigestSHA256: String
+  package let allowedPathSetDigestSHA256: String
+  package let executableDigestSHA256: String
+  package let toolchainDigestSHA256: String
+  package let changedFiles: [String]
+  package let changedLines: Int
+  package let diffArtifactID: String
+  package let buildEvidenceArtifactID: String
+  package let testEvidenceArtifactID: String
+  package let strategy: RockchipEvolutionTypedStrategy
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case candidateID
@@ -582,7 +582,7 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
 
   /// Stable identity of the complete immutable candidate record, including
   /// its source, diff, build and test artifact pins.
-  public var digestSHA256: String {
+  package var digestSHA256: String {
     let encoder = CanonicalJSONEncoders.canonical()
     return RockchipEvolutionCampaignConfirmationAssertion.sha256(
       (try? encoder.encode(self)) ?? Data())
@@ -591,19 +591,19 @@ public struct RockchipEvolutionCandidatePin: Equatable, Codable, Sendable {
 
 /// Historical receipt vocabulary retained only to decode and project
 /// review-bearing campaign ledgers written before the no-review admission path.
-public enum RockchipEvolutionReviewVerdict: String, Codable, Sendable {
+package enum RockchipEvolutionReviewVerdict: String, Codable, Sendable {
   case pass = "PASS"
   case reject = "REJECT"
 }
 
-public enum RockchipEvolutionReviewSeverity: String, Codable, CaseIterable, Sendable {
+package enum RockchipEvolutionReviewSeverity: String, Codable, CaseIterable, Sendable {
   case low = "LOW"
   case medium = "MEDIUM"
   case high = "HIGH"
   case critical = "CRITICAL"
 }
 
-public struct RockchipEvolutionReviewIssue: Equatable, Codable, Sendable {
+package struct RockchipEvolutionReviewIssue: Equatable, Codable, Sendable {
   public let severity: RockchipEvolutionReviewSeverity
   public let code: String
 
@@ -636,15 +636,15 @@ public struct RockchipEvolutionReviewIssue: Equatable, Codable, Sendable {
   }
 }
 
-public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
-  public let reviewID: String
-  public let reviewerID: String
-  public let candidateID: String
-  public let candidateExecutableDigestSHA256: String
+package struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
+  package let reviewID: String
+  package let reviewerID: String
+  package let candidateID: String
+  package let candidateExecutableDigestSHA256: String
   public let planDigestSHA256: String
   public let result: RockchipEvolutionReviewVerdict
-  public let issues: [RockchipEvolutionReviewIssue]
-  public let createdAt: String
+  package let issues: [RockchipEvolutionReviewIssue]
+  package let createdAt: String
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case reviewID
@@ -722,7 +722,7 @@ public struct RockchipEvolutionReviewReceipt: Equatable, Codable, Sendable {
 
 /// Non-Codable, process-local permit. CLI bytes cannot manufacture it; only
 /// the task-owned builder can return one after the fixed candidate checks.
-public final class RockchipEvolutionCampaignAttemptPermit: @unchecked Sendable, Equatable {
+package final class RockchipEvolutionCampaignAttemptPermit: @unchecked Sendable, Equatable {
   let assertion: RockchipEvolutionCampaignConfirmationAssertion
   let candidate: RockchipEvolutionCandidatePin
 

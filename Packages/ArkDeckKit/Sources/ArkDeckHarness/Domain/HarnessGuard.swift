@@ -275,15 +275,15 @@ public struct HarnessStrategySignature: Equatable, Sendable, Codable {
 }
 
 /// Did this round move anything? Computed from persisted state only.
-public struct HarnessProgressVector: Equatable, Sendable, Codable {
-  public let verdictChanged: Bool
-  public let evaluationRecorded: Bool
-  public let newVerifiedEvidenceCount: Int
-  public let sampleDelta: Int
-  public let phaseChanged: Bool
-  public let newFailureCount: Int
-  public let resolvedFailureCount: Int
-  public let workspaceRevisionChanged: Bool
+package struct HarnessProgressVector: Equatable, Sendable, Codable {
+  package let verdictChanged: Bool
+  package let evaluationRecorded: Bool
+  package let newVerifiedEvidenceCount: Int
+  package let sampleDelta: Int
+  package let phaseChanged: Bool
+  package let newFailureCount: Int
+  package let resolvedFailureCount: Int
+  package let workspaceRevisionChanged: Bool
 
   enum CodingKeys: String, CodingKey {
     case verdictChanged
@@ -334,7 +334,7 @@ public struct HarnessProgressVector: Equatable, Sendable, Codable {
   /// decision fingerprint is not progress. Only evidence, a changed verdict,
   /// a sample, an actually changed workspace revision, or a resolved failure
   /// moves the vector.
-  public var isProgress: Bool {
+  package var isProgress: Bool {
     verdictChanged || newVerifiedEvidenceCount > 0 || sampleDelta > 0
       || resolvedFailureCount > 0 || workspaceRevisionChanged
   }
@@ -421,7 +421,7 @@ public enum HarnessGuardVerdict: Equatable, Sendable {
 /// Raw-surface screen for typed inputs. The runtime rejects executable
 /// surfaces too; this is the earlier, cheaper refusal that also names the
 /// offending field in the task's own record (HTP-INV-11).
-public enum HarnessRawSurfaceScreen {
+package enum HarnessRawSurfaceScreen {
   static let forbiddenKeys: Set<String> = [
     "argv", "args", "command", "cmd", "executable", "exec", "shell", "script",
     "hdc", "remotepath", "path", "binary", "interpreter", "env",
@@ -446,7 +446,7 @@ public enum HarnessRawSurfaceScreen {
 
   /// Screening for strings a proposal carries as explanation rather than as
   /// execution input.
-  public static func screenProse(_ values: [String: JSONValue]) -> HarnessGuardRefusal? {
+  package static func screenProse(_ values: [String: JSONValue]) -> HarnessGuardRefusal? {
     screen(values, fragments: forbiddenValueFragments.filter { !proseExemptFragments.contains($0) })
   }
 

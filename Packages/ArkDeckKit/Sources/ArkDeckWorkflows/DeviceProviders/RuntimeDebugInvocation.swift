@@ -55,8 +55,8 @@ public protocol RuntimeDebugAttemptDriving: Sendable {
 }
 
 public struct RuntimeDebugCandidateProvenance: Codable, Equatable, Sendable {
-  public let sourceSHA256: String
-  public let buildSHA256: String
+  package let sourceSHA256: String
+  package let buildSHA256: String
 
   public init(sourceSHA256: String, buildSHA256: String) throws {
     guard Self.isSHA256(sourceSHA256), Self.isSHA256(buildSHA256) else {
@@ -77,7 +77,7 @@ public struct RuntimeDebugCandidateProvenance: Codable, Equatable, Sendable {
 /// does not require a new case. `executePinnedRequest` can only ask the broker
 /// to re-materialize the exact seed request; `observePinnedRequest` is
 /// plan-only and dispatch-free.
-public enum RuntimeDebugCandidateAction: Equatable, Sendable {
+package enum RuntimeDebugCandidateAction: Equatable, Sendable {
   case observePinnedRequest
   case executePinnedRequest
   case stop(reasonCode: String)
@@ -91,11 +91,11 @@ public enum RuntimeDebugCandidateActionError: Error, Equatable, Sendable {
   case invalidReasonCode
 }
 
-public enum RuntimeDebugCandidateActionCodec {
-  public static let schemaVersion = "1.0.0"
-  public static let maximumDocumentBytes = 8 * 1_024
+package enum RuntimeDebugCandidateActionCodec {
+  package static let schemaVersion = "1.0.0"
+  package static let maximumDocumentBytes = 8 * 1_024
 
-  public static func decode(_ data: Data) throws -> RuntimeDebugCandidateAction {
+  package static func decode(_ data: Data) throws -> RuntimeDebugCandidateAction {
     guard !data.isEmpty, data.count <= maximumDocumentBytes else {
       throw RuntimeDebugCandidateActionError.invalidDocument
     }
@@ -155,28 +155,28 @@ public enum RuntimeDebugCandidateActionCodec {
 }
 
 public struct RuntimeDebugObservation: Codable, Equatable, Sendable {
-  public let observationID: String
-  public let materializedPlanDigest: String
+  package let observationID: String
+  package let materializedPlanDigest: String
   public let targetID: String
   public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
-  public let dispatchDisposition: String
+  package let stableIdentitySHA256: String?
+  package let dispatchDisposition: String
 }
 
 public struct RuntimeDebugEvaluation: Codable, Equatable, Sendable {
-  public let ordinal: Int
-  public let destructiveEpoch: Int?
-  public let candidateSourceSHA256: String
-  public let candidateBuildSHA256: String
-  public let candidateActionSHA256: String
-  public let candidateAction: String
-  public let requestID: String?
-  public let idempotencyKey: String?
+  package let ordinal: Int
+  package let destructiveEpoch: Int?
+  package let candidateSourceSHA256: String
+  package let candidateBuildSHA256: String
+  package let candidateActionSHA256: String
+  package let candidateAction: String
+  package let requestID: String?
+  package let idempotencyKey: String?
   public let jobID: String?
   public let outcome: RuntimeDebugExecutionOutcome?
   public let disposition: String
   public let detail: String
-  public let evaluatedAtUTC: String
+  package let evaluatedAtUTC: String
   public let observation: RuntimeDebugObservation?
 }
 
@@ -721,7 +721,7 @@ public actor RuntimeDebugInvocationController {
   }
 }
 
-public struct RuntimeJobEngineDebugAttemptDriver: RuntimeDebugAttemptDriving {
+package struct RuntimeJobEngineDebugAttemptDriver: RuntimeDebugAttemptDriving {
   private let engine: RuntimeJobEngine
 
   public init(engine: RuntimeJobEngine) {

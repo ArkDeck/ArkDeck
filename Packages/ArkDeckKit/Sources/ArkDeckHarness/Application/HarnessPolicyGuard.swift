@@ -56,7 +56,7 @@ public protocol HarnessCapabilityPort: Sendable {
 }
 
 extension HarnessCapabilityPort {
-  public func standingCapabilityID(
+  package func standingCapabilityID(
     operationReference: String,
     targetID: String,
     expectedBindingRevision: Int?,

@@ -12,12 +12,12 @@ import Darwin
 import Foundation
 import Security
 
-public enum BundledRockchipComponent {
-  public static let packageID = "arkdeck-rockchip-component-package@1.0.0"
-  public static let reportedVersion = "rkdeveloptool ver 1.32"
-  public static let bundleRelativePath = "rkdeveloptool"
-  public static let signingIdentifier = "com.arkdeck.desktop.rkdeveloptool"
-  public static let signingTeamIdentifier = "8AQTYW5FKR"
+package enum BundledRockchipComponent {
+  package static let packageID = "arkdeck-rockchip-component-package@1.0.0"
+  package static let reportedVersion = "rkdeveloptool ver 1.32"
+  package static let bundleRelativePath = "rkdeveloptool"
+  package static let signingIdentifier = "com.arkdeck.desktop.rkdeveloptool"
+  package static let signingTeamIdentifier = "8AQTYW5FKR"
 }
 
 public enum BundledRockchipComponentError: Error, Equatable, Sendable,
@@ -56,7 +56,7 @@ public enum BundledRockchipComponentError: Error, Equatable, Sendable,
 
 /// Resolves only fixed ArkDeck product locations. The package-only initializers
 /// are test seams; production callers cannot supply a path.
-public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
+package struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
   private enum TrustPolicy: Sendable {
     case productDeveloperID
     case exactSHA256(String)
@@ -107,7 +107,7 @@ public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
     trustPolicy = .productDeveloperID
   }
 
-  public func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
+  package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
     guard providerID == "rockchip" else {
       throw BundledRockchipComponentError.unsupportedProvider(providerID)
     }
@@ -228,7 +228,7 @@ public struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
 /// Facts come from the adopted target record and the product-owned component,
 /// never from request fields. This makes the target identity and binding
 /// revision used for plan admission the same durable facts used by HDC.
-public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
+package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
   package static let crossModeBindingServerFactKey = "dayu200CrossModeBinding"
   package static let crossModeBindingSatisfied = "satisfied"
   package static let crossModeBindingUnprepared = "unprepared"
@@ -261,7 +261,7 @@ public struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
     self.nowUTC = nowUTC
   }
 
-  public func currentFacts(targetID: String) async throws -> ProviderFacts {
+  package func currentFacts(targetID: String) async throws -> ProviderFacts {
     guard let target = try targetStore.find(targetID: targetID) else {
       throw DeviceProviderError.factsUnavailable("target \(targetID) has not been adopted")
     }
@@ -401,7 +401,7 @@ public protocol RockchipFlashPrerequisiteObserving: Sendable {
 }
 
 extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObserving {
-  public func observePrerequisites(
+  package func observePrerequisites(
     targetID: String
   ) async throws -> [RockchipPrerequisiteObservation] {
     let facts = try await currentFacts(targetID: targetID)
@@ -467,7 +467,7 @@ extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObservin
 /// the concrete compatibility blocker through operation.list. It must not
 /// fall back to PATH, a bookmark, the HDC dispatcher, or the old whole-plan
 /// host (which would consume a second legacy authorization).
-public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
+package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let host: any RockchipRuntimeActionHosting
 
@@ -521,7 +521,7 @@ public struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
     self.host = host
   }
 
-  public func unavailableReason(providerID: String) -> String? {
+  package func unavailableReason(providerID: String) -> String? {
     guard providerID == "rockchip" else {
       return "bundled Rockchip dispatcher cannot serve provider \(providerID)"
     }

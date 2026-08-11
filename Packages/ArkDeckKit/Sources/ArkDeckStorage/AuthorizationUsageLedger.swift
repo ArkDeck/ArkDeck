@@ -536,9 +536,9 @@ private struct AgentAuthorityDynamicCodingKey: CodingKey {
 
 public struct AuthorizationReference: Codable, Equatable, Hashable, Sendable {
   public let authorizationID: String
-  public let mainCommitOID: String
-  public let authorizationBlobOID: String
-  public let approvalPRNumber: Int
+  package let mainCommitOID: String
+  package let authorizationBlobOID: String
+  package let approvalPRNumber: Int
 
   enum CodingKeys: String, CodingKey {
     case authorizationID = "authorizationId"

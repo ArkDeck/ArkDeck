@@ -6,7 +6,7 @@ import ArkDeckWorkflows
 import ArkDeckStorage
 import Foundation
 
-public struct RuntimeEngineAvailabilityPort: HarnessOperationAvailabilityPort {
+package struct RuntimeEngineAvailabilityPort: HarnessOperationAvailabilityPort {
   private let engine: RuntimeJobEngine
 
   public init(engine: RuntimeJobEngine) {
@@ -27,7 +27,7 @@ public struct RuntimeEngineAvailabilityPort: HarnessOperationAvailabilityPort {
   }
 }
 
-public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
+package struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
   private let store: RuntimeCapabilityStore
   private let nowUTC: @Sendable () -> String
 
@@ -47,7 +47,7 @@ public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
   /// guard asks this before dispatch and the dispatcher then asks for the id;
   /// two independent scans could answer "yes" and "none", which is how a task
   /// dispatches a request naming a grant that cannot authorize it.
-  public func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
+  package func hasStandingCapability(operationReference: String, targetID: String) async -> Bool {
     await standingCapabilityID(
       operationReference: operationReference, targetID: targetID,
       expectedBindingRevision: nil, inputs: [:]) != nil
@@ -56,7 +56,7 @@ public struct RuntimeCapabilityStoreHarnessPort: HarnessCapabilityPort {
   /// The selected grant's id, so a request can name it. Selection is
   /// deterministic — first by expiry, then by id — so two wakes on the same
   /// installed set choose the same grant and a replay stays identical.
-  public func standingCapabilityID(
+  package func standingCapabilityID(
     operationReference: String,
     targetID: String,
     expectedBindingRevision: Int?,

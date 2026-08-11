@@ -22,7 +22,7 @@ public enum SessionStorageError: Error, Equatable, Sendable {
   case retentionTargetEscapesRoot(String)
 }
 
-public enum SessionStorageFaultPoint: String, CaseIterable, Sendable {
+package enum SessionStorageFaultPoint: String, CaseIterable, Sendable {
   case sessionBeforeRootCreate
   case sessionRootCreated
   case sessionIdentityFileSync
@@ -57,7 +57,7 @@ public enum SessionStorageFaultPoint: String, CaseIterable, Sendable {
   case retentionBeforeDelete
 }
 
-public struct SessionStorageFaultInjector: @unchecked Sendable {
+package struct SessionStorageFaultInjector: @unchecked Sendable {
   private let body: (SessionStorageFaultPoint) throws -> Void
 
   public init(_ body: @escaping (SessionStorageFaultPoint) throws -> Void) {

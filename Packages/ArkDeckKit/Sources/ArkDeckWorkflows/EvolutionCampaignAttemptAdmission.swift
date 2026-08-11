@@ -17,28 +17,28 @@ import Foundation
 /// What one nine-gate admission produced: the open reservation that authorizes
 /// exactly this attempt, plus the pins the engine lane needs to name the same
 /// archive and the same partition set the campaign was confirmed against.
-public struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
-  public let campaignID: String
-  public let ordinal: Int
-  public let reservationID: String
+package struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
+  package let campaignID: String
+  package let ordinal: Int
+  package let reservationID: String
   public let jobID: String
   public let sessionID: String
-  public let targetStableIdentitySHA256: String
+  package let targetStableIdentitySHA256: String
   public let bindingRevision: Int
   /// Published profile reference (`dayu200`) selected by the
   /// materialized plan's exact archive identity, never by a caller field.
-  public let deviceProfileReference: String
-  public let partitionPlan: [String]
+  package let deviceProfileReference: String
+  package let partitionPlan: [String]
   public let archiveSizeBytes: Int64
   public let archiveSHA256: String
   /// Exact archive-derived profile materialized by this attempt's admission.
   /// This is an invocation-local handoff, not caller authority; upload and
   /// daemon import still revalidate the archive bytes before dispatch.
-  public let archiveProfile: RockchipFlashProfile
+  package let archiveProfile: RockchipFlashProfile
   /// The confirmed plan's own verification level, carried rather than
   /// re-chosen: the engine lane must ask for exactly the post-flash checks
   /// the campaign was confirmed against.
-  public let postFlashVerification: String
+  package let postFlashVerification: String
 
   public init(
     campaignID: String,
@@ -77,7 +77,7 @@ public struct RockchipEvolutionCampaignAdmittedAttempt: Sendable, Equatable {
 /// this and supplies none; a dispatcher whose executor cannot reserve (the
 /// engine lane, by #992's design) supplies one, and the campaign host calls it
 /// immediately before dispatch.
-public protocol RockchipEvolutionCampaignAttemptAdmitting: Sendable {
+package protocol RockchipEvolutionCampaignAttemptAdmitting: Sendable {
   func admitAttempt(
     permit: RockchipEvolutionCampaignAttemptPermit,
     archiveURL: URL,

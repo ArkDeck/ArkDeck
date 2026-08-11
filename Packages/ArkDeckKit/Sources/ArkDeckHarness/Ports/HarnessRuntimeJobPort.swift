@@ -87,7 +87,7 @@ public protocol HarnessRuntimeJobPort: Sendable {
   func requestCancel(jobID: String) async throws
 }
 
-public extension HarnessRuntimeJobPort {
+package extension HarnessRuntimeJobPort {
   func reconcile(jobID: String) async throws -> HarnessJobObservation {
     throw HarnessJobPortError.rejected("job reconciliation is unavailable for \(jobID)")
   }

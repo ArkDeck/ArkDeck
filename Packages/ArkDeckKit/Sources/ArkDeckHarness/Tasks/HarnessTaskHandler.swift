@@ -53,11 +53,11 @@ public protocol HarnessTaskHandler: Sendable {
 }
 
 extension HarnessTaskHandler {
-  public func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
+  package func offeredOperations(for snapshot: HarnessTaskSnapshot) -> Set<String> {
     permittedOperations
   }
 
-  public func requiredE1MutationBudget(
+  package func requiredE1MutationBudget(
     goal: HarnessTaskGoal, policy: HarnessTaskPolicy
   ) -> Int { 0 }
 }

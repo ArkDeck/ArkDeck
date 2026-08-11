@@ -42,7 +42,7 @@ public protocol RockchipBootloaderStatusObserving: Sendable {
 /// Product composition backed only by IOKit and owner-only durable stores.
 /// It cannot spawn a process, dispatch a device effect, adopt a target or
 /// advance a binding.
-public struct ProductRockchipBootloaderStatusObserver:
+package struct ProductRockchipBootloaderStatusObserver:
   RockchipBootloaderStatusObserving, Sendable
 {
   private let targetStore: RuntimeTargetStore
@@ -71,7 +71,7 @@ public struct ProductRockchipBootloaderStatusObserver:
     self.usbProbe = usbProbe
   }
 
-  public func observeBootloaderStatus() throws -> RockchipBootloaderStatus {
+  package func observeBootloaderStatus() throws -> RockchipBootloaderStatus {
     let identities = try usbProbe.registeredDAYU200Identities()
     guard identities.count == 1, let identity = identities.first else {
       return RockchipBootloaderStatus(
@@ -238,7 +238,7 @@ package protocol RockchipBindingReactivationProving: Sendable {
 /// identity/topology fact afresh, applies Core's manual USB rebind policy, and
 /// either activates an exact revision-1 target or advances the same target's
 /// HDC-to-Loader lineage.
-public struct ProductRockchipLoaderBindingCoordinator:
+package struct ProductRockchipLoaderBindingCoordinator:
   RockchipLoaderBindingCoordinating, Sendable
 {
   private let targetStore: RuntimeTargetStore

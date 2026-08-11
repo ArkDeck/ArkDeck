@@ -13,32 +13,32 @@ public enum DeviceTargetingValidationError: Error, Equatable, Sendable {
   case stablePhysicalIdentityMissing
 }
 
-public enum DeviceTargetKind: String, Codable, Sendable {
+package enum DeviceTargetKind: String, Codable, Sendable {
   case real
   case synthetic
 }
 
-public enum DeviceTransport: String, Codable, Sendable {
+package enum DeviceTransport: String, Codable, Sendable {
   case usb
   case tcp
   case uart
   case synthetic
 }
 
-public enum DeviceBindingConfirmation: String, Codable, Sendable {
+package enum DeviceBindingConfirmation: String, Codable, Sendable {
   case corePolicy
   case user
   case simulation
 }
 
-public enum DeviceChannelProtection: String, Codable, Sendable {
+package enum DeviceChannelProtection: String, Codable, Sendable {
   case encryptedVerified
   case unverifiedAssumeUnprotected
   case notApplicable
 }
 
-public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
-  public let attributes: [String: JSONValue]
+package struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
+  package let attributes: [String: JSONValue]
 
   private enum CodingKeys: String, CodingKey {
     case attributes
@@ -72,7 +72,7 @@ public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
   /// observation snapshot. Attributes such as mode and endpoint may legitimately change while an
   /// exclusive Job still owns the same device. A serialless snapshot remains valid identity data,
   /// but cannot authorize a mutation lane and must fail before a side-effect intent is persisted.
-  public func stablePhysicalIdentitySha256() throws -> String {
+  package func stablePhysicalIdentitySha256() throws -> String {
     guard case .string(let serial)? = attributes["serial"],
       !serial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else { throw DeviceTargetingValidationError.stablePhysicalIdentityMissing }
@@ -97,11 +97,11 @@ public struct DeviceIdentitySnapshot: Codable, Equatable, Sendable {
   }
 }
 
-public struct OriginalTargetSnapshot: Codable, Equatable, Sendable {
+package struct OriginalTargetSnapshot: Codable, Equatable, Sendable {
   public let kind: DeviceTargetKind
   public let connectKey: String?
   public let transport: DeviceTransport
-  public let identitySnapshot: DeviceIdentitySnapshot
+  package let identitySnapshot: DeviceIdentitySnapshot
 
   public init(
     kind: DeviceTargetKind,
@@ -138,13 +138,13 @@ public struct OriginalTargetSnapshot: Codable, Equatable, Sendable {
   }
 }
 
-public struct CurrentDeviceBinding: Codable, Equatable, Sendable {
+package struct CurrentDeviceBinding: Codable, Equatable, Sendable {
   public let revision: Int
   public let connectKey: String?
   public let transport: DeviceTransport
-  public let identitySnapshot: DeviceIdentitySnapshot
+  package let identitySnapshot: DeviceIdentitySnapshot
   public let evidence: [String]
-  public let confirmedBy: DeviceBindingConfirmation
+  package let confirmedBy: DeviceBindingConfirmation
   public let channelProtection: DeviceChannelProtection
 
   public init(
@@ -202,9 +202,9 @@ public struct CurrentDeviceBinding: Codable, Equatable, Sendable {
   }
 }
 
-public struct DeviceBindingHistory: Codable, Equatable, Sendable {
+package struct DeviceBindingHistory: Codable, Equatable, Sendable {
   public let targetID: String
-  public let originalTarget: OriginalTargetSnapshot
+  package let originalTarget: OriginalTargetSnapshot
   public private(set) var bindings: [CurrentDeviceBinding]
 
   public init(
@@ -264,7 +264,7 @@ public struct DeviceBindingHistory: Codable, Equatable, Sendable {
   }
 }
 
-public struct DeviceBindingReference: Codable, Equatable, Hashable, Sendable {
+package struct DeviceBindingReference: Codable, Equatable, Hashable, Sendable {
   public let targetID: String
   public let revision: Int
 
@@ -282,7 +282,7 @@ public struct DeviceBindingReference: Codable, Equatable, Hashable, Sendable {
 
 /// This receipt can only be minted by another target in ArkDeckKit after the
 /// locked journal append has returned successfully.
-public struct DurableCurrentDeviceBinding: Equatable, Sendable {
+package struct DurableCurrentDeviceBinding: Equatable, Sendable {
   public let reference: DeviceBindingReference
   public let binding: CurrentDeviceBinding
 
@@ -296,7 +296,7 @@ public struct DurableCurrentDeviceBinding: Equatable, Sendable {
   }
 }
 
-public enum DeviceIdentityDisposition: Equatable, Sendable {
+package enum DeviceIdentityDisposition: Equatable, Sendable {
   case confirmed
   case unconfirmed
   case ambiguous(candidateIDs: [String])
@@ -309,13 +309,13 @@ public enum DeviceEffectGateRejection: Error, Equatable, Sendable {
   case bindingMismatch
 }
 
-public enum DeviceEffectGateDecision: Equatable, Sendable {
+package enum DeviceEffectGateDecision: Equatable, Sendable {
   case permitted
   case rejected(DeviceEffectGateRejection)
 }
 
-public enum DeviceEffectGate {
-  public static func evaluate(
+package enum DeviceEffectGate {
+  package static func evaluate(
     effect: WorkflowEffect,
     intendedBinding: DeviceBindingReference?,
     durableBinding: DurableCurrentDeviceBinding?,
@@ -340,12 +340,12 @@ public enum DeviceEffectGate {
   }
 }
 
-public struct USBRebindEvidence: Codable, Equatable, Sendable {
-  public let serialMatches: Bool
-  public let daemonFingerprintMatches: Bool
-  public let topologyMatches: Bool
-  public let expectedModeMatches: Bool
-  public let modelBuildMatches: Bool
+package struct USBRebindEvidence: Codable, Equatable, Sendable {
+  package let serialMatches: Bool
+  package let daemonFingerprintMatches: Bool
+  package let topologyMatches: Bool
+  package let expectedModeMatches: Bool
+  package let modelBuildMatches: Bool
 
   public init(
     serialMatches: Bool,
@@ -361,18 +361,18 @@ public struct USBRebindEvidence: Codable, Equatable, Sendable {
     self.modelBuildMatches = modelBuildMatches
   }
 
-  public var satisfiesCoreMinimum: Bool {
+  package var satisfiesCoreMinimum: Bool {
     serialMatches && daemonFingerprintMatches && topologyMatches && expectedModeMatches
   }
 }
 
-public struct DeviceRebindCandidate: Codable, Equatable, Sendable {
-  public let candidateID: String
+package struct DeviceRebindCandidate: Codable, Equatable, Sendable {
+  package let candidateID: String
   public let connectKey: String
   public let transport: DeviceTransport
-  public let identitySnapshot: DeviceIdentitySnapshot
+  package let identitySnapshot: DeviceIdentitySnapshot
   public let evidence: [String]
-  public let usbEvidence: USBRebindEvidence?
+  package let usbEvidence: USBRebindEvidence?
 
   public init(
     candidateID: String,
@@ -397,9 +397,9 @@ public struct DeviceRebindCandidate: Codable, Equatable, Sendable {
   }
 }
 
-public struct DeviceRebindProfilePolicy: Codable, Equatable, Sendable {
-  public let requiresManualConfirmation: Bool
-  public let additionalEvidenceSatisfied: Bool
+package struct DeviceRebindProfilePolicy: Codable, Equatable, Sendable {
+  package let requiresManualConfirmation: Bool
+  package let additionalEvidenceSatisfied: Bool
 
   public init(
     requiresManualConfirmation: Bool = false,
@@ -410,14 +410,14 @@ public struct DeviceRebindProfilePolicy: Codable, Equatable, Sendable {
   }
 }
 
-public struct DeviceRebindContext: Equatable, Sendable {
+package struct DeviceRebindContext: Equatable, Sendable {
   public let transport: DeviceTransport
-  public let disconnected: Bool
-  public let endpointExplicitlyAdded: Bool
-  public let expectedModeTransition: Bool
+  package let disconnected: Bool
+  package let endpointExplicitlyAdded: Bool
+  package let expectedModeTransition: Bool
   public let candidates: [DeviceRebindCandidate]
   public let profile: DeviceRebindProfilePolicy
-  public let userConfirmedCandidateID: String?
+  package let userConfirmedCandidateID: String?
 
   public init(
     transport: DeviceTransport,
@@ -449,7 +449,7 @@ public enum DeviceRebindAwaitingReason: String, Codable, Equatable, Sendable {
   case unsupportedTransport
 }
 
-public enum DeviceRebindDecision: Equatable, Sendable {
+package enum DeviceRebindDecision: Equatable, Sendable {
   case autoRebindEligible(DeviceRebindCandidate)
   case awaitingRebindConfirmation(
     reason: DeviceRebindAwaitingReason,
@@ -467,8 +467,8 @@ public enum DeviceRebindAuthorizationError: Error, Equatable, Sendable {
   case unsupportedTransport
 }
 
-public enum DeviceRebindPolicy {
-  public static func evaluate(
+package enum DeviceRebindPolicy {
+  package static func evaluate(
     transport: DeviceTransport,
     disconnected: Bool,
     endpointExplicitlyAdded: Bool,
@@ -511,7 +511,7 @@ public enum DeviceRebindPolicy {
     }
   }
 
-  public static func authorizePersistence(
+  package static func authorizePersistence(
     context: DeviceRebindContext,
     selectedCandidate: DeviceRebindCandidate,
     confirmedBy: DeviceBindingConfirmation
@@ -572,11 +572,11 @@ public enum DeviceRebindPolicy {
   }
 }
 
-public enum DeviceMutationLaneReason: String, Codable, Equatable, Sendable {
+package enum DeviceMutationLaneReason: String, Codable, Equatable, Sendable {
   case deviceLaneBusy
 }
 
-public enum DeviceMutationLaneRequestState: Equatable, Sendable {
+package enum DeviceMutationLaneRequestState: Equatable, Sendable {
   case active
   case queued(reason: DeviceMutationLaneReason)
 }
@@ -622,10 +622,10 @@ package struct DeviceMutationLaneLease: Equatable, Sendable {
   package let ownerID: String
 }
 
-public struct DeviceMutationLaneSnapshot: Equatable, Sendable {
-  public let activeRequestIDs: [String: String]
-  public let queuedRequestIDs: [String: [String]]
-  public let maximumConcurrentByDevice: [String: Int]
+package struct DeviceMutationLaneSnapshot: Equatable, Sendable {
+  package let activeRequestIDs: [String: String]
+  package let queuedRequestIDs: [String: [String]]
+  package let maximumConcurrentByDevice: [String: Int]
 
   public init(
     activeRequestIDs: [String: String],
@@ -638,7 +638,7 @@ public struct DeviceMutationLaneSnapshot: Equatable, Sendable {
   }
 }
 
-public actor DeviceMutationLaneCoordinator {
+package actor DeviceMutationLaneCoordinator {
   private struct ActiveLease {
     let requestIdentity: DeviceMutationLaneRequestIdentity
     var ownerID: String
@@ -665,7 +665,7 @@ public actor DeviceMutationLaneCoordinator {
 
   public init() {}
 
-  public func withMutationLane<Value: Sendable>(
+  package func withMutationLane<Value: Sendable>(
     deviceID: String,
     requestID: String,
     operation: @escaping @Sendable () async throws -> Value

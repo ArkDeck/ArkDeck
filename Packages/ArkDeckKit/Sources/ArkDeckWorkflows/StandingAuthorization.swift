@@ -21,8 +21,8 @@ public enum RockchipStandingAuthorizationParseError: Error, Equatable, Sendable 
 /// The only accepted registry identifier syntax. It deliberately excludes filesystem syntax,
 /// percent encoding, Unicode equivalence and case folding, so an ID can map to exactly one
 /// `<id>.json` path beneath the fixed protected-main registry.
-public enum RockchipStandingAuthorizationIdentifier {
-  public static func isValid(_ value: String) -> Bool {
+package enum RockchipStandingAuthorizationIdentifier {
+  package static func isValid(_ value: String) -> Bool {
     guard (6...128).contains(value.utf8.count), value.hasPrefix("AUTH-"),
       value.first != "-", value.last != "-", !value.contains("--")
     else { return false }
@@ -34,35 +34,35 @@ public enum RockchipStandingAuthorizationIdentifier {
   }
 }
 
-public struct RockchipStandingAuthorizationTarget: Codable, Equatable, Sendable {
+package struct RockchipStandingAuthorizationTarget: Codable, Equatable, Sendable {
   public let model: String
   /// SHA-256 digest of the exact device-serial bytes. Raw serial bytes never enter the
   /// repository or evidence.
-  public let serialSHA256: String
+  package let serialSHA256: String
   public let bindingRevision: Int
 }
 
 /// A decoded maintainer-authored carrier. `approvedBy` and `carrier` are display/cross-check
 /// fields only; neither can establish approval without GitHub provenance.
-public struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
-  public static let supportedSchemaVersion = "1.0.0"
+package struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
+  package static let supportedSchemaVersion = "1.0.0"
 
-  public let schemaVersion: String
-  public let authorizationId: String
-  public let approvedBy: String
-  public let carrier: String
+  package let schemaVersion: String
+  package let authorizationId: String
+  package let approvedBy: String
+  package let carrier: String
   public let target: RockchipStandingAuthorizationTarget
-  public let firmwareArchiveSHA256: String
+  package let firmwareArchiveSHA256: String
   public let transport: String
   public let toolchainFingerprint: String
-  public let providerIdentity: String
+  package let providerIdentity: String
   public let planDigestSHA256: String
   public let stepSetDigestSHA256: String
   public let recoveryPath: String
-  public let validUntil: String
-  public let maxRuns: Int
+  package let validUntil: String
+  package let maxRuns: Int
 
-  public static func parse(_ data: Data) throws -> RockchipStandingAuthorization {
+  package static func parse(_ data: Data) throws -> RockchipStandingAuthorization {
     var duplicateValidator = StrictJSONDuplicateValidator(data: data)
     do {
       try duplicateValidator.validate()

@@ -9,24 +9,24 @@
 import Foundation
 import SQLite3
 
-public enum RuntimeJobAdmissionVerdict: Sendable, Equatable {
+package enum RuntimeJobAdmissionVerdict: Sendable, Equatable {
   case admitted
   case duplicate(jobID: String)
   case conflict
 }
 
-public struct RuntimePersistedJob: Sendable, Equatable {
+package struct RuntimePersistedJob: Sendable, Equatable {
   public let jobID: String
   public let idempotencyKey: String
-  public let requestHash: String
+  package let requestHash: String
   public let state: String
   public let createdAtUTC: String
   public let updatedAtUTC: String
   public let version: Int
-  public let initialRecordData: Data?
+  package let initialRecordData: Data?
 }
 
-public struct RuntimeJobRepositoryPage: Sendable, Equatable {
+package struct RuntimeJobRepositoryPage: Sendable, Equatable {
   public let jobs: [RuntimePersistedJob]
   /// Opaque SQLite row cursor.  It is intentionally not a job ID: callers
   /// cannot skip or repeat records when IDs are hash-shaped rather than
@@ -44,8 +44,8 @@ public enum RuntimeJobRepositoryError: Error, Equatable, Sendable {
 /// initial bytes are also held transactionally here.  That duplicate is what
 /// lets recovery recreate a job directory after a crash immediately following
 /// a committed admission transaction.
-public final class RuntimeJobRepository: @unchecked Sendable {
-  public static let filename = "runtime-jobs.sqlite3"
+package final class RuntimeJobRepository: @unchecked Sendable {
+  package static let filename = "runtime-jobs.sqlite3"
   private static let schemaVersion = 1
   private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -120,7 +120,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
     if let handle { sqlite3_close_v2(handle) }
   }
 
-  public func lookup(idempotencyKey: String, requestHash: String) throws -> RuntimeJobAdmissionVerdict {
+  package func lookup(idempotencyKey: String, requestHash: String) throws -> RuntimeJobAdmissionVerdict {
     lock.lock()
     defer { lock.unlock() }
     guard let row = try query(
@@ -136,7 +136,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
   /// Inserts the idempotency identity, job identity and initial job state in
   /// one transaction.  A duplicate request observes the existing exact job;
   /// a changed request is never allowed to overwrite the first mapping.
-  public func admit(
+  package func admit(
     jobID: String,
     idempotencyKey: String,
     requestHash: String,
@@ -173,7 +173,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
 
   /// State is an index for query/pagination; its journal and job-record
   /// counterparts continue to carry the complete auditable recovery facts.
-  public func updateJobState(
+  package func updateJobState(
     jobID: String, state: String, updatedAtUTC: String, recordData: Data
   ) throws {
     lock.lock()
@@ -190,7 +190,7 @@ public final class RuntimeJobRepository: @unchecked Sendable {
     }
   }
 
-  public func allJobs() throws -> [RuntimePersistedJob] {
+  package func allJobs() throws -> [RuntimePersistedJob] {
     lock.lock()
     defer { lock.unlock() }
     return try query(

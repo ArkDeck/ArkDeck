@@ -24,26 +24,26 @@ import CryptoKit
 import Foundation
 
 public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
-  public let htaskID: String
-  public let stateVersion: Int
+  package let htaskID: String
+  package let stateVersion: Int
   public let status: HarnessTaskLifecycle
-  public let phase: HarnessTaskStage
+  package let phase: HarnessTaskStage
   public let lifecycle: HarnessTaskLifecycle
   public let stage: HarnessTaskStage
   public let waitReason: HarnessTaskWaitReason?
-  public let conditions: [HarnessTaskCondition]
+  package let conditions: [HarnessTaskCondition]
   public let activeRound: Int
   public let activeJobID: String?
   public let cancelRequested: Bool
-  public let expectedBindingRevision: Int?
-  public let latestEvaluationID: String?
-  public let observedState: [String: JSONValue]
-  public let artifactRefs: [String]
-  public let consumedBudget: HarnessConsumedBudget
+  package let expectedBindingRevision: Int?
+  package let latestEvaluationID: String?
+  package let observedState: [String: JSONValue]
+  package let artifactRefs: [String]
+  package let consumedBudget: HarnessConsumedBudget
   /// The operations the producer was allowed to choose from. Availability
   /// changing under a proposal is exactly the case a version counter alone
   /// does not catch: nothing about the task moved, but what it may do did.
-  public let offeredOperations: [String]
+  package let offeredOperations: [String]
 
   enum CodingKeys: String, CodingKey {
     case htaskID = "htaskId"
@@ -108,7 +108,7 @@ public struct HarnessDecisionBasis: Equatable, Sendable, Codable {
 /// "nothing answered", and the staleness check read the second as the first —
 /// asserting a change that was never observed. They have different causes and
 /// different fixes, so they are different values.
-public enum HarnessWorkspaceRevisionReading: Equatable, Sendable {
+package enum HarnessWorkspaceRevisionReading: Equatable, Sendable {
   /// Nothing to establish: this decision pins no workspace revision.
   case notRequired
   case measured(String)
@@ -117,14 +117,14 @@ public enum HarnessWorkspaceRevisionReading: Equatable, Sendable {
   case unmeasurable(reason: String)
 }
 
-public struct HarnessDecisionExecutionFacts: Equatable, Sendable {
-  public let activeAttemptID: String?
+package struct HarnessDecisionExecutionFacts: Equatable, Sendable {
+  package let activeAttemptID: String?
   public let workspaceRevision: HarnessWorkspaceRevisionReading
-  public let deployedArtifactDigest: String?
+  package let deployedArtifactDigest: String?
   public let bindingRevision: Int?
-  public let modelRunID: String?
-  public let modelContextDigest: String?
-  public let modelDecisionID: String?
+  package let modelRunID: String?
+  package let modelContextDigest: String?
+  package let modelDecisionID: String?
 
   public init(
     activeAttemptID: String? = nil,
@@ -145,7 +145,7 @@ public struct HarnessDecisionExecutionFacts: Equatable, Sendable {
   }
 }
 
-public enum HarnessDecisionStaleness: Equatable, Sendable {
+package enum HarnessDecisionStaleness: Equatable, Sendable {
   case taskStateChanged(observed: Int, current: Int)
   case attemptChanged(observed: String?, current: String?)
   case workspaceRevisionChanged(observed: String, current: String)
@@ -195,13 +195,13 @@ public enum HarnessDecisionStaleness: Equatable, Sendable {
   }
 }
 
-public enum HarnessDecisionFreshness {
+package enum HarnessDecisionFreshness {
   /// The single freshness check, run against a snapshot loaded *after* the
   /// proposal came back. Returns `nil` when the decision may proceed.
   ///
   /// A decision that carries no basis at all (a record written before this
   /// guard existed) is `unverifiable`, not "probably fine": fail closed.
-  public static func staleness(
+  package static func staleness(
     of decision: HarnessDecision,
     against current: HarnessDecisionBasis,
     executionFacts: HarnessDecisionExecutionFacts? = nil

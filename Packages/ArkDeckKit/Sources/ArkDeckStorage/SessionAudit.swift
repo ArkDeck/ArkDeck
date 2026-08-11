@@ -3,25 +3,25 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum SessionAuditCategory: String, Codable, CaseIterable, Sendable {
+package enum SessionAuditCategory: String, Codable, CaseIterable, Sendable {
   case preview
   case confirmation
   case intent
   case outcome
 }
 
-public struct SessionAuditRecord: Codable, Equatable, Sendable {
+package struct SessionAuditRecord: Codable, Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
-  public static let maximumCanonicalDetailBytes = 64 * 1_024
-  public static let maximumCanonicalRecordBytes = maximumCanonicalDetailBytes + 8 * 1_024
-  public static let maximumTimestampUTF8Bytes = 64
+  package static let maximumCanonicalDetailBytes = 64 * 1_024
+  package static let maximumCanonicalRecordBytes = maximumCanonicalDetailBytes + 8 * 1_024
+  package static let maximumTimestampUTF8Bytes = 64
 
-  public let recordID: String
-  public let auditID: String
+  package let recordID: String
+  package let auditID: String
   public let correlationID: String
   public let sessionID: String
   public let jobID: String
-  public let category: SessionAuditCategory
+  package let category: SessionAuditCategory
   public let timestamp: String
   public let details: [String: JSONValue]
 
@@ -106,7 +106,7 @@ public struct SessionAuditRecord: Codable, Equatable, Sendable {
   }
 }
 
-public enum SessionAuditCodec {
+package enum SessionAuditCodec {
   public static func encode(_ record: SessionAuditRecord) throws -> Data {
     try SessionStorageValidation.canonicalData(record)
   }
@@ -119,16 +119,16 @@ public enum SessionAuditCodec {
 
 }
 
-public protocol DurableSessionAuditAppending: Sendable {
+package protocol DurableSessionAuditAppending: Sendable {
   var layout: SessionLayout { get }
   func storageVolumeIdentity(using resolver: any VolumeIdentityResolving) throws -> VolumeIdentity
   func appendAndSynchronize(_ record: SessionAuditRecord) throws
   func replay(correlationID: String) throws -> [SessionAuditRecord]
 }
 
-public final class FileDurableSessionAuditStore: DurableSessionAuditAppending, @unchecked Sendable {
-  public static let maximumLogBytes = 16 * 1_024 * 1_024
-  public static let maximumRecordCount = 65_536
+package final class FileDurableSessionAuditStore: DurableSessionAuditAppending, @unchecked Sendable {
+  package static let maximumLogBytes = 16 * 1_024 * 1_024
+  package static let maximumRecordCount = 65_536
 
   public let layout: SessionLayout
   public let url: URL
@@ -259,7 +259,7 @@ public final class FileDurableSessionAuditStore: DurableSessionAuditAppending, @
     }
   }
 
-  public func storageVolumeIdentity(using resolver: any VolumeIdentityResolving) throws
+  package func storageVolumeIdentity(using resolver: any VolumeIdentityResolving) throws
     -> VolumeIdentity
   {
     lock.lock()
@@ -282,7 +282,7 @@ public final class FileDurableSessionAuditStore: DurableSessionAuditAppending, @
     Darwin.close(rootDescriptor)
   }
 
-  public func appendAndSynchronize(_ record: SessionAuditRecord) throws {
+  package func appendAndSynchronize(_ record: SessionAuditRecord) throws {
     guard record.sessionID == sessionID, record.jobID == jobID else {
       throw SessionStorageError.invalidRecord("Session audit identity mismatch")
     }

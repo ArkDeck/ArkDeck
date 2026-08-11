@@ -5,33 +5,33 @@ import ArkDeckStorage
 import Darwin
 import Foundation
 
-public enum RockchipEvolutionAttemptDisposition: String, Codable, Sendable {
+package enum RockchipEvolutionAttemptDisposition: String, Codable, Sendable {
   case succeeded
   case safeToReflash
   case unsafePartial
   case outcomeUnknown
 }
 
-public enum RockchipEvolutionCampaignEventKind: String, Codable, Sendable {
+package enum RockchipEvolutionCampaignEventKind: String, Codable, Sendable {
   case candidatePrepared
   case attemptReserved
   case attemptTerminal
   case campaignStopped
 }
 
-public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
+package struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
   public let sequence: Int
   public let kind: RockchipEvolutionCampaignEventKind
   public let at: String
   public let candidate: RockchipEvolutionCandidatePin?
   public let review: RockchipEvolutionReviewReceipt?
-  public let ordinal: Int?
-  public let reservationID: String?
+  package let ordinal: Int?
+  package let reservationID: String?
   public let jobID: String?
   public let sessionID: String?
   public let disposition: RockchipEvolutionAttemptDisposition?
-  public let destructiveIntentEventIDs: [String]
-  public let reasonCode: String?
+  package let destructiveIntentEventIDs: [String]
+  package let reasonCode: String?
   /// The underlying error a stop was made of. `reasonCode` stays the closed,
   /// greppable classification; this is the one sentence that says which
   /// catch-all fired and why, so a stopped campaign no longer has to be
@@ -39,7 +39,7 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
   /// documents written before this field decode unchanged.
   public let detail: String?
 
-  public static let maximumDetailBytes = 500
+  package static let maximumDetailBytes = 500
 
   private enum CodingKeys: String, CodingKey, CaseIterable {
     case sequence
@@ -112,7 +112,7 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
   /// Turns arbitrary error text into something a durable append-only document
   /// may carry: single-line, control-free and bounded. Callers sanitize before
   /// constructing an event; `validate()` then refuses anything that did not.
-  public static func sanitizedDetail(_ raw: String) -> String? {
+  package static func sanitizedDetail(_ raw: String) -> String? {
     let collapsed = raw.unicodeScalars.map {
       CharacterSet.controlCharacters.contains($0) ? " " : Character($0)
     }
@@ -206,13 +206,13 @@ public struct RockchipEvolutionCampaignEvent: Equatable, Codable, Sendable {
   }
 }
 
-public struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
-  public static let documentType = "rockchip-evolution-campaign-ledger"
-  public static let schemaVersion = "1.0.0"
+package struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
+  package static let documentType = "rockchip-evolution-campaign-ledger"
+  package static let schemaVersion = "1.0.0"
 
-  public let documentType: String
-  public let schemaVersion: String
-  public let campaignID: String
+  package let documentType: String
+  package let schemaVersion: String
+  package let campaignID: String
   public let assertion: RockchipEvolutionCampaignConfirmationAssertion
   public let events: [RockchipEvolutionCampaignEvent]
 
@@ -262,11 +262,11 @@ public struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
     }
   }
 
-  public var reservedAttemptCount: Int {
+  package var reservedAttemptCount: Int {
     events.filter { $0.kind == .attemptReserved }.count
   }
 
-  public var activeReservation: RockchipEvolutionCampaignEvent? {
+  package var activeReservation: RockchipEvolutionCampaignEvent? {
     guard let reserved = events.last(where: { $0.kind == .attemptReserved }),
       let ordinal = reserved.ordinal,
       !events.contains(where: { $0.kind == .attemptTerminal && $0.ordinal == ordinal })
@@ -274,7 +274,7 @@ public struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
     return reserved
   }
 
-  public var latestCandidate: RockchipEvolutionCampaignEvent? {
+  package var latestCandidate: RockchipEvolutionCampaignEvent? {
     events.last(where: { $0.kind == .candidatePrepared })
   }
 
@@ -339,8 +339,8 @@ public struct RockchipEvolutionCampaignDocument: Equatable, Codable, Sendable {
 /// `collectExpiredZeroEventDrafts`, deletes whole documents that never
 /// accrued any event once their confirmation window has expired — it can
 /// never touch a document that holds attempt history.
-public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
-  public static let maximumBytes = 16 * 1_024 * 1_024
+package final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
+  package static let maximumBytes = 16 * 1_024 * 1_024
 
   public let root: URL
 
@@ -398,7 +398,7 @@ public final class RockchipEvolutionCampaignLedger: @unchecked Sendable {
   /// Sweeps are opportunistic hygiene — callers may treat failures as
   /// non-fatal because the subsequent create/load surfaces any real fault.
   @discardableResult
-  public func collectExpiredZeroEventDrafts(at timestamp: String) throws -> [String] {
+  package func collectExpiredZeroEventDrafts(at timestamp: String) throws -> [String] {
     guard RockchipEvolutionCampaignConfirmationAssertion.date(timestamp) != nil else {
       throw RockchipEvolutionCampaignError.persistenceRejected("collectTimestamp")
     }

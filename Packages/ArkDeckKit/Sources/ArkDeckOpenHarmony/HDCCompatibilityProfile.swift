@@ -14,10 +14,10 @@ import Foundation
 
 /// Closed set of tool-version families this parser is registered for.
 /// Unknown versions never parse - they fail closed as `unsupportedVersion`.
-public struct HDCCompatibilityProfile: Sendable, Equatable {
+package struct HDCCompatibilityProfile: Sendable, Equatable {
   public let profileID: String
   /// Exact `Ver: x.y.zc` strings this profile covers (e.g. "3.2.0d", "3.2.0f").
-  public let registeredVersions: Set<String>
+  package let registeredVersions: Set<String>
 
   public init(profileID: String, registeredVersions: Set<String>) {
     self.profileID = profileID
@@ -26,7 +26,7 @@ public struct HDCCompatibilityProfile: Sendable, Equatable {
 
   /// The registered production profile: the 3.2.0 observation family, with
   /// membership mirroring the pinned discovery/registry facts.
-  public static let openHarmony320Family = HDCCompatibilityProfile(
+  package static let openHarmony320Family = HDCCompatibilityProfile(
     profileID: "OPENHARMONY-HDC-3.2.0-FAMILY@1",
     registeredVersions: ["3.2.0d", "3.2.0f"])
 
@@ -38,7 +38,7 @@ public struct HDCCompatibilityProfile: Sendable, Equatable {
 /// Explicit, closed outcomes. There is no "assume success" member and no
 /// exit-code shortcut: every path is either a parsed value or a named
 /// refusal.
-public enum HDCObservationParseOutcome<Value: Sendable & Equatable>: Sendable, Equatable {
+package enum HDCObservationParseOutcome<Value: Sendable & Equatable>: Sendable, Equatable {
   case parsed(Value)
   case unsupportedVersion(String)
   case invalidEncoding
@@ -47,7 +47,7 @@ public enum HDCObservationParseOutcome<Value: Sendable & Equatable>: Sendable, E
   case malformed(reason: String)
 }
 
-public struct HDCParsedClientVersion: Sendable, Equatable {
+package struct HDCParsedClientVersion: Sendable, Equatable {
   public let version: String
 }
 
@@ -56,24 +56,24 @@ public struct HDCParsedClientVersion: Sendable, Equatable {
 /// distinct shape from `hdc -v` - reusing the version parser here is the
 /// defect the first device window exposed (it looked for lines starting
 /// with "Ver:" and found none).
-public struct HDCParsedServerCheck: Sendable, Equatable {
+package struct HDCParsedServerCheck: Sendable, Equatable {
   public let clientVersion: String
   public let serverVersion: String
 
-  public var versionsAgree: Bool { clientVersion == serverVersion }
+  package var versionsAgree: Bool { clientVersion == serverVersion }
 }
 
-public struct HDCParsedTargetLine: Sendable, Equatable {
+package struct HDCParsedTargetLine: Sendable, Equatable {
   public let connectKey: String
   public let transport: String
   public let state: String
 }
 
-public struct HDCParsedTargetList: Sendable, Equatable {
+package struct HDCParsedTargetList: Sendable, Equatable {
   public let targets: [HDCParsedTargetLine]
 }
 
-public enum HDCObservationSemanticParser {
+package enum HDCObservationSemanticParser {
   /// Diagnostic noise the daemon may interleave with observation output.
   /// Matching is prefix-based on the trimmed line; the list is closed and
   /// additive per registered version evidence.
@@ -92,7 +92,7 @@ public enum HDCObservationSemanticParser {
 
   /// Parses `hdc -v` / `hdc checkserver` style version output:
   /// exactly one meaningful line of the form `Ver: <version>`.
-  public static func parseClientVersion(
+  package static func parseClientVersion(
     stdout: Data,
     profile: HDCCompatibilityProfile,
     truncated: Bool
@@ -118,7 +118,7 @@ public enum HDCObservationSemanticParser {
   /// Parses `hdc checkserver` output. A client/server version disagreement
   /// is a named failure, never a pass: the two sides speaking different
   /// protocol versions is exactly the condition this probe exists to find.
-  public static func parseServerCheck(
+  package static func parseServerCheck(
     stdout: Data,
     profile: HDCCompatibilityProfile,
     truncated: Bool
@@ -167,7 +167,7 @@ public enum HDCObservationSemanticParser {
   /// sentinel parses to an empty list. Line order is irrelevant to
   /// equality of the parsed value's set semantics; the parser preserves
   /// input order for display but callers compare normalized sets.
-  public static func parseTargetList(
+  package static func parseTargetList(
     stdout: Data,
     profile: HDCCompatibilityProfile,
     toolVersion: String,

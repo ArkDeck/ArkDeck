@@ -8,14 +8,14 @@ public enum HDCNativeLibraryABI: String, Sendable, Equatable, Codable {
   case x86_64
 }
 
-public struct HDCNativeLibraryArtifactFacts: Sendable, Equatable {
-  public let abi: HDCNativeLibraryABI
-  public let elfClassBits: Int
+package struct HDCNativeLibraryArtifactFacts: Sendable, Equatable {
+  package let abi: HDCNativeLibraryABI
+  package let elfClassBits: Int
   public let machine: UInt16
-  public let buildID: String
+  package let buildID: String
   public let sha256: String
   public let byteCount: Int
-  public let codeSign: HDCNativeLibraryCodeSignFacts?
+  package let codeSign: HDCNativeLibraryCodeSignFacts?
 
   public init(
     abi: HDCNativeLibraryABI,
@@ -36,11 +36,11 @@ public struct HDCNativeLibraryArtifactFacts: Sendable, Equatable {
   }
 }
 
-public struct HDCNativeLibraryCodeSignFacts: Sendable, Equatable {
-  public let formatVersion: Int
-  public let codeSignVersion: Int
-  public let signedDataByteCount: Int
-  public let signatureByteCount: Int
+package struct HDCNativeLibraryCodeSignFacts: Sendable, Equatable {
+  package let formatVersion: Int
+  package let codeSignVersion: Int
+  package let signedDataByteCount: Int
+  package let signatureByteCount: Int
 
   public init(
     formatVersion: Int,
@@ -90,8 +90,8 @@ public enum NativeLibraryArtifactValidationError: Error, Equatable, CustomString
 /// Host-side verifier for leased native libraries. It parses only the closed
 /// ELF fields ArkDeck needs for admission and never invokes a build tool or
 /// accepts caller-supplied metadata.
-public enum NativeLibraryArtifactValidator {
-  public static let maximumBytes = 64 * 1_024 * 1_024
+package enum NativeLibraryArtifactValidator {
+  package static let maximumBytes = 64 * 1_024 * 1_024
 
   public static func validate(
     _ data: Data,
@@ -383,19 +383,19 @@ public enum NativeLibraryArtifactValidator {
   }
 }
 
-public enum HDCNativeRestartProfile: String, Sendable, Equatable, Codable {
+package enum HDCNativeRestartProfile: String, Sendable, Equatable, Codable {
   case restartAbility
   case restartProcess
   case none
 }
 
-public enum HDCNativeVerificationProfile: String, Sendable, Equatable, Codable {
+package enum HDCNativeVerificationProfile: String, Sendable, Equatable, Codable {
   case hashOnly
   case hashAndProcess
   case hashProcessAndMaps
 }
 
-public enum HDCNativeRollbackPolicy: String, Sendable, Equatable, Codable {
+package enum HDCNativeRollbackPolicy: String, Sendable, Equatable, Codable {
   case autoRollback
   case retainBackup
 }
@@ -446,9 +446,9 @@ package struct HDCAppOwnedNativeLibraryExactPaths: Sendable, Equatable {
   }
 }
 
-public struct HDCNativeCodeSignHelperFacts: Sendable, Equatable {
-  public let abi: HDCNativeLibraryABI
-  public let buildID: String
+package struct HDCNativeCodeSignHelperFacts: Sendable, Equatable {
+  package let abi: HDCNativeLibraryABI
+  package let buildID: String
   public let sha256: String
   public let byteCount: Int
 
@@ -469,29 +469,29 @@ public struct HDCNativeCodeSignHelperFacts: Sendable, Equatable {
 /// library name; the canonical remote namespace is derived here and can never
 /// be supplied by a runtime caller.
 public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
-  public static let entryAbility = "EntryAbility"
-  public static let userID = 100
-  public static let moduleName = "entry"
+  package static let entryAbility = "EntryAbility"
+  package static let userID = 100
+  package static let moduleName = "entry"
 
   public let jobID: String
-  public let artifactLeaseID: String
-  public let artifactID: String
+  package let artifactLeaseID: String
+  package let artifactID: String
   public let bundle: HDCBundleReference
-  public let libraryLogicalName: String
-  public let artifactFacts: HDCNativeLibraryArtifactFacts
-  public let restartProfile: HDCNativeRestartProfile
-  public let verificationProfile: HDCNativeVerificationProfile
-  public let rollbackPolicy: HDCNativeRollbackPolicy
-  public let directoryPath: String
-  public let targetPath: String
-  public let loaderVisiblePath: String
-  public let stagingDirectoryPath: String
-  public let stagingDirectoryIsJobOwned: Bool
-  public let stagingPath: String
-  public let backupPath: String
-  public let rollbackStagingPath: String
-  public let codeSignHelperFacts: HDCNativeCodeSignHelperFacts?
-  public let codeSignHelperRemotePath: String?
+  package let libraryLogicalName: String
+  package let artifactFacts: HDCNativeLibraryArtifactFacts
+  package let restartProfile: HDCNativeRestartProfile
+  package let verificationProfile: HDCNativeVerificationProfile
+  package let rollbackPolicy: HDCNativeRollbackPolicy
+  package let directoryPath: String
+  package let targetPath: String
+  package let loaderVisiblePath: String
+  package let stagingDirectoryPath: String
+  package let stagingDirectoryIsJobOwned: Bool
+  package let stagingPath: String
+  package let backupPath: String
+  package let rollbackStagingPath: String
+  package let codeSignHelperFacts: HDCNativeCodeSignHelperFacts?
+  package let codeSignHelperRemotePath: String?
 
   package init(
     jobID: String,
@@ -611,7 +611,7 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
     }
   }
 
-  public var abiDirectoryName: String {
+  package var abiDirectoryName: String {
     switch artifactFacts.abi {
     case .arm64:
       return "arm"
@@ -625,11 +625,11 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
   /// HDC-visible installation directory for native libraries owned by the
   /// target application. OpenHarmony mounts this directory into the
   /// application sandbox's dynamic-linker namespace.
-  public var bundleInstallRootPath: String {
+  package var bundleInstallRootPath: String {
     "/data/app/el1/bundle/public/\(bundle.bundleName)"
   }
 
-  public var nativeLibrariesRootPath: String {
+  package var nativeLibrariesRootPath: String {
     "\(bundleInstallRootPath)/libs"
   }
 

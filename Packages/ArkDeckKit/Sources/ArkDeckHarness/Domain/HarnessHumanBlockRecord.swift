@@ -25,7 +25,7 @@ public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let actionID: String
-  public let htaskID: String
+  package let htaskID: String
   public let block: HarnessHumanBlock
   public let reasonCode: String
   public let round: Int?
@@ -36,13 +36,13 @@ public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
   /// Verbatim `HumanActionRequired` document, when the category vocabulary
   /// covers this block. Absent means: no closed category describes the human
   /// action, so none was fabricated.
-  public let document: JSONValue?
-  public let resumeStatus: HarnessTaskLifecycle
-  public let resumePhase: HarnessTaskStage
-  public let evidenceRefs: [String]
-  public let generatedAtUTC: String
-  public let resolvedAtUTC: String?
-  public let resolution: String?
+  package let document: JSONValue?
+  package let resumeStatus: HarnessTaskLifecycle
+  package let resumePhase: HarnessTaskStage
+  package let evidenceRefs: [String]
+  package let generatedAtUTC: String
+  package let resolvedAtUTC: String?
+  package let resolution: String?
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -95,9 +95,9 @@ public struct HarnessStoredHumanAction: Equatable, Sendable, Codable {
     self.resolution = resolution
   }
 
-  public var isOpen: Bool { resolvedAtUTC == nil }
+  package var isOpen: Bool { resolvedAtUTC == nil }
 
-  public func resolved(
+  package func resolved(
     at atUTC: String,
     resolution: String,
     document: JSONValue? = nil

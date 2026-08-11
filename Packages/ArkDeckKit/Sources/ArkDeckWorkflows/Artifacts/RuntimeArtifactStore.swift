@@ -133,7 +133,7 @@ public struct ArtifactRedactionPolicy: Sendable {
   private static let secretKeyPattern =
     "(?i)(token|secret|password|passwd|api[_-]?key|authorization)([\"'\\s:=]+)([^\\s\"',}]{6,})"
 
-  public func redact(_ data: Data, mediaType: String) -> (data: Data, applied: Bool) {
+  package func redact(_ data: Data, mediaType: String) -> (data: Data, applied: Bool) {
     guard mediaType.hasPrefix("text/") || mediaType == "application/json",
       var text = String(data: data, encoding: .utf8)
     else {
@@ -247,13 +247,13 @@ public struct RuntimeArtifactFilePublicationRequest: Sendable {
   public let name: String
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  public let retentionClass: CatalogArtifactRetentionClass
+  package let retentionClass: CatalogArtifactRetentionClass
   public let sourceOperation: String
   public let providerID: String
-  public let bindingSnapshot: ArtifactBindingSnapshot
-  public let sourceFileURL: URL
-  public let expectedByteCount: Int
-  public let expectedSHA256: String
+  package let bindingSnapshot: ArtifactBindingSnapshot
+  package let sourceFileURL: URL
+  package let expectedByteCount: Int
+  package let expectedSHA256: String
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
@@ -290,11 +290,11 @@ public struct RuntimeArtifactTextFilePublicationRequest: Sendable {
   public let name: String
   public let mediaType: String
   public let privacy: CatalogArtifactPrivacy
-  public let retentionClass: CatalogArtifactRetentionClass
+  package let retentionClass: CatalogArtifactRetentionClass
   public let sourceOperation: String
   public let providerID: String
-  public let bindingSnapshot: ArtifactBindingSnapshot
-  public let sourceFileURL: URL
+  package let bindingSnapshot: ArtifactBindingSnapshot
+  package let sourceFileURL: URL
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
@@ -317,11 +317,11 @@ public struct RuntimeArtifactTextFilePublicationRequest: Sendable {
 }
 
 public struct RuntimeArtifactLeaseResolution: Sendable, Equatable {
-  public let artifactID: String
-  public let fileURL: URL
+  package let artifactID: String
+  package let fileURL: URL
   public let sha256: String
   public let byteCount: Int
-  public let bindingSnapshot: ArtifactBindingSnapshot
+  package let bindingSnapshot: ArtifactBindingSnapshot
 
   public init(
     artifactID: String,
@@ -372,15 +372,15 @@ public struct CleanupDebtRecord: Sendable, Equatable, Codable {
   public let stepID: String
   /// The path case's identity. Empty when the residue is not a path —
   /// kept under this name so records written before r3 decode unchanged.
-  public let remotePath: String
+  package let remotePath: String
   /// Set only for a bundle residue. Absent in every pre-r3 record, which
   /// is what makes those records decode as the path case.
   public var bundleName: String?
   public let reason: String
-  public let recordedAtUTC: String
-  public var settledAtUTC: String?
-  public var retryAttemptStartedAtUTC: String?
-  public var retryOutcomeUnknown: Bool?
+  package let recordedAtUTC: String
+  package var settledAtUTC: String?
+  package var retryAttemptStartedAtUTC: String?
+  package var retryOutcomeUnknown: Bool?
   var persistedAction: PersistedTypedProviderAction?
 
   public var residue: CleanupResidue {
@@ -993,7 +993,7 @@ public actor RuntimeArtifactStore {
     return removed
   }
 
-  package func recordCleanupDebt(
+  public func recordCleanupDebt(
     jobID: String, stepID: String, residue: CleanupResidue, reason: String,
     action: TypedProviderAction? = nil
   ) throws {
@@ -1018,7 +1018,7 @@ public actor RuntimeArtifactStore {
     try persistCleanupDebt(debts)
   }
 
-  package func recordCleanupDebt(
+  public func recordCleanupDebt(
     jobID: String, stepID: String, remotePath: String, reason: String,
     action: TypedProviderAction? = nil
   ) throws {

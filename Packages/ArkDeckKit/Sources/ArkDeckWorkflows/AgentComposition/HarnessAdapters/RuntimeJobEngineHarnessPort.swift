@@ -6,7 +6,7 @@ import ArkDeckWorkflows
 import Foundation
 
 /// Production adapter over the existing engine.
-public struct RuntimeJobEngineHarnessPort: HarnessRuntimeJobPort {
+package struct RuntimeJobEngineHarnessPort: HarnessRuntimeJobPort {
   private let engine: RuntimeJobEngine
 
   public init(engine: RuntimeJobEngine) {
@@ -25,7 +25,7 @@ public struct RuntimeJobEngineHarnessPort: HarnessRuntimeJobPort {
     }
   }
 
-  public func startRun(jobID: String) async throws {
+  package func startRun(jobID: String) async throws {
     let engine = self.engine
     // Detached on purpose: the engine, not the harness, owns how long a
     // job takes. A failure inside `run` is not lost - it lands in the
@@ -33,7 +33,7 @@ public struct RuntimeJobEngineHarnessPort: HarnessRuntimeJobPort {
     Task.detached { _ = try? await engine.run(jobID: jobID) }
   }
 
-  public func observe(jobID: String) async throws -> HarnessJobObservation {
+  package func observe(jobID: String) async throws -> HarnessJobObservation {
     do {
       let status = try await engine.status(jobID: jobID)
       return Self.observation(from: status)

@@ -35,8 +35,8 @@ public enum HarnessRepairPortError: Error, Equatable, Sendable {
 /// One equality primitive for all three repair-stage gates. Keeping the
 /// comparison structural and shared prevents a future stage from degrading
 /// into a truthy "build succeeded"/"install succeeded" check.
-public enum HarnessRepairStageGate {
-  public static func requireEqual(
+package enum HarnessRepairStageGate {
+  package static func requireEqual(
     stage: String, expected: String, actual: String
   ) throws {
     guard !expected.isEmpty, actual == expected else {
@@ -173,13 +173,13 @@ public protocol HarnessRepairPort: Sendable {
 }
 
 extension HarnessRepairPort {
-  public func signedHAPReadback(
+  package func signedHAPReadback(
     jobID: String, unsignedArtifactLease: String, task: HarnessTaskSnapshot
   ) async throws -> HarnessSignedHAPReadback {
     throw HarnessRepairPortError.unavailable("signedHAPReadback")
   }
 
-  public func readableSourceFiles(
+  package func readableSourceFiles(
     projectRef: String,
     task: HarnessTaskSnapshot,
     maximumFiles: Int,
@@ -188,7 +188,7 @@ extension HarnessRepairPort {
 
   /// Compatibility seam for in-memory/non-production fixtures. The production
   /// workspace adapter overrides this with a live filesystem readback.
-  public func currentWorkspaceRevision(
+  package func currentWorkspaceRevision(
     relativePaths: [String], projectRef: String, task: HarnessTaskSnapshot
   ) async throws -> String {
     if let revision = task.repairAttempt?.patchRevision { return revision }
@@ -198,7 +198,7 @@ extension HarnessRepairPort {
     throw HarnessRepairPortError.malformedReadback("baseWorkspaceRevision")
   }
 
-  public func candidatePatch(
+  package func candidatePatch(
     proposal: HarnessPatchProposal,
     prepared: HarnessPreparedPatch,
     task: HarnessTaskSnapshot,

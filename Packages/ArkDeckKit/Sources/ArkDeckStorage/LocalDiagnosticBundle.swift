@@ -3,13 +3,13 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public enum DiagnosticExportTrigger: String, Sendable {
+package enum DiagnosticExportTrigger: String, Sendable {
   case userInitiated
   case appCrash
   case jobFailure
 }
 
-public enum DiagnosticPlaceholderState: String, Codable, CaseIterable, Sendable {
+package enum DiagnosticPlaceholderState: String, Codable, CaseIterable, Sendable {
   case unknown
   case unverified
   case redacted
@@ -26,14 +26,14 @@ public enum LocalDiagnosticBundleError: Error, Equatable, Sendable {
   case fileOperationFailed(path: String, errno: Int32)
 }
 
-public enum LocalDiagnosticBundleFaultPoint: String, CaseIterable, Sendable {
+package enum LocalDiagnosticBundleFaultPoint: String, CaseIterable, Sendable {
   case afterPreparedForExport
   case afterStagingOpened
   case beforePublish
   case afterRenameBeforeCommit
 }
 
-public struct LocalDiagnosticBundleFaultInjector: @unchecked Sendable {
+package struct LocalDiagnosticBundleFaultInjector: @unchecked Sendable {
   private let body: (LocalDiagnosticBundleFaultPoint) throws -> Void
 
   public init(_ body: @escaping (LocalDiagnosticBundleFaultPoint) throws -> Void) {
@@ -47,7 +47,7 @@ public struct LocalDiagnosticBundleFaultInjector: @unchecked Sendable {
   public static let none = LocalDiagnosticBundleFaultInjector { _ in }
 }
 
-public struct DiagnosticBundleMetadata: Codable, Equatable, Sendable {
+package struct DiagnosticBundleMetadata: Codable, Equatable, Sendable {
   public let appName: String
   public let appVersion: String
   public let buildVersion: String
@@ -74,11 +74,11 @@ public struct DiagnosticBundleMetadata: Codable, Equatable, Sendable {
   }
 }
 
-public struct DiagnosticToolPlaceholder: Codable, Equatable, Sendable {
+package struct DiagnosticToolPlaceholder: Codable, Equatable, Sendable {
   public let path: DiagnosticPlaceholderState
   public let version: DiagnosticPlaceholderState
-  public let serverEndpoint: DiagnosticPlaceholderState
-  public let serverOwnership: DiagnosticPlaceholderState
+  package let serverEndpoint: DiagnosticPlaceholderState
+  package let serverOwnership: DiagnosticPlaceholderState
 
   public init(
     path: DiagnosticPlaceholderState = .unknown,
@@ -98,7 +98,7 @@ public struct DiagnosticToolPlaceholder: Codable, Equatable, Sendable {
 /// treats the input as untrusted: it accepts only the writer's closed event/field catalog,
 /// generated correlation shape, and privacy-specific value grammar before retaining canonical
 /// export bytes.
-public struct RedactedDiagnosticLogFile: Equatable, Sendable {
+package struct RedactedDiagnosticLogFile: Equatable, Sendable {
   public static let maximumBytes = 16 * 1_024 * 1_024
   public let name: String
   public let data: Data
@@ -213,9 +213,9 @@ private enum DiagnosticLogExportSanitizer {
 /// The Session source must be an M1-005 `SessionDiagnosticExporter` result created with its
 /// default device-data exclusion and redaction policy. Only bounded structural summaries are
 /// copied into this bundle; journal payload and Artifact bytes are never copied.
-public struct RecentSessionDiagnosticSource: Equatable, Sendable {
+package struct RecentSessionDiagnosticSource: Equatable, Sendable {
   public let export: MaterializedSessionExport
-  public let journalReplay: JournalReplay?
+  package let journalReplay: JournalReplay?
 
   public init(export: MaterializedSessionExport, journalReplay: JournalReplay? = nil) {
     self.export = export
@@ -223,12 +223,12 @@ public struct RecentSessionDiagnosticSource: Equatable, Sendable {
   }
 }
 
-public struct LocalDiagnosticBundleRequest: Equatable, Sendable {
+package struct LocalDiagnosticBundleRequest: Equatable, Sendable {
   public let destination: URL
   public let metadata: DiagnosticBundleMetadata
   public let tool: DiagnosticToolPlaceholder
   public let logs: [RedactedDiagnosticLogFile]
-  public let recentSessions: [RecentSessionDiagnosticSource]
+  package let recentSessions: [RecentSessionDiagnosticSource]
 
   public init(
     destination: URL,
@@ -245,7 +245,7 @@ public struct LocalDiagnosticBundleRequest: Equatable, Sendable {
   }
 }
 
-public struct LocalDiagnosticBundlePreview: Codable, Equatable, Sendable {
+package struct LocalDiagnosticBundlePreview: Codable, Equatable, Sendable {
   public let scopeSHA256: String
   public let includedEntries: [String]
   public let estimatedBytes: UInt64
@@ -267,7 +267,7 @@ public struct LocalDiagnosticBundlePreview: Codable, Equatable, Sendable {
   }
 }
 
-public struct MaterializedLocalDiagnosticBundle: Equatable, Sendable {
+package struct MaterializedLocalDiagnosticBundle: Equatable, Sendable {
   public let root: URL
   public let preview: LocalDiagnosticBundlePreview
 }
@@ -728,8 +728,8 @@ private final class AnchoredDiagnosticBundleStaging {
   }
 }
 
-public struct LocalDiagnosticBundleExporter: Sendable {
-  public static let defaultMaximumBundleBytes: UInt64 = 32 * 1_024 * 1_024
+package struct LocalDiagnosticBundleExporter: Sendable {
+  package static let defaultMaximumBundleBytes: UInt64 = 32 * 1_024 * 1_024
   private let maximumBundleBytes: UInt64
   private let faultInjector: LocalDiagnosticBundleFaultInjector
 

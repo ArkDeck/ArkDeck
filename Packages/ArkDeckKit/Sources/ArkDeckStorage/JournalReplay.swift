@@ -36,10 +36,10 @@ public enum RecoveryAbandonmentPhase: String, CaseIterable, Equatable, Sendable 
 
 public struct PendingRecoveryAbandonment: Equatable, Sendable {
   public let intentEventID: String
-  public let phase: RecoveryAbandonmentPhase
-  public let outcomeEventID: String?
-  public let releaseAuthorized: Bool?
-  public let deviceHazards: [String]
+  package let phase: RecoveryAbandonmentPhase
+  package let outcomeEventID: String?
+  package let releaseAuthorized: Bool?
+  package let deviceHazards: [String]
   public let outcomeCertainty: JournalOutcomeCertainty
 }
 
@@ -48,25 +48,25 @@ public struct JournalReplay: Equatable, Sendable {
   public let hasTornTail: Bool
   public let schemaVersion: String?
   public let executionMode: String?
-  public let executionAuthority: String?
-  public let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
-  public let authorizationReference: AuthorizationReference?
-  public let usageReservationID: String?
+  package let executionAuthority: String?
+  package let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
+  package let authorizationReference: AuthorizationReference?
+  package let usageReservationID: String?
   public let currentState: JobState?
-  public let lastDurableSequence: Int?
+  package let lastDurableSequence: Int?
   public let outstandingIntents: [OutstandingJournalIntent]
   public let unknownOutcomes: [UnknownJournalOutcome]
-  public let requiredAbandonmentHazards: [String]
-  public let latestBindingRevision: Int?
+  package let requiredAbandonmentHazards: [String]
+  package let latestBindingRevision: Int?
   public let lastConfirmedStepID: String?
-  public let lastReconcileOutcomeCertainty: JournalOutcomeCertainty?
-  public let resourceReleaseAuthorized: Bool
-  public let requiresUnknownFinalizedOutcome: Bool
-  public let pendingAbandonment: PendingRecoveryAbandonment?
+  package let lastReconcileOutcomeCertainty: JournalOutcomeCertainty?
+  package let resourceReleaseAuthorized: Bool
+  package let requiresUnknownFinalizedOutcome: Bool
+  package let pendingAbandonment: PendingRecoveryAbandonment?
   public let finalized: Bool
   let pendingReconcileTransition: PendingReconcileTransition?
 
-  public var requiresRecovery: Bool {
+  package var requiresRecovery: Bool {
     hasTornTail || !outstandingIntents.isEmpty || !unknownOutcomes.isEmpty
       || lastReconcileOutcomeCertainty == .outcomeUnknown
       || currentState == .waitingForRecovery || currentState == .reconciling
@@ -74,11 +74,11 @@ public struct JournalReplay: Equatable, Sendable {
       || pendingReconcileTransition != nil
   }
 
-  public var destructiveReplayCount: Int { 0 }
-  public var guessCompensationCount: Int { 0 }
+  package var destructiveReplayCount: Int { 0 }
+  package var guessCompensationCount: Int { 0 }
 }
 
-public enum DurableJournalRecovery {
+package enum DurableJournalRecovery {
   public static func inspect(url: URL) throws -> JournalReplay {
     let descriptor = Darwin.open(
       url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
@@ -1145,11 +1145,11 @@ extension Dictionary where Key == String, Value == JSONValue {
   }
 }
 
-public struct UnfinishedSessionDescriptor: Equatable, Sendable {
+package struct UnfinishedSessionDescriptor: Equatable, Sendable {
   public let sessionID: String
   public let jobID: String
-  public let journalURL: URL
-  public let checkpointURL: URL
+  package let journalURL: URL
+  package let checkpointURL: URL
 
   public init(sessionID: String, jobID: String, journalURL: URL, checkpointURL: URL) {
     self.sessionID = sessionID
@@ -1159,26 +1159,26 @@ public struct UnfinishedSessionDescriptor: Equatable, Sendable {
   }
 }
 
-public enum RecoverySnapshotSource: String, Equatable, Sendable {
+package enum RecoverySnapshotSource: String, Equatable, Sendable {
   case matchingCheckpoint
   case journalSupersedesCheckpoint
   case journalOnly
 }
 
-public struct ScannedRecoverySession: Equatable, Sendable {
+package struct ScannedRecoverySession: Equatable, Sendable {
   public let descriptor: UnfinishedSessionDescriptor
   public let replay: JournalReplay
   public let state: JobState
   public let outcomeCertainty: JournalOutcomeCertainty
-  public let snapshotSource: RecoverySnapshotSource
-  public let nextSequence: Int
+  package let snapshotSource: RecoverySnapshotSource
+  package let nextSequence: Int
 
-  public var destructiveDispatchCount: Int { 0 }
-  public var destructiveReplayCount: Int { 0 }
-  public var guessCompensationCount: Int { 0 }
+  package var destructiveDispatchCount: Int { 0 }
+  package var destructiveReplayCount: Int { 0 }
+  package var guessCompensationCount: Int { 0 }
 }
 
-public struct SessionRecoveryScanner: Sendable {
+package struct SessionRecoveryScanner: Sendable {
   public init() {}
 
   public func scan(_ descriptor: UnfinishedSessionDescriptor) throws -> ScannedRecoverySession? {

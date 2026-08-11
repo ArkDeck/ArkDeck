@@ -36,7 +36,7 @@ protocol UpdateCodeSigningChecking: Sendable {
 
 /// Uses the running product's Developer ID Application signature as the trust anchor. No Team
 /// identifier is hard-coded.
-public struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable {
+package struct SystemUpdateArtifactValidator: UpdateArtifactValidating, Sendable {
   private let codeSigning: any UpdateCodeSigningChecking
 
   public init() {

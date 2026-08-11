@@ -140,7 +140,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
 
 public struct RuntimeJobStatusPage: Sendable, Equatable {
   public let jobs: [RuntimeJobStatus]
-  public let nextCursor: String?
+  package let nextCursor: String?
 }
 
 public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
@@ -184,7 +184,7 @@ public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
       brokerDigestSHA256: brokerDigestSHA256)
   }
 
-  package init(
+  public init(
     campaignID: String,
     attemptID: String,
     attemptOrdinal: Int,
@@ -280,8 +280,8 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
 
 public struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
   public let stepID: String
-  public let stepKind: String
-  public let outcomeAtUTC: String
+  package let stepKind: String
+  package let outcomeAtUTC: String
 
   public init(stepID: String, stepKind: String, outcomeAtUTC: String) {
     self.stepID = stepID
@@ -295,16 +295,16 @@ public struct RuntimeEvidencePreflightStep: Sendable, Equatable, Codable {
 public struct RuntimeEvidenceObservation: Sendable, Equatable, Codable {
   public let targetID: String?
   public let bindingRevision: Int?
-  public let stableIdentitySHA256: String?
+  package let stableIdentitySHA256: String?
   public let model: String?
   public let firmware: String?
   public let transport: String?
   public let providerID: String
   public let toolVersion: String
-  public let toolSHA256: String
+  package let toolSHA256: String
   public let confirmedAtUTC: String?
-  public let confirmationMethod: String
-  public let preflightSteps: [RuntimeEvidencePreflightStep]
+  package let confirmationMethod: String
+  package let preflightSteps: [RuntimeEvidencePreflightStep]
 
   public init(
     targetID: String?,
@@ -340,17 +340,17 @@ public struct RuntimeEvidenceObservation: Sendable, Equatable, Codable {
 public struct RuntimeEvidencePreflightAccumulator: Sendable, Equatable, Codable {
   public let targetID: String
   public let bindingRevision: Int
-  public let stableIdentitySHA256: String
+  package let stableIdentitySHA256: String
   public let providerID: String
   public let toolVersion: String
-  public let toolSHA256: String
+  package let toolSHA256: String
   public var transport: String?
   public var confirmedAtUTC: String?
   public var model: String?
   public var firmware: String?
   public var steps: [RuntimeEvidencePreflightStep]
 
-  public var isComplete: Bool {
+  package var isComplete: Bool {
     transport != nil && confirmedAtUTC != nil && model != nil && firmware != nil
       && steps.map(\.stepID)
         == ["confirm-evidence-target", "read-evidence-model", "read-evidence-firmware"]
@@ -377,9 +377,9 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let startedAtUTC: String?
   public let firstEvidenceStepAtUTC: String?
   public let finishedAtUTC: String?
-  public let recoveryEpoch: SupersedingRecoveryEpoch?
-  public var traceProbeBefore: TraceRuntimeProbeSnapshot? = nil
-  public var traceProbeAfter: TraceRuntimeProbeSnapshot? = nil
+  package let recoveryEpoch: SupersedingRecoveryEpoch?
+  package var traceProbeBefore: TraceRuntimeProbeSnapshot? = nil
+  package var traceProbeAfter: TraceRuntimeProbeSnapshot? = nil
   /// Persisted typed inputs for the read-only History parameter inspector.
   /// They remain structured JSON values; no executable or argv can be
   /// reconstructed from this projection.
@@ -432,7 +432,7 @@ public protocol RuntimeProcessDispatching: Sendable {
 }
 
 extension RuntimeProcessDispatching {
-  public func unavailableReason(providerID: String) -> String? { nil }
+  package func unavailableReason(providerID: String) -> String? { nil }
 }
 
 public enum RuntimeDispatchFailure: Error, Equatable, Sendable {

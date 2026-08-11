@@ -162,11 +162,11 @@ public struct HarnessEvidenceRecord: Equatable, Sendable, Codable {
 /// minimum-samples criterion pass.
 public struct HarnessRoundObservation: Equatable, Sendable, Codable {
   public let round: Int
-  public let measurements: [String: JSONValue]
-  public let sampleContribution: [String: Int]
+  package let measurements: [String: JSONValue]
+  package let sampleContribution: [String: Int]
   public let evidence: [HarnessEvidenceRecord]
-  public let integrityBlockers: [String]
-  public let collectionBlockers: [String]
+  package let integrityBlockers: [String]
+  package let collectionBlockers: [String]
 
   public init(
     round: Int,
@@ -184,7 +184,7 @@ public struct HarnessRoundObservation: Equatable, Sendable, Codable {
     self.collectionBlockers = collectionBlockers
   }
 
-  public var verifiedEvidenceNames: Set<String> {
+  package var verifiedEvidenceNames: Set<String> {
     Set(evidence.filter(\.verified).map(\.name))
   }
 }
@@ -375,7 +375,7 @@ public struct HarnessEvaluation: Equatable, Sendable, Codable {
 /// The criteria evaluator. Pure: criteria plus observed state in, verdict
 /// out. No clock, no store, no port - so a replay of the same evidence
 /// always produces the same answer.
-public enum HarnessCriteriaEvaluator {
+package enum HarnessCriteriaEvaluator {
   public static func evaluate(
     criteria: [HarnessSuccessCriterion],
     observed: HarnessObservedState,
@@ -419,7 +419,7 @@ public enum HarnessCriteriaEvaluator {
 
   /// The strictest inconclusive policy among criteria that came back
   /// inconclusive; nil when nothing was inconclusive.
-  public static func escalation(
+  package static func escalation(
     for evaluation: HarnessEvaluation,
     criteria: [HarnessSuccessCriterion]
   ) -> HarnessInconclusivePolicy? {

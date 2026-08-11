@@ -390,13 +390,13 @@ public struct HarnessAttemptEvent: Equatable, Sendable, Codable {
 
   public let documentType: String
   public let schemaVersion: String
-  public let htaskID: String
+  package let htaskID: String
   public let attemptID: String
   public let sequence: Int
   public let kind: HarnessAttemptEventKind
   public let reasonCode: String
-  public let atUTC: String
-  public let resulting: HarnessAttempt
+  package let atUTC: String
+  package let resulting: HarnessAttempt
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -429,7 +429,7 @@ public struct HarnessAttemptEvent: Equatable, Sendable, Codable {
   }
 }
 
-public enum HarnessAttemptRoute: Equatable, Sendable {
+package enum HarnessAttemptRoute: Equatable, Sendable {
   case newAttempt(ordinal: Int)
   case continueAttempt(attemptID: String)
   case actionRetry(attemptID: String, retryOrdinal: Int)
@@ -441,8 +441,8 @@ public enum HarnessAttemptRoute: Equatable, Sendable {
 /// Pure classifier for the §10.2 split. Recovery is first because it must
 /// reuse the original ActionRun/idempotency key; a confirmed retry creates a
 /// new ActionRun; a semantic duplicate never dispatches.
-public enum HarnessAttemptPlanner {
-  public static func classify(
+package enum HarnessAttemptPlanner {
+  package static func classify(
     attempts: [HarnessAttempt],
     candidateStrategyFingerprint: String,
     identicalActionRunCount: Int,

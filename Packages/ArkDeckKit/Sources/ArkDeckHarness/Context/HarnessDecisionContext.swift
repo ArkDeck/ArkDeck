@@ -284,12 +284,12 @@ public struct HarnessContextSourceFile: Equatable, Sendable, Codable {
 public struct HarnessContextActiveAttemptSummary: Equatable, Sendable, Codable {
   public let attemptID: String
   public let ordinal: Int
-  public let strategyFingerprint: String
+  package let strategyFingerprint: String
   public let operationReference: String
   public let outcome: HarnessAttemptOutcome
-  public let baseWorkspaceRevision: String?
-  public let patchRevision: String?
-  public let expectedNextObservation: String
+  package let baseWorkspaceRevision: String?
+  package let patchRevision: String?
+  package let expectedNextObservation: String
 
   enum CodingKeys: String, CodingKey {
     case attemptID = "attemptId"
@@ -700,18 +700,18 @@ public enum HarnessDecisionRejection: Error, Equatable, Sendable {
 /// Strictly decoded model output. The allowed key set is closed and the
 /// forbidden set is explicit, because "ignore what you do not understand" is
 /// how a control plane ends up acting on a field it never agreed to.
-public struct HarnessDecisionProposal: Equatable, Sendable {
+package struct HarnessDecisionProposal: Equatable, Sendable {
   public let kind: HarnessDecisionKind
   public let operationReference: String?
   public let inputs: [String: JSONValue]
-  public let hypothesis: String
+  package let hypothesis: String
   public let reasonCode: String
-  public let confidence: Double?
-  public let patchProposal: HarnessPatchProposal?
-  public let requiredArtifacts: [String]
-  public let expectedObservation: String?
+  package let confidence: Double?
+  package let patchProposal: HarnessPatchProposal?
+  package let requiredArtifacts: [String]
+  package let expectedObservation: String?
 
-  public static let allowedFields: Set<String> = [
+  package static let allowedFields: Set<String> = [
     "kind", "operationRef", "operationReference", "inputs", "hypothesis", "reasonCode",
     "confidence", "requiredArtifacts", "expectedObservation",
     "baseWorkspaceRevision", "patchSha256", "unifiedDiff", "touchedFiles",
@@ -726,7 +726,7 @@ public struct HarnessDecisionProposal: Equatable, Sendable {
   /// Keys a proposal may never carry. Each one is a decision the harness or
   /// the runtime owns, and accepting it - even as advice - would move that
   /// authority to the model.
-  public static let forbiddenFields: Set<String> = [
+  package static let forbiddenFields: Set<String> = [
     "status", "taskstatus", "phase", "jobstate", "jobstatus", "state", "result",
     "retrycount", "retries", "attempt", "attempts", "verdict", "evaluation", "succeeded",
     "success", "fixed", "authorization", "authorized", "capability", "capabilityid",

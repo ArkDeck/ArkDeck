@@ -1551,8 +1551,8 @@ package actor HDCSessionLifecycleUseCase {
 /// The production Session composition used by the App shell. It owns the
 /// concrete durable audit store and manifest publisher, while keeping the
 /// lifecycle executor outside the diagnostics/UI surface.
-public struct HDCSessionDiagnosticsComposition: Sendable {
-  public let supervisor: HDCServerSupervisor
+package struct HDCSessionDiagnosticsComposition: Sendable {
+  package let supervisor: HDCServerSupervisor
   public let diagnostics: HDCServerDiagnosticsUseCase
   package let lifecycle: HDCSessionLifecycleUseCase?
   package let toolchainIntent: JobToolchainIntent?
@@ -1795,7 +1795,7 @@ package actor HDCApplicationDiagnosticsHost {
   }
 }
 
-public enum HDCSessionDiagnosticsBootstrap {
+package enum HDCSessionDiagnosticsBootstrap {
   /// Internal factory for the host actor. Keeping lifecycle-bearing creation
   /// file-private makes `HDCApplicationDiagnosticsHost.compose`, whose type
   /// requires an impact inventory, the only package entry point that can
@@ -1906,7 +1906,7 @@ public enum HDCSessionDiagnosticsBootstrap {
   /// host-wide Supervisor created by `makeHost`. This API deliberately does
   /// not create an audit store or Supervisor: lifecycle authority and its
   /// durable audit correlation belong to the host composition root.
-  public static func makeAttached(
+  package static func makeAttached(
     supervisor: HDCServerSupervisor,
     snapshot: HDCJobToolchainSnapshot,
     authorization: HDCAuthorizationState,

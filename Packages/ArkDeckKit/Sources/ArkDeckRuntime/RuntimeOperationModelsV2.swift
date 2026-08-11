@@ -401,15 +401,15 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
 /// Optional repository provenance of a *published* operation bundle. This is
 /// the only place where change/task identity may appear in the runtime
 /// plane, every field is optional, and nothing in execution reads it.
-public struct PublishedOperationBundleManifest: Equatable, Sendable, Codable {
+package struct PublishedOperationBundleManifest: Equatable, Sendable, Codable {
   public static let documentType = "published-operation-bundle-manifest"
   public static let schemaVersion = "2.0.0"
 
   public let operation: RuntimeOperationReference
   public let catalogDigest: String
-  public let sourceRevision: String?
-  public let sourceChangeID: String?
-  public let sourceTaskID: String?
+  package let sourceRevision: String?
+  package let sourceChangeID: String?
+  package let sourceTaskID: String?
 
   enum CodingKeys: String, CodingKey {
     case documentType
@@ -516,10 +516,10 @@ enum RuntimeWireValidation {
   }
 }
 
-public enum RuntimeOperationCodec {
-  public static let maximumRequestBytes = 1 << 20
+package enum RuntimeOperationCodec {
+  package static let maximumRequestBytes = 1 << 20
 
-  public static func decodeRequest(_ data: Data) throws -> RuntimeOperationRequest {
+  package static func decodeRequest(_ data: Data) throws -> RuntimeOperationRequest {
     guard data.count <= maximumRequestBytes else {
       throw RuntimeOperationRequestRejection(
         code: .requestTooLarge,
@@ -591,12 +591,12 @@ public enum RuntimeOperationCodec {
     }
   }
 
-  public static func encodeRequest(_ request: RuntimeOperationRequest) throws -> Data {
+  package static func encodeRequest(_ request: RuntimeOperationRequest) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(request)
   }
 
-  public static func decodeBundleManifest(_ data: Data) throws -> PublishedOperationBundleManifest {
+  package static func decodeBundleManifest(_ data: Data) throws -> PublishedOperationBundleManifest {
     guard data.count <= maximumRequestBytes else {
       throw RuntimeOperationRequestRejection(
         code: .requestTooLarge, path: "$", message: "manifest exceeds size cap")
@@ -618,7 +618,7 @@ public enum RuntimeOperationCodec {
     }
   }
 
-  public static func encodeBundleManifest(
+  package static func encodeBundleManifest(
     _ manifest: PublishedOperationBundleManifest
   ) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()

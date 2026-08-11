@@ -31,9 +31,9 @@ import Foundation
   import FoundationNetworking
 #endif
 
-public struct HarnessModelHTTPRequest: Sendable, Equatable {
+package struct HarnessModelHTTPRequest: Sendable, Equatable {
   public let url: String
-  public let headers: [String: String]
+  package let headers: [String: String]
   public let body: Data
 
   public init(url: String, headers: [String: String], body: Data) {
@@ -43,8 +43,8 @@ public struct HarnessModelHTTPRequest: Sendable, Equatable {
   }
 }
 
-public struct HarnessModelHTTPResponse: Sendable, Equatable {
-  public let statusCode: Int
+package struct HarnessModelHTTPResponse: Sendable, Equatable {
+  package let statusCode: Int
   public let body: Data
 
   public init(statusCode: Int, body: Data) {
@@ -55,11 +55,11 @@ public struct HarnessModelHTTPResponse: Sendable, Equatable {
 
 /// The seam the tests replace. Production uses `URLSessionModelTransport`;
 /// nothing in this file opens a socket by itself.
-public protocol HarnessModelTransport: Sendable {
+package protocol HarnessModelTransport: Sendable {
   func send(_ request: HarnessModelHTTPRequest) async throws -> HarnessModelHTTPResponse
 }
 
-public struct URLSessionModelTransport: HarnessModelTransport {
+package struct URLSessionModelTransport: HarnessModelTransport {
   private let timeoutSeconds: Double
 
   public init(timeoutSeconds: Double = 60) {
@@ -92,10 +92,10 @@ public struct URLSessionModelTransport: HarnessModelTransport {
 
 /// What an adapter needs to reach one vendor. The key is held here and put in
 /// a header; it is never serialized with the context.
-public struct HarnessVendorCredential: Sendable {
-  public let apiKey: String
+package struct HarnessVendorCredential: Sendable {
+  package let apiKey: String
   public let endpoint: String
-  public let modelName: String
+  package let modelName: String
 
   public init(apiKey: String, endpoint: String, modelName: String) {
     self.apiKey = apiKey
@@ -172,9 +172,9 @@ package enum HarnessVendorEnvelope {
   }
 }
 
-public struct ClaudeDecisionGateway: HarnessDecisionGateway {
-  public static let defaultEndpoint = "https://api.anthropic.com/v1/messages"
-  public static let apiVersion = "2023-06-01"
+package struct ClaudeDecisionGateway: HarnessDecisionGateway {
+  package static let defaultEndpoint = "https://api.anthropic.com/v1/messages"
+  package static let apiVersion = "2023-06-01"
 
   private let credential: HarnessVendorCredential
   private let transport: any HarnessModelTransport
@@ -192,7 +192,7 @@ public struct ClaudeDecisionGateway: HarnessDecisionGateway {
 
   public var producerID: String { "claude-gateway@1" }
 
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(
       provider: "anthropic", modelName: credential.modelName, adapterVersion: producerID)
   }
@@ -231,8 +231,8 @@ public struct ClaudeDecisionGateway: HarnessDecisionGateway {
   }
 }
 
-public struct OpenAIDecisionGateway: HarnessDecisionGateway {
-  public static let defaultEndpoint = "https://api.openai.com/v1/chat/completions"
+package struct OpenAIDecisionGateway: HarnessDecisionGateway {
+  package static let defaultEndpoint = "https://api.openai.com/v1/chat/completions"
 
   private let credential: HarnessVendorCredential
   private let transport: any HarnessModelTransport
@@ -247,7 +247,7 @@ public struct OpenAIDecisionGateway: HarnessDecisionGateway {
 
   public var producerID: String { "openai-gateway@1" }
 
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(
       provider: "openai", modelName: credential.modelName, adapterVersion: producerID)
   }
@@ -283,8 +283,8 @@ public struct OpenAIDecisionGateway: HarnessDecisionGateway {
   }
 }
 
-public struct GeminiDecisionGateway: HarnessDecisionGateway {
-  public static let defaultEndpoint =
+package struct GeminiDecisionGateway: HarnessDecisionGateway {
+  package static let defaultEndpoint =
     "https://generativelanguage.googleapis.com/v1beta/models"
 
   private let credential: HarnessVendorCredential
@@ -300,7 +300,7 @@ public struct GeminiDecisionGateway: HarnessDecisionGateway {
 
   public var producerID: String { "gemini-gateway@1" }
 
-  public var modelDescriptor: HarnessModelDescriptor {
+  package var modelDescriptor: HarnessModelDescriptor {
     HarnessModelDescriptor(
       provider: "google", modelName: credential.modelName, adapterVersion: producerID)
   }

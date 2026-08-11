@@ -7,7 +7,7 @@ import CryptoKit
 import Darwin
 import Foundation
 
-public struct RockchipEvolutionCandidateBuild: Sendable, Equatable {
+package struct RockchipEvolutionCandidateBuild: Sendable, Equatable {
   public let pin: RockchipEvolutionCandidatePin
 
   public init(pin: RockchipEvolutionCandidatePin) {
@@ -15,7 +15,7 @@ public struct RockchipEvolutionCandidateBuild: Sendable, Equatable {
   }
 }
 
-public protocol RockchipEvolutionCandidateBuilding: Sendable {
+package protocol RockchipEvolutionCandidateBuilding: Sendable {
   func build(
     assertion: RockchipEvolutionCampaignConfirmationAssertion,
     strategy: RockchipEvolutionTypedStrategy
@@ -24,11 +24,11 @@ public protocol RockchipEvolutionCandidateBuilding: Sendable {
 
 /// Identity-bound fixed-command builder.  The caller cannot supply a source
 /// path, executable, argv, build target, scratch path or sandbox profile.
-public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable,
+package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable,
   RockchipEvolutionCandidateBuilding
 {
-  public static let producerID = "task-owned-evolution-candidate-builder@1"
-  public static let maximumCandidateDiffBytes = 512 * 1_024
+  package static let producerID = "task-owned-evolution-candidate-builder@1"
+  package static let maximumCandidateDiffBytes = 512 * 1_024
 
   private let sourceRoot: URL
   private let stateRoot: URL
@@ -269,7 +269,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     return RockchipEvolutionCandidateBuild(pin: pin)
   }
 
-  public static func currentToolchainDigest() async throws -> String {
+  package static func currentToolchainDigest() async throws -> String {
     return try await currentToolchainDigest(
       sourceRoot: configuredSourceRoot().standardizedFileURL)
   }
@@ -282,7 +282,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
       executor: executor, sourceRoot: root, swiftBuild: swiftBuild)
   }
 
-  public static func currentProtectedMainBaseCommitOID() async throws -> String {
+  package static func currentProtectedMainBaseCommitOID() async throws -> String {
     let root = configuredSourceRoot().standardizedFileURL
     let git = URL(fileURLWithPath: "/usr/bin/git")
     let result = try await FoundationProcessExecutor().executeIdentityBound(
@@ -309,7 +309,7 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
     return value
   }
 
-  public static func currentBrokerExecutableDigest() throws -> String {
+  package static func currentBrokerExecutableDigest() throws -> String {
     guard let executable = CommandLine.arguments.first, !executable.isEmpty else {
       throw RockchipEvolutionCampaignError.candidateRejected("brokerExecutable")
     }
@@ -581,9 +581,9 @@ public final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendable
   }
 }
 
-public struct RockchipEvolutionFailureObservation: Sendable, Equatable {
-  public let attemptOrdinal: Int
-  public let failureCode: String
+package struct RockchipEvolutionFailureObservation: Sendable, Equatable {
+  package let attemptOrdinal: Int
+  package let failureCode: String
 
   public init(attemptOrdinal: Int, failureCode: String) throws {
     guard attemptOrdinal > 0,
@@ -596,7 +596,7 @@ public struct RockchipEvolutionFailureObservation: Sendable, Equatable {
   }
 }
 
-public protocol RockchipEvolutionStrategyRepairing: Sendable {
+package protocol RockchipEvolutionStrategyRepairing: Sendable {
   var repairerID: String { get }
   func propose(
     assertion: RockchipEvolutionCampaignConfirmationAssertion,
@@ -618,14 +618,14 @@ public protocol RockchipEvolutionStrategyRepairing: Sendable {
 /// published strategy has already failed, and inventing a second one without a
 /// repairer would be the campaign guessing at a device it cannot observe; the
 /// host stops the campaign instead.
-public struct PublishedRockchipEvolutionStrategyRepairer:
+package struct PublishedRockchipEvolutionStrategyRepairer:
   RockchipEvolutionStrategyRepairing
 {
-  public let repairerID = "published-strategy@1"
+  package let repairerID = "published-strategy@1"
 
   public init() {}
 
-  public func propose(
+  package func propose(
     assertion: RockchipEvolutionCampaignConfirmationAssertion,
     observation: RockchipEvolutionFailureObservation?,
     priorCandidates: [RockchipEvolutionCandidatePin]

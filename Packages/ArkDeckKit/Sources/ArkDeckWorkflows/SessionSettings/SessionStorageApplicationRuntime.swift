@@ -8,33 +8,33 @@ public enum SessionRetentionRuntimeError: Error, Equatable, Sendable {
   case confirmationRequired
 }
 
-public struct SessionRetentionPreview: Equatable, Sendable {
+package struct SessionRetentionPreview: Equatable, Sendable {
   public let settings: SessionSettingsSnapshot
-  public let catalogGeneration: UInt64?
-  public let rootIdentity: SessionCatalogRootIdentity
-  public let volumeIdentity: VolumeIdentity
+  package let catalogGeneration: UInt64?
+  package let rootIdentity: SessionCatalogRootIdentity
+  package let volumeIdentity: VolumeIdentity
   public let currentBytes: UInt64
-  public let projectedBytes: UInt64
-  public let safetyTargetBytes: UInt64
+  package let projectedBytes: UInt64
+  package let safetyTargetBytes: UInt64
   public let pinnedBytes: UInt64
   public let unknownPressure: Bool
-  public let unknownSessionIDs: [String]
-  public let deletionSessionIDs: [String]
+  package let unknownSessionIDs: [String]
+  package let deletionSessionIDs: [String]
   public let entries: [SessionRetentionCatalogEntry]
   public let blocksNewHeavyWriters: Bool
 
   fileprivate let plan: SessionRetentionPlan
 }
 
-public struct SessionCleanupConfirmation: Equatable, Sendable {
-  public let confirmationID: UUID
-  public let settingsGeneration: UInt64
-  public let catalogGeneration: UInt64
-  public let standardizedRootPath: String
-  public let rootIdentity: SessionCatalogRootIdentity
-  public let volumeIdentity: VolumeIdentity
-  public let deletionSessionIDs: [String]
-  public let projectedBytes: UInt64
+package struct SessionCleanupConfirmation: Equatable, Sendable {
+  package let confirmationID: UUID
+  package let settingsGeneration: UInt64
+  package let catalogGeneration: UInt64
+  package let standardizedRootPath: String
+  package let rootIdentity: SessionCatalogRootIdentity
+  package let volumeIdentity: VolumeIdentity
+  package let deletionSessionIDs: [String]
+  package let projectedBytes: UInt64
 
   fileprivate init(preview: SessionRetentionPreview, catalogGeneration: UInt64) {
     confirmationID = UUID()
@@ -58,8 +58,8 @@ public struct SessionCleanupConfirmation: Equatable, Sendable {
   }
 }
 
-public struct SessionRetentionApplyResult: Equatable, Sendable {
-  public let previewAfterRescan: SessionRetentionPreview
+package struct SessionRetentionApplyResult: Equatable, Sendable {
+  package let previewAfterRescan: SessionRetentionPreview
 }
 
 /// Package-only admission seam. It is intentionally not public until a production writer
@@ -199,7 +199,7 @@ package struct SessionStorageExecutionContext: Sendable {
   }
 }
 
-public actor SessionStorageApplicationRuntime {
+package actor SessionStorageApplicationRuntime {
   public nonisolated let settingsStore: SessionSettingsStore
   package nonisolated let coordinator: HostStorageCoordinator
 
@@ -270,7 +270,7 @@ public actor SessionStorageApplicationRuntime {
     return confirmation
   }
 
-  public func cancelCleanup() {
+  package func cancelCleanup() {
     confirmation = nil
   }
 
@@ -327,7 +327,7 @@ public actor SessionStorageApplicationRuntime {
     }
   }
 
-  public func updatePin(
+  package func updatePin(
     sessionID: String,
     isPinned: Bool,
     expectedCatalogGeneration: UInt64

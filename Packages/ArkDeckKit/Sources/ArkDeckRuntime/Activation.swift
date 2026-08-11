@@ -2,10 +2,10 @@ import CoreFoundation
 import Darwin
 import Foundation
 
-public struct ActivationRequest: Codable, Equatable, Sendable {
+package struct ActivationRequest: Codable, Equatable, Sendable {
   public let requestID: String
-  public let productIdentifier: String
-  public let userIdentifier: String
+  package let productIdentifier: String
+  package let userIdentifier: String
 
   public init(
     requestID: String = UUID().uuidString,
@@ -18,7 +18,7 @@ public struct ActivationRequest: Codable, Equatable, Sendable {
   }
 }
 
-public enum ActivationDelivery: String, Codable, Equatable, Sendable {
+package enum ActivationDelivery: String, Codable, Equatable, Sendable {
   case activated
   case duplicate
   case activationFailed
@@ -28,13 +28,13 @@ public enum ActivationDelivery: String, Codable, Equatable, Sendable {
   case invalidResponse
 }
 
-public protocol ActivationRequestSending: Sendable {
+package protocol ActivationRequestSending: Sendable {
   func requestActivation() -> ActivationDelivery
 }
 
 /// Bounded request/reply client for `PORT-ACTIVATION-001`. Endpoint presence
 /// never grants writer authority; only `SingleInstanceGuard` can do that.
-public struct MacOSActivationRequestSender: ActivationRequestSending, Sendable {
+package struct MacOSActivationRequestSender: ActivationRequestSending, Sendable {
   public let request: ActivationRequest
   public let timeout: TimeInterval
 
@@ -52,7 +52,7 @@ public struct MacOSActivationRequestSender: ActivationRequestSending, Sendable {
     self.timeout = timeout.isFinite ? min(max(timeout, 0.05), 5) : 1
   }
 
-  public func requestActivation() -> ActivationDelivery {
+  package func requestActivation() -> ActivationDelivery {
     guard let payload = try? JSONEncoder().encode(request) else {
       return .invalidResponse
     }
@@ -92,8 +92,8 @@ public struct MacOSActivationRequestSender: ActivationRequestSending, Sendable {
 /// Main-instance activation listener. It validates product/user, remembers a
 /// bounded set of request IDs, and calls the activation handler at most once
 /// for every request ID.
-public final class MacOSActivationListener: @unchecked Sendable {
-  public typealias Handler = @Sendable () -> Bool
+package final class MacOSActivationListener: @unchecked Sendable {
+  package typealias Handler = @Sendable () -> Bool
 
   private let productIdentifier: String
   private let userIdentifier: String
