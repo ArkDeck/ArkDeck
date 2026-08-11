@@ -640,7 +640,7 @@ public struct HDCObservationProviderAdapter: DeviceProvider {
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
             ["shell", "hilog", "-x"] + request.filters, context: context),
-          timeoutSeconds: request.durationSeconds + 15))
+          timeoutSeconds: request.commandTimeoutSeconds))
     case .captureCrashIndex:
       // The `-p …` payload is a single argv element after `-a`, exactly as
       // §6 records it. Faultlogger's SA id is 1201.
