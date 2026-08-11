@@ -32,6 +32,7 @@ let package = Package(
         .product(name: "ArkDeckStorage", package: "ArkDeckKit"),
         .product(name: "ArkDeckAgentDaemon", package: "ArkDeckKit"),
         .product(name: "ArkDeckAgentClient", package: "ArkDeckKit"),
+        .product(name: "ArkDeckLaunchAgent", package: "ArkDeckKit"),
       ])
   ]
 )

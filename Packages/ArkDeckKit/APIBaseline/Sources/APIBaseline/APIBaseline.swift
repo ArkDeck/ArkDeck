@@ -12,6 +12,7 @@ import ArkDeckAgentClient
 import ArkDeckAgentDaemon
 import ArkDeckCore
 import ArkDeckHarness
+import ArkDeckLaunchAgent
 import ArkDeckOpenHarmony
 import ArkDeckProcess
 import ArkDeckRuntime
@@ -27,6 +28,9 @@ private enum ProcessSurface {
   static let byteCount = \ProcessStreamCapture.totalByteCount
   static let truncated = \ProcessStreamCapture.wasTruncated
   static let executor: FoundationProcessExecutor.Type = FoundationProcessExecutor.self
+  static let execute = FoundationProcessExecutor.execute(_:captureLimit:onOutput:)
+  static let executeIdentityBound =
+    FoundationProcessExecutor.executeIdentityBound(_:captureLimit:onOutput:)
   static let error: ProcessExecutionError.Type = ProcessExecutionError.self
 }
 
@@ -52,6 +56,8 @@ private enum AgentClientSurface {
 
 private enum DaemonSurface {
   static let server: AgentDaemonServer.Type = AgentDaemonServer.self
+  static let makeServer = AgentDaemonServer.init(stateDirectory:handler:nowUTC:)
+  static let start = AgentDaemonServer.start
   static let socketPath = \AgentDaemonInstance.socketPath
   static let protocolVersion = \AgentDaemonInstance.protocolVersion
 
@@ -71,6 +77,8 @@ private enum DaemonSurface {
 
 private enum HarnessSurface {
   static let coordinator: HarnessTaskCoordinator.Type = HarnessTaskCoordinator.self
+  static let submit = HarnessTaskCoordinator.submit(_:)
+  static let reconcile = HarnessTaskCoordinator.reconcile(_:)
   static let dispatchedJobID = \HarnessReconcileOutcome.dispatchedJobID
 
   static func branches(_ body: () throws -> Void) -> String? {
@@ -128,6 +136,31 @@ private enum StorageSurface {
       try body()
       return nil
     } catch let error as ArkDeckStorage.StrictJSONError {
+      return "\(error)"
+    } catch {
+      return nil
+    }
+  }
+}
+
+// MARK: - ArkDeckLaunchAgent: service lifecycle entry, error contract, status
+
+private enum LaunchAgentSurface {
+  static let module: ArkDeckLaunchAgent.Type = ArkDeckLaunchAgent.self
+  static let service: LaunchAgentService.Type = LaunchAgentService.self
+  static let makeService = LaunchAgentService.init(
+    paths:runner:fileManager:uid:nowUTC:)
+  static let install = LaunchAgentService.install(
+    daemonSource:hdcExecutable:workspace:harnessSensitiveEvidence:harnessModel:beforeBootstrap:)
+  static let status = LaunchAgentService.status
+  static let installed = \LaunchAgentStatus.installed
+  static let loaded = \LaunchAgentStatus.loaded
+
+  static func branches(_ body: () throws -> Void) -> String? {
+    do {
+      try body()
+      return nil
+    } catch let error as LaunchAgentServiceError {
       return "\(error)"
     } catch {
       return nil
