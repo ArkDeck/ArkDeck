@@ -1,3 +1,4 @@
+import AppKit
 import ArkDeckWorkflows
 import Foundation
 import SwiftUI
@@ -192,7 +193,7 @@ struct DebugWorkspaceView: View {
         relatedJobs: model.workspace.jobs.filter {
           $0.operationReference == DebugApplicationFacade.captureDiagnosticsReference
         },
-        runtimeArtifacts: model.runtimeArtifacts(
+        runtimeArtifacts: model.runtimeArtifactRows(
           operationReference: DebugApplicationFacade.captureDiagnosticsReference,
           targetID: selectedTarget?.id))
     case .apps:
@@ -236,12 +237,19 @@ struct DebugWorkspaceView: View {
   }
 }
 
+private struct DebugRuntimeArtifactRow: Identifiable {
+  let jobID: String
+  let artifact: RuntimeArtifactPresentation
+
+  var id: String { "\(jobID):\(artifact.id)" }
+}
+
 private struct DebugLogsWorkspace: View {
   @ObservedObject var model: DebugWorkspaceViewModel
   let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
   let relatedJobs: [DebugJobPresentation]
-  let runtimeArtifacts: [RuntimeArtifactPresentation]
+  let runtimeArtifacts: [DebugRuntimeArtifactRow]
 
   @State private var durationSeconds = 30
   @State private var minimumLevel = "Warn"
@@ -252,6 +260,8 @@ private struct DebugLogsWorkspace: View {
   @State private var marker = ""
   @State private var isViewportPaused = false
   @State private var savesRawHiLog = true
+  @State private var pendingExport: DebugRuntimeArtifactRow?
+  @State private var isExportPreviewPresented = false
 
   private var enteredFilters: [(name: String, value: String)] {
     [
@@ -297,6 +307,29 @@ private struct DebugLogsWorkspace: View {
           .padding(16)
         }
       }
+    }
+    .confirmationDialog(
+      DebugL10n.text("debug.logs.exportPreview.title"),
+      isPresented: $isExportPreviewPresented,
+      presenting: pendingExport
+    ) { row in
+      Button(
+        DebugL10n.text(
+          row.artifact.privacy == "sensitive"
+            ? "debug.logs.exportSensitive" : "debug.logs.exportConfirm")
+      ) {
+        chooseExportDestination(for: row)
+      }
+      Button(DebugL10n.text("debug.logs.exportCancel"), role: .cancel) {}
+    } message: { row in
+      Text(
+        DebugL10n.format(
+          "debug.logs.exportPreview.message",
+          row.artifact.name,
+          ByteCountFormatter.string(
+            fromByteCount: row.artifact.byteCount, countStyle: .file),
+          row.artifact.privacy,
+          row.artifact.sha256))
     }
   }
 
@@ -380,7 +413,8 @@ private struct DebugLogsWorkspace: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(
                   target == nil || !operationIsAvailable || !invalidFilterNames.isEmpty
-                    || model.isSubmittingLogs)
+                    || model.isSubmittingLogs
+                )
                 .accessibilityIdentifier("debug.logs.start")
               }
               if let jobID = model.activeLogJobID {
@@ -492,37 +526,62 @@ private struct DebugLogsWorkspace: View {
               }
               .frame(minHeight: 110)
             } else {
-              ForEach(runtimeArtifacts) { artifact in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                  VStack(alignment: .leading, spacing: 2) {
-                    Text(artifact.name).font(.callout.monospaced())
-                    Text("\(artifact.status) · \(artifact.privacy)")
-                      .font(.caption)
-                      .foregroundStyle(.secondary)
+              ForEach(runtimeArtifacts) { row in
+                let artifact = row.artifact
+                VStack(alignment: .leading, spacing: 5) {
+                  HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                      Text(artifact.name).font(.callout.monospaced())
+                      Text("\(artifact.status) · \(artifact.privacy)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    Text(
+                      ByteCountFormatter.string(
+                        fromByteCount: artifact.byteCount, countStyle: .file)
+                    )
+                    .font(.caption.monospacedDigit())
+                    Text(String(artifact.sha256.prefix(12)))
+                      .font(.caption.monospaced())
+                      .frame(width: 100, alignment: .trailing)
+                      .help(artifact.sha256)
+                    Button(DebugL10n.text("debug.logs.export")) {
+                      pendingExport = row
+                      isExportPreviewPresented = true
+                    }
+                    .disabled(
+                      artifact.status != "published"
+                        || model.exportStatesByArtifactID[artifact.id] == .exporting
+                    )
+                    .accessibilityIdentifier("debug.logs.export.\(artifact.id)")
+                    if model.exportStatesByArtifactID[artifact.id] == .exporting {
+                      ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel(DebugL10n.text("debug.logs.exporting"))
+                    }
+                    if case .completed(let url) = model.exportStatesByArtifactID[artifact.id] {
+                      Button(DebugL10n.text("debug.logs.showInFinder")) {
+                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                      }
+                      .accessibilityIdentifier("debug.logs.showInFinder.\(artifact.id)")
+                    }
                   }
-                  Spacer(minLength: 12)
-                  Text(
-                    ByteCountFormatter.string(
-                      fromByteCount: artifact.byteCount, countStyle: .file)
-                  )
-                  .font(.caption.monospacedDigit())
-                  Text(String(artifact.sha256.prefix(12)))
-                    .font(.caption.monospaced())
-                    .frame(width: 100, alignment: .trailing)
-                    .help(artifact.sha256)
+                  if case .failed(let reason) = model.exportStatesByArtifactID[artifact.id] {
+                    Label(reason, systemImage: "xmark.octagon")
+                      .font(.caption)
+                      .foregroundStyle(.red)
+                      .fixedSize(horizontal: false, vertical: true)
+                      .accessibilityIdentifier("debug.logs.exportFailure.\(artifact.id)")
+                  }
                 }
-                .accessibilityElement(children: .combine)
               }
             }
             Divider()
             HStack {
               Label(
-                DebugL10n.text("debug.logs.storage.partial"),
+                DebugL10n.text("debug.logs.exportBoundary"),
                 systemImage: "checkmark.shield")
-              Spacer()
-              Button(DebugL10n.text("debug.logs.export")) {}
-                .disabled(true)
-                .help(DebugL10n.text("debug.blocked.artifactExport"))
             }
             .font(.footnote)
             if let operation {
@@ -542,6 +601,29 @@ private struct DebugLogsWorkspace: View {
       }
       .padding(16)
     }
+  }
+
+  private func chooseExportDestination(for row: DebugRuntimeArtifactRow) {
+    let panel = NSSavePanel()
+    panel.canCreateDirectories = true
+    panel.isExtensionHidden = false
+    panel.nameFieldStringValue = safeExportName(row.artifact.name)
+    Task { @MainActor in
+      guard await panel.begin() == .OK, let url = panel.url else { return }
+      model.exportArtifact(
+        jobID: row.jobID,
+        artifact: row.artifact,
+        destinationURL: url,
+        allowSensitive: row.artifact.privacy == "sensitive")
+    }
+  }
+
+  private func safeExportName(_ value: String) -> String {
+    let sanitized =
+      value
+      .replacingOccurrences(of: "/", with: "_")
+      .replacingOccurrences(of: ":", with: "_")
+    return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
   }
 
   private var destructiveActions: some View {
@@ -1340,6 +1422,7 @@ final class DebugWorkspaceViewModel: ObservableObject {
   @Published private(set) var workspace = DebugWorkspacePresentation.loading
   @Published private(set) var isRefreshing = false
   @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  @Published private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
   @Published private(set) var isSubmittingLogs = false
   @Published private(set) var isCancellingLogs = false
   @Published private(set) var activeLogJobID: String?
@@ -1365,16 +1448,45 @@ final class DebugWorkspaceViewModel: ObservableObject {
     self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
   }
 
-  func runtimeArtifacts(
+  fileprivate func runtimeArtifactRows(
     operationReference: String,
     targetID: String?
-  ) -> [RuntimeArtifactPresentation] {
+  ) -> [DebugRuntimeArtifactRow] {
     workspace.jobs
       .filter {
         $0.operationReference == operationReference
           && (targetID == nil || $0.targetID == targetID)
       }
-      .flatMap { artifactsByJobID[$0.id] ?? [] }
+      .flatMap { job in
+        (artifactsByJobID[job.id] ?? []).map {
+          DebugRuntimeArtifactRow(jobID: job.id, artifact: $0)
+        }
+      }
+  }
+
+  func exportArtifact(
+    jobID: String,
+    artifact: RuntimeArtifactPresentation,
+    destinationURL: URL,
+    allowSensitive: Bool
+  ) {
+    guard exportStatesByArtifactID[artifact.id] != .exporting else { return }
+    exportStatesByArtifactID[artifact.id] = .exporting
+    let detailProvider = detailProvider
+    Task { [weak self] in
+      let result = await detailProvider.exportArtifact(
+        jobID: jobID,
+        artifact: artifact,
+        destinationURL: destinationURL,
+        allowSensitive: allowSensitive)
+      guard let self, !Task.isCancelled else { return }
+      switch result {
+      case .completed(let url):
+        self.exportStatesByArtifactID[artifact.id] = .completed(url)
+      case .failed(let reason):
+        self.exportStatesByArtifactID[artifact.id] = .failed(reason)
+      }
+    }
   }
 
   func refresh(targetID: String? = nil) {
