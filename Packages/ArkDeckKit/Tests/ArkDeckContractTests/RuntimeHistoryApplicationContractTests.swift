@@ -335,4 +335,27 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(source.contains("method: \"artifact.list\""))
     XCTAssertTrue(source.contains("method: \"artifact.read\""))
   }
+
+  func testDebugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/DebugLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    XCTAssertTrue(view.contains("runtimeArtifactRows("))
+    XCTAssertTrue(view.contains("model.exportArtifact("))
+    XCTAssertTrue(view.contains(".confirmationDialog("))
+    XCTAssertTrue(view.contains("allowSensitive: row.artifact.privacy == \"sensitive\""))
+    XCTAssertTrue(view.contains("exportStatesByArtifactID"))
+    XCTAssertFalse(
+      view.contains("Button(DebugL10n.text(\"debug.logs.export\")) {}"),
+      "Debug must not regress to a permanently disabled export placeholder")
+    XCTAssertFalse(
+      localization.contains("debug.blocked.artifactExport"),
+      "copy must not claim the reviewed artifact.read channel is unavailable")
+  }
 }
