@@ -163,7 +163,7 @@ final class AppShellUITests: XCTestCase {
         residue: "有 2 项未清理残留。"))
   }
 
-  func testV05ReferenceLayoutInEnglishAndSimplifiedChinese() {
+  func testReferenceLayoutsInEnglishAndSimplifiedChinese() {
     for (language, localeName) in [("(en)", "en"), ("(zh-Hans)", "zh-Hans")] {
       try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
       let app = launch(
@@ -174,12 +174,12 @@ final class AppShellUITests: XCTestCase {
         ])
       let adoptedDevice = element("device.row.150100469346864", in: app)
       XCTAssertTrue(adoptedDevice.waitForExistenceFast(timeout: 10))
-      assertV05DeviceDetailLayout(
+      assertDeviceDetailLayout(
         in: app, adoptedDevice: adoptedDevice, localeName: localeName,
         file: #filePath, line: #line)
 
       if localeName == "en" {
-        assertV05FlashPlanLayout(in: app, file: #filePath, line: #line)
+        assertFlashLayout(in: app, file: #filePath, line: #line)
       }
       app.terminate()
     }
@@ -456,41 +456,27 @@ final class AppShellUITests: XCTestCase {
     // the same immutable Runtime facts the production XPC reader consumes; it
     // has no submit/run/authorization surface and cannot touch a device.
     select("app.navigation.flash", in: app)
-    assertDisplayed(
-      app.staticTexts["flash.availability.status"], equals: flash.availability)
-    assertDisplayed(app.staticTexts["flash.mode.badge"], equals: flash.modeBadge)
+    XCTAssertTrue(element("flash.workspace.title", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(element("flash.workspace.currentDevice", in: app).exists)
+    XCTAssertTrue(element("flash.workspace.readiness", in: app).exists)
+    XCTAssertFalse(
+      element("flash.mode", in: app).exists,
+      "Flash exposes only real execution; plan-only and simulated are not page controls")
+    XCTAssertTrue(element("flash.runtime.attention", in: app).exists, file: file, line: line)
+    XCTAssertTrue(app.buttons["flash.runtime.openHistory"].exists, file: file, line: line)
+    XCTAssertTrue(
+      element("flash.workspace.details", in: app).exists,
+      "Flash keeps Runtime and exact-plan facts in one disclosure", file: file, line: line)
+    XCTAssertFalse(
+      element("flash.target", in: app).exists,
+      "Flash details are collapsed by default", file: file, line: line)
+    element("flash.workspace.details", in: app).click()
+    assertDisplayed(app.staticTexts["flash.availability.status"], equals: flash.availability)
     assertDisplayed(element("flash.target", in: app), equals: flash.target)
-    assertDisplayed(element("flash.plan.empty", in: app), equals: flash.emptyPlan)
-    assertDisplayed(element("flash.plan.prepare", in: app), equals: flash.prepareAction)
     assertDisplayed(app.staticTexts["flash.runtime.jobID"], equals: "job-fixture-0002")
     assertDisplayed(app.staticTexts["flash.runtime.state"], equals: flash.runtimeState)
     assertDisplayed(element("flash.runtime.result", in: app), equals: flash.runtimeResult)
-    assertDisplayed(
-      app.staticTexts["flash.runtime.recovery.guidance"],
-      equals: flash.runtimeRecovery)
-    XCTAssertTrue(element("flash.runtime.attention", in: app).exists, file: file, line: line)
-    XCTAssertTrue(app.buttons["flash.runtime.openHistory"].exists, file: file, line: line)
-    assertDisplayed(
-      app.staticTexts.matching(identifier: "flash.noOperationSubmitted").firstMatch,
-      equals: flash.noSubmission)
-    XCTAssertTrue(
-      app.staticTexts[flash.imageBlocker].exists,
-      "the disabled preparation action needs a visible recovery instruction",
-      file: file, line: line)
-
-    // Execute is a real, Runtime-owned submission surface. With no exact plan
-    // prepared the run action remains disabled and no submit control exists;
-    // once the fixture materializes the plan, the separate check below proves
-    // the one-click action is enabled without a confirmation sheet or phrase.
-    let executeMode = element("flash.mode.execute", in: app)
-    XCTAssertTrue(executeMode.exists, file: file, line: line)
-    executeMode.click()
-    let reviewImpact = app.buttons["flash.execute.review"]
-    XCTAssertTrue(reviewImpact.waitForExistenceFast(timeout: 5), file: file, line: line)
-    XCTAssertFalse(reviewImpact.isEnabled, file: file, line: line)
     XCTAssertFalse(app.buttons["flash.execute.submit"].exists, file: file, line: line)
-    element("flash.mode.planOnly", in: app).click()
-    XCTAssertFalse(app.buttons["flash.execute.review"].exists, file: file, line: line)
 
     // Debug is a complete native workspace with four distinct panels. The
     // production App read channel has no target in this fixture, so every
@@ -667,6 +653,7 @@ final class AppShellUITests: XCTestCase {
     }
 
     select("app.navigation.flash", in: app)
+    element("flash.workspace.details", in: app).click()
     XCTAssertTrue(
       app.staticTexts["flash.runtime.empty"].waitForExistenceFast(timeout: 10),
       "Flash must distinguish a reachable empty Runtime history",
@@ -677,6 +664,10 @@ final class AppShellUITests: XCTestCase {
     // separate launch: running first, then succeeded.
     writeFixtureState("--ui-test-runtime-flash-running", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      element("flash.workspace.progress", in: app).waitForExistenceFast(timeout: 10),
+      "a running Flash replaces the image picker with progress",
+      file: file, line: line)
     assertDisplayed(
       app.staticTexts["flash.runtime.state"], equals: flash.runtimeRunningState, timeout: 10)
     assertDisplayed(
@@ -685,6 +676,10 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(element("flash.runtime.attention", in: app).exists, file: file, line: line)
     writeFixtureState("--ui-test-runtime-flash-succeeded", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      app.buttons["flash.image.choose"].waitForExistenceFast(timeout: 10),
+      "historical success must not replace the next Flash action with a stale dashboard",
+      file: file, line: line)
     assertDisplayed(
       app.staticTexts["flash.runtime.state"], equals: flash.runtimeSucceededState, timeout: 10)
     assertDisplayed(
@@ -894,21 +889,18 @@ final class AppShellUITests: XCTestCase {
     writeFixtureState("", in: app, file: file, line: line)
 
     select("app.navigation.flash", in: app, file: file, line: line)
+    XCTAssertTrue(element("flash.workspace.title", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(element("flash.workspace.currentDevice", in: app).exists)
+    XCTAssertTrue(element("flash.workspace.readiness", in: app).exists)
+    XCTAssertFalse(element("flash.mode", in: app).exists, file: file, line: line)
+    XCTAssertTrue(element("flash.runtime.attention", in: app).exists, file: file, line: line)
+    let details = element("flash.workspace.details", in: app)
+    XCTAssertTrue(details.exists, file: file, line: line)
+    details.click()
     assertDisplayed(app.staticTexts["flash.availability.status"], equals: flash.availability)
-    assertDisplayed(app.staticTexts["flash.mode.badge"], equals: flash.modeBadge)
     assertDisplayed(element("flash.target", in: app), equals: flash.target)
-    assertDisplayed(element("flash.plan.empty", in: app), equals: flash.emptyPlan)
-    assertDisplayed(element("flash.plan.prepare", in: app), equals: flash.prepareAction)
     assertDisplayed(app.staticTexts["flash.runtime.state"], equals: flash.runtimeState)
     assertDisplayed(element("flash.runtime.result", in: app), equals: flash.runtimeResult)
-    assertDisplayed(
-      app.staticTexts["flash.runtime.recovery.guidance"], equals: flash.runtimeRecovery)
-    assertDisplayed(
-      app.staticTexts.matching(identifier: "flash.noOperationSubmitted").firstMatch,
-      equals: flash.noSubmission)
-    XCTAssertTrue(
-      app.staticTexts[flash.imageBlocker].exists,
-      "the localized preparation blocker must render", file: file, line: line)
 
     select("app.navigation.debug", in: app, file: file, line: line)
     for (tabID, panelTitle) in zip(
@@ -957,14 +949,21 @@ final class AppShellUITests: XCTestCase {
       file: file, line: line)
 
     select("app.navigation.flash", in: app, file: file, line: line)
+    element("flash.workspace.details", in: app).click()
     writeFixtureState("--ui-test-runtime-flash-running", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      element("flash.workspace.progress", in: app).waitForExistenceFast(timeout: 10),
+      file: file, line: line)
     assertDisplayed(
       app.staticTexts["flash.runtime.state"], equals: flash.runtimeRunningState,
       timeout: 10, file: file, line: line)
     assertDisplayed(element("flash.runtime.result", in: app), equals: flash.runtimeRunningResult)
     writeFixtureState("--ui-test-runtime-flash-succeeded", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      app.buttons["flash.image.choose"].waitForExistenceFast(timeout: 10),
+      file: file, line: line)
     assertDisplayed(
       app.staticTexts["flash.runtime.state"], equals: flash.runtimeSucceededState,
       timeout: 10, file: file, line: line)
@@ -1000,15 +999,21 @@ final class AppShellUITests: XCTestCase {
     in app: XCUIApplication, file: StaticString, line: UInt
   ) {
     writeFixtureState(
-      "--ui-test-flash-loader-unbound\n--ui-test-flash-plan",
+      "--ui-test-flash-loader-unbound\n--ui-test-flash-plan\n--ui-test-runtime-history-empty",
       in: app, file: file, line: line)
     select("app.navigation.flash", in: app)
     app.buttons["flash.refresh"].click()
-    app.buttons["flash.mode.execute"].click()
+    XCTAssertFalse(element("flash.mode", in: app).exists, file: file, line: line)
     XCTAssertFalse(app.buttons["flash.bootloader.bind"].exists, file: file, line: line)
+    let details = element("flash.workspace.details", in: app)
+    XCTAssertTrue(details.waitForExistenceFast(timeout: 10), file: file, line: line)
+    details.click()
     XCTAssertTrue(
       element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
       "the fixture must materialize an exact execute plan", file: file, line: line)
+    XCTAssertTrue(
+      element("flash.workspace.plan.stages", in: app).exists,
+      "Flash summarizes Exact Plan as four readable stages", file: file, line: line)
     let partitions = element("flash.plan.partitions.disclosure", in: app)
     XCTAssertTrue(partitions.exists, file: file, line: line)
     scrollIntoView(partitions, in: app)
@@ -1018,8 +1023,7 @@ final class AppShellUITests: XCTestCase {
       "mapped partition details must be inspectable", file: file, line: line)
     partitions.click()
 
-    // Prerequisites are a top-level, always-expanded section before the exact
-    // plan — what has to hold is readable without a disclosure click.
+    // Prerequisites stay inspectable inside the single Flash details disclosure.
     let prerequisites = element("flash.plan.prerequisitesList", in: app)
     XCTAssertTrue(prerequisites.exists, file: file, line: line)
     scrollIntoView(prerequisites, in: app)
@@ -1031,7 +1035,7 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(submit.exists, file: file, line: line)
     scrollIntoView(submit, in: app)
     XCTAssertTrue(submit.isEnabled, file: file, line: line)
-    XCTAssertEqual(submit.label, "Erase userdata and flash", file: file, line: line)
+    XCTAssertEqual(submit.label, "Erase data and start flashing", file: file, line: line)
     XCTAssertFalse(element("flash.confirm.sheet", in: app).exists, file: file, line: line)
     XCTAssertFalse(element("flash.execute.terminal", in: app).exists, file: file, line: line)
     submit.click()
@@ -1121,11 +1125,11 @@ final class AppShellUITests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch
   }
 
-  /// Lightweight visual regression for the v0.5 reference layout. Native
+  /// Lightweight visual regression for the current device detail layout. Native
   /// materials, accent, fonts and antialiasing remain system-owned, so this
   /// pins structure and keeps an artifact for review instead of comparing raw
   /// pixels across macOS versions.
-  private func assertV05DeviceDetailLayout(
+  private func assertDeviceDetailLayout(
     in app: XCUIApplication, adoptedDevice: XCUIElement, localeName: String,
     file: StaticString, line: UInt
   ) {
@@ -1158,49 +1162,38 @@ final class AppShellUITests: XCTestCase {
 
     let attachment = XCTAttachment(screenshot: window.screenshot())
     attachment.name =
-      "v0.5-device-detail-\(localeName)-\(Int(window.frame.width))x\(Int(window.frame.height))"
+      "device-detail-\(localeName)-\(Int(window.frame.width))x\(Int(window.frame.height))"
     attachment.lifetime = .keepAlways
     add(attachment)
   }
 
-  private func assertV05FlashPlanLayout(
+  private func assertFlashLayout(
     in app: XCUIApplication, file: StaticString, line: UInt
   ) {
-    writeFixtureState("--ui-test-flash-plan", in: app, file: file, line: line)
+    writeFixtureState(
+      "--ui-test-flash-plan\n--ui-test-runtime-history-empty",
+      in: app, file: file, line: line)
     select("app.navigation.flash", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
-    element("flash.mode.execute", in: app).click()
     XCTAssertTrue(
-      element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
-      "the fixture must materialize an exact execute plan", file: file, line: line)
+      app.buttons["flash.execute.submit"].waitForExistenceFast(timeout: 15),
+      "Flash must render the selected image and one real Flash action",
+      file: file, line: line)
+    XCTAssertTrue(app.buttons["flash.execute.submit"].exists, file: file, line: line)
+    XCTAssertFalse(element("flash.mode", in: app).exists, file: file, line: line)
 
-    // Grid/VStack containers do not consistently surface their own AX node on
-    // macOS. A real column header is the stable structural proof that the wide
-    // table branch, rather than the headerless compact rows, is rendered.
-    let planTableHeader = element("flash.plan.header.flash.plan.column.number", in: app)
-    let compactPlan = element("flash.plan.compactList", in: app)
-    if app.windows.firstMatch.frame.width >= 1_100 {
-      XCTAssertTrue(
-        planTableHeader.waitForExistenceFast(timeout: 5),
-        "the 1180pt reference window must render Exact Plan as a compact table",
-        file: file, line: line)
-      XCTAssertFalse(
-        compactPlan.exists, "the wide reference must not fall back to stacked plan rows",
-        file: file, line: line)
-    } else {
-      XCTAssertTrue(
-        planTableHeader.exists || compactPlan.exists,
-        "a clamped display must preserve one compact Exact Plan presentation",
-        file: file, line: line)
-    }
+    let details = element("flash.workspace.details", in: app)
+    XCTAssertTrue(details.exists, file: file, line: line)
+    details.click()
     XCTAssertTrue(
-      element("flash.plan.row.0", in: app).exists,
-      "the plan table must expose stable structural rows", file: file, line: line)
+      element("flash.workspace.plan.stages", in: app).waitForExistenceFast(timeout: 5),
+      "Flash details must expose the four-stage Exact Plan summary",
+      file: file, line: line)
 
     let window = app.windows.firstMatch
     let attachment = XCTAttachment(screenshot: window.screenshot())
     attachment.name =
-      "v0.5-flash-en-\(Int(window.frame.width))x\(Int(window.frame.height))"
+      "flash-en-\(Int(window.frame.width))x\(Int(window.frame.height))"
     attachment.lifetime = .keepAlways
     add(attachment)
   }

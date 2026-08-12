@@ -1,6 +1,50 @@
+import AppKit
 import ArkDeckWorkflows
 import SwiftUI
 import UniformTypeIdentifiers
+
+private struct FlashWorkspaceSurface<Content: View>: View {
+  @ViewBuilder let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  var body: some View {
+    content
+      .padding(18)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        Color(nsColor: .controlBackgroundColor),
+        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+      }
+  }
+}
+
+private enum FlashWorkspaceRunStage: Int, CaseIterable {
+  case prepare
+  case write
+  case verify
+
+  var titleKey: String {
+    switch self {
+    case .prepare: "flash.workspace.stage.prepare"
+    case .write: "flash.workspace.stage.write"
+    case .verify: "flash.workspace.stage.verify"
+    }
+  }
+}
+
+private struct FlashPlanStageSummary: Identifiable {
+  let id: Int
+  let titleKey: String
+  let stepCount: Int
+  let highestEffect: FlashPlanEffect?
+}
 
 enum FlashWorkspaceMode: String, CaseIterable, Hashable {
   case execute
@@ -16,7 +60,7 @@ enum FlashWorkspaceMode: String, CaseIterable, Hashable {
   }
 }
 
-/// Flash planning workspace.
+/// Flash execution workspace.
 ///
 /// The App can read Runtime availability and target facts, and it can ask the
 /// bundled provider to materialize an exact plan from a user-selected archive.
@@ -29,70 +73,32 @@ struct FlashWorkspaceView: View {
   let onRefreshRuntimeHistory: () -> Void
   let onOpenHistory: () -> Void
   @State private var isImporterPresented = false
+  @State private var isDetailsExpanded = false
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
-        modeStatus
-        availabilitySection
-        deviceAccessSection
-        FlashRuntimeActivityView(
-          presentation: runtimeHistory,
-          plan: model.plan,
-          onOpenHistory: onOpenHistory)
-        // Reading order matches the spec. The three plan inputs share one
-        // visual container; Exact Plan and Review remain independent stateful
-        // objects instead of turning every static subsection into a card.
-        ViewThatFits(in: .horizontal) {
-          HStack(alignment: .top, spacing: 16) {
-            planInputsSection
-              .frame(width: 280)
-
-            VStack(spacing: 16) {
-              exactPlanSection(useTable: true)
-              reviewSection
-            }
-            // Fix the wide candidate's ideal width so long Runtime hashes or
-            // command arguments cannot make ViewThatFits choose the narrow
-            // stack in the 1180pt reference window.
-            .frame(width: 500)
-          }
-
-          VStack(spacing: 16) {
-            planInputsSection
-            exactPlanSection(useTable: false)
-            reviewSection
-          }
-        }
+      VStack(alignment: .leading, spacing: 16) {
+        pageLead
+        currentDeviceSurface
+        primarySurface
+        flashDetails
       }
-      .frame(maxWidth: 1_100, alignment: .topLeading)
+      .frame(maxWidth: 760, alignment: .topLeading)
       .padding(20)
     }
     .toolbar {
-      ToolbarItemGroup(placement: .primaryAction) {
-        Picker(flashText("flash.mode.label"), selection: modeBinding) {
-          Text(flashText("flash.mode.execute"))
-            .tag(FlashWorkspaceMode.execute)
-            .accessibilityIdentifier("flash.mode.execute")
-          Text(flashText("flash.mode.planOnly"))
-            .tag(FlashWorkspaceMode.planOnly)
-            .accessibilityIdentifier("flash.mode.planOnly")
-          Text(flashText("flash.mode.simulated"))
-            .tag(FlashWorkspaceMode.simulated)
-            .accessibilityIdentifier("flash.mode.simulated")
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 300)
-        .accessibilityIdentifier("flash.mode")
-        .disabled(model.isPreparingPlan)
-
-        Button(flashText("flash.action.refresh")) {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
           model.refresh()
           onRefreshRuntimeHistory()
+        } label: {
+          Label(flashText("flash.action.refresh"), systemImage: "arrow.clockwise")
         }
+        .labelStyle(.iconOnly)
+        .help(flashText("flash.action.refresh"))
+        .accessibilityLabel(flashText("flash.action.refresh"))
         .accessibilityIdentifier("flash.refresh")
-        .disabled(
-          model.isRefreshing || model.isPreparingPlan || isRuntimeHistoryRefreshing)
+        .disabled(model.isRefreshing || model.isPreparingPlan || isRuntimeHistoryRefreshing)
       }
     }
     .fileImporter(
@@ -124,46 +130,714 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private var modeBinding: Binding<FlashWorkspaceMode> {
-    Binding(get: { model.mode }, set: { model.setMode($0) })
-  }
-
-  // Execute deliberately has no badge: the absence is the statement that
-  // this is real. Plan-only wears a purple outline, simulated an orange
-  // dashed outline — outline, not filled, so neither reads as a state color.
-  @ViewBuilder
-  private var modeStatus: some View {
-    switch model.mode {
-    case .execute:
-      EmptyView()
-    case .planOnly:
-      modeBadge(
-        flashText("flash.mode.planOnly.badge"),
-        systemImage: "doc.text.magnifyingglass",
-        color: .purple,
-        dashed: false)
-    case .simulated:
-      modeBadge(
-        flashText("flash.mode.simulated.badge"),
-        systemImage: "testtube.2",
-        color: .orange,
-        dashed: true)
+  private var pageLead: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(flashText("flash.workspace.title"))
+        .font(.title2.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("flash.workspace.title")
+      Text(flashText("flash.workspace.subtitle"))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 
-  private func modeBadge(
-    _ text: String, systemImage: String, color: Color, dashed: Bool
-  ) -> some View {
-    Label(text, systemImage: systemImage)
-      .font(.callout.weight(.semibold))
-      .foregroundStyle(color)
-      .padding(.horizontal, 10)
-      .padding(.vertical, 5)
-      .overlay {
-        RoundedRectangle(cornerRadius: 7)
-          .stroke(color, style: StrokeStyle(lineWidth: 1, dash: dashed ? [4, 3] : []))
+  private var currentDeviceSurface: some View {
+    FlashWorkspaceSurface {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 12) {
+          currentDeviceIdentity
+          Spacer(minLength: 16)
+          readinessLabel
+        }
+        VStack(alignment: .leading, spacing: 10) {
+          currentDeviceIdentity
+          readinessLabel
+        }
       }
-      .accessibilityIdentifier("flash.mode.badge")
+    }
+  }
+
+  private var currentDeviceIdentity: some View {
+    HStack(spacing: 10) {
+      Image(systemName: model.selectedTarget == nil ? "externaldrive.badge.questionmark" : "externaldrive.fill")
+        .font(.title3)
+        .foregroundStyle(readinessColor)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(
+          model.selectedTarget == nil
+            ? flashText("flash.workspace.device.none")
+            : model.profileReference.uppercased()
+        )
+        .font(.callout.weight(.semibold))
+        .lineLimit(1)
+        if let target = model.selectedTarget {
+          Text(
+            String(
+              format: flashText("flash.workspace.device.detail"),
+              target.id, target.bindingRevision)
+          )
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .help(target.id)
+        } else {
+          Text(flashText("flash.target.guidance"))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+        }
+      }
+    }
+    .accessibilityIdentifier("flash.workspace.currentDevice")
+  }
+
+  private var readinessLabel: some View {
+    VStack(alignment: .trailing, spacing: 2) {
+      Label(flashText(readinessTitleKey), systemImage: readinessSymbol)
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(readinessColor)
+        .accessibilityIdentifier("flash.workspace.readiness")
+      Text(readinessDetail)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.trailing)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private var readinessTitleKey: String {
+    switch model.workspace.availability {
+    case .checking: return "flash.workspace.readiness.checking"
+    case .unavailable: return "flash.workspace.readiness.blocked"
+    case .available:
+      if model.selectedTarget == nil { return "flash.workspace.readiness.noDevice" }
+      if model.isPreparingPlan { return "flash.workspace.readiness.checking" }
+      if model.planFailureCode != nil { return "flash.workspace.readiness.blocked" }
+      if let plan = model.plan,
+        !plan.blockingRequiredPrerequisites.isEmpty,
+        !model.willActivateCurrentTargetOnSubmit
+      {
+        return "flash.workspace.readiness.blocked"
+      }
+      return model.plan == nil
+        ? "flash.workspace.readiness.selected"
+        : "flash.workspace.readiness.ready"
+    }
+  }
+
+  private var readinessSymbol: String {
+    switch readinessTitleKey {
+    case "flash.workspace.readiness.ready": "checkmark.circle.fill"
+    case "flash.workspace.readiness.blocked", "flash.workspace.readiness.noDevice":
+      "exclamationmark.triangle.fill"
+    case "flash.workspace.readiness.checking": "arrow.triangle.2.circlepath"
+    default: "checkmark.circle"
+    }
+  }
+
+  private var readinessColor: Color {
+    switch readinessTitleKey {
+    case "flash.workspace.readiness.ready": .green
+    case "flash.workspace.readiness.blocked", "flash.workspace.readiness.noDevice": .orange
+    case "flash.workspace.readiness.checking": .blue
+    default: .secondary
+    }
+  }
+
+  private var readinessDetail: String {
+    if case .unavailable(let reasons) = model.workspace.availability {
+      return reasons.first ?? flashText("flash.availability.unavailable")
+    }
+    if model.selectedTarget == nil {
+      return flashText("flash.workspace.readiness.noDeviceDetail")
+    }
+    if model.isPreparingPlan {
+      return flashText("flash.workspace.readiness.checkingDetail")
+    }
+    if model.planFailureCode != nil {
+      return flashText("flash.workspace.readiness.planFailedDetail")
+    }
+    if let plan = model.plan {
+      let blockers = plan.blockingRequiredPrerequisites.count
+      if blockers > 0 && !model.willActivateCurrentTargetOnSubmit {
+        return String(
+          format: flashText("flash.workspace.readiness.blockerCount"), blockers)
+      }
+      let satisfied = plan.prerequisites.filter {
+        $0.requirement == .required && $0.status == .satisfied
+      }.count
+      return String(
+        format: flashText("flash.workspace.readiness.checkCount"), satisfied)
+    }
+    return flashText("flash.workspace.readiness.chooseImage")
+  }
+
+  @ViewBuilder
+  private var primarySurface: some View {
+    if let job = attentionFlashJob {
+      recoveryBlockerSurface(job)
+    } else if model.isSubmitting || activeFlashJob != nil {
+      executionProgressSurface
+    } else if model.submission != nil || model.submissionFailure != nil {
+      executionResultSurface
+    } else {
+      imageAndActionSurface
+    }
+  }
+
+  private var imageAndActionSurface: some View {
+    FlashWorkspaceSurface {
+      VStack(alignment: .leading, spacing: 16) {
+        imagePickerRow
+
+        if model.isPreparingPlan {
+          Divider()
+          HStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text(flashText("flash.workspace.image.validating"))
+              .font(.callout)
+          }
+          .accessibilityIdentifier("flash.plan.preparing")
+        } else if let errorCode = model.planFailureCode {
+          Divider()
+          Label(flashText(planFailureKey(errorCode)), systemImage: "xmark.octagon.fill")
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("flash.plan.error")
+          if let detail = model.planFailureDetail {
+            Text(detail)
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          Button(flashText("flash.workspace.image.retry")) { model.preparePlan() }
+            .accessibilityIdentifier("flash.plan.retry")
+        } else if let plan = model.plan {
+          Divider()
+          flashAction(plan)
+        }
+      }
+      .accessibilityIdentifier("flash.workspace.imageAction")
+    }
+  }
+
+  private var imagePickerRow: some View {
+    HStack(spacing: 14) {
+      Image(systemName: model.selectedArchiveURL == nil ? "shippingbox" : "shippingbox.fill")
+        .font(.title2)
+        .foregroundStyle(
+          model.selectedArchiveURL == nil ? Color.secondary : Color.accentColor)
+        .frame(width: 34, height: 34)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(
+          model.selectedArchiveURL?.lastPathComponent
+            ?? flashText("flash.workspace.image.chooseTitle")
+        )
+        .font(.callout.weight(.semibold))
+        .lineLimit(2)
+        .truncationMode(.middle)
+        .accessibilityIdentifier("flash.image.value")
+        if let plan = model.plan {
+          Text(
+            "\(ByteCountFormatter.string(fromByteCount: plan.archiveSizeBytes, countStyle: .file)) · \(plan.runtimeBuildVersion)"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        } else {
+          Text(flashText("flash.workspace.image.chooseHelp"))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      Spacer(minLength: 12)
+      if model.selectedArchiveURL == nil {
+        Button(flashText("flash.workspace.image.choose")) {
+          isImporterPresented = true
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(model.isPreparingPlan)
+        .accessibilityIdentifier("flash.image.choose")
+      } else {
+        Button(flashText("flash.workspace.image.change")) {
+          isImporterPresented = true
+        }
+        .buttonStyle(.bordered)
+        .disabled(model.isPreparingPlan)
+        .accessibilityIdentifier("flash.image.choose")
+      }
+    }
+    .padding(16)
+    .background(
+      Color(nsColor: .windowBackgroundColor).opacity(0.55),
+      in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .stroke(
+          Color(nsColor: .separatorColor),
+          style: StrokeStyle(
+            lineWidth: 1,
+            dash: model.selectedArchiveURL == nil ? [5, 4] : [])
+        )
+    }
+  }
+
+  private func flashAction(_ plan: FlashExactPlanPresentation) -> some View {
+    let impact =
+      plan.dataImpact.first {
+        if case .userDataDestroyed = $0 { return true }
+        return false
+      } ?? .mappedPartitionsOverwritten(count: plan.mappedPartitionCount)
+    return VStack(alignment: .leading, spacing: 12) {
+      Label(mainImpactText(plan), systemImage: "externaldrive.badge.exclamationmark")
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.red)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier(dataImpactIdentifier(impact))
+      Label(flashText("flash.workspace.action.power"), systemImage: "bolt.fill")
+        .font(.callout)
+        .fixedSize(horizontal: false, vertical: true)
+      Text(flashText("flash.workspace.action.authority"))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      if model.canSubmit {
+        Button {
+          model.submit()
+        } label: {
+          Text(flashText("flash.workspace.action.submit"))
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+        .controlSize(.large)
+        .accessibilityIdentifier("flash.execute.submit")
+      } else {
+        Label(flashBlockerText(plan), systemImage: "exclamationmark.triangle.fill")
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("flash.execute.prerequisiteBlocker")
+      }
+    }
+  }
+
+  private func mainImpactText(_ plan: FlashExactPlanPresentation) -> String {
+    let target = plan.target?.id ?? model.profileReference.uppercased()
+    if plan.dataImpact.contains(where: {
+      if case .userDataDestroyed = $0 { return true }
+      return false
+    }) {
+      return String(format: flashText("flash.workspace.action.impact"), target)
+    }
+    return String(
+      format: flashText("flash.impact.partitions"),
+      plan.mappedPartitionCount)
+  }
+
+  private func dataImpactIdentifier(_ impact: FlashDataImpactPresentation) -> String {
+    switch impact {
+    case .mappedPartitionsOverwritten:
+      return "flash.impact.partitions"
+    case .userDataDestroyed:
+      return "flash.impact.userdata"
+    case .forbiddenAreasPreserved:
+      return "flash.impact.preserved"
+    }
+  }
+
+  private func flashBlockerText(_ plan: FlashExactPlanPresentation) -> String {
+    if !plan.blockingRequiredPrerequisites.isEmpty {
+      return String(
+        format: flashText("flash.workspace.action.blocked"),
+        plan.blockingRequiredPrerequisites.count)
+    }
+    return flashText("flash.execute.planRequired")
+  }
+
+  private var activeFlashJob: RuntimeJobSummaryPresentation? {
+    runtimeHistory.jobs.first { job in
+      job.operationReference == "flash.dayu200"
+        && !isTerminalState(job.state)
+        && !job.requiresRecoveryGuidance
+    }
+  }
+
+  private var attentionFlashJob: RuntimeJobSummaryPresentation? {
+    runtimeHistory.jobs.first {
+      $0.operationReference == "flash.dayu200" && $0.requiresRecoveryGuidance
+    }
+  }
+
+  private func recoveryBlockerSurface(
+    _ job: RuntimeJobSummaryPresentation
+  ) -> some View {
+    FlashWorkspaceSurface {
+      VStack(alignment: .leading, spacing: 12) {
+        Label(
+          flashText("flash.runtime.recoveryTitle"),
+          systemImage: "exclamationmark.shield.fill"
+        )
+        .font(.title3.weight(.semibold))
+        .foregroundStyle(.orange)
+        .accessibilityIdentifier("flash.runtime.attention")
+        Text(
+          flashText(
+            job.outcomeUnknown
+              ? "flash.runtime.outcomeUnknownGuidance"
+              : "flash.runtime.waitingForHumanGuidance")
+        )
+        .font(.callout)
+        .fixedSize(horizontal: false, vertical: true)
+        LabeledContent(flashText("flash.runtime.job")) {
+          Text(job.id).font(.callout.monospaced())
+        }
+        Button(flashText("flash.runtime.openRecord"), action: onOpenHistory)
+          .accessibilityIdentifier("flash.runtime.openHistory")
+      }
+    }
+  }
+
+  private func isTerminalState(_ state: String) -> Bool {
+    ["planned", "succeeded", "recovered", "failed", "cancelled", "interrupted"]
+      .contains(state)
+  }
+
+  private var currentRunStage: FlashWorkspaceRunStage {
+    if model.submission != nil { return .verify }
+    guard let job = activeFlashJob, let tail = job.timeline.last else { return .prepare }
+    guard let plan = model.plan,
+      let index = plan.steps.firstIndex(where: { tail == $0.id || tail.contains(" \($0.id)") })
+    else {
+      let lower = tail.lowercased()
+      if lower.contains("postflight") || lower.contains("reboot") || lower.contains("verify") {
+        return .verify
+      }
+      if lower.contains("flash") || lower.contains("write") { return .write }
+      return .prepare
+    }
+    if plan.steps[index].effect == .destructive { return .write }
+    if let lastWrite = plan.steps.lastIndex(where: { $0.effect == .destructive }),
+      index > lastWrite
+    {
+      return .verify
+    }
+    return .prepare
+  }
+
+  private var executionProgressSurface: some View {
+    FlashWorkspaceSurface {
+      VStack(alignment: .leading, spacing: 18) {
+        HStack(alignment: .top, spacing: 12) {
+          VStack(alignment: .leading, spacing: 5) {
+            Text(flashText(currentRunStage.titleKey))
+              .font(.title3.weight(.semibold))
+              .accessibilityAddTraits(.isHeader)
+              .accessibilityIdentifier("flash.workspace.progress")
+            Text(flashText("flash.workspace.progress.keepConnected"))
+              .font(.callout)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          Spacer(minLength: 12)
+          Label(
+            flashText("flash.workspace.progress.running"),
+            systemImage: "arrow.triangle.2.circlepath")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.orange)
+        }
+
+        ProgressView()
+          .progressViewStyle(.linear)
+          .accessibilityLabel(flashText(currentRunStage.titleKey))
+          .accessibilityIdentifier("flash.runtime.progress")
+        Text(flashText("flash.workspace.progress.indeterminate"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+
+        flashStageTrack
+
+        if isCurrentStepCritical {
+          Label(
+            flashText("flash.runtime.criticalWrite"),
+            systemImage: "exclamationmark.triangle.fill"
+          )
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(12)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+          .accessibilityIdentifier("flash.runtime.criticalWrite")
+        }
+
+        if model.activeJobID != nil {
+          Button(flashText("flash.action.cancel"), role: .cancel) {
+            model.cancelActiveJob()
+          }
+          .disabled(model.isCancelling)
+          .accessibilityIdentifier("flash.execute.cancel")
+          Text(flashText("flash.action.cancel.help"))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
+  }
+
+  private var flashStageTrack: some View {
+    HStack(alignment: .top, spacing: 8) {
+      ForEach(FlashWorkspaceRunStage.allCases, id: \.rawValue) { stage in
+        VStack(spacing: 6) {
+          Image(
+            systemName: stage.rawValue < currentRunStage.rawValue
+              ? "checkmark.circle.fill"
+              : stage == currentRunStage
+                ? "circle.inset.filled"
+                : "circle"
+          )
+          .foregroundStyle(
+            stage.rawValue <= currentRunStage.rawValue
+              ? Color.accentColor
+              : Color.secondary)
+          Text(flashText(stage.titleKey))
+            .font(.caption)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(stage == currentRunStage ? .primary : .secondary)
+            .frame(maxWidth: .infinity)
+        }
+        if stage != .verify {
+          Divider()
+            .frame(maxWidth: 60)
+            .padding(.top, 8)
+        }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("flash.workspace.progress.stages")
+  }
+
+  private var isCurrentStepCritical: Bool {
+    guard let tail = activeFlashJob?.timeline.last else { return false }
+    return model.plan?.steps.contains {
+      $0.cancellation == .criticalNonInterruptible
+        && (tail == $0.id || tail.contains(" \($0.id)"))
+    } == true
+  }
+
+  private var executionResultSurface: some View {
+    let succeeded = model.hasVerifiedPostflight
+    return FlashWorkspaceSurface {
+      HStack(alignment: .top, spacing: 15) {
+        Image(systemName: succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+          .font(.system(size: 36))
+          .foregroundStyle(succeeded ? .green : .orange)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 10) {
+          Text(
+            flashText(
+              succeeded
+                ? "flash.workspace.result.success"
+                : "flash.workspace.result.stopped")
+          )
+          .font(.title3.weight(.semibold))
+          .accessibilityAddTraits(.isHeader)
+          .accessibilityIdentifier("flash.execute.terminal")
+          Text(resultDescription(succeeded: succeeded))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+          if let plan = model.plan, let evidence = model.postflightEvidence {
+            flashPostflight(plan: plan, evidence: evidence)
+          }
+          HStack(spacing: 10) {
+            Button(flashText("flash.workspace.result.again")) {
+              model.resetForAnotherFlash()
+            }
+              .buttonStyle(.borderedProminent)
+              .accessibilityIdentifier("flash.workspace.result.again")
+            Button(flashText("flash.workspace.result.history"), action: onOpenHistory)
+              .accessibilityIdentifier("flash.runtime.openHistory")
+          }
+        }
+      }
+    }
+    .accessibilityIdentifier("flash.workspace.result")
+  }
+
+  private func resultDescription(succeeded: Bool) -> String {
+    if succeeded { return flashText("flash.workspace.result.successDetail") }
+    if let failure = model.submissionFailure { return failure }
+    if let submission = model.submission {
+      return String(
+        format: flashText("flash.workspace.result.state"), submission.state)
+    }
+    return flashText("flash.workspace.result.unverified")
+  }
+
+  private var flashDetails: some View {
+    DisclosureGroup(isExpanded: $isDetailsExpanded) {
+      VStack(alignment: .leading, spacing: 18) {
+        availabilitySection
+        deviceAccessSection
+        detailsInputs
+        if let plan = model.plan {
+          exactPlanDetails(plan)
+        }
+        FlashRuntimeActivityView(
+          presentation: runtimeHistory,
+          plan: model.plan,
+          onOpenHistory: onOpenHistory)
+      }
+      .padding(.top, 12)
+    } label: {
+      Text(flashText("flash.workspace.details"))
+        .font(.callout.weight(.semibold))
+    }
+    .accessibilityIdentifier("flash.workspace.details")
+  }
+
+  private var detailsInputs: some View {
+    GroupBox(flashText("flash.workspace.details.configuration")) {
+      VStack(alignment: .leading, spacing: 14) {
+        Picker(flashText("flash.profile.label"), selection: profileBinding) {
+          ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
+            Text(reference).tag(reference)
+          }
+        }
+        .accessibilityIdentifier("flash.profile")
+        .disabled(model.isPreparingPlan || model.isSubmitting)
+        targetContent
+        Divider()
+        Text(flashText("flash.plan.prerequisites"))
+          .font(.subheadline.weight(.semibold))
+          .accessibilityAddTraits(.isHeader)
+        prerequisitesContent
+          .accessibilityIdentifier("flash.plan.prerequisitesSection")
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, 4)
+    }
+  }
+
+  private func exactPlanDetails(_ plan: FlashExactPlanPresentation) -> some View {
+    GroupBox(flashText("flash.plan.title")) {
+      VStack(alignment: .leading, spacing: 12) {
+        Text(
+          String(
+            format: flashText("flash.workspace.plan.summary"),
+            plan.steps.count,
+            flashText(effectKey(highestEffect(in: plan.steps) ?? .hostOnly)))
+        )
+        .font(.callout.weight(.semibold))
+        planStageSummary(plan)
+        Divider()
+        planSummary(plan)
+        Divider()
+        FlashPlanDetailsView(plan: plan)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, 4)
+    }
+    .accessibilityIdentifier("flash.plan.steps")
+  }
+
+  private func planStageSummary(_ plan: FlashExactPlanPresentation) -> some View {
+    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
+      GridRow {
+        Text(flashText("flash.workspace.plan.stage"))
+          .accessibilityIdentifier("flash.workspace.plan.stages")
+        Text(flashText("flash.workspace.plan.steps"))
+        Text(flashText("flash.workspace.plan.effect"))
+      }
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .padding(.bottom, 6)
+      Divider().gridCellColumns(3)
+      ForEach(planStageSummaries(plan.steps)) { stage in
+        GridRow(alignment: .firstTextBaseline) {
+          Text(flashText(stage.titleKey))
+            .fixedSize(horizontal: false, vertical: true)
+          Text(stage.stepCount, format: .number)
+            .monospacedDigit()
+          if let effect = stage.highestEffect {
+            effectLabel(effect)
+          } else {
+            Text("—").foregroundStyle(.secondary)
+          }
+        }
+        .padding(.vertical, 7)
+        if stage.id < 3 { Divider().gridCellColumns(3) }
+      }
+    }
+  }
+
+  private func planStageSummaries(
+    _ steps: [FlashPlanStepPresentation]
+  ) -> [FlashPlanStageSummary] {
+    let firstMutation = steps.firstIndex { $0.effect == .deviceMutation }
+    let firstWrite = steps.firstIndex { $0.effect == .destructive }
+    let lastWrite = steps.lastIndex { $0.effect == .destructive }
+    var buckets = Array(repeating: [FlashPlanStepPresentation](), count: 4)
+
+    for (index, step) in steps.enumerated() {
+      if index < (firstMutation ?? firstWrite ?? steps.count) {
+        buckets[0].append(step)
+      } else if index < (firstWrite ?? steps.count) {
+        buckets[1].append(step)
+      } else if index <= (lastWrite ?? -1) {
+        buckets[2].append(step)
+      } else {
+        buckets[3].append(step)
+      }
+    }
+
+    let keys = [
+      "flash.workspace.plan.prepare",
+      "flash.workspace.plan.loader",
+      "flash.workspace.plan.write",
+      "flash.workspace.plan.verify",
+    ]
+    return buckets.enumerated().map { index, bucket in
+      FlashPlanStageSummary(
+        id: index,
+        titleKey: keys[index],
+        stepCount: bucket.count,
+        highestEffect: highestEffect(in: bucket))
+    }
+  }
+
+  private func highestEffect(
+    in steps: [FlashPlanStepPresentation]
+  ) -> FlashPlanEffect? {
+    steps.map(\.effect).max { effectRank($0) < effectRank($1) }
+  }
+
+  private func effectRank(_ effect: FlashPlanEffect) -> Int {
+    switch effect {
+    case .hostOnly: 0
+    case .readOnly: 1
+    case .deviceMutation: 2
+    case .destructive: 3
+    }
+  }
+
+  private func effectKey(_ effect: FlashPlanEffect) -> String {
+    switch effect {
+    case .hostOnly: "flash.effect.hostOnly"
+    case .readOnly: "flash.effect.readOnly"
+    case .deviceMutation: "flash.effect.deviceMutation"
+    case .destructive: "flash.effect.destructive"
+    }
   }
 
   private var availabilitySection: some View {
@@ -360,53 +1034,6 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private var planInputsSection: some View {
-    GroupBox(flashText("flash.inputs.title")) {
-      VStack(alignment: .leading, spacing: 14) {
-        flashInputSection("flash.profileImage.title") {
-          profileAndImageContent
-        }
-        Divider()
-        flashInputSection("flash.plan.prerequisites") {
-          prerequisitesContent
-        }
-        .accessibilityIdentifier("flash.plan.prerequisitesSection")
-        Divider()
-        flashInputSection("flash.target.title") {
-          targetContent
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
-    }
-  }
-
-  private var profileAndImageContent: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Picker(flashText("flash.profile.label"), selection: profileBinding) {
-        ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
-          Text(reference).tag(reference)
-        }
-      }
-      .accessibilityIdentifier("flash.profile")
-      .disabled(model.isPreparingPlan)
-
-      LabeledContent(flashText("flash.image.label")) {
-        Text(model.selectedArchiveURL?.lastPathComponent ?? flashText("flash.image.none"))
-          .lineLimit(2)
-          .truncationMode(.middle)
-          .accessibilityIdentifier("flash.image.value")
-      }
-      Button(flashText("flash.image.choose")) { isImporterPresented = true }
-        .accessibilityIdentifier("flash.image.choose")
-        .disabled(model.isPreparingPlan)
-      Text(flashText("flash.image.hint"))
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-
   private var profileBinding: Binding<String> {
     Binding(get: { model.profileReference }, set: { model.setProfileReference($0) })
   }
@@ -470,56 +1097,6 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private func flashInputSection<Content: View>(
-    _ titleKey: String,
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(flashText(titleKey))
-        .font(.subheadline.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-      content()
-    }
-  }
-
-  private func exactPlanSection(useTable: Bool) -> some View {
-    GroupBox(flashText("flash.plan.title")) {
-      VStack(alignment: .leading, spacing: 12) {
-        if model.isPreparingPlan {
-          HStack(spacing: 10) {
-            ProgressView()
-              .controlSize(.small)
-            Text(flashText("flash.plan.preparing"))
-          }
-          .accessibilityIdentifier("flash.plan.preparing")
-        } else if let plan = model.plan {
-          planSummary(plan)
-          Divider()
-          Group {
-            if useTable {
-              planStepsTable(plan.steps)
-                .frame(maxWidth: .infinity)
-            } else {
-              planStepsCompactList(plan.steps)
-            }
-          }
-          .accessibilityIdentifier("flash.plan.steps")
-          Divider()
-          FlashPlanDetailsView(plan: plan)
-        } else {
-          ContentUnavailableView {
-            Label(flashText("flash.plan.empty"), systemImage: "list.number")
-          } description: {
-            Text(flashText("flash.plan.emptyDescription"))
-          }
-          .accessibilityIdentifier("flash.plan.empty")
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
-    }
-  }
-
   private func planSummary(_ plan: FlashExactPlanPresentation) -> some View {
     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
       summaryRow("flash.plan.build", plan.runtimeBuildVersion)
@@ -548,97 +1125,6 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private func planStepsTable(_ steps: [FlashPlanStepPresentation]) -> some View {
-    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 0) {
-      GridRow(alignment: .firstTextBaseline) {
-        planColumnHeader("flash.plan.column.number", width: 24)
-        planColumnHeader("flash.plan.column.step", width: 84)
-        planColumnHeader("flash.plan.column.arguments")
-        planColumnHeader("flash.plan.column.effect", width: 88)
-        planColumnHeader("flash.plan.column.disposition", width: 82)
-      }
-      .padding(.bottom, 6)
-
-      Divider().gridCellColumns(5)
-
-      ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-        GridRow(alignment: .firstTextBaseline) {
-          Text(index + 1, format: .number)
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
-            .frame(width: 24, alignment: .leading)
-          Text(step.kind)
-            .font(.caption.monospaced().weight(.semibold))
-            .frame(width: 84, alignment: .leading)
-          Text(step.argumentSummary)
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-            .truncationMode(.middle)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-          effectLabel(step.effect)
-            .frame(width: 88, alignment: .leading)
-          dispositionLabel(step.disposition)
-            .frame(width: 82, alignment: .leading)
-        }
-        .padding(.vertical, 7)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("flash.plan.row.\(index)")
-
-        if index < steps.count - 1 {
-          Divider().gridCellColumns(5)
-        }
-      }
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("flash.plan.table")
-  }
-
-  private func planColumnHeader(_ key: String, width: CGFloat? = nil) -> some View {
-    Text(flashText(key))
-      .font(.caption2.weight(.semibold))
-      .foregroundStyle(.secondary)
-      .frame(width: width, alignment: .leading)
-      .accessibilityIdentifier("flash.plan.header.\(key)")
-  }
-
-  private func planStepsCompactList(_ steps: [FlashPlanStepPresentation]) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
-        planStepCompact(index: index, step: step)
-        if index < steps.count - 1 { Divider() }
-      }
-    }
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("flash.plan.compactList")
-  }
-
-  private func planStepCompact(index: Int, step: FlashPlanStepPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 5) {
-      HStack(spacing: 8) {
-        stepIdentity(index: index, step: step)
-        Spacer(minLength: 8)
-        effectLabel(step.effect)
-      }
-      Text(step.argumentSummary)
-        .font(.caption.monospaced())
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
-        .fixedSize(horizontal: false, vertical: true)
-      dispositionLabel(step.disposition)
-    }
-    .padding(.vertical, 8)
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("flash.plan.row.\(index)")
-  }
-
-  private func stepIdentity(index: Int, step: FlashPlanStepPresentation) -> some View {
-    Text("\(index + 1). \(step.kind)")
-      .font(.callout.monospaced().weight(.semibold))
-      .fixedSize(horizontal: false, vertical: true)
-  }
-
   private func effectLabel(_ effect: FlashPlanEffect) -> some View {
     let key: String
     let symbol: String
@@ -665,200 +1151,6 @@ struct FlashWorkspaceView: View {
       .font(.caption.weight(.semibold))
       .foregroundStyle(color)
       .lineLimit(2)
-  }
-
-  private func dispositionLabel(_ disposition: FlashPlanStepDisposition) -> some View {
-    let key: String
-    switch disposition {
-    case .planned: key = "flash.disposition.planned"
-    case .simulatedPreview: key = "flash.disposition.simulatedPreview"
-    case .executionLocked: key = "flash.disposition.executionLocked"
-    }
-    return Text(flashText(key))
-      .font(.caption.weight(.semibold))
-      .foregroundStyle(.secondary)
-  }
-
-  private var reviewSection: some View {
-    GroupBox(flashText("flash.review.title")) {
-      VStack(alignment: .leading, spacing: 12) {
-        if let errorCode = model.planFailureCode {
-          Label(flashText(planFailureKey(errorCode)), systemImage: "xmark.octagon.fill")
-            .foregroundStyle(.red)
-            .accessibilityIdentifier("flash.plan.error")
-          if let detail = model.planFailureDetail {
-            Text(detail)
-              .font(.caption.monospaced())
-              .textSelection(.enabled)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-
-        Button(action: { model.preparePlan() }) {
-          Text(
-            flashText(
-              model.plan == nil
-                ? "flash.action.preparePlan"
-                : "flash.action.preparePlanAgain"))
-        }
-        .buttonStyle(.borderedProminent)
-        .accessibilityIdentifier("flash.plan.prepare")
-        .disabled(!model.canPreparePlan)
-
-        if model.selectedArchiveURL == nil {
-          Text(flashText("flash.review.selectImageBlocker"))
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        } else if model.mode != .simulated && model.selectedTarget == nil {
-          Text(flashText("flash.review.selectTargetBlocker"))
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        }
-
-        if let plan = model.plan {
-          Divider()
-          Text(flashText("flash.impact.title"))
-            .font(.subheadline.weight(.semibold))
-          ForEach(Array(plan.dataImpact.enumerated()), id: \.offset) { _, impact in
-            dataImpactLabel(impact)
-              .accessibilityIdentifier(dataImpactIdentifier(impact))
-          }
-        }
-
-        switch model.mode {
-        case .execute:
-          Divider()
-          if model.plan != nil {
-            Label(
-              flashText("flash.execute.recoveryPath"),
-              systemImage: "arrow.uturn.backward.circle"
-            )
-            .font(.callout)
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
-            Label(
-              flashText("flash.execute.powerWarning"),
-              systemImage: "bolt.trianglebadge.exclamationmark.fill"
-            )
-            .font(.callout)
-            .fixedSize(horizontal: false, vertical: true)
-          }
-          Button {
-            model.submit()
-          } label: {
-            if model.isSubmitting {
-              HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text(flashText("flash.action.submitting"))
-              }
-            } else {
-              Text(flashText("flash.action.submit"))
-            }
-          }
-          .buttonStyle(.borderedProminent)
-          .tint(.red)
-          .disabled(!model.canSubmit)
-          .accessibilityIdentifier("flash.execute.submit")
-          if model.activeJobID != nil {
-            Button(flashText("flash.action.cancel"), role: .cancel) {
-              model.cancelActiveJob()
-            }
-            .disabled(model.isCancelling)
-            .accessibilityIdentifier("flash.execute.cancel")
-            Text(flashText("flash.action.cancel.help"))
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          if let plan = model.plan,
-            !plan.blockingRequiredPrerequisites.isEmpty,
-            !model.willActivateCurrentTargetOnSubmit,
-            !model.isSubmitting
-          {
-            Label(
-              flashText("flash.execute.prerequisiteBlocker"),
-              systemImage: "exclamationmark.triangle"
-            )
-            .font(.callout)
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("flash.execute.prerequisiteBlocker")
-          } else if !model.canSubmit && !model.isSubmitting {
-            Label(
-              flashText("flash.execute.planRequired"),
-              systemImage: "list.bullet.clipboard"
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-          }
-          Label(flashText("flash.execute.reviewNotAuthority"), systemImage: "lock.shield")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-          if let submission = model.submission {
-            let successful = submission.state == "succeeded" || submission.state == "recovered"
-            Label(
-              String(format: flashText("flash.execute.terminal"), submission.state),
-              systemImage: successful
-                ? "checkmark.circle.fill" : "xmark.octagon.fill"
-            )
-            .foregroundStyle(successful ? .green : .red)
-            .accessibilityIdentifier("flash.execute.terminal")
-            Text(submission.jobID)
-              .font(.caption.monospaced())
-              .textSelection(.enabled)
-              .accessibilityIdentifier("flash.execute.jobId")
-            if let postflight = model.postflightEvidence, let plan = model.plan {
-              flashPostflight(plan: plan, evidence: postflight)
-            }
-          } else if let failure = model.submissionFailure {
-            Label(failure, systemImage: "xmark.octagon.fill")
-              .foregroundStyle(.red)
-              .fixedSize(horizontal: false, vertical: true)
-              .accessibilityIdentifier("flash.execute.failure")
-          }
-        case .planOnly:
-          Label(flashText("flash.planOnly.noSubmission"), systemImage: "checkmark.shield")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("flash.noOperationSubmitted")
-        case .simulated:
-          Label(flashText("flash.simulated.previewOnly"), systemImage: "testtube.2")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("flash.noOperationSubmitted")
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
-    }
-  }
-
-  private func dataImpactLabel(_ impact: FlashDataImpactPresentation) -> some View {
-    switch impact {
-    case .mappedPartitionsOverwritten(let count):
-      return Label(
-        String(format: flashText("flash.impact.partitions"), count),
-        systemImage: "externaldrive.badge.exclamationmark")
-    case .userDataDestroyed:
-      return Label(flashText("flash.impact.userdata"), systemImage: "trash.fill")
-    case .forbiddenAreasPreserved:
-      return Label(flashText("flash.impact.preserved"), systemImage: "checkmark.shield.fill")
-    }
-  }
-
-  private func dataImpactIdentifier(_ impact: FlashDataImpactPresentation) -> String {
-    switch impact {
-    case .mappedPartitionsOverwritten:
-      return "flash.impact.partitions"
-    case .userDataDestroyed:
-      return "flash.impact.userdata"
-    case .forbiddenAreasPreserved:
-      return "flash.impact.preserved"
-    }
   }
 
   private func flashPostflight(
@@ -943,7 +1235,7 @@ struct FlashWorkspaceView: View {
 @MainActor
 final class FlashWorkspaceViewModel: ObservableObject {
   @Published private(set) var workspace = FlashWorkspacePresentation.loading
-  @Published private(set) var mode = FlashWorkspaceMode.planOnly
+  @Published private(set) var mode = FlashWorkspaceMode.execute
   @Published private(set) var selectedTargetID = ""
   @Published private(set) var selectedArchiveURL: URL?
   @Published private(set) var plan: FlashExactPlanPresentation?
@@ -972,6 +1264,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
   /// A production launch has no state URL and never reads one.
   private let uiTestFixtureStateURL: URL?
   private var didPrepareUITestPlan = false
+  private var shouldRegeneratePlanWhenReady = false
 
   init(
     provider: any FlashApplicationProviding,
@@ -1029,6 +1322,18 @@ final class FlashWorkspaceViewModel: ObservableObject {
       && (plan.blockingRequiredPrerequisites.isEmpty || willActivateCurrentTargetOnSubmit)
   }
 
+  var hasVerifiedPostflight: Bool {
+    guard let submission,
+      submission.state == "succeeded" || submission.state == "recovered",
+      let plan,
+      let evidence = postflightEvidence,
+      let plannedBindingRevision = plan.target?.bindingRevision,
+      evidence.observedFirmware == plan.runtimeBuildVersion,
+      evidence.observedBindingRevision == plannedBindingRevision
+    else { return false }
+    return true
+  }
+
   var willActivateCurrentTargetOnSubmit: Bool {
     guard mode == .execute, let selectedTarget else { return false }
     let status = workspace.bootloaderStatus
@@ -1075,6 +1380,8 @@ final class FlashWorkspaceViewModel: ObservableObject {
           self.mode = .execute
           self.selectedArchiveURL = URL(fileURLWithPath: "/ui-fixture/dayu200-images.tar.gz")
         }
+      }
+      if self.selectedArchiveURL != nil, self.plan == nil {
         self.preparePlan()
       }
     }
@@ -1097,23 +1404,27 @@ final class FlashWorkspaceViewModel: ObservableObject {
     guard self.mode != mode else { return }
     self.mode = mode
     invalidatePlan()
+    preparePlan()
   }
 
   func setProfileReference(_ reference: String) {
     guard profileReference != reference else { return }
     profileReference = reference
     invalidatePlan()
+    preparePlan()
   }
 
   func setTargetID(_ targetID: String) {
     guard selectedTargetID != targetID else { return }
     selectedTargetID = targetID
     invalidatePlan()
+    preparePlan()
   }
 
   func selectArchive(_ url: URL) {
     selectedArchiveURL = url
     invalidatePlan()
+    preparePlan()
   }
 
   func rejectArchiveSelection() {
@@ -1122,7 +1433,13 @@ final class FlashWorkspaceViewModel: ObservableObject {
   }
 
   func preparePlan() {
-    guard let archiveURL = selectedArchiveURL, canPreparePlan else { return }
+    guard let archiveURL = selectedArchiveURL,
+      mode == .simulated || selectedTarget != nil
+    else { return }
+    if isPreparingPlan {
+      shouldRegeneratePlanWhenReady = true
+      return
+    }
     isPreparingPlan = true
     plan = nil
     submission = nil
@@ -1141,7 +1458,13 @@ final class FlashWorkspaceViewModel: ObservableObject {
         mode: mode.executionMode,
         target: target)
       guard let self else { return }
-      defer { self.isPreparingPlan = false }
+      defer {
+        self.isPreparingPlan = false
+        if self.shouldRegeneratePlanWhenReady {
+          self.shouldRegeneratePlanWhenReady = false
+          self.preparePlan()
+        }
+      }
       guard
         self.selectedArchiveURL == archiveURL,
         self.profileReference == profileReference,
@@ -1157,6 +1480,13 @@ final class FlashWorkspaceViewModel: ObservableObject {
         self.planFailureDetail = detail
       }
     }
+  }
+
+  func resetForAnotherFlash() {
+    guard !isSubmitting else { return }
+    selectedArchiveURL = nil
+    mode = .execute
+    invalidatePlan()
   }
 
   func submit() {
@@ -1251,23 +1581,31 @@ final class FlashWorkspaceViewModel: ObservableObject {
           return
         }
         self.activeJobID = nil
-        self.isSubmitting = false
         self.isCancelling = false
         guard case .completed(let terminal) = runResult else {
+          self.isSubmitting = false
           if case .failed(let detail) = runResult {
             self.submissionFailure = detail
           }
           return
         }
         self.submission = terminal
+        guard terminal.state == "succeeded" || terminal.state == "recovered" else {
+          self.isSubmitting = false
+          return
+        }
         let detail = await detailProvider.loadJobDetail(
           jobID: terminal.jobID,
           operationReference: "flash.dayu200")
         guard self.selectedArchiveURL == archiveURL,
           self.plan == executionPlan,
           !Task.isCancelled
-        else { return }
+        else {
+          self.isSubmitting = false
+          return
+        }
         self.postflightEvidence = detail.evidence
+        self.isSubmitting = false
       case .failed(let detail):
         self.isSubmitting = false
         self.submissionFailure = detail
