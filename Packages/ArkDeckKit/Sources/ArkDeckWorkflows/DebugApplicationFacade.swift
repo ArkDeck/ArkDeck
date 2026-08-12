@@ -1,11 +1,13 @@
 // App-facing Debug workspace over Runtime's closed typed XPC door.
 //
-// The only executable work exposed here is capture.diagnostics@1 and four
-// target-bound read-only templates. There is no executable, argv, endpoint or
-// authority input: the daemon owns lowering and the App receives a disclosure.
+// Executable work is limited to published Debug operations: bounded
+// diagnostics, one target-bound HAP lifecycle, typed port rules and four
+// read-only templates. There is no executable, argv, endpoint or authority
+// input: the daemon owns lowering and the App receives a disclosure.
 
 import ArkDeckCore
 import ArkDeckRuntime
+import CryptoKit
 import Foundation
 import os
 
@@ -130,6 +132,7 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
   public let waitingForHuman: Bool
   public let outcomeUnknown: Bool
   public let outstandingResidueCount: Int
+  public let timeline: [String]
 
   public var needsAttention: Bool {
     waitingForHuman || outcomeUnknown || outstandingResidueCount > 0
@@ -149,7 +152,8 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
     state: String,
     waitingForHuman: Bool,
     outcomeUnknown: Bool,
-    outstandingResidueCount: Int
+    outstandingResidueCount: Int,
+    timeline: [String] = []
   ) {
     self.id = id
     self.operationReference = operationReference
@@ -158,6 +162,7 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
     self.waitingForHuman = waitingForHuman
     self.outcomeUnknown = outcomeUnknown
     self.outstandingResidueCount = outstandingResidueCount
+    self.timeline = timeline
   }
 }
 
@@ -223,6 +228,71 @@ public struct DebugLogJobAcceptancePresentation: Sendable, Equatable {
 public enum DebugLogJobSubmissionResult: Sendable, Equatable {
   case submitted(DebugLogJobAcceptancePresentation)
   case failed(String)
+}
+
+struct DebugHAPLocalArtifact: Sendable, Equatable {
+  let name: String
+  let byteCount: Int64
+  let sha256: String
+}
+
+enum DebugHAPLocalArtifactError: Error, CustomStringConvertible {
+  case invalidName
+  case invalidSize
+  case notRegularFile
+
+  var description: String {
+    switch self {
+    case .invalidName:
+      "Choose a .hap file whose basename contains only letters, numbers, dot, underscore or hyphen"
+    case .invalidSize:
+      "The selected HAP must be between 1 byte and 64 MiB"
+    case .notRegularFile:
+      "The selected HAP is not a readable regular file"
+    }
+  }
+}
+
+enum DebugHAPLocalArtifactInspector {
+  static let maximumBytes: Int64 = 64 * 1_024 * 1_024
+  static let readChunkBytes = 512 * 1_024
+
+  static func inspect(_ url: URL) throws -> DebugHAPLocalArtifact {
+    let name = url.lastPathComponent
+    guard name.count <= 128,
+      name.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.hap$"#,
+        options: .regularExpression) != nil
+    else { throw DebugHAPLocalArtifactError.invalidName }
+    let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+    guard values.isRegularFile == true else {
+      throw DebugHAPLocalArtifactError.notRegularFile
+    }
+    guard let fileSize = values.fileSize,
+      (1...maximumBytes).contains(Int64(fileSize))
+    else { throw DebugHAPLocalArtifactError.invalidSize }
+
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    var hasher = SHA256()
+    var byteCount: Int64 = 0
+    while true {
+      let chunk = try handle.read(upToCount: readChunkBytes) ?? Data()
+      if chunk.isEmpty { break }
+      byteCount += Int64(chunk.count)
+      guard byteCount <= maximumBytes else {
+        throw DebugHAPLocalArtifactError.invalidSize
+      }
+      hasher.update(data: chunk)
+    }
+    guard byteCount == Int64(fileSize) else {
+      throw DebugHAPLocalArtifactError.notRegularFile
+    }
+    return DebugHAPLocalArtifact(
+      name: name,
+      byteCount: byteCount,
+      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined())
+  }
 }
 
 public struct DebugLogJobTerminalPresentation: Sendable, Equatable {
@@ -311,6 +381,20 @@ public enum DebugTypedValueValidator {
   public static func isSafeTypedIdentifier(_ value: String) -> Bool {
     isSafeHilogComponent(value)
   }
+
+  public static func isValidBundleName(_ value: String) -> Bool {
+    value.count <= 200
+      && value.range(
+        of: #"^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+$"#,
+        options: .regularExpression) != nil
+  }
+
+  public static func isValidAbilityName(_ value: String) -> Bool {
+    value.count <= 200
+      && value.range(
+        of: #"^[a-zA-Z][a-zA-Z0-9_.]*$"#,
+        options: .regularExpression) != nil
+  }
 }
 
 public protocol DebugApplicationProviding: Sendable {
@@ -319,6 +403,17 @@ public protocol DebugApplicationProviding: Sendable {
     target: DebugTargetPresentation,
     durationSeconds: Int,
     filters: [String]
+  ) async -> DebugLogJobSubmissionResult
+  func submitHAP(
+    target: DebugTargetPresentation,
+    fileURL: URL,
+    bundleName: String,
+    abilityName: String,
+    installPolicy: String,
+    cleanupPolicy: String,
+    postRunAbilityState: String,
+    captureDiagnostics: Bool,
+    diagnosticsDurationSeconds: Int
   ) async -> DebugLogJobSubmissionResult
   func run(jobID: String) async -> DebugLogJobRunResult
   func cancel(jobID: String) async -> Bool
@@ -331,6 +426,49 @@ public protocol DebugApplicationProviding: Sendable {
     target: DebugTargetPresentation,
     templateID: String
   ) async -> Result<DebugRuntimeCommandResult, DebugXPCReadFailure>
+}
+
+enum DebugHAPRequestBuilder {
+  static func request(
+    target: DebugTargetPresentation,
+    lease: String,
+    bundleName: String,
+    abilityName: String,
+    installPolicy: String,
+    cleanupPolicy: String,
+    postRunAbilityState: String,
+    captureDiagnostics: Bool,
+    diagnosticsDurationSeconds: Int,
+    nonce: String = UUID().uuidString.lowercased()
+  ) throws -> RuntimeOperationRequest {
+    guard !lease.isEmpty,
+      DebugTypedValueValidator.isValidBundleName(bundleName),
+      DebugTypedValueValidator.isValidAbilityName(abilityName),
+      ["installOrReplace", "installFresh"].contains(installPolicy),
+      ["uninstall", "retain", "restorePrevious"].contains(cleanupPolicy),
+      ["stopped", "running"].contains(postRunAbilityState),
+      (1...300).contains(diagnosticsDurationSeconds)
+    else { throw DebugXPCReadFailure.transport("HAP request is outside the published bounds") }
+    return try RuntimeOperationRequest(
+      requestID: "debug-hap-ui-\(nonce)",
+      idempotencyKey: "debug-hap-ui-\(nonce)",
+      target: DurableTargetReference(
+        targetID: target.id, expectedBindingRevision: target.bindingRevision),
+      operation: RuntimeOperationReference(id: "debug.hap", version: 1),
+      inputs: [
+        "hapArtifactLease": .string(lease),
+        "bundleName": .string(bundleName),
+        "abilityName": .string(abilityName),
+        "installPolicy": .string(installPolicy),
+        "cleanupPolicy": .string(cleanupPolicy),
+        "postRunAbilityState": .string(postRunAbilityState),
+        "captureDiagnostics": .bool(captureDiagnostics),
+        "diagnosticsDurationSeconds": .integer(Int64(diagnosticsDurationSeconds)),
+        "portForwardProfile": .string("none"),
+      ],
+      requestedOutputs: [.rawArtifacts, .derivedArtifacts, .hardwareEvidence],
+      clientContext: RuntimeClientContext(clientName: ArkDeckAgentClientName.debugAppsWorkspace))
+  }
 }
 
 public enum DebugApplicationFacade {
@@ -490,6 +628,125 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     }
   }
 
+  func submitHAP(
+    target: DebugTargetPresentation,
+    fileURL: URL,
+    bundleName: String,
+    abilityName: String,
+    installPolicy: String,
+    cleanupPolicy: String,
+    postRunAbilityState: String,
+    captureDiagnostics: Bool,
+    diagnosticsDurationSeconds: Int
+  ) async -> DebugLogJobSubmissionResult {
+    guard DebugTypedValueValidator.isValidBundleName(bundleName),
+      DebugTypedValueValidator.isValidAbilityName(abilityName)
+    else { return .failed("Bundle or ability name is outside the published schema") }
+    let gainedScope = fileURL.startAccessingSecurityScopedResource()
+    defer {
+      if gainedScope { fileURL.stopAccessingSecurityScopedResource() }
+    }
+    var uploadID: String?
+    do {
+      let local = try await Task.detached(priority: .userInitiated) {
+        try DebugHAPLocalArtifactInspector.inspect(fileURL)
+      }.value
+      let begin = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "artifact.importHap.begin",
+          params: [
+            "targetId": .string(target.id),
+            "name": .string(local.name),
+            "byteCount": .integer(local.byteCount),
+            "sha256": .string(local.sha256),
+          ]))
+      guard let startedUploadID = begin["uploadId"] as? String else {
+        throw DebugXPCReadFailure.transport("Runtime returned no HAP upload identity")
+      }
+      uploadID = startedUploadID
+      guard let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
+        maximumChunkBytes > 0,
+        maximumChunkBytes <= DebugHAPLocalArtifactInspector.readChunkBytes,
+        begin["targetId"] as? String == target.id,
+        begin["bindingRevision"] as? Int == target.bindingRevision
+      else { throw DebugXPCReadFailure.transport("Runtime returned incomplete HAP import facts") }
+
+      let handle = try FileHandle(forReadingFrom: fileURL)
+      defer { try? handle.close() }
+      var offset = 0
+      while Int64(offset) < local.byteCount {
+        guard !Task.isCancelled else { throw CancellationError() }
+        let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
+        guard !chunk.isEmpty else {
+          throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
+        }
+        let appended = try DebugRuntimeResponseDecoding.resultObject(
+          await DebugXPCReadTransport.request(
+            method: "artifact.importHap.append",
+            params: [
+              "uploadId": .string(startedUploadID),
+              "offset": .integer(Int64(offset)),
+              "base64": .string(chunk.base64EncodedString()),
+            ]))
+        guard let nextOffset = appended["nextOffset"] as? Int,
+          nextOffset == offset + chunk.count
+        else { throw DebugXPCReadFailure.transport("Runtime HAP import offset drifted") }
+        offset = nextOffset
+      }
+      guard Int64(offset) == local.byteCount else {
+        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
+      }
+      guard (try handle.read(upToCount: 1) ?? Data()).isEmpty else {
+        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
+      }
+
+      let imported = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "artifact.importHap.commit",
+          params: ["uploadId": .string(startedUploadID)]))
+      uploadID = nil
+      guard let lease = imported["lease"] as? String,
+        imported["targetId"] as? String == target.id,
+        imported["bindingRevision"] as? Int == target.bindingRevision,
+        imported["name"] as? String == local.name,
+        imported["byteCount"] as? Int == Int(local.byteCount),
+        imported["sha256"] as? String == local.sha256
+      else {
+        return .failed("Runtime import facts no longer match the selected target and HAP")
+      }
+
+      let request = try DebugHAPRequestBuilder.request(
+        target: target, lease: lease, bundleName: bundleName, abilityName: abilityName,
+        installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
+        postRunAbilityState: postRunAbilityState,
+        captureDiagnostics: captureDiagnostics,
+        diagnosticsDurationSeconds: diagnosticsDurationSeconds)
+      let requestData = try CanonicalJSONEncoders.canonical().encode(request)
+      guard let requestJSON = String(data: requestData, encoding: .utf8) else {
+        return .failed("Could not encode the typed HAP request")
+      }
+      let submitted = try DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.submit", params: ["requestJson": .string(requestJSON)]))
+      guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
+        return .failed("Runtime accepted HAP Debug without returning a Job ID")
+      }
+      return .submitted(DebugLogJobAcceptancePresentation(jobID: jobID))
+    } catch let failure as DebugXPCReadFailure {
+      if let uploadID {
+        _ = await DebugXPCReadTransport.request(
+          method: "artifact.importHap.abort", params: ["uploadId": .string(uploadID)])
+      }
+      return .failed(failure.message)
+    } catch {
+      if let uploadID {
+        _ = await DebugXPCReadTransport.request(
+          method: "artifact.importHap.abort", params: ["uploadId": .string(uploadID)])
+      }
+      return .failed(String(describing: error))
+    }
+  }
+
   func run(jobID: String) async -> DebugLogJobRunResult {
     do {
       let result = try DebugRuntimeResponseDecoding.resultObject(
@@ -511,9 +768,10 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
   }
 
   func cancel(jobID: String) async -> Bool {
-    guard let result = try? DebugRuntimeResponseDecoding.resultObject(
-      await DebugXPCReadTransport.request(
-        method: "job.cancel", params: ["jobId": .string(jobID)]))
+    guard
+      let result = try? DebugRuntimeResponseDecoding.resultObject(
+        await DebugXPCReadTransport.request(
+          method: "job.cancel", params: ["jobId": .string(jobID)]))
     else { return false }
     return result["cancelRequested"] as? Bool == true
   }
@@ -700,7 +958,8 @@ enum DebugWorkspaceResponseDecoding {
             DebugJobPresentation(
               id: id, operationReference: operation, targetID: targetID, state: state,
               waitingForHuman: waitingForHuman, outcomeUnknown: outcomeUnknown,
-              outstandingResidueCount: residueCount))
+              outstandingResidueCount: residueCount,
+              timeline: entry["timeline"] as? [String] ?? []))
         }
         return DecodedList(value: values)
       }

@@ -6,8 +6,8 @@
 //
 // Narrower in one specific way: every frame is checked against an exact App
 // allowlist before it reaches `RuntimeControlPlaneHandler`. Besides reads,
-// the only effectful entries form the closed typed Flash path. A refused frame
-// is never handled.
+// effectful entries are limited to closed App-owned Artifact uploads and
+// typed Job requests. A refused frame is never handled.
 
 import ArkDeckCore
 import Foundation
@@ -54,7 +54,7 @@ package final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecke
 /// Jobs are the one place where a method-name allowlist is not narrow enough:
 /// `job.submit` can name any Catalog operation and `job.run` can name any
 /// queued Job. The listener therefore shares the identifiers returned by
-/// successful, typed Flash submissions across the App's short-lived XPC
+/// successful, typed App submissions across the App's short-lived XPC
 /// connections. Only those identifiers may cross the run boundary, once.
 enum AgentXPCAppJobKind: String, Sendable, Equatable {
   case flash
@@ -90,7 +90,7 @@ actor AgentXPCAppJobGate {
 }
 
 /// The exported object. It owns exactly one decision — forward or refuse.
-/// The only shared state is the fail-closed Flash Job gate above.
+/// The only shared state is the fail-closed typed App Job gate above.
 final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Sendable {
   enum Admission: Equatable {
     case direct(method: String)
@@ -150,7 +150,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
 
   /// Parses the exact wire envelope and classifies the request before the
   /// daemon handler sees it. `job.submit` is admitted only for the typed UI
-  /// Flash request; `job.run` still requires the shared one-shot Job gate.
+  /// request families; `job.run` still requires the shared one-shot Job gate.
   static func admission(of frame: Data) -> Admission? {
     guard
       let request = try? JSONDecoder().decode(AgentWireProtocol.Request.self, from: frame),
@@ -159,6 +159,7 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
 
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
+      || ArkDeckAgentXPC.forwardableHAPImportMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableRockchipBindingMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableAutomationMethods.contains(request.method)
     {

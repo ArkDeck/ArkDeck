@@ -20,9 +20,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
     operationVersion: Int? = nil,
     clientName: String = ArkDeckAgentClientName.flashWorkspace
   ) throws -> Data {
-    let operationJSON = operationVersion.map {
-      #"{"id":"\#(operationID)","version":\#($0)}"#
-    } ?? #"{"id":"\#(operationID)"}"#
+    let operationJSON =
+      operationVersion.map {
+        #"{"id":"\#(operationID)","version":\#($0)}"#
+      } ?? #"{"id":"\#(operationID)"}"#
     let typedRequest = """
       {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
       "requestId":"ui-request","idempotencyKey":"ui-request-123",\
@@ -51,6 +52,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
   func testTheAllowlistForwardsExactlyTheAppControlPlane() {
     for method in ArkDeckAgentXPC.forwardableReadOnlyMethods
       .union(ArkDeckAgentXPC.forwardableFlashBundleMethods)
+      .union(ArkDeckAgentXPC.forwardableHAPImportMethods)
       .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
       .union(ArkDeckAgentXPC.forwardableAutomationMethods)
     {
@@ -84,6 +86,13 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "artifact.importFlashBundle.begin", "artifact.importFlashBundle.commit",
       ],
       "widening the Flash artifact surface is forbidden")
+    XCTAssertEqual(
+      ArkDeckAgentXPC.forwardableHAPImportMethods,
+      [
+        "artifact.importHap.abort", "artifact.importHap.append",
+        "artifact.importHap.begin", "artifact.importHap.commit",
+      ],
+      "HAP upload must remain the four closed ID-and-chunk methods")
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableRockchipBindingMethods,
       ["flash.bind-current-loader"],
@@ -201,12 +210,10 @@ final class AgentXPCTransportContractTests: XCTestCase {
 
   // The load-bearing assertion: no generic mutation, target, capability or
   // path-based Artifact surface crosses the App transport.
-  func testEveryNonFlashMutationMethodIsRefusedBeforeTheHandler() {
+  func testEveryUnpublishedMutationMethodIsRefusedBeforeTheHandler() {
     for method in [
       "job.reconcile", "job.plan",
       "target.adopt", "artifact.export",
-      "artifact.importHap.begin", "artifact.importHap.append",
-      "artifact.importHap.commit", "artifact.importHap.abort",
       "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.commit",
       "capability.draft", "capability.install", "capability.revoke",
     ] {
