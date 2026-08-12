@@ -1150,4 +1150,3 @@ package enum RecoverySnapshotSource: String, Equatable, Sendable {
   case journalSupersedesCheckpoint
   case journalOnly
 }
-
