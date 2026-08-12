@@ -69,11 +69,35 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     self.resolvedByTargetAliasResolutionID = resolvedByTargetAliasResolutionID
   }
 
-  /// An unknown outcome is never folded into a terminal state: it is the one
-  /// condition a reader must not mistake for "finished".
+  /// Runtime has durable evidence that a later, distinct action established
+  /// the current target epoch. The original Job and its unknown outcome stay
+  /// untouched for audit; this relation only answers whether it still needs a
+  /// current operator action.
+  public var hasEstablishedCurrentEpoch: Bool {
+    supersededByRecoveryEpochID != nil || resolvedByTargetAliasResolutionID != nil
+  }
+
+  /// An unknown outcome is never folded into a terminal state. Once Runtime
+  /// establishes the current epoch, however, that historical unknown is no
+  /// longer a current attention item.
   public var needsAttention: Bool {
-    (outcomeUnknown && supersededByRecoveryEpochID == nil
-      && resolvedByTargetAliasResolutionID == nil) || waitingForHuman
+    !hasEstablishedCurrentEpoch && (outcomeUnknown || waitingForHuman)
+  }
+
+  /// The global banner is reserved for unresolved work the operator can act
+  /// on now. Historical unknowns with an exact Runtime resolution relation
+  /// remain visible in History but must not keep paging the operator.
+  public var requiresRecoveryGuidance: Bool {
+    guard !hasEstablishedCurrentEpoch else { return false }
+    if needsAttention { return true }
+    guard let state = JobState(rawValue: state) else { return false }
+    switch state {
+    case .waitingForRecovery, .awaitingRebindConfirmation, .resumeAtConfirmedSafeBoundary,
+      .userAbandonRequested:
+      return true
+    default:
+      return false
+    }
   }
 }
 
