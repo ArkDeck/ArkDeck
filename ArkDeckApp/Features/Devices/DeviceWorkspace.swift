@@ -1,5 +1,6 @@
 import ArkDeckWorkflows
 import Combine
+import Foundation
 import SwiftUI
 
 /// Sidebar device rows and the authorization guidance detail.
@@ -11,6 +12,8 @@ import SwiftUI
 /// classification; the App renders its published window and result.
 @MainActor
 final class DeviceListViewModel: ObservableObject {
+  static let maximumDisplayNameLength = 64
+
   /// One device's bounded trust wait. `polling` carries the App-owned
   /// deadline the countdown renders; `timedOut` is emitted only when the
   /// Workflows provider exhausts its production polling policy.
@@ -24,13 +27,27 @@ final class DeviceListViewModel: ObservableObject {
   @Published private(set) var presentation = DeviceListPresentation.loading
   @Published private(set) var isRefreshing = false
   @Published private(set) var authorizationWait = AuthorizationWait.idle
+  @Published private(set) var customDisplayNames: [String: String]
 
+  private static let displayNamesDefaultsKey = "app.devices.customDisplayNames.v1"
   private let provider: any DeviceListApplicationProviding
+  private let displayNamesDefaults: UserDefaults
   private let waitWindow: TimeInterval
   private var waitTask: Task<Void, Never>?
 
-  init(provider: any DeviceListApplicationProviding) {
+  init(
+    provider: any DeviceListApplicationProviding,
+    displayNamesDefaults: UserDefaults = .standard,
+    resetDisplayNames: Bool = false
+  ) {
     self.provider = provider
+    self.displayNamesDefaults = displayNamesDefaults
+    if resetDisplayNames {
+      displayNamesDefaults.removeObject(forKey: Self.displayNamesDefaultsKey)
+    }
+    customDisplayNames = displayNamesDefaults.dictionary(
+      forKey: Self.displayNamesDefaultsKey
+    )?.compactMapValues { $0 as? String } ?? [:]
     waitWindow = provider.authorizationWaitWindowSeconds
   }
 
@@ -49,6 +66,51 @@ final class DeviceListViewModel: ObservableObject {
 
   func candidate(forConnectKey connectKey: String) -> DeviceCandidatePresentation? {
     presentation.candidates.first { $0.connectKey == connectKey }
+  }
+
+  /// A custom name is presentation-only. Runtime identity and target binding
+  /// continue to use the candidate's connect key and adopted target ID.
+  func displayName(for candidate: DeviceCandidatePresentation) -> String {
+    if let targetID = candidate.adoptedTargetID,
+      let name = customDisplayNames["target:\(targetID)"]
+    {
+      return name
+    }
+    if let name = customDisplayNames["candidate:\(candidate.connectKey)"] {
+      return name
+    }
+    return candidate.adoptedTargetID ?? candidate.connectKey
+  }
+
+  func canUseDisplayName(_ rawName: String) -> Bool {
+    Self.normalizedDisplayName(rawName) != nil
+  }
+
+  @discardableResult
+  func renameCandidate(withConnectKey connectKey: String, to rawName: String) -> Bool {
+    guard let candidate = candidate(forConnectKey: connectKey),
+      let name = Self.normalizedDisplayName(rawName)
+    else { return false }
+
+    var next = customDisplayNames
+    let candidateKey = "candidate:\(candidate.connectKey)"
+    if let targetID = candidate.adoptedTargetID {
+      next["target:\(targetID)"] = name
+      // A pre-adoption name follows the device into its durable target key;
+      // do not leave an address-scoped alias that a later candidate could use.
+      next.removeValue(forKey: candidateKey)
+    } else {
+      next[candidateKey] = name
+    }
+    customDisplayNames = next
+    displayNamesDefaults.set(next, forKey: Self.displayNamesDefaultsKey)
+    return true
+  }
+
+  private static func normalizedDisplayName(_ rawName: String) -> String? {
+    let name = rawName.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    guard !name.isEmpty, name.count <= maximumDisplayNameLength else { return nil }
+    return name
   }
 
   /// Starts (or restarts) the domain-owned bounded wait for one device's trust
@@ -107,11 +169,12 @@ final class DeviceListViewModel: ObservableObject {
 /// not recognize.
 struct DeviceSidebarRow: View {
   let candidate: DeviceCandidatePresentation
+  let displayName: String
 
   var body: some View {
     Label {
       VStack(alignment: .leading, spacing: 1) {
-        Text(candidate.adoptedTargetID ?? candidate.connectKey)
+        Text(displayName)
           .font(.body)
           .lineLimit(1)
           .truncationMode(.middle)
@@ -192,6 +255,7 @@ struct DeviceSidebarRow: View {
 /// workflow items stay unselected while a device row is chosen.
 struct DeviceDetailView: View {
   let candidate: DeviceCandidatePresentation
+  let displayName: String
   let isRefreshing: Bool
   let waitState: DeviceListViewModel.AuthorizationWait
   let onRecheck: () -> Void
@@ -204,7 +268,7 @@ struct DeviceDetailView: View {
         Text(
           String(
             format: deviceString("device.detail.title"),
-            candidate.adoptedTargetID ?? candidate.connectKey)
+            displayName)
         )
         .font(.title3.weight(.semibold))
         .accessibilityAddTraits(.isHeader)

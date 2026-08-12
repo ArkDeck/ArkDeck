@@ -26,7 +26,9 @@ struct ArkDeckApp: App {
   @StateObject private var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
   @StateObject private var deviceList = DeviceListViewModel(
-    provider: DeviceListApplicationFacade.make())
+    provider: DeviceListApplicationFacade.make(),
+    resetDisplayNames: ProcessInfo.processInfo.arguments.contains(
+      "--ui-test-reset-device-names"))
 
   var body: some Scene {
     WindowGroup {
@@ -145,6 +147,8 @@ private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
   @State private var isJobInspectorExpanded = false
+  @State private var renamingDeviceConnectKey: String?
+  @State private var pendingDeviceName = ""
   @ObservedObject var hdcDiagnostics: HDCStatusViewModel
   @ObservedObject var overviewCapabilities: OverviewCapabilityViewModel
   @ObservedObject var autoUpdate: AutoUpdateViewModel
@@ -229,6 +233,19 @@ private struct AppShellView: View {
       if case .device(waitedKey) = ShellSelection(storageValue: newValue) { return }
       deviceList.cancelAuthorizationWait()
     }
+    .alert(
+      deviceString("device.rename.title"),
+      isPresented: renameDialogIsPresented
+    ) {
+      TextField(deviceString("device.rename.field"), text: pendingDeviceNameBinding)
+        .accessibilityIdentifier("device.rename.name")
+      Button(deviceString("device.rename.cancel"), role: .cancel) {}
+      Button(deviceString("device.rename.commit"), action: commitRename)
+        .disabled(!deviceList.canUseDisplayName(pendingDeviceName))
+        .accessibilityIdentifier("device.rename.commit")
+    } message: {
+      Text(deviceString("device.rename.message"))
+    }
   }
 
   @ViewBuilder
@@ -267,7 +284,7 @@ private struct AppShellView: View {
   private var detailTitle: Text {
     if case .device(let connectKey) = shellSelection {
       let candidate = deviceList.candidate(forConnectKey: connectKey)
-      return Text(candidate?.adoptedTargetID ?? connectKey)
+      return Text(candidate.map(deviceList.displayName(for:)) ?? connectKey)
     }
     return Text(LocalizedStringKey(selectedItem.localizationKey))
   }
@@ -292,8 +309,27 @@ private struct AppShellView: View {
       .accessibilityIdentifier("app.devices.unavailable")
     case .available:
       ForEach(deviceList.presentation.candidates) { candidate in
-        DeviceSidebarRow(candidate: candidate)
-          .tag(ShellSelection.device(connectKey: candidate.connectKey))
+        DeviceSidebarRow(
+          candidate: candidate,
+          displayName: deviceList.displayName(for: candidate)
+        )
+        .contextMenu {
+          Button {
+            beginRenaming(candidate)
+          } label: {
+            Label(deviceString("device.action.rename"), systemImage: "pencil")
+          }
+          .accessibilityIdentifier("device.action.rename.\(candidate.connectKey)")
+
+          Button {
+            deviceList.refresh()
+          } label: {
+            Label(deviceString("device.action.recheck"), systemImage: "arrow.clockwise")
+          }
+          .disabled(deviceList.isRefreshing)
+          .accessibilityIdentifier("device.action.recheck.\(candidate.connectKey)")
+        }
+        .tag(ShellSelection.device(connectKey: candidate.connectKey))
       }
     }
   }
@@ -304,6 +340,7 @@ private struct AppShellView: View {
       if let candidate = deviceList.candidate(forConnectKey: connectKey) {
         DeviceDetailView(
           candidate: candidate,
+          displayName: deviceList.displayName(for: candidate),
           isRefreshing: deviceList.isRefreshing,
           waitState: deviceList.authorizationWaitState(forConnectKey: connectKey),
           onRecheck: deviceList.refresh,
@@ -427,6 +464,36 @@ private struct AppShellView: View {
     .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
     .contentShape(Rectangle())
     .accessibilityIdentifier(item.accessibilityIdentifier)
+  }
+
+  private var renameDialogIsPresented: Binding<Bool> {
+    Binding(
+      get: { renamingDeviceConnectKey != nil },
+      set: { isPresented in
+        if !isPresented {
+          renamingDeviceConnectKey = nil
+          pendingDeviceName = ""
+        }
+      })
+  }
+
+  private var pendingDeviceNameBinding: Binding<String> {
+    Binding(
+      get: { pendingDeviceName },
+      set: { newValue in
+        pendingDeviceName = String(newValue.prefix(DeviceListViewModel.maximumDisplayNameLength))
+      })
+  }
+
+  private func beginRenaming(_ candidate: DeviceCandidatePresentation) {
+    storedSelection = ShellSelection.device(connectKey: candidate.connectKey).storageValue
+    pendingDeviceName = deviceList.displayName(for: candidate)
+    renamingDeviceConnectKey = candidate.connectKey
+  }
+
+  private func commitRename() {
+    guard let connectKey = renamingDeviceConnectKey else { return }
+    _ = deviceList.renameCandidate(withConnectKey: connectKey, to: pendingDeviceName)
   }
 }
 
