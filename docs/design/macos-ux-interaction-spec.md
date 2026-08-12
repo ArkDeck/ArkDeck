@@ -1,19 +1,20 @@
 # ArkDeck macOS UX 与交互定义
 
-> Status：draft v0.4（design input，非 normative；2026-08-08 按当前 App / Runtime / Catalog 对齐）
+> Status：draft v0.6（design input，非 normative；2026-08-12 完成 Flash 主流程减法与进度表达对齐）
 > 交互原型：`docs/design/prototype.html`（可点击，与本文档同版本演进）
 > 行为事实源：`openspec/specs/desktop-ux-observability/spec.md`、各 capability spec、Catalog 与 Runtime contracts；本文档只定义 HOW（布局、组件、层级与流转），行为冲突时以事实源为准
 > Promotion：本目录是草稿区。被采纳的版本在起草 M2+ 功能 change 前移入 `openspec/platforms/macos/design/`，并由 change 的 `design.md` hash-pin。设计中发现的行为级缺口必须走 behavior delta，不能只画进稿子。
 
-## 0. v0.4 目标与当前实现边界
+## 0. v0.6 目标与当前实现边界
 
-v0.4 把已落地的生产诊断、Job 控制、Artifact 导出和 bounded Automation 控制组织成现代 macOS 工具界面：原生窗口层级、可调整的 split view、系统工具栏、适合长时间工作的紧凑密度，以及不依赖颜色的安全状态。
+v0.6 延续 v0.5 已确定的设备导航、已接管设备详情和宽屏信息密度，先把开发者最常用的 Flash 路径收敛为「选择镜像 → 开始刷机 → 查看进度与结果」。复杂的 Runtime 与安全事实不删除，但默认降到可展开详情；进度只表达有事实分母的已确认写入量。
 
 当前代码与目标设计的边界必须如实呈现：
 
-| Surface | 当前实现 | v0.4 设计目标 |
+| Surface | 当前实现 | v0.6 设计方向 |
 | --- | --- | --- |
-| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / UI Dump / Trace / History / Automation 均有实际工作区 | 保留原生 split view；统一 toolbar、设备 scope、全局 Job inspector 与窗口自适应 |
+| App shell | SwiftUI `WindowGroup` + `NavigationSplitView`；Overview / Flash / Debug / UI Dump / Trace / History / Automation 均有实际工作区 | 保留原生 split view；设备行只导航到设备详情，工作流目标保持显式选择；统一 toolbar、全局 Job inspector 与窗口自适应 |
+| Device detail | 未授权设备有接管引导；已接管设备能显示真实 binding / observation facts，并有原生右键重命名和重新检测 | 删除重复内容标题；宽屏拆分状态操作与事实；名称只是 App 展示别名，重新检测只刷新候选事实 |
 | Overview | `HDCStatusView` 展示 HDC、授权、通道、Rockchip 访问诊断与 target-bound 能力矩阵 | 分组为「服务器」「设备与通道」「能力」「需处理事项」，unknown 与 unavailable 不合并 |
 | Settings | 已有独立 macOS `Settings` scene，但当前 AppShell detail 同时内嵌 `AutoUpdateSettingsView`；自动更新检查、下载、校验和 Finder handoff 已接通 | App 主窗口不再内嵌完整更新设置；toolbar 只显示需要注意的更新状态，详细设置回系统 Settings scene |
 | Runtime capability | Catalog 已发布 observe / diagnostics / HAP / Flash / port-forward 等 typed operations；Harness 有持久化 task lifecycle | UI 只提交 operation reference + typed inputs；展示 availability、effect 与受控 lowering disclosure，绝不提供 raw command 输入 |
@@ -64,9 +65,9 @@ Primary Window
 └── Bottom Job Inspector（跨页面、可拖动高度、可折叠）
 ```
 
-- 参考窗口 1180×760；最小 900×600。宽度不足 980 时先把双栏内容改为单栏；不足 760 时 sidebar 可自动收起，但必须保留 toolbar toggle 和 View menu 命令。
+- 参考窗口 1180×760；最小 900×600。宽度不足 980 时先把双栏内容改为单栏；不足 760 时 sidebar 可自动收起，但必须保留 toolbar toggle 和 View menu 命令。双栏在可用宽度足够时应使用 detail pane 的主体宽度，不能把内容永久锁在窄卡片中并留下大面积无意义空白。
 - Sidebar 只保留两级以内层级，不在底部放关键动作。设备与工作流分组；Settings 使用系统 `Settings` scene，不作为 sidebar 最后一项伪装成普通页面。每个固定导航 row 的可见名称、稳定 identifier、selected state 与整行非零 AX hit frame 必须属于同一 accessibility element；不得只把 identifier 挂在无法激活的虚拟文本子节点上。
-- 页面标题在 toolbar，内容区不重复超大标题。需要解释的页面用紧凑 title + subtitle；滚动后 toolbar 仍提供上下文。
+- 页面标题在 toolbar，内容区不重复同一主标题。需要解释的页面用紧凑 section title + subtitle；滚动后 toolbar 仍提供上下文。
 - 表格和日志可以 full-bleed 到 detail pane 的分组边缘；文字、筛选器和操作保持 content inset。
 - 需要同时检查清单与详情时使用三栏 split view（History、Automation Attempt）；其他页保持两栏，避免永久空 inspector。
 
@@ -112,7 +113,10 @@ Primary Window
 
 ### 5.2 设备接管与授权（REQ-HDC-007）
 
+- 设备行是**设备详情导航**，不是全局 scope：选择 ready / offline 行进入该设备详情，选择 unauthorized 行进入同一详情中的接管引导。Flash、Debug、UI Dump、Trace 等工作区必须继续展示并提交自己的显式 target / binding，不得暗中继承最近选中的设备行。
 - Sidebar 未授权设备行显示 warning symbol +「需要信任」，选中后 detail 显示三步 onboarding：解锁 → 设备端信任 → 有界等待。
+- 已接管设备详情只在 toolbar 保留一个主标题。内容按「当前状态与操作」和「Runtime 事实」组织：参考宽屏左右双栏，窄窗按阅读顺序垂直堆叠；connect key、target、binding revision、model、firmware、transport 和确认时间都来自 Runtime projection，缺失即不显示，不以演示值补齐。
+- 设备行右键使用原生 context menu：`重命名…` 只修改 App 本地展示别名，不改变 connect key、target identity 或 binding；`重新检测` 重新读取整个候选列表，既不向设备发送 mutation，也不承诺候选仍存在。菜单项同时提供键盘可达的详情内操作。
 - E000002（等待）与 E000003（拒绝/超时）分状态；retry 是普通按钮。重启 shared HDC server 属独立危险 sheet，绝不成为默认修复。
 - production authorization verdict 由 `device.candidates` 的 domain-owned durable binding 刷新入口生成；App 只解码并展示 `authorized` / `pending` / `timedOut` 等闭集事实，不构造 `DurableCurrentDeviceBinding`。`denied` 在生产 probe 尚无判据时不得由 fixture 推断。
 
@@ -139,19 +143,22 @@ Primary Window
 
 ### 5.6 Flash
 
-- Toolbar 中放 Execute / Plan only / Simulated segmented control，模式 badge 紧随标题并永久保留。
-- 详情顺序：Availability → Profile & Image Set → Prerequisites → Exact Plan → Review & Run。required prerequisite 为 unknown/unsatisfied 时，Run 区显示 blocker，不只留下灰色按钮。
+- 面向开发者的 Flash 页面只提供真实执行，不再显示 Execute / Plan only / Simulated 模式切换。plan-only 与 simulated 仍可作为 Runtime、测试或内部诊断能力存在，但不占用正常刷机主流程。
+- 默认信息层级固定为「当前设备 → 选择镜像 → 擦除数据并开始刷机」。主界面只突出设备就绪状态、镜像名称/大小、userdata 影响和一个主操作；Availability、Profile、Prerequisites、Target & Binding、镜像 SHA 与 Exact Plan 收进可展开的「刷机详情」。required prerequisite 为 unknown/unsatisfied 时，以紧邻主操作的 blocker 取代按钮，不把危险准入细节隐藏成一个不可解释的 disabled 状态。
+- 开始后，镜像选择区原位切换为进度区；完成后原位切换为成功或失败结果，不另开 dashboard。页面的第一视觉焦点依次是当前阶段、进度或结果、镜像名称；Job Inspector 仍可查看完整 timeline，但默认不自动展开、不抢焦点。
+- 百分比只能由 Runtime 已确认写入字节数除以本次 materialized plan 的镜像/分区总字节数得到，并始终标为「镜像写入估算」。准备镜像、进入 Loader、重启和验证等没有可靠 byte denominator 的阶段显示 indeterminate + 阶段文案，不用经过时间伪造百分比。写入达到 100% 只表示镜像写入完成，必须继续显示「正在重启并验证」；只有 postflight 成功才能显示「刷机成功」。
+- 进度视图同时显示已确认写入大小 / 总大小和三个粗粒度阶段「准备 / 写入镜像 / 重启与验证」。不得按文件选择时的压缩包大小直接推导 device write progress；若 Runtime 只提供 partition bytes，分母必须使用 materialized partition plan 的总写入大小。
 - Execute 的 `recoveryPath` 必须来自 owner-only DAYU200 binding 对当前 target stable identity、所选 binding revision 与适用 HDC connect-key alias 的精确覆盖。新跨模式 identity transition 只接受相邻 revision；历史同身份、同 revision binding 只接受已经完成的当前 Runtime attestation，不得就地升级。唯一例外是切换到另一台已采用设备：所选 target 必须仍为 revision 1，fresh USB identity 必须唯一，并同时精确匹配该 target 的 stable identity 与 connect key；Runtime 以独立 CAS 切换 singleton active binding，不把它伪装成 revision 前进。任一条件不满足时仍显示 unsatisfied，并在 capability 签发和首个外部 effect 前拒绝。
 - 页面通过只读 `flash.bootloader-status` 区分未发现、多个候选、已精确绑定和「唯一 DAYU200 精确匹配所选 target、但尚未成为 active binding」。后者可处于 HDC-normal 或 Loader；Rockchip device access 卡只显示说明，不增加第二个绑定按钮。用户选择 target 后点击一次红色刷机按钮，同一次提交先把所选既有 target + expected binding revision 交给 Runtime。Runtime 重新读取唯一 DAYU200；对 revision-1 新设备执行精确 active-binding CAS，对同一设备的 HDC→Loader 身份变化仍只持久化相邻 revision。随后重新生成精确计划，并仅在全部 required prerequisite 满足后提交 Flash。不得把 raw serial / topology 送进 App。
 - DAYU200 页面中的 bootloader 特指 `0x2207:0x350a` RockUSB Loader，不是 HDC `-bootloader` 所选的 fastboot personality。HDC-normal 进态必须由 Provider 固定 lower 到 `loader` 模式，并以 exact Loader identity + `rkdeveloptool ld` 语义回读为成功边界；回读成功后同一 Job 自动继续分区刷写，不增加第二次点击。fastboot、未注册 USB mode 或缺少 Loader 回读都不得把 prerequisite 猜成 satisfied。
 - 当前目标绑定是设备身份选择，不是刷机危险确认：不要求输入短语、checkbox 或第二个 sheet，绑定本身也不派发设备命令。若 Loader 绑定闭合的是唯一、尚无 outcome 行的 `enter-loader-mode` intent，旧 Job 以 confirmed failure 结束且原 action 不重放；机械结算只接受被选择的同 revision fresh re-attestation 或一个相邻 revision。显式 `outcomeUnknown`、多个候选、stale revision、损坏日志、任何 destructive intent 或重新 materialize 后仍有 blocker 都保持 fail closed。绑定落盘后的崩溃恢复只完成同一机械结算，不触发 dispatch。
-- Exact Plan table 展示 step、typed parameters 摘要、effect、execution disposition。plan-only 的 mutation/destructive 行显示 `notExecuted(planned)`。
-- 提交后直到 `job.run` 返回前，页面自动轮询 Runtime 的 `job.list` 并逐条显示真实 timeline；不依赖用户手动刷新。critical write 期间在 Job Inspector 和页面内显示同一句「当前写入不会被强杀；停止只作用于后续步骤」与电源提示。
+- 「刷机详情」里的 Exact Plan 默认显示四个紧凑阶段摘要：准备与校验、进入 Loader 与身份绑定、写入分区、回读/重启/验证，并同时给出 step 数和最高 effect。需要逐步排障时再进入 Job Inspector 查看完整 step timeline；不为每个 step 绘制独立圆角卡片。
+- 提交后直到 `job.run` 返回前，页面自动轮询 Runtime 的 `job.list`，使用真实 timeline 和已确认 byte facts 更新阶段与进度；不依赖用户手动刷新。critical write 期间页面持续显示「当前分区写入不会被强制中断」与电源提示，Job Inspector 补充「停止只作用于后续步骤」。
 - Runtime 返回 Job ID 后立即显示「取消剩余步骤」；请求通过 `job.cancel` 到达 Runtime。临界写入不会被强杀，取消在下一个安全边界生效，不回放 unknown destructive intent。
 - rebind 按 transport 分流：USB 只有在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整匹配时可自动 rebind 并继续；TCP / UART 断连必须停在人工确认，任何证据不完整或漂移都 fail closed。不得把 USB 的已证明自动恢复写成“静默续刷”。
 - 固件可改变 DAYU200 的 HDC serial，而已绑定 Loader identity 保持稳定。Runtime 在首笔写入前必须持有 owner-bound 的旧 HDC identity + USB topology；重启后只接受该 topology 上唯一的 HDC personality、唯一匹配的 `Connected` row，并通过新 connect key 精确校验镜像声明的 model/build。完整只读证明落盘后，后续 facts 与 `flash.bootloader-status` 把新 HDC alias 关联回原 target/binding；拓扑歧义、USB identity 自相矛盾或 model/build 不匹配均零落盘、fail closed。App 只显示脱敏后的 target、revision、mode 与结果，不接收 raw serial/topology，也不提供 alias 管理控件。
 - 当前发布的 `flash.dayu200` 只有 USB / RockUSB 路径，因此执行中的 Job 不暴露 rebind confirm / abort 控件；上面的 Loader target 绑定是执行前身份关联，不是断连后续刷确认。未来若发布 TCP / UART Flash operation，必须先补齐对应 domain 状态与 confirm / abort RPC，不能只在 UI 伪造停点。
-- 成功后的 Postflight 只展示 Runtime 已投影的事实：设备回报 build 与镜像期望的对照、提交时已 materialize 且在 Flash Job 内保持固定的 binding revision `n → n`。执行前 Loader 激活若产生相邻 revision，App 必须先以该新 revision 重新生成精确计划；重启后的 HDC alias 只在 topology、model 与 build 精确证明后关联回这一 target/revision。manifest 全 executed + SHA 在 wire 没有字段前不画占位第三行。
+- 成功结果只展示 Runtime 已投影的事实：明确的「刷机成功」、设备回报 build 与镜像期望一致、总用时；完整 binding revision、plan、artifact 与 timeline 保留在「刷机详情」和 History。执行前 Loader 激活若产生相邻 revision，App 必须先以该新 revision 重新生成精确计划；重启后的 HDC alias 只在 topology、model 与 build 精确证明后关联回这一 target/revision。manifest 全 executed + SHA 在 wire 没有字段前不画占位第三行。failed、cancelled 或 outcomeUnknown 均不得投影为成功，其中 outcomeUnknown 必须显示 needsAttention 与不可通过确认绕过的恢复说明。
 
 ### 5.7 History（REQ-UX-004）
 
@@ -190,7 +197,13 @@ Automation 是现有 Harness task plane 的生产监控与有限生命周期控�
 - 原型必须声明演示数据，不连接设备；任何 simulated、planned、fake 结果不得展示为真实硬件结果。
 - 每次原型变更至少检查：UTF-8/中文；light/dark；900×600 与宽屏；键盘遍历与 modal focus return；Reduce Motion；所有导航页；typed-only 命令面；Job 跨页可见。
 
-## 8. v0.4 已决视觉项
+### 7.1 v0.5 基线与 v0.6 Flash 评审
+
+- `docs/design/references/v0.5/` 固定保存 1180×760 的简体中文与英文设备详情参考截图；原型通过显式 locale / reference state 生成，不依赖浏览器记忆状态。v0.6 Flash 先在交互原型中评审，确认后再固定同尺寸中英文参考截图并进入 SwiftUI 对齐。
+- 参考截图只校验导航层级、宽屏分栏、信息密度、context menu 和文案长度，不是生产 Runtime 截图，更不是硬件验收证据；截图中必须持续标明演示数据。
+- App UI 测试在同一 1180×760 默认窗口和中英文 fixture 下检查：设备详情只有一个主标题、双栏/单栏的几何关系；Flash 默认只显示设备、镜像和主操作，运行态显示阶段与真实 byte-derived 估算，结果态只在 postflight 成功后出现成功文案。测试附加当次窗口截图供人工 diff；系统字体、accent、材质和抗锯齿继续由 macOS 控制，不用逐像素阈值锁死原生渲染。
+
+## 8. v0.6 已决视觉项
 
 - 图标：产品使用 SF Symbols；HTML 原型使用单色 inline SVG 近似，禁止 Emoji 作为最终导航图标。
 - 密度：默认紧凑舒适（macOS medium sidebar size）；不额外提供 App 内密度开关，尊重系统设置。

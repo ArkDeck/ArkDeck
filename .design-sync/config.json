@@ -16,6 +16,7 @@
     "WindowFrame": { "cardMode": "column" },
     "StatusStrip": { "cardMode": "column", "viewport": "1100x700" },
     "BudgetMeters": { "cardMode": "column" },
+    "DeterminateProgress": { "cardMode": "column" },
     "StageTrack": { "cardMode": "column" },
     "ToolbarButton": { "cardMode": "column" },
     "JobInspector": { "cardMode": "column" },

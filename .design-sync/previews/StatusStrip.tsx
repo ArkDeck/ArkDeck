@@ -7,7 +7,7 @@ const CELLS = [
   { label: "Runtime task", value: <span style={mono}>HTASK-DEMO-001 · debugCrash</span> },
   { label: "Lifecycle", value: <Chip tone="warn">● running</Chip> },
   { label: "Current stage", value: "patching" },
-  { label: "Target binding", value: <span style={mono}>rk3568-dev · rev 4</span> },
+  { label: "Target binding", value: <span style={mono}>DAYU200 · rev 3</span> },
 ];
 
 const STAGES = [
@@ -38,13 +38,11 @@ export const AutomationSummary = () => (
   </div>
 );
 
-/** 页头实景:标题 + 形态徽标 + 摘要条,发丝线分隔,不做成一排卡片。 */
+/** 页头实景:标题 + 摘要条,发丝线分隔,不做成一排卡片。 */
 export const AutomationPageHeader = () => (
   <div style={{ width: "100%", maxWidth: 820 }}>
     <WindowFrame title="ArkDeck — OpenHarmony 设备工作台">
-      <h1 style={pageTitle}>
-        Automation <Chip tone="planned">Preview · code-backed candidate</Chip>
-      </h1>
+      <h1 style={pageTitle}>Automation</h1>
       <StatusStrip cells={CELLS} />
     </WindowFrame>
   </div>

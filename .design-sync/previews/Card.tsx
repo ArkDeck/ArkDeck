@@ -31,7 +31,7 @@ export const ChannelProtection = () => (
     <KeyValueList
       items={[
         {
-          term: "rk3568-dev",
+          term: "DAYU200",
           description: (
             <>
               USB · <Chip tone="ok">已授权</Chip> <Chip tone="warn">加密未验证</Chip>
@@ -49,7 +49,7 @@ export const ChannelProtection = () => (
 );
 
 export const CapabilityMatrix = () => (
-  <Card title="能力矩阵(rk3568-dev)" action={<Button>查看 raw</Button>}>
+  <Card title="能力矩阵(DAYU200)" action={<Button>查看 raw</Button>}>
     <DataTable
       columns={[
         { key: "cap", header: "能力" },
@@ -78,11 +78,11 @@ export const CapabilityMatrix = () => (
           cells: { cap: "bytrace", state: <Chip tone="dim">不存在</Chip>, evidence: "—" },
         },
         {
-          id: "flashd",
+          id: "rockusb",
           cells: {
-            cap: "flashd",
-            state: <Chip tone="warn">无法确认</Chip>,
-            evidence: "exit 127 · 仅 updater 模式提供",
+            cap: "RockUSB Flash",
+            state: <Chip tone="ok">可用</Chip>,
+            evidence: "flash.dayu200 · Catalog published",
           },
         },
       ]}
@@ -103,19 +103,19 @@ export const FlashPrerequisites = () => (
       ]}
       rows={[
         {
-          id: "root",
-          cells: { req: "root-capable build", state: <Chip tone="ok">satisfied</Chip>, note: "—" },
+          id: "loader",
+          cells: { req: "loader", state: <Chip tone="ok">satisfied</Chip>, note: "—" },
         },
         {
-          id: "updater",
-          cells: { req: "进入 updater", state: <Chip tone="ok">satisfied</Chip>, note: "—" },
+          id: "recovery",
+          cells: { req: "recoveryPath", state: <Chip tone="ok">satisfied</Chip>, note: "—" },
         },
         {
-          id: "flashd",
+          id: "unlocked",
           cells: {
-            req: "flashd 能力",
-            state: <Chip tone="warn">unknown</Chip>,
-            note: "required 未满足 → Execute 按钮禁用并指向原因(AC-FLASH-002-01)",
+            req: "unlocked",
+            state: <Chip tone="ok">satisfied</Chip>,
+            note: "—",
           },
         },
         {

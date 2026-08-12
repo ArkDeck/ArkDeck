@@ -35,7 +35,7 @@ export const SidebarList = () =>
         设备
       </div>
       <DeviceRow
-        name="rk3568-dev"
+        name="DAYU200"
         detail="OpenHarmony 5.0.0.71"
         transport="USB"
         state="ready"
@@ -59,7 +59,7 @@ export const SidebarList = () =>
 export const ReadySelected = () =>
   sidebar(
     <DeviceRow
-      name="rk3568-dev"
+      name="DAYU200"
       detail="OpenHarmony 5.0.0.71"
       transport="USB"
       state="ready"

@@ -1,4 +1,10 @@
-## Building with ArkDeck
+## Building with ArkDeck — design v0.6
+
+> Current design: **draft v0.6, 2026-08-12**. Authority order for design work is
+> `docs/design/macos-ux-interaction-spec.md` → `docs/design/prototype.html` →
+> `docs/design/arkdeck-ds` → `.design-sync/previews`. If a preview conflicts with
+> the spec or prototype, the preview is stale. v0.6 replaces the v0.4 Flash layout
+> and the first-sync v0.3 preview assumptions.
 
 ArkDeck is a **macOS desktop workbench for OpenHarmony devices** — flashing firmware,
 capturing traces, dumping UI trees, reading logs. Screens are dense, factual, and
@@ -43,7 +49,7 @@ Colors — semantic, and deliberately independent of the accent:
 | `--ad-accent` | selected & interactive **only** — never "safe" or "success" |
 | `--ad-accent-fill` + `--ad-accent-ink` | a **filled** accent control. Use this pair, not `--ad-accent` with white text: in dark mode `--ad-accent` is a light blue that white text cannot sit on. `--ad-danger-fill` + `--ad-accent-ink` is the destructive equivalent. |
 | `--ad-ok` / `--ad-warn` / `--ad-danger` | semantic state; `--ad-danger-weak` / `--ad-accent-weak` / `--ad-accent-sel` are the tinted fills |
-| `--ad-planned` / `--ad-simulated` | the two execution-mode badges (purple solid / amber dashed) |
+| `--ad-planned` / `--ad-simulated` | history/internal-runtime execution-mode badges (purple solid / amber dashed); v0.6 does not expose them as a Flash page mode switch |
 | `--ad-shadow` / `--ad-control-shadow` | window elevation / the much softer lift on a resting control |
 
 Type: `--ad-font-ui` for everything, `--ad-font-mono` for **paths, hashes, versions,
@@ -66,18 +72,30 @@ anything you hardcode will drift the first time they do.
 
 ### Rules this product's screens follow
 
-- **A button label names the complete action** — `刷写 rk3568-dev(2 个分区)…`, not
-  `确定`. The label is the last thing read before something irreversible.
+- **A button label names the complete action** — `擦除数据并开始刷机`, not `确定`.
+  The label is the last thing read before something irreversible.
 - **Danger is never color alone**: glyph + wording + border together (the components
   already do this; keep it if you add your own).
-- **Destructive actions go through `DangerConfirmDialog`** — impact list, one checkbox
-  per thing being certified, confirm button repeating the whole action.
-- **No fake percentages.** Device work has no reliable byte total; use `PhaseTrack` and
-  `IndeterminateBar`.
+- **Flash is the deliberate no-sheet exception.** Its page keeps target, image,
+  userdata impact and one explicit destructive button together. Runtime capability,
+  fresh target facts and the materialized plan remain the authority; do not add a
+  checkbox, typed phrase, or second confirmation sheet. Other destructive actions
+  still use `DangerConfirmDialog` when their current spec requires it.
+- **No fake percentages.** Use `DeterminateProgress` only for Runtime-confirmed written
+  bytes divided by the materialized image/partition total, and label it `镜像写入估算`.
+  Preparation, Loader entry, reboot and verification use stage text plus
+  `IndeterminateBar`. A 100% write is not a successful Flash; success waits for
+  postflight verification.
 - **Classify every device-touching step** with `EffectBadge`:
   `hostOnly → readOnly → deviceMutation → destructive`.
-- **`planned` / `simulated` badges are permanent** — they follow a session into history
-  and exports, so a dry run can never be mistaken for a real one.
+- **The normal Flash page is real execution only.** Do not draw Execute / Plan only /
+  Simulated controls there. If internal or historical planned/simulated sessions are
+  shown in History or Job Inspector, their badges remain permanent so they cannot be
+  mistaken for real execution.
+- **Flash has one calm reading path:** current device → selected image → destructive
+  action; after submission the same region becomes progress, then the verified result.
+  Target binding, image SHA, prerequisites and exact-plan summary live under the native
+  `刷机详情` disclosure instead of becoming a wall of cards.
 
 ### Where to read more
 
@@ -88,30 +106,26 @@ read them before styling anything. Per-component API and examples:
 ### A screen, idiomatically
 
 ```jsx
-const { WindowFrame, Card, DataTable, EffectBadge, Button, Chip } = window.ArkDeckDS;
+const { WindowFrame, Card, Button, Chip, DeterminateProgress } = window.ArkDeckDS;
 
 <div className="ad-root" style={{ padding: 24 }}>
-  <WindowFrame title="ArkDeck — OpenHarmony 设备工作台"
-               toolbar={<Button>AC 标注</Button>}>
-    <Card title="Exact Plan — rk3568-5.0-full"
-          action={<Chip tone="planned">◇ PLANNED</Chip>}>
-      <DataTable
-        columns={[
-          { key: 'n', header: '#', mono: true },
-          { key: 'step', header: 'step', mono: true },
-          { key: 'effect', header: 'effect' },
-        ]}
-        rows={[
-          { id: '1', cells: { n: '1', step: 'enterUpdater',
-              effect: <EffectBadge effect="deviceMutation" /> } },
-          { id: '2', cells: { n: '2', step: 'flashPartition',
-              effect: <EffectBadge effect="destructive" /> } },
-        ]}
+  <WindowFrame title="ArkDeck — 刷机" toolbar={<Button>AC 标注</Button>}>
+    <h1 style={{ margin: 0 }}>刷机</h1>
+    <p style={{ margin: 0, color: "var(--ad-ink-2)" }}>
+      选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。
+    </p>
+    <Card title="正在写入镜像" action={<Chip tone="ok">DAYU200 · 设备已就绪</Chip>}>
+      <DeterminateProgress
+        label="镜像写入估算"
+        value={2_000_000_000}
+        max={6_400_000_000}
+        valueText="已确认写入 2 GB / 6.4 GB"
       />
-      <p style={{ color: 'var(--ad-ink-2)', fontSize: 'var(--ad-text-sm)' }}>
-        镜像原地引用,不复制进 Session;GB 级流式 hash。
+      <p style={{ margin: 0, color: "var(--ad-ink-2)", fontSize: 12 }}>
+        准备 ✓　写入镜像 ●　重启与验证 ○
       </p>
     </Card>
+    <details><summary>查看刷机详情</summary>{/* target / SHA / exact-plan summary */}</details>
   </WindowFrame>
 </div>
 ```

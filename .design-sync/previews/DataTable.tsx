@@ -1,10 +1,9 @@
 import { Button, Chip, DataTable, EffectBadge } from "@arkdeck/ds";
 
 const planColumns = [
-  { key: "n", header: "#", mono: true },
-  { key: "step", header: "step", mono: true },
-  { key: "args", header: "参数摘要", mono: true },
-  { key: "effect", header: "effect" },
+  { key: "stage", header: "计划阶段" },
+  { key: "count", header: "步骤数", mono: true },
+  { key: "effect", header: "最高 effect" },
 ];
 
 export const FlashExactPlan = () => (
@@ -14,45 +13,32 @@ export const FlashExactPlan = () => (
       {
         id: "1",
         cells: {
-          n: "1",
-          step: "enterUpdater",
-          args: "—",
-          effect: <EffectBadge effect="deviceMutation" />,
+          stage: "准备与校验",
+          count: "3",
+          effect: <EffectBadge effect="hostOnly" />,
         },
       },
       {
         id: "2",
         cells: {
-          n: "2",
-          step: "flashPartition",
-          args: "boot · boot.img · 64MB",
-          effect: <EffectBadge effect="destructive" />,
+          stage: "进入 Loader 与身份绑定",
+          count: "4",
+          effect: <EffectBadge effect="deviceMutation" />,
         },
       },
       {
         id: "3",
         cells: {
-          n: "3",
-          step: "flashPartition",
-          args: "system · system.img · 2.1GB",
+          stage: "写入分区",
+          count: "1",
           effect: <EffectBadge effect="destructive" />,
         },
       },
       {
         id: "4",
         cells: {
-          n: "4",
-          step: "reboot + waitReconnect",
-          args: "binding revision + 强证据",
-          effect: <EffectBadge effect="deviceMutation" />,
-        },
-      },
-      {
-        id: "5",
-        cells: {
-          n: "5",
-          step: "postflight verify",
-          args: "版本/设备校验",
+          stage: "回读、重启与验证",
+          count: "6",
           effect: <EffectBadge effect="readOnly" />,
         },
       },
@@ -89,10 +75,10 @@ export const CapabilityMatrix = () => (
         cells: { cap: "bytrace", state: <Chip tone="dim">不存在</Chip>, note: "" },
       },
       {
-        id: "flashd",
+        id: "rockusb",
         cells: {
-          cap: "flashd",
-          state: <Chip tone="warn">无法确认</Chip>,
+          cap: "RockUSB Flash",
+          state: <Chip tone="ok">可用</Chip>,
           note: <Button>查看 raw</Button>,
         },
       },
@@ -100,22 +86,21 @@ export const CapabilityMatrix = () => (
   />
 );
 
-export const ProfileImageSet = () => (
+export const SelectedFlashImage = () => (
   <DataTable
     columns={[
-      { key: "part", header: "分区", mono: true },
-      { key: "img", header: "镜像", mono: true },
+      { key: "img", header: "镜像包", mono: true },
       { key: "size", header: "大小", mono: true },
-      { key: "sha", header: "SHA-256", mono: true },
+      { key: "build", header: "期望 build", mono: true },
     ]}
     rows={[
       {
-        id: "boot",
-        cells: { part: "boot", img: "boot.img", size: "64MB", sha: "c9d2…41aa ✓" },
-      },
-      {
-        id: "system",
-        cells: { part: "system", img: "system.img", size: "2.1GB", sha: "8b07…9e35 ✓" },
+        id: "dayu200-image",
+        cells: {
+          img: "dayu200-openharmony-5.0.0.71.imgpkg",
+          size: "6.4 GB",
+          build: "OpenHarmony 5.0.0.71",
+        },
       },
     ]}
   />
@@ -143,7 +128,7 @@ export const HistorySessions = () => (
               已取消
             </Chip>
           ),
-          dev: "rk3568-dev",
+          dev: "DAYU200",
           what: "Trace · 渲染/动画 30s(用户取消)",
           when: "07-13 10:21",
         },
@@ -157,8 +142,8 @@ export const HistorySessions = () => (
               PLANNED
             </Chip>
           ),
-          dev: "rk3568-dev",
-          what: "Flash · rk3568-5.0-full(3 分区)",
+          dev: "DAYU200",
+          what: "Flash · dayu200-openharmony-5.0.0.71.imgpkg",
           when: "07-12 15:40",
         },
       },
@@ -190,7 +175,7 @@ export const HistorySessions = () => (
               已中断 · 结果未知
             </Chip>
           ),
-          dev: "rk3568-dev",
+          dev: "DAYU200",
           what: "Flash · system 分区(outcomeUnknown)",
           when: "07-11 23:47",
         },
@@ -204,7 +189,7 @@ export const HistorySessions = () => (
               失败
             </Chip>
           ),
-          dev: "rk3568-dev",
+          dev: "DAYU200",
           what: "UI Dump · elementTree(设备离线)",
           when: "07-11 20:15",
         },

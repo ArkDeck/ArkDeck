@@ -21,20 +21,15 @@ const jobHead = (title: string, badge: ReactNode) => (
 
 export const FlashRunning = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 700 }}>
-    {jobHead("Flash · rk3568-5.0-full · rk3568-dev", <Chip tone="warn">运行中</Chip>)}
+    {jobHead("Flash · dayu200-openharmony-5.0.0.71.imgpkg · DAYU200", <Chip tone="warn">运行中</Chip>)}
     <PhaseTrack
       phases={[
-        "Preflight",
-        "EnterUpdater",
-        "Re-identify",
-        "flash boot",
-        "flash system",
-        "Verify",
-        "Reboot",
-        "Postflight",
-        "Complete",
+        "准备镜像",
+        "进入 Loader",
+        "写入镜像",
+        "重启并验证",
       ]}
-      currentIndex={4}
+      currentIndex={2}
       running
     />
   </div>
@@ -42,7 +37,7 @@ export const FlashRunning = () => (
 
 export const TraceRunning = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 700 }}>
-    {jobHead("Trace · ArkUI 深度 15s · rk3568-dev", <Chip tone="warn">运行中</Chip>)}
+    {jobHead("Trace · ArkUI 深度 15s · DAYU200", <Chip tone="warn">运行中</Chip>)}
     <PhaseTrack
       phases={[
         "Preflight",
@@ -65,7 +60,7 @@ export const TraceRunning = () => (
 export const UiDumpFinished = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 700 }}>
     {jobHead(
-      "UI Dump · elementTree · w12 · rk3568-dev",
+      "UI Dump · elementTree · w12 · DAYU200",
       <Chip tone="ok" icon="✓">
         成功
       </Chip>,
@@ -87,6 +82,7 @@ export const UiDumpFinished = () => (
   </div>
 );
 
+/** Internal/history-only simulated session; v0.6 does not expose this as a Flash mode switch. */
 export const SimulatedInjection = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 700 }}>
     {jobHead(

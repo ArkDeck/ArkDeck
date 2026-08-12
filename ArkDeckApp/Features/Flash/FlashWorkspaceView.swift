@@ -40,36 +40,32 @@ struct FlashWorkspaceView: View {
           presentation: runtimeHistory,
           plan: model.plan,
           onOpenHistory: onOpenHistory)
-        // Reading order matches the spec: Availability → Profile & Image Set
-        // → Prerequisites → Exact Plan → Review & Run. Prerequisites are a
-        // top-level section before the plan — what has to hold comes before
-        // the steps that assume it, never folded inside them.
+        // Reading order matches the spec. The three plan inputs share one
+        // visual container; Exact Plan and Review remain independent stateful
+        // objects instead of turning every static subsection into a card.
         ViewThatFits(in: .horizontal) {
           HStack(alignment: .top, spacing: 16) {
-            VStack(spacing: 16) {
-              profileAndImageSection
-              prerequisitesSection
-              targetSection
-            }
-            .frame(minWidth: 260, maxWidth: 330)
+            planInputsSection
+              .frame(width: 280)
 
             VStack(spacing: 16) {
-              exactPlanSection
+              exactPlanSection(useTable: true)
               reviewSection
             }
-            .frame(minWidth: 360, maxWidth: .infinity)
+            // Fix the wide candidate's ideal width so long Runtime hashes or
+            // command arguments cannot make ViewThatFits choose the narrow
+            // stack in the 1180pt reference window.
+            .frame(width: 500)
           }
 
           VStack(spacing: 16) {
-            profileAndImageSection
-            prerequisitesSection
-            targetSection
-            exactPlanSection
+            planInputsSection
+            exactPlanSection(useTable: false)
             reviewSection
           }
         }
       }
-      .frame(maxWidth: 1_000, alignment: .topLeading)
+      .frame(maxWidth: 1_100, alignment: .topLeading)
       .padding(20)
     }
     .toolbar {
@@ -171,34 +167,41 @@ struct FlashWorkspaceView: View {
   }
 
   private var availabilitySection: some View {
-    GroupBox(flashText("flash.availability.title")) {
-      VStack(alignment: .leading, spacing: 8) {
-        switch model.workspace.availability {
-        case .checking:
-          Label(flashText("flash.availability.checking"), systemImage: "hourglass")
-            .accessibilityIdentifier("flash.availability.status")
-        case .available:
-          Label(flashText("flash.availability.available"), systemImage: "checkmark.circle.fill")
-            .foregroundStyle(.green)
-            .accessibilityIdentifier("flash.availability.status")
-        case .unavailable(let reasons):
-          Label(flashText("flash.availability.unavailable"), systemImage: "xmark.octagon.fill")
-            .foregroundStyle(.red)
-            .accessibilityIdentifier("flash.availability.status")
-          ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
-            Text(reason)
-              .font(.callout.monospaced())
-              .textSelection(.enabled)
-              .fixedSize(horizontal: false, vertical: true)
-          }
+    VStack(alignment: .leading, spacing: 8) {
+      flashSectionHeader(flashText("flash.availability.title"))
+      switch model.workspace.availability {
+      case .checking:
+        Label(flashText("flash.availability.checking"), systemImage: "hourglass")
+          .accessibilityIdentifier("flash.availability.status")
+      case .available:
+        Label(flashText("flash.availability.available"), systemImage: "checkmark.circle.fill")
+          .foregroundStyle(.green)
+          .accessibilityIdentifier("flash.availability.status")
+      case .unavailable(let reasons):
+        Label(flashText("flash.availability.unavailable"), systemImage: "xmark.octagon.fill")
+          .foregroundStyle(.red)
+          .accessibilityIdentifier("flash.availability.status")
+        ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
+          Text(reason)
+            .font(.callout.monospaced())
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        Text(flashText("flash.availability.scope"))
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
+      Text(flashText("flash.availability.scope"))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func flashSectionHeader(_ title: String) -> some View {
+    VStack(alignment: .leading, spacing: 7) {
+      Text(title)
+        .font(.subheadline.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+      Divider()
     }
   }
 
@@ -262,8 +265,8 @@ struct FlashWorkspaceView: View {
           .disabled(model.isRefreshingDeviceAccess)
           .accessibilityIdentifier("flash.deviceAccess.reprobe")
         }
-        if (model.workspace.bootloaderStatus.disposition == .unbound
-          || model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared),
+        if model.workspace.bootloaderStatus.disposition == .unbound
+          || model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
           model.workspace.bootloaderStatus.mode == "loader"
         {
           Divider()
@@ -277,10 +280,11 @@ struct FlashWorkspaceView: View {
             flashText(
               model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared
                 ? "flash.bootloader.unprepared.detail"
-                : "flash.bootloader.unbound.detail"))
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+                : "flash.bootloader.unbound.detail")
+          )
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
         } else if model.workspace.bootloaderStatus.disposition == .exactBoundTarget,
           model.workspace.bootloaderStatus.mode == "loader"
         {
@@ -356,33 +360,50 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private var profileAndImageSection: some View {
-    GroupBox(flashText("flash.profileImage.title")) {
-      VStack(alignment: .leading, spacing: 12) {
-        Picker(flashText("flash.profile.label"), selection: profileBinding) {
-          ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
-            Text(reference).tag(reference)
-          }
+  private var planInputsSection: some View {
+    GroupBox(flashText("flash.inputs.title")) {
+      VStack(alignment: .leading, spacing: 14) {
+        flashInputSection("flash.profileImage.title") {
+          profileAndImageContent
         }
-        .accessibilityIdentifier("flash.profile")
-        .disabled(model.isPreparingPlan)
-
-        LabeledContent(flashText("flash.image.label")) {
-          Text(model.selectedArchiveURL?.lastPathComponent ?? flashText("flash.image.none"))
-            .lineLimit(2)
-            .truncationMode(.middle)
-            .accessibilityIdentifier("flash.image.value")
+        Divider()
+        flashInputSection("flash.plan.prerequisites") {
+          prerequisitesContent
         }
-        Button(flashText("flash.image.choose")) { isImporterPresented = true }
-          .accessibilityIdentifier("flash.image.choose")
-          .disabled(model.isPreparingPlan)
-        Text(flashText("flash.image.hint"))
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("flash.plan.prerequisitesSection")
+        Divider()
+        flashInputSection("flash.target.title") {
+          targetContent
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
+    }
+  }
+
+  private var profileAndImageContent: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Picker(flashText("flash.profile.label"), selection: profileBinding) {
+        ForEach(FlashApplicationFacade.profileReferences, id: \.self) { reference in
+          Text(reference).tag(reference)
+        }
+      }
+      .accessibilityIdentifier("flash.profile")
+      .disabled(model.isPreparingPlan)
+
+      LabeledContent(flashText("flash.image.label")) {
+        Text(model.selectedArchiveURL?.lastPathComponent ?? flashText("flash.image.none"))
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .accessibilityIdentifier("flash.image.value")
+      }
+      Button(flashText("flash.image.choose")) { isImporterPresented = true }
+        .accessibilityIdentifier("flash.image.choose")
+        .disabled(model.isPreparingPlan)
+      Text(flashText("flash.image.hint"))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 
@@ -390,45 +411,41 @@ struct FlashWorkspaceView: View {
     Binding(get: { model.profileReference }, set: { model.setProfileReference($0) })
   }
 
-  private var targetSection: some View {
-    GroupBox(flashText("flash.target.title")) {
-      VStack(alignment: .leading, spacing: 10) {
-        if model.workspace.targets.isEmpty {
-          Label(flashText("flash.target.none"), systemImage: "externaldrive.badge.questionmark")
-            .accessibilityIdentifier("flash.target.empty")
-          if let failure = model.workspace.targetLoadFailure {
-            Text(failure)
-              .font(.callout.monospaced())
-              .textSelection(.enabled)
-              .fixedSize(horizontal: false, vertical: true)
+  private var targetContent: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if model.workspace.targets.isEmpty {
+        Label(flashText("flash.target.none"), systemImage: "externaldrive.badge.questionmark")
+          .accessibilityIdentifier("flash.target.empty")
+        if let failure = model.workspace.targetLoadFailure {
+          Text(failure)
+            .font(.callout.monospaced())
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        Text(flashText("flash.target.guidance"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+      } else {
+        Picker(flashText("flash.target.label"), selection: targetBinding) {
+          ForEach(model.workspace.targets) { target in
+            Text(target.id).tag(target.id)
           }
-          Text(flashText("flash.target.guidance"))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        } else {
-          Picker(flashText("flash.target.label"), selection: targetBinding) {
-            ForEach(model.workspace.targets) { target in
-              Text(target.id).tag(target.id)
-            }
+        }
+        .accessibilityIdentifier("flash.target")
+        .disabled(model.isPreparingPlan)
+        if let target = model.selectedTarget {
+          LabeledContent(flashText("flash.target.binding")) {
+            Text(target.bindingRevision, format: .number)
+              .monospacedDigit()
+              .accessibilityIdentifier("flash.target.binding")
           }
-          .accessibilityIdentifier("flash.target")
-          .disabled(model.isPreparingPlan)
-          if let target = model.selectedTarget {
-            LabeledContent(flashText("flash.target.binding")) {
-              Text(target.bindingRevision, format: .number)
-                .monospacedDigit()
-                .accessibilityIdentifier("flash.target.binding")
-            }
-            LabeledContent(flashText("flash.target.toolVersion")) {
-              Text(target.toolVersion)
-                .font(.body.monospaced())
-                .accessibilityIdentifier("flash.target.toolVersion")
-            }
+          LabeledContent(flashText("flash.target.toolVersion")) {
+            Text(target.toolVersion)
+              .font(.body.monospaced())
+              .accessibilityIdentifier("flash.target.toolVersion")
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
   }
 
@@ -436,29 +453,36 @@ struct FlashWorkspaceView: View {
     Binding(get: { model.selectedTargetID }, set: { model.setTargetID($0) })
   }
 
-  private var prerequisitesSection: some View {
-    GroupBox(flashText("flash.plan.prerequisites")) {
-      VStack(alignment: .leading, spacing: 8) {
-        if let plan = model.plan {
-          Text(flashText("flash.plan.prerequisitesNote"))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-          FlashPrerequisitesList(prerequisites: plan.prerequisites)
-        } else {
-          Text(flashText("flash.plan.prerequisitesAwaitPlan"))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
+  private var prerequisitesContent: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if let plan = model.plan {
+        Text(flashText("flash.plan.prerequisitesNote"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+        FlashPrerequisitesList(prerequisites: plan.prerequisites)
+      } else {
+        Text(flashText("flash.plan.prerequisitesAwaitPlan"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
     }
-    .accessibilityIdentifier("flash.plan.prerequisitesSection")
   }
 
-  private var exactPlanSection: some View {
+  private func flashInputSection<Content: View>(
+    _ titleKey: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(flashText(titleKey))
+        .font(.subheadline.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+      content()
+    }
+  }
+
+  private func exactPlanSection(useTable: Bool) -> some View {
     GroupBox(flashText("flash.plan.title")) {
       VStack(alignment: .leading, spacing: 12) {
         if model.isPreparingPlan {
@@ -471,9 +495,12 @@ struct FlashWorkspaceView: View {
         } else if let plan = model.plan {
           planSummary(plan)
           Divider()
-          VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(plan.steps.enumerated()), id: \.element.id) { index, step in
-              planStep(index: index, step: step)
+          Group {
+            if useTable {
+              planStepsTable(plan.steps)
+                .frame(maxWidth: .infinity)
+            } else {
+              planStepsCompactList(plan.steps)
             }
           }
           .accessibilityIdentifier("flash.plan.steps")
@@ -521,31 +548,89 @@ struct FlashWorkspaceView: View {
     }
   }
 
-  private func planStep(index: Int, step: FlashPlanStepPresentation) -> some View {
-    VStack(alignment: .leading, spacing: 5) {
-      ViewThatFits(in: .horizontal) {
-        HStack(spacing: 8) {
-          stepIdentity(index: index, step: step)
-          Spacer(minLength: 8)
+  private func planStepsTable(_ steps: [FlashPlanStepPresentation]) -> some View {
+    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 0) {
+      GridRow(alignment: .firstTextBaseline) {
+        planColumnHeader("flash.plan.column.number", width: 24)
+        planColumnHeader("flash.plan.column.step", width: 84)
+        planColumnHeader("flash.plan.column.arguments")
+        planColumnHeader("flash.plan.column.effect", width: 88)
+        planColumnHeader("flash.plan.column.disposition", width: 82)
+      }
+      .padding(.bottom, 6)
+
+      Divider().gridCellColumns(5)
+
+      ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+        GridRow(alignment: .firstTextBaseline) {
+          Text(index + 1, format: .number)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .frame(width: 24, alignment: .leading)
+          Text(step.kind)
+            .font(.caption.monospaced().weight(.semibold))
+            .frame(width: 84, alignment: .leading)
+          Text(step.argumentSummary)
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+            .truncationMode(.middle)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
           effectLabel(step.effect)
+            .frame(width: 88, alignment: .leading)
           dispositionLabel(step.disposition)
+            .frame(width: 82, alignment: .leading)
         }
-        VStack(alignment: .leading, spacing: 4) {
-          stepIdentity(index: index, step: step)
-          HStack(spacing: 8) {
-            effectLabel(step.effect)
-            dispositionLabel(step.disposition)
-          }
+        .padding(.vertical, 7)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("flash.plan.row.\(index)")
+
+        if index < steps.count - 1 {
+          Divider().gridCellColumns(5)
         }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("flash.plan.table")
+  }
+
+  private func planColumnHeader(_ key: String, width: CGFloat? = nil) -> some View {
+    Text(flashText(key))
+      .font(.caption2.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .frame(width: width, alignment: .leading)
+      .accessibilityIdentifier("flash.plan.header.\(key)")
+  }
+
+  private func planStepsCompactList(_ steps: [FlashPlanStepPresentation]) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+        planStepCompact(index: index, step: step)
+        if index < steps.count - 1 { Divider() }
+      }
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("flash.plan.compactList")
+  }
+
+  private func planStepCompact(index: Int, step: FlashPlanStepPresentation) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack(spacing: 8) {
+        stepIdentity(index: index, step: step)
+        Spacer(minLength: 8)
+        effectLabel(step.effect)
       }
       Text(step.argumentSummary)
         .font(.caption.monospaced())
         .foregroundStyle(.secondary)
         .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
+      dispositionLabel(step.disposition)
     }
-    .padding(10)
-    .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+    .padding(.vertical, 8)
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("flash.plan.row.\(index)")
   }
 
   private func stepIdentity(index: Int, step: FlashPlanStepPresentation) -> some View {
@@ -579,6 +664,7 @@ struct FlashWorkspaceView: View {
     return Label(flashText(key), systemImage: symbol)
       .font(.caption.weight(.semibold))
       .foregroundStyle(color)
+      .lineLimit(2)
   }
 
   private func dispositionLabel(_ disposition: FlashPlanStepDisposition) -> some View {
@@ -838,7 +924,8 @@ struct FlashWorkspaceView: View {
       String(
         format: flashText(
           matches ? "flash.postflight.match" : "flash.postflight.mismatch"),
-        label, expected, observed))
+        label, expected, observed)
+    )
     .accessibilityIdentifier("\(identifier).\(matches ? "match" : "mismatch")")
   }
 
@@ -893,9 +980,11 @@ final class FlashWorkspaceViewModel: ObservableObject {
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) {
     self.provider = provider
-    self.detailProvider = detailProvider
+    self.detailProvider =
+      detailProvider
       ?? RuntimeJobDetailApplicationFacade.make(arguments: arguments)
-    self.deviceAccessProvider = deviceAccessProvider
+    self.deviceAccessProvider =
+      deviceAccessProvider
       ?? RockchipDeviceAccessApplicationFacade.make(arguments: arguments)
     preparesUITestPlan = arguments.contains("--ui-test-flash-plan")
     if arguments.contains("--ui-test-flash") || preparesUITestPlan,

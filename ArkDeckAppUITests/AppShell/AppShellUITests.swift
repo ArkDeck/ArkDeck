@@ -121,6 +121,28 @@ final class AppShellUITests: XCTestCase {
         residue: "有 2 项未清理残留。"))
   }
 
+  func testV05ReferenceLayoutInEnglishAndSimplifiedChinese() {
+    for (language, localeName) in [("(en)", "en"), ("(zh-Hans)", "zh-Hans")] {
+      try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      let app = launch(
+        arguments: [
+          "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+          "--ui-test-device-poll-fast", "--ui-test-fixture-state",
+          fixtureStateFileURL.path, "-AppleLanguages", language,
+        ])
+      let adoptedDevice = element("device.row.150100469346864", in: app)
+      XCTAssertTrue(adoptedDevice.waitForExistenceFast(timeout: 10))
+      assertV05DeviceDetailLayout(
+        in: app, adoptedDevice: adoptedDevice, localeName: localeName,
+        file: #filePath, line: #line)
+
+      if localeName == "en" {
+        assertV05FlashPlanLayout(in: app, file: #filePath, line: #line)
+      }
+      app.terminate()
+    }
+  }
+
   func testApplicationIconSwitchesFromSettings() {
     let app = launch(arguments: ["-AppleLanguages", "(en)"])
 
@@ -199,16 +221,14 @@ final class AppShellUITests: XCTestCase {
     reopened.typeKey(.escape, modifierFlags: [])
 
     let refreshedUnauthorized = element("device.row.7f2c091a445e21", in: reopened)
-    clickCorrectingNavigationSplitAXOffset(refreshedUnauthorized, in: reopened)
-    assertDisplayed(reopened.staticTexts["device.fact.state"], equals: "Unauthorized")
+    assertDisplayed(refreshedUnauthorized, equals: "需要信任")
     writeFixtureState("--ui-test-device-authorized", in: reopened)
     refreshedUnauthorized.rightClick()
     let refreshAfterStateChange = reopened.menuItems["重新检测"]
     XCTAssertTrue(refreshAfterStateChange.waitForExistenceFast(timeout: 5))
     XCTAssertTrue(refreshAfterStateChange.isEnabled)
     refreshAfterStateChange.click()
-    assertDisplayed(
-      reopened.staticTexts["device.fact.state"], equals: "Connected", timeout: 10)
+    assertDisplayed(refreshedUnauthorized, equals: "已授权 · 未接管", timeout: 10)
   }
 
   private struct Overview {
@@ -344,7 +364,8 @@ final class AppShellUITests: XCTestCase {
       displayedText(for: adoptedDevice).contains("OpenHarmony 5.0.0.71"),
       "the adopted device row must carry its observed firmware",
       file: file, line: line)
-    clickCorrectingNavigationSplitAXOffset(unauthorizedDevice, in: app)
+    clickCorrectingNavigationSplitAXOffset(
+      element("device.row.7f2c091a445e21", in: app), in: app)
     XCTAssertTrue(
       element("device.trust.steps", in: app).waitForExistenceFast(timeout: 10),
       "the unauthorized device must show its trust steps", file: file, line: line)
@@ -946,7 +967,6 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
       "the fixture must materialize an exact execute plan", file: file, line: line)
-
     let partitions = element("flash.plan.partitions.disclosure", in: app)
     XCTAssertTrue(partitions.exists, file: file, line: line)
     scrollIntoView(partitions, in: app)
@@ -1059,6 +1079,90 @@ final class AppShellUITests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch
   }
 
+  /// Lightweight visual regression for the v0.5 reference layout. Native
+  /// materials, accent, fonts and antialiasing remain system-owned, so this
+  /// pins structure and keeps an artifact for review instead of comparing raw
+  /// pixels across macOS versions.
+  private func assertV05DeviceDetailLayout(
+    in app: XCUIApplication, adoptedDevice: XCUIElement, localeName: String,
+    file: StaticString, line: UInt
+  ) {
+    clickCorrectingNavigationSplitAXOffset(adoptedDevice, in: app)
+    let status = element("device.detail.statusSection", in: app)
+    let facts = element("device.detail.factsSection", in: app)
+    XCTAssertTrue(
+      status.waitForExistenceFast(timeout: 10), "device status section missing",
+      file: file, line: line)
+    XCTAssertTrue(facts.exists, "device facts section missing", file: file, line: line)
+    XCTAssertFalse(
+      element("device.detail.title", in: app).exists,
+      "the toolbar title must not be duplicated inside device content",
+      file: file, line: line)
+
+    let window = app.windows.firstMatch
+    if window.frame.width >= 1_100 {
+      XCTAssertLessThan(
+        abs(status.frame.minY - facts.frame.minY), 12,
+        "the 1180pt reference must align device sections side by side",
+        file: file, line: line)
+      XCTAssertLessThanOrEqual(
+        status.frame.maxX, facts.frame.minX,
+        "the wide device sections must not overlap", file: file, line: line)
+    } else {
+      XCTAssertFalse(
+        status.frame.intersects(facts.frame),
+        "the clamped layout must not overlap device sections", file: file, line: line)
+    }
+
+    let attachment = XCTAttachment(screenshot: window.screenshot())
+    attachment.name =
+      "v0.5-device-detail-\(localeName)-\(Int(window.frame.width))x\(Int(window.frame.height))"
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
+  private func assertV05FlashPlanLayout(
+    in app: XCUIApplication, file: StaticString, line: UInt
+  ) {
+    writeFixtureState("--ui-test-flash-plan", in: app, file: file, line: line)
+    select("app.navigation.flash", in: app, file: file, line: line)
+    app.buttons["flash.refresh"].click()
+    element("flash.mode.execute", in: app).click()
+    XCTAssertTrue(
+      element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
+      "the fixture must materialize an exact execute plan", file: file, line: line)
+
+    // Grid/VStack containers do not consistently surface their own AX node on
+    // macOS. A real column header is the stable structural proof that the wide
+    // table branch, rather than the headerless compact rows, is rendered.
+    let planTableHeader = element("flash.plan.header.flash.plan.column.number", in: app)
+    let compactPlan = element("flash.plan.compactList", in: app)
+    if app.windows.firstMatch.frame.width >= 1_100 {
+      XCTAssertTrue(
+        planTableHeader.waitForExistenceFast(timeout: 5),
+        "the 1180pt reference window must render Exact Plan as a compact table",
+        file: file, line: line)
+      XCTAssertFalse(
+        compactPlan.exists, "the wide reference must not fall back to stacked plan rows",
+        file: file, line: line)
+    } else {
+      XCTAssertTrue(
+        planTableHeader.exists || compactPlan.exists,
+        "a clamped display must preserve one compact Exact Plan presentation",
+        file: file, line: line)
+    }
+    XCTAssertTrue(
+      element("flash.plan.row.0", in: app).exists,
+      "the plan table must expose stable structural rows", file: file, line: line)
+
+    let window = app.windows.firstMatch
+    let attachment = XCTAttachment(screenshot: window.screenshot())
+    attachment.name =
+      "v0.5-flash-en-\(Int(window.frame.width))x\(Int(window.frame.height))"
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
   // MARK: - Helpers
 
   /// Sidebar rows expose one full-width native navigation element. Its name,
@@ -1139,7 +1243,8 @@ final class AppShellUITests: XCTestCase {
       .withOffset(
         CGVector(
           dx: element.frame.midX - windowFrame.minX,
-          dy: element.frame.midY + verticalCorrection - windowFrame.minY))
+          dy: element.frame.midY + verticalCorrection - windowFrame.minY)
+      )
       .click()
   }
 
@@ -1195,9 +1300,11 @@ final class AppShellUITests: XCTestCase {
       let frame = host.frame
       return frame.width > 0 && frame.minX <= targetX && targetX <= frame.maxX
     }
-    guard let host = hosts.min(by: { lhs, rhs in
-      lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
-    }) else { return }
+    guard
+      let host = hosts.min(by: { lhs, rhs in
+        lhs.frame.width * lhs.frame.height < rhs.frame.width * rhs.frame.height
+      })
+    else { return }
 
     // Large steps: every scroll spends a full idle-wait + snapshot round
     // trip, so fewer, bigger deltas are what make this affordable.
@@ -1224,14 +1331,14 @@ final class AppShellUITests: XCTestCase {
       app.terminate()
     }
     var launchArguments = [
-        "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
-        "--ui-test-hdc-diagnostics",
-        // Without this the App builds the real updater and decides what to
-        // show by checking for updates, which is neither deterministic nor
-        // free of network effects. A test that wants a different update state
-        // passes its own argument; this only makes the default one declared.
-        "--ui-test-auto-update-idle",
-      ]
+      "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+      "--ui-test-hdc-diagnostics",
+      // Without this the App builds the real updater and decides what to
+      // show by checking for updates, which is neither deterministic nor
+      // free of network effects. A test that wants a different update state
+      // passes its own argument; this only makes the default one declared.
+      "--ui-test-auto-update-idle",
+    ]
     if resetDeviceNames { launchArguments.append("--ui-test-reset-device-names") }
     app.launchArguments = launchArguments + arguments
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
@@ -1242,7 +1349,8 @@ final class AppShellUITests: XCTestCase {
     if !openedInitialWindow {
       app.typeKey("n", modifierFlags: .command)
       XCTAssertTrue(
-        app.windows.firstMatch.waitForExistenceFast(timeout: 5), "ArkDeck must create a test window")
+        app.windows.firstMatch.waitForExistenceFast(timeout: 5), "ArkDeck must create a test window"
+      )
     }
     return app
   }

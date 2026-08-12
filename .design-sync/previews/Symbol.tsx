@@ -89,7 +89,7 @@ export const SidebarNavGlyphs = () => (
     <div style={group}>
       <span style={sectionLabel}>设备</span>
       <DeviceRow
-        name="rk3568-dev"
+        name="DAYU200"
         detail="OpenHarmony 5.0.0.71"
         transport="USB"
         state="ready"

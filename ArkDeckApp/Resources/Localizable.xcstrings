@@ -375,6 +375,38 @@
         }
       }
     },
+    "device.detail.factsTitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime facts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime 事实"
+          }
+        }
+      }
+    },
+    "device.detail.statusTitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status and actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前状态与操作"
+          }
+        }
+      }
+    },
     "device.detail.title": {
       "localizations": {
         "en": {

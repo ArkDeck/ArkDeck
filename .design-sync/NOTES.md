@@ -1,5 +1,11 @@
 # design-sync notes — ArkDeck
 
+> **Current sync target: design v0.6 (2026-08-12).** The authoritative files are
+> `docs/design/macos-ux-interaction-spec.md` and `docs/design/prototype.html`.
+> `docs/design/arkdeck-ds/scripts/check-tokens.mjs` pins `ALIGNED_VERSION = "v0.6"`.
+> The paragraphs below that mention v0.2/v0.3 describe the historical first-sync
+> incident; they are not the current design version.
+
 ## What is being synced
 
 `docs/design/arkdeck-ds` (`@arkdeck/ds`) is a **React encoding of the ArkDeck macOS
@@ -28,7 +34,8 @@ converter stops at `[NO_DIST]` instead of shipping stale tokens. Verified by inj
 each drift kind. It catches seven things:
 
 1. any mapped token whose value differs from the prototype's;
-2. a docs version bump (`ALIGNED_VERSION` in the script pins v0.3 — bump it only after
+2. a docs version bump (`ALIGNED_VERSION` in the script pins the current design version —
+   v0.6 as of 2026-08-12 — and must be bumped only after
    re-reading §2 and §1, which is the acknowledgement step that was missing the first time);
 3. a token added to the prototype that this package neither mirrors nor explicitly declines;
 4. a token this package re-themes in dark that the prototype doesn't, or vice versa
@@ -76,7 +83,7 @@ stand-in for those roles, so it necessarily hardcodes them — that is the inten
 divergence, not a bug, but it *is* why the values drift and must be re-checked.
 `conventions.md` says this to the design agent too.
 
-v0.3 also splits fill from ink: `--ad-accent-fill` / `--ad-danger-fill` with
+The token model introduced during the historical v0.3 alignment also splits fill from ink: `--ad-accent-fill` / `--ad-danger-fill` with
 `--ad-accent-ink` are what filled controls use. Do **not** put white text on
 `--ad-accent` — in dark mode that token is a light blue and the text vanishes.
 
@@ -257,10 +264,18 @@ so it fills its own row when used alone and yields when used beside text, and
 
 ## Prototype facts previews depend on (check these when `prototype.html` changes)
 
+- **v0.6 Flash is real-execution-only.** The normal page is current device → image →
+  destructive action, then progress/result in place. Execute / Plan only / Simulated
+  segmented controls, the always-visible Exact Plan card wall, and a second Flash
+  confirmation sheet are stale preview patterns.
+- `DeterminateProgress` is allowed only for confirmed written bytes over the
+  materialized write total. All stages without that denominator remain indeterminate;
+  100% written still waits for reboot/postflight before success.
+
 - Debug tab values are `logs / apps / net / cmd` — **`net`, not `network`**; only the
   label is `Network`.
 - The History device filter list is *derived* from the session list, so its real
-  membership is 全部 / rk3568-dev / SIM-fixture-a3 — a simulated fixture sits in the
+  membership is 全部 / DAYU200 / SIM-fixture-a3 — a simulated fixture sits in the
   same list as a real board. Don't invent device names.
 - A finished `PhaseTrack` is `currentIndex === phases.length` with `running` unset —
   every phase green, no accent. That is the intended state, not a missing current step.
@@ -314,9 +329,17 @@ node .design-sync/.ds-sync/resync.mjs --config .design-sync/config.json \
   --remote .design-sync/.cache/remote-sync.json
 ```
 
-First sync (2026-08-06) ran 4 rebuild iterations: tokens closure → fonts → the two DS
+First sync (2026-08-06, historical v0.3 baseline) ran 4 rebuild iterations: tokens closure → fonts → the two DS
 fixes above → `cardMode` for the six wide components. All 17 components authored and
 graded `good` (70 cells); render check ended 17/17 clean, 0 floor cards.
+
+Repository-side v0.6 alignment (2026-08-12) added `DeterminateProgress`, replaced the
+Flash execution-mode previews with real-execution-only image/progress/result examples,
+and removed stale rk3568 / flashd product literals from the preview set. The local
+package build, token/version guard and all preview TSX bundles pass. Any previously
+published remote component sheet remains a historical snapshot until the documented
+resync command is run; when they disagree, this repository's v0.6 spec and prototype
+remain authoritative.
 
 ## Re-sync risks
 

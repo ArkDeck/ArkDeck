@@ -124,8 +124,8 @@ private enum ArkDeckNavigationItem: String, CaseIterable, Hashable, Identifiable
 }
 
 /// A sidebar choice: one of the fixed workspaces, or a device row. A device
-/// row is not a navigation destination — choosing it leaves every workspace
-/// item unselected while its authorization detail is shown.
+/// row is a navigation destination for that device's detail. It never becomes
+/// an implicit target scope for a workflow workspace.
 private enum ShellSelection: Hashable {
   case navigation(ArkDeckNavigationItem)
   case device(connectKey: String)
@@ -223,9 +223,10 @@ private struct AppShellView: View {
           isRefreshInFlight: runtimeHistory.isRefreshInFlight,
           onRefresh: runtimeHistory.refresh,
           onOpenHistory: openHistory,
-          isExpanded: $isJobInspectorExpanded)
-          .frame(height: 40)
-          .background(.bar)
+          isExpanded: $isJobInspectorExpanded
+        )
+        .frame(height: 40)
+        .background(.bar)
       }
     }
     .frame(minWidth: 900, minHeight: 600)
@@ -267,8 +268,9 @@ private struct AppShellView: View {
           isRefreshInFlight: runtimeHistory.isRefreshInFlight,
           onRefresh: runtimeHistory.refresh,
           onOpenHistory: openHistory,
-          isExpanded: $isJobInspectorExpanded)
-          .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
+          isExpanded: $isJobInspectorExpanded
+        )
+        .frame(minHeight: 220, idealHeight: 260, maxHeight: 320)
       }
     } else {
       workspaceWithRecovery
@@ -297,7 +299,7 @@ private struct AppShellView: View {
     return Text(LocalizedStringKey(selectedItem.localizationKey))
   }
 
-  /// Device rows live under the same Devices section as Overview. The list
+  /// Device detail destinations live under the same Devices section as Overview. The list
   /// states its own failure and stays silent only when there is genuinely
   /// nothing: an unreadable candidate list is never shown as an empty one.
   @ViewBuilder

@@ -3,7 +3,7 @@ import { Callout } from "@arkdeck/ds";
 export const ToneAxis = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
     <Callout tone="ok">完成:postflight 校验通过,设备回报 build 与镜像期望一致。</Callout>
-    <Callout tone="warn">flashd unknown → 执行分支被阻断(不能刷到一半才发现)。</Callout>
+    <Callout tone="warn">recoveryPath unsatisfied → Runtime 拒绝提交，重新检测设备后再试。</Callout>
     <Callout tone="danger">
       系统拒绝访问 USB 设备节点(permissionDenied);设备本身在线。请在系统设置 →
       隐私与安全性中允许 ArkDeck 访问 USB 配件。
@@ -19,8 +19,8 @@ export const TraceBufferClamp = () => (
 
 export const FlashCriticalSection = () => (
   <Callout tone="danger">
-    正在写入分区 —— <b>临界区不可中断</b>
-    :取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep
+    正在写入镜像 —— <b>当前分区写入不会被强制中断</b>
+    ；停止只作用于后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep
     已由系统保持,但合盖无法被阻止)。
   </Callout>
 );

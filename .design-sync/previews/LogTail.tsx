@@ -23,12 +23,11 @@ export const HilogStream = () => (
 export const JobLogTail = () => (
   <LogTail
     lines={[
-      "→ Preflight",
+      "→ 准备镜像",
       "已获取 CriticalActivityLease(idle sleep 保持)",
-      "→ EnterUpdater",
-      "→ Re-identify",
-      "→ flash boot",
-      "→ flash system",
+      "→ 进入 Loader",
+      "→ 写入镜像",
+      "已确认写入 2 GB / 6.4 GB",
     ]}
   />
 );
@@ -49,13 +48,12 @@ export const CapabilityProbeRaw = () => (
   <LogTail
     maxHeight={180}
     lines={[
-      "$ hdc -t 150100469… shell flashd --help",
-      "/system/bin/sh: flashd: inaccessible or not found",
-      "exit 127",
-      "",
-      '$ hdc -t 150100469… shell "ls /bin/flashd 2>/dev/null; ls /system/bin/flashd 2>/dev/null"',
-      "(空输出)",
-      "exit 0",
+      "operation flash.bootloader-status@1",
+      "target TGT-958780b2ffb7 · expected binding revision 3",
+      "candidateCount 1",
+      "match exactSelectedTarget",
+      "mode hdc-normal · transition loader",
+      "raw serial / USB topology redacted from App projection",
     ]}
   />
 );

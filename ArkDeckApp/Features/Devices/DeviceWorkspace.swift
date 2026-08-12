@@ -46,9 +46,10 @@ final class DeviceListViewModel: ObservableObject {
     if resetDisplayNames {
       displayNamesDefaults.removeObject(forKey: Self.displayNamesDefaultsKey)
     }
-    customDisplayNames = displayNamesDefaults.dictionary(
-      forKey: Self.displayNamesDefaultsKey
-    )?.compactMapValues { $0 as? String } ?? [:]
+    customDisplayNames =
+      displayNamesDefaults.dictionary(
+        forKey: Self.displayNamesDefaultsKey
+      )?.compactMapValues { $0 as? String } ?? [:]
     waitWindow = provider.authorizationWaitWindowSeconds
   }
 
@@ -280,8 +281,8 @@ struct DeviceSidebarRow: View {
 
 /// The detail a device row opens. For an unauthorized device this is the
 /// three-step trust guidance plus the bounded wait; for a ready one, its
-/// adoption facts. It is not a navigation destination — the sidebar's
-/// workflow items stay unselected while a device row is chosen.
+/// adoption facts. It is a detail navigation destination, never an implicit
+/// target scope for the workflow workspaces.
 struct DeviceDetailView: View {
   let candidate: DeviceCandidatePresentation
   let displayName: String
@@ -294,56 +295,76 @@ struct DeviceDetailView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
-        Text(
-          String(
-            format: deviceString("device.detail.title"),
-            displayName)
-        )
-        .font(.title3.weight(.semibold))
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityIdentifier("device.detail.title")
-
-        GroupBox {
-          VStack(alignment: .leading, spacing: 14) {
-            stateBlock
-            if candidate.state == "Unauthorized" {
-              trustSteps
-              authorizationWaitBlock
-            }
-            factsGrid
-            if candidate.observedFacts != nil {
-              // Provenance, not certification: these fields describe what the
-              // last succeeded observation recorded, not the device's state
-              // this second.
-              Text(deviceString("device.fact.observedProvenance"))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            actionRow
-            Text(deviceString("device.detail.recheckNote"))
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
+        ViewThatFits(in: .horizontal) {
+          HStack(alignment: .top, spacing: 24) {
+            statusAndActionsSection
+              .frame(width: 320, alignment: .topLeading)
+            factsSection
+              .frame(width: 520, alignment: .topLeading)
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.top, 4)
-        }
-        .frame(maxWidth: 640, alignment: .leading)
 
-        if !candidate.isAdopted, candidate.isAuthorized {
-          // Adoption is deliberately not an App action: the transport refuses
-          // target.adopt. Say who performs it instead of hiding the step.
-          Text(deviceString("device.detail.adoptViaCLI"))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 640, alignment: .leading)
-            .accessibilityIdentifier("device.detail.adoptViaCLI")
+          VStack(alignment: .leading, spacing: 24) {
+            statusAndActionsSection
+            factsSection
+          }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .frame(maxWidth: 960, alignment: .topLeading)
       .padding(20)
+    }
+    .accessibilityIdentifier("device.detail")
+  }
+
+  private var statusAndActionsSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      deviceSectionHeader(deviceString("device.detail.statusTitle"))
+      stateBlock
+      if candidate.state == "Unauthorized" {
+        trustSteps
+        authorizationWaitBlock
+      }
+      actionRow
+      Text(deviceString("device.detail.recheckNote"))
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      if !candidate.isAdopted, candidate.isAuthorized {
+        // Adoption is deliberately not an App action: the transport refuses
+        // target.adopt. Say who performs it instead of hiding the step.
+        Text(deviceString("device.detail.adoptViaCLI"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("device.detail.adoptViaCLI")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityIdentifier("device.detail.statusSection")
+  }
+
+  private var factsSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      deviceSectionHeader(deviceString("device.detail.factsTitle"))
+      factsGrid
+      if candidate.observedFacts != nil {
+        // Provenance, not certification: these fields describe what the last
+        // succeeded observation recorded, not the device's state this second.
+        Text(deviceString("device.fact.observedProvenance"))
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityIdentifier("device.detail.factsSection")
+  }
+
+  private func deviceSectionHeader(_ title: String) -> some View {
+    VStack(alignment: .leading, spacing: 7) {
+      Text(title)
+        .font(.subheadline.weight(.semibold))
+        .accessibilityAddTraits(.isHeader)
+      Divider()
     }
   }
 

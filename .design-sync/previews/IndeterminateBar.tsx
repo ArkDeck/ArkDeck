@@ -71,47 +71,10 @@ export const JobDrawerCollapsed = () => (
         textOverflow: "ellipsis",
       }}
     >
-      1 个运行中 — Flash · rk3568-5.0-full:flash system(5/9)
+      1 个运行中 — Flash · DAYU200:进入 Loader(2/4)
     </span>
     <span style={{ width: 200, flex: "none" }}>
-      <IndeterminateBar label="Flash · rk3568-5.0-full 运行中" />
+      <IndeterminateBar label="Flash · DAYU200 正在进入 Loader" />
     </span>
-  </div>
-);
-
-export const FlashCriticalSection = () => (
-  <div
-    style={{
-      width: "100%",
-      maxWidth: 460,
-      background: "var(--ad-panel)",
-      border: "1px solid var(--ad-line)",
-      borderRadius: 10,
-      padding: "14px 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-    }}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <Chip tone="warn">运行中</Chip>
-      <span
-        style={{
-          fontFamily: "var(--ad-font-ui)",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "var(--ad-accent)",
-          whiteSpace: "nowrap",
-        }}
-      >
-        flash system
-      </span>
-      <span style={{ flex: 1, minWidth: 60, maxWidth: 240 }}>
-        <IndeterminateBar label="正在写入 system 分区" />
-      </span>
-    </div>
-    <p style={hintStyle}>
-      正在写入分区 —— 临界区不可中断:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线。
-    </p>
   </div>
 );

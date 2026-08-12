@@ -20,9 +20,10 @@ export interface BudgetMetersProps {
 
 /** The stop conditions of a bounded run, shown as spend against a ceiling.
  *
- *  This is the one place the design language allows a determinate bar: a budget
- *  has a real denominator that the host itself owns. Device work does not —
- *  use `IndeterminateBar` there and never fabricate a percentage. */
+ *  Determinate bars require a real denominator. A budget has one by definition;
+ *  Flash may also use one when Runtime confirms written bytes against the
+ *  materialized image/partition total. Other device stages use
+ *  `IndeterminateBar` and never fabricate a percentage. */
 export function BudgetMeters({ budgets, className }: BudgetMetersProps) {
   return (
     <div className={["ad-budget-grid", className].filter(Boolean).join(" ")}>
@@ -49,6 +50,57 @@ export function BudgetMeters({ budgets, className }: BudgetMetersProps) {
   );
 }
 
+export interface DeterminateProgressProps {
+  /** Confirmed numerator reported by Runtime. */
+  value: number;
+  /** Materialized denominator owned by Runtime. Must be greater than zero. */
+  max: number;
+  /** Visible description of what the ratio measures, for example `镜像写入估算`. */
+  label: string;
+  /** Locale-formatted numerator and denominator, for example `已确认写入 2 GB / 6.4 GB`. */
+  valueText: string;
+  className?: string;
+}
+
+/** A determinate progress indicator for a fact-backed ratio.
+ *
+ *  Flash may use this only for Runtime-confirmed written bytes divided by the
+ *  materialized image/partition total. It is not an overall Job percentage:
+ *  preparation, Loader entry, reboot and verification still use stage text or
+ *  `IndeterminateBar`. Reaching 100% therefore means "write complete", never
+ *  "Flash succeeded". */
+export function DeterminateProgress({
+  value,
+  max,
+  label,
+  valueText,
+  className,
+}: DeterminateProgressProps) {
+  const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
+  const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), safeMax) : 0;
+  const percent = Math.round((safeValue / safeMax) * 100);
+  return (
+    <div className={["ad-determinate", className].filter(Boolean).join(" ")}>
+      <div className="ad-determinate__head">
+        <span>{label}</span>
+        <strong>{percent}%</strong>
+      </div>
+      <div
+        className="ad-determinate__track"
+        role="progressbar"
+        aria-label={label}
+        aria-valuenow={safeValue}
+        aria-valuemin={0}
+        aria-valuemax={safeMax}
+        aria-valuetext={`${percent}% · ${valueText}`}
+      >
+        <i style={{ width: `${percent}%` }} />
+      </div>
+      <div className="ad-determinate__value">{valueText}</div>
+    </div>
+  );
+}
+
 export interface StageTrackProps {
   /** The task's declared stages, in order. */
   stages: string[];
@@ -65,7 +117,7 @@ export interface StageTrackProps {
  *  the connection between stages is the point. A task can also go *backwards*
  *  here — returning to `analyzing` after `verifying` fails is a legitimate
  *  transition, and it must not be drawn as a new stage or as progress lost.
- *  Stage, lifecycle and conditions are three orthogonal facts (spec v0.4 §5.9);
+ *  Stage, lifecycle and conditions are three orthogonal facts (spec v0.6 §5.9);
  *  do not collapse them into one indicator. */
 export function StageTrack({ stages, currentIndex, className }: StageTrackProps) {
   return (
