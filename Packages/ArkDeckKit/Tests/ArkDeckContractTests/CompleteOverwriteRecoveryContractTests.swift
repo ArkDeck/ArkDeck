@@ -589,7 +589,9 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let job = try XCTUnwrap(presentation.jobs.only)
     XCTAssertTrue(job.outcomeUnknown)
     XCTAssertEqual(job.supersededByRecoveryEpochID, epochID)
+    XCTAssertTrue(job.hasEstablishedCurrentEpoch)
     XCTAssertFalse(job.needsAttention)
+    XCTAssertFalse(job.requiresRecoveryGuidance)
   }
 
   private func recoveryDraft() -> SupersedingRecoveryEpochDraft {

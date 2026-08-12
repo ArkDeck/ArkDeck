@@ -19,12 +19,14 @@ struct FlashRuntimeActivityView: View {
   /// later success would make the page unsafe on a shared target bench.
   private var focusedJob: RuntimeJobSummaryPresentation? {
     flashJobs.first(where: {
-      $0.outcomeUnknown && !hasEstablishedCurrentEpoch($0)
+      $0.outcomeUnknown && !$0.hasEstablishedCurrentEpoch
     })
-      ?? flashJobs.first(where: \.waitingForHuman)
+      ?? flashJobs.first(where: {
+        $0.waitingForHuman && !$0.hasEstablishedCurrentEpoch
+      })
       ?? flashJobs.first(where: { job in
         guard let state = JobState(rawValue: job.state) else { return false }
-        return !state.isTerminal && !hasEstablishedCurrentEpoch(job)
+        return !state.isTerminal && !job.hasEstablishedCurrentEpoch
       })
       ?? flashJobs.first
   }
@@ -334,7 +336,7 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func resultSymbol(_ job: RuntimeJobSummaryPresentation) -> String {
-    if hasEstablishedCurrentEpoch(job) { return "checkmark.shield.fill" }
+    if job.hasEstablishedCurrentEpoch { return "checkmark.shield.fill" }
     if job.outcomeUnknown { return "questionmark.diamond.fill" }
     guard let state = JobState(rawValue: job.state) else { return "questionmark.circle" }
     switch state {
@@ -350,7 +352,7 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func stateSymbol(_ job: RuntimeJobSummaryPresentation) -> String {
-    if hasEstablishedCurrentEpoch(job) { return "checkmark.shield.fill" }
+    if job.hasEstablishedCurrentEpoch { return "checkmark.shield.fill" }
     if job.outcomeUnknown { return "questionmark.diamond.fill" }
     guard let state = JobState(rawValue: job.state) else { return "questionmark.circle" }
     switch state {
@@ -366,7 +368,7 @@ struct FlashRuntimeActivityView: View {
   }
 
   private func stateColor(_ job: RuntimeJobSummaryPresentation) -> Color {
-    if hasEstablishedCurrentEpoch(job) { return .green }
+    if job.hasEstablishedCurrentEpoch { return .green }
     // Unknown is warn, not danger: red stays reserved for known failure.
     if job.outcomeUnknown { return .orange }
     guard let state = JobState(rawValue: job.state) else { return .secondary }
@@ -381,11 +383,6 @@ struct FlashRuntimeActivityView: View {
       return .blue
     default: return .secondary
     }
-  }
-
-  private func hasEstablishedCurrentEpoch(_ job: RuntimeJobSummaryPresentation) -> Bool {
-    job.supersededByRecoveryEpochID != nil
-      || job.resolvedByTargetAliasResolutionID != nil
   }
 
   private func displaysIndeterminateProgress(_ rawState: String) -> Bool {

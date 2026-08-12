@@ -55,6 +55,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(job?.createdAtUTC, "2026-08-06T07:00:00Z")
     XCTAssertEqual(job?.startedAtUTC, "2026-08-06T07:00:01Z")
     XCTAssertEqual(job?.finishedAtUTC, "2026-08-06T07:00:02Z")
+    XCTAssertEqual(job?.requiresRecoveryGuidance, false)
   }
 
   func testAnOlderJobListDoesNotInventNewHistoryFacts() throws {
@@ -155,7 +156,27 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
 
     XCTAssertEqual(presentation.availability, .available)
     XCTAssertEqual(presentation.jobs.map(\.needsAttention), [true, true, false])
+    XCTAssertEqual(presentation.jobs.map(\.requiresRecoveryGuidance), [true, true, false])
     XCTAssertEqual(presentation.jobs.first?.outstandingResidueCount, 2)
+  }
+
+  func testRecoveryStatesRaiseGuidanceUntilRuntimeEstablishesTheCurrentEpoch() {
+    for state in [
+      "waitingForRecovery", "awaitingRebindConfirmation",
+      "resumeAtConfirmedSafeBoundary", "userAbandonRequested",
+    ] {
+      let job = RuntimeJobSummaryPresentation(
+        id: "job-\(state)", operationReference: "flash.dayu200", targetID: "t-1",
+        state: state, waitingForHuman: false, outcomeUnknown: false,
+        outstandingResidueCount: 0, timeline: [])
+      XCTAssertTrue(job.requiresRecoveryGuidance, state)
+    }
+
+    let running = RuntimeJobSummaryPresentation(
+      id: "job-running", operationReference: "flash.dayu200", targetID: "t-1",
+      state: "running", waitingForHuman: false, outcomeUnknown: false,
+      outstandingResidueCount: 0, timeline: [])
+    XCTAssertFalse(running.requiresRecoveryGuidance)
   }
 
   func testTargetAliasResolutionKeepsUnknownOutcomeButSettlesCurrentEpochAttention() throws {
@@ -173,9 +194,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(
       job.resolvedByTargetAliasResolutionID,
       "target-alias-resolution-0123456789abcdef")
+    XCTAssertTrue(job.hasEstablishedCurrentEpoch)
     XCTAssertFalse(
       job.needsAttention,
       "a later complete Flash established the current epoch without settling the old outcome")
+    XCTAssertFalse(
+      job.requiresRecoveryGuidance,
+      "resolved History stays inspectable without remaining a global operator action")
   }
 
   func testCompleteEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {

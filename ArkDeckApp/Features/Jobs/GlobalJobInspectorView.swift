@@ -340,17 +340,12 @@ struct GlobalJobInspectorView: View {
 
   private func priority(of job: RuntimeJobSummaryPresentation) -> Int {
     if job.needsAttention { return 0 }
-    if job.waitingForHuman { return 1 }
-    if isActive(job) { return 2 }
-    return 3
+    if isActive(job) { return 1 }
+    return 2
   }
 
   private func isActive(_ job: RuntimeJobSummaryPresentation) -> Bool {
-    if job.supersededByRecoveryEpochID != nil
-      || job.resolvedByTargetAliasResolutionID != nil
-    {
-      return false
-    }
+    if job.hasEstablishedCurrentEpoch { return false }
     guard let state = JobState(rawValue: job.state) else { return false }
     return !state.isTerminal
   }
@@ -414,7 +409,7 @@ struct GlobalRecoveryBannerView: View {
 
   private var recoveryJobs: [RuntimeJobSummaryPresentation] {
     presentation.jobs
-      .filter { $0.outcomeUnknown || $0.waitingForHuman || requiresRecoveryGuidance($0) }
+      .filter(\.requiresRecoveryGuidance)
       .sorted { severity($0) < severity($1) }
   }
 
@@ -469,17 +464,6 @@ struct GlobalRecoveryBannerView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobRecovery.banner")
-  }
-
-  private func requiresRecoveryGuidance(_ job: RuntimeJobSummaryPresentation) -> Bool {
-    guard let state = JobState(rawValue: job.state) else { return false }
-    switch state {
-    case .waitingForRecovery, .awaitingRebindConfirmation, .resumeAtConfirmedSafeBoundary,
-      .userAbandonRequested:
-      return true
-    default:
-      return false
-    }
   }
 
   private func recoveryTitle(_ job: RuntimeJobSummaryPresentation) -> String {

@@ -92,4 +92,13 @@ final class JobsLocalizationContractTests: XCTestCase {
     XCTAssertFalse(inspector.contains("flash.dayu200@1"))
     XCTAssertFalse(history.contains("flash.dayu200@1"))
   }
+
+  func testGlobalRecoveryBannerUsesTheFacadeCurrentGuidanceProjection() throws {
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    XCTAssertTrue(source.contains(".filter(\\.requiresRecoveryGuidance)"))
+    XCTAssertFalse(
+      source.contains(
+        ".filter { $0.outcomeUnknown || $0.waitingForHuman || requiresRecoveryGuidance($0) }"))
+  }
 }
