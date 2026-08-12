@@ -46,24 +46,15 @@ struct ArkDeckApp: App {
       )
       .task {
         ApplicationIconChoice.applyStoredSelection()
-        // Start every independent read-only projection together. The Runtime
-        // accepts concurrent clients, HDC supports overlapping read commands,
-        // and duplicate candidate enumeration is coalesced at the bootstrap.
-        // Keeping the device task explicit still makes discovery the first
-        // admitted read; awaiting it only after the burst keeps this scene
-        // task alive without placing an artificial barrier in front of the
-        // workspaces.
+        // Keep cold start to projections that are visible in every shell
+        // state. AppShellView admits the selected workspace separately and
+        // defers every hidden workspace until the user selects it. Starting
+        // all five workspaces here used to duplicate Trace/target reads and
+        // saturate HDC before the Overview could settle.
         async let initialDeviceRefresh: Void = deviceList.refreshForStartup()
-        hdcDiagnostics.refresh()
-        overviewCapabilities.refresh()
-        autoUpdate.startup()
         runtimeHistory.refresh()
-        flashWorkspace.refresh()
-        uiDumpWorkspace.refresh()
-        debugWorkspace.refresh()
-        traceWorkspace.refresh()
-        automationWorkspace.refresh()
         await initialDeviceRefresh
+        autoUpdate.startup()
       }
     }
     .defaultSize(width: 1180, height: 760)
@@ -242,6 +233,13 @@ private struct AppShellView: View {
       if case .device(waitedKey) = ShellSelection(storageValue: newValue) { return }
       deviceList.cancelAuthorizationWait()
     }
+    // A workspace owns fresh facts only while it is visible. The initial
+    // callback admits the restored scene selection; later callbacks refresh
+    // on navigation. This avoids spending cold-start I/O and HDC capacity on
+    // five hidden projections while preserving fresh-on-entry behavior.
+    .onChange(of: storedSelection, initial: true) { _, newValue in
+      refreshVisibleProjection(for: newValue)
+    }
     .alert(
       deviceString("device.rename.title"),
       isPresented: renameDialogIsPresented
@@ -289,6 +287,28 @@ private struct AppShellView: View {
 
   private func openHistory() {
     storedSelection = ShellSelection.navigation(.history).storageValue
+  }
+
+  private func refreshVisibleProjection(for storageValue: String) {
+    switch ShellSelection(storageValue: storageValue) {
+    case .device:
+      break
+    case .navigation(.overview):
+      hdcDiagnostics.refresh()
+      overviewCapabilities.refresh()
+    case .navigation(.history):
+      runtimeHistory.refresh()
+    case .navigation(.flash):
+      flashWorkspace.refresh()
+    case .navigation(.debug):
+      debugWorkspace.refresh()
+    case .navigation(.uiDump):
+      uiDumpWorkspace.refresh()
+    case .navigation(.trace):
+      traceWorkspace.refresh()
+    case .navigation(.automation):
+      automationWorkspace.refresh()
+    }
   }
 
   private var detailTitle: Text {
