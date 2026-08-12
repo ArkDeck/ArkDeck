@@ -149,6 +149,68 @@ final class AppShellUITests: XCTestCase {
     XCTAssertEqual(restoredWaveform.value as? String, "Selected")
   }
 
+  func testDeviceContextMenuRenamesAndRefreshesDeviceState() {
+    try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    let fixtureArguments = [
+      "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+      "--ui-test-device-poll-fast", "--ui-test-fixture-state",
+      fixtureStateFileURL.path,
+    ]
+    let app = launch(arguments: fixtureArguments + ["-AppleLanguages", "(en)"])
+    let adoptedDevice = element("device.row.150100469346864", in: app)
+    let unauthorizedDevice = element("device.row.7f2c091a445e21", in: app)
+    XCTAssertTrue(adoptedDevice.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(unauthorizedDevice.exists)
+
+    adoptedDevice.rightClick()
+    let renameMenuItem = app.menuItems["Rename…"]
+    let recheckMenuItem = app.menuItems["Re-check"]
+    XCTAssertTrue(renameMenuItem.waitForExistenceFast(timeout: 5))
+    XCTAssertTrue(recheckMenuItem.exists)
+    renameMenuItem.click()
+
+    // SwiftUI's native alert preserves the field's visible localized label,
+    // but AppKit does not forward its SwiftUI accessibility identifier.
+    let deviceName = app.textFields.firstMatch
+    XCTAssertTrue(deviceName.waitForExistenceFast(timeout: 5))
+    deviceName.click()
+    deviceName.typeKey("a", modifierFlags: .command)
+    deviceName.typeText("Lab DAYU200")
+    let commitRename = app.buttons["device.rename.commit"]
+    XCTAssertTrue(commitRename.isEnabled)
+    commitRename.click()
+    XCTAssertTrue(
+      displayedText(for: adoptedDevice).contains("Lab DAYU200"),
+      "renaming must update the device's visible label")
+
+    // The custom display name survives an App relaunch while the stable row
+    // identity remains the connect key. Test launches reset aliases by default;
+    // this one deliberately preserves the value written above.
+    app.terminate()
+    let reopened = launch(
+      arguments: fixtureArguments + ["-AppleLanguages", "(zh-Hans)"],
+      resetDeviceNames: false)
+    let persistedDevice = element("device.row.150100469346864", in: reopened)
+    XCTAssertTrue(persistedDevice.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(displayedText(for: persistedDevice).contains("Lab DAYU200"))
+    persistedDevice.rightClick()
+    XCTAssertTrue(reopened.menuItems["重命名…"].waitForExistenceFast(timeout: 5))
+    XCTAssertTrue(reopened.menuItems["重新检测"].exists)
+    reopened.typeKey(.escape, modifierFlags: [])
+
+    let refreshedUnauthorized = element("device.row.7f2c091a445e21", in: reopened)
+    clickCorrectingNavigationSplitAXOffset(refreshedUnauthorized, in: reopened)
+    assertDisplayed(reopened.staticTexts["device.fact.state"], equals: "Unauthorized")
+    writeFixtureState("--ui-test-device-authorized", in: reopened)
+    refreshedUnauthorized.rightClick()
+    let refreshAfterStateChange = reopened.menuItems["重新检测"]
+    XCTAssertTrue(refreshAfterStateChange.waitForExistenceFast(timeout: 5))
+    XCTAssertTrue(refreshAfterStateChange.isEnabled)
+    refreshAfterStateChange.click()
+    assertDisplayed(
+      reopened.staticTexts["device.fact.state"], equals: "Connected", timeout: 10)
+  }
+
   private struct Overview {
     let server: String
     let trust: String
@@ -273,14 +335,13 @@ final class AppShellUITests: XCTestCase {
     // unauthorized row opens its authorization guidance — a detail, not a
     // workspace — and re-checking is an enabled, plain read.
     let unauthorizedDevice = element("device.row.7f2c091a445e21", in: app)
+    let adoptedDevice = element("device.row.150100469346864", in: app)
     XCTAssertTrue(unauthorizedDevice.waitForExistenceFast(timeout: 10), file: file, line: line)
-    XCTAssertTrue(
-      element("device.row.150100469346864", in: app).exists, file: file, line: line)
+    XCTAssertTrue(adoptedDevice.exists, file: file, line: line)
     // The adopted row names what its last observation recorded — firmware and
     // transport — as raw domain strings, identical in every language.
     XCTAssertTrue(
-      displayedText(for: element("device.row.150100469346864", in: app))
-        .contains("OpenHarmony 5.0.0.71"),
+      displayedText(for: adoptedDevice).contains("OpenHarmony 5.0.0.71"),
       "the adopted device row must carry its observed firmware",
       file: file, line: line)
     clickCorrectingNavigationSplitAXOffset(unauthorizedDevice, in: app)
@@ -1067,8 +1128,11 @@ final class AppShellUITests: XCTestCase {
     let windowFrame = window.frame
     let toolbar = app.toolbars.firstMatch
     let contentMinY = toolbar.exists ? toolbar.frame.maxY : windowFrame.minY
-    let overviewCell = app.outlines.cells
-      .containing(.staticText, identifier: "app.navigation.overview").firstMatch
+    // A row with a context menu is exposed as a native menu-bearing element
+    // rather than an AXCell on current macOS. Its stable identifier and frame
+    // are still the correct anchor, so do not depend on the private nesting.
+    let overviewCell = self.element("app.navigation.overview", in: app)
+    XCTAssertTrue(overviewCell.exists)
     let expectedOverviewMidY = contentMinY + 35
     let verticalCorrection = expectedOverviewMidY - overviewCell.frame.midY
     window.coordinate(withNormalizedOffset: .zero)
@@ -1152,13 +1216,14 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
-  private func launch(arguments: [String] = []) -> XCUIApplication {
+  private func launch(
+    arguments: [String] = [], resetDeviceNames: Bool = true
+  ) -> XCUIApplication {
     let app = XCUIApplication()
     if app.state != .notRunning {
       app.terminate()
     }
-    app.launchArguments =
-      [
+    var launchArguments = [
         "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
         "--ui-test-hdc-diagnostics",
         // Without this the App builds the real updater and decides what to
@@ -1166,7 +1231,9 @@ final class AppShellUITests: XCTestCase {
         // free of network effects. A test that wants a different update state
         // passes its own argument; this only makes the default one declared.
         "--ui-test-auto-update-idle",
-      ] + arguments
+      ]
+    if resetDeviceNames { launchArguments.append("--ui-test-reset-device-names") }
+    app.launchArguments = launchArguments + arguments
     app.launchEnvironment["ApplePersistenceIgnoreState"] = "YES"
     app.launchEnvironment["NSQuitAlwaysKeepsWindows"] = "NO"
     app.launch()
