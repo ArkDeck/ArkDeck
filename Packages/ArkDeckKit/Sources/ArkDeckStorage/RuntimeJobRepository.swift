@@ -239,31 +239,59 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     ).first.map(persistedJob)
   }
 
-  public func listJobs(pageSize: Int, cursor: String?) throws -> RuntimeJobRepositoryPage {
+  public func listJobs(
+    pageSize: Int, cursor: String?, newestFirst: Bool = false
+  ) throws -> RuntimeJobRepositoryPage {
     guard (1...1_000).contains(pageSize) else {
       throw RuntimeJobRepositoryError.corrupt("pageSize must be between 1 and 1000")
     }
-    let afterRowID: Int64
+    let cursorRowID: Int64?
     if let cursor {
       guard let parsed = Int64(cursor), parsed >= 0 else {
         throw RuntimeJobRepositoryError.corrupt("malformed Runtime job history cursor")
       }
-      afterRowID = parsed
+      cursorRowID = parsed
     } else {
-      afterRowID = 0
+      cursorRowID = nil
     }
     lock.lock()
     defer { lock.unlock() }
-    let rows = try query(
-      """
-      SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
-             created_at_utc, updated_at_utc, version, initial_record_json
-      FROM runtime_job
-      WHERE rowid > ?
-      ORDER BY rowid
-      LIMIT ?
-      """,
-      [.integer(afterRowID), .integer(Int64(pageSize + 1))])
+    let rows: [Row]
+    if newestFirst {
+      if let cursorRowID {
+        rows = try query(
+          """
+          SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
+                 created_at_utc, updated_at_utc, version, initial_record_json
+          FROM runtime_job
+          WHERE rowid < ?
+          ORDER BY rowid DESC
+          LIMIT ?
+          """,
+          [.integer(cursorRowID), .integer(Int64(pageSize + 1))])
+      } else {
+        rows = try query(
+          """
+          SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
+                 created_at_utc, updated_at_utc, version, initial_record_json
+          FROM runtime_job
+          ORDER BY rowid DESC
+          LIMIT ?
+          """,
+          [.integer(Int64(pageSize + 1))])
+      }
+    } else {
+      rows = try query(
+        """
+        SELECT rowid AS storage_row_id, job_id, idempotency_key, request_hash, state,
+               created_at_utc, updated_at_utc, version, initial_record_json
+        FROM runtime_job
+        WHERE rowid > ?
+        ORDER BY rowid
+        LIMIT ?
+        """,
+        [.integer(cursorRowID ?? 0), .integer(Int64(pageSize + 1))])
+    }
     let pageRows = rows.prefix(pageSize)
     let jobs = try pageRows.map(persistedJob)
     let nextCursor: String?

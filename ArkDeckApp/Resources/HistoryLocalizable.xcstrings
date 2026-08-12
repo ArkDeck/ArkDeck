@@ -1,6 +1,7 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "history.action.loadOlder": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Load older Jobs"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"加载更早的 Job"}}}},
     "history.action.refresh": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Refresh history"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"刷新历史"}}}},
     "history.artifacts.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Artifacts were recorded for this Job."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"此 Job 未记录 Artifact。"}}}},
     "history.artifacts.emptyPlanned": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No captured artifacts: a planned job carries only its plan record, by design."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"无采集产物：planned Job 按设计只含计划记录。"}}}},

@@ -685,8 +685,26 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
     case "job.list":
       do {
+        if request.params?["pageSize"] != nil || request.params?["order"] != nil
+          || request.params?["includeTimeline"] != nil
+          || request.params?["includeCurrent"] != nil
+          || request.params?["cursor"] != nil
+        {
+          let options = try Self.jobListOptions(
+            request.params, acceptsCursor: false, acceptsCurrent: false)
+          let page = try await engine.listJobs(
+            pageSize: options.pageSize, newestFirst: options.newestFirst)
+          return success(
+            id: request.id,
+            result: .array(
+              page.jobs.map {
+                Self.encodeStatus($0, includeTimeline: options.includeTimeline)
+              }))
+        }
         let statuses = try await engine.listJobs()
         return success(id: request.id, result: .array(statuses.map { Self.encodeStatus($0) }))
+      } catch let error as JobListOptionsError {
+        return failure(id: request.id, code: .invalidParams, message: error.description)
       } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
         return failure(
           id: request.id, code: .recordUnreadable,
@@ -696,32 +714,28 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "job.list-page":
-      let pageSize: Int
-      if case .integer(let raw)? = request.params?["pageSize"] {
-        guard let value = Int(exactly: raw), (1...1_000).contains(value) else {
-          return failure(id: request.id, code: .invalidParams, message: "pageSize must be 1...1000")
-        }
-        pageSize = value
-      } else {
-        pageSize = 100
-      }
-      let cursor: String?
-      if let supplied = request.params?["cursor"] {
-        guard case .string(let value) = supplied else {
-          return failure(id: request.id, code: .invalidParams, message: "cursor must be a string")
-        }
-        cursor = value
-      } else {
-        cursor = nil
-      }
       do {
-        let page = try await engine.listJobs(pageSize: pageSize, cursor: cursor)
+        let options = try Self.jobListOptions(
+          request.params, acceptsCursor: true, acceptsCurrent: true)
+        let page = try await engine.listJobs(
+          pageSize: options.pageSize, cursor: options.cursor,
+          newestFirst: options.newestFirst)
+        let current = options.includeCurrent ? try await engine.listCurrentJobs() : []
         return success(
           id: request.id,
           result: .object([
-            "jobs": .array(page.jobs.map { Self.encodeStatus($0) }),
+            "jobs": .array(
+              page.jobs.map {
+                Self.encodeStatus($0, includeTimeline: options.includeTimeline)
+              }),
+            "currentJobs": .array(
+              current.map {
+                Self.encodeStatus($0, includeTimeline: options.includeTimeline)
+              }),
             "nextCursor": page.nextCursor.map(JSONValue.string) ?? .null,
           ]))
+      } catch let error as JobListOptionsError {
+        return failure(id: request.id, code: .invalidParams, message: error.description)
       } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
         return failure(
           id: request.id, code: .recordUnreadable,
@@ -1622,9 +1636,81 @@ public struct RuntimeControlPlaneHandler: Sendable {
     return try JSONDecoder().decode(JSONValue.self, from: encoder.encode(value))
   }
 
+  private struct JobListOptions {
+    let pageSize: Int
+    let cursor: String?
+    let newestFirst: Bool
+    let includeTimeline: Bool
+    let includeCurrent: Bool
+  }
+
+  private struct JobListOptionsError: Error, CustomStringConvertible {
+    let description: String
+  }
+
+  private static func jobListOptions(
+    _ params: [String: JSONValue]?, acceptsCursor: Bool, acceptsCurrent: Bool
+  ) throws -> JobListOptions {
+    let pageSize: Int
+    if let supplied = params?["pageSize"] {
+      guard case .integer(let raw) = supplied else {
+        throw JobListOptionsError(description: "pageSize must be 1...1000")
+      }
+      guard let value = Int(exactly: raw), (1...1_000).contains(value) else {
+        throw JobListOptionsError(description: "pageSize must be 1...1000")
+      }
+      pageSize = value
+    } else {
+      pageSize = 100
+    }
+    let cursor: String?
+    if let supplied = params?["cursor"] {
+      guard acceptsCursor, case .string(let value) = supplied else {
+        throw JobListOptionsError(description: "cursor must be a string")
+      }
+      cursor = value
+    } else {
+      cursor = nil
+    }
+    let newestFirst: Bool
+    if let supplied = params?["order"] {
+      guard case .string(let value) = supplied,
+        value == "oldestFirst" || value == "newestFirst"
+      else {
+        throw JobListOptionsError(description: "order must be oldestFirst or newestFirst")
+      }
+      newestFirst = value == "newestFirst"
+    } else {
+      newestFirst = false
+    }
+    let includeTimeline: Bool
+    if let supplied = params?["includeTimeline"] {
+      guard case .bool(let value) = supplied else {
+        throw JobListOptionsError(description: "includeTimeline must be a boolean")
+      }
+      includeTimeline = value
+    } else {
+      includeTimeline = true
+    }
+    let includeCurrent: Bool
+    if let supplied = params?["includeCurrent"] {
+      guard acceptsCurrent, case .bool(let value) = supplied else {
+        throw JobListOptionsError(
+          description: "includeCurrent must be a boolean on job.list-page")
+      }
+      includeCurrent = value
+    } else {
+      includeCurrent = false
+    }
+    return JobListOptions(
+      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst,
+      includeTimeline: includeTimeline, includeCurrent: includeCurrent)
+  }
+
   private static func encodeStatus(
     _ status: RuntimeJobStatus,
-    stateOverride: String? = nil
+    stateOverride: String? = nil,
+    includeTimeline: Bool = true
   ) -> JSONValue {
     .object([
       "jobId": .string(status.jobID),
@@ -1634,7 +1720,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "waitingForHuman": .bool(status.waitingForHuman),
       "outcomeUnknown": .bool(status.outcomeUnknown),
       "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
-      "timeline": .array(status.timeline.map(JSONValue.string)),
+      "timeline": includeTimeline ? .array(status.timeline.map(JSONValue.string)) : .null,
       "executionMode": status.executionMode.map(JSONValue.string) ?? .null,
       "sessionId": status.sessionID.map(JSONValue.string) ?? .null,
       "actualEffect": status.actualEffect.map(JSONValue.string) ?? .null,

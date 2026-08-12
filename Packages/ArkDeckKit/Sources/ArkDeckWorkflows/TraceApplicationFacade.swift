@@ -274,7 +274,8 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
   func refreshWorkspace(targetID: String?) async -> TraceWorkspacePresentation {
     async let operations = TraceXPCReadTransport.request(method: "operation.list")
     async let targets = TraceXPCReadTransport.request(method: "target.list")
-    async let jobs = TraceXPCReadTransport.request(method: "job.list")
+    async let jobs = TraceXPCReadTransport.request(
+      method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
     let base = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
