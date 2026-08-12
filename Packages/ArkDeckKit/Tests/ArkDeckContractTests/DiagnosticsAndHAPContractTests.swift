@@ -143,6 +143,50 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     }
   }
 
+  /// A re-entrant fake HDC runner. Sleeping after admission leaves the actor
+  /// available to record another call, so `maximumActiveCount` proves whether
+  /// the production probe submitted independent reads concurrently without
+  /// relying on wall-clock assertions.
+  private actor ConcurrentReadRunner: RockchipRuntimeCommandRunning {
+    private var activeCount = 0
+    private var maximumActiveCount = 0
+    private var seenArguments: [[String]] = []
+
+    func run(
+      executable _: ResolvedExecutable,
+      arguments: [String],
+      timeoutSeconds _: Int?,
+      outputByteBudget _: Int,
+      criticalNonInterruptible _: Bool
+    ) async throws -> ProviderSubprocessReceipt {
+      activeCount += 1
+      maximumActiveCount = max(maximumActiveCount, activeCount)
+      seenArguments.append(arguments)
+      try await Task.sleep(for: .milliseconds(40))
+      activeCount -= 1
+
+      let command = Array(arguments.dropFirst(2))
+      let stdout: String
+      if command.count == 4, Array(command.prefix(3)) == ["shell", "param", "get"] {
+        stdout = "Get parameter \"\(command[3])\" fail! errNum is:106!\n"
+      } else if command == ["shell", "bm", "dump", "-a"] {
+        stdout = "com.example.alpha\ncom.example.beta\n"
+      } else if command == ["fport", "ls"] {
+        stdout = "tcp:9000 tcp:9001\n"
+      } else if command == ["rport", "ls"] {
+        stdout = "tcp:9100 tcp:9101\n"
+      } else {
+        stdout = "[Fail] fixture remains unsupported\n"
+      }
+      return ProviderSubprocessReceipt(
+        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.04)
+    }
+
+    func maximumConcurrency() -> Int { maximumActiveCount }
+    func arguments() -> [[String]] { seenArguments }
+  }
+
   private func makeTraceProbe(
     runner: any RockchipRuntimeCommandRunning
   ) throws -> (probe: FoundationTraceRuntimeProbe, targetID: String) {
@@ -303,6 +347,56 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(snapshot.parameters.map(\.name), TraceDebugParameterCatalog.definitions.map(\.name))
     XCTAssertTrue(snapshot.parameters.allSatisfy { $0.state == .missing })
     XCTAssertTrue(snapshot.parameters.allSatisfy { $0.value == nil && $0.detail == nil })
+  }
+
+  func testTraceProbeOverlapsIndependentReadsAndPreservesCatalogOrder() async throws {
+    let runner = ConcurrentReadRunner()
+    let fixture = try makeTraceProbe(runner: runner)
+
+    let snapshot = try await fixture.probe.probeTraceRuntime(targetID: fixture.targetID)
+    let maximumConcurrency = await runner.maximumConcurrency()
+    let callCount = await runner.arguments().count
+
+    XCTAssertGreaterThan(
+      maximumConcurrency, 1,
+      "independent read-only HDC probes must overlap instead of forming a serial chain")
+    XCTAssertEqual(
+      snapshot.tools.map(\.tool),
+      [TraceProbeTool.hitrace.rawValue, TraceProbeTool.bytrace.rawValue])
+    XCTAssertEqual(
+      snapshot.parameters.map(\.name), TraceDebugParameterCatalog.definitions.map(\.name),
+      "concurrent completion must not reorder the catalog projection")
+    XCTAssertTrue(snapshot.parameters.allSatisfy { $0.state == .missing })
+    XCTAssertEqual(
+      callCount,
+      2 + TraceDebugParameterCatalog.definitions.count)
+  }
+
+  func testDebugProbeOverlapsIndependentReadsAndPreservesPresentationOrder() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appendingPathComponent("debug-concurrency", isDirectory: true))
+    let adopted = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
+      nowUTC: "2026-08-12T00:00:00Z"
+    ).record
+    let runner = ConcurrentReadRunner()
+    let probe = FoundationDebugRuntimeProbe(
+      targetStore: targetStore,
+      hdcResolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc"),
+      runner: runner)
+
+    let snapshot = try await probe.probeDebugRuntime(targetID: adopted.targetID)
+    let maximumConcurrency = await runner.maximumConcurrency()
+    let callCount = await runner.arguments().count
+
+    XCTAssertEqual(
+      maximumConcurrency, 3,
+      "package, forward and reverse inventories must run concurrently")
+    XCTAssertEqual(snapshot.packages, ["com.example.alpha", "com.example.beta"])
+    XCTAssertEqual(snapshot.portRules.map(\.direction), [.forward, .reverse])
+    XCTAssertEqual(snapshot.warnings, [])
+    XCTAssertEqual(callCount, 3)
   }
 
   func testTraceProbeKeepsNonExactMissingParameterFailuresUnreadable() async throws {

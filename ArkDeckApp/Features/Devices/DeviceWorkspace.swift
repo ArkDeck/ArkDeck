@@ -59,9 +59,9 @@ final class DeviceListViewModel: ObservableObject {
     }
   }
 
-  /// The App's startup task awaits this read before it launches unrelated
-  /// workspace probes. Manual refresh keeps the fire-and-forget UI action
-  /// above; both paths share the same synchronous admission guard.
+  /// The App's startup task awaits this read after it launches unrelated
+  /// workspace probes concurrently. Manual refresh keeps the fire-and-forget
+  /// UI action above; both paths share the same synchronous admission guard.
   func refreshForStartup() async {
     guard let generation = beginRefresh() else { return }
     await finishRefresh(generation: generation)

@@ -105,6 +105,16 @@ public protocol DebugRuntimeProbing: Sendable {
 }
 
 package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
+  private struct PackageObservation: Sendable {
+    let packages: [String]
+    let warnings: [String]
+  }
+
+  private struct PortObservation: Sendable {
+    let rules: [DebugRuntimePortRule]
+    let warnings: [String]
+  }
+
   private let targetStore: RuntimeTargetStore
   private let hdcResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
@@ -135,49 +145,66 @@ package struct FoundationDebugRuntimeProbe: DebugRuntimeProbing {
   ) async throws -> DebugRuntimeProbeSnapshot {
     let route = try requireRoute(targetID)
     let hdc = try hdcResolver.resolveExecutable(providerID: "hdc")
-    var packages: [String] = []
-    var portRules: [DebugRuntimePortRule] = []
-    var warnings: [String] = []
-
-    do {
-      let receipt = try await run(
-        hdc, route: route, command: ["shell", "bm", "dump", "-a"],
-        byteBudget: 2 * 1024 * 1024)
-      if receipt.exitStatus == 0, !receipt.stdoutTruncated {
-        packages = Self.packageNames(receipt.stdout)
-        if packages.isEmpty, !receipt.stdout.isEmpty {
-          warnings.append("packageInventoryUnparseable")
-        }
-      } else {
-        warnings.append("packageInventoryUnavailable")
-      }
-    } catch {
-      warnings.append("packageInventoryUnavailable")
-    }
-
-    for (direction, verb) in [
-      (DebugRuntimePortDirection.forward, "fport"),
-      (DebugRuntimePortDirection.reverse, "rport"),
-    ] {
-      do {
-        let receipt = try await run(
-          hdc, route: route, command: [verb, "ls"], byteBudget: 128 * 1024)
-        if receipt.exitStatus == 0, !receipt.stdoutTruncated {
-          portRules += Self.portRules(receipt.stdout, direction: direction)
-        } else {
-          warnings.append("\(direction.rawValue)RulesUnavailable")
-        }
-      } catch {
-        warnings.append("\(direction.rawValue)RulesUnavailable")
-      }
-    }
+    // Package and port inventories are independent, target-bound read-only
+    // commands. Preserve their presentation order while allowing HDC to run
+    // all three clients concurrently.
+    async let packageObservation = probePackages(hdc, route: route)
+    async let forwardObservation = probePortRules(
+      hdc, route: route, direction: .forward, verb: "fport")
+    async let reverseObservation = probePortRules(
+      hdc, route: route, direction: .reverse, verb: "rport")
+    let (package, forward, reverse) = await (
+      packageObservation, forwardObservation, reverseObservation
+    )
 
     return DebugRuntimeProbeSnapshot(
       targetID: route.targetID,
       bindingRevision: route.bindingRevision,
-      packages: packages.sorted(),
-      portRules: portRules,
-      warnings: warnings)
+      packages: package.packages.sorted(),
+      portRules: forward.rules + reverse.rules,
+      warnings: package.warnings + forward.warnings + reverse.warnings)
+  }
+
+  private func probePackages(
+    _ executable: ResolvedExecutable,
+    route: RuntimeTargetHDCRoute
+  ) async -> PackageObservation {
+    do {
+      let receipt = try await run(
+        executable, route: route, command: ["shell", "bm", "dump", "-a"],
+        byteBudget: 2 * 1024 * 1024)
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated else {
+        return PackageObservation(packages: [], warnings: ["packageInventoryUnavailable"])
+      }
+      let packages = Self.packageNames(receipt.stdout)
+      let warnings =
+        packages.isEmpty && !receipt.stdout.isEmpty
+        ? ["packageInventoryUnparseable"] : []
+      return PackageObservation(packages: packages, warnings: warnings)
+    } catch {
+      return PackageObservation(packages: [], warnings: ["packageInventoryUnavailable"])
+    }
+  }
+
+  private func probePortRules(
+    _ executable: ResolvedExecutable,
+    route: RuntimeTargetHDCRoute,
+    direction: DebugRuntimePortDirection,
+    verb: String
+  ) async -> PortObservation {
+    do {
+      let receipt = try await run(
+        executable, route: route, command: [verb, "ls"], byteBudget: 128 * 1024)
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated else {
+        return PortObservation(
+          rules: [], warnings: ["\(direction.rawValue)RulesUnavailable"])
+      }
+      return PortObservation(
+        rules: Self.portRules(receipt.stdout, direction: direction), warnings: [])
+    } catch {
+      return PortObservation(
+        rules: [], warnings: ["\(direction.rawValue)RulesUnavailable"])
+    }
   }
 
   package func runDebugTemplate(
