@@ -27,7 +27,7 @@ export const DebugCommands = () => (
   <Tabs label="Debug 工作台" tabs={DEBUG_TABS} value="cmd" />
 );
 
-/** 切 tab 只换视图 —— 目标设备与执行模式都不随之改变。 */
+/** 切 tab 只换视图 —— 每个工作区自己的显式目标不随之改变。 */
 export const TabBarInPanel = () => (
   <div
     style={{
@@ -49,7 +49,7 @@ export const TabBarInPanel = () => (
         color: "var(--ad-ink-2)",
       }}
     >
-      tcp:9222 → tcp:9222 · rk3568-dev
+      tcp:9222 → tcp:9222 · DAYU200
     </span>
   </div>
 );

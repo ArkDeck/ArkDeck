@@ -28,7 +28,7 @@ function srcFiles(dir) {
 // Bump ONLY after re-reading the docs and confirming this package still
 // expresses them. This is the deliberate acknowledgement step: a docs version
 // bump is exactly the event that silently invalidated the library once.
-const ALIGNED_VERSION = "v0.4";
+const ALIGNED_VERSION = "v0.6";
 
 const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const designDir = join(pkgRoot, "..");
@@ -300,6 +300,7 @@ for (const name of dsLight.keys()) {
     tabs: "Tabs",
     window: "WindowFrame", titlebar: "WindowFrame", lights: "WindowFrame",
     "budget-grid": "BudgetMeters", metric: "BudgetMeters", meter: "BudgetMeters",
+    "flash-progress-track": "DeterminateProgress",
     "op-list": "OperationList",
     "stage-line": "StageTrack", "stage-node": "StageTrack",
     "summary-strip": "StatusStrip", "summary-cell": "StatusStrip",
@@ -316,6 +317,30 @@ for (const name of dsLight.keys()) {
     acin: "AC-annotation overlay", acmode: "AC-annotation overlay",
     main: "page scaffolding", content: "page scaffolding", page: "page scaffolding",
     sidebar: "page scaffolding", two: "layout grid", grid2: "layout grid",
+    "device-layout": "responsive device-detail layout grid",
+    "device-section": "device-detail section grouping",
+    "device-actions": "device-detail action row",
+    "context-menu": "HTML approximation of a native macOS context menu",
+    "flash-shell": "Flash page layout",
+    "flash-lead": "Flash page heading group",
+    "flash-target": "Flash page target summary",
+    "flash-target-main": "Flash target text layout",
+    "flash-image": "Flash image selection layout",
+    "flash-file-icon": "prototype file icon frame",
+    "flash-image-copy": "Flash image text layout",
+    "flash-actions": "Flash primary action row",
+    "flash-impact": "Flash userdata impact copy",
+    "flash-progress-card": "Flash running-state layout",
+    "flash-progress-head": "Flash progress heading layout",
+    "flash-percent": "Flash byte-derived progress value",
+    "flash-progress-meta": "Flash progress metadata row",
+    "flash-stages": "Flash coarse stage layout",
+    "flash-stage": "Flash coarse stage item",
+    "flash-result": "Flash terminal result layout",
+    "flash-result-icon": "Flash terminal result symbol frame",
+    "flash-result-copy": "Flash terminal result text layout",
+    "flash-details": "native disclosure for secondary Flash facts",
+    "flash-detail-grid": "Flash fact layout inside disclosure",
     sec: "sidebar section heading",
     hint: "text utility", note: "text utility", empty: "empty-state text utility",
     mono: "type utility", livetag: "inline marker in a History row",

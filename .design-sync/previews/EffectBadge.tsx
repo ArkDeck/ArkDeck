@@ -1,13 +1,6 @@
-import { Card, Chip, DataTable, EffectBadge } from "@arkdeck/ds";
+import { Card, DataTable, EffectBadge } from "@arkdeck/ds";
 
 const hint = { margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--ad-ink-2)" };
-
-const planColumns = [
-  { key: "n", header: "#", mono: true },
-  { key: "step", header: "step", mono: true },
-  { key: "args", header: "参数摘要", mono: true },
-  { key: "effect", header: "effect" },
-];
 
 export const EffectClassAxis = () => (
   <Card title="effect 分级 — blast radius 自左向右递增">
@@ -18,130 +11,51 @@ export const EffectClassAxis = () => (
       <EffectBadge effect="destructive" />
     </div>
     <p style={hint}>
-      hostOnly 不接触设备;readOnly 只读设备状态;deviceMutation 改变可恢复状态;destructive
-      覆写分区。形状 + 文字承载语义,不只靠颜色(AC-UX-005-01)。
+      hostOnly 不接触设备；readOnly 只读设备状态；deviceMutation 改变可恢复状态；destructive
+      覆写分区。形状、符号和文字共同承载语义，不只靠颜色。
     </p>
   </Card>
 );
 
-export const FlashPlanEffectColumn = () => (
-  <Card title="Exact Plan — rk3568-5.0-full · Execute">
+/** v0.6 Flash details: collapse 14 exact steps into four readable stages. */
+export const FlashDetailsEffectSummary = () => (
+  <Card title="刷机详情 · exact plan 摘要">
     <DataTable
-      columns={planColumns}
-      rows={[
-        {
-          id: "1",
-          cells: {
-            n: "1",
-            step: "enterUpdater",
-            args: "—",
-            effect: <EffectBadge effect="deviceMutation" />,
-          },
-        },
-        {
-          id: "2",
-          cells: {
-            n: "2",
-            step: "flashPartition",
-            args: "boot · boot.img · 64MB",
-            effect: <EffectBadge effect="destructive" />,
-          },
-        },
-        {
-          id: "3",
-          cells: {
-            n: "3",
-            step: "flashPartition",
-            args: "system · system.img · 2.1GB",
-            effect: <EffectBadge effect="destructive" />,
-          },
-        },
-        {
-          id: "4",
-          cells: {
-            n: "4",
-            step: "reboot + waitReconnect",
-            args: "binding revision + 强证据",
-            effect: <EffectBadge effect="deviceMutation" />,
-          },
-        },
-        {
-          id: "5",
-          cells: {
-            n: "5",
-            step: "postflight verify",
-            args: "版本/设备校验",
-            effect: <EffectBadge effect="readOnly" />,
-          },
-        },
+      columns={[
+        { key: "stage", header: "计划阶段" },
+        { key: "count", header: "步骤数", mono: true },
+        { key: "effect", header: "最高 effect" },
       ]}
-    />
-    <p style={hint}>整份计划在执行前已逐步分级,读者一眼看到 2 个 destructive 步骤。</p>
-  </Card>
-);
-
-export const PlanOnlyLedger = () => (
-  <Card
-    title="Exact Plan — Plan only"
-    action={<Chip tone="planned">◇ PLANNED — 不派发 deviceMutation/destructive</Chip>}
-  >
-    <DataTable
-      columns={[...planColumns, { key: "status", header: "status" }]}
       rows={[
         {
-          id: "1",
+          id: "prepare",
+          cells: { stage: "准备与校验", count: "3", effect: <EffectBadge effect="hostOnly" /> },
+        },
+        {
+          id: "loader",
           cells: {
-            n: "1",
-            step: "enterUpdater",
-            args: "—",
+            stage: "进入 Loader 与身份绑定",
+            count: "4",
             effect: <EffectBadge effect="deviceMutation" />,
-            status: <Chip tone="planned">notExecuted(planned)</Chip>,
           },
         },
         {
-          id: "2",
-          cells: {
-            n: "2",
-            step: "flashPartition",
-            args: "boot · c9d2…41aa",
-            effect: <EffectBadge effect="destructive" />,
-            status: <Chip tone="planned">notExecuted(planned)</Chip>,
-          },
+          id: "write",
+          cells: { stage: "写入分区", count: "1", effect: <EffectBadge effect="destructive" /> },
         },
         {
-          id: "3",
+          id: "verify",
           cells: {
-            n: "3",
-            step: "flashPartition",
-            args: "system · 8b07…9e35",
-            effect: <EffectBadge effect="destructive" />,
-            status: <Chip tone="planned">notExecuted(planned)</Chip>,
-          },
-        },
-        {
-          id: "4",
-          cells: {
-            n: "4",
-            step: "reboot + waitReconnect",
-            args: "binding revision + 强证据",
-            effect: <EffectBadge effect="deviceMutation" />,
-            status: <Chip tone="planned">notExecuted(planned)</Chip>,
-          },
-        },
-        {
-          id: "5",
-          cells: {
-            n: "5",
-            step: "postflightVerify",
-            args: "版本/设备校验",
+            stage: "回读、重启与验证",
+            count: "6",
             effect: <EffectBadge effect="readOnly" />,
-            status: <Chip tone="planned">notExecuted(planned)</Chip>,
           },
         },
       ]}
     />
     <p style={hint}>
-      完整计划含 2 个 destructive 步骤,全部 notExecuted(planned);mutation dispatch = 0。
+      正常页面默认折叠此表；开发者需要排障时再展开。Flash 主界面不显示 plan-only 或 simulated
+      模式切换。
     </p>
   </Card>
 );

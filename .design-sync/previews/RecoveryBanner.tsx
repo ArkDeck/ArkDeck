@@ -23,7 +23,7 @@ const FLASH_DETAIL = (
 /** 归档被拒时不传 onArchive:按钮本来就 disabled,再挂回调只会骗到读代码的人。 */
 const flashUnknown = (archiveBlockedReason?: string): RecoveryItem => ({
   kind: "outcomeUnknown",
-  title: "Flash · rk3568-dev · system 分区",
+  title: "Flash · DAYU200 · system 分区",
   detail: FLASH_DETAIL,
   onGuide: () => {},
   onArchive: archiveBlockedReason ? undefined : () => {},
@@ -33,14 +33,14 @@ const flashUnknown = (archiveBlockedReason?: string): RecoveryItem => ({
 /** 原型第二项。剩余时间从正文里挪进 remaining —— DS 把它渲染成右侧 chip。 */
 const TRACE_WAITING: RecoveryItem = {
   kind: "waiting",
-  title: "Trace · rk3568-dev",
+  title: "Trace · DAYU200",
   detail: "等待设备重启回连。回连后自动继续参数恢复。",
   remaining: "04:12",
 };
 
 const DUMP_RESUME: RecoveryItem = {
   kind: "resumeSafe",
-  title: "UI Dump · elementTree · w12 · rk3568-dev",
+  title: "UI Dump · elementTree · w12 · DAYU200",
   detail:
     "上次会话停在 RestoreParam 之前退出:参数快照完整,persist.ace.debug.enabled 仍停在临时开启值。Provider 声明该步骤 restartSafe,可原地重放。",
   resumeLabel: "从 RestoreParam 继续",

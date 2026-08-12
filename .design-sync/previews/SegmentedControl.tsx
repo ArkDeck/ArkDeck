@@ -1,24 +1,15 @@
 import { SegmentedControl } from "@arkdeck/ds";
 
-const EXECUTION_MODES = [
-  { value: "execute", label: "Execute" },
-  { value: "planOnly", label: "Plan only" },
-  { value: "simulated", label: "Simulated" },
-];
-
-/** Flash page default: dispatch is live, no execution-mode badge follows the job. */
-export const ExecutionModeExecute = () => (
-  <SegmentedControl label="执行模式" options={EXECUTION_MODES} value="execute" />
-);
-
-/** Plan only — the plan is produced in full, deviceMutation/destructive steps are never dispatched. */
-export const ExecutionModePlanOnly = () => (
-  <SegmentedControl label="执行模式" options={EXECUTION_MODES} value="planOnly" />
-);
-
-/** Simulated — runs against fixture-a3, touches no real device. */
-export const ExecutionModeSimulated = () => (
-  <SegmentedControl label="执行模式" options={EXECUTION_MODES} value="simulated" />
+/** v0.6: execution modes are not a Flash-page control. Segments remain for real view choices. */
+export const TracePresetSource = () => (
+  <SegmentedControl
+    label="Trace 配置来源"
+    options={[
+      { value: "preset", label: "Preset" },
+      { value: "custom", label: "Custom" },
+    ]}
+    value="preset"
+  />
 );
 
 /** Inline `sm` form: the Debug logs level floor, sitting in a card heading row. */

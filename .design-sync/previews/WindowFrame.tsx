@@ -3,8 +3,7 @@ import {
   Callout,
   Card,
   Chip,
-  DataTable,
-  EffectBadge,
+  DeterminateProgress,
   KeyValueList,
   WindowFrame,
 } from "@arkdeck/ds";
@@ -37,7 +36,7 @@ export const OverviewWindow = () => (
         <KeyValueList
           items={[
             {
-              term: "rk3568-dev",
+              term: "DAYU200",
               description: (
                 <>
                   USB · <Chip tone="ok">已授权</Chip> <Chip tone="warn">加密未验证</Chip>
@@ -55,76 +54,56 @@ export const OverviewWindow = () => (
   </div>
 );
 
-export const FlashPlanWindow = () => (
+export const FlashWorkspaceWriting = () => (
   <div style={{ width: 820 }}>
-    <WindowFrame title={TITLE} toolbar={AC}>
-      <Card title="Exact Plan · rk3568-5.0-full" action={<Button>查看 plan artifact</Button>}>
-        <DataTable
-          columns={[
-            { key: "n", header: "#", mono: true },
-            { key: "step", header: "step", mono: true },
-            { key: "args", header: "参数摘要", mono: true },
-            { key: "effect", header: "effect" },
-          ]}
-          rows={[
-            {
-              id: "1",
-              cells: {
-                n: "1",
-                step: "enterUpdater",
-                args: "—",
-                effect: <EffectBadge effect="deviceMutation" />,
-              },
-            },
-            {
-              id: "2",
-              cells: {
-                n: "2",
-                step: "flashPartition",
-                args: "boot · boot.img · 64MB",
-                effect: <EffectBadge effect="destructive" />,
-              },
-            },
-            {
-              id: "3",
-              cells: {
-                n: "3",
-                step: "flashPartition",
-                args: "system · system.img · 2.1GB",
-                effect: <EffectBadge effect="destructive" />,
-              },
-            },
-            {
-              id: "4",
-              cells: {
-                n: "4",
-                step: "reboot + waitReconnect",
-                args: "binding revision + 强证据",
-                effect: <EffectBadge effect="deviceMutation" />,
-              },
-            },
-            {
-              id: "5",
-              cells: {
-                n: "5",
-                step: "postflight verify",
-                args: "版本/设备校验",
-                effect: <EffectBadge effect="readOnly" />,
-              },
-            },
-          ]}
+    <WindowFrame title="ArkDeck — 刷机" toolbar={AC}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: 20 }}>刷机</h1>
+        <p style={{ margin: "4px 0 0", color: "var(--ad-ink-2)", fontSize: 13 }}>
+          选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。
+        </p>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          border: "1px solid var(--ad-line)",
+          borderRadius: 8,
+        }}
+      >
+        <b>DAYU200</b>
+        <span style={{ flex: 1, color: "var(--ad-ink-2)", fontSize: 12 }}>
+          USB · OpenHarmony 5.0.0.71
+        </span>
+        <Chip tone="ok">✓ 设备已就绪</Chip>
+        <span style={{ color: "var(--ad-ink-2)", fontSize: 12 }}>4 项安全检查通过</span>
+      </div>
+      <Card title="正在写入镜像">
+        <p style={{ margin: 0, color: "var(--ad-ink-2)", fontSize: 12 }}>
+          刷机过程中请勿拔线、断电或合盖。当前分区写入不会被强制中断。
+        </p>
+        <DeterminateProgress
+          label="镜像写入估算"
+          value={2_000_000_000}
+          max={6_400_000_000}
+          valueText="已确认写入 2 GB / 6.4 GB"
         />
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <Button
-            variant="danger"
-            disabled
-            title="required prerequisite flashd 为 unknown,临界步骤前阻断"
-          >
-            刷写 rk3568-dev(2 个分区)…
-          </Button>
-          <Chip tone="warn">flashd unknown → 执行分支被阻断</Chip>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+          <span style={{ color: "var(--ad-ok)" }}>● 准备</span>
+          <b style={{ color: "var(--ad-accent)" }}>● 写入镜像</b>
+          <span style={{ color: "var(--ad-ink-2)" }}>○ 重启与验证</span>
         </div>
       </Card>
+      <div style={{ color: "var(--ad-ink-2)", fontSize: 12 }}>
+        <b style={{ color: "var(--ad-ink)" }}>dayu200-openharmony-5.0.0.71.imgpkg</b> · 6.4 GB
+      </div>
+      <details style={{ borderTop: "1px solid var(--ad-line)", paddingTop: 10 }}>
+        <summary style={{ cursor: "pointer", color: "var(--ad-ink-2)", fontSize: 12 }}>
+          查看刷机详情
+        </summary>
+      </details>
     </WindowFrame>
   </div>
 );

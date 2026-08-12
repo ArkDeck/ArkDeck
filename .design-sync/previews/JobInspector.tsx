@@ -39,15 +39,10 @@ const Dock = ({ above, children }: { above?: ReactNode; children: ReactNode }) =
 );
 
 const FLASH_PHASES = [
-  "Preflight",
-  "EnterUpdater",
-  "Re-identify",
-  "flash boot",
-  "flash system",
-  "Verify",
-  "Reboot",
-  "Postflight",
-  "Complete",
+  "准备镜像",
+  "进入 Loader",
+  "写入镜像",
+  "重启并验证",
 ];
 
 const SIM_PHASES = [
@@ -63,21 +58,21 @@ const SIM_PHASES = [
 
 const flashRunning = (over: Partial<Job> = {}): Job => ({
   id: "J4",
-  title: "Flash · rk3568-5.0-full · rk3568-dev",
+  title: "Flash · dayu200-openharmony-5.0.0.71.imgpkg · DAYU200",
   state: "running",
   mode: "execute",
   risk: 3,
   phases: FLASH_PHASES,
-  currentIndex: 4,
+  currentIndex: 2,
   cancelLabel: "取消(在安全边界)",
-  log: ["已获取 CriticalActivityLease(idle sleep 保持)", "→ flash boot", "→ flash system"],
+  log: ["已获取 CriticalActivityLease(idle sleep 保持)", "→ 进入 Loader", "→ 写入镜像"],
   onCancel: () => {},
   ...over,
 });
 
 const DUMP_DONE: Job = {
   id: "J3",
-  title: "UI Dump · elementTree · w12 · rk3568-dev",
+  title: "UI Dump · elementTree · w12 · DAYU200",
   state: "succeeded",
   mode: "execute",
   risk: 2,
@@ -88,13 +83,13 @@ const DUMP_DONE: Job = {
 
 const PLAN_ONLY: Job = {
   id: "J1",
-  title: "Flash(plan-only)· rk3568-5.0-full",
+  title: "Flash(plan-only)· dayu200-openharmony-5.0.0.71.imgpkg",
   state: "planned",
   mode: "planOnly",
   risk: 1,
   phases: ["Preflight", "Validate", "makePlan", "Persist plan"],
   currentIndex: 4,
-  log: ["完整计划含 2 个 destructive 步骤,全部 notExecuted(planned);mutation dispatch = 0。"],
+  log: ["完整计划含 1 个 destructive 写入阶段,全部 notExecuted(planned);mutation dispatch = 0。"],
 };
 
 const SIM_DONE: Job = {
@@ -131,9 +126,9 @@ export const CollapsedFlashRunning = () => (
   <div style={col}>
     <Dock
       above={
-        <Card title="Flash · rk3568-5.0-full">
+        <Card title="Flash · dayu200-openharmony-5.0.0.71.imgpkg">
           <p style={hint}>
-            正在写入 2 个分区。任务在页间不中断,离开本页去看 History 时,下方这条依然在。
+            正在写入镜像。任务在页间不中断，离开本页去看 History 时，下方这条依然在。
           </p>
         </Card>
       }
@@ -142,11 +137,12 @@ export const CollapsedFlashRunning = () => (
     </Dock>
     <Card title="摘要由组件自己算,给不进来">
       <p style={hint}>
-        「1 个运行中 — Flash · rk3568-5.0-full · rk3568-dev:flash system(5/9)」:运行中数量 +
+        「1 个运行中 — Flash · dayu200-openharmony-5.0.0.71.imgpkg · DAYU200:写入镜像(3/4)」:运行中数量 +
         risk 最高那个任务的当前阶段 i/n。摘要若能与下面的列表打架,还不如不给。
       </p>
       <p style={hint}>
-        右侧 indeterminate 条只表示「有东西在动」,没有百分比 —— 设备不报可信字节总数,编一个比不给更糟。
+        右侧 indeterminate 条只表示「有任务在动」。字节百分比属于 Flash 页面，并且只在 Runtime
+        提供已确认写入量和 materialized 总量时显示。
       </p>
     </Card>
   </div>
@@ -160,7 +156,8 @@ export const ExpandedNewestFirst = () => (
     </Dock>
     <Card title="展开态 220–320pt:阶段、日志尾部、以及策略给的取消文案">
       <p style={hint}>
-        阶段序列替代百分比:已过的阶段转绿,当前阶段走 accent,读者看得出还剩几步。已完成的任务全绿且没有 accent —— 那是终态,不是丢了当前步。
+        Inspector 使用阶段序列解释完整 timeline；Flash 页面另以 Runtime byte facts 表达写入估算。
+        已完成的任务全绿且没有 accent —— 那是终态，不是丢了当前步。
       </p>
     </Card>
   </div>
@@ -193,9 +190,9 @@ export const CancelRequestedCritical = () => (
           flashRunning({
             cancelRequested: true,
             criticalNote:
-              "正在写入分区 —— 临界区不可中断:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。",
+              "正在写入镜像 —— 当前分区写入不会被强制中断；取消只停止后续步骤。请勿合盖、手动睡眠、断电或拔线。",
             log: [
-              "→ flash system",
+              "→ 写入镜像",
               "用户请求取消(策略:atSafeBoundary)",
               "— 已请求取消:等待安全边界 —",
             ],

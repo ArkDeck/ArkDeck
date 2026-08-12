@@ -18,7 +18,7 @@ const MODE = [
 
 const DEVICE = [
   { value: "all", label: "全部" },
-  { value: "rk3568-dev", label: "rk3568-dev" },
+  { value: "DAYU200", label: "DAYU200" },
   { value: "SIM-fixture-a3", label: "SIM-fixture-a3" },
 ];
 
@@ -34,7 +34,7 @@ export const HistoryModeFilter = () => (
 
 /** History 设备维度 — 模拟 fixture 与真实设备并列,选中项即当前作用域。 */
 export const HistoryDeviceFilter = () => (
-  <FilterPills label="设备" options={DEVICE} value="rk3568-dev" />
+  <FilterPills label="设备" options={DEVICE} value="DAYU200" />
 );
 
 /** 三个维度叠成一张过滤卡:当前组合应当能被当成一句话读出来。 */
@@ -42,6 +42,6 @@ export const HistoryFilterStack = () => (
   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
     <FilterPills label="状态" options={STATUS} value="failed" />
     <FilterPills label="模式" options={MODE} value="execute" />
-    <FilterPills label="设备" options={DEVICE} value="rk3568-dev" />
+    <FilterPills label="设备" options={DEVICE} value="DAYU200" />
   </div>
 );

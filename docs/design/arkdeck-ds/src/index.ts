@@ -53,10 +53,16 @@ export type {
   StatusCell,
 } from "./components/shell.js";
 
-export { BudgetMeters, StageTrack, OperationList } from "./components/harness.js";
+export {
+  BudgetMeters,
+  DeterminateProgress,
+  StageTrack,
+  OperationList,
+} from "./components/harness.js";
 export type {
   BudgetMetersProps,
   Budget,
+  DeterminateProgressProps,
   StageTrackProps,
   OperationListProps,
 } from "./components/harness.js";

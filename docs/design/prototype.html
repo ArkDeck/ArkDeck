@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ArkDeck 交互原型 v0.4</title>
+<title>ArkDeck 交互原型 v0.6</title>
 <style>
 :root{
   color-scheme:light dark;
@@ -54,8 +54,11 @@ button,input,select{font:inherit}
 button{color:inherit}
 .note{max-width:1240px;width:100%;color:var(--ink2);font-size:12px;text-wrap:pretty}
 .note b{color:var(--ink)}
-.window{width:100%;max-width:1240px;height:min(800px,calc(100vh - 96px));min-height:600px;background:var(--panel);
+.window{width:min(1180px,100%);height:min(760px,calc(100vh - 96px));min-height:600px;background:var(--panel);
   border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+body.reference{padding:0;gap:0;justify-content:flex-start;min-width:1180px;min-height:760px}
+body.reference .note{display:none}
+body.reference .window{width:1180px;height:760px;min-height:760px;border-radius:0;border:none;box-shadow:none}
 .titlebar{height:52px;display:grid;grid-template-columns:minmax(210px,1fr) auto minmax(210px,1fr);align-items:center;
   gap:10px;background:var(--chrome);border-bottom:1px solid var(--line);padding:0 12px;flex:none;
   -webkit-backdrop-filter:blur(28px) saturate(1.35);backdrop-filter:blur(28px) saturate(1.35)}
@@ -124,7 +127,7 @@ h2{font-size:13px;line-height:1.3;font-weight:600;color:var(--ink);display:flex;
 .btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
 .btn:focus-visible,.nav button:focus-visible,.dev:focus-visible,.addlink:focus-visible,.toolbar-btn:focus-visible,
 .acbtn:focus-visible,.drawer .bar:focus-visible,.tabs button:focus-visible,.filters button:focus-visible,
-.tagpick button:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tagpick button:focus-visible,.flash-details summary:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){
   .btn,.toolbar-btn,.acbtn,.nav button,.dev{transition-property:transform,background-color,border-color,opacity;transition-duration:120ms;transition-timing-function:cubic-bezier(.2,0,0,1)}
   .btn:active,.toolbar-btn:active,.acbtn:active{transform:scale(.96)}
@@ -224,6 +227,52 @@ select.inp{cursor:pointer}
 .acmode .acin{display:inline-block}
 .two{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
 @media(max-width:940px){.two{grid-template-columns:1fr}}
+.device-layout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(420px,1.18fr);gap:24px;max-width:920px}
+.device-section{display:flex;flex-direction:column;gap:12px;min-width:0}
+.device-section h2{padding-bottom:7px;border-bottom:1px solid var(--line)}
+.device-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.flash-shell{width:min(760px,100%);display:flex;flex-direction:column;gap:16px}
+.flash-lead{display:flex;flex-direction:column;gap:5px}
+.flash-lead p{margin:0;color:var(--ink2);font-size:13px;text-wrap:pretty}
+.flash-target{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel-solid)}
+.flash-target-main{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.flash-target-main b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flash-target-main span{font-size:11.5px;color:var(--ink2)}
+.flash-image{min-height:116px;display:flex;align-items:center;gap:14px;padding:18px;border:1px dashed color-mix(in srgb,var(--ink2) 60%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--panel-solid) 92%,var(--ground) 8%)}
+.flash-image.has-file{border-style:solid}
+.flash-file-icon{width:42px;height:52px;display:flex;align-items:center;justify-content:center;flex:none;border:1px solid var(--line);border-radius:7px;background:var(--panel-solid);color:var(--accent);box-shadow:var(--control-shadow)}
+.flash-image-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.flash-image-copy b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flash-image-copy span{font-size:12px;color:var(--ink2)}
+.flash-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.flash-impact{color:var(--danger);font-size:12px;max-width:470px;text-wrap:pretty}
+.flash-progress-card{display:flex;flex-direction:column;gap:18px;padding:22px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
+.flash-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.flash-progress-head h2{font-size:17px;letter-spacing:-.01em}
+.flash-percent{font-size:28px;line-height:1;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.flash-progress-track{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+.flash-progress-track i{display:block;height:100%;border-radius:inherit;background:var(--accent);transition:width 320ms cubic-bezier(.2,0,0,1)}
+.flash-progress-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ink2);font-size:12px;font-variant-numeric:tabular-nums}
+.flash-stages{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.flash-stage{display:flex;align-items:center;gap:7px;color:var(--ink2);font-size:11.5px}
+.flash-stage i{width:8px;height:8px;border-radius:50%;background:var(--line);flex:none}
+.flash-stage.done{color:var(--ok)}.flash-stage.done i{background:var(--ok)}
+.flash-stage.now{color:var(--ink);font-weight:600}.flash-stage.now i{background:var(--accent);box-shadow:0 0 0 4px var(--accent-weak)}
+.flash-result{display:flex;align-items:flex-start;gap:15px;padding:22px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);box-shadow:var(--control-shadow)}
+.flash-result-icon{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok);font-size:20px;font-weight:700}
+.flash-result-icon.warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.flash-result-copy{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}.flash-result-copy h2{font-size:17px}.flash-result-copy p{margin:0;color:var(--ink2);font-size:12.5px}
+.flash-details{border-top:1px solid var(--line);padding-top:11px}
+.flash-details summary{width:max-content;max-width:100%;color:var(--ink2);font-size:12px;cursor:pointer;list-style-position:outside;padding:3px 2px}
+.flash-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px;margin-top:11px;padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
+.flash-detail-grid div{min-width:0}.flash-detail-grid small{display:block;color:var(--ink2);font-size:10.5px}.flash-detail-grid b{display:block;margin-top:2px;font-family:var(--mono);font-size:11.5px;word-break:break-word}
+@media (prefers-reduced-motion:reduce){.flash-progress-track i{transition:none}}
+.context-menu{position:fixed;z-index:80;min-width:176px;padding:5px;background:var(--panel-solid);border:1px solid var(--line);
+  border-radius:9px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.context-menu[hidden]{display:none}
+.context-menu button{min-height:27px;border:0;border-radius:5px;background:transparent;text-align:start;padding:4px 10px;cursor:pointer;color:var(--ink)}
+.context-menu button:hover,.context-menu button:focus-visible{background:var(--accent);color:var(--accent-ink);outline:none}
+@media(max-width:980px){.device-layout{grid-template-columns:1fr;max-width:680px}}
 .tablewrap{overflow-x:auto}
 .empty{color:var(--ink2);font-size:12.5px;font-style:italic}
 .summary-strip{display:grid;grid-template-columns:minmax(180px,1.6fr) repeat(3,minmax(100px,.7fr));gap:1px;
@@ -247,6 +296,7 @@ select.inp{cursor:pointer}
   .titlebar{grid-template-columns:1fr auto}.titlebar .t{display:none}
   .sidebar{position:absolute;z-index:20;height:calc(100% - 52px);box-shadow:12px 0 36px rgba(0,0,0,.18)}
   .page{padding:18px}.summary-strip{grid-template-columns:1fr}.budget-grid{grid-template-columns:1fr}
+  .flash-progress-head,.flash-actions{align-items:flex-start;flex-direction:column}.flash-stages{grid-template-columns:1fr}.flash-detail-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -269,13 +319,13 @@ select.inp{cursor:pointer}
   </defs>
 </svg>
 
-<p class="note"><b>ArkDeck macOS 交互原型 v0.4</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v0.4）同版本。v0.4 对齐当前 SwiftUI / Runtime / Catalog：Flash 直接提交并在安全边界取消，Overview 使用四项生产能力词汇，History 逐 Artifact 导出，Automation 是受控 task 监控页。工具栏可切换外观与 AC 标注。所有数据均为演示数据，不连接设备，也不构成真实硬件验收。</p>
+<p class="note"><b>ArkDeck macOS 交互原型 v0.6</b> — 与 <span class="mono">docs/design/macos-ux-interaction-spec.md</span>（draft v0.6）同版本。v0.6 将 Flash 收敛为选择镜像、执行真实刷机、查看估算进度与结果；技术与安全事实默认收进“刷机详情”。工具栏可切换语言、外观与 AC 标注。所有数据均为演示数据，不连接设备，也不构成真实硬件验收。</p>
 
 <div class="window" id="win" aria-label="ArkDeck 设计原型窗口">
   <div class="titlebar" role="toolbar" aria-label="窗口工具栏">
     <div class="leading">
       <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
-      <button class="toolbar-btn icon-only" onclick="toggleSidebar()" aria-label="显示或隐藏边栏" title="显示或隐藏边栏">
+      <button class="toolbar-btn icon-only" id="sidebarToggle" onclick="toggleSidebar()" aria-label="显示或隐藏边栏" title="显示或隐藏边栏">
         <svg class="symbol"><use href="#i-sidebar"></use></svg>
       </button>
     </div>
@@ -284,9 +334,10 @@ select.inp{cursor:pointer}
       <button class="toolbar-btn icon-only" onclick="go('settings')" aria-label="打开设置" title="设置（原型中内嵌展示）">
         <svg class="symbol"><use href="#i-settings"></use></svg>
       </button>
+      <button class="toolbar-btn" id="languageToggle" onclick="toggleLanguage()" title="仅原型评审使用">EN</button>
       <button class="toolbar-btn" id="themeToggle" onclick="toggleTheme()" title="仅原型评审使用">系统外观</button>
-      <button class="toolbar-btn" onclick="toggleDrawer()" aria-label="显示或隐藏任务检查器">
-        <svg class="symbol sm"><use href="#i-jobs"></use></svg><span>任务</span>
+      <button class="toolbar-btn" id="jobsToggle" onclick="toggleDrawer()" aria-label="显示或隐藏任务检查器">
+        <svg class="symbol sm"><use href="#i-jobs"></use></svg><span id="jobsLabel">任务</span>
       </button>
       <button class="acbtn" id="acToggle" onclick="toggleAC()">AC 标注</button>
     </div>
@@ -294,12 +345,12 @@ select.inp{cursor:pointer}
   <div class="main">
     <aside class="sidebar" id="sidebar" aria-label="设备与功能导航">
       <div>
-        <div class="sec">设备</div>
+        <div class="sec" id="devicesSectionLabel">设备</div>
         <div id="devlist"></div>
-        <button class="addlink" onclick="addTargetModal()"><svg class="symbol sm"><use href="#i-plus"></use></svg>添加 TCP / UART 目标…</button>
+        <button class="addlink" id="addTargetButton" onclick="addTargetModal()"><svg class="symbol sm"><use href="#i-plus"></use></svg><span>添加 TCP / UART 目标…</span></button>
       </div>
       <div>
-        <div class="sec">功能</div>
+        <div class="sec" id="workflowsSectionLabel">功能</div>
         <nav class="nav" id="nav"></nav>
       </div>
     </aside>
@@ -307,7 +358,7 @@ select.inp{cursor:pointer}
       <div class="page" id="page"></div>
       <div class="drawer" id="drawer">
         <button class="bar" id="drawerToggle" onclick="toggleDrawer()" aria-expanded="false" aria-controls="drawerBody">
-          <span id="drawerArrow">▸</span><b>任务</b>
+          <span id="drawerArrow">▸</span><b id="drawerLabel">任务</b>
           <span class="st" id="drawerSt" style="flex:1" role="status" aria-live="polite">没有运行中的任务</span>
           <span class="ibar" id="drawerIbar" style="display:none"></span>
           <span class="ac">AC-UX-001-01</span>
@@ -318,12 +369,16 @@ select.inp{cursor:pointer}
   </div>
 </div>
 <div id="modalHost"></div>
+<div id="deviceMenu" class="context-menu" role="menu" hidden></div>
 
 <script>
 "use strict";
 /* ---------- state ---------- */
+const PARAMS=new URLSearchParams(location.search);
 const S = {
-  nav:"overview", device:"dayu200", acMode:false, drawerOpen:false, sidebarOpen:true, appearance:"system",
+  nav:PARAMS.get("page")||(PARAMS.has("reference")?"device":"overview"), device:"dayu200", language:PARAMS.get("lang")==="en"?"en":"zh-Hans",
+  acMode:false, drawerOpen:false, sidebarOpen:true, appearance:"system", lastChecked:null,
+  deviceNames:{dayu200:"DAYU200",tab01:PARAMS.get("lang")==="en"?"Unknown tablet":"待授权设备"},
   recovery:{archived:false},
   auth:{phase:"idle", left:0, t:null},        // idle|polling|timedOut|ready
   permDemo:false,
@@ -343,14 +398,15 @@ const S = {
   ],
   fwd:[{l:"tcp:9222", r:"tcp:9222"}],
   cmd:{val:"device.packageInventory", hist:[]},
-  flashMode:"execute", flashPrerequisitesReady:true, loaderBound:false, flashJob:null, planSaved:false, lastFlash:null,
+  flashPrerequisitesReady:true, loaderBound:true, flashJob:null, flashImage:null, flashView:"idle",
+  flashProgress:{stage:"idle",tick:0,bytesDone:0,totalBytes:0},lastFlash:null,
   debugTab:"logs", hf:{st:"all", mode:"all", dev:"all"}, histSel:null, histSeq:1,
   hdcSel:"deveco",
   jobs:[], jobSeq:1
 };
 const DEVICES=[
-  {id:"dayu200", name:"DAYU200", tp:"USB", state:"ready", build:"由 Runtime observation 提供", key:"TGT-…"},
-  {id:"tab01", name:"待授权设备", tp:"USB", state:"unauthorized", build:"—", key:"connect key 已脱敏"}
+  {id:"dayu200", name:"DAYU200", tp:"USB", state:"ready", build:"OpenHarmony 5.0.0.71 · USB", key:"TGT-958780b2ffb7"},
+  {id:"tab01", name:"Unknown tablet", tp:"USB", state:"unauthorized", build:"—", key:"connect key 已脱敏"}
 ];
 const NAV=[["overview","overview","Overview"],["flash","flash","Flash"],["debug","debug","Debug"],
   ["dump","dump","UI Dump"],["trace","trace","Trace"],["history","history","History"],
@@ -369,6 +425,30 @@ const STCHIP={succeeded:'<span class="chip ok">✓ 成功</span>',failed:'<span 
 function modeBadge(m,fx){return m==="planOnly"?'<span class="chip planned">◇ PLANNED</span>'
   :m==="simulated"?'<span class="chip sim">▤ SIMULATED'+(fx?" · "+fx:"")+'</span>':"";}
 
+const COPY={
+  "zh-Hans":{devices:"设备",workflows:"功能",addTarget:"添加 TCP / UART 目标…",jobs:"任务",emptyJobs:"没有运行中的任务",appearance:"系统外观",ac:"AC 标注",
+    needsTrust:"需要信任 — 点击处理",ready:"已接管",rename:"重命名…",recheck:"重新检测",renameTitle:"重命名设备",cancel:"取消",save:"保存",
+    statusActions:"当前状态与操作",facts:"Runtime 事实",readyNotice:"已接管且已连接——设备就绪。",recheckNote:"重新检测只读取最新候选列表，不会向设备发送任何内容。",
+    connectKey:"Connect key",reported:"报告状态",target:"已接管目标",revision:"Binding revision",model:"观测机型",firmware:"观测固件",transport:"观测传输",confirmed:"确认时间",lastChecked:"刚刚重新读取候选列表",
+    flashTitle:"刷机",flashSubtitle:"选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。",flashReady:"设备已就绪",flashChecks:"4 项安全检查通过",
+    chooseImage:"选择镜像…",changeImage:"更换镜像…",chooseImageTitle:"选择要刷入的镜像",chooseImageHelp:"支持 Runtime 已发布的 DAYU200 镜像包",
+    startFlash:"擦除数据并开始刷机",flashImpact:"将擦除 DAYU200 上的用户数据。请保持设备连接和稳定供电。",flashDetails:"查看刷机详情",
+    preparing:"正在准备镜像",enteringLoader:"正在进入 Loader",writing:"正在写入镜像",verifying:"写入完成，正在重启并验证",estimatedProgress:"镜像写入估算",confirmedBytes:"已确认写入",
+    stagePrepare:"准备",stageWrite:"写入镜像",stageVerify:"重启与验证",keepConnected:"刷机过程中请勿拔线、断电或合盖。当前分区写入不会被强制中断。",
+    flashSuccess:"刷机成功",flashSuccessBody:"设备已重新连接，回报版本与所选镜像一致。",flashAgain:"再次刷机",openHistory:"打开历史记录",elapsed:"用时 3 分 18 秒"},
+  en:{devices:"Devices",workflows:"Workflows",addTarget:"Add TCP / UART target…",jobs:"Jobs",emptyJobs:"No running jobs",appearance:"System appearance",ac:"AC labels",
+    needsTrust:"Needs trust — click to resolve",ready:"Adopted",rename:"Rename…",recheck:"Re-check",renameTitle:"Rename device",cancel:"Cancel",save:"Save",
+    statusActions:"Status and actions",facts:"Runtime facts",readyNotice:"Adopted and connected — device ready.",recheckNote:"Re-check only reloads the current candidate list; it sends nothing to the device.",
+    connectKey:"Connect key",reported:"Reported state",target:"Adopted target",revision:"Binding revision",model:"Observed model",firmware:"Observed firmware",transport:"Observed transport",confirmed:"Confirmed at",lastChecked:"Candidate list reloaded just now",
+    flashTitle:"Flash",flashSubtitle:"Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.",flashReady:"Device ready",flashChecks:"4 safety checks passed",
+    chooseImage:"Choose image…",changeImage:"Change image…",chooseImageTitle:"Choose an image to flash",chooseImageHelp:"Supports DAYU200 image bundles published by Runtime",
+    startFlash:"Erase data and start flashing",flashImpact:"This erases user data on DAYU200. Keep the device connected to stable power.",flashDetails:"Show flash details",
+    preparing:"Preparing image",enteringLoader:"Entering Loader",writing:"Writing image",verifying:"Write complete — rebooting and verifying",estimatedProgress:"Estimated image write",confirmedBytes:"Confirmed written",
+    stagePrepare:"Prepare",stageWrite:"Write image",stageVerify:"Reboot & verify",keepConnected:"Do not unplug, power off, or close the Mac during flashing. The current partition write will not be force-stopped.",
+    flashSuccess:"Flash succeeded",flashSuccessBody:"The device reconnected and its reported build matches the selected image.",flashAgain:"Flash again",openHistory:"Open History",elapsed:"3 min 18 sec"}
+};
+function tx(key){return COPY[S.language][key]||key;}
+
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -382,15 +462,36 @@ function toggleDrawer(){
   $("drawerToggle").setAttribute("aria-expanded",String(S.drawerOpen));$("drawerBody").setAttribute("aria-hidden",String(!S.drawerOpen));$("drawerBody").inert=!S.drawerOpen;
 }
 function toggleSidebar(){S.sidebarOpen=!S.sidebarOpen;$("sidebar").classList.toggle("hidden",!S.sidebarOpen);}
+function toggleLanguage(){S.language=S.language==="zh-Hans"?"en":"zh-Hans";render();}
 function toggleTheme(){
   S.appearance=S.appearance==="system"?"light":S.appearance==="light"?"dark":"system";
   if(S.appearance==="system")document.documentElement.removeAttribute("data-theme");
   else document.documentElement.dataset.theme=S.appearance;
-  $("themeToggle").textContent=S.appearance==="system"?"系统外观":S.appearance==="light"?"浅色外观":"深色外观";
+  $("themeToggle").textContent=S.appearance==="system"?tx("appearance")
+    :S.appearance==="light"?(S.language==="en"?"Light":"浅色外观"):(S.language==="en"?"Dark":"深色外观");
 }
 function openDrawer(){if(!S.drawerOpen)toggleDrawer();}
 function go(nav){S.nav=nav;render();}
-function pickDevice(id){S.device=id;S.nav=(DEVICES.find(d=>d.id===id).state==="unauthorized")?"auth":S.nav==="auth"?"overview":S.nav;render();}
+function pickDevice(id){S.device=id;S.nav=DEVICES.find(d=>d.id===id).state==="unauthorized"?"auth":"device";render();}
+function closeDeviceMenu(){$("deviceMenu").hidden=true;$("deviceMenu").innerHTML="";}
+function openDeviceMenu(event,id){
+  event.preventDefault();event.stopPropagation();S.device=id;renderDevs();
+  const menu=$("deviceMenu");
+  menu.innerHTML=`<button role="menuitem" onclick="renameDeviceModal('${id}')">${tx("rename")}</button>
+    <button role="menuitem" onclick="recheckDevice('${id}')">${tx("recheck")}</button>`;
+  menu.hidden=false;menu.style.left=Math.min(event.clientX,innerWidth-190)+"px";menu.style.top=Math.min(event.clientY,innerHeight-72)+"px";
+  menu.querySelector("button").focus();
+}
+function renameDeviceModal(id){
+  closeDeviceMenu();const d=DEVICES.find(x=>x.id===id);const current=S.deviceNames[id]||d.name;
+  modal(`<div class="modal"><h3>${tx("renameTitle")}</h3>
+    <input class="inp" id="deviceRenameInput" maxlength="64" value="${esc(current)}" aria-label="${tx("renameTitle")}">
+    <div class="mfoot"><button class="btn" onclick="closeModal()">${tx("cancel")}</button>
+    <button class="btn pri" onclick="saveDeviceName('${id}')">${tx("save")}</button></div></div>`);
+  $("deviceRenameInput")?.select();
+}
+function saveDeviceName(id){const name=$("deviceRenameInput").value.trim().replace(/\s+/g," ");if(!name)return;S.deviceNames[id]=name;closeModal();render();}
+function recheckDevice(id){closeDeviceMenu();S.device=id;S.lastChecked=id;S.nav=DEVICES.find(d=>d.id===id).state==="unauthorized"?"auth":"device";render();}
 function ckGate(btnId,need){const c=document.querySelectorAll("#modalHost .checks input:checked").length;const b=$(btnId);if(b)b.disabled=c<need;}
 function doneBtn(el,label){el.textContent=label;el.disabled=true;}
 
@@ -421,6 +522,7 @@ document.addEventListener("keydown",e=>{
   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
+document.addEventListener("pointerdown",e=>{if(!$("deviceMenu").hidden&&!$("deviceMenu").contains(e.target))closeDeviceMenu();});
 
 /* ---------- jobs ---------- */
 function addJob(j){j.id="J"+(S.jobSeq++);j.cancelled=false;S.jobs.push(j);openDrawer();renderDrawer();return j;}
@@ -463,7 +565,7 @@ function renderDrawer(){
     const top=running.slice().sort((a,b)=>(b.risk||1)-(a.risk||1))[0];
     st=running.length+" 个运行中 — "+top.title+":"+(top.awaiting?"等待 rebind 确认":top.phases[top.phaseIdx])
       +"("+Math.min(top.phaseIdx+1,top.phases.length)+"/"+top.phases.length+")";
-  } else st=S.jobs.length?S.jobs.length+" 个任务(无运行中)":"没有运行中的任务";
+  } else st=S.jobs.length?S.jobs.length+(S.language==="en"?" jobs (none running)":" 个任务(无运行中)"):tx("emptyJobs");
   $("drawerSt").textContent=st;
   $("drawerIbar").style.display=running.length?"block":"none";
   $("drawerBody").innerHTML=S.jobs.slice().reverse().map(j=>{
@@ -602,11 +704,41 @@ function restartSrvModal(){
       <button class="btn danger" id="goSrv" disabled onclick="closeModal();S.auth.phase='idle';renderPage()">重启共享 HDC server</button></div>
   </div>`);
 }
+function pDevice(){
+  const d=DEVICES.find(x=>x.id===S.device)||DEVICES[0],name=S.deviceNames[d.id]||d.name;
+  return `<div class="device-layout" data-page-title="${esc(name)}" data-acin><span class="ac">REQ-HDC-007</span>
+    <section class="device-section">
+      <h2>${tx("statusActions")}</h2>
+      <div class="okbox">${icon("overview",true)}<span>${tx("readyNotice")}</span></div>
+      <div class="device-actions">
+        <button class="btn" onclick="renameDeviceModal('${d.id}')">${tx("rename")}</button>
+        <button class="btn" onclick="recheckDevice('${d.id}')">${tx("recheck")}</button>
+      </div>
+      ${S.lastChecked===d.id?`<div class="hint" role="status">✓ ${tx("lastChecked")}</div>`:""}
+      <p class="hint">${tx("recheckNote")}</p>
+    </section>
+    <section class="device-section">
+      <h2>${tx("facts")}</h2>
+      <dl class="kv">
+        <dt>${tx("connectKey")}</dt><dd>150100469346864</dd>
+        <dt>${tx("reported")}</dt><dd>Connected</dd>
+        <dt>${tx("target")}</dt><dd>${esc(d.key)}</dd>
+        <dt>${tx("revision")}</dt><dd>3</dd>
+        <dt>${tx("model")}</dt><dd>ohos</dd>
+        <dt>${tx("firmware")}</dt><dd>OpenHarmony 5.0.0.71</dd>
+        <dt>${tx("transport")}</dt><dd>usb</dd>
+        <dt>${tx("confirmed")}</dt><dd>2026-08-12T07:04:17Z</dd>
+      </dl>
+      <p class="hint">${S.language==="en"?"Observation facts come from the latest successful Runtime read; they are not invented live state.":"观测事实来自 Runtime 最近一次成功读取，不是 App 补齐的实时状态。"}</p>
+    </section>
+  </div>`;
+}
 function pAuth(){
   const ph=S.auth.phase;
+  const name=S.deviceNames[S.device]||"Unknown tablet";
   return `
-  <h1>设备授权 — unknown-tablet <span class="acin">REQ-HDC-007</span></h1>
-  <div class="card" style="max-width:640px" data-acin><span class="ac">AC-HDC-007-01/02</span>
+  <div data-page-title="${esc(name)}">
+  <div class="card" style="max-width:680px" data-acin><span class="ac">AC-HDC-007-01/02</span>
     <h2>此设备尚未信任本机(E000002)</h2>
     <ol style="margin-left:20px;font-size:13.5px;display:flex;flex-direction:column;gap:6px">
       <li>解锁设备屏幕;</li>
@@ -621,7 +753,7 @@ function pAuth(){
       ${ph==="timedOut"?'<button class="btn danger" onclick="restartSrvModal()">重启共享 HDC server…</button>'
                      :'<button class="btn" onclick="simTimeout()">模拟:授权超时(E000003)</button>'}
     </div>
-  </div>`;
+  </div></div>`;
 }
 
 /* ---------- UI Dump ---------- */
@@ -981,148 +1113,120 @@ ${esc(h.out)}</div>`).join("")||'<p class="empty">尚未运行 typed template。
 
 /* ---------- Flash ---------- */
 function pFlash(){
-  const m=S.flashMode, ok=S.flashPrerequisitesReady;
-  const modeB=m==="planOnly"?'<span class="chip planned">◇ PLANNED — 不派发 deviceMutation/destructive</span>'
-    :m==="simulated"?'<span class="chip sim">▤ SIMULATED · fixture-a3 — 不接触真实设备</span>':"";
-  const planRows=[
-    ["1","verify-image-bundle","artifact lease + archive facts","host","hostOnly"],
-    ["2","hash-images","streaming SHA-256","host","hostOnly"],
-    ["3","confirm-flash-intent","Runtime durable intent","host","hostOnly"],
-    ["4","enter-loader-mode","bound target","mut","deviceMutation"],
-    ["5","wait-loader-disconnect","expected USB transition","read","readOnly"],
-    ["6","wait-loader-reconnect","expected USB transition","read","readOnly"],
-    ["7","rebind-loader-identity","fresh identity · n→n / n→n+1","read","readOnly"],
-    ["8","flash-partitions","partitionPlan + exact digest","destr","destructive"],
-    ["9","verify-flash-readback","per-partition readback","read","readOnly"],
-    ["10","reboot-device","bound target","mut","deviceMutation"],
-    ["11","wait-for-hdc","normal-mode reconnect","read","readOnly"],
-    ["12","rebind-and-verify-build","build + binding","read","readOnly"],
-    ["13","capture-post-flash-diagnostics","optional bounded HiLog","read","readOnly"],
-    ["14","finalize-session","manifest + artifacts","host","hostOnly"]
-  ].map(([n,s,a,c,e])=>`<tr><td class="mono">${n}</td><td class="mono">${s}</td><td class="mono">${a}</td>
-    <td>${effectBadge(c,e)}</td><td>${m==="planOnly"?'<span class="chip planned">notExecuted(planned)</span>':""}</td></tr>`).join("");
-  return recoveryHTML()+`
-  <h1>Flash <span class="acin">REQ-FLASH-*</span></h1>
-  <div class="card">
-    <h2>Availability</h2>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span class="chip ok">AVAILABLE</span><span class="mono">flash.dayu200</span>
-    </div>
-    <p class="hint">Runtime 可以为已接管 DAYU200 生成精确计划；availability、effect 与原因均来自 Catalog / daemon，不由界面猜测。</p>
-  </div>
-  <div class="card">
-    <h2>Rockchip device access</h2>
-    ${S.loaderBound?`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span class="chip ok">Loader 已绑定到所选设备</span><span class="mono">1 个 loader observation · Runtime probe</span>
-      <button class="btn" onclick="doneBtn(this,'已重新检查')">重新检查设备访问</button>
-    </div>`:`<div class="warnbox"><b>所选 DAYU200 需要切换为当前绑定</b><br>ArkDeck 已发现唯一一台精确匹配所选 revision-1 target 的 DAYU200（HDC-normal 或 Loader）。只需点击一次刷机；Runtime 会 fresh-read 身份、原子切换 active binding、刷新精确计划，并仅在全部前置条件通过后继续。</div>`}
-    <dl class="kv"><dt>责任方</dt><dd>设备操作员</dd><dt>最小动作</dt><dd>${S.loaderBound?"无需处理":"确认当前选择的是已连接的目标设备"}</dd></dl>
-    <p class="hint">permission denied、driver unavailable、offline / unauthorized、tool blocked 与 protocol blocked 会分别显示责任方和 ArkDeck 外最小修复动作；页面不提供 sudo 或驱动安装。</p>
-    <p class="hint">当前目标绑定只提交所选 target + expected revision；Runtime 重新读取唯一注册 DAYU200。另一台设备只允许精确切换到 revision-1 target；同一设备的 HDC→Loader 变化仍只允许相邻 revision。App 不接收 serial / topology，绑定本身不派发设备命令。</p>
-  </div>
-  <div class="card" data-acin><span class="ac">REQ-UX-006 · AC-FLASH-004-01</span>
-    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-      <span class="seg">
-        <button class="${m==="execute"?"on":""}" onclick="S.flashMode='execute';renderPage()">Execute</button>
-        <button class="${m==="planOnly"?"on":""}" onclick="S.flashMode='planOnly';renderPage()">Plan only</button>
-        <button class="${m==="simulated"?"on":""}" onclick="S.flashMode='simulated';renderPage()">Simulated</button>
-      </span>${modeB}
-    </div>
-  </div>
-  <div class="two">
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="card"><h2>Profile &amp; Image Set</h2>
-        <dl class="kv">
-          <dt>operation</dt><dd>flash.dayu200</dd>
-          <dt>profile</dt><dd>dayu200</dd>
-          <dt>image bundle</dt><dd>images.tar.gz · size / SHA-256 由 Runtime 编码</dd>
-          <dt>partition plan</dt><dd>来自 profile 闭集 · 最多 16 项</dd>
-        </dl>
-        <p class="hint">镜像原地引用；App 只提交 artifact lease、profile 与精确 partitionPlan，不发 executable / argv。</p>
-      </div>
-      <div class="card" data-acin><span class="ac">AC-FLASH-002-01</span>
-        <h2>Prerequisites</h2>
-        <div class="tablewrap"><table>
-          <tr><td>loader</td><td><span class="chip ok">satisfied</span></td><td class="mono">flash.prerequisites</td></tr>
-          <tr><td>recoveryPath</td><td><span class="chip ${S.loaderBound?"ok":"bad"}">${S.loaderBound?"satisfied":"unsatisfied"}</span></td><td class="mono">bootloader / vendor recovery</td></tr>
-          <tr><td>unlocked</td><td><span class="chip ${S.loaderBound?"ok":"warn"}">${S.loaderBound?"satisfied":"unknown"}</span></td><td class="mono">target-bound probe</td></tr>
-          <tr><td>stablePower</td><td><span class="chip ok">satisfied</span></td><td class="mono">target-bound probe</td></tr>
-        </table></div>
-      </div>
-      <div class="card"><h2>Target</h2>
-        <dl class="kv"><dt>target</dt><dd>已接管 DAYU200</dd><dt>binding</dt><dd>${S.loaderBound?"revision n / n+1 · Runtime attested":"revision n · Loader 待关联/重核验"}</dd><dt>tool</dt><dd>pinned rkdeveloptool · version 来自 Runtime</dd></dl>
-      </div>
-      ${S.lastFlash?`<div class="card" data-acin><span class="ac">postflight verify</span>
-        <h2>上次执行 · Postflight</h2>
-        <dl class="kv">
-          <dt>设备回报 build</dt><dd>${esc(S.lastFlash.build)} <span class="chip ok">= 镜像期望 ✓</span></dd>
-          <dt>设备身份</dt><dd>同一稳定身份 · binding revision ${esc(S.lastFlash.binding)}</dd>
-        </dl>
-      </div>`:""}
-    </div>
-    <div class="card" data-acin><span class="ac">AC-FLASH-005-01 · effect 分级</span>
-      <h2>Exact Plan</h2>
-      <div class="tablewrap"><table>
-        <tr><th>#</th><th>step</th><th>参数摘要</th><th>effect</th><th></th></tr>${planRows}
-      </table></div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        ${m==="execute"?`<button class="btn danger" onclick="runFlash()" ${ok&&!S.flashJob?"":"disabled"}>擦除用户数据并刷机</button>
-          ${S.flashJob?`<button class="btn" onclick="cancelJob('${S.flashJob.id}')" ${S.flashJob.cancelled?"disabled":""}>${S.flashJob.cancelled?"等待安全边界…":"取消剩余步骤"}</button>`:""}`:""}
-        ${m==="planOnly"?`<button class="btn pri" onclick="runPlanOnly()">生成完整计划(零设备写入)</button>
-          ${S.planSaved?'<button class="btn" onclick="planModal()">查看 plan artifact</button><span class="chip planned">◇ planned · 已持久化</span>':""}`:""}
-        ${m==="simulated"?'<button class="btn pri" onclick="runSim()">运行模拟场景(断连注入)</button>':""}
-      </div>
-      ${m==="execute"?'<p class="hint">点击主按钮即提交；不再打开确认 sheet、checkbox 或文字短语。该点击只是 UX acknowledgement，Runtime capability 与 fresh facts 仍是唯一准入。</p>':""}
-      ${m==="execute"&&S.flashJob&&S.flashJob.phases[S.flashJob.phaseIdx]==="flash-partitions"?`<div class="warnbox" data-acin><span class="ac">AC-FLASH-009-01</span>⚠ 正在写入分区 —— <b>临界区不可中断</b>:取消只会停止后续步骤。请勿合盖、手动睡眠、断电或拔线(idle sleep 已由系统保持,但合盖无法被阻止)。</div>`:""}
-      ${m==="simulated"?'<p class="hint">fixture-a3 使用 TCP 断连注入并停在「WaitReconnect → Rebind 确认」。USB 只在稳定身份、同 revision fresh re-attestation 或一个相邻 binding revision 与 plan 阶段证据完整时自动 rebind；证据不足则阻断。</p>':""}
-    </div>
+  const image=S.flashImage,p=S.flashProgress;
+  const pct=p.totalBytes?Math.min(100,Math.round(p.bytesDone/p.totalBytes*100)):0;
+  const running=S.flashView==="running";
+  const stageIndex=p.stage==="prepare"||p.stage==="loader"?0:p.stage==="write"?1:p.stage==="verify"||S.flashView==="success"?2:-1;
+  const stageText=p.stage==="prepare"?tx("preparing"):p.stage==="loader"?tx("enteringLoader"):p.stage==="write"?tx("writing"):tx("verifying");
+  const imageBox=image?`<div class="flash-image has-file">
+      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
+      <div class="flash-image-copy"><b>${esc(image.name)}</b><span>${formatBytes(image.sizeBytes)} · OpenHarmony 5.0.0.71</span></div>
+      ${running?"":`<button class="btn" onclick="chooseFlashImage()">${tx("changeImage")}</button>`}
+    </div>`:`<div class="flash-image">
+      <div class="flash-file-icon" aria-hidden="true">${icon("flash")}</div>
+      <div class="flash-image-copy"><b>${tx("chooseImageTitle")}</b><span>${tx("chooseImageHelp")}</span></div>
+      <button class="btn pri" onclick="chooseFlashImage()">${tx("chooseImage")}</button>
+    </div>`;
+  let main;
+  if(running){
+    const hasByteProgress=p.stage==="write"||p.stage==="verify";
+    main=`<div class="flash-progress-card" aria-live="polite">
+      <div class="flash-progress-head"><div><h2>${stageText}</h2><p class="hint">${tx("keepConnected")}</p></div>
+        ${hasByteProgress?`<div class="flash-percent">${pct}%</div>`:'<span class="chip warn pulse">运行中</span>'}</div>
+      ${hasByteProgress?`<div class="flash-progress-track" role="progressbar" aria-label="${tx("estimatedProgress")}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-valuetext="${pct}% · ${formatBytes(p.bytesDone)} / ${formatBytes(p.totalBytes)}"><i style="width:${pct}%"></i></div>
+        <div class="flash-progress-meta"><span>${tx("estimatedProgress")}</span><span>${tx("confirmedBytes")} ${formatBytes(p.bytesDone)} / ${formatBytes(p.totalBytes)}</span></div>`:
+        `<div class="ibar" role="progressbar" aria-label="${stageText}" style="max-width:none;width:100%"></div><p class="hint">${S.language==="en"?"No byte denominator is available in this stage, so no percentage is shown.":"当前阶段没有可用的字节总量，因此不显示伪造的百分比。"}</p>`}
+      ${flashStages(stageIndex)}
+    </div>`;
+  } else if(S.flashView==="success"){
+    main=`<div class="flash-result" role="status">
+      <div class="flash-result-icon" aria-hidden="true">✓</div>
+      <div class="flash-result-copy"><h2>${tx("flashSuccess")}</h2><p>${tx("flashSuccessBody")}</p>
+        <div class="flash-progress-meta"><span>${tx("elapsed")}</span><span class="mono">OpenHarmony 5.0.0.71</span></div>
+        <div class="device-actions"><button class="btn pri" onclick="flashAgain()">${tx("flashAgain")}</button><button class="btn" onclick="go('history')">${tx("openHistory")}</button></div>
+      </div></div>`;
+  } else if(S.flashView==="stopped"){
+    main=`<div class="flash-result" role="status"><div class="flash-result-icon warn" aria-hidden="true">!</div>
+      <div class="flash-result-copy"><h2>${S.language==="en"?"Flash stopped":"刷机已停止"}</h2><p>${S.language==="en"?"Runtime stopped at a safe boundary. The device result is not shown as successful.":"Runtime 已在安全边界停止；设备结果不会显示为成功。"}</p>
+      <button class="btn" onclick="flashAgain()">${tx("flashAgain")}</button></div></div>`;
+  } else {
+    main=`<div class="card">${imageBox}
+      <div class="flash-actions"><p class="flash-impact">${tx("flashImpact")}</p>
+        <button class="btn danger" onclick="runFlash()" ${image&&S.flashPrerequisitesReady?"":"disabled"}>${tx("startFlash")}</button></div>
+    </div>`;
+  }
+  return `<div class="flash-shell" data-acin><span class="ac">Flash v0.6 · real execution only</span>
+    <div class="flash-lead"><h1>${tx("flashTitle")}</h1><p>${tx("flashSubtitle")}</p></div>
+    <div class="flash-target"><span class="dot ok" aria-hidden="true"></span><div class="flash-target-main"><b>DAYU200</b><span>USB · OpenHarmony 5.0.0.71</span></div>
+      <span class="chip ok">✓ ${tx("flashReady")}</span><span class="hint">${tx("flashChecks")}</span></div>
+    ${main}
+    ${running?`<div class="hint"><b>${esc(image.name)}</b> · ${formatBytes(image.sizeBytes)}</div>`:""}
+    ${flashDetails(image)}
   </div>`;
 }
+function flashStages(now){
+  return `<div class="flash-stages" aria-label="${S.language==="en"?"Flash stages":"刷机阶段"}">
+    ${[tx("stagePrepare"),tx("stageWrite"),tx("stageVerify")].map((label,i)=>`<div class="flash-stage ${i<now?"done":i===now?"now":""}"><i aria-hidden="true"></i><span>${label}</span></div>`).join("")}
+  </div>`;
+}
+function flashDetails(image){
+  return `<details class="flash-details"><summary>${tx("flashDetails")}</summary>
+    <div class="flash-detail-grid">
+      <div><small>operation / profile</small><b>flash.dayu200 / dayu200</b></div>
+      <div><small>target / binding</small><b>TGT-958780b2ffb7 / revision 3</b></div>
+      <div><small>image SHA-256</small><b>${image?"Runtime 校验后显示":"选择镜像后由 Runtime 校验"}</b></div>
+      <div><small>exact plan</small><b>14 steps · 1 destructive write stage</b></div>
+    </div>
+    <div class="tablewrap" style="margin-top:10px"><table>
+      <tr><th>${S.language==="en"?"Plan stage":"计划阶段"}</th><th>${S.language==="en"?"Steps":"步骤数"}</th><th>effect</th></tr>
+      <tr><td>${S.language==="en"?"Prepare and validate":"准备与校验"}</td><td>3</td><td>${effectBadge("host","hostOnly")}</td></tr>
+      <tr><td>${S.language==="en"?"Enter Loader and bind identity":"进入 Loader 与身份绑定"}</td><td>4</td><td>${effectBadge("mut","deviceMutation")}</td></tr>
+      <tr><td>${S.language==="en"?"Write partitions":"写入分区"}</td><td>1</td><td>${effectBadge("destr","destructive")}</td></tr>
+      <tr><td>${S.language==="en"?"Read back, reboot, and verify":"回读、重启与验证"}</td><td>6</td><td>${effectBadge("read","readOnly")}</td></tr>
+    </table></div>
+    <p class="hint">${S.language==="en"?"These facts come from Runtime. The app does not invent target identity, image hashes, or safety admission.":"这些事实均来自 Runtime；App 不补造目标身份、镜像哈希或安全准入结论。"}</p>
+  </details>`;
+}
+function formatBytes(bytes){
+  if(!Number.isFinite(bytes)||bytes<=0)return "0 GB";
+  return new Intl.NumberFormat(S.language==="en"?"en-US":"zh-CN",{maximumFractionDigits:1}).format(bytes/1e9)+" GB";
+}
+function chooseFlashImage(){
+  S.flashImage={name:"dayu200-openharmony-5.0.0.71.imgpkg",sizeBytes:6400000000};
+  S.flashView="ready";S.lastFlash=null;renderPage();
+}
 function runFlash(){
-  S.loaderBound=true;
-  S.flashJob=startJob(addJob({title:"Flash · flash.dayu200 · 已接管 DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
-    phases:["verify-image-bundle","hash-images","confirm-flash-intent","enter-loader-mode","wait-loader-disconnect","wait-loader-reconnect","rebind-loader-identity","flash-partitions","verify-flash-readback","reboot-device","wait-for-hdc","rebind-and-verify-build","capture-post-flash-diagnostics","finalize-session"],
-    phaseIdx:0,safeBoundary:8,tick:520,log:["→ verify-image-bundle","已获取 CriticalActivityLease(idle sleep 保持)"],pages:["flash"],
-    doneMsg:"完成:postflight 校验通过,设备回报 build 与镜像期望一致。",
-    onDone:st=>{S.flashJob=null;
-      if(st==="succeeded"){S.lastFlash={build:"Runtime observation.firmware",binding:"n→n"};
-        DEVICES[0].build="由最新 Runtime observation 提供";renderDevs();}
-      renderPageIf(["flash"]);}}));
-  renderPage();
+  if(!S.flashImage||S.flashJob)return;
+  S.flashView="running";S.flashProgress={stage:"prepare",tick:0,bytesDone:0,totalBytes:S.flashImage.sizeBytes};
+  const j={id:"J"+(S.jobSeq++),title:"Flash · flash.dayu200 · DAYU200",mode:"execute",dev:"DAYU200",risk:3,state:"running",
+    phases:["准备镜像","进入 Loader","写入镜像","重启并验证"],phaseIdx:0,safeBoundary:2,tick:650,cancelled:false,
+    log:["→ 准备镜像","进度百分比只使用 Runtime 已确认写入字节数"],pages:["flash"],isFlash:true};
+  S.jobs.push(j);S.flashJob=j;renderDrawer();renderPage();
+  j.timer=setTimeout(()=>advanceFlash(j),j.tick);
 }
-function runPlanOnly(){
-  S.planSaved=true;
-  const j={id:"J"+(S.jobSeq++),title:"Flash(plan-only) · flash.dayu200",mode:"planOnly",dev:"DAYU200",risk:1,state:"planned",
-    phases:["Preflight","Validate","makePlan","Persist plan"],phaseIdx:4,safeBoundary:0,tick:0,cancelled:false,
-    log:["完整计划含 14 个 Catalog 步骤；deviceMutation / destructive 全部 notExecuted(planned)，mutation dispatch = 0。"]};
-  S.jobs.push(j);histFromJob(j);openDrawer();renderDrawer();renderPage();
+function advanceFlash(j){
+  if(j.state!=="running")return;
+  const p=S.flashProgress,previous=p.stage;p.tick++;
+  if(j.cancelled&&p.stage!=="write"){finishFlash(j,"cancelled","已在安全边界停止，未显示成功结果。");return;}
+  if(p.tick<=2){p.stage="prepare";j.phaseIdx=0;}
+  else if(p.tick<=4){p.stage="loader";j.phaseIdx=1;}
+  else if(p.tick<=17){p.stage="write";j.phaseIdx=2;p.bytesDone=Math.min(p.totalBytes,p.totalBytes*(p.tick-4)/13);}
+  else if(j.cancelled){finishFlash(j,"cancelled","当前分区写入完成后，剩余步骤已停止。");return;}
+  else if(p.tick<=20){p.stage="verify";j.phaseIdx=3;p.bytesDone=p.totalBytes;}
+  else {finishFlash(j,"succeeded","完成：设备回报 build 与所选镜像一致。");return;}
+  if(previous!==p.stage)j.log.push("→ "+j.phases[j.phaseIdx]);
+  renderDrawer();renderPageIf(["flash"]);j.timer=setTimeout(()=>advanceFlash(j),j.tick);
 }
-function planModal(){
-  modal(`<div class="modal" role="dialog" aria-modal="true">
-    <h3>plan artifact — flash.dayu200 <span class="chip planned">◇ PLANNED</span></h3>
-    <div class="logtail" style="max-height:240px">{
-  "schema": "flash-plan/1.0",
-  "operation": "flash.dayu200",
-  "profile": "dayu200",
-  "target": {"id": "TGT-…", "bindingRevision": "n"},
-  "stepSet": ["verify-image-bundle", "hash-images", "confirm-flash-intent",
-    "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
-    "rebind-loader-identity", "flash-partitions", "verify-flash-readback",
-    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
-    "capture-post-flash-diagnostics", "finalize-session"],
-  "mutationDisposition": "notExecuted(planned)",
-  "mutationDispatch": 0
-}</div>
-    <p class="hint">设备、size、hash、toolchain 与 plan digest 由生产 facade 注入；PLANNED 标识在 History 与导出中永久保留。</p>
-    <div class="mfoot"><button class="btn" onclick="closeModal()">关闭</button></div>
-  </div>`);
+function finishFlash(j,state,msg){
+  clearTimeout(j.timer);j.state=state;j.log.push(msg);histFromJob(j);S.flashJob=null;
+  if(state==="succeeded"){
+    S.flashView="success";S.lastFlash={build:"OpenHarmony 5.0.0.71",binding:"3 → 3"};
+    DEVICES[0].build="OpenHarmony 5.0.0.71 · USB";renderDevs();
+  }else S.flashView="stopped";
+  renderDrawer();renderPageIf(["flash"]);
 }
-function runSim(){
-  startJob(addJob({title:"Flash(simulated)· fixture-a3 TCP 断连注入",mode:"simulated",dev:"SIM-fixture-a3",risk:3,state:"running",
-    phases:["Preflight","EnterUpdater","flash boot","注入断连","WaitReconnect","Rebind 确认","reconcile","Complete"],
-    pauseAt:"Rebind 确认",phaseIdx:0,safeBoundary:2,tick:520,
-    log:["→ Preflight(合成 TCP 设备,无真实 connectKey)"],pages:["flash"],
-    doneMsg:"完成:reconcile 与注入脚本一致;SIMULATED 标识永久保留。"}));
+function flashAgain(){
+  S.flashView=S.flashImage?"ready":"idle";S.flashProgress={stage:"idle",tick:0,bytesDone:0,totalBytes:S.flashImage?.sizeBytes||0};S.lastFlash=null;renderPage();
 }
 
 /* ---------- History ---------- */
@@ -1288,12 +1392,12 @@ function diagModal(){
 }
 
 /* ---------- render ---------- */
-const PAGES={overview:pOverview,auth:pAuth,dump:pDump,trace:pTrace,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
+const PAGES={overview:pOverview,device:pDevice,auth:pAuth,dump:pDump,trace:pTrace,debug:pDebug,flash:pFlash,history:pHistory,automation:pAutomation,settings:pSettings};
 function renderDevs(){
   $("devlist").innerHTML=DEVICES.map(d=>`
-    <button class="dev ${S.device===d.id?"on":""}" onclick="pickDevice('${d.id}')" aria-pressed="${S.device===d.id}">
+    <button class="dev ${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"on":""}" onclick="pickDevice('${d.id}')" oncontextmenu="openDeviceMenu(event,'${d.id}')" aria-current="${S.device===d.id&&(S.nav==="device"||S.nav==="auth")?"page":"false"}">
       <span class="dot ${d.state==="ready"?"ok":d.state==="unauthorized"?"warn":"off"}"></span>
-      <span class="dn"><b>${esc(d.name)}</b><span>${d.state==="unauthorized"?"未授权 — 点击处理":esc(d.build)}</span></span>
+      <span class="dn"><b>${esc(S.deviceNames[d.id]||d.name)}</b><span>${d.state==="unauthorized"?tx("needsTrust"):esc(d.build)}</span></span>
       <span class="tag">${d.tp}</span>
     </button>`).join("");
 }
@@ -1302,11 +1406,20 @@ function renderNav(){
 }
 function renderPage(){
   $("page").innerHTML=PAGES[S.nav]();
-  const title=$("page").querySelector("h1");
-  if(title){title.id="pageTitle";$("page").setAttribute("aria-labelledby","pageTitle");document.querySelector(".titlebar .t").textContent="ArkDeck — "+title.childNodes[0].textContent.trim();}
+  const detail=$("page").querySelector("[data-page-title]"),title=$("page").querySelector("h1");
+  if(detail){document.querySelector(".titlebar .t").textContent=detail.dataset.pageTitle;$("page").setAttribute("aria-label",detail.dataset.pageTitle);}
+  else if(title){title.id="pageTitle";$("page").setAttribute("aria-labelledby","pageTitle");document.querySelector(".titlebar .t").textContent="ArkDeck — "+title.childNodes[0].textContent.trim();}
   const ls=$("logstream");if(ls)ls.scrollTop=ls.scrollHeight;
 }
-function render(){renderDevs();renderNav();renderPage();renderDrawer();}
+function renderShellText(){
+  document.documentElement.lang=S.language==="en"?"en":"zh-CN";
+  document.body.classList.toggle("reference",PARAMS.has("reference"));
+  $("devicesSectionLabel").textContent=tx("devices");$("workflowsSectionLabel").textContent=tx("workflows");
+  $("addTargetButton").querySelector("span").textContent=tx("addTarget");$("jobsLabel").textContent=tx("jobs");$("drawerLabel").textContent=tx("jobs");
+  $("drawerSt").textContent=tx("emptyJobs");$("languageToggle").textContent=S.language==="en"?"中文":"EN";
+  $("acToggle").textContent=tx("ac");$("themeToggle").textContent=tx("appearance");
+}
+function render(){renderShellText();renderDevs();renderNav();renderPage();renderDrawer();}
 render();
 </script>
 </body>

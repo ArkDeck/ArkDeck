@@ -19,7 +19,8 @@ export const CapabilityProbe = () => (
   </div>
 );
 
-export const ExecutionMode = () => (
+/** History/internal-runtime badges; they are not a v0.6 Flash page selector. */
+export const HistoricalExecutionModes = () => (
   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
     <Chip tone="planned" icon="◇">
       PLANNED

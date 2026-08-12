@@ -7,19 +7,19 @@ const row = {
   alignItems: "center",
 };
 
-/** The three variants, each carrying a label a Flash page actually uses. */
+/** The three variants in current v0.6 product language. */
 export const VariantScale = () => (
   <div style={row}>
-    <Button>恢复指引</Button>
-    <Button variant="primary">生成完整计划(零设备写入)</Button>
-    <Button variant="danger">刷写 rk3568-dev(2 个分区)…</Button>
+    <Button>更换镜像…</Button>
+    <Button variant="primary">选择镜像…</Button>
+    <Button variant="danger">擦除数据并开始刷机</Button>
   </div>
 );
 
 /** `danger` is only for steps that mutate or destroy device state. */
 export const DestructiveActions = () => (
   <div style={row}>
-    <Button variant="danger">刷写 rk3568-dev 的 2 个分区</Button>
+    <Button variant="danger">擦除数据并开始刷机</Button>
     <Button variant="danger">清空设备 buffer…</Button>
     <Button variant="danger">结束恢复并归档…</Button>
   </div>
@@ -31,9 +31,9 @@ export const BlockedByPrecondition = () => (
     <Button
       variant="danger"
       disabled
-      title="required prerequisite flashd 为 unknown,临界步骤前阻断"
+      title="required prerequisite recoveryPath 为 unsatisfied，Runtime 拒绝提交"
     >
-      刷写 rk3568-dev(2 个分区)…
+      擦除数据并开始刷机
     </Button>
     <Button disabled title="Provider 未声明 restartSafe,最后一步结果不明">
       从安全边界继续

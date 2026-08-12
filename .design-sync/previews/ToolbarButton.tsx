@@ -63,7 +63,7 @@ export const UnifiedTitlebar = () => (
           { label: "Runtime task", value: <span style={mono}>HTASK-DEMO-001 · debugCrash</span> },
           { label: "Lifecycle", value: <Chip tone="warn">● running</Chip> },
           { label: "Current stage", value: "patching" },
-          { label: "Target binding", value: <span style={mono}>rk3568-dev · rev 4</span> },
+          { label: "Target binding", value: <span style={mono}>DAYU200 · rev 3</span> },
         ]}
       />
     </WindowFrame>

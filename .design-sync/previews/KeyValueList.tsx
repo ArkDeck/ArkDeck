@@ -23,7 +23,7 @@ export const ChannelProtection = () => (
   <KeyValueList
     items={[
       {
-        term: "rk3568-dev",
+        term: "DAYU200",
         description: (
           <>
             USB · <Chip tone="ok">已授权</Chip> <Chip tone="warn">加密未验证</Chip>
@@ -45,12 +45,11 @@ export const PostflightVerify = () => (
         term: "设备回报 build",
         description: (
           <>
-            OpenHarmony 5.0.0.96 <Chip tone="ok">= 镜像期望 ✓</Chip>
+            OpenHarmony 5.0.0.71 <Chip tone="ok">= 镜像期望 ✓</Chip>
           </>
         ),
       },
-      { term: "设备身份", description: "同一 serial · binding revision 3→4" },
-      { term: "manifest", description: "9 steps 全部 executed · SHA e0a1…88f2" },
+      { term: "设备身份", description: "同一稳定身份 · binding revision 3→3" },
     ]}
   />
 );

@@ -1,19 +1,17 @@
 import { DangerConfirmDialog } from "@arkdeck/ds";
 
-export const FlashPartitions = () => (
+/** v0.6 Flash does not use a second confirmation sheet; shared HDC restart still does. */
+export const RestartSharedHdcServer = () => (
   <DangerConfirmDialog
-    title="刷写 rk3568-dev 的 2 个分区"
+    title="重启共享 HDC server?"
     impactTitle="影响范围"
     impact={[
-      "设备:rk3568-dev · serial 150100469… · binding rev 3(已确认)",
-      "写入:boot(64MB)、system(2.1GB)——将覆盖现有系统",
-      "失败可能导致设备无法启动,需使用厂商恢复工具;ArkDeck 不保证可自动恢复",
+      "所有 HDC 连接会暂时中断",
+      "DevEco 与其他工具正在进行的传输或调试会失败",
+      "ArkDeck 不会把此操作当作默认修复步骤",
     ]}
-    acknowledgements={[
-      "我确认目标设备与镜像匹配(rk3568 · OpenHarmony 5.0)",
-      "我已确认稳定供电与厂商恢复路径可用",
-    ]}
-    confirmLabel="刷写 rk3568-dev 的 2 个分区"
+    acknowledgements={["我了解会影响 DevEco 与其他设备会话"]}
+    confirmLabel="重启共享 HDC server"
   />
 );
 
