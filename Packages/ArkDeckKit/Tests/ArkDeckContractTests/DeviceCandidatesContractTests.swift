@@ -311,8 +311,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
     })?.isAuthorized == true)
   }
 
-  // The facade's provider protocol carries candidate and authorization reads
-  // only; neither method can name a Runtime write.
+  // The facade's provider protocol carries candidate, historical decoration
+  // and authorization reads only; no method can name a Runtime write.
   func testApplicationSurfaceCannotNameAWriteMethod() throws {
     let source = try String(
       contentsOf: URL(fileURLWithPath: #filePath)
@@ -327,8 +327,9 @@ final class DeviceCandidatesContractTests: XCTestCase {
         .lowerBound)
     let protocolBody = String(source[protocolStart..<protocolEnd])
     XCTAssertEqual(
-      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 2)
+      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 3)
     XCTAssertTrue(protocolBody.contains("func refreshCandidates()"))
+    XCTAssertTrue(protocolBody.contains("func enrichCandidates("))
     XCTAssertTrue(protocolBody.contains("func waitForAuthorization(connectKey: String)"))
     XCTAssertTrue(source.contains("method: \"device.candidates\""))
     for forbidden in [
@@ -336,5 +337,57 @@ final class DeviceCandidatesContractTests: XCTestCase {
     ] {
       XCTAssertFalse(source.contains(forbidden), forbidden)
     }
+  }
+
+  func testAppPublishesInitialDeviceRefreshBeforeWorkspaceProbeBurst() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let source = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
+      encoding: .utf8)
+    let taskStart = try XCTUnwrap(source.range(of: ".task {")?.upperBound)
+    let taskEnd = try XCTUnwrap(
+      source.range(of: ".defaultSize", range: taskStart..<source.endIndex)?.lowerBound)
+    let startup = String(source[taskStart..<taskEnd])
+
+    let deviceStart = try XCTUnwrap(
+      startup.range(of: "deviceList.refreshForStartup()")?.lowerBound)
+    let diagnosticsStart = try XCTUnwrap(
+      startup.range(of: "hdcDiagnostics.refresh()")?.lowerBound)
+    let devicePublished = try XCTUnwrap(
+      startup.range(of: "await initialDeviceRefresh")?.lowerBound)
+    let workspaceStart = try XCTUnwrap(
+      startup.range(of: "overviewCapabilities.refresh()")?.lowerBound)
+
+    XCTAssertLessThan(deviceStart, diagnosticsStart)
+    XCTAssertLessThan(diagnosticsStart, devicePublished)
+    XCTAssertLessThan(devicePublished, workspaceStart)
+    XCTAssertFalse(
+      startup.contains("deviceList.refresh()"),
+      "startup must not enqueue the sidebar read behind unrelated workspaces")
+  }
+
+  func testAppPublishesCandidateIdentityBeforeHistoricalDecoration() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let source = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Devices/DeviceWorkspace.swift"),
+      encoding: .utf8)
+    let finishStart = try XCTUnwrap(
+      source.range(of: "private func finishRefresh(generation:")?.lowerBound)
+    let candidateRead = try XCTUnwrap(
+      source.range(of: "provider.refreshCandidates()", range: finishStart..<source.endIndex)?
+        .lowerBound)
+    let candidatePublish = try XCTUnwrap(
+      source.range(of: "presentation = base", range: candidateRead..<source.endIndex)?.lowerBound)
+    let enrichment = try XCTUnwrap(
+      source.range(of: "provider.enrichCandidates(base)", range: candidatePublish..<source.endIndex)?
+        .lowerBound)
+
+    XCTAssertLessThan(candidateRead, candidatePublish)
+    XCTAssertLessThan(candidatePublish, enrichment)
+    XCTAssertTrue(
+      String(source[candidatePublish..<enrichment]).contains("Task {"),
+      "historical decoration must run after the startup-critical candidate publication")
   }
 }

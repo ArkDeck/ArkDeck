@@ -770,10 +770,17 @@ public protocol BootstrapObservationPort: Sendable {
 // MARK: - The machine
 
 public actor DeviceBootstrapMachine {
+  private struct CandidateEnumeration: Sendable {
+    let id: UInt64
+    let task: Task<[BootstrapCandidate], Error>
+  }
+
   public private(set) var phase: BootstrapPhase = .discoverHostTools
   private let observation: any BootstrapObservationPort
   private let targetStore: RuntimeTargetStore
   private let nowUTC: @Sendable () -> String
+  private var candidateEnumeration: CandidateEnumeration?
+  private var nextCandidateEnumerationID: UInt64 = 0
 
   public init(
     observation: any BootstrapObservationPort,
@@ -791,7 +798,27 @@ public actor DeviceBootstrapMachine {
   /// when exactly one Connected candidate is present, this method is
   /// deliberately incapable of producing a binding.
   public func enumerateCandidates() async throws -> [BootstrapCandidate] {
-    try await observation.listCandidates()
+    if let candidateEnumeration {
+      return try await candidateEnumeration.task.value
+    }
+
+    nextCandidateEnumerationID &+= 1
+    let enumerationID = nextCandidateEnumerationID
+    let observation = observation
+    let task = Task { try await observation.listCandidates() }
+    candidateEnumeration = CandidateEnumeration(id: enumerationID, task: task)
+    do {
+      let candidates = try await task.value
+      if candidateEnumeration?.id == enumerationID {
+        candidateEnumeration = nil
+      }
+      return candidates
+    } catch {
+      if candidateEnumeration?.id == enumerationID {
+        candidateEnumeration = nil
+      }
+      throw error
+    }
   }
 
   /// Runs the bootstrap to its next decision point. `selectedConnectKey`
