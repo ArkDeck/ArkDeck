@@ -3777,6 +3777,8 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   - `Catalog/**`
   - `Packages/ArkDeckKit/**`
   - `docs/design/**`
+  - `.design-sync/**`（仅用于与 `docs/design/**` 权威 v0.6 规格同车更新的设计工具镜像；
+    维护者 review/合入本行即构成该根目录的精确路径扩权，不含其他点目录）
   - `scripts/catalog_gen/**`
   - `.github/workflows/swift-slow-lanes.yml`（单文件扩权:深度扫描 P2「慢车道有闸无人拉」
     的 nightly 调度载体,与 `Packages/ArkDeckKit/Scripts/run-test-lane.sh` 的调用方注释
