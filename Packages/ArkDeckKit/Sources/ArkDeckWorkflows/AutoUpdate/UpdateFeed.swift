@@ -507,6 +507,11 @@ package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Senda
     }
   }
 
+  /// Deliberate durability downgrade (adjudicated, deep-scan list B item 4):
+  /// this data class tolerates losing the last write on power failure, so an
+  /// unavailable F_FULLFSYNC falls back to plain fsync instead of failing the
+  /// operation. Safety-kernel stores use DurableFilePrimitives.fullSync,
+  /// which requires both and throws.
   private static func fullSync(_ descriptor: Int32) throws {
     if fcntl(descriptor, F_FULLFSYNC) == 0 { return }
     guard fsync(descriptor) == 0 else { throw UpdateFeedError.replayStateWriteFailed }
