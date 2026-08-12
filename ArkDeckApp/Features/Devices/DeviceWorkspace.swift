@@ -34,6 +34,7 @@ final class DeviceListViewModel: ObservableObject {
   private let displayNamesDefaults: UserDefaults
   private let waitWindow: TimeInterval
   private var waitTask: Task<Void, Never>?
+  private var refreshGeneration: UInt64 = 0
 
   init(
     provider: any DeviceListApplicationProviding,
@@ -52,15 +53,43 @@ final class DeviceListViewModel: ObservableObject {
   }
 
   func refresh() {
-    guard !isRefreshing else { return }
+    guard let generation = beginRefresh() else { return }
+    Task { [weak self] in
+      await self?.finishRefresh(generation: generation)
+    }
+  }
+
+  /// The App's startup task awaits this read before it launches unrelated
+  /// workspace probes. Manual refresh keeps the fire-and-forget UI action
+  /// above; both paths share the same synchronous admission guard.
+  func refreshForStartup() async {
+    guard let generation = beginRefresh() else { return }
+    await finishRefresh(generation: generation)
+  }
+
+  private func beginRefresh() -> UInt64? {
+    guard !isRefreshing else { return nil }
     isRefreshing = true
+    refreshGeneration &+= 1
+    return refreshGeneration
+  }
+
+  private func finishRefresh(generation: UInt64) async {
+    let base = await provider.refreshCandidates()
+    guard generation == refreshGeneration else { return }
+    isRefreshing = false
+    guard !Task.isCancelled else { return }
+
+    // Candidate identity and trust are the startup-critical result. Publish
+    // them immediately; model / firmware / transport are historical
+    // decoration and must never hold the sidebar behind Job history reads.
+    presentation = base
+
     let provider = provider
     Task { [weak self] in
-      let next = await provider.refreshCandidates()
-      guard let self else { return }
-      defer { self.isRefreshing = false }
-      guard !Task.isCancelled else { return }
-      self.presentation = next
+      let enriched = await provider.enrichCandidates(base)
+      guard let self, !Task.isCancelled, generation == self.refreshGeneration else { return }
+      self.presentation = enriched
     }
   }
 

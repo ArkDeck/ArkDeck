@@ -99,6 +99,7 @@ public struct DeviceAuthorizationWaitResult: Sendable, Equatable {
 public protocol DeviceListApplicationProviding: Sendable {
   var authorizationWaitWindowSeconds: TimeInterval { get }
   func refreshCandidates() async -> DeviceListPresentation
+  func enrichCandidates(_ presentation: DeviceListPresentation) async -> DeviceListPresentation
   func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult
 }
 
@@ -118,15 +119,19 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
   private let authorizationProbeInterval: Duration = .seconds(5)
 
   func refreshCandidates() async -> DeviceListPresentation {
-    let base: DeviceListPresentation
     switch await DeviceListXPCReadTransport.request(method: "device.candidates") {
     case .failure(.transport(let reason)):
       return DeviceListPresentation(
         availability: .unavailable(reason: reason), candidates: [])
     case .success(let data):
-      base = DeviceCandidatesResponseDecoding.presentation(data)
+      return DeviceCandidatesResponseDecoding.presentation(data)
     }
-    return await joinObservedFacts(into: base)
+  }
+
+  func enrichCandidates(
+    _ presentation: DeviceListPresentation
+  ) async -> DeviceListPresentation {
+    await joinObservedFacts(into: presentation)
   }
 
   func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult {
@@ -386,6 +391,12 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
           adoptedTargetID: nil,
           bindingRevision: nil),
       ])
+  }
+
+  func enrichCandidates(
+    _ presentation: DeviceListPresentation
+  ) async -> DeviceListPresentation {
+    presentation
   }
 
   func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult {

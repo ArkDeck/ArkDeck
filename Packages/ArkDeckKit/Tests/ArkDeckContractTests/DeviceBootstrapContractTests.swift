@@ -35,6 +35,27 @@ final class DeviceBootstrapContractTests: XCTestCase {
     }
   }
 
+  private actor SlowCountingObservation: BootstrapObservationPort {
+    private(set) var candidateReadCount = 0
+    let candidates: [BootstrapCandidate]
+
+    init(candidates: [BootstrapCandidate]) {
+      self.candidates = candidates
+    }
+
+    func observeToolVersion() async throws -> String { "3.2.0f" }
+
+    func listCandidates() async throws -> [BootstrapCandidate] {
+      candidateReadCount += 1
+      try await Task.sleep(for: .milliseconds(50))
+      return candidates
+    }
+
+    func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
+      ["serial": connectKey]
+    }
+  }
+
   private func makeMachine(
     _ observation: ScriptedObservation
   ) throws -> (DeviceBootstrapMachine, RuntimeTargetStore) {
@@ -67,6 +88,26 @@ final class DeviceBootstrapContractTests: XCTestCase {
       RuntimeTargetHDCRoute(
         targetID: record.targetID, bindingRevision: record.bindingRevision,
         toolVersion: record.toolVersion, connectKey: record.connectKey))
+  }
+
+  func testConcurrentCandidateReadsShareOneProviderProbe() async throws {
+    let candidate = BootstrapCandidate(connectKey: "candidate-a", state: "Connected")
+    let observation = SlowCountingObservation(candidates: [candidate])
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let machine = DeviceBootstrapMachine(
+      observation: observation, targetStore: store, nowUTC: { "2026-08-12T00:00:00Z" })
+
+    async let first = machine.enumerateCandidates()
+    async let second = machine.enumerateCandidates()
+    let results = try await (first, second)
+
+    XCTAssertEqual(results.0, [candidate])
+    XCTAssertEqual(results.1, [candidate])
+    let candidateReadCount = await observation.candidateReadCount
+    XCTAssertEqual(
+      candidateReadCount, 1,
+      "App diagnostics and sidebar startup reads must not launch duplicate HDC probes")
+    XCTAssertTrue(try store.list().isEmpty, "coalesced discovery remains read-only")
   }
 
   func testMultipleCandidatesRequireExplicitSelection() async throws {
