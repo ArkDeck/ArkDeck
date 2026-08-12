@@ -3,73 +3,60 @@ import ArkDeckWorkflows
 import Combine
 import SwiftUI
 
-@main
-struct ArkDeckApp: App {
-  @StateObject private var hdcDiagnostics = HDCStatusViewModel(
-    provider: HDCApplicationDiagnosticsFacade.make())
-  @StateObject private var overviewCapabilities = OverviewCapabilityViewModel(
-    provider: OverviewCapabilityApplicationFacade.make())
-  @StateObject private var autoUpdate = AutoUpdateViewModel()
-  @StateObject private var runtimeHistory = RuntimeHistoryViewModel(
+/// Owns the App's long-lived presentation models without constructing every
+/// workspace before the first frame. Only projections rendered by the shell
+/// itself are eager; a workspace pays its setup cost when its branch first
+/// becomes visible.
+@MainActor
+private final class ArkDeckAppModelStore: ObservableObject {
+  let autoUpdate = AutoUpdateViewModel()
+  let runtimeHistory = RuntimeHistoryViewModel(
     provider: RuntimeHistoryApplicationFacade.make(),
     detailProvider: RuntimeJobDetailApplicationFacade.make())
-  @StateObject private var flashWorkspace = FlashWorkspaceViewModel(
-    provider: FlashApplicationFacade.make())
-  @StateObject private var uiDumpWorkspace = UIDumpWorkspaceViewModel(
-    provider: UIDumpApplicationFacade.make())
-  @StateObject private var debugWorkspace = DebugWorkspaceViewModel(
-    provider: DebugApplicationFacade.make())
-  @StateObject private var traceWorkspace = TraceWorkspaceViewModel(
-    provider: TraceApplicationFacade.make())
-  @StateObject private var automationWorkspace = AutomationWorkspaceViewModel(
-    provider: AutomationApplicationFacade.make())
-  @StateObject private var settingsWorkspace = SettingsWorkspaceViewModel(
-    provider: SettingsApplicationFacade.make())
-  @StateObject private var deviceList = DeviceListViewModel(
+  let deviceList = DeviceListViewModel(
     provider: DeviceListApplicationFacade.make(),
     resetDisplayNames: ProcessInfo.processInfo.arguments.contains(
       "--ui-test-reset-device-names"))
 
+  lazy var hdcDiagnostics = HDCStatusViewModel(
+    provider: HDCApplicationDiagnosticsFacade.make())
+  lazy var overviewCapabilities = OverviewCapabilityViewModel(
+    provider: OverviewCapabilityApplicationFacade.make())
+  lazy var flashWorkspace = FlashWorkspaceViewModel(
+    provider: FlashApplicationFacade.make())
+  lazy var uiDumpWorkspace = UIDumpWorkspaceViewModel(
+    provider: UIDumpApplicationFacade.make())
+  lazy var debugWorkspace = DebugWorkspaceViewModel(
+    provider: DebugApplicationFacade.make())
+  lazy var traceWorkspace = TraceWorkspaceViewModel(
+    provider: TraceApplicationFacade.make())
+  lazy var automationWorkspace = AutomationWorkspaceViewModel(
+    provider: AutomationApplicationFacade.make())
+  lazy var settingsWorkspace = SettingsWorkspaceViewModel(
+    provider: SettingsApplicationFacade.make())
+
+  init() {
+    // The connected-device row is first-screen content, so begin its async
+    // read while SwiftUI builds the window instead of waiting for `.task`
+    // after first appearance. The task inherits the main actor only for
+    // publication; the provider actor owns the Runtime/XPC wait.
+    Task { [deviceList] in
+      await deviceList.refreshForStartup()
+    }
+  }
+}
+
+@main
+struct ArkDeckApp: App {
+  @StateObject private var models = ArkDeckAppModelStore()
+
   var body: some Scene {
     WindowGroup {
-      AppShellView(
-        hdcDiagnostics: hdcDiagnostics,
-        overviewCapabilities: overviewCapabilities,
-        autoUpdate: autoUpdate,
-        runtimeHistory: runtimeHistory,
-        flashWorkspace: flashWorkspace,
-        uiDumpWorkspace: uiDumpWorkspace,
-        debugWorkspace: debugWorkspace,
-        traceWorkspace: traceWorkspace,
-        automationWorkspace: automationWorkspace,
-        deviceList: deviceList
-      )
-      .task {
-        ApplicationIconChoice.applyStoredSelection()
-        // Keep cold start to projections that are visible in every shell
-        // state. AppShellView admits the selected workspace separately and
-        // defers every hidden workspace until the user selects it. Starting
-        // all five workspaces here used to duplicate Trace/target reads and
-        // saturate HDC before the Overview could settle.
-        async let initialDeviceRefresh: Void = deviceList.refreshForStartup()
-        runtimeHistory.refresh()
-        await initialDeviceRefresh
-        autoUpdate.startup()
-      }
+      AppShellView(models: models)
     }
     .defaultSize(width: 1180, height: 760)
     Settings {
-      SettingsRootView(
-        model: settingsWorkspace,
-        hdcPresentation: hdcDiagnostics.presentation,
-        isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
-        hdcConfigurationError: hdcDiagnostics.configurationError,
-        hasActiveRuntimeJobs: runtimeHistory.hasActiveJobs,
-        onHDCRefresh: { hdcDiagnostics.refresh() },
-        onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
-      ) {
-        AutoUpdateSettingsView(model: autoUpdate)
-      }
+      SettingsSceneLoader(models: models)
     }
   }
 }
@@ -142,22 +129,45 @@ private enum ShellSelection: Hashable {
 /// per navigation item. Implemented workspaces consume only their own Runtime
 /// projections; features without an accepted production surface remain
 /// explicit rather than re-rendering another page's data under a new title.
+private struct OverviewWorkspaceView: View {
+  @ObservedObject var hdcDiagnostics: HDCStatusViewModel
+  @ObservedObject var overviewCapabilities: OverviewCapabilityViewModel
+
+  var body: some View {
+    HDCStatusView(
+      presentation: hdcDiagnostics.presentation,
+      capabilityMatrix: overviewCapabilities.presentation,
+      onRefresh: {
+        hdcDiagnostics.refresh()
+        overviewCapabilities.refresh()
+      },
+      isRefreshInFlight: hdcDiagnostics.isRefreshInFlight
+        || overviewCapabilities.isRefreshInFlight,
+      onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
+      onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
+      onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
+      onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
+      configurationError: hdcDiagnostics.configurationError)
+  }
+}
+
 private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
   @State private var isJobInspectorExpanded = false
   @State private var renamingDeviceConnectKey: String?
   @State private var pendingDeviceName = ""
-  @ObservedObject var hdcDiagnostics: HDCStatusViewModel
-  @ObservedObject var overviewCapabilities: OverviewCapabilityViewModel
-  @ObservedObject var autoUpdate: AutoUpdateViewModel
-  @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
-  @ObservedObject var flashWorkspace: FlashWorkspaceViewModel
-  @ObservedObject var uiDumpWorkspace: UIDumpWorkspaceViewModel
-  @ObservedObject var debugWorkspace: DebugWorkspaceViewModel
-  @ObservedObject var traceWorkspace: TraceWorkspaceViewModel
-  @ObservedObject var automationWorkspace: AutomationWorkspaceViewModel
-  @ObservedObject var deviceList: DeviceListViewModel
+  private let models: ArkDeckAppModelStore
+  @ObservedObject private var autoUpdate: AutoUpdateViewModel
+  @ObservedObject private var runtimeHistory: RuntimeHistoryViewModel
+  @ObservedObject private var deviceList: DeviceListViewModel
+
+  init(models: ArkDeckAppModelStore) {
+    self.models = models
+    _autoUpdate = ObservedObject(wrappedValue: models.autoUpdate)
+    _runtimeHistory = ObservedObject(wrappedValue: models.runtimeHistory)
+    _deviceList = ObservedObject(wrappedValue: models.deviceList)
+  }
 
   private var shellSelection: ShellSelection {
     ShellSelection(storageValue: storedSelection)
@@ -233,12 +243,22 @@ private struct AppShellView: View {
       if case .device(waitedKey) = ShellSelection(storageValue: newValue) { return }
       deviceList.cancelAuthorizationWait()
     }
-    // A workspace owns fresh facts only while it is visible. The initial
-    // callback admits the restored scene selection; later callbacks refresh
-    // on navigation. This avoids spending cold-start I/O and HDC capacity on
-    // five hidden projections while preserving fresh-on-entry behavior.
-    .onChange(of: storedSelection, initial: true) { _, newValue in
+    // A workspace owns fresh facts only while it is visible. The device read
+    // admits the restored selection below; subsequent navigation refreshes
+    // only the newly visible branch.
+    .onChange(of: storedSelection) { _, newValue in
+      guard deviceList.presentation.availability != .checking else { return }
       refreshVisibleProjection(for: newValue)
+    }
+    .task(id: deviceList.startupInformationReady) {
+      guard deviceList.startupInformationReady else { return }
+      // Yield the main actor once so SwiftUI can commit the complete device
+      // row before independent secondary reads fan out concurrently.
+      await Task.yield()
+      runtimeHistory.refresh()
+      autoUpdate.startup()
+      ApplicationIconChoice.applyStoredSelection()
+      refreshVisibleProjection(for: storedSelection)
     }
     .alert(
       deviceString("device.rename.title"),
@@ -294,20 +314,20 @@ private struct AppShellView: View {
     case .device:
       break
     case .navigation(.overview):
-      hdcDiagnostics.refresh()
-      overviewCapabilities.refresh()
+      models.hdcDiagnostics.refresh()
+      models.overviewCapabilities.refresh()
     case .navigation(.history):
       runtimeHistory.refresh()
     case .navigation(.flash):
-      flashWorkspace.refresh()
+      models.flashWorkspace.refresh()
     case .navigation(.debug):
-      debugWorkspace.refresh()
+      models.debugWorkspace.refresh()
     case .navigation(.uiDump):
-      uiDumpWorkspace.refresh()
+      models.uiDumpWorkspace.refresh()
     case .navigation(.trace):
-      traceWorkspace.refresh()
+      models.traceWorkspace.refresh()
     case .navigation(.automation):
-      automationWorkspace.refresh()
+      models.automationWorkspace.refresh()
     }
   }
 
@@ -366,7 +386,12 @@ private struct AppShellView: View {
 
   @ViewBuilder
   private var detail: some View {
-    if case .device(let connectKey) = shellSelection {
+    if deviceList.presentation.availability == .checking {
+      ProgressView()
+        .controlSize(.large)
+        .accessibilityIdentifier("app.devices.checking")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    } else if case .device(let connectKey) = shellSelection {
       if let candidate = deviceList.candidate(forConnectKey: connectKey) {
         DeviceDetailView(
           candidate: candidate,
@@ -402,20 +427,9 @@ private struct AppShellView: View {
   private var workspaceDetail: some View {
     switch selectedItem {
     case .overview:
-      HDCStatusView(
-        presentation: hdcDiagnostics.presentation,
-        capabilityMatrix: overviewCapabilities.presentation,
-        onRefresh: {
-          hdcDiagnostics.refresh()
-          overviewCapabilities.refresh()
-        },
-        isRefreshInFlight: hdcDiagnostics.isRefreshInFlight
-          || overviewCapabilities.isRefreshInFlight,
-        onRequestRecoveryImpactPreview: hdcDiagnostics.requestRecoveryImpactPreview,
-        onConfirmRecoveryImpactPreview: hdcDiagnostics.confirmRecoveryImpactPreview,
-        onDispatchConfirmedRecovery: hdcDiagnostics.dispatchConfirmedRecoveryAction,
-        onSelectUserConfiguredExecutable: hdcDiagnostics.selectUserConfiguredExecutable,
-        configurationError: hdcDiagnostics.configurationError)
+      OverviewWorkspaceView(
+        hdcDiagnostics: models.hdcDiagnostics,
+        overviewCapabilities: models.overviewCapabilities)
     case .history:
       RuntimeHistoryView(
         presentation: runtimeHistory.presentation,
@@ -430,21 +444,21 @@ private struct AppShellView: View {
         onExportArtifact: runtimeHistory.exportArtifact)
     case .flash:
       FlashWorkspaceView(
-        model: flashWorkspace,
+        model: models.flashWorkspace,
         runtimeHistory: runtimeHistory.presentation,
         isRuntimeHistoryRefreshing: runtimeHistory.isRefreshInFlight,
         onRefreshRuntimeHistory: runtimeHistory.refresh,
         onOpenHistory: openHistory)
     case .debug:
       DebugWorkspaceView(
-        model: debugWorkspace,
+        model: models.debugWorkspace,
         onOpenHistory: openHistory)
     case .uiDump:
-      UIDumpWorkspaceView(model: uiDumpWorkspace)
+      UIDumpWorkspaceView(model: models.uiDumpWorkspace)
     case .trace:
-      TraceWorkspaceView(model: traceWorkspace)
+      TraceWorkspaceView(model: models.traceWorkspace)
     case .automation:
-      AutomationWorkspaceView(model: automationWorkspace)
+      AutomationWorkspaceView(model: models.automationWorkspace)
     }
   }
 
@@ -527,6 +541,56 @@ private struct AppShellView: View {
   }
 }
 
+/// A Settings scene can exist without a Settings window. Delay access to its
+/// models until the scene is actually presented; constructing the scene graph
+/// at launch must not initialize session storage or diagnostics exporters.
+private struct SettingsSceneLoader: View {
+  let models: ArkDeckAppModelStore
+  @State private var isPresented = false
+
+  var body: some View {
+    Group {
+      if isPresented {
+        SettingsSceneContent(models: models)
+      } else {
+        ProgressView()
+      }
+    }
+    .task {
+      await Task.yield()
+      isPresented = true
+    }
+  }
+}
+
+private struct SettingsSceneContent: View {
+  @ObservedObject var model: SettingsWorkspaceViewModel
+  @ObservedObject var hdcDiagnostics: HDCStatusViewModel
+  @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
+  @ObservedObject var autoUpdate: AutoUpdateViewModel
+
+  init(models: ArkDeckAppModelStore) {
+    _model = ObservedObject(wrappedValue: models.settingsWorkspace)
+    _hdcDiagnostics = ObservedObject(wrappedValue: models.hdcDiagnostics)
+    _runtimeHistory = ObservedObject(wrappedValue: models.runtimeHistory)
+    _autoUpdate = ObservedObject(wrappedValue: models.autoUpdate)
+  }
+
+  var body: some View {
+    SettingsRootView(
+      model: model,
+      hdcPresentation: hdcDiagnostics.presentation,
+      isHDCRefreshInFlight: hdcDiagnostics.isRefreshInFlight,
+      hdcConfigurationError: hdcDiagnostics.configurationError,
+      hasActiveRuntimeJobs: runtimeHistory.hasActiveJobs,
+      onHDCRefresh: { hdcDiagnostics.refresh() },
+      onSelectHDC: hdcDiagnostics.selectUserConfiguredExecutable
+    ) {
+      AutoUpdateSettingsView(model: autoUpdate)
+    }
+  }
+}
+
 private struct AutoUpdateSettingsView: View {
   @ObservedObject var model: AutoUpdateViewModel
 
@@ -604,7 +668,7 @@ private final class AutoUpdateViewModel: ObservableObject {
     }
   }
 
-  private let service: AutoUpdateService?
+  private var service: AutoUpdateService?
   private let identity = AutoUpdateApplicationFacade.currentProductIdentity()
   private var started = false
   /// UI automation drives a declared state instead of the real updater, which
@@ -615,24 +679,28 @@ private final class AutoUpdateViewModel: ObservableObject {
 
   init() {
     usesFixture = AutoUpdateUIFixture.isSelected()
-    guard !usesFixture else {
-      service = nil
-      return
-    }
-    service = try? AutoUpdateApplicationFacade.make()
-    if service == nil { statusKey = "update.status.unavailable" }
+    service = nil
   }
 
   func startup() {
+    guard !started else { return }
+    started = true
     if usesFixture {
-      guard !started else { return }
-      started = true
       Task { await synchronize() }
       return
     }
-    guard !started, let service else { return }
-    started = true
-    Task {
+    Task { [weak self] in
+      // Storage discovery and diagnostic log scanning are not UI work. Build
+      // the actor away from the main actor, after connected devices are visible.
+      let service = await Task.detached(priority: .utility) {
+        try? AutoUpdateApplicationFacade.make()
+      }.value
+      guard let self, !Task.isCancelled else { return }
+      guard let service else {
+        statusKey = "update.status.unavailable"
+        return
+      }
+      self.service = service
       do {
         try await service.recoverOrphanPartials()
         automaticChecksEnabled = await service.automaticChecksEnabled
