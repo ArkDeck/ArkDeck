@@ -147,7 +147,9 @@ package enum DurableJournalRecovery {
     for (offset, line) in completedLines.enumerated() {
       guard !line.isEmpty else { throw DurableFileError.malformedCompletedRecord(line: offset + 1) }
       do {
-        events.append(try JournalEventCodec.decode(Data(line)))
+        try autoreleasepool {
+          events.append(try JournalEventCodec.decode(Data(line)))
+        }
       } catch {
         throw DurableFileError.malformedCompletedRecord(line: offset + 1)
       }

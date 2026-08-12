@@ -49,12 +49,23 @@ package enum CanonicalJSONEncoders {
 /// regardless of probe order; a fresh formatter per call matches the
 /// pre-consolidation behaviour and keeps the API thread-safe.
 package enum ISO8601Timestamps {
+  // ISO8601DateFormatter is documented thread-safe and these two are fully
+  // configured before first use; constructing formatters per call dominated
+  // journal replay (two allocations per validated event).
+  private nonisolated(unsafe) static let fractionalFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
+
+  private nonisolated(unsafe) static let plainFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+
   package static func parse(_ value: String) -> Date? {
-    let fractional = ISO8601DateFormatter()
-    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = fractional.date(from: value) { return date }
-    let plain = ISO8601DateFormatter()
-    plain.formatOptions = [.withInternetDateTime]
-    return plain.date(from: value)
+    if let date = fractionalFormatter.date(from: value) { return date }
+    return plainFormatter.date(from: value)
   }
 }
