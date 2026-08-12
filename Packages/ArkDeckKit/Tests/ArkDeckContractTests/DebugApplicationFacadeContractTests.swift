@@ -1,3 +1,4 @@
+import ArkDeckCore
 import Foundation
 import XCTest
 
@@ -107,12 +108,70 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
   }
 
   func testTypedIdentifierValidatorGatesBundleAndAbilityNames() throws {
-    for accepted in ["com.example.app", "EntryAbility", "com.demo.gallery2"] {
-      XCTAssertTrue(DebugTypedValueValidator.isSafeTypedIdentifier(accepted))
+    for accepted in ["com.example.app", "com.demo.gallery2", "A.b"] {
+      XCTAssertTrue(DebugTypedValueValidator.isValidBundleName(accepted))
     }
-    for rejected in ["", "com.example; rm -rf /", "$(id)", "a b", "app | tee"] {
-      XCTAssertFalse(DebugTypedValueValidator.isSafeTypedIdentifier(rejected))
+    for rejected in ["", "EntryAbility", "com.example-app", "com.example;rm", "$(id)"] {
+      XCTAssertFalse(DebugTypedValueValidator.isValidBundleName(rejected))
     }
+    for accepted in ["EntryAbility", "entry.MainAbility", "Ability_2"] {
+      XCTAssertTrue(DebugTypedValueValidator.isValidAbilityName(accepted))
+    }
+    for rejected in ["", "entry-ability", "a b", "app | tee", "$(id)"] {
+      XCTAssertFalse(DebugTypedValueValidator.isValidAbilityName(rejected))
+    }
+  }
+
+  func testHAPLocalInspectionIsBoundedAndProducesExactByteFacts() throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-debug-hap-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let file = directory.appending(path: "entry.hap")
+    try Data([0x50, 0x4b, 0x03, 0x04, 0x01, 0x02]).write(to: file)
+
+    let inspected = try DebugHAPLocalArtifactInspector.inspect(file)
+    XCTAssertEqual(inspected.name, "entry.hap")
+    XCTAssertEqual(inspected.byteCount, 6)
+    XCTAssertEqual(inspected.sha256.count, 64)
+    XCTAssertTrue(inspected.sha256.allSatisfy { $0.isHexDigit && !$0.isUppercase })
+    XCTAssertThrowsError(
+      try DebugHAPLocalArtifactInspector.inspect(
+        directory.appending(path: "entry.zip")))
+  }
+
+  func testHAPRequestBuilderPinsTargetLeaseInputsAndAppsClient() throws {
+    let target = DebugTargetPresentation(
+      id: "target-dayu200-a", bindingRevision: 9, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-06T12:00:00Z")
+    let request = try DebugHAPRequestBuilder.request(
+      target: target, lease: "LEASE-HAP-1", bundleName: "com.example.app",
+      abilityName: "EntryAbility", installPolicy: "installOrReplace",
+      cleanupPolicy: "uninstall", postRunAbilityState: "stopped",
+      captureDiagnostics: true, diagnosticsDurationSeconds: 30,
+      nonce: "contract")
+    let data = try CanonicalJSONEncoders.canonical().encode(request)
+    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let operation = try XCTUnwrap(object["operation"] as? [String: Any])
+    let targetObject = try XCTUnwrap(object["target"] as? [String: Any])
+    let inputs = try XCTUnwrap(object["inputs"] as? [String: Any])
+    let context = try XCTUnwrap(object["clientContext"] as? [String: Any])
+
+    XCTAssertEqual(operation["id"] as? String, "debug.hap")
+    XCTAssertEqual(operation["version"] as? Int, 1)
+    XCTAssertEqual(targetObject["targetId"] as? String, target.id)
+    XCTAssertEqual(targetObject["expectedBindingRevision"] as? Int, 9)
+    XCTAssertEqual(inputs["hapArtifactLease"] as? String, "LEASE-HAP-1")
+    XCTAssertEqual(inputs["bundleName"] as? String, "com.example.app")
+    XCTAssertEqual(inputs["abilityName"] as? String, "EntryAbility")
+    XCTAssertEqual(inputs["portForwardProfile"] as? String, "none")
+    XCTAssertEqual(context["clientName"] as? String, ArkDeckAgentClientName.debugAppsWorkspace)
+    XCTAssertThrowsError(
+      try DebugHAPRequestBuilder.request(
+        target: target, lease: "LEASE-HAP-1", bundleName: "not-a-bundle",
+        abilityName: "EntryAbility", installPolicy: "installOrReplace",
+        cleanupPolicy: "uninstall", postRunAbilityState: "stopped",
+        captureDiagnostics: true, diagnosticsDurationSeconds: 30))
   }
 
   func testApprovedTemplatesAreClosedRunnableAndReadOnly() throws {
@@ -132,7 +191,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       DebugApplicationFacade.approvedCommandTemplates.contains { $0.id == "requestRootMode" })
   }
 
-  func testApplicationSurfaceCannotNameAWriteMethod() throws {
+  func testApplicationSurfaceNamesOnlyClosedTypedWrites() throws {
     let source = try String(
       contentsOf: URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
@@ -145,27 +204,48 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
     XCTAssertEqual(
-      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 6)
+      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 7)
     XCTAssertTrue(protocolBody.contains("func refreshWorkspace(targetID:"))
     XCTAssertTrue(protocolBody.contains("func submitLogs("))
+    XCTAssertTrue(protocolBody.contains("func submitHAP("))
     XCTAssertTrue(protocolBody.contains("func run(jobID:"))
     XCTAssertTrue(protocolBody.contains("func cancel(jobID:"))
     XCTAssertTrue(protocolBody.contains("func submitPortRule("))
     XCTAssertTrue(protocolBody.contains("func runTemplate("))
 
     for mutating in [
-      "artifact.import", "target.adopt",
+      "target.adopt",
       "forward.create", "forward.delete", "buffer.clear", "command.run",
     ] {
       XCTAssertFalse(source.contains("\"\(mutating)\""))
     }
-    for readOnly in [
+    for exposed in [
       "operation.list", "target.list", "job.list", "debug.probe", "debug.template.run",
       "job.submit", "job.run", "job.cancel",
       "port-forward.create", "port-forward.remove",
+      "artifact.importHap.begin", "artifact.importHap.append",
+      "artifact.importHap.commit", "artifact.importHap.abort",
     ] {
-      XCTAssertTrue(source.contains("\"\(readOnly)\""))
+      XCTAssertTrue(source.contains("\"\(exposed)\""))
     }
+  }
+
+  func testDebugAppsViewRunsTheTypedHAPPathInsteadOfADisabledPlaceholder() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/DebugLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    XCTAssertTrue(view.contains("model.submitHAP("))
+    XCTAssertTrue(view.contains("model.cancelHAP()"))
+    XCTAssertTrue(view.contains("model.activeHAPJobID"))
+    XCTAssertTrue(view.contains("job.timeline.last"))
+    XCTAssertFalse(view.contains("Button(DebugL10n.text(\"debug.apps.run\")) {}"))
+    XCTAssertFalse(localization.contains("debug.blocked.hapImport"))
   }
 
   func testDebugProbeAndCommandResponsesStayBoundToTargetAndClosedTemplate() throws {
@@ -213,7 +293,8 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
   func testDebugProbeParsersAcceptOnlyTypedPackageAndPortRows() {
     XCTAssertEqual(
       FoundationDebugRuntimeProbe.packageNames(
-        Data("com.example.app\nnot a bundle\ncom.ohos.launcher\n".utf8)).sorted(),
+        Data("com.example.app\nnot a bundle\ncom.ohos.launcher\n".utf8)
+      ).sorted(),
       ["com.example.app", "com.ohos.launcher"])
     XCTAssertEqual(
       FoundationDebugRuntimeProbe.portRules(
@@ -231,9 +312,10 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
 
     XCTAssertThrowsError(
       try HDCReadOnlyProbeReceiptValidation.requireNoSemanticFailure(
-        receipt, context: "test probe")) { error in
-          XCTAssertTrue(String(describing: error).contains("explicit failure"))
-        }
+        receipt, context: "test probe")
+    ) { error in
+      XCTAssertTrue(String(describing: error).contains("explicit failure"))
+    }
   }
 
   func testPortForwardCompensationKeepsTheExactPairAcrossLaterHostFailures() throws {

@@ -24,8 +24,9 @@ enum DebugWorkspaceTab: String, CaseIterable, Hashable {
   }
 }
 
-/// The complete Debug workspace. It projects Runtime facts and typed Catalog
-/// contracts, but deliberately owns no submit, import, or command transport.
+/// The complete Debug workspace. It projects Runtime facts and invokes only
+/// the closed typed Debug facade; provider lowering and raw command transport
+/// remain outside the App.
 struct DebugWorkspaceView: View {
   @ObservedObject var model: DebugWorkspaceViewModel
   let onOpenHistory: () -> Void
@@ -64,7 +65,9 @@ struct DebugWorkspaceView: View {
           }
           .accessibilityIdentifier("debug.activeJobs")
         }
-        Button { model.refresh(targetID: selectedTargetID) } label: {
+        Button {
+          model.refresh(targetID: selectedTargetID)
+        } label: {
           Label(DebugL10n.text("debug.action.refresh"), systemImage: "arrow.clockwise")
         }
         .disabled(model.isRefreshing)
@@ -198,13 +201,17 @@ struct DebugWorkspaceView: View {
           targetID: selectedTarget?.id))
     case .apps:
       DebugAppsWorkspace(
+        model: model,
         operation: model.workspace.operation(DebugApplicationFacade.debugHAPReference),
         target: selectedTarget,
         relatedJobs: model.workspace.jobs.filter {
           $0.operationReference == DebugApplicationFacade.debugHAPReference
         },
         runtimeProbe: model.workspace.runtimeProbe,
-        probeFailure: model.workspace.probeFailure)
+        probeFailure: model.workspace.probeFailure,
+        runtimeArtifacts: model.runtimeArtifactRows(
+          operationReference: DebugApplicationFacade.debugHAPReference,
+          targetID: selectedTarget?.id))
     case .network:
       DebugNetworkWorkspace(
         model: model,
@@ -654,11 +661,13 @@ private struct DebugLogsWorkspace: View {
 }
 
 private struct DebugAppsWorkspace: View {
+  @ObservedObject var model: DebugWorkspaceViewModel
   let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
   let relatedJobs: [DebugJobPresentation]
   let runtimeProbe: DebugRuntimeProbeSnapshot?
   let probeFailure: String?
+  let runtimeArtifacts: [DebugRuntimeArtifactRow]
 
   @State private var isImporterPresented = false
   @State private var selectedHAPURL: URL?
@@ -685,6 +694,7 @@ private struct DebugAppsWorkspace: View {
           }
         }
         packageInventory
+        if !runtimeArtifacts.isEmpty { resultArtifacts }
         DebugRecentJobsCard(jobs: relatedJobs)
       }
       .frame(maxWidth: 1_050, alignment: .topLeading)
@@ -794,6 +804,13 @@ private struct DebugAppsWorkspace: View {
 
       DebugCard(title: DebugL10n.text("debug.apps.plan.title"), symbol: "list.number") {
         VStack(alignment: .leading, spacing: 8) {
+          DebugCodeRow(label: "bundleName", value: bundleName.isEmpty ? "—" : bundleName)
+          DebugCodeRow(label: "abilityName", value: abilityName.isEmpty ? "—" : abilityName)
+          DebugCodeRow(label: "installPolicy", value: installPolicy)
+          DebugCodeRow(label: "cleanupPolicy", value: cleanupPolicy)
+          DebugCodeRow(label: "postRunAbilityState", value: postRunState)
+          DebugCodeRow(label: "captureDiagnostics", value: String(captureDiagnostics))
+          Divider()
           if let operation {
             ForEach(operation.steps) { step in
               HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -818,11 +835,57 @@ private struct DebugAppsWorkspace: View {
               if step.id != operation.steps.last?.id { Divider() }
             }
           }
-          Button(DebugL10n.text("debug.apps.run")) {}
-            .buttonStyle(.borderedProminent)
-            .disabled(true)
-            .help(DebugL10n.text("debug.blocked.hapImport"))
-          DebugBlockedReason(text: DebugL10n.text("debug.blocked.hapImport"))
+          HStack {
+            if model.isSubmittingHAP {
+              ProgressView().controlSize(.small)
+              Text(
+                DebugL10n.text(
+                  model.activeHAPJobID == nil
+                    ? "debug.apps.importing" : "debug.apps.running")
+              )
+              .font(.footnote)
+              if let jobID = model.activeHAPJobID {
+                Text(jobID).font(.caption.monospaced()).lineLimit(1)
+                Spacer()
+                Button(DebugL10n.text("debug.action.cancel")) { model.cancelHAP() }
+                  .disabled(model.isCancellingHAP)
+                  .accessibilityIdentifier("debug.apps.cancel")
+              }
+            } else {
+              Button(DebugL10n.text("debug.apps.run")) {
+                guard let target, let selectedHAPURL else { return }
+                model.submitHAP(
+                  target: target,
+                  fileURL: selectedHAPURL,
+                  bundleName: bundleName,
+                  abilityName: abilityName,
+                  installPolicy: installPolicy,
+                  cleanupPolicy: cleanupPolicy,
+                  postRunAbilityState: postRunState,
+                  captureDiagnostics: captureDiagnostics,
+                  diagnosticsDurationSeconds: diagnosticsDuration)
+              }
+              .buttonStyle(.borderedProminent)
+              .disabled(!canSubmit)
+              .accessibilityIdentifier("debug.apps.run")
+            }
+          }
+          if let failure = model.hapFailure {
+            Label(failure, systemImage: "xmark.octagon")
+              .font(.footnote)
+              .foregroundStyle(.red)
+              .fixedSize(horizontal: false, vertical: true)
+              .textSelection(.enabled)
+          }
+          if let terminal = model.hapTerminal {
+            Label(
+              "\(terminal.state) · \(terminal.jobID)",
+              systemImage: terminal.state == "succeeded"
+                ? "checkmark.circle.fill" : "exclamationmark.circle"
+            )
+            .font(.footnote.monospaced())
+            .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
+          }
         }
       }
     }
@@ -879,12 +942,57 @@ private struct DebugAppsWorkspace: View {
     }
   }
 
+  private var resultArtifacts: some View {
+    DebugCard(title: DebugL10n.text("debug.apps.artifacts.title"), symbol: "shippingbox.fill") {
+      VStack(spacing: 8) {
+        ForEach(runtimeArtifacts) { row in
+          HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(row.artifact.name).font(.callout.monospaced())
+              Text("\(row.artifact.status) · \(row.artifact.privacy) · \(row.jobID)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            Text(
+              ByteCountFormatter.string(
+                fromByteCount: row.artifact.byteCount, countStyle: .file)
+            )
+            .font(.caption.monospacedDigit())
+            Text(String(row.artifact.sha256.prefix(12)))
+              .font(.caption.monospaced())
+              .help(row.artifact.sha256)
+          }
+          .accessibilityElement(children: .combine)
+        }
+      }
+    }
+  }
+
+  private var operationIsAvailable: Bool {
+    guard let operation else { return false }
+    if case .available = operation.availability { return true }
+    return false
+  }
+
+  private var canSubmit: Bool {
+    target != nil && selectedHAPURL != nil && operationIsAvailable
+      && invalidIdentityFieldNames == nil && !bundleName.isEmpty && !abilityName.isEmpty
+      && !model.isSubmittingHAP
+  }
+
   private var invalidIdentityFieldNames: String? {
     let invalid = [
-      (DebugL10n.text("debug.apps.bundle"), bundleName),
-      (DebugL10n.text("debug.apps.ability"), abilityName),
+      (
+        DebugL10n.text("debug.apps.bundle"), bundleName,
+        DebugTypedValueValidator.isValidBundleName(bundleName)
+      ),
+      (
+        DebugL10n.text("debug.apps.ability"), abilityName,
+        DebugTypedValueValidator.isValidAbilityName(abilityName)
+      ),
     ]
-    .filter { !$0.1.isEmpty && !DebugTypedValueValidator.isSafeTypedIdentifier($0.1) }
+    .filter { !$0.1.isEmpty && !$0.2 }
     .map(\.0)
     return invalid.isEmpty ? nil : invalid.joined(separator: ", ")
   }
@@ -967,13 +1075,13 @@ private struct DebugNetworkWorkspace: View {
           guard let target, case .valid(let rule) = validation else { return }
           model.mutatePortRule(target: target, rule: rule, removing: false)
         }
-          .buttonStyle(.borderedProminent)
-          .disabled(
-            target == nil || model.isMutatingPortRule
-              || {
-                if case .valid = validation { return false }
-                return true
-              }())
+        .buttonStyle(.borderedProminent)
+        .disabled(
+          target == nil || model.isMutatingPortRule
+            || {
+              if case .valid = validation { return false }
+              return true
+            }())
         if let jobID = model.activePortRuleJobID {
           HStack(spacing: 8) {
             ProgressView().controlSize(.small)
@@ -1227,8 +1335,8 @@ private struct DebugCommandsWorkspace: View {
               guard let target else { return }
               model.runTemplate(target: target, templateID: template.id)
             }
-              .buttonStyle(.borderedProminent)
-              .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
+            .buttonStyle(.borderedProminent)
+            .disabled(target == nil || !template.isRunnable || model.isRunningCommand)
             Spacer()
             Label(DebugL10n.text("debug.commands.noPTY"), systemImage: "rectangle.slash")
               .font(.footnote)
@@ -1335,19 +1443,27 @@ private struct DebugRecentJobsCard: View {
       } else {
         VStack(spacing: 8) {
           ForEach(jobs.prefix(5)) { job in
-            HStack(spacing: 10) {
-              Image(systemName: job.needsAttention ? "exclamationmark.triangle" : "circle.fill")
-                .font(.caption)
-                .foregroundStyle(job.needsAttention ? .orange : .secondary)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(job.id).font(.callout.monospaced())
-                Text("\(job.targetID) · \(job.operationReference)")
+            VStack(alignment: .leading, spacing: 4) {
+              HStack(spacing: 10) {
+                Image(systemName: job.needsAttention ? "exclamationmark.triangle" : "circle.fill")
+                  .font(.caption)
+                  .foregroundStyle(job.needsAttention ? .orange : .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(job.id).font(.callout.monospaced())
+                  Text("\(job.targetID) · \(job.operationReference)")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(job.state)
+                  .font(.caption.weight(.medium))
+              }
+              if let latest = job.timeline.last {
+                Text(latest)
                   .font(.caption.monospaced())
                   .foregroundStyle(.secondary)
+                  .lineLimit(2)
               }
-              Spacer()
-              Text(job.state)
-                .font(.caption.weight(.medium))
             }
           }
         }
@@ -1436,6 +1552,11 @@ final class DebugWorkspaceViewModel: ObservableObject {
   @Published private(set) var activePortRuleJobID: String?
   @Published private(set) var portRuleTerminal: DebugLogJobTerminalPresentation?
   @Published private(set) var portRuleFailure: String?
+  @Published private(set) var isSubmittingHAP = false
+  @Published private(set) var isCancellingHAP = false
+  @Published private(set) var activeHAPJobID: String?
+  @Published private(set) var hapTerminal: DebugLogJobTerminalPresentation?
+  @Published private(set) var hapFailure: String?
 
   private let provider: any DebugApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
@@ -1564,6 +1685,70 @@ final class DebugWorkspaceViewModel: ObservableObject {
       guard let self else { return }
       self.isCancellingLogs = false
       if !accepted { self.logFailure = "Runtime refused the cancellation request" }
+    }
+  }
+
+  func submitHAP(
+    target: DebugTargetPresentation,
+    fileURL: URL,
+    bundleName: String,
+    abilityName: String,
+    installPolicy: String,
+    cleanupPolicy: String,
+    postRunAbilityState: String,
+    captureDiagnostics: Bool,
+    diagnosticsDurationSeconds: Int
+  ) {
+    guard !isSubmittingHAP else { return }
+    isSubmittingHAP = true
+    activeHAPJobID = nil
+    hapTerminal = nil
+    hapFailure = nil
+    let provider = provider
+    Task { [weak self] in
+      let submitted = await provider.submitHAP(
+        target: target, fileURL: fileURL, bundleName: bundleName, abilityName: abilityName,
+        installPolicy: installPolicy, cleanupPolicy: cleanupPolicy,
+        postRunAbilityState: postRunAbilityState,
+        captureDiagnostics: captureDiagnostics,
+        diagnosticsDurationSeconds: diagnosticsDurationSeconds)
+      guard let self, !Task.isCancelled else { return }
+      switch submitted {
+      case .failed(let failure):
+        self.hapFailure = failure
+        self.isSubmittingHAP = false
+      case .submitted(let acceptance):
+        self.activeHAPJobID = acceptance.jobID
+        let polling = Task { @MainActor [weak self] in
+          while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled else { break }
+            self?.refresh(targetID: target.id)
+          }
+        }
+        let result = await provider.run(jobID: acceptance.jobID)
+        polling.cancel()
+        guard !Task.isCancelled else { return }
+        self.activeHAPJobID = nil
+        self.isSubmittingHAP = false
+        switch result {
+        case .completed(let terminal): self.hapTerminal = terminal
+        case .failed(let failure): self.hapFailure = failure
+        }
+        self.refresh(targetID: target.id)
+      }
+    }
+  }
+
+  func cancelHAP() {
+    guard let jobID = activeHAPJobID, !isCancellingHAP else { return }
+    isCancellingHAP = true
+    let provider = provider
+    Task { [weak self] in
+      let accepted = await provider.cancel(jobID: jobID)
+      guard let self else { return }
+      self.isCancellingHAP = false
+      if !accepted { self.hapFailure = "Runtime refused the cancellation request" }
     }
   }
 

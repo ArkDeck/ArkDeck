@@ -122,6 +122,17 @@ package enum ArkDeckAgentXPC {
     "artifact.importFlashBundle.commit",
   ]
 
+  /// HAP ingestion is the other closed App-owned Artifact upload. The caller
+  /// supplies only an adopted target, a safe basename, exact byte facts and
+  /// bounded chunks; Runtime validates the container and returns an
+  /// identity-bound lease. No host or device path crosses XPC.
+  package static let forwardableHAPImportMethods: Set<String> = [
+    "artifact.importHap.abort",
+    "artifact.importHap.append",
+    "artifact.importHap.begin",
+    "artifact.importHap.commit",
+  ]
+
   /// The App may ask Runtime to bind one freshly re-read Loader candidate to
   /// the explicitly selected adopted target. This method is not a device
   /// command and cannot dispatch Flash; the daemon applies Core rebind policy
@@ -153,6 +164,7 @@ package enum ArkDeckAgentXPC {
   package static let forwardableMethods =
     forwardableReadOnlyMethods
     .union(forwardableFlashBundleMethods)
+    .union(forwardableHAPImportMethods)
     .union(forwardableRockchipBindingMethods)
     .union(gatedAppJobMethods)
     .union(forwardableAutomationMethods)
