@@ -101,4 +101,19 @@ final class JobsLocalizationContractTests: XCTestCase {
       source.contains(
         ".filter { $0.outcomeUnknown || $0.waitingForHuman || requiresRecoveryGuidance($0) }"))
   }
+
+  func testInspectorDistinguishesEstablishedCurrentEpochFromHistoricalUnknownState() throws {
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    XCTAssertTrue(source.contains("if job.hasEstablishedCurrentEpoch"))
+    XCTAssertTrue(source.contains("recordedStateFactRow(job.state)"))
+    XCTAssertTrue(source.contains("job.supersededByRecoveryEpochID"))
+    XCTAssertTrue(source.contains("job.resolvedByTargetAliasResolutionID"))
+    XCTAssertTrue(
+      source.contains(#"accessibilityIdentifier("jobInspector.establishedCurrentEpoch")"#))
+    XCTAssertTrue(source.contains(#"systemImage: "checkmark.shield.fill""#))
+    XCTAssertFalse(
+      source.contains("job.outcomeUnknown = false"),
+      "the inspector must project the relation without rewriting the historical outcome")
+  }
 }

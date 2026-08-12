@@ -7,6 +7,11 @@ private func jobsText(_ key: String) -> String {
   Bundle.main.localizedString(forKey: key, value: key, table: "JobsLocalizable")
 }
 
+private struct EstablishedCurrentEpochRelation {
+  let id: String
+  let messageKey: String
+}
+
 /// Cross-workspace, read-only Runtime status. This surface consumes only the
 /// daemon's `job.list` projection; it has no submit, cancel, retry, resume,
 /// reconcile or archive action to call.
@@ -163,12 +168,31 @@ struct GlobalJobInspectorView: View {
               "jobInspector.fact.operation",
               displayedOperationReference(job.operationReference))
             factRow("jobInspector.fact.target", job.targetID)
+            if job.hasEstablishedCurrentEpoch {
+              recordedStateFactRow(job.state)
+            }
             if let badge = RuntimeExecutionModeBadge(job.executionMode) {
               GridRow(alignment: .firstTextBaseline) {
                 Text(jobsText("jobInspector.fact.mode")).foregroundStyle(.secondary)
                 badge
               }
             }
+          }
+
+          if let relation = establishedCurrentEpochRelation(job) {
+            VStack(alignment: .leading, spacing: 8) {
+              Label(
+                jobsText(relation.messageKey),
+                systemImage: "checkmark.shield.fill"
+              )
+              .foregroundStyle(.green)
+              .fixedSize(horizontal: false, vertical: true)
+              Grid(alignment: .leading, horizontalSpacing: 16) {
+                factRow("jobInspector.fact.recoveryRelation", relation.id)
+              }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("jobInspector.establishedCurrentEpoch")
           }
 
           if job.needsAttention {
@@ -327,15 +351,50 @@ struct GlobalJobInspectorView: View {
     }
   }
 
-  private func stateLabel(_ job: RuntimeJobSummaryPresentation) -> some View {
-    Label {
-      stateText(job.state)
-    } icon: {
-      Image(systemName: symbol(for: job))
-        .accessibilityHidden(true)
+  private func recordedStateFactRow(_ rawState: String) -> some View {
+    GridRow(alignment: .firstTextBaseline) {
+      Text(jobsText("jobInspector.fact.recordedState")).foregroundStyle(.secondary)
+      stateText(rawState)
+        .font(.body.monospaced())
+        .textSelection(.enabled)
     }
-    .font(.callout.weight(.semibold))
-    .foregroundStyle(color(for: job))
+  }
+
+  private func establishedCurrentEpochRelation(
+    _ job: RuntimeJobSummaryPresentation
+  ) -> EstablishedCurrentEpochRelation? {
+    if let recoveryEpochID = job.supersededByRecoveryEpochID {
+      return EstablishedCurrentEpochRelation(
+        id: recoveryEpochID,
+        messageKey: "jobInspector.result.supersededByRecovery")
+    }
+    if let resolutionID = job.resolvedByTargetAliasResolutionID {
+      return EstablishedCurrentEpochRelation(
+        id: resolutionID,
+        messageKey: "jobInspector.result.targetAliasResolved")
+    }
+    return nil
+  }
+
+  @ViewBuilder
+  private func stateLabel(_ job: RuntimeJobSummaryPresentation) -> some View {
+    if job.hasEstablishedCurrentEpoch {
+      Label(
+        jobsText("jobInspector.state.currentEpochEstablished"),
+        systemImage: "checkmark.shield.fill"
+      )
+      .font(.callout.weight(.semibold))
+      .foregroundStyle(.green)
+    } else {
+      Label {
+        stateText(job.state)
+      } icon: {
+        Image(systemName: symbol(for: job))
+          .accessibilityHidden(true)
+      }
+      .font(.callout.weight(.semibold))
+      .foregroundStyle(color(for: job))
+    }
   }
 
   private func priority(of job: RuntimeJobSummaryPresentation) -> Int {
@@ -366,6 +425,7 @@ struct GlobalJobInspectorView: View {
   }
 
   private func symbol(for job: RuntimeJobSummaryPresentation) -> String {
+    if job.hasEstablishedCurrentEpoch { return "checkmark.shield.fill" }
     if job.outcomeUnknown { return "questionmark.diamond.fill" }
     guard let state = JobState(rawValue: job.state) else { return "questionmark.circle" }
     switch state {
@@ -381,6 +441,7 @@ struct GlobalJobInspectorView: View {
   }
 
   private func color(for job: RuntimeJobSummaryPresentation) -> Color {
+    if job.hasEstablishedCurrentEpoch { return .green }
     // Unknown is warn, not danger: red stays reserved for known failure.
     if job.outcomeUnknown { return .orange }
     guard let state = JobState(rawValue: job.state) else { return .secondary }
