@@ -68,6 +68,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let nowUTC: @Sendable () -> String
   private let targetStore: RuntimeTargetStore?
   private let bootstrap: DeviceBootstrapMachine?
+  private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let artifactStore: RuntimeArtifactStore?
   private let flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)?
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
@@ -92,6 +93,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     nowUTC: @escaping @Sendable () -> String,
     targetStore: RuntimeTargetStore? = nil,
     bootstrap: DeviceBootstrapMachine? = nil,
+    hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     flashBundleImportDirectory: URL? = nil,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
@@ -107,6 +109,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providerIDs, nowUTC: nowUTC,
       targetStore: targetStore, bootstrap: bootstrap,
+      hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: artifactStore,
       flashBundleImportDirectory: flashBundleImportDirectory,
       flashBundleImportPolicy: .production,
@@ -127,6 +130,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     nowUTC: @escaping @Sendable () -> String,
     targetStore: RuntimeTargetStore?,
     bootstrap: DeviceBootstrapMachine?,
+    hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     artifactStore: RuntimeArtifactStore?,
     flashBundleImportDirectory: URL?,
     flashBundleImportPolicy: FlashBundleImportPolicy,
@@ -145,6 +149,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.nowUTC = nowUTC
     self.targetStore = targetStore
     self.bootstrap = bootstrap
+    self.hdcRuntimeDiagnostics = hdcRuntimeDiagnostics
     self.artifactStore = artifactStore
     self.flashPrerequisiteObserver = flashPrerequisiteObserver
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
@@ -200,6 +205,35 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "protocolVersion": .string(AgentWireProtocol.version),
           "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
           "providers": .array(providerIDs.map(JSONValue.string)),
+        ]))
+
+    case "runtime.hdc-status":
+      guard request.params == nil || request.params?.isEmpty == true else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "runtime.hdc-status does not accept parameters")
+      }
+      guard let diagnostics = hdcRuntimeDiagnostics else {
+        return success(
+          id: request.id,
+          result: .object([
+            "availability": .string("unavailable"),
+            "reason": .string("Runtime has no managed HDC server"),
+          ]))
+      }
+      return success(
+        id: request.id,
+        result: .object([
+          "availability": .string("ready"),
+          "source": .string("runtimeManaged"),
+          "toolSha256": .string(diagnostics.executableSHA256),
+          "clientVersion": .string(diagnostics.clientVersion),
+          "serverVersion": .string(diagnostics.serverVersion),
+          "endpoint": .string(diagnostics.endpoint),
+          "endpointSource": .string(diagnostics.endpointSource),
+          "serverHealth": .string("healthy"),
+          "ownership": .string("arkDeckManaged"),
+          "protocolVersion": .string(AgentWireProtocol.version),
         ]))
 
     case "operation.list":

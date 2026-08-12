@@ -311,11 +311,13 @@ private struct ToolchainsSettingsPane: View {
             ])
           Divider()
           HStack {
-            Button(settingsText("settings.toolchains.choose")) {
-              isSelectingExecutable = true
+            if !presentation.isRuntimeManaged {
+              Button(settingsText("settings.toolchains.choose")) {
+                isSelectingExecutable = true
+              }
+              .accessibilityIdentifier("settings.toolchains.choose")
+              .disabled(isRefreshInFlight)
             }
-            .accessibilityIdentifier("settings.toolchains.choose")
-            .disabled(isRefreshInFlight)
             Button(settingsText("settings.common.refresh"), action: onRefresh)
               .accessibilityIdentifier("settings.toolchains.refresh")
               .disabled(isRefreshInFlight)

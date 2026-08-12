@@ -107,6 +107,7 @@ package enum ArkDeckAgentXPC {
     "job.list-page",
     "job.status",
     "operation.list",
+    "runtime.hdc-status",
     "target.list",
     "trace.probe",
   ]

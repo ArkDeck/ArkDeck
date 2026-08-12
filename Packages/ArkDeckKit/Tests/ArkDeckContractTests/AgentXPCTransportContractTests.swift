@@ -74,7 +74,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         "debug.template.run",
         "device.candidates", "flash.bootloader-status", "flash.prerequisites",
         "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
-        "target.list", "trace.probe",
+        "runtime.hdc-status", "target.list", "trace.probe",
       ],
       "read-only surface drift is a control-plane decision")
     XCTAssertEqual(

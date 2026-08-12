@@ -13,6 +13,15 @@ public typealias HDCDeviceObservationPresentationEvent =
 public typealias HDCServerOtherClientDetection =
   ArkDeckOpenHarmony.HDCServerOtherClientDetection
 
+extension HDCDiagnosticsPresentation {
+  /// True only for the path-free status projection emitted by the daemon
+  /// that owns the HDC server. App views can hide local executable and
+  /// lifecycle controls without learning an executable path or process ID.
+  public var isRuntimeManaged: Bool {
+    source == HDCRuntimeDiagnosticsResponseDecoding.sourceLabel
+  }
+}
+
 /// Closed diagnostics surface consumed by the App. It exposes presentation
 /// actions and user-selected configuration, but no process runner, argv,
 /// supervisor, lifecycle executor, or durable-audit primitive.
@@ -78,38 +87,50 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
   private var deviceObservationSessionKey: HDCDeviceObservationSessionKey?
 
   func refresh() async -> HDCDiagnosticsPresentation {
+    if let runtime = await runtimeManagedPresentation() { return runtime }
     await attachSessionIfConfigured()
-    let presentation = await provider.refresh()
+    let base = await provider.refresh()
+    let presentation = await runtimeOverlay(base)
     guard let deviceObservationSession else { return presentation }
     return presentation.overlayingDeviceEvents(await deviceObservationSession.refresh())
   }
 
   func requestRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
+    if let runtime = await runtimeManagedPresentation() { return runtime }
     await attachSessionIfConfigured()
-    return await overlayCurrentDeviceEvents(
-      on: provider.requestRecoveryImpactPreview())
+    let requested = await provider.requestRecoveryImpactPreview()
+    let withEvents = await overlayCurrentDeviceEvents(on: requested)
+    return await runtimeOverlay(withEvents)
   }
 
   func confirmRecoveryImpactPreview() async -> HDCDiagnosticsPresentation {
+    if let runtime = await runtimeManagedPresentation() { return runtime }
     await attachSessionIfConfigured()
-    return await overlayCurrentDeviceEvents(
-      on: provider.confirmRecoveryImpactPreview())
+    let confirmed = await provider.confirmRecoveryImpactPreview()
+    let withEvents = await overlayCurrentDeviceEvents(on: confirmed)
+    return await runtimeOverlay(withEvents)
   }
 
   func dispatchConfirmedRecovery() async -> HDCDiagnosticsPresentation {
+    if let runtime = await runtimeManagedPresentation() { return runtime }
     guard let sessionDiagnostics, let sessionLifecycle else {
-      return await overlayCurrentDeviceEvents(on: provider.refresh())
-    }
-    let current = await sessionDiagnostics.refresh()
-    guard case .confirmed(let confirmation) = current.lifecycleRecovery else {
+      let current = await provider.refresh()
       return await overlayCurrentDeviceEvents(on: current)
+    }
+    let sessionCurrent = await sessionDiagnostics.refresh()
+    guard case .confirmed(let confirmation) = sessionCurrent.lifecycleRecovery else {
+      let withEvents = await overlayCurrentDeviceEvents(on: sessionCurrent)
+      return await runtimeOverlay(withEvents)
     }
     let result = await sessionLifecycle.dispatch(confirmation: confirmation)
     await sessionDiagnostics.applyLifecycleDispatchResult(result)
-    return await overlayCurrentDeviceEvents(on: sessionDiagnostics.refresh())
+    let refreshed = await sessionDiagnostics.refresh()
+    let withEvents = await overlayCurrentDeviceEvents(on: refreshed)
+    return await runtimeOverlay(withEvents)
   }
 
   func selectUserConfiguredExecutable(_ url: URL) async throws -> HDCDiagnosticsPresentation {
+    if let runtime = await runtimeManagedPresentation() { return runtime }
     try HDCApplicationDiagnosticsConfiguration.persistUserConfiguredExecutable(url)
     attemptedSessionBootstrap = false
     sessionDiagnostics = nil
@@ -119,7 +140,25 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     await provider.configure(
       discoveryRequest: HDCApplicationDiagnosticsConfiguration.discoveryRequest())
     await attachSessionIfConfigured()
-    return await overlayCurrentDeviceEvents(on: provider.refresh())
+    let refreshed = await provider.refresh()
+    let withEvents = await overlayCurrentDeviceEvents(on: refreshed)
+    return await runtimeOverlay(withEvents)
+  }
+
+  private func runtimeManagedPresentation() async -> HDCDiagnosticsPresentation? {
+    let presentation = await runtimeOverlay(.unprobed)
+    return presentation.isRuntimeManaged ? presentation : nil
+  }
+
+  private func runtimeOverlay(
+    _ presentation: HDCDiagnosticsPresentation
+  ) async -> HDCDiagnosticsPresentation {
+    async let status = DeviceListXPCReadTransport.request(method: "runtime.hdc-status")
+    async let candidates = DeviceListXPCReadTransport.request(method: "device.candidates")
+    return HDCRuntimeDiagnosticsResponseDecoding.overlay(
+      presentation: presentation,
+      statusResponse: await status,
+      candidateResponse: await candidates)
   }
 
   private func attachSessionIfConfigured() async {
@@ -274,6 +313,106 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     return applicationSupport.appending(
       path: "ArkDeck/HDC/app-diagnostics-session",
       directoryHint: .isDirectory)
+  }
+}
+
+enum HDCRuntimeDiagnosticsResponseDecoding {
+  static let sourceLabel = "ArkDeck Runtime"
+
+  static func overlay(
+    presentation: HDCDiagnosticsPresentation,
+    statusResponse: Result<Data, DeviceListXPCReadFailure>,
+    candidateResponse: Result<Data, DeviceListXPCReadFailure>
+  ) -> HDCDiagnosticsPresentation {
+    guard case .success(let statusData) = statusResponse,
+      let status = resultObject(statusData),
+      status["availability"] as? String == "ready",
+      status["source"] as? String == "runtimeManaged",
+      status["serverHealth"] as? String == HDCServerHealth.healthy.rawValue,
+      status["ownership"] as? String == HDCServerOwnership.arkDeckManaged.rawValue,
+      let executableSHA256 = status["toolSha256"] as? String,
+      isSHA256(executableSHA256),
+      let clientVersion = nonempty(status["clientVersion"] as? String),
+      let serverVersion = nonempty(status["serverVersion"] as? String),
+      clientVersion == serverVersion,
+      let endpoint = loopbackEndpoint(status["endpoint"] as? String),
+      let endpointSourceRaw = status["endpointSource"] as? String,
+      let endpointSource = HDCServerEndpointSource(rawValue: endpointSourceRaw),
+      let protocolVersion = nonempty(status["protocolVersion"] as? String)
+    else { return presentation }
+
+    return HDCDiagnosticsPresentation(
+      absolutePath: "not exposed by Runtime",
+      source: sourceLabel,
+      hash: executableSHA256,
+      platformTrust: "descriptor-bound SHA-256 verified by Runtime",
+      clientVersion: clientVersion,
+      serverVersion: serverVersion,
+      daemonVersion: "Runtime protocol \(protocolVersion)",
+      endpoint: endpoint,
+      serverHealth: .healthy,
+      generation: "Runtime-owned process lifetime",
+      ownership: .arkDeckManaged,
+      authorization: authorization(from: candidateResponse),
+      channelProtection: .unverifiedAssumeUnprotected,
+      tcpUnprotectedWarning: nil,
+      keyAccessError: nil,
+      subserverCapability: .unsupported,
+      lifecycleRecovery: .unavailable(
+        reason: "ArkDeck Runtime owns the managed HDC server lifecycle"),
+      endpointSource: endpointSource,
+      deviceEvents: presentation.deviceEvents)
+  }
+
+  private static func authorization(
+    from response: Result<Data, DeviceListXPCReadFailure>
+  ) -> HDCAuthorizationState {
+    guard case .success(let data) = response,
+      let candidates = resultArray(data)
+    else {
+      return .unavailable(reason: "Runtime device authorization could not be read")
+    }
+    let states = candidates.compactMap { $0["state"] as? String }
+    if states.contains("Connected") { return .ready }
+    if states.contains("Unauthorized") { return .unauthorizedWaitingForTrust }
+    if states.contains("Offline") {
+      return .unavailable(reason: "HDC reported the target offline")
+    }
+    if states.isEmpty {
+      return .unavailable(reason: "No HDC device candidate is visible")
+    }
+    return .unavailable(reason: "Runtime returned an unrecognized HDC device state")
+  }
+
+  private static func resultObject(_ data: Data) -> [String: Any]? {
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      envelope["ok"] as? Bool == true
+    else { return nil }
+    return envelope["result"] as? [String: Any]
+  }
+
+  private static func resultArray(_ data: Data) -> [[String: Any]]? {
+    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      envelope["ok"] as? Bool == true
+    else { return nil }
+    return envelope["result"] as? [[String: Any]]
+  }
+
+  private static func nonempty(_ value: String?) -> String? {
+    guard let value, !value.isEmpty else { return nil }
+    return value
+  }
+
+  private static func isSHA256(_ value: String) -> Bool {
+    value.count == 64 && value.allSatisfy(\.isHexDigit)
+  }
+
+  private static func loopbackEndpoint(_ value: String?) -> String? {
+    guard let value, value.hasPrefix("127.0.0.1:"),
+      let port = Int(value.dropFirst("127.0.0.1:".count)),
+      (1...65_535).contains(port)
+    else { return nil }
+    return value
   }
 }
 

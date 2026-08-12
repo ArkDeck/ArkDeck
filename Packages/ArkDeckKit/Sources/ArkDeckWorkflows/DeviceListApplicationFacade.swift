@@ -420,7 +420,7 @@ enum DeviceListXPCReadFailure: Error, Sendable, Equatable {
   case transport(String)
 }
 
-private enum DeviceListXPCReadTransport {
+enum DeviceListXPCReadTransport {
   static func request(
     method: String, params: [String: JSONValue]? = nil
   ) async -> Result<Data, DeviceListXPCReadFailure> {
