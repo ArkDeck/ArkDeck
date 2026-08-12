@@ -200,7 +200,8 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
     let adoptedIDs = Set(base.candidates.compactMap(\.adoptedTargetID))
     guard !adoptedIDs.isEmpty else { return base }
     guard
-      case .success(let jobData) = await DeviceListXPCReadTransport.request(method: "job.list")
+      case .success(let jobData) = await DeviceListXPCReadTransport.request(
+        method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
     else { return base }
     let latest = DeviceCandidatesResponseDecoding.latestSucceededObservationJobIDs(
       jobData, adoptedTargetIDs: adoptedIDs)

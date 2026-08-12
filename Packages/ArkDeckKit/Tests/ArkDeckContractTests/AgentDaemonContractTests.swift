@@ -244,6 +244,66 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(ok.ok)
   }
 
+  func testPagedJobListReturnsNewestSummariesAndOldCurrentJobsWithoutTimelines() async throws {
+    let (handler, engine) = try makeStack()
+    var accepted: [RuntimeJobAcceptance] = []
+    for index in 1...3 {
+      let operation = Data(
+        """
+        {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+        "requestId":"req-paged-wire-\(index)",\
+        "idempotencyKey":"idem-paged-wire-\(index)",\
+        "target":{"targetId":"TGT-PAGED-WIRE","expectedBindingRevision":7},\
+        "operation":{"id":"observe.device","version":1}}
+        """.utf8)
+      accepted.append(try await engine.submit(operation))
+    }
+    try await engine.requestCancel(jobID: accepted[2].jobID)
+
+    let response = try await request(
+      handler, method: "job.list-page",
+      params: [
+        "pageSize": .integer(1),
+        "order": .string("newestFirst"),
+        "includeTimeline": .bool(false),
+        "includeCurrent": .bool(true),
+      ])
+    XCTAssertTrue(response.ok, response.error?.message ?? "-")
+    guard case .object(let result)? = response.result,
+      case .array(let page)? = result["jobs"],
+      case .array(let current)? = result["currentJobs"]
+    else {
+      return XCTFail("job.list-page must return page and current summary arrays")
+    }
+    XCTAssertEqual(page.count, 1)
+    guard case .object(let newest) = page[0] else {
+      return XCTFail("newest summary must be an object")
+    }
+    XCTAssertEqual(newest["jobId"], .string(accepted[2].jobID))
+    XCTAssertEqual(newest["timeline"], .null)
+    XCTAssertEqual(
+      Set(current.compactMap { value -> String? in
+        guard case .object(let fields) = value,
+          case .string(let jobID)? = fields["jobId"]
+        else { return nil }
+        XCTAssertEqual(fields["timeline"], .null)
+        return jobID
+      }),
+      Set(accepted.prefix(2).map(\.jobID)))
+    XCTAssertNotEqual(result["nextCursor"], .null)
+
+    for params in [
+      ["pageSize": JSONValue.string("1")],
+      ["order": JSONValue.string("latest")],
+      ["includeTimeline": .string("false")],
+      ["includeCurrent": .string("true")],
+    ] {
+      let invalid = try await request(handler, method: "job.list-page", params: params)
+      XCTAssertFalse(invalid.ok)
+      XCTAssertEqual(invalid.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+    }
+  }
+
   func testOperationSurfaceComesFromCatalog() async throws {
     let (handler, _) = try makeStack()
     let list = await handler.handleFrame(

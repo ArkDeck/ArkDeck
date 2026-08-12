@@ -248,7 +248,8 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
   func refreshWorkspace() async -> UIDumpWorkspacePresentation {
     async let operations = UIDumpXPCReadTransport.request(method: "operation.list")
     async let targets = UIDumpXPCReadTransport.request(method: "target.list")
-    async let jobs = UIDumpXPCReadTransport.request(method: "job.list")
+    async let jobs = UIDumpXPCReadTransport.request(
+      method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
     return UIDumpWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
@@ -415,11 +416,12 @@ enum UIDumpXPCReadFailure: Error, Sendable, Equatable {
 }
 
 private enum UIDumpXPCReadTransport {
-  static func request(method: String) async -> Result<Data, UIDumpXPCReadFailure> {
+  static func request(
+    method: String, params: [String: JSONValue]? = nil
+  ) async -> Result<Data, UIDumpXPCReadFailure> {
     let frame: Data
     do {
-      frame = try JSONSerialization.data(
-        withJSONObject: ["v": 1, "id": UUID().uuidString, "method": method])
+      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
     } catch {
       return .failure(.transport("Could not compose a Runtime request"))
     }

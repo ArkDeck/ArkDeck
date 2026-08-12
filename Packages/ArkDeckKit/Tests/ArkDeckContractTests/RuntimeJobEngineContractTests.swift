@@ -522,6 +522,32 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(status.state, "preflight")
   }
 
+  func testNewestFirstHistoryKeepsOldCurrentJobsOutsideThePageVisible() async throws {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    var accepted: [RuntimeJobAcceptance] = []
+    for index in 1...3 {
+      accepted.append(
+        try await engine.submit(
+          observeRequest(
+            idempotencyKey: "idem-current-history-\(index)",
+            requestID: "req-current-history-\(index)")))
+    }
+    try await engine.requestCancel(jobID: accepted[2].jobID)
+
+    let first = try await engine.listJobs(pageSize: 1, newestFirst: true)
+    XCTAssertEqual(first.jobs.map(\.jobID), [accepted[2].jobID])
+    XCTAssertNotNil(first.nextCursor)
+    let second = try await engine.listJobs(
+      pageSize: 1, cursor: first.nextCursor, newestFirst: true)
+    XCTAssertEqual(second.jobs.map(\.jobID), [accepted[1].jobID])
+
+    let current = try await engine.listCurrentJobs()
+    XCTAssertEqual(Set(current.map(\.jobID)), Set(accepted.prefix(2).map(\.jobID)))
+    XCTAssertTrue(
+      current.contains { $0.jobID == accepted[0].jobID },
+      "an older non-terminal Job must not disappear behind the newest page")
+  }
+
   func testUnreadablePersistedRecordIsDistinctFromMissingAcrossHistoryReads() async throws {
     let jobID: String
     do {
@@ -759,6 +785,17 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       cursor = page.nextCursor
     } while cursor != nil
     XCTAssertEqual(listed, 10_000)
+
+    let newest = try repository.listJobs(
+      pageSize: 3, cursor: nil, newestFirst: true)
+    XCTAssertEqual(
+      newest.jobs.map(\.jobID),
+      ["job-history-09999", "job-history-09998", "job-history-09997"])
+    let older = try repository.listJobs(
+      pageSize: 3, cursor: newest.nextCursor, newestFirst: true)
+    XCTAssertEqual(
+      older.jobs.map(\.jobID),
+      ["job-history-09996", "job-history-09995", "job-history-09994"])
   }
 
   func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {

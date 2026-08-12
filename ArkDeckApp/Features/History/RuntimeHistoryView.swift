@@ -18,7 +18,9 @@ struct RuntimeHistoryView: View {
   let loadingDetailJobIDs: Set<String>
   let exportStatesByArtifactID: [String: RuntimeArtifactExportState]
   let isRefreshInFlight: Bool
+  let isLoadOlderInFlight: Bool
   let onRefresh: (() -> Void)?
+  let onLoadOlder: (() -> Void)?
   let onLoadDetail: ((String, String) -> Void)?
   let onExportArtifact: ((String, RuntimeArtifactPresentation, URL, Bool) -> Void)?
 
@@ -354,6 +356,33 @@ struct RuntimeHistoryView: View {
         .accessibilityIdentifier("history.table")
       }
       Divider()
+      if presentation.hasOlderJobs || presentation.olderJobsLoadFailure != nil {
+        VStack(alignment: .leading, spacing: 6) {
+          if let failure = presentation.olderJobsLoadFailure {
+            Label(failure, systemImage: "exclamationmark.triangle")
+              .font(.footnote)
+              .foregroundStyle(.orange)
+              .accessibilityIdentifier("history.loadOlder.failure")
+          }
+          if presentation.hasOlderJobs, let onLoadOlder {
+            Button(action: onLoadOlder) {
+              if isLoadOlderInFlight {
+                ProgressView()
+                  .controlSize(.small)
+              } else {
+                Label(
+                  historyLocalized("history.action.loadOlder"),
+                  systemImage: "clock.arrow.circlepath")
+              }
+            }
+            .disabled(isLoadOlderInFlight)
+            .accessibilityIdentifier("history.loadOlder")
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+      }
       Text(historyLocalized("history.readOnlyNote"))
         .font(.footnote)
         .foregroundStyle(.secondary)
@@ -464,15 +493,33 @@ struct RuntimeHistoryView: View {
 
   @ViewBuilder
   private func timelineSection(_ job: RuntimeJobSummaryPresentation) -> some View {
-    if !job.timeline.isEmpty {
+    if let detail = detailsByJobID[job.id] {
+      switch detail.timelineAvailability {
+      case .available:
+        timelineEntries(detail.timeline, job: job)
+      case .unavailable(let reason):
+        historySection("history.detail.timeline") {
+          unavailableSection(reason)
+        }
+      }
+    } else if !job.timeline.isEmpty {
+      timelineEntries(job.timeline, job: job)
+    }
+  }
+
+  @ViewBuilder
+  private func timelineEntries(
+    _ timeline: [String], job: RuntimeJobSummaryPresentation
+  ) -> some View {
+    if !timeline.isEmpty {
       historySection("history.detail.timeline") {
         VStack(alignment: .leading, spacing: 7) {
-          ForEach(Array(job.timeline.enumerated()), id: \.offset) { index, entry in
+          ForEach(Array(timeline.enumerated()), id: \.offset) { index, entry in
             HStack(alignment: .firstTextBaseline, spacing: 8) {
               Image(
-                systemName: index == job.timeline.count - 1 ? stateSymbol(job) : "checkmark.circle"
+                systemName: index == timeline.count - 1 ? stateSymbol(job) : "checkmark.circle"
               )
-              .foregroundStyle(index == job.timeline.count - 1 ? stateColor(job) : .secondary)
+              .foregroundStyle(index == timeline.count - 1 ? stateColor(job) : .secondary)
               .accessibilityHidden(true)
               Text(entry)
                 .font(.callout.monospaced())
@@ -942,7 +989,7 @@ struct RuntimeHistoryView: View {
   }
 
   private func historyDate(_ job: RuntimeJobSummaryPresentation) -> Date? {
-    Self.parseUTC(job.finishedAtUTC ?? job.startedAtUTC ?? job.createdAtUTC)
+    job.activityDate
   }
 
   private static func parseUTC(_ value: String?) -> Date? {
@@ -1097,6 +1144,7 @@ final class RuntimeHistoryViewModel: ObservableObject {
   @Published private(set) var loadingDetailJobIDs: Set<String> = []
   @Published private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
   @Published private(set) var isRefreshInFlight = false
+  @Published private(set) var isLoadOlderInFlight = false
   private let provider: any RuntimeHistoryApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
 
@@ -1126,6 +1174,22 @@ final class RuntimeHistoryViewModel: ObservableObject {
       let next = await provider.refreshHistory()
       guard let self else { return }
       defer { self.isRefreshInFlight = false }
+      guard !Task.isCancelled else { return }
+      self.presentation = next
+      let validJobIDs = Set(next.jobs.map(\.id))
+      self.detailsByJobID = self.detailsByJobID.filter { validJobIDs.contains($0.key) }
+      self.loadingDetailJobIDs.formIntersection(validJobIDs)
+    }
+  }
+
+  func loadOlder() {
+    guard !isRefreshInFlight, !isLoadOlderInFlight, presentation.hasOlderJobs else { return }
+    isLoadOlderInFlight = true
+    let provider = provider
+    Task { [weak self] in
+      let next = await provider.loadOlderHistory()
+      guard let self else { return }
+      defer { self.isLoadOlderInFlight = false }
       guard !Task.isCancelled else { return }
       self.presentation = next
       let validJobIDs = Set(next.jobs.map(\.id))

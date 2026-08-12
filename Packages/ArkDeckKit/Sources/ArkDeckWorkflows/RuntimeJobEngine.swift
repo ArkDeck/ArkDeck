@@ -3042,6 +3042,25 @@ public actor RuntimeJobEngine {
   /// completed job.
   public func listJobs() async throws -> [RuntimeJobStatus] {
     let indexes = await recoveryEpochIndexes()
+    let statuses = try allJobStatuses(indexes: indexes)
+    return statuses.values.sorted { $0.jobID < $1.jobID }
+  }
+
+  /// Returns the small current-work set that must never disappear behind a
+  /// newest-first History page. This includes every non-terminal or unknown
+  /// future state plus terminal Jobs whose unresolved outcome, human wait, or
+  /// cleanup residue still needs operator visibility. A Runtime-established
+  /// current epoch settles only the historical unknown/wait signal; it does
+  /// not hide a still-active Job or outstanding cleanup residue.
+  public func listCurrentJobs() async throws -> [RuntimeJobStatus] {
+    let indexes = await recoveryEpochIndexes()
+    let statuses = try allJobStatuses(indexes: indexes)
+    return statuses.values.filter(Self.isCurrentJob).sorted { $0.jobID < $1.jobID }
+  }
+
+  private func allJobStatuses(
+    indexes: RecoveryEpochIndexes
+  ) throws -> [String: RuntimeJobStatus] {
     var statuses: [String: RuntimeJobStatus] = [:]
     let persisted: [RuntimePersistedJob]
     do {
@@ -3068,17 +3087,29 @@ public actor RuntimeJobEngine {
         resolvedByTargetAliasResolutionID: indexes.resolvedAliasByJobID[
           runtime.record.jobID])
     }
-    return statuses.values.sorted { $0.jobID < $1.jobID }
+    return statuses
   }
 
-  /// Reads compact terminal history from SQLite.  Active jobs still return
-  /// their in-memory snapshots above; both views use the same typed status
-  /// model and opaque cursor contract.
+  private static func isCurrentJob(_ status: RuntimeJobStatus) -> Bool {
+    if (status.outstandingResidueCount ?? 0) > 0 { return true }
+    let hasEstablishedCurrentEpoch = status.supersededByRecoveryEpochID != nil
+      || status.resolvedByTargetAliasResolutionID != nil
+    if !hasEstablishedCurrentEpoch && (status.outcomeUnknown || status.waitingForHuman) {
+      return true
+    }
+    guard let state = JobState(rawValue: status.state) else { return true }
+    return !state.isTerminal
+  }
+
+  /// Reads one compact history page from SQLite. Current work that may sit
+  /// outside this page is exposed separately by `listCurrentJobs()`; both
+  /// views use the same typed status model and opaque cursor contract.
   public func listJobs(
-    pageSize: Int, cursor: String? = nil
+    pageSize: Int, cursor: String? = nil, newestFirst: Bool = false
   ) async throws -> RuntimeJobStatusPage {
     let indexes = await recoveryEpochIndexes()
-    let page = try admissionService.listJobs(pageSize: pageSize, cursor: cursor)
+    let page = try admissionService.listJobs(
+      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
     let statuses = try page.jobs.map { persisted -> RuntimeJobStatus in
       let record = try decodePersistedRecord(persisted)
       return status(

@@ -555,7 +555,8 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
   func refreshWorkspace(targetID: String?) async -> DebugWorkspacePresentation {
     async let operations = DebugXPCReadTransport.request(method: "operation.list")
     async let targets = DebugXPCReadTransport.request(method: "target.list")
-    async let jobs = DebugXPCReadTransport.request(method: "job.list")
+    async let jobs = DebugXPCReadTransport.request(
+      method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
     let base = DebugWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,

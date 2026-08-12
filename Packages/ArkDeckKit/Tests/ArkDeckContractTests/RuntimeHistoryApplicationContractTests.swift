@@ -76,6 +76,40 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertNil(job.finishedAtUTC)
   }
 
+  func testPagedSummaryMergesCurrentJobsWithoutInventingACompactTimeline() throws {
+    let data = try JSONSerialization.data(
+      withJSONObject: [
+        "ok": true,
+        "id": "paged-history",
+        "result": [
+          "jobs": [
+            [
+              "jobId": "job-newest", "operation": "observe.device@1",
+              "targetId": "TGT-1", "state": "succeeded", "timeline": NSNull(),
+            ]
+          ],
+          "currentJobs": [
+            [
+              "jobId": "job-old-current", "operation": "flash.dayu200@1",
+              "targetId": "TGT-1", "state": "waitingForRecovery",
+              "outcomeUnknown": true, "timeline": NSNull(),
+            ]
+          ],
+          "nextCursor": "41",
+        ],
+      ])
+
+    switch RuntimeHistoryResponseDecoding.page(from: data) {
+    case .unavailable(let reason):
+      XCTFail("complete page must decode: \(reason)")
+    case .available(let jobs, let cursor):
+      XCTAssertEqual(jobs.map(\.id), ["job-old-current", "job-newest"])
+      XCTAssertEqual(jobs.map(\.timeline), [[], []])
+      XCTAssertTrue(jobs[0].requiresRecoveryGuidance)
+      XCTAssertEqual(cursor, "41")
+    }
+  }
+
   // The load-bearing distinction: a daemon that answered "no jobs" and a
   // daemon that could not be read must never produce the same presentation.
   func testAnEmptyHistoryIsNotTheSameAsAnUnreadableOne() {
@@ -204,6 +238,11 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testCompleteEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {
+    let status = try response([
+      "jobId": "job-1",
+      "operation": "observe.device@1",
+      "timeline": ["queued", "running", "succeeded"],
+    ])
     let evidence = try response([
       "jobId": "job-1",
       "operationReference": "observe.device@1",
@@ -244,9 +283,12 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: "job-1",
       operationReference: "observe.device@1",
+      statusResponse: status,
       evidenceResponse: evidence,
       artifactResponse: artifacts)
 
+    XCTAssertEqual(detail.timelineAvailability, .available)
+    XCTAssertEqual(detail.timeline, ["queued", "running", "succeeded"])
     XCTAssertEqual(detail.evidenceAvailability, .available)
     XCTAssertEqual(detail.evidence?.providerID, "openharmony-hdc")
     XCTAssertEqual(detail.evidence?.parameters.map(\.name), ["includeToolFacts", "limit"])
@@ -406,9 +448,9 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(detail.artifacts.isEmpty, "no partial Artifact row may survive")
   }
 
-  // The App-facing surface has exactly one method, and it reads. If a
-  // mutating method is ever added here it stops being a surface the sandboxed
-  // GUI may hold, so the absence is pinned rather than assumed.
+  // The App-facing surface has only bounded reads. If a mutating method is
+  // ever added here it stops being a surface the sandboxed GUI may hold, so
+  // the absence is pinned rather than assumed.
   func testTheApplicationSurfaceExposesNoMutation() throws {
     let source = try String(
       contentsOf: URL(fileURLWithPath: #filePath)
@@ -423,9 +465,10 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
     XCTAssertEqual(
-      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 1,
-      "the App-facing Runtime surface must expose exactly one call")
+      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 2,
+      "the App-facing Runtime surface must expose only paged summary reads")
     XCTAssertTrue(protocolBody.contains("func refreshHistory()"))
+    XCTAssertTrue(protocolBody.contains("func loadOlderHistory()"))
 
     let detailProtocolBody = try XCTUnwrap(
       source.range(of: "public protocol RuntimeJobDetailApplicationProviding: Sendable {")
@@ -448,10 +491,56 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         source.contains("\"\(mutating)"),
         "the App-facing facade must not be able to name \(mutating)")
     }
-    XCTAssertTrue(source.contains("request(method: \"job.list\")"))
+    XCTAssertTrue(source.contains("method: \"job.list-page\""))
+    XCTAssertTrue(source.contains("\"order\": .string(\"newestFirst\")"))
+    XCTAssertTrue(source.contains("\"includeTimeline\": .bool(false)"))
+    XCTAssertTrue(source.contains("\"includeCurrent\"] = .bool(true)"))
+    XCTAssertTrue(source.contains("method: \"job.status\""))
     XCTAssertTrue(source.contains("method: \"job.evidence\""))
     XCTAssertTrue(source.contains("method: \"artifact.list\""))
     XCTAssertTrue(source.contains("method: \"artifact.read\""))
+  }
+
+  func testEveryAppWorkspaceUsesTheBoundedRecentSummaryPolicy() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let workflow = repository.appending(
+      path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows")
+    for file in [
+      "DebugApplicationFacade.swift", "DeviceListApplicationFacade.swift",
+      "TraceApplicationFacade.swift", "UIDumpApplicationFacade.swift",
+    ] {
+      let source = try String(
+        contentsOf: workflow.appending(path: file), encoding: .utf8)
+      XCTAssertTrue(
+        source.contains("params: RuntimeAppJobListPolicy.recentSummaryParams"),
+        "\(file) must not restore an unbounded startup history read")
+    }
+    let policy = try String(
+      contentsOf: workflow.appending(path: "RuntimeAppJobListPolicy.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(policy.contains("\"pageSize\": .integer(250)"))
+    XCTAssertTrue(policy.contains("\"order\": .string(\"newestFirst\")"))
+    XCTAssertTrue(policy.contains("\"includeTimeline\": .bool(false)"))
+  }
+
+  func testHistoryLoadsFullTimelineOnlyWithSelectedDetail() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(
+        path: "ArkDeckApp/Features/History/RuntimeHistoryView.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/HistoryLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    XCTAssertTrue(view.contains("detail.timelineAvailability"))
+    XCTAssertTrue(view.contains("timelineEntries(detail.timeline, job: job)"))
+    XCTAssertTrue(view.contains("presentation.hasOlderJobs"))
+    XCTAssertTrue(view.contains("history.loadOlder"))
+    XCTAssertTrue(view.contains("job.activityDate"))
+    XCTAssertTrue(localization.contains("\"history.action.loadOlder\""))
   }
 
   func testDebugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {

@@ -60,8 +60,9 @@ struct RuntimeAdmissionService {
   }
 
   func listJobs(
-    pageSize: Int, cursor: String?
+    pageSize: Int, cursor: String?, newestFirst: Bool = false
   ) throws -> RuntimeJobRepositoryPage {
-    try repository.listJobs(pageSize: pageSize, cursor: cursor)
+    try repository.listJobs(
+      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
   }
 }

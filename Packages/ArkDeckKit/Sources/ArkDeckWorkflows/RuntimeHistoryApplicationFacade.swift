@@ -40,6 +40,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
   public let supersededByRecoveryEpochID: String?
   public let recoveryEpochID: String?
   public let resolvedByTargetAliasResolutionID: String?
+  public let activityDate: Date?
 
   public init(
     id: String, operationReference: String, targetID: String, state: String,
@@ -67,6 +68,12 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
     self.supersededByRecoveryEpochID = supersededByRecoveryEpochID
     self.recoveryEpochID = recoveryEpochID
     self.resolvedByTargetAliasResolutionID = resolvedByTargetAliasResolutionID
+    activityDate = Self.parseUTC(finishedAtUTC ?? startedAtUTC ?? createdAtUTC)
+  }
+
+  private static func parseUTC(_ value: String?) -> Date? {
+    guard let value else { return nil }
+    return ISO8601DateFormatter().date(from: value)
   }
 
   /// Runtime has durable evidence that a later, distinct action established
@@ -104,10 +111,19 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
 public struct RuntimeHistoryPresentation: Sendable, Equatable {
   public let availability: RuntimeHistoryAvailability
   public let jobs: [RuntimeJobSummaryPresentation]
+  public let hasOlderJobs: Bool
+  public let olderJobsLoadFailure: String?
 
-  public init(availability: RuntimeHistoryAvailability, jobs: [RuntimeJobSummaryPresentation]) {
+  public init(
+    availability: RuntimeHistoryAvailability,
+    jobs: [RuntimeJobSummaryPresentation],
+    hasOlderJobs: Bool = false,
+    olderJobsLoadFailure: String? = nil
+  ) {
     self.availability = availability
     self.jobs = jobs
+    self.hasOlderJobs = hasOlderJobs
+    self.olderJobsLoadFailure = olderJobsLoadFailure
   }
 
   public static let loading = RuntimeHistoryPresentation(
@@ -198,6 +214,8 @@ public struct RuntimeArtifactPresentation: Sendable, Equatable, Identifiable {
 
 public struct RuntimeJobDetailPresentation: Sendable, Equatable {
   public let jobID: String
+  public let timelineAvailability: RuntimeJobDetailSectionAvailability
+  public let timeline: [String]
   public let evidenceAvailability: RuntimeJobDetailSectionAvailability
   public let evidence: RuntimeJobEvidencePresentation?
   public let artifactAvailability: RuntimeJobDetailSectionAvailability
@@ -209,10 +227,17 @@ public enum RuntimeArtifactExportResult: Sendable, Equatable {
   case failed(String)
 }
 
-/// Closed App-facing surface. It exposes one read and nothing else: there is
-/// no submit, run, cancel, reconcile, adopt or import method to call.
+/// Closed App-facing surface. It exposes only bounded summary reads and no
+/// submit, run, cancel, reconcile, adopt or import method to call.
 public protocol RuntimeHistoryApplicationProviding: Sendable {
   func refreshHistory() async -> RuntimeHistoryPresentation
+  func loadOlderHistory() async -> RuntimeHistoryPresentation
+}
+
+extension RuntimeHistoryApplicationProviding {
+  public func loadOlderHistory() async -> RuntimeHistoryPresentation {
+    await refreshHistory()
+  }
 }
 
 /// A second closed reader keeps on-demand detail separate from the global
@@ -262,13 +287,56 @@ public enum RuntimeJobDetailApplicationFacade {
 /// is not vending it the connection simply never answers and this reports an
 /// accurate reason rather than pretending the history is empty.
 private actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
+  private static let pageSize = 200
+  private var loadedJobs: [RuntimeJobSummaryPresentation] = []
+  private var nextCursor: String?
+
   func refreshHistory() async -> RuntimeHistoryPresentation {
-    let response = await RuntimeHistoryXPCReadTransport.request(method: "job.list")
+    loadedJobs = []
+    nextCursor = nil
+    return await loadPage(cursor: nil)
+  }
+
+  func loadOlderHistory() async -> RuntimeHistoryPresentation {
+    guard let nextCursor else {
+      return RuntimeHistoryPresentation(availability: .available, jobs: loadedJobs)
+    }
+    return await loadPage(cursor: nextCursor)
+  }
+
+  private func loadPage(cursor: String?) async -> RuntimeHistoryPresentation {
+    var params: [String: JSONValue] = [
+      "pageSize": .integer(Int64(Self.pageSize)),
+      "order": .string("newestFirst"),
+      "includeTimeline": .bool(false),
+    ]
+    if let cursor {
+      params["cursor"] = .string(cursor)
+    } else {
+      params["includeCurrent"] = .bool(true)
+    }
+    let response = await RuntimeHistoryXPCReadTransport.request(
+      method: "job.list-page", params: params)
     switch response {
     case .failure(let reason):
-      return .unavailable(reason)
+      guard !loadedJobs.isEmpty else { return .unavailable(reason) }
+      return RuntimeHistoryPresentation(
+        availability: .available, jobs: loadedJobs, hasOlderJobs: true,
+        olderJobsLoadFailure: reason)
     case .success(let data):
-      return RuntimeHistoryResponseDecoding.presentation(from: data)
+      switch RuntimeHistoryResponseDecoding.page(from: data) {
+      case .unavailable(let reason):
+        guard !loadedJobs.isEmpty else { return .unavailable(reason) }
+        return RuntimeHistoryPresentation(
+          availability: .available, jobs: loadedJobs, hasOlderJobs: true,
+          olderJobsLoadFailure: reason)
+      case .available(let jobs, let cursor):
+        var known = Set(loadedJobs.map(\.id))
+        loadedJobs.append(contentsOf: jobs.filter { known.insert($0.id).inserted })
+        nextCursor = cursor
+        return RuntimeHistoryPresentation(
+          availability: .available, jobs: loadedJobs, hasOlderJobs: cursor != nil)
+      }
     }
   }
 }
@@ -278,6 +346,8 @@ private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding 
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
+    async let status = RuntimeHistoryXPCReadTransport.request(
+      method: "job.status", params: ["jobId": .string(jobID)])
     async let evidence = RuntimeHistoryXPCReadTransport.request(
       method: "job.evidence", params: ["jobId": .string(jobID)])
     async let artifacts = RuntimeHistoryXPCReadTransport.request(
@@ -285,6 +355,7 @@ private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding 
     return await RuntimeJobDetailResponseDecoding.presentation(
       jobID: jobID,
       operationReference: operationReference,
+      statusResponse: await status,
       evidenceResponse: evidence,
       artifactResponse: artifacts)
   }
@@ -514,6 +585,11 @@ private enum RuntimeHistoryXPCReadTransport {
 /// matters can be pinned directly: what the App is allowed to conclude
 /// from a given daemon answer.
 enum RuntimeHistoryResponseDecoding {
+  enum PageResult {
+    case available([RuntimeJobSummaryPresentation], nextCursor: String?)
+    case unavailable(String)
+  }
+
   /// Anything the daemon did not answer completely is unavailable, not an
   /// empty history: "no jobs" and "could not read jobs" must never render the
   /// same way.
@@ -529,8 +605,63 @@ enum RuntimeHistoryResponseDecoding {
     guard object["ok"] as? Bool == true, let result = object["result"] as? [[String: Any]] else {
       return .unavailable("ArkDeck Runtime returned no job list")
     }
+    return presentation(entries: result)
+  }
+
+  static func page(from data: Data) -> PageResult {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return .unavailable("ArkDeck Runtime returned an unreadable history page")
+    }
+    if let error = object["error"] as? [String: Any] {
+      let code = error["code"] as? String ?? "unknown"
+      let message = error["message"] as? String ?? "no message"
+      return .unavailable("ArkDeck Runtime refused the history page: \(code) — \(message)")
+    }
+    guard object["ok"] as? Bool == true,
+      let result = object["result"] as? [String: Any],
+      let entries = result["jobs"] as? [[String: Any]]
+    else {
+      return .unavailable("ArkDeck Runtime returned no paged job list")
+    }
+    let currentEntries: [[String: Any]]
+    if let supplied = result["currentJobs"] {
+      guard let values = supplied as? [[String: Any]] else {
+        return .unavailable("ArkDeck Runtime returned an invalid current Job list")
+      }
+      currentEntries = values
+    } else {
+      currentEntries = []
+    }
+    var combinedEntries = currentEntries
+    var knownIDs = Set(currentEntries.compactMap { $0["jobId"] as? String })
+    combinedEntries.append(
+      contentsOf: entries.filter { entry in
+        guard let jobID = entry["jobId"] as? String else { return true }
+        return knownIDs.insert(jobID).inserted
+      })
+    let presentation = presentation(entries: combinedEntries)
+    guard case .available = presentation.availability else {
+      if case .unavailable(let reason) = presentation.availability {
+        return .unavailable(reason)
+      }
+      return .unavailable("ArkDeck Runtime returned an unreadable history page")
+    }
+    let nextCursor: String?
+    if result["nextCursor"] is NSNull || result["nextCursor"] == nil {
+      nextCursor = nil
+    } else if let value = result["nextCursor"] as? String {
+      nextCursor = value
+    } else {
+      return .unavailable("ArkDeck Runtime returned an invalid history cursor")
+    }
+    return .available(presentation.jobs, nextCursor: nextCursor)
+  }
+
+  private static func presentation(
+    entries: [[String: Any]]
+  ) -> RuntimeHistoryPresentation {
     var jobs: [RuntimeJobSummaryPresentation] = []
-    for entry in result {
+    for entry in entries {
       guard
         let id = entry["jobId"] as? String,
         let operation = entry["operation"] as? String,
@@ -573,9 +704,14 @@ enum RuntimeJobDetailResponseDecoding {
   static func presentation(
     jobID: String,
     operationReference: String,
+    statusResponse: RuntimeHistoryTransportResult? = nil,
     evidenceResponse: RuntimeHistoryTransportResult,
     artifactResponse: RuntimeHistoryTransportResult
   ) -> RuntimeJobDetailPresentation {
+    let timeline = decodeTimeline(
+      jobID: jobID,
+      operationReference: operationReference,
+      response: statusResponse)
     let evidence = decodeEvidence(
       jobID: jobID,
       operationReference: operationReference,
@@ -584,6 +720,17 @@ enum RuntimeJobDetailResponseDecoding {
       jobID: jobID,
       operationReference: operationReference,
       response: artifactResponse)
+
+    let timelineAvailability: RuntimeJobDetailSectionAvailability
+    let timelineValue: [String]
+    switch timeline {
+    case .available(let value):
+      timelineAvailability = .available
+      timelineValue = value
+    case .unavailable(let reason):
+      timelineAvailability = .unavailable(reason: reason)
+      timelineValue = []
+    }
 
     let evidenceAvailability: RuntimeJobDetailSectionAvailability
     let evidenceValue: RuntimeJobEvidencePresentation?
@@ -609,10 +756,38 @@ enum RuntimeJobDetailResponseDecoding {
 
     return RuntimeJobDetailPresentation(
       jobID: jobID,
+      timelineAvailability: timelineAvailability,
+      timeline: timelineValue,
       evidenceAvailability: evidenceAvailability,
       evidence: evidenceValue,
       artifactAvailability: artifactAvailability,
       artifacts: artifactValues)
+  }
+
+  private static func decodeTimeline(
+    jobID: String,
+    operationReference: String,
+    response: RuntimeHistoryTransportResult?
+  ) -> Section<[String]> {
+    guard let response else {
+      return .unavailable("This detail reader did not request the Job timeline")
+    }
+    let value: [String: Any]
+    switch response {
+    case .failure(let reason): return .unavailable(reason)
+    case .success(let data):
+      switch resultObject(from: data, label: "Job status") {
+      case .available(let result): value = result
+      case .unavailable(let reason): return .unavailable(reason)
+      }
+    }
+    guard value["jobId"] as? String == jobID,
+      value["operation"] as? String == operationReference,
+      let timeline = value["timeline"] as? [String]
+    else {
+      return .unavailable("Job status did not match the selected Job")
+    }
+    return .available(timeline)
   }
 
   private static func decodeEvidence(
@@ -837,6 +1012,10 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     let isFlash = operationReference == "flash.dayu200"
     return RuntimeJobDetailPresentation(
       jobID: jobID,
+      timelineAvailability: .available,
+      timeline: isFlash
+        ? ["queued", "preflight", "running", "waitingForDevice"]
+        : ["queued", "running", "succeeded"],
       evidenceAvailability: .available,
       evidence: RuntimeJobEvidencePresentation(
         catalogDigest: String(repeating: "a", count: 64),

@@ -356,7 +356,9 @@ private struct AppShellView: View {
         loadingDetailJobIDs: runtimeHistory.loadingDetailJobIDs,
         exportStatesByArtifactID: runtimeHistory.exportStatesByArtifactID,
         isRefreshInFlight: runtimeHistory.isRefreshInFlight,
+        isLoadOlderInFlight: runtimeHistory.isLoadOlderInFlight,
         onRefresh: runtimeHistory.refresh,
+        onLoadOlder: runtimeHistory.loadOlder,
         onLoadDetail: runtimeHistory.loadDetail,
         onExportArtifact: runtimeHistory.exportArtifact)
     case .flash:
