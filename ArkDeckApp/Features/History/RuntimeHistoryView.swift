@@ -572,29 +572,104 @@ struct RuntimeHistoryView: View {
         unavailableSection(reason)
       case .available:
         if let evidence = detail.evidence {
-          if !evidence.parametersWereReported {
+          if !evidence.traceParameters.isEmpty {
+            traceParameterTable(evidence.traceParameters)
+            if evidence.parametersWereReported, !evidence.parameters.isEmpty {
+              Text(historyLocalized("history.parameters.typedInputs"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+              typedParameterGrid(evidence.parameters)
+            }
+          } else if !evidence.parametersWereReported {
             Text(historyLocalized("history.parameters.unavailable"))
               .foregroundStyle(.secondary)
           } else if evidence.parameters.isEmpty {
             Text(historyLocalized("history.parameters.empty"))
               .foregroundStyle(.secondary)
           } else {
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
-              ForEach(evidence.parameters) { parameter in
-                GridRow(alignment: .firstTextBaseline) {
-                  Text(parameter.name).font(.callout.monospaced())
-                  Text(parameter.value)
-                    .font(.callout.monospaced())
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-              }
-            }
-            .accessibilityIdentifier("history.parameters")
+            typedParameterGrid(evidence.parameters)
           }
         }
       }
     }
+  }
+
+  private func traceParameterTable(
+    _ parameters: [RuntimeTraceParameterPresentation]
+  ) -> some View {
+    Table(parameters) {
+      TableColumn(historyLocalized("history.parameters.column.name")) { parameter in
+        Text(parameter.name)
+          .font(.caption.monospaced())
+          .lineLimit(2)
+          .help(parameter.name)
+          .textSelection(.enabled)
+      }
+      .width(min: 90, ideal: 170)
+      TableColumn(historyLocalized("history.parameters.column.before")) { parameter in
+        traceParameterValue(state: parameter.beforeState, value: parameter.beforeValue)
+      }
+      .width(min: 48, ideal: 72)
+      TableColumn(historyLocalized("history.parameters.column.after")) { parameter in
+        traceParameterValue(state: parameter.afterState, value: parameter.afterValue)
+      }
+      .width(min: 48, ideal: 72)
+      TableColumn(historyLocalized("history.parameters.column.status")) { parameter in
+        traceParameterStatus(parameter.comparison)
+      }
+      .width(min: 82, ideal: 104)
+    }
+    .frame(minHeight: 250, idealHeight: 300)
+    .accessibilityIdentifier("history.parameters.traceDiff")
+  }
+
+  private func typedParameterGrid(
+    _ parameters: [RuntimeJobParameterPresentation]
+  ) -> some View {
+    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+      ForEach(parameters) { parameter in
+        GridRow(alignment: .firstTextBaseline) {
+          Text(parameter.name).font(.callout.monospaced())
+          Text(parameter.value)
+            .font(.callout.monospaced())
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
+    .accessibilityIdentifier("history.parameters")
+  }
+
+  private func traceParameterValue(state: String, value: String?) -> some View {
+    let displayValue: String
+    switch state {
+    case "value": displayValue = value ?? historyLocalized("history.value.notReported")
+    case "missing": displayValue = historyLocalized("history.parameters.state.missing")
+    case "unreadable": displayValue = historyLocalized("history.parameters.state.unreadable")
+    default: displayValue = historyLocalized("history.parameters.state.unknown")
+    }
+    return Text(displayValue)
+      .font(.caption.monospaced())
+      .lineLimit(2)
+      .textSelection(.enabled)
+  }
+
+  private func traceParameterStatus(
+    _ comparison: RuntimeTraceParameterComparison
+  ) -> some View {
+    let presentation: (key: String, symbol: String, color: Color) =
+      switch comparison {
+      case .unchanged:
+        ("history.parameters.comparison.unchanged", "checkmark.circle", .green)
+      case .changed:
+        ("history.parameters.comparison.changed", "exclamationmark.triangle.fill", .orange)
+      case .unverified:
+        ("history.parameters.comparison.unverified", "questionmark.circle", .orange)
+      }
+    return Label(historyLocalized(presentation.key), systemImage: presentation.symbol)
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(presentation.color)
+      .fixedSize(horizontal: false, vertical: true)
   }
 
   @ViewBuilder
