@@ -63,4 +63,40 @@ final class ISO8601TimestampsTests: XCTestCase {
     XCTAssertNil(ISO8601Timestamps.parse("2026-08-11T12:00:00"))
     XCTAssertNil(ISO8601Timestamps.parse("2026-13-40T99:99:99Z"))
   }
+
+  /// The parser shares locked formatter instances across every concurrent
+  /// caller (journal, artifact, authorization services), so hammer it from
+  /// parallel tasks and require every result to stay correct.
+  func testConcurrentParsingStaysCorrectAcrossTasks() async {
+    let expectations: [(String, TimeInterval?)] = [
+      ("2026-08-11T12:00:00Z", 1_786_449_600),
+      ("2026-08-11T12:00:00.250Z", 1_786_449_600.25),
+      ("2026-08-11T04:00:00-08:00", 1_786_449_600),
+      ("not-a-date", nil),
+      ("2026-08-11T12:00:00", nil),
+    ]
+    let failures = await withTaskGroup(of: Int.self) { group in
+      for task in 0..<8 {
+        group.addTask {
+          var mismatches = 0
+          for iteration in 0..<2_000 {
+            let (input, expected) = expectations[(task + iteration) % expectations.count]
+            let parsed = ISO8601Timestamps.parse(input)
+            switch (parsed, expected) {
+            case (nil, nil):
+              break
+            case (let date?, let interval?)
+            where abs(date.timeIntervalSince1970 - interval) < 0.001:
+              break
+            default:
+              mismatches += 1
+            }
+          }
+          return mismatches
+        }
+      }
+      return await group.reduce(0, +)
+    }
+    XCTAssertEqual(failures, 0)
+  }
 }

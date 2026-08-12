@@ -46,15 +46,31 @@ package enum CanonicalJSONEncoders {
 
 /// Fallback parsing for the two ISO-8601 spellings ArkDeck reads back
 /// (with and without fractional seconds). The accepted set is identical
-/// regardless of probe order; a fresh formatter per call matches the
-/// pre-consolidation behaviour and keeps the API thread-safe.
+/// regardless of probe order and unchanged from the per-call-formatter
+/// spelling this replaced.
 package enum ISO8601Timestamps {
+  // The SDK marks ISO8601DateFormatter's Sendable conformance unavailable,
+  // so the two cached formatters (constructing them per call dominated
+  // journal replay) are only touched under this lock. Uncontended
+  // lock/unlock is nanoseconds against the microseconds a parse costs;
+  // the replay hot loop is single-threaded, so it never contends.
+  private static let lock = NSLock()
+  private nonisolated(unsafe) static let fractionalFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }()
+
+  private nonisolated(unsafe) static let plainFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }()
+
   package static func parse(_ value: String) -> Date? {
-    let fractional = ISO8601DateFormatter()
-    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = fractional.date(from: value) { return date }
-    let plain = ISO8601DateFormatter()
-    plain.formatOptions = [.withInternetDateTime]
-    return plain.date(from: value)
+    lock.lock()
+    defer { lock.unlock() }
+    if let date = fractionalFormatter.date(from: value) { return date }
+    return plainFormatter.date(from: value)
   }
 }
