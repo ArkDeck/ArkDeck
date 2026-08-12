@@ -139,10 +139,8 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
   }
 
   public var isActive: Bool {
-    switch state {
-    case "queued", "preflighting", "running", "cancelling", "reconciling": true
-    default: false
-    }
+    guard let state = JobState(rawValue: state) else { return false }
+    return !state.isTerminal
   }
 
   public init(

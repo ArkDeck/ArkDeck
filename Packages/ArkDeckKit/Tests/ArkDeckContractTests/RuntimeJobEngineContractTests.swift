@@ -261,10 +261,11 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let cancelledAcceptance = try await cancelledEngine.submit(
       observeRequest(idempotencyKey: "idem-power-cancelled-01"))
     try await cancelledEngine.requestCancel(jobID: cancelledAcceptance.jobID)
-    let cancelled = try await cancelledEngine.run(jobID: cancelledAcceptance.jobID)
+    let cancelled = try await cancelledEngine.status(jobID: cancelledAcceptance.jobID)
     XCTAssertEqual(cancelled.state, JobState.cancelled.rawValue)
-    XCTAssertEqual(cancelledBackend.beginCount, 1)
-    XCTAssertEqual(cancelledBackend.endCount, 1)
+    XCTAssertEqual(cancelledDispatcher.dispatchCount, 0)
+    XCTAssertEqual(cancelledBackend.beginCount, 0)
+    XCTAssertEqual(cancelledBackend.endCount, 0)
     XCTAssertEqual(cancelledController.activeLeaseCount, 0)
   }
 
@@ -844,6 +845,32 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       "the daemon-owned reference must survive restart in the persisted typed request")
   }
 
+  func testCancelMutationBeforeRunDoesNotConsumeOrFabricateCapabilityLineage() async throws {
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease()
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-cancel-before-run",
+        idempotencyKey: "idem-hap-cancel-before-run"))
+    let capabilityStatuses = try await capabilityStore.list()
+    let capabilityID = try XCTUnwrap(
+      capabilityStatuses.first?.capability.capabilityID)
+
+    try await engine.requestCancel(jobID: acceptance.jobID)
+
+    let status = try await engine.status(jobID: acceptance.jobID)
+    XCTAssertEqual(status.state, JobState.cancelled.rawValue)
+    XCTAssertFalse(status.outcomeUnknown)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    let capability = try await capabilityStore.inspect(capabilityID: capabilityID)
+    XCTAssertEqual(capability?.remainingUses, 10_000)
+    XCTAssertEqual(capability?.consumptionCount, 0)
+    XCTAssertTrue(capability?.lineage.isEmpty == true)
+    XCTAssertTrue(capability?.lineageAllowsNewExecution == true)
+  }
+
   func testAutomaticCapabilityValidationUsesFreshClockAfterIssuance() async throws {
     let clock = AdvancingClock()
     let dispatcher = ScriptedDispatcher(script: .observationHappy)
@@ -1277,14 +1304,29 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
   // MARK: - Cancel
 
-  func testCancelLandsAtSafeBoundary() async throws {
+  func testCancelBeforeRunClosesDurablyWithZeroDispatch() async throws {
     let dispatcher = ScriptedDispatcher(script: .observationHappy)
-    let (engine, _) = try makeEngine(dispatcher: dispatcher)
+    let root = stateDirectory!
+    let (engine, _) = try makeEngine(dispatcher: dispatcher, stateRoot: root)
     let acceptance = try await engine.submit(observeRequest(idempotencyKey: "idem-cancel-01"))
     try await engine.requestCancel(jobID: acceptance.jobID)
-    let status = try await engine.run(jobID: acceptance.jobID)
+    let status = try await engine.status(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "cancelled")
+    XCTAssertNotNil(status.finishedAtUTC)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    XCTAssertTrue(status.timeline.contains("preflight->cancelRequested"))
     XCTAssertTrue(status.timeline.contains("cancelRequested->cancellingAtSafeBoundary"))
+    XCTAssertTrue(status.timeline.contains("cancellingAtSafeBoundary->cancelled"))
+
+    let restartedDispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (restarted, _) = try makeEngine(
+      dispatcher: restartedDispatcher, stateRoot: root)
+    let recoveredActiveJobs = try await restarted.recoverActiveJobs()
+    XCTAssertTrue(recoveredActiveJobs.isEmpty)
+    let afterRestart = try await restarted.status(jobID: acceptance.jobID)
+    XCTAssertEqual(afterRestart.state, "cancelled")
+    XCTAssertEqual(afterRestart.timeline, status.timeline)
+    XCTAssertEqual(restartedDispatcher.dispatchCount, 0)
   }
 
   // MARK: - Crash windows (process-level fixture)
@@ -1434,7 +1476,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         observeRequest(idempotencyKey: "idem-quiet-\(window.name)"))
       if window.cancelBeforeRun {
         try await original.requestCancel(jobID: acceptance.jobID)
-        let cancelled = try await original.run(jobID: acceptance.jobID)
+        let cancelled = try await original.status(jobID: acceptance.jobID)
         XCTAssertEqual(cancelled.state, "cancelled", window.name)
       } else {
         let completed = try await original.run(jobID: acceptance.jobID)

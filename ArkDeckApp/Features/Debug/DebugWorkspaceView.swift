@@ -604,7 +604,7 @@ private struct DebugLogsWorkspace: View {
           }
         }
 
-        DebugRecentJobsCard(jobs: relatedJobs)
+        DebugRecentJobsCard(model: model, jobs: relatedJobs)
       }
       .padding(16)
     }
@@ -695,7 +695,7 @@ private struct DebugAppsWorkspace: View {
         }
         packageInventory
         if !runtimeArtifacts.isEmpty { resultArtifacts }
-        DebugRecentJobsCard(jobs: relatedJobs)
+        DebugRecentJobsCard(model: model, jobs: relatedJobs)
       }
       .frame(maxWidth: 1_050, alignment: .topLeading)
       .padding(16)
@@ -1431,6 +1431,7 @@ private struct DebugAvailabilityCard: View {
 }
 
 private struct DebugRecentJobsCard: View {
+  @ObservedObject var model: DebugWorkspaceViewModel
   let jobs: [DebugJobPresentation]
 
   var body: some View {
@@ -1457,6 +1458,21 @@ private struct DebugRecentJobsCard: View {
                 Spacer()
                 Text(job.state)
                   .font(.caption.weight(.medium))
+                if job.isActive {
+                  Button {
+                    model.cancelOutstandingJob(job)
+                  } label: {
+                    HStack(spacing: 5) {
+                      if model.isCancellingOutstandingJob(job.id) {
+                        ProgressView().controlSize(.mini)
+                      }
+                      Text(DebugL10n.text("debug.action.cancel"))
+                    }
+                  }
+                  .controlSize(.small)
+                  .disabled(model.isCancellingOutstandingJob(job.id))
+                  .accessibilityIdentifier("debug.jobs.cancel.\(job.id)")
+                }
               }
               if let latest = job.timeline.last {
                 Text(latest)
@@ -1557,6 +1573,7 @@ final class DebugWorkspaceViewModel: ObservableObject {
   @Published private(set) var activeHAPJobID: String?
   @Published private(set) var hapTerminal: DebugLogJobTerminalPresentation?
   @Published private(set) var hapFailure: String?
+  @Published private(set) var cancellingOutstandingJobIDs: Set<String> = []
 
   private let provider: any DebugApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
@@ -1749,6 +1766,41 @@ final class DebugWorkspaceViewModel: ObservableObject {
       guard let self else { return }
       self.isCancellingHAP = false
       if !accepted { self.hapFailure = "Runtime refused the cancellation request" }
+    }
+  }
+
+  func isCancellingOutstandingJob(_ jobID: String) -> Bool {
+    cancellingOutstandingJobIDs.contains(jobID)
+  }
+
+  func cancelOutstandingJob(_ job: DebugJobPresentation) {
+    guard job.isActive, !isCancellingOutstandingJob(job.id) else { return }
+    cancellingOutstandingJobIDs.insert(job.id)
+    let provider = provider
+    Task { [weak self] in
+      guard let self else { return }
+      defer { self.cancellingOutstandingJobIDs.remove(job.id) }
+      guard await provider.cancel(jobID: job.id) else {
+        self.recordCancellationFailure(for: job)
+        return
+      }
+      for _ in 0..<80 {
+        guard !Task.isCancelled else { return }
+        let next = await provider.refreshWorkspace(targetID: job.targetID)
+        guard !Task.isCancelled else { return }
+        self.workspace = next
+        guard next.jobs.first(where: { $0.id == job.id })?.isActive == true else { return }
+        try? await Task.sleep(for: .milliseconds(750))
+      }
+    }
+  }
+
+  private func recordCancellationFailure(for job: DebugJobPresentation) {
+    let message = "Runtime refused the cancellation request"
+    switch job.operationReference {
+    case DebugApplicationFacade.debugHAPReference: hapFailure = message
+    case DebugApplicationFacade.captureDiagnosticsReference: logFailure = message
+    default: portRuleFailure = message
     }
   }
 
