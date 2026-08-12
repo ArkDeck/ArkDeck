@@ -99,9 +99,29 @@ public protocol TraceRuntimeProbing: Sendable {
 }
 
 package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
-  private enum ParameterReadOutcome {
+  private enum ParameterReadOutcome: Sendable {
     case missing
     case receipt(ProviderSubprocessReceipt)
+  }
+
+  private struct ToolHelpObservation: Sendable {
+    let presentation: TraceRuntimeToolObservation
+    let evaluation: TraceProbeHelpEvaluation?
+  }
+
+  private struct ToolObservations: Sendable {
+    let disposition: String
+    let tool: String?
+    let family: String?
+    let tags: [String]
+    let rawHelp: String?
+    let rawHelpSHA256: String?
+    let presentations: [TraceRuntimeToolObservation]
+  }
+
+  private struct IndexedParameterObservation: Sendable {
+    let index: Int
+    let presentation: TraceRuntimeParameterObservation
   }
 
   private let targetStore: RuntimeTargetStore
@@ -136,107 +156,153 @@ package struct FoundationTraceRuntimeProbe: TraceRuntimeProbing {
       throw DeviceProviderError.factsUnavailable("target \(targetID) has not been adopted")
     }
     let hdc = try hdcResolver.resolveExecutable(providerID: "hdc")
-    var toolObservations: [TraceRuntimeToolObservation] = []
-    var hitraceHelp: TraceProbeHelpEvaluation?
-    for probeTool in [TraceProbeTool.hitrace, .bytrace] {
-      do {
-        let receipt = try await readAllowingNonZero(
-          executable: hdc,
-          arguments: deviceArguments(
-            connectKey: route.connectKey,
-            command: ["shell", probeTool.rawValue, "--help"]),
-          byteBudget: 64 * 1024)
-        let evaluation = TraceProbeAdapter.evaluateHelp(
-          tool: probeTool, stdout: receipt.stdout, stderr: receipt.stderr)
-        if probeTool == .hitrace { hitraceHelp = evaluation }
-        let toolDisposition: TraceRuntimeToolDisposition
-        let selectedFamily: String?
-        switch evaluation.selection {
-        case .captureEligible(_, let family):
-          toolDisposition = .captureEligible
-          selectedFamily = family
-        case .probeOnlyNotCaptureEligible(_, let family):
-          toolDisposition = .probeOnly
-          selectedFamily = family
-        case .unsupported:
-          toolDisposition = .unrecognized
-          selectedFamily = nil
-        }
-        toolObservations.append(
-          TraceRuntimeToolObservation(
-            tool: probeTool.rawValue,
-            disposition: toolDisposition,
-            family: selectedFamily,
-            rawHelpSHA256: evaluation.rawHelpSHA256,
-            detail: receipt.exitStatus == 0 ? nil : "probe exited non-zero"))
-      } catch {
-        toolObservations.append(
-          TraceRuntimeToolObservation(
-            tool: probeTool.rawValue,
-            disposition: .probeFailed,
-            detail: "read-only probe could not complete"))
-      }
-    }
-
-    var disposition = "unsupported"
-    var tool: String?
-    var family: String?
-    var tags: [String] = []
-    if let hitraceHelp,
-      case .captureEligible(let selectedTool, let selectedFamily) = hitraceHelp.selection
-    {
-      let tagReceipt = try await read(
-        executable: hdc,
-        arguments: deviceArguments(
-          connectKey: route.connectKey, command: ["shell", "hitrace", "-l"]),
-        byteBudget: 64 * 1024)
-      let tagList = TraceProbeAdapter.evaluateTagList(
-        tool: .hitrace, stdout: tagReceipt.stdout, stderr: tagReceipt.stderr)
-      if case .captureEligible(let tagTool, let tagFamily) = tagList.selection,
-        tagTool == selectedTool, tagFamily == selectedFamily
-      {
-        disposition = "captureEligible"
-        tool = selectedTool.rawValue
-        family = selectedFamily
-        tags = tagList.tags
-      }
-    }
-
-    var parameters: [TraceRuntimeParameterObservation] = []
-    for definition in TraceDebugParameterCatalog.definitions {
-      do {
-        let outcome = try await readParameter(
-          executable: hdc,
-          arguments: deviceArguments(
-            connectKey: route.connectKey,
-            command: ["shell", "param", "get", definition.name]),
-          name: definition.name)
-        switch outcome {
-        case .missing:
-          parameters.append(
-            TraceRuntimeParameterObservation(name: definition.name, state: .missing))
-        case .receipt(let receipt):
-          parameters.append(Self.parameterObservation(definition.name, receipt: receipt))
-        }
-      } catch {
-        parameters.append(
-          TraceRuntimeParameterObservation(
-            name: definition.name, state: .unreadable,
-            detail: String(describing: error)))
-      }
-    }
+    // These reads share only an immutable target route and executable
+    // identity. HDC supports concurrent clients, so tool capability reads and
+    // the bounded parameter catalog must not form a serial startup chain.
+    // Each result is reassembled in catalog order below.
+    async let tools = probeTools(executable: hdc, connectKey: route.connectKey)
+    async let parameters = probeParameters(executable: hdc, connectKey: route.connectKey)
+    let toolObservations = try await tools
+    let parameterObservations = await parameters
 
     return TraceRuntimeProbeSnapshot(
       targetID: route.targetID,
       bindingRevision: route.bindingRevision,
-      adapterDisposition: disposition,
-      tool: tool,
-      family: family,
-      supportedTags: tags,
+      adapterDisposition: toolObservations.disposition,
+      tool: toolObservations.tool,
+      family: toolObservations.family,
+      supportedTags: toolObservations.tags,
+      rawHelp: toolObservations.rawHelp,
+      rawHelpSHA256: toolObservations.rawHelpSHA256,
+      tools: toolObservations.presentations,
+      parameters: parameterObservations)
+  }
+
+  private func probeTools(
+    executable: ResolvedExecutable,
+    connectKey: String
+  ) async throws -> ToolObservations {
+    async let hitrace = probeHelp(
+      tool: .hitrace, executable: executable, connectKey: connectKey)
+    async let bytrace = probeHelp(
+      tool: .bytrace, executable: executable, connectKey: connectKey)
+    let (hitraceObservation, bytraceObservation) = await (hitrace, bytrace)
+
+    var disposition = "unsupported"
+    var selectedTool: String?
+    var selectedFamily: String?
+    var tags: [String] = []
+    if let hitraceHelp = hitraceObservation.evaluation,
+      case .captureEligible(let tool, let family) = hitraceHelp.selection
+    {
+      let tagReceipt = try await read(
+        executable: executable,
+        arguments: deviceArguments(
+          connectKey: connectKey, command: ["shell", "hitrace", "-l"]),
+        byteBudget: 64 * 1024)
+      let tagList = TraceProbeAdapter.evaluateTagList(
+        tool: .hitrace, stdout: tagReceipt.stdout, stderr: tagReceipt.stderr)
+      if case .captureEligible(let tagTool, let tagFamily) = tagList.selection,
+        tagTool == tool, tagFamily == family
+      {
+        disposition = "captureEligible"
+        selectedTool = tool.rawValue
+        selectedFamily = family
+        tags = tagList.tags
+      }
+    }
+
+    let hitraceHelp = hitraceObservation.evaluation
+    return ToolObservations(
+      disposition: disposition,
+      tool: selectedTool,
+      family: selectedFamily,
+      tags: tags,
       rawHelp: hitraceHelp.flatMap { String(data: $0.rawHelp, encoding: .utf8) },
       rawHelpSHA256: hitraceHelp?.rawHelpSHA256,
-      tools: toolObservations,
-      parameters: parameters)
+      presentations: [hitraceObservation.presentation, bytraceObservation.presentation])
+  }
+
+  private func probeHelp(
+    tool: TraceProbeTool,
+    executable: ResolvedExecutable,
+    connectKey: String
+  ) async -> ToolHelpObservation {
+    do {
+      let receipt = try await readAllowingNonZero(
+        executable: executable,
+        arguments: deviceArguments(
+          connectKey: connectKey,
+          command: ["shell", tool.rawValue, "--help"]),
+        byteBudget: 64 * 1024)
+      let evaluation = TraceProbeAdapter.evaluateHelp(
+        tool: tool, stdout: receipt.stdout, stderr: receipt.stderr)
+      let disposition: TraceRuntimeToolDisposition
+      let family: String?
+      switch evaluation.selection {
+      case .captureEligible(_, let selectedFamily):
+        disposition = .captureEligible
+        family = selectedFamily
+      case .probeOnlyNotCaptureEligible(_, let selectedFamily):
+        disposition = .probeOnly
+        family = selectedFamily
+      case .unsupported:
+        disposition = .unrecognized
+        family = nil
+      }
+      return ToolHelpObservation(
+        presentation: TraceRuntimeToolObservation(
+          tool: tool.rawValue,
+          disposition: disposition,
+          family: family,
+          rawHelpSHA256: evaluation.rawHelpSHA256,
+          detail: receipt.exitStatus == 0 ? nil : "probe exited non-zero"),
+        evaluation: evaluation)
+    } catch {
+      return ToolHelpObservation(
+        presentation: TraceRuntimeToolObservation(
+          tool: tool.rawValue,
+          disposition: .probeFailed,
+          detail: "read-only probe could not complete"),
+        evaluation: nil)
+    }
+  }
+
+  private func probeParameters(
+    executable: ResolvedExecutable,
+    connectKey: String
+  ) async -> [TraceRuntimeParameterObservation] {
+    await withTaskGroup(of: IndexedParameterObservation.self) { group in
+      for (index, definition) in TraceDebugParameterCatalog.definitions.enumerated() {
+        group.addTask {
+          let presentation: TraceRuntimeParameterObservation
+          do {
+            let outcome = try await readParameter(
+              executable: executable,
+              arguments: deviceArguments(
+                connectKey: connectKey,
+                command: ["shell", "param", "get", definition.name]),
+              name: definition.name)
+            switch outcome {
+            case .missing:
+              presentation = TraceRuntimeParameterObservation(
+                name: definition.name, state: .missing)
+            case .receipt(let receipt):
+              presentation = Self.parameterObservation(
+                definition.name, receipt: receipt)
+            }
+          } catch {
+            presentation = TraceRuntimeParameterObservation(
+              name: definition.name, state: .unreadable,
+              detail: String(describing: error))
+          }
+          return IndexedParameterObservation(index: index, presentation: presentation)
+        }
+      }
+      var observations: [IndexedParameterObservation] = []
+      for await observation in group { observations.append(observation) }
+      return observations.sorted { $0.index < $1.index }.map(\.presentation)
+    }
   }
 
   private func deviceArguments(connectKey: String, command: [String]) -> [String] {

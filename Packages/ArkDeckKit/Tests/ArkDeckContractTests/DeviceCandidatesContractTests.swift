@@ -339,7 +339,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
   }
 
-  func testAppPublishesInitialDeviceRefreshBeforeWorkspaceProbeBurst() throws {
+  func testAppStartsIndependentWorkspaceProbeBurstBeforeAwaitingDeviceRefresh() throws {
     var repository = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let source = try String(
@@ -360,8 +360,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
       startup.range(of: "overviewCapabilities.refresh()")?.lowerBound)
 
     XCTAssertLessThan(deviceStart, diagnosticsStart)
-    XCTAssertLessThan(diagnosticsStart, devicePublished)
-    XCTAssertLessThan(devicePublished, workspaceStart)
+    XCTAssertLessThan(diagnosticsStart, workspaceStart)
+    XCTAssertLessThan(workspaceStart, devicePublished)
     XCTAssertFalse(
       startup.contains("deviceList.refresh()"),
       "startup must not enqueue the sidebar read behind unrelated workspaces")

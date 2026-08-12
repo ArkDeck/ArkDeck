@@ -46,16 +46,15 @@ struct ArkDeckApp: App {
       )
       .task {
         ApplicationIconChoice.applyStoredSelection()
-        // Device discovery is the first Golden Journey and the sidebar's
-        // first useful result. Start the diagnostics read alongside it (the
-        // Runtime coalesces their shared candidate enumeration), then wait
-        // for the device row before launching the more expensive workspace
-        // probes. Previously the sidebar refresh was last in this burst, so
-        // its one-second read could sit behind every startup probe for tens
-        // of seconds.
+        // Start every independent read-only projection together. The Runtime
+        // accepts concurrent clients, HDC supports overlapping read commands,
+        // and duplicate candidate enumeration is coalesced at the bootstrap.
+        // Keeping the device task explicit still makes discovery the first
+        // admitted read; awaiting it only after the burst keeps this scene
+        // task alive without placing an artificial barrier in front of the
+        // workspaces.
         async let initialDeviceRefresh: Void = deviceList.refreshForStartup()
         hdcDiagnostics.refresh()
-        await initialDeviceRefresh
         overviewCapabilities.refresh()
         autoUpdate.startup()
         runtimeHistory.refresh()
@@ -64,6 +63,7 @@ struct ArkDeckApp: App {
         debugWorkspace.refresh()
         traceWorkspace.refresh()
         automationWorkspace.refresh()
+        await initialDeviceRefresh
       }
     }
     .defaultSize(width: 1180, height: 760)
