@@ -26,6 +26,7 @@ final class DeviceListViewModel: ObservableObject {
 
   @Published private(set) var presentation = DeviceListPresentation.loading
   @Published private(set) var isRefreshing = false
+  @Published private(set) var startupInformationReady = false
   @Published private(set) var authorizationWait = AuthorizationWait.idle
   @Published private(set) var customDisplayNames: [String: String]
 
@@ -60,12 +61,12 @@ final class DeviceListViewModel: ObservableObject {
     }
   }
 
-  /// The App's startup task awaits this read after it launches unrelated
-  /// workspace probes concurrently. Manual refresh keeps the fire-and-forget
-  /// UI action above; both paths share the same synchronous admission guard.
+  /// The App's startup task awaits this read as its only startup I/O. Manual
+  /// refresh keeps the fire-and-forget UI action above; both paths share the
+  /// same synchronous admission guard.
   func refreshForStartup() async {
     guard let generation = beginRefresh() else { return }
-    await finishRefresh(generation: generation)
+    await finishRefresh(generation: generation, awaitEnrichment: true)
   }
 
   private func beginRefresh() -> UInt64? {
@@ -75,7 +76,10 @@ final class DeviceListViewModel: ObservableObject {
     return refreshGeneration
   }
 
-  private func finishRefresh(generation: UInt64) async {
+  private func finishRefresh(
+    generation: UInt64,
+    awaitEnrichment: Bool = false
+  ) async {
     let base = await provider.refreshCandidates()
     guard generation == refreshGeneration else { return }
     isRefreshing = false
@@ -87,6 +91,17 @@ final class DeviceListViewModel: ObservableObject {
     presentation = base
 
     let provider = provider
+    if awaitEnrichment {
+      // Startup gives this already bounded local-history join priority over
+      // every secondary dashboard read. The base row is visible first; once
+      // its firmware / transport decoration is published, the shell may fan
+      // out the independent Overview, History and update work concurrently.
+      let enriched = await provider.enrichCandidates(base)
+      guard generation == refreshGeneration, !Task.isCancelled else { return }
+      presentation = enriched
+      startupInformationReady = true
+      return
+    }
     Task { [weak self] in
       let enriched = await provider.enrichCandidates(base)
       guard let self, !Task.isCancelled, generation == self.refreshGeneration else { return }

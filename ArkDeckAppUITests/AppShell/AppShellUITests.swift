@@ -11,15 +11,57 @@ import XCTest
 /// different fixture still launch separately, but they assert raw domain
 /// strings, which read the same in every language and pin no locale.
 ///
-/// Every launch here uses the presentation-only UI fixtures. Nothing in this
-/// file observes a device, submits an operation, or may be recorded as
-/// hardware evidence.
+/// Default regression launches use presentation-only UI fixtures. The one
+/// explicitly opted-in cold-start acceptance below opens the production app
+/// and may be recorded as hardware evidence; it remains skipped unless the
+/// caller names the real-device environment gate. No test submits an
+/// operation.
 @MainActor
 final class AppShellUITests: XCTestCase {
+  private static let realDeviceStartupEnvironmentKey =
+    "ARKDECK_REAL_DEVICE_STARTUP_ACCEPTANCE"
+
   override class func setUp() {
     super.setUp()
     KeyboardInputSourcePin.pinPlainKeyboardLayout()
     KeyboardInputSourcePin.restoreWhenTheRunFinishes()
+  }
+
+  /// Opt-in hardware acceptance for GJ-1. The query deliberately matches the
+  /// presentation identifier rather than a serial number, so no device
+  /// identity is embedded in source or test output.
+  func testRealDeviceColdStartShowsConnectedDeviceWithinTwoSeconds() throws {
+    guard
+      ProcessInfo.processInfo.environment[
+        Self.realDeviceStartupEnvironmentKey
+      ] == "1"
+    else {
+      throw XCTSkip(
+        "Set \(Self.realDeviceStartupEnvironmentKey)=1 for real-device startup acceptance")
+    }
+
+    let app = XCUIApplication()
+    let startedAt = Date()
+    app.launch()
+
+    let deviceRow = app.descendants(matching: .any).matching(
+      NSPredicate(
+        format: "identifier BEGINSWITH %@ AND NOT identifier BEGINSWITH %@",
+        "device.row.", "device.row.observed."))
+      .firstMatch
+    let appeared = deviceRow.waitForExistence(timeout: 2)
+    let elapsed = Date().timeIntervalSince(startedAt)
+
+    let evidence = XCTAttachment(
+      string: String(format: "connected device row visible after %.3f seconds", elapsed))
+    evidence.name = "GJ-1 real-device cold-start timing"
+    evidence.lifetime = .keepAlways
+    add(evidence)
+
+    XCTAssertTrue(appeared, "The connected-device row did not appear within two seconds")
+    XCTAssertLessThanOrEqual(
+      elapsed, 2,
+      "Cold start took \(String(format: "%.3f", elapsed)) seconds to show the device row")
   }
 
   // MARK: - One launch per language

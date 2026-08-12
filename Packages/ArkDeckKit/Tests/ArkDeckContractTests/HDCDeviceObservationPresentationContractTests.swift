@@ -592,9 +592,9 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
         range: modelStart.upperBound..<app.endIndex))
     let model = String(app[modelStart.lowerBound..<modelEnd.lowerBound])
 
-    let overviewStart = try XCTUnwrap(app.range(of: "HDCStatusView("))
+    let overviewStart = try XCTUnwrap(app.range(of: "private struct OverviewWorkspaceView"))
     let overviewEnd = try XCTUnwrap(
-      app.range(of: "case .history:", range: overviewStart.upperBound..<app.endIndex))
+      app.range(of: "private struct AppShellView", range: overviewStart.upperBound..<app.endIndex))
     let overviewWiring = String(app[overviewStart.lowerBound..<overviewEnd.lowerBound])
 
     XCTAssertEqual(occurrences(of: "hdcDiagnostics.refresh()", in: overviewWiring), 1)

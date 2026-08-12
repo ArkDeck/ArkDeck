@@ -12,6 +12,8 @@ import XCTest
 /// path that adopts a single Connected candidate), and the App-facing decode
 /// reports incomplete facts as a failure instead of a silently empty list.
 final class DeviceCandidatesContractTests: XCTestCase {
+  private static let realDeviceLatencyEnvironmentKey =
+    "ARKDECK_REAL_DEVICE_CANDIDATE_LATENCY_ACCEPTANCE"
   private var stateDirectory: URL!
 
   override func setUpWithError() throws {
@@ -65,6 +67,42 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
   private func frame(_ method: String) -> Data {
     Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"t\",\"method\":\"\(method)\"}".utf8)
+  }
+
+  /// Opt-in real Runtime acceptance. The App begins this exact read while its
+  /// first window is being built, so the request must stay below the launch
+  /// budget without embedding or printing a hardware identifier.
+  func testRealRuntimePublishesConnectedDeviceInformationWithinStartupBudget() async throws {
+    guard
+      ProcessInfo.processInfo.environment[
+        Self.realDeviceLatencyEnvironmentKey
+      ] == "1"
+    else {
+      throw XCTSkip(
+        "Set \(Self.realDeviceLatencyEnvironmentKey)=1 for real-device latency acceptance")
+    }
+
+    let provider = DeviceListApplicationFacade.make(arguments: [])
+    let clock = ContinuousClock()
+    let startedAt = clock.now
+    let candidates = await provider.refreshCandidates()
+    let candidatesElapsed = startedAt.duration(to: clock.now)
+    let enrichStartedAt = clock.now
+    let presentation = await provider.enrichCandidates(candidates)
+    let enrichmentElapsed = enrichStartedAt.duration(to: clock.now)
+    let elapsed = startedAt.duration(to: clock.now)
+
+    guard case .available = presentation.availability else {
+      return XCTFail("The production Runtime did not publish an available candidate list")
+    }
+    XCTAssertFalse(presentation.candidates.isEmpty, "No connected device candidate was published")
+    XCTAssertTrue(
+      presentation.candidates.contains { $0.observedFacts != nil },
+      "The connected-device row did not receive its historical model / firmware / transport")
+    XCTAssertLessThanOrEqual(
+      elapsed, .milliseconds(1_250),
+      "device information exceeded its 1.25-second share of the cold-start budget "
+        + "(candidates=\(candidatesElapsed), enrichment=\(enrichmentElapsed))")
   }
 
   // Listing candidates adopts nothing — even when exactly one Connected
@@ -339,33 +377,28 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
   }
 
-  func testAppColdStartRefreshesVisibleShellFactsAndDefersHiddenWorkspaces() throws {
+  func testAppColdStartPublishesDevicesBeforeSecondaryAndHiddenWorkspaces() throws {
     var repository = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let source = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
       encoding: .utf8)
-    let taskStart = try XCTUnwrap(source.range(of: ".task {")?.upperBound)
-    let taskEnd = try XCTUnwrap(
-      source.range(of: ".defaultSize", range: taskStart..<source.endIndex)?.lowerBound)
-    let startup = String(source[taskStart..<taskEnd])
+    let deviceSource = try String(
+      contentsOf: repository.appending(
+        path: "ArkDeckApp/Features/Devices/DeviceWorkspace.swift"),
+      encoding: .utf8)
+    let storeStart = try XCTUnwrap(
+      source.range(of: "private final class ArkDeckAppModelStore")?.lowerBound)
+    let storeEnd = try XCTUnwrap(
+      source.range(of: "@main", range: storeStart..<source.endIndex)?.lowerBound)
+    let startup = String(source[storeStart..<storeEnd])
 
-    let deviceStart = try XCTUnwrap(
-      startup.range(of: "deviceList.refreshForStartup()")?.lowerBound)
-    let historyStart = try XCTUnwrap(
-      startup.range(of: "runtimeHistory.refresh()")?.lowerBound)
-    let devicePublished = try XCTUnwrap(
-      startup.range(of: "await initialDeviceRefresh")?.lowerBound)
-    let updateStart = try XCTUnwrap(
-      startup.range(of: "autoUpdate.startup()")?.lowerBound)
-
-    XCTAssertLessThan(deviceStart, historyStart)
-    XCTAssertLessThan(historyStart, devicePublished)
-    XCTAssertLessThan(devicePublished, updateStart)
-    XCTAssertFalse(
-      startup.contains("deviceList.refresh()"),
-      "startup must not enqueue the sidebar read behind unrelated workspaces")
-    for deferred in [
+    XCTAssertTrue(startup.contains("Task { [deviceList] in"))
+    XCTAssertTrue(startup.contains("await deviceList.refreshForStartup()"))
+    for nonCritical in [
+      "runtimeHistory.refresh()",
+      "autoUpdate.startup()",
+      "ApplicationIconChoice.applyStoredSelection()",
       "hdcDiagnostics.refresh()",
       "overviewCapabilities.refresh()",
       "flashWorkspace.refresh()",
@@ -375,11 +408,65 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "automationWorkspace.refresh()",
     ] {
       XCTAssertFalse(
-        startup.contains(deferred),
-        "cold start must defer selection-owned projection: \(deferred)")
+        startup.contains(nonCritical),
+        "device.candidates must own the cold-start I/O lane: \(nonCritical)")
     }
 
-    XCTAssertTrue(source.contains(".onChange(of: storedSelection, initial: true)"))
+    let secondaryStart = try XCTUnwrap(
+      source.range(of: ".task(id: deviceList.startupInformationReady) {")?.upperBound)
+    let secondaryEnd = try XCTUnwrap(
+      source.range(of: ".alert(", range: secondaryStart..<source.endIndex)?.lowerBound)
+    let secondary = String(source[secondaryStart..<secondaryEnd])
+    XCTAssertTrue(secondary.contains("guard deviceList.startupInformationReady else { return }"))
+    XCTAssertTrue(secondary.contains("await Task.yield()"))
+    XCTAssertTrue(secondary.contains("runtimeHistory.refresh()"))
+    XCTAssertTrue(secondary.contains("autoUpdate.startup()"))
+    XCTAssertTrue(secondary.contains("ApplicationIconChoice.applyStoredSelection()"))
+    XCTAssertTrue(secondary.contains("refreshVisibleProjection(for: storedSelection)"))
+    XCTAssertTrue(
+      deviceSource.contains(
+        "await finishRefresh(generation: generation, awaitEnrichment: true)"))
+    let enrichmentPublication = try XCTUnwrap(
+      deviceSource.range(of: "if awaitEnrichment {")?.lowerBound)
+    let manualEnrichment = try XCTUnwrap(
+      deviceSource.range(of: "Task { [weak self] in", range: enrichmentPublication..<deviceSource.endIndex)?
+        .lowerBound)
+    let startupEnrichment = String(deviceSource[enrichmentPublication..<manualEnrichment])
+    XCTAssertTrue(startupEnrichment.contains("await provider.enrichCandidates(base)"))
+    XCTAssertTrue(startupEnrichment.contains("startupInformationReady = true"))
+
+    XCTAssertFalse(source.contains(".onChange(of: storedSelection, initial: true)"))
+    for lazyModel in [
+      "lazy var hdcDiagnostics",
+      "lazy var overviewCapabilities",
+      "lazy var flashWorkspace",
+      "lazy var uiDumpWorkspace",
+      "lazy var debugWorkspace",
+      "lazy var traceWorkspace",
+      "lazy var automationWorkspace",
+      "lazy var settingsWorkspace",
+    ] {
+      XCTAssertTrue(
+        source.contains(lazyModel),
+        "offscreen model must be initialized on first visible use: \(lazyModel)")
+    }
+
+    let updaterStart = try XCTUnwrap(
+      source.range(of: "private final class AutoUpdateViewModel")?.lowerBound)
+    let updaterEnd = try XCTUnwrap(
+      source.range(of: "private struct FinderUpdateArtifactRevealer", range: updaterStart..<source.endIndex)?
+        .lowerBound)
+    let updater = String(source[updaterStart..<updaterEnd])
+    let updaterInitStart = try XCTUnwrap(updater.range(of: "init() {")?.lowerBound)
+    let updaterStartupStart = try XCTUnwrap(
+      updater.range(of: "func startup()", range: updaterInitStart..<updater.endIndex)?.lowerBound)
+    XCTAssertFalse(
+      updater[updaterInitStart..<updaterStartupStart].contains(
+        "AutoUpdateApplicationFacade.make()"),
+      "the updater must not scan storage and diagnostics while SwiftUI constructs the App")
+    XCTAssertTrue(updater[updaterStartupStart...].contains("Task.detached(priority: .utility)"))
+    XCTAssertTrue(updater[updaterStartupStart...].contains("AutoUpdateApplicationFacade.make()"))
+
     let demandStart = try XCTUnwrap(
       source.range(
         of: "private func refreshVisibleProjection(for storageValue:")?.lowerBound)
@@ -410,7 +497,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
       contentsOf: repository.appending(path: "ArkDeckApp/Features/Devices/DeviceWorkspace.swift"),
       encoding: .utf8)
     let finishStart = try XCTUnwrap(
-      source.range(of: "private func finishRefresh(generation:")?.lowerBound)
+      source.range(of: "private func finishRefresh(")?.lowerBound)
     let candidateRead = try XCTUnwrap(
       source.range(of: "provider.refreshCandidates()", range: finishStart..<source.endIndex)?
         .lowerBound)
@@ -423,7 +510,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertLessThan(candidateRead, candidatePublish)
     XCTAssertLessThan(candidatePublish, enrichment)
     XCTAssertTrue(
-      String(source[candidatePublish..<enrichment]).contains("Task {"),
-      "historical decoration must run after the startup-critical candidate publication")
+      String(source[candidatePublish..<enrichment]).contains("let provider = provider"),
+      "historical decoration must begin only after the candidate row is published")
   }
 }
