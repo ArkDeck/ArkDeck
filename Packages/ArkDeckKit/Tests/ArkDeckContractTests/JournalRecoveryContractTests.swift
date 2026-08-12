@@ -874,14 +874,14 @@ final class JournalRecoveryContractTests: XCTestCase {
       events: try DurableJournalRecovery.inspect(url: journalURL).events,
       appending: [
         toFinalizing, failed,
-        try forgedFinalized(sequence: 6, terminalStatus: "failed", certainty: "confirmed"),
+        try rawFinalized(sequence: 6, terminalStatus: "failed", certainty: "confirmed"),
       ],
       in: directory)
   }
 
-  /// Review-restored (PR #1276 round 2): a pending finalize-lane intent
-  /// blocks the normal terminal lifecycle, and a read-only outstanding
-  /// intent still blocks a forged confirmed terminal.
+  /// Review-restored (PR #1276 rounds 2-3): a pending finalize-lane intent
+  /// and a read-only outstanding intent each block the normal terminal
+  /// lifecycle on both the append gate and the raw-replay gate.
   func testHostOnlyAndReadOnlyOutstandingIntentsBlockNormalTerminalLifecycle() throws {
     let finalizeDirectory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: finalizeDirectory) }
@@ -913,7 +913,7 @@ final class JournalRecoveryContractTests: XCTestCase {
       events: try DurableJournalRecovery.inspect(url: finalizeURL).events,
       appending: [
         forgedSuccess,
-        try forgedFinalized(sequence: 6, terminalStatus: "succeeded", certainty: "confirmed"),
+        try rawFinalized(sequence: 6, terminalStatus: "succeeded", certainty: "confirmed"),
       ],
       in: finalizeDirectory)
 
@@ -933,17 +933,29 @@ final class JournalRecoveryContractTests: XCTestCase {
         sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
         from: .preflight, to: .running, reason: "fixture"))
     try readOnlyJournal.appendAndSynchronize(try makeReadOnlyIntent(sequence: 3))
-    XCTAssertThrowsError(
-      try JournalEvent.stateTransition(
-        eventID: "ro-succeeded", sequence: 4,
-        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
-        from: .running, to: .succeeded, reason: "outstanding read-only intent"),
-      "the deterministic-harness hardening rejects the forged terminal at construction")
+    let toFinalizing = try JournalEvent.stateTransition(
+      eventID: "ro-to-finalizing", sequence: 4,
+      sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+      from: .running, to: .finalizing, reason: "invalid unresolved intent path")
+    XCTAssertThrowsError(try readOnlyJournal.appendAndSynchronize(toFinalizing))
+    let forgedReadOnlySuccess = try JournalEvent.stateTransition(
+      eventID: "ro-succeeded", sequence: 5,
+      sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+      from: .finalizing, to: .succeeded, reason: "invalid unresolved intent path")
+    try assertRawJournalRejected(
+      events: try DurableJournalRecovery.inspect(url: readOnlyURL).events,
+      appending: [
+        toFinalizing, forgedReadOnlySuccess,
+        try rawFinalized(sequence: 6, terminalStatus: "succeeded", certainty: "confirmed"),
+      ],
+      in: readOnlyDirectory)
   }
 
   /// Review-restored (PR #1276 round 2): a finalized record whose
-  /// terminalStatus mismatches the durable interrupted state is rejected on
-  /// both the append and the replay path.
+  /// terminalStatus mismatches the durable state is rejected on both the
+  /// append and the replay path — in the interrupted scenario (where the
+  /// certainty rule also covers the forgery) and in a confirmed-success
+  /// scenario that pins the status-match rule in isolation.
   func testAuthorizedInterruptedRejectsMismatchedFinalizedStatus() throws {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -961,12 +973,47 @@ final class JournalRecoveryContractTests: XCTestCase {
     try appendAuthorizedAbandonment(
       to: journal, at: journalURL, nextSequence: 5, outcomeCertainty: .outcomeUnknown)
 
-    let mismatched = try forgedFinalized(
+    // (failed, outcomeUnknown) cannot exist at all — event validation
+    // rejects non-interrupted terminal status with unconfirmed certainty at
+    // construction — so this is the only constructible status-mismatch
+    // forgery here; the certainty rule also covers it. The isolated
+    // status-mismatch pin lives in the confirmed-success scenario below,
+    // where the forgery's certainty is fully legal.
+    let mismatched = try rawFinalized(
       sequence: 9, terminalStatus: "failed", certainty: "confirmed")
     XCTAssertThrowsError(try journal.appendAndSynchronize(mismatched))
     try assertRawJournalRejected(
       events: try DurableJournalRecovery.inspect(url: journalURL).events,
       appending: [mismatched], in: directory)
+
+    let successDirectory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: successDirectory) }
+    let successURL = successDirectory.appending(path: "journal.jsonl")
+    try writeRunningFlashJournal(at: successURL, includeOutcome: true)
+    let successJournal = try FileDurableJournal(url: successURL)
+    try successJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "success-to-finalizing", sequence: 5,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .running, to: .finalizing, reason: "confirmed outcome finalization"))
+    try successJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "success-to-succeeded", sequence: 6,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .finalizing, to: .succeeded, reason: "confirmed outcome finalization"))
+    // Durable state is succeeded with zero outstanding intents, so
+    // (failed, confirmed) carries a fully legal certainty and violates the
+    // status-match rule alone.
+    let statusOnlyMismatch = try rawFinalized(
+      sequence: 7, terminalStatus: "failed", certainty: "confirmed")
+    XCTAssertThrowsError(try successJournal.appendAndSynchronize(statusOnlyMismatch))
+    try assertRawJournalRejected(
+      events: try DurableJournalRecovery.inspect(url: successURL).events,
+      appending: [statusOnlyMismatch], in: successDirectory)
+    // And the honest spelling still finalizes.
+    try successJournal.appendAndSynchronize(
+      try rawFinalized(sequence: 7, terminalStatus: "succeeded", certainty: "confirmed"))
+    XCTAssertTrue(try DurableJournalRecovery.inspect(url: successURL).finalized)
   }
 
   /// Review-restored (PR #1276 round 2): an interrupted terminal reached
@@ -987,11 +1034,18 @@ final class JournalRecoveryContractTests: XCTestCase {
     let interrupted = try DurableJournalRecovery.inspect(url: journalURL)
     XCTAssertTrue(interrupted.requiresUnknownFinalizedOutcome)
 
-    let incorrectlyConfirmed = try forgedFinalized(
+    let incorrectlyConfirmed = try rawFinalized(
       sequence: 9, terminalStatus: "interrupted", certainty: "confirmed")
     XCTAssertThrowsError(try journal.appendAndSynchronize(incorrectlyConfirmed))
     try assertRawJournalRejected(
       events: interrupted.events, appending: [incorrectlyConfirmed], in: directory)
+
+    // The honest spelling must still finalize: the guard is against forged
+    // confirmation, not against finalizing at all.
+    let unknownFinalized = try rawFinalized(
+      sequence: 9, terminalStatus: "interrupted", certainty: "outcomeUnknown")
+    try journal.appendAndSynchronize(unknownFinalized)
+    XCTAssertTrue(try DurableJournalRecovery.inspect(url: journalURL).finalized)
   }
 
   private let timestamp = "2026-07-16T00:00:00Z"
@@ -1189,11 +1243,11 @@ final class JournalRecoveryContractTests: XCTestCase {
         triggerEventID: outcomeID))
   }
 
-  private func forgedFinalized(
+  private func rawFinalized(
     sequence: Int, terminalStatus: String, certainty: String
   ) throws -> JournalEvent {
     try JournalEvent(
-      eventID: "forged-finalized-\(sequence)", sequence: sequence,
+      eventID: "raw-finalized-\(sequence)", sequence: sequence,
       sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
       kind: .finalized,
       payload: [
