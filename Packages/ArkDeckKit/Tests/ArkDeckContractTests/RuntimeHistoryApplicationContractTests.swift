@@ -259,6 +259,99 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(detail.artifacts.first?.byteCount, 128)
   }
 
+  func testTraceBeforeAndAfterFactsReachHistoryWithoutClaimingRestore() throws {
+    let names = TraceDebugParameterCatalog.definitions.map(\.name)
+    let before = names.enumerated().map { index, name -> [String: Any] in
+      switch index {
+      case 0: return ["name": name, "state": "value", "value": "false"]
+      case 1: return ["name": name, "state": "missing"]
+      case 2: return ["name": name, "state": "unreadable", "detail": "permission denied"]
+      default: return ["name": name, "state": "missing"]
+      }
+    }
+    let after = names.enumerated().map { index, name -> [String: Any] in
+      switch index {
+      case 0: return ["name": name, "state": "value", "value": "false"]
+      case 1: return ["name": name, "state": "value", "value": "true"]
+      case 2: return ["name": name, "state": "unreadable", "detail": "permission denied"]
+      default: return ["name": name, "state": "missing"]
+      }
+    }
+    let traceProbe: ([[String: Any]]) -> [String: Any] = { parameters in
+      [
+        "targetId": "TGT-TRACE-1",
+        "bindingRevision": 3,
+        "supportedTags": ["ace", "app"],
+        "parameters": parameters,
+      ]
+    }
+    let evidence = try response([
+      "jobId": "job-trace-1",
+      "operationReference": "capture.diagnostics@1",
+      "catalogDigest": String(repeating: "a", count: 64),
+      "bindingRevision": 3,
+      "providerId": "hdc",
+      "actualEffect": "deviceMutation",
+      "executionMode": "execute",
+      "terminalState": "succeeded",
+      "parameters": ["durationSeconds": 15, "traceCategories": ["ace", "app"]],
+      "actualStepKinds": ["captureRemoteFile", "receiveFile"],
+      "traceProbeBefore": traceProbe(before),
+      "traceProbeAfter": traceProbe(after),
+      "blockers": [],
+    ])
+
+    let detail = RuntimeJobDetailResponseDecoding.presentation(
+      jobID: "job-trace-1",
+      operationReference: "capture.diagnostics@1",
+      evidenceResponse: evidence,
+      artifactResponse: try response([]))
+
+    let parameters = try XCTUnwrap(detail.evidence?.traceParameters)
+    XCTAssertEqual(parameters.map(\.name), names)
+    XCTAssertEqual(parameters[0].beforeValue, "false")
+    XCTAssertEqual(parameters[0].afterValue, "false")
+    XCTAssertEqual(parameters[0].comparison, .unchanged)
+    XCTAssertEqual(parameters[1].beforeState, "missing")
+    XCTAssertEqual(parameters[1].afterValue, "true")
+    XCTAssertEqual(parameters[1].comparison, .changed)
+    XCTAssertEqual(parameters[2].comparison, .unverified)
+    XCTAssertEqual(detail.evidence?.parameters.map(\.name), ["durationSeconds", "traceCategories"])
+  }
+
+  func testHistoryRendersTraceDiffBeforeTypedInputsWithExplicitComparisonCopy() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let view = try String(
+      contentsOf: repository.appending(
+        path: "ArkDeckApp/Features/History/RuntimeHistoryView.swift"),
+      encoding: .utf8)
+    let localization = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Resources/HistoryLocalizable.xcstrings"),
+      encoding: .utf8)
+
+    let traceBranch = try XCTUnwrap(view.range(of: "if !evidence.traceParameters.isEmpty"))
+    let typedInputs = try XCTUnwrap(view.range(of: "history.parameters.typedInputs"))
+    XCTAssertLessThan(traceBranch.lowerBound, typedInputs.lowerBound)
+    XCTAssertTrue(view.contains("traceParameterTable(evidence.traceParameters)"))
+    XCTAssertTrue(view.contains("Table(parameters)"))
+    XCTAssertTrue(view.contains("parameter.comparison"))
+    XCTAssertTrue(view.contains("typedParameterGrid(evidence.parameters)"))
+    for key in [
+      "history.parameters.column.before",
+      "history.parameters.column.after",
+      "history.parameters.column.status",
+      "history.parameters.comparison.unchanged",
+      "history.parameters.comparison.changed",
+      "history.parameters.comparison.unverified",
+    ] {
+      XCTAssertTrue(localization.contains("\"\(key)\""), "missing localized key \(key)")
+    }
+    XCTAssertFalse(
+      localization.contains("history.parameters.comparison.restored"),
+      "equal readbacks must not be promoted into a restore claim")
+  }
+
   func testEvidenceForAnotherJobOrOperationIsUnavailable() throws {
     let evidence = try response([
       "jobId": "job-other",

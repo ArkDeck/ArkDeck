@@ -136,6 +136,25 @@ public struct RuntimeTraceParameterPresentation: Sendable, Equatable, Identifiab
   public let afterState: String
   public let afterValue: String?
   public var id: String { name }
+
+  /// This is deliberately a comparison, not a restore verdict. The current
+  /// Trace operation reads these parameters before and after capture but does
+  /// not write them, so equal observations prove only that they did not
+  /// change during this Job. An unreadable endpoint cannot prove equality.
+  public var comparison: RuntimeTraceParameterComparison {
+    guard beforeState != "unreadable", afterState != "unreadable",
+      ["value", "missing"].contains(beforeState),
+      ["value", "missing"].contains(afterState)
+    else { return .unverified }
+    return beforeState == afterState && beforeValue == afterValue
+      ? .unchanged : .changed
+  }
+}
+
+public enum RuntimeTraceParameterComparison: String, Sendable, Equatable {
+  case unchanged
+  case changed
+  case unverified
 }
 
 public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
