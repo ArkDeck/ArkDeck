@@ -339,7 +339,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
   }
 
-  func testAppStartsIndependentWorkspaceProbeBurstBeforeAwaitingDeviceRefresh() throws {
+  func testAppColdStartRefreshesVisibleShellFactsAndDefersHiddenWorkspaces() throws {
     var repository = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let source = try String(
@@ -352,19 +352,55 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
     let deviceStart = try XCTUnwrap(
       startup.range(of: "deviceList.refreshForStartup()")?.lowerBound)
-    let diagnosticsStart = try XCTUnwrap(
-      startup.range(of: "hdcDiagnostics.refresh()")?.lowerBound)
+    let historyStart = try XCTUnwrap(
+      startup.range(of: "runtimeHistory.refresh()")?.lowerBound)
     let devicePublished = try XCTUnwrap(
       startup.range(of: "await initialDeviceRefresh")?.lowerBound)
-    let workspaceStart = try XCTUnwrap(
-      startup.range(of: "overviewCapabilities.refresh()")?.lowerBound)
+    let updateStart = try XCTUnwrap(
+      startup.range(of: "autoUpdate.startup()")?.lowerBound)
 
-    XCTAssertLessThan(deviceStart, diagnosticsStart)
-    XCTAssertLessThan(diagnosticsStart, workspaceStart)
-    XCTAssertLessThan(workspaceStart, devicePublished)
+    XCTAssertLessThan(deviceStart, historyStart)
+    XCTAssertLessThan(historyStart, devicePublished)
+    XCTAssertLessThan(devicePublished, updateStart)
     XCTAssertFalse(
       startup.contains("deviceList.refresh()"),
       "startup must not enqueue the sidebar read behind unrelated workspaces")
+    for deferred in [
+      "hdcDiagnostics.refresh()",
+      "overviewCapabilities.refresh()",
+      "flashWorkspace.refresh()",
+      "uiDumpWorkspace.refresh()",
+      "debugWorkspace.refresh()",
+      "traceWorkspace.refresh()",
+      "automationWorkspace.refresh()",
+    ] {
+      XCTAssertFalse(
+        startup.contains(deferred),
+        "cold start must defer selection-owned projection: \(deferred)")
+    }
+
+    XCTAssertTrue(source.contains(".onChange(of: storedSelection, initial: true)"))
+    let demandStart = try XCTUnwrap(
+      source.range(
+        of: "private func refreshVisibleProjection(for storageValue:")?.lowerBound)
+    let demandEnd = try XCTUnwrap(
+      source.range(of: "private var detailTitle:", range: demandStart..<source.endIndex)?
+        .lowerBound)
+    let demand = String(source[demandStart..<demandEnd])
+    for visibleRefresh in [
+      "hdcDiagnostics.refresh()",
+      "overviewCapabilities.refresh()",
+      "runtimeHistory.refresh()",
+      "flashWorkspace.refresh()",
+      "uiDumpWorkspace.refresh()",
+      "debugWorkspace.refresh()",
+      "traceWorkspace.refresh()",
+      "automationWorkspace.refresh()",
+    ] {
+      XCTAssertTrue(
+        demand.contains(visibleRefresh),
+        "selecting a projection must refresh it: \(visibleRefresh)")
+    }
   }
 
   func testAppPublishesCandidateIdentityBeforeHistoricalDecoration() throws {
