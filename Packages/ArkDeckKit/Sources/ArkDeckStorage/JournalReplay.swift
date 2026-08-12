@@ -1144,9 +1144,3 @@ extension Dictionary where Key == String, Value == JSONValue {
     return result
   }
 }
-
-package enum RecoverySnapshotSource: String, Equatable, Sendable {
-  case matchingCheckpoint
-  case journalSupersedesCheckpoint
-  case journalOnly
-}

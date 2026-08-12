@@ -1286,7 +1286,7 @@ package enum HDCApplicationDiagnosticsConfiguration {
   package static let userConfiguredPathsPreferenceKey = "ArkDeck.HDC.userConfiguredPaths"
   package static let userConfiguredBookmarksPreferenceKey =
     "ArkDeck.HDC.userConfiguredSecurityScopedBookmarks"
-  /// Read-only operator surface (adjudicated, deep-scan list B item 17):
+  /// Read-only, maintainer-adjudicated operator surface:
   /// no code writes these two keys; operators seed them with
   /// `defaults write` on hosts whose SDK layout the automatic probes
   /// cannot see. Keep them read-only here.

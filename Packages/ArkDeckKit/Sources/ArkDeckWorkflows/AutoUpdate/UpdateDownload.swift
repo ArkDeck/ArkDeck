@@ -298,9 +298,10 @@ public struct UpdateArtifactStore: Sendable {
     return EIO
   }
 
-  /// Deliberate durability downgrade (adjudicated, deep-scan list B item 4):
-  /// this data class tolerates losing the last write on power failure, so an
-  /// unavailable F_FULLFSYNC falls back to plain fsync instead of failing the
+  /// Deliberate, maintainer-adjudicated durability downgrade: staged
+  /// download bytes are digest-verified before use, so losing the last
+  /// write on power failure is caught by verification, and an unavailable
+  /// F_FULLFSYNC falls back to plain fsync instead of failing the
   /// operation. Safety-kernel stores use DurableFilePrimitives.fullSync,
   /// which requires both and throws.
   private func fullSync(_ descriptor: Int32) throws {

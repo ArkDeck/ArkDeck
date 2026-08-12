@@ -749,6 +749,108 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertThrowsError(try RecoveryManifestCodec.decode(Data(unknown.utf8)))
   }
 
+  /// Review-restored coverage (PR #1276 item 1): torn-tail auto-repair is a
+  /// live FileDurableJournal behaviour and must stay pinned after the
+  /// scanner-based recovery cluster retired.
+  func testTornTailIsDurablyRepairedOnJournalReopen() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "journal.jsonl")
+    try writeRunningFlashJournal(at: journalURL, includeOutcome: true)
+    let intact = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertFalse(intact.hasTornTail)
+    let durableCount = intact.events.count
+
+    try appendTornTail(to: journalURL)
+    XCTAssertTrue(try DurableJournalRecovery.inspect(url: journalURL).hasTornTail)
+
+    _ = try FileDurableJournal(url: journalURL)
+    let repaired = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertFalse(repaired.hasTornTail, "reopening must durably discard the torn tail")
+    XCTAssertEqual(repaired.events.count, durableCount, "repair must not lose durable events")
+  }
+
+  /// Review-restored coverage (PR #1276 item 1): a durable unknown outcome
+  /// must keep hazard derivation intact and hold the write-ahead gate at
+  /// zero external dispatch.
+  func testDurableUnknownOutcomeForcesFailClosedDispatchAndHazards() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "journal.jsonl")
+    try writeRunningFlashJournal(
+      at: journalURL, includeOutcome: true, outcomeCertainty: .outcomeUnknown)
+
+    let replay = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertTrue(replay.outstandingIntents.isEmpty)
+    XCTAssertEqual(replay.unknownOutcomes.map(\.correlatedIntentEventID), ["flash-intent"])
+    XCTAssertEqual(
+      replay.requiredAbandonmentHazards,
+      ["unresolved-destructive-intent:flash-step:flash-intent"])
+
+    let failClosedGate = WriteAheadIntentGate(journal: try FileDurableJournal(url: journalURL))
+    var dispatchCount = 0
+    XCTAssertThrowsError(
+      try failClosedGate.dispatch(
+        intent: makeFlashIntent(
+          sequence: 5, eventID: "next-flash-intent", stepID: "next-flash-step")
+      ) {
+        dispatchCount += 1
+      })
+    XCTAssertEqual(dispatchCount, 0, "an unresolved unknown outcome must block new dispatch")
+  }
+
+
+  /// Review-restored coverage (PR #1276 item 1): the real-process SIGKILL
+  /// crash-window matrix pins DurableJournalRecovery's unknown-outcome
+  /// preservation and the zero-device-dispatch invariant. Scanner-side
+  /// session projection retired with the recovery cluster; every assertion
+  /// here reads the live inspect surface and the fixture's own counters.
+  func testMacOSCrashWindowMatrixPreservesUnknownOutcomeAndZeroDeviceDispatch() throws {
+    let executable = try crashFixtureExecutable()
+    let windows = [
+      "beforeIntent", "afterDurableIntent", "afterSyntheticSideEffectBeforeOutcome",
+      "afterDurableOutcomeBeforeFinalize",
+    ]
+    for window in windows {
+      let directory = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let process = Process()
+      process.executableURL = executable
+      process.arguments = [window, directory.path]
+      try process.run()
+      let ready = directory.appending(path: "ready")
+      let deadline = Date().addingTimeInterval(10)
+      while !FileManager.default.fileExists(atPath: ready.path), Date() < deadline {
+        usleep(10_000)
+      }
+      XCTAssertTrue(
+        FileManager.default.fileExists(atPath: ready.path), "fixture did not reach \(window)")
+      Darwin.kill(process.processIdentifier, SIGKILL)
+      process.waitUntilExit()
+
+      let replay = try DurableJournalRecovery.inspect(
+        url: directory.appending(path: "journal.jsonl"))
+      let counters = try XCTUnwrap(
+        JSONSerialization.jsonObject(
+          with: Data(contentsOf: directory.appending(path: "counters.json"))) as? [String: Int])
+      XCTAssertEqual(counters["deviceDispatchCount"], 0)
+      XCTAssertEqual(counters["destructiveDispatchCount"], 0)
+      XCTAssertEqual(replay.destructiveReplayCount, 0)
+      XCTAssertEqual(replay.guessCompensationCount, 0)
+      if window == "afterDurableIntent" || window == "afterSyntheticSideEffectBeforeOutcome" {
+        XCTAssertEqual(replay.outstandingIntents.map(\.eventID), ["flash-intent"])
+        XCTAssertTrue(replay.requiresRecovery)
+      } else {
+        XCTAssertTrue(replay.outstandingIntents.isEmpty)
+      }
+      XCTAssertEqual(
+        counters["hostSyntheticEffectCount"],
+        window == "afterSyntheticSideEffectBeforeOutcome"
+          || window == "afterDurableOutcomeBeforeFinalize" ? 1 : 0)
+    }
+  }
+
+
   private let timestamp = "2026-07-16T00:00:00Z"
 
   private func temporaryDirectory() throws -> URL {
@@ -902,16 +1004,30 @@ final class JournalRecoveryContractTests: XCTestCase {
       state: state.rawValue, updatedAt: timestamp)
   }
 
-  private func abandonmentRequest(
-    nextSequence: Int = 10,
-    outcomeCertainty: JournalOutcomeCertainty = .outcomeUnknown,
-    deviceHazards: [String] = ["remote-task-unknown"]
-  ) -> RecoveryAbandonmentRequest {
-    RecoveryAbandonmentRequest(
-      sessionID: "session-1", jobID: "job-1", nextSequence: nextSequence,
-      userConfirmationID: "confirmation-1", lastConfirmedStepID: "step-1",
-      outcomeCertainty: outcomeCertainty, managedProcessState: "runningInterruptible",
-      deviceHazards: deviceHazards)
+  /// Writes the canonical running-flash journal used by the durability
+  /// tests: jobCreated, two state transitions, a destructive flash intent
+  /// and (optionally) its outcome. Direct replacement for the retired
+  /// scanner-based fixture; consumes only live journal surfaces.
+  private func writeRunningFlashJournal(
+    at journalURL: URL,
+    includeOutcome: Bool,
+    outcomeCertainty: JournalOutcomeCertainty = .confirmed
+  ) throws {
+    let journal = try FileDurableJournal(url: journalURL)
+    try journal.appendAndSynchronize(try makeJobCreated(sequence: 0))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "to-preflight", sequence: 1, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .queued, to: .preflight, reason: "fixture"))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "to-running", sequence: 2, sessionID: "session-1", jobID: "job-1",
+        timestamp: timestamp, from: .preflight, to: .running, reason: "fixture"))
+    try journal.appendAndSynchronize(makeFlashIntent(sequence: 3))
+    if includeOutcome {
+      try journal.appendAndSynchronize(
+        makeOutcome(sequence: 4, outcomeCertainty: outcomeCertainty))
+    }
   }
 
   private func appendTornTail(to journalURL: URL) throws {
