@@ -1145,99 +1145,9 @@ extension Dictionary where Key == String, Value == JSONValue {
   }
 }
 
-package struct UnfinishedSessionDescriptor: Equatable, Sendable {
-  public let sessionID: String
-  public let jobID: String
-  package let journalURL: URL
-  package let checkpointURL: URL
-
-  public init(sessionID: String, jobID: String, journalURL: URL, checkpointURL: URL) {
-    self.sessionID = sessionID
-    self.jobID = jobID
-    self.journalURL = journalURL
-    self.checkpointURL = checkpointURL
-  }
-}
-
 package enum RecoverySnapshotSource: String, Equatable, Sendable {
   case matchingCheckpoint
   case journalSupersedesCheckpoint
   case journalOnly
 }
 
-package struct ScannedRecoverySession: Equatable, Sendable {
-  public let descriptor: UnfinishedSessionDescriptor
-  public let replay: JournalReplay
-  public let state: JobState
-  public let outcomeCertainty: JournalOutcomeCertainty
-  package let snapshotSource: RecoverySnapshotSource
-  package let nextSequence: Int
-
-  package var destructiveDispatchCount: Int { 0 }
-  package var destructiveReplayCount: Int { 0 }
-  package var guessCompensationCount: Int { 0 }
-}
-
-package struct SessionRecoveryScanner: Sendable {
-  public init() {}
-
-  public func scan(_ descriptor: UnfinishedSessionDescriptor) throws -> ScannedRecoverySession? {
-    let replay = try DurableJournalRecovery.inspect(url: descriptor.journalURL)
-    guard let first = replay.events.first, first.sequence == 0, first.kind == .jobCreated else {
-      throw DurableFileError.sequenceViolation(
-        "recovery journal must begin with sequence 0 jobCreated")
-    }
-    if replay.finalized { return nil }
-    guard first.sessionID == descriptor.sessionID, first.jobID == descriptor.jobID else {
-      throw DurableFileError.sequenceViolation("catalog identity does not match journal")
-    }
-
-    let journalState = replay.currentState
-    let checkpointExists = FileManager.default.fileExists(atPath: descriptor.checkpointURL.path)
-    let snapshotSource: RecoverySnapshotSource
-    if checkpointExists {
-      let checkpoint = try AtomicJournalCheckpointStore(url: descriptor.checkpointURL).load()
-      guard checkpoint.sessionID == descriptor.sessionID, checkpoint.jobID == descriptor.jobID
-      else {
-        throw DurableFileError.checkpointInvalid("checkpoint identity mismatch")
-      }
-      guard let lastSequence = replay.lastDurableSequence else {
-        throw DurableFileError.checkpointInvalid("checkpoint exists without journal authority")
-      }
-      guard checkpoint.journalSequence <= lastSequence else {
-        throw DurableFileError.checkpointInvalid("checkpoint is ahead of journal")
-      }
-      if checkpoint.journalSequence == lastSequence {
-        if let journalState, checkpoint.state != journalState.rawValue {
-          throw DurableFileError.checkpointInvalid("checkpoint state disagrees with journal")
-        }
-        snapshotSource = .matchingCheckpoint
-      } else {
-        snapshotSource = .journalSupersedesCheckpoint
-      }
-    } else {
-      snapshotSource = .journalOnly
-    }
-
-    let uncertainOutcome =
-      replay.hasTornTail || !replay.outstandingIntents.isEmpty
-      || !replay.unknownOutcomes.isEmpty
-      || replay.lastReconcileOutcomeCertainty == .outcomeUnknown
-      || replay.pendingAbandonment != nil
-    let interruptedRecovery = journalState == .reconciling
-    let state: JobState
-    if uncertainOutcome || journalState == .userAbandonRequested || interruptedRecovery {
-      state = .waitingForRecovery
-    } else {
-      state = journalState ?? .waitingForRecovery
-    }
-    return ScannedRecoverySession(
-      descriptor: descriptor,
-      replay: replay,
-      state: state,
-      outcomeCertainty: uncertainOutcome ? .outcomeUnknown : .confirmed,
-      snapshotSource: snapshotSource,
-      nextSequence: (replay.lastDurableSequence ?? -1) + 1
-    )
-  }
-}
