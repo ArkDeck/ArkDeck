@@ -851,6 +851,149 @@ final class JournalRecoveryContractTests: XCTestCase {
   }
 
 
+  /// Review-restored (PR #1276 round 2): an unresolved external-effect
+  /// intent must neither enter finalization/terminal nor be hidden by a
+  /// forged finalized record.
+  func testOutstandingExternalIntentCannotBeFinalizedOrHiddenFromRecovery() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "journal.jsonl")
+    try writeRunningFlashJournal(at: journalURL, includeOutcome: false)
+    let journal = try FileDurableJournal(url: journalURL)
+    let toFinalizing = try JournalEvent.stateTransition(
+      eventID: "to-finalizing", sequence: 4,
+      sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+      from: .running, to: .finalizing, reason: "invalid unresolved terminal path")
+    XCTAssertThrowsError(try journal.appendAndSynchronize(toFinalizing))
+
+    let failed = try JournalEvent.stateTransition(
+      eventID: "to-failed", sequence: 5,
+      sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+      from: .finalizing, to: .failed, reason: "invalid unresolved terminal path")
+    try assertRawJournalRejected(
+      events: try DurableJournalRecovery.inspect(url: journalURL).events,
+      appending: [
+        toFinalizing, failed,
+        try forgedFinalized(sequence: 6, terminalStatus: "failed", certainty: "confirmed"),
+      ],
+      in: directory)
+  }
+
+  /// Review-restored (PR #1276 round 2): a pending finalize-lane intent
+  /// blocks the normal terminal lifecycle, and a read-only outstanding
+  /// intent still blocks a forged confirmed terminal.
+  func testHostOnlyAndReadOnlyOutstandingIntentsBlockNormalTerminalLifecycle() throws {
+    let finalizeDirectory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: finalizeDirectory) }
+    let finalizeURL = finalizeDirectory.appending(path: "journal.jsonl")
+    let finalizeJournal = try FileDurableJournal(url: finalizeURL)
+    try finalizeJournal.appendAndSynchronize(try makeJobCreated(sequence: 0))
+    try finalizeJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "finalize-to-preflight", sequence: 1,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .queued, to: .preflight, reason: "fixture"))
+    try finalizeJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "finalize-to-running", sequence: 2,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .preflight, to: .running, reason: "fixture"))
+    try finalizeJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "enter-finalizing", sequence: 3,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .running, to: .finalizing, reason: "begin finalization"))
+    try finalizeJournal.appendAndSynchronize(try makeFinalizeIntent(sequence: 4))
+    let forgedSuccess = try JournalEvent.stateTransition(
+      eventID: "finalize-succeeded", sequence: 5,
+      sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+      from: .finalizing, to: .succeeded, reason: "missing finalize outcome")
+    XCTAssertThrowsError(try finalizeJournal.appendAndSynchronize(forgedSuccess))
+    try assertRawJournalRejected(
+      events: try DurableJournalRecovery.inspect(url: finalizeURL).events,
+      appending: [
+        forgedSuccess,
+        try forgedFinalized(sequence: 6, terminalStatus: "succeeded", certainty: "confirmed"),
+      ],
+      in: finalizeDirectory)
+
+    let readOnlyDirectory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: readOnlyDirectory) }
+    let readOnlyURL = readOnlyDirectory.appending(path: "journal.jsonl")
+    let readOnlyJournal = try FileDurableJournal(url: readOnlyURL)
+    try readOnlyJournal.appendAndSynchronize(try makeJobCreated(sequence: 0))
+    try readOnlyJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "ro-to-preflight", sequence: 1,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .queued, to: .preflight, reason: "fixture"))
+    try readOnlyJournal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "ro-to-running", sequence: 2,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .preflight, to: .running, reason: "fixture"))
+    try readOnlyJournal.appendAndSynchronize(try makeReadOnlyIntent(sequence: 3))
+    XCTAssertThrowsError(
+      try JournalEvent.stateTransition(
+        eventID: "ro-succeeded", sequence: 4,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .running, to: .succeeded, reason: "outstanding read-only intent"),
+      "the deterministic-harness hardening rejects the forged terminal at construction")
+  }
+
+  /// Review-restored (PR #1276 round 2): a finalized record whose
+  /// terminalStatus mismatches the durable interrupted state is rejected on
+  /// both the append and the replay path.
+  func testAuthorizedInterruptedRejectsMismatchedFinalizedStatus() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "journal.jsonl")
+    try writeRunningFlashJournal(at: journalURL, includeOutcome: false)
+    let journal = try FileDurableJournal(url: journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "to-recovery", sequence: 4,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .running, to: .waitingForRecovery, reason: "fixture unresolved device intent"))
+    // An outstanding (outcome-less) intent forces unknown certainty on the
+    // durable abandon record (the journal validates that, mirroring the
+    // retired coordinator's derivation).
+    try appendAuthorizedAbandonment(
+      to: journal, at: journalURL, nextSequence: 5, outcomeCertainty: .outcomeUnknown)
+
+    let mismatched = try forgedFinalized(
+      sequence: 9, terminalStatus: "failed", certainty: "confirmed")
+    XCTAssertThrowsError(try journal.appendAndSynchronize(mismatched))
+    try assertRawJournalRejected(
+      events: try DurableJournalRecovery.inspect(url: journalURL).events,
+      appending: [mismatched], in: directory)
+  }
+
+  /// Review-restored (PR #1276 round 2): an interrupted terminal reached
+  /// with unknown outcome certainty must never be finalized as confirmed.
+  func testInterruptedFinalizedCannotConfirmUnresolvedIntentOutcome() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let journalURL = directory.appending(path: "journal.jsonl")
+    try writeRunningFlashJournal(at: journalURL, includeOutcome: false)
+    let journal = try FileDurableJournal(url: journalURL)
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "to-recovery", sequence: 4,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .running, to: .waitingForRecovery, reason: "fixture unresolved device intent"))
+    try appendAuthorizedAbandonment(
+      to: journal, at: journalURL, nextSequence: 5, outcomeCertainty: .outcomeUnknown)
+    let interrupted = try DurableJournalRecovery.inspect(url: journalURL)
+    XCTAssertTrue(interrupted.requiresUnknownFinalizedOutcome)
+
+    let incorrectlyConfirmed = try forgedFinalized(
+      sequence: 9, terminalStatus: "interrupted", certainty: "confirmed")
+    XCTAssertThrowsError(try journal.appendAndSynchronize(incorrectlyConfirmed))
+    try assertRawJournalRejected(
+      events: interrupted.events, appending: [incorrectlyConfirmed], in: directory)
+  }
+
   private let timestamp = "2026-07-16T00:00:00Z"
 
   private func temporaryDirectory() throws -> URL {
@@ -1004,6 +1147,77 @@ final class JournalRecoveryContractTests: XCTestCase {
       state: state.rawValue, updatedAt: timestamp)
   }
 
+  /// Drives a live journal through the durable abandonment sequence the
+  /// retired coordinator used to write (abandon intent, userAbandonRequested,
+  /// authorized abandon outcome, interrupted) — every event via the live
+  /// JournalEvent factories, so these tests exercise replay validation only.
+  private func appendAuthorizedAbandonment(
+    to journal: FileDurableJournal,
+    at journalURL: URL,
+    nextSequence: Int,
+    outcomeCertainty: JournalOutcomeCertainty
+  ) throws {
+    let deviceHazards = try DurableJournalRecovery.inspect(url: journalURL)
+      .requiredAbandonmentHazards
+    let intentID = "abandon-intent-\(nextSequence)"
+    try journal.appendAndSynchronize(
+      JournalEvent.abandonIntent(
+        eventID: intentID, sequence: nextSequence,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        userConfirmationID: "user-confirm-1", lastConfirmedStep: nil,
+        outcomeCertainty: outcomeCertainty, managedProcessState: "notRunning",
+        deviceHazards: deviceHazards))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "abandon-requested-\(nextSequence)", sequence: nextSequence + 1,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .waitingForRecovery, to: .userAbandonRequested,
+        reason: "durable recovery abandonment intent", triggerEventID: intentID))
+    let outcomeID = "abandon-outcome-\(nextSequence)"
+    try journal.appendAndSynchronize(
+      JournalEvent.abandonOutcome(
+        eventID: outcomeID, sequence: nextSequence + 2,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        correlatesToAbandonIntentEventID: intentID, result: "archivedInterrupted",
+        releaseAuthorized: true, unresolvedHazards: deviceHazards))
+    try journal.appendAndSynchronize(
+      JournalEvent.stateTransition(
+        eventID: "abandon-terminal-\(nextSequence)", sequence: nextSequence + 3,
+        sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+        from: .userAbandonRequested, to: .interrupted,
+        reason: "durable abandon outcome authorizes terminal transition",
+        triggerEventID: outcomeID))
+  }
+
+  private func forgedFinalized(
+    sequence: Int, terminalStatus: String, certainty: String
+  ) throws -> JournalEvent {
+    try JournalEvent(
+      eventID: "forged-finalized-\(sequence)", sequence: sequence,
+      sessionID: "session-1", jobID: "job-1", timestamp: timestamp,
+      kind: .finalized,
+      payload: [
+        "terminalStatus": .string(terminalStatus),
+        "manifestSha256": .string(String(repeating: "a", count: 64)),
+        "outcomeCertainty": .string(certainty),
+      ])
+  }
+
+  private func assertRawJournalRejected(
+    events: [JournalEvent], appending forged: [JournalEvent], in directory: URL,
+    file: StaticString = #filePath, line: UInt = #line
+  ) throws {
+    let rawURL = directory.appending(path: "forged-\(UUID().uuidString).jsonl")
+    var raw = Data()
+    for event in events + forged {
+      raw.append(try JournalEventCodec.encode(event))
+      raw.append(Data("\n".utf8))
+    }
+    try raw.write(to: rawURL)
+    XCTAssertThrowsError(
+      try DurableJournalRecovery.inspect(url: rawURL), file: file, line: line)
+  }
+
   /// Writes the canonical running-flash journal used by the durability
   /// tests: jobCreated, two state transitions, a destructive flash intent
   /// and (optionally) its outcome. Direct replacement for the retired
@@ -1084,9 +1298,6 @@ private final class RecordingJournal: DurableJournalAppending, @unchecked Sendab
     observer(event)
   }
 
-  func abandonmentContext() throws -> JournalAbandonmentContext {
-    JournalAbandonmentContext(requiredHazards: [], requiresOutcomeUnknown: false)
-  }
 }
 
 private final class RecordingCheckpointStore: JournalCheckpointSaving, @unchecked Sendable {

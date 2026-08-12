@@ -456,13 +456,3 @@ package enum ResourceReleaseDisposition: Equatable, Sendable {
   case releasedNow
   case alreadyReleased
 }
-
-public enum RecoveryResourceReleaseError: Error, Equatable, Sendable {
-  case releaseNotDurablyAuthorized
-}
-
-public enum RecoveryAbandonmentContinuationError: Error, Equatable, Sendable {
-  case noPendingAbandonment
-  case identityMismatch
-  case confirmationMismatch
-}

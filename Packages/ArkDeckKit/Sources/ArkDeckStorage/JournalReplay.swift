@@ -645,13 +645,6 @@ struct JournalAppendValidationState {
     finalized = replay.finalized
   }
 
-  var abandonmentContext: JournalAbandonmentContext {
-    JournalAbandonmentContext(
-      requiredHazards: unresolvedDeviceHazards.sorted(),
-      requiresOutcomeUnknown: !outstanding.isEmpty || hasUnknownOutcome
-        || lastReconcileOutcomeCertainty == .outcomeUnknown)
-  }
-
   func validate(_ event: JournalEvent) throws {
     if let lastSequence {
       guard event.sequence == lastSequence + 1 else {
