@@ -976,6 +976,30 @@ final class AutoUpdateContractTests: XCTestCase {
       at: url, includingPropertiesForKeys: nil)
     return try files.sorted(by: { $0.path < $1.path }).map(sourceTree(at:)).joined()
   }
+
+  /// PR #1276 review: replay-state durability is split — regular files take
+  /// the strict fsync+F_FULLFSYNC pair, directories take plain fsync — and
+  /// both spellings fail loudly on a dead descriptor.
+  func testReplayStateSyncSpellingsFailLoudlyAndSucceedOnLiveDescriptors() throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-update-sync-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let fileURL = directory.appending(path: "watermark.json")
+    let fileDescriptor = open(fileURL.path, O_RDWR | O_CREAT, 0o600)
+    XCTAssertGreaterThanOrEqual(fileDescriptor, 0)
+    XCTAssertNoThrow(try FileUpdateReplayStore.strictFileSync(fileDescriptor))
+    close(fileDescriptor)
+
+    let directoryDescriptor = open(directory.path, O_RDONLY | O_DIRECTORY)
+    XCTAssertGreaterThanOrEqual(directoryDescriptor, 0)
+    XCTAssertNoThrow(try FileUpdateReplayStore.syncDirectory(directoryDescriptor))
+    close(directoryDescriptor)
+
+    XCTAssertThrowsError(try FileUpdateReplayStore.strictFileSync(-1))
+    XCTAssertThrowsError(try FileUpdateReplayStore.syncDirectory(-1))
+  }
 }
 
 private struct SignedFixture {

@@ -469,16 +469,16 @@ package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Senda
       if temporaryExists { _ = unlinkat(directoryDescriptor, temporaryName, 0) }
     }
     try writeAll(data, descriptor: descriptor)
-    try fullSync(descriptor)
+    try strictFileSync(descriptor)
     guard fchmod(descriptor, 0o400) == 0 else {
       throw UpdateFeedError.replayStateWriteFailed
     }
-    try fullSync(descriptor)
+    try strictFileSync(descriptor)
     guard renameat(directoryDescriptor, temporaryName, directoryDescriptor, stateName) == 0 else {
       throw UpdateFeedError.replayStateWriteFailed
     }
     temporaryExists = false
-    try fullSync(directoryDescriptor)
+    try syncDirectory(directoryDescriptor)
   }
 
   private static func canonicalData(_ record: UpdateReplayRecord) throws -> Data {
@@ -507,9 +507,26 @@ package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Senda
     }
   }
 
-  private static func fullSync(_ descriptor: Int32) throws {
-    if fcntl(descriptor, F_FULLFSYNC) == 0 { return }
-    guard fsync(descriptor) == 0 else { throw UpdateFeedError.replayStateWriteFailed }
+  /// The replay state is a security watermark (highest accepted
+  /// sequence/version, backing the replay / sequence-conflict fail-closed
+  /// checks), not a cache: losing the last write reopens a window in which
+  /// an older-but-still-signed feed could be accepted again. Regular-file
+  /// writes therefore use the same strict durability as the safety-kernel
+  /// stores — fsync AND F_FULLFSYNC must both succeed or the write fails
+  /// loudly.
+  static func strictFileSync(_ descriptor: Int32) throws {
+    guard fsync(descriptor) == 0, fcntl(descriptor, F_FULLFSYNC) == 0 else {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
+  }
+
+  /// Directory entries take plain fsync only, matching
+  /// DurableFilePrimitives.syncDirectory: F_FULLFSYNC on a directory
+  /// descriptor is not portable across filesystems.
+  static func syncDirectory(_ descriptor: Int32) throws {
+    guard fsync(descriptor) == 0 else {
+      throw UpdateFeedError.replayStateWriteFailed
+    }
   }
 }
 

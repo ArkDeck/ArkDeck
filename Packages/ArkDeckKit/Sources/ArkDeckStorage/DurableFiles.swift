@@ -132,19 +132,8 @@ enum SessionTerminalPublicationLock {
   }
 }
 
-public struct JournalAbandonmentContext: Equatable, Sendable {
-  package let requiredHazards: [String]
-  package let requiresOutcomeUnknown: Bool
-
-  public init(requiredHazards: [String], requiresOutcomeUnknown: Bool) {
-    self.requiredHazards = requiredHazards
-    self.requiresOutcomeUnknown = requiresOutcomeUnknown
-  }
-}
-
 package protocol DurableJournalAppending: Sendable {
   func appendAndSynchronize(_ event: JournalEvent) throws
-  func abandonmentContext() throws -> JournalAbandonmentContext
 }
 
 /// The validated tail of one open journal writer.  It allows the common
@@ -317,30 +306,6 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
     // inode (including in-place torn-tail repair) remain valid.
     boundDevice = inspection.metadata.st_dev
     boundInode = inspection.metadata.st_ino
-  }
-
-  public func abandonmentContext() throws -> JournalAbandonmentContext {
-    lock.lock()
-    defer { lock.unlock() }
-    guard !poisoned else {
-      throw DurableFileError.sequenceViolation("journal writer is poisoned after a failed append")
-    }
-    let inspection = try SessionTerminalPublicationLock.withExclusive(
-      in: url.deletingLastPathComponent()
-    ) {
-      let descriptor = Darwin.open(
-        url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
-      guard descriptor >= 0 else {
-        throw DurableFileError.openFailed(path: url.path, errno: errno)
-      }
-      defer { Darwin.close(descriptor) }
-      return try DurableJournalRecovery.inspect(
-        openFileDescriptor: descriptor, path: url.path)
-    }
-    try requireBoundJournal(inspection.metadata)
-    appendState = try JournalAppendValidationState(replay: inspection.replay)
-    appendCursor = try JournalAppendCursor(metadata: inspection.metadata, replay: inspection.replay)
-    return appendState.abandonmentContext
   }
 
   public func appendAndSynchronize(_ event: JournalEvent) throws {

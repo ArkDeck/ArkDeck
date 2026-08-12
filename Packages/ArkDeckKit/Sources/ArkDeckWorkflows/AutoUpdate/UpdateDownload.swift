@@ -298,6 +298,12 @@ public struct UpdateArtifactStore: Sendable {
     return EIO
   }
 
+  /// Deliberate, maintainer-adjudicated durability downgrade: staged
+  /// download bytes are digest-verified before use, so losing the last
+  /// write on power failure is caught by verification, and an unavailable
+  /// F_FULLFSYNC falls back to plain fsync instead of failing the
+  /// operation. Safety-kernel stores use DurableFilePrimitives.fullSync,
+  /// which requires both and throws.
   private func fullSync(_ descriptor: Int32) throws {
     if fcntl(descriptor, F_FULLFSYNC) == 0 { return }
     guard fsync(descriptor) == 0 else {
