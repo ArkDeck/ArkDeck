@@ -602,9 +602,9 @@ package enum JournalEventCodec {
     try JournalCanonicalJSON.encode(event)
   }
 
-  // JSONDecoder configuration is immutable here and decode(_:from:) holds no
-  // instance state, so one shared instance serves the whole hot replay loop.
-  private nonisolated(unsafe) static let sharedDecoder = JSONDecoder()
+  // JSONDecoder is Sendable and this instance's configuration never changes,
+  // so one shared instance serves the whole hot replay loop.
+  private static let sharedDecoder = JSONDecoder()
 
   public static func decode(_ data: Data) throws -> JournalEvent {
     var duplicateValidator = StrictJSONDuplicateValidator(data: data)
