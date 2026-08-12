@@ -52,6 +52,21 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       .unavailable(reasons: ["capability_missing"]))
   }
 
+  func testEveryKnownNonterminalJobStateIsActiveIncludingPreflight() {
+    for state in JobState.allCases {
+      let job = DebugJobPresentation(
+        id: "job-\(state.rawValue)", operationReference: "debug.hap@1",
+        targetID: "target-dayu200-a", state: state.rawValue,
+        waitingForHuman: false, outcomeUnknown: false, outstandingResidueCount: 0)
+      XCTAssertEqual(job.isActive, !state.isTerminal, state.rawValue)
+    }
+    let future = DebugJobPresentation(
+      id: "job-future", operationReference: "debug.hap@1",
+      targetID: "target-dayu200-a", state: "future-state",
+      waitingForHuman: false, outcomeUnknown: false, outstandingResidueCount: 0)
+    XCTAssertFalse(future.isActive)
+  }
+
   func testMissingOrMalformedFactsFailClosedInsteadOfInventingAvailability() throws {
     let presentation = DebugWorkspaceResponseDecoding.presentation(
       operationResponse: .success(try response([])),
@@ -242,6 +257,8 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
 
     XCTAssertTrue(view.contains("model.submitHAP("))
     XCTAssertTrue(view.contains("model.cancelHAP()"))
+    XCTAssertTrue(view.contains("model.cancelOutstandingJob(job)"))
+    XCTAssertTrue(view.contains("debug.jobs.cancel.\\(job.id)"))
     XCTAssertTrue(view.contains("model.activeHAPJobID"))
     XCTAssertTrue(view.contains("job.timeline.last"))
     XCTAssertFalse(view.contains("Button(DebugL10n.text(\"debug.apps.run\")) {}"))

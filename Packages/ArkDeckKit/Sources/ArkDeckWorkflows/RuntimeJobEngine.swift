@@ -2882,7 +2882,40 @@ public actor RuntimeJobEngine {
   // MARK: Cancel / status / recovery
 
   public func requestCancel(jobID: String) throws {
-    guard jobs[jobID] != nil else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    guard var runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+
+    // A submitted Job has no provider intent and no external effect yet. It
+    // therefore has no executing run() task that could ever consume an
+    // in-memory cancellation request. Complete this zero-dispatch decision
+    // durably now; otherwise an abandoned App submission remains `preflight`
+    // forever and every daemon restart replays it as an active clean journal.
+    if runtime.record.state == JobState.preflight.rawValue {
+      try transition(
+        &runtime, from: .preflight, to: .cancelRequested,
+        reason: "client-cancel before execution")
+      try transition(
+        &runtime, from: .cancelRequested, to: .cancellingAtSafeBoundary,
+        reason: "no provider intent was dispatched")
+      try transition(
+        &runtime, from: .cancellingAtSafeBoundary, to: .cancelled,
+        reason: "never-started job closed with zero dispatch")
+      runtime.record.finishedAtUTC = nowUTC()
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
+      // Capability consumption happens only immediately before the first
+      // mutation. A preflight cancellation therefore has no lineage use to
+      // settle and must not spend or fabricate one.
+      if let provider = providers.provider(id: runtime.record.providerID) {
+        _ = statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+      } else {
+        _ = statusAndReleaseTerminalRuntime(runtime.record)
+      }
+      return
+    }
+
+    // An executing Job observes this request at its next Catalog-declared
+    // safe boundary. Unknown/outstanding-effect states are never rewritten
+    // into a certain terminal outcome merely because a client asked to stop.
     cancellationRequests.insert(jobID)
   }
 
