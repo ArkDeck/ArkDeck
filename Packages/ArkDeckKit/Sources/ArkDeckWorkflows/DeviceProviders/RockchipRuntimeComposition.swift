@@ -534,6 +534,13 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   }
 
   public func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+    try await dispatch(plan, progress: { _ in })
+  }
+
+  public func dispatch(
+    _ plan: TypedProcessPlan,
+    progress: @escaping RuntimeProcessProgressHandler
+  ) async throws -> ProviderProcessReceipt {
     guard case .rockchip(let action) = plan.action else {
       throw RuntimeDispatchFailure.failed(
         "bundled Rockchip dispatcher received a non-Rockchip action")
@@ -559,7 +566,8 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
     let result = try await host.execute(
       action: action,
       descriptor: descriptor,
-      rockchipExecutable: executable)
+      rockchipExecutable: executable,
+      progress: progress)
     guard let recordID = result.summary["recordID"], !recordID.isEmpty else {
       throw RuntimeDispatchFailure.outcomeUnknown(
         "Rockchip host returned no durable job/step receipt")

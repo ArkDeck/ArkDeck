@@ -275,6 +275,186 @@ public struct FlashSubmissionPresentation: Sendable, Equatable {
   }
 }
 
+public enum FlashJobStatusResult: Sendable, Equatable {
+  case available(FlashSubmissionPresentation)
+  case failed(String)
+}
+
+public enum FlashLiveProgressPhase: Sendable, Equatable {
+  case importingImage
+  case validatingImage
+  case enteringBootloader
+  case extractingImage
+  case writingPartition
+  case verifyingPartitions
+  case rebootingDevice
+  case reconnectingDevice
+  case verifyingSystem
+}
+
+public struct FlashLiveProgressPresentation: Sendable, Equatable {
+  public let phase: FlashLiveProgressPhase
+  public let partitionName: String?
+  public let completedPartitionCount: Int?
+  public let totalPartitionCount: Int?
+  public let currentPartitionPercent: Int?
+  public let writeFractionCompleted: Double?
+
+  public init(
+    phase: FlashLiveProgressPhase,
+    partitionName: String? = nil,
+    completedPartitionCount: Int? = nil,
+    totalPartitionCount: Int? = nil,
+    currentPartitionPercent: Int? = nil,
+    writeFractionCompleted: Double? = nil
+  ) {
+    self.phase = phase
+    self.partitionName = partitionName
+    self.completedPartitionCount = completedPartitionCount
+    self.totalPartitionCount = totalPartitionCount
+    self.currentPartitionPercent = currentPartitionPercent
+    self.writeFractionCompleted = writeFractionCompleted
+  }
+
+  public var writePercentCompleted: Int? {
+    writeFractionCompleted.map { min(100, max(0, Int(($0 * 100).rounded(.down)))) }
+  }
+}
+
+public enum FlashLiveProgressProjector {
+  public static func project(
+    status: FlashSubmissionPresentation?,
+    partitions: [FlashPartitionPresentation]
+  ) -> FlashLiveProgressPresentation {
+    guard let status else {
+      return FlashLiveProgressPresentation(phase: .importingImage)
+    }
+    let timeline = status.timeline
+    let latestKnownStep = latestStep(in: timeline)
+    if latestKnownStep?.id == "flash-partitions",
+      let progress = latestProviderProgress(in: timeline),
+      progress.timelineIndex >= (latestKnownStep?.timelineIndex ?? -1)
+    {
+      if progress.phase == .staging {
+        return FlashLiveProgressPresentation(phase: .extractingImage)
+      }
+      let fraction = writeFraction(progress: progress, partitions: partitions)
+      return FlashLiveProgressPresentation(
+        phase: .writingPartition,
+        partitionName: progress.unitName,
+        completedPartitionCount: progress.completed,
+        totalPartitionCount: progress.total,
+        currentPartitionPercent: progress.percent,
+        writeFractionCompleted: fraction)
+    }
+    switch latestKnownStep?.id {
+    case "verify-image-bundle", "hash-images", "confirm-flash-intent":
+      return FlashLiveProgressPresentation(phase: .validatingImage)
+    case "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
+      "rebind-loader-identity":
+      return FlashLiveProgressPresentation(phase: .enteringBootloader)
+    case "flash-partitions":
+      return FlashLiveProgressPresentation(phase: .extractingImage)
+    case "verify-flash-readback":
+      return FlashLiveProgressPresentation(phase: .verifyingPartitions)
+    case "reboot-device":
+      return FlashLiveProgressPresentation(phase: .rebootingDevice)
+    case "wait-for-hdc":
+      return FlashLiveProgressPresentation(phase: .reconnectingDevice)
+    case "rebind-and-verify-build", "capture-post-flash-diagnostics", "finalize-session":
+      return FlashLiveProgressPresentation(phase: .verifyingSystem)
+    default:
+      return FlashLiveProgressPresentation(phase: .validatingImage)
+    }
+  }
+
+  private struct TimelineStep {
+    let id: String
+    let timelineIndex: Int
+  }
+
+  private struct ProviderProgress {
+    let timelineIndex: Int
+    let phase: RuntimeProcessProgressPhase
+    let unitName: String?
+    let completed: Int
+    let total: Int
+    let percent: Int?
+  }
+
+  private static let runtimeStepIDs = [
+    "verify-image-bundle", "hash-images", "confirm-flash-intent",
+    "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
+    "rebind-loader-identity", "flash-partitions", "verify-flash-readback",
+    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+    "capture-post-flash-diagnostics", "finalize-session",
+  ]
+
+  private static func latestStep(in timeline: [String]) -> TimelineStep? {
+    for index in timeline.indices.reversed() {
+      if let id = runtimeStepIDs.first(where: { timeline[index].contains($0) }) {
+        return TimelineStep(id: id, timelineIndex: index)
+      }
+    }
+    return nil
+  }
+
+  private static func latestProviderProgress(in timeline: [String]) -> ProviderProgress? {
+    for index in timeline.indices.reversed() {
+      let tokens = timeline[index].split(separator: " ").map(String.init)
+      guard tokens.count >= 5,
+        tokens[0] == "progress", tokens[1] == "flash-partitions"
+      else { continue }
+      let pairs = tokens.dropFirst(2).compactMap { token -> (String, String)? in
+        let parts = token.split(separator: "=", maxSplits: 1).map(String.init)
+        return parts.count == 2 ? (parts[0], parts[1]) : nil
+      }
+      var values: [String: String] = [:]
+      for (key, value) in pairs where values[key] == nil { values[key] = value }
+      guard let phaseText = values["phase"],
+        let phase = RuntimeProcessProgressPhase(rawValue: phaseText),
+        let completedText = values["completed"], let completed = Int(completedText),
+        let totalText = values["total"], let total = Int(totalText),
+        total > 0, (0...total).contains(completed),
+        values["percent"].flatMap(Int.init).map({ (0...100).contains($0) }) ?? true
+      else { continue }
+      return ProviderProgress(
+        timelineIndex: index, phase: phase,
+        unitName: values["unit"], completed: completed, total: total,
+        percent: values["percent"].flatMap(Int.init))
+    }
+    return nil
+  }
+
+  private static func writeFraction(
+    progress: ProviderProgress,
+    partitions: [FlashPartitionPresentation]
+  ) -> Double {
+    let currentFraction = Double(progress.percent ?? 0) / 100
+    let ordered = partitions.sorted { $0.writeOrder < $1.writeOrder }
+    if ordered.count == progress.total,
+      progress.completed == progress.total
+    {
+      return 1
+    }
+    if ordered.count == progress.total,
+      ordered.indices.contains(progress.completed),
+      ordered[progress.completed].partitionName == progress.unitName
+    {
+      let totalBytes = ordered.reduce(Int64(0)) { $0 + $1.imageSizeBytes }
+      guard totalBytes > 0 else { return 0 }
+      let completedBytes = ordered.prefix(progress.completed).reduce(Int64(0)) {
+        $0 + $1.imageSizeBytes
+      }
+      let currentBytes = Double(ordered[progress.completed].imageSizeBytes) * currentFraction
+      return min(1, (Double(completedBytes) + currentBytes) / Double(totalBytes))
+    }
+    return min(
+      1,
+      (Double(progress.completed) + currentFraction) / Double(progress.total))
+  }
+}
+
 public struct FlashPostflightBindingPresentation: Sendable, Equatable {
   public let expected: String
   public let observed: String
@@ -331,6 +511,7 @@ public protocol FlashApplicationProviding: Sendable {
     archiveURL: URL,
     plan: FlashExactPlanPresentation
   ) async -> FlashSubmissionResult
+  func status(jobID: String) async -> FlashJobStatusResult
   func run(jobID: String) async -> FlashRunResult
   func bindCurrentLoader(target: FlashTargetPresentation) async -> FlashLoaderBindingResult
   func cancel(jobID: String) async -> Bool
@@ -530,6 +711,30 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     }
   }
 
+  func status(jobID: String) async -> FlashJobStatusResult {
+    do {
+      let current = try await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "job.status", params: ["jobId": .string(jobID)]))
+      guard let returnedJobID = current["jobId"] as? String,
+        returnedJobID == jobID,
+        let state = current["state"] as? String,
+        let outcomeUnknown = current["outcomeUnknown"] as? Bool,
+        let timeline = current["timeline"] as? [String]
+      else {
+        return .failed("Runtime returned an incomplete live Flash status")
+      }
+      return .available(
+        FlashSubmissionPresentation(
+          jobID: jobID, state: state,
+          outcomeUnknown: outcomeUnknown, timeline: timeline))
+    } catch let failure as FlashResponseFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+
   func cancel(jobID: String) async -> Bool {
     guard let result = try? await FlashXPCResponseDecoding.resultObject(
       await FlashXPCTransport.request(
@@ -649,6 +854,23 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
       FlashSubmissionPresentation(
         jobID: "job-ui-fixture-flash", state: "succeeded", outcomeUnknown: false,
         timeline: ["jobCreated", "finalized"]))
+  }
+
+  func status(jobID: String) async -> FlashJobStatusResult {
+    .available(
+      FlashSubmissionPresentation(
+        jobID: jobID, state: "running", outcomeUnknown: false,
+        timeline: [
+          "verified verify-image-bundle []",
+          "verified hash-images []",
+          "verified confirm-flash-intent []",
+          "verified enter-loader-mode []",
+          "verified wait-loader-disconnect []",
+          "verified wait-loader-reconnect []",
+          "verified rebind-loader-identity []",
+          "intent flash-partitions",
+          "progress flash-partitions phase=writing completed=4 total=9 unit=system percent=35",
+        ]))
   }
 
   func bindCurrentLoader(target: FlashTargetPresentation) async -> FlashLoaderBindingResult {

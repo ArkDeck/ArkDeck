@@ -28,6 +28,27 @@ protocol RockchipRuntimeActionExecuting: Sendable {
     rockchipExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL,
+    progress: @escaping RuntimeProcessProgressHandler
+  ) async throws -> RockchipRuntimeActionExecutionResult
+}
+
+extension RockchipRuntimeActionExecuting {
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL,
+    progress _: @escaping RuntimeProcessProgressHandler
+  ) async throws -> RockchipRuntimeActionExecutionResult {
+    try await execute(
+      action: action, descriptor: descriptor,
+      rockchipExecutable: rockchipExecutable, actionDirectory: actionDirectory)
+  }
 }
 
 protocol RockchipRuntimeActionHosting: Sendable {
@@ -37,6 +58,25 @@ protocol RockchipRuntimeActionHosting: Sendable {
     descriptor: HostManagedProcessDescriptor,
     rockchipExecutable: ResolvedExecutable
   ) async throws -> RockchipRuntimeActionExecutionResult
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    progress: @escaping RuntimeProcessProgressHandler
+  ) async throws -> RockchipRuntimeActionExecutionResult
+}
+
+extension RockchipRuntimeActionHosting {
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    progress _: @escaping RuntimeProcessProgressHandler
+  ) async throws -> RockchipRuntimeActionExecutionResult {
+    try await execute(
+      action: action, descriptor: descriptor,
+      rockchipExecutable: rockchipExecutable)
+  }
 }
 
 struct RefusingRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
@@ -61,6 +101,30 @@ protocol RockchipRuntimeCommandRunning: Sendable {
     outputByteBudget: Int,
     criticalNonInterruptible: Bool
   ) async throws -> ProviderSubprocessReceipt
+  func run(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    timeoutSeconds: Int?,
+    outputByteBudget: Int,
+    criticalNonInterruptible: Bool,
+    onOutput: @escaping ProcessOutputHandler
+  ) async throws -> ProviderSubprocessReceipt
+}
+
+extension RockchipRuntimeCommandRunning {
+  func run(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    timeoutSeconds: Int?,
+    outputByteBudget: Int,
+    criticalNonInterruptible: Bool,
+    onOutput _: @escaping ProcessOutputHandler
+  ) async throws -> ProviderSubprocessReceipt {
+    try await run(
+      executable: executable, arguments: arguments,
+      timeoutSeconds: timeoutSeconds, outputByteBudget: outputByteBudget,
+      criticalNonInterruptible: criticalNonInterruptible)
+  }
 }
 
 struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
@@ -92,6 +156,21 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
     outputByteBudget: Int,
     criticalNonInterruptible: Bool
   ) async throws -> ProviderSubprocessReceipt {
+    try await run(
+      executable: executable, arguments: arguments,
+      timeoutSeconds: timeoutSeconds, outputByteBudget: outputByteBudget,
+      criticalNonInterruptible: criticalNonInterruptible,
+      onOutput: { _ in })
+  }
+
+  func run(
+    executable: ResolvedExecutable,
+    arguments: [String],
+    timeoutSeconds: Int?,
+    outputByteBudget: Int,
+    criticalNonInterruptible: Bool,
+    onOutput: @escaping ProcessOutputHandler
+  ) async throws -> ProviderSubprocessReceipt {
     let operation: @Sendable () async throws -> ProviderSubprocessReceipt = {
       let request = ProcessIdentityBoundRequest(
         process: ProcessRequest(
@@ -107,7 +186,7 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
       let result: ProcessIdentityBoundExecutionResult
       do {
         result = try await FoundationProcessExecutor().executeIdentityBound(
-          request, captureLimit: outputByteBudget)
+          request, captureLimit: outputByteBudget, onOutput: onOutput)
       } catch let error as ProcessExecutionError {
         // All thrown ProcessExecutionError cases happen before a child has
         // been observed as spawned. They are definite zero-dispatch refusals.
@@ -144,6 +223,47 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
       return try await Task.detached(operation: operation).value
     }
     return try await operation()
+  }
+}
+
+/// Extracts only the tool's closed numeric percentage token from streamed
+/// output. Raw subprocess bytes never cross the provider boundary, and a
+/// five-point cadence keeps the durable live-status projection bounded.
+final class RockchipWriteProgressParser: @unchecked Sendable {
+  private let lock = NSLock()
+  private let onPercent: @Sendable (Int) -> Void
+  private var suffix: [UInt8] = []
+  private var latestEmittedPercent = -5
+
+  init(onPercent: @escaping @Sendable (Int) -> Void) {
+    self.onPercent = onPercent
+  }
+
+  func consume(_ chunk: ProcessOutputChunk) {
+    var emitted: [Int] = []
+    lock.lock()
+    let bytes = suffix + chunk.bytes
+    for percentIndex in bytes.indices where bytes[percentIndex] == 37 {
+      var digitIndex = percentIndex
+      var digits: [UInt8] = []
+      while digitIndex > bytes.startIndex, digits.count < 3 {
+        let candidateIndex = bytes.index(before: digitIndex)
+        let candidate = bytes[candidateIndex]
+        guard (48...57).contains(candidate) else { break }
+        digits.append(candidate)
+        digitIndex = candidateIndex
+      }
+      guard !digits.isEmpty,
+        let percent = Int(String(decoding: digits.reversed(), as: UTF8.self)),
+        (0...100).contains(percent),
+        percent == 100 || percent >= latestEmittedPercent + 5
+      else { continue }
+      latestEmittedPercent = percent
+      emitted.append(percent)
+    }
+    suffix = Array(bytes.suffix(4))
+    lock.unlock()
+    for percent in emitted { onPercent(percent) }
   }
 }
 
@@ -739,6 +859,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     rockchipExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult {
+    try await execute(
+      action: action, descriptor: descriptor,
+      rockchipExecutable: rockchipExecutable, actionDirectory: actionDirectory,
+      progress: { _ in })
+  }
+
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    actionDirectory: URL,
+    progress: @escaping RuntimeProcessProgressHandler
+  ) async throws -> RockchipRuntimeActionExecutionResult {
     // A non-nil value was persisted by the protected broker in the admitted
     // campaign reservation, then re-read by the Runtime while materializing
     // this descriptor. It is never sourced from caller inputs.
@@ -888,7 +1021,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         bundle: bundle,
         descriptor: descriptor,
         rockchipExecutable: rockchipExecutable,
-        actionDirectory: actionDirectory)
+        actionDirectory: actionDirectory,
+        progress: progress)
 
     case .verifyFlashReadback(let bundle):
       // Same as the write step: the board describes the bundle in hand, and
@@ -1157,7 +1291,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     bundle: RockchipRuntimeFlashBundle,
     descriptor: HostManagedProcessDescriptor,
     rockchipExecutable: ResolvedExecutable,
-    actionDirectory: URL
+    actionDirectory: URL,
+    progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
     // Set immediately before the first `wl` is spawned, and never cleared. A
     // refusal raised while it is false provably left the device untouched:
@@ -1172,7 +1307,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       return try await flashWrites(
         bundle: bundle, descriptor: descriptor,
         rockchipExecutable: rockchipExecutable, actionDirectory: actionDirectory,
-        writeDispatched: &writeDispatched)
+        writeDispatched: &writeDispatched, progress: progress)
     } catch let failure as RuntimeDispatchFailure where !writeDispatched {
       throw Self.refusedBeforeFirstWrite(failure)
     }
@@ -1199,7 +1334,8 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     descriptor: HostManagedProcessDescriptor,
     rockchipExecutable: ResolvedExecutable,
     actionDirectory: URL,
-    writeDispatched: inout Bool
+    writeDispatched: inout Bool,
+    progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
     // The board, and the bundle in hand described against it. Looking the
     // bundle's digest up among the builds compiled into the product turned
@@ -1244,6 +1380,11 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       staged.removeAll()
       try? FileManager.default.removeItem(at: work)
     }
+    await progress(
+      RuntimeProcessProgress(
+        phase: .staging,
+        completedUnitCount: 0,
+        totalUnitCount: profile.mappedPartitions.count))
     do {
       staged = try stage(bundle, profile, work)
     } catch {
@@ -1258,7 +1399,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       profile: profile, executable: rockchipExecutable,
       actionDirectory: actionDirectory)
     receipts.append(contentsOf: mediumReceipts)
-    for mapping in profile.mappedPartitions {
+    for (mappingIndex, mapping) in profile.mappedPartitions.enumerated() {
       guard
         let member = profile.member(
           named: mapping.imageMemberName),
@@ -1306,18 +1447,44 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       }
       // The device may be changed from the instant the child is spawned, so
       // the boundary is drawn here rather than after the receipt.
+      await progress(
+        RuntimeProcessProgress(
+          phase: .writing,
+          unitName: mapping.partitionName,
+          completedUnitCount: mappingIndex,
+          totalUnitCount: profile.mappedPartitions.count,
+          currentUnitPercent: 0))
+      let outputProgress = RockchipWriteProgressParser { percent in
+        Task {
+          await progress(
+            RuntimeProcessProgress(
+              phase: .writing,
+              unitName: mapping.partitionName,
+              completedUnitCount: mappingIndex,
+              totalUnitCount: profile.mappedPartitions.count,
+              currentUnitPercent: percent))
+        }
+      }
       writeDispatched = true
       let receipt = try await runner.run(
         executable: rockchipExecutable,
         arguments: ["wlx", mapping.partitionName, image.stableDescriptorPath],
         timeoutSeconds: nil,
         outputByteBudget: Self.writeOutputByteBudget,
-        criticalNonInterruptible: true)
+        criticalNonInterruptible: true,
+        onOutput: outputProgress.consume)
       try requireSemanticSuccess(
         receipt,
         effectMayHaveOccurred: true,
         successMarker: RockchipRockUSBFlashProvider.writeSuccessMarker)
       receipts.append(receipt)
+      await progress(
+        RuntimeProcessProgress(
+          phase: .writing,
+          unitName: mapping.partitionName,
+          completedUnitCount: mappingIndex + 1,
+          totalUnitCount: profile.mappedPartitions.count,
+          currentUnitPercent: 100))
       if Task.isCancelled {
         throw RuntimeDispatchFailure.outcomeUnknown(
           "flash cancellation observed at the \(mapping.partitionName) safe boundary")
@@ -2326,6 +2493,17 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     descriptor: HostManagedProcessDescriptor,
     rockchipExecutable: ResolvedExecutable
   ) async throws -> RockchipRuntimeActionExecutionResult {
+    try await execute(
+      action: action, descriptor: descriptor,
+      rockchipExecutable: rockchipExecutable, progress: { _ in })
+  }
+
+  func execute(
+    action: RockchipProviderAction,
+    descriptor: HostManagedProcessDescriptor,
+    rockchipExecutable: ResolvedExecutable,
+    progress: @escaping RuntimeProcessProgressHandler
+  ) async throws -> RockchipRuntimeActionExecutionResult {
     let typedAction = TypedProviderAction.rockchip(action)
     try validate(
       action: typedAction,
@@ -2344,7 +2522,8 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
       action: action,
       descriptor: descriptor,
       rockchipExecutable: rockchipExecutable,
-      actionDirectory: actionDirectory)
+      actionDirectory: actionDirectory,
+      progress: progress)
     do {
       let recordID = try records.finish(
         descriptor: descriptor,

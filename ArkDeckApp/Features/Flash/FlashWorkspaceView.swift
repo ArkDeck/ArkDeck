@@ -140,6 +140,17 @@ struct FlashWorkspaceView: View {
         try? await Task.sleep(for: .milliseconds(750))
       }
     }
+    .task(id: progressPollingJobID) {
+      guard let jobID = progressPollingJobID else { return }
+      while !Task.isCancelled {
+        let reachedTerminal = await model.refreshLiveStatus(jobID: jobID)
+        if reachedTerminal {
+          onRefreshRuntimeHistory()
+          return
+        }
+        try? await Task.sleep(for: .milliseconds(500))
+      }
+    }
   }
 
   private var pageLead: some View {
@@ -426,16 +437,18 @@ struct FlashWorkspaceView: View {
         .fixedSize(horizontal: false, vertical: true)
 
       if model.canSubmit {
-        Button {
-          model.submit()
-        } label: {
-          Text(flashText("flash.workspace.action.submit"))
-            .frame(maxWidth: .infinity)
+        HStack {
+          Spacer(minLength: 0)
+          Button {
+            model.submit()
+          } label: {
+            Text(flashText("flash.workspace.action.submit"))
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(.red)
+          .controlSize(.large)
+          .accessibilityIdentifier("flash.execute.submit")
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.red)
-        .controlSize(.large)
-        .accessibilityIdentifier("flash.execute.submit")
       } else {
         Label(flashBlockerText(plan), systemImage: "exclamationmark.triangle.fill")
           .font(.callout.weight(.semibold))
@@ -486,6 +499,28 @@ struct FlashWorkspaceView: View {
     }
   }
 
+  private var progressPollingJobID: String? {
+    model.activeJobID ?? activeFlashJob?.id
+  }
+
+  private var currentFlashStatus: FlashSubmissionPresentation? {
+    if let status = model.liveStatus,
+      status.jobID == progressPollingJobID
+    {
+      return status
+    }
+    guard let job = activeFlashJob else { return nil }
+    return FlashSubmissionPresentation(
+      jobID: job.id, state: job.state,
+      outcomeUnknown: job.outcomeUnknown, timeline: job.timeline)
+  }
+
+  private var liveProgress: FlashLiveProgressPresentation {
+    FlashLiveProgressProjector.project(
+      status: currentFlashStatus,
+      partitions: model.plan?.partitions ?? [])
+  }
+
   private var attentionFlashJob: RuntimeJobSummaryPresentation? {
     runtimeHistory.jobs.first {
       $0.operationReference == "flash.dayu200" && $0.requiresRecoveryGuidance
@@ -522,25 +557,14 @@ struct FlashWorkspaceView: View {
   }
 
   private var currentRunStage: FlashWorkspaceRunStage {
-    if model.submission != nil { return .verify }
-    guard let job = activeFlashJob, let tail = job.timeline.last else { return .prepare }
-    guard let plan = model.plan,
-      let index = plan.steps.firstIndex(where: { tail == $0.id || tail.contains(" \($0.id)") })
-    else {
-      let lower = tail.lowercased()
-      if lower.contains("postflight") || lower.contains("reboot") || lower.contains("verify") {
-        return .verify
-      }
-      if lower.contains("flash") || lower.contains("write") { return .write }
+    switch liveProgress.phase {
+    case .writingPartition:
+      return .write
+    case .verifyingPartitions, .rebootingDevice, .reconnectingDevice, .verifyingSystem:
+      return .verify
+    case .importingImage, .validatingImage, .enteringBootloader, .extractingImage:
       return .prepare
     }
-    if plan.steps[index].effect == .destructive { return .write }
-    if let lastWrite = plan.steps.lastIndex(where: { $0.effect == .destructive }),
-      index > lastWrite
-    {
-      return .verify
-    }
-    return .prepare
   }
 
   private var executionProgressSurface: some View {
@@ -548,7 +572,7 @@ struct FlashWorkspaceView: View {
       VStack(alignment: .leading, spacing: 18) {
         HStack(alignment: .top, spacing: 12) {
           VStack(alignment: .leading, spacing: 5) {
-            Text(flashText(currentRunStage.titleKey))
+            Text(progressTitle)
               .font(.title3.weight(.semibold))
               .accessibilityAddTraits(.isHeader)
               .accessibilityIdentifier("flash.workspace.progress")
@@ -558,20 +582,37 @@ struct FlashWorkspaceView: View {
               .fixedSize(horizontal: false, vertical: true)
           }
           Spacer(minLength: 12)
-          Label(
-            flashText("flash.workspace.progress.running"),
-            systemImage: "arrow.triangle.2.circlepath")
+          if let percent = liveProgress.writePercentCompleted {
+            Text("\(percent)%")
+              .font(.title3.monospacedDigit().weight(.semibold))
+              .foregroundStyle(Color.accentColor)
+              .accessibilityIdentifier("flash.runtime.progress.percent")
+          } else {
+            Label(
+              flashText("flash.workspace.progress.running"),
+              systemImage: "arrow.triangle.2.circlepath"
+            )
             .font(.caption.weight(.semibold))
             .foregroundStyle(.orange)
+          }
         }
 
-        ProgressView()
-          .progressViewStyle(.linear)
-          .accessibilityLabel(flashText(currentRunStage.titleKey))
-          .accessibilityIdentifier("flash.runtime.progress")
-        Text(flashText("flash.workspace.progress.indeterminate"))
+        if let fraction = liveProgress.writeFractionCompleted {
+          ProgressView(value: fraction)
+            .progressViewStyle(.linear)
+            .accessibilityLabel(progressTitle)
+            .accessibilityValue("\(liveProgress.writePercentCompleted ?? 0)%")
+            .accessibilityIdentifier("flash.runtime.progress")
+        } else {
+          ProgressView()
+            .progressViewStyle(.linear)
+            .accessibilityLabel(progressTitle)
+            .accessibilityIdentifier("flash.runtime.progress")
+        }
+        Text(progressDetail)
           .font(.footnote)
           .foregroundStyle(.secondary)
+          .accessibilityIdentifier("flash.runtime.progress.detail")
 
         flashStageTrack
 
@@ -637,11 +678,46 @@ struct FlashWorkspaceView: View {
   }
 
   private var isCurrentStepCritical: Bool {
-    guard let tail = activeFlashJob?.timeline.last else { return false }
-    return model.plan?.steps.contains {
-      $0.cancellation == .criticalNonInterruptible
-        && (tail == $0.id || tail.contains(" \($0.id)"))
-    } == true
+    liveProgress.phase == .writingPartition
+  }
+
+  private var progressTitle: String {
+    switch liveProgress.phase {
+    case .importingImage:
+      return flashText("flash.workspace.progress.importing")
+    case .validatingImage:
+      return flashText("flash.workspace.progress.validating")
+    case .enteringBootloader:
+      return flashText("flash.workspace.progress.bootloader")
+    case .extractingImage:
+      return flashText("flash.workspace.progress.extracting")
+    case .writingPartition:
+      return String(
+        format: flashText("flash.workspace.progress.partition"),
+        liveProgress.partitionName ?? flashText("flash.workspace.progress.partitionUnknown"))
+    case .verifyingPartitions:
+      return flashText("flash.workspace.progress.verifyingPartitions")
+    case .rebootingDevice:
+      return flashText("flash.workspace.progress.rebooting")
+    case .reconnectingDevice:
+      return flashText("flash.workspace.progress.reconnecting")
+    case .verifyingSystem:
+      return flashText("flash.workspace.progress.verifyingSystem")
+    }
+  }
+
+  private var progressDetail: String {
+    if liveProgress.phase == .writingPartition,
+      let completed = liveProgress.completedPartitionCount,
+      let total = liveProgress.totalPartitionCount,
+      let partitionPercent = liveProgress.currentPartitionPercent,
+      let writePercent = liveProgress.writePercentCompleted
+    {
+      return String(
+        format: flashText("flash.workspace.progress.partitionDetail"),
+        completed, total, partitionPercent, writePercent)
+    }
+    return flashText("flash.workspace.progress.indeterminate")
   }
 
   private var executionResultSurface: some View {
@@ -1253,6 +1329,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
   @Published private(set) var planFailureCode: FlashPlanFailureCode?
   @Published private(set) var planFailureDetail: String?
   @Published private(set) var submission: FlashSubmissionPresentation?
+  @Published private(set) var liveStatus: FlashSubmissionPresentation?
   @Published private(set) var submissionFailure: String?
   @Published private(set) var postflightEvidence: RuntimeJobEvidencePresentation?
   @Published private(set) var deviceAccess = RockchipDeviceAccessPresentation.loading
@@ -1456,6 +1533,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
     isPreparingPlan = true
     plan = nil
     submission = nil
+    liveStatus = nil
     submissionFailure = nil
     postflightEvidence = nil
     planFailureCode = nil
@@ -1502,10 +1580,26 @@ final class FlashWorkspaceViewModel: ObservableObject {
     invalidatePlan()
   }
 
+  func refreshLiveStatus(jobID: String) async -> Bool {
+    let result = await provider.status(jobID: jobID)
+    guard !Task.isCancelled else { return true }
+    guard case .available(let status) = result,
+      status.jobID == jobID,
+      activeJobID == nil || activeJobID == jobID
+    else { return false }
+    liveStatus = status
+    return status.outcomeUnknown
+      || [
+        "succeeded", "failed", "cancelled", "recovered", "interrupted",
+        "waitingForRecovery", "awaitingRebindConfirmation", "userAbandonRequested",
+      ].contains(status.state)
+  }
+
   func submit() {
     guard canSubmit, let archiveURL = selectedArchiveURL, let plan else { return }
     isSubmitting = true
     submission = nil
+    liveStatus = nil
     submissionFailure = nil
     postflightEvidence = nil
     let provider = provider
@@ -1603,6 +1697,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
           return
         }
         self.submission = terminal
+        self.liveStatus = terminal
         guard terminal.state == "succeeded" || terminal.state == "recovered" else {
           self.isSubmitting = false
           return
@@ -1657,6 +1752,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
   private func invalidatePlan() {
     plan = nil
     submission = nil
+    liveStatus = nil
     submissionFailure = nil
     postflightEvidence = nil
     activeJobID = nil

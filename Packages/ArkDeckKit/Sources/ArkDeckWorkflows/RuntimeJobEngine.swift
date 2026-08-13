@@ -429,11 +429,56 @@ public struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
 public protocol RuntimeProcessDispatching: Sendable {
   func unavailableReason(providerID: String) -> String?
   func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt
+  func dispatch(
+    _ plan: TypedProcessPlan,
+    progress: @escaping RuntimeProcessProgressHandler
+  ) async throws -> ProviderProcessReceipt
 }
 
 extension RuntimeProcessDispatching {
   package func unavailableReason(providerID: String) -> String? { nil }
+
+  public func dispatch(
+    _ plan: TypedProcessPlan,
+    progress _: @escaping RuntimeProcessProgressHandler
+  ) async throws -> ProviderProcessReceipt {
+    try await dispatch(plan)
+  }
 }
+
+public enum RuntimeProcessProgressPhase: String, Sendable, Equatable {
+  case staging
+  case writing
+}
+
+/// Closed, observational progress from inside one already-admitted provider
+/// action. It cannot select an action, widen a plan, or claim success; Runtime
+/// exposes it only as a replaceable status projection while the outer durable
+/// intent remains authoritative.
+public struct RuntimeProcessProgress: Sendable, Equatable {
+  public let phase: RuntimeProcessProgressPhase
+  public let unitName: String?
+  public let completedUnitCount: Int
+  public let totalUnitCount: Int
+  public let currentUnitPercent: Int?
+
+  public init(
+    phase: RuntimeProcessProgressPhase,
+    unitName: String? = nil,
+    completedUnitCount: Int,
+    totalUnitCount: Int,
+    currentUnitPercent: Int? = nil
+  ) {
+    self.phase = phase
+    self.unitName = unitName
+    self.completedUnitCount = completedUnitCount
+    self.totalUnitCount = totalUnitCount
+    self.currentUnitPercent = currentUnitPercent
+  }
+}
+
+public typealias RuntimeProcessProgressHandler =
+  @Sendable (RuntimeProcessProgress) async -> Void
 
 public enum RuntimeDispatchFailure: Error, Equatable, Sendable {
   /// The dispatcher cannot say whether the external effect happened.
@@ -567,6 +612,11 @@ public actor RuntimeJobEngine {
     var skippedStepIDs: Set<String> = []
   }
 
+  private struct ProcessProgressKey: Hashable {
+    let jobID: String
+    let stepID: String
+  }
+
   private struct MaterializedAdmission: Sendable {
     /// Absent for a host-only plan; a device-bound plan always carries both.
     let stableTargetIdentitySHA256: String?
@@ -685,6 +735,8 @@ public actor RuntimeJobEngine {
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
   private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
+  private var activeProcessProgressKeys: Set<ProcessProgressKey> = []
+  private var latestProcessProgress: [ProcessProgressKey: RuntimeProcessProgress] = [:]
 
   public init(
     configuration: Configuration,
@@ -2304,8 +2356,17 @@ public actor RuntimeJobEngine {
     jobs[jobID] = runtime
 
     let receipt: ProviderProcessReceipt
+    let progressKey = ProcessProgressKey(jobID: jobID, stepID: step.stepID)
+    activeProcessProgressKeys.insert(progressKey)
+    defer {
+      activeProcessProgressKeys.remove(progressKey)
+      latestProcessProgress.removeValue(forKey: progressKey)
+    }
     do {
-      receipt = try await dispatcher.dispatch(plan)
+      receipt = try await dispatcher.dispatch(plan) { [weak self] progress in
+        await self?.recordProcessProgress(
+          progress, jobID: jobID, stepID: step.stepID)
+      }
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
       let confirmedNotExecuted: Bool
@@ -5958,6 +6019,69 @@ public actor RuntimeJobEngine {
     guard var runtime = jobs[jobID] else { return }
     runtime.record.timeline.append(entry)
     jobs[jobID] = runtime
+  }
+
+  private func recordProcessProgress(
+    _ progress: RuntimeProcessProgress,
+    jobID: String,
+    stepID: String
+  ) {
+    let key = ProcessProgressKey(jobID: jobID, stepID: stepID)
+    guard activeProcessProgressKeys.contains(key),
+      progress.totalUnitCount > 0,
+      progress.completedUnitCount >= 0,
+      progress.completedUnitCount <= progress.totalUnitCount,
+      progress.currentUnitPercent.map({ (0...100).contains($0) }) ?? true,
+      progress.unitName.map(Self.isSafeProgressUnitName) ?? true,
+      shouldAcceptProcessProgress(progress, after: latestProcessProgress[key]),
+      var runtime = jobs[jobID]
+    else { return }
+
+    latestProcessProgress[key] = progress
+    var fields = [
+      "progress", stepID, "phase=\(progress.phase.rawValue)",
+      "completed=\(progress.completedUnitCount)",
+      "total=\(progress.totalUnitCount)",
+    ]
+    if let unitName = progress.unitName { fields.append("unit=\(unitName)") }
+    if let percent = progress.currentUnitPercent { fields.append("percent=\(percent)") }
+    let entry = fields.joined(separator: " ")
+    let prefix = "progress \(stepID) "
+    if runtime.record.timeline.last?.hasPrefix(prefix) == true {
+      runtime.record.timeline[runtime.record.timeline.count - 1] = entry
+    } else {
+      runtime.record.timeline.append(entry)
+    }
+    jobs[jobID] = runtime
+    // Live progress is observational. A transient status-persistence failure
+    // must never interrupt an already-dispatched destructive child; the
+    // durable outer intent/outcome path remains unchanged and authoritative.
+    try? persistRuntimeRecord(runtime.record)
+  }
+
+  private func shouldAcceptProcessProgress(
+    _ progress: RuntimeProcessProgress,
+    after previous: RuntimeProcessProgress?
+  ) -> Bool {
+    guard let previous else { return true }
+    if previous.phase == .staging { return progress.phase == .writing }
+    guard progress.phase == .writing,
+      progress.totalUnitCount == previous.totalUnitCount,
+      progress.completedUnitCount >= previous.completedUnitCount
+    else { return false }
+    if progress.completedUnitCount > previous.completedUnitCount { return true }
+    if progress.unitName == previous.unitName {
+      return (progress.currentUnitPercent ?? 0) >= (previous.currentUnitPercent ?? 0)
+    }
+    return previous.currentUnitPercent == 100
+  }
+
+  private static func isSafeProgressUnitName(_ value: String) -> Bool {
+    !value.isEmpty
+      && value.utf8.allSatisfy {
+        (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+          || $0 == 45 || $0 == 46 || $0 == 95
+      }
   }
 
   private func jobDirectory(for jobID: String) -> URL {

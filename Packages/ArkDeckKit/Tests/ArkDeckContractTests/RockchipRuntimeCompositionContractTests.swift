@@ -3,6 +3,7 @@ import XCTest
 
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckProcess
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
@@ -40,6 +41,30 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       defer { lock.unlock() }
       return count
     }
+  }
+
+  private final class LockedPercentLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Int] = []
+
+    func append(_ value: Int) {
+      lock.lock()
+      values.append(value)
+      lock.unlock()
+    }
+
+    var snapshot: [Int] {
+      lock.lock()
+      defer { lock.unlock() }
+      return values
+    }
+  }
+
+  private actor ProcessProgressLog {
+    private var values: [RuntimeProcessProgress] = []
+
+    func append(_ value: RuntimeProcessProgress) { values.append(value) }
+    func snapshot() -> [RuntimeProcessProgress] { values }
   }
 
   private struct SuccessfulActionExecutor: RockchipRuntimeActionExecuting {
@@ -795,6 +820,57 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertTrue(
       writes.allSatisfy { $0.hasPrefix("wlx ") },
       "every write must be name-addressed: \(writes)")
+  }
+
+  func testFlashActionReportsStagingAndEveryPartitionBoundary() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identity = String(repeating: "a", count: 64)
+    let executor = flashExecutor(
+      runner: MediumRunner(log: WriteAttemptLog()), identity: identity)
+    let component = ResolvedExecutable(
+      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+    let bundle = flashBundle()
+    let plan = try rockchipPlan(
+      action: .flashPartitions(bundle), stepID: "flash-partitions",
+      toolSHA256: component.sha256)
+    let log = ProcessProgressLog()
+
+    _ = try await executor.execute(
+      action: .flashPartitions(bundle), descriptor: hostDescriptor(plan),
+      rockchipExecutable: component, actionDirectory: root
+    ) { progress in
+      await log.append(progress)
+    }
+
+    let progress = await log.snapshot()
+    XCTAssertEqual(progress.first?.phase, .staging)
+    let writes = progress.filter { $0.phase == .writing }
+    XCTAssertEqual(writes.count, RockchipFlashProfile.dayu200.mappedPartitions.count * 2)
+    for (index, mapping) in RockchipFlashProfile.dayu200.mappedPartitions.enumerated() {
+      let started = writes[index * 2]
+      let completed = writes[index * 2 + 1]
+      XCTAssertEqual(started.unitName, mapping.partitionName)
+      XCTAssertEqual(started.completedUnitCount, index)
+      XCTAssertEqual(started.currentUnitPercent, 0)
+      XCTAssertEqual(completed.unitName, mapping.partitionName)
+      XCTAssertEqual(completed.completedUnitCount, index + 1)
+      XCTAssertEqual(completed.currentUnitPercent, 100)
+    }
+  }
+
+  func testWriteProgressParserHandlesChunkBoundariesAndBoundsUpdateCadence() {
+    let log = LockedPercentLog()
+    let parser = RockchipWriteProgressParser(onPercent: log.append)
+
+    parser.consume(
+      ProcessOutputChunk(stream: .stdout, bytes: Data("Write LBA (1".utf8)))
+    parser.consume(
+      ProcessOutputChunk(
+        stream: .stdout,
+        bytes: Data("0%) 12% 14% 15% 100%\n".utf8)))
+
+    XCTAssertEqual(log.snapshot, [10, 15, 100])
   }
 
   func testAWindowedReadDomainSkipsReadbackAndNamesTheAuthority() async throws {
