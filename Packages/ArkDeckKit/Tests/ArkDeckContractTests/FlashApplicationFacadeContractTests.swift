@@ -4,6 +4,33 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class FlashApplicationFacadeContractTests: XCTestCase {
+  func testFlashImageArchiveSelectionPolicyAllowsOnlySupportedFilenameSuffixes() {
+    for filename in [
+      "dayu200-images.tar.gz",
+      "dayu200-images.TAR.GZ",
+      "dayu200-images.zip",
+      "dayu200-images.ZIP",
+      "dayu200-images.7z",
+      "dayu200-images.7Z",
+    ] {
+      XCTAssertTrue(
+        FlashImageArchiveSelectionPolicy.allows(URL(fileURLWithPath: "/tmp/\(filename)")),
+        filename)
+    }
+
+    for filename in [
+      "dayu200-images.gz",
+      "dayu200-images.tar",
+      "dayu200-images.dmg",
+      "dayu200-images.zip.txt",
+      ".zip",
+    ] {
+      XCTAssertFalse(
+        FlashImageArchiveSelectionPolicy.allows(URL(fileURLWithPath: "/tmp/\(filename)")),
+        filename)
+    }
+  }
+
   func testPostflightBindingKeepsTheSubmittedPlanRevision() {
     let confirmed = FlashPostflightPresentationBuilder.binding(
       plannedRevision: 3,

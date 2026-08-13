@@ -237,10 +237,23 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
 
 public enum FlashPlanFailureCode: String, Sendable, Equatable {
   case fileAccessDenied
+  case unsupportedArchiveFormat
   case unreadableArchive
   case invalidArchive
   case unsupportedBundle
   case planMaterializationFailed
+}
+
+public enum FlashImageArchiveSelectionPolicy {
+  public static let allowedFilenameExtensions = ["tar.gz", "zip", "7z"]
+
+  public static func allows(_ url: URL) -> Bool {
+    let filename = url.lastPathComponent.lowercased()
+    return allowedFilenameExtensions.contains { filenameExtension in
+      let suffix = ".\(filenameExtension)"
+      return filename.count > suffix.count && filename.hasSuffix(suffix)
+    }
+  }
 }
 
 public enum FlashPlanPreparationResult: Sendable, Equatable {
@@ -864,6 +877,9 @@ enum FlashPlanPresentationBuilder {
     mode: RockchipFlashExecutionMode,
     target: FlashTargetPresentation?
   ) -> FlashPlanPreparationResult {
+    guard FlashImageArchiveSelectionPolicy.allows(archiveURL) else {
+      return .failed(code: .unsupportedArchiveFormat, detail: nil)
+    }
     guard FileManager.default.isReadableFile(atPath: archiveURL.path) else {
       return .failed(code: .fileAccessDenied, detail: nil)
     }
