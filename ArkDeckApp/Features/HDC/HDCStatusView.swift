@@ -277,8 +277,8 @@ struct HDCStatusView: View {
       return String(localized: "overview.capabilities.title.noTarget")
     }
     return String(
-      format: String(localized: "overview.capabilities.title.target"), targetID,
-      capabilityMatrix.bindingRevision ?? 0)
+      localized: .overviewCapabilitiesTitleTarget(
+        targetID, capabilityMatrix.bindingRevision ?? 0))
   }
 
   private func capabilityStateKey(_ state: OverviewCapabilityState) -> String {
@@ -655,8 +655,7 @@ struct HDCStatusView: View {
     case 0: String(localized: "overview.status.needsAttention.none")
     case 1: String(localized: "overview.status.needsAttention.one")
     default:
-      String(
-        format: String(localized: "overview.status.needsAttention.other"), needsAttentionCount)
+      String(localized: .overviewStatusNeedsAttentionOther(needsAttentionCount))
     }
   }
 
@@ -836,8 +835,7 @@ private struct HDCRecoveryImpactSheet: View {
         if let onConfirm, let snapshot = presentation.lifecycleImpactPreview {
           Button(
             String(
-              format: String(localized: "overview.recovery.confirmGeneration"),
-              snapshot.generation),
+              localized: .overviewRecoveryConfirmGeneration(snapshot.generation)),
             action: onConfirm
           )
           .accessibilityIdentifier("hdc.lifecycle.confirmImpactPreview")

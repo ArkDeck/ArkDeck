@@ -21,8 +21,8 @@ struct FlashPlanDetailsView: View {
             .accessibilityHidden(true)
           Label(
             String(
-              format: flashText("flash.plan.partitionCount"),
-              plan.partitions.count),
+              localized: LocalizedStringResource.FlashLocalizable.flashPlanPartitionCount(
+                Int32(clamping: plan.partitions.count))),
             systemImage: "externaldrive.badge.checkmark"
           )
           .font(.subheadline.weight(.semibold))

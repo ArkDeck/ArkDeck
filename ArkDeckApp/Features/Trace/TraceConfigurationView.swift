@@ -95,7 +95,9 @@ struct TraceConfigurationView: View {
             customTagToggle(tag)
           }
         }
-        Text(String(format: traceString("trace.custom.count"), model.customTags.count))
+        Text(
+          LocalizedStringResource.TraceLocalizable.traceCustomCount(model.customTags.count)
+        )
           .font(.footnote.monospacedDigit())
           .foregroundStyle(.secondary)
           .accessibilityIdentifier("trace.custom.count")
@@ -185,9 +187,9 @@ struct TraceConfigurationView: View {
         Spacer(minLength: 12)
         Text(
           String(
-            format: traceString("trace.tags.verifiedCount"),
-            model.requestedTags.count - model.unsupportedRequestedTags.count,
-            model.requestedTags.count)
+            localized: LocalizedStringResource.TraceLocalizable.traceTagsVerifiedCount(
+              Int32(clamping: model.requestedTags.count - model.unsupportedRequestedTags.count),
+              Int32(clamping: model.requestedTags.count)))
         )
         .font(.caption.monospacedDigit())
         .foregroundStyle(model.unsupportedRequestedTags.isEmpty ? Color.green : Color.orange)
@@ -524,7 +526,8 @@ struct TraceConfigurationView: View {
       return traceString("trace.validation.decimal")
     case .invalid(.outsideRange(let range)):
       return String(
-        format: traceString("trace.validation.range"), range.lowerBound, range.upperBound)
+        localized: LocalizedStringResource.TraceLocalizable.traceValidationRange(
+          Int32(clamping: range.lowerBound), Int32(clamping: range.upperBound)))
     }
   }
 }

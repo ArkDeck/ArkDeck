@@ -578,10 +578,10 @@ private struct StorageSettingsPane: View {
     guard let count = storage.pinnedSessionCount, let bytes = storage.pinnedBytes else {
       return settingsText("settings.common.unknown")
     }
-    return String.localizedStringWithFormat(
-      settingsText("settings.storage.pinnedFormat"),
-      count,
-      ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file))
+    return String(
+      localized: LocalizedStringResource.SettingsLocalizable.settingsStoragePinnedFormat(
+        count,
+        ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)))
   }
 
   private func synchronizeDrafts() {

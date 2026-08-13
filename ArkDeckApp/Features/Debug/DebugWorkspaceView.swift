@@ -61,7 +61,9 @@ struct DebugWorkspaceView: View {
         if !activeJobs.isEmpty {
           Button(action: onOpenHistory) {
             Label(
-              DebugL10n.format("debug.jobs.active", activeJobs.count),
+              String(
+                localized: LocalizedStringResource.DebugLocalizable.debugJobsActive(
+                  Int32(clamping: activeJobs.count))),
               systemImage: "bolt.horizontal.circle")
           }
           .accessibilityIdentifier("debug.activeJobs")
@@ -128,8 +130,9 @@ struct DebugWorkspaceView: View {
       .accessibilityIdentifier("debug.target")
       if let selectedTarget {
         Text(
-          DebugL10n.format(
-            "debug.target.binding", selectedTarget.bindingRevision, selectedTarget.toolVersion)
+          String(
+            localized: LocalizedStringResource.DebugLocalizable.debugTargetBinding(
+              Int32(clamping: selectedTarget.bindingRevision), selectedTarget.toolVersion))
         )
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
@@ -331,13 +334,13 @@ private struct DebugLogsWorkspace: View {
       Button(DebugL10n.text("debug.logs.exportCancel"), role: .cancel) {}
     } message: { row in
       Text(
-        DebugL10n.format(
-          "debug.logs.exportPreview.message",
-          row.artifact.name,
-          ByteCountFormatter.string(
-            fromByteCount: row.artifact.byteCount, countStyle: .file),
-          row.artifact.privacy,
-          row.artifact.sha256))
+        String(
+          localized: LocalizedStringResource.DebugLocalizable.debugLogsExportPreviewMessage(
+            row.artifact.name,
+            ByteCountFormatter.string(
+              fromByteCount: row.artifact.byteCount, countStyle: .file),
+            row.artifact.privacy,
+            row.artifact.sha256)))
     }
   }
 
@@ -353,7 +356,9 @@ private struct DebugLogsWorkspace: View {
                 .font(.body.monospaced())
             }
             Stepper(
-              DebugL10n.format("debug.logs.duration", durationSeconds),
+              String(
+                localized: LocalizedStringResource.DebugLocalizable.debugLogsDuration(
+                  Int32(clamping: durationSeconds))),
               value: $durationSeconds, in: 1...600)
             // Three closed steps, defaulting to Warn: the viewport's default
             // reading is "what needs attention", not the full Info firehose.
@@ -384,8 +389,9 @@ private struct DebugLogsWorkspace: View {
               .foregroundStyle(.secondary)
             if !invalidFilterNames.isEmpty {
               Label(
-                DebugL10n.format(
-                  "debug.logs.filters.invalid", invalidFilterNames.joined(separator: ", ")),
+                String(
+                  localized: LocalizedStringResource.DebugLocalizable.debugLogsFiltersInvalid(
+                    invalidFilterNames.joined(separator: ", "))),
                 systemImage: "exclamationmark.circle"
               )
               .font(.footnote)
@@ -594,10 +600,10 @@ private struct DebugLogsWorkspace: View {
             .font(.footnote)
             if let operation {
               Text(
-                DebugL10n.format(
-                  "debug.logs.storage.totalBudget",
-                  ByteCountFormatter.string(
-                    fromByteCount: Int64(operation.outputByteBudget), countStyle: .file))
+                String(
+                  localized: LocalizedStringResource.DebugLocalizable.debugLogsStorageTotalBudget(
+                    ByteCountFormatter.string(
+                      fromByteCount: Int64(operation.outputByteBudget), countStyle: .file)))
               )
               .font(.footnote.monospacedDigit())
               .foregroundStyle(.secondary)
@@ -750,7 +756,9 @@ private struct DebugAppsWorkspace: View {
           // here, not deferred to a future submit path.
           if let invalid = invalidIdentityFieldNames {
             Label(
-              DebugL10n.format("debug.typed.invalidIdentifier", invalid),
+              String(
+                localized: LocalizedStringResource.DebugLocalizable.debugTypedInvalidIdentifier(
+                  invalid)),
               systemImage: "exclamationmark.circle"
             )
             .font(.footnote)
@@ -788,7 +796,9 @@ private struct DebugAppsWorkspace: View {
           Toggle(DebugL10n.text("debug.apps.captureDiagnostics"), isOn: $captureDiagnostics)
           if captureDiagnostics {
             Stepper(
-              DebugL10n.format("debug.apps.diagnosticsDuration", diagnosticsDuration),
+              String(
+                localized: LocalizedStringResource.DebugLocalizable.debugAppsDiagnosticsDuration(
+                  Int32(clamping: diagnosticsDuration))),
               value: $diagnosticsDuration, in: 1...300)
           }
           Divider()
@@ -1420,7 +1430,10 @@ private struct DebugAvailabilityCard: View {
                 .textSelection(.enabled)
             }
           }
-          Text(DebugL10n.format("debug.availability.effect", operation.minimumEffect))
+          Text(
+            LocalizedStringResource.DebugLocalizable.debugAvailabilityEffect(
+              operation.minimumEffect)
+          )
             .font(.footnote)
             .foregroundStyle(.secondary)
         } else {
@@ -1886,9 +1899,5 @@ final class DebugWorkspaceViewModel {
 private enum DebugL10n {
   static func text(_ key: String) -> String {
     String(localized: String.LocalizationValue(key), table: "DebugLocalizable")
-  }
-
-  static func format(_ key: String, _ arguments: CVarArg...) -> String {
-    String(format: text(key), arguments: arguments)
   }
 }

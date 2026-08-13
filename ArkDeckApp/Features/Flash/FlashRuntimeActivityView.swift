@@ -163,8 +163,8 @@ struct FlashRuntimeActivityView: View {
           Spacer(minLength: 12)
           Text(
             String(
-              format: flashText("flash.runtime.jobCount"),
-              flashJobs.count)
+              localized: LocalizedStringResource.FlashLocalizable.flashRuntimeJobCount(
+                Int32(clamping: flashJobs.count)))
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -180,8 +180,8 @@ struct FlashRuntimeActivityView: View {
           }
           Text(
             String(
-              format: flashText("flash.runtime.jobCount"),
-              flashJobs.count)
+              localized: LocalizedStringResource.FlashLocalizable.flashRuntimeJobCount(
+                Int32(clamping: flashJobs.count)))
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -196,8 +196,8 @@ struct FlashRuntimeActivityView: View {
       if job.outstandingResidueCount > 0 {
         Label(
           String(
-            format: flashText("flash.runtime.residue"),
-            job.outstandingResidueCount),
+            localized: LocalizedStringResource.FlashLocalizable.flashRuntimeResidue(
+              Int32(clamping: job.outstandingResidueCount))),
           systemImage: "externaldrive.badge.exclamationmark"
         )
         .foregroundStyle(.orange)
