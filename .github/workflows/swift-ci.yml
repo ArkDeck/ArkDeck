@@ -12,7 +12,10 @@ name: Swift CI
 # ArkDeckKit keeps its full test suite as the merge gate.  SwiftPM's stable
 # mirrored workspace makes a restored cache genuinely incremental across
 # ephemeral checkout paths.  The App lane compiles the app and UI-test bundle
-# with build-for-testing, but never launches a simulator or device.
+# with build-for-testing, but never launches a simulator or device.  Cache
+# restores prefer an exact input hash, then fall back to the newest protected-
+# main cache for the same runner and toolchain; the build systems remain
+# responsible for invalidating stale outputs after a partial restore.
 
 on:
   push:
@@ -116,6 +119,7 @@ jobs:
           key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
 
       - name: ArkDeckKit full test suite (8 workers)
         env:
@@ -175,6 +179,7 @@ jobs:
           key: arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
             arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
 
       - name: Build ArkDeck app and UI-test bundle
         env:
@@ -244,6 +249,6 @@ jobs:
             echo "- ArkDeck App lane selected: \`${{ needs.plan.outputs.app }}\`; result: \`${{ needs.app-build.result }}\`."
             echo "- ArkDeckKit changes retain the full test suite; test-only changes do not rebuild the App."
             echo "- App/UI-test/project changes compile with build-for-testing; no simulator or device test is claimed."
-            echo "- Restored build caches are best-effort and only protected main writes new entries."
+            echo "- Cache restore order is exact inputs, then the newest same-toolchain protected-main entry; only protected main writes new entries."
             echo "- A green CI result is validation evidence, not maintainer approval."
           } >> "$GITHUB_STEP_SUMMARY"

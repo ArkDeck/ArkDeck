@@ -358,9 +358,16 @@ def validate_automatic_check_contract(
         "ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm",
         "python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        "          restore-keys: |\n"
+        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
+        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
         "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
         "--num-workers 8",
-        "github.ref == 'refs/heads/main'",
+        "        if: >-\n"
+        "          success() &&\n"
+        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.swift-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
     required_app_build = (
@@ -371,6 +378,10 @@ def validate_automatic_check_contract(
         "CLANG_MODULE_CACHE_PATH: ${{ runner.temp }}/arkdeck-xcode/ModuleCache",
         "SWIFTPM_MODULECACHE_OVERRIDE: ${{ runner.temp }}/arkdeck-xcode/ModuleCache",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        "          restore-keys: |\n"
+        "            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift') }}-\n"
+        "            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
         "-project ArkDeck.xcodeproj",
         "-scheme ArkDeck",
         "-derivedDataPath",
@@ -379,7 +390,10 @@ def validate_automatic_check_contract(
         "CODE_SIGNING_ALLOWED=NO",
         "ROCKCHIP_COMPONENT_INPUT=/usr/bin/false",
         "build-for-testing",
-        "github.ref == 'refs/heads/main'",
+        "        if: >-\n"
+        "          success() &&\n"
+        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.app-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
     required_aggregate = (
@@ -572,6 +586,34 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                     "      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer\n",
                     "      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer\n"
                     "      INVALID_JOB_CACHE: ${{ runner.temp }}/invalid\n",
+                    1,
+                ),
+            ),
+            (
+                "missing SwiftPM toolchain fallback",
+                agent,
+                sdd,
+                swift.replace(
+                    "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+                    "",
+                ),
+            ),
+            (
+                "missing Xcode toolchain fallback",
+                agent,
+                sdd,
+                swift.replace(
+                    "            arkdeck-xcode-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+                    "",
+                ),
+            ),
+            (
+                "Agent branch cache write",
+                agent,
+                sdd,
+                swift.replace(
+                    "          github.ref == 'refs/heads/main' &&\n",
+                    "          startsWith(github.ref, 'refs/heads/agent/') &&\n",
                     1,
                 ),
             ),
