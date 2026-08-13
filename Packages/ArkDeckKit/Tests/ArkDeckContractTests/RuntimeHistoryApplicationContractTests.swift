@@ -211,6 +211,18 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       state: "running", waitingForHuman: false, outcomeUnknown: false,
       outstandingResidueCount: 0, timeline: [])
     XCTAssertFalse(running.requiresRecoveryGuidance)
+    XCTAssertTrue(running.isCurrentActivity)
+
+    let resolvedRecovery = RuntimeJobSummaryPresentation(
+      id: "job-resolved-recovery", operationReference: "flash.dayu200", targetID: "t-1",
+      state: "waitingForRecovery", waitingForHuman: false, outcomeUnknown: true,
+      outstandingResidueCount: 0, timeline: ["running", "waitingForRecovery"],
+      supersededByRecoveryEpochID: "recovery-epoch-current")
+    XCTAssertTrue(resolvedRecovery.hasEstablishedCurrentEpoch)
+    XCTAssertFalse(resolvedRecovery.requiresRecoveryGuidance)
+    XCTAssertFalse(
+      resolvedRecovery.isCurrentActivity,
+      "historical unknown states remain nonterminal for audit but are not current activity")
   }
 
   func testTargetAliasResolutionKeepsUnknownOutcomeButSettlesCurrentEpochAttention() throws {

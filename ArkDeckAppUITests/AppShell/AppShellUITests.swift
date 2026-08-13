@@ -661,7 +661,8 @@ final class AppShellUITests: XCTestCase {
 
     // Runtime activity is stage-based and terminal states carry their own
     // sentences. Walked here through the same state file instead of a
-    // separate launch: running first, then succeeded.
+    // separate launch: running first, a historical recovery relation, then
+    // succeeded.
     writeFixtureState("--ui-test-runtime-flash-running", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
     XCTAssertTrue(
@@ -673,6 +674,19 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(
       element("flash.runtime.result", in: app), equals: flash.runtimeRunningResult)
     XCTAssertTrue(element("flash.runtime.progress", in: app).exists, file: file, line: line)
+    XCTAssertFalse(element("flash.runtime.attention", in: app).exists, file: file, line: line)
+    writeFixtureState(
+      "--ui-test-runtime-flash-resolved-recovery", in: app, file: file, line: line)
+    app.buttons["flash.refresh"].click()
+    XCTAssertTrue(
+      app.buttons["flash.image.choose"].waitForExistenceFast(timeout: 10),
+      "a historical waitingForRecovery Job with an established current epoch must stay idle",
+      file: file, line: line)
+    XCTAssertFalse(
+      element("flash.workspace.progress", in: app).exists,
+      "resolved recovery history must not look like an automatically started Flash",
+      file: file, line: line)
+    XCTAssertFalse(element("flash.runtime.progress", in: app).exists, file: file, line: line)
     XCTAssertFalse(element("flash.runtime.attention", in: app).exists, file: file, line: line)
     writeFixtureState("--ui-test-runtime-flash-succeeded", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
