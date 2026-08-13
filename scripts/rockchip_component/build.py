@@ -49,6 +49,7 @@ OUTPUT_METADATA = (
     "sbom.spdx.json",
     "registry.yaml",
 )
+RKDEVELOPTOOL_CXX_STANDARD = "c++23"
 SOURCE_DATE_EPOCH = 1779028641
 FIXED_CREATED = "2026-05-17T14:37:21Z"
 MAX_ARCHIVE_MEMBER_BYTES = 64 * 1024 * 1024
@@ -522,6 +523,20 @@ def inspect_toolchain(recipe: Mapping[str, Any]) -> Dict[str, Any]:
         tools[name] = _decode(
             _run_raw(["/usr/bin/xcrun", "--sdk", "macosx", "--find", name], env=env)
         ).strip()
+    standard = recipe["component"].get("cxxLanguageStandard")
+    if standard != RKDEVELOPTOOL_CXX_STANDARD:
+        raise BuildError("the recipe does not pin rkdeveloptool to C++23")
+    _run_raw(
+        [
+            tools["clang++"],
+            "-std={}".format(standard),
+            "-x",
+            "c++",
+            "-fsyntax-only",
+            "/dev/null",
+        ],
+        env=env,
+    )
     clang_version = _decode(_run_raw([tools["clang"], "--version"], env=env)).splitlines()[0]
     make_version = _decode(_run_raw(["/usr/bin/make", "--version"], env=env)).splitlines()[0]
     bash_version = _decode(_run_raw(["/bin/bash", "--version"], env=env)).splitlines()[0]
@@ -720,6 +735,63 @@ def _closed_build_environment(
         "TZ": recipe["environment"]["TZ"],
         "ZERO_AR_DATE": recipe["environment"]["ZERO_AR_DATE"],
     }
+
+
+def rkdeveloptool_compile_arguments(
+    *,
+    compiler: str,
+    source: Path,
+    output: Path,
+    work_root: Path,
+    rk_source: Path,
+    libusb_source: Path,
+    libusb_build: Path,
+    generated_config: Path,
+    toolchain: Mapping[str, Any],
+    recipe: Mapping[str, Any],
+) -> List[str]:
+    standard = recipe["component"].get("cxxLanguageStandard")
+    if standard != RKDEVELOPTOOL_CXX_STANDARD:
+        raise BuildError(
+            "rkdeveloptool C++ standard drift: observed={!r} expected={!r}".format(
+                standard,
+                RKDEVELOPTOOL_CXX_STANDARD,
+            )
+        )
+    if source.suffix != ".cpp":
+        raise BuildError("rkdeveloptool compilation requires a .cpp source")
+    return [
+        compiler,
+        "-std={}".format(standard),
+        "-target",
+        recipe["component"]["targetTriple"],
+        "-arch",
+        recipe["component"]["architecture"],
+        "-mmacosx-version-min=14.0",
+        "-isysroot",
+        toolchain["sdkPath"],
+        "-O2",
+        "-g0",
+        "-fno-ident",
+        "-fno-strict-aliasing",
+        "-Wno-deprecated-declarations",
+        "-D_FILE_OFFSET_BITS=64",
+        "-D_LARGE_FILE",
+        "-fdebug-prefix-map={}=/build".format(work_root),
+        "-ffile-prefix-map={}=/build".format(work_root),
+        "-I",
+        str(generated_config.parent),
+        "-I",
+        str(rk_source),
+        "-I",
+        str(libusb_source / "libusb"),
+        "-I",
+        str(libusb_build / "libusb"),
+        "-c",
+        str(source),
+        "-o",
+        str(output),
+    ]
 
 
 def _write_generated_config(path: Path, recipe: Mapping[str, Any]) -> None:
@@ -1484,33 +1556,6 @@ def build_once(builder_id: str, work_root: Path, output_dir: Path) -> Dict[str, 
     _write_generated_config(generated_config, recipe)
     object_dir = build_root / "objects"
     object_dir.mkdir()
-    common_cpp_flags = [
-        "-std=c++11",
-        "-target",
-        recipe["component"]["targetTriple"],
-        "-arch",
-        recipe["component"]["architecture"],
-        "-mmacosx-version-min=14.0",
-        "-isysroot",
-        toolchain["sdkPath"],
-        "-O2",
-        "-g0",
-        "-fno-ident",
-        "-fno-strict-aliasing",
-        "-Wno-deprecated-declarations",
-        "-D_FILE_OFFSET_BITS=64",
-        "-D_LARGE_FILE",
-        "-fdebug-prefix-map={}=/build".format(work_root),
-        "-ffile-prefix-map={}=/build".format(work_root),
-        "-I",
-        str(generated_config.parent),
-        "-I",
-        str(rk_source),
-        "-I",
-        str(libusb_source / "libusb"),
-        "-I",
-        str(libusb_build / "libusb"),
-    ]
     objects: List[Path] = []
     for source_name in recipe["inputs"]["rkdeveloptool"]["sourceFiles"]:
         source = rk_source / source_name
@@ -1518,14 +1563,18 @@ def build_once(builder_id: str, work_root: Path, output_dir: Path) -> Dict[str, 
             raise BuildError("pinned rkdeveloptool source file is missing")
         obj = object_dir / (Path(source_name).stem + ".o")
         recorder.run(
-            [
-                toolchain["tools"]["clang++"],
-                *common_cpp_flags,
-                "-c",
-                str(source),
-                "-o",
-                str(obj),
-            ],
+            rkdeveloptool_compile_arguments(
+                compiler=toolchain["tools"]["clang++"],
+                source=source,
+                output=obj,
+                work_root=work_root,
+                rk_source=rk_source,
+                libusb_source=libusb_source,
+                libusb_build=libusb_build,
+                generated_config=generated_config,
+                toolchain=toolchain,
+                recipe=recipe,
+            ),
             cwd=build_root,
             env=env,
         )

@@ -2,28 +2,28 @@
   "availabilityWindow": "max(binary public availability, five years after release issuedAt)",
   "buildFiles": [
     {
-      "gitBlob": "46a7067821e9427915559bb45110fb0d69cb206d",
+      "gitBlob": "5396bb94c5785fdff46ad0401e7405790973f5f0",
       "path": "scripts/rockchip_component/README.md",
-      "sha256": "cde4656d59d47684765907c056c8fdd0c7bab6729fdd63fcb594d6b1e0c6e778",
-      "size": 2423
+      "sha256": "42f5d72c4bf63fb56553544cca07eaa18f0c23d50a02017646f8e0ab73ee428c",
+      "size": 2547
     },
     {
-      "gitBlob": "27ca1c99ba73cbe5e58d0500f4ba40ce4575f933",
+      "gitBlob": "7c3a686eba5c83741b4c2d11d0c35bc81818b3d0",
       "path": "scripts/rockchip_component/build.py",
-      "sha256": "72e88d42220f69c39330d642a4da4c36054b066376c574d746a4bac6a95581d6",
-      "size": 66363
+      "sha256": "c35b56b9ea24af966cfc5ef3c399ff0faa62f79002ba616e76b0bdcb4ace6ab2",
+      "size": 67862
     },
     {
-      "gitBlob": "a17d61d3b0262f46dbfd94847df56232f79bc5bd",
+      "gitBlob": "c1fcab6e0861d4f0ef4f5b6d5662af002795ceeb",
       "path": "scripts/rockchip_component/test_build.py",
-      "sha256": "51981baa21749e485947ce41ec626d1dcf0ca8391f062c746a13883a0dca6203",
-      "size": 19776
+      "sha256": "a8ae15b2c4c023c05c72530e907445f752d1ce4e8892cd74407c93c2d1dfcf5d",
+      "size": 21599
     },
     {
-      "gitBlob": "794c127f20bb6ff06f88f4beff0f26e5f1f87e07",
+      "gitBlob": "e3e06015652c9899866c5a9091fb552b4eb78c1e",
       "path": "openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json",
-      "sha256": "22a6c7359a1b5ea97702e76568817746c8e7815981a139a1bb04b475f9f747ec",
-      "size": 4934
+      "sha256": "311c61b0d37819fe6602c69743f1573c40a01e344fe0a4bc2b7d040dca596caf",
+      "size": 4970
     }
   ],
   "component": {
