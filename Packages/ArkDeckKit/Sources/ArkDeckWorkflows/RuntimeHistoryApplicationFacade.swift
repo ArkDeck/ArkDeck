@@ -106,6 +106,17 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
       return false
     }
   }
+
+  /// A nonterminal state represents current work only while it still belongs
+  /// to the current target epoch and does not require recovery guidance.
+  /// Runtime deliberately keeps historical unknown states nonterminal for
+  /// audit, so checking `state` alone would render an old Flash as running.
+  public var isCurrentActivity: Bool {
+    guard !hasEstablishedCurrentEpoch, !requiresRecoveryGuidance,
+      let state = JobState(rawValue: state)
+    else { return false }
+    return !state.isTerminal
+  }
 }
 
 public struct RuntimeHistoryPresentation: Sendable, Equatable {
@@ -1111,6 +1122,9 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
   /// the domain already keeps them apart, but nothing rendered the empty one.
   private var empty: Bool { fixtureRequests("--ui-test-runtime-history-empty") }
   private var flashRunning: Bool { fixtureRequests("--ui-test-runtime-flash-running") }
+  private var flashResolvedRecovery: Bool {
+    fixtureRequests("--ui-test-runtime-flash-resolved-recovery")
+  }
   private var flashSucceeded: Bool { fixtureRequests("--ui-test-runtime-flash-succeeded") }
 
   func refreshHistory() async -> RuntimeHistoryPresentation {
@@ -1138,6 +1152,27 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
             actualEffect: "destructive",
             createdAtUTC: "2026-08-06T08:00:00Z",
             startedAtUTC: "2026-08-06T08:00:01Z")
+        ])
+    }
+    if flashResolvedRecovery {
+      return RuntimeHistoryPresentation(
+        availability: .available,
+        jobs: [
+          RuntimeJobSummaryPresentation(
+            id: "job-fixture-flash-resolved-recovery",
+            operationReference: "flash.dayu200",
+            targetID: "target-fixture-dayu200",
+            state: "waitingForRecovery",
+            waitingForHuman: false,
+            outcomeUnknown: true,
+            outstandingResidueCount: 0,
+            timeline: ["queued", "preflight", "running", "waitingForRecovery"],
+            executionMode: "execute",
+            sessionID: "session-job-fixture-flash-resolved-recovery",
+            actualEffect: "destructive",
+            createdAtUTC: "2026-08-06T08:00:00Z",
+            startedAtUTC: "2026-08-06T08:00:01Z",
+            supersededByRecoveryEpochID: "recovery-epoch-fixture")
         ])
     }
     if flashSucceeded {

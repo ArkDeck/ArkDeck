@@ -466,8 +466,7 @@ struct FlashWorkspaceView: View {
   private var activeFlashJob: RuntimeJobSummaryPresentation? {
     runtimeHistory.jobs.first { job in
       job.operationReference == "flash.dayu200"
-        && !isTerminalState(job.state)
-        && !job.requiresRecoveryGuidance
+        && job.isCurrentActivity
     }
   }
 
@@ -504,11 +503,6 @@ struct FlashWorkspaceView: View {
           .accessibilityIdentifier("flash.runtime.openHistory")
       }
     }
-  }
-
-  private func isTerminalState(_ state: String) -> Bool {
-    ["planned", "succeeded", "recovered", "failed", "cancelled", "interrupted"]
-      .contains(state)
   }
 
   private var currentRunStage: FlashWorkspaceRunStage {
