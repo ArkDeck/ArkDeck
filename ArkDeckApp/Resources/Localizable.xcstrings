@@ -856,6 +856,7 @@
       }
     },
     "device.trust.unknownState": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -936,6 +937,7 @@
       }
     },
     "device.wait.unavailable": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -1534,6 +1536,7 @@
       }
     },
     "overview.capabilities.title.target": {
+      "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Device capability matrix (%1$@ · binding %2$lld)" } },
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "设备能力矩阵（%1$@ · binding %2$lld）" } }
@@ -2020,6 +2023,7 @@
       }
     },
     "overview.recovery.confirmGeneration": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -2276,6 +2280,7 @@
       }
     },
     "overview.status.needsAttention.other": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {

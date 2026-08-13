@@ -101,8 +101,8 @@ struct GlobalJobInspectorView: View {
           if job.outstandingResidueCount > 0 {
             Label(
               String(
-                format: jobsText("jobInspector.residue.compact"),
-                job.outstandingResidueCount),
+                localized: LocalizedStringResource.JobsLocalizable.jobInspectorResidueCompact(
+                  Int32(clamping: job.outstandingResidueCount))),
               systemImage: "externaldrive.badge.exclamationmark"
             )
             .font(.caption)
@@ -213,8 +213,8 @@ struct GlobalJobInspectorView: View {
           if job.outstandingResidueCount > 0 {
             Label(
               String(
-                format: jobsText("jobInspector.residue"),
-                job.outstandingResidueCount),
+                localized: LocalizedStringResource.JobsLocalizable.jobInspectorResidue(
+                  Int32(clamping: job.outstandingResidueCount))),
               systemImage: "externaldrive.badge.exclamationmark"
             )
             .foregroundStyle(.orange)
@@ -309,8 +309,8 @@ struct GlobalJobInspectorView: View {
           if activeJobCount > 0 {
             Text(
               String(
-                format: jobsText("jobInspector.compact.activeCount"),
-                activeJobCount)
+                localized: LocalizedStringResource.JobsLocalizable.jobInspectorCompactActiveCount(
+                  Int32(clamping: activeJobCount)))
             )
             .font(.caption)
             .foregroundStyle(.secondary)

@@ -203,8 +203,8 @@ struct FlashWorkspaceView: View {
         if let target = model.selectedTarget {
           Text(
             String(
-              format: flashText("flash.workspace.device.detail"),
-              target.id, target.bindingRevision)
+              localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceDeviceDetail(
+                target.id, Int32(clamping: target.bindingRevision)))
           )
           .font(.caption.monospaced())
           .foregroundStyle(.secondary)
@@ -292,13 +292,15 @@ struct FlashWorkspaceView: View {
       let blockers = plan.blockingRequiredPrerequisites.count
       if blockers > 0 && !model.willActivateCurrentTargetOnSubmit {
         return String(
-          format: flashText("flash.workspace.readiness.blockerCount"), blockers)
+          localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceReadinessBlockerCount(
+            Int32(clamping: blockers)))
       }
       let satisfied = plan.prerequisites.filter {
         $0.requirement == .required && $0.status == .satisfied
       }.count
       return String(
-        format: flashText("flash.workspace.readiness.checkCount"), satisfied)
+        localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceReadinessCheckCount(
+          Int32(clamping: satisfied)))
     }
     return flashText("flash.workspace.readiness.chooseImage")
   }
@@ -470,11 +472,12 @@ struct FlashWorkspaceView: View {
       if case .userDataDestroyed = $0 { return true }
       return false
     }) {
-      return String(format: flashText("flash.workspace.action.impact"), target)
+      return String(
+        localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceActionImpact(target))
     }
     return String(
-      format: flashText("flash.impact.partitions"),
-      plan.mappedPartitionCount)
+      localized: LocalizedStringResource.FlashLocalizable.flashImpactPartitions(
+        Int32(clamping: plan.mappedPartitionCount)))
   }
 
   private func dataImpactIdentifier(_ impact: FlashDataImpactPresentation) -> String {
@@ -491,8 +494,8 @@ struct FlashWorkspaceView: View {
   private func flashBlockerText(_ plan: FlashExactPlanPresentation) -> String {
     if !plan.blockingRequiredPrerequisites.isEmpty {
       return String(
-        format: flashText("flash.workspace.action.blocked"),
-        plan.blockingRequiredPrerequisites.count)
+        localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceActionBlocked(
+          Int32(clamping: plan.blockingRequiredPrerequisites.count)))
     }
     return flashText("flash.execute.planRequired")
   }
@@ -698,8 +701,8 @@ struct FlashWorkspaceView: View {
       return flashText("flash.workspace.progress.extracting")
     case .writingPartition:
       return String(
-        format: flashText("flash.workspace.progress.partition"),
-        liveProgress.partitionName ?? flashText("flash.workspace.progress.partitionUnknown"))
+        localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceProgressPartition(
+          liveProgress.partitionName ?? flashText("flash.workspace.progress.partitionUnknown")))
     case .verifyingPartitions:
       return flashText("flash.workspace.progress.verifyingPartitions")
     case .rebootingDevice:
@@ -719,8 +722,11 @@ struct FlashWorkspaceView: View {
       let writePercent = liveProgress.writePercentCompleted
     {
       return String(
-        format: flashText("flash.workspace.progress.partitionDetail"),
-        completed, total, partitionPercent, writePercent)
+        localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceProgressPartitionDetail(
+          Int32(clamping: completed),
+          Int32(clamping: total),
+          Int32(clamping: partitionPercent),
+          Int32(clamping: writePercent)))
     }
     return flashText("flash.workspace.progress.indeterminate")
   }
@@ -770,7 +776,8 @@ struct FlashWorkspaceView: View {
     if let failure = model.submissionFailure { return failure }
     if let submission = model.submission {
       return String(
-        format: flashText("flash.workspace.result.state"), submission.state)
+        localized: LocalizedStringResource.FlashLocalizable.flashWorkspaceResultState(
+          submission.state))
     }
     return flashText("flash.workspace.result.unverified")
   }
@@ -825,9 +832,9 @@ struct FlashWorkspaceView: View {
       VStack(alignment: .leading, spacing: 12) {
         Text(
           String(
-            format: flashText("flash.workspace.plan.summary"),
-            plan.steps.count,
-            flashText(effectKey(highestEffect(in: plan.steps) ?? .hostOnly)))
+            localized: LocalizedStringResource.FlashLocalizable.flashWorkspacePlanSummary(
+              Int32(clamping: plan.steps.count),
+              flashText(effectKey(highestEffect(in: plan.steps) ?? .hostOnly))))
         )
         .font(.callout.weight(.semibold))
         planStageSummary(plan)
@@ -1014,9 +1021,10 @@ struct FlashWorkspaceView: View {
                     .foregroundStyle(.secondary)
                   Text(
                     String(
-                      format: flashText("flash.deviceAccess.observationValue"),
-                      model.deviceAccess.observationCount,
-                      model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", "))
+                      localized: LocalizedStringResource.FlashLocalizable
+                        .flashDeviceAccessObservationValue(
+                          Int32(clamping: model.deviceAccess.observationCount),
+                          model.deviceAccess.observedModes.map(\.rawValue).joined(separator: ", ")))
                   )
                 }
               }
@@ -1295,8 +1303,8 @@ struct FlashWorkspaceView: View {
         Text(label).font(.callout.weight(.semibold))
         Text(
           String(
-            format: flashText("flash.postflight.comparison"),
-            expected, observed)
+            localized: LocalizedStringResource.FlashLocalizable.flashPostflightComparison(
+              expected, observed))
         )
         .font(.caption.monospaced())
         .textSelection(.enabled)
@@ -1304,12 +1312,21 @@ struct FlashWorkspaceView: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
-      String(
-        format: flashText(
-          matches ? "flash.postflight.match" : "flash.postflight.mismatch"),
-        label, expected, observed)
+      String(localized: postflightAccessibilityResource(
+        matches: matches, label: label, expected: expected, observed: observed))
     )
     .accessibilityIdentifier("\(identifier).\(matches ? "match" : "mismatch")")
+  }
+
+  private func postflightAccessibilityResource(
+    matches: Bool, label: String, expected: String, observed: String
+  ) -> LocalizedStringResource {
+    if matches {
+      return LocalizedStringResource.FlashLocalizable.flashPostflightMatch(
+        label, expected, observed)
+    }
+    return LocalizedStringResource.FlashLocalizable.flashPostflightMismatch(
+      label, expected, observed)
   }
 
   private func planFailureKey(_ code: FlashPlanFailureCode) -> String {

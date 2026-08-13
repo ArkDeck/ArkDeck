@@ -160,8 +160,8 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       workspace.contains(
         "String.LocalizationValue(key), table: \"TraceLocalizable\""))
     XCTAssertTrue(workspace.contains("model.submit()"))
-    XCTAssertTrue(workspace.contains("trace.action.startNamed"))
-    XCTAssertTrue(workspace.contains("trace.action.applyAndStartNamed"))
+    XCTAssertTrue(workspace.contains("traceActionStartNamed("))
+    XCTAssertTrue(workspace.contains("traceActionApplyAndStartNamed("))
     XCTAssertTrue(workspace.contains("model.cancel()"))
     XCTAssertTrue(configuration.contains("TracePresetCatalog.definitions"))
     XCTAssertTrue(configuration.contains("TraceDebugParameterCatalog.definitions"))
@@ -257,6 +257,18 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     referencedKeys.formUnion(requiredKeys)
     referencedKeys.formUnion(
       requiredKeys.filter { $0.hasPrefix("trace.parameters.mode.") }.map { "\($0).detail" })
+    let generatedSymbolConsumers = [
+      "trace.action.applyAndStartNamed": "traceActionApplyAndStartNamed(",
+      "trace.action.startNamed": "traceActionStartNamed(",
+      "trace.custom.count": "traceCustomCount(",
+      "trace.progress.cancelDetail": "traceProgressCancelDetail(",
+      "trace.tags.verifiedCount": "traceTagsVerifiedCount(",
+      "trace.validation.range": "traceValidationRange(",
+    ]
+    referencedKeys.formUnion(
+      generatedSymbolConsumers.compactMap { key, symbol in
+        sources.contains(symbol) ? key : nil
+      })
 
     let orphanedKeys = Set(strings.keys).subtracting(referencedKeys).sorted()
     XCTAssertTrue(

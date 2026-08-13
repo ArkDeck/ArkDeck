@@ -275,11 +275,13 @@ struct TraceWorkspaceView: View {
   /// so before capturing, and the configuration name and duration ride along
   /// so the reader can match them against the left column before acting.
   private var startActionTitle: String {
-    let key =
+    let resource =
       model.parameterMode == .unchanged
-      ? "trace.action.startNamed" : "trace.action.applyAndStartNamed"
-    return String(
-      format: traceString(key), model.configurationTitle, model.durationText)
+      ? LocalizedStringResource.TraceLocalizable.traceActionStartNamed(
+        model.configurationTitle, model.durationText)
+      : LocalizedStringResource.TraceLocalizable.traceActionApplyAndStartNamed(
+        model.configurationTitle, model.durationText)
+    return String(localized: resource)
   }
 
   private var reviewBlockers: [String] {

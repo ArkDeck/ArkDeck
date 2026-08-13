@@ -162,7 +162,8 @@ struct TraceProgressArtifactsView: View {
     let policy =
       model.workspace.operation.traceStepCancellation
       ?? traceString("trace.value.unavailable")
-    return String(format: traceString("trace.progress.cancelDetail"), policy)
+    return String(
+      localized: LocalizedStringResource.TraceLocalizable.traceProgressCancelDetail(policy))
   }
 
   /// One artifact per row: file, role, contract status. Roles differ on

@@ -114,11 +114,11 @@ struct RuntimeHistoryView: View {
     } message: { artifact in
       Text(
         String(
-          format: historyLocalized("history.artifacts.exportPreview.message"),
-          artifact.name,
-          ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file),
-          artifact.privacy,
-          artifact.sha256))
+          localized: LocalizedStringResource.HistoryLocalizable.historyArtifactsExportPreviewMessage(
+            artifact.name,
+            ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file),
+            artifact.privacy,
+            artifact.sha256)))
     }
   }
 
@@ -260,9 +260,9 @@ struct RuntimeHistoryView: View {
   private var filterResultSummary: some View {
     Text(
       String(
-        format: historyLocalized("history.filter.resultCount"),
-        filteredJobs.count,
-        presentation.jobs.count)
+        localized: LocalizedStringResource.HistoryLocalizable.historyFilterResultCount(
+          filteredJobs.count,
+          presentation.jobs.count))
     )
     .font(.caption)
     .foregroundStyle(.secondary)
@@ -482,8 +482,8 @@ struct RuntimeHistoryView: View {
       if job.outstandingResidueCount > 0 {
         Label(
           String(
-            format: historyLocalized("history.detail.residue"),
-            job.outstandingResidueCount),
+            localized: LocalizedStringResource.HistoryLocalizable.historyDetailResidue(
+              job.outstandingResidueCount)),
           systemImage: "externaldrive.badge.exclamationmark"
         )
         .foregroundStyle(.orange)

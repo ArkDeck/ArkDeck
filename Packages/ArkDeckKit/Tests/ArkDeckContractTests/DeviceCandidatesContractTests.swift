@@ -554,6 +554,34 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
   }
 
+  func testAppUsesGeneratedStringCatalogSymbolsUnderStrictMemorySafety() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let project = try String(
+      contentsOf: repository.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
+
+    XCTAssertEqual(
+      project.components(separatedBy: "STRING_CATALOG_GENERATE_SYMBOLS = YES;").count - 1,
+      2)
+    XCTAssertEqual(
+      project.components(separatedBy: "SWIFT_STRICT_MEMORY_SAFETY = YES;").count - 1,
+      2)
+
+    let appRoot = repository.appending(path: "ArkDeckApp")
+    let swiftSources = try XCTUnwrap(
+      FileManager.default.enumerator(
+        at: appRoot, includingPropertiesForKeys: nil)?.allObjects as? [URL]
+    ).filter { $0.pathExtension == "swift" }
+      .map { try String(contentsOf: $0, encoding: .utf8) }
+      .joined(separator: "\n")
+    let unsafeFormatting = try NSRegularExpression(
+      pattern: #"String\s*\(\s*format:|String\s*\.localizedStringWithFormat"#)
+    XCTAssertNil(
+      unsafeFormatting.firstMatch(
+        in: swiftSources, range: NSRange(swiftSources.startIndex..., in: swiftSources)))
+  }
+
   func testDaemonBuildsOneConcurrentDeviceInformationProjection() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }

@@ -417,7 +417,7 @@ struct DeviceDetailView: View {
           identifier: "device.trust.ready")
       default:
         deviceNotice(
-          String(format: deviceString("device.trust.unknownState"), candidate.state),
+          String(localized: .deviceTrustUnknownState(candidate.state)),
           systemImage: "questionmark.circle",
           color: .secondary,
           identifier: "device.trust.unknownState")
@@ -463,7 +463,7 @@ struct DeviceDetailView: View {
       }
     case .unavailable(_, let reason):
       deviceNotice(
-        String(format: deviceString("device.wait.unavailable"), reason),
+        String(localized: .deviceWaitUnavailable(reason)),
         systemImage: "xmark.octagon.fill",
         color: .red,
         identifier: "device.wait.unavailable")
