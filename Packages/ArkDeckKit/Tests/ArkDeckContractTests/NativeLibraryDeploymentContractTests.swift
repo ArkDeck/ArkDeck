@@ -390,7 +390,7 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
       .appendingPathComponent("Tools/OpenHarmonyNativeCodeSignHelper/main.c")
-    let code = try String(contentsOf: source)
+    let code = try String(contentsOf: source, encoding: .utf8)
 
     // Every diagnostic prints the captured value.
     let reports = code.components(separatedBy: "ARKDECK_CODE_SIGN_ERROR").dropFirst()

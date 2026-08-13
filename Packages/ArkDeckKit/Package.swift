@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3
 
 import PackageDescription
 
@@ -100,9 +100,11 @@ let package = Package(
     ),
     .target(
       name: "ArkDeckLaunchAgent",
+      dependencies: ["ArkDeckCore"],
       path: "LaunchAgents",
       exclude: ["README.md"],
-      resources: [.copy("com.arkdeck.agentd.plist")]
+      resources: [.copy("com.arkdeck.agentd.plist")],
+      linkerSettings: [.linkedFramework("Security")]
     ),
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",

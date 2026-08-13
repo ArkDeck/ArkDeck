@@ -1,6 +1,8 @@
+import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
+import Security
 
 public enum ArkDeckLaunchAgent {
   public static let label = "com.arkdeck.agentd"
@@ -67,6 +69,7 @@ public struct FoundationLaunchAgentCommandRunner: LaunchAgentCommandRunning {
 public struct LaunchAgentPaths: Sendable, Equatable {
   public let homeDirectory: URL
   public let plist: URL
+  public let installedDaemonBundle: URL
   public let installedDaemon: URL
   public let receipt: URL
   public let logDirectory: URL
@@ -82,7 +85,10 @@ public struct LaunchAgentPaths: Sendable, Equatable {
       "Application Support/ArkDeck", isDirectory: true)
     self.plist = library.appendingPathComponent(
       "LaunchAgents/\(ArkDeckLaunchAgent.label).plist")
-    self.installedDaemon = support.appendingPathComponent("bin/arkdeck-agentd")
+    self.installedDaemonBundle = support.appendingPathComponent(
+      "Helpers/\(ArkDeckHelperIdentity.daemonBundleName)", isDirectory: true)
+    self.installedDaemon = self.installedDaemonBundle.appendingPathComponent(
+      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     self.receipt = support.appendingPathComponent("LaunchAgent/install-receipt.json")
     self.logDirectory = library.appendingPathComponent("Logs/ArkDeck", isDirectory: true)
     self.standardOutput = self.logDirectory.appendingPathComponent("agentd.log")
@@ -224,6 +230,7 @@ public final class LaunchAgentService: @unchecked Sendable {
   private let fileManager: FileManager
   private let uid: uid_t
   private let nowUTC: @Sendable () -> String
+  private let daemonBundleValidator: (URL) throws -> URL
 
   public init(
     paths: LaunchAgentPaths = LaunchAgentPaths(),
@@ -237,19 +244,39 @@ public final class LaunchAgentService: @unchecked Sendable {
     self.fileManager = fileManager
     self.uid = uid
     self.nowUTC = nowUTC
+    self.daemonBundleValidator = { candidate in
+      try LaunchAgentService.validateProductionDaemonBundle(
+        candidate, fileManager: fileManager)
+    }
+  }
+
+  package init(
+    paths: LaunchAgentPaths, runner: any LaunchAgentCommandRunning,
+    fileManager: FileManager = .default, uid: uid_t,
+    nowUTC: @escaping @Sendable () -> String,
+    daemonBundleValidator: @escaping (URL) throws -> URL
+  ) {
+    self.paths = paths
+    self.runner = runner
+    self.fileManager = fileManager
+    self.uid = uid
+    self.nowUTC = nowUTC
+    self.daemonBundleValidator = daemonBundleValidator
   }
 
   public var launchDomain: String { "gui/\(uid)" }
 
   @discardableResult
   public func install(
-    daemonSource: URL, hdcExecutable: URL,
+    daemonBundleSource: URL, hdcExecutable: URL,
     workspace: LaunchAgentWorkspaceConfiguration? = nil,
     harnessSensitiveEvidence: [String] = [],
     harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
-    let daemonSource = try validatedExecutable(daemonSource, name: "arkdeck-agentd")
+    let daemonBundleSource = try daemonBundleValidator(daemonBundleSource)
+    let daemonSource = daemonBundleSource.appendingPathComponent(
+      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     let hdcExecutable = try validatedExecutable(hdcExecutable, name: "HDC")
     let workspace = try workspace.map(validatedWorkspace)
     let harnessSensitiveEvidence = try validatedSensitiveEvidence(harnessSensitiveEvidence)
@@ -258,13 +285,8 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     let daemonSHA256 = try sha256(daemonSource)
     let hdcSHA256 = try sha256(hdcExecutable)
-    let installedDaemonSHA256 = try? sha256(paths.installedDaemon)
-    let previousReceipt = try? JSONDecoder().decode(
-      LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
-    let credentialIdentityChanged = previousReceipt?.daemonSHA256 != daemonSHA256
-
     try createOwnedDirectory(paths.plist.deletingLastPathComponent())
-    try createOwnedDirectory(paths.installedDaemon.deletingLastPathComponent())
+    try createOwnedDirectory(paths.installedDaemonBundle.deletingLastPathComponent())
     try createOwnedDirectory(paths.receipt.deletingLastPathComponent())
     try createOwnedDirectory(paths.logDirectory)
 
@@ -274,22 +296,17 @@ public final class LaunchAgentService: @unchecked Sendable {
         operation: "bootout")
     }
 
-    if daemonSource.path != paths.installedDaemon.path,
-      installedDaemonSHA256 != daemonSHA256
-    {
-      let staging = paths.installedDaemon.deletingLastPathComponent()
-        .appendingPathComponent(".arkdeck-agentd-\(UUID().uuidString)")
+    if daemonBundleSource.path != paths.installedDaemonBundle.path {
+      let staging = paths.installedDaemonBundle.deletingLastPathComponent()
+        .appendingPathComponent(".arkdeck-agentd-\(UUID().uuidString).app")
       defer { try? fileManager.removeItem(at: staging) }
-      try fileManager.copyItem(at: daemonSource, to: staging)
-      try fileManager.setAttributes(
-        [.posixPermissions: 0o700], ofItemAtPath: staging.path)
-      try replaceItem(at: paths.installedDaemon, with: staging)
-      // `replaceItemAt` may preserve the destination's previous mode. Restore
-      // the installer contract on the final inode before credential ACLs are
-      // refreshed or launchd is allowed to execute it.
+      try fileManager.copyItem(at: daemonBundleSource, to: staging)
+      // The executable bytes can remain identical while its Developer ID
+      // signature, embedded profile, entitlements or notarization changes.
+      // Replace and revalidate the complete helper bundle on every update.
+      try replaceItem(at: paths.installedDaemonBundle, with: staging)
     }
-    // Reassert the final inode's owner-only contract even when an identical
-    // binary update avoids replacement and credential ACL churn.
+    _ = try daemonBundleValidator(paths.installedDaemonBundle)
     try fileManager.setAttributes(
       [.posixPermissions: 0o700], ofItemAtPath: paths.installedDaemon.path)
 
@@ -317,12 +334,12 @@ public final class LaunchAgentService: @unchecked Sendable {
     try encoder.encode(receipt).write(to: paths.receipt, options: .atomic)
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.receipt.path)
 
-    // Let the CLI compare the replacement's exact SecTrustedApplication
-    // binary identity with dependent user-domain credentials after the
-    // receipt is durable but before launchd starts the replacement executable.
-    if credentialIdentityChanged {
+    // Migrate any legacy file-based Keychain item and update the exact daemon
+    // identity receipt after the replacement is durable but before launchd
+    // starts it. Current Data Protection Keychain items remain in place.
+    if let beforeBootstrap {
       do {
-        try beforeBootstrap?()
+        try beforeBootstrap()
       } catch {
         // Credential maintenance is allowed to fail closed for signing, but
         // it must not strand the whole read-only Device Runtime offline after
@@ -348,7 +365,7 @@ public final class LaunchAgentService: @unchecked Sendable {
         operation: "bootout")
     }
     let removedPlist = try removeIfPresent(paths.plist)
-    let removedDaemon = try removeIfPresent(paths.installedDaemon)
+    let removedDaemon = try removeIfPresent(paths.installedDaemonBundle)
     let removedReceipt = try removeIfPresent(paths.receipt)
     return LaunchAgentRemoval(
       removedPlist: removedPlist, removedDaemon: removedDaemon,
@@ -378,6 +395,14 @@ public final class LaunchAgentService: @unchecked Sendable {
         devecoSDKPath = configuration.workspace?.devecoSDKRoot.path
         harnessSensitiveEvidence = configuration.harnessSensitiveEvidence
         harnessModel = configuration.harnessModel?.status
+        do {
+          let validatedBundle = try daemonBundleValidator(paths.installedDaemonBundle)
+          if validatedBundle.path != paths.installedDaemonBundle.path {
+            diagnostics.append("installed daemon helper bundle path is not canonical")
+          }
+        } catch {
+          diagnostics.append("installed daemon helper bundle is invalid: \(error)")
+        }
         if configuration.daemon != paths.installedDaemon.path {
           diagnostics.append("ProgramArguments does not name the ArkDeck-managed daemon path")
         }
@@ -600,6 +625,93 @@ public final class LaunchAgentService: @unchecked Sendable {
     else {
       throw LaunchAgentServiceError.invalidExecutable(
         "\(name) is missing, is not a regular file, or is not executable: \(canonical.path)")
+    }
+    return canonical
+  }
+
+  private static func validateProductionDaemonBundle(
+    _ candidate: URL, fileManager: FileManager
+  ) throws -> URL {
+    guard candidate.path.hasPrefix("/") else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper bundle path must be absolute")
+    }
+    let canonical = candidate.resolvingSymlinksInPath().standardizedFileURL
+    var isDirectory: ObjCBool = false
+    guard fileManager.fileExists(atPath: canonical.path, isDirectory: &isDirectory),
+      isDirectory.boolValue, canonical.pathExtension == "app"
+    else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd must be supplied as an app-like helper bundle")
+    }
+    let infoURL = canonical.appendingPathComponent("Contents/Info.plist")
+    let executableURL = canonical.appendingPathComponent(
+      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
+    guard
+      let info = try PropertyListSerialization.propertyList(
+        from: Data(contentsOf: infoURL), format: nil) as? [String: Any],
+      info["CFBundleIdentifier"] as? String == ArkDeckHelperIdentity.daemonBundleIdentifier,
+      info["CFBundleExecutable"] as? String == ArkDeckHelperIdentity.daemonExecutableName
+    else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper Info.plist identity is invalid")
+    }
+    var executableIsDirectory: ObjCBool = false
+    guard
+      fileManager.fileExists(
+        atPath: executableURL.path, isDirectory: &executableIsDirectory),
+      !executableIsDirectory.boolValue,
+      fileManager.isExecutableFile(atPath: executableURL.path)
+    else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper executable is missing or is not executable")
+    }
+    var staticCode: SecStaticCode?
+    let createStatus = SecStaticCodeCreateWithPath(canonical as CFURL, SecCSFlags(), &staticCode)
+    guard createStatus == errSecSuccess, let staticCode else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper signature is unreadable (status \(createStatus))")
+    }
+    var staticRequirement: SecRequirement?
+    let requirementStatus = SecRequirementCreateWithString(
+      ArkDeckHelperIdentity.daemonCodeRequirement as CFString,
+      SecCSFlags(), &staticRequirement)
+    guard requirementStatus == errSecSuccess, let staticRequirement else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper requirement is invalid (status \(requirementStatus))")
+    }
+    let validityStatus = SecStaticCodeCheckValidity(
+      staticCode,
+      SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures),
+      staticRequirement)
+    guard validityStatus == errSecSuccess else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper signature does not match ArkDeck (status \(validityStatus))")
+    }
+    var rawInformation: CFDictionary?
+    let informationStatus = SecCodeCopySigningInformation(
+      staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &rawInformation)
+    // CS_RUNTIME from <Security/CSCommon.h>; the Swift overlay does not expose
+    // the enum case even though kSecCodeInfoFlags is public.
+    let hardenedRuntimeFlag: UInt32 = 0x0001_0000
+    guard informationStatus == errSecSuccess,
+      let information = rawInformation as? [String: Any],
+      information[kSecCodeInfoTeamIdentifier as String] as? String
+        == ArkDeckHelperIdentity.teamIdentifier,
+      let entitlements = information[kSecCodeInfoEntitlementsDict as String] as? [String: Any],
+      entitlements["com.apple.application-identifier"] as? String
+        == ArkDeckHelperIdentity.applicationIdentifier(
+          bundleIdentifier: ArkDeckHelperIdentity.daemonBundleIdentifier),
+      (entitlements["keychain-access-groups"] as? [String])?.contains(
+        ArkDeckHelperIdentity.keychainAccessGroup) == true,
+      let flags = information[kSecCodeInfoFlags as String] as? NSNumber,
+      flags.uint32Value & hardenedRuntimeFlag != 0,
+      fileManager.fileExists(
+        atPath: canonical.appendingPathComponent("Contents/embedded.provisionprofile").path)
+    else {
+      throw LaunchAgentServiceError.invalidExecutable(
+        "arkdeck-agentd helper lacks its team, hardened runtime, shared Keychain group, "
+          + "or embedded provisioning profile")
     }
     return canonical
   }

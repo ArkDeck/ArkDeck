@@ -10,6 +10,7 @@ import XCTest
 final class LaunchAgentServiceContractTests: XCTestCase {
   private var root: URL!
   private var paths: LaunchAgentPaths!
+  private var daemonBundle: URL!
   private var daemon: URL!
   private var hdc: URL!
   private var runner: FakeLaunchAgentCommandRunner!
@@ -21,14 +22,19 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     paths = LaunchAgentPaths(homeDirectory: root.appendingPathComponent("home", isDirectory: true))
-    daemon = root.appendingPathComponent("products/arkdeck-agentd")
+    daemonBundle = root.appendingPathComponent(
+      "products/\(ArkDeckHelperIdentity.daemonBundleName)", isDirectory: true)
+    daemon = daemonBundle.appendingPathComponent(
+      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     hdc = root.appendingPathComponent("DevEco/toolchains/hdc")
+    try makeDaemonBundle(daemonBundle)
     try makeExecutable(daemon, bytes: "daemon-v1")
     try makeExecutable(hdc, bytes: "hdc-v1")
     runner = FakeLaunchAgentCommandRunner()
     service = LaunchAgentService(
       paths: paths, runner: runner, uid: 501,
-      nowUTC: { "2026-08-08T12:00:00Z" })
+      nowUTC: { "2026-08-08T12:00:00Z" },
+      daemonBundleValidator: { $0.resolvingSymlinksInPath().standardizedFileURL })
   }
 
   override func tearDownWithError() throws {
@@ -44,12 +50,68 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ArkDeckAgentFilesystemLayout.socketFilename)
   }
 
+  func testDistributionHelpersShareOnlyTheProvisionedKeychainGroup() throws {
+    let distribution = packageRoot.appendingPathComponent("Distribution/macOS")
+    let cliInfo = try plist(at: distribution.appendingPathComponent("ArkDeckCLI-Info.plist"))
+    let daemonInfo = try plist(
+      at: distribution.appendingPathComponent("ArkDeckAgent-Info.plist"))
+    XCTAssertEqual(
+      cliInfo["CFBundleIdentifier"] as? String, ArkDeckHelperIdentity.cliBundleIdentifier)
+    XCTAssertEqual(
+      daemonInfo["CFBundleIdentifier"] as? String,
+      ArkDeckHelperIdentity.daemonBundleIdentifier)
+    for name in ["ArkDeckCLI.entitlements", "ArkDeckAgent.entitlements"] {
+      let entitlements = try plist(at: distribution.appendingPathComponent(name))
+      XCTAssertEqual(
+        entitlements["com.apple.developer.team-identifier"] as? String,
+        ArkDeckHelperIdentity.teamIdentifier)
+      let bundleIdentifier =
+        name == "ArkDeckCLI.entitlements"
+        ? ArkDeckHelperIdentity.cliBundleIdentifier
+        : ArkDeckHelperIdentity.daemonBundleIdentifier
+      XCTAssertEqual(
+        entitlements["com.apple.application-identifier"] as? String,
+        ArkDeckHelperIdentity.applicationIdentifier(bundleIdentifier: bundleIdentifier))
+      XCTAssertEqual(
+        entitlements["keychain-access-groups"] as? [String],
+        [ArkDeckHelperIdentity.keychainAccessGroup])
+    }
+    let releaseScript = try String(
+      contentsOf: distribution.appendingPathComponent("build-helpers.sh"), encoding: .utf8)
+    for requiredStep in [
+      "security cms -D",
+      "codesign --verify --strict --deep",
+      "xcrun notarytool submit",
+      "xcrun stapler staple",
+      "spctl --assess --type execute",
+    ] {
+      XCTAssertTrue(
+        releaseScript.contains(requiredStep),
+        "release helper pipeline must retain \(requiredStep)")
+    }
+  }
+
+  func testProductionInstallerRejectsAnUnsignedHelperBeforeLaunchctl() throws {
+    let production = LaunchAgentService(
+      paths: paths, runner: runner, uid: 501,
+      nowUTC: { "2026-08-08T12:00:00Z" })
+    XCTAssertThrowsError(
+      try production.install(
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("signature"), "unexpected error: \(error)")
+    }
+    XCTAssertTrue(runner.commands.isEmpty)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
+  }
+
   func testInstallClosesTemplateExecutableHDCAndUserDomainLifecycle() throws {
     XCTAssertEqual(
       ArkDeckLaunchAgent.harnessLocalModelProviders,
       HarnessLocalAgentCLIProfile.all.map(\.profileID).sorted(),
       "the installer and daemon composition must keep one closed local-provider vocabulary")
-    let receipt = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    let receipt = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc)
 
     XCTAssertEqual(receipt.daemonPath, paths.installedDaemon.path)
     XCTAssertEqual(receipt.daemonSHA256, try digest(daemon))
@@ -98,11 +160,11 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   func testUpdateBootsOutLoadedServiceRefreshesIdentitiesAndCLIUsesSameManager() throws {
-    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     let oldReceipt = try JSONDecoder().decode(
       LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
     // Foundation replacement can preserve this old destination mode. The
-    // update must restore the owner-only daemon contract before its ACL hook.
+    // update must restore the owner-only daemon contract before credential migration.
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: paths.installedDaemon.path)
     try makeExecutable(daemon, bytes: "daemon-v2")
@@ -113,12 +175,12 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     let installedDaemonPath = paths.installedDaemon.path
 
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemon.path, "--hdc", hdc.path, "--json"],
+      ["update", "--daemon", daemonBundle.path, "--hdc", hdc.path, "--json"],
       service: service,
       beforeBootstrap: {
         XCTAssertFalse(
           commandRunner.commands.contains { $0.first == "bootstrap" },
-          "signing Keychain ACL must refresh before the replacement daemon starts")
+          "signing Keychain migration must finish before the replacement daemon starts")
         var installedInfo = stat()
         XCTAssertEqual(
           installedDaemonPath.withCString { lstat($0, &installedInfo) }, 0)
@@ -144,18 +206,24 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ])
   }
 
-  func testIdenticalDaemonUpdateSkipsCredentialACLRefresh() throws {
-    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+  func testIdenticalExecutableUpdateRevalidatesBundleAndCredentialIdentity() throws {
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     runner.removeAllCommands()
-    let unexpectedRefresh = CallbackFlag()
+    let identityRefresh = CallbackFlag()
+    try Data("profile-v2".utf8).write(
+      to: daemonBundle.appendingPathComponent("Contents/embedded.provisionprofile"))
 
     _ = try service.install(
-      daemonSource: daemon, hdcExecutable: hdc,
-      beforeBootstrap: { unexpectedRefresh.mark() })
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      beforeBootstrap: { identityRefresh.mark() })
 
-    XCTAssertFalse(
-      unexpectedRefresh.isMarked,
-      "an identical daemon identity must not churn Keychain ACL ownership")
+    XCTAssertTrue(identityRefresh.isMarked)
+    XCTAssertEqual(
+      try Data(
+        contentsOf: paths.installedDaemonBundle.appendingPathComponent(
+          "Contents/embedded.provisionprofile")),
+      Data("profile-v2".utf8),
+      "a renewed signing profile must not be skipped when executable bytes are unchanged")
     XCTAssertEqual(try permissions(paths.installedDaemon), 0o700)
     XCTAssertEqual(
       runner.commands,
@@ -169,13 +237,13 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   func testCredentialRefreshFailureRestartsValidatedReplacementBeforeReturningError()
     throws
   {
-    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     try makeExecutable(daemon, bytes: "daemon-v2")
     runner.removeAllCommands()
 
     XCTAssertThrowsError(
       try service.install(
-        daemonSource: daemon, hdcExecutable: hdc,
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         beforeBootstrap: { throw CredentialRefreshFixtureError.refused }))
 
     XCTAssertEqual(
@@ -208,7 +276,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       cliWorkingDirectory: project, cliTimeoutSeconds: 900)
 
     let receipt = try service.install(
-      daemonSource: daemon, hdcExecutable: hdc,
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
       workspace: LaunchAgentWorkspaceConfiguration(
         projectRoot: project, devecoSDKRoot: sdk),
       harnessSensitiveEvidence: ["hilog.txt", "crash-index.txt"],
@@ -250,7 +318,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     try makeExecutable(daemon, bytes: "daemon-v2")
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemon.path, "--json"], service: service)
+      ["update", "--daemon", daemonBundle.path, "--json"], service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     XCTAssertEqual(environment["ARKDECK_WORKSPACE_PROJECTS"], "demo-app=\(project.path)")
@@ -266,7 +334,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(status.harnessModel, receipt.harnessModel)
 
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemon.path, "--sensitive-evidence", "none", "--json"],
+      ["update", "--daemon", daemonBundle.path, "--sensitive-evidence", "none", "--json"],
       service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
@@ -274,7 +342,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(try service.status().harnessSensitiveEvidence, [])
 
     try RuntimeCLI.runAgentDaemon(
-      ["update", "--daemon", daemon.path, "--harness-model-provider", "none", "--json"],
+      ["update", "--daemon", daemonBundle.path, "--harness-model-provider", "none", "--json"],
       service: service)
     environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
@@ -290,7 +358,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   func testWorkspaceConfigurationFailsClosedUnlessProjectAndSDKAreBothValid() throws {
     XCTAssertThrowsError(
       try RuntimeCLI.runAgentDaemon(
-        ["install", "--daemon", daemon.path, "--hdc", hdc.path,
+        ["install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
           "--workspace-project", root.path],
         service: service)) { error in
           XCTAssertTrue("\(error)".contains("--workspace-project and --deveco-sdk together"))
@@ -300,7 +368,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     let missingSDK = root.appendingPathComponent("missing-sdk", isDirectory: true)
     XCTAssertThrowsError(
       try service.install(
-        daemonSource: daemon, hdcExecutable: hdc,
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         workspace: LaunchAgentWorkspaceConfiguration(
           projectRoot: missingProject, devecoSDKRoot: missingSDK)))
 
@@ -319,7 +387,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       withIntermediateDirectories: true)
     XCTAssertThrowsError(
       try service.install(
-        daemonSource: daemon, hdcExecutable: hdc,
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         workspace: LaunchAgentWorkspaceConfiguration(
           projectRoot: protectedProject, devecoSDKRoot: validSDK))) { error in
           XCTAssertTrue("\(error)".contains("macOS privacy-managed"))
@@ -331,7 +399,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     for invalid in [["../crash-index.txt"], ["hilog.txt", "hilog.txt"], [""]] {
       XCTAssertThrowsError(
         try service.install(
-          daemonSource: daemon, hdcExecutable: hdc,
+          daemonBundleSource: daemonBundle, hdcExecutable: hdc,
           harnessSensitiveEvidence: invalid)) { error in
           XCTAssertTrue("\(error)".contains("unique safe artifact basenames"))
         }
@@ -341,7 +409,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     try makeExecutable(modelCLI, bytes: "codex-cli-v1")
     XCTAssertThrowsError(
       try service.install(
-        daemonSource: daemon, hdcExecutable: hdc,
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         harnessModel: LaunchAgentHarnessModelConfiguration(
           provider: "codex", modelName: "gpt-5", cliExecutable: modelCLI,
           cliWorkingDirectory: root))) { error in
@@ -349,7 +417,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         }
     XCTAssertThrowsError(
       try RuntimeCLI.runAgentDaemon(
-        ["install", "--daemon", daemon.path, "--hdc", hdc.path,
+        ["install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
           "--harness-cli", modelCLI.path],
         service: service)) { error in
           XCTAssertTrue("\(error)".contains("require --harness-model-provider"))
@@ -373,7 +441,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     XCTAssertThrowsError(
       try service.install(
-        daemonSource: daemon, hdcExecutable: hdc, workspace: workspace,
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc, workspace: workspace,
         harnessModel: LaunchAgentHarnessModelConfiguration(
           provider: "shell", modelName: "anything", cliExecutable: modelCLI,
           cliWorkingDirectory: project))) { error in
@@ -381,7 +449,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         }
 
     _ = try service.install(
-      daemonSource: daemon, hdcExecutable: hdc, workspace: workspace,
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc, workspace: workspace,
       harnessModel: LaunchAgentHarnessModelConfiguration(
         provider: "codex", modelName: "gpt-5", cliExecutable: modelCLI,
         cliWorkingDirectory: project))
@@ -398,7 +466,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   func testStatusNamesHDCIdentityDriftAndUninstallPreservesStateAndLogs() throws {
-    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     try makeExecutable(hdc, bytes: "unreviewed-hdc-replacement")
     let stateMarker = paths.stateDirectory.appendingPathComponent("jobs.sqlite")
     try FileManager.default.createDirectory(
@@ -429,11 +497,11 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   func testUpdateRetriesOnlyTransientLaunchdEIOAfterBootout() throws {
-    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     runner.removeAllCommands()
     runner.failNextBootstrapWithEIO()
 
-    _ = try service.install(daemonSource: daemon, hdcExecutable: hdc)
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
 
     XCTAssertEqual(
       runner.commands,
@@ -450,10 +518,10 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     try Data("bytes".utf8).write(to: nonExecutable)
 
     XCTAssertThrowsError(
-      try service.install(daemonSource: nonExecutable, hdcExecutable: hdc))
+      try service.install(daemonBundleSource: nonExecutable, hdcExecutable: hdc))
     XCTAssertThrowsError(
       try service.install(
-        daemonSource: daemon,
+        daemonBundleSource: daemonBundle,
         hdcExecutable: root.appendingPathComponent("missing-hdc")))
     XCTAssertTrue(runner.commands.isEmpty)
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
@@ -482,10 +550,32 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       [.posixPermissions: 0o700], ofItemAtPath: url.path)
   }
 
+  private func makeDaemonBundle(_ url: URL) throws {
+    let contents = url.appendingPathComponent("Contents", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: contents.appendingPathComponent("MacOS", isDirectory: true),
+      withIntermediateDirectories: true)
+    let info: [String: Any] = [
+      "CFBundleIdentifier": ArkDeckHelperIdentity.daemonBundleIdentifier,
+      "CFBundleExecutable": ArkDeckHelperIdentity.daemonExecutableName,
+      "CFBundlePackageType": "APPL",
+    ]
+    try PropertyListSerialization.data(
+      fromPropertyList: info, format: .xml, options: 0
+    ).write(to: contents.appendingPathComponent("Info.plist"))
+  }
+
   private func plist(at url: URL) throws -> [String: Any] {
     try XCTUnwrap(
       PropertyListSerialization.propertyList(
         from: Data(contentsOf: url), options: [], format: nil) as? [String: Any])
+  }
+
+  private var packageRoot: URL {
+    URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
   }
 
   private func digest(_ url: URL) throws -> String {

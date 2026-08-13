@@ -151,7 +151,7 @@ private enum LaunchAgentSurface {
   static let makeService = LaunchAgentService.init(
     paths:runner:fileManager:uid:nowUTC:)
   static let install = LaunchAgentService.install(
-    daemonSource:hdcExecutable:workspace:harnessSensitiveEvidence:harnessModel:beforeBootstrap:)
+    daemonBundleSource:hdcExecutable:workspace:harnessSensitiveEvidence:harnessModel:beforeBootstrap:)
   static let status = LaunchAgentService.status
   static let installed = \LaunchAgentStatus.installed
   static let loaded = \LaunchAgentStatus.loaded

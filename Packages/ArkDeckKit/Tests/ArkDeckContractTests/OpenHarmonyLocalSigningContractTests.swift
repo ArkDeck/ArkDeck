@@ -24,27 +24,30 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     if let root { try? FileManager.default.removeItem(at: root) }
   }
 
-  func testLoginKeychainReadsForbidBothModernAndLegacyAuthenticationUI() throws {
+  func testLoginKeychainReadsUseOnlyModernNonInteractiveAuthenticationContext() throws {
     let options = LoginKeychainSigningSecretStore.nonInteractiveReadOptions()
     let context = try XCTUnwrap(
       options[kSecUseAuthenticationContext as String] as? LAContext)
     XCTAssertTrue(context.interactionNotAllowed)
-    let authenticationUI = try XCTUnwrap(
-      options[kSecUseAuthenticationUI as String])
-    XCTAssertTrue(CFEqual(authenticationUI as CFTypeRef, kSecUseAuthenticationUIFail))
+    XCTAssertNil(options[kSecUseAuthenticationUI as String])
   }
 
-  func testLoginKeychainPresenceProbeNeverRequestsSecretDataOrAuthenticationUI() throws {
+  func testDataProtectionKeychainPresenceProbeIsGroupBoundAndNeverRequestsSecretData() throws {
     let query = LoginKeychainSigningSecretStore.presenceQuery(account: "fixture-account")
     XCTAssertEqual(query[kSecAttrAccount as String] as? String, "fixture-account")
     XCTAssertEqual(query[kSecReturnAttributes as String] as? Bool, true)
     XCTAssertEqual(query[kSecReturnData as String] as? Bool, false)
-    XCTAssertNil(query[kSecUseAuthenticationContext as String])
-    let authenticationUI = try XCTUnwrap(query[kSecUseAuthenticationUI as String])
-    XCTAssertTrue(CFEqual(authenticationUI as CFTypeRef, kSecUseAuthenticationUIFail))
+    XCTAssertEqual(query[kSecUseDataProtectionKeychain as String] as? Bool, true)
+    XCTAssertEqual(
+      query[kSecAttrAccessGroup as String] as? String,
+      ArkDeckHelperIdentity.keychainAccessGroup)
+    let context = try XCTUnwrap(
+      query[kSecUseAuthenticationContext as String] as? LAContext)
+    XCTAssertTrue(context.interactionNotAllowed)
+    XCTAssertNil(query[kSecUseAuthenticationUI as String])
   }
 
-  func testExistingKeychainSecretUpdateDoesNotChurnACLIdentity() throws {
+  func testExistingKeychainSecretUpdateDoesNotChurnAccessGroupIdentity() throws {
     let value = Data("replacement".utf8)
     let update = LoginKeychainSigningSecretStore.existingItemValueUpdate(value)
     XCTAssertEqual(update.count, 1)
@@ -52,26 +55,28 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertNil(update[kSecAttrAccess as String])
   }
 
-  func testTrustedApplicationFingerprintChangesWhenDaemonBytesChange() throws {
+  func testDaemonFingerprintChangesWhenDaemonBytesChange() throws {
     let opaqueIdentity = Data("same-designated-application".utf8)
     let firstExecutable = Data(SHA256.hash(data: Data("daemon-v1".utf8)))
     let secondExecutable = Data(SHA256.hash(data: Data("daemon-v2".utf8)))
 
-    let first = LoginKeychainSigningSecretStore.trustedApplicationFingerprint(
+    let first = LoginKeychainSigningSecretStore.daemonFingerprint(
       applicationIdentity: opaqueIdentity, executableSHA256: firstExecutable)
-    let repeated = LoginKeychainSigningSecretStore.trustedApplicationFingerprint(
+    let repeated = LoginKeychainSigningSecretStore.daemonFingerprint(
       applicationIdentity: opaqueIdentity, executableSHA256: firstExecutable)
-    let replacement = LoginKeychainSigningSecretStore.trustedApplicationFingerprint(
+    let replacement = LoginKeychainSigningSecretStore.daemonFingerprint(
       applicationIdentity: opaqueIdentity, executableSHA256: secondExecutable)
 
     XCTAssertEqual(first, repeated)
     XCTAssertNotEqual(
       first, replacement,
-      "an unchanged SecTrustedApplication identity must not hide rebuilt daemon bytes")
+      "an unchanged code-signing identity must not hide rebuilt daemon bytes")
     XCTAssertEqual(first.utf8.count, 64)
   }
 
-  func testSDKReleasePresetRebindsUpdatedDaemonWithoutReadingStaleACL() async throws {
+  func testSDKReleasePresetUpdatesDaemonReceiptWithoutReadingOrReplacingKeychainItem()
+    async throws
+  {
     let fixture = try makeSDKReleaseFixture(mode: "success")
     fixture.secrets.trustedDaemonIdentity = "stable-installed-daemon"
     let fixedNow = Date(timeIntervalSince1970: 1_786_406_400)
@@ -145,7 +150,7 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       "ordinary Runtime readiness must not accept an obsolete ACL schema")
 
     fixture.secrets.trustedDaemonIdentity = "replacement-installed-daemon"
-    try fixture.store.refreshTrustedApplicationAccess()
+    try fixture.store.refreshDaemonKeychainIdentity()
     let rebound = try fixture.store.loadValidated()
     let reboundAccount = try XCTUnwrap(rebound.secretEnvelopeAccount)
     XCTAssertNotEqual(reboundAccount, firstAccount)
@@ -309,16 +314,14 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertTrue(fixture.secrets.contains(account: envelopeAccount))
     XCTAssertFalse(fixture.secrets.contains(account: receipt.keystorePasswordAccount))
     XCTAssertFalse(fixture.secrets.contains(account: receipt.keyPasswordAccount))
-    try fixture.store.refreshTrustedApplicationAccess()
-    XCTAssertTrue(fixture.secrets.refreshedAccounts.isEmpty)
+    try fixture.store.refreshDaemonKeychainIdentity()
     XCTAssertEqual(fixture.secrets.secretReadCount, 0)
     fixture.secrets.trustedDaemonIdentity = "stable-daemon-v2"
-    try fixture.store.refreshTrustedApplicationAccess()
+    try fixture.store.refreshDaemonKeychainIdentity()
     let rebound = try fixture.store.loadValidated()
-    XCTAssertNotEqual(rebound.secretEnvelopeAccount, envelopeAccount)
-    XCTAssertTrue(rebound.legacyPasswordAccounts?.contains(envelopeAccount) == true)
-    XCTAssertTrue(fixture.secrets.refreshedAccounts.isEmpty)
-    XCTAssertEqual(fixture.secrets.secretReadCount, 1)
+    XCTAssertEqual(rebound.secretEnvelopeAccount, envelopeAccount)
+    XCTAssertFalse(rebound.legacyPasswordAccounts?.contains(envelopeAccount) == true)
+    XCTAssertEqual(fixture.secrets.secretReadCount, 0)
     XCTAssertEqual(rebound.trustedDaemonApplicationSHA256, "stable-daemon-v2")
     var reboundPair = try fixture.store.secretPair(for: rebound)
     XCTAssertEqual(reboundPair.keystore, Data("keystore-secret".utf8))
@@ -472,8 +475,7 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertTrue(migratedStatus.ready, migratedStatus.diagnostics.joined(separator: " | "))
     XCTAssertTrue(migratedStatus.keystorePasswordPresent)
     XCTAssertTrue(migratedStatus.keyPasswordPresent)
-    try store.refreshTrustedApplicationAccess()
-    XCTAssertTrue(secrets.refreshedAccounts.isEmpty)
+    try store.refreshDaemonKeychainIdentity()
     XCTAssertEqual(try store.loadValidated().secretEnvelopeAccount, envelopeAccount)
 
     try RuntimeCLI.runSigning(
@@ -511,8 +513,8 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
         "--json",
       ], store: store)
     let reboundReceipt = try store.loadValidated()
-    XCTAssertNotEqual(reboundReceipt.secretEnvelopeAccount, envelopeAccount)
-    XCTAssertTrue(reboundReceipt.legacyPasswordAccounts?.contains(envelopeAccount) == true)
+    XCTAssertEqual(reboundReceipt.secretEnvelopeAccount, envelopeAccount)
+    XCTAssertFalse(reboundReceipt.legacyPasswordAccounts?.contains(envelopeAccount) == true)
     XCTAssertEqual(
       reboundReceipt.trustedDaemonApplicationSHA256, "installed-daemon-v2")
 
@@ -1367,11 +1369,9 @@ private final class MemorySigningSecretStore: OpenHarmonySigningSecretStoring,
 {
   private let lock = NSLock()
   private var values: [String: Data] = [:]
-  private var refreshed: [String] = []
   private var reads = 0
   var trustedDaemonIdentity: String?
 
-  var refreshedAccounts: [String] { lock.withLock { refreshed } }
   var secretReadCount: Int { lock.withLock { reads } }
 
   func set(_ data: Data, account: String) throws {
@@ -1390,10 +1390,6 @@ private final class MemorySigningSecretStore: OpenHarmonySigningSecretStoring,
 
   func contains(account: String) -> Bool {
     lock.withLock { values[account] != nil }
-  }
-
-  func refreshTrustedApplicationAccess(account: String) throws {
-    lock.withLock { refreshed.append(account) }
   }
 
   func trustedDaemonApplicationSHA256() throws -> String? {

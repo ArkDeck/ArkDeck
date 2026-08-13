@@ -93,7 +93,7 @@ enum RuntimeCLI {
         "--harness-cli", "--harness-cli-timeout-seconds",
       ])
       let previousStatus = subcommand == "update" ? try? service.status() : nil
-      let daemonPath = options.value("--daemon") ?? defaultAgentDaemonExecutablePath()
+      let daemonBundlePath = options.value("--daemon") ?? defaultAgentDaemonBundlePath()
       let configuredHDC: String?
       if let supplied = options.value("--hdc") {
         configuredHDC = supplied
@@ -107,10 +107,10 @@ enum RuntimeCLI {
           exitCode: EX_USAGE,
           message: "agentd \(subcommand) requires --hdc with an absolute executable path")
       }
-      guard daemonPath.hasPrefix("/") else {
+      guard daemonBundlePath.hasPrefix("/") else {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "agentd \(subcommand) requires an absolute arkdeck-agentd path")
+          message: "agentd \(subcommand) requires an absolute ArkDeckAgent.app path")
       }
       let workspaceProject =
         options.value("--workspace-project") ?? previousStatus?.workspaceProjectPath
@@ -204,7 +204,7 @@ enum RuntimeCLI {
         }
       }
       let receipt = try service.install(
-        daemonSource: URL(fileURLWithPath: daemonPath),
+        daemonBundleSource: URL(fileURLWithPath: daemonBundlePath, isDirectory: true),
         hdcExecutable: URL(fileURLWithPath: hdcPath), workspace: workspace,
         harnessSensitiveEvidence: harnessSensitiveEvidence,
         harnessModel: harnessModel,
@@ -330,7 +330,7 @@ enum RuntimeCLI {
     // official public password, while private presets read the old envelope
     // only when an actual daemon-identity/access-schema migration is required.
     guard FileManager.default.fileExists(atPath: store.receiptPath) else { return }
-    try store.refreshTrustedApplicationAccess()
+    try store.refreshDaemonKeychainIdentity()
   }
 
   /// Installs the single published OpenHarmony signing preset. Passwords are
@@ -649,10 +649,18 @@ enum RuntimeCLI {
       try exactHexField("storePassword"), try exactHexField("keyPassword"), storeFile)
   }
 
-  private static func defaultAgentDaemonExecutablePath() -> String {
-    guard let executable = Bundle.main.executableURL else { return "arkdeck-agentd" }
-    return executable.deletingLastPathComponent()
-      .appendingPathComponent("arkdeck-agentd").path
+  private static func defaultAgentDaemonBundlePath() -> String {
+    if Bundle.main.bundleURL.pathExtension == "app" {
+      return Bundle.main.bundleURL.appendingPathComponent(
+        "Contents/Helpers/\(ArkDeckHelperIdentity.daemonBundleName)", isDirectory: true
+      ).path
+    }
+    guard let executable = Bundle.main.executableURL else {
+      return ArkDeckHelperIdentity.daemonBundleName
+    }
+    return executable.deletingLastPathComponent().appendingPathComponent(
+      ArkDeckHelperIdentity.daemonBundleName, isDirectory: true
+    ).path
   }
 
   private static func encodedJSON<T: Encodable>(_ value: T) throws -> JSONValue {
