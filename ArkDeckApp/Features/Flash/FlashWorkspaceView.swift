@@ -3,6 +3,34 @@ import ArkDeckWorkflows
 import SwiftUI
 import UniformTypeIdentifiers
 
+private final class FlashImageArchiveOpenPanelDelegate: NSObject, NSOpenSavePanelDelegate {
+  func panel(_ sender: Any, shouldEnable url: URL) -> Bool {
+    if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+      return true
+    }
+    return FlashImageArchiveSelectionPolicy.allows(url)
+  }
+}
+
+@MainActor
+private enum FlashImageArchiveOpenPanel {
+  static func choose() -> URL? {
+    let panel = NSOpenPanel()
+    let exactFilenameDelegate = FlashImageArchiveOpenPanelDelegate()
+    panel.delegate = exactFilenameDelegate
+    panel.allowedContentTypes = [
+      .gzip,
+      .zip,
+      UTType(filenameExtension: "7z") ?? UTType(importedAs: "org.7-zip.7-zip-archive"),
+    ]
+    panel.allowsOtherFileTypes = false
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowsMultipleSelection = false
+    return panel.runModal() == .OK ? panel.url : nil
+  }
+}
+
 private struct FlashWorkspaceSurface<Content: View>: View {
   @ViewBuilder let content: Content
 
@@ -72,7 +100,6 @@ struct FlashWorkspaceView: View {
   let isRuntimeHistoryRefreshing: Bool
   let onRefreshRuntimeHistory: () -> Void
   let onOpenHistory: () -> Void
-  @State private var isImporterPresented = false
   @State private var isDetailsExpanded = false
 
   var body: some View {
@@ -99,21 +126,6 @@ struct FlashWorkspaceView: View {
         .accessibilityLabel(flashText("flash.action.refresh"))
         .accessibilityIdentifier("flash.refresh")
         .disabled(model.isRefreshing || model.isPreparingPlan || isRuntimeHistoryRefreshing)
-      }
-    }
-    .fileImporter(
-      isPresented: $isImporterPresented,
-      allowedContentTypes: [.gzip, .data],
-      allowsMultipleSelection: false
-    ) { result in
-      switch result {
-      case .success(let urls):
-        if let url = urls.first {
-          model.selectArchive(url)
-        } else {
-          model.rejectArchiveSelection()
-        }
-      case .failure: model.rejectArchiveSelection()
       }
     }
     .task(id: model.isSubmitting) {
@@ -359,14 +371,18 @@ struct FlashWorkspaceView: View {
       Spacer(minLength: 12)
       if model.selectedArchiveURL == nil {
         Button(flashText("flash.workspace.image.choose")) {
-          isImporterPresented = true
+          if let url = FlashImageArchiveOpenPanel.choose() {
+            model.selectArchive(url)
+          }
         }
         .buttonStyle(.borderedProminent)
         .disabled(model.isPreparingPlan)
         .accessibilityIdentifier("flash.image.choose")
       } else {
         Button(flashText("flash.workspace.image.change")) {
-          isImporterPresented = true
+          if let url = FlashImageArchiveOpenPanel.choose() {
+            model.selectArchive(url)
+          }
         }
         .buttonStyle(.bordered)
         .disabled(model.isPreparingPlan)
@@ -1218,6 +1234,7 @@ struct FlashWorkspaceView: View {
   private func planFailureKey(_ code: FlashPlanFailureCode) -> String {
     switch code {
     case .fileAccessDenied: "flash.error.fileAccess"
+    case .unsupportedArchiveFormat: "flash.error.format"
     case .unreadableArchive: "flash.error.unreadable"
     case .invalidArchive: "flash.error.invalid"
     case .unsupportedBundle: "flash.error.unsupported"
@@ -1416,14 +1433,16 @@ final class FlashWorkspaceViewModel: ObservableObject {
   }
 
   func selectArchive(_ url: URL) {
+    guard FlashImageArchiveSelectionPolicy.allows(url) else {
+      selectedArchiveURL = nil
+      invalidatePlan()
+      planFailureCode = .unsupportedArchiveFormat
+      planFailureDetail = nil
+      return
+    }
     selectedArchiveURL = url
     invalidatePlan()
     preparePlan()
-  }
-
-  func rejectArchiveSelection() {
-    planFailureCode = .fileAccessDenied
-    planFailureDetail = nil
   }
 
   func preparePlan() {
