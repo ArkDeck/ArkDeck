@@ -924,12 +924,13 @@ final class AgentDaemonContractTests: XCTestCase {
       at: stateDirectory, withIntermediateDirectories: true)
     let payloadBytes = 4 * 1024 * 1024
     let identifier = "stub-response-id"
-    var response = try JSONEncoder().encode(
+    var encodedResponse = try JSONEncoder().encode(
       StubResponse(
         id: identifier, ok: true,
         result: .object(["padding": .string(String(repeating: "q", count: payloadBytes))]),
         error: nil))
-    response.append(0x0A)
+    encodedResponse.append(0x0A)
+    let response = encodedResponse
 
     let listenerFD = socket(AF_UNIX, SOCK_STREAM, 0)
     XCTAssertGreaterThanOrEqual(listenerFD, 0)
@@ -996,6 +997,19 @@ final class AgentDaemonContractTests: XCTestCase {
     let error: AgentWireProtocol.WireError?
   }
 
+  private final class LockedAgentResponses: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [JSONValue?] = [nil, nil]
+
+    func store(_ value: JSONValue?, at index: Int) {
+      lock.withLock { storage[index] = value }
+    }
+
+    var values: [JSONValue?] {
+      lock.withLock { storage }
+    }
+  }
+
   // MARK: - UDS integration
 
   func testTwoConcurrentClientsShareOneDaemon() throws {
@@ -1005,20 +1019,17 @@ final class AgentDaemonContractTests: XCTestCase {
     let clientB = AgentClient(socketPath: server.socketURL.path)
 
     let group = DispatchGroup()
-    var results: [JSONValue?] = [nil, nil]
-    let lock = NSLock()
+    let results = LockedAgentResponses()
     for (index, client) in [clientA, clientB].enumerated() {
       group.enter()
       DispatchQueue.global().async {
         let value = try? client.request(method: "health")
-        lock.lock()
-        results[index] = value
-        lock.unlock()
+        results.store(value, at: index)
         group.leave()
       }
     }
     XCTAssertEqual(group.wait(timeout: .now() + 15), .success)
-    for value in results {
+    for value in results.values {
       guard case .object(let fields)? = value else {
         return XCTFail("both clients must get a health object")
       }

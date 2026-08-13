@@ -550,7 +550,7 @@ final class HDCServerSupervisorContractTests: XCTestCase {
       )
 
       let stateAfter = await supervisor.state(for: HDCServerFixtures.sharedEndpoint)
-      let auditEvents = await audit.events()
+      let auditEvents = audit.events()
       XCTAssertEqual(stateAfter, stateBefore)
       XCTAssertFalse(
         auditEvents.contains { event in
@@ -651,7 +651,7 @@ final class HDCServerSupervisorContractTests: XCTestCase {
     )
     let dispatchedSteps = await executor.steps()
     XCTAssertTrue(dispatchedSteps.isEmpty)
-    let auditEvents = await audit.events()
+    let auditEvents = audit.events()
     XCTAssertEqual(auditEvents.count, 2, "blocked dispatch must not write lifecycle intent/outcome")
   }
 
@@ -800,7 +800,7 @@ final class HDCServerSupervisorContractTests: XCTestCase {
     XCTAssertEqual(broadcast.outcome, .succeeded(resultingGeneration: 21))
     XCTAssertFalse(broadcast.requiresReconcile)
 
-    let auditEvents = await audit.events()
+    let auditEvents = audit.events()
     XCTAssertEqual(auditEvents.count, 5)
     guard case .impactPreview(let auditedPreview) = auditEvents[0],
       case .confirmation(let auditedConfirmation) = auditEvents[1],

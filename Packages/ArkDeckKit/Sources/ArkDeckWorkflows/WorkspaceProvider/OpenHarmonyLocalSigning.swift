@@ -11,16 +11,16 @@ package enum OpenHarmonyLocalSigning {
   package static let defaultPresetID = "openharmony-release@1"
   package static let defaultProjectRef = "demo-app"
   static let keychainService = "dev.arkdeck.openharmony-local-signing"
-  /// Bumps only when ArkDeck changes how the Keychain item binds the
-  /// interactive maintainer CLI and the installed LaunchAgent daemon. A
-  /// missing/older value is forward-readable, but is never silently reused:
-  /// the next explicit install creates one new ACL-bearing envelope.
-  static let keychainAccessSchema = "trusted-applications-v3"
+  /// Both production helpers carry this access group in an Apple-authorized
+  /// provisioning profile. The Data Protection Keychain uses that signed
+  /// identity rather than the deprecated per-executable `SecAccess` ACL.
+  static let keychainAccessGroup = ArkDeckHelperIdentity.keychainAccessGroup
+  static let keychainAccessSchema = "data-protection-access-group-v1"
 
   /// Public password shipped with the official OpenHarmony SDK release
-  /// keystore. Runtime still reads it from Keychain; maintenance may use this
-  /// known value to bind a fresh envelope to a replaced daemon without asking
-  /// the user to authorize an obsolete per-binary ACL.
+  /// keystore. Runtime verifies the Data Protection Keychain envelope as the
+  /// reversible installation fact; maintenance may recreate that envelope
+  /// without asking the user to authorize an obsolete per-binary ACL.
   static func publicSDKReleasePassword() -> Data {
     Data([49, 50, 51, 52, 53, 54])
   }
@@ -32,7 +32,9 @@ package enum OpenHarmonyLocalSigning {
 
   package static func defaultAgentDaemonURL() -> URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent("ArkDeck/bin/arkdeck-agentd")
+      .appendingPathComponent(
+        "ArkDeck/Helpers/\(ArkDeckHelperIdentity.daemonBundleName)/Contents/MacOS/"
+          + ArkDeckHelperIdentity.daemonExecutableName)
   }
 
 }
@@ -211,14 +213,18 @@ private struct OpenHarmonySigningSecretEnvelope: Codable {
 package protocol OpenHarmonySigningSecretStoring: Sendable {
   func set(_ data: Data, account: String) throws
   func read(account: String) throws -> Data
+  func readLegacy(account: String) throws -> Data
   func contains(account: String) -> Bool
-  func refreshTrustedApplicationAccess(account: String) throws
   func trustedDaemonApplicationSHA256() throws -> String?
   @discardableResult func remove(account: String) throws -> Bool
+  @discardableResult func removeLegacy(account: String) throws -> Bool
 }
 
 extension OpenHarmonySigningSecretStoring {
   package func trustedDaemonApplicationSHA256() throws -> String? { nil }
+  package func readLegacy(account: String) throws -> Data { try read(account: account) }
+  @discardableResult
+  package func removeLegacy(account: String) throws -> Bool { try remove(account: account) }
 }
 
 package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
@@ -234,7 +240,7 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   }
 
   public func set(_ data: Data, account: String) throws {
-    let identity = query(account: account)
+    let identity = query(account: account, dataProtection: true)
     let update = SecItemUpdate(
       identity as CFDictionary,
       Self.existingItemValueUpdate(data) as CFDictionary)
@@ -244,7 +250,7 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
     }
     var add = identity
     add[kSecValueData as String] = data
-    add[kSecAttrAccess as String] = try trustedApplicationAccess()
+    add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
     let status = SecItemAdd(add as CFDictionary, nil)
     guard status == errSecSuccess else {
       throw OpenHarmonySigningError.secretUnavailable("Keychain add status \(status)")
@@ -259,7 +265,15 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   }
 
   public func read(account: String) throws -> Data {
-    var request = query(account: account)
+    try read(account: account, dataProtection: true)
+  }
+
+  package func readLegacy(account: String) throws -> Data {
+    try read(account: account, dataProtection: false)
+  }
+
+  private func read(account: String, dataProtection: Bool) throws -> Data {
+    var request = query(account: account, dataProtection: dataProtection)
     request[kSecReturnData as String] = true
     request[kSecMatchLimit as String] = kSecMatchLimitOne
     if !allowsUserInteraction {
@@ -277,15 +291,13 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   }
 
   static func nonInteractiveReadOptions() -> [String: Any] {
-    // A LaunchAgent has no UI contract. `LAContext.interactionNotAllowed` is
-    // the current API, while the explicit Security UI policy is also needed
-    // by the legacy macOS Keychain ACL path used by `kSecAttrAccess`. Without
-    // the latter, securityd can still wait for an invisible confirmation.
+    // A LaunchAgent has no UI contract. macOS 26 uses the authentication
+    // context as the single current non-interactive policy; the deprecated
+    // kSecUseAuthenticationUIFail option is intentionally absent.
     let context = LAContext()
     context.interactionNotAllowed = true
     return [
-      kSecUseAuthenticationContext as String: context,
-      kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
+      kSecUseAuthenticationContext as String: context
     ]
   }
 
@@ -304,61 +316,66 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   }
 
   static func presenceQuery(account: String) -> [String: Any] {
-    [
+    var request: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: OpenHarmonyLocalSigning.keychainService,
       kSecAttrAccount as String: account,
+      kSecAttrAccessGroup as String: OpenHarmonyLocalSigning.keychainAccessGroup,
+      kSecUseDataProtectionKeychain as String: true,
       kSecReturnAttributes as String: true,
       kSecReturnData as String: false,
       kSecMatchLimit as String: kSecMatchLimitOne,
-      kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
     ]
-  }
-
-  package func refreshTrustedApplicationAccess(account: String) throws {
-    let status = SecItemUpdate(
-      query(account: account) as CFDictionary,
-      [kSecAttrAccess as String: try trustedApplicationAccess()] as CFDictionary)
-    guard status == errSecSuccess else {
-      throw OpenHarmonySigningError.secretUnavailable(
-        "Keychain trusted-application update status \(status)")
-    }
+    request.merge(nonInteractiveReadOptions()) { _, replacement in replacement }
+    return request
   }
 
   package func trustedDaemonApplicationSHA256() throws -> String? {
-    let daemonApplication = try trustedApplications().daemon
+    let daemonURL = try validatedDaemonURL()
     var staticCode: SecStaticCode?
     let createStatus = SecStaticCodeCreateWithPath(
-      agentDaemonURL as CFURL, SecCSFlags(), &staticCode)
+      daemonURL as CFURL, SecCSFlags(), &staticCode)
     guard createStatus == errSecSuccess, let staticCode else {
       throw OpenHarmonySigningError.secretUnavailable(
         "could not inspect arkdeck-agentd signing identity (status \(createStatus))")
     }
-    let validityStatus = SecStaticCodeCheckValidity(staticCode, SecCSFlags(), nil)
+    var staticRequirement: SecRequirement?
+    let requirementStatus = SecRequirementCreateWithString(
+      ArkDeckHelperIdentity.daemonCodeRequirement as CFString,
+      SecCSFlags(), &staticRequirement)
+    guard requirementStatus == errSecSuccess, let staticRequirement else {
+      throw OpenHarmonySigningError.secretUnavailable(
+        "could not construct the ArkDeck daemon code requirement (status \(requirementStatus))")
+    }
+    let validityStatus = SecStaticCodeCheckValidity(
+      staticCode,
+      SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures),
+      staticRequirement)
     guard validityStatus == errSecSuccess else {
       throw OpenHarmonySigningError.secretUnavailable(
         "arkdeck-agentd code signature is invalid (status \(validityStatus))")
     }
-    var applicationIdentity: CFData?
-    let identityStatus = SecTrustedApplicationCopyData(
-      daemonApplication, &applicationIdentity)
-    guard identityStatus == errSecSuccess, let applicationIdentity else {
+    var rawInformation: CFDictionary?
+    let identityStatus = SecCodeCopySigningInformation(
+      staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &rawInformation)
+    guard identityStatus == errSecSuccess,
+      let information = rawInformation as? [String: Any],
+      let applicationIdentity = information[kSecCodeInfoUnique as String] as? Data,
+      !applicationIdentity.isEmpty
+    else {
       throw OpenHarmonySigningError.secretUnavailable(
-        "could not read arkdeck-agentd Keychain ACL identity (status \(identityStatus))")
+        "could not read arkdeck-agentd code identity (status \(identityStatus))")
     }
-    // `SecTrustedApplicationCopyData` is opaque and may remain stable across
-    // ad-hoc rebuilds that share a code-signing identity. The ACL still has
-    // to be recreated for the exact installed daemon bytes: otherwise a
-    // replacement can be mistaken for the previously authorised executable
-    // and the first headless read waits on SecurityAgent. Bind both facts in
-    // one domain-separated receipt fingerprint.
-    let executableSHA256 = try Self.streamedSHA256(agentDaemonURL)
-    return Self.trustedApplicationFingerprint(
-      applicationIdentity: applicationIdentity as Data,
+    // kSecCodeInfoUnique is the current Security framework identity for exact
+    // static code. Bind it to independently streamed executable bytes so the
+    // receipt remains fail-closed even if code-signing hash algorithms evolve.
+    let executableSHA256 = try Self.streamedSHA256(daemonURL)
+    return Self.daemonFingerprint(
+      applicationIdentity: applicationIdentity,
       executableSHA256: executableSHA256)
   }
 
-  static func trustedApplicationFingerprint(
+  static func daemonFingerprint(
     applicationIdentity: Data,
     executableSHA256: Data
   ) -> String {
@@ -382,7 +399,16 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
 
   @discardableResult
   public func remove(account: String) throws -> Bool {
-    let status = SecItemDelete(query(account: account) as CFDictionary)
+    try remove(account: account, dataProtection: true)
+  }
+
+  package func removeLegacy(account: String) throws -> Bool {
+    try remove(account: account, dataProtection: false)
+  }
+
+  private func remove(account: String, dataProtection: Bool) throws -> Bool {
+    let status = SecItemDelete(
+      query(account: account, dataProtection: dataProtection) as CFDictionary)
     if status == errSecItemNotFound { return false }
     guard status == errSecSuccess else {
       throw OpenHarmonySigningError.secretUnavailable("Keychain delete status \(status)")
@@ -390,31 +416,20 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
     return true
   }
 
-  private func query(account: String) -> [String: Any] {
-    [
+  private func query(account: String, dataProtection: Bool) -> [String: Any] {
+    var query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: OpenHarmonyLocalSigning.keychainService,
       kSecAttrAccount as String: account,
     ]
-  }
-
-  private func trustedApplicationAccess() throws -> SecAccess {
-    let applications = try trustedApplications()
-    var keychainAccess: SecAccess?
-    let accessStatus = SecAccessCreate(
-      "ArkDeck OpenHarmony local signing" as CFString,
-      [applications.current, applications.daemon] as CFArray,
-      &keychainAccess)
-    guard accessStatus == errSecSuccess, let keychainAccess else {
-      throw OpenHarmonySigningError.secretUnavailable(
-        "could not create the signing Keychain ACL (status \(accessStatus))")
+    if dataProtection {
+      query[kSecAttrAccessGroup as String] = OpenHarmonyLocalSigning.keychainAccessGroup
+      query[kSecUseDataProtectionKeychain as String] = true
     }
-    return keychainAccess
+    return query
   }
 
-  private func trustedApplications() throws -> (
-    current: SecTrustedApplication, daemon: SecTrustedApplication
-  ) {
+  private func validatedDaemonURL() throws -> URL {
     let daemonPath = agentDaemonURL.path
     var info = stat()
     guard agentDaemonURL.isFileURL, daemonPath.hasPrefix("/"),
@@ -425,24 +440,9 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
       info.st_mode & 0o077 == 0, access(daemonPath, X_OK) == 0
     else {
       throw OpenHarmonySigningError.unsafeFile(
-        "installed arkdeck-agentd is absent or unsafe for Keychain ACL")
+        "installed arkdeck-agentd helper is absent or unsafe")
     }
-
-    var currentApplication: SecTrustedApplication?
-    let currentStatus = SecTrustedApplicationCreateFromPath(nil, &currentApplication)
-    guard currentStatus == errSecSuccess, let currentApplication else {
-      throw OpenHarmonySigningError.secretUnavailable(
-        "could not identify the ArkDeck CLI for Keychain ACL (status \(currentStatus))")
-    }
-    var daemonApplication: SecTrustedApplication?
-    let daemonStatus = daemonPath.withCString {
-      SecTrustedApplicationCreateFromPath($0, &daemonApplication)
-    }
-    guard daemonStatus == errSecSuccess, let daemonApplication else {
-      throw OpenHarmonySigningError.secretUnavailable(
-        "could not identify arkdeck-agentd for Keychain ACL (status \(daemonStatus))")
-    }
-    return (currentApplication, daemonApplication)
+    return agentDaemonURL
   }
 }
 
@@ -523,8 +523,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       }
       // There is exactly one published preset. Keep its Keychain account
       // independent of the selected workspace, and store both passwords in
-      // one envelope so install/update has one ACL boundary rather than one
-      // SecurityAgent authorization per password.
+      // one Data Protection Keychain envelope shared only by the provisioned
+      // ArkDeck CLI and LaunchAgent access group.
       let accountPrefix = configuration.presetID
       let envelopePrefix = accountPrefix + "|secret-envelope-"
       let previousReceipt = try? JSONDecoder().decode(
@@ -533,7 +533,6 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       let daemonIdentity = try secrets.trustedDaemonApplicationSHA256()
       let reusableEnvelope = previousReceipt.flatMap { previous -> String? in
         guard previous.presetID == configuration.presetID,
-          previous.trustedDaemonApplicationSHA256 == daemonIdentity,
           previous.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema,
           let account = previous.secretEnvelopeAccount,
           account.hasPrefix(envelopePrefix),
@@ -704,24 +703,22 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       let migratedKeyAlias = keyAlias ?? receipt.keyAlias
       let daemonIdentity = try secrets.trustedDaemonApplicationSHA256()
       if let existing = receipt.secretEnvelopeAccount,
-        receipt.trustedDaemonApplicationSHA256 == daemonIdentity,
-        receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema
+        receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema,
+        secrets.contains(account: existing)
       {
-        // Reuse the existing ACL-bearing item, but never treat its value as
-        // immutable. A corrected DevEco source must be able to replace stale
-        // credentials without creating another Keychain authorization
-        // boundary. Secret-store updates are atomic and intentionally leave
-        // the item's trusted-application ACL unchanged.
+        // The access group is stable across signed helper updates, so a
+        // corrected DevEco source can update the existing protected value
+        // without replacing the item or invoking SecurityAgent.
         var replacement = try Self.encodeEnvelope(
           keystorePassword: keystorePassword, keyPassword: keyPassword)
         defer { replacement.resetBytes(in: 0..<replacement.count) }
-        if migratedKeyAlias == receipt.keyAlias {
+        var previous = try secrets.read(account: existing)
+        defer { previous.resetBytes(in: 0..<previous.count) }
+        do {
           try secrets.set(replacement, account: existing)
-        } else {
-          var previous = try secrets.read(account: existing)
-          defer { previous.resetBytes(in: 0..<previous.count) }
-          do {
-            try secrets.set(replacement, account: existing)
+          if migratedKeyAlias != receipt.keyAlias
+            || receipt.trustedDaemonApplicationSHA256 != daemonIdentity
+          {
             try write(
               Self.copyReceipt(
                 receipt, secretEnvelopeAccount: existing,
@@ -729,15 +726,15 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
                 trustedDaemonApplicationSHA256: daemonIdentity,
                 keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
                 keyAlias: migratedKeyAlias))
-          } catch {
-            do {
-              try secrets.set(previous, account: existing)
-            } catch {
-              throw OpenHarmonySigningError.secretUnavailable(
-                "signing alias migration failed and Keychain rollback was incomplete")
-            }
-            throw error
           }
+        } catch {
+          do {
+            try secrets.set(previous, account: existing)
+          } catch {
+            throw OpenHarmonySigningError.secretUnavailable(
+              "signing metadata migration failed and Keychain rollback was incomplete")
+          }
+          throw error
         }
         return OpenHarmonySigningEnvelopeMigration(
           presetID: receipt.presetID, migrated: false,
@@ -776,35 +773,42 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
   }
 
-  /// Migrates existing secret bytes into one fresh Keychain envelope bound to
-  /// the currently installed daemon identity. Updating an existing legacy
-  /// `SecAccess` can make macOS authorize each ACL entry separately (several
-  /// password windows for one maintenance action). A new envelope has one ACL
-  /// creation boundary; the old item remains a receipt-tracked legacy item so
-  /// a failed receipt write is reversible and removal still cleans it up.
-  package func refreshTrustedApplicationAccess(
+  /// Migrates an older file-based Keychain envelope into the Data Protection
+  /// Keychain. Once the receipt is current, a daemon update changes only the
+  /// independently verified executable identity in the receipt: access-group
+  /// authorization remains stable and the secret is neither read nor copied.
+  package func refreshDaemonKeychainIdentity(
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID
   ) throws {
     try lock.withLock {
       let receipt = try loadValidatedUnlocked(
         presetID: presetID, requireSecrets: false, allowLegacyAccessSchema: true)
       let daemonIdentity = try secrets.trustedDaemonApplicationSHA256()
-      if receipt.trustedDaemonApplicationSHA256 == daemonIdentity,
-        receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema
-      {
+      if receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema {
+        guard let envelope = receipt.secretEnvelopeAccount,
+          secrets.contains(account: envelope)
+        else {
+          throw OpenHarmonySigningError.secretUnavailable(
+            "Data Protection Keychain envelope is absent")
+        }
+        guard receipt.trustedDaemonApplicationSHA256 != daemonIdentity else { return }
+        try write(
+          Self.copyReceipt(
+            receipt, secretEnvelopeAccount: envelope,
+            legacyPasswordAccounts: receipt.legacyPasswordAccounts,
+            trustedDaemonApplicationSHA256: daemonIdentity,
+            keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema))
         return
       }
       var pair: (keystore: Data, key: Data)
       if Self.isManagedSDKReleasePreset(receipt) {
-        // The SDK password is public and already used by the explicit SDK
-        // installer. Re-create the Keychain envelope for the new exact daemon
-        // identity without reading an obsolete ACL and triggering a password
-        // dialog. Private presets still take the guarded read path below.
+        // The SDK password is public, so migration does not need to ask the
+        // legacy file-based Keychain to decrypt its obsolete item.
         pair = (
           OpenHarmonyLocalSigning.publicSDKReleasePassword(),
           OpenHarmonyLocalSigning.publicSDKReleasePassword())
       } else {
-        pair = try secretPair(for: receipt)
+        pair = try legacySecretPair(for: receipt)
       }
       defer {
         pair.keystore.resetBytes(in: 0..<pair.keystore.count)
@@ -843,12 +847,9 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   ) throws -> (keystore: Data, key: Data) {
     if Self.isManagedSDKReleasePreset(receipt) {
       // This credential is published with the official SDK and therefore has
-      // no confidentiality value. Keep the receipt-tracked Keychain envelope
-      // as the reversible installation/configuration fact requested by the
-      // product, but do not decrypt it on the runtime hot path. Exact daemon
-      // bytes, receipt schema and item presence are still checked before any
-      // signer process can start. Private presets continue below and never use
-      // this public credential path.
+      // no confidentiality value. Keep the receipt-tracked Data Protection
+      // Keychain envelope as the reversible installation fact, but do not
+      // decrypt it on the Runtime hot path.
       guard receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema,
         let envelope = receipt.secretEnvelopeAccount,
         secrets.contains(account: envelope)
@@ -860,6 +861,10 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       return (
         OpenHarmonyLocalSigning.publicSDKReleasePassword(),
         OpenHarmonyLocalSigning.publicSDKReleasePassword())
+    }
+    guard receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema else {
+      throw OpenHarmonySigningError.secretUnavailable(
+        "signing secrets require Data Protection Keychain migration")
     }
     if let envelopeAccount = receipt.secretEnvelopeAccount {
       var encoded = try secrets.read(account: envelopeAccount)
@@ -879,6 +884,34 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     let keystore = try secrets.read(account: receipt.keystorePasswordAccount)
     do {
       return (keystore, try secrets.read(account: receipt.keyPasswordAccount))
+    } catch {
+      var mutable = keystore
+      mutable.resetBytes(in: 0..<mutable.count)
+      throw error
+    }
+  }
+
+  private func legacySecretPair(
+    for receipt: OpenHarmonySigningPresetReceipt
+  ) throws -> (keystore: Data, key: Data) {
+    if let envelopeAccount = receipt.secretEnvelopeAccount {
+      var encoded = try secrets.readLegacy(account: envelopeAccount)
+      defer { encoded.resetBytes(in: 0..<encoded.count) }
+      var envelope = try Self.decodeEnvelope(encoded)
+      defer {
+        envelope.keystorePassword.resetBytes(in: 0..<envelope.keystorePassword.count)
+        envelope.keyPassword.resetBytes(in: 0..<envelope.keyPassword.count)
+      }
+      try Self.validateSecret(envelope.keystorePassword)
+      try Self.validateSecret(envelope.keyPassword)
+      return (Data(envelope.keystorePassword), Data(envelope.keyPassword))
+    }
+    let keystore = try secrets.readLegacy(account: receipt.keystorePasswordAccount)
+    do {
+      return (
+        keystore,
+        try secrets.readLegacy(account: receipt.keyPasswordAccount)
+      )
     } catch {
       var mutable = keystore
       mutable.resetBytes(in: 0..<mutable.count)
@@ -952,8 +985,10 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       if let envelope = receipt?.secretEnvelopeAccount { accounts.append(envelope) }
       accounts.append(contentsOf: receipt?.legacyPasswordAccounts ?? [])
       var removedAccounts: Set<String> = []
-      for account in Set(accounts) where try secrets.remove(account: account) {
-        removedAccounts.insert(account)
+      for account in Set(accounts) {
+        let removedCurrent = try secrets.remove(account: account)
+        let removedLegacy = try secrets.removeLegacy(account: account)
+        if removedCurrent || removedLegacy { removedAccounts.insert(account) }
       }
       let removedEnvelope = receipt?.secretEnvelopeAccount.map {
         removedAccounts.contains($0)
@@ -1008,12 +1043,13 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     } catch {
       throw OpenHarmonySigningError.receiptUnavailable("\(error)")
     }
+    let legacyAccessSchemas: Set<String?> = [
+      nil, "trusted-applications-v2", "trusted-applications-v3",
+    ]
     guard receipt.schemaVersion == "arkdeck-openharmony-signing/v1",
       receipt.presetID == presetID,
-      receipt.keychainAccessSchema == nil
-        || receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema
-        || (allowLegacyAccessSchema
-          && receipt.keychainAccessSchema == "trusted-applications-v2")
+      receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema
+        || (allowLegacyAccessSchema && legacyAccessSchemas.contains(receipt.keychainAccessSchema))
     else {
       throw OpenHarmonySigningError.receiptUnavailable("schema or preset mismatch")
     }

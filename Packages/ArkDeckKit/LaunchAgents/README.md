@@ -10,9 +10,16 @@ HDC 执行路径。
    登录用户会话中完成；调试 HAP 还必须把当前设备 UDID 加入其签名 profile。刷入新系统后
    若包管理器报告 `9568423`，应重新完成设备授权并重新签名/构建 HAP。LaunchAgent 不绕过
    macOS、设备信任或应用签名授权。
-2. 构建 `arkdeck` 与 `arkdeck-agentd`，确认 HDC 的真实绝对路径。不要传目录、相对路径
-   或依赖 `PATH`。
-3. 从同一构建目录运行：
+2. 为 `com.arkdeck.cli` 和 `com.arkdeck.agentd` 准备同一 Team 的 Developer ID provisioning
+   profile；两份 profile 都必须授权 `8AQTYW5FKR.com.arkdeck.shared` Keychain access group。
+   将路径分别传入 `ARKDECK_CLI_PROVISIONING_PROFILE` 与
+   `ARKDECK_DAEMON_PROVISIONING_PROFILE`；先用 `xcrun notarytool store-credentials`
+   保存公证凭据，再把 profile 名称传入 `ARKDECK_NOTARY_KEYCHAIN_PROFILE`，运行
+   `Distribution/macOS/build-helpers.sh`。脚本会核对两份 profile 的 Team、application
+   identifier 和共享 Keychain group，生成带 hardened runtime 的 `ArkDeckCLI.app`，在
+   `Contents/Helpers` 内嵌、逐层签名 `ArkDeckAgent.app`，最后完成 notarization、staple 和
+   Gatekeeper assessment。未提供 Apple 授权的 profile 或公证凭据时不会产出发布 helper。
+3. 从已签名 CLI helper 运行：
 
    ```text
    arkdeck agentd install --hdc /absolute/path/to/hdc
@@ -20,8 +27,9 @@ HDC 执行路径。
    arkdeck doctor
    ```
 
-`install` 会验证并哈希 daemon/HDC，把 daemon 复制到
-`~/Library/Application Support/ArkDeck/bin/arkdeck-agentd`，生成
+`install` 会严格验证 helper bundle 的 Developer ID、Team、bundle ID、hardened runtime、
+embedded provisioning profile 和共享 Keychain entitlement，再哈希 daemon/HDC，把完整 daemon
+bundle 复制到 `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，生成
 `~/Library/LaunchAgents/com.arkdeck.agentd.plist`，再用 `gui/$UID` 启动服务。plist
 明确传入 `ARKDECK_HDC_PATH`；Runtime 在启动时固定 HDC 摘要，并在每次 spawn 前重新验证
 文件身份，缺失或漂移都会 fail closed。daemon 会用同一份 identity-bound HDC 在
@@ -30,7 +38,8 @@ UDS；因此不需要 DevEco Studio、Terminal 或另一个后台脚本托管 HD
 结束时，该子进程随 LaunchAgent 的进程组一起释放；ArkDeck 不修改系统级 HDC 或 `pmset`
 配置。
 
-指定另一份 daemon 可使用 `--daemon /absolute/path/to/arkdeck-agentd`。更新当前构建时运行：
+指定另一份已签名 daemon bundle 可使用
+`--daemon /absolute/path/to/ArkDeckAgent.app`。更新当前构建时运行：
 
 ```text
 arkdeck agentd update
@@ -86,13 +95,12 @@ ArkDeck 会复制并固定 SDK release keystore/profile material 的身份；SDK
 application leaf，安装器会从同一份已测量的 SDK profile certificate bundle 组装完整的
 root/application CA/application leaf 三证书链，避免 hapsigner 的 `11013004` 拒绝。SDK source
 保持不变，托管副本权限为 `0600`、目录为 `0700`。SDK 共享 keystore 的官方口令本身是公开值；
-ArkDeck 仍用登录 Keychain 单信封记录其可逆安装事实，但 Runtime 不再为该公开值解密 Keychain，
+ArkDeck 仍用 Data Protection Keychain 单信封记录其可逆安装事实，但 Runtime 不再为该公开值解密 Keychain，
 而是在校验信封存在、receipt schema 与精确 daemon 二进制身份后，通过无回显 PTY 交给
-hapsigner；它不进入 argv、环境、receipt 或日志。macOS 的 `SecTrustedApplication` ACL 绑定精确二进制身份，daemon 内容变化后旧 ACL 不能
-可靠复用。对这个 SDK 默认 preset，`agentd update` 会使用官方公开口令直接建立一个绑定新
-daemon 的单一新信封，不读取旧 ACL，因此正常更新无需密码弹框；旧信封保留在 receipt 的可清理
-列表中，便于失败回滚和卸载。相同二进制更新不改信封。登录 Keychain 被锁定时 Runtime fail
-closed 且禁止弹 UI。
+hapsigner；它不进入 argv、环境、receipt 或日志。CLI 与 daemon 通过 provisioning profile
+授权的同一 access group 访问该信封；daemon 更新只刷新独立的可执行文件身份收据，不读取或
+替换 Keychain item，因此正常更新无需密码弹框。登录 Keychain 被锁定时 Runtime fail closed
+且禁止弹 UI。
 
 已有自有证书/Provision profile 的安装仍可使用兼容入口。keystore 必须属于当前用户且权限为
 `0600`；两个密码只从真实 Terminal 的无回显 TTY prompt 输入，不接受 password flag、环境变量
@@ -113,36 +121,35 @@ arkdeck operation list --json
 
 DevEco Studio 写入 `build-profile.json5` 的 `storePassword`/`keyPassword` 可能是 76 字符的
 加密值。LaunchAgent 安装完成后，可让 ArkDeck 从受限的 build-profile 一次性迁移；它严格使用
-profile 自己的 `storeFile` 同级 `material/` 做认证解密，把两个明文合并进一个登录 Keychain
-信封，并把 ACL 绑定到最终安装位置的 daemon（不能传 SwiftPM build 软链）。该 `storeFile`
+profile 自己的 `storeFile` 同级 `material/` 做认证解密，把两个明文合并进一个 Data Protection
+Keychain 信封。该 `storeFile`
 必须存在、保持 owner-private，且内容身份与 ArkDeck preset 中已安装的 keystore 完全一致；
 缺失、陈旧或指向另一 keystore 的 profile 会在改写 Keychain 前 fail closed：
 
 ```text
 arkdeck signing migrate-deveco \
   --build-profile /absolute/project/build-profile.json5 \
-  --daemon "$HOME/Library/Application Support/ArkDeck/bin/arkdeck-agentd" \
+  --daemon "$HOME/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd" \
   --key-alias <actual-private-key-alias-if-profile-is-stale> \
   --json
 ```
 
 `--key-alias` 是可选的非秘密修复参数：仅当 DevEco profile 中的 alias 已陈旧、而实际
 PKCS#12 私钥 alias 已由只读诊断确认时提供。ArkDeck 会校验其闭合集合格式并原子更新 preset，
-复用已有 Keychain 信封与 ACL；错误 alias 仍会在签名时 fail closed 为 `keyAliasRejected`。
+复用已有 Keychain 信封与 access group；错误 alias 仍会在签名时 fail closed 为 `keyAliasRejected`。
 
 Runtime Job 此后不再读取 DevEco material，也禁止唤起 Keychain UI；Keychain 锁定或可信应用
-身份漂移会立即 fail closed。私有 signing preset 继续只使用 Keychain：daemon 精确二进制身份
-变化时，`agentd update` 需要把旧私有信封内容迁入一个绑定新身份的信封，这个维护边界最多可能
-要求一次 macOS Keychain 授权；status 和 Runtime Job 永不弹框。若旧版 ArkDeck 已把密文原样
-存入两项 Keychain，可用上述命令迁移为单信封；`signing normalize` 仅保留给同一
+身份漂移会立即 fail closed。私有 signing preset 继续只使用 Keychain。首次从旧版 file-based
+Keychain 升级时，`agentd update` 会在显式维护边界读取旧信封并迁入 Data Protection Keychain，
+最多可能要求一次 macOS Keychain 授权；之后 daemon 更新不再搬迁秘密。status 和 Runtime Job
+永不弹框。若旧版 ArkDeck 已把密文原样存入两项 Keychain，可用上述命令迁移为单信封；`signing normalize` 仅保留给同一
 keystore/material 布局的旧安装修复。两条命令都只报告迁移状态，不返回密码。
 
 登录 Keychain 通常随用户登录自动解锁；若私有 preset 迁移返回 Keychain `-60008`，只在自己的
 Terminal 执行一次 `security unlock-keychain "$HOME/Library/Keychains/login.keychain-db"`，不要把
 密码放进 argv、配置或日志。SDK 默认 preset 的 daemon 更新不读取旧信封；私有 preset 只有在
-精确 daemon 身份变化时才进入一次显式维护读取。Runtime/status 始终使用禁止 UI 的 Keychain
-查询。开发期每次重建都会改变 trusted-application 的加密身份；长期宿主应只通过
-`agentd update` 原子安装最终 daemon，不要让 build 目录二进制直接读取生产信封。
+旧式 access schema 存在时才进入一次显式维护读取。Runtime/status 始终使用禁止 UI 的
+Data Protection Keychain 查询。未包装、未 provision 的 SwiftPM build 二进制不能访问生产信封。
 
 `status` 显示非秘密路径、SHA-256、Keychain item 是否存在及漂移诊断，不返回也不解密密码，
 因此健康检查不会触发 Keychain 授权。私有 preset 只在真实签名 Job 的 signer 启动前执行一次

@@ -535,7 +535,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
       encoding: .utf8)
 
     for manifest in [package, baselinePackage] {
-      XCTAssertTrue(manifest.hasPrefix("// swift-tools-version: 6.2"))
+      XCTAssertTrue(manifest.hasPrefix("// swift-tools-version: 6.3"))
       XCTAssertTrue(manifest.contains("platforms: [.macOS(.v26)]"))
       XCTAssertFalse(manifest.contains(".macOS(.v14)"))
     }

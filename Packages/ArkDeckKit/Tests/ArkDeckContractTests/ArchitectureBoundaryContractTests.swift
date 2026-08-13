@@ -54,7 +54,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       "ArkDeckWorkflows", "ArkDeckAgentClient",
     ],
     "ArkDeckAgentClient": ["ArkDeckCore"],
-    "ArkDeckLaunchAgent": [],
+    "ArkDeckLaunchAgent": ["ArkDeckCore"],
     "ArkDeckAgentDaemon": ["ArkDeckCore", "ArkDeckHarness", "ArkDeckStorage", "ArkDeckWorkflows"],
     "ArkDeckCLI": [
       "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
@@ -81,7 +81,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
     ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
     ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
-    ("ArkDeckLaunchAgent", "LaunchAgents", []),
+    ("ArkDeckLaunchAgent", "LaunchAgents", ["ArkDeckCore"]),
     ("ArkDeckAgentDaemon", "Sources/ArkDeckAgentDaemon", []),
     ("ArkDeckCLI", "Sources/ArkDeckCLI", []),
     ("ArkDeckAgentDaemonMain", "Sources/ArkDeckAgentDaemonMain", []),
@@ -94,7 +94,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// makes a forbidden import a build error, so this test guards against the
   /// edge quietly returning in a later manifest edit.
   func testPackageManifestDependencyMatrix() throws {
-    let manifest = try String(contentsOf: packageRoot().appendingPathComponent("Package.swift"))
+    let manifest = try String(
+      contentsOf: packageRoot().appendingPathComponent("Package.swift"), encoding: .utf8)
     let targets = Self.parseTargets(manifest: manifest)
     XCTAssertFalse(targets.isEmpty, "no targets parsed from Package.swift")
     for (name, dependencies) in targets {
@@ -121,7 +122,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// back into the parent target and the parent silently regains the very
   /// imports the split removed.
   func testCompositionCarveOutsStayExcluded() throws {
-    let manifest = try String(contentsOf: packageRoot().appendingPathComponent("Package.swift"))
+    let manifest = try String(
+      contentsOf: packageRoot().appendingPathComponent("Package.swift"), encoding: .utf8)
     XCTAssertTrue(
       manifest.contains("exclude: [\"AgentComposition\"]"),
       "ArkDeckWorkflows must exclude AgentComposition/ (it is the ArkDeckAgentComposition target)")
@@ -428,7 +430,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   func testTheCampaignLaneDoesNotSelectAProfileByArchiveDigest() throws {
     let admitter = packageRoot()
       .appendingPathComponent("Sources/ArkDeckWorkflows/EvolutionCampaignEngineLaneAdmitter.swift")
-    let code = try String(contentsOf: admitter)
+    let code = try String(contentsOf: admitter, encoding: .utf8)
     XCTAssertFalse(
       code.contains("$0.archiveSHA256 == admission.plan.archiveSHA256"),
       "the campaign lane is matching the plan's archive against compiled-in builds again")
@@ -444,7 +446,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   func testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion() throws {
     let engine = packageRoot()
       .appendingPathComponent("Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
-    let code = try String(contentsOf: engine)
+    let code = try String(contentsOf: engine, encoding: .utf8)
     // Each construction runs to its closing paren before the next statement;
     // splitting on the constructor name is enough to isolate them.
     let constructions = code.components(separatedBy: "ProviderExecutionContext(").dropFirst()
@@ -465,7 +467,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   }
 
   private func arkdeckImports(of file: URL) throws -> Set<String> {
-    let code = try String(contentsOf: file)
+    let code = try String(contentsOf: file, encoding: .utf8)
     var result: Set<String> = []
     let pattern = "^\\s*(?:@testable\\s+|@_exported\\s+)?import\\s+([A-Za-z_][A-Za-z0-9_]*)"
     let regex = try NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
@@ -485,7 +487,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// purpose: a forbidden fragment inside a literal is exactly what several
   /// tests exist to catch.
   private func codeWithoutComments(of file: URL) throws -> String {
-    let raw = try String(contentsOf: file)
+    let raw = try String(contentsOf: file, encoding: .utf8)
     var lines: [String] = []
     var inBlockComment = false
     for line in raw.split(separator: "\n", omittingEmptySubsequences: false) {

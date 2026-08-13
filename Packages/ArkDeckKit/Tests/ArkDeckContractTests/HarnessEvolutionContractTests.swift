@@ -164,7 +164,8 @@ final class HarnessEvolutionContractTests: XCTestCase {
       to: URL(fileURLWithPath: isolated.projectRoot)
         .appendingPathComponent("Sources/App.txt"))
     XCTAssertEqual(
-      try String(contentsOf: sourceRoot.appendingPathComponent("Sources/App.txt")),
+      try String(
+        contentsOf: sourceRoot.appendingPathComponent("Sources/App.txt"), encoding: .utf8),
       "old\n")
 
     let provider = WorkspaceOperationsProvider(

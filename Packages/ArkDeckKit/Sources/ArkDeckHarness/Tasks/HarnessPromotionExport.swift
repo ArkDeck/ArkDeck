@@ -86,7 +86,7 @@ package enum HarnessPromotionExport {
           + "(sha256 \(candidate.diffDigest)) is not available to export")
     }
 
-    var files = [
+    let files = [
       HarnessPromotionExportFile(
         name: summaryFileName,
         contents: summaryMarkdown(
