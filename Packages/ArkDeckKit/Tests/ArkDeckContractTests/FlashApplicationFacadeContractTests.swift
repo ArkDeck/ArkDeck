@@ -14,7 +14,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       "dayu200-images.7Z",
     ] {
       XCTAssertTrue(
-        FlashImageArchiveSelectionPolicy.allows(URL(fileURLWithPath: "/tmp/\(filename)")),
+        FlashImageArchiveSelectionPolicy.allows(URL(filePath: "/tmp/\(filename)")),
         filename)
     }
 
@@ -26,7 +26,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       ".zip",
     ] {
       XCTAssertFalse(
-        FlashImageArchiveSelectionPolicy.allows(URL(fileURLWithPath: "/tmp/\(filename)")),
+        FlashImageArchiveSelectionPolicy.allows(URL(filePath: "/tmp/\(filename)")),
         filename)
     }
   }
@@ -386,13 +386,15 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     guard case .success(let observations) = decoded else {
       return XCTFail("matching Runtime prerequisite facts must decode")
     }
-    XCTAssertEqual(Set(observations.map(\.identifier)), Set(RockchipPrerequisiteIdentifier.allCases))
+    XCTAssertEqual(
+      Set(observations.map(\.identifier)), Set(RockchipPrerequisiteIdentifier.allCases))
 
     let wrongBinding = FlashTargetPresentation(
       id: target.id, bindingRevision: 5, toolVersion: target.toolVersion,
       adoptedAtUTC: target.adoptedAtUTC)
-    guard case .failure = FlashPrerequisiteResponseDecoding.observations(
-      .success(data), target: wrongBinding, profileReference: "dayu200")
+    guard
+      case .failure = FlashPrerequisiteResponseDecoding.observations(
+        .success(data), target: wrongBinding, profileReference: "dayu200")
     else { return XCTFail("stale binding facts must fail closed") }
   }
 

@@ -11,7 +11,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let board = RockchipFlashProfile.dayu200
     let first = ProviderResolvedInputArtifact(
       artifactID: "ART-flash",
-      fileURL: URL(fileURLWithPath: "/tmp/arkdeck-flash.imgs"),
+      fileURL: URL(filePath: "/tmp/arkdeck-flash.imgs"),
       sha256: board.archiveSHA256,
       byteCount: Int(board.archiveSizeBytes))
     var cache = RuntimeFlashArchiveProfileCache()
@@ -50,7 +50,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let board = RockchipFlashProfile.dayu200
     let artifact = ProviderResolvedInputArtifact(
       artifactID: "ART-invalid-flash",
-      fileURL: URL(fileURLWithPath: "/tmp/invalid-flash.imgs"),
+      fileURL: URL(filePath: "/tmp/invalid-flash.imgs"),
       sha256: String(repeating: "c", count: 64),
       byteCount: 64)
     var cache = RuntimeFlashArchiveProfileCache()
@@ -80,8 +80,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-engine-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-engine-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -193,9 +193,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let stateRoot = stateRoot ?? self.stateDirectory!
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateRoot.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateRoot.appending(path: "capabilities", directoryHint: .isDirectory))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateRoot.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateRoot.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { nowUTC })
     self.artifactStore = artifactStore
     let engine = try RuntimeJobEngine(
@@ -238,7 +238,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let unknownBackend = EnginePowerActivityBackend()
     let unknownController = PowerActivityController(backend: unknownBackend)
     let unknownDispatcher = ScriptedDispatcher(script: .outcomeUnknownOnDeviceProbe)
-    let unknownRoot = stateDirectory.appendingPathComponent("unknown-power", isDirectory: true)
+    let unknownRoot = stateDirectory.appending(path: "unknown-power", directoryHint: .isDirectory)
     let (unknownEngine, _) = try makeEngine(
       dispatcher: unknownDispatcher, powerActivityController: unknownController,
       stateRoot: unknownRoot)
@@ -253,8 +253,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let cancelledBackend = EnginePowerActivityBackend()
     let cancelledController = PowerActivityController(backend: cancelledBackend)
     let cancelledDispatcher = ScriptedDispatcher(script: .observationHappy)
-    let cancelledRoot = stateDirectory.appendingPathComponent(
-      "cancelled-power", isDirectory: true)
+    let cancelledRoot = stateDirectory.appending(
+      path:
+        "cancelled-power", directoryHint: .isDirectory)
     let (cancelledEngine, _) = try makeEngine(
       dispatcher: cancelledDispatcher, powerActivityController: cancelledController,
       stateRoot: cancelledRoot)
@@ -425,7 +426,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // The journal itself carries the intents: replay sees a clean history.
     let journalURL =
       stateDirectory
-      .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+      .appending(path: "jobs/\(acceptance.jobID)/journal.jsonl")
     let inspection = try DurableJournalRecovery.inspect(url: journalURL)
     XCTAssertTrue(inspection.outstandingIntents.isEmpty)
     XCTAssertTrue(inspection.unknownOutcomes.isEmpty)
@@ -441,13 +442,15 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let outcome = try await engine.runtimeDebugExecutionOutcome(jobID: acceptance.jobID)
     XCTAssertEqual(outcome, .safeToReflash)
     let replay = try DurableJournalRecovery.inspect(
-      url: stateDirectory.appendingPathComponent(
-        "jobs/\(acceptance.jobID)/journal.jsonl"))
+      url: stateDirectory.appending(
+        path:
+          "jobs/\(acceptance.jobID)/journal.jsonl"))
     XCTAssertFalse(
       replay.events.contains {
         $0.kind == .stepIntent && $0.stepEffect.map { $0 >= .deviceMutation } == true
       },
-      "a new known failure is retryable because durable effects are absent, not because its name is listed")
+      "a new known failure is retryable because durable effects are absent, not because its name is listed"
+    )
   }
 
   // MARK: - Idempotency
@@ -481,15 +484,19 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   func testFreshStateAdmissionCreatesEveryDurableProjectionAndSurvivesRestart() async throws {
     let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let accepted = try await engine.submit(observeRequest(idempotencyKey: "idem-fresh-state-01"))
-    let jobDirectory = stateDirectory
-      .appendingPathComponent("jobs/\(accepted.jobID)", isDirectory: true)
-    XCTAssertTrue(FileManager.default.fileExists(atPath: jobDirectory.appendingPathComponent("journal.jsonl").path))
-    XCTAssertTrue(FileManager.default.fileExists(atPath: jobDirectory.appendingPathComponent("job-record.json").path))
+    let jobDirectory =
+      stateDirectory
+      .appending(path: "jobs/\(accepted.jobID)", directoryHint: .isDirectory)
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: jobDirectory.appending(path: "journal.jsonl").path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: jobDirectory.appending(path: "job-record.json").path))
     XCTAssertTrue(
       FileManager.default.fileExists(
-        atPath: stateDirectory.appendingPathComponent(RuntimeJobRepository.filename).path))
+        atPath: stateDirectory.appending(path: RuntimeJobRepository.filename).path))
     XCTAssertFalse(
-      FileManager.default.fileExists(atPath: stateDirectory.appendingPathComponent("idempotency.json").path),
+      FileManager.default.fileExists(
+        atPath: stateDirectory.appending(path: "idempotency.json").path),
       "new Runtime state must not retain JSON as the idempotency authority")
 
     let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
@@ -595,7 +602,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   func testDaemonRecoveryReopensOnlyActiveJobsWhileTerminalHistoryStaysQueryable() async throws {
     let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
     let terminal = try await engine.submit(
-      observeRequest(idempotencyKey: "idem-terminal-history-01", requestID: "req-terminal-history-01"))
+      observeRequest(
+        idempotencyKey: "idem-terminal-history-01", requestID: "req-terminal-history-01"))
     let terminalCompletion = try await engine.run(jobID: terminal.jobID)
     XCTAssertEqual(terminalCompletion.state, "succeeded")
     let active = try await engine.submit(
@@ -695,10 +703,11 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   /// means unconsumed history and must block admission outright — silently
   /// ignoring it could replay a used key as a fresh device mutation.
   func testRetiredIdempotencyLedgerBlocksOnlyUnconsumedKeys() throws {
-    let root = stateDirectory.appendingPathComponent(
-      "retired-ledger-\(UUID().uuidString)", isDirectory: true)
+    let root = stateDirectory.appending(
+      path:
+        "retired-ledger-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    let ledgerURL = root.appendingPathComponent("idempotency.json")
+    let ledgerURL = root.appending(path: "idempotency.json")
 
     // Consumed residue: the previous release imported this key into SQLite
     // and left the file behind. The repository must keep opening.
@@ -747,7 +756,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   /// durable SQLite/recovery boundary: executing 10,000 provider plans would
   /// turn a startup-scaling check into a device-provider throughput test.
   func testTenThousandTerminalHistoryDoesNotExpandRestartRecovery() async throws {
-    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS"] == "1" else {
+    guard ProcessInfo.processInfo.environment["ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS"] == "1"
+    else {
       throw XCTSkip(
         "set ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS=1 to run the 10,000-job history test")
     }
@@ -803,7 +813,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let root = stateDirectory!
     defer { stateDirectory = root }
     for point in RuntimeAdmissionFaultPoint.allCases {
-      stateDirectory = root.appendingPathComponent(point.rawValue, isDirectory: true)
+      stateDirectory = root.appending(path: point.rawValue, directoryHint: .isDirectory)
       let injector = RuntimeAdmissionFaultInjector { observed in
         if observed == point { throw SimulatedProcessLoss() }
       }
@@ -874,8 +884,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(status.consumptionCount, 0)
 
     let record = try RuntimeJobRecord.load(
-      from: stateDirectory.appendingPathComponent(
-        "jobs/\(acceptance.jobID)", isDirectory: true))
+      from: stateDirectory.appending(
+        path:
+          "jobs/\(acceptance.jobID)", directoryHint: .isDirectory))
     XCTAssertEqual(
       record.request.authorization?.capabilityID,
       status.capability.capabilityID,
@@ -1052,7 +1063,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       String(decoding: hapRequest, as: UTF8.self)
         .replacingOccurrences(of: "\"req-hap\"", with: "\"req-hap-2\"")
         .replacingOccurrences(
-          of: "\"idem-hap-0001\"", with: "\"idem-hap-0002\"").utf8)
+          of: "\"idem-hap-0001\"", with: "\"idem-hap-0002\""
+        ).utf8)
     let second = try await engine.submit(secondRequest)
     _ = try await engine.run(jobID: second.jobID)
     let afterSecond = try await capabilityStore.inspect(
@@ -1189,8 +1201,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
         RuntimeJobEngine.journalSchemaVersion(of: record),
         JournalEvent.completeOverwriteRecoverySchemaVersion)
 
-      let journalURL = stateDirectory.appendingPathComponent(
-        "flash-schema-\(index)-journal.jsonl")
+      let journalURL = stateDirectory.appending(
+        path:
+          "flash-schema-\(index)-journal.jsonl")
       let journal = try FileDurableJournal(url: journalURL)
       let schemaVersion = RuntimeJobEngine.journalSchemaVersion(of: record)
       try journal.appendAndSynchronize(
@@ -1246,9 +1259,9 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // real archive; the branch is shared with the mutating route, which is
     // where the consequence lands.
     let replay = try DurableJournalRecovery.inspect(
-      url: stateDirectory.appendingPathComponent("jobs", isDirectory: true)
-        .appendingPathComponent(acceptance.jobID, isDirectory: true)
-        .appendingPathComponent("journal.jsonl"))
+      url: stateDirectory.appending(path: "jobs", directoryHint: .isDirectory)
+        .appending(path: acceptance.jobID, directoryHint: .isDirectory)
+        .appending(path: "journal.jsonl"))
     let reconciledOutcome = try XCTUnwrap(
       replay.events.last { $0.kind == .stepOutcome && $0.eventID.hasPrefix("reconciled-outcome-") },
       "reconciliation must journal its own correlated outcome")
@@ -1273,9 +1286,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let parked = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(parked.state, JobState.waitingForRecovery.rawValue)
     XCTAssertTrue(parked.outcomeUnknown)
-    let capabilityURL = stateDirectory
-      .appendingPathComponent("capabilities", isDirectory: true)
-      .appendingPathComponent("runtime-capabilities.json")
+    let capabilityURL =
+      stateDirectory
+      .appending(path: "capabilities", directoryHint: .isDirectory)
+      .appending(path: "runtime-capabilities.json")
     let parkedCapabilityBytes = try Data(contentsOf: capabilityURL)
 
     let firstReconcile = try await engine.reconcile(jobID: acceptance.jobID)
@@ -1369,18 +1383,18 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   // MARK: - Crash windows (process-level fixture)
 
   func testCrashWindowsPreserveUnknownOutcomeAndNeverRedispatch() async throws {
-    let fixtureURL = productsDirectory.appendingPathComponent("ArkDeckEngineCrashFixture")
+    let fixtureURL = productsDirectory.appending(path: "ArkDeckEngineCrashFixture")
     guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
       throw XCTSkip("ArkDeckEngineCrashFixture binary not built")
     }
     for window in ["afterIntentBeforeDispatch", "afterDispatchBeforeOutcome"] {
-      let directory = stateDirectory.appendingPathComponent(window, isDirectory: true)
+      let directory = stateDirectory.appending(path: window, directoryHint: .isDirectory)
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
       let process = Process()
       process.executableURL = fixtureURL
       process.arguments = [window, directory.path]
       try process.run()
-      let ready = directory.appendingPathComponent("ready")
+      let ready = directory.appending(path: "ready")
       let deadline = Date().addingTimeInterval(30)
       while !FileManager.default.fileExists(atPath: ready.path) {
         if Date() > deadline {
@@ -1392,7 +1406,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       kill(process.processIdentifier, SIGKILL)
       process.waitUntilExit()
 
-      let effectMarker = directory.appendingPathComponent("external-effect-marker")
+      let effectMarker = directory.appending(path: "external-effect-marker")
       let markerExists = FileManager.default.fileExists(atPath: effectMarker.path)
       XCTAssertEqual(
         markerExists, window == "afterDispatchBeforeOutcome",
@@ -1400,10 +1414,10 @@ final class RuntimeJobEngineContractTests: XCTestCase {
 
       // Recovery in this process over the fixture's state: parked, no redispatch.
       let capabilityStore = try RuntimeCapabilityStore(
-        directoryURL: directory.appendingPathComponent("capabilities", isDirectory: true))
+        directoryURL: directory.appending(path: "capabilities", directoryHint: .isDirectory))
       let dispatcher = ScriptedDispatcher(script: .observationHappy)
       let engine = try RuntimeJobEngine(
-        configuration: .init(stateDirectory: directory.appendingPathComponent("engine-state")),
+        configuration: .init(stateDirectory: directory.appending(path: "engine-state")),
         providers: DeviceProviderRegistry(providers: [
           HDCObservationProviderAdapter(factsPort: FactsPort())
         ]),
@@ -1433,7 +1447,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     // after the last provider outcome, before running->finalizing.
     let journalURL =
       stateDirectory
-      .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+      .appending(path: "jobs/\(acceptance.jobID)/journal.jsonl")
     let fullReplay = try DurableJournalRecovery.inspect(url: journalURL)
     let boundary = try XCTUnwrap(
       fullReplay.events.last {
@@ -1503,8 +1517,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     ]
     for window in windows {
       stateDirectory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("arkdeck-engine-tests", isDirectory: true)
-        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        .appending(path: "arkdeck-engine-tests", directoryHint: .isDirectory)
+        .appending(path: UUID().uuidString, directoryHint: .isDirectory)
       defer { try? FileManager.default.removeItem(at: stateDirectory) }
 
       let originalDispatcher = ScriptedDispatcher(script: .observationHappy)
@@ -1524,7 +1538,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       // the transition into the window's state became durable.
       let journalURL =
         stateDirectory
-        .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+        .appending(path: "jobs/\(acceptance.jobID)/journal.jsonl")
       let fullReplay = try DurableJournalRecovery.inspect(url: journalURL)
       let boundary = try XCTUnwrap(
         fullReplay.events.first {

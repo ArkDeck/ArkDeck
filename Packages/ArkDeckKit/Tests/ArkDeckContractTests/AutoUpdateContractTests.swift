@@ -1,3 +1,4 @@
+import ArkDeckCore
 import ArkDeckRuntime
 import CryptoKit
 import Darwin
@@ -7,7 +8,7 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class AutoUpdateContractTests: XCTestCase {
-  private let now = ISO8601DateFormatter().date(from: "2026-07-24T00:00:00Z")!
+  private let now = ISO8601Timestamps.parseCanonicalPlain("2026-07-24T00:00:00Z")!
 
   /// The UI fixture exists so the Settings scene can be rendered by a test
   /// without the real updater deciding what it shows. The property that
@@ -659,7 +660,7 @@ final class AutoUpdateContractTests: XCTestCase {
     preferences.setAutomaticChecksEnabled(false)
     XCTAssertFalse(preferences.automaticChecksEnabled())
     let attempt = try XCTUnwrap(
-      ISO8601DateFormatter().date(from: "2026-07-24T00:00:00Z"))
+      ISO8601Timestamps.parseCanonicalPlain("2026-07-24T00:00:00Z"))
     preferences.recordCheckAttempt(attempt)
     XCTAssertEqual(preferences.lastCheckAttempt(), attempt)
     XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4"), "1.4.0")
@@ -958,7 +959,7 @@ final class AutoUpdateContractTests: XCTestCase {
   }
 
   private var repoRoot: URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

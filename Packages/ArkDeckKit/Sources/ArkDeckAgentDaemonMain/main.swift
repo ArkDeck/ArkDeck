@@ -26,7 +26,7 @@ if CommandLine.arguments.dropFirst().first == "--analyze-crash-ledger" {
     exit(64)
   }
   do {
-    let source = try Data(contentsOf: URL(fileURLWithPath: values[0]))
+    let source = try Data(contentsOf: URL(filePath: values[0]))
     FileHandle.standardOutput.write(try HarnessCrashLedgerDerivedAnalyzer.analyze(source))
     exit(0)
   } catch {
@@ -36,11 +36,7 @@ if CommandLine.arguments.dropFirst().first == "--analyze-crash-ledger" {
 }
 
 func utcNow() -> String {
-  let formatter = DateFormatter()
-  formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
-  formatter.timeZone = TimeZone(identifier: "UTC")
-  formatter.locale = Locale(identifier: "en_US_POSIX")
-  return formatter.string(from: Date())
+  ISO8601Timestamps.string(from: Date())
 }
 
 let defaultStateDirectory = ArkDeckAgentFilesystemLayout.defaultStateDirectory()
@@ -55,7 +51,7 @@ while let argument = arguments.first {
       FileHandle.standardError.write(Data("--state-dir requires a path\n".utf8))
       exit(64)
     }
-    stateDirectory = URL(fileURLWithPath: value, isDirectory: true)
+    stateDirectory = URL(filePath: value, directoryHint: .isDirectory)
     arguments = arguments.dropFirst()
   case "--help":
     print("usage: arkdeck-agentd [--state-dir <path>]")
@@ -200,14 +196,16 @@ Task.detached {
   defer { ready.signal() }
   do {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: resolvedStateDirectory.appendingPathComponent("capabilities", isDirectory: true)
+      directoryURL: resolvedStateDirectory.appending(
+        path: "capabilities", directoryHint: .isDirectory)
     )
     let targetStore = try RuntimeTargetStore(
-      directoryURL: resolvedStateDirectory.appendingPathComponent("targets", isDirectory: true))
-    var startupLoaderBindingRecovery: (
-      targetID: String,
-      proof: RockchipLoaderBindingRecoveryProof
-    )?
+      directoryURL: resolvedStateDirectory.appending(path: "targets", directoryHint: .isDirectory))
+    var startupLoaderBindingRecovery:
+      (
+        targetID: String,
+        proof: RockchipLoaderBindingRecoveryProof
+      )?
 
     // A Loader rebind advances the product's owner-only Rockchip binding,
     // while the adopted Runtime target deliberately keeps its normal-mode
@@ -372,8 +370,9 @@ Task.detached {
     let configuredInspector = ProcessInfo.processInfo.environment["ARKDECK_WORKSPACE_INSPECTOR"]
     let signingPresetStore = OpenHarmonySigningPresetStore()
     let signingAttemptStore = try OpenHarmonySigningAttemptStore(
-      rootURL: resolvedStateDirectory.appendingPathComponent(
-        "workspace-signing-attempts", isDirectory: true))
+      rootURL: resolvedStateDirectory.appending(
+        path:
+          "workspace-signing-attempts", directoryHint: .isDirectory))
     var workspaceTool: WorkspaceInspectorTool?
     var inspectorExecutable: ResolvedExecutable?
     var workspaceDispatcher: any RuntimeProcessDispatching = RefusingDispatcher(
@@ -407,7 +406,7 @@ Task.detached {
         switch activeProjectRef {
         case "ArkDeck":
           profile = try WorkspaceProjectProfile.arkDeck(
-            rootURL: URL(fileURLWithPath: activeRoot, isDirectory: true))
+            rootURL: URL(filePath: activeRoot, directoryHint: .isDirectory))
         case "demo-app":
           let node =
             ProcessInfo.processInfo.environment["ARKDECK_DEVECO_NODE_PATH"]
@@ -419,11 +418,12 @@ Task.detached {
             ProcessInfo.processInfo.environment["ARKDECK_DEVECO_SDK_HOME"]
             ?? ProcessInfo.processInfo.environment["DEVECO_SDK_HOME"]
             ?? "/Applications/DevEco-Studio.app/Contents/sdk"
-          let sdk = URL(fileURLWithPath: configuredSDK, isDirectory: true)
+          let sdk = URL(filePath: configuredSDK, directoryHint: .isDirectory)
             .resolvingSymlinksInPath().standardizedFileURL
           var sdkIsDirectory: ObjCBool = false
-          let openHarmonySDK = sdk.appendingPathComponent(
-            "default/openharmony", isDirectory: true)
+          let openHarmonySDK = sdk.appending(
+            path:
+              "default/openharmony", directoryHint: .isDirectory)
           guard configuredSDK.hasPrefix("/"),
             FileManager.default.fileExists(
               atPath: openHarmonySDK.path, isDirectory: &sdkIsDirectory),
@@ -433,7 +433,7 @@ Task.detached {
               "workspace.projectProfileUnavailable: DevEco OpenHarmony SDK is absent")
           }
           profile = try WorkspaceProjectProfile.waterFlowDemo(
-            rootURL: URL(fileURLWithPath: activeRoot, isDirectory: true),
+            rootURL: URL(filePath: activeRoot, directoryHint: .isDirectory),
             projectRef: activeProjectRef, nodePath: node, hvigorScriptPath: hvigor)
           // Hvigor rejects a missing or stale inherited DEVECO_SDK_HOME with
           // configuration error 00303217. Pin the validated profile SDK on
@@ -444,12 +444,14 @@ Task.detached {
             "workspace.projectProfileUnavailable:\(activeProjectRef) is unsupported")
         }
         let attempts = try WorkspacePatchAttemptStore(
-          rootURL: resolvedStateDirectory.appendingPathComponent(
-            "workspace-patch-attempts", isDirectory: true))
+          rootURL: resolvedStateDirectory.appending(
+            path:
+              "workspace-patch-attempts", directoryHint: .isDirectory))
         let profiles = WorkspaceProjectProfileRegistry(profile: profile)
         let evolution = try EvolutionWorkspaceManager(
-          rootURL: resolvedStateDirectory.appendingPathComponent(
-            "evolution-workspaces", isDirectory: true),
+          rootURL: resolvedStateDirectory.appending(
+            path:
+              "evolution-workspaces", directoryHint: .isDirectory),
           profileRegistry: profiles)
         workspaceOperations = WorkspaceOperationsProvider(
           profile: profile, profileRegistry: profiles,
@@ -525,7 +527,7 @@ Task.detached {
       hdc: hdcDispatcher, rockchip: rockchipDispatcher, workspace: workspaceDispatcher,
       analyzer: analyzerDispatcher)
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: resolvedStateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: resolvedStateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: utcNow)
     // Historical authority records remain mounted read-only for versioned
     // decode/export. New admission never reserves or consumes this ledger.
@@ -533,8 +535,8 @@ Task.detached {
       for: .applicationSupportDirectory, in: .userDomainMask,
       appropriateFor: nil, create: true
     )
-    .appendingPathComponent("ArkDeck", isDirectory: true)
-    .appendingPathComponent("AuthorizationUsage", isDirectory: true)
+    .appending(path: "ArkDeck", directoryHint: .isDirectory)
+    .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: resolvedStateDirectory),
       providers: providers,
@@ -582,7 +584,7 @@ Task.detached {
     // Harness task plane (CHG-2026-054): one composition root, not a second
     // daemon. It reaches execution only through the engine port below.
     let harnessStore = try HarnessTaskStore(
-      rootURL: resolvedStateDirectory.appendingPathComponent("harness", isDirectory: true))
+      rootURL: resolvedStateDirectory.appending(path: "harness", directoryHint: .isDirectory))
     // Model egress is opt-in per project and off unless the operator names
     // them: `ARKDECK_HARNESS_EGRESS_PROJECTS=app-a,app-b`. With none named no
     // decision context leaves this host and the loop runs on the built-in
@@ -665,8 +667,9 @@ Task.detached {
       bootstrap: bootstrap,
       hdcRuntimeDiagnostics: startedHDCServerHost?.diagnostics,
       artifactStore: artifactStore,
-      flashBundleImportDirectory: resolvedStateDirectory.appendingPathComponent(
-        "flash-bundle-imports", isDirectory: true),
+      flashBundleImportDirectory: resolvedStateDirectory.appending(
+        path:
+          "flash-bundle-imports", directoryHint: .isDirectory),
       flashPrerequisiteObserver: rockchipFactsPort,
       rockchipBootloaderStatusObserver: ProductRockchipBootloaderStatusObserver(
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),

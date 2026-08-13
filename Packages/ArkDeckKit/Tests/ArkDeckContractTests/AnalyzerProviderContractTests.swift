@@ -35,8 +35,8 @@ final class AnalyzerProviderContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-analyzer-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-analyzer-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
   }
 
@@ -231,9 +231,9 @@ final class AnalyzerProviderContractTests: XCTestCase {
   func testRuntimeAnalyzesADeviceBoundArtifactWithoutClaimingADeviceBoundJob()
     async throws
   {
-    let state = root.appendingPathComponent("runtime", isDirectory: true)
+    let state = root.appending(path: "runtime", directoryHint: .isDirectory)
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: state.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let raw = Data("Fault log list:\n******\n******\n".utf8)
     let source = try await artifactStore.publish(
@@ -252,10 +252,10 @@ final class AnalyzerProviderContractTests: XCTestCase {
     let output = try HarnessCrashLedgerDerivedAnalyzer.analyze(raw)
     let provider = try makeProvider()
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: state.appending(path: "capabilities", directoryHint: .isDirectory))
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: state.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: AnalyzerResultDispatcher(output: output),
       capabilityStore: capabilityStore, artifactStore: artifactStore,
@@ -308,7 +308,7 @@ final class AnalyzerProviderContractTests: XCTestCase {
   }
 
   private func toolDigest() throws -> String {
-    let bytes = try Data(contentsOf: URL(fileURLWithPath: "/bin/cat"))
+    let bytes = try Data(contentsOf: URL(filePath: "/bin/cat"))
     return AnalyzerProvider.sha256(bytes)
   }
 
@@ -331,7 +331,7 @@ final class AnalyzerProviderContractTests: XCTestCase {
   }
 
   private func sourceArtifact(contents: String) throws -> ProviderResolvedInputArtifact {
-    let url = root.appendingPathComponent("crash-\(UUID().uuidString.prefix(6)).txt")
+    let url = root.appending(path: "crash-\(UUID().uuidString.prefix(6)).txt")
     let bytes = Data(contents.utf8)
     try bytes.write(to: url)
     return ProviderResolvedInputArtifact(

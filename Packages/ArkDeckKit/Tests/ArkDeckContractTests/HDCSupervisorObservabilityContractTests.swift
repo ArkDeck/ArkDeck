@@ -203,7 +203,7 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
       pid: validReceipt.pid,
       startSeconds: validReceipt.startSeconds,
       startMicroseconds: validReceipt.startMicroseconds,
-      executablePath: URL(fileURLWithPath: "/private/tmp/hso-wrong-path"),
+      executablePath: URL(filePath: "/private/tmp/hso-wrong-path"),
       executableSHA256: validReceipt.executableSHA256,
       endpoint: validReceipt.endpoint)
     let wrongHash = HDCServerProcessIdentityReceipt(
@@ -719,9 +719,10 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
     XCTAssertTrue(
       labels.contains("managedStartDispatchCount"),
       "the managed count keeps its own field name and is not renamed automatic")
-    let automaticFieldValue = mirror.children.first {
-      $0.label == "automaticLifecycleDispatchCount"
-    }?.value as? Int
+    let automaticFieldValue =
+      mirror.children.first {
+        $0.label == "automaticLifecycleDispatchCount"
+      }?.value as? Int
     XCTAssertEqual(
       automaticFieldValue, 1,
       "the automatic field carries the measured value, not confirmed-minus-managed arithmetic")
@@ -1753,7 +1754,7 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
 
   private func hsoCandidate(_ label: String) -> HDCCandidate {
     HDCCandidate(
-      path: URL(fileURLWithPath: "/private/tmp/arkdeck-\(label)-hdc"),
+      path: URL(filePath: "/private/tmp/arkdeck-\(label)-hdc"),
       source: .userConfigured,
       sha256: HDCSupervisorObservationProbeCatalog.targetExecutableSHA256)
   }
@@ -1884,7 +1885,7 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
   }
 
   private func observabilityPackageRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
   }
 
@@ -2003,7 +2004,7 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
       if await condition() { return true }
-      try? await Task.sleep(nanoseconds: 50_000_000)
+      try? await Task.sleep(for: .milliseconds(50))
     }
     return await condition()
   }

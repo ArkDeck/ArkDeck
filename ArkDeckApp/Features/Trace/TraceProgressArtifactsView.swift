@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 
 struct TraceProgressArtifactsView: View {
-  @ObservedObject var model: TraceWorkspaceViewModel
+  var model: TraceWorkspaceViewModel
 
   var body: some View {
     VStack(spacing: 18) {

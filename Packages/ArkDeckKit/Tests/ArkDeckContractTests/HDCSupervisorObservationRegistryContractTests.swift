@@ -250,7 +250,7 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
   }
 
   private var repoRoot: URL {
-    var url = URL(fileURLWithPath: #filePath)
+    var url = URL(filePath: #filePath)
     for _ in 0..<5 {
       url.deleteLastPathComponent()
     }
@@ -261,15 +261,15 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
     let probes = try XCTUnwrap(
       Bundle.module.url(forResource: "Probes", withExtension: nil),
       "SwiftPM must copy the whole Probes resource tree")
-    return probes.appendingPathComponent("SupervisorObservation/1.0.0", isDirectory: true)
+    return probes.appending(path: "SupervisorObservation/1.0.0", directoryHint: .isDirectory)
   }
 
   private func packData(_ path: String) throws -> Data {
-    try Data(contentsOf: try packURL().appendingPathComponent(path))
+    try Data(contentsOf: try packURL().appending(path: path))
   }
 
   private func repositoryData(_ path: String) throws -> Data {
-    try Data(contentsOf: repoRoot.appendingPathComponent(path))
+    try Data(contentsOf: repoRoot.appending(path: path))
   }
 
   private func digest(_ data: Data) -> String {
@@ -314,7 +314,7 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
     let listed = try FileManager.default.subpathsOfDirectory(atPath: root.path).filter { relative in
       var isDirectory: ObjCBool = false
       _ = FileManager.default.fileExists(
-        atPath: root.appendingPathComponent(relative).path, isDirectory: &isDirectory)
+        atPath: root.appending(path: relative).path, isDirectory: &isDirectory)
       return !isDirectory.boolValue
     }
     XCTAssertEqual(
@@ -434,7 +434,8 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
     XCTAssertEqual(Set(value.dispatchCounters.keys), Self.zeroEffectKeys)
     XCTAssertTrue(value.dispatchCounters.values.allSatisfy { $0 == 0 })
 
-    let text = String(decoding: try packData("receipts/server-identity-generation.json"), as: UTF8.self)
+    let text = String(
+      decoding: try packData("receipts/server-identity-generation.json"), as: UTF8.self)
     for forbidden in ["/Users/", "fuhanfeng", "22677", "80306", "connectKey", "serialNumber"] {
       XCTAssertFalse(text.contains(forbidden), "redacted receipt leaks \(forbidden)")
     }
@@ -475,47 +476,71 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
     let mutations: [(String, (inout [String: Any], inout [String: Any]) -> Void)] = [
       ("profile", { root, _ in root["integrationProfile"] = "OPENHARMONY-TOOLS@0.5.0" }),
       ("registry-id", { root, _ in root["registryId"] = "OPENHARMONY-HDC-READONLY-PROBES" }),
-      ("tool-version", { root, _ in
-        var tool = root["toolContext"] as! [String: Any]
-        tool["reportedVersion"] = "3.2.0d"
-        root["toolContext"] = tool
-      }),
-      ("tool-hash", { root, _ in
-        var tool = root["toolContext"] as! [String: Any]
-        tool["executableSHA256"] = String(repeating: "0", count: 64)
-        root["toolContext"] = tool
-      }),
-      ("endpoint", { root, _ in
-        var tool = root["toolContext"] as! [String: Any]
-        tool["endpoint"] = "127.0.0.1:8711"
-        root["toolContext"] = tool
-      }),
+      (
+        "tool-version",
+        { root, _ in
+          var tool = root["toolContext"] as! [String: Any]
+          tool["reportedVersion"] = "3.2.0d"
+          root["toolContext"] = tool
+        }
+      ),
+      (
+        "tool-hash",
+        { root, _ in
+          var tool = root["toolContext"] as! [String: Any]
+          tool["executableSHA256"] = String(repeating: "0", count: 64)
+          root["toolContext"] = tool
+        }
+      ),
+      (
+        "endpoint",
+        { root, _ in
+          var tool = root["toolContext"] as! [String: Any]
+          tool["endpoint"] = "127.0.0.1:8711"
+          root["toolContext"] = tool
+        }
+      ),
       ("argv", { _, entry in entry["exactArgv"] = ["checkserver"] }),
       ("invocation", { _, entry in entry["invocationAllowed"] = true }),
       ("effect", { _, entry in entry["effectClassification"] = "hdcCommand" }),
-      ("fallback", { _, entry in
-        var policy = entry["endpointPolicy"] as! [String: Any]
-        policy["fallbackAllowed"] = true
-        entry["endpointPolicy"] = policy
-      }),
-      ("receipt-hash", { _, entry in
-        var input = entry["inputContract"] as! [String: Any]
-        input["receiptSHA256"] = String(repeating: "0", count: 64)
-        entry["inputContract"] = input
-      }),
-      ("accepted-merges", { _, entry in
-        var provenance = entry["provenance"] as! [String: Any]
-        provenance["acceptedMerges"] = [Self.acceptedMerges[0]]
-        entry["provenance"] = provenance
-      }),
-      ("dev-1", { _, entry in
-        var provenance = entry["provenance"] as! [String: Any]
-        provenance["deviation"] = ["id": "NONE", "disposition": "none"]
-        entry["provenance"] = provenance
-      }),
-      ("forbidden-effects", { _, entry in
-        entry["forbiddenEffects"] = ["serverStart", "serverStop", "destructive"]
-      }),
+      (
+        "fallback",
+        { _, entry in
+          var policy = entry["endpointPolicy"] as! [String: Any]
+          policy["fallbackAllowed"] = true
+          entry["endpointPolicy"] = policy
+        }
+      ),
+      (
+        "receipt-hash",
+        { _, entry in
+          var input = entry["inputContract"] as! [String: Any]
+          input["receiptSHA256"] = String(repeating: "0", count: 64)
+          entry["inputContract"] = input
+        }
+      ),
+      (
+        "accepted-merges",
+        { _, entry in
+          var provenance = entry["provenance"] as! [String: Any]
+          provenance["acceptedMerges"] = [Self.acceptedMerges[0]]
+          entry["provenance"] = provenance
+        }
+      ),
+      (
+        "dev-1",
+        { _, entry in
+          var provenance = entry["provenance"] as! [String: Any]
+          provenance["deviation"] = ["id": "NONE", "disposition": "none"]
+          entry["provenance"] = provenance
+        }
+      ),
+      (
+        "forbidden-effects",
+        { _, entry in
+          entry["forbiddenEffects"] = ["serverStart", "serverStop", "destructive"]
+        }
+      ),
     ]
 
     for (name, mutation) in mutations {
@@ -641,8 +666,8 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
   }
 }
 
-private extension Array {
-  var only: Element? {
+extension Array {
+  fileprivate var only: Element? {
     count == 1 ? first : nil
   }
 }

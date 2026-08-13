@@ -57,7 +57,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     profile: HDCCompatibilityProfile = .openHarmony320Family,
     appOwnedNativeLibraryAvailability: ProviderOperationAvailability? = nil,
     hostReceiveRoot: URL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-receive", isDirectory: true)
+      .appending(path: "arkdeck-receive", directoryHint: .isDirectory)
   ) {
     self.factsPort = factsPort
     self.profile = profile
@@ -361,11 +361,15 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         "bundleName is required for application liveness")
     }
     let abilityName: String?
-    if case .string(let value)? = inputs["abilityName"] { abilityName = value } else {
+    if case .string(let value)? = inputs["abilityName"] {
+      abilityName = value
+    } else {
       abilityName = nil
     }
     let processName: String?
-    if case .string(let value)? = inputs["processName"] { processName = value } else {
+    if case .string(let value)? = inputs["processName"] {
+      processName = value
+    } else {
       processName = nil
     }
     let deployedDigest: String?
@@ -532,7 +536,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     }
     guard restart == .restartAbility else {
       throw DeviceProviderError.unsupportedAction(
-        "\(restart.rawValue) has no complete app-owned restart/readback plan; refusing before authorization")
+        "\(restart.rawValue) has no complete app-owned restart/readback plan; refusing before authorization"
+      )
     }
     guard let resolved = context.resolvedInputArtifact,
       lease.hasSuffix(":\(resolved.artifactID)")
@@ -567,8 +572,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case "send-to-staging":
       return .hdc(.sendNativeLibraryToStaging(deployment))
     case "verify-remote-staging":
-      return .hdc(.inspectNativeLibrary(
-        deployment, expectation: .stagingMatchesArtifact))
+      return .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .stagingMatchesArtifact))
     case "backup-current-version":
       return .hdc(.backupNativeLibrary(deployment))
     case "atomic-publish":
@@ -602,7 +608,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case .observeTool:
       return TypedProcessPlan(
         action: action,
-        kind: .process(executableSHA256: "resolved-at-dispatch", argumentSummary: ["-v"], timeoutSeconds: 15))
+        kind: .process(
+          executableSHA256: "resolved-at-dispatch", argumentSummary: ["-v"], timeoutSeconds: 15))
     case .observeServer:
       return TypedProcessPlan(
         action: action,
@@ -695,8 +702,10 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           invocations: [
             TypedProcessInvocation(
               arguments: try deviceArguments(
-                ["shell", "hitrace", "-t", String(request.durationSeconds), "-b",
-                  String(request.bufferKB)] + request.categories + ["-o", path.remotePath],
+                [
+                  "shell", "hitrace", "-t", String(request.durationSeconds), "-b",
+                  String(request.bufferKB),
+                ] + request.categories + ["-o", path.remotePath],
                 context: context),
               timeoutSeconds: request.durationSeconds + 30,
               continueAfterNonZero: true),
@@ -1015,17 +1024,20 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         nativeCodeSignHelper.facts == expectedHelper
       else {
         throw DeviceProviderError.unsupportedAction(
-          "native send requires the same engine-resolved Artifact and a job-owned staging directory")
+          "native send requires the same engine-resolved Artifact and a job-owned staging directory"
+        )
       }
       return try nativeSequence(
         action: action, context: context,
         commands: [
           (["shell", "mkdir", "-p", deployment.stagingDirectoryPath], false, 30),
           (["file", "send", resolved.fileURL.path, deployment.stagingPath], false, 300),
-          ([
-            "file", "send", nativeCodeSignHelper.fileURL.path,
-            helperRemotePath,
-          ], false, 60),
+          (
+            [
+              "file", "send", nativeCodeSignHelper.fileURL.path,
+              helperRemotePath,
+            ], false, 60
+          ),
           (["shell", "chmod", "700", helperRemotePath], false, 30),
           (["shell", "sha256sum", helperRemotePath], false, 30),
         ])
@@ -1059,17 +1071,23 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           // keeps that file's attestation across the rename. Reading it here
           // is this side's own measurement of what the replacement must match,
           // independent of the branch the helper took.
-          ([
-            "shell", helperRemotePath, "verify", deployment.backupPath,
-          ], true, 30),
-          ([
-            "shell", helperRemotePath, "publish", deployment.stagingPath,
-            deployment.targetPath, deployment.rollbackStagingPath,
-          ], false, 60),
+          (
+            [
+              "shell", helperRemotePath, "verify", deployment.backupPath,
+            ], true, 30
+          ),
+          (
+            [
+              "shell", helperRemotePath, "publish", deployment.stagingPath,
+              deployment.targetPath, deployment.rollbackStagingPath,
+            ], false, 60
+          ),
           (["shell", "sha256sum", deployment.targetPath], false, 30),
-          ([
-            "shell", helperRemotePath, "verify", deployment.targetPath,
-          ], true, 30),
+          (
+            [
+              "shell", helperRemotePath, "verify", deployment.targetPath,
+            ], true, 30
+          ),
           (["shell", "ls", "-ln", deployment.targetPath], false, 15),
         ])
     case .stopNativeTarget(let deployment):
@@ -1085,16 +1103,18 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       return try nativeSequence(
         action: action, context: context,
         commands: [
-          ([
-            "shell", "aa", "start", "-b", deployment.bundle.bundleName, "-a",
-            HDCAppOwnedNativeLibraryDeployment.entryAbility,
-          ], true, 60),
+          (
+            [
+              "shell", "aa", "start", "-b", deployment.bundle.bundleName, "-a",
+              HDCAppOwnedNativeLibraryDeployment.entryAbility,
+            ], true, 60
+          ),
           (["shell", "sleep", "2"], true, 5),
           (["shell", "pidof", deployment.bundle.bundleName], true, 30),
         ])
     case .cleanupNativeLibrary(let deployment):
       var commands: [([String], Bool, Int)] = [
-        (["shell", "rm", "-f", deployment.stagingPath], true, 30),
+        (["shell", "rm", "-f", deployment.stagingPath], true, 30)
       ]
       if let helperRemotePath = deployment.codeSignHelperRemotePath {
         commands.append((["shell", "rm", "-f", helperRemotePath], true, 30))
@@ -1131,23 +1151,31 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           (["shell", "sleep", "2"], true, 5),
           (["shell", "pidof", deployment.bundle.bundleName], true, 30),
           (["shell", "rm", "-f", deployment.rollbackStagingPath], true, 30),
-          ([
-            "shell", "ln", deployment.backupPath, deployment.rollbackStagingPath,
-          ], true, 60),
-          ([
-            "shell", "mv", "-f", deployment.rollbackStagingPath,
-            deployment.targetPath,
-          ], true, 60),
+          (
+            [
+              "shell", "ln", deployment.backupPath, deployment.rollbackStagingPath,
+            ], true, 60
+          ),
+          (
+            [
+              "shell", "mv", "-f", deployment.rollbackStagingPath,
+              deployment.targetPath,
+            ], true, 60
+          ),
           (["shell", "sha256sum", deployment.targetPath], true, 30),
-          ([
-            "shell", "aa", "start", "-b", deployment.bundle.bundleName, "-a",
-            HDCAppOwnedNativeLibraryDeployment.entryAbility,
-          ], true, 60),
+          (
+            [
+              "shell", "aa", "start", "-b", deployment.bundle.bundleName, "-a",
+              HDCAppOwnedNativeLibraryDeployment.entryAbility,
+            ], true, 60
+          ),
           (["shell", "sleep", "2"], true, 5),
           (["shell", "pidof", deployment.bundle.bundleName], true, 30),
-          ([
-            "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
-          ], true, 30),
+          (
+            [
+              "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
+            ], true, 30
+          ),
         ])
     case .inspectNativeLibrary(let deployment, let expectation):
       return try nativeInspectionPlan(
@@ -1221,14 +1249,16 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       if deployment.verificationProfile == .hashProcessAndMaps {
         selected.append(
-          ([
-            "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
-          ], true, 30))
+          (
+            [
+              "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
+            ], true, 30
+          ))
       }
       commands = selected
     case .cleanupComplete:
       var selected: [([String], Bool, Int)] = [
-        (["shell", "ls", "-ld", deployment.stagingPath], true, 15),
+        (["shell", "ls", "-ld", deployment.stagingPath], true, 15)
       ]
       if let helperRemotePath = deployment.codeSignHelperRemotePath {
         selected.append(
@@ -1253,9 +1283,11 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       ]
       if deployment.verificationProfile == .hashProcessAndMaps {
         selected.append(
-          ([
-            "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
-          ], true, 30))
+          (
+            [
+              "shell", "grep", "-F", deployment.loaderVisiblePath, "/proc/*/maps",
+            ], true, 30
+          ))
       }
       commands = selected
     }
@@ -1311,8 +1343,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   /// job/step/nonce tuple, so a fixed root cannot collide across jobs and no
   /// caller input reaches this path.
   func hostLandingURL(for remote: HDCOwnedRemotePath) -> URL {
-    hostReceiveRoot.appendingPathComponent(
-      URL(fileURLWithPath: remote.remotePath).lastPathComponent, isDirectory: false)
+    hostReceiveRoot.appending(
+      path:
+        URL(filePath: remote.remotePath).lastPathComponent, directoryHint: .notDirectory)
   }
 
   /// Mints a provider-owned staging path for an artifact lease. As with
@@ -2019,7 +2052,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         summary["state"] = "UNKNOWN"
         summary["processState"] = "UNKNOWN"
         summary["pidObserved"] = "false"
-        summary["reasonCode"] = receipt.stdoutTruncated
+        summary["reasonCode"] =
+          receipt.stdoutTruncated
           ? "processReadbackTruncated" : "processReadbackUnavailable"
         return .verified(summary: summary)
       }
@@ -2031,10 +2065,12 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         summary["reasonCode"] = "targetProcessNotRunning"
         return .verified(summary: summary)
       }
-      guard tokens.allSatisfy({ token in
-        guard let value = UInt32(token) else { return false }
-        return value > 0
-      }) else {
+      guard
+        tokens.allSatisfy({ token in
+          guard let value = UInt32(token) else { return false }
+          return value > 0
+        })
+      else {
         summary["state"] = "UNKNOWN"
         summary["processState"] = "UNKNOWN"
         summary["pidObserved"] = "false"
@@ -2070,8 +2106,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       guard receipt.subprocesses.count == 2 else {
         return .unknown(reason: "uninstall did not produce its package readback")
       }
-      guard let installed = Self.packagePresence(
-        receipt.subprocesses[1], bundleName: bundle.bundleName)
+      guard
+        let installed = Self.packagePresence(
+          receipt.subprocesses[1], bundleName: bundle.bundleName)
       else {
         return .unknown(reason: "package readback for \(bundle.bundleName) is ambiguous")
       }
@@ -2088,8 +2125,9 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       }
       return .verified(summary: ["localPort": String(spec.localPort)])
     case .readPackagePresence(let bundle):
-      guard let present = Self.packagePresence(
-        Self.soleSubprocess(of: receipt), bundleName: bundle.bundleName)
+      guard
+        let present = Self.packagePresence(
+          Self.soleSubprocess(of: receipt), bundleName: bundle.bundleName)
       else {
         return .unknown(reason: "package presence readback is not trustworthy")
       }
@@ -2517,7 +2555,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   ) -> String {
     let byteLimit = 512
     func field(_ data: Data) -> String {
-      data.prefix(byteLimit).map { String(format: "%02x", $0) }.joined()
+      SHA256Hex.lowercaseHex(data.prefix(byteLimit))
     }
     return
       "outBytes=\(receipt.stdout.count),outHex=\(field(receipt.stdout)),"
@@ -2556,9 +2594,11 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     }
     if stdout.count >= 2,
       let first = stdout.first,
-      [UInt8(ascii: "-"), UInt8(ascii: "d"), UInt8(ascii: "l"),
+      [
+        UInt8(ascii: "-"), UInt8(ascii: "d"), UInt8(ascii: "l"),
         UInt8(ascii: "b"), UInt8(ascii: "c"), UInt8(ascii: "p"),
-        UInt8(ascii: "s")].contains(first),
+        UInt8(ascii: "s"),
+      ].contains(first),
       stdout[stdout.startIndex + 1] == UInt8(ascii: "r")
         || stdout[stdout.startIndex + 1] == UInt8(ascii: "-")
     {
@@ -2755,26 +2795,33 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     case .hdc(.createPortForward(let spec)), .hdc(.removePortForward(let spec)):
       readback = .hdc(.readPortForwardPresence(spec))
     case .hdc(.sendNativeLibraryToStaging(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .stagingMatchesArtifact))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .stagingMatchesArtifact))
     case .hdc(.backupNativeLibrary(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .backupMatchesTarget))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .backupMatchesTarget))
     case .hdc(.publishNativeLibrary(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .targetMatchesArtifact))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .targetMatchesArtifact))
     case .hdc(.stopNativeTarget(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .targetStopped))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .targetStopped))
     case .hdc(.startNativeTarget(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .targetStarted))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .targetStarted))
     case .hdc(.cleanupNativeLibrary(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .cleanupComplete))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .cleanupComplete))
     case .hdc(.rollbackNativeLibrary(let deployment)):
-      readback = .hdc(.inspectNativeLibrary(
-        deployment, expectation: .rollbackRestored))
+      readback = .hdc(
+        .inspectNativeLibrary(
+          deployment, expectation: .rollbackRestored))
     default:
       return nil
     }
@@ -2999,16 +3046,19 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
     case ("rebind-loader-identity", .probeDevice):
       return .rockchip(.rebindLoader(stableIdentitySHA256: identity))
     case ("flash-partitions", .flashPartition):
-      return .rockchip(.flashPartitions(
-        try flashBundle(inputs: inputs, context: context)))
+      return .rockchip(
+        .flashPartitions(
+          try flashBundle(inputs: inputs, context: context)))
     case ("verify-flash-readback", .verifyRemoteState):
-      return .rockchip(.verifyFlashReadback(
-        try flashBundle(inputs: inputs, context: context)))
+      return .rockchip(
+        .verifyFlashReadback(
+          try flashBundle(inputs: inputs, context: context)))
     case ("reboot-device", .rebootDevice):
       return .rockchip(.rebootToNormal(stableIdentitySHA256: identity))
     case ("wait-for-hdc", .waitForReconnect):
-      return .rockchip(.waitForBoundHDCReconnect(
-        expectation: try hdcReconnectExpectation(context: context, connectKey: connectKey)))
+      return .rockchip(
+        .waitForBoundHDCReconnect(
+          expectation: try hdcReconnectExpectation(context: context, connectKey: connectKey)))
     case ("rebind-and-verify-build", .probeDevice):
       let bundle = try flashBundle(inputs: inputs, context: context)
       // The version to expect is the one baked into the system image this plan
@@ -3034,10 +3084,11 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
           expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
           expectedBuildVersion: expectedBuildVersion))
     case ("capture-post-flash-diagnostics", .captureRemoteStdout):
-      return .rockchip(.capturePostFlashDiagnostics(
-        connectKey: connectKey,
-        request: try HDCHilogCaptureRequest(
-          durationSeconds: 30, filters: [], byteBudget: 16 * 1024 * 1024)))
+      return .rockchip(
+        .capturePostFlashDiagnostics(
+          connectKey: connectKey,
+          request: try HDCHilogCaptureRequest(
+            durationSeconds: 30, filters: [], byteBudget: 16 * 1024 * 1024)))
     default:
       throw DeviceProviderError.unsupportedStepKind(
         "\(step.stepID) has no registered Rockchip runtime action")
@@ -3190,9 +3241,10 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
         throw DeviceProviderError.factsUnavailable(
           "normal-mode recovery has no descriptor-bound connect key")
       }
-      action = .rockchip(.waitForBoundHDCReconnect(
-        expectation: try hdcReconnectExpectation(
-          context: context, connectKey: connectKey)))
+      action = .rockchip(
+        .waitForBoundHDCReconnect(
+          expectation: try hdcReconnectExpectation(
+            context: context, connectKey: connectKey)))
     default:
       return nil
     }

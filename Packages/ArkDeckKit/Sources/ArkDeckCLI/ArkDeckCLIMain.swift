@@ -152,9 +152,6 @@ struct ArkDeckCommandLine {
     }
   }
 
-
-
-
   private static func printFlashFinding(_ finding: RockchipFlashSessionFinding) {
     var header = ["session: \(finding.sessionID)"]
     if let jobID = finding.jobID { header.append("job: \(jobID)") }
@@ -197,7 +194,6 @@ struct ArkDeckCommandLine {
     }
   }
 
-
   // MARK: install-tool
 
   static func runInstallTool(_ arguments: [String]) throws {
@@ -209,7 +205,7 @@ struct ArkDeckCommandLine {
         message: "install-tool requires --path with a canonical absolute file path")
     }
     let receipt = try RockchipToolInstallation.install(
-      executableURL: URL(fileURLWithPath: path))
+      executableURL: URL(filePath: path))
     print("pinned rkdeveloptool ordinary bookmark and live trust facts installed")
     print("tool sha256: \(receipt.executableSHA256)")
     print("code trust: \(receipt.codeTrust.rawValue)")
@@ -227,7 +223,7 @@ struct ArkDeckCommandLine {
         message: "trust-tool requires --path and the full --expected-sha256 product pin")
     }
     let receipt = try RockchipToolInstallation.trustAndInstall(
-      executableURL: URL(fileURLWithPath: path),
+      executableURL: URL(filePath: path),
       expectedSHA256: expectedSHA256)
     print("exact pinned rkdeveloptool trusted and installed")
     print("tool sha256: \(receipt.executableSHA256)")
@@ -349,7 +345,7 @@ struct ArkDeckCommandLine {
         let result = try await engineLaneCampaignHost(options: options)
           .executeConfirmedCampaign(
             confirmationDigestSHA256: campaignDigest,
-            archiveURL: URL(fileURLWithPath: imagesPath), targetLocationSelector: location)
+            archiveURL: URL(filePath: imagesPath), targetLocationSelector: location)
         printCampaignResult(result)
       } else {
         throw CLIError(exitCode: EX_USAGE, message: "Agent E2 authority is missing")
@@ -427,7 +423,7 @@ struct ArkDeckCommandLine {
       providerIdentity: RockchipRockUSBFlashProvider.providerIdentity,
       planDigestSHA256: plan.planDigestSHA256,
       stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      confirmedAtTimestamp: ISO8601DateFormatter().string(from: Date()))
+      confirmedAtTimestamp: ISO8601Timestamps.string(from: Date()))
 
     let decision = await gate.authorize(
       authority: .humanOperator,
@@ -468,7 +464,7 @@ struct ArkDeckCommandLine {
   /// four read-only observations and a refusal, never an execution stack.
   static func requireGreenPreflight(imagesPath: String) async throws {
     let receipt = await RockchipFlashPreflight().run(
-      archiveURL: URL(fileURLWithPath: imagesPath))
+      archiveURL: URL(filePath: imagesPath))
     for line in receipt.renderedLines() { print(line) }
     guard receipt.isGreen else {
       throw CLIError(
@@ -502,7 +498,7 @@ struct ArkDeckCommandLine {
     // problem that was free to fix a second earlier.
     try await requireGreenPreflight(imagesPath: images)
     let preview = try await RockchipEvolutionCampaignPlanning.preview(
-      archiveURL: URL(fileURLWithPath: images), maxAttempts: maxAttempts,
+      archiveURL: URL(filePath: images), maxAttempts: maxAttempts,
       maxChangedFiles: maxChangedFiles, maxDiffLines: maxDiffLines,
       validitySeconds: validitySeconds)
     let assertion = preview.assertion
@@ -557,7 +553,7 @@ struct ArkDeckCommandLine {
     try requireCampaignAgentContext(firstAdmission: false)
     try await requireGreenPreflight(imagesPath: images)
     let result = try await engineLaneCampaignHost(options: options).continueCampaign(
-      campaignID: campaignID, archiveURL: URL(fileURLWithPath: images),
+      campaignID: campaignID, archiveURL: URL(filePath: images),
       targetLocationSelector: location)
     printCampaignResult(result)
   }
@@ -676,7 +672,7 @@ struct ArkDeckCommandLine {
         exitCode: EX_USAGE,
         message: "postflight requires --observation <observation.json>")
     }
-    let data = try Data(contentsOf: URL(fileURLWithPath: observationPath))
+    let data = try Data(contentsOf: URL(filePath: observationPath))
     let observation = try JSONDecoder().decode(CLIRunObservation.self, from: data)
     let provider = RockchipRockUSBFlashProvider(profile: try selectedProfile(options: options))
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
@@ -737,7 +733,7 @@ struct ArkDeckCommandLine {
         message: "prepare requires sequence/version/minimum-system/issued-at/expires-at/"
           + "artifact/artifact-url/notes/out")
     }
-    let artifact = URL(fileURLWithPath: artifactPath).standardizedFileURL
+    let artifact = URL(filePath: artifactPath).standardizedFileURL
     let measurement = try measureArtifact(artifact)
     let payload = UpdateFeedPayload(
       sequence: sequence,
@@ -753,7 +749,7 @@ struct ArkDeckCommandLine {
     let canonicalPayload = try UpdateFeedCodec.canonicalPayload(payload)
     let signatureInput = try UpdateFeedCodec.signatureInput(
       payload: canonicalPayload, keyID: UpdateFeedTrust.productionKeyID)
-    let output = URL(fileURLWithPath: outputPath).standardizedFileURL
+    let output = URL(filePath: outputPath).standardizedFileURL
     try FileManager.default.createDirectory(
       at: output, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -779,10 +775,10 @@ struct ArkDeckCommandLine {
         exitCode: EX_USAGE, message: "assemble requires --payload, --signature and --out")
     }
     let payload = try Data(
-      contentsOf: URL(fileURLWithPath: payloadPath),
+      contentsOf: URL(filePath: payloadPath),
       options: [.mappedIfSafe, .uncached])
     let signature = try Data(
-      contentsOf: URL(fileURLWithPath: signaturePath),
+      contentsOf: URL(filePath: signaturePath),
       options: [.mappedIfSafe, .uncached])
     let envelope = try UpdateFeedCodec.assemble(
       canonicalPayload: payload,
@@ -804,7 +800,7 @@ struct ArkDeckCommandLine {
         systemVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
         architecture: "arm64"),
       now: Date())
-    let output = URL(fileURLWithPath: outputPath).standardizedFileURL
+    let output = URL(filePath: outputPath).standardizedFileURL
     try envelope.write(to: output, options: [.atomic, .completeFileProtection])
     print("feed: \(output.path)")
     print("feed sha256: \(UpdateFeedCodec.sha256(envelope))")
@@ -862,7 +858,7 @@ struct ArkDeckCommandLine {
     print("validating \(imagesPath) (streaming SHA-256; this can take a while)…")
     let board = try selectedProfile(options: options)
     let summary = try GzipTarArchiveReader.summarize(
-      fileAt: URL(fileURLWithPath: imagesPath),
+      fileAt: URL(filePath: imagesPath),
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
     // The plan is built for the archive in hand. Anything the board cannot
     // make a complete plan for is refused here, by name; a build nobody had
@@ -872,7 +868,8 @@ struct ArkDeckCommandLine {
       profile = try board.forBuild(
         RockchipImageArchiveIntrospection.describe(summary: summary, board: board))
     } catch {
-      throw CLIError(exitCode: 2, message: "archive does not fit \(board.catalogReference): \(error)")
+      throw CLIError(
+        exitCode: 2, message: "archive does not fit \(board.catalogReference): \(error)")
     }
     print("build: \(profile.runtimeBuildVersion)")
     let provider = RockchipRockUSBFlashProvider(profile: profile)
@@ -1005,9 +1002,9 @@ struct ArkDeckCommandLine {
   /// to find as it was.
   static func outputURL(_ options: CLIOptions, fileName: String) -> URL {
     if let chosen = options.value("--out") {
-      return URL(fileURLWithPath: chosen).appendingPathComponent(fileName)
+      return URL(filePath: chosen).appending(path: fileName)
     }
-    return defaultDocumentDirectory().appendingPathComponent(fileName)
+    return defaultDocumentDirectory().appending(path: fileName)
   }
 
   static func defaultDocumentDirectory() -> URL {

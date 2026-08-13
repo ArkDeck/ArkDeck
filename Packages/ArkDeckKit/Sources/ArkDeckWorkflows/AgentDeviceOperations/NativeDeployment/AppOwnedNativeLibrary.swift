@@ -347,8 +347,8 @@ package enum NativeLibraryArtifactValidator {
         data.subdata(in: nameStart..<(nameStart + 3)) == Data("GNU".utf8),
         descriptionSize > 0
       {
-        return data[descriptionStart..<(descriptionStart + descriptionSize)]
-          .map { String(format: "%02x", $0) }.joined()
+        return SHA256Hex.lowercaseHex(
+          data[descriptionStart..<(descriptionStart + descriptionSize)])
       }
       cursor = descriptionStart + paddedDescriptionSize
     }
@@ -506,15 +506,17 @@ public struct HDCAppOwnedNativeLibraryDeployment: Sendable, Equatable {
     codeSignHelperFacts: HDCNativeCodeSignHelperFacts? = nil,
     exactPaths: HDCAppOwnedNativeLibraryExactPaths? = nil
   ) throws {
-    guard jobID.range(
-      of: #"^[A-Za-z0-9][A-Za-z0-9-]{0,127}$"#,
-      options: .regularExpression) != nil
+    guard
+      jobID.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9-]{0,127}$"#,
+        options: .regularExpression) != nil
     else {
       throw DeviceProviderError.unsupportedAction("native deployment job identity is invalid")
     }
-    guard libraryLogicalName.range(
-      of: #"^lib[A-Za-z0-9_.-]+\.so$"#,
-      options: .regularExpression) != nil,
+    guard
+      libraryLogicalName.range(
+        of: #"^lib[A-Za-z0-9_.-]+\.so$"#,
+        options: .regularExpression) != nil,
       libraryLogicalName.count <= 128
     else {
       throw DeviceProviderError.unsupportedAction("native library logical name is invalid")

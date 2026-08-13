@@ -19,7 +19,7 @@ final class OverviewCapabilityApplicationFacadeContractTests: XCTestCase {
 
   func testProductionSourceUsesIndependentFactsAndThePublishedFlashOperation() throws {
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/OverviewCapabilityApplicationFacade.swift"),

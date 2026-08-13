@@ -164,7 +164,7 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
   }
 
   private func repositorySource(_ path: String) throws -> String {
-    var root = URL(fileURLWithPath: #filePath)
+    var root = URL(filePath: #filePath)
     for _ in 0..<5 { root.deleteLastPathComponent() }
     return try String(contentsOf: root.appending(path: path), encoding: .utf8)
   }

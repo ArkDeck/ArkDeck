@@ -87,7 +87,11 @@ private final class ConvergenceArtifactPort: HarnessArtifactPort, @unchecked Sen
       let ability: String
       if case .string(let value)? = inputs["abilityName"] { ability = value } else { ability = "" }
       let process: String
-      if case .string(let value)? = inputs["processName"] { process = value } else { process = bundle }
+      if case .string(let value)? = inputs["processName"] {
+        process = value
+      } else {
+        process = bundle
+      }
       let applicationRef = sha256Hex(Data("\(bundle)|\(ability)|\(process)".utf8))
       let liveness =
         #"{"documentType":"arkdeck-application-liveness","schemaVersion":"1.0.0","applicationRef":"\#(applicationRef)","state":"HEALTHY","reasonCode":"targetProcessRunning","abilityState":"UNKNOWN","processState":"RUNNING","pidObserved":true,"targetBindingRevision":1,"sourceRuntimeJobId":"\#(jobID)","sourceOperationRef":"capture.diagnostics@1","observationWindow":{"startedAtUtc":"2026-07-31T04:00:00Z","endedAtUtc":"2026-07-31T04:00:00Z"},"observedAtUtc":"2026-07-31T04:00:00Z"}"#
@@ -249,8 +253,8 @@ final class HarnessConvergenceContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-converge-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-converge-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -316,7 +320,8 @@ final class HarnessConvergenceContractTests: XCTestCase {
   func testAutoDriveConvergesASubmittedTaskWithNoExternalReconcile() async throws {
     let jobPort = SucceedingJobPort(operations: OperationLedger())
     let harness = try coordinator(
-      sensitiveEvidence: ["hilog.txt", "crash-index.txt"], sensitiveArtifacts: true, jobPort: jobPort)
+      sensitiveEvidence: ["hilog.txt", "crash-index.txt"], sensitiveArtifacts: true,
+      jobPort: jobPort)
     let submitted = try await harness.submit(submission())
 
     let ticker = HarnessAutoDriveTicker(
@@ -478,7 +483,8 @@ final class HarnessConvergenceContractTests: XCTestCase {
   func testThePlannedCaptureReachesTheEngineWithItsDeclaredInputs() async throws {
     let jobPort = SucceedingJobPort(operations: OperationLedger())
     let harness = try coordinator(
-      sensitiveEvidence: ["hilog.txt", "crash-index.txt"], sensitiveArtifacts: true, jobPort: jobPort)
+      sensitiveEvidence: ["hilog.txt", "crash-index.txt"], sensitiveArtifacts: true,
+      jobPort: jobPort)
     let submitted = try await harness.submit(submission())
     // observe, then capture: two reconciles reach the second dispatch.
     for _ in 0..<4 { _ = try? await harness.reconcile(submitted.htaskID) }

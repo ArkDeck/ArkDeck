@@ -225,7 +225,8 @@ final class HDCStatusUITests: XCTestCase {
       ],
       fixture: false)
     expandAdvancedDiagnostics(app)
-    assertDisplayedValue(app.staticTexts["hdc.toolchain.path"], equals: "/usr/bin/true", timeout: 15)
+    assertDisplayedValue(
+      app.staticTexts["hdc.toolchain.path"], equals: "/usr/bin/true", timeout: 15)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
       equals: "No recovery impact preview has been requested", timeout: 15)
@@ -310,7 +311,8 @@ final class HDCStatusUITests: XCTestCase {
     // predicate cannot double as the existence check — isEnabled on an
     // unresolved element is a query failure, not false.
     let openButton = openPanel.buttons["OKButton"]
-    XCTAssertTrue(openButton.waitForExistenceFast(timeout: 5), "Open panel must expose its Open button")
+    XCTAssertTrue(
+      openButton.waitForExistenceFast(timeout: 5), "Open panel must expose its Open button")
     assertEnabled(openButton, equals: true, timeout: 10)
     openButton.click()
 
@@ -572,7 +574,7 @@ final class HDCStatusUITests: XCTestCase {
   /// inode that teardown deletes.
   private func stagedPickerExecutable() throws -> URL {
     if let explicit = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_EXECUTABLE"] {
-      return URL(fileURLWithPath: explicit).standardizedFileURL
+      return URL(filePath: explicit).standardizedFileURL
     }
     let source = repositoryFakeHDCExecutable()
     let directory = FileManager.default.temporaryDirectory
@@ -588,7 +590,7 @@ final class HDCStatusUITests: XCTestCase {
   }
 
   private func repositoryRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

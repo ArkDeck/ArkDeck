@@ -213,7 +213,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
           for: endpoint.endpoint),
         postDispatchProbe: { step in
           await lifecyclePostDispatchProbe.observe(after: step)
-      })
+        })
       activeExecutionIdentity = executionIdentity
       activeCandidateCatalogID = candidateCatalogID
       if let identity = await observeRegisteredServerIdentity(
@@ -453,7 +453,7 @@ private actor HDCFixtureApplicationDiagnostics: HDCApplicationDiagnosticsProvidi
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
-      stateFileURL = URL(fileURLWithPath: arguments[index + 1])
+      stateFileURL = URL(filePath: arguments[index + 1])
     } else {
       stateFileURL = nil
     }

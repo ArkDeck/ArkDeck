@@ -18,7 +18,7 @@ else {
   exit(64)
 }
 
-let directory = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
+let directory = URL(filePath: CommandLine.arguments[2], directoryHint: .isDirectory)
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 let journal = try FileDurableJournal(url: directory.appending(path: "journal.jsonl"))
 let timestamp = "2026-07-16T00:00:00Z"

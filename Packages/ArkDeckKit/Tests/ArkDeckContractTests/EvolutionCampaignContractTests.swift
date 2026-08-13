@@ -2,11 +2,11 @@ import CryptoKit
 import Foundation
 import XCTest
 
+@testable import ArkDeckAgentComposition
 @testable import ArkDeckCore
 @testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
-@testable import ArkDeckAgentComposition
 @testable import ArkDeckWorkflows
 
 final class EvolutionCampaignContractTests: XCTestCase {
@@ -25,7 +25,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   /// requirements colliding through a default. Observed on the 7.0.0.34 window,
   /// where the file had to be deleted by hand between `plan` and `execute`.
   func testProducedDocumentsDoNotDefaultIntoTheWorkingTree() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
@@ -56,7 +56,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testFlashCLIDefaultsToCampaignAndRemovesLegacySelectors() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let sourceURL = packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift")
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
@@ -110,7 +110,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testTaskPromotionCLIExportsOverTheTaskPlaneAndFailsClosedWithoutATask() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let taskCLI = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
@@ -129,7 +129,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testProductCandidateToolchainProbeUsesIdentityBoundSwiftPMRole() async throws {
-    let repositoryRoot = URL(fileURLWithPath: #filePath)
+    let repositoryRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -221,7 +221,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   private func runCLI(_ arguments: [String]) throws -> (status: Int32, output: String) {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let process = Process()
     let output = Pipe()
@@ -235,7 +235,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
     return (
       process.terminationStatus,
       String(
-        decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
+        decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    )
   }
 
   func testCampaignLedgerAllowsExactlySixteenSerialSafeAttemptsAndRejectsSeventeenthOrConcurrent()
@@ -379,7 +380,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       _ = try await service.admit(
         permit: permit,
         facts: RockchipAuthorizationFactRequest(
-          archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+          archiveURL: URL(filePath: "/tmp/images.tar.gz"),
           sessionID: "session-next", jobID: "job-next", targetID: "target-next",
           targetLocationSelector: "42"),
         sessionID: "session-next", startingMode: .loader)
@@ -513,7 +514,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
         campaignID: assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     let dispatches = await flash.dispatchCount()
     XCTAssertEqual(dispatches, 0)
@@ -590,7 +591,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       flash: flash, nowUTC: { Self.confirmedAt })
     let result = try await host.continueCampaign(
       campaignID: assertion.campaignID,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 2)
@@ -656,7 +657,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       flash: flash, nowUTC: { Self.confirmedAt })
     let result = try await host.continueCampaign(
       campaignID: assertion.campaignID,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 2)
@@ -717,7 +718,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     do {
       _ = try await host.continueCampaign(
         campaignID: assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42")
       XCTFail("an unresolved mutation must keep the campaign sealed")
     } catch {}
@@ -779,7 +780,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     do {
       _ = try await host.continueCampaign(
         campaignID: assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42")
       XCTFail("a refused submission must surface to the operator")
     } catch let error as RockchipFlashExecutionError {
@@ -830,7 +831,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
         campaignID: assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     let unresolvedDispatches = await flash.dispatchCount()
     XCTAssertEqual(unresolvedDispatches, 0)
@@ -866,7 +867,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.executeConfirmedCampaign(
         confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     let rejectedDispatches = await flash.dispatchCount()
     XCTAssertEqual(rejectedDispatches, 1)
@@ -902,7 +903,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     let result = try await host.executeConfirmedCampaign(
       confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 2)
@@ -947,7 +948,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     _ = try await host.executeConfirmedCampaign(
       confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     let observedFailureCodes = await repairer.observedFailureCodes()
@@ -991,7 +992,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.executeConfirmedCampaign(
         confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
 
     let dispatches = await flash.dispatchCount()
@@ -1029,7 +1030,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     let result = try await host.executeConfirmedCampaign(
       confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 1)
@@ -1065,7 +1066,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     let result = try await host.executeConfirmedCampaign(
       confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 1)
@@ -1102,7 +1103,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     let result = try await host.executeConfirmedCampaign(
       confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 1)
@@ -1154,7 +1155,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     let result = try await host.executeConfirmedCampaign(
       confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     XCTAssertEqual(result.attemptOrdinal, 1)
@@ -1188,7 +1189,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.executeConfirmedCampaign(
         confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
 
     let dispatches = await flash.dispatchCount()
@@ -1251,34 +1252,34 @@ final class EvolutionCampaignContractTests: XCTestCase {
     // File channel (codex): stdout is noise, the answer is in the named file.
     let fileFixture = root.appending(path: "file-channel-fixture", directoryHint: .notDirectory)
     try """
-      #!/bin/sh
-      output=''
-      while [ "$#" -gt 0 ]; do
-        if [ "$1" = '--output-last-message' ]; then
-          output="$2"
-          shift 2
-          continue
-        fi
-        shift
-      done
-      printf '%s' 'session diagnostic that is not JSON\n'
-      printf '%s' '\(expected)' > "$output"
-      """.write(to: fileFixture, atomically: true, encoding: .utf8)
+    #!/bin/sh
+    output=''
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = '--output-last-message' ]; then
+        output="$2"
+        shift 2
+        continue
+      fi
+      shift
+    done
+    printf '%s' 'session diagnostic that is not JSON\n'
+    printf '%s' '\(expected)' > "$output"
+    """.write(to: fileFixture, atomically: true, encoding: .utf8)
 
     // Stdout channel (claude-code print mode): the answer is stdout itself,
     // and no output-file flag is ever passed.
     let stdoutFixture = root.appending(
       path: "stdout-channel-fixture", directoryHint: .notDirectory)
     try """
-      #!/bin/sh
-      for argument in "$@"; do
-        if [ "$argument" = '--output-last-message' ]; then
-          echo 'a stdout-channel profile must not be given an output file' >&2
-          exit 3
-        fi
-      done
-      printf '%s\\n' '\(expected)'
-      """.write(to: stdoutFixture, atomically: true, encoding: .utf8)
+    #!/bin/sh
+    for argument in "$@"; do
+      if [ "$argument" = '--output-last-message' ]; then
+        echo 'a stdout-channel profile must not be given an output file' >&2
+        exit 3
+      fi
+    done
+    printf '%s\\n' '\(expected)'
+    """.write(to: stdoutFixture, atomically: true, encoding: .utf8)
 
     for (profile, executable) in [
       (HarnessLocalAgentCLIProfile.codex, fileFixture),
@@ -1300,7 +1301,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testCandidateTargetAndSandboxHaveNoRuntimeDeviceNetworkOrRawProcessSurface() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let manifest = try String(
       contentsOf: packageRoot.appending(path: "Package.swift"), encoding: .utf8)
@@ -1320,8 +1321,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
     }
 
     let profile = ProductRockchipEvolutionCandidateBuilder.sandboxProfile(
-      candidateURL: URL(fileURLWithPath: "/private/tmp/candidate"),
-      requestURL: URL(fileURLWithPath: "/private/tmp/request.json"))
+      candidateURL: URL(filePath: "/private/tmp/candidate"),
+      requestURL: URL(filePath: "/private/tmp/request.json"))
     XCTAssertTrue(profile.contains("(deny default)"))
     XCTAssertTrue(profile.contains("(import \"dyld-support.sb\")"))
     XCTAssertTrue(
@@ -1337,12 +1338,12 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testCandidateSandboxLaunchesOnlyTheExactCandidateLiteral() throws {
-    let sandbox = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
-    let candidate = URL(fileURLWithPath: "/usr/bin/true")
-    let otherExecutable = URL(fileURLWithPath: "/usr/bin/false")
+    let sandbox = URL(filePath: "/usr/bin/sandbox-exec")
+    let candidate = URL(filePath: "/usr/bin/true")
+    let otherExecutable = URL(filePath: "/usr/bin/false")
     let profile = ProductRockchipEvolutionCandidateBuilder.sandboxProfile(
       candidateURL: candidate,
-      requestURL: URL(fileURLWithPath: "/private/tmp/unused-candidate-request.json"))
+      requestURL: URL(filePath: "/private/tmp/unused-candidate-request.json"))
 
     func run(_ executable: URL) throws -> (status: Int32, stderr: String) {
       let process = Process()
@@ -1354,7 +1355,8 @@ final class EvolutionCampaignContractTests: XCTestCase {
       process.waitUntilExit()
       return (
         process.terminationStatus,
-        String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
+        String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      )
     }
 
     let exact = try run(candidate)
@@ -1437,7 +1439,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.executeConfirmedCampaign(
         confirmationDigestSHA256: assertion.confirmationDigestSHA256,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     XCTAssertThrowsError(
       try ledger.load(expiredDraft.campaignID),
@@ -1451,7 +1453,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
         campaignID: assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     XCTAssertThrowsError(try ledger.load(secondExpired.campaignID))
 
@@ -1460,7 +1462,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testPreviewSourceSweepsExpiredDraftsBeforePersistingItsOwnDraft() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(
       contentsOf: packageRoot.appending(
@@ -1538,7 +1540,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   }
 
   func testActiveFlashCLICannotReachHistoricalCampaignWriters() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
@@ -1582,7 +1584,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
 
     let result = try await host.continueCampaign(
       campaignID: context.assertion.campaignID,
-      archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+      archiveURL: URL(filePath: "/tmp/images.tar.gz"),
       targetLocationSelector: "42")
 
     // The unknown attempt is settled as a no-effect failure and the campaign
@@ -1661,7 +1663,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       await ain019AssertThrowsAsync(
         try await host.continueCampaign(
           campaignID: context.assertion.campaignID,
-          archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+          archiveURL: URL(filePath: "/tmp/images.tar.gz"),
           targetLocationSelector: "42"))
       let dispatches = await flash.dispatchCount()
       XCTAssertEqual(dispatches, 0, row.label)
@@ -1692,7 +1694,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
         campaignID: context.assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
     XCTAssertEqual(
       try context.ledger.load(context.assertion.campaignID).events
@@ -1755,7 +1757,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
         bindingSnapshot: ArtifactBindingSnapshot(
           targetID: "TGT-DAYU200-70035", bindingRevision: 7,
           stableIdentitySHA256: Self.engineDeviceIdentity),
-        sourceFileURL: URL(fileURLWithPath: archivePath).standardizedFileURL,
+        sourceFileURL: URL(filePath: archivePath).standardizedFileURL,
         expectedByteCount: Int(profile.archiveSizeBytes),
         expectedSHA256: profile.archiveSHA256))
     let lease = try await artifactStore.leaseReference(
@@ -1873,7 +1875,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
       await ain019AssertThrowsAsync(
         try await host.continueCampaign(
           campaignID: context.assertion.campaignID,
-          archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+          archiveURL: URL(filePath: "/tmp/images.tar.gz"),
           targetLocationSelector: "42"))
       let closed = try XCTUnwrap(
         try context.ledger.load(context.assertion.campaignID).events
@@ -1916,7 +1918,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     await ain019AssertThrowsAsync(
       try await host.continueCampaign(
         campaignID: context.assertion.campaignID,
-        archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"),
+        archiveURL: URL(filePath: "/tmp/images.tar.gz"),
         targetLocationSelector: "42"))
 
     let closed = try XCTUnwrap(
@@ -2021,7 +2023,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     // have executed ends its job, so the job's status is `failed` and never
     // `outcomeUnknown`.
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift"),
@@ -2044,7 +2046,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
   /// ended `outcomeUnknown` and the refusal named no cause.
   func testContinueSaysWhetherTheCampaignEndedOrTheConfirmationLapsed() throws {
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/AgentComposition/EvolutionCampaignHost.swift"),

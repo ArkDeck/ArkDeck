@@ -1628,7 +1628,7 @@ package struct HDCApplicationDiagnosticsExecutionCatalog: Sendable {
         let adapter = try DurableHDCServerLifecycleAuditStore(
           auditStore: auditStore,
           manifestPublisher: AtomicSessionManifestPublisher(layout: layout),
-          timestamp: { ISO8601DateFormatter().string(from: Date()) })
+          timestamp: { ISO8601Timestamps.string(from: Date()) })
         if try adapter.lifecycleRecoveryGate() != nil {
           return HDCApplicationDiagnosticsExecutionIdentity(
             sessionID: locator.sessionID,
@@ -1840,7 +1840,7 @@ package enum HDCSessionDiagnosticsBootstrap {
     }
     let layout = try SessionLayout(sessionID: sessionID, jobID: jobID, root: sessionRoot)
     let durableAudit = try FileDurableSessionAuditStore(layout: layout)
-    let timestamp: @Sendable () -> String = { ISO8601DateFormatter().string(from: Date()) }
+    let timestamp: @Sendable () -> String = { ISO8601Timestamps.string(from: Date()) }
     let intentStore = DurableHDCJobToolchainIntentStore(
       auditStore: durableAudit, timestamp: timestamp)
     let adapter = try DurableHDCServerLifecycleAuditStore(

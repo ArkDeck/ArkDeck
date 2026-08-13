@@ -3,6 +3,7 @@ import ArkDeckProcess
 import CryptoKit
 import Darwin
 import Foundation
+
 struct HDCProcessCommand: Sendable, Equatable {
   let toolchain: HDCCandidate
   let endpoint: HDCServerEndpointSelection
@@ -1281,7 +1282,6 @@ public actor HDCProcessLifecycleExecutor: HDCServerLifecycleExecutor {
   }
 }
 
-
 package enum HDCApplicationDiagnosticsConfiguration {
   package static let userConfiguredPathsPreferenceKey = "ArkDeck.HDC.userConfiguredPaths"
   package static let userConfiguredBookmarksPreferenceKey =
@@ -1373,7 +1373,7 @@ package enum HDCApplicationDiagnosticsConfiguration {
 
   private static func absoluteURL(_ value: String) -> URL? {
     guard value.hasPrefix("/") else { return nil }
-    return URL(fileURLWithPath: value)
+    return URL(filePath: value)
   }
 
   private static func restoreUserConfiguredBookmarks(
@@ -1455,10 +1455,8 @@ public struct HDCDeviceObservationPresentationEvent: Sendable, Equatable {
     kind: HDCDeviceObservationPresentationKind,
     redactedDeviceIdentifier: String?
   ) {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    timestamp = formatter.string(from: acceptedAt)
+    timestamp = ISO8601Timestamps.string(
+      from: acceptedAt, includingFractionalSeconds: true)
     self.kind = kind
     self.redactedDeviceIdentifier = redactedDeviceIdentifier
   }
@@ -2084,7 +2082,7 @@ actor HDCRegisteredDeviceObservationSource: HDCDeviceObservationSnapshotProvidin
       connectKey in
       let code = HMAC<SHA256>.authenticationCode(
         for: Data(connectKey.utf8), using: pseudonymKey)
-      let digest = code.map { String(format: "%02x", $0) }.joined().prefix(24)
+      let digest = SHA256Hex.lowercaseHex(code).prefix(24)
       return HDCObservedDeviceIdentifier(redactedKey: "redacted-device-\(digest)")
     }
   }

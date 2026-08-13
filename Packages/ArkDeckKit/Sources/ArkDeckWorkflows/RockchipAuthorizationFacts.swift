@@ -38,7 +38,7 @@ final class RockchipContinuousAdmissionClock: @unchecked Sendable, RockchipAdmis
     let nanoseconds = UInt64(seconds) * 1_000_000_000 + UInt64(attoseconds / 1_000_000_000)
     return RockchipTrustedClockReading(
       monotonicNanoseconds: nanoseconds,
-      auditTimestamp: ISO8601DateFormatter().string(from: Date()))
+      auditTimestamp: ISO8601Timestamps.string(from: Date()))
   }
 }
 
@@ -319,7 +319,6 @@ struct RockchipAuthorizationFactCollector: RockchipAuthorizationFactCollecting {
     self.clock = clock
     self.provider = provider
   }
-
 
   func collect(
     request: RockchipAuthorizationFactRequest,

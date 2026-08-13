@@ -11,8 +11,8 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-target-alias-reconciliation", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-target-alias-reconciliation", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.lowercased(), directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -73,8 +73,9 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     _ = try admission.admit(
       record: unknownBefore, requestHash: String(repeating: "f", count: 64))
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: fixture.stateDirectory.appendingPathComponent(
-        "capabilities", isDirectory: true))
+      directoryURL: fixture.stateDirectory.appending(
+        path:
+          "capabilities", directoryHint: .isDirectory))
     let resolver = try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc")
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: fixture.stateDirectory),
@@ -97,11 +98,12 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
 
   func testUnreadableHistoricalJobFailsClosedInsteadOfBeingSkipped() throws {
     let fixture = try makeFixture(unknownStepID: "enter-loader-mode")
-    let malformed = root.appendingPathComponent(
-      "state/jobs/job-33333333333333333333333333333333", isDirectory: true)
+    let malformed = root.appending(
+      path:
+        "state/jobs/job-33333333333333333333333333333333", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: malformed, withIntermediateDirectories: true)
     try Data("not-json".utf8).write(
-      to: malformed.appendingPathComponent("job-record.json"))
+      to: malformed.appending(path: "job-record.json"))
 
     XCTAssertThrowsError(try fixture.reconciler.reconcileIfProven())
     XCTAssertTrue(try fixture.targetStore.aliasResolutions().isEmpty)
@@ -119,11 +121,12 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
   }
 
   private func makeFixture(unknownStepID: String) throws -> Fixture {
-    let state = root.appendingPathComponent("state", isDirectory: true)
-    let applicationSupport = root.appendingPathComponent(
-      "application-support", isDirectory: true)
+    let state = root.appending(path: "state", directoryHint: .isDirectory)
+    let applicationSupport = root.appending(
+      path:
+        "application-support", directoryHint: .isDirectory)
     let targetStore = try RuntimeTargetStore(
-      directoryURL: state.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: state.appending(path: "targets", directoryHint: .isDirectory))
     let bindingStore = RockchipProductBindingStore(rootURL: applicationSupport)
     let postFlashStore = RockchipPostFlashHDCBindingStore(rootURL: applicationSupport)
     let originalConnectKey = "original-hdc-address"
@@ -132,7 +135,8 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     let loaderIdentity = digest(loaderSerial)
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: originalIdentity, connectKey: originalConnectKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let canonical = try targetStore.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
@@ -156,7 +160,8 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     let aliasIdentity = digest(aliasConnectKey)
     let alias = try targetStore.adopt(
       stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z"
+    ).record
     let unknownJobID = "job-22222222222222222222222222222222"
     let unknownDirectory = try writeUnknownJob(
       state: state, jobID: unknownJobID, target: alias,
@@ -214,7 +219,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     let directory = try jobDirectory(state: state, jobID: jobID)
     try record.persist(into: directory)
     let journal = try FileDurableJournal(
-      url: directory.appendingPathComponent("journal.jsonl"))
+      url: directory.appending(path: "journal.jsonl"))
     var sequence = try appendRunningPrefix(
       journal: journal, record: record, timestamp: timestamp)
     let step = try workflowStep(stepID)
@@ -263,7 +268,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
     let directory = try jobDirectory(state: state, jobID: jobID)
     try record.persist(into: directory)
     let journal = try FileDurableJournal(
-      url: directory.appendingPathComponent("journal.jsonl"))
+      url: directory.appending(path: "journal.jsonl"))
     var sequence = try appendRunningPrefix(
       journal: journal, record: record, timestamp: startedAtUTC)
     for stepID in [
@@ -422,7 +427,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
   }
 
   private func jobDirectory(state: URL, jobID: String) throws -> URL {
-    let directory = state.appendingPathComponent("jobs/\(jobID)", isDirectory: true)
+    let directory = state.appending(path: "jobs/\(jobID)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: directory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])

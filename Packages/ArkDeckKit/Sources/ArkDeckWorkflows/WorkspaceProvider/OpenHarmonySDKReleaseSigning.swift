@@ -56,11 +56,11 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
     try Self.validateIdentifier(configuration.projectRef, name: "projectRef")
     try Self.validateBundleName(configuration.bundleName)
     let sdkRoot = try validatedSDKRoot(configuration.sdkRoot)
-    let library = sdkRoot.appendingPathComponent("toolchains/lib", isDirectory: true)
-    let signerJAR = library.appendingPathComponent("hap-sign-tool.jar")
-    let sourceKeystore = library.appendingPathComponent("OpenHarmony.p12")
-    let profileCertificate = library.appendingPathComponent("OpenHarmonyProfileRelease.pem")
-    let profileTemplate = library.appendingPathComponent("UnsgnedReleasedProfileTemplate.json")
+    let library = sdkRoot.appending(path: "toolchains/lib", directoryHint: .isDirectory)
+    let signerJAR = library.appending(path: "hap-sign-tool.jar")
+    let sourceKeystore = library.appending(path: "OpenHarmony.p12")
+    let profileCertificate = library.appending(path: "OpenHarmonyProfileRelease.pem")
+    let profileTemplate = library.appending(path: "UnsgnedReleasedProfileTemplate.json")
 
     _ = try OpenHarmonySigningPresetStore.measure(
       configuration.javaExecutable, role: "java", mustBeExecutable: true)
@@ -78,8 +78,9 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
       attributes: [.posixPermissions: 0o700])
     try fileManager.setAttributes(
       [.posixPermissions: 0o700], ofItemAtPath: materialParentURL.path)
-    let material = materialParentURL.appendingPathComponent(
-      "sdk-release-\(UUID().uuidString.lowercased())", isDirectory: true)
+    let material = materialParentURL.appending(
+      path:
+        "sdk-release-\(UUID().uuidString.lowercased())", directoryHint: .isDirectory)
     try fileManager.createDirectory(
       at: material, withIntermediateDirectories: false,
       attributes: [.posixPermissions: 0o700])
@@ -88,17 +89,17 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
       if !committed { try? fileManager.removeItem(at: material) }
     }
 
-    let keystore = material.appendingPathComponent("OpenHarmony.p12")
-    let appCertificate = material.appendingPathComponent("OpenHarmonyApplicationRelease.pem")
-    let unsignedProfile = material.appendingPathComponent("release-profile.json")
-    let signedProfile = material.appendingPathComponent("release-profile.p7b")
-    let profileVerification = material.appendingPathComponent("profile-verification.json")
+    let keystore = material.appending(path: "OpenHarmony.p12")
+    let appCertificate = material.appending(path: "OpenHarmonyApplicationRelease.pem")
+    let unsignedProfile = material.appending(path: "release-profile.json")
+    let signedProfile = material.appending(path: "release-profile.p7b")
+    let profileVerification = material.appending(path: "profile-verification.json")
 
     try copyPrivate(
       source: sourceKeystore, expected: sourceKeystoreIdentity, destination: keystore)
     try copyPrivate(
       source: profileCertificate, expected: profileCertificateIdentity,
-      destination: material.appendingPathComponent("OpenHarmonyProfileRelease.pem"))
+      destination: material.appending(path: "OpenHarmonyProfileRelease.pem"))
     let generated = try generateProfile(
       template: profileTemplate, expected: profileTemplateIdentity,
       bundleName: configuration.bundleName)
@@ -113,7 +114,7 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
     try await signProfile(
       java: configuration.javaExecutable, signerJAR: signerJAR,
       signerJARIdentity: jarIdentity, keystore: keystore,
-      profileCertificate: material.appendingPathComponent("OpenHarmonyProfileRelease.pem"),
+      profileCertificate: material.appending(path: "OpenHarmonyProfileRelease.pem"),
       unsignedProfile: unsignedProfile, signedProfile: signedProfile)
     try await verifyProfile(
       java: configuration.javaExecutable, signerJAR: signerJAR,
@@ -140,7 +141,7 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
     if let oldPath = previous?.managedMaterialDirectory,
       oldPath != material.path
     {
-      let old = URL(fileURLWithPath: oldPath).standardizedFileURL
+      let old = URL(filePath: oldPath).standardizedFileURL
       if old.path == oldPath,
         old.deletingLastPathComponent().path == materialParentURL.path
       {
@@ -265,15 +266,18 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
     let input = try VerifiedRegularFileDescriptor.open(
       path: unsignedProfile,
       expectedSHA256: OpenHarmonySigningPresetStore.measure(
-        unsignedProfile, role: "generated release profile").sha256)
+        unsignedProfile, role: "generated release profile"
+      ).sha256)
     let keyStore = try VerifiedRegularFileDescriptor.open(
       path: keystore,
       expectedSHA256: OpenHarmonySigningPresetStore.measure(
-        keystore, role: "managed SDK release keystore", ownerPrivate: true).sha256)
+        keystore, role: "managed SDK release keystore", ownerPrivate: true
+      ).sha256)
     let certificate = try VerifiedRegularFileDescriptor.open(
       path: profileCertificate,
       expectedSHA256: OpenHarmonySigningPresetStore.measure(
-        profileCertificate, role: "managed SDK profile certificate").sha256)
+        profileCertificate, role: "managed SDK profile certificate"
+      ).sha256)
     defer {
       jar.close()
       input.close()
@@ -299,7 +303,8 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
           ],
           workingDirectory: unsignedProfile.deletingLastPathComponent(), timeout: 120),
         expectedSHA256: try OpenHarmonySigningPresetStore.measure(
-          java, role: "java", mustBeExecutable: true).sha256),
+          java, role: "java", mustBeExecutable: true
+        ).sha256),
       interactions: [
         IdentityBoundPTYInteraction(
           expectedPrompt: Data("please input KeystorePwd (timeout 30 seconds):".utf8),
@@ -311,7 +316,8 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
       verifiedResources: [jar, input, keyStore, certificate])
     guard case .exited(0) = result.termination, result.completedInteractions == 2 else {
       throw OpenHarmonySigningError.ioFailure(
-        "SDK release profile signer failed with closed diagnostic \(result.failureCategory.rawValue)")
+        "SDK release profile signer failed with closed diagnostic \(result.failureCategory.rawValue)"
+      )
     }
     try fileManager.setAttributes(
       [.posixPermissions: 0o600], ofItemAtPath: signedProfile.path)
@@ -329,7 +335,8 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
     let profile = try VerifiedRegularFileDescriptor.open(
       path: signedProfile,
       expectedSHA256: OpenHarmonySigningPresetStore.measure(
-        signedProfile, role: "signed SDK release profile").sha256)
+        signedProfile, role: "signed SDK release profile"
+      ).sha256)
     defer {
       jar.close()
       profile.close()
@@ -345,7 +352,8 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
           ],
           workingDirectory: signedProfile.deletingLastPathComponent(), timeout: 120),
         expectedSHA256: try OpenHarmonySigningPresetStore.measure(
-          java, role: "java", mustBeExecutable: true).sha256),
+          java, role: "java", mustBeExecutable: true
+        ).sha256),
       verifiedResources: [jar, profile], captureLimit: 256 * 1_024)
     guard case .exited(0) = result.execution.termination,
       !result.execution.stdout.wasTruncated, !result.execution.stderr.wasTruncated,
@@ -384,13 +392,15 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
   private func copyPrivate(
     source: URL, expected: OpenHarmonySigningFileIdentity, destination: URL
   ) throws {
-    guard try OpenHarmonySigningPresetStore.measure(source, role: "SDK signing material")
-      == expected
+    guard
+      try OpenHarmonySigningPresetStore.measure(source, role: "SDK signing material")
+        == expected
     else { throw OpenHarmonySigningError.identityDrift("SDK signing material") }
     let bytes = try Data(contentsOf: source, options: [.uncached])
     try writePrivate(bytes, to: destination)
-    guard try OpenHarmonySigningPresetStore.measure(source, role: "SDK signing material")
-      == expected
+    guard
+      try OpenHarmonySigningPresetStore.measure(source, role: "SDK signing material")
+        == expected
     else { throw OpenHarmonySigningError.identityDrift("SDK signing material") }
   }
 
@@ -401,9 +411,10 @@ package final class OpenHarmonySDKReleasePresetInstaller: @unchecked Sendable {
   }
 
   private static func validateIdentifier(_ value: String, name: String) throws {
-    guard value.range(
-      of: #"^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$"#,
-      options: .regularExpression) != nil
+    guard
+      value.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$"#,
+        options: .regularExpression) != nil
     else { throw OpenHarmonySigningError.invalidConfiguration("\(name) is malformed") }
   }
 

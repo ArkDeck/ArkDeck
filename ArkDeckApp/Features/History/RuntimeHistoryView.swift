@@ -800,7 +800,8 @@ struct RuntimeHistoryView: View {
         }
         .disabled(
           artifact.status != "published"
-            || exportStatesByArtifactID[artifact.id] == .exporting)
+            || exportStatesByArtifactID[artifact.id] == .exporting
+        )
         .accessibilityIdentifier("history.artifact.export.\(artifact.id)")
         if case .completed(let url) = exportStatesByArtifactID[artifact.id] {
           Button(historyLocalized("history.artifacts.showInFinder")) {
@@ -841,7 +842,8 @@ struct RuntimeHistoryView: View {
   }
 
   private func safeExportName(_ value: String) -> String {
-    let sanitized = value
+    let sanitized =
+      value
       .replacingOccurrences(of: "/", with: "_")
       .replacingOccurrences(of: ":", with: "_")
     return sanitized.isEmpty ? "ArkDeck-Artifact" : sanitized
@@ -995,7 +997,7 @@ struct RuntimeHistoryView: View {
 
   private static func parseUTC(_ value: String?) -> Date? {
     guard let value else { return nil }
-    return ISO8601DateFormatter().date(from: value)
+    return try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value)
   }
 
   private func formattedUTC(_ value: String?) -> String {

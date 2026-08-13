@@ -28,7 +28,7 @@ else {
   exit(64)
 }
 
-let directory = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
+let directory = URL(filePath: CommandLine.arguments[2], directoryHint: .isDirectory)
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
 struct FixtureFactsPort: HDCObservationFactsPort {
@@ -69,13 +69,13 @@ struct StoppingDispatcher: RuntimeProcessDispatching {
       break
     }
     if window == .afterDispatchBeforeOutcome {
-      let marker = directory.appendingPathComponent("external-effect-marker")
+      let marker = directory.appending(path: "external-effect-marker")
       try Data("synthetic".utf8).write(to: marker, options: [])
       let handle = try FileHandle(forWritingTo: marker)
       try handle.synchronize()
       try handle.close()
     }
-    let ready = directory.appendingPathComponent("ready")
+    let ready = directory.appending(path: "ready")
     try Data(window.rawValue.utf8).write(to: ready, options: [])
     let readyHandle = try FileHandle(forWritingTo: ready)
     try readyHandle.synchronize()
@@ -85,9 +85,9 @@ struct StoppingDispatcher: RuntimeProcessDispatching {
   }
 }
 
-let engineState = directory.appendingPathComponent("engine-state", isDirectory: true)
+let engineState = directory.appending(path: "engine-state", directoryHint: .isDirectory)
 let capabilityStore = try RuntimeCapabilityStore(
-  directoryURL: directory.appendingPathComponent("capabilities", isDirectory: true))
+  directoryURL: directory.appending(path: "capabilities", directoryHint: .isDirectory))
 let engine = try RuntimeJobEngine(
   configuration: .init(stateDirectory: engineState),
   providers: DeviceProviderRegistry(providers: [

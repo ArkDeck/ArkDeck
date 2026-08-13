@@ -620,7 +620,7 @@ public actor HarnessTaskCoordinator {
         observation.state == JobState.waitingForRecovery.rawValue
         && !observation.timeline.contains(where: { $0.hasPrefix("reconcile started ") })
       let isInterruptedRecovery = observation.state == JobState.reconciling.rawValue
-      if (isUnattemptedRecovery || isInterruptedRecovery),
+      if isUnattemptedRecovery || isInterruptedRecovery,
         observation.outcomeUnknown,
         let actualEffect = observation.actualEffect,
         actualEffect <= .readOnly
@@ -2467,7 +2467,8 @@ public actor HarnessTaskCoordinator {
         for: evaluation, criteria: snapshot.successCriteria)
       switch escalation {
       case .requestHuman, .failTask:
-        let terminalStatus: HarnessTaskLifecycle = escalation == .failTask ? .failed : .humanRequired
+        let terminalStatus: HarnessTaskLifecycle =
+          escalation == .failTask ? .failed : .humanRequired
         let reason = "inconclusive:\(escalation == .failTask ? "failTask" : "requestHuman")"
         try await recordAttemptEvaluation(
           taskID: snapshot.htaskID, evaluation: evaluation,
@@ -2790,10 +2791,8 @@ public actor HarnessTaskCoordinator {
   // MARK: - Clock
 
   func elapsedSeconds(since startUTC: String) -> Int? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    guard let start = formatter.date(from: startUTC),
-      let now = formatter.date(from: nowUTC())
+    guard let start = ISO8601Timestamps.parse(startUTC),
+      let now = ISO8601Timestamps.parse(nowUTC())
     else { return nil }
     return Int(now.timeIntervalSince(start))
   }

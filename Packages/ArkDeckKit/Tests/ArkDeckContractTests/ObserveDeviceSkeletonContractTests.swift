@@ -22,7 +22,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     }
 
     let nonExecutable = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-non-executable-\(UUID().uuidString)")
+      .appending(path: "arkdeck-non-executable-\(UUID().uuidString)")
     try Data("not executable".utf8).write(to: nonExecutable)
     defer { try? FileManager.default.removeItem(at: nonExecutable) }
     XCTAssertThrowsError(
@@ -32,15 +32,15 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     }
 
     let symlink = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-hdc-link-\(UUID().uuidString)")
+      .appending(path: "arkdeck-hdc-link-\(UUID().uuidString)")
     try FileManager.default.createSymbolicLink(
-      at: symlink, withDestinationURL: URL(fileURLWithPath: "/bin/ls"))
+      at: symlink, withDestinationURL: URL(filePath: "/bin/ls"))
     defer { try? FileManager.default.removeItem(at: symlink) }
     let resolver = try FixedExecutableResolver.hashing(path: symlink.path, providerID: "hdc")
     let resolved = try resolver.resolveExecutable(providerID: "hdc")
     XCTAssertEqual(
       resolved.path,
-      URL(fileURLWithPath: "/bin/ls").resolvingSymlinksInPath().standardizedFileURL.path)
+      URL(filePath: "/bin/ls").resolvingSymlinksInPath().standardizedFileURL.path)
     XCTAssertEqual(resolved.sha256.count, 64)
   }
 
@@ -50,9 +50,9 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-skeleton-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
-    let fixture = productsDirectory.appendingPathComponent("ArkDeckFakeHDCFixture")
+      .appending(path: "arkdeck-skeleton-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
+    let fixture = productsDirectory.appending(path: "ArkDeckFakeHDCFixture")
     guard FileManager.default.fileExists(atPath: fixture.path) else {
       throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
     }
@@ -86,9 +86,9 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     RuntimeControlPlaneHandler, RuntimeJobEngine, RuntimeTargetStore
   ) {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let resolver = try FixedExecutableResolver.hashing(
       path: toolURL.path, providerID: "hdc")
     let dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
@@ -97,7 +97,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     let providers = DeviceProviderRegistry(providers: [provider])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers, dispatcher: dispatcher, capabilityStore: capabilityStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let bootstrap = DeviceBootstrapMachine(

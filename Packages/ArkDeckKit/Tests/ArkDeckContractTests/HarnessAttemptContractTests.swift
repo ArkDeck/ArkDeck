@@ -136,8 +136,8 @@ final class HarnessAttemptContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-attempt-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-attempt-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -246,9 +246,11 @@ final class HarnessAttemptContractTests: XCTestCase {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let patch = try proposal()
     var observed = HarnessObservedState(latestVerdict: .inconclusive).asJSON
-    observed[HarnessRepairAttempt.observedStateKey] = HarnessRepairAttempt(
-      proposal: patch, patchAttemptRef: "patch-fixture",
-      deployedDigest: String(repeating: "d", count: 64)).json
+    observed[HarnessRepairAttempt.observedStateKey] =
+      HarnessRepairAttempt(
+        proposal: patch, patchAttemptRef: "patch-fixture",
+        deployedDigest: String(repeating: "d", count: 64)
+      ).json
     let snapshot = taskSnapshot(stage: .verifying, observedState: observed)
     try await store.create(snapshot)
     let active = HarnessAttempt(
@@ -385,7 +387,8 @@ final class HarnessAttemptContractTests: XCTestCase {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let failing = taskSnapshot(
       observedState: HarnessObservedState(
-        latestVerdict: .fail, blockers: ["DC-1 failed"]).asJSON)
+        latestVerdict: .fail, blockers: ["DC-1 failed"]
+      ).asJSON)
     try await store.create(failing)
     let patch = try proposal()
     let patchBytes = try proposalBytes(
@@ -496,7 +499,8 @@ final class HarnessAttemptContractTests: XCTestCase {
       stage: .building,
       observedState: [
         HarnessRepairAttempt.observedStateKey: HarnessRepairAttempt(
-          proposal: proposal, patchRevision: String(repeating: "f", count: 64)).json
+          proposal: proposal, patchRevision: String(repeating: "f", count: 64)
+        ).json
       ], version: 3)
     let patched = HarnessTaskCoordinator.progress(
       before: before, after: withPatch, newFailures: 0)
@@ -528,10 +532,11 @@ final class HarnessAttemptContractTests: XCTestCase {
         maxE1Mutations: 0, maxNoProgressRounds: 0, maxActionRetriesPerRun: 1),
       policy: HarnessTaskCoordinator.defaultPolicy(for: .debugCrash))
     XCTAssertThrowsError(
-      try invalid.validate(permittedOperations: DebugCrashTaskHandler().permittedOperations)) {
-        XCTAssertEqual(
-          $0 as? HarnessTaskSubmissionError, .budgetOutOfRange("maxNoProgressRounds"))
-      }
+      try invalid.validate(permittedOperations: DebugCrashTaskHandler().permittedOperations)
+    ) {
+      XCTAssertEqual(
+        $0 as? HarnessTaskSubmissionError, .budgetOutOfRange("maxNoProgressRounds"))
+    }
   }
 
   func testNoProgressBudgetRefusesOnlyTheSameStrategy() async {

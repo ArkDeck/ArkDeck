@@ -96,8 +96,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-complete-overwrite-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-complete-overwrite-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: stateDirectory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -147,7 +147,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   func testRecoveryStoreRejectsTamperedHashChain() async throws {
     let store = try RuntimeSupersedingRecoveryStore(stateDirectory: stateDirectory)
     _ = try await store.append(recoveryDraft())
-    let url = stateDirectory.appendingPathComponent("superseding-recovery-epochs.json")
+    let url = stateDirectory.appending(path: "superseding-recovery-epochs.json")
     var data = try Data(contentsOf: url)
     let original = Data(String(repeating: "7", count: 64).utf8)
     let replacement = Data(String(repeating: "8", count: 64).utf8)
@@ -179,7 +179,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private func assertLoaderBindingSettlement(currentBindingRevision: Int) async throws {
     let archive = try recoveryArchive()
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-08T01:00:00Z" })
     let artifact = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
@@ -195,7 +195,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let lease = try await artifactStore.leaseReference(
       jobID: artifact.jobID, artifactID: artifact.artifactID)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: stateDirectory),
@@ -245,8 +245,9 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let dispatches = await dispatchLog.snapshot()
     XCTAssertEqual(dispatches, ["enter-loader-mode"])
     let replay = try DurableJournalRecovery.inspect(
-      url: stateDirectory.appendingPathComponent(
-        "jobs/\(accepted.jobID)/journal.jsonl"))
+      url: stateDirectory.appending(
+        path:
+          "jobs/\(accepted.jobID)/journal.jsonl"))
     XCTAssertTrue(replay.outstandingIntents.isEmpty)
     XCTAssertTrue(replay.unknownOutcomes.isEmpty)
     XCTAssertEqual(replay.currentState, .failed)
@@ -286,7 +287,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: second.recordURL), originalSecond)
 
     let epochs = try await RuntimeSupersedingRecoveryStore(
-      stateDirectory: stateDirectory).list()
+      stateDirectory: stateDirectory
+    ).list()
     let epoch = try XCTUnwrap(epochs.only)
     XCTAssertEqual(admission.recognizedEpoch, epoch)
     XCTAssertEqual(epoch.source, .historicalRecognition)
@@ -322,7 +324,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(context?.coveredIntents.count, 1)
     XCTAssertNil(admission.recognizedEpoch)
     let epochs = try await RuntimeSupersedingRecoveryStore(
-      stateDirectory: stateDirectory).list()
+      stateDirectory: stateDirectory
+    ).list()
     XCTAssertTrue(epochs.isEmpty)
   }
 
@@ -409,7 +412,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let originalJournal = try Data(contentsOf: old.journalURL)
     let archive = try recoveryArchive()
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-08T01:00:00Z" })
     let artifact = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
@@ -425,7 +428,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let lease = try await artifactStore.leaseReference(
       jobID: artifact.jobID, artifactID: artifact.artifactID)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: stateDirectory),
@@ -454,11 +457,13 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertNotNil(status.recoveryEpochID)
     XCTAssertEqual(try Data(contentsOf: old.recordURL), originalRecord)
     XCTAssertEqual(try Data(contentsOf: old.journalURL), originalJournal)
-    let recoveryDirectory = stateDirectory
-      .appendingPathComponent("jobs/\(acceptance.jobID)", isDirectory: true)
-    let recoveryJournalURL = recoveryDirectory.appendingPathComponent("journal.jsonl")
+    let recoveryDirectory =
+      stateDirectory
+      .appending(path: "jobs/\(acceptance.jobID)", directoryHint: .isDirectory)
+    let recoveryJournalURL = recoveryDirectory.appending(path: "journal.jsonl")
     let recoveryReplay = try DurableJournalRecovery.inspect(url: recoveryJournalURL)
-    XCTAssertEqual(recoveryReplay.schemaVersion, JournalEvent.completeOverwriteRecoverySchemaVersion)
+    XCTAssertEqual(
+      recoveryReplay.schemaVersion, JournalEvent.completeOverwriteRecoverySchemaVersion)
     XCTAssertTrue(
       recoveryReplay.events.allSatisfy {
         $0.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion
@@ -476,16 +481,19 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(dispatches.filter { $0 == "flash-partitions" }.count, 1)
     XCTAssertEqual(dispatches.filter { $0 == "enter-loader-mode" }.count, 1)
     let epochs = try await RuntimeSupersedingRecoveryStore(
-      stateDirectory: stateDirectory).list()
+      stateDirectory: stateDirectory
+    ).list()
     let epoch = try XCTUnwrap(epochs.only)
     XCTAssertEqual(epoch.source, .distinctRecoveryExecution)
     XCTAssertEqual(epoch.epochID, status.recoveryEpochID)
     XCTAssertEqual(epoch.coveredIntents.map(\.jobID), ["job-original-unknown"])
     XCTAssertTrue(Set(dispatches).isSubset(of: Set(epoch.confirmedStepIDs)))
     XCTAssertTrue(
-      Set(["flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
-           "rebind-and-verify-build"])
-        .isSubset(of: Set(epoch.confirmedStepIDs)))
+      Set([
+        "flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
+        "rebind-and-verify-build",
+      ])
+      .isSubset(of: Set(epoch.confirmedStepIDs)))
     let finalCapabilities = try await capabilityStore.list()
     let consumed = try XCTUnwrap(finalCapabilities.only)
     XCTAssertEqual(consumed.consumptionCount, 1)
@@ -517,7 +525,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         initialRecordData: nil))
     XCTAssertEqual(replayed.record.state, JobState.recovered.rawValue)
     let epochsAfterReplay = try await RuntimeSupersedingRecoveryStore(
-      stateDirectory: stateDirectory).list()
+      stateDirectory: stateDirectory
+    ).list()
     XCTAssertEqual(epochsAfterReplay, [epoch])
     let dispatchesAfterReplay = await dispatchLog.snapshot()
     XCTAssertEqual(dispatchesAfterReplay.count, dispatchCountAtCrash)
@@ -526,7 +535,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   func testUnpreparedCrossModeBindingRejectsBeforeCapabilityAndDispatch() async throws {
     let archive = try recoveryArchive()
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-08T01:00:00Z" })
     let artifact = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
@@ -542,7 +551,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let lease = try await artifactStore.leaseReference(
       jobID: artifact.jobID, artifactID: artifact.artifactID)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: stateDirectory),
@@ -663,7 +672,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     record.outcomeUnknown = projectedOutcomeUnknown
     let directory = try jobDirectory(jobID)
     try record.persist(into: directory)
-    let journalURL = directory.appendingPathComponent("journal.jsonl")
+    let journalURL = directory.appending(path: "journal.jsonl")
     let journal = try FileDurableJournal(url: journalURL)
     var sequence = try appendRunningPrefix(journal: journal, record: record)
     let step = try workflowStep("flash-partitions")
@@ -699,7 +708,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         sessionID: record.sessionID, jobID: jobID, timestamp: timestamp,
         from: waitingSource, to: .waitingForRecovery, reason: "outcome unknown"))
     return (
-      directory.appendingPathComponent("job-record.json"), journalURL)
+      directory.appending(path: "job-record.json"), journalURL
+    )
   }
 
   private func writeSuccessfulRecoveryJob(
@@ -713,7 +723,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let directory = try jobDirectory(jobID)
     try record.persist(into: directory)
     let journal = try FileDurableJournal(
-      url: directory.appendingPathComponent("journal.jsonl"))
+      url: directory.appending(path: "journal.jsonl"))
     var sequence = try appendRunningPrefix(journal: journal, record: record)
     let actualSteps = [
       "inspect-recovery-target", "flash-partitions", "verify-flash-readback",
@@ -771,7 +781,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   private func jobDirectory(_ jobID: String) throws -> URL {
-    let url = stateDirectory.appendingPathComponent("jobs/\(jobID)", isDirectory: true)
+    let url = stateDirectory.appending(path: "jobs/\(jobID)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: url, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -873,7 +883,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     ).coveredEffects.map { String($0.dropFirst("partition:".count)) }
     let bundle = RockchipRuntimeFlashBundle(
       artifactLeaseID: "lease-fixture", artifactID: "artifact-fixture",
-      fileURL: URL(fileURLWithPath: "/private/tmp/fixture-images.tar.gz"),
+      fileURL: URL(filePath: "/private/tmp/fixture-images.tar.gz"),
       sha256: artifactSHA256, byteCount: 1, partitionNames: partitions)
     switch stepID {
     case "flash-partitions": action = .flashPartitions(bundle)
@@ -890,8 +900,9 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let actionSHA256 = sha256(try encoder.encode(persisted))
-    let directory = stateDirectory
-      .appendingPathComponent("rockchip-runtime/\(record.jobID)/\(stepID)", isDirectory: true)
+    let directory =
+      stateDirectory
+      .appending(path: "rockchip-runtime/\(record.jobID)/\(stepID)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: directory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -912,20 +923,22 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       stdoutSHA256: sha256(Data("ok".utf8)), stderrSHA256: sha256(Data()),
       stdoutTruncated: false, subprocessCount: 1)
     try DurableFileWriter.createOrReplaceAtomically(
-      destination: directory.appendingPathComponent("intent.json"),
+      destination: directory.appending(path: "intent.json"),
       data: try encoder.encode(intent))
     try DurableFileWriter.createOrReplaceAtomically(
-      destination: directory.appendingPathComponent("receipt.json"),
+      destination: directory.appending(path: "receipt.json"),
       data: try encoder.encode(receipt))
   }
 
   private func recoveryArchive() throws -> Data {
     let profile = RockchipFlashProfile.dayu200
-    let partitionEntries = profile.mappedPartitions.map {
-      "0x1@0x\(String($0.offsetSectors, radix: 16))(\($0.partitionName))"
-    } + profile.membershiplessPartitionsWriteForbidden.enumerated().map {
-      "0x1@0x\(String(0x2000000 + $0.offset * 0x1000, radix: 16))(\($0.element))"
-    }
+    let partitionEntries =
+      profile.mappedPartitions.map {
+        "0x1@0x\(String($0.offsetSectors, radix: 16))(\($0.partitionName))"
+      }
+      + profile.membershiplessPartitionsWriteForbidden.enumerated().map {
+        "0x1@0x\(String(0x2000000 + $0.offset * 0x1000, radix: 16))(\($0.element))"
+      }
     let parameter = Data(
       "CMDLINE:mtdparts=rk29xxnand:\(partitionEntries.joined(separator: ","))\n".utf8)
     var members = profile.mappedPartitions.map { partition -> (name: String, bytes: Data) in
@@ -947,8 +960,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   private func isolatedStateDirectory(_ name: String) throws -> URL {
     let url = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-complete-overwrite-\(name)", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-complete-overwrite-\(name)", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: url, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -983,6 +996,6 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 }
 
-private extension Array {
-  var only: Element? { count == 1 ? self[0] : nil }
+extension Array {
+  fileprivate var only: Element? { count == 1 ? self[0] : nil }
 }

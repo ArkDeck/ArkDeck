@@ -338,7 +338,7 @@ struct GlobalJobInspectorView: View {
 
   private func startedDate(_ job: RuntimeJobSummaryPresentation) -> Date? {
     guard let startedAtUTC = job.startedAtUTC else { return nil }
-    return ISO8601DateFormatter().date(from: startedAtUTC)
+    return try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(startedAtUTC)
   }
 
   private func factRow(_ key: String, _ value: String) -> some View {

@@ -132,10 +132,7 @@ package struct RockchipStandingAuthorization: Codable, Equatable, Sendable {
   }
 
   static func parseTimestamp(_ value: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    if let date = formatter.date(from: value) { return date }
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.date(from: value)
+    ISO8601Timestamps.parse(value)
   }
 
   static func isCanonicalTimestamp(_ value: String) -> Bool {

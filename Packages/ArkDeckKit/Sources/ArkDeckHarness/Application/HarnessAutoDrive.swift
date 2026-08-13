@@ -94,7 +94,7 @@ package struct HarnessAutoDriveTicker: Sendable {
     target: any HarnessAutoDriveTarget,
     intervalSeconds: Int,
     sleep: @escaping @Sendable (Int) async throws -> Void = { seconds in
-      try await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
+      try await Task.sleep(for: .seconds(seconds))
     },
     log: @escaping @Sendable (String) -> Void = { _ in }
   ) {

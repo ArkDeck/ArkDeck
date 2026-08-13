@@ -289,7 +289,7 @@ enum DebugHAPLocalArtifactInspector {
     return DebugHAPLocalArtifact(
       name: name,
       byteCount: byteCount,
-      sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined())
+      sha256: SHA256Hex.lowercaseHex(hasher.finalize()))
   }
 }
 

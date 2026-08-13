@@ -34,7 +34,7 @@ if suppliedArguments.count >= 3, suppliedArguments[0] == "-s" {
 }
 if let invocationLog = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_INVOCATION_LOG"] {
   let record = suppliedArguments.joined(separator: "\u{1F}") + "\n"
-  let logURL = URL(fileURLWithPath: invocationLog)
+  let logURL = URL(filePath: invocationLog)
   if FileManager.default.fileExists(atPath: logURL.path),
     let handle = try? FileHandle(forWritingTo: logURL)
   {
@@ -73,7 +73,7 @@ if endpointBoundArguments
   // three real landings: bytes at the named path, an empty file, and a
   // transfer that lands somewhere the caller did not name (DEVICE-COMMAND-
   // FACTS.md §4).
-  let destination = URL(fileURLWithPath: suppliedArguments[receiveIndex + 2])
+  let destination = URL(filePath: suppliedArguments[receiveIndex + 2])
   switch ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_RECV_MODE"] {
   case "nothing":
     break

@@ -103,8 +103,8 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-native-deployment-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-native-deployment-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -386,10 +386,10 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
   /// on the device: nothing in this suite can execute it and read what it
   /// printed. What can be checked is that no reporting site reads live `errno`.
   func testTheCodeSignHelperReportsTheFailingCallsErrnoNotTheCleanups() throws {
-    let source = URL(fileURLWithPath: #filePath)
+    let source = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("Tools/OpenHarmonyNativeCodeSignHelper/main.c")
+      .appending(path: "Tools/OpenHarmonyNativeCodeSignHelper/main.c")
     let code = try String(contentsOf: source, encoding: .utf8)
 
     // Every diagnostic prints the captured value.
@@ -452,7 +452,7 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
 
   func testNativeProviderPlanIsAvailablePathClosedAndDescriptorBound() throws {
     let bytes = NativeLibraryTestFixture.arm64ELF()
-    let file = stateDirectory.appendingPathComponent("libarkdeck_gj.so")
+    let file = stateDirectory.appending(path: "libarkdeck_gj.so")
     try FileManager.default.createDirectory(
       at: stateDirectory, withIntermediateDirectories: true)
     try bytes.write(to: file)
@@ -569,13 +569,19 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertEqual(
       stopInvocations.map(\.arguments),
       [
-        ["-t", "150100424a544e4600", "shell", "aa", "force-stop",
-          "com.example.nativegj"],
-        ["-t", "150100424a544e4600", "shell", "pidof",
-          "com.example.nativegj"],
+        [
+          "-t", "150100424a544e4600", "shell", "aa", "force-stop",
+          "com.example.nativegj",
+        ],
+        [
+          "-t", "150100424a544e4600", "shell", "pidof",
+          "com.example.nativegj",
+        ],
         ["-t", "150100424a544e4600", "shell", "sleep", "2"],
-        ["-t", "150100424a544e4600", "shell", "pidof",
-          "com.example.nativegj"],
+        [
+          "-t", "150100424a544e4600", "shell", "pidof",
+          "com.example.nativegj",
+        ],
       ])
 
     func stopReceipt(
@@ -635,18 +641,21 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertEqual(provider.runtimeAvailability(for: descriptor), .available)
 
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "capabilities-unavailable", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "capabilities-unavailable", directoryHint: .isDirectory))
     let dispatcher = NativeDispatcher(
       mode: .success, newHash: String(repeating: "a", count: 64))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-unavailable", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-unavailable", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent(
-          "engine-unavailable", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(
+          path:
+            "engine-unavailable", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: dispatcher, capabilityStore: capabilityStore,
       artifactStore: artifactStore,
@@ -876,7 +885,6 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertTrue(remainingDebt.isEmpty)
   }
 
-
   /// `DHA-VERITY-001` — the platform attests nothing, and publish still works.
   ///
   /// This is the measured DAYU200 / OpenHarmony 7.0.0.37 case. Before this,
@@ -934,10 +942,10 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
   /// checked at the source, because nothing in this suite can run an arm64
   /// device binary and observe which branch it took.
   func testTheCodeSignHelperDecidesByMeasurementNotByAFailedEnable() throws {
-    let source = URL(fileURLWithPath: #filePath)
+    let source = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("Tools/OpenHarmonyNativeCodeSignHelper/main.c")
+      .appending(path: "Tools/OpenHarmonyNativeCodeSignHelper/main.c")
     let code = try String(contentsOf: source, encoding: .utf8)
 
     // The decision is taken from the file being replaced, before anything is
@@ -950,9 +958,11 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     let publishEnd = try XCTUnwrap(publishBody.range(of: "\n}\n"))
     let publish = String(publishBody[..<publishEnd.lowerBound])
     let enableIndex = try XCTUnwrap(
-      publish.range(of: "enable_code_sign_internal(")).lowerBound
+      publish.range(of: "enable_code_sign_internal(")
+    ).lowerBound
     let branchIndex = try XCTUnwrap(
-      publish.range(of: "if (replaced_is_attested) {")).lowerBound
+      publish.range(of: "if (replaced_is_attested) {")
+    ).lowerBound
     XCTAssertLessThan(
       branchIndex, enableIndex,
       "the enable must sit inside the measured branch, not before it")
@@ -961,7 +971,6 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       enableIndex, renameIndex,
       "a refused enable must still be unable to reach the rename")
   }
-
 
   /// `DHA-VERITY-002` — "no digest came back" is two different facts.
   ///
@@ -1001,8 +1010,9 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
       marker: UInt8(truncatingIfNeeded: suffix.utf8.first ?? 0xA5))
     let hash = NativeLibraryTestFixture.sha256(bytes)
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-\(suffix)", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-\(suffix)", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let input = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
@@ -1018,16 +1028,18 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     let lease = try await artifactStore.leaseReference(
       jobID: input.jobID, artifactID: input.artifactID)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "capabilities-\(suffix)", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "capabilities-\(suffix)", directoryHint: .isDirectory))
     let dispatcher = NativeDispatcher(
       mode: mode, newHash: hash, platformAttests: platformAttests,
       downgradeAttestation: downgradeAttestation,
       unreadableBackup: unreadableBackup)
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent(
-          "engine-\(suffix)", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(
+          path:
+            "engine-\(suffix)", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(
           factsPort: FactsPort(),
@@ -1065,16 +1077,19 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     dispatcher: NativeDispatcher
   ) throws -> RuntimeJobEngine {
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-\(suffix)", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-\(suffix)", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "capabilities-\(suffix)", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "capabilities-\(suffix)", directoryHint: .isDirectory))
     return try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent(
-          "engine-\(suffix)", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(
+          path:
+            "engine-\(suffix)", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(
           factsPort: FactsPort(),

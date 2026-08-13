@@ -34,9 +34,9 @@ package enum OpenHarmonyDevEcoPasswordDecoder {
     guard looksLikeEnvelope(encryptedPassword) else { return candidate }
 
     let material = keystore.deletingLastPathComponent()
-      .appendingPathComponent("material", isDirectory: true)
+      .appending(path: "material", directoryHint: .isDirectory)
     var fdParts = try readFDParts(
-      in: material.appendingPathComponent("fd", isDirectory: true),
+      in: material.appending(path: "fd", directoryHint: .isDirectory),
       fileManager: fileManager)
     defer {
       for index in fdParts.indices {
@@ -44,11 +44,11 @@ package enum OpenHarmonyDevEcoPasswordDecoder {
       }
     }
     var salt = try onlyFile(
-      in: material.appendingPathComponent("ac", isDirectory: true),
+      in: material.appending(path: "ac", directoryHint: .isDirectory),
       expectedByteCount: 16, fileManager: fileManager)
     defer { salt.resetBytes(in: 0..<salt.count) }
     var encryptedWorkKey = try onlyFile(
-      in: material.appendingPathComponent("ce", isDirectory: true),
+      in: material.appending(path: "ce", directoryHint: .isDirectory),
       expectedByteCount: nil, fileManager: fileManager)
     defer { encryptedWorkKey.resetBytes(in: 0..<encryptedWorkKey.count) }
 
@@ -100,9 +100,10 @@ package enum OpenHarmonyDevEcoPasswordDecoder {
   ) throws -> [Data] {
     try validateDirectory(directory)
     let slots = try fileManager.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil)
-      .filter { $0.lastPathComponent != ".DS_Store" }
-      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+      at: directory, includingPropertiesForKeys: nil
+    )
+    .filter { $0.lastPathComponent != ".DS_Store" }
+    .sorted { $0.lastPathComponent < $1.lastPathComponent }
     guard slots.count == 3 else {
       throw OpenHarmonySigningError.invalidConfiguration(
         "DevEco signing material layout is incomplete")
@@ -119,9 +120,10 @@ package enum OpenHarmonyDevEcoPasswordDecoder {
   ) throws -> [Data] {
     try validateDirectory(directory)
     let entries = try fileManager.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil)
-      .filter { $0.lastPathComponent != ".DS_Store" }
-      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+      at: directory, includingPropertiesForKeys: nil
+    )
+    .filter { $0.lastPathComponent != ".DS_Store" }
+    .sorted { $0.lastPathComponent < $1.lastPathComponent }
     guard entries.count == expectedCount else {
       throw OpenHarmonySigningError.invalidConfiguration(
         "DevEco signing material layout is incomplete")

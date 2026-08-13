@@ -251,8 +251,8 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     } catch {
       throw BootstrapError.storeFailure("cannot create target store directory: \(error)")
     }
-    self.url = directoryURL.appendingPathComponent("targets.json")
-    self.lockURL = directoryURL.appendingPathComponent(".targets.lock")
+    self.url = directoryURL.appending(path: "targets.json")
+    self.lockURL = directoryURL.appending(path: ".targets.lock")
   }
 
   public func list() throws -> [RuntimeTargetRecord] {
@@ -283,12 +283,16 @@ public final class RuntimeTargetStore: @unchecked Sendable {
         throw BootstrapError.storeFailure("candidate connect key has ambiguous target owners")
       }
       guard let direct = matches.first else { return nil }
-      guard let resolution = (document.aliasResolutions ?? []).first(where: {
-        $0.aliasTargetID == direct.targetID
-      }) else { return direct }
-      guard let canonical = document.targets.first(where: {
-        $0.targetID == resolution.canonicalTargetID
-      }) else {
+      guard
+        let resolution = (document.aliasResolutions ?? []).first(where: {
+          $0.aliasTargetID == direct.targetID
+        })
+      else { return direct }
+      guard
+        let canonical = document.targets.first(where: {
+          $0.targetID == resolution.canonicalTargetID
+        })
+      else {
         throw BootstrapError.storeFailure("resolved candidate canonical target is missing")
       }
       return canonical
@@ -361,12 +365,14 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       guard !existing.contains(where: { $0.aliasTargetID == draft.canonicalTargetID }) else {
         throw BootstrapError.storeFailure("target alias resolution chains are forbidden")
       }
-      let existingIntentKeys = Set(existing.flatMap {
-        $0.coveredUnknownIntents.map { "\($0.jobID)\n\($0.intentEventID)" }
-      })
-      let newIntentKeys = Set(draft.coveredUnknownIntents.map {
-        "\($0.jobID)\n\($0.intentEventID)"
-      })
+      let existingIntentKeys = Set(
+        existing.flatMap {
+          $0.coveredUnknownIntents.map { "\($0.jobID)\n\($0.intentEventID)" }
+        })
+      let newIntentKeys = Set(
+        draft.coveredUnknownIntents.map {
+          "\($0.jobID)\n\($0.intentEventID)"
+        })
       guard existingIntentKeys.isDisjoint(with: newIntentKeys),
         !existing.contains(where: {
           $0.establishingFlashJobID == draft.establishingFlashJobID
@@ -477,9 +483,11 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       if let resolution = (document.aliasResolutions ?? []).first(where: {
         $0.aliasStableIdentitySHA256 == stableIdentitySHA256
           || $0.routedHDCIdentitySHA256 == stableIdentitySHA256
-      }), let canonical = document.targets.first(where: {
-        $0.targetID == resolution.canonicalTargetID
-      }) {
+      }),
+        let canonical = document.targets.first(where: {
+          $0.targetID == resolution.canonicalTargetID
+        })
+      {
         return (canonical, false)
       }
       if let existing = document.targets.first(where: {
@@ -487,9 +495,11 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       }) {
         if let resolution = (document.aliasResolutions ?? []).first(where: {
           $0.aliasTargetID == existing.targetID
-        }), let canonical = document.targets.first(where: {
-          $0.targetID == resolution.canonicalTargetID
-        }) {
+        }),
+          let canonical = document.targets.first(where: {
+            $0.targetID == resolution.canonicalTargetID
+          })
+        {
           return (canonical, false)
         }
         return (existing, false)
@@ -603,9 +613,10 @@ public final class RuntimeTargetStore: @unchecked Sendable {
   }
 
   private static func isCanonicalSHA256(_ value: String) -> Bool {
-    value.count == 64 && value.allSatisfy {
-      ("0"..."9").contains($0) || ("a"..."f").contains($0)
-    }
+    value.count == 64
+      && value.allSatisfy {
+        ("0"..."9").contains($0) || ("a"..."f").contains($0)
+      }
   }
 
   private func load() throws -> TargetStoreDocument {
@@ -702,7 +713,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
         !$0.jobID.isEmpty && !$0.intentEventID.isEmpty
           && $0.stepID == "enter-loader-mode" && $0.effect == "deviceMutation"
       }),
-      ISO8601DateFormatter().date(from: draft.establishedAtUTC) != nil
+      ISO8601Timestamps.parse(draft.establishedAtUTC) != nil
     else {
       throw BootstrapError.storeFailure(
         "target alias resolution lacks exact identity, history or postflight proof")
@@ -767,7 +778,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       throw BootstrapError.storeFailure("cannot encode target store: \(error)")
     }
     let temporary = url.deletingLastPathComponent()
-      .appendingPathComponent(".targets.tmp.\(getpid())")
+      .appending(path: ".targets.tmp.\(getpid())")
     do {
       try data.write(to: temporary, options: [])
       let handle = try FileHandle(forWritingTo: temporary)
@@ -840,9 +851,10 @@ public actor DeviceBootstrapMachine {
       return try await refreshCandidateSnapshot()
     }
     scheduleCandidateRefresh()
-    let isWithinFreshnessWindow = latestCandidateSnapshotObservedAt.map {
-      $0.duration(to: candidateClock.now) <= candidateSnapshotFreshnessWindow
-    } ?? false
+    let isWithinFreshnessWindow =
+      latestCandidateSnapshotObservedAt.map {
+        $0.duration(to: candidateClock.now) <= candidateSnapshotFreshnessWindow
+      } ?? false
     return BootstrapCandidateSnapshot(
       candidates: latestCandidateSnapshot.candidates,
       observedAtUTC: latestCandidateSnapshot.observedAtUTC,

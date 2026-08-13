@@ -663,7 +663,7 @@ final class WorkflowStepContractTests: XCTestCase {
   }
 
   private func repositoryRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

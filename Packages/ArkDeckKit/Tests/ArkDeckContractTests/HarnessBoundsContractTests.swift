@@ -148,8 +148,8 @@ final class HarnessBoundsContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-bounds-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-bounds-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -495,7 +495,9 @@ final class HarnessBoundsContractTests: XCTestCase {
       lastOutcome = outcome
       if ![HarnessTaskLifecycle.running, .waiting, .created].contains(
         outcome.snapshot.lifecycle)
-      { break }
+      {
+        break
+      }
       jobs.finish("JOB-\(round)")
     }
     let outcome = try XCTUnwrap(lastOutcome)
@@ -679,7 +681,8 @@ final class HarnessBoundsContractTests: XCTestCase {
         workspaceAllowed, operation: "workspace.apply-patch@1", permitted: permitted))
     XCTAssertEqual(
       workspaceWithoutGrant,
-      .refuse(.authorizationRequired(reference: "workspace.apply-patch@1", effect: "deviceMutation")))
+      .refuse(
+        .authorizationRequired(reference: "workspace.apply-patch@1", effect: "deviceMutation")))
     let workspaceHeld = HarnessPolicyGuard(
       availability: availability,
       capabilities: StubCapabilityPort(held: ["workspace.apply-patch@1"]))
@@ -781,7 +784,8 @@ final class HarnessBoundsContractTests: XCTestCase {
     XCTAssertNotEqual(
       HarnessHumanBlock.producerProposalRequired, .strategyExhausted)
     XCTAssertTrue(HarnessHumanBlock.allCases.contains(.producerProposalRequired))
-    XCTAssertEqual(HarnessHumanBlock.producerProposalRequired.rawValue,
+    XCTAssertEqual(
+      HarnessHumanBlock.producerProposalRequired.rawValue,
       "producerProposalRequired")
 
     // Old ledger rows decode unchanged: extending a persisted closed
@@ -806,7 +810,7 @@ final class HarnessBoundsContractTests: XCTestCase {
 
     // And the route that used to write nothing now writes one.
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckHarness/Application/HarnessTaskCoordinator.swift"),

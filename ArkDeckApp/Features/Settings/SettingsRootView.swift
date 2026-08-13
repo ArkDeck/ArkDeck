@@ -1,10 +1,11 @@
 import AppKit
 import ArkDeckWorkflows
+import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsRootView<UpdatesContent: View>: View {
-  @ObservedObject var model: SettingsWorkspaceViewModel
+  var model: SettingsWorkspaceViewModel
   let hdcPresentation: HDCDiagnosticsPresentation
   let isHDCRefreshInFlight: Bool
   let hdcConfigurationError: String?
@@ -71,7 +72,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
 }
 
 private struct GeneralSettingsPane: View {
-  @ObservedObject var model: SettingsWorkspaceViewModel
+  var model: SettingsWorkspaceViewModel
   @AppStorage(ApplicationIconChoice.persistenceKey)
   private var applicationIconChoice = ApplicationIconChoice.defaultChoice.rawValue
 
@@ -397,7 +398,7 @@ private struct ToolchainsSettingsPane: View {
 }
 
 private struct StorageSettingsPane: View {
-  @ObservedObject var model: SettingsWorkspaceViewModel
+  var model: SettingsWorkspaceViewModel
   @State private var quotaGiB = ""
   @State private var safetyMarginGiB = ""
   @State private var retentionDays = ""
@@ -610,7 +611,7 @@ private struct StorageSettingsPane: View {
 }
 
 private struct DiagnosticsSettingsPane: View {
-  @ObservedObject var model: SettingsWorkspaceViewModel
+  var model: SettingsWorkspaceViewModel
 
   var body: some View {
     SettingsPaneContainer {
@@ -731,18 +732,19 @@ private struct DiagnosticsSettingsPane: View {
 }
 
 @MainActor
-final class SettingsWorkspaceViewModel: ObservableObject {
+@Observable
+final class SettingsWorkspaceViewModel {
   static let gibibyte: UInt64 = 1_024 * 1_024 * 1_024
 
-  @Published private(set) var presentation: SettingsApplicationPresentation?
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var isStorageBusy = false
-  @Published private(set) var isDiagnosticsBusy = false
-  @Published private(set) var storageError: String?
-  @Published private(set) var diagnosticPreview: SettingsDiagnosticBundlePreview?
-  @Published private(set) var diagnosticDestination: URL?
-  @Published private(set) var exportedDiagnosticURL: URL?
-  @Published private(set) var diagnosticsMessage: String?
+  private(set) var presentation: SettingsApplicationPresentation?
+  private(set) var isRefreshing = false
+  private(set) var isStorageBusy = false
+  private(set) var isDiagnosticsBusy = false
+  private(set) var storageError: String?
+  private(set) var diagnosticPreview: SettingsDiagnosticBundlePreview?
+  private(set) var diagnosticDestination: URL?
+  private(set) var exportedDiagnosticURL: URL?
+  private(set) var diagnosticsMessage: String?
 
   private let provider: any SettingsApplicationProviding
 

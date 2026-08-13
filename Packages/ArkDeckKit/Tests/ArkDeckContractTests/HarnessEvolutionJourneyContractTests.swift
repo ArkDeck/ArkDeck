@@ -464,8 +464,8 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-journey-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-journey-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -730,7 +730,8 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       signingRequest.operation.reference, DebugCrashTaskHandler.signOpenHarmonyHAP)
     XCTAssertEqual(
       inputString(signingRequest, "projectRef"), "demo-app",
-      "the signing preset belongs to the source profile, while the immutable unsigned HAP still comes from the isolated evolution workspace")
+      "the signing preset belongs to the source profile, while the immutable unsigned HAP still comes from the isolated evolution workspace"
+    )
     XCTAssertEqual(
       inputString(signingRequest, "unsignedHapArtifactLease"),
       "lease-v1:build:ART-BUILD")
@@ -942,7 +943,8 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertTrue(
       Set(promoted.snapshot.artifactRefs).isSuperset(of: Set(promotion.artifactIDs)),
       "the succeeded task must carry every promotion artifact reference")
-    let verifiedEvidence = try await stack.store.evaluations(stack.taskID)
+    let verifiedEvidence =
+      try await stack.store.evaluations(stack.taskID)
       .last.map { $0.evidence.filter(\.verified).map(\.artifactID) } ?? []
     XCTAssertTrue(
       Set(verifiedEvidence).isSubset(of: Set(strategyAttempt.runtimeArtifactIDs)),

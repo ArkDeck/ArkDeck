@@ -29,6 +29,8 @@ Environment overrides:
 The runner owns --package-path, --scratch-path, and --cache-path so every
 worktree sees the same logical source and build paths. The source mirror
 contains tracked and non-ignored untracked files; ignored files stay local.
+Every target treats Swift's DeprecatedDeclaration diagnostic group as an
+error so local and CI test runs enforce the current SDK surface.
 EOF
 }
 
@@ -166,4 +168,6 @@ exec "$swift_executable" "$swift_command" \
   --package-path "$stable_package" \
   --scratch-path "$scratch_path" \
   --cache-path "$dependency_cache" \
+  -Xswiftc -Werror \
+  -Xswiftc DeprecatedDeclaration \
   "$@"

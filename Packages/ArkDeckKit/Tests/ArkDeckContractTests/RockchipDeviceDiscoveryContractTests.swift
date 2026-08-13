@@ -321,7 +321,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
   func testAdapterMaterializesOnlyAbsoluteIdentityBoundLDArgvAndRejectsDriftBeforeLaunch()
     async throws
   {
-    let executable = URL(fileURLWithPath: "/usr/bin/true")
+    let executable = URL(filePath: "/usr/bin/true")
     let executableHash = try sha256(Data(contentsOf: executable))
     let profile = testProfile(executableSHA256: executableHash)
     let launches = LaunchCounter()
@@ -365,7 +365,7 @@ final class RockchipDeviceDiscoveryContractTests: XCTestCase {
   func testReadOnlyDiscoveryAdapterUsesOnlyTheCleanReadOnlyDiscoveryIdentity()
     async throws
   {
-    let executable = URL(fileURLWithPath: "/usr/bin/true")
+    let executable = URL(filePath: "/usr/bin/true")
     let profile = RockchipDiscoveryIntegrationProfile.pinnedReadOnlyDiscovery
     let adapter = RockchipDeviceDiscoveryAdapter(
       profile: profile, workingDirectory: FileManager.default.temporaryDirectory)

@@ -361,7 +361,7 @@ final class TraceAdapterGoldenTests: XCTestCase {
   // MARK: - Repository fixture access
 
   private var repositoryRoot: URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()  // ArkDeckContractTests
       .deletingLastPathComponent()  // Tests
       .deletingLastPathComponent()  // ArkDeckKit

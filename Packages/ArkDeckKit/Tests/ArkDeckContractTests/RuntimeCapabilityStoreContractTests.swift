@@ -8,8 +8,8 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     directoryURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-capability-store-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-capability-store-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -718,11 +718,11 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       at: directoryURL, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     let external = directoryURL.deletingLastPathComponent()
-      .appendingPathComponent("external-\(UUID().uuidString).json")
+      .appending(path: "external-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: external) }
     let externalDocument = Data(#"{"records":[],"schemaVersion":"2.0.0"}"#.utf8)
     try externalDocument.write(to: external)
-    let documentURL = directoryURL.appendingPathComponent("runtime-capabilities.json")
+    let documentURL = directoryURL.appending(path: "runtime-capabilities.json")
     try FileManager.default.createSymbolicLink(at: documentURL, withDestinationURL: external)
 
     let store = try makeStore()
@@ -747,7 +747,7 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       let store = try makeStore()
       try await store.install(try e1Capability())
     }
-    let documentURL = directoryURL.appendingPathComponent("runtime-capabilities.json")
+    let documentURL = directoryURL.appending(path: "runtime-capabilities.json")
     let original = try String(contentsOf: documentURL, encoding: .utf8)
     // Break use accounting: remainingUses above maximumUses.
     let corrupted = original.replacingOccurrences(
@@ -773,7 +773,7 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
         capabilityID: "CAP-RT-STORE-001", reservationID: "res-tamper",
         jobID: "job-tamper", query: query(), nowUTC: "2026-07-15T00:00:00Z")
     }
-    let documentURL = directoryURL.appendingPathComponent("runtime-capabilities.json")
+    let documentURL = directoryURL.appending(path: "runtime-capabilities.json")
     let original = try String(contentsOf: documentURL, encoding: .utf8)
     let corrupted = original.replacingOccurrences(
       of: "\"receiptSHA256\" : \"", with: "\"receiptSHA256\" : \"0")
@@ -796,7 +796,7 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     try FileManager.default.createDirectory(
       at: directoryURL, withIntermediateDirectories: true)
     try Data(legacy.utf8).write(
-      to: directoryURL.appendingPathComponent("runtime-capabilities.json"))
+      to: directoryURL.appending(path: "runtime-capabilities.json"))
     do {
       _ = try await makeStore().list()
       XCTFail("a v1 store document must be refused, not migrated")

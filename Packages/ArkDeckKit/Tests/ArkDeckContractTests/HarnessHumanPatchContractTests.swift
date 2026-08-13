@@ -161,12 +161,14 @@ private actor HumanPatchGrant: HarnessCapabilityPort {
   private var covered: Set<String>
 
   init(enabled: Bool) {
-    covered = enabled
+    covered =
+      enabled
       ? [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch] : []
   }
 
   func setEnabled(_ value: Bool) {
-    covered = value
+    covered =
+      value
       ? [DebugCrashTaskHandler.createCheckpoint, DebugCrashTaskHandler.applyPatch] : []
   }
 
@@ -192,8 +194,8 @@ final class HarnessHumanPatchContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-human-patch-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-human-patch-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 

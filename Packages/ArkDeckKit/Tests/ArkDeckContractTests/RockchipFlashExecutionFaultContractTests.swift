@@ -29,9 +29,11 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
     let entry = cacheRoot.appending(
       path: fixture.profile.archiveSHA256, directoryHint: .isDirectory)
     XCTAssertTrue(FileManager.default.fileExists(atPath: entry.path))
-    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path), [
-      fixture.profile.archiveSHA256
-    ])
+    XCTAssertEqual(
+      try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path),
+      [
+        fixture.profile.archiveSHA256
+      ])
     first.removeAll()
 
     // A hit must reopen and hash the existing images without consulting or
@@ -41,9 +43,11 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
       archiveURL: fixture.archive, profile: fixture.profile)
     XCTAssertEqual(Set(second.keys), Set(fixture.profile.mappedPartitions.map(\.imageMemberName)))
     for image in second.values { XCTAssertNoThrow(try image.revalidate()) }
-    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path), [
-      fixture.profile.archiveSHA256
-    ])
+    XCTAssertEqual(
+      try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path),
+      [
+        fixture.profile.archiveSHA256
+      ])
   }
 
   func testContentAddressedImageCacheEvictsThePreviousArchive() throws {
@@ -79,9 +83,11 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
     let second = try cache.images(
       archiveURL: alternateArchive, profile: alternateProfile)
     XCTAssertEqual(Set(second.keys), Set(alternateMembers.map(\.name)))
-    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path), [
-      alternateProfile.archiveSHA256
-    ])
+    XCTAssertEqual(
+      try FileManager.default.contentsOfDirectory(atPath: cacheRoot.path),
+      [
+        alternateProfile.archiveSHA256
+      ])
     XCTAssertFalse(
       FileManager.default.fileExists(
         atPath: cacheRoot.appending(path: fixture.profile.archiveSHA256).path))
@@ -151,7 +157,6 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
   }
 
   private enum ArchiveFault { case traversal, duplicate, link }
-
 
   private func makeFaultArchive(_ fault: ArchiveFault) throws -> (
     data: Data, profile: RockchipFlashProfile
@@ -263,7 +268,7 @@ struct RockchipExecutionTestFixture {
       ])
     let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
       mode: .execute, archiveValidation: .valid)
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let executable = packageRoot.appending(path: ".build/debug/ArkDeckFakeRockchipFixture")
     let executableSHA256 = sha256(try Data(contentsOf: executable))
@@ -284,7 +289,6 @@ struct RockchipExecutionTestFixture {
       profile: profile, plan: plan, sessionsRoot: sessionsRoot,
       coordinator: HostStorageCoordinator())
   }
-
 
   static func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()

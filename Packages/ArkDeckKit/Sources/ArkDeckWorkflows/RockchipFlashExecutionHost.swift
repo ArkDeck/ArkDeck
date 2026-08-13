@@ -87,7 +87,7 @@ package enum RockchipDeviceBindingInstallation {
 /// It is deliberately not configurable by CLI/environment/PATH.
 enum RockchipHDCIntegrationProfile {
   static let executableURL = URL(
-    fileURLWithPath:
+    filePath:
       "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc")
   static let executableSHA256 =
     "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
@@ -397,15 +397,17 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable binding reactivation evidence is invalid or ambiguous")
     }
-    let expectedSelection = SHA256Hex.string(of: Data([
-      "rockchip-loader-user-selection",
-      targetID,
-      String(replacedRevision),
-      String(revision),
-      replacedIdentity,
-      SHA256Hex.string(of: Data(serial.utf8)),
-      usbTopology,
-    ].joined(separator: "\n").utf8))
+    let expectedSelection = SHA256Hex.string(
+      of: Data(
+        [
+          "rockchip-loader-user-selection",
+          targetID,
+          String(replacedRevision),
+          String(revision),
+          replacedIdentity,
+          SHA256Hex.string(of: Data(serial.utf8)),
+          usbTopology,
+        ].joined(separator: "\n").utf8))
     guard selection == expectedSelection else {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable binding reactivation selection digest does not match its exact facts")
@@ -662,8 +664,9 @@ package struct RockchipProductBindingStore: Sendable {
         throw configurationError("binding temporary file cannot be closed")
       }
       temporaryOpen = false
-      guard renameat(
-        rootDescriptor, temporaryName, rootDescriptor, Self.bindingFileName) == 0
+      guard
+        renameat(
+          rootDescriptor, temporaryName, rootDescriptor, Self.bindingFileName) == 0
       else { throw configurationError("binding replacement cannot be committed") }
       guard Darwin.fsync(rootDescriptor) == 0 else {
         throw configurationError("binding directory cannot be synchronized")
@@ -1221,7 +1224,8 @@ package enum RockchipProductToolRuntimeDirectory {
     // it as a real directory.
     let bindable = runtime.resolvingSymlinksInPath().standardizedFileURL
     let container = root.resolvingSymlinksInPath().standardizedFileURL
-    let containerPrefix = container.path.hasSuffix("/")
+    let containerPrefix =
+      container.path.hasSuffix("/")
       ? container.path : container.path + "/"
     guard bindable.path.hasPrefix(containerPrefix) else {
       throw configurationError("Rockchip tool runtime escaped its product state root")
@@ -1661,7 +1665,6 @@ private struct RockchipProductHDCNormalAuthorizationFactCollector:
   let tool: RockchipSelectedDiscoveryTool
   let toolWorkingDirectory: URL
   let clock: any RockchipAdmissionClock
-
 
   func collect(
     request: RockchipAuthorizationFactRequest,

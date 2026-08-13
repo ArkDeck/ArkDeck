@@ -174,7 +174,7 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
     let operation: @Sendable () async throws -> ProviderSubprocessReceipt = {
       let request = ProcessIdentityBoundRequest(
         process: ProcessRequest(
-          executable: URL(fileURLWithPath: executable.path),
+          executable: URL(filePath: executable.path),
           arguments: arguments,
           // This runner serves both the RockUSB tool and hdc transitions.
           // The spawn base allowlist drops an inherited HDC port, so it is
@@ -445,7 +445,7 @@ final class RockchipRuntimeStagedImageHandle: @unchecked Sendable {
 
 typealias RockchipRuntimeStaging =
   @Sendable (RockchipRuntimeFlashBundle, RockchipFlashProfile, URL) throws
-    -> [String: RockchipRuntimeStagedImageHandle]
+  -> [String: RockchipRuntimeStagedImageHandle]
 
 /// One-entry cache for the board profile derived from an exact Runtime-owned
 /// Artifact lease. Runtime still resolves and re-hashes that lease before
@@ -469,16 +469,16 @@ final class RockchipFlashBundleProfileCache: @unchecked Sendable {
   }
 
   private let lock = NSLock()
-  private let describeArchive:
-    @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
+  private let describeArchive: @Sendable (RockchipFlashProfile, URL) throws -> RockchipFlashProfile
   private var entry: Entry?
 
   init(
-    describeArchive: @escaping @Sendable (
-      RockchipFlashProfile, URL
-    ) throws -> RockchipFlashProfile = { board, url in
-      try board.forArchive(at: url)
-    }
+    describeArchive:
+      @escaping @Sendable (
+        RockchipFlashProfile, URL
+      ) throws -> RockchipFlashProfile = { board, url in
+        try board.forArchive(at: url)
+      }
   ) {
     self.describeArchive = describeArchive
   }
@@ -637,8 +637,9 @@ struct FoundationRockchipRuntimePartitionReadback:
       let sectors = min(
         maximumChunkSectors, Self.sectorCount(remainingBytes))
       let bytes = min(remainingBytes, sectors * 512)
-      let outputURL = outputDirectory.appendingPathComponent(
-        "\(mapping.writeOrder)-\(mapping.partitionName)-\(chunkIndex).part")
+      let outputURL = outputDirectory.appending(
+        path:
+          "\(mapping.writeOrder)-\(mapping.partitionName)-\(chunkIndex).part")
       guard !FileManager.default.fileExists(atPath: outputURL.path) else {
         throw RuntimeDispatchFailure.failed(
           "RockUSB readback destination already exists")
@@ -789,7 +790,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     imageCache: RockchipFlashImageCache? = nil,
     bundleProfileCache: RockchipFlashBundleProfileCache? = nil,
     nowUTC: @escaping @Sendable () -> String = {
-      ISO8601DateFormatter().string(from: Date())
+      ISO8601Timestamps.string(from: Date())
     },
     describeBundle: (
       @Sendable (RockchipFlashProfile, RockchipRuntimeFlashBundle) throws
@@ -798,38 +799,40 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     stage: RockchipRuntimeStaging? = nil
   ) {
     let profileCache = bundleProfileCache ?? RockchipFlashBundleProfileCache()
-    self.stage = stage ?? { bundle, profile, sessionRoot in
-      // Read the bundle in hand rather than looking it up by digest. A build
-      // the product has never seen is not the same thing as an unusable one:
-      // what matters is that it fits the board and that these are the bytes
-      // the plan was built for. `flashWrites` derives that profile once and
-      // passes it here; the stager still re-hashes the archive itself.
-      guard profile.archiveSHA256 == bundle.sha256,
-        profile.archiveSizeBytes == Int64(bundle.byteCount)
-      else {
-        throw RuntimeDispatchFailure.failed(
-          "RockUSB staging bundle drifted from its lease")
+    self.stage =
+      stage ?? { bundle, profile, sessionRoot in
+        // Read the bundle in hand rather than looking it up by digest. A build
+        // the product has never seen is not the same thing as an unusable one:
+        // what matters is that it fits the board and that these are the bytes
+        // the plan was built for. `flashWrites` derives that profile once and
+        // passes it here; the stager still re-hashes the archive itself.
+        guard profile.archiveSHA256 == bundle.sha256,
+          profile.archiveSizeBytes == Int64(bundle.byteCount)
+        else {
+          throw RuntimeDispatchFailure.failed(
+            "RockUSB staging bundle drifted from its lease")
+        }
+        let staged =
+          try imageCache?.images(
+            archiveURL: bundle.fileURL, profile: profile)
+          ?? RockchipFlashExecutionStager.stage(
+            archiveURL: bundle.fileURL,
+            sessionRoot: sessionRoot,
+            profile: profile)
+        return Dictionary(
+          uniqueKeysWithValues: staged.map { memberName, image in
+            (
+              memberName,
+              RockchipRuntimeStagedImageHandle(
+                memberName: image.memberName,
+                partitionName: image.partitionName,
+                sizeBytes: image.sizeBytes,
+                sha256: image.sha256,
+                stableDescriptorPath: image.stableDescriptorPath,
+                validation: { try image.revalidate() })
+            )
+          })
       }
-      let staged = try imageCache?.images(
-        archiveURL: bundle.fileURL, profile: profile)
-        ?? RockchipFlashExecutionStager.stage(
-          archiveURL: bundle.fileURL,
-          sessionRoot: sessionRoot,
-          profile: profile)
-      return Dictionary(
-        uniqueKeysWithValues: staged.map { memberName, image in
-          (
-            memberName,
-            RockchipRuntimeStagedImageHandle(
-              memberName: image.memberName,
-              partitionName: image.partitionName,
-              sizeBytes: image.sizeBytes,
-              sha256: image.sha256,
-              stableDescriptorPath: image.stableDescriptorPath,
-              validation: { try image.revalidate() })
-          )
-        })
-    }
     self.hdcResolver = hdcResolver
     self.runner = runner
     self.usbProbe = usbProbe
@@ -1073,8 +1076,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           ],
           receipts: receipts)
       }
-      let outputDirectory = actionDirectory.appendingPathComponent(
-        "readback", isDirectory: true)
+      let outputDirectory = actionDirectory.appending(
+        path:
+          "readback", directoryHint: .isDirectory)
       do {
         try FileManager.default.createDirectory(
           at: outputDirectory,
@@ -1361,8 +1365,9 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     _ = try exactLoaderIdentity(
       stableIdentitySHA256: descriptor.expectedIdentitySHA256)
 
-    let work = actionDirectory.appendingPathComponent(
-      "work", isDirectory: true)
+    let work = actionDirectory.appending(
+      path:
+        "work", directoryHint: .isDirectory)
     do {
       try FileManager.default.createDirectory(
         at: work, withIntermediateDirectories: false,
@@ -1568,9 +1573,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       }
       try await Task.sleep(for: .seconds(1))
     }
-    let malformedSuffix = lastMalformedReason.map {
-      "; last malformed target list read: \($0)"
-    } ?? ""
+    let malformedSuffix =
+      lastMalformedReason.map {
+        "; last malformed target list read: \($0)"
+      } ?? ""
     throw RuntimeDispatchFailure.failed(
       (expectedConnected
         ? "descriptor-bound HDC target did not reconnect before the deadline"
@@ -1625,9 +1631,11 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
             throw RuntimeDispatchFailure.failed(
               "topology-bound HDC USB identity is internally inconsistent")
           }
-          guard list.targets.filter({
-            $0.connectKey == identity.connectKey && $0.state == "Connected"
-          }).count == 1 else { break }
+          guard
+            list.targets.filter({
+              $0.connectKey == identity.connectKey && $0.state == "Connected"
+            }).count == 1
+          else { break }
           return (identity, receipts)
         }
       case .unsupportedVersion(let version):
@@ -1644,9 +1652,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
       }
       try await Task.sleep(for: .seconds(1))
     }
-    let malformedSuffix = lastMalformedReason.map {
-      "; last malformed target list read: \($0)"
-    } ?? ""
+    let malformedSuffix =
+      lastMalformedReason.map {
+        "; last malformed target list read: \($0)"
+      } ?? ""
     throw RuntimeDispatchFailure.failed(
       "topology-bound HDC target did not reconnect before the deadline"
         + malformedSuffix)
@@ -1851,7 +1860,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     executable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> ([ProviderSubprocessReceipt], RockchipMediumReadDomain) {
-    let directory = actionDirectory.appendingPathComponent("medium", isDirectory: true)
+    let directory = actionDirectory.appending(path: "medium", directoryHint: .isDirectory)
     do {
       try FileManager.default.createDirectory(
         at: directory, withIntermediateDirectories: false,
@@ -1908,7 +1917,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     directory: URL,
     name: String
   ) async throws -> (ProviderSubprocessReceipt, Data) {
-    let outputURL = directory.appendingPathComponent("\(name).sector")
+    let outputURL = directory.appending(path: "\(name).sector")
     let receipt = try await run(
       executable: executable,
       arguments: ["rl", String(offsetSectors), String(count), outputURL.path],
@@ -2088,7 +2097,7 @@ private struct RockchipRuntimeHostReceiptRecord: Codable, Equatable {
   }
 }
 
-fileprivate enum RockchipRuntimeHostPreparation {
+private enum RockchipRuntimeHostPreparation {
   case execute(URL)
   case replay(RockchipRuntimeActionExecutionResult)
 }
@@ -2126,15 +2135,16 @@ struct RockchipRuntimeActionRecordStore: Sendable {
 
     do {
       try validateComponent(record.jobID, field: "jobID")
-      let directory = rootURL
-        .appendingPathComponent(record.jobID, isDirectory: true)
-        .appendingPathComponent(stepID, isDirectory: true)
+      let directory =
+        rootURL
+        .appending(path: record.jobID, directoryHint: .isDirectory)
+        .appending(path: stepID, directoryHint: .isDirectory)
       let intent = try read(
         RockchipRuntimeHostIntentRecord.self,
-        from: directory.appendingPathComponent("intent.json"))
+        from: directory.appending(path: "intent.json"))
       let receipt = try read(
         RockchipRuntimeHostReceiptRecord.self,
-        from: directory.appendingPathComponent("receipt.json"))
+        from: directory.appending(path: "receipt.json"))
       let materializedAction = try intent.action.materialize()
       guard intent.schemaVersion == "1.0.0",
         intent.jobID == record.jobID,
@@ -2189,11 +2199,13 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     try validateComponent(descriptor.jobID, field: "jobID")
     try validateComponent(descriptor.stepID, field: "stepID")
     try prepareDirectory(rootURL, allowExisting: true)
-    let jobDirectory = rootURL.appendingPathComponent(
-      descriptor.jobID, isDirectory: true)
+    let jobDirectory = rootURL.appending(
+      path:
+        descriptor.jobID, directoryHint: .isDirectory)
     try prepareDirectory(jobDirectory, allowExisting: true)
-    let actionDirectory = jobDirectory.appendingPathComponent(
-      descriptor.stepID, isDirectory: true)
+    let actionDirectory = jobDirectory.appending(
+      path:
+        descriptor.stepID, directoryHint: .isDirectory)
     let record = RockchipRuntimeHostIntentRecord(
       schemaVersion: "1.0.0",
       jobID: descriptor.jobID,
@@ -2215,7 +2227,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
       do {
         existingIntent = try read(
           RockchipRuntimeHostIntentRecord.self,
-          from: actionDirectory.appendingPathComponent("intent.json"))
+          from: actionDirectory.appending(path: "intent.json"))
       } catch {
         if action.effect >= .deviceMutation {
           throw RuntimeDispatchFailure.outcomeUnknown(
@@ -2232,7 +2244,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
         throw RuntimeDispatchFailure.failed(
           "durable Rockchip read-only intent identity drifted")
       }
-      let receiptURL = actionDirectory.appendingPathComponent("receipt.json")
+      let receiptURL = actionDirectory.appending(path: "receipt.json")
       var receiptMetadata = stat()
       if lstat(receiptURL.path, &receiptMetadata) == 0 {
         let receipt: RockchipRuntimeHostReceiptRecord
@@ -2277,7 +2289,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
     }
     try synchronizeDirectory(actionDirectory.deletingLastPathComponent())
     do {
-      try write(record, to: actionDirectory.appendingPathComponent("intent.json"))
+      try write(record, to: actionDirectory.appending(path: "intent.json"))
     } catch {
       throw RuntimeDispatchFailure.failed(
         "cannot persist Rockchip host intent before dispatch: \(error)")
@@ -2306,7 +2318,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
       stderrByteCount: result.stderr.count,
       stdoutTruncated: result.stdoutTruncated,
       subprocessCount: result.subprocesses.count)
-    try write(record, to: actionDirectory.appendingPathComponent("receipt.json"))
+    try write(record, to: actionDirectory.appending(path: "receipt.json"))
     return recordID(descriptor: descriptor)
   }
 
@@ -2361,8 +2373,9 @@ struct RockchipRuntimeActionRecordStore: Sendable {
   private func write<T: Encodable>(_ value: T, to url: URL) throws {
     let encoder = CanonicalJSONEncoders.canonical()
     let data = try encoder.encode(value)
-    let temporary = url.deletingLastPathComponent().appendingPathComponent(
-      ".\(url.lastPathComponent).\(UUID().uuidString.lowercased()).tmp")
+    let temporary = url.deletingLastPathComponent().appending(
+      path:
+        ".\(url.lastPathComponent).\(UUID().uuidString.lowercased()).tmp")
     let descriptor = Darwin.open(
       temporary.path,
       O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,

@@ -26,7 +26,6 @@ import XCTest
 final class RockchipFlashSupportingContractTests: XCTestCase {
   private enum ToolPreferenceFailure: Error { case injected }
 
-
   private final class ToolPreferenceBox: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String: Any] = [:]
@@ -414,7 +413,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
   func testPublicRequestRejectsAuthorityAndSelectorInjection() throws {
     XCTAssertThrowsError(
       try RockchipFlashExecutionRequest(
-        authorizationID: "../AUTH", archiveURL: URL(fileURLWithPath: "/tmp/a"),
+        authorizationID: "../AUTH", archiveURL: URL(filePath: "/tmp/a"),
         targetLocationSelector: "42"))
     XCTAssertThrowsError(
       try RockchipFlashExecutionRequest(
@@ -423,7 +422,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     for selector in ["", "042", "42 --tool /tmp/fake", "-1", "４２"] {
       XCTAssertThrowsError(
         try RockchipFlashExecutionRequest(
-          authorizationID: "AUTH-TEST", archiveURL: URL(fileURLWithPath: "/tmp/a"),
+          authorizationID: "AUTH-TEST", archiveURL: URL(filePath: "/tmp/a"),
           targetLocationSelector: selector))
     }
   }
@@ -467,9 +466,10 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
             declaredPartitions: board.mappedPartitions.map {
               RockchipDeclaredPartition(
                 name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
-            } + board.membershiplessPartitionsWriteForbidden.map {
-              RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-            },
+            }
+              + board.membershiplessPartitionsWriteForbidden.map {
+                RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+              },
             runtimeBuildVersion: board.runtimeBuildVersion))
       },
       boundTargetIdentitySHA256: { boundIdentity },
@@ -486,7 +486,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       return try snapshot(url, board)
     }
     let receipt = await RockchipFlashPreflight(probes: probes)
-      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      .run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertTrue(receipt.isGreen, receipt.renderedLines().joined(separator: "\n"))
     XCTAssertEqual(counter.value, 1, "preflight must stream one archive snapshot only once")
     XCTAssertEqual(receipt.deviceMutationDispatchCount, 0)
@@ -508,14 +508,15 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
           declaredPartitions: board.mappedPartitions.map {
             RockchipDeclaredPartition(
               name: $0.partitionName, sizeSectors: 1, offsetSectors: $0.offsetSectors)
-          } + board.membershiplessPartitionsWriteForbidden.map {
-            RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-          },
+          }
+            + board.membershiplessPartitionsWriteForbidden.map {
+              RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+            },
           runtimeBuildVersion: board.runtimeBuildVersion))
     }
 
     let receipt = await RockchipFlashPreflight(probes: probes)
-      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      .run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
 
     XCTAssertEqual(receipt.failedChecks, [.archiveIntegrity])
     let finding = try XCTUnwrap(
@@ -528,14 +529,14 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     // answer, not a dead tool, and refusing it would make the gate unusable.
     let alive = await RockchipFlashPreflight(
       probes: preflightProbes(rockUSB: .survivedSpawn(exitStatus: 1))
-    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertTrue(alive.isGreen, alive.renderedLines().joined(separator: "\n"))
 
     // A child killed before `main` is the 2026-08-04 host fault, and the
     // finding must hand the operator the two things it took a day to find.
     let dead = await RockchipFlashPreflight(
       probes: preflightProbes(rockUSB: .diedOnSignal(6))
-    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertFalse(dead.isGreen)
     XCTAssertEqual(dead.failedChecks, [.rockUSBToolAliveness])
     let rendered = dead.renderedLines().joined(separator: "\n")
@@ -548,7 +549,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
   func testPreflightRefusesAnUnavailableHDCWithAnActionableFinding() async throws {
     let receipt = await RockchipFlashPreflight(
       probes: preflightProbes(hdc: .unavailable("ARKDECK_HDC_PATH is unset"))
-    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertEqual(receipt.failedChecks, [.hdcToolAliveness])
     XCTAssertFalse(
       try XCTUnwrap(receipt.findings.first { $0.check == .hdcToolAliveness }).remediation
@@ -572,7 +573,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     let admitted = await RockchipFlashPreflight(
       probes: preflightProbes(
         archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
-    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertEqual(admitted.failedChecks, [])
     XCTAssertTrue(
       admitted.findings.contains {
@@ -591,13 +592,14 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
           members: board.members.filter { $0.name != "system.img" },
           declaredPartitions: board.mappedPartitions.map {
             RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
-          } + board.membershiplessPartitionsWriteForbidden.map {
-            RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-          },
+          }
+            + board.membershiplessPartitionsWriteForbidden.map {
+              RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+            },
           runtimeBuildVersion: board.runtimeBuildVersion))
     }
     let refused = await RockchipFlashPreflight(probes: probes)
-      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      .run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertEqual(refused.failedChecks, [.archiveIntegrity])
 
     // Unreadable as an images archive at all: also refused.
@@ -606,7 +608,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       archive: RockchipFlashArchiveIdentity(sha256: unknownDigest, byteCount: 1_234))
     broken.archiveSnapshot = { _, _ in throw Unreadable() }
     let unreadable = await RockchipFlashPreflight(probes: broken)
-      .run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      .run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertEqual(unreadable.failedChecks, [.archiveIntegrity])
   }
 
@@ -629,7 +631,7 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
     for (label, readback) in cases {
       let receipt = await RockchipFlashPreflight(
         probes: preflightProbes(readback: readback)
-      ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
       XCTAssertEqual(receipt.failedChecks, [.targetPresence], label)
       XCTAssertFalse(
         try XCTUnwrap(receipt.findings.first { $0.check == .targetPresence }).remediation
@@ -649,43 +651,47 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
         readback: RockchipEvolutionTargetReadback(
           stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
           usbTopology: "18874368"))
-    ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+    ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
     XCTAssertTrue(receipt.isGreen, receipt.renderedLines().joined(separator: "\n"))
     let summary = try XCTUnwrap(
-      receipt.findings.first { $0.check == .targetPresence }).summary
+      receipt.findings.first { $0.check == .targetPresence }
+    ).summary
     XCTAssertTrue(summary.contains("confirmed hdc-normal alias"), summary)
   }
 
   func testPreflightRefusesAliasShapedReadbacksThatDoNotMatchTheConfirmedEdge() async throws {
     let aliasIdentity = String(repeating: "d", count: 64)
-    let cases: [(String, (identitySHA256: String, usbTopology: String)?,
-      RockchipEvolutionTargetReadback)] = [
-      (
-        "no alias in the binding",
-        nil,
-        RockchipEvolutionTargetReadback(
-          stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
-          usbTopology: "18874368")
-      ),
-      (
-        "alias identity at the wrong topology",
-        (identitySHA256: aliasIdentity, usbTopology: "18874368"),
-        RockchipEvolutionTargetReadback(
-          stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
-          usbTopology: "999")
-      ),
-      (
-        "alias identity claiming loader mode",
-        (identitySHA256: aliasIdentity, usbTopology: "18874368"),
-        RockchipEvolutionTargetReadback(
-          stableIdentitySHA256: aliasIdentity, registeredMode: .loader,
-          usbTopology: "18874368")
-      ),
-    ]
+    let cases:
+      [(
+        String, (identitySHA256: String, usbTopology: String)?,
+        RockchipEvolutionTargetReadback
+      )] = [
+        (
+          "no alias in the binding",
+          nil,
+          RockchipEvolutionTargetReadback(
+            stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
+            usbTopology: "18874368")
+        ),
+        (
+          "alias identity at the wrong topology",
+          (identitySHA256: aliasIdentity, usbTopology: "18874368"),
+          RockchipEvolutionTargetReadback(
+            stableIdentitySHA256: aliasIdentity, registeredMode: .hdcNormal,
+            usbTopology: "999")
+        ),
+        (
+          "alias identity claiming loader mode",
+          (identitySHA256: aliasIdentity, usbTopology: "18874368"),
+          RockchipEvolutionTargetReadback(
+            stableIdentitySHA256: aliasIdentity, registeredMode: .loader,
+            usbTopology: "18874368")
+        ),
+      ]
     for (label, alias, readback) in cases {
       let receipt = await RockchipFlashPreflight(
         probes: preflightProbes(hdcNormalAlias: alias, readback: readback)
-      ).run(archiveURL: URL(fileURLWithPath: "/tmp/images.tar.gz"))
+      ).run(archiveURL: URL(filePath: "/tmp/images.tar.gz"))
       XCTAssertEqual(receipt.failedChecks, [.targetPresence], label)
     }
   }

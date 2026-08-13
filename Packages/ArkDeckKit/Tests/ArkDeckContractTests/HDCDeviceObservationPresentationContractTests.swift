@@ -70,10 +70,12 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
     _ = await session.refresh()
     let events = await session.refresh()
 
-    XCTAssertEqual(events.map(\.timestamp), [
-      "2026-07-28T00:00:00.000Z",
-      "2026-07-28T00:00:01.000Z",
-    ])
+    XCTAssertEqual(
+      events.map(\.timestamp),
+      [
+        "2026-07-28T00:00:00.000Z",
+        "2026-07-28T00:00:01.000Z",
+      ])
     XCTAssertEqual(events.map(\.kind), [.appeared, .disappeared])
     XCTAssertTrue(
       events.compactMap(\.redactedDeviceIdentifier).allSatisfy {
@@ -166,7 +168,7 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
   func testDP8_WrongCandidateSHAAppendsUnavailableWithZeroRunnerInvocation() async throws {
     let session = HDCDeviceObservationApplicationSession.makeProduction(
       toolchain: HDCCandidate(
-        path: URL(fileURLWithPath: "/private/tmp/arkdeck-obs-dp8-missing"),
+        path: URL(filePath: "/private/tmp/arkdeck-obs-dp8-missing"),
         source: .userConfigured,
         sha256: "wrong-sha256"),
       endpointSelection: try exactEndpointSelection())
@@ -717,7 +719,7 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
 
   private func exactDeclaredMissingCandidate(label: String) -> HDCCandidate {
     HDCCandidate(
-      path: URL(fileURLWithPath: "/private/tmp/arkdeck-obs-\(label)-missing"),
+      path: URL(filePath: "/private/tmp/arkdeck-obs-\(label)-missing"),
       source: .userConfigured,
       sha256: HDCDeviceObservationProbeCatalog.targetExecutableSHA256)
   }
@@ -782,7 +784,7 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
   }
 
   private func packageRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -839,8 +841,8 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
   }
 }
 
-private extension HDCDeviceObservationPresentationKind {
-  static let allContractCases: [Self] = [
+extension HDCDeviceObservationPresentationKind {
+  fileprivate static let allContractCases: [Self] = [
     .appeared, .disappeared, .observationUnknown, .observationUnavailable,
   ]
 }

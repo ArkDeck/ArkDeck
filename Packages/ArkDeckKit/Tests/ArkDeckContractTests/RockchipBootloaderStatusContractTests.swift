@@ -9,8 +9,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-loader-onboarding", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-loader-onboarding", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.lowercased(), directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -19,9 +19,9 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
   func testReadOnlyObserverDistinguishesAbsentAmbiguousAndUnboundLoader() throws {
     let targets = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
     let bindings = RockchipProductBindingStore(
-      rootURL: root.appendingPathComponent("binding", isDirectory: true))
+      rootURL: root.appending(path: "binding", directoryHint: .isDirectory))
     let loader = loaderIdentity(serial: "loader-current", topology: "17956864")
 
     XCTAssertEqual(
@@ -91,18 +91,21 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
     for fixture in identities {
       let targets = try RuntimeTargetStore(
-        directoryURL: root
-          .appendingPathComponent("targets-switch-\(fixture.name)", isDirectory: true))
+        directoryURL:
+          root
+          .appending(path: "targets-switch-\(fixture.name)", directoryHint: .isDirectory))
       let bindings = RockchipProductBindingStore(
-        rootURL: root
-          .appendingPathComponent("binding-switch-\(fixture.name)", isDirectory: true))
+        rootURL:
+          root
+          .appending(path: "binding-switch-\(fixture.name)", directoryHint: .isDirectory))
       let previousIdentity = hdcIdentity(
         serial: "previous-hdc-\(fixture.name)", topology: "16777216")
       let previousTarget = try targets.adopt(
         stableIdentitySHA256: digest(previousIdentity.serial),
         connectKey: previousIdentity.serial,
         toolVersion: "3.2.0f",
-        nowUTC: "2026-08-08T00:00:00Z").record
+        nowUTC: "2026-08-08T00:00:00Z"
+      ).record
       _ = try bindings.install(
         RockchipProductBindingSnapshot(
           revision: 1,
@@ -116,7 +119,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         stableIdentitySHA256: digest(fixture.identity.serial),
         connectKey: fixture.identity.serial,
         toolVersion: "3.2.0f",
-        nowUTC: "2026-08-08T00:01:00Z").record
+        nowUTC: "2026-08-08T00:01:00Z"
+      ).record
 
       let statusBefore = try observer(
         targets: targets,
@@ -248,7 +252,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
   func testRuntimeReactivationProofSourceRequiresCorrelatedUniqueTopology() throws {
     let fixture = try makeDisplacedAdvancedFixture("durable-proof")
-    let recordRoot = root.appendingPathComponent("runtime-proof", isDirectory: true)
+    let recordRoot = root.appending(path: "runtime-proof", directoryHint: .isDirectory)
     try writeCurrentRouteIntent(
       root: recordRoot,
       jobID: "job-current",
@@ -287,8 +291,9 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
   func testRuntimeReactivationProofSourceScopesHistoryToCurrentProvider() throws {
     let fixture = try makeDisplacedAdvancedFixture("durable-proof-provider-history")
-    let recordRoot = root.appendingPathComponent(
-      "runtime-proof-provider-history", isDirectory: true)
+    let recordRoot = root.appending(
+      path:
+        "runtime-proof-provider-history", directoryHint: .isDirectory)
     let currentProvider = String(repeating: "a", count: 64)
     try writeCurrentRouteIntent(
       root: recordRoot,
@@ -322,7 +327,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
   func testRuntimeReactivationProofSourceRejectsHashAndOwnershipDrift() throws {
     let fixture = try makeDisplacedAdvancedFixture("durable-proof-negative")
-    let hashRoot = root.appendingPathComponent("runtime-proof-hash", isDirectory: true)
+    let hashRoot = root.appending(path: "runtime-proof-hash", directoryHint: .isDirectory)
     try writeCurrentRouteIntent(
       root: hashRoot,
       jobID: "job-current",
@@ -340,7 +345,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       try RockchipRuntimeBindingReactivationProofSource(rootURL: hashRoot)
         .proof(for: fixture.target))
 
-    let modeRoot = root.appendingPathComponent("runtime-proof-mode", isDirectory: true)
+    let modeRoot = root.appending(path: "runtime-proof-mode", directoryHint: .isDirectory)
     try writeCurrentRouteIntent(
       root: modeRoot,
       jobID: "job-current",
@@ -358,7 +363,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       try RockchipRuntimeBindingReactivationProofSource(rootURL: modeRoot)
         .proof(for: fixture.target))
 
-    let oldRoot = root.appendingPathComponent("runtime-proof-old", isDirectory: true)
+    let oldRoot = root.appending(path: "runtime-proof-old", directoryHint: .isDirectory)
     try writeCurrentRouteIntent(
       root: oldRoot,
       jobID: "job-current",
@@ -376,8 +381,9 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         .proof(for: fixture.target),
       "a non-adjacent historical route must not reactivate the current revision")
 
-    let providerRoot = root.appendingPathComponent(
-      "runtime-proof-provider", isDirectory: true)
+    let providerRoot = root.appending(
+      path:
+        "runtime-proof-provider", directoryHint: .isDirectory)
     try writeCurrentRouteIntent(
       root: providerRoot,
       jobID: "job-current",
@@ -399,9 +405,9 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
 
   func testSelectedInitialTargetActivationRejectsConnectKeyDriftWithoutChangingBinding() throws {
     let targets = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets-switch-drift", isDirectory: true))
+      directoryURL: root.appending(path: "targets-switch-drift", directoryHint: .isDirectory))
     let bindings = RockchipProductBindingStore(
-      rootURL: root.appendingPathComponent("binding-switch-drift", isDirectory: true))
+      rootURL: root.appending(path: "binding-switch-drift", directoryHint: .isDirectory))
     let previous = hdcIdentity(serial: "previous-active", topology: "16777216")
     let current = hdcIdentity(serial: "current-live", topology: "18874368")
     _ = try bindings.install(
@@ -417,7 +423,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       stableIdentitySHA256: digest(current.serial),
       connectKey: "different-connect-key",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:00:00Z").record
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let originalBinding = try bindings.loadExisting()
     let coordinator = ProductRockchipLoaderBindingCoordinator(
       targetStore: targets,
@@ -512,7 +519,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       stableIdentitySHA256: digest(nextHDC.serial),
       connectKey: nextHDC.serial,
       toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:20:00Z").record
+      nowUTC: "2026-08-08T00:20:00Z"
+    ).record
     XCTAssertNotEqual(duplicate.targetID, original.targetID)
     let routedStore = RockchipPostFlashHDCBindingStore(rootURL: fixture.bindings.rootURL)
     _ = try routedStore.publish(
@@ -648,23 +656,27 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     loader: RockchipProductUSBIdentity
   ) {
     let targets = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent(
-        "targets-displaced-\(suffix)", isDirectory: true))
+      directoryURL: root.appending(
+        path:
+          "targets-displaced-\(suffix)", directoryHint: .isDirectory))
     let bindings = RockchipProductBindingStore(
-      rootURL: root.appendingPathComponent(
-        "binding-displaced-\(suffix)", isDirectory: true))
+      rootURL: root.appending(
+        path:
+          "binding-displaced-\(suffix)", directoryHint: .isDirectory))
     let hdcSerial = "selected-hdc-\(suffix)"
     let adopted = try targets.adopt(
       stableIdentitySHA256: digest(hdcSerial),
       connectKey: hdcSerial,
       toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:00:00Z").record
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let revisionTwo = try targets.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: adopted.stablePhysicalIdentitySHA256,
         previousRevision: adopted.bindingRevision,
         currentStableIdentitySHA256: digest("prior-loader-\(suffix)"),
-        currentRevision: adopted.bindingRevision + 1)).record
+        currentRevision: adopted.bindingRevision + 1)
+    ).record
     let loader = loaderIdentity(
       serial: "current-loader-\(suffix)", topology: "17956864")
     let target = try targets.advanceBindingLineage(
@@ -672,7 +684,8 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         previousStableIdentitySHA256: revisionTwo.stablePhysicalIdentitySHA256,
         previousRevision: revisionTwo.bindingRevision,
         currentStableIdentitySHA256: digest(loader.serial),
-        currentRevision: revisionTwo.bindingRevision + 1)).record
+        currentRevision: revisionTwo.bindingRevision + 1)
+    ).record
     let active = hdcIdentity(
       serial: "other-active-\(suffix)", topology: "16777216")
     _ = try bindings.install(
@@ -697,9 +710,10 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     let stepID = "wait-for-hdc"
     let action = try persistedAction(
       .rockchip(.waitForHDCReconnect(connectKey: target.connectKey)))
-    let directory = root
-      .appendingPathComponent(jobID, isDirectory: true)
-      .appendingPathComponent(stepID, isDirectory: true)
+    let directory =
+      root
+      .appending(path: jobID, directoryHint: .isDirectory)
+      .appending(path: stepID, directoryHint: .isDirectory)
     try prepareRecordDirectory(directory, root: root)
     try writeRecord(
       [
@@ -713,7 +727,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
         "actionSHA256": actionSHA256Override ?? action.sha256,
         "action": action.object,
       ],
-      to: directory.appendingPathComponent("intent.json"))
+      to: directory.appending(path: "intent.json"))
   }
 
   private func writeConfirmedHDCRoute(
@@ -729,9 +743,10 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
   ) throws {
     let action = try persistedAction(
       .rockchip(.observeHDCNormalUSB(connectKey: target.connectKey)))
-    let directory = root
-      .appendingPathComponent(jobID, isDirectory: true)
-      .appendingPathComponent(stepID, isDirectory: true)
+    let directory =
+      root
+      .appending(path: jobID, directoryHint: .isDirectory)
+      .appending(path: stepID, directoryHint: .isDirectory)
     try prepareRecordDirectory(directory, root: root)
     let common: [String: Any] = [
       "schemaVersion": "1.0.0",
@@ -745,7 +760,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     ]
     var intent = common
     intent["action"] = action.object
-    try writeRecord(intent, to: directory.appendingPathComponent("intent.json"))
+    try writeRecord(intent, to: directory.appending(path: "intent.json"))
 
     var receipt = common
     receipt["summary"] = [
@@ -761,7 +776,7 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     receipt["subprocessCount"] = 1
     try writeRecord(
       receipt,
-      to: directory.appendingPathComponent("receipt.json"),
+      to: directory.appending(path: "receipt.json"),
       permissions: receiptPermissions)
   }
 
@@ -809,9 +824,9 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     currentLoader: RockchipProductUSBIdentity
   ) {
     let targets = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
     let bindings = RockchipProductBindingStore(
-      rootURL: root.appendingPathComponent("binding", isDirectory: true))
+      rootURL: root.appending(path: "binding", directoryHint: .isDirectory))
     let hdcSerial = "hdc-normal-connect-key"
     let oldLoaderSerial = "loader-previous-session"
     let currentLoader = loaderIdentity(serial: "loader-current-session", topology: "17956864")
@@ -819,14 +834,16 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
       stableIdentitySHA256: digest(hdcSerial),
       connectKey: hdcSerial,
       toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:00:00Z").record
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let oldLoaderDigest = digest(oldLoaderSerial)
     let advanced = try targets.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: adopted.stablePhysicalIdentitySHA256,
         previousRevision: adopted.bindingRevision,
         currentStableIdentitySHA256: oldLoaderDigest,
-        currentRevision: adopted.bindingRevision + 1)).record
+        currentRevision: adopted.bindingRevision + 1)
+    ).record
     _ = try bindings.install(
       RockchipProductBindingSnapshot(
         revision: 2,
@@ -852,23 +869,25 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     loader: RockchipProductUSBIdentity
   ) {
     let targets = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets-same-loader", isDirectory: true))
+      directoryURL: root.appending(path: "targets-same-loader", directoryHint: .isDirectory))
     let bindings = RockchipProductBindingStore(
-      rootURL: root.appendingPathComponent("binding-same-loader", isDirectory: true))
+      rootURL: root.appending(path: "binding-same-loader", directoryHint: .isDirectory))
     let hdcSerial = "hdc-normal-connect-key"
     let loader = loaderIdentity(serial: "loader-current-session", topology: "17956864")
     let adopted = try targets.adopt(
       stableIdentitySHA256: digest(hdcSerial),
       connectKey: hdcSerial,
       toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:00:00Z").record
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let loaderDigest = digest(loader.serial)
     let advanced = try targets.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: adopted.stablePhysicalIdentitySHA256,
         previousRevision: adopted.bindingRevision,
         currentStableIdentitySHA256: loaderDigest,
-        currentRevision: adopted.bindingRevision + 1)).record
+        currentRevision: adopted.bindingRevision + 1)
+    ).record
     _ = try bindings.install(
       RockchipProductBindingSnapshot(
         revision: 2,

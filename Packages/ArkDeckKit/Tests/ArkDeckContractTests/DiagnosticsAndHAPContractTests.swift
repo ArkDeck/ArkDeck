@@ -13,8 +13,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-mu4-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-mu4-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -191,29 +191,32 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     runner: any RockchipRuntimeCommandRunning
   ) throws -> (probe: FoundationTraceRuntimeProbe, targetID: String) {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true))
+      directoryURL: stateDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory))
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
-      nowUTC: "2026-08-11T00:00:00Z").record
+      nowUTC: "2026-08-11T00:00:00Z"
+    ).record
     return (
       FoundationTraceRuntimeProbe(
         targetStore: targetStore,
         hdcResolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc"),
         runner: runner),
-      adopted.targetID)
+      adopted.targetID
+    )
   }
 
   func testTraceProbeUsesTheProvenAliasExecutionRoute() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let originalIdentity = String(repeating: "a", count: 64)
     let loaderIdentity = String(repeating: "b", count: 64)
     let aliasConnectKey = "post-flash-hdc-address"
     let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasConnectKey)
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: originalIdentity, connectKey: "stale-canonical-address",
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let canonical = try targetStore.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
@@ -221,7 +224,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     ).record
     let alias = try targetStore.adopt(
       stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z"
+    ).record
     XCTAssertNotEqual(alias.targetID, adopted.targetID)
     _ = try targetStore.appendAliasResolution(
       RuntimeTargetAliasResolutionDraft(
@@ -264,14 +268,15 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
   func testDebugProbeAndTemplatesUseTheProvenAliasExecutionRoute() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let originalIdentity = String(repeating: "a", count: 64)
     let loaderIdentity = String(repeating: "b", count: 64)
     let aliasConnectKey = "post-flash-hdc-address"
     let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasConnectKey)
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: originalIdentity, connectKey: "stale-canonical-address",
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let canonical = try targetStore.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
@@ -279,7 +284,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     ).record
     let alias = try targetStore.adopt(
       stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z"
+    ).record
     XCTAssertEqual(adopted.targetID, canonical.targetID)
     _ = try targetStore.appendAliasResolution(
       RuntimeTargetAliasResolutionDraft(
@@ -344,7 +350,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
     let snapshot = try await fixture.probe.probeTraceRuntime(targetID: fixture.targetID)
 
-    XCTAssertEqual(snapshot.parameters.map(\.name), TraceDebugParameterCatalog.definitions.map(\.name))
+    XCTAssertEqual(
+      snapshot.parameters.map(\.name), TraceDebugParameterCatalog.definitions.map(\.name))
     XCTAssertTrue(snapshot.parameters.allSatisfy { $0.state == .missing })
     XCTAssertTrue(snapshot.parameters.allSatisfy { $0.value == nil && $0.detail == nil })
   }
@@ -374,7 +381,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
   func testDebugProbeOverlapsIndependentReadsAndPreservesPresentationOrder() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("debug-concurrency", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "debug-concurrency", directoryHint: .isDirectory)
+    )
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
@@ -489,7 +497,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var screenshotListing: String?
       /// Bytes the simulated `file recv` leaves for the screenshot leg.
       /// Defaults to a real PNG header so the magic gate sees a valid file.
-      var screenshotPayload: Data? = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+      var screenshotPayload: Data? =
+        Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         + Data("fake-png-body".utf8)
       /// Bytes the simulated `file recv` leaves for the component tree leg.
       var uiTreePayload: Data? = Data(
@@ -800,9 +809,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     artifactQuota: ArtifactQuota = ArtifactQuota()
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore, RuntimeArtifactStore) {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       quota: artifactQuota,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let engine = try RuntimeJobEngine(
@@ -846,9 +855,10 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let bundle = bundleName.map { "\"bundleName\": \"\($0)\"," } ?? ""
     let ability = abilityName.map { "\"abilityName\": \"\($0)\"," } ?? ""
     let process = processName.map { "\"processName\": \"\($0)\"," } ?? ""
-    let digest = expectedDeployedArtifactDigest.map {
-      "\"expectedDeployedArtifactDigest\": \"\($0)\","
-    } ?? ""
+    let digest =
+      expectedDeployedArtifactDigest.map {
+        "\"expectedDeployedArtifactDigest\": \"\($0)\","
+      } ?? ""
     return Data(
       """
       {
@@ -1044,11 +1054,13 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       (
         "unavailable",
         .init(processReadbackText: "", processReadbackExit: 1),
-        "processReadbackUnavailable"),
+        "processReadbackUnavailable"
+      ),
       (
         "ambiguous",
         .init(processReadbackText: "some-other-process\n"),
-        "processReadbackAmbiguous"),
+        "processReadbackAmbiguous"
+      ),
     ]
     for (suffix, script, reason) in scripts {
       let dispatcher = ScriptedDispatcher(script: script)
@@ -1318,8 +1330,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       "an empty capture must not proceed to the receive leg")
 
     let recorded = try await artifacts.list(jobID: acceptance.jobID)
-    guard case .missing(let reason)? = recorded.first(where: { $0.name == "trace.htrace" })?
-      .status
+    guard
+      case .missing(let reason)? = recorded.first(where: { $0.name == "trace.htrace" })?
+        .status
     else {
       return XCTFail("a zero-byte capture must record the trace as missing")
     }
@@ -1456,7 +1469,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
     let journalURL =
       stateDirectory
-      .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl")
+      .appending(path: "jobs/\(acceptance.jobID)/journal.jsonl")
     let journal = try String(contentsOf: journalURL, encoding: .utf8)
 
     // The HiLog step must carry the diagnostics action, and no step may
@@ -1699,8 +1712,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(status.state, "succeeded")
 
     let journal = try String(
-      contentsOf: stateDirectory.appendingPathComponent(
-        "jobs/\(acceptance.jobID)/journal.jsonl"),
+      contentsOf: stateDirectory.appending(
+        path:
+          "jobs/\(acceptance.jobID)/journal.jsonl"),
       encoding: .utf8)
     let ownedPath =
       "/data/local/tmp/arkdeck-\(acceptance.jobID)-send-hap-owned.hap"
@@ -1924,7 +1938,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertEqual(beforeRun?.consumptionCount, 0)
     XCTAssertTrue(
       dispatcher.dispatchedActions.isEmpty,
-      "submit may materialize and preauthorize, but every external probe needs a durable job intent")
+      "submit may materialize and preauthorize, but every external probe needs a durable job intent"
+    )
     let status = try await engine.run(jobID: acceptance.jobID)
 
     XCTAssertEqual(status.state, "failed", status.timeline.joined(separator: " | "))
@@ -2256,7 +2271,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let parkedReplay = try DurableJournalRecovery.inspect(
       url:
         stateDirectory
-        .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl"))
+        .appending(path: "jobs/\(acceptance.jobID)/journal.jsonl"))
     XCTAssertEqual(
       parkedReplay.outstandingIntents.map(\.stepID), ["send-hap"],
       "an unknown dispatch must retain the original durable intent")
@@ -2285,7 +2300,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     let completedReplay = try DurableJournalRecovery.inspect(
       url:
         stateDirectory
-        .appendingPathComponent("jobs/\(acceptance.jobID)/journal.jsonl"))
+        .appending(path: "jobs/\(acceptance.jobID)/journal.jsonl"))
     XCTAssertTrue(completedReplay.outstandingIntents.isEmpty)
     XCTAssertTrue(completedReplay.unknownOutcomes.isEmpty)
 
@@ -2459,7 +2474,7 @@ extension DiagnosticsAndHAPContractTests {
           providerID: "hdc",
           bindingSnapshot: ArtifactBindingSnapshot(
             targetID: "TGT-1", bindingRevision: 7, stableIdentitySHA256: nil),
-          sourceFileURL: URL(fileURLWithPath: "/private/tmp/whatever.json"),
+          sourceFileURL: URL(filePath: "/private/tmp/whatever.json"),
           expectedByteCount: 10, expectedSHA256: String(repeating: "a", count: 64)))
       XCTFail("publishFile must keep refusing application/json")
     } catch {}
@@ -2607,7 +2622,8 @@ extension DiagnosticsAndHAPContractTests {
         jobID: acceptance.jobID, identity: "bundle:com.example.somethingelse")
       XCTFail("an unrecorded residue must not be actionable")
     } catch {}
-    XCTAssertTrue(dispatcher.dispatchedActions.filter { $0 == "uninstallPackage" }.count == 1,
+    XCTAssertTrue(
+      dispatcher.dispatchedActions.filter { $0 == "uninstallPackage" }.count == 1,
       "the refusal must not dispatch a second uninstall")
   }
 }

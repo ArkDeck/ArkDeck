@@ -256,18 +256,19 @@ enum RuntimeDebugAttemptPermitStore {
         "Runtime debug attempt provenance does not match the typed request")
     }
     if let nowUTC {
-      let invocationURL = stateDirectory
-        .appendingPathComponent("runtime-debug-invocations", isDirectory: true)
-        .appendingPathComponent("\(record.invocationID).json")
+      let invocationURL =
+        stateDirectory
+        .appending(path: "runtime-debug-invocations", directoryHint: .isDirectory)
+        .appending(path: "\(record.invocationID).json")
       let invocation = try JSONDecoder().decode(
         RuntimeDebugInvocationDocument.self, from: Data(contentsOf: invocationURL))
-      let formatter = ISO8601DateFormatter()
       guard invocation.schemaVersion == RuntimeDebugInvocationDocument.schemaVersion,
         invocation.invocationID == record.invocationID,
         invocation.state == "active",
-        invocation.destructiveEpochsUsed <= RuntimeDebugInvocationController.maximumDestructiveEpochs,
-        let now = formatter.date(from: nowUTC),
-        let expiry = formatter.date(from: invocation.expiresAtUTC),
+        invocation.destructiveEpochsUsed
+          <= RuntimeDebugInvocationController.maximumDestructiveEpochs,
+        let now = ISO8601Timestamps.parse(nowUTC),
+        let expiry = ISO8601Timestamps.parse(invocation.expiresAtUTC),
         now <= expiry,
         invocation.evaluations.contains(where: {
           $0.disposition == "executing"
@@ -285,8 +286,8 @@ enum RuntimeDebugAttemptPermitStore {
 
   private static func url(stateDirectory: URL, idempotencyKey: String) -> URL {
     stateDirectory
-      .appendingPathComponent("runtime-debug-attempts", isDirectory: true)
-      .appendingPathComponent("\(idempotencyKey).json")
+      .appending(path: "runtime-debug-attempts", directoryHint: .isDirectory)
+      .appending(path: "\(idempotencyKey).json")
   }
 
   static func canonicalEncode<T: Encodable>(_ value: T) throws -> Data {
@@ -331,8 +332,9 @@ public actor RuntimeDebugInvocationController {
     self.driver = driver
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
-      at: stateDirectory.appendingPathComponent(
-        "runtime-debug-invocations", isDirectory: true),
+      at: stateDirectory.appending(
+        path:
+          "runtime-debug-invocations", directoryHint: .isDirectory),
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
   }
@@ -528,7 +530,8 @@ public actor RuntimeDebugInvocationController {
         inputs: document.seedRequest.inputs,
         requestedOutputs: document.seedRequest.requestedOutputs)
     } catch {
-      throw RuntimeDebugInvocationError.invalidSeedRequest("cannot derive attempt request: \(error)")
+      throw RuntimeDebugInvocationError.invalidSeedRequest(
+        "cannot derive attempt request: \(error)")
     }
     try RuntimeDebugAttemptPermitStore.persist(
       stateDirectory: stateDirectory,
@@ -595,11 +598,11 @@ public actor RuntimeDebugInvocationController {
   }
 
   private var invocationDirectory: URL {
-    stateDirectory.appendingPathComponent("runtime-debug-invocations", isDirectory: true)
+    stateDirectory.appending(path: "runtime-debug-invocations", directoryHint: .isDirectory)
   }
 
   private func url(_ invocationID: String) -> URL {
-    invocationDirectory.appendingPathComponent("\(invocationID).json")
+    invocationDirectory.appending(path: "\(invocationID).json")
   }
 
   private func load(_ invocationID: String) throws -> RuntimeDebugInvocationDocument {
@@ -680,14 +683,14 @@ public actor RuntimeDebugInvocationController {
   }
 
   private func parse(_ value: String) throws -> Date {
-    guard let date = ISO8601DateFormatter().date(from: value) else {
+    guard let date = ISO8601Timestamps.parse(value) else {
       throw RuntimeDebugInvocationError.persistenceFailure("Runtime clock is not ISO-8601")
     }
     return date
   }
 
   private func format(_ date: Date) -> String {
-    ISO8601DateFormatter().string(from: date)
+    ISO8601Timestamps.string(from: date)
   }
 
   private static func canonicalActionData(

@@ -153,7 +153,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       nowUTC: "2026-08-01T00:00:00Z",
       resolvedInputArtifact: ProviderResolvedInputArtifact(
         artifactID: "ART-70035",
-        fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+        fileURL: URL(filePath: "/private/tmp/images.tar.gz"),
         sha256: profile.archiveSHA256,
         byteCount: Int(profile.archiveSizeBytes)))
     let inputs = flashInputs(
@@ -350,7 +350,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     guard let archivePath = ProcessInfo.processInfo.environment[Self.archiveEnvironmentKey] else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
-    let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+    let archiveURL = URL(filePath: archivePath).standardizedFileURL
     let profile = RockchipFlashProfile.dayu200
     let summary = try GzipTarArchiveReader.summarize(
       fileAt: archiveURL,
@@ -362,15 +362,16 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     XCTAssertEqual(executePlan.archiveSHA256, profile.archiveSHA256)
     XCTAssertEqual(executePlan.planDigestSHA256.count, 64)
 
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-dayu200-70035-plan-only-\(UUID().uuidString.lowercased())",
-      isDirectory: true)
+    let root = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-dayu200-70035-plan-only-\(UUID().uuidString.lowercased())",
+      directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: root, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     defer { try? FileManager.default.removeItem(at: root) }
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: root.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-01T00:00:00Z" })
     let artifact = try await artifactStore.publishFile(
       RuntimeArtifactFilePublicationRequest(
@@ -388,11 +389,11 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let lease = try await artifactStore.leaseReference(
       jobID: artifact.jobID, artifactID: artifact.artifactID)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: root.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(
           factsPort: FactsPort(), availability: .available)

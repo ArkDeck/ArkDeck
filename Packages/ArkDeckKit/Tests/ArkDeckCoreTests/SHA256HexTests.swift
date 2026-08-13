@@ -21,6 +21,10 @@ final class SHA256HexTests: XCTestCase {
       SHA256Hex.string(of: payload))
   }
 
+  func testArbitraryBytesRenderWithoutCFormatting() {
+    XCTAssertEqual(SHA256Hex.lowercaseHex([0x00, 0x0f, 0x10, 0xff]), "000f10ff")
+  }
+
   func testPredicateAcceptsExactlyLowercase64Hex() {
     let digest = SHA256Hex.string(of: Data("abc".utf8))
     XCTAssertTrue(SHA256Hex.isLowercaseSHA256(digest))

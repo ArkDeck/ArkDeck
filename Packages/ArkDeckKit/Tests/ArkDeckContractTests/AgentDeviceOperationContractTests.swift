@@ -65,7 +65,7 @@ final class AgentDeviceOperationContractTests: XCTestCase {
   }
 
   private static let repositoryRoot: URL = {
-    var url = URL(fileURLWithPath: #filePath)
+    var url = URL(filePath: #filePath)
     for _ in 0..<5 {
       url.deleteLastPathComponent()
     }
@@ -74,20 +74,21 @@ final class AgentDeviceOperationContractTests: XCTestCase {
 
   private static let changeRoot =
     repositoryRoot
-    .appendingPathComponent("openspec/changes/chg-2026-025-ai-native-unattended-device-ops")
-  private static let contractRoot = changeRoot.appendingPathComponent("contracts")
+    .appending(path: "openspec/changes/chg-2026-025-ai-native-unattended-device-ops")
+  private static let contractRoot = changeRoot.appending(path: "contracts")
   private static let runRoot =
     changeRoot
-    .appendingPathComponent("evidence/runs/TASK-AIN-009")
+    .appending(path: "evidence/runs/TASK-AIN-009")
 
   func testSchemaIdentityClosedObjectsAndCoreEnumsAreFrozen() throws {
     let agent = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent("agent-device-operation.schema.v1-draft.json"))
+      Self.contractRoot.appending(path: "agent-device-operation.schema.v1-draft.json"))
     let human = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent("human-action-required.schema.v1-draft.json"))
+      Self.contractRoot.appending(path: "human-action-required.schema.v1-draft.json"))
     let registry = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent(
-        "agent-device-operation-registry.schema.v1-draft.json"))
+      Self.contractRoot.appending(
+        path:
+          "agent-device-operation-registry.schema.v1-draft.json"))
 
     XCTAssertEqual(
       agent["$id"] as? String,
@@ -163,7 +164,7 @@ final class AgentDeviceOperationContractTests: XCTestCase {
   func testPositiveAndSingleFactNegativeVectors() throws {
     let registry = try loadRegistry()
     let (_, _, facts) = try loadSchemasAndFacts()
-    let corpus = try loadJSONObject(Self.runRoot.appendingPathComponent("vectors.json"))
+    let corpus = try loadJSONObject(Self.runRoot.appending(path: "vectors.json"))
     let requests = try requiredDictionary(corpus, "requests")
     let results = try requiredDictionary(corpus, "results")
     let humanActions = try requiredArray(corpus, "humanActions")
@@ -214,8 +215,9 @@ final class AgentDeviceOperationContractTests: XCTestCase {
         mutation,
         base: try mutationBase(
           base, corpus: corpus,
-          registryURL: Self.contractRoot.appendingPathComponent(
-            "agent-device-operation-registry.v1-draft.json")))
+          registryURL: Self.contractRoot.appending(
+            path:
+              "agent-device-operation-registry.v1-draft.json")))
 
       let actual: String?
       if base.hasPrefix("request:") {
@@ -251,7 +253,7 @@ final class AgentDeviceOperationContractTests: XCTestCase {
 
   func testDuplicateMembersIncludingEscapedNamesFailClosed() throws {
     for name in ["duplicate-request.json", "duplicate-request-escaped.json"] {
-      let data = try Data(contentsOf: Self.runRoot.appendingPathComponent(name))
+      let data = try Data(contentsOf: Self.runRoot.appending(path: name))
       var validator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
       XCTAssertThrowsError(try validator.validate(), name) { error in
         guard case ArkDeckCore.StrictJSONError.duplicateMemberName(let path) = error else {
@@ -266,15 +268,16 @@ final class AgentDeviceOperationContractTests: XCTestCase {
     -> ([String: Any], [String: Any], SchemaFacts)
   {
     let agent = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent("agent-device-operation.schema.v1-draft.json"))
+      Self.contractRoot.appending(path: "agent-device-operation.schema.v1-draft.json"))
     let human = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent("human-action-required.schema.v1-draft.json"))
+      Self.contractRoot.appending(path: "human-action-required.schema.v1-draft.json"))
     return (agent, human, try schemaFacts(agent: agent, human: human))
   }
 
   private func loadRegistry() throws -> Registry {
-    let url = Self.contractRoot.appendingPathComponent(
-      "agent-device-operation-registry.v1-draft.json")
+    let url = Self.contractRoot.appending(
+      path:
+        "agent-device-operation-registry.v1-draft.json")
     let data = try Data(contentsOf: url)
     var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
     try duplicateValidator.validate()

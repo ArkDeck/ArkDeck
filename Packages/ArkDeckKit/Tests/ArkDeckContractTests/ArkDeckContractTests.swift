@@ -121,7 +121,7 @@ final class ArkDeckContractTests: XCTestCase {
   // MARK: - Source scanning
 
   private var packageRoot: URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()  // ArkDeckContractTests
       .deletingLastPathComponent()  // Tests
       .deletingLastPathComponent()  // package root
@@ -264,11 +264,11 @@ final class ArkDeckContractTests: XCTestCase {
 
 final class ProcessAndHDCContractTests: XCTestCase {
   func testExternalFirstDiscoveryAndJobSnapshotRemainStable() throws {
-    let printf = URL(fileURLWithPath: "/usr/bin/printf")
+    let printf = URL(filePath: "/usr/bin/printf")
     let report = HDCExternalFirstDiscovery.discover(
       HDCDiscoveryRequest(
         userConfiguredPaths: [printf],
-        devecoSDKPaths: [printf, URL(fileURLWithPath: "/usr/bin/yes")],
+        devecoSDKPaths: [printf, URL(filePath: "/usr/bin/yes")],
         openHarmonySDKPaths: [try XCTUnwrap(URL(string: "relative/hdc"))]
       )
     )
@@ -581,7 +581,7 @@ final class HDCServerSupervisorContractTests: XCTestCase {
     let mismatchedEvidence = HDCManagedServerLaunchEvidence(
       endpoint: HDCServerFixtures.isolatedEndpoint,
       pid: 910,
-      toolPath: URL(fileURLWithPath: "/usr/bin/printf"),
+      toolPath: URL(filePath: "/usr/bin/printf"),
       arguments: [],
       generation: 1,
       version: .known("5.0.0")
@@ -599,7 +599,7 @@ final class HDCServerSupervisorContractTests: XCTestCase {
     let fabricatedEvidence = HDCManagedServerLaunchEvidence(
       endpoint: HDCServerFixtures.sharedEndpoint,
       pid: 910,
-      toolPath: URL(fileURLWithPath: "/usr/bin/printf"),
+      toolPath: URL(filePath: "/usr/bin/printf"),
       arguments: ["-s", HDCServerFixtures.sharedEndpoint.rawValue, "server"],
       generation: 1,
       version: .known("5.0.0")

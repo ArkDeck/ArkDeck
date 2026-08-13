@@ -58,8 +58,9 @@ final class AutomationApplicationFacadeContractTests: XCTestCase {
     }
     XCTAssertEqual(task.id, "HTASK-42")
 
-    guard case .failed = AutomationResponseDecoding.action(
-      .success(data), action: .reconcile, taskID: "HTASK-other")
+    guard
+      case .failed = AutomationResponseDecoding.action(
+        .success(data), action: .reconcile, taskID: "HTASK-other")
     else { return XCTFail("a different task must fail closed") }
   }
 
@@ -73,7 +74,7 @@ final class AutomationApplicationFacadeContractTests: XCTestCase {
       Set(["reconcile", "pause", "cancel"]))
 
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/AutomationApplicationFacade.swift"),

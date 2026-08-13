@@ -46,7 +46,7 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
     for legacyTree in ["tasks", "memory"] {
       let root = try makeRoot()
       try FileManager.default.createDirectory(
-        at: root.appendingPathComponent(legacyTree, isDirectory: true),
+        at: root.appending(path: legacyTree, directoryHint: .isDirectory),
         withIntermediateDirectories: true)
       XCTAssertThrowsError(try HarnessTaskStore(rootURL: root)) { error in
         guard case HarnessTaskStoreError.corrupt(let detail) = error else {
@@ -56,7 +56,7 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
         XCTAssertTrue(detail.contains(legacyTree), detail)
       }
       try FileManager.default.removeItem(
-        at: root.appendingPathComponent(legacyTree, isDirectory: true))
+        at: root.appending(path: legacyTree, directoryHint: .isDirectory))
       XCTAssertNoThrow(try HarnessTaskStore(rootURL: root))
     }
   }
@@ -76,11 +76,11 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
           .text("complete"),
         ])
     }
-    let mirrorTask = root.appendingPathComponent("tasks/HTASK-OLDMIRROR01", isDirectory: true)
+    let mirrorTask = root.appending(path: "tasks/HTASK-OLDMIRROR01", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: mirrorTask, withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: mirrorTask.appendingPathComponent("task.json"))
+    try Data("{}".utf8).write(to: mirrorTask.appending(path: "task.json"))
     try FileManager.default.createDirectory(
-      at: root.appendingPathComponent("memory", isDirectory: true),
+      at: root.appending(path: "memory", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
 
     let store = try HarnessTaskStore(rootURL: root)
@@ -185,9 +185,9 @@ final class HarnessSQLiteMigrationContractTests: XCTestCase {
 
   private func makeRoot(copyHistoricalFixture: Bool = false) throws -> URL {
     let parent = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-hfa012-tests", isDirectory: true)
+      .appending(path: "arkdeck-hfa012-tests", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-    let root = parent.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let root = parent.appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     roots.append(root)
     return root

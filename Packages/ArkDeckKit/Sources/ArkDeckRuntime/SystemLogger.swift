@@ -725,10 +725,10 @@ public final class SystemLogger: @unchecked Sendable {
       }
       redacted[key.rawValue] = redactionPolicy.redact(field)
     }
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let record = RedactedDiagnosticRecord(
-      timestamp: formatter.string(from: auditClock.nowUTC), level: level, category: category,
+      timestamp: ISO8601Timestamps.string(
+        from: auditClock.nowUTC, includingFractionalSeconds: true),
+      level: level, category: category,
       eventName: eventName.rawValue, correlationID: correlationID.rawValue, fields: redacted)
     try structuredStore.appendAndSynchronize(record)
     unifiedLogger.log(record)

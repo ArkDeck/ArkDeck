@@ -243,7 +243,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
   // each other. If they drift, the lookup fails closed at runtime with no
   // compile-time signal, so the drift is caught here instead.
   func testTheMachServiceNameAgreesAcrossTheAppEntitlementAndLaunchAgent() throws {
-    let root = URL(fileURLWithPath: #filePath)
+    let root = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let name = ArkDeckAgentXPC.machServiceName

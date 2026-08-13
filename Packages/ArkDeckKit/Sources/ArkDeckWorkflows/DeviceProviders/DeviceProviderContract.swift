@@ -462,7 +462,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       optional(artifact.expectedSHA256, into: &arguments, key: "expectedSha256")
       if let magic = artifact.expectedLeadingBytes {
         arguments["expectedLeadingBytes"] = .string(
-          magic.map { String(format: "%02x", $0) }.joined())
+          SHA256Hex.lowercaseHex(magic))
       }
       self.init(kind: "hdc.receiveOwnedArtifact", arguments: arguments)
     case .hdc(.cleanupOwnedRemotePath(let path)):
@@ -750,7 +750,7 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "persisted \(kind) carries an invalid Artifact byte count")
       }
       let pathValue = try string("artifactPath")
-      let fileURL = URL(fileURLWithPath: pathValue)
+      let fileURL = URL(filePath: pathValue)
       guard
         pathValue.hasPrefix("/"),
         fileURL.standardizedFileURL.path == pathValue
@@ -949,18 +949,24 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       }
       return .hdc(.queryProperty(property))
     case "hdc.observeStorage":
-      return .hdc(.observeStorage(try HDCStoragePreflightRequest(
-        requiredBytes: integer("requiredBytes"))))
+      return .hdc(
+        .observeStorage(
+          try HDCStoragePreflightRequest(
+            requiredBytes: integer("requiredBytes"))))
     case "hdc.captureHilog":
-      return .hdc(.captureHilog(try HDCHilogCaptureRequest(
-        durationSeconds: integer("durationSeconds"),
-        filters: stringArray("filters"), byteBudget: integer("byteBudget"))))
+      return .hdc(
+        .captureHilog(
+          try HDCHilogCaptureRequest(
+            durationSeconds: integer("durationSeconds"),
+            filters: stringArray("filters"), byteBudget: integer("byteBudget"))))
     case "hdc.captureUIDump":
       guard let scope = HDCUIDumpRequest.Scope(rawValue: try string("scope")) else {
         throw DeviceProviderError.unsupportedAction("persisted UI dump scope is invalid")
       }
-      return .hdc(.captureUIDump(try HDCUIDumpRequest(
-        scope: scope, byteBudget: integer("byteBudget"))))
+      return .hdc(
+        .captureUIDump(
+          try HDCUIDumpRequest(
+            scope: scope, byteBudget: integer("byteBudget"))))
     case "hdc.captureCrashIndex":
       return .hdc(.captureCrashIndex(byteBudget: try integer("byteBudget")))
     case "hdc.captureCrashLog":
@@ -969,29 +975,33 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           try HDCFaultLogName(try string("faultLogName")),
           byteBudget: try integer("byteBudget")))
     case "hdc.captureTrace":
-      return .hdc(.captureTrace(
-        try HDCTraceCaptureRequest(
-          durationSeconds: integer("durationSeconds"),
-          categories: stringArray("categories"), bufferKB: integer("bufferKB")),
-        into: try path()))
+      return .hdc(
+        .captureTrace(
+          try HDCTraceCaptureRequest(
+            durationSeconds: integer("durationSeconds"),
+            categories: stringArray("categories"), bufferKB: integer("bufferKB")),
+          into: try path()))
     case "hdc.captureComponentTree":
       return .hdc(.captureComponentTree(into: try path()))
     case "hdc.captureScreenshot":
       return .hdc(.captureScreenshot(into: try path()))
     case "hdc.receiveOwnedArtifact":
-      return .hdc(.receiveOwnedArtifact(
-        HDCOwnedRemoteArtifact(
-          path: try path(), expectedSHA256: try optionalString("expectedSha256"),
-          maximumBytes: try integer("maximumBytes"),
-          expectedLeadingBytes: try optionalString("expectedLeadingBytes").map { hex in
-            var bytes = Data()
-            var index = hex.startIndex
-            while index < hex.endIndex, let next = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) {
-              if let byte = UInt8(hex[index..<next], radix: 16) { bytes.append(byte) }
-              index = next
-            }
-            return bytes
-          })))
+      return .hdc(
+        .receiveOwnedArtifact(
+          HDCOwnedRemoteArtifact(
+            path: try path(), expectedSHA256: try optionalString("expectedSha256"),
+            maximumBytes: try integer("maximumBytes"),
+            expectedLeadingBytes: try optionalString("expectedLeadingBytes").map { hex in
+              var bytes = Data()
+              var index = hex.startIndex
+              while index < hex.endIndex,
+                let next = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex)
+              {
+                if let byte = UInt8(hex[index..<next], radix: 16) { bytes.append(byte) }
+                index = next
+              }
+              return bytes
+            })))
     case "hdc.cleanupOwnedRemotePath":
       return .hdc(.cleanupOwnedRemotePath(try path()))
     case "hdc.sendArtifactToStaging":
@@ -1029,13 +1039,17 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "hdc.uninstallPackage":
       return .hdc(.uninstallPackage(try bundle()))
     case "hdc.createPortForward":
-      return .hdc(.createPortForward(try HDCPortForwardSpec(
-        direction: try portDirection(),
-        localPort: integer("localPort"), remotePort: integer("remotePort"))))
+      return .hdc(
+        .createPortForward(
+          try HDCPortForwardSpec(
+            direction: try portDirection(),
+            localPort: integer("localPort"), remotePort: integer("remotePort"))))
     case "hdc.removePortForward":
-      return .hdc(.removePortForward(try HDCPortForwardSpec(
-        direction: try portDirection(),
-        localPort: integer("localPort"), remotePort: integer("remotePort"))))
+      return .hdc(
+        .removePortForward(
+          try HDCPortForwardSpec(
+            direction: try portDirection(),
+            localPort: integer("localPort"), remotePort: integer("remotePort"))))
     case "hdc.readPackagePresence":
       return .hdc(.readPackagePresence(try bundle()))
     case "hdc.readProcessPresence":
@@ -1043,9 +1057,11 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "hdc.readOwnedPathPresence":
       return .hdc(.readOwnedPathPresence(try path()))
     case "hdc.readPortForwardPresence":
-      return .hdc(.readPortForwardPresence(try HDCPortForwardSpec(
-        direction: try portDirection(),
-        localPort: integer("localPort"), remotePort: integer("remotePort"))))
+      return .hdc(
+        .readPortForwardPresence(
+          try HDCPortForwardSpec(
+            direction: try portDirection(),
+            localPort: integer("localPort"), remotePort: integer("remotePort"))))
     case "hdc.sendNativeLibraryToStaging":
       return .hdc(.sendNativeLibraryToStaging(try nativeDeployment()))
     case "hdc.backupNativeLibrary":
@@ -1061,14 +1077,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "hdc.rollbackNativeLibrary":
       return .hdc(.rollbackNativeLibrary(try nativeDeployment()))
     case "hdc.inspectNativeLibrary":
-      guard let expectation = HDCNativeLibraryInspection(
-        rawValue: try string("expectation"))
+      guard
+        let expectation = HDCNativeLibraryInspection(
+          rawValue: try string("expectation"))
       else {
         throw DeviceProviderError.unsupportedAction(
           "persisted native inspection expectation is unknown")
       }
-      return .hdc(.inspectNativeLibrary(
-        try nativeDeployment(), expectation: expectation))
+      return .hdc(
+        .inspectNativeLibrary(
+          try nativeDeployment(), expectation: expectation))
     case "rockchip.enterLoader":
       return .rockchip(.enterLoader(connectKey: try string("connectKey")))
     case "rockchip.observeHDCNormalUSB":
@@ -1076,23 +1094,27 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case "rockchip.waitForHDCDisconnect":
       return .rockchip(.waitForHDCDisconnect(connectKey: try string("connectKey")))
     case "rockchip.waitForLoader":
-      return .rockchip(.waitForLoader(
-        stableIdentitySHA256: try string("stableIdentitySha256")))
+      return .rockchip(
+        .waitForLoader(
+          stableIdentitySHA256: try string("stableIdentitySha256")))
     case "rockchip.rebindLoader":
-      return .rockchip(.rebindLoader(
-        stableIdentitySHA256: try string("stableIdentitySha256")))
+      return .rockchip(
+        .rebindLoader(
+          stableIdentitySHA256: try string("stableIdentitySha256")))
     case "rockchip.flashPartitions":
       return .rockchip(.flashPartitions(try rockchipBundle()))
     case "rockchip.verifyFlashReadback":
       return .rockchip(.verifyFlashReadback(try rockchipBundle()))
     case "rockchip.rebootToNormal":
-      return .rockchip(.rebootToNormal(
-        stableIdentitySHA256: try string("stableIdentitySha256")))
+      return .rockchip(
+        .rebootToNormal(
+          stableIdentitySHA256: try string("stableIdentitySha256")))
     case "rockchip.waitForHDCReconnect":
       return .rockchip(.waitForHDCReconnect(connectKey: try string("connectKey")))
     case "rockchip.waitForBoundHDCReconnect":
-      return .rockchip(.waitForBoundHDCReconnect(
-        expectation: try rockchipHDCExpectation()))
+      return .rockchip(
+        .waitForBoundHDCReconnect(
+          expectation: try rockchipHDCExpectation()))
     case "rockchip.verifyBuild":
       return .rockchip(
         .verifyBuild(
@@ -1106,12 +1128,13 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           expectedProductModel: try string("expectedProductModel"),
           expectedBuildVersion: try string("expectedBuildVersion")))
     case "rockchip.capturePostFlashDiagnostics":
-      return .rockchip(.capturePostFlashDiagnostics(
-        connectKey: try string("connectKey"),
-        request: try HDCHilogCaptureRequest(
-          durationSeconds: integer("durationSeconds"),
-          filters: stringArray("filters"),
-          byteBudget: integer("byteBudget"))))
+      return .rockchip(
+        .capturePostFlashDiagnostics(
+          connectKey: try string("connectKey"),
+          request: try HDCHilogCaptureRequest(
+            durationSeconds: integer("durationSeconds"),
+            filters: stringArray("filters"),
+            byteBudget: integer("byteBudget"))))
     default:
       throw DeviceProviderError.unsupportedAction(
         "persisted typed provider action kind \(kind) is unknown")
@@ -1320,7 +1343,9 @@ public struct HostLandingExpectation: Sendable, Equatable {
       if leading.count < 8 {
         leading.append(contentsOf: buffer.prefix(min(read, 8 - leading.count)))
       }
-      buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(read))) }
+      buffer.withUnsafeBytes {
+        hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(read)))
+      }
     }
     guard hashed == byteCount else { return nil }
     return ProviderLandedArtifact(

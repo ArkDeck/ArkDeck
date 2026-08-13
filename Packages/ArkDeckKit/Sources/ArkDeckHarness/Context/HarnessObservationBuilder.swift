@@ -177,7 +177,8 @@ package struct HarnessObservationBuilder: Sendable {
         evidence.append(record(descriptor, verified: false, blocker: blocker))
         continue
       }
-      let sensitiveOptIn = descriptor.sensitive
+      let sensitiveOptIn =
+        descriptor.sensitive
         && sensitiveEvidenceAllowList.contains(descriptor.name)
       if descriptor.sensitive, !sensitiveOptIn {
         // No operator named this artifact, so the evaluator does not look:
@@ -285,11 +286,14 @@ package struct HarnessObservationBuilder: Sendable {
     measurements: [String: JSONValue], samples: [String: Int],
     integrityBlockers: [String], collectionBlockers: [String]
   ) {
-    guard let artifact = verified.first(where: {
-      $0.jobID == evidenceJobID && $0.name == Self.applicationLivenessArtifact
-    }) else { return ([:], [:], [], []) }
-    guard let envelope = try? JSONDecoder().decode(
-      HarnessApplicationLivenessArtifact.self, from: artifact.data),
+    guard
+      let artifact = verified.first(where: {
+        $0.jobID == evidenceJobID && $0.name == Self.applicationLivenessArtifact
+      })
+    else { return ([:], [:], [], []) }
+    guard
+      let envelope = try? JSONDecoder().decode(
+        HarnessApplicationLivenessArtifact.self, from: artifact.data),
       envelope.documentType == "arkdeck-application-liveness",
       envelope.schemaVersion == "1.0.0",
       envelope.sourceRuntimeJobID == evidenceJobID,
@@ -307,14 +311,16 @@ package struct HarnessObservationBuilder: Sendable {
     {
       return (
         [:], [:], [],
-        ["applicationLivenessBindingRevisionChanged"])
+        ["applicationLivenessBindingRevisionChanged"]
+      )
     }
     if let expectedDeployedArtifactDigest,
       envelope.deployedArtifactDigest != expectedDeployedArtifactDigest
     {
       return (
         [:], [:], [],
-        ["applicationLivenessDeployedArtifactChanged"])
+        ["applicationLivenessDeployedArtifactChanged"]
+      )
     }
     switch envelope.state {
     case "HEALTHY":
@@ -326,18 +332,21 @@ package struct HarnessObservationBuilder: Sendable {
           "verificationRunCount": .integer(1),
           "applicationLiveness": .string("healthy"),
         ],
-        ["verificationRunCount": 1, "applicationLiveness": 1], [], [])
+        ["verificationRunCount": 1, "applicationLiveness": 1], [], []
+      )
     case "UNHEALTHY":
       return (
         [
           "verificationRunCount": .integer(1),
           "applicationLiveness": .string("unhealthy"),
         ],
-        ["verificationRunCount": 1, "applicationLiveness": 1], [], [])
+        ["verificationRunCount": 1, "applicationLiveness": 1], [], []
+      )
     case "UNKNOWN":
       return (
         [:], [:], [],
-        ["applicationLivenessUnknown:\(envelope.reasonCode)"])
+        ["applicationLivenessUnknown:\(envelope.reasonCode)"]
+      )
     default:
       return ([:], [:], ["applicationLivenessStateInvalid"], [])
     }
@@ -346,10 +355,9 @@ package struct HarnessObservationBuilder: Sendable {
   private static func isValidObservationWindow(
     _ envelope: HarnessApplicationLivenessArtifact
   ) -> Bool {
-    let formatter = ISO8601DateFormatter()
-    guard let started = formatter.date(from: envelope.observationWindow.startedAtUTC),
-      let ended = formatter.date(from: envelope.observationWindow.endedAtUTC),
-      let observed = formatter.date(from: envelope.observedAtUTC)
+    guard let started = ISO8601Timestamps.parse(envelope.observationWindow.startedAtUTC),
+      let ended = ISO8601Timestamps.parse(envelope.observationWindow.endedAtUTC),
+      let observed = ISO8601Timestamps.parse(envelope.observedAtUTC)
     else { return false }
     return started <= observed && observed <= ended
   }
@@ -385,8 +393,9 @@ package struct HarnessObservationBuilder: Sendable {
     }
     let entries: [HarnessFaultLogEntry]
     if let derived = verified.first(where: { $0.name == "crash-signature.json" }) {
-      guard let envelope = try? JSONDecoder().decode(
-        HarnessCrashLedgerDerivedArtifact.self, from: derived.data),
+      guard
+        let envelope = try? JSONDecoder().decode(
+          HarnessCrashLedgerDerivedArtifact.self, from: derived.data),
         let analyzerOutput = try? HarnessCrashLedgerDerivedAnalyzer.canonicalData(
           envelope.result),
         envelope.schemaVersion == HarnessCrashLedgerAnalysis.schemaVersion,
@@ -412,7 +421,8 @@ package struct HarnessObservationBuilder: Sendable {
           [
             "crashLedgerUnreadable:\(Self.crashIndexArtifact):"
               + (envelope.result.unreadableReason ?? "analyzerUnreadable")
-          ])
+          ]
+        )
       }
       entries = envelope.result.entries
     } else {

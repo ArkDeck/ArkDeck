@@ -120,7 +120,7 @@ package struct AnalyzerProvider: DeviceProvider {
       // an analyzer this host has not been given (PRODUCT-LOOP §8).
       return .unavailable(reason: "analyzer.profileUnavailable")
     }
-    guard let bytes = try? Data(contentsOf: URL(fileURLWithPath: profile.executablePath)),
+    guard let bytes = try? Data(contentsOf: URL(filePath: profile.executablePath)),
       AnalyzerProvider.sha256(bytes) == profile.executableSHA256
     else {
       return .unavailable(reason: "analyzer.toolIdentityDrift")
@@ -211,7 +211,8 @@ package struct AnalyzerProvider: DeviceProvider {
     guard receipt.exitStatus == 0 else {
       return .failed(
         code: "analyzer.failed",
-        detail: "\(invocation.analyzerRef) exited \(receipt.exitStatus.map(String.init) ?? "unknown")")
+        detail:
+          "\(invocation.analyzerRef) exited \(receipt.exitStatus.map(String.init) ?? "unknown")")
     }
     guard !receipt.stdout.isEmpty else {
       // An empty derived artifact is not a conclusion. Publishing one would
@@ -230,8 +231,9 @@ package struct AnalyzerProvider: DeviceProvider {
         detail: "\(invocation.analyzerRef) did not produce a structured result")
     }
     if invocation.analyzerRef == HarnessCrashLedgerAnalysis.analyzerRef {
-      guard let result = try? JSONDecoder().decode(
-        HarnessCrashLedgerAnalysis.self, from: receipt.stdout),
+      guard
+        let result = try? JSONDecoder().decode(
+          HarnessCrashLedgerAnalysis.self, from: receipt.stdout),
         result.schemaVersion == HarnessCrashLedgerAnalysis.schemaVersion,
         result.analyzerRef == invocation.analyzerRef,
         result.analyzerVersion == invocation.analyzerVersion

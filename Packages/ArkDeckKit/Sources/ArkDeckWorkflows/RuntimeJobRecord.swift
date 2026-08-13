@@ -46,7 +46,7 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
 
   func persist(into directory: URL) throws {
     try DurableFileWriter.createOrReplaceAtomically(
-      destination: directory.appendingPathComponent("job-record.json"), data: try durableData())
+      destination: directory.appending(path: "job-record.json"), data: try durableData())
   }
 
   func durableData() throws -> Data {
@@ -58,7 +58,7 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   static func load(from directory: URL) throws -> RuntimeJobRecord {
     try JSONDecoder().decode(
       RuntimeJobRecord.self,
-      from: Data(contentsOf: directory.appendingPathComponent("job-record.json")))
+      from: Data(contentsOf: directory.appending(path: "job-record.json")))
   }
 
   static func sha256Hex(_ data: Data) -> String {

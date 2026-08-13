@@ -1,9 +1,10 @@
 import ArkDeckCore
-@testable import ArkDeckHarness
 import ArkDeckStorage
 import ArkDeckWorkflows
 import Foundation
 import XCTest
+
+@testable import ArkDeckHarness
 
 final class HarnessMemoryContractTests: XCTestCase {
   private let revisionA = String(repeating: "a", count: 64)
@@ -11,8 +12,9 @@ final class HarnessMemoryContractTests: XCTestCase {
   private var rootURL: URL!
 
   override func setUpWithError() throws {
-    rootURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-hfa010-\(UUID().uuidString)", isDirectory: true)
+    rootURL = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-hfa010-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -41,8 +43,8 @@ final class HarnessMemoryContractTests: XCTestCase {
     XCTAssertThrowsError(
       try verified(
         id: "MEM-WRONG-RECEIPT", verificationID: "EVAL-2",
-        evidence: HarnessMemoryEvidence(evaluationID: "EVAL-1")))
-    { error in
+        evidence: HarnessMemoryEvidence(evaluationID: "EVAL-1"))
+    ) { error in
       XCTAssertEqual(error as? HarnessMemoryError, .verificationEvidenceMismatch)
     }
 
@@ -56,8 +58,8 @@ final class HarnessMemoryContractTests: XCTestCase {
         invalidationConditions: invalidationConditions(),
         verification: HarnessMemoryVerification(
           source: .evaluatorPass, evidenceID: "EVAL-1", verifiedAtUTC: timestamp(1)),
-        createdAtUTC: timestamp(0)))
-    { error in
+        createdAtUTC: timestamp(0))
+    ) { error in
       XCTAssertEqual(error as? HarnessMemoryError, .verifiedMemoryRequiresExactScope)
     }
   }
@@ -72,8 +74,8 @@ final class HarnessMemoryContractTests: XCTestCase {
         toProjectRef: "waterflow", verification: verification,
         applicability: exactScope(), invalidationConditions: invalidationConditions(),
         additionalEvidence: HarnessMemoryEvidence(requestIDs: ["HACT-1"]),
-        atUTC: timestamp(2)))
-    { error in
+        atUTC: timestamp(2))
+    ) { error in
       XCTAssertEqual(error as? HarnessMemoryError, .verificationEvidenceMismatch)
     }
 
@@ -121,8 +123,8 @@ final class HarnessMemoryContractTests: XCTestCase {
       """
 
     XCTAssertThrowsError(
-      try JSONDecoder().decode(HarnessMemoryEntry.self, from: Data(forged.utf8)))
-    { error in
+      try JSONDecoder().decode(HarnessMemoryEntry.self, from: Data(forged.utf8))
+    ) { error in
       XCTAssertEqual(error as? HarnessMemoryError, .verificationRequired)
     }
   }
@@ -174,7 +176,9 @@ final class HarnessMemoryContractTests: XCTestCase {
       "an unverified memory can never outrank evidence from this task")
   }
 
-  func testMatchingVerifiedMemoryOutranksCandidateAndLifecycleRowsCollapseAfterRestart() async throws {
+  func testMatchingVerifiedMemoryOutranksCandidateAndLifecycleRowsCollapseAfterRestart()
+    async throws
+  {
     let store = try HarnessTaskStore(rootURL: rootURL)
     let candidate = try taskCandidate(id: "MEM-CANDIDATE")
     let matching = try verified(id: "MEM-MATCH")
@@ -224,7 +228,8 @@ final class HarnessMemoryContractTests: XCTestCase {
         $0.contains("MEM-MATCH") && $0.contains("WaterFlow crash fix is durable")
       })
     XCTAssertFalse(context.confirmedFacts.current.contains { $0.contains("unverified suggestion") })
-    XCTAssertFalse(context.confirmedFacts.current.contains { $0.contains("foreign revision claim") })
+    XCTAssertFalse(
+      context.confirmedFacts.current.contains { $0.contains("foreign revision claim") })
     XCTAssertEqual(
       context.memorySelectionManifest.selected.first?.reason, .exactProjectScope)
     XCTAssertEqual(context.memorySelectionManifest.excludedScopeCount, 1)
@@ -316,9 +321,10 @@ final class HarnessMemoryContractTests: XCTestCase {
       memoryID: id, scope: .project, kind: .verifiedKnowledge,
       htaskID: "HTASK-1", projectRef: "waterflow", round: 1,
       summary: summary, confidence: .evaluated,
-      evidence: evidence ?? HarnessMemoryEvidence(
-        artifactIDs: ["ART-1"], evaluationID: verificationID,
-        workspaceRevision: revisionA),
+      evidence: evidence
+        ?? HarnessMemoryEvidence(
+          artifactIDs: ["ART-1"], evaluationID: verificationID,
+          workspaceRevision: revisionA),
       lifecycle: .verified, applicability: applicability ?? exactScope(),
       invalidationConditions: invalidationConditions(),
       verification: HarnessMemoryVerification(

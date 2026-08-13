@@ -40,8 +40,8 @@ func XCTAssertSameFileSystemItem(
 
 final class FileSystemAssertionsContractTests: XCTestCase {
   func testTmpAliasUsesFileIdentityInsteadOfAbsolutePathSpelling() {
-    let alias = URL(fileURLWithPath: "/tmp", isDirectory: true)
-    let physical = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+    let alias = URL(filePath: "/tmp", directoryHint: .isDirectory)
+    let physical = URL(filePath: "/private/tmp", directoryHint: .isDirectory)
 
     XCTAssertNotEqual(alias.path, physical.path, "the regression requires two path spellings")
     XCTAssertSameFileSystemItem(

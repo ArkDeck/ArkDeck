@@ -279,7 +279,7 @@ final class DiagnosticsWorkflowStepContractTests: XCTestCase {
   }
 
   private func repositoryRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -340,7 +340,7 @@ final class HardwareEvidenceWorkflowStepContractTests: XCTestCase {
   }
 
   private func repositoryRoot() -> URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

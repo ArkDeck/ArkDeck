@@ -16,9 +16,10 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
   private var artifactStore: RuntimeArtifactStore?
 
   override func setUpWithError() throws {
-    stateDirectory = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(
-        ".arkdeck-agent-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    stateDirectory = URL(filePath: NSHomeDirectory())
+      .appending(
+        path:
+          ".arkdeck-agent-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -100,9 +101,9 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     observer: (@Sendable (String) -> Void)? = nil
   ) throws -> AgentClient {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     if let preAdoptedConnectKey {
       _ = try targetStore.adopt(
         stableIdentitySHA256: DeviceBootstrapMachine.stableIdentitySHA256(
@@ -111,14 +112,14 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         nowUTC: "2026-07-29T00:00:00Z")
     }
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-29T00:00:00Z" })
     self.artifactStore = artifactStore
     let provider = HDCObservationProviderAdapter(factsPort: FactsPort(store: targetStore))
     let providers = DeviceProviderRegistry(providers: [provider])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers, dispatcher: HappyDispatcher(),
       capabilityStore: capabilityStore, artifactStore: artifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
@@ -164,11 +165,12 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertFalse(receipt.catalogDigest.isEmpty)
     XCTAssertTrue(receipt.humanActions.isEmpty, "nothing physical was needed here")
     XCTAssertFalse(receipt.artifacts.isEmpty, "the run's products are referenced by ID")
-    guard case .published(let evidence) = HardwareEvidenceProjector.project(
-      receipt: receipt,
-      claims: HardwareEvidenceClaimMetadata(
-        evidenceID: "EVD-AHE-RUNNER-001",
-        acceptanceIDs: ["AC-WF-004-01"]))
+    guard
+      case .published(let evidence) = HardwareEvidenceProjector.project(
+        receipt: receipt,
+        claims: HardwareEvidenceClaimMetadata(
+          evidenceID: "EVD-AHE-RUNNER-001",
+          acceptanceIDs: ["AC-WF-004-01"]))
     else {
       return XCTFail("complete daemon-owned receipt must project to V5")
     }
@@ -519,8 +521,10 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     }
     XCTAssertTrue(
       called.allSatisfy { method in
-        ["health", "operation.describe", "target.list", "target.adopt", "job.submit", "job.run",
-          "job.status", "artifact.list", "job.evidence"].contains(method)
+        [
+          "health", "operation.describe", "target.list", "target.adopt", "job.submit", "job.run",
+          "job.status", "artifact.list", "job.evidence",
+        ].contains(method)
       },
       "the agent may only use the published runtime surface: \(called)")
 
@@ -657,7 +661,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
   }
 
   private func packageRoot() -> URL {
-    var url = URL(fileURLWithPath: #filePath)
+    var url = URL(filePath: #filePath)
     while url.lastPathComponent != "ArkDeckKit" && url.pathComponents.count > 1 {
       url = url.deletingLastPathComponent()
     }

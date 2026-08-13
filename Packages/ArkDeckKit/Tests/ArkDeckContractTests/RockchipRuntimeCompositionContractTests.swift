@@ -81,7 +81,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       await log.append(
         action,
         intentExists: FileManager.default.fileExists(
-          atPath: actionDirectory.appendingPathComponent("intent.json").path))
+          atPath: actionDirectory.appending(path: "intent.json").path))
       return RockchipRuntimeActionExecutionResult(
         summary: ["semantic": "verified"],
         stdout: Data("verified\n".utf8),
@@ -112,7 +112,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       await log.append(
         action,
         intentExists: FileManager.default.fileExists(
-          atPath: actionDirectory.appendingPathComponent("intent.json").path))
+          atPath: actionDirectory.appending(path: "intent.json").path))
       throw RuntimeDispatchFailure.outcomeUnknown(
         "fixture interrupted after durable host intent")
     }
@@ -344,9 +344,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       self.connectKey = connectKey
       self.topology = topology
       self.reportedTopology = reportedTopology ?? topology
-      self.reportedDigest = reportedDigest
+      self.reportedDigest =
+        reportedDigest
         ?? SHA256.hash(data: Data(connectKey.utf8))
-          .map { String(format: "%02x", $0) }.joined()
+        .map { String(format: "%02x", $0) }.joined()
     }
 
     func singleLoader(
@@ -505,7 +506,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         in: byteOffset..<(byteOffset + byteCount))
       materialized.append(
         Data(repeating: 0, count: sectorCount * 512 - byteCount))
-      try materialized.write(to: URL(fileURLWithPath: arguments[3]))
+      try materialized.write(to: URL(filePath: arguments[3]))
       return ProviderSubprocessReceipt(
         exitStatus: 0,
         stdout: Data("Read LBA from device (100%)\n".utf8),
@@ -983,7 +984,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       previousIdentitySHA256: previousDigest,
       usbTopology: "42")
     let store = RockchipPostFlashHDCBindingStore(
-      rootURL: root.appendingPathComponent("binding", isDirectory: true))
+      rootURL: root.appending(path: "binding", directoryHint: .isDirectory))
     let log = CommandLog(
       connectedTarget: nextConnectKey, emptyFirstTargetList: false)
     let executor = FoundationRockchipRuntimeActionExecutor(
@@ -1034,12 +1035,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(binding.buildVersion, RockchipFlashProfile.dayu200.runtimeBuildVersion)
     XCTAssertEqual(binding.jobID, "job-host")
     let invocations = await log.snapshot()
-    XCTAssertTrue(invocations.contains {
-      $0.arguments.starts(with: ["-t", nextConnectKey, "shell", "param", "get"])
-    })
-    XCTAssertFalse(invocations.contains {
-      $0.arguments.starts(with: ["-t", previousConnectKey])
-    })
+    XCTAssertTrue(
+      invocations.contains {
+        $0.arguments.starts(with: ["-t", nextConnectKey, "shell", "param", "get"])
+      })
+    XCTAssertFalse(
+      invocations.contains {
+        $0.arguments.starts(with: ["-t", previousConnectKey])
+      })
   }
 
   func testPostFlashHDCBindingRejectsInexactBuildAndInconsistentTopology() async throws {
@@ -1062,7 +1065,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       action: action, stepID: "rebind-and-verify-build", toolSHA256: component.sha256)
 
     let buildStore = RockchipPostFlashHDCBindingStore(
-      rootURL: root.appendingPathComponent("bad-build", isDirectory: true))
+      rootURL: root.appending(path: "bad-build", directoryHint: .isDirectory))
     let badBuildExecutor = FoundationRockchipRuntimeActionExecutor(
       hdcResolver: FixedExecutableResolver(
         table: [
@@ -1082,7 +1085,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertNil(try buildStore.loadIfPresent())
 
     let topologyStore = RockchipPostFlashHDCBindingStore(
-      rootURL: root.appendingPathComponent("bad-topology", isDirectory: true))
+      rootURL: root.appending(path: "bad-topology", directoryHint: .isDirectory))
     let badTopologyExecutor = FoundationRockchipRuntimeActionExecutor(
       hdcResolver: FixedExecutableResolver(
         table: [
@@ -1278,8 +1281,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testBundledResolverAcceptsOnlyFixedSiblingAndExactIdentity() throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let product = root.appendingPathComponent("arkdeck-agentd")
-    let component = root.appendingPathComponent("rkdeveloptool")
+    let product = root.appending(path: "arkdeck-agentd")
+    let component = root.appending(path: "rkdeveloptool")
     try Data("product".utf8).write(to: product)
     try Data("component".utf8).write(to: component)
     XCTAssertEqual(chmod(component.path, 0o700), 0)
@@ -1316,9 +1319,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testBundledResolverFindsFixedInstalledProductWithoutCallerPath() throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let missingSibling = root.appendingPathComponent("missing/rkdeveloptool")
-    let installedComponent = root.appendingPathComponent(
-      "Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool")
+    let missingSibling = root.appending(path: "missing/rkdeveloptool")
+    let installedComponent = root.appending(
+      path:
+        "Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool")
     try FileManager.default.createDirectory(
       at: installedComponent.deletingLastPathComponent(),
       withIntermediateDirectories: true,
@@ -1340,7 +1344,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testBundledResolverRejectsUnsignedInstalledProduct() throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let component = root.appendingPathComponent("rkdeveloptool")
+    let component = root.appending(path: "rkdeveloptool")
     try Data("unsigned-component".utf8).write(to: component)
     XCTAssertEqual(chmod(component.path, 0o700), 0)
 
@@ -1357,7 +1361,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   func testBundledResolverRejectsSignedNonProductExecutable() throws {
     let resolver = BundledRockchipExecutableResolver(
-      componentURLs: [URL(fileURLWithPath: "/usr/bin/true")])
+      componentURLs: [URL(filePath: "/usr/bin/true")])
     XCTAssertThrowsError(
       try resolver.resolveExecutable(providerID: "rockchip")
     ) { error in
@@ -1371,7 +1375,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let targetStore = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
     let identity = String(repeating: "a", count: 64)
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: identity, connectKey: "device-1",
@@ -1413,7 +1417,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let targetStore = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
     let boundConnectKey = "device-bound"
     let boundIdentity = SHA256.hash(data: Data(boundConnectKey.utf8))
       .map { String(format: "%02x", $0) }.joined()
@@ -1429,7 +1433,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:01Z"
     ).record
     let bindingStore = RockchipProductBindingStore(
-      rootURL: root.appendingPathComponent("product-binding", isDirectory: true))
+      rootURL: root.appending(path: "product-binding", directoryHint: .isDirectory))
     _ = try bindingStore.install(
       RockchipProductBindingSnapshot(
         revision: 1, serial: boundConnectKey, usbTopology: "42",
@@ -1480,7 +1484,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let targetStore = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
     let previousHDC = "device-1"
     let loader = "loader-1"
     let nextHDC = "device-2"
@@ -1501,7 +1505,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         currentStableIdentitySHA256: loaderDigest,
         currentRevision: adopted.bindingRevision + 1)
     ).record
-    let bindingRoot = root.appendingPathComponent("binding", isDirectory: true)
+    let bindingRoot = root.appending(path: "binding", directoryHint: .isDirectory)
     let bindingStore = RockchipProductBindingStore(rootURL: bindingRoot)
     let binding = try bindingStore.install(
       RockchipProductBindingSnapshot(
@@ -1515,7 +1519,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           "identity:hdc-normal-alias-sha256=\(previousDigest)",
           "binding:hdc-normal-alias-usb-topology=42",
           "rebind:user-selection-sha256=\(String(repeating: "c", count: 64))",
-        ])).snapshot
+        ])
+    ).snapshot
     XCTAssertTrue(try binding.coversRuntimeTarget(target))
     let postFlashStore = RockchipPostFlashHDCBindingStore(rootURL: bindingRoot)
     _ = try postFlashStore.publish(
@@ -1861,7 +1866,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let targetStore = try RuntimeTargetStore(
-      directoryURL: root.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
     let adopted = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: "device-1", toolVersion: "3.2.0f",
@@ -2141,9 +2146,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       result.summary["transitionEvidence"], "exact-bound-loader-readback")
     XCTAssertEqual(result.subprocesses.count, 1)
     let invocations = await runner.invocations()
-    XCTAssertEqual(invocations.map(\.arguments), [
-      ["-t", "device-1", "target", "boot", "loader"], ["ld"],
-    ])
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [
+        ["-t", "device-1", "target", "boot", "loader"], ["ld"],
+      ])
   }
 
   func testEnterLoaderUsesOnlyBrokerRecordedCampaignTiming() async throws {
@@ -2180,9 +2187,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       rockchipExecutable: rockchip, actionDirectory: root)
 
     let invocations = await runner.invocations()
-    XCTAssertEqual(invocations.map(\.arguments), [
-      ["-t", "device-1", "target", "boot", "loader"], ["ld"],
-    ])
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [
+        ["-t", "device-1", "target", "boot", "loader"], ["ld"],
+      ])
     XCTAssertEqual(invocations.map(\.timeoutSeconds), [7, 9])
   }
 
@@ -2293,9 +2302,11 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       XCTAssertEqual(diagnostic, .enterLoaderHDCNoCleanReceipt)
     }
     let invocations = await runner.invocations()
-    XCTAssertEqual(invocations.map(\.arguments), [
-      ["-t", connectKey, "target", "boot", "loader"]
-    ])
+    XCTAssertEqual(
+      invocations.map(\.arguments),
+      [
+        ["-t", connectKey, "target", "boot", "loader"]
+      ])
   }
 
   func testNormalUSBReadbackUsesExactConnectKeyIdentityWithoutHDCProcess()
@@ -2348,8 +2359,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       host: DurableRockchipRuntimeActionHost(
         executor: SuccessfulActionExecutor(log: actionLog),
         records: RockchipRuntimeActionRecordStore(
-          rootURL: root.appendingPathComponent(
-            "rockchip-runtime", isDirectory: true))))
+          rootURL: root.appending(
+            path:
+              "rockchip-runtime", directoryHint: .isDirectory))))
     XCTAssertNil(dispatcher.unavailableReason(providerID: "rockchip"))
 
     let signedPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
@@ -2393,7 +2405,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testSucceededFlashProjectsPostflightFromCorrelatedDurableReceipt() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let recordRoot = root.appendingPathComponent("rockchip-runtime", isDirectory: true)
+    let recordRoot = root.appending(path: "rockchip-runtime", directoryHint: .isDirectory)
     let component = ResolvedExecutable(
       path: "/product/Contents/MacOS/rkdeveloptool",
       sha256: Self.reviewedSignedComponentSHA256)
@@ -2484,22 +2496,25 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       host: DurableRockchipRuntimeActionHost(
         executor: SuccessfulActionExecutor(log: ActionLog()),
         records: RockchipRuntimeActionRecordStore(
-          rootURL: root.appendingPathComponent(
-            "rockchip-runtime", isDirectory: true))))
+          rootURL: root.appending(
+            path:
+              "rockchip-runtime", directoryHint: .isDirectory))))
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(
         providers: [
           RockchipFlashProviderAdapter(availability: .available)
         ]),
       dispatcher: dispatcher,
       capabilityStore: try RuntimeCapabilityStore(
-        directoryURL: root.appendingPathComponent(
-          "capabilities", isDirectory: true)),
+        directoryURL: root.appending(
+          path:
+            "capabilities", directoryHint: .isDirectory)),
       artifactStore: try RuntimeArtifactStore(
-        rootURL: root.appendingPathComponent(
-          "artifacts", isDirectory: true),
+        rootURL: root.appending(
+          path:
+            "artifacts", directoryHint: .isDirectory),
         nowUTC: { "2026-07-31T00:00:00Z" }),
       nowUTC: { "2026-07-31T00:00:00Z" })
 
@@ -2547,8 +2562,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       host: DurableRockchipRuntimeActionHost(
         executor: SuccessfulActionExecutor(log: log),
         records: RockchipRuntimeActionRecordStore(
-          rootURL: root.appendingPathComponent(
-            "rockchip-runtime", isDirectory: true))))
+          rootURL: root.appending(
+            path:
+              "rockchip-runtime", directoryHint: .isDirectory))))
     let identity = String(repeating: "a", count: 64)
     let hdcIdentity = SHA256.hash(data: Data("device-1".utf8))
       .map { String(format: "%02x", $0) }.joined()
@@ -2594,17 +2610,17 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         "rockchip-runtime/job-host/\(stepID)/receipt.json")
       let directory =
         root
-        .appendingPathComponent("rockchip-runtime/job-host/\(stepID)")
+        .appending(path: "rockchip-runtime/job-host/\(stepID)")
       XCTAssertTrue(
         FileManager.default.fileExists(
-          atPath: directory.appendingPathComponent("intent.json").path))
+          atPath: directory.appending(path: "intent.json").path))
       XCTAssertTrue(
         FileManager.default.fileExists(
-          atPath: directory.appendingPathComponent("receipt.json").path))
+          atPath: directory.appending(path: "receipt.json").path))
       let intent =
         try JSONSerialization.jsonObject(
           with: Data(
-            contentsOf: directory.appendingPathComponent("intent.json")))
+            contentsOf: directory.appending(path: "intent.json")))
         as? [String: Any]
       XCTAssertEqual(intent?["jobID"] as? String, "job-host")
       XCTAssertEqual(intent?["stepID"] as? String, stepID)
@@ -2658,8 +2674,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       path: "/product/Contents/MacOS/rkdeveloptool",
       sha256: Self.reviewedSignedComponentSHA256)
     let interruptedLog = ActionLog()
-    let recordRoot = root.appendingPathComponent(
-      "rockchip-runtime", isDirectory: true)
+    let recordRoot = root.appending(
+      path:
+        "rockchip-runtime", directoryHint: .isDirectory)
     let interrupted = BundledRockchipRuntimeDispatcher(
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
       host: DurableRockchipRuntimeActionHost(
@@ -2699,8 +2716,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let component = ResolvedExecutable(
       path: "/product/Contents/MacOS/rkdeveloptool",
       sha256: Self.reviewedSignedComponentSHA256)
-    let recordRoot = root.appendingPathComponent(
-      "rockchip-runtime", isDirectory: true)
+    let recordRoot = root.appending(
+      path:
+        "rockchip-runtime", directoryHint: .isDirectory)
     let readback = RockchipProviderAction.verifyFlashReadback(flashBundle())
     let plan = try rockchipPlan(
       action: readback,
@@ -2763,13 +2781,15 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         .rockchip(.verifyFlashReadback(bundle))
       ),
       (
-        .rockchip(.rebootToNormal(
-          stableIdentitySHA256: String(repeating: "a", count: 64))),
-        .rockchip(.waitForBoundHDCReconnect(
-          expectation: RockchipHDCReconnectExpectation(
-            previousConnectKey: "device-1",
-            previousIdentitySHA256: hdcIdentity,
-            usbTopology: "42")))
+        .rockchip(
+          .rebootToNormal(
+            stableIdentitySHA256: String(repeating: "a", count: 64))),
+        .rockchip(
+          .waitForBoundHDCReconnect(
+            expectation: RockchipHDCReconnectExpectation(
+              previousConnectKey: "device-1",
+              previousIdentitySHA256: hdcIdentity,
+              usbTopology: "42")))
       ),
     ]
 
@@ -2814,7 +2834,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let occupiedRoot = root.appendingPathComponent("occupied")
+    let occupiedRoot = root.appending(path: "occupied")
     try Data("not-a-directory".utf8).write(to: occupiedRoot)
     let host = DurableRockchipRuntimeActionHost(
       executor: SuccessfulActionExecutor(log: ActionLog()),
@@ -2827,8 +2847,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testProductionExecutorUsesDescriptorBoundHDCAndClosedRockUSBCommands() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let actionDirectory = root.appendingPathComponent(
-      "action", isDirectory: true)
+    let actionDirectory = root.appending(
+      path:
+        "action", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: actionDirectory,
       withIntermediateDirectories: false,
@@ -2945,7 +2966,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       FoundationRockchipRuntimePartitionReadback.arguments(
         mapping: firstMapping,
         member: firstMember,
-        outputURL: URL(fileURLWithPath: "/private/tmp/readback.img")),
+        outputURL: URL(filePath: "/private/tmp/readback.img")),
       [
         "rl", String(firstMapping.offsetSectors),
         String((firstMember.sizeBytes + 511) / 512),
@@ -3070,7 +3091,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     // A run that begins in one chunk and continues through the next two must
     // be reported from where it actually began, not from the last chunk.
     profile.consume(ArraySlice([UInt8](repeating: 0x5A, count: 1_000)))
-    profile.consume(ArraySlice([UInt8](repeating: 0x5A, count: 24) + [UInt8](repeating: 0xCC, count: 1_000)))
+    profile.consume(
+      ArraySlice([UInt8](repeating: 0x5A, count: 24) + [UInt8](repeating: 0xCC, count: 1_000)))
     profile.consume(ArraySlice([UInt8](repeating: 0xCC, count: 4_000)))
     XCTAssertEqual(profile.byteCount, 6_024)
     XCTAssertEqual(profile.trailingByte, 0xCC)
@@ -3081,7 +3103,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     // A short run is ordinary content, not a signature.
     var ordinary = RockchipReadbackContentProfile()
-    ordinary.consume(ArraySlice([UInt8](repeating: 0x11, count: 5_000) + [UInt8](repeating: 0x22, count: 8)))
+    ordinary.consume(
+      ArraySlice([UInt8](repeating: 0x11, count: 5_000) + [UInt8](repeating: 0x22, count: 8)))
     XCTAssertFalse(ordinary.hasSignificantTrailingRun)
     XCTAssertTrue(
       ordinary.diagnosis(offsetSectors: 0).contains("no erased-medium tail"))
@@ -3172,7 +3195,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     // `pwd -P` and Foundation may spell `/private/tmp` differently across OS
     // and toolchain versions. The contract is directory identity, not text.
     let childDirectory = URL(
-      fileURLWithPath: try XCTUnwrap(String(data: receipt.stdout, encoding: .utf8))
+      filePath: try XCTUnwrap(String(data: receipt.stdout, encoding: .utf8))
         .trimmingCharacters(in: .whitespacesAndNewlines))
     XCTAssertSameFileSystemItem(
       childDirectory,
@@ -3231,7 +3254,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   }
 
   private static func hashedExecutable(path: String) throws -> ResolvedExecutable {
-    let digest = SHA256.hash(data: try Data(contentsOf: URL(fileURLWithPath: path)))
+    let digest = SHA256.hash(data: try Data(contentsOf: URL(filePath: path)))
     return ResolvedExecutable(
       path: path, sha256: digest.map { String(format: "%02x", $0) }.joined())
   }
@@ -3261,7 +3284,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     RockchipRuntimeFlashBundle(
       artifactLeaseID: "lease:flash-artifact",
       artifactID: "flash-artifact",
-      fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+      fileURL: URL(filePath: "/private/tmp/images.tar.gz"),
       sha256: RockchipFlashProfile.dayu200.archiveSHA256,
       byteCount: Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
       partitionNames: RockchipFlashProfile.dayu200.mappedPartitions.map(
@@ -3270,9 +3293,10 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
   private func temporaryDirectory() throws -> URL {
     let url = FileManager.default.temporaryDirectory
-      .appendingPathComponent(
-        "arkdeck-rockchip-runtime-\(UUID().uuidString.lowercased())",
-        isDirectory: true)
+      .appending(
+        path:
+          "arkdeck-rockchip-runtime-\(UUID().uuidString.lowercased())",
+        directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: url, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])

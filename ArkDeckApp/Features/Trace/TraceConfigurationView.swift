@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 
 struct TraceConfigurationView: View {
-  @ObservedObject var model: TraceWorkspaceViewModel
+  var model: TraceWorkspaceViewModel
 
   var body: some View {
     VStack(spacing: 18) {
@@ -125,13 +125,15 @@ struct TraceConfigurationView: View {
           selected
             ? AnyShapeStyle(Color.accentColor.opacity(0.14))
             : AnyShapeStyle(.quaternary.opacity(0.5)),
-          in: Capsule())
+          in: Capsule()
+        )
         .contentShape(Capsule())
     }
     .buttonStyle(.plain)
     .help(isLastSelected ? traceString("trace.custom.minimumOne") : "")
     .accessibilityValue(
-      selected ? traceString("trace.value.selected") : traceString("trace.value.notSelected"))
+      selected ? traceString("trace.value.selected") : traceString("trace.value.notSelected")
+    )
     .accessibilityIdentifier("trace.custom.tag.\(tag)")
   }
 
@@ -170,7 +172,8 @@ struct TraceConfigurationView: View {
     }
     .buttonStyle(.plain)
     .accessibilityValue(
-      selected ? traceString("trace.value.selected") : traceString("trace.value.notSelected"))
+      selected ? traceString("trace.value.selected") : traceString("trace.value.notSelected")
+    )
     .accessibilityIdentifier("trace.preset.option.\(preset.id.rawValue)")
   }
 
@@ -184,9 +187,10 @@ struct TraceConfigurationView: View {
           String(
             format: traceString("trace.tags.verifiedCount"),
             model.requestedTags.count - model.unsupportedRequestedTags.count,
-            model.requestedTags.count))
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(model.unsupportedRequestedTags.isEmpty ? Color.green : Color.orange)
+            model.requestedTags.count)
+        )
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(model.unsupportedRequestedTags.isEmpty ? Color.green : Color.orange)
       }
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
         ForEach(model.requestedTags, id: \.self) { tag in
@@ -199,7 +203,8 @@ struct TraceConfigurationView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary.opacity(0.5), in: Capsule())
             .accessibilityLabel(
-              "\(tag), \(traceString(supported ? "trace.tags.supported" : "trace.tags.unsupported"))")
+              "\(tag), \(traceString(supported ? "trace.tags.supported" : "trace.tags.unsupported"))"
+            )
         }
       }
       Text(traceString("trace.tags.verifiedNote"))

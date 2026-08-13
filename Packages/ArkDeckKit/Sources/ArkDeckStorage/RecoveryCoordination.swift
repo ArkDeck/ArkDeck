@@ -170,10 +170,12 @@ package actor RuntimeSupersedingRecoveryStore {
   public init(stateDirectory: URL) throws {
     try DurableFilePrimitives.requireAbsoluteFileURL(stateDirectory)
     try DurableFilePrimitives.createDirectoryIfNeeded(stateDirectory)
-    documentURL = stateDirectory.appendingPathComponent(
-      "superseding-recovery-epochs.json")
-    lockURL = stateDirectory.appendingPathComponent(
-      ".superseding-recovery-epochs.lock")
+    documentURL = stateDirectory.appending(
+      path:
+        "superseding-recovery-epochs.json")
+    lockURL = stateDirectory.appending(
+      path:
+        ".superseding-recovery-epochs.lock")
   }
 
   public func list() throws -> [SupersedingRecoveryEpoch] {

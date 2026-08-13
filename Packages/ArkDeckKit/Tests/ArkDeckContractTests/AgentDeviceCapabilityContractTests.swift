@@ -33,7 +33,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
   }
 
   private static let repositoryRoot: URL = {
-    var url = URL(fileURLWithPath: #filePath)
+    var url = URL(filePath: #filePath)
     for _ in 0..<5 {
       url.deleteLastPathComponent()
     }
@@ -42,10 +42,10 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
 
   private static let changeRoot =
     repositoryRoot
-    .appendingPathComponent("openspec/changes/chg-2026-025-ai-native-unattended-device-ops")
-  private static let contractRoot = changeRoot.appendingPathComponent("contracts")
+    .appending(path: "openspec/changes/chg-2026-025-ai-native-unattended-device-ops")
+  private static let contractRoot = changeRoot.appending(path: "contracts")
   private static let runRoot =
-    changeRoot.appendingPathComponent("evidence/runs/TASK-AIN-009R")
+    changeRoot.appending(path: "evidence/runs/TASK-AIN-009R")
 
   private static let schemaFiles = [
     "agent-device-capability.schema.v1-draft.json":
@@ -63,7 +63,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
   func testSchemaIdentityClosedObjectsAndAuthorityUnionMatchAIN009() throws {
     var schemas: [String: [String: Any]] = [:]
     for (name, identifier) in Self.schemaFiles {
-      let schema = try loadJSONObject(Self.contractRoot.appendingPathComponent(name))
+      let schema = try loadJSONObject(Self.contractRoot.appending(path: name))
       schemas[name] = schema
       XCTAssertEqual(
         schema["$schema"] as? String,
@@ -85,8 +85,9 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
     let newAuthority = try XCTUnwrap(
       schemas["agent-execution-authority.schema.v1-draft.json"])
     let oldOperation = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent(
-        "agent-device-operation.schema.v1-draft.json"))
+      Self.contractRoot.appending(
+        path:
+          "agent-device-operation.schema.v1-draft.json"))
     let newDefinitions = try requiredDictionary(newAuthority, "$defs")
     let oldDefinitions = try requiredDictionary(oldOperation, "$defs")
     for definitionName in [
@@ -153,8 +154,9 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
     }
 
     let capabilitySchema = try loadJSONObject(
-      Self.contractRoot.appendingPathComponent(
-        "agent-device-capability.schema.v1-draft.json"))
+      Self.contractRoot.appending(
+        path:
+          "agent-device-capability.schema.v1-draft.json"))
     let definitions = try requiredDictionary(capabilitySchema, "$defs")
     let operationScope = try requiredDictionary(definitions, "operationScope")
     let branches = try requiredArray(operationScope, "oneOf")
@@ -555,7 +557,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
       ] {
         let relativePath = try XCTUnwrap(vector[pair.0] as? String)
         let expectedHash = try XCTUnwrap(vector[pair.1] as? String)
-        let url = Self.repositoryRoot.appendingPathComponent(relativePath)
+        let url = Self.repositoryRoot.appending(path: relativePath)
         XCTAssertTrue(
           url.standardizedFileURL.path.hasPrefix(Self.repositoryRoot.standardizedFileURL.path))
         let bytes = try Data(contentsOf: url)
@@ -585,8 +587,9 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
     XCTAssertEqual(versions, ["1.x", "2.0.0", "2.1.0"])
 
     let existingE2Usage = try Data(
-      contentsOf: Self.contractRoot.appendingPathComponent(
-        "authorization-usage.schema.v1-draft.json"))
+      contentsOf: Self.contractRoot.appending(
+        path:
+          "authorization-usage.schema.v1-draft.json"))
     XCTAssertEqual(
       gitBlobSHA1(existingE2Usage),
       "b232db49d2d76fc2eb96fed6b7d0230455d99345")
@@ -594,7 +597,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
 
   func testDuplicateMembersIncludingUnicodeEscapesFailClosed() throws {
     for name in ["duplicate-capability.json", "duplicate-capability-escaped.json"] {
-      let data = try Data(contentsOf: Self.runRoot.appendingPathComponent(name))
+      let data = try Data(contentsOf: Self.runRoot.appending(path: name))
       var validator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
       XCTAssertThrowsError(try validator.validate(), name) { error in
         guard case ArkDeckCore.StrictJSONError.duplicateMemberName(let path) = error else {
@@ -606,7 +609,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
   }
 
   private func loadCorpus() throws -> [String: Any] {
-    try loadJSONObject(Self.runRoot.appendingPathComponent("vectors.json"))
+    try loadJSONObject(Self.runRoot.appending(path: "vectors.json"))
   }
 
   private func loadJSONObject(_ url: URL) throws -> [String: Any] {
@@ -619,8 +622,9 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
 
   private func registryProfiles() throws -> [String: Profile] {
     let data = try Data(
-      contentsOf: Self.contractRoot.appendingPathComponent(
-        "agent-device-operation-registry.v1-draft.json"))
+      contentsOf: Self.contractRoot.appending(
+        path:
+          "agent-device-operation-registry.v1-draft.json"))
     var duplicateValidator = ArkDeckCore.StrictJSONDuplicateValidator(data: data)
     try duplicateValidator.validate()
     let registry = try JSONDecoder().decode(Registry.self, from: data)
@@ -1464,9 +1468,7 @@ final class AgentDeviceCapabilityContractTests: XCTestCase {
     else {
       return nil
     }
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.date(from: string)
+    return ISO8601Timestamps.parseCanonicalPlain(string)
   }
 
   private func canonicalData(_ value: Any) throws -> Data {

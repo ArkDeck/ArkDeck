@@ -7,7 +7,7 @@ enum RuntimeJobSQLiteTestSupport {
   static func replaceInitialRecord(
     stateDirectory: URL, jobID: String, data: Data
   ) throws {
-    let databaseURL = stateDirectory.appendingPathComponent("runtime-jobs.sqlite3")
+    let databaseURL = stateDirectory.appending(path: "runtime-jobs.sqlite3")
     var database: OpaquePointer?
     let openCode = sqlite3_open_v2(
       databaseURL.path, &database,

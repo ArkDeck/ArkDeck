@@ -99,8 +99,9 @@ struct RuntimeRecoveryService {
     let expectedPartitions = profileContract.coveredEffects.map {
       String($0.dropFirst("partition:".count))
     }
-    guard let requestedPartitions = Self.stringArrayInput(
-      "partitionPlan", request: request),
+    guard
+      let requestedPartitions = Self.stringArrayInput(
+        "partitionPlan", request: request),
       requestedPartitions == expectedPartitions,
       Self.stringInput("postFlashVerification", request: request) == "full"
     else {
@@ -108,20 +109,21 @@ struct RuntimeRecoveryService {
         "completeOverwriteRecovery.incompleteRequestedCoverage")
     }
     let coveredEffects = Set(profileContract.coveredEffects)
-    guard unresolved.allSatisfy({
-      $0.operationReference == descriptor.reference
-        && $0.profileReference == profile
-        && Set($0.possibleEffects).isSubset(of: coveredEffects)
-    }) else {
+    guard
+      unresolved.allSatisfy({
+        $0.operationReference == descriptor.reference
+          && $0.profileReference == profile
+          && Set($0.possibleEffects).isSubset(of: coveredEffects)
+      })
+    else {
       throw RuntimeCompleteOverwriteRecoveryError.blocked(
         "completeOverwriteRecovery.unboundedOrUnsupportedEffect")
     }
 
-    let formatter = ISO8601DateFormatter()
     guard
-      let started = unresolved.compactMap({ formatter.date(from: $0.observedAtUTC) }).min(),
-      unresolved.allSatisfy({ formatter.date(from: $0.observedAtUTC) != nil }),
-      let latestUnknown = unresolved.compactMap({ formatter.date(from: $0.observedAtUTC) }).max()
+      let started = unresolved.compactMap({ ISO8601Timestamps.parse($0.observedAtUTC) }).min(),
+      unresolved.allSatisfy({ ISO8601Timestamps.parse($0.observedAtUTC) != nil }),
+      let latestUnknown = unresolved.compactMap({ ISO8601Timestamps.parse($0.observedAtUTC) }).max()
     else {
       throw RuntimeCompleteOverwriteRecoveryError.blocked(
         "completeOverwriteRecovery.invalidHistoricalTimestamp")
@@ -138,7 +140,7 @@ struct RuntimeRecoveryService {
         recoveryContext: nil, recognizedEpoch: epoch)
     }
 
-    guard let now = formatter.date(from: nowUTC()),
+    guard let now = ISO8601Timestamps.parse(nowUTC()),
       now.timeIntervalSince(started) < 4 * 60 * 60
     else {
       throw RuntimeCompleteOverwriteRecoveryError.blocked(
@@ -147,7 +149,7 @@ struct RuntimeRecoveryService {
     let priorEpochs = epochs.filter {
       $0.stableTargetIdentitySHA256 == stableIdentitySHA256
         && $0.bindingRevision == bindingRevision
-        && formatter.date(from: $0.establishedAtUTC).map {
+        && ISO8601Timestamps.parse($0.establishedAtUTC).map {
           now.timeIntervalSince($0) < 4 * 60 * 60
         } == true
     }.count
@@ -173,10 +175,11 @@ struct RuntimeRecoveryService {
     bindingRevision: Int,
     epochs: [SupersedingRecoveryEpoch]
   ) throws -> [SupersededRecoveryIntent] {
-    let jobsRoot = stateDirectory.appendingPathComponent("jobs", isDirectory: true)
-    guard let directories = try? FileManager.default.contentsOfDirectory(
-      at: jobsRoot, includingPropertiesForKeys: nil,
-      options: [.skipsHiddenFiles])
+    let jobsRoot = stateDirectory.appending(path: "jobs", directoryHint: .isDirectory)
+    guard
+      let directories = try? FileManager.default.contentsOfDirectory(
+        at: jobsRoot, includingPropertiesForKeys: nil,
+        options: [.skipsHiddenFiles])
     else { return [] }
     var unresolved: [SupersededRecoveryIntent] = []
     for directory in directories.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
@@ -185,7 +188,7 @@ struct RuntimeRecoveryService {
         record.materializedBindingRevision == bindingRevision
       else { continue }
       let replay = try DurableJournalRecovery.inspect(
-        url: directory.appendingPathComponent("journal.jsonl"))
+        url: directory.appending(path: "journal.jsonl"))
       guard !replay.hasTornTail else {
         throw RuntimeCompleteOverwriteRecoveryError.blocked(
           "completeOverwriteRecovery.tornHistoricalJournal")
@@ -219,7 +222,9 @@ struct RuntimeRecoveryService {
             jobID: record.jobID, intentEventID: intentEventID,
             stableIdentitySHA256: stableIdentitySHA256,
             bindingRevision: bindingRevision)
-        }) { continue }
+        }) {
+          continue
+        }
         guard record.operationReference == "flash.dayu200",
           stepID == "flash-partitions", !profile.isEmpty,
           let partitions, !partitions.isEmpty,
@@ -255,22 +260,22 @@ struct RuntimeRecoveryService {
     stableIdentitySHA256: String,
     bindingRevision: Int
   ) throws -> SupersedingRecoveryEpochDraft? {
-    let jobsRoot = stateDirectory.appendingPathComponent("jobs", isDirectory: true)
-    guard let directories = try? FileManager.default.contentsOfDirectory(
-      at: jobsRoot, includingPropertiesForKeys: nil,
-      options: [.skipsHiddenFiles])
+    let jobsRoot = stateDirectory.appending(path: "jobs", directoryHint: .isDirectory)
+    guard
+      let directories = try? FileManager.default.contentsOfDirectory(
+        at: jobsRoot, includingPropertiesForKeys: nil,
+        options: [.skipsHiddenFiles])
     else { return nil }
     let profile = profileContract.reference
     let expectedPartitions = profileContract.coveredEffects.map {
       String($0.dropFirst("partition:".count))
     }
     let requiredSteps = [contract.overwriteStepID] + contract.verificationStepIDs
-    let formatter = ISO8601DateFormatter()
     let candidates = directories.compactMap {
       directory -> (URL, RuntimeJobRecord, Date)? in
       guard let record = try? RuntimeJobRecord.load(from: directory),
         let finishedAtUTC = record.finishedAtUTC,
-        let finishedAt = formatter.date(from: finishedAtUTC),
+        let finishedAt = ISO8601Timestamps.parse(finishedAtUTC),
         finishedAt > latestUnknown,
         record.state == JobState.succeeded.rawValue,
         !record.outcomeUnknown,
@@ -288,7 +293,7 @@ struct RuntimeRecoveryService {
 
     for (directory, record, _) in candidates {
       let replay = try DurableJournalRecovery.inspect(
-        url: directory.appendingPathComponent("journal.jsonl"))
+        url: directory.appending(path: "journal.jsonl"))
       guard !replay.hasTornTail, replay.outstandingIntents.isEmpty,
         replay.unknownOutcomes.isEmpty, replay.currentState == .succeeded
       else { continue }
@@ -352,24 +357,25 @@ struct RuntimeRecoveryService {
     requiredStepIDs: [String],
     expectedPartitions: [String]
   ) throws -> (artifactSHA256: String, providerExecutableSHA256: String)? {
-    let root = stateDirectory
-      .appendingPathComponent("rockchip-runtime", isDirectory: true)
-      .appendingPathComponent(record.jobID, isDirectory: true)
+    let root =
+      stateDirectory
+      .appending(path: "rockchip-runtime", directoryHint: .isDirectory)
+      .appending(path: record.jobID, directoryHint: .isDirectory)
     var executable: String?
     var artifact: String?
     for stepID in requiredStepIDs {
-      let directory = root.appendingPathComponent(stepID, isDirectory: true)
+      let directory = root.appending(path: stepID, directoryHint: .isDirectory)
       let intent: RuntimeHistoricalRockchipIntent
       let receipt: RuntimeHistoricalRockchipReceipt
       do {
         intent = try JSONDecoder().decode(
           RuntimeHistoricalRockchipIntent.self,
           from: try Self.readOwnerOnlyRecord(
-            directory.appendingPathComponent("intent.json")))
+            directory.appending(path: "intent.json")))
         receipt = try JSONDecoder().decode(
           RuntimeHistoricalRockchipReceipt.self,
           from: try Self.readOwnerOnlyRecord(
-            directory.appendingPathComponent("receipt.json")))
+            directory.appending(path: "receipt.json")))
       } catch { return nil }
       let actionEncoder = CanonicalJSONEncoders.canonical()
       guard let encodedAction = try? actionEncoder.encode(intent.action),
@@ -502,8 +508,8 @@ struct RuntimeRecoveryService {
   /// because it could otherwise hide an external-effect history.
   func restoreInitialAdmissionProjectionIfNeeded(_ persisted: RuntimePersistedJob) throws {
     let directory = jobDirectory(for: persisted.jobID)
-    let recordURL = directory.appendingPathComponent("job-record.json")
-    let journalURL = directory.appendingPathComponent("journal.jsonl")
+    let recordURL = directory.appending(path: "job-record.json")
+    let journalURL = directory.appending(path: "journal.jsonl")
     let hasRecord = FileManager.default.fileExists(atPath: recordURL.path)
     let hasJournal = FileManager.default.fileExists(atPath: journalURL.path)
     if hasRecord && hasJournal { return }
@@ -570,7 +576,7 @@ struct RuntimeRecoveryService {
       throw RuntimeJobEngineError.internalFailure(
         "admitted job \(jobID) has no readable durable record after recovery projection")
     }
-    let journalURL = directory.appendingPathComponent("journal.jsonl")
+    let journalURL = directory.appending(path: "journal.jsonl")
     let journal = try FileDurableJournal(url: journalURL)
     var inspection = try DurableJournalRecovery.inspect(url: journalURL)
     var nextSequence = Int((inspection.lastDurableSequence ?? -1) + 1)
@@ -637,7 +643,8 @@ struct RuntimeRecoveryService {
         inspection = try DurableJournalRecovery.inspect(url: journalURL)
         record.finishedAtUTC = nowUTC()
         record.timeline.append(
-          "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch")
+          "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
+        )
       case .finalizing:
         let establishedRecoveryEpoch: SupersedingRecoveryEpoch?
         if record.admissionEvidence?.completeOverwriteRecovery != nil,
@@ -693,8 +700,8 @@ struct RuntimeRecoveryService {
 
   private func jobDirectory(for jobID: String) -> URL {
     stateDirectory
-      .appendingPathComponent("jobs", isDirectory: true)
-      .appendingPathComponent(jobID, isDirectory: true)
+      .appending(path: "jobs", directoryHint: .isDirectory)
+      .appending(path: jobID, directoryHint: .isDirectory)
   }
 
   private func appendInitialAdmissionEvents(

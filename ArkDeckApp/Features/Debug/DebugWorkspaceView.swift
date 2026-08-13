@@ -1,6 +1,7 @@
 import AppKit
 import ArkDeckWorkflows
 import Foundation
+import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -28,7 +29,7 @@ enum DebugWorkspaceTab: String, CaseIterable, Hashable {
 /// the closed typed Debug facade; provider lowering and raw command transport
 /// remain outside the App.
 struct DebugWorkspaceView: View {
-  @ObservedObject var model: DebugWorkspaceViewModel
+  var model: DebugWorkspaceViewModel
   let onOpenHistory: () -> Void
 
   @SceneStorage("debug.workspace.tab")
@@ -252,7 +253,7 @@ private struct DebugRuntimeArtifactRow: Identifiable {
 }
 
 private struct DebugLogsWorkspace: View {
-  @ObservedObject var model: DebugWorkspaceViewModel
+  var model: DebugWorkspaceViewModel
   let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
   let relatedJobs: [DebugJobPresentation]
@@ -661,7 +662,7 @@ private struct DebugLogsWorkspace: View {
 }
 
 private struct DebugAppsWorkspace: View {
-  @ObservedObject var model: DebugWorkspaceViewModel
+  var model: DebugWorkspaceViewModel
   let operation: DebugOperationPresentation?
   let target: DebugTargetPresentation?
   let relatedJobs: [DebugJobPresentation]
@@ -1015,7 +1016,7 @@ private struct DebugAppsWorkspace: View {
 }
 
 private struct DebugNetworkWorkspace: View {
-  @ObservedObject var model: DebugWorkspaceViewModel
+  var model: DebugWorkspaceViewModel
   let target: DebugTargetPresentation?
   let runtimeProbe: DebugRuntimeProbeSnapshot?
   let probeFailure: String?
@@ -1214,7 +1215,7 @@ private struct DebugNetworkWorkspace: View {
 }
 
 private struct DebugCommandsWorkspace: View {
-  @ObservedObject var model: DebugWorkspaceViewModel
+  var model: DebugWorkspaceViewModel
   let target: DebugTargetPresentation?
 
   @State private var selectedTemplateID =
@@ -1431,7 +1432,7 @@ private struct DebugAvailabilityCard: View {
 }
 
 private struct DebugRecentJobsCard: View {
-  @ObservedObject var model: DebugWorkspaceViewModel
+  var model: DebugWorkspaceViewModel
   let jobs: [DebugJobPresentation]
 
   var body: some View {
@@ -1550,30 +1551,31 @@ private func effectColor(_ effect: String) -> Color {
 }
 
 @MainActor
-final class DebugWorkspaceViewModel: ObservableObject {
-  @Published private(set) var workspace = DebugWorkspacePresentation.loading
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
-  @Published private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
-  @Published private(set) var isSubmittingLogs = false
-  @Published private(set) var isCancellingLogs = false
-  @Published private(set) var activeLogJobID: String?
-  @Published private(set) var logTerminal: DebugLogJobTerminalPresentation?
-  @Published private(set) var logFailure: String?
-  @Published private(set) var isRunningCommand = false
-  @Published private(set) var commandResult: DebugRuntimeCommandResult?
-  @Published private(set) var commandFailure: String?
-  @Published private(set) var isMutatingPortRule = false
-  @Published private(set) var isCancellingPortRule = false
-  @Published private(set) var activePortRuleJobID: String?
-  @Published private(set) var portRuleTerminal: DebugLogJobTerminalPresentation?
-  @Published private(set) var portRuleFailure: String?
-  @Published private(set) var isSubmittingHAP = false
-  @Published private(set) var isCancellingHAP = false
-  @Published private(set) var activeHAPJobID: String?
-  @Published private(set) var hapTerminal: DebugLogJobTerminalPresentation?
-  @Published private(set) var hapFailure: String?
-  @Published private(set) var cancellingOutstandingJobIDs: Set<String> = []
+@Observable
+final class DebugWorkspaceViewModel {
+  private(set) var workspace = DebugWorkspacePresentation.loading
+  private(set) var isRefreshing = false
+  private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
+  private(set) var isSubmittingLogs = false
+  private(set) var isCancellingLogs = false
+  private(set) var activeLogJobID: String?
+  private(set) var logTerminal: DebugLogJobTerminalPresentation?
+  private(set) var logFailure: String?
+  private(set) var isRunningCommand = false
+  private(set) var commandResult: DebugRuntimeCommandResult?
+  private(set) var commandFailure: String?
+  private(set) var isMutatingPortRule = false
+  private(set) var isCancellingPortRule = false
+  private(set) var activePortRuleJobID: String?
+  private(set) var portRuleTerminal: DebugLogJobTerminalPresentation?
+  private(set) var portRuleFailure: String?
+  private(set) var isSubmittingHAP = false
+  private(set) var isCancellingHAP = false
+  private(set) var activeHAPJobID: String?
+  private(set) var hapTerminal: DebugLogJobTerminalPresentation?
+  private(set) var hapFailure: String?
+  private(set) var cancellingOutstandingJobIDs: Set<String> = []
 
   private let provider: any DebugApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding

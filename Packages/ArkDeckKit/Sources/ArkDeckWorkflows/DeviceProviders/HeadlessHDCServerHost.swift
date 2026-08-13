@@ -134,7 +134,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
   ) -> ProcessIdentityBoundRequest {
     ProcessIdentityBoundRequest(
       process: ProcessRequest(
-        executable: URL(fileURLWithPath: executable.path),
+        executable: URL(filePath: executable.path),
         arguments: ["-s", endpoint.endpoint.rawValue, "-m"],
         environment: endpoint.childEnvironment),
       expectedSHA256: executable.sha256)

@@ -44,10 +44,11 @@ package struct RockchipRuntimeBindingReactivationProofSource:
 
     for jobDirectory in jobDirectories {
       let jobID = jobDirectory.lastPathComponent
-      let waitDirectory = jobDirectory.appendingPathComponent(
-        "wait-for-hdc", isDirectory: true)
+      let waitDirectory = jobDirectory.appending(
+        path:
+          "wait-for-hdc", directoryHint: .isDirectory)
       if let record = try? readIntent(
-        from: waitDirectory.appendingPathComponent("intent.json")),
+        from: waitDirectory.appending(path: "intent.json")),
         record.value.jobID == jobID,
         record.value.stepID == "wait-for-hdc",
         record.value.targetID == target.targetID,
@@ -65,7 +66,7 @@ package struct RockchipRuntimeBindingReactivationProofSource:
       for actionDirectory in actionDirectories {
         guard
           let intent = try? readIntent(
-            from: actionDirectory.appendingPathComponent("intent.json")),
+            from: actionDirectory.appending(path: "intent.json")),
           intent.value.jobID == jobID,
           intent.value.stepID == actionDirectory.lastPathComponent,
           intent.value.targetID == target.targetID,
@@ -78,7 +79,7 @@ package struct RockchipRuntimeBindingReactivationProofSource:
           connectKey == target.connectKey,
           try validActionHash(intent.value),
           let receipt = try? readReceipt(
-            from: actionDirectory.appendingPathComponent("receipt.json")),
+            from: actionDirectory.appending(path: "receipt.json")),
           receipt.value.matches(intent.value),
           receipt.value.isWellFormed,
           receipt.value.summary["usbState"] == "hdc-normal",
@@ -231,9 +232,10 @@ package struct RockchipRuntimeBindingReactivationProofSource:
         providerExecutableSHA256: intent.providerExecutableSHA256,
         intentSHA256: Self.sha256(bytes))
     case "rockchip.waitForBoundHDCReconnect":
-      guard Set(intent.action.arguments.keys) == [
-        "previousConnectKey", "previousIdentitySha256", "usbTopology",
-      ],
+      guard
+        Set(intent.action.arguments.keys) == [
+          "previousConnectKey", "previousIdentitySha256", "usbTopology",
+        ],
         let connectKey = Self.string(
           "previousConnectKey", in: intent.action.arguments),
         let identity = Self.string(
@@ -281,9 +283,10 @@ package struct RockchipRuntimeBindingReactivationProofSource:
     let entries = try FileManager.default.contentsOfDirectory(
       at: parent,
       includingPropertiesForKeys: nil,
-      options: [.skipsHiddenFiles])
-      .filter { predicate($0.lastPathComponent) }
-      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+      options: [.skipsHiddenFiles]
+    )
+    .filter { predicate($0.lastPathComponent) }
+    .sorted { $0.lastPathComponent < $1.lastPathComponent }
     guard entries.count <= Self.maximumEntries else {
       throw failure("Runtime reactivation record directory exceeds its bound")
     }
@@ -302,21 +305,25 @@ package struct RockchipRuntimeBindingReactivationProofSource:
 
   private func readIntent(from url: URL) throws -> (value: IntentRecord, bytes: Data) {
     let bytes = try readOwnerOnlyRecord(url)
-    guard try exactKeys(bytes) == [
-      "schemaVersion", "jobID", "stepID", "targetID", "bindingRevision",
-      "stableIdentitySHA256", "providerExecutableSHA256", "actionSHA256", "action",
-    ] else { throw failure("Runtime reactivation intent schema is invalid") }
+    guard
+      try exactKeys(bytes) == [
+        "schemaVersion", "jobID", "stepID", "targetID", "bindingRevision",
+        "stableIdentitySHA256", "providerExecutableSHA256", "actionSHA256", "action",
+      ]
+    else { throw failure("Runtime reactivation intent schema is invalid") }
     return (try JSONDecoder().decode(IntentRecord.self, from: bytes), bytes)
   }
 
   private func readReceipt(from url: URL) throws -> (value: ReceiptRecord, bytes: Data) {
     let bytes = try readOwnerOnlyRecord(url)
-    guard try exactKeys(bytes) == [
-      "schemaVersion", "jobID", "stepID", "targetID", "bindingRevision",
-      "stableIdentitySHA256", "providerExecutableSHA256", "actionSHA256", "summary",
-      "stdoutSHA256", "stdoutByteCount", "stderrSHA256", "stderrByteCount",
-      "stdoutTruncated", "subprocessCount",
-    ] else { throw failure("Runtime reactivation receipt schema is invalid") }
+    guard
+      try exactKeys(bytes) == [
+        "schemaVersion", "jobID", "stepID", "targetID", "bindingRevision",
+        "stableIdentitySHA256", "providerExecutableSHA256", "actionSHA256", "summary",
+        "stdoutSHA256", "stdoutByteCount", "stderrSHA256", "stderrByteCount",
+        "stdoutTruncated", "subprocessCount",
+      ]
+    else { throw failure("Runtime reactivation receipt schema is invalid") }
     return (try JSONDecoder().decode(ReceiptRecord.self, from: bytes), bytes)
   }
 
@@ -339,9 +346,13 @@ package struct RockchipRuntimeBindingReactivationProofSource:
       while offset < bytes.count {
         let count = Darwin.read(
           descriptor, bytes.baseAddress!.advanced(by: offset), bytes.count - offset)
-        if count > 0 { offset += count }
-        else if count < 0, errno == EINTR { continue }
-        else { throw failure("Runtime reactivation record is truncated") }
+        if count > 0 {
+          offset += count
+        } else if count < 0, errno == EINTR {
+          continue
+        } else {
+          throw failure("Runtime reactivation record is truncated")
+        }
       }
     }
     return data

@@ -180,8 +180,8 @@ package struct AgentRuntimeExecutor: Sendable {
     self.client = client
     self.stateDirectory =
       stateDirectory
-      ?? URL(fileURLWithPath: client.socketPath).deletingLastPathComponent()
-        .appendingPathComponent("agent-runtime", isDirectory: true)
+      ?? URL(filePath: client.socketPath).deletingLastPathComponent()
+      .appending(path: "agent-runtime", directoryHint: .isDirectory)
     self.nowUTC = nowUTC
   }
 
@@ -845,7 +845,7 @@ package struct AgentRuntimeExecutor: Sendable {
   }
 
   private func pendingFile(token: String) -> URL {
-    stateDirectory.appendingPathComponent("\(token).json")
+    stateDirectory.appending(path: "\(token).json")
   }
 
   private func persist<T: Encodable>(_ value: T, to destination: URL) throws {
@@ -855,8 +855,9 @@ package struct AgentRuntimeExecutor: Sendable {
         attributes: [.posixPermissions: 0o700])
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-      let temporary = stateDirectory.appendingPathComponent(
-        ".pending-\(UUID().uuidString.lowercased())")
+      let temporary = stateDirectory.appending(
+        path:
+          ".pending-\(UUID().uuidString.lowercased())")
       try encoder.encode(value).write(to: temporary, options: [])
       let handle = try FileHandle(forWritingTo: temporary)
       try handle.synchronize()

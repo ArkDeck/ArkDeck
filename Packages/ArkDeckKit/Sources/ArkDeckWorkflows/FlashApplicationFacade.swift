@@ -736,9 +736,10 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
   }
 
   func cancel(jobID: String) async -> Bool {
-    guard let result = try? await FlashXPCResponseDecoding.resultObject(
-      await FlashXPCTransport.request(
-        method: "job.cancel", params: ["jobId": .string(jobID)]))
+    guard
+      let result = try? await FlashXPCResponseDecoding.resultObject(
+        await FlashXPCTransport.request(
+          method: "job.cancel", params: ["jobId": .string(jobID)]))
     else { return false }
     return result["cancelRequested"] as? Bool == true
   }
@@ -785,16 +786,17 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
-      fixtureStateURL = URL(fileURLWithPath: arguments[index + 1])
+      fixtureStateURL = URL(filePath: arguments[index + 1])
     } else {
       fixtureStateURL = nil
     }
   }
 
   func refreshWorkspace() async -> FlashWorkspacePresentation {
-    let fixtureState = fixtureStateURL.flatMap {
-      try? String(contentsOf: $0, encoding: .utf8)
-    } ?? ""
+    let fixtureState =
+      fixtureStateURL.flatMap {
+        try? String(contentsOf: $0, encoding: .utf8)
+      } ?? ""
     let loaderIsUnbound = fixtureState.contains("--ui-test-flash-loader-unbound")
     return FlashWorkspacePresentation(
       availability: .available,
@@ -827,10 +829,10 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
       let plan = try provider.makePlan(
         mode: mode, archiveValidation: .valid, planNonce: "ui-fixture")
       let presentation = FlashPlanPresentationBuilder.presentation(
-          plan: plan,
-          profile: board,
-          target: target,
-          imageFileName: archiveURL.lastPathComponent)
+        plan: plan,
+        profile: board,
+        target: target,
+        imageFileName: archiveURL.lastPathComponent)
       let observations = RockchipPrerequisiteIdentifier.allCases.map {
         RockchipPrerequisiteObservation(
           identifier: $0,
@@ -1202,7 +1204,8 @@ enum FlashPlanPresentationBuilder {
       ],
       partitions: profile.mappedPartitions.map { mapped in
         guard let member = profile.member(named: mapped.imageMemberName) else {
-          preconditionFailure("validated profile is missing mapped member \(mapped.imageMemberName)")
+          preconditionFailure(
+            "validated profile is missing mapped member \(mapped.imageMemberName)")
         }
         return FlashPartitionPresentation(
           writeOrder: mapped.writeOrder,
@@ -1285,7 +1288,8 @@ private enum FlashXPCTransport {
       }
       let proxy =
         connection.remoteObjectProxyWithErrorHandler { error in
-          finish(.failure(.transport("ArkDeck Runtime is not reachable: \(error.localizedDescription)")))
+          finish(
+            .failure(.transport("ArkDeck Runtime is not reachable: \(error.localizedDescription)")))
         } as? ArkDeckAgentXPCProtocol
       guard let proxy else {
         finish(.failure(.transport("ArkDeck Runtime is not reachable")))

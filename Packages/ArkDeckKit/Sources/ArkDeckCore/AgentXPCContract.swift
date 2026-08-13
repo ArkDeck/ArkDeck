@@ -29,12 +29,12 @@ package enum ArkDeckAgentFilesystemLayout {
     fileManager: FileManager = .default
   ) -> URL {
     fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent(applicationSupportRelativeStateDirectory, isDirectory: true)
+      .appending(path: applicationSupportRelativeStateDirectory, directoryHint: .isDirectory)
   }
 
   package static func defaultSocketURL(fileManager: FileManager = .default) -> URL {
     defaultStateDirectory(fileManager: fileManager)
-      .appendingPathComponent(socketFilename)
+      .appending(path: socketFilename)
   }
 }
 

@@ -39,7 +39,7 @@ final class HarnessSQLiteRepository: @unchecked Sendable {
       ).first?.text("value") == "complete"
     guard !imported else { return }
     for legacyTree in ["tasks", "memory"] {
-      let url = rootURL.appendingPathComponent(legacyTree, isDirectory: true)
+      let url = rootURL.appending(path: legacyTree, directoryHint: .isDirectory)
       var isDirectory: ObjCBool = false
       if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
         isDirectory.boolValue

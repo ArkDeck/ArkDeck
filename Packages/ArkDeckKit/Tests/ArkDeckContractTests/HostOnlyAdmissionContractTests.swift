@@ -9,8 +9,8 @@ import CryptoKit
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckRuntime
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -60,8 +60,8 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-host-only-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-host-only-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -90,14 +90,14 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
     artifactStore: RuntimeArtifactStore? = nil
   ) throws -> RuntimeJobEngine {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let providers = DeviceProviderRegistry(providers: [
       HDCObservationProviderAdapter(factsPort: witness),
       workspaceProvider(tool: workspaceTool),
     ])
     return try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers,
       dispatcher: RecordingDispatcher(
         log: dispatcherLog, stdout: stdout, exitStatus: exitStatus),
@@ -168,7 +168,7 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
 
   func testTheInspectionArtifactHoldsTheRealBytesAndNoDeviceBinding() async throws {
     let store = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let bytes = Data("Sources/WaterFlow.cpp:2:WaterFlowPattern_RecoverBack\n".utf8)
     let engine = try makeEngine(
@@ -411,8 +411,9 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       registry: WorkspaceProjectRegistry(),
       tool: WorkspaceInspectorTool(
         executablePath: "/usr/bin/grep", executableSHA256: String(repeating: "a", count: 64)))
-    guard case .unavailable(let projectReason) =
-      noProject.runtimeAvailability(for: inspectSource)
+    guard
+      case .unavailable(let projectReason) =
+        noProject.runtimeAvailability(for: inspectSource)
     else {
       return XCTFail("no registered project must report unavailable")
     }

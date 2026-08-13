@@ -1,5 +1,6 @@
 import AppKit
 import ArkDeckWorkflows
+import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -95,7 +96,7 @@ enum FlashWorkspaceMode: String, CaseIterable, Hashable {
 /// Runtime owns destructive admission; the UI only submits the reviewed typed
 /// request and never carries or administers a capability.
 struct FlashWorkspaceView: View {
-  @ObservedObject var model: FlashWorkspaceViewModel
+  var model: FlashWorkspaceViewModel
   let runtimeHistory: RuntimeHistoryPresentation
   let isRuntimeHistoryRefreshing: Bool
   let onRefreshRuntimeHistory: () -> Void
@@ -184,10 +185,13 @@ struct FlashWorkspaceView: View {
 
   private var currentDeviceIdentity: some View {
     HStack(spacing: 10) {
-      Image(systemName: model.selectedTarget == nil ? "externaldrive.badge.questionmark" : "externaldrive.fill")
-        .font(.title3)
-        .foregroundStyle(readinessColor)
-        .accessibilityHidden(true)
+      Image(
+        systemName: model.selectedTarget == nil
+          ? "externaldrive.badge.questionmark" : "externaldrive.fill"
+      )
+      .font(.title3)
+      .foregroundStyle(readinessColor)
+      .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(
           model.selectedTarget == nil
@@ -354,7 +358,8 @@ struct FlashWorkspaceView: View {
       Image(systemName: model.selectedArchiveURL == nil ? "shippingbox" : "shippingbox.fill")
         .font(.title2)
         .foregroundStyle(
-          model.selectedArchiveURL == nil ? Color.secondary : Color.accentColor)
+          model.selectedArchiveURL == nil ? Color.secondary : Color.accentColor
+        )
         .frame(width: 34, height: 34)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 3) {
@@ -749,8 +754,8 @@ struct FlashWorkspaceView: View {
             Button(flashText("flash.workspace.result.again")) {
               model.resetForAnotherFlash()
             }
-              .buttonStyle(.borderedProminent)
-              .accessibilityIdentifier("flash.workspace.result.again")
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("flash.workspace.result.again")
             Button(flashText("flash.workspace.result.history"), action: onOpenHistory)
               .accessibilityIdentifier("flash.runtime.openHistory")
           }
@@ -1320,26 +1325,27 @@ struct FlashWorkspaceView: View {
 }
 
 @MainActor
-final class FlashWorkspaceViewModel: ObservableObject {
-  @Published private(set) var workspace = FlashWorkspacePresentation.loading
-  @Published private(set) var mode = FlashWorkspaceMode.execute
-  @Published private(set) var selectedTargetID = ""
-  @Published private(set) var selectedArchiveURL: URL?
-  @Published private(set) var plan: FlashExactPlanPresentation?
-  @Published private(set) var planFailureCode: FlashPlanFailureCode?
-  @Published private(set) var planFailureDetail: String?
-  @Published private(set) var submission: FlashSubmissionPresentation?
-  @Published private(set) var liveStatus: FlashSubmissionPresentation?
-  @Published private(set) var submissionFailure: String?
-  @Published private(set) var postflightEvidence: RuntimeJobEvidencePresentation?
-  @Published private(set) var deviceAccess = RockchipDeviceAccessPresentation.loading
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var isPreparingPlan = false
-  @Published private(set) var isSubmitting = false
-  @Published private(set) var isCancelling = false
-  @Published private(set) var activeJobID: String?
-  @Published private(set) var isRefreshingDeviceAccess = false
-  @Published private(set) var profileReference =
+@Observable
+final class FlashWorkspaceViewModel {
+  private(set) var workspace = FlashWorkspacePresentation.loading
+  private(set) var mode = FlashWorkspaceMode.execute
+  private(set) var selectedTargetID = ""
+  private(set) var selectedArchiveURL: URL?
+  private(set) var plan: FlashExactPlanPresentation?
+  private(set) var planFailureCode: FlashPlanFailureCode?
+  private(set) var planFailureDetail: String?
+  private(set) var submission: FlashSubmissionPresentation?
+  private(set) var liveStatus: FlashSubmissionPresentation?
+  private(set) var submissionFailure: String?
+  private(set) var postflightEvidence: RuntimeJobEvidencePresentation?
+  private(set) var deviceAccess = RockchipDeviceAccessPresentation.loading
+  private(set) var isRefreshing = false
+  private(set) var isPreparingPlan = false
+  private(set) var isSubmitting = false
+  private(set) var isCancelling = false
+  private(set) var activeJobID: String?
+  private(set) var isRefreshingDeviceAccess = false
+  private(set) var profileReference =
     FlashApplicationFacade.profileReferences.last ?? "dayu200"
 
   private let provider: any FlashApplicationProviding
@@ -1351,8 +1357,8 @@ final class FlashWorkspaceViewModel: ObservableObject {
   /// workspace first and enter the exact-plan flow later, without a relaunch.
   /// A production launch has no state URL and never reads one.
   private let uiTestFixtureStateURL: URL?
-  private var didPrepareUITestPlan = false
-  private var shouldRegeneratePlanWhenReady = false
+  @ObservationIgnored private var didPrepareUITestPlan = false
+  @ObservationIgnored private var shouldRegeneratePlanWhenReady = false
 
   init(
     provider: any FlashApplicationProviding,
@@ -1372,13 +1378,13 @@ final class FlashWorkspaceViewModel: ObservableObject {
       let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
-      uiTestFixtureStateURL = URL(fileURLWithPath: arguments[index + 1])
+      uiTestFixtureStateURL = URL(filePath: arguments[index + 1])
     } else {
       uiTestFixtureStateURL = nil
     }
     if preparesUITestPlan {
       mode = .execute
-      selectedArchiveURL = URL(fileURLWithPath: "/ui-fixture/dayu200-images.tar.gz")
+      selectedArchiveURL = URL(filePath: "/ui-fixture/dayu200-images.tar.gz")
     }
   }
 
@@ -1466,7 +1472,7 @@ final class FlashWorkspaceViewModel: ObservableObject {
         self.didPrepareUITestPlan = true
         if self.selectedArchiveURL == nil {
           self.mode = .execute
-          self.selectedArchiveURL = URL(fileURLWithPath: "/ui-fixture/dayu200-images.tar.gz")
+          self.selectedArchiveURL = URL(filePath: "/ui-fixture/dayu200-images.tar.gz")
         }
       }
       if self.selectedArchiveURL != nil, self.plan == nil {

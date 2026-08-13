@@ -11,13 +11,13 @@ final class ProcessExecutorContractTests: XCTestCase {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
 
-    let executable = directory.appendingPathComponent("argv probe 中文;$(shell)&[]")
+    let executable = directory.appending(path: "argv probe 中文;$(shell)&[]")
     try FileManager.default.createSymbolicLink(
       at: executable,
-      withDestinationURL: URL(fileURLWithPath: "/usr/bin/printf")
+      withDestinationURL: URL(filePath: "/usr/bin/printf")
     )
 
-    let expansionSentinel = directory.appendingPathComponent("shell-expanded")
+    let expansionSentinel = directory.appending(path: "shell-expanded")
     let arguments = [
       "image with spaces/中文;$(touch \(expansionSentinel.path))&*.img",
       "single' double\" backslash\\",
@@ -49,8 +49,8 @@ final class ProcessExecutorContractTests: XCTestCase {
   func testTEST_AC_JOB_005_01_PreflightRejectsInvalidRequestsBeforeChildLaunch() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let launchSentinel = directory.appendingPathComponent("launched")
-    let touch = URL(fileURLWithPath: "/usr/bin/touch")
+    let launchSentinel = directory.appending(path: "launched")
+    let touch = URL(filePath: "/usr/bin/touch")
 
     try await assertRejected(
       ProcessRequest(
@@ -130,7 +130,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     ]
     let result = try await executor.execute(
       ProcessRequest(
-        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        executable: URL(filePath: "/usr/bin/env"),
         arguments: ["-0"],
         environment: requestEnvironment
       )
@@ -166,11 +166,11 @@ final class ProcessExecutorContractTests: XCTestCase {
 
   func testTEST_AC_JOB_005_01_LaunchExitAndSignalHaveIndependentClassifications() async throws {
     let nonzeroExit = try await executor.execute(
-      ProcessRequest(executable: URL(fileURLWithPath: "/usr/bin/false"))
+      ProcessRequest(executable: URL(filePath: "/usr/bin/false"))
     )
     XCTAssertEqual(nonzeroExit.termination, .exited(1))
 
-    let perl = URL(fileURLWithPath: "/usr/bin/perl")
+    let perl = URL(filePath: "/usr/bin/perl")
     XCTAssertTrue(
       FileManager.default.isExecutableFile(atPath: perl.path),
       "macOS process fixture requires /usr/bin/perl")
@@ -181,7 +181,7 @@ final class ProcessExecutorContractTests: XCTestCase {
 
     do {
       _ = try await executor.execute(
-        ProcessRequest(executable: URL(fileURLWithPath: "/private/tmp/arkdeck-does-not-exist"))
+        ProcessRequest(executable: URL(filePath: "/private/tmp/arkdeck-does-not-exist"))
       )
       XCTFail("a missing absolute executable must report launch failure")
     } catch let error as ProcessExecutionError {
@@ -198,7 +198,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     let parent = FileManager.default.currentDirectoryPath
     let result = try await executor.execute(
       ProcessRequest(
-        executable: URL(fileURLWithPath: "/bin/pwd"),
+        executable: URL(filePath: "/bin/pwd"),
         workingDirectory: canonicalDirectory))
     XCTAssertEqual(result.termination, .exited(0))
     let reportedDirectory = String(decoding: result.stdout.data, as: UTF8.self)
@@ -211,13 +211,13 @@ final class ProcessExecutorContractTests: XCTestCase {
     do {
       _ = try await executor.execute(
         ProcessRequest(
-          executable: URL(fileURLWithPath: "/bin/pwd"),
-          workingDirectory: canonicalDirectory.appendingPathComponent("missing")))
+          executable: URL(filePath: "/bin/pwd"),
+          workingDirectory: canonicalDirectory.appending(path: "missing")))
       XCTFail("an absent working directory must be refused before spawn")
     } catch let error as ProcessExecutionError {
       XCTAssertEqual(
         error,
-        .workingDirectoryUnavailable(canonicalDirectory.appendingPathComponent("missing").path))
+        .workingDirectoryUnavailable(canonicalDirectory.appending(path: "missing").path))
     }
   }
 
@@ -225,7 +225,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     let bytes = LockedStreamBytes()
     let invalidUTF8 = try await executor.execute(
       ProcessRequest(
-        executable: URL(fileURLWithPath: "/usr/bin/printf"),
+        executable: URL(filePath: "/usr/bin/printf"),
         arguments: ["\\377\\376A"]
       ),
       onOutput: { bytes.append($0) }
@@ -237,7 +237,7 @@ final class ProcessExecutorContractTests: XCTestCase {
 
     let split = try await executor.execute(
       ProcessRequest(
-        executable: URL(fileURLWithPath: "/usr/bin/awk"),
+        executable: URL(filePath: "/usr/bin/awk"),
         arguments: [
           "BEGIN { printf \"stdout-marker\"; printf \"stderr-marker\" > \"/dev/stderr\" }"
         ]
@@ -251,11 +251,11 @@ final class ProcessExecutorContractTests: XCTestCase {
   func testTEST_AC_JOB_005_01_ExitZeroCanStillBeASemanticFailure() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let fixture = directory.appendingPathComponent("semantic-exit-zero-failure.fixture")
+    let fixture = directory.appending(path: "semantic-exit-zero-failure.fixture")
     try ProcessExecutorFixtures.semanticExitZeroFailure.write(to: fixture)
     let result = try await executor.execute(
       ProcessRequest(
-        executable: URL(fileURLWithPath: "/bin/cat"),
+        executable: URL(filePath: "/bin/cat"),
         arguments: [fixture.path]
       ),
       evaluating: FailureMarkerEvaluator(marker: Data("STATUS=FAIL".utf8))
@@ -279,7 +279,7 @@ final class ProcessExecutorContractTests: XCTestCase {
   func testTEST_AC_JOB_005_01_CancellationTerminatesTheControlledProcessGroup() async throws {
     let executor = FoundationProcessExecutor()
     let task = Task { try await executeIgnoringProcessTree(using: executor, timeout: nil) }
-    try await Task.sleep(nanoseconds: 200_000_000)
+    try await Task.sleep(for: .milliseconds(200))
     task.cancel()
     let result = try await task.value
 
@@ -311,7 +311,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     let task = Task {
       try await executeLeaderExitWithPipeHoldingChild(using: executor, timeout: nil)
     }
-    try await Task.sleep(nanoseconds: 300_000_000)
+    try await Task.sleep(for: .milliseconds(300))
     let cancelledAt = Date()
     task.cancel()
     let result = try await task.value
@@ -330,7 +330,7 @@ final class ProcessExecutorContractTests: XCTestCase {
   func testTEST_AC_NFR_002_01_OneGiBSparseFixtureUsesBoundedCaptureAndMemory() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let sparseFixture = directory.appendingPathComponent("one-gib-sparse.fixture")
+    let sparseFixture = directory.appending(path: "one-gib-sparse.fixture")
     try Data().write(to: sparseFixture)
     let writer = try FileHandle(forWritingTo: sparseFixture)
     try writer.truncate(atOffset: 1_073_741_824)
@@ -341,7 +341,7 @@ final class ProcessExecutorContractTests: XCTestCase {
     let residentSetSampler = try PeakResidentSetSampler()
     let result = try await executor.execute(
       ProcessRequest(
-        executable: URL(fileURLWithPath: "/bin/cat"),
+        executable: URL(filePath: "/bin/cat"),
         arguments: [sparseFixture.path],
         timeout: 120
       ),
@@ -379,7 +379,7 @@ final class ProcessExecutorContractTests: XCTestCase {
   /// as exactly the capture limit with `wasTruncated == false`, which no caller
   /// can tell apart from a child that produced that much and exited.
   func testAStoppedDrainNeverReportsItsPartialCaptureAsUntruncated() async throws {
-    let perl = URL(fileURLWithPath: "/usr/bin/perl")
+    let perl = URL(filePath: "/usr/bin/perl")
     guard FileManager.default.isExecutableFile(atPath: perl.path) else {
       throw POSIXTestError(operation: "missing /usr/bin/perl fixture", code: ENOENT)
     }
@@ -411,7 +411,7 @@ final class ProcessExecutorContractTests: XCTestCase {
   func testIdentityBoundLaunchExecutesTheVerifiedDescriptorAndReturnsItsReceipt() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
-    let executable = URL(fileURLWithPath: "/usr/bin/printf")
+    let executable = URL(filePath: "/usr/bin/printf")
     let expectedHash = try sha256(of: executable)
     let launches = LockedLaunchCounter()
     let executor = FoundationProcessExecutor(
@@ -443,7 +443,7 @@ final class ProcessExecutorContractTests: XCTestCase {
       identityBoundPreSpawnHook: { _ in
         try FileManager.default.removeItem(at: executable)
         try FileManager.default.copyItem(
-          at: URL(fileURLWithPath: "/usr/bin/touch"), to: executable)
+          at: URL(filePath: "/usr/bin/touch"), to: executable)
       },
       launchObserver: { _ in launches.recordLaunch() })
 
@@ -496,8 +496,8 @@ final class ProcessExecutorContractTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: directory) }
     let symlink = directory.appending(path: "linked-tool")
     try FileManager.default.createSymbolicLink(
-      at: symlink, withDestinationURL: URL(fileURLWithPath: "/usr/bin/printf"))
-    let expectedHash = try sha256(of: URL(fileURLWithPath: "/usr/bin/printf"))
+      at: symlink, withDestinationURL: URL(filePath: "/usr/bin/printf"))
+    let expectedHash = try sha256(of: URL(filePath: "/usr/bin/printf"))
     let launches = LockedLaunchCounter()
     let symlinkExecutor = FoundationProcessExecutor(
       identityBoundPreSpawnHook: { _ in },
@@ -625,7 +625,7 @@ private final class LockedLaunchCounter: @unchecked Sendable {
 private func copyExecutable(_ source: String, into directory: URL, named name: String) throws -> URL
 {
   let destination = directory.appending(path: name)
-  try FileManager.default.copyItem(at: URL(fileURLWithPath: source), to: destination)
+  try FileManager.default.copyItem(at: URL(filePath: source), to: destination)
   guard chmod(destination.path, 0o755) == 0 else {
     throw POSIXTestError(operation: "chmod", code: errno)
   }
@@ -748,7 +748,7 @@ private final class PeakResidentSetSampler: @unchecked Sendable {
 
 private func makeTemporaryDirectory() throws -> URL {
   let directory = FileManager.default.temporaryDirectory
-    .appendingPathComponent("arkdeck-process-contract-\(UUID().uuidString)", isDirectory: true)
+    .appending(path: "arkdeck-process-contract-\(UUID().uuidString)", directoryHint: .isDirectory)
   try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
   return directory
 }
@@ -757,7 +757,7 @@ private func executeIgnoringProcessTree(
   using executor: FoundationProcessExecutor,
   timeout: TimeInterval?
 ) async throws -> ProcessExecutionResult {
-  let perl = URL(fileURLWithPath: "/usr/bin/perl")
+  let perl = URL(filePath: "/usr/bin/perl")
   guard FileManager.default.isExecutableFile(atPath: perl.path) else {
     throw POSIXTestError(operation: "missing /usr/bin/perl fixture", code: ENOENT)
   }
@@ -784,7 +784,7 @@ private func executeLeaderExitWithPipeHoldingChild(
   using executor: FoundationProcessExecutor,
   timeout: TimeInterval?
 ) async throws -> ProcessExecutionResult {
-  let perl = URL(fileURLWithPath: "/usr/bin/perl")
+  let perl = URL(filePath: "/usr/bin/perl")
   guard FileManager.default.isExecutableFile(atPath: perl.path) else {
     throw POSIXTestError(operation: "missing /usr/bin/perl fixture", code: ENOENT)
   }

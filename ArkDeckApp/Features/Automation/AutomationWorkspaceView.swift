@@ -1,8 +1,9 @@
 import ArkDeckWorkflows
+import Observation
 import SwiftUI
 
 struct AutomationWorkspaceView: View {
-  @ObservedObject var model: AutomationWorkspaceViewModel
+  var model: AutomationWorkspaceViewModel
   @State private var selectedTaskID: AutomationTaskPresentation.ID?
 
   private var selectedTask: AutomationTaskPresentation? {
@@ -32,7 +33,8 @@ struct AutomationWorkspaceView: View {
           ContentUnavailableView(
             "automation.empty.title",
             systemImage: "checklist.unchecked",
-            description: Text("automation.empty.description"))
+            description: Text("automation.empty.description")
+          )
           .accessibilityIdentifier("automation.empty")
         } else {
           HSplitView {
@@ -142,7 +144,8 @@ struct AutomationWorkspaceView: View {
             }
             .disabled(
               task.isTerminal || task.lifecycle == "waiting"
-                || task.lifecycle == "humanRequired" || model.isPerformingAction)
+                || task.lifecycle == "humanRequired" || model.isPerformingAction
+            )
             .accessibilityIdentifier("automation.pause")
 
             Button("automation.action.cancel", role: .destructive) {
@@ -221,11 +224,12 @@ struct AutomationWorkspaceView: View {
 }
 
 @MainActor
-final class AutomationWorkspaceViewModel: ObservableObject {
-  @Published private(set) var presentation = AutomationPresentation.loading
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var isPerformingAction = false
-  @Published private(set) var actionFailure: String?
+@Observable
+final class AutomationWorkspaceViewModel {
+  private(set) var presentation = AutomationPresentation.loading
+  private(set) var isRefreshing = false
+  private(set) var isPerformingAction = false
+  private(set) var actionFailure: String?
 
   private let provider: any AutomationApplicationProviding
 

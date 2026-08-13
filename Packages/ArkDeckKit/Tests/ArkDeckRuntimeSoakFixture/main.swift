@@ -45,7 +45,7 @@ private struct SoakConfiguration {
         guard value.hasPrefix("/") else {
           throw SoakFixtureError.invalidArguments("--state-directory must be absolute")
         }
-        let url = URL(fileURLWithPath: value).standardizedFileURL
+        let url = URL(filePath: value).standardizedFileURL
         stateDirectory = url
       case "--duration-seconds":
         durationSeconds = try Self.positiveInteger(value, flag: flag)
@@ -210,18 +210,20 @@ private let maximumResidentSetGrowthBytes: Int64 = 32 * 1024 * 1024
 private let maximumOpenFileDescriptorGrowth = 16
 
 private func currentUTC() -> String {
-  ISO8601DateFormatter().string(from: Date())
+  ISO8601Timestamps.string(from: Date())
 }
 
 private func makeEngine(
   configuration: SoakConfiguration
-) throws -> (RuntimeJobEngine, SimulatedHDCDispatcher, RuntimeArtifactStore, RuntimeCapabilityStore) {
+) throws -> (RuntimeJobEngine, SimulatedHDCDispatcher, RuntimeArtifactStore, RuntimeCapabilityStore)
+{
   let dispatcher = SimulatedHDCDispatcher()
   let capabilities = try RuntimeCapabilityStore(
-    directoryURL: configuration.stateDirectory.appendingPathComponent(
-      "capabilities", isDirectory: true))
+    directoryURL: configuration.stateDirectory.appending(
+      path:
+        "capabilities", directoryHint: .isDirectory))
   let artifacts = try RuntimeArtifactStore(
-    rootURL: configuration.stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+    rootURL: configuration.stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
     nowUTC: currentUTC)
   let engine = try RuntimeJobEngine(
     configuration: .init(stateDirectory: configuration.stateDirectory),
@@ -252,7 +254,7 @@ private func startDaemon(
   // soak directory.  The server owns only transport state; the engine state
   // remains at the parent directory and therefore survives this restart.
   let server = AgentDaemonServer(
-    stateDirectory: configuration.stateDirectory.appendingPathComponent("d", isDirectory: true),
+    stateDirectory: configuration.stateDirectory.appending(path: "d", directoryHint: .isDirectory),
     handler: handler,
     nowUTC: currentUTC)
   guard try server.start() == .started else {
@@ -357,10 +359,11 @@ private func executeCycle(
 }
 
 private func treeUsage(at root: URL) -> FileTreeUsage {
-  guard let enumerator = FileManager.default.enumerator(
-    at: root,
-    includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-    options: [.skipsHiddenFiles])
+  guard
+    let enumerator = FileManager.default.enumerator(
+      at: root,
+      includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+      options: [.skipsHiddenFiles])
   else { return FileTreeUsage() }
 
   var usage = FileTreeUsage()
@@ -441,10 +444,11 @@ private func verifyTerminalState(
 }
 
 private func verifyJournalIntegrity(at root: URL) throws {
-  guard let enumerator = FileManager.default.enumerator(
-    at: root,
-    includingPropertiesForKeys: [.isRegularFileKey],
-    options: [.skipsHiddenFiles])
+  guard
+    let enumerator = FileManager.default.enumerator(
+      at: root,
+      includingPropertiesForKeys: [.isRegularFileKey],
+      options: [.skipsHiddenFiles])
   else { return }
   for case let url as URL in enumerator where url.lastPathComponent == "journal.jsonl" {
     let inspection = try DurableJournalRecovery.inspect(url: url)
@@ -473,7 +477,7 @@ private func collectMetrics(
   let terminal = states.values.reduce(0, +) - active
   let state = treeUsage(at: configuration.stateDirectory)
   let artifacts = treeUsage(
-    at: configuration.stateDirectory.appendingPathComponent("artifacts", isDirectory: true))
+    at: configuration.stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory))
   let openDescriptors = openFileDescriptorCount()
   let residentSet = maximumResidentSetBytes()
   let residentBaseline = baselineResidentSetBytes ?? residentSet
@@ -487,7 +491,8 @@ private func collectMetrics(
   return SoakMetrics(
     schemaVersion: "arkdeck-runtime-soak/v1", runID: runID, phase: phase, cycle: cycle,
     generatedAtUTC: currentUTC(), elapsedSeconds: Int(Date().timeIntervalSince(startedAt)),
-    configuredDurationSeconds: configuration.durationSeconds, jobsPerCycle: configuration.jobsPerCycle,
+    configuredDurationSeconds: configuration.durationSeconds,
+    jobsPerCycle: configuration.jobsPerCycle,
     recoveredThisCycle: recovered, fakeProviderCommandsThisCycle: dispatches,
     fakeProviderChildProcessCount: 0, processID: getpid(),
     openFileDescriptorCount: openDescriptors, maxResidentSetBytes: residentSet,
@@ -518,19 +523,17 @@ private func persistMetrics(_ metrics: SoakMetrics, to stateDirectory: URL) thro
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
   try DurableFileWriter.createOrReplaceAtomically(
-    destination: stateDirectory.appendingPathComponent("runtime-soak-metrics.json"),
+    destination: stateDirectory.appending(path: "runtime-soak-metrics.json"),
     data: try encoder.encode(metrics))
 }
 
 private func usage() {
   FileHandle.standardError.write(
     Data(
-      (
-        "usage: ArkDeckRuntimeSoakFixture --state-directory <absolute-directory> "
-          + "[--duration-seconds <positive-int>] "
-          + "[--restart-interval-seconds <positive-int>] "
-          + "[--jobs-per-cycle <positive-int>]\n"
-      ).utf8))
+      ("usage: ArkDeckRuntimeSoakFixture --state-directory <absolute-directory> "
+        + "[--duration-seconds <positive-int>] "
+        + "[--restart-interval-seconds <positive-int>] "
+        + "[--jobs-per-cycle <positive-int>]\n").utf8))
 }
 
 do {
@@ -569,7 +572,7 @@ do {
     let remaining = deadline.timeIntervalSinceNow
     guard remaining > 0 else { break }
     let pause = min(TimeInterval(configuration.restartIntervalSeconds), remaining)
-    try await Task.sleep(nanoseconds: UInt64(pause * 1_000_000_000))
+    try await Task.sleep(for: .seconds(pause))
   }
 
   // One final fresh Runtime drains clean preflight jobs left deliberately by
@@ -592,7 +595,8 @@ do {
       + "verifiedArtifactJobs=\(verified.verifiedArtifactJobs) simulatedProvider=true")
 } catch let error as SoakFixtureError {
   usage()
-  FileHandle.standardError.write(Data("ArkDeck Runtime soak failed: \(error.localizedDescription)\n".utf8))
+  FileHandle.standardError.write(
+    Data("ArkDeck Runtime soak failed: \(error.localizedDescription)\n".utf8))
   exit(1)
 } catch {
   FileHandle.standardError.write(Data("ArkDeck Runtime soak failed: \(error)\n".utf8))

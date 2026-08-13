@@ -1,5 +1,5 @@
 import ArkDeckWorkflows
-import Combine
+import Observation
 import SwiftUI
 
 /// ArkUI UI Dump's single, leading-edge workflow.
@@ -10,7 +10,7 @@ import SwiftUI
 /// action stays fail-closed until the published operation carries the accepted
 /// window-scoped inputs and a reviewed App submission path exists.
 struct UIDumpWorkspaceView: View {
-  @ObservedObject var model: UIDumpWorkspaceViewModel
+  var model: UIDumpWorkspaceViewModel
 
   var body: some View {
     ScrollView {
@@ -777,17 +777,18 @@ struct UIDumpWorkspaceView: View {
 }
 
 @MainActor
-final class UIDumpWorkspaceViewModel: ObservableObject {
-  @Published private(set) var workspace = UIDumpWorkspacePresentation.loading
-  @Published private(set) var selectedTargetID = ""
-  @Published private(set) var manualWindowID = ""
-  @Published private(set) var selectedRecipeID = UIDumpRecipeID.elementTree
-  @Published private(set) var componentID = ""
-  @Published private(set) var debugPolicy = UIDumpDebugParameterPolicy.unchanged
-  @Published private(set) var persistentEnableConfirmed = false
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
-  @Published private(set) var artifactFailuresByJobID: [String: String] = [:]
+@Observable
+final class UIDumpWorkspaceViewModel {
+  private(set) var workspace = UIDumpWorkspacePresentation.loading
+  private(set) var selectedTargetID = ""
+  private(set) var manualWindowID = ""
+  private(set) var selectedRecipeID = UIDumpRecipeID.elementTree
+  private(set) var componentID = ""
+  private(set) var debugPolicy = UIDumpDebugParameterPolicy.unchanged
+  private(set) var persistentEnableConfirmed = false
+  private(set) var isRefreshing = false
+  private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  private(set) var artifactFailuresByJobID: [String: String] = [:]
 
   let canUseTemporaryRestore = false
   private let provider: any UIDumpApplicationProviding

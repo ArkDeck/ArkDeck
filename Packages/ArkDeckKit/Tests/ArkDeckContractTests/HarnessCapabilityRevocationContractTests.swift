@@ -66,8 +66,8 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-capability-revocation-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-capability-revocation-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -79,7 +79,7 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
 
   private func makePort() throws -> (RuntimeCapabilityStore, RuntimeCapabilityStoreHarnessPort) {
     let store = try RuntimeCapabilityStore(
-      directoryURL: rootURL.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: rootURL.appending(path: "capabilities", directoryHint: .isDirectory))
     return (store, RuntimeCapabilityStoreHarnessPort(store: store, nowUTC: { Self.now }))
   }
 
@@ -141,7 +141,7 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
     // Before revocation the grant is the one a request would name.
     var named = await port.standingCapabilityID(
       operationReference: "debug.hap@1", targetID: "TGT-1",
-        expectedBindingRevision: nil, inputs: [:])
+      expectedBindingRevision: nil, inputs: [:])
     XCTAssertEqual(named, "CAP-RT-REVOKE-001")
     var held = await port.hasStandingCapability(
       operationReference: "debug.hap@1", targetID: "TGT-1")
@@ -162,7 +162,7 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
 
     named = await port.standingCapabilityID(
       operationReference: "debug.hap@1", targetID: "TGT-1",
-        expectedBindingRevision: nil, inputs: [:])
+      expectedBindingRevision: nil, inputs: [:])
     XCTAssertNil(named, "a revoked grant must never be named into a request")
     held = await port.hasStandingCapability(
       operationReference: "debug.hap@1", targetID: "TGT-1")
@@ -182,7 +182,7 @@ final class HarnessCapabilityRevocationContractTests: XCTestCase {
 
     let named = await port.standingCapabilityID(
       operationReference: "debug.hap@1", targetID: "TGT-1",
-        expectedBindingRevision: nil, inputs: [:])
+      expectedBindingRevision: nil, inputs: [:])
     XCTAssertEqual(named, "CAP-RT-REVOKE-LATE")
     let held = await port.hasStandingCapability(
       operationReference: "debug.hap@1", targetID: "TGT-1")

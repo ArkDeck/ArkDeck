@@ -113,7 +113,7 @@ else { fail("closed request path required") }
 
 let input: CandidateInput
 do {
-  let data = try Data(contentsOf: URL(fileURLWithPath: arguments[1]))
+  let data = try Data(contentsOf: URL(filePath: arguments[1]))
   input = try JSONDecoder().decode(CandidateInput.self, from: data)
 } catch {
   fail("request unreadable")

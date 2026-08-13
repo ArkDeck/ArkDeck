@@ -149,8 +149,9 @@ final class DeviceProviderContractTests: XCTestCase {
     let good = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .verified(let summary) = try hdc.verify(
-      receipt: good, action: .hdc(.observeTool), context: context)
+    guard
+      case .verified(let summary) = try hdc.verify(
+        receipt: good, action: .hdc(.observeTool), context: context)
     else {
       return XCTFail("registered version must verify")
     }
@@ -159,8 +160,9 @@ final class DeviceProviderContractTests: XCTestCase {
     let unknownVersion = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data("Ver: 9.9.9x\n".utf8), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .unsupported = try hdc.verify(
-      receipt: unknownVersion, action: .hdc(.observeTool), context: context)
+    guard
+      case .unsupported = try hdc.verify(
+        receipt: unknownVersion, action: .hdc(.observeTool), context: context)
     else {
       return XCTFail("unregistered version must be unsupported")
     }
@@ -181,8 +183,9 @@ final class DeviceProviderContractTests: XCTestCase {
       exitStatus: 0,
       stdout: Data("error: install failed: incompatible api".utf8),
       stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .failed(let code, let detail) = try hdc.verify(
-      receipt: rejected, action: action, context: context)
+    guard
+      case .failed(let code, let detail) = try hdc.verify(
+        receipt: rejected, action: action, context: context)
     else {
       return XCTFail("package-manager rejection must fail before readback")
     }
@@ -197,8 +200,9 @@ final class DeviceProviderContractTests: XCTestCase {
         "error: failed to install bundle.\ncode:9568423\n"
           .appending("error: the device is unauthorized\n").utf8),
       stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .failed(let authorizationCode, let authorizationDetail) = try hdc.verify(
-      receipt: unauthorized, action: action, context: context)
+    guard
+      case .failed(let authorizationCode, let authorizationDetail) = try hdc.verify(
+        receipt: unauthorized, action: action, context: context)
     else {
       return XCTFail("the registered device authorization rejection must be named")
     }
@@ -211,8 +215,9 @@ final class DeviceProviderContractTests: XCTestCase {
       exitStatus: 0,
       stdout: Data("install bundle successfully.".utf8),
       stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .unknown = try hdc.verify(
-      receipt: accepted, action: action, context: context)
+    guard
+      case .unknown = try hdc.verify(
+        receipt: accepted, action: action, context: context)
     else {
       return XCTFail("package-manager success still requires package readback")
     }
@@ -220,8 +225,9 @@ final class DeviceProviderContractTests: XCTestCase {
     let legacyEmpty = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data(), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .unknown = try hdc.verify(
-      receipt: legacyEmpty, action: action, context: context)
+    guard
+      case .unknown = try hdc.verify(
+        receipt: legacyEmpty, action: action, context: context)
     else {
       return XCTFail("registered empty-output shape must remain unknown")
     }
@@ -233,8 +239,9 @@ final class DeviceProviderContractTests: XCTestCase {
     let versionShape = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data("Ver: 3.2.0f\n".utf8), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .unknown = try hdc.verify(
-      receipt: versionShape, action: .hdc(.observeServer), context: context)
+    guard
+      case .unknown = try hdc.verify(
+        receipt: versionShape, action: .hdc(.observeServer), context: context)
     else {
       return XCTFail("the -v shape must not satisfy a server check")
     }
@@ -242,8 +249,9 @@ final class DeviceProviderContractTests: XCTestCase {
       exitStatus: 0,
       stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n".utf8),
       stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .verified(let summary) = try hdc.verify(
-      receipt: serverShape, action: .hdc(.observeServer), context: context)
+    guard
+      case .verified(let summary) = try hdc.verify(
+        receipt: serverShape, action: .hdc(.observeServer), context: context)
     else {
       return XCTFail("the real checkserver shape must verify")
     }
@@ -255,8 +263,9 @@ final class DeviceProviderContractTests: XCTestCase {
       exitStatus: 0,
       stdout: Data("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0d\n".utf8),
       stderr: Data(), stdoutTruncated: false, durationSeconds: 0.1)
-    guard case .failed(let code, _) = try hdc.verify(
-      receipt: mismatch, action: .hdc(.observeServer), context: context)
+    guard
+      case .failed(let code, _) = try hdc.verify(
+        receipt: mismatch, action: .hdc(.observeServer), context: context)
     else {
       return XCTFail("a version mismatch must fail, not pass")
     }
@@ -269,8 +278,9 @@ final class DeviceProviderContractTests: XCTestCase {
       .enterLoader(connectKey: "150100424a544e4600"))
     let withoutRecord = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false, durationSeconds: 1)
-    guard case .unknown = try rockchip.verify(
-      receipt: withoutRecord, action: action, context: context)
+    guard
+      case .unknown = try rockchip.verify(
+        receipt: withoutRecord, action: action, context: context)
     else {
       return XCTFail("flash without a durable manifest reference can never verify")
     }
@@ -278,8 +288,9 @@ final class DeviceProviderContractTests: XCTestCase {
       exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false, durationSeconds: 1,
       hostManagedRecordID: "manifest-1",
       hostManagedSummary: ["firmware": "OpenHarmony-7.0.0.37"])
-    guard case .verified(let summary) = try rockchip.verify(
-      receipt: withRecord, action: action, context: context)
+    guard
+      case .verified(let summary) = try rockchip.verify(
+        receipt: withRecord, action: action, context: context)
     else {
       return XCTFail("host-managed record must verify")
     }
@@ -428,7 +439,7 @@ final class DeviceProviderContractTests: XCTestCase {
     RockchipRuntimeFlashBundle(
       artifactLeaseID: "lease:flash-artifact",
       artifactID: "flash-artifact",
-      fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+      fileURL: URL(filePath: "/private/tmp/images.tar.gz"),
       sha256: RockchipFlashProfile.dayu200.archiveSHA256,
       byteCount: Int(RockchipFlashProfile.dayu200.archiveSizeBytes),
       partitionNames: RockchipFlashProfile.dayu200.mappedPartitions.map(\.partitionName))
@@ -450,7 +461,7 @@ final class DeviceProviderContractTests: XCTestCase {
       nowUTC: "2026-07-30T00:00:00Z",
       resolvedInputArtifact: ProviderResolvedInputArtifact(
         artifactID: "flash-artifact",
-        fileURL: URL(fileURLWithPath: "/private/tmp/images.tar.gz"),
+        fileURL: URL(filePath: "/private/tmp/images.tar.gz"),
         sha256: RockchipFlashProfile.dayu200.archiveSHA256,
         byteCount: Int(RockchipFlashProfile.dayu200.archiveSizeBytes)))
   }
@@ -589,27 +600,30 @@ final class DeviceProviderContractTests: XCTestCase {
 
   func testUninstallVerifiesOnlyWhenTheDumpNoLongerNamesTheBundle() throws {
     let bundle = try HDCBundleReference(bundleName: "com.example.demo")
-    guard case .verified = try hdc.verify(
-      receipt: mutationReceipt(
-        mutation: "uninstall bundle successfully", mutationExit: 0,
-        probe: "", probeExit: 0),
-      action: .hdc(.uninstallPackage(bundle)), context: context)
+    guard
+      case .verified = try hdc.verify(
+        receipt: mutationReceipt(
+          mutation: "uninstall bundle successfully", mutationExit: 0,
+          probe: "", probeExit: 0),
+        action: .hdc(.uninstallPackage(bundle)), context: context)
     else {
       return XCTFail("an absent bundle is an uninstalled bundle")
     }
     // A neighbouring bundle name must not read as this one surviving.
-    guard case .verified = try hdc.verify(
-      receipt: mutationReceipt(
-        mutation: "", mutationExit: 0,
-        probe: "bundleName: com.example.demo.helper\n", probeExit: 0),
-      action: .hdc(.uninstallPackage(bundle)), context: context)
+    guard
+      case .verified = try hdc.verify(
+        receipt: mutationReceipt(
+          mutation: "", mutationExit: 0,
+          probe: "bundleName: com.example.demo.helper\n", probeExit: 0),
+        action: .hdc(.uninstallPackage(bundle)), context: context)
     else {
       return XCTFail("a longer neighbouring bundle name is not this bundle")
     }
-    guard case .unknown = try hdc.verify(
-      receipt: mutationReceipt(
-        mutation: "", mutationExit: 0, probe: "", probeExit: 1),
-      action: .hdc(.uninstallPackage(bundle)), context: context)
+    guard
+      case .unknown = try hdc.verify(
+        receipt: mutationReceipt(
+          mutation: "", mutationExit: 0, probe: "", probeExit: 1),
+        action: .hdc(.uninstallPackage(bundle)), context: context)
     else {
       return XCTFail("an unreadable dump is not proof of removal")
     }
@@ -638,7 +652,7 @@ final class DeviceProviderContractTests: XCTestCase {
     let artifactID = "ART-0123456789abcdef0123456789abcdef"
     let artifact = ProviderResolvedInputArtifact(
       artifactID: artifactID,
-      fileURL: URL(fileURLWithPath: "/private/tmp/input.hap"),
+      fileURL: URL(filePath: "/private/tmp/input.hap"),
       sha256: String(repeating: "c", count: 64),
       byteCount: 128)
     let boundContext = ProviderExecutionContext(
@@ -725,9 +739,10 @@ final class DeviceProviderContractTests: XCTestCase {
         stdoutTruncated: false, durationSeconds: 0.1)
     }
     let action = TypedProviderAction.hdc(.observeDevice(connectKey: "resolved-by-binding"))
-    guard case .verified(let summary) = try hdc.verify(
-      receipt: receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
-      action: action, context: context)
+    guard
+      case .verified(let summary) = try hdc.verify(
+        receipt: receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
+        action: action, context: context)
     else {
       return XCTFail("the one exact registered target row must verify")
     }
@@ -737,23 +752,26 @@ final class DeviceProviderContractTests: XCTestCase {
       "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1")
     XCTAssertNil(summary["connectKeys"], "runtime target confirmation must not expose raw keys")
 
-    guard case .failed(let zeroCode, _) = try hdc.verify(
-      receipt: receipt("different\t\tUSB\tConnected\tlocalhost\n"),
-      action: action, context: context)
+    guard
+      case .failed(let zeroCode, _) = try hdc.verify(
+        receipt: receipt("different\t\tUSB\tConnected\tlocalhost\n"),
+        action: action, context: context)
     else { return XCTFail("zero exact matches must fail") }
     XCTAssertEqual(zeroCode, "targetConfirmationMismatch")
 
     let duplicate =
       "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
       + "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
-    guard case .failed(let duplicateCode, _) = try hdc.verify(
-      receipt: receipt(duplicate), action: action, context: context)
+    guard
+      case .failed(let duplicateCode, _) = try hdc.verify(
+        receipt: receipt(duplicate), action: action, context: context)
     else { return XCTFail("multiple exact matches must fail") }
     XCTAssertEqual(duplicateCode, "targetConfirmationMismatch")
 
-    guard case .unknown = try hdc.verify(
-      receipt: receipt("150100424a544e4600\t\tBLUETOOTH\tConnected\tlocalhost\n"),
-      action: action, context: context)
+    guard
+      case .unknown = try hdc.verify(
+        receipt: receipt("150100424a544e4600\t\tBLUETOOTH\tConnected\tlocalhost\n"),
+        action: action, context: context)
     else { return XCTFail("an unregistered transport row must fail closed") }
   }
 
@@ -789,9 +807,10 @@ final class DeviceProviderContractTests: XCTestCase {
       expectedIdentitySHA256: String(repeating: "a", count: 64),
       toolVersion: "3.2.0f", toolSHA256: String(repeating: "a", count: 64),
       nowUTC: "2026-07-29T00:00:00Z")
-    guard case .failed(let code, _) = try hdc.verify(
-      receipt: receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
-      action: action, context: campaignIdentityContext)
+    guard
+      case .failed(let code, _) = try hdc.verify(
+        receipt: receipt("150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"),
+        action: action, context: campaignIdentityContext)
     else {
       return XCTFail("an expected identity that is not the connect-key derivation must fail")
     }
