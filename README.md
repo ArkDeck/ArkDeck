@@ -97,6 +97,25 @@ swift build --package-path Packages/ArkDeckKit
 swift test --package-path Packages/ArkDeckKit --parallel
 ```
 
+Repository contributors can run the same path-aware plan used by GitHub CI.
+It always checks SDD/catalog consistency, then selects only the compiled lanes
+affected by the branch plus current worktree. Missing comparison facts select
+all lanes rather than silently skipping validation:
+
+```bash
+python3 scripts/ci/plan.py \
+  --repo-root . \
+  --base-revision origin/main \
+  --head-revision HEAD \
+  --merge-base \
+  --include-worktree \
+  --run-local
+```
+
+ArkDeckKit tests use a stable cache outside individual worktrees. App and UI
+test changes compile the Xcode scheme with `build-for-testing`; this does not
+launch a simulator or claim device acceptance.
+
 For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. The Debug configuration covers app and runtime development; actually flashing a DAYU200 additionally needs the reviewed Rockchip component and the release packaging path.
 
 ### Starting the runtime

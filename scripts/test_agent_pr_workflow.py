@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Closed contract for the legacy Agent PR namespace partition.
+"""Closed contract for automatic Agent PR and compiled CI workflows.
 
 The test parser intentionally accepts only the reviewed ``on.push.branches``
 shape. It uses the Python standard library and performs no network, subprocess,
@@ -318,6 +318,97 @@ def validate_automatic_check_contract(
         raise WorkflowContractError("Swift CI must be push-only")
     if EXPECTED_PUSH_FLOW not in swift_text:
         raise WorkflowContractError("Swift CI push branches drifted")
+    if "\n    paths:" in swift_text or "\n    paths-ignore:" in swift_text:
+        raise WorkflowContractError(
+            "Swift CI must report its stable check instead of skipping the workflow"
+        )
+
+    plan_job = _job_block(swift_text, "plan")
+    swift_tests_job = _job_block(swift_text, "swift-tests")
+    app_build_job = _job_block(swift_text, "app-build")
+    swift_aggregate_job = _job_block(swift_text, "swift")
+    for job_name, job_block in (
+        ("Swift test", swift_tests_job),
+        ("App build", app_build_job),
+    ):
+        job_header, separator, _ = job_block.partition("    steps:\n")
+        if not separator:
+            raise WorkflowContractError(f"{job_name} job has no steps block")
+        if "${{ runner." in job_header:
+            raise WorkflowContractError(
+                f"{job_name} job-level fields cannot use the step-only runner context"
+            )
+    if not swift_aggregate_job.startswith("  swift:\n    if: always()\n"):
+        raise WorkflowContractError("Swift aggregate job must run after every lane result")
+    required_plan = (
+        "    runs-on: ubuntu-latest\n",
+        '"+refs/heads/main:refs/remotes/origin/main"',
+        '"+${ARKDECK_CI_REF}:refs/remotes/origin/ci"',
+        "python3 scripts/ci/test_plan.py",
+        "python3 scripts/test_agent_pr_workflow.py",
+        "python3 scripts/ci/plan.py",
+        '--event "$GITHUB_EVENT_PATH"',
+        '--github-output "$GITHUB_OUTPUT"',
+    )
+    required_swift_tests = (
+        "    needs: plan\n",
+        "    if: needs.plan.outputs.swift == 'true'\n",
+        "    runs-on: macos-26\n",
+        "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer",
+        "ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm",
+        "python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py",
+        "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+        "--num-workers 8",
+        "github.ref == 'refs/heads/main'",
+        "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    )
+    required_app_build = (
+        "    needs: plan\n",
+        "    if: needs.plan.outputs.app == 'true'\n",
+        "    runs-on: macos-26\n",
+        "ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode",
+        "CLANG_MODULE_CACHE_PATH: ${{ runner.temp }}/arkdeck-xcode/ModuleCache",
+        "SWIFTPM_MODULECACHE_OVERRIDE: ${{ runner.temp }}/arkdeck-xcode/ModuleCache",
+        "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        "-project ArkDeck.xcodeproj",
+        "-scheme ArkDeck",
+        "-derivedDataPath",
+        "-clonedSourcePackagesDirPath",
+        "-packageCachePath",
+        "CODE_SIGNING_ALLOWED=NO",
+        "ROCKCHIP_COMPONENT_INPUT=/usr/bin/false",
+        "build-for-testing",
+        "github.ref == 'refs/heads/main'",
+        "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    )
+    required_aggregate = (
+        "    needs: [plan, swift-tests, app-build]\n",
+        "PLAN_RESULT: ${{ needs.plan.result }}",
+        "SWIFT_RESULT: ${{ needs.swift-tests.result }}",
+        "APP_RESULT: ${{ needs.app-build.result }}",
+        'test "$PLAN_RESULT" = success',
+        'test "$SWIFT_RESULT" = success',
+        'test "$APP_RESULT" = success',
+    )
+    for token in required_plan:
+        if token not in plan_job:
+            raise WorkflowContractError(f"Swift plan job missing contract token: {token}")
+    for token in required_swift_tests:
+        if token not in swift_tests_job:
+            raise WorkflowContractError(
+                f"Swift test job missing contract token: {token}"
+            )
+    for token in required_app_build:
+        if token not in app_build_job:
+            raise WorkflowContractError(
+                f"App build job missing contract token: {token}"
+            )
+    for token in required_aggregate:
+        if token not in swift_aggregate_job:
+            raise WorkflowContractError(
+                f"Swift aggregate job missing contract token: {token}"
+            )
 
 
 def _glob_regex(pattern: str) -> re.Pattern[str]:
@@ -441,6 +532,47 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     '  push:\n    branches: [main, "agent/**"]\n',
                     '  push:\n    branches: [main, "agent/**"]\n  pull_request:\n',
+                ),
+            ),
+            (
+                "workflow paths filter",
+                agent,
+                sdd,
+                swift.replace(
+                    '    branches: [main, "agent/**"]\n',
+                    '    branches: [main, "agent/**"]\n    paths:\n      - "Packages/**"\n',
+                ),
+            ),
+            (
+                "unstable SwiftPM invocation",
+                agent,
+                sdd,
+                swift.replace(
+                    "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+                    "swift --package-path Packages/ArkDeckKit",
+                ),
+            ),
+            (
+                "missing app build",
+                agent,
+                sdd,
+                swift.replace("          build-for-testing\n", "          build\n"),
+            ),
+            (
+                "missing stable aggregator",
+                agent,
+                sdd,
+                swift.replace("    if: always()\n", "    if: success()\n", 1),
+            ),
+            (
+                "runner context at job scope",
+                agent,
+                sdd,
+                swift.replace(
+                    "      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer\n",
+                    "      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer\n"
+                    "      INVALID_JOB_CACHE: ${{ runner.temp }}/invalid\n",
+                    1,
                 ),
             ),
         )
