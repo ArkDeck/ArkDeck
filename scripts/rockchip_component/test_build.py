@@ -67,6 +67,8 @@ class RockchipComponentBuildTests(unittest.TestCase):
         self.assertEqual(self.recipe["recipeId"], "rockchip-component-build@1.0.0")
         self.assertEqual(self.recipe["component"]["targetTriple"], "arm64-apple-macos14.0")
         self.assertEqual(self.recipe["component"]["architecture"], "arm64")
+        self.assertEqual(self.recipe["component"]["cxxLanguageStandard"], "c++23")
+        self.assertEqual(build.RKDEVELOPTOOL_CXX_STANDARD, "c++23")
         self.assertEqual(
             self.recipe["builder"]["hostedImage"],
             {
@@ -98,6 +100,44 @@ class RockchipComponentBuildTests(unittest.TestCase):
         self.assertEqual(self.recipe["reproducibility"]["normalization"], "forbidden")
         self.assertEqual(self.recipe["environment"]["callerPATH"], "ignored")
         self.assertEqual(self.recipe["environment"]["homebrewBuildPaths"], "denied")
+
+    def test_rkdeveloptool_compile_arguments_require_cpp23(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source/main.cpp"
+            output = root / "objects/main.o"
+            arguments = build.rkdeveloptool_compile_arguments(
+                compiler="/toolchain/clang++",
+                source=source,
+                output=output,
+                work_root=root,
+                rk_source=root / "source",
+                libusb_source=root / "libusb-source",
+                libusb_build=root / "libusb-build",
+                generated_config=root / "generated/config.h",
+                toolchain={"sdkPath": "/SDK"},
+                recipe=self.recipe,
+            )
+        self.assertEqual(arguments[0], "/toolchain/clang++")
+        self.assertIn("-std=c++23", arguments)
+        self.assertNotIn("-std=c++11", arguments)
+        self.assertEqual(arguments[-4:], ["-c", str(source), "-o", str(output)])
+
+        mutated = json.loads(json.dumps(self.recipe))
+        mutated["component"]["cxxLanguageStandard"] = "c++11"
+        with self.assertRaises(build.BuildError):
+            build.rkdeveloptool_compile_arguments(
+                compiler="/toolchain/clang++",
+                source=source,
+                output=output,
+                work_root=root,
+                rk_source=root / "source",
+                libusb_source=root / "libusb-source",
+                libusb_build=root / "libusb-build",
+                generated_config=root / "generated/config.h",
+                toolchain={"sdkPath": "/SDK"},
+                recipe=mutated,
+            )
 
     def test_pinned_input_digests_are_not_placeholders(self) -> None:
         assets = [

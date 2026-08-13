@@ -11,7 +11,10 @@
       "com.apple.security.device.usb": true,
       "com.apple.security.files.bookmarks.app-scope": true,
       "com.apple.security.files.user-selected.read-write": true,
-      "com.apple.security.network.client": true
+      "com.apple.security.network.client": true,
+      "com.apple.security.temporary-exception.mach-lookup.global-name": [
+        "com.arkdeck.agentd"
+      ]
     },
     "minimumMacOS": "14.0",
     "name": "ArkDeck",
@@ -34,11 +37,11 @@
     ],
     "entitlements": {},
     "identifier": "com.arkdeck.desktop.rkdeveloptool",
-    "machoUUID": "8ab1a64a-f879-3fc1-a6de-63d3529c79c6",
+    "machoUUID": "d3db5b9f-fdfe-3fe6-ad47-467ddcea6928",
     "minimumMacOS": "14.0",
     "name": "rkdeveloptool",
-    "sha256": "55f6700bdd1c311a273394791baa00713ae7cf62a372077a3d63028b5473f218",
-    "size": 247488,
+    "sha256": "be753c696b8e37016cd072167acaac426e561ab070a8ee8a8e5fb29816b36fb7",
+    "size": 246936,
     "unsigned": true,
     "version": "1.32"
   },
@@ -58,15 +61,15 @@
     "files": [
       {
         "name": "registry.yaml",
-        "sha256": "0ba1946357edb63a7abbbaea792e483651c1aac37fd36ee23ca53b4b91848625"
+        "sha256": "fab70dad0fa7e60cf36464168c4d29f27b0d1c988c66e48fff1d018e8de66f15"
       },
       {
         "name": "recipe.json",
-        "sha256": "22a6c7359a1b5ea97702e76568817746c8e7815981a139a1bb04b475f9f747ec"
+        "sha256": "311c61b0d37819fe6602c69743f1573c40a01e344fe0a4bc2b7d040dca596caf"
       },
       {
         "name": "sbom.spdx.json",
-        "sha256": "1e231026acf767b5e96d00efda6e0e28a50933fa0ce6e9609b588054519fde4c"
+        "sha256": "2a842ed5cdd9ca29460a322dee3f2c5c4210ce45ab37f126f0c8216adf79c4d3"
       },
       {
         "name": "THIRD-PARTY-NOTICES.txt",
@@ -74,7 +77,7 @@
       },
       {
         "name": "source-distribution-manifest.json",
-        "sha256": "d94c2714047960014b071d60c3c1e939402d1fb719a55f6186e0fba04f85985f"
+        "sha256": "47939fa22dcfd8db9cc35448126ce63e323cc95f348e6a6f8885cb58e00fa297"
       }
     ]
   },
@@ -91,12 +94,12 @@
     "teamIdentifier": "8AQTYW5FKR"
   },
   "sourceArtifact": {
-    "artifactArchiveDigest": "sha256:0815f86640f492036cb0d8da8acfff61505137337522f30ed7a20b6135c00a49",
-    "artifactExpiresAt": "2026-09-03T04:13:46Z",
-    "artifactId": "8879893404",
+    "artifactArchiveDigest": "sha256:486e14492e49d66601c3a9b61dedbe322f1ba695eb7c6c50b5d94c1e170e1b19",
+    "artifactExpiresAt": "2026-09-12T05:17:36Z",
+    "artifactId": "9169271670",
     "artifactName": "rockchip-builder-a",
-    "runHead": "ab1d32c68934f5a776797e606bbe1f52dc947420",
-    "workflowRun": "30877024781"
+    "runHead": "b6434ebd17fdafbe930f3a78320c4a1c61b92bab",
+    "workflowRun": "31669795149"
   },
   "xcode": {
     "archiveConfiguration": "Release",

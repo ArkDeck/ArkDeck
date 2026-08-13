@@ -14,6 +14,8 @@ The recipe:
 - builds only on the exact GitHub-hosted `macos-26-arm64` image pinned by the
   recipe, with its exact macOS/Xcode/SDK/Clang envelope, inside a deny-network
   `sandbox-exec` profile;
+- compiles all pinned rkdeveloptool `.cpp` translation units with the recipe's
+  exact `-std=c++23` language-standard flag;
 - compares two independent build roots without output normalization;
 - requires the linker-generated Mach-O `LC_UUID`; it is retained in the
   inspected registry and covered by the two builders' byte-identical result;

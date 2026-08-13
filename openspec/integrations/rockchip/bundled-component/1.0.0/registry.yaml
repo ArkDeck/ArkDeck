@@ -13,13 +13,13 @@
     ],
     "exportedSymbolCount": 203,
     "exportedSymbolsSHA256": "0659a01d19792457e67e78a52129acb097b3f8f2e060ea54da69d46a06c9368c",
-    "loadCommandsSHA256": "8c7b6c7cd732c964eb0f6aba48b152ce8c8d9704993dc9c4e512f801301f7b46",
-    "machoUUID": "8ab1a64a-f879-3fc1-a6de-63d3529c79c6",
+    "loadCommandsSHA256": "b5ea3134f56307aff4349c72b2760f8003cd95f20aa3b0dbd7424022e8772ce6",
+    "machoUUID": "d3db5b9f-fdfe-3fe6-ad47-467ddcea6928",
     "minimumMacOS": "14.0",
-    "sha256": "55f6700bdd1c311a273394791baa00713ae7cf62a372077a3d63028b5473f218",
-    "size": 247488,
-    "undefinedSymbolCount": 193,
-    "undefinedSymbolsSHA256": "695166f61e92d97191dcf1ec324ecea1a198b57affa6c69fcd58d15ed5d42a1e",
+    "sha256": "be753c696b8e37016cd072167acaac426e561ab070a8ee8a8e5fb29816b36fb7",
+    "size": 246936,
+    "undefinedSymbolCount": 187,
+    "undefinedSymbolsSHA256": "cf0d09b1f523f9526923d1d882b5dc0c8a3c1a2adf76ac3cf1a7b9c3fbfbdec9",
     "versionStringEvidence": {
       "expectedRuntimeOutput": "rkdeveloptool ver 1.32",
       "staticFormat": "rkdeveloptool ver %s",
@@ -27,12 +27,12 @@
     }
   },
   "build": {
-    "commandDigest": "a5eb8b1002339bcf244e59ed25f129baef7081327dec6ecad67e743188e74a4d",
+    "commandDigest": "dc0d701fc0c120978bfd641cd596b69d182054ba5e239a346da8b3677342fe8a",
     "networkDuringBuild": "denied-by-sandbox-exec",
     "normalization": "forbidden",
-    "recipeGitBlob": "794c127f20bb6ff06f88f4beff0f26e5f1f87e07",
+    "recipeGitBlob": "e3e06015652c9899866c5a9091fb552b4eb78c1e",
     "recipePath": "openspec/integrations/rockchip/bundled-component/1.0.0/recipe.json",
-    "recipeSHA256": "22a6c7359a1b5ea97702e76568817746c8e7815981a139a1bb04b475f9f747ec",
+    "recipeSHA256": "311c61b0d37819fe6602c69743f1573c40a01e344fe0a4bc2b7d040dca596caf",
     "sourceDateEpoch": 1779028641
   },
   "builder": {
@@ -78,6 +78,7 @@
   },
   "component": {
     "architecture": "arm64",
+    "cxxLanguageStandard": "c++23",
     "expectedVersionString": "rkdeveloptool ver 1.32",
     "minimumMacOS": "14.0.0",
     "name": "rkdeveloptool",
@@ -135,11 +136,11 @@
     "sbom": {
       "format": "SPDX-2.3 JSON",
       "path": "sbom.spdx.json",
-      "sha256": "1e231026acf767b5e96d00efda6e0e28a50933fa0ce6e9609b588054519fde4c"
+      "sha256": "2a842ed5cdd9ca29460a322dee3f2c5c4210ce45ab37f126f0c8216adf79c4d3"
     },
     "sourceDistributionManifest": {
       "path": "source-distribution-manifest.json",
-      "sha256": "d94c2714047960014b071d60c3c1e939402d1fb719a55f6186e0fba04f85985f"
+      "sha256": "47939fa22dcfd8db9cc35448126ce63e323cc95f348e6a6f8885cb58e00fa297"
     }
   },
   "inputs": {

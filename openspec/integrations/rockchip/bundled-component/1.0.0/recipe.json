@@ -39,6 +39,7 @@
   },
   "component": {
     "architecture": "arm64",
+    "cxxLanguageStandard": "c++23",
     "expectedVersionString": "rkdeveloptool ver 1.32",
     "minimumMacOS": "14.0.0",
     "name": "rkdeveloptool",

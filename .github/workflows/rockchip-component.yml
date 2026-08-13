@@ -32,7 +32,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (Node 24)
 
       - name: Mutation and contract tests
-        run: /usr/bin/python3 scripts/rockchip_component/test_build.py
+        run: |
+          /usr/bin/python3 scripts/rockchip_component/test_build.py
+          /usr/bin/python3 scripts/rockchip_component/test_local_app.py
 
   build:
     runs-on: macos-26
@@ -46,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (Node 24)
 
-      - name: Exact toolchain preflight and clean unsigned build
+      - name: Exact toolchain preflight and clean unsigned C++23 build
         run: |
           set -eu
           test -d "$DEVELOPER_DIR"
