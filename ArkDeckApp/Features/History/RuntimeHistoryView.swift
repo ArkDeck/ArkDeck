@@ -2,6 +2,7 @@ import AppKit
 import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
+import Observation
 import SwiftUI
 
 private let historyLocalizationTable = "HistoryLocalizable"
@@ -1138,13 +1139,14 @@ private enum HistoryTimeFilter: String, CaseIterable, Identifiable {
 /// Bridges the App to two read-only domain readers. Detail requests are keyed
 /// by Job ID and ignored if the Job disappears during a concurrent refresh.
 @MainActor
-final class RuntimeHistoryViewModel: ObservableObject {
-  @Published private(set) var presentation: RuntimeHistoryPresentation = .loading
-  @Published private(set) var detailsByJobID: [String: RuntimeJobDetailPresentation] = [:]
-  @Published private(set) var loadingDetailJobIDs: Set<String> = []
-  @Published private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
-  @Published private(set) var isRefreshInFlight = false
-  @Published private(set) var isLoadOlderInFlight = false
+@Observable
+final class RuntimeHistoryViewModel {
+  private(set) var presentation: RuntimeHistoryPresentation = .loading
+  private(set) var detailsByJobID: [String: RuntimeJobDetailPresentation] = [:]
+  private(set) var loadingDetailJobIDs: Set<String> = []
+  private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
+  private(set) var isRefreshInFlight = false
+  private(set) var isLoadOlderInFlight = false
   private let provider: any RuntimeHistoryApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
 

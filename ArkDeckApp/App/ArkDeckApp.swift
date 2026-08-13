@@ -1,41 +1,120 @@
 import AppKit
 import ArkDeckWorkflows
-import Combine
+import Observation
 import SwiftUI
+import os
+
+/// Points of Interest for the user-perceived launch path. Instruments' App
+/// Launch template owns process/loader/first-frame timing; these regions add
+/// the product milestones that matter after the process begins building the
+/// SwiftUI shell.
+@MainActor
+enum AppStartupPerformance {
+  private static let clock = ContinuousClock()
+  private static let signposter = OSSignposter(
+    subsystem: Bundle.main.bundleIdentifier ?? "com.arkdeck.desktop",
+    category: .pointsOfInterest)
+  private static let logger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "com.arkdeck.desktop",
+    category: "StartupPerformance")
+  private static var startupState: OSSignpostIntervalState?
+  private static var startupBeganAt: ContinuousClock.Instant?
+  private static var deviceDiscoveryState: OSSignpostIntervalState?
+
+  static func beginStartup() {
+    guard startupState == nil else { return }
+    startupBeganAt = clock.now
+    startupState = signposter.beginInterval("App Startup to Device Information")
+    signposter.emitEvent("Startup Model Construction Began")
+  }
+
+  static func modelsReady() {
+    signposter.emitEvent("Startup Models Ready")
+  }
+
+  static func firstWindowAppeared() {
+    signposter.emitEvent("First Window Appeared")
+    if let startupBeganAt {
+      let seconds = startupBeganAt.duration(to: clock.now).timeInterval
+      logger.notice("First window appeared after \(seconds, privacy: .public) seconds")
+    }
+  }
+
+  static func beginDeviceDiscovery() {
+    guard deviceDiscoveryState == nil else { return }
+    deviceDiscoveryState = signposter.beginInterval("Startup Device Discovery")
+  }
+
+  static func deviceCandidatesPublished() {
+    signposter.emitEvent("Device Candidates Published")
+  }
+
+  static func deviceInformationReady() {
+    signposter.emitEvent("Complete Device Information Ready")
+    if let state = deviceDiscoveryState {
+      signposter.endInterval("Startup Device Discovery", state)
+      deviceDiscoveryState = nil
+    }
+  }
+
+  static func deviceInformationDisplayed() {
+    guard let state = startupState, let startupBeganAt else { return }
+    signposter.emitEvent("Complete Device Information Displayed")
+    let seconds = startupBeganAt.duration(to: clock.now).timeInterval
+    logger.notice(
+      "Complete device information displayed after \(seconds, privacy: .public) seconds")
+    signposter.endInterval("App Startup to Device Information", state)
+    startupState = nil
+    AppStartupPerformance.startupBeganAt = nil
+  }
+}
+
+private extension Duration {
+  var timeInterval: TimeInterval {
+    let parts = components
+    return TimeInterval(parts.seconds) + TimeInterval(parts.attoseconds) / 1e18
+  }
+}
 
 /// Owns the App's long-lived presentation models without constructing every
 /// workspace before the first frame. Only projections rendered by the shell
 /// itself are eager; a workspace pays its setup cost when its branch first
 /// becomes visible.
 @MainActor
-private final class ArkDeckAppModelStore: ObservableObject {
-  let autoUpdate = AutoUpdateViewModel()
-  let runtimeHistory = RuntimeHistoryViewModel(
-    provider: RuntimeHistoryApplicationFacade.make(),
-    detailProvider: RuntimeJobDetailApplicationFacade.make())
-  let deviceList = DeviceListViewModel(
-    provider: DeviceListApplicationFacade.make(),
-    resetDisplayNames: ProcessInfo.processInfo.arguments.contains(
-      "--ui-test-reset-device-names"))
+@Observable
+private final class ArkDeckAppModelStore {
+  let autoUpdate: AutoUpdateViewModel
+  let runtimeHistory: RuntimeHistoryViewModel
+  let deviceList: DeviceListViewModel
 
-  lazy var hdcDiagnostics = HDCStatusViewModel(
+  @ObservationIgnored lazy var hdcDiagnostics = HDCStatusViewModel(
     provider: HDCApplicationDiagnosticsFacade.make())
-  lazy var overviewCapabilities = OverviewCapabilityViewModel(
+  @ObservationIgnored lazy var overviewCapabilities = OverviewCapabilityViewModel(
     provider: OverviewCapabilityApplicationFacade.make())
-  lazy var flashWorkspace = FlashWorkspaceViewModel(
+  @ObservationIgnored lazy var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())
-  lazy var uiDumpWorkspace = UIDumpWorkspaceViewModel(
+  @ObservationIgnored lazy var uiDumpWorkspace = UIDumpWorkspaceViewModel(
     provider: UIDumpApplicationFacade.make())
-  lazy var debugWorkspace = DebugWorkspaceViewModel(
+  @ObservationIgnored lazy var debugWorkspace = DebugWorkspaceViewModel(
     provider: DebugApplicationFacade.make())
-  lazy var traceWorkspace = TraceWorkspaceViewModel(
+  @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
     provider: TraceApplicationFacade.make())
-  lazy var automationWorkspace = AutomationWorkspaceViewModel(
+  @ObservationIgnored lazy var automationWorkspace = AutomationWorkspaceViewModel(
     provider: AutomationApplicationFacade.make())
-  lazy var settingsWorkspace = SettingsWorkspaceViewModel(
+  @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make())
 
   init() {
+    AppStartupPerformance.beginStartup()
+    autoUpdate = AutoUpdateViewModel()
+    runtimeHistory = RuntimeHistoryViewModel(
+      provider: RuntimeHistoryApplicationFacade.make(),
+      detailProvider: RuntimeJobDetailApplicationFacade.make())
+    deviceList = DeviceListViewModel(
+      provider: DeviceListApplicationFacade.make(),
+      resetDisplayNames: ProcessInfo.processInfo.arguments.contains(
+        "--ui-test-reset-device-names"))
+    AppStartupPerformance.modelsReady()
     // The connected-device row is first-screen content, so begin its async
     // read while SwiftUI builds the window instead of waiting for `.task`
     // after first appearance. The task inherits the main actor only for
@@ -48,7 +127,7 @@ private final class ArkDeckAppModelStore: ObservableObject {
 
 @main
 struct ArkDeckApp: App {
-  @StateObject private var models = ArkDeckAppModelStore()
+  @State private var models = ArkDeckAppModelStore()
 
   var body: some Scene {
     WindowGroup {
@@ -130,8 +209,8 @@ private enum ShellSelection: Hashable {
 /// projections; features without an accepted production surface remain
 /// explicit rather than re-rendering another page's data under a new title.
 private struct OverviewWorkspaceView: View {
-  @ObservedObject var hdcDiagnostics: HDCStatusViewModel
-  @ObservedObject var overviewCapabilities: OverviewCapabilityViewModel
+  let hdcDiagnostics: HDCStatusViewModel
+  let overviewCapabilities: OverviewCapabilityViewModel
 
   var body: some View {
     HDCStatusView(
@@ -151,6 +230,68 @@ private struct OverviewWorkspaceView: View {
   }
 }
 
+/// Observation stays inside the inspector instead of making every Runtime
+/// history publication invalidate the complete navigation shell.
+private struct RuntimeHistoryJobInspector: View {
+  let model: RuntimeHistoryViewModel
+  let onOpenHistory: () -> Void
+  @Binding var isExpanded: Bool
+
+  var body: some View {
+    GlobalJobInspectorView(
+      presentation: model.presentation,
+      isRefreshInFlight: model.isRefreshInFlight,
+      onRefresh: model.refresh,
+      onOpenHistory: onOpenHistory,
+      isExpanded: $isExpanded)
+  }
+}
+
+/// The global recovery summary has its own Observation dependency boundary.
+/// A history refresh no longer reruns sidebar and device-detail construction.
+private struct RuntimeRecoveryBanner: View {
+  let model: RuntimeHistoryViewModel
+  let onOpenHistory: () -> Void
+
+  var body: some View {
+    GlobalRecoveryBannerView(
+      presentation: model.presentation,
+      onOpenHistory: onOpenHistory)
+  }
+}
+
+/// Update state is independent from navigation and device discovery. Keeping
+/// it in ToolbarContent prevents an updater transition from invalidating the
+/// AppShellView body.
+private struct UpdateAttentionToolbarContent: ToolbarContent {
+  let model: AutoUpdateViewModel
+
+  @ToolbarContentBuilder
+  var body: some ToolbarContent {
+    if let attention = model.attention {
+      ToolbarItem(placement: .automatic) {
+        SettingsLink {
+          Label(
+            LocalizedStringKey(attention.localizationKey),
+            systemImage: attention.systemImageName
+          )
+          .labelStyle(.titleAndIcon)
+        }
+        .accessibilityIdentifier("app.toolbar.updateAttention")
+      }
+    } else {
+      ToolbarItem(placement: .automatic) {
+        SettingsLink {
+          Label("app.toolbar.openSettings", systemImage: "gearshape")
+            .labelStyle(.iconOnly)
+        }
+        .help(Text("app.toolbar.openSettings"))
+        .accessibilityIdentifier("app.toolbar.openSettings")
+      }
+    }
+  }
+}
+
 private struct AppShellView: View {
   @SceneStorage("app.shell.selection")
   private var storedSelection = ArkDeckNavigationItem.overview.rawValue
@@ -158,15 +299,15 @@ private struct AppShellView: View {
   @State private var renamingDeviceConnectKey: String?
   @State private var pendingDeviceName = ""
   private let models: ArkDeckAppModelStore
-  @ObservedObject private var autoUpdate: AutoUpdateViewModel
-  @ObservedObject private var runtimeHistory: RuntimeHistoryViewModel
-  @ObservedObject private var deviceList: DeviceListViewModel
+  private let autoUpdate: AutoUpdateViewModel
+  private let runtimeHistory: RuntimeHistoryViewModel
+  private let deviceList: DeviceListViewModel
 
   init(models: ArkDeckAppModelStore) {
     self.models = models
-    _autoUpdate = ObservedObject(wrappedValue: models.autoUpdate)
-    _runtimeHistory = ObservedObject(wrappedValue: models.runtimeHistory)
-    _deviceList = ObservedObject(wrappedValue: models.deviceList)
+    autoUpdate = models.autoUpdate
+    runtimeHistory = models.runtimeHistory
+    deviceList = models.deviceList
   }
 
   private var shellSelection: ShellSelection {
@@ -213,16 +354,14 @@ private struct AppShellView: View {
               alignment: .topLeading)
         }
         .navigationTitle(detailTitle)
-        .toolbar { updateAttentionToolbarItem }
+        .toolbar { UpdateAttentionToolbarContent(model: autoUpdate) }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       if !isJobInspectorExpanded {
         Divider()
-        GlobalJobInspectorView(
-          presentation: runtimeHistory.presentation,
-          isRefreshInFlight: runtimeHistory.isRefreshInFlight,
-          onRefresh: runtimeHistory.refresh,
+        RuntimeHistoryJobInspector(
+          model: runtimeHistory,
           onOpenHistory: openHistory,
           isExpanded: $isJobInspectorExpanded
         )
@@ -231,6 +370,9 @@ private struct AppShellView: View {
       }
     }
     .frame(minWidth: 900, minHeight: 600)
+    .onAppear {
+      AppStartupPerformance.firstWindowAppeared()
+    }
     // Leaving the device whose trust window is being waited on ends that wait
     // without a verdict: an abandoned window must not later claim it closed.
     .onChange(of: storedSelection) { _, newValue in
@@ -281,10 +423,8 @@ private struct AppShellView: View {
       VSplitView {
         workspaceWithRecovery
           .frame(minHeight: 320, maxHeight: .infinity)
-        GlobalJobInspectorView(
-          presentation: runtimeHistory.presentation,
-          isRefreshInFlight: runtimeHistory.isRefreshInFlight,
-          onRefresh: runtimeHistory.refresh,
+        RuntimeHistoryJobInspector(
+          model: runtimeHistory,
           onOpenHistory: openHistory,
           isExpanded: $isJobInspectorExpanded
         )
@@ -297,9 +437,7 @@ private struct AppShellView: View {
 
   private var workspaceWithRecovery: some View {
     VStack(spacing: 0) {
-      GlobalRecoveryBannerView(
-        presentation: runtimeHistory.presentation,
-        onOpenHistory: openHistory)
+      RuntimeRecoveryBanner(model: runtimeHistory, onOpenHistory: openHistory)
       detail
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -462,35 +600,6 @@ private struct AppShellView: View {
     }
   }
 
-  /// Only update states the user has to act on reach the main window; the
-  /// complete update flow stays in the system Settings scene. The plain
-  /// icon-only Settings entry is always present — Settings is a scene, not a
-  /// sidebar destination, so the toolbar is its one discoverable door.
-  @ToolbarContentBuilder
-  private var updateAttentionToolbarItem: some ToolbarContent {
-    if let attention = autoUpdate.attention {
-      ToolbarItem(placement: .automatic) {
-        SettingsLink {
-          Label(
-            LocalizedStringKey(attention.localizationKey),
-            systemImage: attention.systemImageName
-          )
-          .labelStyle(.titleAndIcon)
-        }
-        .accessibilityIdentifier("app.toolbar.updateAttention")
-      }
-    } else {
-      ToolbarItem(placement: .automatic) {
-        SettingsLink {
-          Label("app.toolbar.openSettings", systemImage: "gearshape")
-            .labelStyle(.iconOnly)
-        }
-        .help(Text("app.toolbar.openSettings"))
-        .accessibilityIdentifier("app.toolbar.openSettings")
-      }
-    }
-  }
-
   private func navigationRow(_ item: ArkDeckNavigationItem) -> some View {
     NavigationLink(value: ShellSelection.navigation(item)) {
       Label {
@@ -565,15 +674,15 @@ private struct SettingsSceneLoader: View {
 
 private struct SettingsSceneContent: View {
   @ObservedObject var model: SettingsWorkspaceViewModel
-  @ObservedObject var hdcDiagnostics: HDCStatusViewModel
-  @ObservedObject var runtimeHistory: RuntimeHistoryViewModel
-  @ObservedObject var autoUpdate: AutoUpdateViewModel
+  let hdcDiagnostics: HDCStatusViewModel
+  let runtimeHistory: RuntimeHistoryViewModel
+  let autoUpdate: AutoUpdateViewModel
 
   init(models: ArkDeckAppModelStore) {
     _model = ObservedObject(wrappedValue: models.settingsWorkspace)
-    _hdcDiagnostics = ObservedObject(wrappedValue: models.hdcDiagnostics)
-    _runtimeHistory = ObservedObject(wrappedValue: models.runtimeHistory)
-    _autoUpdate = ObservedObject(wrappedValue: models.autoUpdate)
+    hdcDiagnostics = models.hdcDiagnostics
+    runtimeHistory = models.runtimeHistory
+    autoUpdate = models.autoUpdate
   }
 
   var body: some View {
@@ -592,7 +701,7 @@ private struct SettingsSceneContent: View {
 }
 
 private struct AutoUpdateSettingsView: View {
-  @ObservedObject var model: AutoUpdateViewModel
+  let model: AutoUpdateViewModel
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -634,17 +743,18 @@ private struct AutoUpdateSettingsView: View {
 }
 
 @MainActor
-private final class AutoUpdateViewModel: ObservableObject {
-  @Published private(set) var automaticChecksEnabled = true
-  @Published private(set) var statusKey = "update.status.idle"
-  @Published private(set) var releaseNotesSummary: String?
-  @Published private(set) var isBusy = false
-  @Published private(set) var canCheck = true
-  @Published private(set) var canDownload = false
-  @Published private(set) var canReveal = false
+@Observable
+private final class AutoUpdateViewModel {
+  private(set) var automaticChecksEnabled = true
+  private(set) var statusKey = "update.status.idle"
+  private(set) var releaseNotesSummary: String?
+  private(set) var isBusy = false
+  private(set) var canCheck = true
+  private(set) var canDownload = false
+  private(set) var canReveal = false
   /// Only states the user has to act on reach the main window. Idle and
   /// up-to-date results stay in the Settings scene.
-  @Published private(set) var attention: Attention?
+  private(set) var attention: Attention?
 
   enum Attention: String, Sendable {
     case available
@@ -668,9 +778,9 @@ private final class AutoUpdateViewModel: ObservableObject {
     }
   }
 
-  private var service: AutoUpdateService?
+  @ObservationIgnored private var service: AutoUpdateService?
   private let identity = AutoUpdateApplicationFacade.currentProductIdentity()
-  private var started = false
+  @ObservationIgnored private var started = false
   /// UI automation drives a declared state instead of the real updater, which
   /// is neither deterministic nor free of network effects. It is only the
   /// state: the mapping below is the product's own, so a test reads what the
@@ -844,10 +954,11 @@ private struct FinderUpdateArtifactRevealer: UpdateArtifactRevealing {
 /// has no candidate, process runner, lifecycle executor, or durable-audit
 /// access of its own.
 @MainActor
-private final class HDCStatusViewModel: ObservableObject {
-  @Published private(set) var presentation: HDCDiagnosticsPresentation = .loading
-  @Published private(set) var configurationError: String?
-  @Published private(set) var isRefreshInFlight = false
+@Observable
+private final class HDCStatusViewModel {
+  private(set) var presentation: HDCDiagnosticsPresentation = .loading
+  private(set) var configurationError: String?
+  private(set) var isRefreshInFlight = false
   let lifecycleDispatchIsProductionComposed: Bool
   private let provider: any HDCApplicationDiagnosticsProviding
 
@@ -917,9 +1028,10 @@ private final class HDCStatusViewModel: ObservableObject {
 }
 
 @MainActor
-private final class OverviewCapabilityViewModel: ObservableObject {
-  @Published private(set) var presentation = OverviewCapabilityMatrixPresentation.loading
-  @Published private(set) var isRefreshInFlight = false
+@Observable
+private final class OverviewCapabilityViewModel {
+  private(set) var presentation = OverviewCapabilityMatrixPresentation.loading
+  private(set) var isRefreshInFlight = false
   private let provider: any OverviewCapabilityApplicationProviding
 
   init(provider: any OverviewCapabilityApplicationProviding) {

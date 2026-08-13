@@ -519,8 +519,8 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let workflow = repository.appending(
       path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows")
     for file in [
-      "DebugApplicationFacade.swift", "DeviceListApplicationFacade.swift",
-      "TraceApplicationFacade.swift", "UIDumpApplicationFacade.swift",
+      "DebugApplicationFacade.swift", "TraceApplicationFacade.swift",
+      "UIDumpApplicationFacade.swift",
     ] {
       let source = try String(
         contentsOf: workflow.appending(path: file), encoding: .utf8)
@@ -528,6 +528,16 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         source.contains("params: RuntimeAppJobListPolicy.recentSummaryParams"),
         "\(file) must not restore an unbounded startup history read")
     }
+    let deviceList = try String(
+      contentsOf: workflow.appending(path: "DeviceListApplicationFacade.swift"),
+      encoding: .utf8)
+    XCTAssertFalse(
+      deviceList.contains("method: \"job.list"),
+      "device startup must use the daemon's compact projection, not read job history")
+    let engine = try String(
+      contentsOf: workflow.appending(path: "RuntimeJobEngine.swift"), encoding: .utf8)
+    XCTAssertTrue(engine.contains("public func latestSucceededDeviceObservations("))
+    XCTAssertTrue(engine.contains("pageSize: Int = 250"))
     let policy = try String(
       contentsOf: workflow.appending(path: "RuntimeAppJobListPolicy.swift"),
       encoding: .utf8)

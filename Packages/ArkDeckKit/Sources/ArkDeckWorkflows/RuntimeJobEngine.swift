@@ -3121,6 +3121,32 @@ public actor RuntimeJobEngine {
     return RuntimeJobStatusPage(jobs: statuses, nextCursor: page.nextCursor)
   }
 
+  /// Returns the latest verified `observe.device@1` facts per target without
+  /// constructing full History status or artifact projections. The App's
+  /// startup device projection needs only these compact, durable facts; using
+  /// the evidence endpoint for every row would add separate XPC round trips
+  /// and artifact verification to the cold-start path.
+  public func latestSucceededDeviceObservations(
+    pageSize: Int = 250
+  ) throws -> [String: RuntimeEvidenceObservation] {
+    let page = try admissionService.listJobs(
+      pageSize: pageSize, cursor: nil, newestFirst: true)
+    var observations: [String: RuntimeEvidenceObservation] = [:]
+    for persisted in page.jobs {
+      let record = try decodePersistedRecord(persisted)
+      let targetID = record.request.target.targetID
+      guard observations[targetID] == nil,
+        record.operationReference == "observe.device@1",
+        record.state == JobState.succeeded.rawValue,
+        !record.outcomeUnknown,
+        let observation = record.evidenceObservation,
+        observation.targetID == targetID
+      else { continue }
+      observations[targetID] = observation
+    }
+    return observations
+  }
+
   public func listCleanupDebt() async throws -> [CleanupDebtRecord] {
     guard let artifactStore else {
       throw RuntimeJobEngineError.internalFailure("Artifact store is not configured")

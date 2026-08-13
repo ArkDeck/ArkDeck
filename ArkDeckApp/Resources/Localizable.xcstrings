@@ -364,13 +364,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting and re-checking are plain reads of the current candidate list; they send nothing to the device and can be repeated freely."
+            "value": "Waiting and re-checking refresh the latest timestamped HDC observation. They send nothing to the device and can be repeated freely."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待与重新检测都只是重新读取当前候选列表；不向设备发送任何内容，可随时重复。"
+            "value": "等待与重新检测会刷新带时间的最新 HDC 观测；不向设备发送任何内容，可随时重复。"
           }
         }
       }
@@ -535,6 +535,22 @@
         }
       }
     },
+    "device.fact.stateObservedAt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State observed at"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态观测时间"
+          }
+        }
+      }
+    },
     "device.fact.target": {
       "localizations": {
         "en": {
@@ -659,6 +675,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已授权 · 未接管"
+          }
+        }
+      }
+    },
+    "device.state.needsRecheck": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status needs re-check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态待重新确认"
           }
         }
       }

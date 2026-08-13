@@ -56,6 +56,51 @@ final class DeviceBootstrapContractTests: XCTestCase {
     }
   }
 
+  private actor WarmThenSlowObservation: BootstrapObservationPort {
+    private(set) var candidateReadCount = 0
+    let first: [BootstrapCandidate]
+    let second: [BootstrapCandidate]
+
+    init(first: [BootstrapCandidate], second: [BootstrapCandidate]) {
+      self.first = first
+      self.second = second
+    }
+
+    func observeToolVersion() async throws -> String { "3.2.0f" }
+
+    func listCandidates() async throws -> [BootstrapCandidate] {
+      candidateReadCount += 1
+      if candidateReadCount == 1 { return first }
+      try await Task.sleep(for: .milliseconds(250))
+      return second
+    }
+
+    func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
+      ["serial": connectKey]
+    }
+  }
+
+  private actor SucceedThenFailObservation: BootstrapObservationPort {
+    private(set) var candidateReadCount = 0
+    let candidate: BootstrapCandidate
+
+    init(candidate: BootstrapCandidate) {
+      self.candidate = candidate
+    }
+
+    func observeToolVersion() async throws -> String { "3.2.0f" }
+
+    func listCandidates() async throws -> [BootstrapCandidate] {
+      candidateReadCount += 1
+      if candidateReadCount == 1 { return [candidate] }
+      throw BootstrapError.observationFailed("scripted refresh failure")
+    }
+
+    func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
+      ["serial": connectKey]
+    }
+  }
+
   private func makeMachine(
     _ observation: ScriptedObservation
   ) throws -> (DeviceBootstrapMachine, RuntimeTargetStore) {
@@ -108,6 +153,58 @@ final class DeviceBootstrapContractTests: XCTestCase {
       candidateReadCount, 1,
       "App diagnostics and sidebar startup reads must not launch duplicate HDC probes")
     XCTAssertTrue(try store.list().isEmpty, "coalesced discovery remains read-only")
+  }
+
+  func testPresentationReadsWarmSnapshotWithoutWaitingForSlowHDCRefresh() async throws {
+    let first = BootstrapCandidate(connectKey: "candidate-a", state: "Connected")
+    let second = BootstrapCandidate(connectKey: "candidate-a", state: "Offline")
+    let observation = WarmThenSlowObservation(first: [first], second: [second])
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let machine = DeviceBootstrapMachine(
+      observation: observation, targetStore: store, nowUTC: { "2026-08-13T00:00:00Z" })
+
+    let initial = try await machine.candidateSnapshotForPresentation()
+    XCTAssertEqual(initial.candidates, [first])
+
+    let clock = ContinuousClock()
+    let startedAt = clock.now
+    let warm = try await machine.candidateSnapshotForPresentation()
+    XCTAssertLessThan(
+      startedAt.duration(to: clock.now), .milliseconds(50),
+      "a warm App launch must not join the next HDC command")
+    XCTAssertEqual(warm.candidates, [first])
+
+    // Await the coalesced refresh itself instead of assuming a fixed wall
+    // clock delay is enough on every CI runner. The assertion above owns the
+    // warm-path latency contract; this call deterministically observes the
+    // eventual refresh result without launching a duplicate provider probe.
+    let refreshed = try await machine.refreshCandidateSnapshotForPresentation()
+    XCTAssertEqual(refreshed.candidates, [second])
+    let published = try await machine.candidateSnapshotForPresentation()
+    XCTAssertEqual(published.candidates, [second])
+    let refreshedReadCount = await observation.candidateReadCount
+    XCTAssertGreaterThanOrEqual(refreshedReadCount, 2)
+    XCTAssertTrue(try store.list().isEmpty, "background observation remains read-only")
+  }
+
+  func testFailedFollowUpMarksCachedCandidateStateStale() async throws {
+    let candidate = BootstrapCandidate(connectKey: "candidate-a", state: "Connected")
+    let observation = SucceedThenFailObservation(candidate: candidate)
+    let store = try RuntimeTargetStore(directoryURL: directory)
+    let machine = DeviceBootstrapMachine(
+      observation: observation, targetStore: store, nowUTC: { "2026-08-13T00:00:00Z" })
+
+    let initial = try await machine.candidateSnapshotForPresentation()
+    XCTAssertEqual(initial.health, .current)
+    _ = try await machine.candidateSnapshotForPresentation()
+    try await Task.sleep(for: .milliseconds(20))
+
+    let stale = try await machine.candidateSnapshotForPresentation()
+    XCTAssertEqual(stale.candidates, [candidate])
+    XCTAssertEqual(stale.health, .stale)
+    let failedReadCount = await observation.candidateReadCount
+    XCTAssertGreaterThanOrEqual(failedReadCount, 2)
+    XCTAssertTrue(try store.list().isEmpty)
   }
 
   func testMultipleCandidatesRequireExplicitSelection() async throws {

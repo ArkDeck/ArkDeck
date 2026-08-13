@@ -1494,10 +1494,33 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id, code: .internalError,
           message: "bootstrap is not configured in this composition")
       }
+      let usesWarmSnapshot: Bool
+      switch request.params {
+      case nil, .some([:]):
+        usesWarmSnapshot = false
+      case .some(["useWarmSnapshot": .bool(true)]):
+        usesWarmSnapshot = true
+      default:
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "device.candidates accepts only useWarmSnapshot=true")
+      }
       do {
-        let candidates = try await bootstrap.enumerateCandidates()
+        // The daemon keeps the official HDC candidate read warm outside the
+        // App launch path. Reading that completed snapshot and the compact
+        // local observation history are independent, so both projections are
+        // still composed in one XPC response without a serial I/O chain.
+        async let candidateRead = usesWarmSnapshot
+          ? bootstrap.candidateSnapshotForPresentation()
+          : bootstrap.refreshCandidateSnapshotForPresentation()
+        // Historical device facts are optional decoration. A damaged or
+        // temporarily unreadable history store must not hide the primary HDC
+        // candidate observation from the App.
+        async let observationRead = try? engine.latestSucceededDeviceObservations()
+        let (candidateSnapshot, observedFacts) = try await (candidateRead, observationRead)
+        let observations = observedFacts ?? [:]
         var projected: [(candidate: BootstrapCandidate, target: RuntimeTargetRecord?)] = []
-        for candidate in candidates {
+        for candidate in candidateSnapshot.candidates {
           let target = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
           if let target,
             let index = projected.firstIndex(where: { $0.target?.targetID == target.targetID })
@@ -1521,12 +1544,24 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id,
           result: .array(
             projected.map { row in
+              let observation = row.target.flatMap { observations[$0.targetID] }
               return .object([
                 "connectKey": .string(row.candidate.connectKey),
                 "state": .string(row.candidate.state),
+                "stateObservedAtUtc": .string(candidateSnapshot.observedAtUTC),
+                "stateObservationHealth": .string(candidateSnapshot.health.rawValue),
                 "adoptedTargetId": row.target.map { .string($0.targetID) } ?? .null,
                 "bindingRevision": row.target.map {
                   .integer(Int64($0.bindingRevision))
+                } ?? .null,
+                "observedFacts": observation.map {
+                  .object([
+                    "targetId": $0.targetID.map(JSONValue.string) ?? .null,
+                    "model": $0.model.map(JSONValue.string) ?? .null,
+                    "firmware": $0.firmware.map(JSONValue.string) ?? .null,
+                    "transport": $0.transport.map(JSONValue.string) ?? .null,
+                    "confirmedAtUtc": $0.confirmedAtUTC.map(JSONValue.string) ?? .null,
+                  ])
                 } ?? .null,
               ])
             }))

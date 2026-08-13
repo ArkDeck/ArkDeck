@@ -821,7 +821,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     initializedFileActions = true
     if let directory = request.workingDirectory {
       let result = directory.path.withCString {
-        posix_spawn_file_actions_addchdir_np(&fileActions, $0)
+        posix_spawn_file_actions_addchdir(&fileActions, $0)
       }
       guard result == 0 else {
         throw ProcessExecutionError.launchFailed(
