@@ -152,24 +152,29 @@
   diff 的 base-tree active Task。不得声明仅由当前 head 新建/恢复的 Task,不得为通过门禁
   扩张 Allowed paths。`agent-pr` workflow 使用同一 preflight 结果创建初始 PR 正文,
   Agent 不得先 push 再依赖编辑 PR 正文补 `Task:`。
-- **本地闸是四条命令,不是一条**。改动触及 `Catalog/**`、`openspec/contracts/**` 或
-  生成物时尤其如此——新增一个 action/字段类型要在 schema、生成器词表、生成器 pin、
-  Swift 校验器与合约测试**多处 lockstep**,而只有后两处会被 `swift test` 发现:
+- **本地闸由与 GitHub 共用的路径分类器选择编译车道**。统一入口始终执行 SDD、
+  catalog generator unittest 与零漂移三道门；随后按 `origin/main...HEAD + worktree`
+  的实际改动选择编译验证：`Packages/ArkDeckKit/**` 跑并行全量 Swift test；
+  `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`ArkDeck.xcodeproj/**` 跑 App/UI-test bundle
+  `build-for-testing`；Package 生产 source/manifest 同时跑两条；纯文档与设计稿不分配
+  Swift/Xcode 编译。可信 base、merge-base 或 diff 不可得时 fail closed 跑两条。
+  `--filter`/`--skip-build` 仍只用于开发反馈,不得替代被分类器选中的最终车道:
 
   ```bash
-  sh scripts/check-sdd.sh
-  .venv-sdd/bin/python -m unittest discover -s scripts/catalog_gen -p "test_*.py"
-  .venv-sdd/bin/python scripts/catalog_gen/generate.py --check
+  python3 scripts/ci/plan.py \
+    --repo-root . \
+    --base-revision origin/main \
+    --head-revision HEAD \
+    --merge-base \
+    --include-worktree \
+    --run-local
   ```
 
-  三条全绿后还必须执行本地并行全量 Swift 门(`--num-workers` 控制测试执行并发;
-  `--filter`/`--skip-build` 只用于开发反馈,不得替代本门):
-
-  ```bash
-  swift test --package-path Packages/ArkDeckKit --parallel --num-workers 8
-  ```
-
-  四条全绿再加上面的 preflight,才等价于 CI 的门。
+  该入口使用稳定的 worktree 外 SwiftPM cache；只改测试时不会重编未变化的生产
+  module，只改 App 时不会额外执行 ArkDeckKit 全量测试。分类器完成后再执行上面的
+  preflight,才等价于 CI 的门。改动触及 `Catalog/**`、`openspec/contracts/**` 或生成物
+  时仍须确认 schema、生成器词表/pin、Swift 校验器与合约测试多处 lockstep，分类器
+  不改变这三道通用门及 Swift 面全量回归的语义。
 - **产品工作不需要治理载体**:修复 Golden Journey 产品缺陷不要求 ready 任务包、不创建新
   OpenSpec change、不刷新旧任务状态。CI 的任务声明(`scripts/check_pr_paths.py`)仅是
   路径护栏:产品 PR 声明一个 base 上已存在、allowed paths 覆盖其改动的 active 任务
