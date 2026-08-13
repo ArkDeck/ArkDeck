@@ -41,7 +41,7 @@
     },
     {
       "pathTemplate": "ArkDeck-rockchip-component-sbom-<appVersion>.spdx.json",
-      "sha256": "1e231026acf767b5e96d00efda6e0e28a50933fa0ce6e9609b588054519fde4c",
+      "sha256": "2a842ed5cdd9ca29460a322dee3f2c5c4210ce45ab37f126f0c8216adf79c4d3",
       "size": 37076
     }
   ],
