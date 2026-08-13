@@ -3833,3 +3833,73 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
 - 当前 Catalog digest 的 DAYU200 真机 UI 路径只有完整 submit→execute→rebind→postflight
   才能记 `REAL_DEVICE_PASS`；设备 Offline、任何 identity/permission/driver/outcome 不确定时
   新 dispatch 为 0，并如实记录 blocker。
+
+## TASK-AIN-022 — 路径感知 CI 与稳定编译缓存
+
+- Status:in-progress（本 Task 是编译效率产品改动的 base-tree 路径前置；本段必须先由
+  维护者 review/merge 进入 protected `main`，后续实现 PR 才可声明 `TASK-AIN-022`。
+  实现 PR 不得再次修改本 Task 或借机扩张 Allowed paths）
+- Golden Journey:GJ-1—GJ-5 共用的产品交付反馈链；本 Task 只缩短安全改动的验证等待，
+  不以 CI 通过替代当前 Catalog digest 的真实设备验收，也不单独翻转任一 GJ 状态
+- Platform:macos、GitHub Actions
+- Root cause:现有 Swift merge gate 在 Agent 分支首推时缺少可信 `before`，会把纯文档改动
+  保守升级为全量 macOS 编译；SwiftPM cache 绑定临时 checkout，恢复后仍重编生产 module；
+  App/UI-test/project 改动又没有独立的编译车道。结果是无关改动浪费 macOS runner，而真正
+  影响 App composition root 的改动缺少对应 build gate
+- Depends on:protected `main` 上现有 SDD/catalog 三道通用门、
+  `Packages/ArkDeckKit/Scripts/run-swiftpm.sh` 稳定镜像机制与 Xcode 26.6 runner；
+  不依赖新 operation、provider、integration/device profile 或 destructive policy
+- Production reachability:local worktree 或 GitHub push → exact base/head diff → 共享路径分类器
+  → SDD/catalog 通用门 → 被影响的 ArkDeckKit full-test / ArkDeck App build-for-testing 车道
+  → 始终存在的稳定 required-check 聚合结果
+- Allowed paths:
+  - `.github/workflows/swift-ci.yml`
+  - `scripts/ci/**`
+  - `scripts/test_agent_pr_workflow.py`
+  - `scripts/README.md`
+  - `Packages/ArkDeckKit/Scripts/run-swiftpm.sh`
+  - `Packages/ArkDeckKit/Scripts/test_run_swiftpm.py`
+  - `AGENTS.md`
+  - `README.md`
+- Forbidden paths:
+  - `.github/workflows/**` 中除 `swift-ci.yml` 外的文件
+  - `Catalog/**`、`openspec/contracts/**`、`openspec/specs/**`、
+    `openspec/constitution.md`、`PRODUCT-LOOP.md`
+  - `Packages/ArkDeckKit/Sources/**`、`Packages/ArkDeckKit/Tests/**`、
+    `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`ArkDeck.xcodeproj/**`
+  - operation/provider/profile、Runtime admission/capability、device transport、raw command、
+    target/binding/trusted fact、destructive recovery 与真实硬件 evidence 语义
+- Risk:low（只改变 host 侧验证调度与 build cache；比较事实缺失或不可解析时必须 fail closed
+  选择全部编译车道，缓存 miss/restore/save 失败只能退化为冷构建，不得跳过被选中的门）
+- Hardware required:no
+- Decision-Grade:D0
+
+### Deliverables
+
+- 本地与 GitHub 使用同一个 stdlib 路径分类器；Agent 分支始终对当前 `origin/main` merge-base
+  计算累计 diff，正确覆盖全零首推 `before` 与后续只改文档的增量 push；main push 使用事件
+  的 exact `before`，任何 base/head/diff 不可信都选择 ArkDeckKit + App 两条车道。
+- 纯文档、设计稿和非编译治理文件不分配 macOS runner；仅 Package tests/fixtures 运行
+  ArkDeckKit full tests 而不重建 App；Package production source/manifest 同时运行 Swift 与
+  App 车道；App、UI tests 与 Xcode project 改动运行 `build-for-testing`。
+- SwiftPM 使用 worktree 外稳定镜像/cache，使测试改动复用未变化的生产 module；App 使用稳定
+  DerivedData/SourcePackages/PackageCache。Agent branch 只能恢复 protected-main cache，只有
+  protected `main` 成功后写入新 cache；cache 始终 best-effort、不得成为验证前置。
+- 保留始终上报的 `swift` required-check 聚合 job，不使用会让 required check 长期 pending 的
+  workflow-level `paths` 跳过；选中车道任一失败或 planner 失败时聚合门失败。
+- `scripts/ci/plan.py --include-worktree --run-local` 成为与 GitHub 同源的本地入口，始终执行
+  SDD、catalog generator unittest 与 zero-drift，再只运行被分类器选中的编译车道。
+
+### Verification
+
+- 分类器正负契约覆盖 docs-only、test-only、Package source/manifest、App/UI tests/project、
+  planner 自修改、全零首推、累计 Agent diff、main exact-before、rename、worktree 与所有
+  fail-closed 分支；撤销关键规则时对应测试打红。
+- workflow 封闭契约钉住 push-only 事件、Linux planner、稳定 cache root、main-only save、
+  Xcode 26.6、ArkDeckKit full tests、App `build-for-testing` 与 always-run 聚合门；禁止加入
+  workflow-level `paths`/`paths-ignore`。
+- 本地执行 SDD/catalog 三门、分类器与 workflow contract tests、SwiftPM wrapper tests、
+  ArkDeckKit 并行全量测试及无签名 App `build-for-testing`；分别记录冷/热 cache 构建时间，
+  但性能数字只作优化证据，不替代测试正确性。
+- 设备连接、HDC/RockUSB/Flash dispatch 与真实硬件 evidence 均为 0；CI 绿色只表示验证通过，
+  不构成维护者批准，也不产生 `REAL_DEVICE_PASS`。
