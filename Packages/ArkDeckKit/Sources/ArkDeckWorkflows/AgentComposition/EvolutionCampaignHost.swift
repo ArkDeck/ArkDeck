@@ -3,8 +3,8 @@
 
 import ArkDeckCore
 import ArkDeckHarness
-import ArkDeckWorkflows
 import ArkDeckStorage
+import ArkDeckWorkflows
 import CryptoKit
 import Darwin
 import Foundation
@@ -52,8 +52,6 @@ extension RockchipEvolutionFlashDispatching {
   package var attemptAdmitter: (any RockchipEvolutionCampaignAttemptAdmitting)? { nil }
 }
 
-
-
 /// E0 preview. It hashes the complete published archive, protected-main base,
 /// candidate toolchain, running broker and durable stable target. It creates a
 /// non-authoritative draft ledger only; no usage reservation or device process
@@ -87,8 +85,8 @@ package enum RockchipEvolutionCampaignPlanning {
     async let toolchain = ProductRockchipEvolutionCandidateBuilder.currentToolchainDigest()
     let broker = try ProductRockchipEvolutionCandidateBuilder.currentBrokerExecutableDigest()
     let now = Date()
-    let confirmedAt = ISO8601DateFormatter().string(from: now)
-    let validUntil = ISO8601DateFormatter().string(
+    let confirmedAt = ISO8601Timestamps.string(from: now)
+    let validUntil = ISO8601Timestamps.string(
       from: now.addingTimeInterval(TimeInterval(validitySeconds)))
     let assertion = try await RockchipEvolutionCampaignConfirmationAssertion.draft(
       baseCommitOID: base,
@@ -163,7 +161,7 @@ package final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       flash: flash,
       targetReadback: ProductRockchipEvolutionTargetReadback(),
       attemptIntents: attemptIntents,
-      nowUTC: { ISO8601DateFormatter().string(from: Date()) })
+      nowUTC: { ISO8601Timestamps.string(from: Date()) })
   }
 
   /// `targetReadback` and `attemptIntents` default to the two values that
@@ -677,7 +675,9 @@ package final class RockchipEvolutionCampaignHost: @unchecked Sendable {
       userdataImpact: strategy.userdataImpact)
   }
 
-  private static func requiredStartingMode(from failureCode: String) -> RockchipEvolutionStartingMode? {
+  private static func requiredStartingMode(from failureCode: String)
+    -> RockchipEvolutionStartingMode?
+  {
     let prefix = "flash.startingModeNotAllowed:"
     guard failureCode.hasPrefix(prefix) else { return nil }
     return RockchipEvolutionStartingMode(rawValue: String(failureCode.dropFirst(prefix.count)))

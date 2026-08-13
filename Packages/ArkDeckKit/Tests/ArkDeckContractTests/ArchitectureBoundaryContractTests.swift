@@ -95,7 +95,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// edge quietly returning in a later manifest edit.
   func testPackageManifestDependencyMatrix() throws {
     let manifest = try String(
-      contentsOf: packageRoot().appendingPathComponent("Package.swift"), encoding: .utf8)
+      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
     let targets = Self.parseTargets(manifest: manifest)
     XCTAssertFalse(targets.isEmpty, "no targets parsed from Package.swift")
     for (name, dependencies) in targets {
@@ -123,7 +123,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// imports the split removed.
   func testCompositionCarveOutsStayExcluded() throws {
     let manifest = try String(
-      contentsOf: packageRoot().appendingPathComponent("Package.swift"), encoding: .utf8)
+      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
     XCTAssertTrue(
       manifest.contains("exclude: [\"AgentComposition\"]"),
       "ArkDeckWorkflows must exclude AgentComposition/ (it is the ArkDeckAgentComposition target)")
@@ -286,7 +286,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   func testStorageAndArtifactStoreAreTaskIgnorant() throws {
     var files = try swiftFiles(under: "Sources/ArkDeckStorage", skippingSubdirectories: [])
     files.append(
-      packageRoot().appendingPathComponent("Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift"))
+      packageRoot().appending(path: "Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift")
+    )
     for file in files {
       let code = try codeWithoutComments(of: file)
       for token in ["import ArkDeckHarness", "HarnessTask", "HTASK-"] {
@@ -366,7 +367,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
   private func packageRoot() -> URL {
     // …/Tests/ArkDeckContractTests/ArchitectureBoundaryContractTests.swift -> package root
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -381,8 +382,9 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private func swiftFiles(
     under relativePath: String, skippingSubdirectories: [String]
   ) throws -> [URL] {
-    let root = packageRoot().appendingPathComponent(relativePath)
-    let skipped = Set(skippingSubdirectories.map { root.appendingPathComponent($0).standardizedFileURL.path })
+    let root = packageRoot().appending(path: relativePath)
+    let skipped = Set(
+      skippingSubdirectories.map { root.appending(path: $0).standardizedFileURL.path })
     guard
       let enumerator = FileManager.default.enumerator(
         at: root, includingPropertiesForKeys: nil)
@@ -393,7 +395,9 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     var files: [URL] = []
     for case let url as URL in enumerator {
       let standardized = url.standardizedFileURL
-      if skipped.contains(where: { standardized.path.hasPrefix($0 + "/") || standardized.path == $0 }) {
+      if skipped.contains(where: {
+        standardized.path.hasPrefix($0 + "/") || standardized.path == $0
+      }) {
         continue
       }
       if standardized.pathExtension == "swift" {
@@ -429,7 +433,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// back, which is what a future change would most plausibly reintroduce.
   func testTheCampaignLaneDoesNotSelectAProfileByArchiveDigest() throws {
     let admitter = packageRoot()
-      .appendingPathComponent("Sources/ArkDeckWorkflows/EvolutionCampaignEngineLaneAdmitter.swift")
+      .appending(path: "Sources/ArkDeckWorkflows/EvolutionCampaignEngineLaneAdmitter.swift")
     let code = try String(contentsOf: admitter, encoding: .utf8)
     XCTAssertFalse(
       code.contains("$0.archiveSHA256 == admission.plan.archiveSHA256"),
@@ -445,7 +449,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
   func testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion() throws {
     let engine = packageRoot()
-      .appendingPathComponent("Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
+      .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
     let code = try String(contentsOf: engine, encoding: .utf8)
     // Each construction runs to its closing paren before the next statement;
     // splitting on the constructor name is enough to isolate them.

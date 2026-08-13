@@ -208,7 +208,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
 
   func testApplicationSurfaceNamesOnlyClosedTypedWrites() throws {
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/DebugApplicationFacade.swift"),
@@ -246,7 +246,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
   }
 
   func testDebugAppsViewRunsTheTypedHAPPathInsteadOfADisabledPlaceholder() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),
@@ -337,7 +337,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
 
   func testPortForwardCompensationKeepsTheExactPairAcrossLaterHostFailures() throws {
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift"),

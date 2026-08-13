@@ -1,11 +1,11 @@
-import XCTest
 import CryptoKit
+import XCTest
 
 @testable import ArkDeckAgentClient
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore
-@testable import ArkDeckRuntime
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -60,8 +60,8 @@ final class AgentDaemonContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-daemon-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-daemon-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -159,13 +159,13 @@ final class AgentDaemonContractTests: XCTestCase {
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let providers = DeviceProviderRegistry(providers: [
       HDCObservationProviderAdapter(factsPort: FactsPort())
     ])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
@@ -179,8 +179,9 @@ final class AgentDaemonContractTests: XCTestCase {
       bootstrap: nil,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: artifactStore,
-      flashBundleImportDirectory: stateDirectory.appendingPathComponent(
-        "flash-bundle-imports-\(UUID().uuidString)", isDirectory: true),
+      flashBundleImportDirectory: stateDirectory.appending(
+        path:
+          "flash-bundle-imports-\(UUID().uuidString)", directoryHint: .isDirectory),
       flashBundleImportPolicy: flashBundleImportPolicy,
       flashPrerequisiteObserver: flashPrerequisiteObserver,
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
@@ -282,13 +283,14 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(newest["jobId"], .string(accepted[2].jobID))
     XCTAssertEqual(newest["timeline"], .null)
     XCTAssertEqual(
-      Set(current.compactMap { value -> String? in
-        guard case .object(let fields) = value,
-          case .string(let jobID)? = fields["jobId"]
-        else { return nil }
-        XCTAssertEqual(fields["timeline"], .null)
-        return jobID
-      }),
+      Set(
+        current.compactMap { value -> String? in
+          guard case .object(let fields) = value,
+            case .string(let jobID)? = fields["jobId"]
+          else { return nil }
+          XCTAssertEqual(fields["timeline"], .null)
+          return jobID
+        }),
       Set(accepted.prefix(2).map(\.jobID)))
     XCTAssertNotEqual(result["nextCursor"], .null)
 
@@ -409,12 +411,14 @@ final class AgentDaemonContractTests: XCTestCase {
       }
     }
     let targets = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "targets-prerequisites", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "targets-prerequisites", directoryHint: .isDirectory))
     let target = try targets.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:00:00Z").record
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let (handler, _) = try makeStack(
       targetStore: targets, flashPrerequisiteObserver: Observer())
 
@@ -504,7 +508,7 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testPlanPreviewRemainsReadOnlyAndCapabilityAdministrationIsNotAgentFacing() async throws {
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-29T00:00:00Z" })
     let artifact = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
@@ -674,16 +678,19 @@ final class AgentDaemonContractTests: XCTestCase {
   /// dropped, duplicated or reordered byte fails the commit.
   func testLargeFrameSurvivesManySmallSocketReads() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "targets-framing", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "targets-framing", directoryHint: .isDirectory))
     let target = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-30T00:00:00Z").record
+      nowUTC: "2026-07-30T00:00:00Z"
+    ).record
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-framing", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-framing", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
 
     var scratch = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
@@ -919,7 +926,7 @@ final class AgentDaemonContractTests: XCTestCase {
   /// frame terminator, not from read boundaries. The stand-in server writes in
   /// small pieces so the client is forced through many partial reads.
   func testLargeResponseIsReassembledAcrossManyReads() throws {
-    let socketURL = stateDirectory.appendingPathComponent("stub.sock")
+    let socketURL = stateDirectory.appending(path: "stub.sock")
     try FileManager.default.createDirectory(
       at: stateDirectory, withIntermediateDirectories: true)
     let payloadBytes = 4 * 1024 * 1024
@@ -1057,8 +1064,9 @@ final class AgentDaemonContractTests: XCTestCase {
   /// message is the contract.
   func testOverlongSocketPathFailsWithAnActionableMessage() throws {
     let (handler, _) = try makeStack()
-    let deep = stateDirectory.appendingPathComponent(
-      String(repeating: "d", count: 120), isDirectory: true)
+    let deep = stateDirectory.appending(
+      path:
+        String(repeating: "d", count: 120), directoryHint: .isDirectory)
     let server = AgentDaemonServer(
       stateDirectory: deep, handler: handler, nowUTC: { "2026-07-29T00:00:00Z" })
     do {
@@ -1069,7 +1077,7 @@ final class AgentDaemonContractTests: XCTestCase {
       XCTAssertTrue(message.contains("platform limit"), message)
       XCTAssertTrue(message.contains("--state-dir"), "the fix must be named: \(message)")
     }
-    let client = AgentClient(socketPath: deep.appendingPathComponent("agentd.sock").path)
+    let client = AgentClient(socketPath: deep.appending(path: "agentd.sock").path)
     do {
       _ = try client.request(method: "health")
       XCTFail("client must refuse an overlong socket path too")
@@ -1107,14 +1115,15 @@ final class AgentDaemonContractTests: XCTestCase {
   /// composition's. `testConfiguredHDCFlipsTheDescriptorBoundBlockers` covers
   /// the configured one.
   func testDaemonBinaryStaysAliveAndServesRequests() throws {
-    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
     }
     // Short path: sun_path is 104 bytes, and the default temp directory
     // plus a UUID already crowds it.
-    let shortState = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let shortState = URL(filePath: NSHomeDirectory())
+      .appending(
+        path: ".arkdeck-test-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: shortState) }
 
     let process = try launchProductionDaemon(binary: binary, stateDirectory: shortState)
@@ -1122,7 +1131,7 @@ final class AgentDaemonContractTests: XCTestCase {
       if process.isRunning { process.terminate() }
     }
 
-    let socketURL = shortState.appendingPathComponent("agentd.sock")
+    let socketURL = shortState.appending(path: "agentd.sock")
     XCTAssertTrue(
       FileManager.default.fileExists(atPath: socketURL.path), "daemon never created its socket")
 
@@ -1154,7 +1163,7 @@ final class AgentDaemonContractTests: XCTestCase {
       flash.reasons.contains { $0.contains("is not registered") },
       "the production daemon must register the rockchip provider: \(flash.reasons)")
 
-    let cliURL = productsDirectory.appendingPathComponent("arkdeck")
+    let cliURL = productsDirectory.appending(path: "arkdeck")
     XCTAssertTrue(
       FileManager.default.isExecutableFile(atPath: cliURL.path),
       "the production CLI must be built beside the daemon")
@@ -1203,15 +1212,16 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
   func testProductionDaemonAdvancesRuntimeTargetFromOwnerOnlyRockchipLineage() throws {
-    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
     }
-    let shortRoot = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(
-        ".arkdeck-lineage-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
-    let rockchipRoot = shortRoot.appendingPathComponent("ArkDeck", isDirectory: true)
-    let daemonState = rockchipRoot.appendingPathComponent("Agentd", isDirectory: true)
+    let shortRoot = URL(filePath: NSHomeDirectory())
+      .appending(
+        path:
+          ".arkdeck-lineage-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
+    let rockchipRoot = shortRoot.appending(path: "ArkDeck", directoryHint: .isDirectory)
+    let daemonState = rockchipRoot.appending(path: "Agentd", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: shortRoot) }
 
     let previousIdentity = String(repeating: "a", count: 64)
@@ -1220,12 +1230,13 @@ final class AgentDaemonContractTests: XCTestCase {
       String(format: "%02x", $0)
     }.joined()
     let targets = try RuntimeTargetStore(
-      directoryURL: daemonState.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: daemonState.appending(path: "targets", directoryHint: .isDirectory))
     let adopted = try targets.adopt(
       stableIdentitySHA256: previousIdentity,
       connectKey: "normal-mode-connect-key",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-08-03T00:00:00Z").record
+      nowUTC: "2026-08-03T00:00:00Z"
+    ).record
     _ = try RockchipProductBindingStore(rootURL: rockchipRoot).install(
       RockchipProductBindingSnapshot(
         revision: 2,
@@ -1243,7 +1254,7 @@ final class AgentDaemonContractTests: XCTestCase {
     defer {
       if process.isRunning { process.terminate() }
     }
-    let socketURL = daemonState.appendingPathComponent("agentd.sock")
+    let socketURL = daemonState.appending(path: "agentd.sock")
     let client = AgentClient(socketPath: socketURL.path)
     guard case .object(let health) = try client.request(method: "health") else {
       return XCTFail("the reconciled production daemon must answer health")
@@ -1252,7 +1263,7 @@ final class AgentDaemonContractTests: XCTestCase {
 
     let reconciled = try XCTUnwrap(
       RuntimeTargetStore(
-        directoryURL: daemonState.appendingPathComponent("targets", isDirectory: true)
+        directoryURL: daemonState.appending(path: "targets", directoryHint: .isDirectory)
       ).find(targetID: adopted.targetID))
     XCTAssertEqual(reconciled.targetID, adopted.targetID)
     XCTAssertEqual(reconciled.connectKey, adopted.connectKey)
@@ -1266,18 +1277,19 @@ final class AgentDaemonContractTests: XCTestCase {
   /// refusing for some unrelated reason. Same binary, one declared
   /// environment difference.
   func testConfiguredHDCFlipsTheDescriptorBoundBlockers() throws {
-    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
     }
-    let shortState = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    let shortState = URL(filePath: NSHomeDirectory())
+      .appending(
+        path: ".arkdeck-test-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: shortState) }
     // The production composition now establishes a real foreground server
     // before opening UDS. Use the executable fixture so startup exercises the
     // exact descriptor-bound `-s 127.0.0.1:8710 -m` plus typed checkserver
     // readiness path instead of relying on a path-presence placeholder.
-    let hdcFixture = productsDirectory.appendingPathComponent("ArkDeckFakeHDCFixture")
+    let hdcFixture = productsDirectory.appending(path: "ArkDeckFakeHDCFixture")
     guard FileManager.default.isExecutableFile(atPath: hdcFixture.path) else {
       throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
     }
@@ -1287,7 +1299,7 @@ final class AgentDaemonContractTests: XCTestCase {
     defer {
       if process.isRunning { process.terminate() }
     }
-    let socketURL = shortState.appendingPathComponent("agentd.sock")
+    let socketURL = shortState.appending(path: "agentd.sock")
     XCTAssertTrue(
       FileManager.default.fileExists(atPath: socketURL.path), "daemon never created its socket")
     let operations = try listOperations(socketPath: socketURL.path)
@@ -1326,21 +1338,23 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
   func testWaterFlowProductionProfilePublishesTheClosedWorkspaceOperations() throws {
-    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
     }
-    let shortState = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
-    let project = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".arkdeck-waterflow-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
-    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    let shortState = URL(filePath: NSHomeDirectory())
+      .appending(
+        path: ".arkdeck-test-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
+    let project = URL(filePath: NSHomeDirectory())
+      .appending(
+        path: ".arkdeck-waterflow-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
+    let module = project.appending(path: "entry/src/main", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
-    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
-    let hvigor = project.appendingPathComponent("hvigorw.js")
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appending(path: "module.json5"))
+    let hvigor = project.appending(path: "hvigorw.js")
     try Data("// fixture".utf8).write(to: hvigor)
-    let sdk = project.appendingPathComponent("sdk/default/openharmony", isDirectory: true)
+    let sdk = project.appending(path: "sdk/default/openharmony", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: sdk, withIntermediateDirectories: true)
     defer {
       try? FileManager.default.removeItem(at: shortState)
@@ -1354,10 +1368,10 @@ final class AgentDaemonContractTests: XCTestCase {
         "ARKDECK_WORKSPACE_ACTIVE_PROJECT": "demo-app",
         "ARKDECK_DEVECO_NODE_PATH": "/usr/bin/true",
         "ARKDECK_DEVECO_HVIGOR_PATH": hvigor.path,
-        "ARKDECK_DEVECO_SDK_HOME": project.appendingPathComponent("sdk").path,
+        "ARKDECK_DEVECO_SDK_HOME": project.appending(path: "sdk").path,
       ])
     defer { if process.isRunning { process.terminate() } }
-    let socketURL = shortState.appendingPathComponent("agentd.sock")
+    let socketURL = shortState.appending(path: "agentd.sock")
     XCTAssertTrue(FileManager.default.fileExists(atPath: socketURL.path))
     let operations = try listOperations(socketPath: socketURL.path)
     for reference in [
@@ -1372,20 +1386,22 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
   func testWaterFlowProductionProfileFailsClosedWhenItsSDKIsAbsent() throws {
-    let binary = productsDirectory.appendingPathComponent("arkdeck-agentd")
+    let binary = productsDirectory.appending(path: "arkdeck-agentd")
     guard FileManager.default.fileExists(atPath: binary.path) else {
       throw XCTSkip("arkdeck-agentd binary not built")
     }
-    let shortState = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(".arkdeck-test-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
-    let project = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(
-        ".arkdeck-waterflow-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
-    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    let shortState = URL(filePath: NSHomeDirectory())
+      .appending(
+        path: ".arkdeck-test-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
+    let project = URL(filePath: NSHomeDirectory())
+      .appending(
+        path:
+          ".arkdeck-waterflow-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
+    let module = project.appending(path: "entry/src/main", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
-    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
-    let hvigor = project.appendingPathComponent("hvigorw.js")
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appending(path: "module.json5"))
+    let hvigor = project.appending(path: "hvigorw.js")
     try Data("// fixture".utf8).write(to: hvigor)
     defer {
       try? FileManager.default.removeItem(at: shortState)
@@ -1399,11 +1415,11 @@ final class AgentDaemonContractTests: XCTestCase {
         "ARKDECK_WORKSPACE_ACTIVE_PROJECT": "demo-app",
         "ARKDECK_DEVECO_NODE_PATH": "/usr/bin/true",
         "ARKDECK_DEVECO_HVIGOR_PATH": hvigor.path,
-        "ARKDECK_DEVECO_SDK_HOME": project.appendingPathComponent("missing-sdk").path,
+        "ARKDECK_DEVECO_SDK_HOME": project.appending(path: "missing-sdk").path,
       ])
     defer { if process.isRunning { process.terminate() } }
     let operations = try listOperations(
-      socketPath: shortState.appendingPathComponent("agentd.sock").path)
+      socketPath: shortState.appending(path: "agentd.sock").path)
     let build = try XCTUnwrap(operations["workspace.build-openharmony@1"])
 
     XCTAssertEqual(build.availability, "unavailable")
@@ -1471,8 +1487,9 @@ final class AgentDaemonContractTests: XCTestCase {
     var environment = ProcessInfo.processInfo.environment.filter {
       !$0.key.hasPrefix("ARKDECK_")
     }
-    let processHome = stateDirectory
-      .appendingPathComponent("process-home", isDirectory: true)
+    let processHome =
+      stateDirectory
+      .appending(path: "process-home", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: processHome, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -1486,7 +1503,7 @@ final class AgentDaemonContractTests: XCTestCase {
     process.standardError = output
     try process.run()
 
-    let socketURL = stateDirectory.appendingPathComponent("agentd.sock")
+    let socketURL = stateDirectory.appending(path: "agentd.sock")
     let deadline = Date().addingTimeInterval(20)
     while !FileManager.default.fileExists(atPath: socketURL.path) {
       guard Date() < deadline, process.isRunning else { break }
@@ -1580,7 +1597,7 @@ final class AgentDaemonContractTests: XCTestCase {
       self.server = nil
     }
     try RuntimeJobSQLiteTestSupport.replaceInitialRecord(
-      stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true),
+      stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory),
       jobID: jobID, data: Data("not-json".utf8))
 
     let (freshHandler, _) = try makeStack()
@@ -1612,7 +1629,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testGracefulDrainCompletesInFlightJobBeforeReleasingTheDaemonLock() async throws {
     let dispatcher = GatedDispatcher()
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-29T00:00:00Z" })
     let (handler, _) = try makeStack(
       artifactStore: artifactStore, dispatcher: dispatcher)
@@ -1681,8 +1698,9 @@ final class AgentDaemonContractTests: XCTestCase {
     // The accepted request must drain through the durable state layers before
     // the daemon releases its lock: its journal is replayable and its
     // published evidence remains addressable after the client socket closes.
-    let journalURL = stateDirectory
-      .appendingPathComponent("engine/jobs/\(jobID)/journal.jsonl")
+    let journalURL =
+      stateDirectory
+      .appending(path: "engine/jobs/\(jobID)/journal.jsonl")
     let journal = try DurableJournalRecovery.inspect(url: journalURL)
     XCTAssertFalse(journal.hasTornTail)
     XCTAssertTrue(journal.outstandingIntents.isEmpty)
@@ -1730,13 +1748,14 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testChunkedHAPImportPublishesATargetBoundIDOnlyLease() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let stableIdentity = String(repeating: "a", count: 64)
     let target = try targetStore.adopt(
       stableIdentitySHA256: stableIdentity,
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-29T00:00:00Z").record
+      nowUTC: "2026-07-29T00:00:00Z"
+    ).record
     let aliasConnectKey = "150100424a544e4600-post-flash"
     let aliasIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
       connectKey: aliasConnectKey)
@@ -1744,7 +1763,8 @@ final class AgentDaemonContractTests: XCTestCase {
       stableIdentitySHA256: aliasIdentity,
       connectKey: aliasConnectKey,
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-29T00:01:00Z").record
+      nowUTC: "2026-07-29T00:01:00Z"
+    ).record
     _ = try targetStore.appendAliasResolution(
       RuntimeTargetAliasResolutionDraft(
         aliasTargetID: alias.targetID,
@@ -1764,7 +1784,7 @@ final class AgentDaemonContractTests: XCTestCase {
         coveredUnknownIntents: [],
         establishedAtUTC: "2026-07-29T00:02:00Z"))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-29T00:00:00Z" })
     let (handler, _) = try makeStack(
       targetStore: targetStore, artifactStore: artifactStore)
@@ -1868,14 +1888,15 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testHAPImportRejectsUnknownTargetAndInvalidContainerWithoutPublication() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let target = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "b", count: 64),
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-29T00:00:00Z").record
+      nowUTC: "2026-07-29T00:00:00Z"
+    ).record
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-29T00:00:00Z" })
     let (handler, _) = try makeStack(
       targetStore: targetStore, artifactStore: artifactStore)
@@ -1930,7 +1951,8 @@ final class AgentDaemonContractTests: XCTestCase {
       "input-hap-\(target.targetID)-r\(target.bindingRevision)-"
       + String(
         HDCObservationProviderAdapter.stableIdentitySHA256(
-          connectKey: target.connectKey).prefix(16)) + "-"
+          connectKey: target.connectKey
+        ).prefix(16)) + "-"
       + String(digest.prefix(16))
     let artifacts = try await artifactStore.list(jobID: expectedJob)
     XCTAssertTrue(artifacts.isEmpty)
@@ -1970,24 +1992,27 @@ final class AgentDaemonContractTests: XCTestCase {
     // images archive is refused by the candidate's own validation.
     try FileManager.default.createDirectory(
       at: stateDirectory, withIntermediateDirectories: true)
-    let notAnArchive = stateDirectory.appendingPathComponent("not-an-archive.tar.gz")
+    let notAnArchive = stateDirectory.appending(path: "not-an-archive.tar.gz")
     try Data(repeating: 0x41, count: 4_096).write(to: notAnArchive)
     XCTAssertThrowsError(try candidates[0].validate(notAnArchive))
   }
 
   func testChunkedFlashBundleImportAcceptsDailyFilenameAndPublishesCanonicalLease() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "targets-flash", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "targets-flash", directoryHint: .isDirectory))
     let stableIdentity = String(repeating: "e", count: 64)
     let target = try targetStore.adopt(
       stableIdentitySHA256: stableIdentity,
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-30T00:00:00Z").record
+      nowUTC: "2026-07-30T00:00:00Z"
+    ).record
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-flash", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-flash", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let bytes = Data("fixture-flash-bundle".utf8)
     let digest =
@@ -2091,8 +2116,9 @@ final class AgentDaemonContractTests: XCTestCase {
     async throws
   {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "targets-flash-negative", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "targets-flash-negative", directoryHint: .isDirectory))
     let target = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "f", count: 64),
       connectKey: "150100424a544e4600",
@@ -2100,8 +2126,9 @@ final class AgentDaemonContractTests: XCTestCase {
       nowUTC: "2026-07-30T00:00:00Z"
     ).record
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-flash-negative", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-flash-negative", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let (handler, _) = try makeStack(
       targetStore: targetStore, artifactStore: artifactStore)
@@ -2157,14 +2184,16 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testNativeLibraryImportValidatesELFAndPublishesBoundLease() async throws {
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent(
-        "targets-native", isDirectory: true))
+      directoryURL: stateDirectory.appending(
+        path:
+          "targets-native", directoryHint: .isDirectory))
     let stableIdentity = String(repeating: "d", count: 64)
     let target = try targetStore.adopt(
       stableIdentitySHA256: stableIdentity,
       connectKey: "150100424a544e4600",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-30T00:00:00Z").record
+      nowUTC: "2026-07-30T00:00:00Z"
+    ).record
     let aliasConnectKey = "150100424a544e4600-post-flash-native"
     let aliasIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
       connectKey: aliasConnectKey)
@@ -2172,7 +2201,8 @@ final class AgentDaemonContractTests: XCTestCase {
       stableIdentitySHA256: aliasIdentity,
       connectKey: aliasConnectKey,
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-30T00:01:00Z").record
+      nowUTC: "2026-07-30T00:01:00Z"
+    ).record
     _ = try targetStore.appendAliasResolution(
       RuntimeTargetAliasResolutionDraft(
         aliasTargetID: alias.targetID,
@@ -2192,8 +2222,9 @@ final class AgentDaemonContractTests: XCTestCase {
         coveredUnknownIntents: [],
         establishedAtUTC: "2026-07-30T00:02:00Z"))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent(
-        "artifacts-native", isDirectory: true),
+      rootURL: stateDirectory.appending(
+        path:
+          "artifacts-native", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let (handler, _) = try makeStack(
       targetStore: targetStore, artifactStore: artifactStore)
@@ -2295,7 +2326,6 @@ final class AgentDaemonContractTests: XCTestCase {
       XCTAssertEqual(response.error?.code, "unknownMethod", method)
     }
   }
-
 
 }
 

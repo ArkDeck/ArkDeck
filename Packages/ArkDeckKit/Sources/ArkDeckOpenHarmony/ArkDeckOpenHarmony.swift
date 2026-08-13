@@ -673,7 +673,7 @@ struct SystemHDCManagedServerProcessInspector: HDCManagedServerProcessInspecting
     guard let terminator = buffer.firstIndex(of: 0) else { return nil }
     let path = String(
       decoding: buffer[..<terminator].map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    return URL(fileURLWithPath: path).resolvingSymlinksInPath()
+    return URL(filePath: path).resolvingSymlinksInPath()
       .standardizedFileURL
   }
 
@@ -1569,9 +1569,9 @@ public actor HDCServerSupervisor: HDCServerLifecycleDispatchLeaseValidating {
     // external ownership; any missing evidence keeps the endpoint unknown.
     let ownership =
       basis.preExistingServerReceipt
-      && basis.zeroAutomaticLifecycleDispatch
-      && basis.generationMintedFromObservation
-      && basis.noActiveOrUnreconciledManagedProvenance
+        && basis.zeroAutomaticLifecycleDispatch
+        && basis.generationMintedFromObservation
+        && basis.noActiveOrUnreconciledManagedProvenance
       ? HDCServerOwnership.external : HDCServerOwnership.unknown
     let next = HDCServerState(
       endpoint: endpoint, health: health, version: version,
@@ -2329,7 +2329,8 @@ actor HDCDeviceObservationFanOut {
     if presentationBuffer.count > capacity {
       presentationBuffer.removeFirst(presentationBuffer.count - capacity)
     }
-    for consumerID in consumerQueues.keys where (consumerQueues[consumerID]?.count ?? 0) > capacity {
+    for consumerID in consumerQueues.keys where (consumerQueues[consumerID]?.count ?? 0) > capacity
+    {
       let overflow = (consumerQueues[consumerID]?.count ?? 0) - capacity
       consumerQueues[consumerID]?.removeFirst(overflow)
     }

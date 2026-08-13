@@ -33,8 +33,8 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
   private let sourceRoot: URL
   private let stateRoot: URL
   private let executor: FoundationProcessExecutor
-  private let gitURL = URL(fileURLWithPath: "/usr/bin/git")
-  private let sandboxURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+  private let gitURL = URL(filePath: "/usr/bin/git")
+  private let sandboxURL = URL(filePath: "/usr/bin/sandbox-exec")
 
   public convenience init(stateRoot: URL) throws {
     try self.init(sourceRoot: Self.configuredSourceRoot(), stateRoot: stateRoot)
@@ -52,10 +52,10 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
     if let configured = environment["ARKDECK_EVOLUTION_SOURCE_ROOT"],
       configured.hasPrefix("/")
     {
-      return URL(fileURLWithPath: configured, isDirectory: true)
+      return URL(filePath: configured, directoryHint: .isDirectory)
     }
     return URL(
-      fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+      filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)
   }
 
   package init(
@@ -88,7 +88,8 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
     let topLevel = try await runText(
       executable: gitURL, sha256: gitSHA,
       arguments: ["rev-parse", "--show-toplevel"], timeout: 15)
-    guard URL(fileURLWithPath: topLevel, isDirectory: true).standardizedFileURL == sourceRoot else {
+    guard URL(filePath: topLevel, directoryHint: .isDirectory).standardizedFileURL == sourceRoot
+    else {
       // The candidate diff below uses `-- .`, so a source root below the top
       // level would silently scope the diff to a subtree and miss changes the
       // budget is supposed to bound. The requirement stays; only the operator's
@@ -187,7 +188,7 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
       at: scratch, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     let build = try await run(
-      executable: URL(fileURLWithPath: swiftBuild.executable.path),
+      executable: URL(filePath: swiftBuild.executable.path),
       sha256: swiftBuild.executable.sha256, argumentZero: swiftBuild.argumentZero,
       arguments: swiftBuild.fixedArguments + [
         "--scratch-path", scratch.path, "--product",
@@ -197,12 +198,12 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
       !build.stderr.wasTruncated
     else { throw RockchipEvolutionCampaignError.candidateRejected("buildFailed") }
     let binPath = try await runText(
-      executable: URL(fileURLWithPath: swiftBuild.executable.path),
+      executable: URL(filePath: swiftBuild.executable.path),
       sha256: swiftBuild.executable.sha256, argumentZero: swiftBuild.argumentZero,
       arguments: swiftBuild.fixedArguments + [
         "--scratch-path", scratch.path, "--show-bin-path",
       ], timeout: 120)
-    let candidateURL = URL(fileURLWithPath: binPath, isDirectory: true)
+    let candidateURL = URL(filePath: binPath, directoryHint: .isDirectory)
       .appending(path: RockchipEvolutionCampaignConfirmationAssertion.candidateBuildTarget)
       .standardizedFileURL
     let executableDigest = try Self.executableSHA256(candidateURL)
@@ -284,7 +285,7 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
 
   package static func currentProtectedMainBaseCommitOID() async throws -> String {
     let root = configuredSourceRoot().standardizedFileURL
-    let git = URL(fileURLWithPath: "/usr/bin/git")
+    let git = URL(filePath: "/usr/bin/git")
     let result = try await FoundationProcessExecutor().executeIdentityBound(
       ProcessIdentityBoundRequest(
         process: ProcessRequest(
@@ -315,11 +316,11 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
     }
     let executableURL: URL
     if executable.hasPrefix("/") {
-      executableURL = URL(fileURLWithPath: executable)
+      executableURL = URL(filePath: executable)
     } else {
       executableURL = URL(
-        fileURLWithPath: FileManager.default.currentDirectoryPath,
-        isDirectory: true
+        filePath: FileManager.default.currentDirectoryPath,
+        directoryHint: .isDirectory
       ).appending(path: executable)
     }
     return try executableSHA256(
@@ -334,7 +335,7 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
     let result = try await executor.executeIdentityBound(
       ProcessIdentityBoundRequest(
         process: ProcessRequest(
-          executable: URL(fileURLWithPath: swiftBuild.executable.path),
+          executable: URL(filePath: swiftBuild.executable.path),
           argumentZero: swiftBuild.argumentZero, arguments: ["--version"],
           environment: ["NO_COLOR": "1"], workingDirectory: sourceRoot, timeout: 30),
         expectedSHA256: swiftBuild.executable.sha256), captureLimit: 64 * 1_024)
@@ -362,7 +363,7 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
     sourceRoot: URL
   ) async throws -> WorkspaceCommandPreset {
     do {
-      let xcodeSelect = URL(fileURLWithPath: "/usr/bin/xcode-select")
+      let xcodeSelect = URL(filePath: "/usr/bin/xcode-select")
       let selected = try await executor.executeIdentityBound(
         ProcessIdentityBoundRequest(
           process: ProcessRequest(
@@ -377,11 +378,12 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
       else {
         throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
       }
-      let developerRoot = URL(fileURLWithPath: selectedPath, isDirectory: true)
+      let developerRoot = URL(filePath: selectedPath, directoryHint: .isDirectory)
         .resolvingSymlinksInPath().standardizedFileURL
       var isDirectory: ObjCBool = false
-      guard FileManager.default.fileExists(
-        atPath: developerRoot.path, isDirectory: &isDirectory), isDirectory.boolValue
+      guard
+        FileManager.default.fileExists(
+          atPath: developerRoot.path, isDirectory: &isDirectory), isDirectory.boolValue
       else {
         throw RockchipEvolutionCampaignError.candidateRejected("toolchainUnavailable")
       }
@@ -577,7 +579,7 @@ package final class ProductRockchipEvolutionCandidateBuilder: @unchecked Sendabl
   }
 
   private static func timestamp() -> String {
-    ISO8601DateFormatter().string(from: Date())
+    ISO8601Timestamps.string(from: Date())
   }
 }
 

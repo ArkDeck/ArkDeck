@@ -2,8 +2,8 @@
 
 import ArkDeckCore
 import ArkDeckHarness
-import ArkDeckWorkflows
 import ArkDeckStorage
+import ArkDeckWorkflows
 import CryptoKit
 import Foundation
 
@@ -72,7 +72,7 @@ package struct WorkspaceHarnessRepairPort: HarnessRepairPort {
       requestGlobs: requested)
     var files: [HarnessContextSourceFile] = []
     for path in paths.sorted().prefix(maximumFiles) {
-      guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+      guard let data = try? Data(contentsOf: URL(filePath: path)),
         let text = String(data: data, encoding: .utf8)
       else { continue }
       let truncated = text.count > maximumCharactersPerFile
@@ -258,8 +258,9 @@ package struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     // patching before the product bytes are opened.
     _ = try WorkspaceProviderSupport.snapshots(
       relativePaths: [relativeProduct], root: profile.projectRoot)
-    let productURL = URL(fileURLWithPath: profile.projectRoot).appendingPathComponent(
-      relativeProduct)
+    let productURL = URL(filePath: profile.projectRoot).appending(
+      path:
+        relativeProduct)
     guard FileManager.default.fileExists(atPath: productURL.path) else {
       throw HarnessRepairPortError.missingBuildProduct(relativeProduct)
     }
@@ -331,12 +332,13 @@ package struct WorkspaceHarnessRepairPort: HarnessRepairPort {
     }
 
     let inventory = try await artifacts.list(jobID: jobID)
-    guard let signed = inventory.first(where: {
-      $0.name == "signed.hap" && $0.status.isPublished
-        && $0.sourceOperation == "workspace.sign-openharmony-hap@1"
-        && $0.providerID == "workspace"
-        && $0.mediaType == "application/vnd.openharmony.hap"
-    }),
+    guard
+      let signed = inventory.first(where: {
+        $0.name == "signed.hap" && $0.status.isPublished
+          && $0.sourceOperation == "workspace.sign-openharmony-hap@1"
+          && $0.providerID == "workspace"
+          && $0.mediaType == "application/vnd.openharmony.hap"
+      }),
       inventory.contains(where: {
         $0.name == "signing-report.json" && $0.status.isPublished
           && $0.sourceOperation == "workspace.sign-openharmony-hap@1"

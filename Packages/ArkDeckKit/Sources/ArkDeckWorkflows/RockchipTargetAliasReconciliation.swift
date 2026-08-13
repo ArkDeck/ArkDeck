@@ -92,7 +92,7 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
     let establishingFlashDirectory = jobDirectory(route.jobID)
     let establishingFlash = try RuntimeJobRecord.load(from: establishingFlashDirectory)
     let replay = try DurableJournalRecovery.inspect(
-      url: establishingFlashDirectory.appendingPathComponent("journal.jsonl"))
+      url: establishingFlashDirectory.appending(path: "journal.jsonl"))
     guard establishingFlash.jobID == route.jobID,
       RuntimeJobEngine.isDayu200Flash(establishingFlash),
       establishingFlash.providerID == "rockchip",
@@ -143,8 +143,9 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
       throw BootstrapError.storeFailure(
         "post-flash HDC alias establishing Flash lacks write/readback/postflight proof")
     }
-    guard let establishingFlashStarted = Self.date(
-      establishingFlash.startedAtUTC ?? establishingFlash.createdAtUTC),
+    guard
+      let establishingFlashStarted = Self.date(
+        establishingFlash.startedAtUTC ?? establishingFlash.createdAtUTC),
       let aliasAdopted = Self.date(alias.adoptedAtUTC),
       aliasAdopted < establishingFlashStarted
     else {
@@ -175,7 +176,7 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
     alias: RuntimeTargetRecord,
     before recoveryStarted: Date
   ) throws -> [RuntimeTargetAliasCoveredIntent] {
-    let jobsRoot = stateDirectory.appendingPathComponent("jobs", isDirectory: true)
+    let jobsRoot = stateDirectory.appending(path: "jobs", directoryHint: .isDirectory)
     let directories = try FileManager.default.contentsOfDirectory(
       at: jobsRoot, includingPropertiesForKeys: [.isDirectoryKey],
       options: [.skipsHiddenFiles])
@@ -197,18 +198,19 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
         record.materializedBindingRevision == alias.bindingRevision
       else { continue }
       let replay = try DurableJournalRecovery.inspect(
-        url: directory.appendingPathComponent("journal.jsonl"))
+        url: directory.appending(path: "journal.jsonl"))
       guard !replay.hasTornTail else {
         throw BootstrapError.storeFailure("target alias history has a torn journal")
       }
-      let intents = replay.outstandingIntents.map {
-        ($0.eventID, $0.eventID, $0.stepID, $0.effect)
-      } + replay.unknownOutcomes.map {
-        ($0.correlatedIntentEventID, $0.eventID, $0.stepID, $0.effect)
-      }
+      let intents =
+        replay.outstandingIntents.map {
+          ($0.eventID, $0.eventID, $0.stepID, $0.effect)
+        }
+        + replay.unknownOutcomes.map {
+          ($0.correlatedIntentEventID, $0.eventID, $0.stepID, $0.effect)
+        }
       for (intentEventID, uncertaintyEventID, stepID, effect) in intents
-      where effect >= .deviceMutation
-      {
+      where effect >= .deviceMutation {
         guard RuntimeJobEngine.isDayu200Flash(record),
           stepID == "enter-loader-mode",
           effect == .deviceMutation,
@@ -236,8 +238,8 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
   }
 
   private func jobDirectory(_ jobID: String) -> URL {
-    stateDirectory.appendingPathComponent("jobs", isDirectory: true)
-      .appendingPathComponent(jobID, isDirectory: true)
+    stateDirectory.appending(path: "jobs", directoryHint: .isDirectory)
+      .appending(path: jobID, directoryHint: .isDirectory)
   }
 
   private static func confirmedStepIDs(_ replay: JournalReplay) -> [String] {
@@ -298,13 +300,14 @@ package struct ProductRockchipTargetAliasReconciler: Sendable {
   }
 
   private static func date(_ text: String) -> Date? {
-    ISO8601DateFormatter().date(from: text)
+    ISO8601Timestamps.parse(text)
   }
 
   private static func isSHA256(_ value: String) -> Bool {
-    value.count == 64 && value.allSatisfy {
-      ("0"..."9").contains($0) || ("a"..."f").contains($0)
-    }
+    value.count == 64
+      && value.allSatisfy {
+        ("0"..."9").contains($0) || ("a"..."f").contains($0)
+      }
   }
 
   private static func isJobID(_ value: String) -> Bool {

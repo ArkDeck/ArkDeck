@@ -121,8 +121,9 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
   // MARK: - Facts honesty (ungated)
 
   func testTargetFactsPortReportsUnknownInsteadOfFabricating() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-facts-honesty-\(UUID().uuidString.lowercased())", isDirectory: true)
+    let root = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-facts-honesty-\(UUID().uuidString.lowercased())", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let store = try RuntimeTargetStore(directoryURL: root)
@@ -146,18 +147,19 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
     else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
-    let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+    let archiveURL = URL(filePath: archivePath).standardizedFileURL
     let profile = RockchipFlashProfile.dayu200
 
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-campaign-wire-\(UUID().uuidString.lowercased())", isDirectory: true)
+    let root = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-campaign-wire-\(UUID().uuidString.lowercased())", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: root, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     defer { try? FileManager.default.removeItem(at: root) }
 
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: root.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { Self.fixedNow })
     let artifact = try await artifactStore.publishFile(
       RuntimeArtifactFilePublicationRequest(
@@ -176,7 +178,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
       jobID: artifact.jobID, artifactID: artifact.artifactID)
 
     let usageLedger = try AgentAuthorityUsageLedger(
-      root: root.appendingPathComponent("usage", isDirectory: true))
+      root: root.appending(path: "usage", directoryHint: .isDirectory))
     let authorityRef = AgentExecutionAuthorityReference.evolutionCampaignConfirmation(
       campaignDigestSHA256: String(repeating: "f", count: 64),
       baseCommitOID: String(repeating: "a", count: 40),
@@ -215,13 +217,13 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(factsPort: FactsPort(), availability: .available)
       ]),
       dispatcher: RecordingRefusingDispatcher(log: dispatchLog),
       capabilityStore: try RuntimeCapabilityStore(
-        directoryURL: root.appendingPathComponent("capabilities", isDirectory: true)),
+        directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory)),
       artifactStore: artifactStore,
       agentUsageLedger: usageLedger,
       nowUTC: { Self.fixedNow })

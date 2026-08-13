@@ -107,8 +107,8 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
 
   private func temporaryRoot() -> URL {
     FileManager.default.temporaryDirectory
-      .appendingPathComponent("runtime-debug-invocation-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "runtime-debug-invocation-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   func testNovelCandidateRevisionContinuesWithoutARepairKindOrMergeBoundary() async throws {

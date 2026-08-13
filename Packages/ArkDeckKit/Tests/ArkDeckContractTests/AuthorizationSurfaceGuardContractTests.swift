@@ -12,14 +12,16 @@ import XCTest
 /// subcommand may regain an in-process execution stack.
 final class AuthorizationSurfaceGuardContractTests: XCTestCase {
   func testCallerFacingSurfacesCannotInjectFactsOrObtainCommands() throws {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let workflowSource = try String(
-      contentsOf: packageRoot.appendingPathComponent(
-        "Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift"), encoding: .utf8)
+      contentsOf: packageRoot.appending(
+        path:
+          "Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift"), encoding: .utf8)
     let cliSource = try String(
-      contentsOf: packageRoot.appendingPathComponent(
-        "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"), encoding: .utf8)
+      contentsOf: packageRoot.appending(
+        path:
+          "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"), encoding: .utf8)
 
     for forbidden in [
       "RockchipStanding" + "AuthorizationContext", "RockchipUnattended" + "ExecutionIntent",
@@ -34,7 +36,8 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
     let runFlashStart = try XCTUnwrap(
       cliSource.range(of: "static func runFlash(_ arguments: [String]) async throws"))
     let reconcileStart = try XCTUnwrap(
-      cliSource.range(of: "// MARK: reconcile", range: runFlashStart.upperBound..<cliSource.endIndex))
+      cliSource.range(
+        of: "// MARK: reconcile", range: runFlashStart.upperBound..<cliSource.endIndex))
     let activeFlashSurface = cliSource[runFlashStart.lowerBound..<reconcileStart.lowerBound]
     XCTAssertFalse(activeFlashSurface.contains("--authorization-id"))
     XCTAssertTrue(activeFlashSurface.contains("historical campaign preview is retired"))
@@ -50,8 +53,9 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
     XCTAssertFalse(cliSource.contains("RockchipFlashExecutionHost"))
 
     let factsSource = try String(
-      contentsOf: packageRoot.appendingPathComponent(
-        "Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift"), encoding: .utf8)
+      contentsOf: packageRoot.appending(
+        path:
+          "Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift"), encoding: .utf8)
     XCTAssertTrue(factsSource.contains("attempt.observations.count == 1"))
     XCTAssertTrue(
       factsSource.contains("plan: plan, executableIdentity: toolDevice.executableIdentity"))

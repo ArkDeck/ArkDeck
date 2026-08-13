@@ -23,14 +23,14 @@ final class WorkspaceRevisionBindingContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-workspace-revision", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
-    state = root.appendingPathComponent("state", isDirectory: true)
+      .appending(path: "arkdeck-workspace-revision", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
+    state = root.appending(path: "state", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: root.appendingPathComponent("Sources", isDirectory: true),
+      at: root.appending(path: "Sources", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
-    try Data("one\n".utf8).write(to: root.appendingPathComponent("Sources/App.txt"))
+    try Data("one\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
   }
 
   override func tearDownWithError() throws {
@@ -48,43 +48,43 @@ final class WorkspaceRevisionBindingContractTests: XCTestCase {
 
   func testAWorkingTreeEditMovesTheRevision() throws {
     let before = try revision()
-    try Data("two\n".utf8).write(to: root.appendingPathComponent("Sources/App.txt"))
+    try Data("two\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
     // A dirty worktree is exactly what a HEAD-only revision would miss, and
     // it is the case that matters: the decision was made against these bytes.
     XCTAssertNotEqual(before, try revision())
   }
 
   func testHeadAndIndexBothParticipate() throws {
-    let git = root.appendingPathComponent(".git", isDirectory: true)
+    let git = root.appending(path: ".git", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: git.appendingPathComponent("refs/heads", isDirectory: true),
+      at: git.appending(path: "refs/heads", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
-    try Data("ref: refs/heads/main\n".utf8).write(to: git.appendingPathComponent("HEAD"))
-    try Data("a".utf8).write(to: git.appendingPathComponent("index"))
+    try Data("ref: refs/heads/main\n".utf8).write(to: git.appending(path: "HEAD"))
+    try Data("a".utf8).write(to: git.appending(path: "index"))
     let oid = String(repeating: "ab", count: 20)
-    try Data((oid + "\n").utf8).write(to: git.appendingPathComponent("refs/heads/main"))
+    try Data((oid + "\n").utf8).write(to: git.appending(path: "refs/heads/main"))
     let atFirstCommit = try revision()
 
     // Moving HEAD moves the revision even when no file changed.
     let moved = String(repeating: "cd", count: 20)
-    try Data((moved + "\n").utf8).write(to: git.appendingPathComponent("refs/heads/main"))
+    try Data((moved + "\n").utf8).write(to: git.appending(path: "refs/heads/main"))
     XCTAssertNotEqual(atFirstCommit, try revision())
 
     // Staging moves it too: the index is part of what "this tree" means.
-    try Data((moved + "\n").utf8).write(to: git.appendingPathComponent("refs/heads/main"))
+    try Data((moved + "\n").utf8).write(to: git.appending(path: "refs/heads/main"))
     let afterHeadMove = try revision()
-    try Data("b".utf8).write(to: git.appendingPathComponent("index"))
+    try Data("b".utf8).write(to: git.appending(path: "index"))
     XCTAssertNotEqual(afterHeadMove, try revision())
   }
 
   func testAPackedRefResolvesRatherThanReadingAsAbsent() throws {
-    let git = root.appendingPathComponent(".git", isDirectory: true)
+    let git = root.appending(path: ".git", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
-    try Data("ref: refs/heads/main\n".utf8).write(to: git.appendingPathComponent("HEAD"))
+    try Data("ref: refs/heads/main\n".utf8).write(to: git.appending(path: "HEAD"))
     let withoutRef = try revision()
     let oid = String(repeating: "ef", count: 20)
     try Data("# pack-refs with: peeled\n\(oid) refs/heads/main\n".utf8)
-      .write(to: git.appendingPathComponent("packed-refs"))
+      .write(to: git.appending(path: "packed-refs"))
     // A repository whose branch is packed is not a repository with no HEAD.
     XCTAssertNotEqual(withoutRef, try revision())
   }
@@ -92,7 +92,7 @@ final class WorkspaceRevisionBindingContractTests: XCTestCase {
   func testTheIdentityIsTheTreeAndNotItsContents() throws {
     let identity = WorkspaceProviderSupport.workspaceIdentity(
       root: root.path, profileID: "test-workspace@1")
-    try Data("changed\n".utf8).write(to: root.appendingPathComponent("Sources/App.txt"))
+    try Data("changed\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
     XCTAssertEqual(
       identity,
       WorkspaceProviderSupport.workspaceIdentity(root: root.path, profileID: "test-workspace@1"))
@@ -106,7 +106,7 @@ final class WorkspaceRevisionBindingContractTests: XCTestCase {
   func testAMutationDeclaringAMovedRevisionIsRefused() throws {
     let provider = try makeProvider()
     let stale = try revision()
-    try Data("three\n".utf8).write(to: root.appendingPathComponent("Sources/App.txt"))
+    try Data("three\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
 
     XCTAssertThrowsError(
       try provider.action(
@@ -191,7 +191,7 @@ final class WorkspaceRevisionBindingContractTests: XCTestCase {
     return WorkspaceOperationsProvider(
       profile: profile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent(UUID().uuidString, isDirectory: true)),
+        rootURL: state.appending(path: UUID().uuidString, directoryHint: .isDirectory)),
       nowUTC: { "2026-08-01T00:00:00Z" })
   }
 

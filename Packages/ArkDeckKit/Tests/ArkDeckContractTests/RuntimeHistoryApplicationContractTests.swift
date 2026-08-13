@@ -374,7 +374,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testHistoryRendersTraceDiffBeforeTypedInputsWithExplicitComparisonCopy() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
       contentsOf: repository.appending(
@@ -465,7 +465,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   // the absence is pinned rather than assumed.
   func testTheApplicationSurfaceExposesNoMutation() throws {
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(
@@ -514,7 +514,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testEveryAppWorkspaceUsesTheBoundedRecentSummaryPolicy() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let workflow = repository.appending(
       path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows")
@@ -547,7 +547,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testHistoryLoadsFullTimelineOnlyWithSelectedDetail() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
       contentsOf: repository.appending(
@@ -566,7 +566,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testDebugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Features/Debug/DebugWorkspaceView.swift"),

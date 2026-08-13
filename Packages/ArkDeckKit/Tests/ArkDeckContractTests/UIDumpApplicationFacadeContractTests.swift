@@ -223,7 +223,7 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
   }
 
   private var repository: URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

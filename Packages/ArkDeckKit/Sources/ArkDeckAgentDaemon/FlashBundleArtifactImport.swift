@@ -168,9 +168,10 @@ actor FlashBundleArtifactImportCoordinator {
     directoryURL: URL = FileManager.default.temporaryDirectory,
     policy: FlashBundleImportPolicy = .production
   ) {
-    let workingDirectory = directoryURL.appendingPathComponent(
-      "arkdeck-flash-import-\(UUID().uuidString.lowercased())",
-      isDirectory: true)
+    let workingDirectory = directoryURL.appending(
+      path:
+        "arkdeck-flash-import-\(UUID().uuidString.lowercased())",
+      directoryHint: .isDirectory)
     self.policy = policy
     self.directoryURL = workingDirectory
     do {
@@ -242,7 +243,7 @@ actor FlashBundleArtifactImportCoordinator {
       throw FlashBundleArtifactImportError.invalidSHA256
     }
     let uploadID = "FLASH-\(UUID().uuidString.lowercased())"
-    let fileURL = directoryURL.appendingPathComponent(uploadID)
+    let fileURL = directoryURL.appending(path: uploadID)
     let descriptor = Darwin.open(
       fileURL.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard descriptor >= 0 else {

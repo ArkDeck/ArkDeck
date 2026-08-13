@@ -14,8 +14,8 @@ import XCTest
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore
 @testable import ArkDeckHarness
-@testable import ArkDeckRuntime
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -183,8 +183,8 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -564,7 +564,8 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let transition = HarnessTaskTransition(
       causation: .jobDispatched, reasonCode: "deployBaselineCrashFixture",
       lifecycle: .waiting, stage: .reproducing, activeRound: 3,
-      activeJobID: "JOB-BASELINE", consumedBudget: HarnessConsumedBudget(
+      activeJobID: "JOB-BASELINE",
+      consumedBudget: HarnessConsumedBudget(
         rounds: 3, e1Mutations: 1), jobID: "JOB-BASELINE",
       artifactRefs: [], cancelRequested: false,
       atUTC: "2026-07-31T00:00:01Z", waitReason: .activeJob,
@@ -854,10 +855,10 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let port = RecordingJobPort()
     let (coordinator, store) = try makeCoordinator(port: port)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: rootURL.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: rootURL.appending(path: "capabilities", directoryHint: .isDirectory))
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: rootURL.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: rootURL.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: []),
       dispatcher: NeverDispatchingPort(reason: "tests never dispatch through the engine here"),
       capabilityStore: capabilityStore,
@@ -898,10 +899,11 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
         "maxE1Mutations": .integer(7),
         "maxModelCalls": .integer(4),
       ])
-    let taskID = try XCTUnwrap({ () -> String? in
-      if case .string(let value)? = field(submitted, "htaskId") { return value }
-      return nil
-    }())
+    let taskID = try XCTUnwrap(
+      { () -> String? in
+        if case .string(let value)? = field(submitted, "htaskId") { return value }
+        return nil
+      }())
     let contextExport = try await call(
       ArkDeckAgentMethod.taskContext, ["htaskId": .string(taskID)])
     guard case .object(let contextExportFields) = contextExport,
@@ -923,12 +925,13 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     XCTAssertEqual(field(submitted, "stage"), .string("initializing"))
     XCTAssertEqual(field(submitted, "waitReason"), .null)
     if case .array(let conditions)? = field(submitted, "conditions") {
-      let names = Set(conditions.compactMap { condition -> String? in
-        guard case .object(let fields) = condition,
-          case .string(let name)? = fields["name"]
-        else { return nil }
-        return name
-      })
+      let names = Set(
+        conditions.compactMap { condition -> String? in
+          guard case .object(let fields) = condition,
+            case .string(let name)? = fields["name"]
+          else { return nil }
+          return name
+        })
       XCTAssertEqual(
         names,
         [
@@ -1049,10 +1052,10 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
     let port = RecordingJobPort()
     let (coordinator, _) = try makeCoordinator(port: port)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: rootURL.appendingPathComponent("wire-capabilities", isDirectory: true))
+      directoryURL: rootURL.appending(path: "wire-capabilities", directoryHint: .isDirectory))
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: rootURL.appendingPathComponent("wire-engine", isDirectory: true)),
+        stateDirectory: rootURL.appending(path: "wire-engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: []),
       dispatcher: NeverDispatchingPort(reason: "wire rejection must not dispatch"),
       capabilityStore: capabilityStore, artifactStore: nil,
@@ -1067,7 +1070,7 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
           AgentWireProtocol.Request(id: UUID().uuidString, method: "task.submit", params: fields)))
     }
     let base: [String: JSONValue] = [
-      "targetId": .string("TGT-958780b2ffb7"), "goal": .string("repair crash")
+      "targetId": .string("TGT-958780b2ffb7"), "goal": .string("repair crash"),
     ]
     let missingBundle = try await submit(
       base.merging(["abilityName": .string("EntryAbility")]) { _, new in new })
@@ -1150,10 +1153,10 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
       evolutionWorkspacePort: IsolationWorkspacePort(),
       nowUTC: { "2026-07-30T00:00:00Z" })
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: rootURL.appendingPathComponent("isolation-capabilities", isDirectory: true))
+      directoryURL: rootURL.appending(path: "isolation-capabilities", directoryHint: .isDirectory))
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: rootURL.appendingPathComponent("isolation-engine", isDirectory: true)),
+        stateDirectory: rootURL.appending(path: "isolation-engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: []),
       dispatcher: NeverDispatchingPort(reason: "submission validation must not dispatch"),
       capabilityStore: capabilityStore, artifactStore: nil,
@@ -1236,10 +1239,10 @@ final class HarnessTaskPlaneContractTests: XCTestCase {
 
   func testTaskMethodsFailClosedWhenTheHarnessIsNotConfigured() async throws {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: rootURL.appendingPathComponent("capabilities-2", isDirectory: true))
+      directoryURL: rootURL.appending(path: "capabilities-2", directoryHint: .isDirectory))
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: rootURL.appendingPathComponent("engine-2", isDirectory: true)),
+        stateDirectory: rootURL.appending(path: "engine-2", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: []),
       dispatcher: NeverDispatchingPort(reason: "no dispatch in this composition"),
       capabilityStore: capabilityStore,

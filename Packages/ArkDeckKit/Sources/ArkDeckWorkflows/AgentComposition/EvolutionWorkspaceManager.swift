@@ -89,10 +89,11 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
       else {
         throw EvolutionWorkspaceError.sourceProfileUnavailable(workspace.sourceProjectRef)
       }
-      let taskRoot = rootURL.appendingPathComponent(
-        workspace.workspaceID, isDirectory: true)
-      let workspaceRoot = taskRoot.appendingPathComponent("workspace", isDirectory: true)
-      let manifestURL = taskRoot.appendingPathComponent("workspace.json")
+      let taskRoot = rootURL.appending(
+        path:
+          workspace.workspaceID, directoryHint: .isDirectory)
+      let workspaceRoot = taskRoot.appending(path: "workspace", directoryHint: .isDirectory)
+      let manifestURL = taskRoot.appending(path: "workspace.json")
       guard FileManager.default.fileExists(atPath: manifestURL.path),
         let data = try? Data(contentsOf: manifestURL),
         let stored = try? JSONDecoder().decode(Manifest.self, from: data),
@@ -107,7 +108,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
         // A swept workspace keeps its manifest for audit. Adoption must not
         // bring one back to life.
         if FileManager.default.fileExists(
-          atPath: taskRoot.appendingPathComponent("teardown.json").path)
+          atPath: taskRoot.appending(path: "teardown.json").path)
         {
           throw EvolutionWorkspaceError.workspaceAlreadyDestroyed(workspace.workspaceID)
         }
@@ -156,9 +157,9 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
       let digest = SHA256Hex.string(of: seed)
       let workspaceID = "evo-\(digest.prefix(24))"
       let projectRef = "evolution-\(digest.prefix(20))"
-      let taskRoot = rootURL.appendingPathComponent(workspaceID, isDirectory: true)
-      let workspaceRoot = taskRoot.appendingPathComponent("workspace", isDirectory: true)
-      let manifestURL = taskRoot.appendingPathComponent("workspace.json")
+      let taskRoot = rootURL.appending(path: workspaceID, directoryHint: .isDirectory)
+      let workspaceRoot = taskRoot.appending(path: "workspace", directoryHint: .isDirectory)
+      let manifestURL = taskRoot.appending(path: "workspace.json")
       let allowedDigest = Self.allowedPathsDigest(policy.allowedPaths)
       let workspace = HarnessEvolutionWorkspace(
         workspaceID: workspaceID, htaskID: htaskID,
@@ -176,7 +177,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
           // A swept workspace keeps its manifest for audit. Reopening it is a
           // terminal-task identity being reused, never a recovery path.
           if FileManager.default.fileExists(
-            atPath: taskRoot.appendingPathComponent("teardown.json").path)
+            atPath: taskRoot.appending(path: "teardown.json").path)
           {
             throw EvolutionWorkspaceError.workspaceAlreadyDestroyed(workspace.workspaceID)
           }
@@ -192,10 +193,10 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
       try FileManager.default.createDirectory(
         at: taskRoot, withIntermediateDirectories: false,
         attributes: [.posixPermissions: 0o700])
-      let temporary = taskRoot.appendingPathComponent(".workspace.tmp", isDirectory: true)
+      let temporary = taskRoot.appending(path: ".workspace.tmp", directoryHint: .isDirectory)
       do {
         try Self.copyIsolatedTree(
-          from: URL(fileURLWithPath: source.projectRoot, isDirectory: true),
+          from: URL(filePath: source.projectRoot, directoryHint: .isDirectory),
           to: temporary)
         try FileManager.default.moveItem(at: temporary, to: workspaceRoot)
         let copiedRevision = try WorkspaceProviderSupport.workspaceRevision(
@@ -211,7 +212,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
         try profiles.register(profile)
         try Self.write(Manifest(workspace: workspace), to: manifestURL)
         try FileManager.default.createDirectory(
-          at: taskRoot.appendingPathComponent("attempts", isDirectory: true),
+          at: taskRoot.appending(path: "attempts", directoryHint: .isDirectory),
           withIntermediateDirectories: false,
           attributes: [.posixPermissions: 0o700])
         return workspace
@@ -234,16 +235,16 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
       guard WorkspaceProviderSupport.isIdentifier(attemptID), ordinal > 0 else {
         throw EvolutionWorkspaceError.attemptManifestConflict
       }
-      let taskRoot = rootURL.appendingPathComponent(workspace.workspaceID, isDirectory: true)
+      let taskRoot = rootURL.appending(path: workspace.workspaceID, directoryHint: .isDirectory)
       let workspaceManifest = try JSONDecoder().decode(
         Manifest.self,
-        from: Data(contentsOf: taskRoot.appendingPathComponent("workspace.json")))
+        from: Data(contentsOf: taskRoot.appending(path: "workspace.json")))
       guard workspaceManifest.workspace == workspace else {
         throw EvolutionWorkspaceError.workspaceManifestConflict
       }
-      let directory = taskRoot.appendingPathComponent("attempts", isDirectory: true)
-        .appendingPathComponent(String(format: "attempt-%03d", ordinal), isDirectory: true)
-      let manifestURL = directory.appendingPathComponent("attempt.json")
+      let directory = taskRoot.appending(path: "attempts", directoryHint: .isDirectory)
+        .appending(path: String(format: "attempt-%03d", ordinal), directoryHint: .isDirectory)
+      let manifestURL = directory.appending(path: "attempt.json")
       let manifest = AttemptManifest(
         attemptID: attemptID, ordinal: ordinal,
         workspaceID: workspace.workspaceID, createdAtUTC: createdAtUTC)
@@ -300,7 +301,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
           let reference = references[name],
           let manifest = try? JSONDecoder().decode(
             Manifest.self,
-            from: Data(contentsOf: entry.appendingPathComponent("workspace.json"))),
+            from: Data(contentsOf: entry.appending(path: "workspace.json"))),
           manifest.workspace.workspaceID == name,
           manifest.workspace.htaskID == reference.htaskID
         else {
@@ -321,7 +322,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
           .contains { FileManager.default.fileExists(atPath: $0.path) }
         if !hasMaterial,
           FileManager.default.fileExists(
-            atPath: entry.appendingPathComponent("teardown.json").path)
+            atPath: entry.appending(path: "teardown.json").path)
         {
           findings.append(
             HarnessEvolutionWorkspaceGCFinding(
@@ -376,7 +377,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
         }
         try Self.destroyIsolatedTree(under: candidate.taskRoot)
         profiles.unregisterEvolutionProfile(projectRef: candidate.projectRef)
-        let teardownURL = candidate.taskRoot.appendingPathComponent("teardown.json")
+        let teardownURL = candidate.taskRoot.appending(path: "teardown.json")
         if !FileManager.default.fileExists(atPath: teardownURL.path) {
           try Self.write(
             TeardownRecord(
@@ -407,15 +408,15 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
   /// manifest, the attempt manifests and the teardown record are never here.
   private static func destroyableEntries(under taskRoot: URL) -> [URL] {
     [
-      taskRoot.appendingPathComponent("workspace", isDirectory: true),
-      taskRoot.appendingPathComponent(".workspace.doomed", isDirectory: true),
-      taskRoot.appendingPathComponent(".workspace.tmp", isDirectory: true),
+      taskRoot.appending(path: "workspace", directoryHint: .isDirectory),
+      taskRoot.appending(path: ".workspace.doomed", directoryHint: .isDirectory),
+      taskRoot.appending(path: ".workspace.tmp", directoryHint: .isDirectory),
     ]
   }
 
   private static func destroyIsolatedTree(under taskRoot: URL) throws {
-    let workspaceRoot = taskRoot.appendingPathComponent("workspace", isDirectory: true)
-    let doomed = taskRoot.appendingPathComponent(".workspace.doomed", isDirectory: true)
+    let workspaceRoot = taskRoot.appending(path: "workspace", directoryHint: .isDirectory)
+    let doomed = taskRoot.appending(path: ".workspace.doomed", directoryHint: .isDirectory)
     // The rename makes the tree disappear from its addressable path first, so
     // a crash mid-removal leaves a resumable `.workspace.doomed`, never a
     // half-deleted `workspace/` that still looks reopenable.
@@ -511,7 +512,7 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
 
   private static func copyIsolatedTree(from source: URL, to destination: URL) throws {
     let sourcePath = source.resolvingSymlinksInPath().standardizedFileURL.path
-    let canonicalSource = URL(fileURLWithPath: sourcePath, isDirectory: true)
+    let canonicalSource = URL(filePath: sourcePath, directoryHint: .isDirectory)
     let destinationPath = destination.standardizedFileURL.path
     guard destinationPath != sourcePath, !destinationPath.hasPrefix(sourcePath + "/") else {
       throw EvolutionWorkspaceError.unsafeSourceEntry("destinationInsideSource")
@@ -548,16 +549,16 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
         let target = try FileManager.default.destinationOfSymbolicLink(atPath: entry.path)
         let resolvedTarget: URL
         if target.hasPrefix("/") {
-          resolvedTarget = URL(fileURLWithPath: target)
+          resolvedTarget = URL(filePath: target)
         } else {
-          resolvedTarget = entry.deletingLastPathComponent().appendingPathComponent(target)
+          resolvedTarget = entry.deletingLastPathComponent().appending(path: target)
         }
         let resolvedPath = resolvedTarget.resolvingSymlinksInPath().standardizedFileURL.path
         guard resolvedPath == sourcePath || resolvedPath.hasPrefix(sourcePath + "/") else {
           throw EvolutionWorkspaceError.unsafeSourceEntry(relative)
         }
       }
-      let output = destination.appendingPathComponent(relative)
+      let output = destination.appending(path: relative)
       if values.isDirectory == true, values.isSymbolicLink != true {
         try FileManager.default.createDirectory(
           at: output, withIntermediateDirectories: false,

@@ -209,7 +209,7 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
       !value.productModel.isEmpty,
       !value.buildVersion.isEmpty,
       !value.jobID.isEmpty,
-      ISO8601DateFormatter().date(from: value.establishedAtUTC) != nil
+      ISO8601Timestamps.parse(value.establishedAtUTC) != nil
     else { throw failure("post-flash binding document is invalid") }
   }
 
@@ -253,9 +253,10 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
   }
 
   private static func isSHA256(_ value: String) -> Bool {
-    value.count == 64 && value.allSatisfy {
-      ("0"..."9").contains($0) || ("a"..."f").contains($0)
-    }
+    value.count == 64
+      && value.allSatisfy {
+        ("0"..."9").contains($0) || ("a"..."f").contains($0)
+      }
   }
 
   private func failure(_ detail: String) -> RockchipFlashExecutionError {

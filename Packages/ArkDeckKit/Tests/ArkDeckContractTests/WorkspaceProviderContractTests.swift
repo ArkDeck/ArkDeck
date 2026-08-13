@@ -1,10 +1,11 @@
 import ArkDeckCore
-@testable import ArkDeckRuntime
-@testable import ArkDeckStorage
-@testable import ArkDeckWorkflows
 import CryptoKit
 import Foundation
 import XCTest
+
+@testable import ArkDeckRuntime
+@testable import ArkDeckStorage
+@testable import ArkDeckWorkflows
 
 final class WorkspaceProviderContractTests: XCTestCase {
   private var root: URL!
@@ -14,16 +15,18 @@ final class WorkspaceProviderContractTests: XCTestCase {
   private var dispatcher: DescriptorBoundProcessDispatcher!
 
   override func setUpWithError() throws {
-    root = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-workspace-\(UUID().uuidString)", isDirectory: true)
-    state = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-workspace-state-\(UUID().uuidString)", isDirectory: true)
+    root = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-workspace-\(UUID().uuidString)", directoryHint: .isDirectory)
+    state = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-workspace-state-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: root.appendingPathComponent("Sources", isDirectory: true),
+      at: root.appending(path: "Sources", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
     try Data("old\n".utf8).write(
-      to: root.appendingPathComponent("Sources/App.txt"))
+      to: root.appending(path: "Sources/App.txt"))
 
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
@@ -52,7 +55,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     provider = WorkspaceOperationsProvider(
       profile: profile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("attempts", isDirectory: true)),
+        rootURL: state.appending(path: "attempts", directoryHint: .isDirectory)),
       nowUTC: { "2026-07-31T00:00:00Z" })
     dispatcher = DescriptorBoundProcessDispatcher(
       resolver: WorkspaceActionExecutableResolver(profile: profile))
@@ -70,8 +73,10 @@ final class WorkspaceProviderContractTests: XCTestCase {
       try WorkspaceProviderSupport.files(
         root: profile.projectRoot, profileGlobs: ["Sources/**"],
         requestGlobs: ["Sources/**"]),
-      [URL(fileURLWithPath: profile.projectRoot)
-        .appendingPathComponent("Sources/App.txt").path])
+      [
+        URL(filePath: profile.projectRoot)
+          .appending(path: "Sources/App.txt").path
+      ])
 
     XCTAssertTrue(
       WorkspaceProviderSupport.globMayMatchDescendant(
@@ -121,7 +126,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       try XCTUnwrap(tests.operationInvocation).arguments,
       ["TESTS_OK\\n"])
 
-    let dump = root.appendingPathComponent("dump.txt")
+    let dump = root.appending(path: "dump.txt")
     try Data("0x1234\n".utf8).write(to: dump)
     let symbolContext = executionContext(
       artifact: resolvedArtifact(dump, artifactID: "ART-DUMP"))
@@ -155,8 +160,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
 
     let receipt = try await dispatcher.dispatch(
       try provider.lower(action: .workspace(apply), context: patchContext))
-    guard case .verified(let summary) = try provider.verify(
-      receipt: receipt, action: .workspace(apply), context: patchContext),
+    guard
+      case .verified(let summary) = try provider.verify(
+        receipt: receipt, action: .workspace(apply), context: patchContext),
       let reference = summary["patchAttemptRef"]
     else {
       return XCTFail("patch did not verify")
@@ -167,17 +173,20 @@ final class WorkspaceProviderContractTests: XCTestCase {
         "projectRef": .string("TestProject"),
         "patchAttemptRef": .string(reference),
       ], context: context)
-    let durablePatchPath = state.appendingPathComponent(
-      "attempts/\(reference).patch").path
+    let durablePatchPath = state.appending(
+      path:
+        "attempts/\(reference).patch"
+    ).path
     XCTAssertEqual(
       try XCTUnwrap(revert.operationInvocation).arguments,
       ["-f", "-R", "-p1", "-d", profile.projectRoot, "-i", durablePatchPath])
-    XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: durablePatchPath)),
-                   try Data(contentsOf: patchURL))
+    XCTAssertEqual(
+      try Data(contentsOf: URL(filePath: durablePatchPath)),
+      try Data(contentsOf: patchURL))
   }
 
   func testProductionProfileBindsSwiftPMExecutableRoleAndSelfSafeTestPreset() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let production = try WorkspaceProjectProfile.arkDeck(rootURL: repository)
     let build = try XCTUnwrap(production.buildPresets["arkdeck-debug"])
@@ -187,7 +196,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       build.fixedArguments,
       [
         "--package-path",
-        repository.appendingPathComponent("Packages/ArkDeckKit").path,
+        repository.appending(path: "Packages/ArkDeckKit").path,
       ])
     let tests = try XCTUnwrap(production.testPresets["arkdeck-tests"])
     XCTAssertEqual(tests.executable, build.executable)
@@ -202,14 +211,14 @@ final class WorkspaceProviderContractTests: XCTestCase {
   }
 
   func testWaterFlowProfilePinsTheRealBuildTestAndDeployProduct() throws {
-    let project = root.appendingPathComponent("WaterFlow", isDirectory: true)
+    let project = root.appending(path: "WaterFlow", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: project.appendingPathComponent("entry/src/main", isDirectory: true),
+      at: project.appending(path: "entry/src/main", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
     try Data("{}".utf8).write(
-      to: project.appendingPathComponent("entry/src/main/module.json5"))
-    let script = project.appendingPathComponent("hvigorw.js")
+      to: project.appending(path: "entry/src/main/module.json5"))
+    let script = project.appending(path: "hvigorw.js")
     try Data("// fixture".utf8).write(to: script)
 
     let production = try WorkspaceProjectProfile.waterFlowDemo(
@@ -257,7 +266,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let environmentProvider = WorkspaceOperationsProvider(
       profile: environmentProfile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("environment-attempts", isDirectory: true)),
+        rootURL: state.appending(path: "environment-attempts", directoryHint: .isDirectory)),
       nowUTC: { "2026-08-01T00:00:00Z" })
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "workspace.build-openharmony@1"))
@@ -279,7 +288,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
   }
 
   func testPatchScopeApplyArtifactReadbackAndExactRevert() async throws {
-    let original = try Data(contentsOf: root.appendingPathComponent("Sources/App.txt"))
+    let original = try Data(contentsOf: root.appending(path: "Sources/App.txt"))
     let originalRevision = sha(original)
     let patchURL = try writePatch(relativePath: "Sources/App.txt")
     let patchContext = executionContext(
@@ -293,16 +302,18 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ], context: patchContext)
     let plan = try provider.lower(action: .workspace(action), context: patchContext)
     let receipt = try await dispatcher.dispatch(plan)
-    guard case .verified(let summary) = try provider.verify(
-      receipt: receipt, action: .workspace(action), context: patchContext),
+    guard
+      case .verified(let summary) = try provider.verify(
+        receipt: receipt, action: .workspace(action), context: patchContext),
       let reference = summary["patchAttemptRef"]
     else {
       return XCTFail("apply must produce a durable patchAttemptRef")
     }
     try FileManager.default.removeItem(at: patchURL)
     XCTAssertEqual(
-      String(data: try Data(
-        contentsOf: root.appendingPathComponent("Sources/App.txt")), encoding: .utf8),
+      String(
+        data: try Data(
+          contentsOf: root.appending(path: "Sources/App.txt")), encoding: .utf8),
       "new\n")
 
     let persisted = try PersistedTypedProviderAction(.workspace(action))
@@ -325,20 +336,23 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ], context: revertContext)
     let revertReceipt = try await dispatcher.dispatch(
       try provider.lower(action: .workspace(revert), context: revertContext))
-    guard case .verified(let revertSummary) = try provider.verify(
-      receipt: revertReceipt, action: .workspace(revert), context: revertContext)
+    guard
+      case .verified(let revertSummary) = try provider.verify(
+        receipt: revertReceipt, action: .workspace(revert), context: revertContext)
     else {
       return XCTFail("revert must verify by exact original file hashes")
     }
-    XCTAssertEqual(revertSummary["workspaceRevision"], shaSnapshot(
-      path: "Sources/App.txt", sha256: originalRevision))
     XCTAssertEqual(
-      try Data(contentsOf: root.appendingPathComponent("Sources/App.txt")), original)
+      revertSummary["workspaceRevision"],
+      shaSnapshot(
+        path: "Sources/App.txt", sha256: originalRevision))
+    XCTAssertEqual(
+      try Data(contentsOf: root.appending(path: "Sources/App.txt")), original)
   }
 
   func testRuntimeConsumesHostBoundPatchLeaseAndRevertsExactAttempt() async throws {
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("patch-runtime-artifacts"),
+      rootURL: state.appending(path: "patch-runtime-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let patchBytes = try Data(
       contentsOf: writePatch(relativePath: "Sources/App.txt"))
@@ -356,7 +370,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let patchLease = try await artifactStore.leaseReference(
       jobID: imported.jobID, artifactID: imported.artifactID)
     let grantStore1 = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("workspace-grant-1"))
+      directoryURL: state.appending(path: "workspace-grant-1"))
     // One bounded workspace standing grant covers the approved route. Each
     // exact operation and its typed inputs are still materialized, authorized,
     // consumed and outcome-recorded independently.
@@ -365,7 +379,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       operations: ["workspace.apply-patch", "workspace.revert-patch"])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appendingPathComponent("patch-runtime-engine")),
+        stateDirectory: state.appending(path: "patch-runtime-engine")),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
@@ -387,7 +401,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let applyStatus = try await engine.run(jobID: applyAcceptance.jobID)
     XCTAssertEqual(applyStatus.state, "succeeded")
     XCTAssertEqual(
-      try Data(contentsOf: root.appendingPathComponent("Sources/App.txt")),
+      try Data(contentsOf: root.appending(path: "Sources/App.txt")),
       Data("new\n".utf8))
 
     let applyArtifacts = try await artifactStore.list(jobID: applyAcceptance.jobID)
@@ -415,7 +429,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let revertStatus = try await engine.run(jobID: revertAcceptance.jobID)
     XCTAssertEqual(revertStatus.state, "succeeded")
     XCTAssertEqual(
-      try Data(contentsOf: root.appendingPathComponent("Sources/App.txt")),
+      try Data(contentsOf: root.appending(path: "Sources/App.txt")),
       Data("old\n".utf8))
     let inspectedGrant = try await grantStore1.inspect(
       capabilityID: Self.workspaceGrantID)
@@ -440,8 +454,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ], context: patchContext)
     let applyReceipt = try await dispatcher.dispatch(
       try provider.lower(action: .workspace(apply), context: patchContext))
-    guard case .verified(let summary) = try provider.verify(
-      receipt: applyReceipt, action: .workspace(apply), context: patchContext),
+    guard
+      case .verified(let summary) = try provider.verify(
+        receipt: applyReceipt, action: .workspace(apply), context: patchContext),
       let reference = summary["patchAttemptRef"]
     else {
       return XCTFail("apply must produce a durable attempt")
@@ -477,7 +492,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
   }
 
   func testOutOfGlobPatchFailsBeforeSpawnAndLeavesWorkspaceUntouched() throws {
-    let forbidden = root.appendingPathComponent("Forbidden.txt")
+    let forbidden = root.appending(path: "Forbidden.txt")
     try Data("old\n".utf8).write(to: forbidden)
     let patchURL = try writePatch(relativePath: "Forbidden.txt")
     let context = executionContext(
@@ -497,7 +512,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
   }
 
   func testPatchPrefixCannotChangeThePathAfterP1ScopeValidation() throws {
-    let outside = root.appendingPathComponent("App.txt")
+    let outside = root.appending(path: "App.txt")
     try Data("old\n".utf8).write(to: outside)
     let patch = """
       --- Sources/App.txt
@@ -507,7 +522,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       +new
 
       """
-    let patchURL = state.appendingPathComponent("prefix-bypass.patch")
+    let patchURL = state.appending(path: "prefix-bypass.patch")
     try Data(patch.utf8).write(to: patchURL)
     let context = executionContext(
       artifact: resolvedArtifact(patchURL, artifactID: "ART-PREFIX-BYPASS"))
@@ -524,7 +539,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     }
     XCTAssertEqual(try Data(contentsOf: outside), Data("old\n".utf8))
     XCTAssertEqual(
-      try Data(contentsOf: root.appendingPathComponent("Sources/App.txt")),
+      try Data(contentsOf: root.appending(path: "Sources/App.txt")),
       Data("old\n".utf8))
   }
 
@@ -542,8 +557,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
         ], context: context)
       let receipt = try await dispatcher.dispatch(
         try provider.lower(action: .workspace(action), context: context))
-      guard case .verified(let summary) = try provider.verify(
-        receipt: receipt, action: .workspace(action), context: context)
+      guard
+        case .verified(let summary) = try provider.verify(
+          receipt: receipt, action: .workspace(action), context: context)
       else {
         return XCTFail("\(reference) must verify its real process receipt")
       }
@@ -555,7 +571,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let failureProvider = WorkspaceOperationsProvider(
       profile: failureProfile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("failure-attempts")),
+        rootURL: state.appending(path: "failure-attempts")),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let failureDispatcher = DescriptorBoundProcessDispatcher(
       resolver: WorkspaceActionExecutableResolver(profile: failureProfile))
@@ -569,8 +585,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
       ], context: executionContext())
     let receipt = try await failureDispatcher.dispatch(
       try failureProvider.lower(action: action, context: executionContext()))
-    guard case .failed(let code, _) = try failureProvider.verify(
-      receipt: receipt, action: action, context: executionContext())
+    guard
+      case .failed(let code, _) = try failureProvider.verify(
+        receipt: receipt, action: action, context: executionContext())
     else {
       return XCTFail("a non-zero build must not become verified")
     }
@@ -580,7 +597,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let stderrProvider = WorkspaceOperationsProvider(
       profile: stderrProfile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("stderr-attempts")),
+        rootURL: state.appending(path: "stderr-attempts")),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let stderrAction = try stderrProvider.action(
       for: descriptor.steps[0], operation: descriptor,
@@ -593,8 +610,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
       outputByteBudget: 1)
     let truncated = try await stderrBounded.dispatch(
       try stderrProvider.lower(action: stderrAction, context: executionContext()))
-    guard case .failed(let truncatedCode, _) = try stderrProvider.verify(
-      receipt: truncated, action: stderrAction, context: executionContext())
+    guard
+      case .failed(let truncatedCode, _) = try stderrProvider.verify(
+        receipt: truncated, action: stderrAction, context: executionContext())
     else {
       return XCTFail("a truncated diagnostic stream must fail closed")
     }
@@ -645,7 +663,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let unavailable = WorkspaceOperationsProvider(
       profile: noSymbols,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("unavailable-attempts")),
+        rootURL: state.appending(path: "unavailable-attempts")),
       nowUTC: { "2026-07-31T00:00:00Z" })
     XCTAssertEqual(
       unavailable.runtimeAvailability(for: symbolDescriptor),
@@ -681,13 +699,13 @@ final class WorkspaceProviderContractTests: XCTestCase {
 
   func testRuntimeAvailabilityRejectsBeforeJobOrCapabilityConsumption() async throws {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("unavailable-capabilities"))
+      directoryURL: state.appending(path: "unavailable-capabilities"))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("unavailable-artifacts"),
+      rootURL: state.appending(path: "unavailable-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appendingPathComponent("unavailable-engine")),
+        stateDirectory: state.appending(path: "unavailable-engine")),
       providers: DeviceProviderRegistry(providers: [
         UnavailableWorkspaceOperationsProvider(reason: "workspace.toolchainUnavailable")
       ]),
@@ -726,7 +744,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
 
   func testMaterializedPlanDigestBindsSemanticArgumentZero() async throws {
     var digests: [String] = []
-    for (index, argumentZero) in [nil, "profile-owned-printf"] .enumerated() {
+    for (index, argumentZero) in [nil, "profile-owned-printf"].enumerated() {
       let preset = try WorkspaceCommandPreset(
         presetID: "build-ok", executable: profile.buildPresets["build-ok"]!.executable,
         argumentZero: argumentZero,
@@ -743,16 +761,16 @@ final class WorkspaceProviderContractTests: XCTestCase {
       let variantProvider = WorkspaceOperationsProvider(
         profile: variant,
         attemptStore: try WorkspacePatchAttemptStore(
-          rootURL: state.appendingPathComponent("digest-attempts-\(index)")),
+          rootURL: state.appending(path: "digest-attempts-\(index)")),
         nowUTC: { "2026-07-31T00:00:00Z" })
       let variantDispatcher = DescriptorBoundProcessDispatcher(
         resolver: WorkspaceActionExecutableResolver(profile: variant))
-      let engineRoot = state.appendingPathComponent("digest-engine-\(index)")
+      let engineRoot = state.appending(path: "digest-engine-\(index)")
       // The variant profile is a *different* tree, so its grant must be
       // issued against that identity — a capability for one workspace does
       // not authorize another (CHG-2026-055, TASK-HFA-009 r2).
       let variantGrants = try RuntimeCapabilityStore(
-        directoryURL: state.appendingPathComponent("digest-capabilities-\(index)"))
+        directoryURL: state.appending(path: "digest-capabilities-\(index)"))
       try await installWorkspaceGrant(
         into: variantGrants, operations: ["workspace.build-openharmony"], profile: variant)
       let engine = try RuntimeJobEngine(
@@ -763,7 +781,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
           workspace: variantDispatcher),
         capabilityStore: variantGrants,
         artifactStore: try RuntimeArtifactStore(
-          rootURL: state.appendingPathComponent("digest-artifacts-\(index)"),
+          rootURL: state.appending(path: "digest-artifacts-\(index)"),
           nowUTC: { "2026-07-31T00:00:00Z" }),
         nowUTC: { "2026-07-31T00:00:00Z" })
       let request = try operationRequest(
@@ -776,8 +794,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
         idempotencyKey: "idempotency-plan-digest-\(index)")
       let acceptance = try await engine.submit(try JSONEncoder().encode(request))
       let record = try RuntimeJobRecord.load(
-        from: engineRoot.appendingPathComponent(
-          "jobs/\(acceptance.jobID)", isDirectory: true))
+        from: engineRoot.appending(
+          path:
+            "jobs/\(acceptance.jobID)", directoryHint: .isDirectory))
       digests.append(try XCTUnwrap(record.materializedPlanDigest))
     }
     XCTAssertNotEqual(digests[0], digests[1])
@@ -785,13 +804,13 @@ final class WorkspaceProviderContractTests: XCTestCase {
 
   func testCatalogToRuntimeBuildSpawnsAndPublishesExactArtifact() async throws {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("runtime-capabilities"))
+      directoryURL: state.appending(path: "runtime-capabilities"))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("runtime-artifacts"),
+      rootURL: state.appending(path: "runtime-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
     try await installWorkspaceGrant(
       into: capabilityStore, operations: ["workspace.build-openharmony"])
-    let engineRoot = state.appendingPathComponent("runtime-engine")
+    let engineRoot = state.appending(path: "runtime-engine")
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: engineRoot),
       providers: DeviceProviderRegistry(providers: [provider]),
@@ -817,8 +836,9 @@ final class WorkspaceProviderContractTests: XCTestCase {
       idempotencyKey: "idempotency-runtime-build")
     let acceptance = try await engine.submit(try JSONEncoder().encode(request))
     let admitted = try RuntimeJobRecord.load(
-      from: engineRoot.appendingPathComponent(
-        "jobs/\(acceptance.jobID)", isDirectory: true))
+      from: engineRoot.appending(
+        path:
+          "jobs/\(acceptance.jobID)", directoryHint: .isDirectory))
     XCTAssertNil(admitted.materializedStableTargetIdentitySHA256)
     XCTAssertNil(admitted.materializedBindingRevision)
     XCTAssertNotNil(admitted.materializedPlanDigest)
@@ -838,7 +858,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
     async throws
   {
     let checkpointPreset = try WorkspaceCommandPreset(
-      presetID: "checkpoint", executable: try WorkspaceExecutableIdentity.hashing(
+      presetID: "checkpoint",
+      executable: try WorkspaceExecutableIdentity.hashing(
         path: "/usr/bin/bsdtar"), fixedArguments: [], timeoutSeconds: 10)
     let checkpointProfile = try WorkspaceProjectProfile(
       profileID: profile.profileID, projectRef: profile.projectRef,
@@ -853,21 +874,21 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let checkpointProvider = WorkspaceOperationsProvider(
       profile: checkpointProfile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("checkpoint-attempts", isDirectory: true)),
+        rootURL: state.appending(path: "checkpoint-attempts", directoryHint: .isDirectory)),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let checkpointDispatcher = DescriptorBoundProcessDispatcher(
       resolver: WorkspaceActionExecutableResolver(profile: checkpointProfile))
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("checkpoint-capabilities"))
+      directoryURL: state.appending(path: "checkpoint-capabilities"))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("checkpoint-artifacts"),
+      rootURL: state.appending(path: "checkpoint-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
     try await installWorkspaceGrant(
       into: capabilityStore, operations: ["workspace.create-checkpoint"],
       profile: checkpointProfile)
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appendingPathComponent("checkpoint-engine")),
+        stateDirectory: state.appending(path: "checkpoint-engine")),
       providers: DeviceProviderRegistry(providers: [checkpointProvider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: checkpointDispatcher, rockchip: checkpointDispatcher,
@@ -940,11 +961,16 @@ final class WorkspaceProviderContractTests: XCTestCase {
 
   func testWorkspaceIsUnavailableWithoutArtifactStoreBeforeAdmission() async throws {
     let grantStore2 = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("workspace-grant-2"))
-    try await installWorkspaceGrant(into: grantStore2, operations: ["workspace.apply-patch", "workspace.build-openharmony", "workspace.revert-patch", "workspace.run-tests", "workspace.create-checkpoint"])
+      directoryURL: state.appending(path: "workspace-grant-2"))
+    try await installWorkspaceGrant(
+      into: grantStore2,
+      operations: [
+        "workspace.apply-patch", "workspace.build-openharmony", "workspace.revert-patch",
+        "workspace.run-tests", "workspace.create-checkpoint",
+      ])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appendingPathComponent("missing-artifact-engine")),
+        stateDirectory: state.appending(path: "missing-artifact-engine")),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
@@ -981,19 +1007,24 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let failureProvider = WorkspaceOperationsProvider(
       profile: failureProfile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("runtime-failure-attempts")),
+        rootURL: state.appending(path: "runtime-failure-attempts")),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let failureDispatcher = DescriptorBoundProcessDispatcher(
       resolver: WorkspaceActionExecutableResolver(profile: failureProfile))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("runtime-failure-artifacts"),
+      rootURL: state.appending(path: "runtime-failure-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let grantStore3 = try RuntimeCapabilityStore(
-      directoryURL: state.appendingPathComponent("workspace-grant-3"))
-    try await installWorkspaceGrant(into: grantStore3, operations: ["workspace.apply-patch", "workspace.build-openharmony", "workspace.revert-patch", "workspace.run-tests", "workspace.create-checkpoint"])
+      directoryURL: state.appending(path: "workspace-grant-3"))
+    try await installWorkspaceGrant(
+      into: grantStore3,
+      operations: [
+        "workspace.apply-patch", "workspace.build-openharmony", "workspace.revert-patch",
+        "workspace.run-tests", "workspace.create-checkpoint",
+      ])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appendingPathComponent("runtime-failure-engine")),
+        stateDirectory: state.appending(path: "runtime-failure-engine")),
       providers: DeviceProviderRegistry(providers: [failureProvider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: failureDispatcher, rockchip: failureDispatcher,
@@ -1125,7 +1156,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       +new
 
       """
-    let url = state.appendingPathComponent("\(UUID().uuidString).patch")
+    let url = state.appending(path: "\(UUID().uuidString).patch")
     try Data(patch.utf8).write(to: url)
     return url
   }

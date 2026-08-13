@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 public struct StorageConfigurationToken: Equatable, Sendable {
   fileprivate let value: UUID
@@ -9,37 +10,32 @@ public struct StorageConfigurationToken: Equatable, Sendable {
 /// Session creation. Successful or partially-visible configuration mutations invalidate every
 /// previously issued token. Claim-bound Session creation holds the fence through root creation so
 /// a settings/catalog mutation is ordered either wholly before or wholly after that creation.
-public final class StorageConfigurationEpoch: @unchecked Sendable {
-  private let lock = NSLock()
-  private var value = UUID()
+public final class StorageConfigurationEpoch: Sendable {
+  private let value = Mutex(UUID())
 
   public init() {}
 
   public func snapshot() -> StorageConfigurationToken {
-    lock.lock()
-    defer { lock.unlock() }
-    return StorageConfigurationToken(value: value)
+    value.withLock { StorageConfigurationToken(value: $0) }
   }
 
   public func performMutation<T>(_ body: () throws -> T) rethrows -> T {
-    lock.lock()
-    defer {
-      value = UUID()
-      lock.unlock()
+    try value.withLock { value in
+      defer { value = UUID() }
+      return try body()
     }
-    return try body()
   }
 
   public func performIfCurrent<T>(
     _ token: StorageConfigurationToken,
     _ body: () throws -> T
   ) throws -> T {
-    lock.lock()
-    defer { lock.unlock() }
-    guard token.value == value else {
-      throw SessionStorageError.claimUnavailable("stale-storage-configuration")
+    try value.withLock { value in
+      guard token.value == value else {
+        throw SessionStorageError.claimUnavailable("stale-storage-configuration")
+      }
+      return try body()
     }
-    return try body()
   }
 }
 

@@ -763,10 +763,11 @@ public actor RuntimeJobEngine {
       ?? { try RockchipFlashStagingCapacity.availableBytes(at: $0) }
     self.nowUTC = nowUTC
     try FileManager.default.createDirectory(
-      at: configuration.stateDirectory.appendingPathComponent("jobs", isDirectory: true),
+      at: configuration.stateDirectory.appending(path: "jobs", directoryHint: .isDirectory),
       withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    self.admissionService = try RuntimeAdmissionService(stateDirectory: configuration.stateDirectory)
+    self.admissionService = try RuntimeAdmissionService(
+      stateDirectory: configuration.stateDirectory)
   }
 
   public func operationAvailability() -> [RuntimeOperationAvailability] {
@@ -986,12 +987,12 @@ public actor RuntimeJobEngine {
     try configuration.admissionFaultInjector.check(.afterAdmission)
 
     let jobDirectory = configuration.stateDirectory
-      .appendingPathComponent("jobs", isDirectory: true)
-      .appendingPathComponent(jobID, isDirectory: true)
+      .appending(path: "jobs", directoryHint: .isDirectory)
+      .appending(path: jobID, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: jobDirectory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
-    let journal = try FileDurableJournal(url: jobDirectory.appendingPathComponent("journal.jsonl"))
+    let journal = try FileDurableJournal(url: jobDirectory.appending(path: "journal.jsonl"))
     try configuration.admissionFaultInjector.check(.beforeJournalAppend)
     try journal.appendAndSynchronize(
       JournalEvent.jobCreated(
@@ -1188,7 +1189,8 @@ public actor RuntimeJobEngine {
           runtime: &current, descriptor: descriptor)
         establishedRecoveryEpochID = epoch.epochID
         current.record.timeline.append(
-          "superseding recovery epoch \(epoch.epochID) established; original outcomes remain unknown")
+          "superseding recovery epoch \(epoch.epochID) established; original outcomes remain unknown"
+        )
         try persistRuntimeRecord(current.record)
         jobs[jobID] = current
         try transition(
@@ -1506,7 +1508,8 @@ public actor RuntimeJobEngine {
           providerID: descriptor.provider.rawValue)
       }
       let campaignExecutionTuning = try executionTuning(
-        for: jobs[jobID]?.record.request).tuning
+        for: jobs[jobID]?.record.request
+      ).tuning
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
         targetID: targetID,
@@ -1529,7 +1532,7 @@ public actor RuntimeJobEngine {
           for: step, operation: descriptor,
           inputs: jobs[jobID]?.record.request.inputs ?? [:],
           context: context)
-      } catch where step.isOptional {
+      } catch  where step.isOptional {
         try await recordSkippedOptionalStep(
           jobID: jobID, step: step, descriptor: descriptor,
           reason: "provider has no action for this step")
@@ -1642,8 +1645,9 @@ public actor RuntimeJobEngine {
     default:
       return
     }
-    guard let compensatingDescriptor = RuntimeOperationCatalog.descriptor(
-      reference: compensatingReference)
+    guard
+      let compensatingDescriptor = RuntimeOperationCatalog.descriptor(
+        reference: compensatingReference)
     else {
       throw RuntimeJobEngineError.internalFailure(
         "missing published compensation operation \(compensatingReference)")
@@ -2129,8 +2133,9 @@ public actor RuntimeJobEngine {
       descriptor.provider == .workspace
       && descriptor.permittedEffects.allSatisfy({ $0 <= .deviceMutation })
       && descriptor.authorization[.deviceMutation] == .standingCapability
-    guard descriptor.minimumEffect <= .hostOnly
-      || (mutatingWorkspace && descriptor.minimumEffect == .deviceMutation)
+    guard
+      descriptor.minimumEffect <= .hostOnly
+        || (mutatingWorkspace && descriptor.minimumEffect == .deviceMutation)
     else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput,
@@ -2667,7 +2672,8 @@ public actor RuntimeJobEngine {
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: runtime.record.operationReference)
     else { return }
-    guard let mapping = RuntimeArtifactService.artifactMapping[descriptor.reference]?[step.stepID] else {
+    guard let mapping = RuntimeArtifactService.artifactMapping[descriptor.reference]?[step.stepID]
+    else {
       return  // this step owns no declared product
     }
     guard let artifactStore else {
@@ -2764,7 +2770,9 @@ public actor RuntimeJobEngine {
       }
       do {
         let metadata: RuntimeArtifactMetadata
-        if let landed, RuntimeArtifactService.fileBackedArtifacts.contains(name), let sha256 = landed.sha256 {
+        if let landed, RuntimeArtifactService.fileBackedArtifacts.contains(name),
+          let sha256 = landed.sha256
+        {
           metadata = try await artifactStore.publishFile(
             RuntimeArtifactFilePublicationRequest(
               jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
@@ -3008,7 +3016,7 @@ public actor RuntimeJobEngine {
     }
     if record.state == JobState.failed.rawValue {
       let replay = try DurableJournalRecovery.inspect(
-        url: jobDirectory(for: jobID).appendingPathComponent("journal.jsonl"))
+        url: jobDirectory(for: jobID).appending(path: "journal.jsonl"))
       let intents = replay.events.filter { $0.kind == .stepIntent }
       if intents.allSatisfy({ $0.stepEffect != nil })
         && !intents.contains(where: { $0.stepEffect! >= .deviceMutation })
@@ -3036,12 +3044,15 @@ public actor RuntimeJobEngine {
   public func evidenceSnapshot(jobID: String) async throws -> RuntimeJobEvidenceSnapshot {
     let record = try recordForRead(jobID: jobID)
     let epochs = try await RuntimeSupersedingRecoveryStore(
-      stateDirectory: configuration.stateDirectory).list()
+      stateDirectory: configuration.stateDirectory
+    ).list()
     let recoveryEpoch = epochs.last(where: { $0.recoveryJobID == record.jobID })
-    let observation = record.evidenceObservation
+    let observation =
+      record.evidenceObservation
       ?? RockchipRuntimeActionRecordStore(
-        rootURL: configuration.stateDirectory.appendingPathComponent(
-          "rockchip-runtime", isDirectory: true)
+        rootURL: configuration.stateDirectory.appending(
+          path:
+            "rockchip-runtime", directoryHint: .isDirectory)
       ).flashPostflightObservation(for: record)
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
@@ -3153,7 +3164,8 @@ public actor RuntimeJobEngine {
 
   private static func isCurrentJob(_ status: RuntimeJobStatus) -> Bool {
     if (status.outstandingResidueCount ?? 0) > 0 { return true }
-    let hasEstablishedCurrentEpoch = status.supersededByRecoveryEpochID != nil
+    let hasEstablishedCurrentEpoch =
+      status.supersededByRecoveryEpochID != nil
       || status.resolvedByTargetAliasResolutionID != nil
     if !hasEstablishedCurrentEpoch && (status.outcomeUnknown || status.waitingForHuman) {
       return true
@@ -3375,7 +3387,9 @@ public actor RuntimeJobEngine {
   /// Reopen the supplied authoritative job set, replay each journal and park
   /// unknowns. Clean journals retain their exact confirmed provider boundary
   /// and can be resumed explicitly. Recovery itself never dispatches.
-  private func recover(records persistedJobs: [RuntimePersistedJob]) async throws -> [RuntimeJobStatus] {
+  private func recover(records persistedJobs: [RuntimePersistedJob]) async throws
+    -> [RuntimeJobStatus]
+  {
     let recoveryService = RuntimeRecoveryService(
       stateDirectory: configuration.stateDirectory, nowUTC: nowUTC)
     for persisted in persistedJobs {
@@ -3445,12 +3459,14 @@ public actor RuntimeJobEngine {
     currentBindingRevision: Int,
     selectionEvidenceSHA256: String
   ) async throws -> RuntimeJobStatus {
-    guard currentBindingRevision == previousBindingRevision
+    guard
+      currentBindingRevision == previousBindingRevision
         || currentBindingRevision == previousBindingRevision + 1,
       Self.isLowercaseSHA256(selectionEvidenceSHA256)
     else {
       throw RuntimeJobEngineError.jobNotRunnable(
-        "Loader binding settlement requires the selected or one adjacent revision and canonical evidence")
+        "Loader binding settlement requires the selected or one adjacent revision and canonical evidence"
+      )
     }
     guard var runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
@@ -3532,7 +3548,8 @@ public actor RuntimeJobEngine {
     runtime.record.recoveryAction = nil
     runtime.record.finishedAtUTC = nowUTC()
     runtime.record.timeline.append(
-      "reconciled: Loader bound at revision \(currentBindingRevision); original action not replayed")
+      "reconciled: Loader bound at revision \(currentBindingRevision); original action not replayed"
+    )
     try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
     try await recordCapabilityOutcome(
@@ -3560,7 +3577,7 @@ public actor RuntimeJobEngine {
         "Job \(jobID) is not an unresolved enter-Loader transition for the selected target")
     }
     let inspection = try DurableJournalRecovery.inspect(
-      url: jobDirectory(for: jobID).appendingPathComponent("journal.jsonl"))
+      url: jobDirectory(for: jobID).appending(path: "journal.jsonl"))
     guard !inspection.hasTornTail,
       inspection.currentState == .waitingForRecovery,
       inspection.unknownOutcomes.isEmpty,
@@ -3594,7 +3611,7 @@ public actor RuntimeJobEngine {
       try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
       return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
     }
-    let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
+    let journalURL = jobDirectory(for: jobID).appending(path: "journal.jsonl")
     var inspection = try DurableJournalRecovery.inspect(url: journalURL)
 
     // Finish a reconcile decision that was already durable when the
@@ -3711,8 +3728,9 @@ public actor RuntimeJobEngine {
       inspection = try DurableJournalRecovery.inspect(url: journalURL)
     }
 
-    guard let descriptor = RuntimeOperationCatalog.descriptor(
-      reference: runtime.record.request.operation.reference)
+    guard
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        reference: runtime.record.request.operation.reference)
     else {
       throw RuntimeJobEngineError.internalFailure(
         "catalog operation vanished for \(jobID)")
@@ -4005,7 +4023,7 @@ public actor RuntimeJobEngine {
     else { return }
 
     let replay = try DurableJournalRecovery.inspect(
-      url: jobDirectory(for: record.jobID).appendingPathComponent("journal.jsonl"))
+      url: jobDirectory(for: record.jobID).appending(path: "journal.jsonl"))
     guard replay.currentState == .failed,
       let provenNonExecution = replay.events.last(where: {
         $0.kind == .stepOutcome
@@ -4113,7 +4131,7 @@ public actor RuntimeJobEngine {
     }
     let replay = try DurableJournalRecovery.inspect(
       url: jobDirectory(for: runtime.record.jobID)
-        .appendingPathComponent("journal.jsonl"))
+        .appending(path: "journal.jsonl"))
     guard !replay.hasTornTail, replay.outstandingIntents.isEmpty,
       replay.unknownOutcomes.isEmpty
     else {
@@ -4205,8 +4223,9 @@ public actor RuntimeJobEngine {
           "flash host verification cannot resolve its typed imageBundleLease")
       }
       let board = RockchipFlashProfile.dayu200
-      guard case .string(let profileReference)? =
-        runtime.record.request.inputs["deviceProfile"],
+      guard
+        case .string(let profileReference)? =
+          runtime.record.request.inputs["deviceProfile"],
         RockchipFlashProfile.board(reference: profileReference) != nil
       else {
         throw RuntimeDispatchFailure.failed(
@@ -4324,39 +4343,46 @@ public actor RuntimeJobEngine {
     let lease: String
     switch runtime.record.operationReference {
     case "debug.hap@1":
-      guard case .string(let value)? =
-        runtime.record.request.inputs["hapArtifactLease"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["hapArtifactLease"]
       else { return nil }
       lease = value
     case "deploy.native-library.app-owned@1":
-      guard case .string(let value)? =
-        runtime.record.request.inputs["libraryArtifactLease"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["libraryArtifactLease"]
       else { return nil }
       lease = value
     case "flash.dayu200":
-      guard case .string(let value)? =
-        runtime.record.request.inputs["imageBundleLease"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["imageBundleLease"]
       else { return nil }
       lease = value
     case "workspace.apply-patch@1":
-      guard case .string(let value)? =
-        runtime.record.request.inputs["patchArtifactRef"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["patchArtifactRef"]
       else { return nil }
       lease = value
     case "workspace.symbolize-crash@1":
-      guard case .string(let value)? =
-        runtime.record.request.inputs["dumpArtifactRef"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["dumpArtifactRef"]
       else { return nil }
       lease = value
     case OpenHarmonyLocalSigning.operationReference:
-      guard case .string(let value)? =
-        runtime.record.request.inputs["unsignedHapArtifactLease"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["unsignedHapArtifactLease"]
       else { return nil }
       lease = value
     case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
       "analyzer.summarize-trace@1":
-      guard case .string(let value)? =
-        runtime.record.request.inputs["sourceArtifactRef"]
+      guard
+        case .string(let value)? =
+          runtime.record.request.inputs["sourceArtifactRef"]
       else { return nil }
       lease = value
     default:
@@ -4665,9 +4691,11 @@ public actor RuntimeJobEngine {
         }
       }
       if descriptor.reference == "deploy.native-library.app-owned@1" {
-        guard let publishStep = descriptor.steps.first(where: {
-          $0.stepID == "atomic-publish"
-        }) else {
+        guard
+          let publishStep = descriptor.steps.first(where: {
+            $0.stepID == "atomic-publish"
+          })
+        else {
           throw RuntimeJobEngineError.internalFailure(
             "native deployment catalog has no atomic publish step")
         }
@@ -4719,8 +4747,9 @@ public actor RuntimeJobEngine {
           for: rollbackStep, jobID: context.jobID, inputs: request.inputs,
           action: rollbackAction, resolvedInputArtifact: resolved,
           operationReference: descriptor.reference)
-        guard case .processSequence(
-          let executableSHA256, let invocations) = rollbackPlan.kind
+        guard
+          case .processSequence(
+            let executableSHA256, let invocations) = rollbackPlan.kind
         else {
           throw RuntimeJobEngineError.internalFailure(
             "native rollback did not lower to an exact process sequence")
@@ -5030,9 +5059,9 @@ public actor RuntimeJobEngine {
       // A workspace a person works in is still off limits: that one keeps
       // requiring a grant issued against this tree, this revision and these
       // writable scopes (CHG-2026-055 TASK-HFA-009 r2, HTP-INV-6).
-      (query.workspaceIdentitySHA256 == nil
+      query.workspaceIdentitySHA256 == nil
         ? descriptor.defaultPolicyIssuanceEnabled
-        : query.workspaceIsIsolatedTaskCopy)
+        : query.workspaceIsIsolatedTaskCopy
     {
       authorization = try await automaticRuntimeCapability(
         descriptor: descriptor, query: query,
@@ -5136,10 +5165,9 @@ public actor RuntimeJobEngine {
         .authorizationRequired,
         "reservation \(campaign.reservationID) does not carry a campaign confirmation")
     }
-    let formatter = ISO8601DateFormatter()
-    guard let admitted = formatter.date(from: admittedAtUTC),
-      let windowStart = formatter.date(from: confirmedAt),
-      let windowEnd = formatter.date(from: validUntil),
+    guard let admitted = ISO8601Timestamps.parse(admittedAtUTC),
+      let windowStart = ISO8601Timestamps.parse(confirmedAt),
+      let windowEnd = ISO8601Timestamps.parse(validUntil),
       admitted >= windowStart, admitted <= windowEnd
     else {
       throw RuntimeJobEngineError.rejected(
@@ -5203,9 +5231,10 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "campaign timing is unavailable in this runtime (no usage ledger)")
     }
-    guard let reservation = try ledger.load().reservations.first(where: {
-      $0.reservationID == campaign.reservationID
-    }), reservation.terminal == nil,
+    guard
+      let reservation = try ledger.load().reservations.first(where: {
+        $0.reservationID == campaign.reservationID
+      }), reservation.terminal == nil,
       case .evolutionCampaignConfirmation = reservation.authorizationRef
     else {
       throw RuntimeDispatchFailure.failed(
@@ -5227,8 +5256,9 @@ public actor RuntimeJobEngine {
     recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
   ) async throws -> RuntimeCapabilityReference {
     let issuedAtUTC = nowUTC()
-    guard let expiresAtUTC = Self.automaticCapabilityExpiry(
-      issuedAtUTC: issuedAtUTC, effect: query.effect)
+    guard
+      let expiresAtUTC = Self.automaticCapabilityExpiry(
+        issuedAtUTC: issuedAtUTC, effect: query.effect)
     else {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
@@ -5256,9 +5286,7 @@ public actor RuntimeJobEngine {
     // a safe continuation stays within sixteen serial uses and four hours.
     var destructiveAttemptCount = 0
     var destructiveInvocationStartedAt: Date?
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    let admittedDate = formatter.date(from: issuedAtUTC)
+    let admittedDate = ISO8601Timestamps.parse(issuedAtUTC)
     for generation in 1...100_000 {
       let capabilityID =
         "CAP-RT-POLICY-\(policyFingerprint.prefix(40))-G\(generation)"
@@ -5281,8 +5309,9 @@ public actor RuntimeJobEngine {
           case .pending, .outcomeUnknown:
             return RuntimeCapabilityReference(capabilityID: capabilityID)
           case .confirmed:
-            guard terminal.terminalState == JobState.succeeded.rawValue
-              || terminal.terminalState == JobState.recovered.rawValue
+            guard
+              terminal.terminalState == JobState.succeeded.rawValue
+                || terminal.terminalState == JobState.recovered.rawValue
             else {
               return RuntimeCapabilityReference(capabilityID: capabilityID)
             }
@@ -5290,8 +5319,8 @@ public actor RuntimeJobEngine {
             destructiveInvocationStartedAt = nil
             continue
           case .safeToReflash:
-            let generationStart = formatter.date(
-              from: existing.capability.issuedAtUTC)
+            let generationStart = ISO8601Timestamps.parse(
+              existing.capability.issuedAtUTC)
             if destructiveInvocationStartedAt == nil {
               destructiveInvocationStartedAt = generationStart
             }
@@ -5383,10 +5412,11 @@ public actor RuntimeJobEngine {
     recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
   ) -> String {
     let scopeFingerprint = authorizationScopeFingerprint(of: query)
-    let recoveryFingerprint = recoveryContext.map {
-      "\($0.uncertainEffectSetSHA256)\n\($0.coverageContractVersion)\n"
-        + "\($0.coveredEffectSetSHA256)\n\($0.destructiveEpochOrdinal)"
-    } ?? "ordinary"
+    let recoveryFingerprint =
+      recoveryContext.map {
+        "\($0.uncertainEffectSetSHA256)\n\($0.coverageContractVersion)\n"
+          + "\($0.coveredEffectSetSHA256)\n\($0.destructiveEpochOrdinal)"
+      } ?? "ordinary"
     return RuntimeJobRecord.sha256Hex(
       Data(
         "\(RuntimeOperationCatalog.catalogDigest)\n\(scopeFingerprint)\n"
@@ -5406,13 +5436,15 @@ public actor RuntimeJobEngine {
     recoveryContext: RuntimeCompleteOverwriteRecoveryContext? = nil
   ) async throws {
     let epochs = try await RuntimeSupersedingRecoveryStore(
-      stateDirectory: configuration.stateDirectory).list()
+      stateDirectory: configuration.stateDirectory
+    ).list()
     let supersededJobIDs = Set(
       epochs.filter {
         $0.stableTargetIdentitySHA256 == stableIdentitySHA256
           && $0.bindingRevision == bindingRevision
-      }.flatMap { $0.coveredIntents.map(\.jobID) })
-      .union(recoveryContext.map { Set($0.coveredIntents.map(\.jobID)) } ?? [])
+      }.flatMap { $0.coveredIntents.map(\.jobID) }
+    )
+    .union(recoveryContext.map { Set($0.coveredIntents.map(\.jobID)) } ?? [])
     for status in try await capabilityStore.list() {
       for entry in status.lineage
       where entry.targetStableIdentitySHA256 == stableIdentitySHA256
@@ -5534,13 +5566,14 @@ public actor RuntimeJobEngine {
         "authorizationRequired: fresh typed plan, target or binding drifted before dispatch")
     }
     let resolvedArtifact = try await resolvedInputArtifact(jobID: jobID)
-    let artifactFacts: [String: String] = resolvedArtifact.map {
-      [
-        "artifactId": $0.artifactID,
-        "artifactSha256": $0.sha256,
-        "artifactByteCount": String($0.byteCount),
-      ]
-    } ?? [:]
+    let artifactFacts: [String: String] =
+      resolvedArtifact.map {
+        [
+          "artifactId": $0.artifactID,
+          "artifactSha256": $0.sha256,
+          "artifactByteCount": String($0.byteCount),
+        ]
+      } ?? [:]
     // The subject is re-established here, at the moment of the effect, not
     // trusted from admission. A device mutation re-proves identity and
     // binding; a workspace mutation re-reads the tree, so a workspace that
@@ -5606,7 +5639,8 @@ public actor RuntimeJobEngine {
             "completeOverwriteRecovery.freshProofDrifted")
         }
         if let recovery = liveRecovery.context {
-          guard runtime.record.state == JobState.running.rawValue
+          guard
+            runtime.record.state == JobState.running.rawValue
               || runtime.record.state == JobState.recoveringByCompleteOverwrite.rawValue
           else {
             throw RuntimeDispatchFailure.failed(
@@ -5650,8 +5684,9 @@ public actor RuntimeJobEngine {
       if status.capability.issuer.kind == .runtimeDefaultPolicy {
         let fingerprint = Self.automaticCapabilityPolicyFingerprint(
           query: query, recoveryContext: liveRecovery.context)
-        guard authorization.capabilityID.hasPrefix(
-          "CAP-RT-POLICY-\(fingerprint.prefix(40))-G")
+        guard
+          authorization.capabilityID.hasPrefix(
+            "CAP-RT-POLICY-\(fingerprint.prefix(40))-G")
         else {
           throw RuntimeDispatchFailure.failed(
             "completeOverwriteRecovery.freshProofDrifted")
@@ -5748,11 +5783,10 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: reservation does not carry a campaign confirmation")
     }
-    let formatter = ISO8601DateFormatter()
     let consumeAt = nowUTC()
-    guard let moment = formatter.date(from: consumeAt),
-      let windowStart = formatter.date(from: confirmedAt),
-      let windowEnd = formatter.date(from: validUntil),
+    guard let moment = ISO8601Timestamps.parse(consumeAt),
+      let windowStart = ISO8601Timestamps.parse(confirmedAt),
+      let windowEnd = ISO8601Timestamps.parse(validUntil),
       moment >= windowStart, moment <= windowEnd
     else {
       throw RuntimeDispatchFailure.failed(
@@ -5860,7 +5894,7 @@ public actor RuntimeJobEngine {
   private func mutationIntentEvidence(
     for jobID: String, operationReference: String
   ) throws -> (all: [String], confirmedNotExecuted: [String], completed: [String]) {
-    let journalURL = jobDirectory(for: jobID).appendingPathComponent("journal.jsonl")
+    let journalURL = jobDirectory(for: jobID).appending(path: "journal.jsonl")
     let replay: JournalReplay
     do {
       replay = try DurableJournalRecovery.inspect(url: journalURL)
@@ -6112,8 +6146,8 @@ public actor RuntimeJobEngine {
 
   private func jobDirectory(for jobID: String) -> URL {
     configuration.stateDirectory
-      .appendingPathComponent("jobs", isDirectory: true)
-      .appendingPathComponent(jobID, isDirectory: true)
+      .appending(path: "jobs", directoryHint: .isDirectory)
+      .appending(path: jobID, directoryHint: .isDirectory)
   }
 
   private func persistRuntimeRecord(_ record: RuntimeJobRecord) throws {
@@ -6225,8 +6259,9 @@ public actor RuntimeJobEngine {
       }
     }
     if let targetStore = try? RuntimeTargetStore(
-      directoryURL: configuration.stateDirectory.appendingPathComponent(
-        "targets", isDirectory: true)),
+      directoryURL: configuration.stateDirectory.appending(
+        path:
+          "targets", directoryHint: .isDirectory)),
       let resolutions = try? targetStore.aliasResolutions()
     {
       for resolution in resolutions {
@@ -6311,12 +6346,9 @@ public actor RuntimeJobEngine {
     issuedAtUTC: String,
     effect: WorkflowEffect
   ) -> String? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    guard let issued = formatter.date(from: issuedAtUTC) else { return nil }
+    guard let issued = ISO8601Timestamps.parse(issuedAtUTC) else { return nil }
     let lifetime: TimeInterval = effect == .destructive ? 4 * 60 * 60 : 30 * 24 * 60 * 60
-    return formatter.string(from: issued.addingTimeInterval(lifetime))
+    return ISO8601Timestamps.string(from: issued.addingTimeInterval(lifetime))
   }
 
   private static func stableJobID(

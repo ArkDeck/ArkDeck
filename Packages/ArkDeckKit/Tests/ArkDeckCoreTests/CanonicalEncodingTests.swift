@@ -64,9 +64,22 @@ final class ISO8601TimestampsTests: XCTestCase {
     XCTAssertNil(ISO8601Timestamps.parse("2026-13-40T99:99:99Z"))
   }
 
-  /// The parser shares locked formatter instances across every concurrent
-  /// caller (journal, artifact, authorization services), so hammer it from
-  /// parallel tasks and require every result to stay correct.
+  func testFormatsCanonicalPlainAndFractionalSpellings() {
+    let epoch = Date(timeIntervalSince1970: 0)
+    XCTAssertEqual(ISO8601Timestamps.string(from: epoch), "1970-01-01T00:00:00Z")
+    XCTAssertEqual(
+      ISO8601Timestamps.string(from: epoch, includingFractionalSeconds: true),
+      "1970-01-01T00:00:00.000Z")
+  }
+
+  func testCanonicalPlainParserRejectsAlternateEquivalentSpellings() {
+    XCTAssertNotNil(ISO8601Timestamps.parseCanonicalPlain("1970-01-01T00:00:00Z"))
+    XCTAssertNil(ISO8601Timestamps.parseCanonicalPlain("1970-01-01T00:00:00.000Z"))
+    XCTAssertNil(ISO8601Timestamps.parseCanonicalPlain("1969-12-31T16:00:00-08:00"))
+  }
+
+  /// The shared format styles are immutable Sendable values, so hammer them
+  /// from parallel callers and require every result to stay correct.
   func testConcurrentParsingStaysCorrectAcrossTasks() async {
     let expectations: [(String, TimeInterval?)] = [
       ("2026-08-11T12:00:00Z", 1_786_449_600),

@@ -131,8 +131,8 @@ enum RuntimeCLI {
       let workspace: LaunchAgentWorkspaceConfiguration?
       if let workspaceProject, let devecoSDK {
         workspace = LaunchAgentWorkspaceConfiguration(
-          projectRoot: URL(fileURLWithPath: workspaceProject),
-          devecoSDKRoot: URL(fileURLWithPath: devecoSDK))
+          projectRoot: URL(filePath: workspaceProject),
+          devecoSDKRoot: URL(filePath: devecoSDK))
       } else {
         workspace = nil
       }
@@ -186,8 +186,8 @@ enum RuntimeCLI {
         }
         harnessModel = LaunchAgentHarnessModelConfiguration(
           provider: suppliedProvider, modelName: suppliedModel,
-          cliExecutable: URL(fileURLWithPath: suppliedCLI),
-          cliWorkingDirectory: URL(fileURLWithPath: workspaceProject),
+          cliExecutable: URL(filePath: suppliedCLI),
+          cliWorkingDirectory: URL(filePath: workspaceProject),
           cliTimeoutSeconds: timeout)
       } else {
         guard suppliedModel == nil, suppliedCLI == nil, suppliedTimeout == nil else {
@@ -198,14 +198,14 @@ enum RuntimeCLI {
         harnessModel = previousStatus?.harnessModel.map {
           LaunchAgentHarnessModelConfiguration(
             provider: $0.provider, modelName: $0.modelName,
-            cliExecutable: URL(fileURLWithPath: $0.cliPath),
-            cliWorkingDirectory: URL(fileURLWithPath: $0.cliWorkingDirectory),
+            cliExecutable: URL(filePath: $0.cliPath),
+            cliWorkingDirectory: URL(filePath: $0.cliWorkingDirectory),
             cliTimeoutSeconds: $0.cliTimeoutSeconds)
         }
       }
       let receipt = try service.install(
-        daemonBundleSource: URL(fileURLWithPath: daemonBundlePath, isDirectory: true),
-        hdcExecutable: URL(fileURLWithPath: hdcPath), workspace: workspace,
+        daemonBundleSource: URL(filePath: daemonBundlePath, directoryHint: .isDirectory),
+        hdcExecutable: URL(filePath: hdcPath), workspace: workspace,
         harnessSensitiveEvidence: harnessSensitiveEvidence,
         harnessModel: harnessModel,
         beforeBootstrap: beforeBootstrap)
@@ -344,8 +344,10 @@ enum RuntimeCLI {
     guard arguments.first == "install-sdk-release" else {
       return try runSigning(arguments, store: suppliedStore)
     }
-    let store = suppliedStore ?? OpenHarmonySigningPresetStore(
-      secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    let store =
+      suppliedStore
+      ?? OpenHarmonySigningPresetStore(
+        secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
     rest.removeAll { $0 == "--json" }
@@ -374,8 +376,8 @@ enum RuntimeCLI {
         projectRef: options.value("--project-ref")
           ?? OpenHarmonyLocalSigning.defaultProjectRef,
         bundleName: try required("--bundle-name"),
-        javaExecutable: URL(fileURLWithPath: java),
-        sdkRoot: URL(fileURLWithPath: sdk)))
+        javaExecutable: URL(filePath: java),
+        sdkRoot: URL(filePath: sdk)))
     emit(try encodedJSON(receipt), json: json)
   }
 
@@ -383,13 +385,16 @@ enum RuntimeCLI {
     _ arguments: [String],
     store suppliedStore: OpenHarmonySigningPresetStore? = nil
   ) throws {
-    let store = suppliedStore ?? OpenHarmonySigningPresetStore(
-      secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
+    let store =
+      suppliedStore
+      ?? OpenHarmonySigningPresetStore(
+        secrets: LoginKeychainSigningSecretStore(allowsUserInteraction: true))
     guard let subcommand = arguments.first else {
       throw CLIError(
         exitCode: EX_USAGE,
         message:
-          "missing signing subcommand (install-sdk-release|install|normalize|migrate-deveco|status|remove)")
+          "missing signing subcommand (install-sdk-release|install|normalize|migrate-deveco|status|remove)"
+      )
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -424,7 +429,7 @@ enum RuntimeCLI {
       defer { keystorePassword.resetBytes(in: 0..<keystorePassword.count) }
       var keyPassword = try readTTYSecret(prompt: "Key password: ")
       defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
-      let keystoreURL = URL(fileURLWithPath: keystore)
+      let keystoreURL = URL(filePath: keystore)
       var normalizedKeystorePassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         keystorePassword, keystore: keystoreURL)
       defer {
@@ -437,11 +442,11 @@ enum RuntimeCLI {
         configuration: OpenHarmonySigningPresetConfiguration(
           projectRef: options.value("--project-ref")
             ?? OpenHarmonyLocalSigning.defaultProjectRef,
-          javaExecutable: URL(fileURLWithPath: java),
-          signerJAR: URL(fileURLWithPath: jar),
+          javaExecutable: URL(filePath: java),
+          signerJAR: URL(filePath: jar),
           keystore: keystoreURL,
-          appCertificate: URL(fileURLWithPath: certificate),
-          signedProfile: URL(fileURLWithPath: profile),
+          appCertificate: URL(filePath: certificate),
+          signedProfile: URL(filePath: profile),
           keyAlias: try required("--key-alias")),
         keystorePassword: normalizedKeystorePassword,
         keyPassword: normalizedKeyPassword)
@@ -465,7 +470,7 @@ enum RuntimeCLI {
           message:
             "signing migrate-deveco requires --build-profile and --daemon absolute paths")
       }
-      let daemonURL = URL(fileURLWithPath: daemonPath)
+      let daemonURL = URL(filePath: daemonPath)
       if suppliedStore == nil {
         let installedDaemon = OpenHarmonyLocalSigning.defaultAgentDaemonURL()
         guard daemonURL.standardizedFileURL.path == installedDaemon.path,
@@ -475,16 +480,19 @@ enum RuntimeCLI {
           throw CLIError(
             exitCode: EX_USAGE,
             message:
-              "signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon")
+              "signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon"
+          )
         }
       }
-      let migrationStore = suppliedStore ?? OpenHarmonySigningPresetStore(
-        secrets: LoginKeychainSigningSecretStore(
-          agentDaemonURL: daemonURL,
-          allowsUserInteraction: true))
+      let migrationStore =
+        suppliedStore
+        ?? OpenHarmonySigningPresetStore(
+          secrets: LoginKeychainSigningSecretStore(
+            agentDaemonURL: daemonURL,
+            allowsUserInteraction: true))
       let receipt = try migrationStore.loadValidated(requireSecrets: false)
       var encrypted = try readDevEcoBuildProfileSigningMaterial(
-        at: URL(fileURLWithPath: buildProfilePath))
+        at: URL(filePath: buildProfilePath))
       defer {
         encrypted.keystore.resetBytes(in: 0..<encrypted.keystore.count)
         encrypted.key.resetBytes(in: 0..<encrypted.key.count)
@@ -524,8 +532,10 @@ enum RuntimeCLI {
       // Status is a diagnostic probe, not an authorization ceremony. Match
       // the LaunchAgent's fail-closed read contract so it can never summon a
       // SecurityAgent dialog merely by checking readiness.
-      let statusStore = suppliedStore ?? OpenHarmonySigningPresetStore(
-        secrets: LoginKeychainSigningSecretStore())
+      let statusStore =
+        suppliedStore
+        ?? OpenHarmonySigningPresetStore(
+          secrets: LoginKeychainSigningSecretStore())
       emit(try encodedJSON(statusStore.status()), json: json)
 
     case "remove":
@@ -637,7 +647,7 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message: "DevEco build-profile must contain exactly one storeFile path")
     }
-    let storeFile = URL(fileURLWithPath: String(document[storeFileRange]))
+    let storeFile = URL(filePath: String(document[storeFileRange]))
     guard storeFile.path.hasPrefix("/"),
       storeFile.standardizedFileURL.path == storeFile.path
     else {
@@ -646,20 +656,23 @@ enum RuntimeCLI {
         message: "DevEco build-profile storeFile must be a canonical absolute path")
     }
     return (
-      try exactHexField("storePassword"), try exactHexField("keyPassword"), storeFile)
+      try exactHexField("storePassword"), try exactHexField("keyPassword"), storeFile
+    )
   }
 
   private static func defaultAgentDaemonBundlePath() -> String {
     if Bundle.main.bundleURL.pathExtension == "app" {
-      return Bundle.main.bundleURL.appendingPathComponent(
-        "Contents/Helpers/\(ArkDeckHelperIdentity.daemonBundleName)", isDirectory: true
+      return Bundle.main.bundleURL.appending(
+        path:
+          "Contents/Helpers/\(ArkDeckHelperIdentity.daemonBundleName)", directoryHint: .isDirectory
       ).path
     }
     guard let executable = Bundle.main.executableURL else {
       return ArkDeckHelperIdentity.daemonBundleName
     }
-    return executable.deletingLastPathComponent().appendingPathComponent(
-      ArkDeckHelperIdentity.daemonBundleName, isDirectory: true
+    return executable.deletingLastPathComponent().appending(
+      path:
+        ArkDeckHelperIdentity.daemonBundleName, directoryHint: .isDirectory
     ).path
   }
 
@@ -790,7 +803,7 @@ enum RuntimeCLI {
       }
       var inputs: [String: JSONValue] = [:]
       if let index = rest.firstIndex(of: "--inputs-file"), index + 1 < rest.count {
-        let url = URL(fileURLWithPath: rest[index + 1])
+        let url = URL(filePath: rest[index + 1])
         guard let data = try? Data(contentsOf: url),
           let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data)
         else {
@@ -853,11 +866,7 @@ enum RuntimeCLI {
   }
 
   static func utcNow() -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
-    formatter.timeZone = TimeZone(identifier: "UTC")
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    return formatter.string(from: Date())
+    ISO8601Timestamps.string(from: Date())
   }
 
   static func runCapability(_ arguments: [String]) throws {
@@ -1113,7 +1122,7 @@ enum RuntimeCLI {
           + "[--device-profile <dayu200>]")
     }
     let targetID = arguments[targetIndex + 1]
-    let url = URL(fileURLWithPath: arguments[fileIndex + 1]).standardizedFileURL
+    let url = URL(filePath: arguments[fileIndex + 1]).standardizedFileURL
     // The vendor publishes `version-Daily_Version-OpenHarmony_7.0.0.37-…-\
     // dayu200_img.tar.gz`. Requiring a rename before the product would look at
     // the file was never a safety check — the archive is judged by reading it.
@@ -1292,7 +1301,7 @@ enum RuntimeCLI {
   }
 
   private static func readHAPImportPayload(path: String) throws -> HAPImportPayload {
-    let url = URL(fileURLWithPath: path).standardizedFileURL
+    let url = URL(filePath: path).standardizedFileURL
     let name = url.lastPathComponent
     guard name.count <= 128,
       name.range(
@@ -1357,7 +1366,7 @@ enum RuntimeCLI {
   private static func readNativeLibraryImportPayload(
     path: String
   ) throws -> HAPImportPayload {
-    let url = URL(fileURLWithPath: path).standardizedFileURL
+    let url = URL(filePath: path).standardizedFileURL
     let name = url.lastPathComponent
     guard name.count <= 128,
       name.range(
@@ -1497,7 +1506,7 @@ enum RuntimeCLI {
           exitCode: EX_USAGE,
           message: "job plan requires --request-file <typed-request.json>")
       }
-      let url = URL(fileURLWithPath: rest[fileIndex + 1])
+      let url = URL(filePath: rest[fileIndex + 1])
       guard let requestJSON = try? String(contentsOf: url, encoding: .utf8) else {
         throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
       }
@@ -1576,7 +1585,7 @@ enum RuntimeCLI {
       // express; it is passed through verbatim so the daemon, not the CLI,
       // remains the validator.
       if let fileIndex = rest.firstIndex(of: "--request-file"), fileIndex + 1 < rest.count {
-        let url = URL(fileURLWithPath: rest[fileIndex + 1])
+        let url = URL(filePath: rest[fileIndex + 1])
         guard let json = try? String(contentsOf: url, encoding: .utf8) else {
           throw CLIError(exitCode: EX_USAGE, message: "cannot read \(url.path)")
         }
@@ -1689,7 +1698,7 @@ enum RuntimeCLI {
           exitCode: EX_USAGE,
           message: "debug start requires --request-file <destructive-flash-request.json>")
       }
-      let requestURL = URL(fileURLWithPath: requestPath)
+      let requestURL = URL(filePath: requestPath)
       guard let requestJSON = try? String(contentsOf: requestURL, encoding: .utf8) else {
         throw CLIError(exitCode: EX_USAGE, message: "cannot read \(requestURL.path)")
       }
@@ -1710,7 +1719,7 @@ enum RuntimeCLI {
             "debug evaluate requires --invocation <id> --action-file <effect-action.json> "
             + "--source-sha256 <sha256> --build-sha256 <sha256>")
       }
-      let actionURL = URL(fileURLWithPath: actionPath)
+      let actionURL = URL(filePath: actionPath)
       guard let actionJSON = try? String(contentsOf: actionURL, encoding: .utf8) else {
         throw CLIError(exitCode: EX_USAGE, message: "cannot read \(actionURL.path)")
       }
@@ -1925,7 +1934,7 @@ enum RuntimeCLI {
           exitCode: EX_USAGE,
           message: "task propose-patch requires --proposal-file <proposal.json>")
       }
-      let url = URL(fileURLWithPath: path).standardizedFileURL
+      let url = URL(filePath: path).standardizedFileURL
       let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
       guard values?.isRegularFile == true,
         let size = values?.fileSize, size > 0,
@@ -1990,7 +1999,7 @@ enum RuntimeCLI {
         "refusing to write final.patch: bytes hash to \(patchDigest) "
           + "but the candidate metadata names \(diffDigest)")
     }
-    let directory = URL(fileURLWithPath: destinationPath, isDirectory: true)
+    let directory = URL(filePath: destinationPath, directoryHint: .isDirectory)
       .standardizedFileURL
     var isDirectory: ObjCBool = false
     if FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
@@ -2010,7 +2019,7 @@ enum RuntimeCLI {
     // Refuse every collision before writing anything: a bundle is delivered
     // whole or not at all.
     for (name, _) in files {
-      let target = directory.appendingPathComponent(name)
+      let target = directory.appending(path: name)
       guard !FileManager.default.fileExists(atPath: target.path) else {
         throw CLIError(
           exitCode: EX_CANTCREAT,
@@ -2020,7 +2029,7 @@ enum RuntimeCLI {
     var written: [String] = []
     for (name, contents) in files {
       try Data(contents.utf8).write(
-        to: directory.appendingPathComponent(name), options: [.atomic])
+        to: directory.appending(path: name), options: [.atomic])
       written.append(name)
     }
     return .object([
@@ -2058,7 +2067,9 @@ enum RuntimeCLI {
       guard read > 0 else {
         throw CLIError(exitCode: EX_IOERR, message: "cannot read flash bundle file")
       }
-      buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[0..<read])) }
+      buffer.withUnsafeBytes {
+        hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0[0..<read]))
+      }
     }
     guard lseek(descriptor, 0, SEEK_SET) == 0 else {
       throw CLIError(exitCode: EX_IOERR, message: "cannot rewind flash bundle file")

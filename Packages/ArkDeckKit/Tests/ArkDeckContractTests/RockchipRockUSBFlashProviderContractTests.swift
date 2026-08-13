@@ -338,11 +338,11 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     async throws
   {
     let container = FileManager.default.temporaryDirectory
-      .appendingPathComponent("rockusb-boundary-\(UUID().uuidString)")
+      .appending(path: "rockusb-boundary-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: container) }
     let layout = try SessionLayout(
       sessionID: "rk-test-session", jobID: "rk-test-job",
-      root: container.appendingPathComponent("session"))
+      root: container.appending(path: "session"))
     let auditStore = try FileDurableSessionAuditStore(layout: layout)
 
     let boundary = RockchipCriticalWriteBoundary()
@@ -651,7 +651,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     ])
     let gzipped = Self.gzip(tar, fileName: "images.tar")
     let url = FileManager.default.temporaryDirectory
-      .appendingPathComponent("rockusb-tar-\(UUID().uuidString).tar.gz")
+      .appending(path: "rockusb-tar-\(UUID().uuidString).tar.gz")
     defer { try? FileManager.default.removeItem(at: url) }
     try gzipped.write(to: url)
 
@@ -769,7 +769,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
 
   private static func writeTemporary(_ data: Data) throws -> URL {
     let url = FileManager.default.temporaryDirectory
-      .appendingPathComponent("rockusb-fixture-\(UUID().uuidString)")
+      .appending(path: "rockusb-fixture-\(UUID().uuidString)")
     try data.write(to: url)
     return url
   }

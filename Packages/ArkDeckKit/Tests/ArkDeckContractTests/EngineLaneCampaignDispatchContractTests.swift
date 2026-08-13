@@ -16,8 +16,9 @@ import XCTest
 /// campaign retries, stops, or is told it succeeded.
 final class EngineLaneCampaignDispatchContractTests: XCTestCase {
   private static let profile = RockchipFlashProfile.dayu200
-  private static let archiveURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-    "arkdeck-dispatch-must-not-redescribe-\(UUID().uuidString.lowercased()).tar.gz")
+  private static let archiveURL = FileManager.default.temporaryDirectory.appending(
+    path:
+      "arkdeck-dispatch-must-not-redescribe-\(UUID().uuidString.lowercased()).tar.gz")
 
   private static func admitted(
     ordinal: Int = 1,
@@ -338,8 +339,9 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
     let bytes = Data("not-a-flash-archive".utf8)
     let actualDigest = SHA256.hash(data: bytes)
       .map { String(format: "%02x", $0) }.joined()
-    let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-admission-profile-drift-\(UUID().uuidString.lowercased()).tar.gz")
+    let fileURL = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-admission-profile-drift-\(UUID().uuidString.lowercased()).tar.gz")
     try bytes.write(to: fileURL, options: .atomic)
     defer { try? FileManager.default.removeItem(at: fileURL) }
 
@@ -360,8 +362,10 @@ final class EngineLaneCampaignDispatchContractTests: XCTestCase {
       try profile(size: Int64(bytes.count), digest: String(repeating: "0", count: 64)),
     ]
     let client = AgentClient(
-      socketPath: FileManager.default.temporaryDirectory.appendingPathComponent(
-        "arkdeck-no-rpc-\(UUID().uuidString.lowercased()).sock").path)
+      socketPath: FileManager.default.temporaryDirectory.appending(
+        path:
+          "arkdeck-no-rpc-\(UUID().uuidString.lowercased()).sock"
+      ).path)
 
     for drifted in profiles {
       do {

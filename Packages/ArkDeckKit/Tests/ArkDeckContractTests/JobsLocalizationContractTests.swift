@@ -3,7 +3,7 @@ import XCTest
 
 final class JobsLocalizationContractTests: XCTestCase {
   private var repositoryRoot: URL {
-    var root = URL(fileURLWithPath: #filePath)
+    var root = URL(filePath: #filePath)
     for _ in 0..<5 {
       root.deleteLastPathComponent()
     }
@@ -11,8 +11,9 @@ final class JobsLocalizationContractTests: XCTestCase {
   }
 
   private var sourceURL: URL {
-    repositoryRoot.appendingPathComponent(
-      "ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift")
+    repositoryRoot.appending(
+      path:
+        "ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift")
   }
 
   func testJobsCopyUsesDedicatedNamedTable() throws {
@@ -38,8 +39,9 @@ final class JobsLocalizationContractTests: XCTestCase {
   }
 
   func testEveryStaticJobsKeyHasEnglishAndSimplifiedChineseValues() throws {
-    let catalogURL = repositoryRoot.appendingPathComponent(
-      "ArkDeckApp/Resources/JobsLocalizable.xcstrings")
+    let catalogURL = repositoryRoot.appending(
+      path:
+        "ArkDeckApp/Resources/JobsLocalizable.xcstrings")
     let data = try Data(contentsOf: catalogURL)
     let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     let strings = try XCTUnwrap(root["strings"] as? [String: Any])
@@ -73,7 +75,7 @@ final class JobsLocalizationContractTests: XCTestCase {
 
   func testJobsLocalizationCatalogIsAnAppResource() throws {
     let project = try String(
-      contentsOf: repositoryRoot.appendingPathComponent("ArkDeck.xcodeproj/project.pbxproj"),
+      contentsOf: repositoryRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
 
     XCTAssertTrue(project.contains("JobsLocalizable.xcstrings in Resources"))
@@ -82,8 +84,9 @@ final class JobsLocalizationContractTests: XCTestCase {
   func testDAYU200OperationIsDisplayedWithoutHistoricalVersionSuffixes() throws {
     let inspector = try String(contentsOf: sourceURL, encoding: .utf8)
     let history = try String(
-      contentsOf: repositoryRoot.appendingPathComponent(
-        "ArkDeckApp/Features/History/RuntimeHistoryView.swift"),
+      contentsOf: repositoryRoot.appending(
+        path:
+          "ArkDeckApp/Features/History/RuntimeHistoryView.swift"),
       encoding: .utf8)
 
     XCTAssertTrue(inspector.contains("displayedOperationReference(job.operationReference)"))

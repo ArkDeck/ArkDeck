@@ -33,18 +33,19 @@ private func stalePatchReply(hypothesis: String) -> Data {
     """
   let digest = SHA256.hash(data: Data(diff.utf8))
     .map { String(format: "%02x", $0) }.joined()
-  return (try? JSONEncoder().encode(
-    JSONValue.object([
-      "kind": .string("proposePatch"),
-      "hypothesis": .string(hypothesis),
-      "reasonCode": .string("patchModelProposal"),
-      "baseWorkspaceRevision": .string(stalePatchBaseRevision),
-      "patchSha256": .string(digest),
-      "unifiedDiff": .string(diff),
-      "touchedFiles": .array([.string("Sources/A.swift")]),
-      "expectedChangedSymbols": .array([.string("value")]),
-      "expectedObservation": .string("PATCH_APPLIED"),
-    ]))) ?? Data()
+  return
+    (try? JSONEncoder().encode(
+      JSONValue.object([
+        "kind": .string("proposePatch"),
+        "hypothesis": .string(hypothesis),
+        "reasonCode": .string("patchModelProposal"),
+        "baseWorkspaceRevision": .string(stalePatchBaseRevision),
+        "patchSha256": .string(digest),
+        "unifiedDiff": .string(diff),
+        "touchedFiles": .array([.string("Sources/A.swift")]),
+        "expectedChangedSymbols": .array([.string("value")]),
+        "expectedObservation": .string("PATCH_APPLIED"),
+      ]))) ?? Data()
 }
 
 /// Runs `interference` while the coordinator waits for a proposal, then
@@ -222,8 +223,8 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-stale-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-stale-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -412,8 +413,9 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
     let narrowed = HarnessDecisionBasis(
       snapshot: snapshot(version: 4),
       offeredOperations: [DebugCrashTaskHandler.observeDevice])
-    guard case .basisMismatch? = HarnessDecisionFreshness.staleness(
-      of: decision, against: narrowed)
+    guard
+      case .basisMismatch? = HarnessDecisionFreshness.staleness(
+        of: decision, against: narrowed)
     else {
       return XCTFail("a narrowed operation set must read as a changed basis")
     }
@@ -859,8 +861,9 @@ final class HarnessStaleDecisionContractTests: XCTestCase {
       kind: .invokeOperation, operationReference: DebugCrashTaskHandler.observeDevice,
       hypothesis: "replacement", reasonCode: "replacement", producer: "deterministic@1",
       createdAtUTC: "2026-07-31T00:00:01Z"
-    ).stamped(with: HarnessDecisionBasis(
-      snapshot: current, offeredOperations: [DebugCrashTaskHandler.observeDevice]))
+    ).stamped(
+      with: HarnessDecisionBasis(
+        snapshot: current, offeredOperations: [DebugCrashTaskHandler.observeDevice]))
     do {
       try await store.putDecision(replacement)
       XCTFail("an unresolved submitted intent must own its original decision")

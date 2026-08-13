@@ -1901,7 +1901,7 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       cancelPersistence.store(
         try Self.terminalFinalization(
           fixture: fixture, status: "cancelled", recordID: "terminal-cancel"))
-      try await Task.sleep(nanoseconds: 5_000_000_000)
+      try await Task.sleep(for: .seconds(5))
       return "late"
     }
     let cancelFinalizer:
@@ -1919,7 +1919,7 @@ final class SessionArtifactStorageContractTests: XCTestCase {
         request: cancelling, snapshot: snapshot,
         operation: cancelOperation, finalize: cancelFinalizer)
     }
-    try await Task.sleep(nanoseconds: 50_000_000)
+    try await Task.sleep(for: .milliseconds(50))
     task.cancel()
     do {
       _ = try await task.value
@@ -2975,7 +2975,7 @@ final class SessionArtifactStorageContractTests: XCTestCase {
       }
     }
     XCTAssertThrowsError(
-      try InputImageReferencer().reference(URL(fileURLWithPath: "/dev/zero")))
+      try InputImageReferencer().reference(URL(filePath: "/dev/zero")))
   }
 
   func testArtifactPublicationRejectsSourceAppendAndTruncateDuringStreaming() async throws {

@@ -369,13 +369,15 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         try faultInjector.check(.journalFileSync)
         let fileSyncStarted = measuresAppend ? DispatchTime.now().uptimeNanoseconds : 0
         try DurableFilePrimitives.fullSync(descriptor, path: url.path)
-        let fileSyncNanoseconds = measuresAppend
+        let fileSyncNanoseconds =
+          measuresAppend
           ? DispatchTime.now().uptimeNanoseconds - fileSyncStarted
           : 0
         try faultInjector.check(.journalDirectorySync)
         let directorySyncStarted = measuresAppend ? DispatchTime.now().uptimeNanoseconds : 0
         try DurableFilePrimitives.syncDirectory(url.deletingLastPathComponent())
-        let directorySyncNanoseconds = measuresAppend
+        let directorySyncNanoseconds =
+          measuresAppend
           ? DispatchTime.now().uptimeNanoseconds - directorySyncStarted
           : 0
         var finalMetadata = stat()
@@ -388,12 +390,13 @@ public final class FileDurableJournal: DurableJournalAppending, @unchecked Senda
         currentCursor.accept(event: event, encodedData: data, metadata: finalMetadata)
         appendCursor = currentCursor
         if let appendMeasurementSink {
-          appendMeasurementSink(JournalAppendMeasurement(
-            validationBytesRead: validationBytesRead,
-            usedFullReplay: usedFullReplay,
-            fileSyncNanoseconds: fileSyncNanoseconds,
-            directorySyncNanoseconds: directorySyncNanoseconds,
-            totalAppendNanoseconds: DispatchTime.now().uptimeNanoseconds - appendStarted))
+          appendMeasurementSink(
+            JournalAppendMeasurement(
+              validationBytesRead: validationBytesRead,
+              usedFullReplay: usedFullReplay,
+              fileSyncNanoseconds: fileSyncNanoseconds,
+              directorySyncNanoseconds: directorySyncNanoseconds,
+              totalAppendNanoseconds: DispatchTime.now().uptimeNanoseconds - appendStarted))
         }
       }
     } catch {
@@ -459,7 +462,7 @@ package struct JournalCheckpoint: Codable, Equatable, Sendable {
   ) throws {
     guard !sessionID.isEmpty, !jobID.isEmpty, journalSequence >= 0,
       JobState(rawValue: state) != nil,
-      ISO8601DateFormatter().date(from: updatedAt) != nil
+      ISO8601Timestamps.parse(updatedAt) != nil
     else { throw DurableFileError.checkpointInvalid("invalid checkpoint fields") }
     schemaVersion = "1.0.0"
     self.sessionID = sessionID

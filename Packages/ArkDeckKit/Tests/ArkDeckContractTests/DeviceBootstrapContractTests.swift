@@ -8,8 +8,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     directory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-bootstrap-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-bootstrap-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -331,7 +331,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
     let store = try RuntimeTargetStore(directoryURL: directory)
     let adopted = try store.adopt(
       stableIdentitySHA256: normalModeIdentity, connectKey: connectKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-07-29T00:00:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-07-29T00:00:00Z"
+    ).record
     let flashed = try store.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: normalModeIdentity, previousRevision: 1,
@@ -381,7 +382,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
       stableIdentitySHA256: previousIdentity,
       connectKey: "normal-mode-connect-key",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-29T00:00:00Z").record
+      nowUTC: "2026-07-29T00:00:00Z"
+    ).record
     let advance = RuntimeTargetBindingLineageAdvance(
       previousStableIdentitySHA256: previousIdentity,
       previousRevision: 1,
@@ -412,7 +414,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
       stableIdentitySHA256: previousIdentity,
       connectKey: "normal-mode-connect-key",
       toolVersion: "3.2.0f",
-      nowUTC: "2026-07-29T00:00:00Z").record
+      nowUTC: "2026-07-29T00:00:00Z"
+    ).record
 
     XCTAssertThrowsError(
       try store.advanceBindingLineage(
@@ -452,7 +455,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
       serial: aliasConnectKey)
     let adopted = try store.adopt(
       stableIdentitySHA256: originalIdentity, connectKey: "original-hdc-address",
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let canonical = try store.advanceBindingLineage(
       RuntimeTargetBindingLineageAdvance(
         previousStableIdentitySHA256: originalIdentity, previousRevision: 1,
@@ -460,7 +464,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
     ).record
     let alias = try store.adopt(
       stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z"
+    ).record
     XCTAssertNotEqual(alias.targetID, adopted.targetID)
 
     let draft = RuntimeTargetAliasResolutionDraft(
@@ -498,7 +503,8 @@ final class DeviceBootstrapContractTests: XCTestCase {
     XCTAssertEqual(
       try store.adopt(
         stableIdentitySHA256: aliasIdentity, connectKey: aliasConnectKey,
-        toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:20:00Z").record,
+        toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:20:00Z"
+      ).record,
       canonical)
     XCTAssertFalse(
       try store.hasConflictingHDCAliasOwner(
@@ -527,12 +533,14 @@ final class DeviceBootstrapContractTests: XCTestCase {
     let canonical = try store.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: "canonical", toolVersion: "3.2.0f",
-      nowUTC: "2026-08-08T00:00:00Z").record
+      nowUTC: "2026-08-08T00:00:00Z"
+    ).record
     let aliasKey = "alias"
     let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasKey)
     let alias = try store.adopt(
       stableIdentitySHA256: aliasIdentity, connectKey: aliasKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-08T00:01:00Z"
+    ).record
     _ = try store.appendAliasResolution(
       RuntimeTargetAliasResolutionDraft(
         aliasTargetID: alias.targetID,
@@ -550,7 +558,7 @@ final class DeviceBootstrapContractTests: XCTestCase {
         ],
         coveredUnknownIntents: [], establishedAtUTC: "2026-08-08T00:10:00Z"))
 
-    let url = directory.appendingPathComponent("targets.json")
+    let url = directory.appending(path: "targets.json")
     var document = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
     var resolutions = try XCTUnwrap(document["aliasResolutions"] as? [[String: Any]])
@@ -577,7 +585,7 @@ final class DeviceBootstrapContractTests: XCTestCase {
         }]
       }
       """.utf8)
-    try legacy.write(to: directory.appendingPathComponent("targets.json"))
+    try legacy.write(to: directory.appending(path: "targets.json"))
     let store = try RuntimeTargetStore(directoryURL: directory)
     let record = try XCTUnwrap(store.find(targetID: "TGT-LEGACY"))
     XCTAssertEqual(record.bindingRevision, 1)

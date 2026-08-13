@@ -941,9 +941,9 @@ actor RockchipEvolutionCampaignAdmissionService {
       operationDigestSHA256: assertion.planDigestSHA256,
       targetDigestSHA256: facts.targetDigestSHA256,
       reservedAt: beforeReservation.auditTimestamp,
-      forwardLeaseExpiresAt: ISO8601DateFormatter().string(
+      forwardLeaseExpiresAt: ISO8601Timestamps.string(
         from: reservationDate.addingTimeInterval(30)),
-      compensationLeaseExpiresAt: ISO8601DateFormatter().string(
+      compensationLeaseExpiresAt: ISO8601Timestamps.string(
         from: reservationDate.addingTimeInterval(120)),
       campaignEvidenceProvenance: try AgentAuthorityCampaignEvidenceProvenance(
         candidateDigestSHA256: permit.candidate.digestSHA256,

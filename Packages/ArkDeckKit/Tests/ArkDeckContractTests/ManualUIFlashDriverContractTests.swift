@@ -8,10 +8,11 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   /// fresh module cache per assertion turned three small shape checks into
   /// several minutes of unrelated AppKit/Foundation cold compilation.
   private static let candidateValidatorModuleCache = FileManager.default.temporaryDirectory
-    .appendingPathComponent("manual-ui-validator-modules-\(UUID().uuidString)", isDirectory: true)
+    .appending(
+      path: "manual-ui-validator-modules-\(UUID().uuidString)", directoryHint: .isDirectory)
 
   private func repositoryRoot() -> URL {
-    var repositoryRoot = URL(fileURLWithPath: #filePath)
+    var repositoryRoot = URL(filePath: #filePath)
     for _ in 0..<5 {
       repositoryRoot.deleteLastPathComponent()
     }
@@ -20,7 +21,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
   private func repositorySource(_ path: String) throws -> String {
     return try String(
-      contentsOf: repositoryRoot().appendingPathComponent(path),
+      contentsOf: repositoryRoot().appending(path: path),
       encoding: .utf8)
   }
 
@@ -36,11 +37,13 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     let output = Pipe()
     let errors = Pipe()
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    process.executableURL = URL(filePath: "/usr/bin/xcrun")
     process.arguments = [
       "swift", "-module-cache-path", cache.path,
-      repositoryRoot().appendingPathComponent(
-        "scripts/rockchip_component/manual_ui_flash.swift").path,
+      repositoryRoot().appending(
+        path:
+          "scripts/rockchip_component/manual_ui_flash.swift"
+      ).path,
       "--validate-candidate", candidateURL.path,
     ]
     process.standardOutput = output
@@ -52,7 +55,8 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     return (
       process.terminationStatus,
       String(decoding: stdout, as: UTF8.self),
-      String(decoding: stderr, as: UTF8.self))
+      String(decoding: stderr, as: UTF8.self)
+    )
   }
 
   func testDriverUsesThePublishedOneClickFlashSurface() throws {
@@ -148,8 +152,9 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   }
 
   func testStandaloneValidatorAcceptsNovelCompositionAndRejectsAuthorityField() throws {
-    let candidateURL = repositoryRoot().appendingPathComponent(
-      "scripts/rockchip_component/manual_ui_flash_candidate.json")
+    let candidateURL = repositoryRoot().appending(
+      path:
+        "scripts/rockchip_component/manual_ui_flash_candidate.json")
     let accepted = try runCandidateValidator(candidateURL)
     XCTAssertEqual(accepted.status, 0, accepted.stderr)
     XCTAssertTrue(accepted.stdout.contains("CANDIDATE_VALID:"))
@@ -161,7 +166,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       ["kind": "waitForPresence", "identifier": "flash.novel.debug.control"], at: 0)
     object["actions"] = actions
     let novelURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("manual-ui-novel-\(UUID().uuidString).json")
+      .appending(path: "manual-ui-novel-\(UUID().uuidString).json")
     try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
       .write(to: novelURL, options: .atomic)
     defer { try? FileManager.default.removeItem(at: novelURL) }
@@ -170,18 +175,20 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
 
     object["capability"] = "candidate-must-not-supply"
     let invalidURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("manual-ui-invalid-\(UUID().uuidString).json")
+      .appending(path: "manual-ui-invalid-\(UUID().uuidString).json")
     try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
       .write(to: invalidURL, options: .atomic)
     defer { try? FileManager.default.removeItem(at: invalidURL) }
     let rejected = try runCandidateValidator(invalidURL)
     XCTAssertEqual(rejected.status, 2)
-    XCTAssertTrue(rejected.stderr.contains("candidate UI program must have the exact published shape"))
+    XCTAssertTrue(
+      rejected.stderr.contains("candidate UI program must have the exact published shape"))
   }
 
   func testRockchipSourceManifestPinsCurrentRepoBuildInputsBeforePush() throws {
-    let manifestURL = repositoryRoot().appendingPathComponent(
-      "openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json")
+    let manifestURL = repositoryRoot().appending(
+      path:
+        "openspec/integrations/rockchip/bundled-component/1.0.0/source-distribution-manifest.json")
     let manifest = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
     let records = try XCTUnwrap(manifest["buildFiles"] as? [[String: Any]])
@@ -192,7 +199,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       let expectedSize = try XCTUnwrap(record["size"] as? Int)
       let expectedSHA256 = try XCTUnwrap(record["sha256"] as? String)
       let expectedGitBlob = try XCTUnwrap(record["gitBlob"] as? String)
-      let bytes = try Data(contentsOf: repositoryRoot().appendingPathComponent(relativePath))
+      let bytes = try Data(contentsOf: repositoryRoot().appending(path: relativePath))
       let sha256 = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
       var gitBlobInput = Data("blob \(bytes.count)\0".utf8)
       gitBlobInput.append(bytes)
@@ -208,7 +215,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   func testCandidateProgramCannotNameTargetArchivePlanValueOrSubmit() throws {
     let data = try Data(
       contentsOf: repositoryRoot()
-        .appendingPathComponent("scripts/rockchip_component/manual_ui_flash_candidate.json"))
+        .appending(path: "scripts/rockchip_component/manual_ui_flash_candidate.json"))
     let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     XCTAssertEqual(
       Set(object.keys),
@@ -223,14 +230,16 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
     for key in forbidden { XCTAssertNil(object[key], "candidate exposed forbidden key \(key)") }
 
     var forbiddenAction = object
-    forbiddenAction["actions"] = [[
-      "kind": "perform",
-      "identifier": "flash.execute.submit",
-      "delivery": "pointerClick",
-      "fallbackStrings": [],
-    ]]
+    forbiddenAction["actions"] = [
+      [
+        "kind": "perform",
+        "identifier": "flash.execute.submit",
+        "delivery": "pointerClick",
+        "fallbackStrings": [],
+      ]
+    ]
     let invalidURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("manual-ui-submit-\(UUID().uuidString).json")
+      .appending(path: "manual-ui-submit-\(UUID().uuidString).json")
     try JSONSerialization.data(withJSONObject: forbiddenAction, options: [.sortedKeys])
       .write(to: invalidURL, options: .atomic)
     defer { try? FileManager.default.removeItem(at: invalidURL) }

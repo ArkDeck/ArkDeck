@@ -13,8 +13,8 @@
 import CryptoKit
 import XCTest
 
-@testable import ArkDeckCore
 @testable import ArkDeckAgentComposition
+@testable import ArkDeckCore
 @testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
@@ -34,7 +34,8 @@ private func applicationLivenessJSON(
   deployedDigest: String? = nil
 ) -> String {
   let digest = deployedDigest.map { #", "deployedArtifactDigest":"\#($0)""# } ?? ""
-  return #"{"documentType":"arkdeck-application-liveness","schemaVersion":"1.0.0","applicationRef":"\#(String(repeating: "a", count: 64))","state":"\#(state)","reasonCode":"\#(reasonCode)","abilityState":"UNKNOWN","processState":"\#(processState)","pidObserved":\#(pidObserved),"targetBindingRevision":\#(bindingRevision)\#(digest),"sourceRuntimeJobId":"\#(jobID)","sourceOperationRef":"capture.diagnostics@1","observationWindow":{"startedAtUtc":"2026-08-01T00:00:00Z","endedAtUtc":"2026-08-01T00:00:00Z"},"observedAtUtc":"2026-08-01T00:00:00Z"}"#
+  return
+    #"{"documentType":"arkdeck-application-liveness","schemaVersion":"1.0.0","applicationRef":"\#(String(repeating: "a", count: 64))","state":"\#(state)","reasonCode":"\#(reasonCode)","abilityState":"UNKNOWN","processState":"\#(processState)","pidObserved":\#(pidObserved),"targetBindingRevision":\#(bindingRevision)\#(digest),"sourceRuntimeJobId":"\#(jobID)","sourceOperationRef":"capture.diagnostics@1","observationWindow":{"startedAtUtc":"2026-08-01T00:00:00Z","endedAtUtc":"2026-08-01T00:00:00Z"},"observedAtUtc":"2026-08-01T00:00:00Z"}"#
 }
 
 private enum HilogFixture {
@@ -238,7 +239,9 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
       published: published,
       sensitive: sensitive,
       missingReason: missingReason)
-    lock.withLock { staged[jobID, default: []].append(StagedArtifact(descriptor: descriptor, bytes: data)) }
+    lock.withLock {
+      staged[jobID, default: []].append(StagedArtifact(descriptor: descriptor, bytes: data))
+    }
   }
 
   func inventory(jobID: String) async throws -> [HarnessArtifactDescriptor] {
@@ -252,7 +255,8 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
 
   func read(jobID: String, artifactID: String, maximumBytes: Int) async throws -> Data {
     try lock.withLock {
-      guard let match = (staged[jobID] ?? []).first(where: { $0.descriptor.artifactID == artifactID })
+      guard
+        let match = (staged[jobID] ?? []).first(where: { $0.descriptor.artifactID == artifactID })
       else { throw HarnessArtifactPortError.unreadable(artifactID) }
       reads.append(artifactID)
       return match.bytes.prefix(maximumBytes)
@@ -266,9 +270,11 @@ private final class StagingArtifactPort: HarnessArtifactPort, @unchecked Sendabl
         throw HarnessArtifactPortError.unavailable(
           "artifact leases are unavailable in this composition")
       }
-      guard (staged[jobID] ?? []).contains(where: {
-        $0.descriptor.artifactID == artifactID && $0.descriptor.published
-      }) else { throw HarnessArtifactPortError.unreadable(artifactID) }
+      guard
+        (staged[jobID] ?? []).contains(where: {
+          $0.descriptor.artifactID == artifactID && $0.descriptor.published
+        })
+      else { throw HarnessArtifactPortError.unreadable(artifactID) }
       return "lease-v1:\(jobID):\(artifactID)"
     }
   }
@@ -332,8 +338,8 @@ final class HarnessEvaluationContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-eval-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-eval-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -345,7 +351,7 @@ final class HarnessEvaluationContractTests: XCTestCase {
 
   func testSensitiveEvidenceLeaseRequiresTheSameExplicitOptInAsReading() async throws {
     let store = try RuntimeArtifactStore(
-      rootURL: rootURL.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: rootURL.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-31T00:00:00Z" })
     let published = try await store.publish(
       RuntimeArtifactPublicationRequest(
@@ -686,7 +692,9 @@ final class HarnessEvaluationContractTests: XCTestCase {
           artifactID: "ART-1", name: "crash-index.txt", byteCount: 10, sha256: "abc",
           verified: true)
       ])
-    let criteria = [criterion("DC-1", metric: "matchingCrashCount", expected: .integer(0), minimumSamples: 5)]
+    let criteria = [
+      criterion("DC-1", metric: "matchingCrashCount", expected: .integer(0), minimumSamples: 5)
+    ]
 
     let short = HarnessCriteriaEvaluator.evaluate(
       criteria: criteria,
@@ -1278,12 +1286,14 @@ extension HarnessEvaluationContractTests {
   func testUnreadableLedgerIsAnIntegrityBlockerNotAnEmptyLedger() async throws {
     let port = StagingArtifactPort()
     port.stage(jobID: "JOB-1", name: "crash-index.txt", text: "hidumper: unknown service 1201")
-    port.stage(jobID: "JOB-2", name: "crash-index.txt", text: """
-      Fault log list:
-      ******
-      not-a-valid-entry-name
-      ******
-      """)
+    port.stage(
+      jobID: "JOB-2", name: "crash-index.txt",
+      text: """
+        Fault log list:
+        ******
+        not-a-valid-entry-name
+        ******
+        """)
     let builder = HarnessObservationBuilder(artifacts: port)
 
     let garbage = try await builder.observe(

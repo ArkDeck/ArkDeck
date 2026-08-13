@@ -18,15 +18,18 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-launchagent-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-launchagent-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    paths = LaunchAgentPaths(homeDirectory: root.appendingPathComponent("home", isDirectory: true))
-    daemonBundle = root.appendingPathComponent(
-      "products/\(ArkDeckHelperIdentity.daemonBundleName)", isDirectory: true)
-    daemon = daemonBundle.appendingPathComponent(
-      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
-    hdc = root.appendingPathComponent("DevEco/toolchains/hdc")
+    paths = LaunchAgentPaths(
+      homeDirectory: root.appending(path: "home", directoryHint: .isDirectory))
+    daemonBundle = root.appending(
+      path:
+        "products/\(ArkDeckHelperIdentity.daemonBundleName)", directoryHint: .isDirectory)
+    daemon = daemonBundle.appending(
+      path:
+        "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
+    hdc = root.appending(path: "DevEco/toolchains/hdc")
     try makeDaemonBundle(daemonBundle)
     try makeExecutable(daemon, bytes: "daemon-v1")
     try makeExecutable(hdc, bytes: "hdc-v1")
@@ -51,17 +54,17 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   func testDistributionHelpersShareOnlyTheProvisionedKeychainGroup() throws {
-    let distribution = packageRoot.appendingPathComponent("Distribution/macOS")
-    let cliInfo = try plist(at: distribution.appendingPathComponent("ArkDeckCLI-Info.plist"))
+    let distribution = packageRoot.appending(path: "Distribution/macOS")
+    let cliInfo = try plist(at: distribution.appending(path: "ArkDeckCLI-Info.plist"))
     let daemonInfo = try plist(
-      at: distribution.appendingPathComponent("ArkDeckAgent-Info.plist"))
+      at: distribution.appending(path: "ArkDeckAgent-Info.plist"))
     XCTAssertEqual(
       cliInfo["CFBundleIdentifier"] as? String, ArkDeckHelperIdentity.cliBundleIdentifier)
     XCTAssertEqual(
       daemonInfo["CFBundleIdentifier"] as? String,
       ArkDeckHelperIdentity.daemonBundleIdentifier)
     for name in ["ArkDeckCLI.entitlements", "ArkDeckAgent.entitlements"] {
-      let entitlements = try plist(at: distribution.appendingPathComponent(name))
+      let entitlements = try plist(at: distribution.appending(path: name))
       XCTAssertEqual(
         entitlements["com.apple.developer.team-identifier"] as? String,
         ArkDeckHelperIdentity.teamIdentifier)
@@ -77,7 +80,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         [ArkDeckHelperIdentity.keychainAccessGroup])
     }
     let releaseScript = try String(
-      contentsOf: distribution.appendingPathComponent("build-helpers.sh"), encoding: .utf8)
+      contentsOf: distribution.appending(path: "build-helpers.sh"), encoding: .utf8)
     for requiredStep in [
       "security cms -D",
       "codesign --verify --strict --deep",
@@ -211,7 +214,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     runner.removeAllCommands()
     let identityRefresh = CallbackFlag()
     try Data("profile-v2".utf8).write(
-      to: daemonBundle.appendingPathComponent("Contents/embedded.provisionprofile"))
+      to: daemonBundle.appending(path: "Contents/embedded.provisionprofile"))
 
     _ = try service.install(
       daemonBundleSource: daemonBundle, hdcExecutable: hdc,
@@ -220,8 +223,9 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertTrue(identityRefresh.isMarked)
     XCTAssertEqual(
       try Data(
-        contentsOf: paths.installedDaemonBundle.appendingPathComponent(
-          "Contents/embedded.provisionprofile")),
+        contentsOf: paths.installedDaemonBundle.appending(
+          path:
+            "Contents/embedded.provisionprofile")),
       Data("profile-v2".utf8),
       "a renewed signing profile must not be skipped when executable bytes are unchanged")
     XCTAssertEqual(try permissions(paths.installedDaemon), 0o700)
@@ -260,16 +264,16 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   func testInstallPersistsValidatedWaterFlowWorkspaceForHeadlessGJ5AndUpdateKeepsIt()
     throws
   {
-    let project = root.appendingPathComponent("WaterFlowLayoutDemo", isDirectory: true)
-    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    let project = root.appending(path: "WaterFlowLayoutDemo", directoryHint: .isDirectory)
+    let module = project.appending(path: "entry/src/main", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
-    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
-    let sdk = root.appendingPathComponent("DevEco/sdk", isDirectory: true)
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appending(path: "module.json5"))
+    let sdk = root.appending(path: "DevEco/sdk", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: sdk.appendingPathComponent("default/openharmony", isDirectory: true),
+      at: sdk.appending(path: "default/openharmony", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
-    let modelCLI = root.appendingPathComponent("model-cli/claude")
+    let modelCLI = root.appending(path: "model-cli/claude")
     try makeExecutable(modelCLI, bytes: "claude-cli-v1")
     let harnessModel = LaunchAgentHarnessModelConfiguration(
       provider: "claude-code", modelName: "sonnet", cliExecutable: modelCLI,
@@ -358,41 +362,46 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   func testWorkspaceConfigurationFailsClosedUnlessProjectAndSDKAreBothValid() throws {
     XCTAssertThrowsError(
       try RuntimeCLI.runAgentDaemon(
-        ["install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
-          "--workspace-project", root.path],
-        service: service)) { error in
-          XCTAssertTrue("\(error)".contains("--workspace-project and --deveco-sdk together"))
-        }
+        [
+          "install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
+          "--workspace-project", root.path,
+        ],
+        service: service)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("--workspace-project and --deveco-sdk together"))
+    }
 
-    let missingProject = root.appendingPathComponent("missing-project", isDirectory: true)
-    let missingSDK = root.appendingPathComponent("missing-sdk", isDirectory: true)
+    let missingProject = root.appending(path: "missing-project", directoryHint: .isDirectory)
+    let missingSDK = root.appending(path: "missing-sdk", directoryHint: .isDirectory)
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         workspace: LaunchAgentWorkspaceConfiguration(
           projectRoot: missingProject, devecoSDKRoot: missingSDK)))
 
-    let protectedProject = paths.homeDirectory.appendingPathComponent(
-      "Downloads/WaterFlowLayoutDemo", isDirectory: true)
+    let protectedProject = paths.homeDirectory.appending(
+      path:
+        "Downloads/WaterFlowLayoutDemo", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: protectedProject.appendingPathComponent("entry/src/main", isDirectory: true),
+      at: protectedProject.appending(path: "entry/src/main", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
     try Data("{}".utf8).write(
-      to: protectedProject.appendingPathComponent("build-profile.json5"))
+      to: protectedProject.appending(path: "build-profile.json5"))
     try Data("{}".utf8).write(
-      to: protectedProject.appendingPathComponent("entry/src/main/module.json5"))
-    let validSDK = root.appendingPathComponent("valid-sdk", isDirectory: true)
+      to: protectedProject.appending(path: "entry/src/main/module.json5"))
+    let validSDK = root.appending(path: "valid-sdk", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: validSDK.appendingPathComponent("default/openharmony", isDirectory: true),
+      at: validSDK.appending(path: "default/openharmony", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         workspace: LaunchAgentWorkspaceConfiguration(
-          projectRoot: protectedProject, devecoSDKRoot: validSDK))) { error in
-          XCTAssertTrue("\(error)".contains("macOS privacy-managed"))
-          XCTAssertTrue("\(error)".contains("~/Developer"))
-        }
+          projectRoot: protectedProject, devecoSDKRoot: validSDK))
+    ) { error in
+      XCTAssertTrue("\(error)".contains("macOS privacy-managed"))
+      XCTAssertTrue("\(error)".contains("~/Developer"))
+    }
     XCTAssertTrue(runner.commands.isEmpty)
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
 
@@ -400,41 +409,46 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       XCTAssertThrowsError(
         try service.install(
           daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-          harnessSensitiveEvidence: invalid)) { error in
-          XCTAssertTrue("\(error)".contains("unique safe artifact basenames"))
-        }
+          harnessSensitiveEvidence: invalid)
+      ) { error in
+        XCTAssertTrue("\(error)".contains("unique safe artifact basenames"))
+      }
     }
 
-    let modelCLI = root.appendingPathComponent("model-cli/codex")
+    let modelCLI = root.appending(path: "model-cli/codex")
     try makeExecutable(modelCLI, bytes: "codex-cli-v1")
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
         harnessModel: LaunchAgentHarnessModelConfiguration(
           provider: "codex", modelName: "gpt-5", cliExecutable: modelCLI,
-          cliWorkingDirectory: root))) { error in
-          XCTAssertTrue("\(error)".contains("requires the validated demo-app workspace"))
-        }
+          cliWorkingDirectory: root))
+    ) { error in
+      XCTAssertTrue("\(error)".contains("requires the validated demo-app workspace"))
+    }
     XCTAssertThrowsError(
       try RuntimeCLI.runAgentDaemon(
-        ["install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
-          "--harness-cli", modelCLI.path],
-        service: service)) { error in
-          XCTAssertTrue("\(error)".contains("require --harness-model-provider"))
-        }
+        [
+          "install", "--daemon", daemonBundle.path, "--hdc", hdc.path,
+          "--harness-cli", modelCLI.path,
+        ],
+        service: service)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("require --harness-model-provider"))
+    }
   }
 
   func testHarnessLocalModelConfigurationFailsClosedOnProviderAndIdentityDrift() throws {
-    let project = root.appendingPathComponent("WaterFlowLayoutDemo", isDirectory: true)
-    let module = project.appendingPathComponent("entry/src/main", isDirectory: true)
+    let project = root.appending(path: "WaterFlowLayoutDemo", directoryHint: .isDirectory)
+    let module = project.appending(path: "entry/src/main", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: module, withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
-    try Data("{}".utf8).write(to: module.appendingPathComponent("module.json5"))
-    let sdk = root.appendingPathComponent("DevEco/sdk", isDirectory: true)
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
+    try Data("{}".utf8).write(to: module.appending(path: "module.json5"))
+    let sdk = root.appending(path: "DevEco/sdk", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: sdk.appendingPathComponent("default/openharmony", isDirectory: true),
+      at: sdk.appending(path: "default/openharmony", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
-    let modelCLI = root.appendingPathComponent("model-cli/codex")
+    let modelCLI = root.appending(path: "model-cli/codex")
     try makeExecutable(modelCLI, bytes: "codex-cli-v1")
     let workspace = LaunchAgentWorkspaceConfiguration(
       projectRoot: project, devecoSDKRoot: sdk)
@@ -444,9 +458,10 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         daemonBundleSource: daemonBundle, hdcExecutable: hdc, workspace: workspace,
         harnessModel: LaunchAgentHarnessModelConfiguration(
           provider: "shell", modelName: "anything", cliExecutable: modelCLI,
-          cliWorkingDirectory: project))) { error in
-          XCTAssertTrue("\(error)".contains("must be codex or claude-code"))
-        }
+          cliWorkingDirectory: project))
+    ) { error in
+      XCTAssertTrue("\(error)".contains("must be codex or claude-code"))
+    }
 
     _ = try service.install(
       daemonBundleSource: daemonBundle, hdcExecutable: hdc, workspace: workspace,
@@ -468,7 +483,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   func testStatusNamesHDCIdentityDriftAndUninstallPreservesStateAndLogs() throws {
     _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     try makeExecutable(hdc, bytes: "unreviewed-hdc-replacement")
-    let stateMarker = paths.stateDirectory.appendingPathComponent("jobs.sqlite")
+    let stateMarker = paths.stateDirectory.appending(path: "jobs.sqlite")
     try FileManager.default.createDirectory(
       at: paths.stateDirectory, withIntermediateDirectories: true)
     try Data("history".utf8).write(to: stateMarker)
@@ -514,7 +529,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   func testInvalidOrMissingExecutablesFailBeforeLaunchctlAndConfigurationWrites() throws {
-    let nonExecutable = root.appendingPathComponent("not-executable")
+    let nonExecutable = root.appending(path: "not-executable")
     try Data("bytes".utf8).write(to: nonExecutable)
 
     XCTAssertThrowsError(
@@ -522,7 +537,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle,
-        hdcExecutable: root.appendingPathComponent("missing-hdc")))
+        hdcExecutable: root.appending(path: "missing-hdc")))
     XCTAssertTrue(runner.commands.isEmpty)
     XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
   }
@@ -551,9 +566,9 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   private func makeDaemonBundle(_ url: URL) throws {
-    let contents = url.appendingPathComponent("Contents", isDirectory: true)
+    let contents = url.appending(path: "Contents", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: contents.appendingPathComponent("MacOS", isDirectory: true),
+      at: contents.appending(path: "MacOS", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
     let info: [String: Any] = [
       "CFBundleIdentifier": ArkDeckHelperIdentity.daemonBundleIdentifier,
@@ -562,7 +577,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     ]
     try PropertyListSerialization.data(
       fromPropertyList: info, format: .xml, options: 0
-    ).write(to: contents.appendingPathComponent("Info.plist"))
+    ).write(to: contents.appending(path: "Info.plist"))
   }
 
   private func plist(at url: URL) throws -> [String: Any] {
@@ -572,7 +587,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
   }
 
   private var packageRoot: URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

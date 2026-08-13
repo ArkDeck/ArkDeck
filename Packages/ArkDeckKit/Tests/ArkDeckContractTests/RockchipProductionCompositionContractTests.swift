@@ -33,7 +33,7 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
     async throws
   {
     let literal = Self.independentlyPinnedProductionSHA256
-    let toolWorkingDirectory = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+    let toolWorkingDirectory = URL(filePath: "/private/tmp", directoryHint: .isDirectory)
     let adapter = RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(
       toolWorkingDirectory: toolWorkingDirectory)
 
@@ -109,7 +109,8 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
       runtime,
       root.appending(
         path: RockchipProductToolRuntimeDirectory.directoryName,
-        directoryHint: .isDirectory).standardizedFileURL)
+        directoryHint: .isDirectory
+      ).standardizedFileURL)
     XCTAssertEqual(try Data(contentsOf: config), Data())
     XCTAssertTrue(FileManager.default.fileExists(atPath: log.path))
     XCTAssertEqual(try permissions(of: runtime), 0o700)
@@ -159,7 +160,8 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
       runtime,
       physical.appending(
         path: RockchipProductToolRuntimeDirectory.directoryName,
-        directoryHint: .isDirectory).standardizedFileURL,
+        directoryHint: .isDirectory
+      ).standardizedFileURL,
       "the prepared directory must resolve to the one under the link's target")
     // The exact gate `ProcessExecutor` applies before a launch.
     XCTAssertEqual(runtime.resolvingSymlinksInPath().standardizedFileURL.path, runtime.path)
@@ -171,7 +173,7 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
   /// containment check against the not-yet-created child refused every such
   /// root and took the whole flash lane down with it.
   func testPreparedToolRuntimeAcceptsAStateRootSpelledUnderPrivate() throws {
-    let root = URL(fileURLWithPath: "/private/tmp", isDirectory: true).appending(
+    let root = URL(filePath: "/private/tmp", directoryHint: .isDirectory).appending(
       path: "arkdeck-rockchip-private-\(UUID().uuidString)", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -205,7 +207,7 @@ final class RockchipProductionCompositionContractTests: XCTestCase {
   /// executable hash, non-quarantined platform trust.
   private func productionDeclaredTool() -> RockchipSelectedDiscoveryTool {
     RockchipSelectedDiscoveryTool(
-      executableURL: URL(fileURLWithPath: "/usr/bin/true"),
+      executableURL: URL(filePath: "/usr/bin/true"),
       pathSource: .installedOrdinaryBookmark,
       bookmarkData: Data([0x01]),
       reportedVersion: RockchipDiscoveryIntegrationProfile.pinnedProduction.reportedToolVersion,

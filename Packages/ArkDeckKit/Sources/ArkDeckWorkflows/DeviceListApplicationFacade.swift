@@ -140,7 +140,8 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
   }
 
   private func candidates(useWarmSnapshot: Bool) async -> DeviceListPresentation {
-    let params: [String: JSONValue]? = useWarmSnapshot
+    let params: [String: JSONValue]? =
+      useWarmSnapshot
       ? ["useWarmSnapshot": .bool(true)] : nil
     switch await DeviceListXPCReadTransport.request(
       method: "device.candidates", params: params)
@@ -297,7 +298,7 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
-      stateFileURL = URL(fileURLWithPath: arguments[index + 1])
+      stateFileURL = URL(filePath: arguments[index + 1])
     } else {
       stateFileURL = nil
     }

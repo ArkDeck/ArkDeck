@@ -17,8 +17,8 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     receiveRoot = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-receive-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-receive-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -84,8 +84,9 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
     guard case .process(_, let arguments, let timeout) = plan.kind else {
       return XCTFail("expected a process plan")
     }
-    let destination = receiveRoot.appendingPathComponent(
-      "arkdeck-job-receive-1-capture-trace-n1.htrace", isDirectory: false)
+    let destination = receiveRoot.appending(
+      path:
+        "arkdeck-job-receive-1-capture-trace-n1.htrace", directoryHint: .notDirectory)
     XCTAssertEqual(
       arguments,
       ["-t", connectKey, "file", "recv", owned.path.remotePath, destination.path])
@@ -104,7 +105,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
     let destination = try XCTUnwrap(plan.hostLanding?.destination)
     XCTAssertEqual(
       destination.lastPathComponent,
-      URL(fileURLWithPath: owned.path.remotePath).lastPathComponent)
+      URL(filePath: owned.path.remotePath).lastPathComponent)
   }
 
   // MARK: - Verdict from the bytes on disk
@@ -112,7 +113,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   func testReceivedBytesDecideTheVerdictAndItsDigest() throws {
     let payload = Data("htrace-fixture-bytes".utf8)
     let landing = HostLandingExpectation(
-      destination: receiveRoot.appendingPathComponent("trace.htrace"),
+      destination: receiveRoot.appending(path: "trace.htrace"),
       maximumBytes: 64 * 1024)
     try landing.prepareDestination()
     try payload.write(to: landing.destination)
@@ -135,7 +136,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   /// `.verified` through a record ID nothing in the HDC path ever set.
   func testTransferThatLandsNowhereIsUnknownNotVerified() throws {
     let landing = HostLandingExpectation(
-      destination: receiveRoot.appendingPathComponent("trace.htrace"),
+      destination: receiveRoot.appending(path: "trace.htrace"),
       maximumBytes: 64 * 1024)
     try landing.prepareDestination()
 
@@ -149,7 +150,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
 
   func testEmptyReceivedFileFailsRatherThanPublishingZeroBytes() throws {
     let landing = HostLandingExpectation(
-      destination: receiveRoot.appendingPathComponent("trace.htrace"),
+      destination: receiveRoot.appending(path: "trace.htrace"),
       maximumBytes: 64 * 1024)
     try landing.prepareDestination()
     try Data().write(to: landing.destination)
@@ -167,7 +168,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   /// precisely so an unbounded file is never read end to end.
   func testOversizedReceiveFailsAndIsNeverDigested() throws {
     let landing = HostLandingExpectation(
-      destination: receiveRoot.appendingPathComponent("trace.htrace"), maximumBytes: 8)
+      destination: receiveRoot.appending(path: "trace.htrace"), maximumBytes: 8)
     try landing.prepareDestination()
     try Data(repeating: 0x61, count: 4096).write(to: landing.destination)
 
@@ -189,7 +190,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   /// and call that verification. Bytes that do not match must fail.
   func testPinnedHashMismatchFails() throws {
     let landing = HostLandingExpectation(
-      destination: receiveRoot.appendingPathComponent("trace.htrace"),
+      destination: receiveRoot.appending(path: "trace.htrace"),
       maximumBytes: 64 * 1024)
     try landing.prepareDestination()
     try Data("not-the-pinned-bytes".utf8).write(to: landing.destination)
@@ -208,7 +209,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   func testPinnedHashMatchVerifies() throws {
     let payload = Data("the-pinned-bytes".utf8)
     let landing = HostLandingExpectation(
-      destination: receiveRoot.appendingPathComponent("trace.htrace"),
+      destination: receiveRoot.appending(path: "trace.htrace"),
       maximumBytes: 64 * 1024)
     try landing.prepareDestination()
     try payload.write(to: landing.destination)
@@ -253,7 +254,8 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
         exit: 1),
       action: try traceAction(), context: context)
     guard case .verified(let summary) = verified else {
-      return XCTFail("a written trace must verify even when hitrace exits non-zero, got \(verified)")
+      return XCTFail(
+        "a written trace must verify even when hitrace exits non-zero, got \(verified)")
     }
     XCTAssertEqual(summary["remoteByteCount"], "4096")
 
@@ -298,8 +300,9 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
     let single = ProviderProcessReceipt(
       exitStatus: 0, stdout: Data(), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.01)
-    guard case .unknown = try provider.verify(
-      receipt: single, action: try traceAction(), context: context)
+    guard
+      case .unknown = try provider.verify(
+        receipt: single, action: try traceAction(), context: context)
     else {
       return XCTFail("a capture with no readback sequence must be unknown")
     }
@@ -316,8 +319,9 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
           stdout: Data("-rw-r--r-- 1 root root 4096 2026".utf8), stderr: Data(),
           stdoutTruncated: true, durationSeconds: 0.01),
       ])
-    guard case .unknown = try provider.verify(
-      receipt: truncated, action: try traceAction(), context: context)
+    guard
+      case .unknown = try provider.verify(
+        receipt: truncated, action: try traceAction(), context: context)
     else {
       return XCTFail("a truncated listing must not be parsed as a size")
     }
@@ -374,7 +378,7 @@ final class ArtifactReceiveLegContractTests: XCTestCase {
   private func makeDispatchedPlan(
     childEnvironment: [String: String] = [:]
   ) throws -> (DescriptorBoundProcessDispatcher, TypedProcessPlan) {
-    let fixture = productsDirectory.appendingPathComponent("ArkDeckFakeHDCFixture")
+    let fixture = productsDirectory.appending(path: "ArkDeckFakeHDCFixture")
     guard FileManager.default.fileExists(atPath: fixture.path) else {
       throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
     }

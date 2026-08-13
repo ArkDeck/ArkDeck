@@ -83,7 +83,7 @@ public struct UpdateArtifactStore: Sendable {
       throw UpdateDownloadError.fileOperationFailed(errno: Self.posixErrorCode(for: error))
     }
     for name in names where name.hasSuffix(".part") {
-      guard name == URL(fileURLWithPath: name).lastPathComponent else { continue }
+      guard name == URL(filePath: name).lastPathComponent else { continue }
       if unlinkat(directoryDescriptor, name, 0) != 0, errno != ENOENT {
         throw UpdateDownloadError.fileOperationFailed(errno: errno)
       }

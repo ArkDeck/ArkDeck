@@ -3,7 +3,7 @@ import XCTest
 
 final class FlashLocalizationContractTests: XCTestCase {
   private var repositoryRoot: URL {
-    var root = URL(fileURLWithPath: #filePath)
+    var root = URL(filePath: #filePath)
     for _ in 0..<5 {
       root.deleteLastPathComponent()
     }
@@ -11,7 +11,7 @@ final class FlashLocalizationContractTests: XCTestCase {
   }
 
   private var flashFeatureRoot: URL {
-    repositoryRoot.appendingPathComponent("ArkDeckApp/Features/Flash")
+    repositoryRoot.appending(path: "ArkDeckApp/Features/Flash")
   }
 
   private var flashSources: [(URL, String)] {
@@ -28,7 +28,7 @@ final class FlashLocalizationContractTests: XCTestCase {
 
   func testFlashCopyUsesDedicatedNamedTable() throws {
     let localizationSource = try String(
-      contentsOf: flashFeatureRoot.appendingPathComponent("FlashLocalization.swift"),
+      contentsOf: flashFeatureRoot.appending(path: "FlashLocalization.swift"),
       encoding: .utf8)
 
     XCTAssertTrue(localizationSource.contains("table: \"FlashLocalizable\""))
@@ -53,8 +53,9 @@ final class FlashLocalizationContractTests: XCTestCase {
   }
 
   func testEveryFlashTextKeyHasEnglishAndSimplifiedChineseValues() throws {
-    let catalogURL = repositoryRoot.appendingPathComponent(
-      "ArkDeckApp/Resources/FlashLocalizable.xcstrings")
+    let catalogURL = repositoryRoot.appending(
+      path:
+        "ArkDeckApp/Resources/FlashLocalizable.xcstrings")
     let data = try Data(contentsOf: catalogURL)
     let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     let strings = try XCTUnwrap(root["strings"] as? [String: Any])
@@ -84,7 +85,7 @@ final class FlashLocalizationContractTests: XCTestCase {
 
   func testFlashLocalizationFilesAreAppTargetMembers() throws {
     let project = try String(
-      contentsOf: repositoryRoot.appendingPathComponent("ArkDeck.xcodeproj/project.pbxproj"),
+      contentsOf: repositoryRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
 
     XCTAssertTrue(project.contains("FlashLocalization.swift in Sources"))

@@ -70,7 +70,7 @@ public enum AutoUpdateUIFixture {
   private static var artifact: ValidatedUpdateArtifact {
     ValidatedUpdateArtifact(
       downloaded: DownloadedUpdateArtifact(
-        url: URL(fileURLWithPath: "/dev/null"),
+        url: URL(filePath: "/dev/null"),
         byteLength: 4,
         sha256: fixtureSHA256,
         identity: UpdateFileIdentity(

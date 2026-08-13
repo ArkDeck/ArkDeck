@@ -60,7 +60,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
   private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
   init(rootURL: URL) throws {
-    self.url = rootURL.appendingPathComponent(Self.filename)
+    self.url = rootURL.appending(path: Self.filename)
     var opened: OpaquePointer?
     let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
     guard sqlite3_open_v2(url.path, &opened, flags, nil) == SQLITE_OK, let opened else {
@@ -302,9 +302,7 @@ final class HarnessSQLiteDatabase: @unchecked Sendable {
   }
 
   private static func utcNow() -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: Date())
+    ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
   }
 
   private static let schemaV1 = """

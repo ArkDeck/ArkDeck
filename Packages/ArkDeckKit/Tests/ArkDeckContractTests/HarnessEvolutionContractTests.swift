@@ -2,8 +2,8 @@ import CryptoKit
 import Foundation
 import XCTest
 
-@testable import ArkDeckCore
 @testable import ArkDeckAgentComposition
+@testable import ArkDeckCore
 @testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
@@ -41,8 +41,8 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let sourceRoot = try temporaryDirectory("adopt-source")
     let stateRoot = try temporaryDirectory("adopt-state")
     try FileManager.default.createDirectory(
-      at: sourceRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: sourceRoot.appendingPathComponent("Sources/App.txt"))
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: sourceRoot)
     let policy = try HarnessEvolutionPolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
@@ -50,7 +50,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
         globs: ["Sources/**"]),
       allowedPaths: ["Sources/**"], maxAttempts: 3, maxChangedFiles: 2,
       maxDiffLines: 20, allowedOperations: ["workspace.build-openharmony@1"])
-    let evolutionRoot = stateRoot.appendingPathComponent("evolution")
+    let evolutionRoot = stateRoot.appending(path: "evolution")
 
     let created = WorkspaceProjectProfileRegistry(profile: profile)
     let workspace = try await EvolutionWorkspaceManager(
@@ -86,8 +86,8 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let sourceRoot = try temporaryDirectory("adopt-conflict-source")
     let stateRoot = try temporaryDirectory("adopt-conflict-state")
     try FileManager.default.createDirectory(
-      at: sourceRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: sourceRoot.appendingPathComponent("Sources/App.txt"))
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: sourceRoot)
     let policy = try HarnessEvolutionPolicy(
       baseRevision: try WorkspaceProviderSupport.workspaceRevision(
@@ -95,7 +95,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
         globs: ["Sources/**"]),
       allowedPaths: ["Sources/**"], maxAttempts: 3, maxChangedFiles: 2,
       maxDiffLines: 20, allowedOperations: ["workspace.build-openharmony@1"])
-    let evolutionRoot = stateRoot.appendingPathComponent("evolution")
+    let evolutionRoot = stateRoot.appending(path: "evolution")
     let created = WorkspaceProjectProfileRegistry(profile: profile)
     let workspace = try await EvolutionWorkspaceManager(
       rootURL: evolutionRoot, profileRegistry: created
@@ -129,9 +129,9 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let sourceRoot = try temporaryDirectory("evolution-source")
     let stateRoot = try temporaryDirectory("evolution-state")
     try FileManager.default.createDirectory(
-      at: sourceRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
     try Data("old\n".utf8).write(
-      to: sourceRoot.appendingPathComponent("Sources/App.txt"))
+      to: sourceRoot.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: sourceRoot)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
     let revision = try WorkspaceProviderSupport.workspaceRevision(
@@ -142,7 +142,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       maxChangedFiles: 2, maxDiffLines: 20,
       allowedOperations: ["workspace.build-openharmony@1"])
     let manager = try EvolutionWorkspaceManager(
-      rootURL: stateRoot.appendingPathComponent("evolution"),
+      rootURL: stateRoot.appending(path: "evolution"),
       profileRegistry: registry)
 
     let workspace = try await manager.prepareWorkspace(
@@ -161,17 +161,17 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertNotEqual(isolated.projectRoot, profile.projectRoot)
     XCTAssertNil(isolated.sourceControlPreset)
     try Data("candidate\n".utf8).write(
-      to: URL(fileURLWithPath: isolated.projectRoot)
-        .appendingPathComponent("Sources/App.txt"))
+      to: URL(filePath: isolated.projectRoot)
+        .appending(path: "Sources/App.txt"))
     XCTAssertEqual(
       try String(
-        contentsOf: sourceRoot.appendingPathComponent("Sources/App.txt"), encoding: .utf8),
+        contentsOf: sourceRoot.appending(path: "Sources/App.txt"), encoding: .utf8),
       "old\n")
 
     let provider = WorkspaceOperationsProvider(
       profile: profile, profileRegistry: registry,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: stateRoot.appendingPathComponent("patch-attempts")),
+        rootURL: stateRoot.appending(path: "patch-attempts")),
       nowUTC: { "2026-08-02T00:00:00Z" })
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "workspace.build-openharmony@1"))
@@ -193,16 +193,16 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let root = try temporaryDirectory("candidate-source")
     let state = try temporaryDirectory("candidate-state")
     try FileManager.default.createDirectory(
-      at: root.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: root.appendingPathComponent("Sources/App.txt"))
+      at: root.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: root)
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: state.appendingPathComponent("artifacts"),
+      rootURL: state.appending(path: "artifacts"),
       nowUTC: { "2026-08-02T00:00:00Z" })
     let port = WorkspaceHarnessRepairPort(
       profile: profile,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent("attempts")),
+        rootURL: state.appending(path: "attempts")),
       artifactStore: artifactStore)
     let proposal = try patchProposal(root: root)
     let task = try taskSnapshot(
@@ -231,8 +231,8 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let source = try temporaryDirectory("submission-source")
     let state = try temporaryDirectory("submission-state")
     try FileManager.default.createDirectory(
-      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: source)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
     let base = try WorkspaceProviderSupport.workspaceRevision(
@@ -243,9 +243,9 @@ final class HarnessEvolutionContractTests: XCTestCase {
       maxChangedFiles: 2, maxDiffLines: 20,
       allowedOperations: evolutionOperations)
     let workspaceManager = try EvolutionWorkspaceManager(
-      rootURL: state.appendingPathComponent("evolution"), profileRegistry: registry)
+      rootURL: state.appending(path: "evolution"), profileRegistry: registry)
     let coordinator = HarnessTaskCoordinator(
-      store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness")),
+      store: try HarnessTaskStore(rootURL: state.appending(path: "harness")),
       jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: workspaceManager,
       nowUTC: { "2026-08-02T00:00:00Z" },
       taskIDFactory: { "HTASK-ABCDEF012345" })
@@ -272,17 +272,17 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let source = try temporaryDirectory("workspace-wire-source")
     let state = try temporaryDirectory("workspace-wire-state")
     try FileManager.default.createDirectory(
-      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: source)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
     let base = try WorkspaceProviderSupport.workspaceRevision(
       root: profile.projectRoot, profileVersion: profile.profileID,
       globs: ["Sources/**"])
     let manager = try EvolutionWorkspaceManager(
-      rootURL: state.appendingPathComponent("workspace"), profileRegistry: registry)
+      rootURL: state.appending(path: "workspace"), profileRegistry: registry)
     let coordinator = HarnessTaskCoordinator(
-      store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness")),
+      store: try HarnessTaskStore(rootURL: state.appending(path: "harness")),
       jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: manager,
       nowUTC: { "2026-08-02T00:00:00Z" },
       taskIDFactory: { "HTASK-ABCDEF012346" })
@@ -464,11 +464,11 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let root = try temporaryDirectory("stale-source")
     let state = try temporaryDirectory("stale-state")
     try FileManager.default.createDirectory(
-      at: root.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: root.appendingPathComponent("Sources/App.txt"))
+      at: root.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: root.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: root)
     let manager = try EvolutionWorkspaceManager(
-      rootURL: state.appendingPathComponent("evolution"),
+      rootURL: state.appending(path: "evolution"),
       profileRegistry: WorkspaceProjectProfileRegistry(profile: profile))
     let stale = try HarnessEvolutionPolicy(
       baseRevision: String(repeating: "f", count: 64), allowedPaths: ["Sources/**"],
@@ -492,15 +492,15 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let external = try temporaryDirectory("symlink-external")
     let state = try temporaryDirectory("symlink-state")
     try FileManager.default.createDirectory(
-      at: source.appendingPathComponent("Sources/Safe"), withIntermediateDirectories: true)
+      at: source.appending(path: "Sources/Safe"), withIntermediateDirectories: true)
     try Data("old\n".utf8).write(
-      to: source.appendingPathComponent("Sources/Safe/App.txt"))
-    try Data("secret\n".utf8).write(to: external.appendingPathComponent("secret.txt"))
+      to: source.appending(path: "Sources/Safe/App.txt"))
+    try Data("secret\n".utf8).write(to: external.appending(path: "secret.txt"))
     try FileManager.default.createDirectory(
-      at: source.appendingPathComponent("Other"), withIntermediateDirectories: true)
+      at: source.appending(path: "Other"), withIntermediateDirectories: true)
     let relativeEscape = "../../\(external.lastPathComponent)/secret.txt"
     try FileManager.default.createSymbolicLink(
-      atPath: source.appendingPathComponent("Other/escape").path,
+      atPath: source.appending(path: "Other/escape").path,
       withDestinationPath: relativeEscape)
     let profile = try workspaceProfile(root: source)
     let base = try WorkspaceProviderSupport.workspaceRevision(
@@ -510,7 +510,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
       baseRevision: base, allowedPaths: ["Sources/Safe/**"],
       allowedOperations: ["workspace.apply-patch@1"])
     let manager = try EvolutionWorkspaceManager(
-      rootURL: state.appendingPathComponent("evolution"),
+      rootURL: state.appending(path: "evolution"),
       profileRegistry: WorkspaceProjectProfileRegistry(profile: profile))
 
     do {
@@ -591,16 +591,16 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let terminalRoot = fixture.workspaceRoot(terminal)
     XCTAssertFalse(
       FileManager.default.fileExists(
-        atPath: terminalRoot.appendingPathComponent("workspace").path))
+        atPath: terminalRoot.appending(path: "workspace").path))
     XCTAssertTrue(
       FileManager.default.fileExists(
-        atPath: terminalRoot.appendingPathComponent("workspace.json").path))
+        atPath: terminalRoot.appending(path: "workspace.json").path))
     XCTAssertTrue(
       FileManager.default.fileExists(
-        atPath: terminalRoot.appendingPathComponent("attempts/attempt-001/attempt.json").path))
+        atPath: terminalRoot.appending(path: "attempts/attempt-001/attempt.json").path))
     let teardown = try XCTUnwrap(
       try JSONSerialization.jsonObject(
-        with: Data(contentsOf: terminalRoot.appendingPathComponent("teardown.json")))
+        with: Data(contentsOf: terminalRoot.appending(path: "teardown.json")))
         as? [String: Any])
     XCTAssertEqual(teardown["documentType"] as? String, "evolution-workspace-teardown")
     XCTAssertEqual(teardown["htaskID"] as? String, terminal.htaskID)
@@ -612,10 +612,10 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertNotNil(fixture.registry.profile(for: active.projectRef))
     XCTAssertTrue(
       FileManager.default.fileExists(
-        atPath: fixture.workspaceRoot(active).appendingPathComponent("workspace").path))
+        atPath: fixture.workspaceRoot(active).appending(path: "workspace").path))
     XCTAssertTrue(
       FileManager.default.fileExists(
-        atPath: fixture.workspaceRoot(unknown).appendingPathComponent("workspace").path))
+        atPath: fixture.workspaceRoot(unknown).appending(path: "workspace").path))
 
     // Recoverability: the active workspace still reopens idempotently; the
     // destroyed one refuses to impersonate a live tree.
@@ -676,7 +676,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     for workspace in [oldest, young, newest] {
       XCTAssertTrue(
         FileManager.default.fileExists(
-          atPath: fixture.workspaceRoot(workspace).appendingPathComponent("workspace").path))
+          atPath: fixture.workspaceRoot(workspace).appending(path: "workspace").path))
     }
 
     let findings = try await fixture.manager.sweepTerminalWorkspaces(
@@ -689,11 +689,11 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertEqual(byWorkspace[newest.workspaceID]?.disposition, .retainedByPolicy)
     XCTAssertFalse(
       FileManager.default.fileExists(
-        atPath: fixture.workspaceRoot(oldest).appendingPathComponent("workspace").path))
+        atPath: fixture.workspaceRoot(oldest).appending(path: "workspace").path))
     for workspace in [young, newest] {
       XCTAssertTrue(
         FileManager.default.fileExists(
-          atPath: fixture.workspaceRoot(workspace).appendingPathComponent("workspace").path))
+          atPath: fixture.workspaceRoot(workspace).appending(path: "workspace").path))
     }
   }
 
@@ -704,12 +704,12 @@ final class HarnessEvolutionContractTests: XCTestCase {
     // Simulate a teardown that crashed between the rename and the removal,
     // with a stale copy temporary from an interrupted prepare next to it.
     try FileManager.default.moveItem(
-      at: taskRoot.appendingPathComponent("workspace"),
-      to: taskRoot.appendingPathComponent(".workspace.doomed"))
+      at: taskRoot.appending(path: "workspace"),
+      to: taskRoot.appending(path: ".workspace.doomed"))
     try FileManager.default.createDirectory(
-      at: taskRoot.appendingPathComponent(".workspace.tmp"), withIntermediateDirectories: false)
+      at: taskRoot.appending(path: ".workspace.tmp"), withIntermediateDirectories: false)
     try Data("stale\n".utf8).write(
-      to: taskRoot.appendingPathComponent(".workspace.tmp/leftover.txt"))
+      to: taskRoot.appending(path: ".workspace.tmp/leftover.txt"))
 
     let findings = try await fixture.manager.sweepTerminalWorkspaces(
       tasks: [
@@ -725,27 +725,27 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertGreaterThan(try XCTUnwrap(findings.first).reclaimedBytes, 0)
     for doomed in ["workspace", ".workspace.doomed", ".workspace.tmp"] {
       XCTAssertFalse(
-        FileManager.default.fileExists(atPath: taskRoot.appendingPathComponent(doomed).path))
+        FileManager.default.fileExists(atPath: taskRoot.appending(path: doomed).path))
     }
     XCTAssertTrue(
-      FileManager.default.fileExists(atPath: taskRoot.appendingPathComponent("teardown.json").path))
+      FileManager.default.fileExists(atPath: taskRoot.appending(path: "teardown.json").path))
   }
 
   func testTaskWorkspaceGCWireSweepsCancelledTaskAndValidatesBounds() async throws {
     let source = try temporaryDirectory("gc-wire-source")
     let state = try temporaryDirectory("gc-wire-state")
     try FileManager.default.createDirectory(
-      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("old\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: source)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
     let base = try WorkspaceProviderSupport.workspaceRevision(
       root: profile.projectRoot, profileVersion: profile.profileID,
       globs: ["Sources/**"])
     let manager = try EvolutionWorkspaceManager(
-      rootURL: state.appendingPathComponent("evolution"), profileRegistry: registry)
+      rootURL: state.appending(path: "evolution"), profileRegistry: registry)
     let coordinator = HarnessTaskCoordinator(
-      store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness")),
+      store: try HarnessTaskStore(rootURL: state.appending(path: "harness")),
       jobPort: EvolutionNoopJobPort(), evolutionWorkspacePort: manager,
       nowUTC: { "2026-08-02T00:00:00Z" },
       taskIDFactory: { "HTASK-ABCDEF0123AA" })
@@ -801,7 +801,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     XCTAssertEqual(malformed.errorCode, .invalidParams)
     let portless = HarnessTaskMethodService(
       coordinator: HarnessTaskCoordinator(
-        store: try HarnessTaskStore(rootURL: state.appendingPathComponent("harness-portless")),
+        store: try HarnessTaskStore(rootURL: state.appending(path: "harness-portless")),
         jobPort: EvolutionNoopJobPort(),
         nowUTC: { "2026-08-02T00:00:00Z" },
         taskIDFactory: { "HTASK-ABCDEF0123AB" }),
@@ -826,7 +826,7 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
 
     func workspaceRoot(_ workspace: HarnessEvolutionWorkspace) -> URL {
-      managerRoot.appendingPathComponent(workspace.workspaceID, isDirectory: true)
+      managerRoot.appending(path: workspace.workspaceID, directoryHint: .isDirectory)
     }
   }
 
@@ -834,14 +834,14 @@ final class HarnessEvolutionContractTests: XCTestCase {
     let source = try temporaryDirectory("\(prefix)-source")
     let state = try temporaryDirectory("\(prefix)-state")
     try FileManager.default.createDirectory(
-      at: source.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-    try Data("payload\n".utf8).write(to: source.appendingPathComponent("Sources/App.txt"))
+      at: source.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("payload\n".utf8).write(to: source.appending(path: "Sources/App.txt"))
     let profile = try workspaceProfile(root: source)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
     let base = try WorkspaceProviderSupport.workspaceRevision(
       root: profile.projectRoot, profileVersion: profile.profileID,
       globs: ["Sources/**"])
-    let managerRoot = state.appendingPathComponent("evolution", isDirectory: true)
+    let managerRoot = state.appending(path: "evolution", directoryHint: .isDirectory)
     return EvolutionGCFixture(
       manager: try EvolutionWorkspaceManager(
         rootURL: managerRoot, profileRegistry: registry),
@@ -869,8 +869,9 @@ final class HarnessEvolutionContractTests: XCTestCase {
   }
 
   private func temporaryDirectory(_ prefix: String) throws -> URL {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-\(prefix)-\(UUID().uuidString)", isDirectory: true)
+    let url = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-\(prefix)-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     roots.append(url)
     return url

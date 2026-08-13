@@ -183,8 +183,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-gateway-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-gateway-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -415,7 +415,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
   /// never executed. Inputs keep the full list, because inputs are what an
   /// executor consumes.
   func testProseMayQuoteCodeWhileInputsStillRefuseEveryFragment() throws {
-    let quoting = #"{"kind":"noSafeAction","hypothesis":"the `if (!ENABLED)` guard returns early","reasonCode":"quoted"}"#
+    let quoting =
+      #"{"kind":"noSafeAction","hypothesis":"the `if (!ENABLED)` guard returns early","reasonCode":"quoted"}"#
     let proposal = try HarnessDecisionProposal.parse(
       Data(quoting.utf8), offeredOperations: offered)
     XCTAssertEqual(proposal.kind, .noSafeAction)
@@ -429,7 +430,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     }
 
     // Inputs are unchanged: even a bare backtick is refused there.
-    let viaInputs = #"{"kind":"invokeOperation","operationRef":"observe.device@1","inputs":{"note":"`x`"},"hypothesis":"h","reasonCode":"r"}"#
+    let viaInputs =
+      #"{"kind":"invokeOperation","operationRef":"observe.device@1","inputs":{"note":"`x`"},"hypothesis":"h","reasonCode":"r"}"#
     XCTAssertThrowsError(
       try HarnessDecisionProposal.parse(Data(viaInputs.utf8), offeredOperations: offered))
   }
@@ -480,8 +482,9 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     ) {
       // The refusal names the alternatives as well as the refusal, so a
       // producer is not left proposing the same unavailable thing every round.
-      guard case .operationNotOffered(let reference, let alternatives)? =
-        $0 as? HarnessDecisionRejection
+      guard
+        case .operationNotOffered(let reference, let alternatives)? =
+          $0 as? HarnessDecisionRejection
       else { return XCTFail("expected operationNotOffered, got \($0)") }
       XCTAssertEqual(reference, "flash.dayu200")
       XCTAssertEqual(Set(alternatives), offered)
@@ -1008,7 +1011,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertFalse(context.authorizedOperationRefs.contains(DebugCrashTaskHandler.observeDevice))
     _ = try await coordinator.reconcile(task.htaskID)
     XCTAssertTrue(gateway.seenContexts.isEmpty, "mechanical steps never consult the gateway")
-    XCTAssertTrue(jobs.submittedOperations.isEmpty, "an unavailable operation must reach zero dispatch")
+    XCTAssertTrue(
+      jobs.submittedOperations.isEmpty, "an unavailable operation must reach zero dispatch")
   }
 
   func testCoordinatorProjectsStandingCapabilityWithoutExposingItsIdentifier() async throws {
@@ -1148,7 +1152,8 @@ final class HarnessDecisionGatewayContractTests: XCTestCase {
     XCTAssertEqual(outcome.snapshot.consumedBudget.modelCalls, 0)
 
     let deterministic = DebugCrashTaskHandler().plan(
-      for: task, decisionID: "dec-fixture", nowUTC: "2026-07-31T00:00:00Z").decision
+      for: task, decisionID: "dec-fixture", nowUTC: "2026-07-31T00:00:00Z"
+    ).decision
     let injectedDeploy = HarnessDecisionProposal(
       kind: .invokeOperation, operationReference: DebugCrashTaskHandler.deployHAP,
       inputs: ["hapArtifactLease": .string("lease-v1:foreign:ART-1")],

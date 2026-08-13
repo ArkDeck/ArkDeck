@@ -11,8 +11,8 @@
 
 import XCTest
 
-@testable import ArkDeckCore
 @testable import ArkDeckAgentComposition
+@testable import ArkDeckCore
 @testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
@@ -89,8 +89,8 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-vendor-gateway-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-vendor-gateway-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -113,9 +113,10 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
         environment: [
           HarnessVendorConfiguration.providerKey: "openai",
           HarnessVendorConfiguration.modelKey: "gpt-test",
-        ])) { error in
-          XCTAssertEqual(error as? HarnessVendorConfigurationError, .missingCredential)
-        }
+        ])
+    ) { error in
+      XCTAssertEqual(error as? HarnessVendorConfigurationError, .missingCredential)
+    }
     XCTAssertThrowsError(
       try HarnessVendorConfiguration.gateway(
         environment: [
@@ -123,9 +124,10 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
           HarnessVendorConfiguration.apiKeyKey: secretKey,
           HarnessVendorConfiguration.modelKey: "gpt-test",
           HarnessVendorConfiguration.endpointKey: "http://model.invalid/v1",
-        ])) { error in
-          XCTAssertEqual(error as? HarnessVendorConfigurationError, .malformedEndpoint)
-        }
+        ])
+    ) { error in
+      XCTAssertEqual(error as? HarnessVendorConfigurationError, .malformedEndpoint)
+    }
   }
 
   func testProductionConfigurationSelectsOneAdapterWithoutExposingTheKey() throws {
@@ -213,8 +215,9 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
             retired: "/bin/echo",
           ])
       ) { error in
-        guard case .unexpectedConfiguration(let detail)? =
-          error as? HarnessVendorConfigurationError
+        guard
+          case .unexpectedConfiguration(let detail)? =
+            error as? HarnessVendorConfigurationError
         else { return XCTFail("\(retired) was not refused") }
         XCTAssertTrue(detail.hasPrefix(retired), detail)
         XCTAssertTrue(detail.contains(HarnessVendorConfiguration.cliPathKey), detail)
@@ -381,7 +384,8 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
       object)
     // Trailing narration too, and a language tag that is absent.
     XCTAssertEqual(
-      LocalAgentCLIProcessTransport.unfenced("Here it is:\n```\n\(object)\n```\nThat is my answer."),
+      LocalAgentCLIProcessTransport.unfenced(
+        "Here it is:\n```\n\(object)\n```\nThat is my answer."),
       object)
 
     // An agent that shows its work puts the answer last; an earlier block is
@@ -550,7 +554,8 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     let jobs = VendorJobPort()
     let (gateway, transport) = try claude(
       replying: claudeReply(
-        text: #"{"kind":"invokeOperation","operationRef":"observe.device@1","hypothesis":"h","reasonCode":"baselineTargetObservation"}"#
+        text:
+          #"{"kind":"invokeOperation","operationRef":"observe.device@1","hypothesis":"h","reasonCode":"baselineTargetObservation"}"#
       ))
     // Zero calls allowed: the deterministic handler must still converge, so
     // this is a ceiling on spend, not a halt.
@@ -694,7 +699,7 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     jobs: VendorJobPort,
     budgets: HarnessTaskBudgets? = nil
   ) throws -> (HarnessTaskCoordinator, HarnessTaskStore) {
-    let store = try HarnessTaskStore(rootURL: rootURL.appendingPathComponent(UUID().uuidString))
+    let store = try HarnessTaskStore(rootURL: rootURL.appending(path: UUID().uuidString))
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs, nowUTC: { "2026-07-31T00:00:00Z" },
       decisionGateway: gateway,
@@ -706,7 +711,7 @@ final class HarnessVendorGatewayContractTests: XCTestCase {
     gateway: any HarnessDecisionGateway,
     jobs: VendorJobPort
   ) throws -> (HarnessTaskCoordinator, HarnessTaskStore) {
-    let store = try HarnessTaskStore(rootURL: rootURL.appendingPathComponent(UUID().uuidString))
+    let store = try HarnessTaskStore(rootURL: rootURL.appending(path: UUID().uuidString))
     let coordinator = HarnessTaskCoordinator(
       store: store, jobPort: jobs, handlers: [PatchQuestionHandler()],
       nowUTC: { "2026-07-31T00:00:00Z" }, decisionGateway: gateway,

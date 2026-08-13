@@ -28,7 +28,9 @@ let package = Package(
     .executable(name: "ArkDeckFakeHapSignerFixture", targets: ["ArkDeckFakeHapSignerFixture"]),
   ],
   targets: [
-    .target(name: "ArkDeckCore"),
+    .target(
+      name: "ArkDeckCore",
+      swiftSettings: [.strictMemorySafety()]),
     .target(name: "ArkDeckProcess", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),

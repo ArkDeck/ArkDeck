@@ -453,7 +453,7 @@ struct SystemHDCServerProcessIdentityObserver: HDCServerProcessIdentityObserving
     else { return nil }
     let path = String(
       decoding: buffer[..<terminator].map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    return URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+    return URL(filePath: path).resolvingSymlinksInPath().standardizedFileURL
   }
 
   private func startIdentity(for pid: Int32) -> (seconds: UInt64, microseconds: UInt64)? {

@@ -12,13 +12,13 @@ final class HDCSupervisorContractTests: XCTestCase {
   func testApplicationDiagnosticsSessionScopeSeparatesByteIdenticalPaths() {
     let hash = String(repeating: "a", count: 64)
     let first = HDCCandidate(
-      path: URL(fileURLWithPath: "/tmp/sdk-a/hdc"), source: .userConfigured, sha256: hash)
+      path: URL(filePath: "/tmp/sdk-a/hdc"), source: .userConfigured, sha256: hash)
     let identical = HDCCandidate(
-      path: URL(fileURLWithPath: "/tmp/sdk-a/hdc"), source: .userConfigured, sha256: hash)
+      path: URL(filePath: "/tmp/sdk-a/hdc"), source: .userConfigured, sha256: hash)
     let copied = HDCCandidate(
-      path: URL(fileURLWithPath: "/tmp/sdk-b/hdc"), source: .userConfigured, sha256: hash)
+      path: URL(filePath: "/tmp/sdk-b/hdc"), source: .userConfigured, sha256: hash)
     let replaced = HDCCandidate(
-      path: URL(fileURLWithPath: "/tmp/sdk-a/hdc"), source: .userConfigured,
+      path: URL(filePath: "/tmp/sdk-a/hdc"), source: .userConfigured,
       sha256: String(repeating: "b", count: 64))
 
     XCTAssertEqual(
@@ -390,7 +390,7 @@ final class HDCSupervisorContractTests: XCTestCase {
         "set \(HDCApplicationDiagnosticsConfiguration.userConfiguredPathEnvironmentKey) "
           + "to a real HDC executable to measure gate B")
     }
-    let expected = URL(fileURLWithPath: configured)
+    let expected = URL(filePath: configured)
       .resolvingSymlinksInPath().standardizedFileURL
     let suiteName = "ArkDeck.HDC.GateB.\(UUID().uuidString)"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -2281,7 +2281,7 @@ final class HDCSupervisorContractTests: XCTestCase {
   }
 
   private func fixtureExecutable() -> URL {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     return packageRoot.appending(path: ".build/debug/ArkDeckFakeHDCFixture")
   }

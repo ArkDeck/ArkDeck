@@ -59,7 +59,7 @@ package struct FixedExecutableResolver: RuntimeExecutableResolving {
       throw RuntimeDispatchFailure.failed(
         "provider executable path must be explicit and absolute")
     }
-    let executable = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+    let executable = URL(filePath: path).resolvingSymlinksInPath().standardizedFileURL
     let attributes = try FileManager.default.attributesOfItem(atPath: executable.path)
     guard attributes[.type] as? FileAttributeType == .typeRegular,
       FileManager.default.isExecutableFile(atPath: executable.path)
@@ -183,11 +183,11 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     workingDirectory: String?
   ) async throws -> ProviderSubprocessReceipt {
     let request = ProcessRequest(
-      executable: URL(fileURLWithPath: executable.path),
+      executable: URL(filePath: executable.path),
       argumentZero: argumentZero,
       arguments: invocation.arguments,
       environment: childEnvironment,
-      workingDirectory: workingDirectory.map { URL(fileURLWithPath: $0, isDirectory: true) },
+      workingDirectory: workingDirectory.map { URL(filePath: $0, directoryHint: .isDirectory) },
       timeout: invocation.timeoutSeconds.map(TimeInterval.init))
     let executor = FoundationProcessExecutor()
     let result: ProcessIdentityBoundExecutionResult

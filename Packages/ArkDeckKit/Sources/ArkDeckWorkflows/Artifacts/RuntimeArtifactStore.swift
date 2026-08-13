@@ -192,11 +192,9 @@ public struct ArtifactRetentionPolicy: Sendable, Equatable {
     guard lifetime > 0 else {
       throw RuntimeArtifactError.ioFailure("artifact retention lifetime must be positive")
     }
-    let deadlineFormatter = ISO8601DateFormatter()
-    deadlineFormatter.formatOptions = [.withInternetDateTime]
     return ArtifactRetention(
       retentionClass: retentionClass,
-      deadlineUTC: deadlineFormatter.string(from: created.addingTimeInterval(lifetime)),
+      deadlineUTC: ISO8601Timestamps.string(from: created.addingTimeInterval(lifetime)),
       pinned: false)
   }
 }
@@ -432,7 +430,9 @@ public actor RuntimeArtifactStore {
 
   // MARK: - Publication
 
-  public func publish(_ request: RuntimeArtifactPublicationRequest) throws -> RuntimeArtifactMetadata {
+  public func publish(_ request: RuntimeArtifactPublicationRequest) throws
+    -> RuntimeArtifactMetadata
+  {
     let (payload, redacted) = redaction.redact(request.contents, mediaType: request.mediaType)
     let digest = SHA256Hex.string(of: payload)
     let identityInput = Data("\(request.jobID)\u{0}\(request.name)\u{0}\(digest)".utf8)
@@ -476,7 +476,7 @@ public actor RuntimeArtifactStore {
       return existing
     }
 
-    let destination = jobDirectory.appendingPathComponent(artifactID)
+    let destination = jobDirectory.appending(path: artifactID)
     let destinationExists = FileManager.default.fileExists(atPath: destination.path)
     if destinationExists {
       // Recover only an exact payload left between the durable data write
@@ -577,7 +577,7 @@ public actor RuntimeArtifactStore {
       return existing
     }
 
-    let destination = jobDirectory.appendingPathComponent(artifactID)
+    let destination = jobDirectory.appending(path: artifactID)
     let used = try totalBytesUsed()
     if FileManager.default.fileExists(atPath: destination.path) {
       _ = try validateStoredPayload(metadata, at: destination)
@@ -606,7 +606,7 @@ public actor RuntimeArtifactStore {
   ) throws -> RuntimeArtifactMetadata {
     guard request.sourceFileURL.isFileURL,
       request.sourceFileURL.path.hasPrefix("/"),
-      (request.mediaType.hasPrefix("text/") || request.mediaType == "application/json")
+      request.mediaType.hasPrefix("text/") || request.mediaType == "application/json"
     else {
       throw RuntimeArtifactError.ioFailure(
         "text file publication requires an absolute text or JSON source")
@@ -626,8 +626,9 @@ public actor RuntimeArtifactStore {
     }
 
     let jobDirectory = try directory(for: request.jobID)
-    let temporary = jobDirectory.appendingPathComponent(
-      ".tmp-redacted-\(UUID().uuidString.prefix(12).lowercased())")
+    let temporary = jobDirectory.appending(
+      path:
+        ".tmp-redacted-\(UUID().uuidString.prefix(12).lowercased())")
     let temporaryFD = Darwin.open(
       temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard temporaryFD >= 0 else {
@@ -692,7 +693,7 @@ public actor RuntimeArtifactStore {
       return existing
     }
 
-    let destination = jobDirectory.appendingPathComponent(metadata.artifactID)
+    let destination = jobDirectory.appending(path: metadata.artifactID)
     let used = try totalBytesUsed()
     if FileManager.default.fileExists(atPath: destination.path) {
       _ = try validateStoredPayload(metadata, at: destination)
@@ -753,9 +754,11 @@ public actor RuntimeArtifactStore {
   }
 
   public func inspect(jobID: String, artifactID: String) throws -> RuntimeArtifactMetadata {
-    guard let match = try loadIndex(jobID: jobID).artifacts.first(where: {
-      $0.artifactID == artifactID
-    }) else {
+    guard
+      let match = try loadIndex(jobID: jobID).artifacts.first(where: {
+        $0.artifactID == artifactID
+      })
+    else {
       throw RuntimeArtifactError.artifactNotFound(artifactID)
     }
     return match
@@ -786,7 +789,7 @@ public actor RuntimeArtifactStore {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) is not published")
       }
-      let url = try directory(for: jobID).appendingPathComponent(metadata.artifactID)
+      let url = try directory(for: jobID).appending(path: metadata.artifactID)
       guard FileManager.default.fileExists(atPath: url.path) else {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "artifact \(metadata.artifactID) bytes are missing")
@@ -878,7 +881,7 @@ public actor RuntimeArtifactStore {
     // escape the destination directory.
     let safeName = metadata.name.replacingOccurrences(of: "/", with: "_")
       .replacingOccurrences(of: "..", with: "_")
-    let destination = destinationDirectory.appendingPathComponent("\(artifactID)-\(safeName)")
+    let destination = destinationDirectory.appending(path: "\(artifactID)-\(safeName)")
     guard !FileManager.default.fileExists(atPath: destination.path) else {
       throw RuntimeArtifactError.exportDestinationRejected(
         "refusing to overwrite \(destination.lastPathComponent)")
@@ -980,7 +983,7 @@ public actor RuntimeArtifactStore {
           if metadata.status.isPublished {
             do {
               try FileManager.default.removeItem(
-                at: entry.appendingPathComponent(metadata.artifactID))
+                at: entry.appending(path: metadata.artifactID))
             } catch {
               throw RuntimeArtifactError.ioFailure(
                 "cannot collect \(metadata.artifactID): \(error)")
@@ -1046,9 +1049,11 @@ public actor RuntimeArtifactStore {
     -> CleanupDebtRecord
   {
     var debts = try loadCleanupDebt()
-    guard let index = debts.firstIndex(where: {
-      $0.jobID == jobID && $0.identity == identity && $0.settledAtUTC == nil
-    }) else {
+    guard
+      let index = debts.firstIndex(where: {
+        $0.jobID == jobID && $0.identity == identity && $0.settledAtUTC == nil
+      })
+    else {
       throw RuntimeArtifactError.artifactNotFound("cleanup-debt:\(jobID):\(identity)")
     }
     guard debts[index].retryOutcomeUnknown != true,
@@ -1066,9 +1071,11 @@ public actor RuntimeArtifactStore {
     jobID: String, identity: String, outcomeUnknown: Bool
   ) throws {
     var debts = try loadCleanupDebt()
-    guard let index = debts.firstIndex(where: {
-      $0.jobID == jobID && $0.identity == identity && $0.settledAtUTC == nil
-    }) else {
+    guard
+      let index = debts.firstIndex(where: {
+        $0.jobID == jobID && $0.identity == identity && $0.settledAtUTC == nil
+      })
+    else {
       throw RuntimeArtifactError.artifactNotFound("cleanup-debt:\(jobID):\(identity)")
     }
     debts[index].retryOutcomeUnknown = outcomeUnknown
@@ -1088,7 +1095,7 @@ public actor RuntimeArtifactStore {
     else {
       throw RuntimeArtifactError.ioFailure("malformed job identifier")
     }
-    let url = rootURL.appendingPathComponent(jobID, isDirectory: true)
+    let url = rootURL.appending(path: jobID, directoryHint: .isDirectory)
     if FileManager.default.fileExists(atPath: url.path) {
       do {
         try Self.requireDirectoryWithoutSymlink(url, label: "artifact job directory")
@@ -1109,7 +1116,7 @@ public actor RuntimeArtifactStore {
   }
 
   private func indexURL(for jobID: String) throws -> URL {
-    try directory(for: jobID).appendingPathComponent("index.json")
+    try directory(for: jobID).appending(path: "index.json")
   }
 
   private func loadIndex(jobID: String) throws -> ArtifactIndexDocument {
@@ -1139,8 +1146,9 @@ public actor RuntimeArtifactStore {
         }
         if metadata.status.isPublished {
           _ = try validateStoredPayload(
-            metadata, at: url.deletingLastPathComponent()
-              .appendingPathComponent(metadata.artifactID))
+            metadata,
+            at: url.deletingLastPathComponent()
+              .appending(path: metadata.artifactID))
         }
       }
       return document
@@ -1184,7 +1192,7 @@ public actor RuntimeArtifactStore {
   }
 
   private func cleanupDebtURL() -> URL {
-    rootURL.appendingPathComponent("cleanup-debt.json")
+    rootURL.appending(path: "cleanup-debt.json")
   }
 
   private func loadCleanupDebt() throws -> [CleanupDebtRecord] {
@@ -1210,8 +1218,9 @@ public actor RuntimeArtifactStore {
   }
 
   private func atomicWrite(_ data: Data, to destination: URL, directory: URL) throws {
-    let temporary = directory.appendingPathComponent(
-      ".tmp-\(UUID().uuidString.prefix(8).lowercased())")
+    let temporary = directory.appending(
+      path:
+        ".tmp-\(UUID().uuidString.prefix(8).lowercased())")
     do {
       try data.write(to: temporary, options: [])
       let handle = try FileHandle(forWritingTo: temporary)
@@ -1245,8 +1254,9 @@ public actor RuntimeArtifactStore {
       throw RuntimeArtifactError.ioFailure(
         "cannot rewind file-backed Artifact source (errno \(errno))")
     }
-    let temporary = directory.appendingPathComponent(
-      ".tmp-file-\(UUID().uuidString.prefix(12).lowercased())")
+    let temporary = directory.appending(
+      path:
+        ".tmp-file-\(UUID().uuidString.prefix(12).lowercased())")
     let destinationFD = Darwin.open(
       temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard destinationFD >= 0 else {
@@ -1392,7 +1402,7 @@ public actor RuntimeArtifactStore {
     guard Self.isSafeArtifactID(metadata.artifactID) else {
       throw RuntimeArtifactError.indexCorrupted("unsafe artifact identifier in index")
     }
-    let url = try directory(for: metadata.jobID).appendingPathComponent(metadata.artifactID)
+    let url = try directory(for: metadata.jobID).appending(path: metadata.artifactID)
     return try validateStoredPayload(metadata, at: url)
   }
 

@@ -70,15 +70,15 @@ package struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
     if let productExecutableURL = Bundle.main.executableURL {
       candidates.append(
         productExecutableURL.deletingLastPathComponent()
-          .appendingPathComponent(BundledRockchipComponent.bundleRelativePath))
+          .appending(path: BundledRockchipComponent.bundleRelativePath))
     }
     candidates.append(
-      URL(fileURLWithPath: "/Applications/ArkDeck.app/Contents/MacOS")
-        .appendingPathComponent(BundledRockchipComponent.bundleRelativePath))
+      URL(filePath: "/Applications/ArkDeck.app/Contents/MacOS")
+        .appending(path: BundledRockchipComponent.bundleRelativePath))
     candidates.append(
       FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Applications/ArkDeck.app/Contents/MacOS")
-        .appendingPathComponent(BundledRockchipComponent.bundleRelativePath))
+        .appending(path: "Applications/ArkDeck.app/Contents/MacOS")
+        .appending(path: BundledRockchipComponent.bundleRelativePath))
     componentURLs = candidates.reduce(into: []) { result, candidate in
       if !result.contains(candidate) {
         result.append(candidate)
@@ -88,12 +88,13 @@ package struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
   }
 
   package init(productExecutableURL: URL?, expectedSHA256: String) {
-    componentURLs = productExecutableURL.map {
-      [
-        $0.deletingLastPathComponent()
-          .appendingPathComponent(BundledRockchipComponent.bundleRelativePath)
-      ]
-    } ?? []
+    componentURLs =
+      productExecutableURL.map {
+        [
+          $0.deletingLastPathComponent()
+            .appending(path: BundledRockchipComponent.bundleRelativePath)
+        ]
+      } ?? []
     trustPolicy = .exactSHA256(expectedSHA256)
   }
 
@@ -216,8 +217,9 @@ package struct BundledRockchipExecutableResolver: RuntimeExecutableResolving {
     // Sandbox inheritance, child USB/file/network capability and Hardened
     // Runtime exceptions are all rejected by having no key at all.
     let entitlements = information[kSecCodeInfoEntitlementsDict]
-    guard entitlements == nil
-      || (entitlements as? [String: Any])?.isEmpty == true
+    guard
+      entitlements == nil
+        || (entitlements as? [String: Any])?.isEmpty == true
     else {
       throw BundledRockchipComponentError.codeSignatureMetadataInvalid(
         "entitlements")
@@ -310,7 +312,8 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
       } else {
         covered = false
       }
-      serverFacts[Self.crossModeBindingServerFactKey] = covered
+      serverFacts[Self.crossModeBindingServerFactKey] =
+        covered
         ? Self.crossModeBindingSatisfied : Self.crossModeBindingUnprepared
     }
     let live = await liveFacts(
@@ -414,7 +417,8 @@ extension TargetStoreRockchipRuntimeFactsPort: RockchipFlashPrerequisiteObservin
       // Mirrors RockchipProductPrerequisitePort: one attributable Loader
       // observation proves the three product prerequisites that port emits.
       // Stable power has no production sensor and therefore remains unknown.
-      statuses = crossModeBindingReady || bindingStore == nil
+      statuses =
+        crossModeBindingReady || bindingStore == nil
         ? [
           .loader: .satisfied,
           .recoveryPath: .satisfied,
@@ -506,11 +510,13 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
           workingDirectory: toolWorkingDirectory),
         postFlashHDCBindingStore: postFlashHDCBindingStore,
         imageCache: RockchipFlashImageCache(
-          rootURL: stateDirectory.appendingPathComponent(
-            "rockchip-image-cache", isDirectory: true))),
+          rootURL: stateDirectory.appending(
+            path:
+              "rockchip-image-cache", directoryHint: .isDirectory))),
       records: RockchipRuntimeActionRecordStore(
-        rootURL: stateDirectory.appendingPathComponent(
-          "rockchip-runtime", isDirectory: true)))
+        rootURL: stateDirectory.appending(
+          path:
+            "rockchip-runtime", directoryHint: .isDirectory)))
   }
 
   init(

@@ -213,8 +213,9 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     drifted["bindingRevision"] = 10
     let driftedData = try JSONSerialization.data(
       withJSONObject: ["id": "probe", "ok": true, "result": drifted])
-    guard case .failure = TraceRuntimeProbeResponseDecoding.snapshot(
-      .success(driftedData), target: target)
+    guard
+      case .failure = TraceRuntimeProbeResponseDecoding.snapshot(
+        .success(driftedData), target: target)
     else { return XCTFail("binding drift must fail closed") }
   }
 
@@ -280,7 +281,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
   }
 
   private var repository: URL {
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

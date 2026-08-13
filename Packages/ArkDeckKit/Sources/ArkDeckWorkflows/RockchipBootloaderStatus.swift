@@ -66,7 +66,8 @@ package struct ProductRockchipBootloaderStatusObserver:
   ) {
     self.targetStore = targetStore
     self.bindingStore = bindingStore
-    self.postFlashHDCBindingStore = postFlashHDCBindingStore
+    self.postFlashHDCBindingStore =
+      postFlashHDCBindingStore
       ?? RockchipPostFlashHDCBindingStore(rootURL: bindingStore.rootURL)
     self.usbProbe = usbProbe
   }
@@ -136,7 +137,8 @@ package struct ProductRockchipBootloaderStatusObserver:
     let covered: Bool
     if let binding {
       do {
-        covered = try binding.coversRuntimeTarget(target)
+        covered =
+          try binding.coversRuntimeTarget(target)
           && binding.matchesConfirmedLiveIdentity(identity)
       } catch {
         // A decoded historical or otherwise incomplete binding is a safe,
@@ -251,9 +253,10 @@ package struct ProductRockchipLoaderBindingCoordinator:
     self.bindingStore = RockchipProductBindingStore(rootURL: applicationSupportRoot)
     self.usbProbe = RockchipProductUSBProbe()
     self.reactivationProofSource = RockchipRuntimeBindingReactivationProofSource(
-      rootURL: applicationSupportRoot
-        .appendingPathComponent("Agentd", isDirectory: true)
-        .appendingPathComponent("rockchip-runtime", isDirectory: true))
+      rootURL:
+        applicationSupportRoot
+        .appending(path: "Agentd", directoryHint: .isDirectory)
+        .appending(path: "rockchip-runtime", directoryHint: .isDirectory))
   }
 
   init(
@@ -265,11 +268,12 @@ package struct ProductRockchipLoaderBindingCoordinator:
     self.targetStore = targetStore
     self.bindingStore = bindingStore
     self.usbProbe = usbProbe
-    self.reactivationProofSource = reactivationProofSource
+    self.reactivationProofSource =
+      reactivationProofSource
       ?? RockchipRuntimeBindingReactivationProofSource(
         rootURL: bindingStore.rootURL
-          .appendingPathComponent("Agentd", isDirectory: true)
-          .appendingPathComponent("rockchip-runtime", isDirectory: true))
+          .appending(path: "Agentd", directoryHint: .isDirectory)
+          .appending(path: "rockchip-runtime", directoryHint: .isDirectory))
   }
 
   public func bindCurrentLoader(
@@ -363,7 +367,8 @@ package struct ProductRockchipLoaderBindingCoordinator:
       currentIdentity == existingIdentity,
       identity.topology == existing.usbTopology
     {
-      let alreadyCovered = (try? existing.coversRuntimeTarget(target)) == true
+      let alreadyCovered =
+        (try? existing.coversRuntimeTarget(target)) == true
         && (try? existing.matchesConfirmedLiveIdentity(identity)) == true
       let initialSelections = existing.evidence.compactMap { value -> String? in
         let prefix = "rebind:user-selection-sha256="
@@ -600,15 +605,17 @@ package struct ProductRockchipLoaderBindingCoordinator:
     currentIdentity: String,
     currentTopology: String
   ) -> String {
-    SHA256Hex.string(of: Data([
-      "rockchip-loader-user-selection",
-      targetID,
-      String(previousRevision),
-      String(currentRevision),
-      previousIdentity,
-      currentIdentity,
-      currentTopology,
-    ].joined(separator: "\n").utf8))
+    SHA256Hex.string(
+      of: Data(
+        [
+          "rockchip-loader-user-selection",
+          targetID,
+          String(previousRevision),
+          String(currentRevision),
+          previousIdentity,
+          currentIdentity,
+          currentTopology,
+        ].joined(separator: "\n").utf8))
   }
 
   private static func authorizeSelectedTarget(

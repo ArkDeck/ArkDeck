@@ -14,7 +14,6 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
 
-
 /// The repair model has no workspace, Runtime, authority or device port. It receives only a
 /// normalized failure code and prior closed strategies, then returns timing/mode values that the
 /// isolated candidate executable and merged broker both validate. The first attempt is the
@@ -35,9 +34,9 @@ package struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStr
     workingDirectory: String,
     transport: any HarnessLocalAgentCLITransport = LocalAgentCLIProcessTransport()
   ) throws {
-    let executableURL = URL(fileURLWithPath: executablePath)
+    let executableURL = URL(filePath: executablePath)
       .resolvingSymlinksInPath().standardizedFileURL
-    let workingURL = URL(fileURLWithPath: workingDirectory, isDirectory: true)
+    let workingURL = URL(filePath: workingDirectory, directoryHint: .isDirectory)
       .resolvingSymlinksInPath().standardizedFileURL
     var isDirectory: ObjCBool = false
     guard executablePath.hasPrefix("/"), executableURL.path == executablePath,
@@ -78,7 +77,8 @@ package struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStr
     }
     let prior = priorCandidates.suffix(8).map { candidate in
       let strategy = candidate.strategy
-      return "\(strategy.digestSHA256):modes=\(strategy.allowedStartingModes.map(\.rawValue).joined(separator: ",")):loader=\(strategy.loaderDiscoveryTimeoutSeconds):poll=\(strategy.loaderPollIntervalMilliseconds):hdc=\(strategy.hdcCommandTimeoutSeconds):read=\(strategy.readOnlyCommandTimeoutSeconds)"
+      return
+        "\(strategy.digestSHA256):modes=\(strategy.allowedStartingModes.map(\.rawValue).joined(separator: ",")):loader=\(strategy.loaderDiscoveryTimeoutSeconds):poll=\(strategy.loaderPollIntervalMilliseconds):hdc=\(strategy.hdcCommandTimeoutSeconds):read=\(strategy.readOnlyCommandTimeoutSeconds)"
     }.joined(separator: "\n")
     let prompt = """
       You are a bounded firmware-campaign strategy repairer. You have no filesystem, shell,
@@ -118,9 +118,11 @@ package struct LocalAgentRockchipEvolutionStrategyRepairer: RockchipEvolutionStr
       else { throw RockchipEvolutionCampaignError.candidateRejected("repairStartingMode") }
       return mode
     }
-    guard [loaderTimeout, pollMilliseconds, hdcTimeout, readOnlyTimeout].allSatisfy({
-      $0 >= Int64(Int.min) && $0 <= Int64(Int.max)
-    }) else { throw RockchipEvolutionCampaignError.candidateRejected("repairInteger") }
+    guard
+      [loaderTimeout, pollMilliseconds, hdcTimeout, readOnlyTimeout].allSatisfy({
+        $0 >= Int64(Int.min) && $0 <= Int64(Int.max)
+      })
+    else { throw RockchipEvolutionCampaignError.candidateRejected("repairInteger") }
     let proposed = try Self.strategy(
       assertion: assertion, modes: modes, loaderTimeout: Int(loaderTimeout),
       pollMilliseconds: Int(pollMilliseconds), hdcTimeout: Int(hdcTimeout),

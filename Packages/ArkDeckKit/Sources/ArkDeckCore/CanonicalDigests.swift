@@ -6,12 +6,28 @@ import Foundation
 /// so digest formatting must not be re-derived per call site: a second
 /// spelling is how two components silently disagree about the same identity.
 package enum SHA256Hex {
+  private static let lowercaseDigits = Array("0123456789abcdef".utf8)
+
   package static func string(of data: Data) -> String {
     hexString(SHA256.hash(data: data))
   }
 
   package static func hexString(_ digest: SHA256.Digest) -> String {
-    digest.map { String(format: "%02x", $0) }.joined()
+    lowercaseHex(digest)
+  }
+
+  /// Encodes arbitrary bytes without routing through C varargs. Keeping the
+  /// spelling here lets native-boundary callers share the same memory-safe
+  /// lowercase representation as SHA-256 identities.
+  package static func lowercaseHex<Bytes: Sequence>(_ bytes: Bytes) -> String
+  where Bytes.Element == UInt8 {
+    var encoded: [UInt8] = []
+    encoded.reserveCapacity(bytes.underestimatedCount * 2)
+    for byte in bytes {
+      encoded.append(lowercaseDigits[Int(byte >> 4)])
+      encoded.append(lowercaseDigits[Int(byte & 0x0f)])
+    }
+    return String(decoding: encoded, as: UTF8.self)
   }
 
   /// True exactly for 64 lowercase hexadecimal characters — the closed wire
@@ -49,28 +65,25 @@ package enum CanonicalJSONEncoders {
 /// regardless of probe order and unchanged from the per-call-formatter
 /// spelling this replaced.
 package enum ISO8601Timestamps {
-  // The SDK marks ISO8601DateFormatter's Sendable conformance unavailable,
-  // so the two cached formatters (constructing them per call dominated
-  // journal replay) are only touched under this lock. Uncontended
-  // lock/unlock is nanoseconds against the microseconds a parse costs;
-  // the replay hot loop is single-threaded, so it never contends.
-  private static let lock = NSLock()
-  private nonisolated(unsafe) static let fractionalFormatter: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter
-  }()
-
-  private nonisolated(unsafe) static let plainFormatter: ISO8601DateFormatter = {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter
-  }()
+  private static let plain = Date.ISO8601FormatStyle()
+  private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
   package static func parse(_ value: String) -> Date? {
-    lock.lock()
-    defer { lock.unlock() }
-    if let date = fractionalFormatter.date(from: value) { return date }
-    return plainFormatter.date(from: value)
+    (try? fractional.parse(value)) ?? (try? plain.parse(value))
+  }
+
+  package static func parseCanonicalPlain(_ value: String) -> Date? {
+    guard let date = try? plain.parse(value), plain.format(date) == value else { return nil }
+    return date
+  }
+
+  package static func string(
+    from date: Date,
+    includingFractionalSeconds: Bool = false
+  ) -> String {
+    if includingFractionalSeconds {
+      return fractional.format(date)
+    }
+    return plain.format(date)
   }
 }

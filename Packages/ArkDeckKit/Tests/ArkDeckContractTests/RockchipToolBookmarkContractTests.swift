@@ -260,7 +260,7 @@ final class RockchipToolBookmarkContractTests: XCTestCase {
     assertConfigurationUnavailable { try fakeVerifierStore.install(executableURL: nonFile) }
 
     let nonCanonical = URL(
-      fileURLWithPath: temporaryRoot.path + "/../"
+      filePath: temporaryRoot.path + "/../"
         + temporaryRoot.lastPathComponent + "/input-tool")
     assertConfigurationUnavailable {
       try fakeVerifierStore.install(executableURL: nonCanonical)
@@ -297,7 +297,7 @@ final class RockchipToolBookmarkContractTests: XCTestCase {
       try productionStore.install(executableURL: nonExecutable)
     }
     assertConfigurationUnavailable {
-      try productionStore.install(executableURL: URL(fileURLWithPath: "/usr/bin/true"))
+      try productionStore.install(executableURL: URL(filePath: "/usr/bin/true"))
     }
     XCTAssertNil(box.values[RockchipProductToolBookmarkStore.ordinaryKey])
 

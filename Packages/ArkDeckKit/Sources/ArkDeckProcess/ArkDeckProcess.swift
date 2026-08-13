@@ -410,7 +410,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     identityBoundLaunchFault: ProcessIdentityBoundLaunchFault = .none,
     identityBoundSpawnObserver:
       @escaping @Sendable (ProcessExecutableIdentityReceipt, ProcessRequest, pid_t) -> Void =
-        { _, _, _ in }
+      { _, _, _ in }
   ) {
     self.identityBoundPreSpawnHook = identityBoundPreSpawnHook
     self.identityBoundFinalLaunchHook = identityBoundFinalLaunchHook
@@ -999,13 +999,8 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     Void, Never
   >? {
     guard let timeout else { return nil }
-    let requestedNanoseconds = timeout * 1_000_000_000
-    let nanoseconds =
-      requestedNanoseconds >= Double(UInt64.max)
-      ? UInt64.max
-      : UInt64(requestedNanoseconds.rounded(.up))
     return Task {
-      try? await Task.sleep(nanoseconds: nanoseconds)
+      try? await Task.sleep(for: .seconds(timeout))
       guard !Task.isCancelled else { return }
       control.stop(reason: .timedOut)
     }
@@ -1038,7 +1033,8 @@ package final class VerifiedExecutableDescriptor {
     self.openedInode = openedInode
   }
 
-  package static func open(path: URL, expectedSHA256: String) throws -> VerifiedExecutableDescriptor {
+  package static func open(path: URL, expectedSHA256: String) throws -> VerifiedExecutableDescriptor
+  {
     var pathMetadata = stat()
     guard path.path.withCString({ lstat($0, &pathMetadata) }) == 0 else {
       throw ProcessExecutionError.executableOpenFailed(path.path, errno)

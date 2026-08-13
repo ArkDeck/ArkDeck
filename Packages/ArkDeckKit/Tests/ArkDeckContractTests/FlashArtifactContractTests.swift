@@ -73,7 +73,8 @@ final class FlashArtifactContractTests: XCTestCase {
     let mapped =
       Set(
         RuntimeArtifactService.artifactMapping["flash.dayu200", default: [:]]
-          .values.flatMap { $0 })
+          .values.flatMap { $0 }
+      )
       .union(RuntimeArtifactService.finalizeArtifacts["flash.dayu200", default: []])
     XCTAssertEqual(mapped, Set(descriptor.artifacts.map(\.name)))
   }
@@ -143,7 +144,7 @@ final class FlashArtifactContractTests: XCTestCase {
 
   func testFlashArtifactBytesHashesAndBindingSurviveStoreReopen() async throws {
     let root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-flash-artifacts-\(UUID().uuidString)")
+      .appending(path: "arkdeck-flash-artifacts-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let descriptor = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))

@@ -120,8 +120,9 @@ package actor HDCSupervisorObservationApplicationSession {
           reason: "selected executable is outside OPENHARMONY-TOOLS@0.6.0"),
         reason: "selected executable is outside OPENHARMONY-TOOLS@0.6.0")
     }
-    guard endpointSelection.endpoint.rawValue
-      == HDCSupervisorObservationProbeCatalog.exactEndpoint
+    guard
+      endpointSelection.endpoint.rawValue
+        == HDCSupervisorObservationProbeCatalog.exactEndpoint
     else {
       return await fail(
         .unsupported(reason: "selected endpoint is outside the supervisor registry"),
@@ -324,7 +325,7 @@ struct HDCExact320FSystemIdentityObserver: HDCServerProcessIdentityObserving {
     let path = String(
       decoding: buffer[..<terminator].map { UInt8(bitPattern: $0) },
       as: UTF8.self)
-    return URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+    return URL(filePath: path).resolvingSymlinksInPath().standardizedFileURL
   }
 
   private func startIdentity(for pid: Int32) -> (seconds: UInt64, microseconds: UInt64)? {

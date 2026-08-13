@@ -1,10 +1,11 @@
 import ArkDeckCore
-@testable import ArkDeckStorage
 import ArkDeckWorkflows
 import Darwin
 import Dispatch
 import Foundation
 import XCTest
+
+@testable import ArkDeckStorage
 
 final class JournalRecoveryContractTests: XCTestCase {
   /// Real durable append benchmarks for the writer cursor at 100, 1,000, and
@@ -14,7 +15,8 @@ final class JournalRecoveryContractTests: XCTestCase {
   /// hot path without treating a fast disk as correctness.
   func testIncrementalJournalCursorScalesPastTenThousandDurableEvents() throws {
     guard ProcessInfo.processInfo.environment["ARKDECK_RUN_LONG_JOURNAL_TESTS"] == "1" else {
-      throw XCTSkip("set ARKDECK_RUN_LONG_JOURNAL_TESTS=1 to run the 10,000-event journal benchmark")
+      throw XCTSkip(
+        "set ARKDECK_RUN_LONG_JOURNAL_TESTS=1 to run the 10,000-event journal benchmark")
     }
     for historicalEventCount in [100, 1_000, 10_000] {
       let measurement = try measureCursorBenchmark(historicalEventCount: historicalEventCount)
@@ -29,7 +31,8 @@ final class JournalRecoveryContractTests: XCTestCase {
         "the cursor benchmark must take the validated incremental append path")
       XCTAssertLessThan(
         measurement.validationBytesRead, 4_096,
-        "the hot append path must read only its validated tail, not \(historicalEventCount) records")
+        "the hot append path must read only its validated tail, not \(historicalEventCount) records"
+      )
       print(
         "ARKDECK_JOURNAL_CURSOR historicalEvents=\(measurement.historicalEventCount) "
           + "totalEvents=\(measurement.totalEventCount) "
@@ -799,7 +802,6 @@ final class JournalRecoveryContractTests: XCTestCase {
     XCTAssertEqual(dispatchCount, 0, "an unresolved unknown outcome must block new dispatch")
   }
 
-
   /// Review-restored coverage (PR #1276 item 1): the real-process SIGKILL
   /// crash-window matrix pins DurableJournalRecovery's unknown-outcome
   /// preservation and the zero-device-dispatch invariant. Scanner-side
@@ -849,7 +851,6 @@ final class JournalRecoveryContractTests: XCTestCase {
           || window == "afterDurableOutcomeBeforeFinalize" ? 1 : 0)
     }
   }
-
 
   /// Review-restored (PR #1276 round 2): an unresolved external-effect
   /// intent must neither enter finalization/terminal nor be hidden by a
@@ -1307,7 +1308,7 @@ final class JournalRecoveryContractTests: XCTestCase {
   }
 
   private func crashFixtureExecutable() throws -> URL {
-    let packageRoot = URL(fileURLWithPath: #filePath)
+    let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

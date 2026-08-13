@@ -73,7 +73,7 @@ public struct RuntimeJobSummaryPresentation: Sendable, Equatable, Identifiable {
 
   private static func parseUTC(_ value: String?) -> Date? {
     guard let value else { return nil }
-    return ISO8601DateFormatter().date(from: value)
+    return ISO8601Timestamps.parse(value)
   }
 
   /// Runtime has durable evidence that a later, distinct action established
@@ -391,7 +391,7 @@ private actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding 
       if gainedScope { destinationURL.stopAccessingSecurityScopedResource() }
     }
     let temporaryURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-artifact-\(UUID().uuidString.lowercased())")
+      .appending(path: "arkdeck-artifact-\(UUID().uuidString.lowercased())")
     defer { try? FileManager.default.removeItem(at: temporaryURL) }
     guard FileManager.default.createFile(atPath: temporaryURL.path, contents: nil),
       let handle = try? FileHandle(forWritingTo: temporaryURL)
@@ -1102,7 +1102,7 @@ private actor RuntimeHistoryFixtureProvider: RuntimeHistoryApplicationProviding 
     if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
       arguments.indices.contains(index + 1)
     {
-      stateFileURL = URL(fileURLWithPath: arguments[index + 1])
+      stateFileURL = URL(filePath: arguments[index + 1])
     } else {
       stateFileURL = nil
     }

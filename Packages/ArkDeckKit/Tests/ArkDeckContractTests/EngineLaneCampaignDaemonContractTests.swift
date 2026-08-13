@@ -43,9 +43,10 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
   override func setUpWithError() throws {
     // sun_path is 104 bytes; the default temp directory plus a UUID already
     // crowds it, so the socket lives under a short home-relative root.
-    stateDirectory = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent(
-        ".arkdeck-engine-lane-\(UInt32.random(in: 0..<100_000))", isDirectory: true)
+    stateDirectory = URL(filePath: NSHomeDirectory())
+      .appending(
+        path:
+          ".arkdeck-engine-lane-\(UInt32.random(in: 0..<100_000))", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: stateDirectory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
@@ -64,11 +65,11 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
-    let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+    let archiveURL = URL(filePath: archivePath).standardizedFileURL
     let profile = RockchipFlashProfile.dayu200
 
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let initialTarget = try targetStore.adopt(
       stableIdentitySHA256: Self.previousTargetIdentity, connectKey: "usb-engine-lane",
       toolVersion: "3.2.0f", nowUTC: Self.fixedNow
@@ -81,10 +82,10 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
         currentRevision: 2)
     ).record
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: stateDirectory.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { Self.fixedNow })
     let usageLedger = try AgentAuthorityUsageLedger(
-      root: stateDirectory.appendingPathComponent("usage", isDirectory: true))
+      root: stateDirectory.appending(path: "usage", directoryHint: .isDirectory))
 
     // The reservation a nine-gate campaign admission would have minted, with
     // the confirmation pins the engine re-verifies. Seeded directly because
@@ -127,7 +128,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
 
     let dispatchLog = DispatchLog()
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let providers = DeviceProviderRegistry(providers: [
       RockchipFlashProviderAdapter(
         factsPort: SealedFactsPort(bindingRevision: adopted.bindingRevision),
@@ -135,7 +136,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
     ])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers,
       dispatcher: RecordingRefusingDispatcher(log: dispatchLog),
       capabilityStore: capabilityStore,
@@ -149,8 +150,9 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       targetStore: targetStore,
       bootstrap: nil,
       artifactStore: artifactStore,
-      flashBundleImportDirectory: stateDirectory.appendingPathComponent(
-        "flash-bundle-imports", isDirectory: true),
+      flashBundleImportDirectory: stateDirectory.appending(
+        path:
+          "flash-bundle-imports", directoryHint: .isDirectory),
       flashBundleImportPolicy: .production,
       harnessCoordinator: nil,
       methodObserver: nil)
@@ -160,7 +162,7 @@ final class EngineLaneCampaignDaemonContractTests: XCTestCase {
       return XCTFail("the contract daemon must start fresh")
     }
     self.server = server
-    let socketPath = stateDirectory.appendingPathComponent("agentd.sock").path
+    let socketPath = stateDirectory.appending(path: "agentd.sock").path
 
     let admitted = RockchipEvolutionCampaignAdmittedAttempt(
       campaignID: "ECAMP-\(String(repeating: "F", count: 24))", ordinal: 1,

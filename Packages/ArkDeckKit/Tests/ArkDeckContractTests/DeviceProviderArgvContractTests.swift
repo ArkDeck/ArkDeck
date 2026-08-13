@@ -217,10 +217,11 @@ final class DeviceProviderArgvContractTests: XCTestCase {
     XCTAssertEqual(dumpPath, cleanupPath)
 
     // And they must not collide with the trace leg's path in the same job.
-    guard case .hdc(.captureTrace(_, let tracePath)) = try provider.action(
-      for: XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-trace" }),
-      operation: descriptor,
-      inputs: ["traceCategories": .array([.string("ability")])], context: context)
+    guard
+      case .hdc(.captureTrace(_, let tracePath)) = try provider.action(
+        for: XCTUnwrap(descriptor.steps.first { $0.stepID == "capture-trace" }),
+        operation: descriptor,
+        inputs: ["traceCategories": .array([.string("ability")])], context: context)
     else {
       return XCTFail("trace action")
     }
@@ -254,7 +255,7 @@ extension DeviceProviderArgvContractTests {
 
   private func artifact(_ id: String, _ path: String) -> ProviderResolvedInputArtifact {
     ProviderResolvedInputArtifact(
-      artifactID: id, fileURL: URL(fileURLWithPath: path),
+      artifactID: id, fileURL: URL(filePath: path),
       sha256: String(repeating: id.last.map(String.init) ?? "a", count: 64), byteCount: 128)
   }
 
@@ -418,7 +419,7 @@ extension DeviceProviderArgvContractTests {
           exitStatus: 0, stdout: Data("FileTransfer finish".utf8), stderr: Data(),
           stdoutTruncated: false, durationSeconds: 0.01,
           landedArtifact: ProviderLandedArtifact(
-            localURL: URL(fileURLWithPath: "/private/tmp/shot.png"),
+            localURL: URL(filePath: "/private/tmp/shot.png"),
             byteCount: 1024, sha256: String(repeating: "a", count: 64),
             leadingBytes: leading)),
         action: .hdc(.receiveOwnedArtifact(artifact)), context: context)
@@ -443,9 +444,11 @@ extension DeviceProviderArgvContractTests {
   /// is one argv element after `-a`, which is what §6 records and what the
   /// device parses.
   func testCrashLedgerLowersToTheTwoFaultloggerForms() throws {
-    guard case .process(_, let index, _) = try provider.lower(
-      action: .hdc(.captureCrashIndex(byteBudget: 8 * 1024 * 1024)), context: context
-    ).kind else {
+    guard
+      case .process(_, let index, _) = try provider.lower(
+        action: .hdc(.captureCrashIndex(byteBudget: 8 * 1024 * 1024)), context: context
+      ).kind
+    else {
       return XCTFail("expected a process plan")
     }
     XCTAssertEqual(
@@ -453,9 +456,11 @@ extension DeviceProviderArgvContractTests {
       ["-t", connectKey, "shell", "hidumper", "-s", "1201", "-a", "-p Faultlogger -l"])
 
     let name = try HDCFaultLogName("jscrash-com.example.demo-20010056-20260731161809")
-    guard case .process(_, let entry, _) = try provider.lower(
-      action: .hdc(.captureCrashLog(name, byteBudget: 8 * 1024 * 1024)), context: context
-    ).kind else {
+    guard
+      case .process(_, let entry, _) = try provider.lower(
+        action: .hdc(.captureCrashLog(name, byteBudget: 8 * 1024 * 1024)), context: context
+      ).kind
+    else {
       return XCTFail("expected a process plan")
     }
     XCTAssertEqual(

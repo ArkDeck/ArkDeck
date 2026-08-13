@@ -19,8 +19,8 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
   private var root: URL!
 
   override func setUpWithError() throws {
-    root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-      .appendingPathComponent("arkdeck-archive-\(UUID().uuidString)", isDirectory: true)
+    root = URL(filePath: NSTemporaryDirectory(), directoryHint: .isDirectory)
+      .appending(path: "arkdeck-archive-\(UUID().uuidString)", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
   }
 
@@ -52,9 +52,10 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
       members: members,
       declaredPartitions: board.mappedPartitions.map {
         RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
-      } + board.membershiplessPartitionsWriteForbidden.map {
-        RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-      },
+      }
+        + board.membershiplessPartitionsWriteForbidden.map {
+          RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+        },
       runtimeBuildVersion: "OpenHarmony-9.9.9.9")
     let derived = try board.forBuild(build)
 
@@ -100,7 +101,7 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     """
 
   func testTheRealPartitionTableParsesIntoNamesSizesAndOffsets() throws {
-    let url = root.appendingPathComponent("parameter.txt")
+    let url = root.appending(path: "parameter.txt")
     try Data(Self.realCMDLINE.utf8).write(to: url)
     let declared = try RockchipImageArchiveIntrospection.partitions(inTableAt: url)
 
@@ -126,7 +127,7 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
   /// image reaches which partition, so it is asserted against the shipped
   /// table rather than a tidied one.
   func testTheRealTableCoversEveryPartitionTheBoardMaps() throws {
-    let url = root.appendingPathComponent("parameter.txt")
+    let url = root.appending(path: "parameter.txt")
     try Data(Self.realCMDLINE.utf8).write(to: url)
     let declared = Set(
       try RockchipImageArchiveIntrospection.partitions(inTableAt: url).map(\.name))
@@ -154,7 +155,7 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
       ("not hex", "CMDLINE:mtdparts=rk29xxnand:0xzz@0x2(uboot)\n"),
     ]
     for (label, text) in cases {
-      let url = root.appendingPathComponent("parameter-\(UUID().uuidString).txt")
+      let url = root.appending(path: "parameter-\(UUID().uuidString).txt")
       try Data(text.utf8).write(to: url)
       XCTAssertThrowsError(
         try RockchipImageArchiveIntrospection.partitions(inTableAt: url), label)
@@ -220,7 +221,7 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     }
     let board = RockchipFlashProfile.dayu200
     let summary = try GzipTarArchiveReader.summarize(
-      fileAt: URL(fileURLWithPath: path),
+      fileAt: URL(filePath: path),
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
     let build = try RockchipImageArchiveIntrospection.describe(summary: summary, board: board)
 
@@ -252,7 +253,7 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     }
     let board = RockchipFlashProfile.dayu200
     let summary = try GzipTarArchiveReader.summarize(
-      fileAt: URL(fileURLWithPath: path),
+      fileAt: URL(filePath: path),
       derivation: RockchipImageArchiveIntrospection.derivationRequest(board: board))
     let build = try RockchipImageArchiveIntrospection.describe(summary: summary, board: board)
 
@@ -288,13 +289,16 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
   /// declares a partition this board does not know, is not.
   func testConformanceJudgesStructureRatherThanRecognisingADigest() {
     let board = RockchipFlashProfile.dayu200
-    let table = board.mappedPartitions.map {
-      RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
-    } + board.membershiplessPartitionsWriteForbidden.map {
-      RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
-    }
+    let table =
+      board.mappedPartitions.map {
+        RockchipDeclaredPartition(name: $0.partitionName, sizeSectors: 1, offsetSectors: 0)
+      }
+      + board.membershiplessPartitionsWriteForbidden.map {
+        RockchipDeclaredPartition(name: $0, sizeSectors: 1, offsetSectors: 0)
+      }
     func build(
-      members: [String], partitions: [RockchipDeclaredPartition], version: String = "OpenHarmony-9.9.9.9"
+      members: [String], partitions: [RockchipDeclaredPartition],
+      version: String = "OpenHarmony-9.9.9.9"
     ) -> RockchipImageBuildDescriptor {
       RockchipImageBuildDescriptor(
         archiveSizeBytes: 1, archiveSHA256: String(repeating: "a", count: 64),
@@ -308,7 +312,8 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     let allImages = board.mappedPartitions.map(\.imageMemberName)
 
     // A build with a version no profile has ever named still conforms.
-    XCTAssertEqual(build(members: allImages, partitions: table).conformanceViolations(on: board), [])
+    XCTAssertEqual(
+      build(members: allImages, partitions: table).conformanceViolations(on: board), [])
 
     XCTAssertEqual(
       build(members: Array(allImages.dropFirst()), partitions: table)

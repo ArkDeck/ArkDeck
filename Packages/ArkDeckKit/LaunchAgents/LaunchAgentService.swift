@@ -51,7 +51,7 @@ public struct FoundationLaunchAgentCommandRunner: LaunchAgentCommandRunning {
 
   public func run(arguments: [String]) throws -> LaunchAgentCommandResult {
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+    process.executableURL = URL(filePath: "/bin/launchctl")
     process.arguments = arguments
     let stdout = Pipe()
     let stderr = Pipe()
@@ -80,21 +80,25 @@ public struct LaunchAgentPaths: Sendable, Equatable {
 
   public init(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
     self.homeDirectory = homeDirectory.standardizedFileURL
-    let library = self.homeDirectory.appendingPathComponent("Library", isDirectory: true)
-    let support = library.appendingPathComponent(
-      "Application Support/ArkDeck", isDirectory: true)
-    self.plist = library.appendingPathComponent(
-      "LaunchAgents/\(ArkDeckLaunchAgent.label).plist")
-    self.installedDaemonBundle = support.appendingPathComponent(
-      "Helpers/\(ArkDeckHelperIdentity.daemonBundleName)", isDirectory: true)
-    self.installedDaemon = self.installedDaemonBundle.appendingPathComponent(
-      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
-    self.receipt = support.appendingPathComponent("LaunchAgent/install-receipt.json")
-    self.logDirectory = library.appendingPathComponent("Logs/ArkDeck", isDirectory: true)
-    self.standardOutput = self.logDirectory.appendingPathComponent("agentd.log")
-    self.standardError = self.logDirectory.appendingPathComponent("agentd.error.log")
-    self.stateDirectory = support.appendingPathComponent("Agentd", isDirectory: true)
-    self.socket = self.stateDirectory.appendingPathComponent("agentd.sock")
+    let library = self.homeDirectory.appending(path: "Library", directoryHint: .isDirectory)
+    let support = library.appending(
+      path:
+        "Application Support/ArkDeck", directoryHint: .isDirectory)
+    self.plist = library.appending(
+      path:
+        "LaunchAgents/\(ArkDeckLaunchAgent.label).plist")
+    self.installedDaemonBundle = support.appending(
+      path:
+        "Helpers/\(ArkDeckHelperIdentity.daemonBundleName)", directoryHint: .isDirectory)
+    self.installedDaemon = self.installedDaemonBundle.appending(
+      path:
+        "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
+    self.receipt = support.appending(path: "LaunchAgent/install-receipt.json")
+    self.logDirectory = library.appending(path: "Logs/ArkDeck", directoryHint: .isDirectory)
+    self.standardOutput = self.logDirectory.appending(path: "agentd.log")
+    self.standardError = self.logDirectory.appending(path: "agentd.error.log")
+    self.stateDirectory = support.appending(path: "Agentd", directoryHint: .isDirectory)
+    self.socket = self.stateDirectory.appending(path: "agentd.sock")
   }
 }
 
@@ -275,8 +279,9 @@ public final class LaunchAgentService: @unchecked Sendable {
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
     let daemonBundleSource = try daemonBundleValidator(daemonBundleSource)
-    let daemonSource = daemonBundleSource.appendingPathComponent(
-      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
+    let daemonSource = daemonBundleSource.appending(
+      path:
+        "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     let hdcExecutable = try validatedExecutable(hdcExecutable, name: "HDC")
     let workspace = try workspace.map(validatedWorkspace)
     let harnessSensitiveEvidence = try validatedSensitiveEvidence(harnessSensitiveEvidence)
@@ -298,7 +303,7 @@ public final class LaunchAgentService: @unchecked Sendable {
 
     if daemonBundleSource.path != paths.installedDaemonBundle.path {
       let staging = paths.installedDaemonBundle.deletingLastPathComponent()
-        .appendingPathComponent(".arkdeck-agentd-\(UUID().uuidString).app")
+        .appending(path: ".arkdeck-agentd-\(UUID().uuidString).app")
       defer { try? fileManager.removeItem(at: staging) }
       try fileManager.copyItem(at: daemonBundleSource, to: staging)
       // The executable bytes can remain identical while its Developer ID
@@ -349,7 +354,8 @@ public final class LaunchAgentService: @unchecked Sendable {
           try bootstrap()
         } catch let recoveryError {
           throw LaunchAgentServiceError.launchctl(
-            "credential refresh failed (\(error)); replacement daemon recovery failed (\(recoveryError))")
+            "credential refresh failed (\(error)); replacement daemon recovery failed (\(recoveryError))"
+          )
         }
         throw error
       }
@@ -408,7 +414,7 @@ public final class LaunchAgentService: @unchecked Sendable {
         }
         do {
           let daemon = try validatedExecutable(
-            URL(fileURLWithPath: configuration.daemon), name: "configured arkdeck-agentd")
+            URL(filePath: configuration.daemon), name: "configured arkdeck-agentd")
           if daemon.path != configuration.daemon {
             diagnostics.append("configured daemon path is not canonical")
           }
@@ -418,7 +424,7 @@ public final class LaunchAgentService: @unchecked Sendable {
         }
         do {
           let hdc = try validatedExecutable(
-            URL(fileURLWithPath: configuration.hdc), name: "configured HDC")
+            URL(filePath: configuration.hdc), name: "configured HDC")
           if hdc.path != configuration.hdc {
             diagnostics.append("configured HDC path is not canonical")
           }
@@ -541,8 +547,8 @@ public final class LaunchAgentService: @unchecked Sendable {
       }
       workspace = try validatedWorkspace(
         LaunchAgentWorkspaceConfiguration(
-          projectRoot: URL(fileURLWithPath: String(projectEntry.dropFirst(prefix.count))),
-          devecoSDKRoot: URL(fileURLWithPath: sdk)))
+          projectRoot: URL(filePath: String(projectEntry.dropFirst(prefix.count))),
+          devecoSDKRoot: URL(filePath: sdk)))
     }
     let harnessModel = try configuredHarnessModel(
       environment: environment, workspace: workspace)
@@ -644,9 +650,10 @@ public final class LaunchAgentService: @unchecked Sendable {
       throw LaunchAgentServiceError.invalidExecutable(
         "arkdeck-agentd must be supplied as an app-like helper bundle")
     }
-    let infoURL = canonical.appendingPathComponent("Contents/Info.plist")
-    let executableURL = canonical.appendingPathComponent(
-      "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
+    let infoURL = canonical.appending(path: "Contents/Info.plist")
+    let executableURL = canonical.appending(
+      path:
+        "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     guard
       let info = try PropertyListSerialization.propertyList(
         from: Data(contentsOf: infoURL), format: nil) as? [String: Any],
@@ -707,7 +714,7 @@ public final class LaunchAgentService: @unchecked Sendable {
       let flags = information[kSecCodeInfoFlags as String] as? NSNumber,
       flags.uint32Value & hardenedRuntimeFlag != 0,
       fileManager.fileExists(
-        atPath: canonical.appendingPathComponent("Contents/embedded.provisionprofile").path)
+        atPath: canonical.appending(path: "Contents/embedded.provisionprofile").path)
     else {
       throw LaunchAgentServiceError.invalidExecutable(
         "arkdeck-agentd helper lacks its team, hardened runtime, shared Keychain group, "
@@ -734,12 +741,14 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     let project = try directory(configuration.projectRoot, name: "WaterFlow project")
     let protectedRoots = ["Desktop", "Documents", "Downloads"].map {
-      paths.homeDirectory.appendingPathComponent($0, isDirectory: true)
+      paths.homeDirectory.appending(path: $0, directoryHint: .isDirectory)
         .standardizedFileURL.path
     }
-    guard !protectedRoots.contains(where: {
-      project.path == $0 || project.path.hasPrefix($0 + "/")
-    }) else {
+    guard
+      !protectedRoots.contains(where: {
+        project.path == $0 || project.path.hasPrefix($0 + "/")
+      })
+    else {
       throw LaunchAgentServiceError.configuration(
         "WaterFlow project cannot be under macOS privacy-managed Desktop, "
           + "Documents or Downloads; use an absolute path under ~/Developer "
@@ -749,19 +758,21 @@ public final class LaunchAgentService: @unchecked Sendable {
       throw LaunchAgentServiceError.configuration(
         "WaterFlow project path cannot contain ',' or '='")
     }
-    guard fileManager.fileExists(
-      atPath: project.appendingPathComponent("build-profile.json5").path),
+    guard
       fileManager.fileExists(
-        atPath: project.appendingPathComponent("entry/src/main/module.json5").path)
+        atPath: project.appending(path: "build-profile.json5").path),
+      fileManager.fileExists(
+        atPath: project.appending(path: "entry/src/main/module.json5").path)
     else {
       throw LaunchAgentServiceError.configuration(
         "WaterFlow project is missing build-profile.json5 or entry/src/main/module.json5")
     }
     let sdk = try directory(configuration.devecoSDKRoot, name: "DevEco SDK")
     var openHarmonyIsDirectory: ObjCBool = false
-    guard fileManager.fileExists(
-      atPath: sdk.appendingPathComponent("default/openharmony").path,
-      isDirectory: &openHarmonyIsDirectory), openHarmonyIsDirectory.boolValue
+    guard
+      fileManager.fileExists(
+        atPath: sdk.appending(path: "default/openharmony").path,
+        isDirectory: &openHarmonyIsDirectory), openHarmonyIsDirectory.boolValue
     else {
       throw LaunchAgentServiceError.configuration(
         "DevEco SDK does not contain default/openharmony")
@@ -809,8 +820,8 @@ public final class LaunchAgentService: @unchecked Sendable {
     return try validatedHarnessModel(
       LaunchAgentHarnessModelConfiguration(
         provider: provider, modelName: model,
-        cliExecutable: URL(fileURLWithPath: executable),
-        cliWorkingDirectory: URL(fileURLWithPath: workdir),
+        cliExecutable: URL(filePath: executable),
+        cliWorkingDirectory: URL(filePath: workdir),
         cliTimeoutSeconds: timeout),
       workspace: workspace)
   }
@@ -928,8 +939,6 @@ public final class LaunchAgentService: @unchecked Sendable {
   }
 
   public static func utcNow() -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.string(from: Date())
+    ISO8601Timestamps.string(from: Date())
   }
 }

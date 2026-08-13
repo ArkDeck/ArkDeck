@@ -76,10 +76,10 @@ private func write<T: Encodable>(_ value: T, to url: URL) throws {
 
 private func runHolder(arguments: [String]) throws {
   guard arguments.count == 7 else { throw FixtureError.invalidArguments }
-  let lockFile = URL(fileURLWithPath: arguments[2])
-  let readyFile = URL(fileURLWithPath: arguments[3])
-  let stopFile = URL(fileURLWithPath: arguments[4])
-  let resultFile = URL(fileURLWithPath: arguments[5])
+  let lockFile = URL(filePath: arguments[2])
+  let readyFile = URL(filePath: arguments[3])
+  let stopFile = URL(filePath: arguments[4])
+  let resultFile = URL(filePath: arguments[5])
   let productIdentifier = arguments[6]
 
   let writerProbes = WriterInitializationProbes()
@@ -123,8 +123,8 @@ private func runHolder(arguments: [String]) throws {
 
 private func runContender(arguments: [String]) throws {
   guard arguments.count == 6 else { throw FixtureError.invalidArguments }
-  let lockFile = URL(fileURLWithPath: arguments[2])
-  let resultFile = URL(fileURLWithPath: arguments[3])
+  let lockFile = URL(filePath: arguments[2])
+  let resultFile = URL(filePath: arguments[3])
   let activationProductIdentifier = arguments[4]
   let requestID = arguments[5]
   let sender = MacOSActivationRequestSender(

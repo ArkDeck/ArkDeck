@@ -160,8 +160,8 @@ public actor RuntimeCapabilityStore {
 
   public init(directoryURL: URL) throws {
     self.directoryURL = directoryURL
-    self.documentURL = directoryURL.appendingPathComponent("runtime-capabilities.json")
-    self.lockURL = directoryURL.appendingPathComponent(".runtime-capabilities.lock")
+    self.documentURL = directoryURL.appending(path: "runtime-capabilities.json")
+    self.lockURL = directoryURL.appending(path: ".runtime-capabilities.lock")
     do {
       try FileManager.default.createDirectory(
         at: directoryURL,

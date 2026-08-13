@@ -7,8 +7,8 @@
 import CryptoKit
 import XCTest
 
-@testable import ArkDeckCore
 @testable import ArkDeckAgentComposition
+@testable import ArkDeckCore
 @testable import ArkDeckHarness
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
@@ -113,8 +113,8 @@ final class HarnessRepairContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     rootURL = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-harness-repair-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-harness-repair-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
   }
 
@@ -221,7 +221,8 @@ final class HarnessRepairContractTests: XCTestCase {
           stage: stage, expected: expected, actual: expected))
       XCTAssertThrowsError(
         try HarnessRepairStageGate.requireEqual(
-          stage: stage, expected: expected, actual: different)) { error in
+          stage: stage, expected: expected, actual: different)
+      ) { error in
         XCTAssertEqual(
           error as? HarnessRepairPortError,
           .stageGateMismatch(stage: stage, expected: expected, actual: different))
@@ -294,7 +295,7 @@ final class HarnessRepairContractTests: XCTestCase {
         stage: .building, activeJobID: nil, repair: item.1,
         consumed: HarnessConsumedBudget(rounds: 1, e1Mutations: item.2))
       let store = try HarnessTaskStore(
-        rootURL: rootURL.appendingPathComponent("accepted-e1-\(index)", isDirectory: true))
+        rootURL: rootURL.appending(path: "accepted-e1-\(index)", directoryHint: .isDirectory))
       try await store.create(snapshot)
       let jobs = RepairJobPort(observations: [:])
       let fixedNow = now
@@ -316,16 +317,16 @@ final class HarnessRepairContractTests: XCTestCase {
   }
 
   func testWorkspaceProfileGlobSymlinkAndBaseMismatchPublishNoPatchArtifact() async throws {
-    let workspace = rootURL.appendingPathComponent("workspace", isDirectory: true)
-    let sources = workspace.appendingPathComponent("Sources", isDirectory: true)
-    let other = workspace.appendingPathComponent("Other", isDirectory: true)
+    let workspace = rootURL.appending(path: "workspace", directoryHint: .isDirectory)
+    let sources = workspace.appending(path: "Sources", directoryHint: .isDirectory)
+    let other = workspace.appending(path: "Other", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
-    try Data("let value = 0\n".utf8).write(to: sources.appendingPathComponent("A.swift"))
-    try Data("let other = 0\n".utf8).write(to: other.appendingPathComponent("A.swift"))
+    try Data("let value = 0\n".utf8).write(to: sources.appending(path: "A.swift"))
+    try Data("let other = 0\n".utf8).write(to: other.appending(path: "A.swift"))
     try FileManager.default.createSymbolicLink(
-      at: sources.appendingPathComponent("Link.swift"),
-      withDestinationURL: sources.appendingPathComponent("A.swift"))
+      at: sources.appending(path: "Link.swift"),
+      withDestinationURL: sources.appending(path: "A.swift"))
 
     let executable = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/true")
     let preset = try WorkspaceCommandPreset(
@@ -336,9 +337,9 @@ final class HarnessRepairContractTests: XCTestCase {
       inspectionPreset: preset, patchPreset: preset,
       buildPresets: [:], testPresets: [:], symbolPresets: [:])
     let attemptStore = try WorkspacePatchAttemptStore(
-      rootURL: rootURL.appendingPathComponent("attempts", isDirectory: true))
+      rootURL: rootURL.appending(path: "attempts", directoryHint: .isDirectory))
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: rootURL.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: rootURL.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-31T01:00:00Z" })
     let port = WorkspaceHarnessRepairPort(
       profile: profile, attemptStore: attemptStore, artifactStore: artifactStore)
@@ -353,13 +354,16 @@ final class HarnessRepairContractTests: XCTestCase {
           path: "Other/A.swift",
           base: WorkspaceProviderSupport.revision(
             try WorkspaceProviderSupport.snapshots(
-              relativePaths: ["Other/A.swift"], root: workspace.path)))),
+              relativePaths: ["Other/A.swift"], root: workspace.path)))
+      ),
       (
         "dec-symlink",
-        try proposal(path: "Sources/Link.swift", base: String(repeating: "0", count: 64))),
+        try proposal(path: "Sources/Link.swift", base: String(repeating: "0", count: 64))
+      ),
       (
         "dec-base",
-        try proposal(path: "Sources/A.swift", base: String(repeating: "0", count: 64))),
+        try proposal(path: "Sources/A.swift", base: String(repeating: "0", count: 64))
+      ),
     ]
     for (decisionID, proposal) in cases {
       do {
@@ -526,7 +530,8 @@ final class HarnessRepairContractTests: XCTestCase {
       samples: [
         "matchingCrashCount": 1, "newFatalSignatureCount": 1,
         "applicationLiveness": 1,
-      ], latestVerdict: .fail).asJSON
+      ], latestVerdict: .fail
+    ).asJSON
     failedEpoch[DebugCrashTaskHandler.baselineDeploymentMarker] = .bool(true)
     let snapshot = makeSnapshot(
       stage: .deploying, activeJobID: "JOB-DEPLOY", repair: attempt,
@@ -686,10 +691,10 @@ final class HarnessRepairContractTests: XCTestCase {
   /// materialize on a copy. Nothing caught it because the two sides were only
   /// ever tested apart, and a copy is now the only place a repair runs.
   func testPreparedPatchInputsCarryTheRevisionAnIsolatedCopyRequires() async throws {
-    let workspace = rootURL.appendingPathComponent("evolution-workspace", isDirectory: true)
-    let sources = workspace.appendingPathComponent("Sources", isDirectory: true)
+    let workspace = rootURL.appending(path: "evolution-workspace", directoryHint: .isDirectory)
+    let sources = workspace.appending(path: "Sources", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-    try Data("let value = 0\n".utf8).write(to: sources.appendingPathComponent("A.swift"))
+    try Data("let value = 0\n".utf8).write(to: sources.appending(path: "A.swift"))
 
     let preset = try WorkspaceCommandPreset(
       presetID: "fixture",
@@ -702,12 +707,12 @@ final class HarnessRepairContractTests: XCTestCase {
       buildPresets: [:], testPresets: [:], symbolPresets: [:],
       kind: .evolution)
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: rootURL.appendingPathComponent("evolution-artifacts", isDirectory: true),
+      rootURL: rootURL.appending(path: "evolution-artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-31T01:00:00Z" })
     let port = WorkspaceHarnessRepairPort(
       profile: copy,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: rootURL.appendingPathComponent("evolution-attempts", isDirectory: true)),
+        rootURL: rootURL.appending(path: "evolution-attempts", directoryHint: .isDirectory)),
       artifactStore: artifactStore)
 
     // An isolated copy states the profile-scoped workspace revision, not a
@@ -736,13 +741,13 @@ final class HarnessRepairContractTests: XCTestCase {
   func testWorkspacePatchIsHostOnlyAndBuiltHAPInheritsTheAdmittedDeviceBinding()
     async throws
   {
-    let workspace = rootURL.appendingPathComponent("binding-workspace", isDirectory: true)
-    let sources = workspace.appendingPathComponent("Sources", isDirectory: true)
-    let outputs = workspace.appendingPathComponent("Outputs", isDirectory: true)
+    let workspace = rootURL.appending(path: "binding-workspace", directoryHint: .isDirectory)
+    let sources = workspace.appending(path: "Sources", directoryHint: .isDirectory)
+    let outputs = workspace.appending(path: "Outputs", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: outputs, withIntermediateDirectories: true)
-    try Data("let value = 0\n".utf8).write(to: sources.appendingPathComponent("A.swift"))
-    try Data("signed-hap".utf8).write(to: outputs.appendingPathComponent("app.hap"))
+    try Data("let value = 0\n".utf8).write(to: sources.appending(path: "A.swift"))
+    try Data("signed-hap".utf8).write(to: outputs.appending(path: "app.hap"))
 
     let executable = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/true")
     let preset = try WorkspaceCommandPreset(
@@ -754,7 +759,7 @@ final class HarnessRepairContractTests: XCTestCase {
       buildPresets: [preset.presetID: preset], testPresets: [:], symbolPresets: [:],
       buildProducts: [preset.presetID: "Outputs/app.hap"])
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: rootURL.appendingPathComponent("binding-artifacts", isDirectory: true),
+      rootURL: rootURL.appending(path: "binding-artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-07-31T01:00:00Z" })
     let baseline = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
@@ -769,7 +774,7 @@ final class HarnessRepairContractTests: XCTestCase {
     let baselineLease = try await artifactStore.leaseReference(
       jobID: baseline.jobID, artifactID: baseline.artifactID)
     let attempts = try WorkspacePatchAttemptStore(
-      rootURL: rootURL.appendingPathComponent("binding-attempts", isDirectory: true))
+      rootURL: rootURL.appending(path: "binding-attempts", directoryHint: .isDirectory))
     let port = WorkspaceHarnessRepairPort(
       profile: profile, attemptStore: attempts, artifactStore: artifactStore)
     let revision = WorkspaceProviderSupport.revision(
@@ -807,9 +812,12 @@ final class HarnessRepairContractTests: XCTestCase {
     observedState: [String: JSONValue]? = nil,
     consumed: HarnessConsumedBudget = HarnessConsumedBudget()
   ) -> HarnessTaskSnapshot {
-    let observed = observedState ?? HarnessObservedState(
-      measurements: [HarnessObservationBuilder.watermarkMetric: .string("")],
-      latestVerdict: .inconclusive).asJSON
+    let observed =
+      observedState
+      ?? HarnessObservedState(
+        measurements: [HarnessObservationBuilder.watermarkMetric: .string("")],
+        latestVerdict: .inconclusive
+      ).asJSON
     return HarnessTaskSnapshot(
       htaskID: "HTASK-0123456789AB", type: .debugCrash, intakeDescription: nil,
       projectRef: "demo-app",
@@ -969,7 +977,8 @@ final class HarnessRepairContractTests: XCTestCase {
         store: store, jobPort: jobs, repairPort: repair, nowUTC: { fixedNow },
         policyGuard: HarnessPolicyGuard(
           capabilities: IssuedWorkspaceGrant(covered: workspaceMutations))),
-      store)
+      store
+    )
   }
 
   private func repairFixture(

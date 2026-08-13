@@ -504,7 +504,8 @@ package enum HardwareEvidenceProjector {
     if receipt.outcomeUnknown {
       reasons.append("runtime outcome is unknown")
     }
-    let terminal = schemaTerminalState(receipt.terminalState, outcomeUnknown: receipt.outcomeUnknown)
+    let terminal = schemaTerminalState(
+      receipt.terminalState, outcomeUnknown: receipt.outcomeUnknown)
     if terminal == nil {
       reasons.append("terminal state is not evidence-representable")
     }
@@ -602,7 +603,8 @@ package enum HardwareEvidenceProjector {
       let firmware = nonempty(observation.firmware),
       let transport = observation.transport
     else {
-      return incomplete(reasons + ["target/model/firmware/transport preflight facts are incomplete"])
+      return incomplete(
+        reasons + ["target/model/firmware/transport preflight facts are incomplete"])
     }
     if observedTargetID != targetID || observedBinding != bindingRevision {
       reasons.append("preflight target or binding does not match the job")
@@ -861,8 +863,11 @@ package enum HardwareEvidenceProjector {
   }
 
   private static func validSHA256(_ value: String) -> Bool {
-    value.count == 64 && value.allSatisfy { ("0"..."9").contains(String($0))
-      || ("a"..."f").contains(String($0)) }
+    value.count == 64
+      && value.allSatisfy {
+        ("0"..."9").contains(String($0))
+          || ("a"..."f").contains(String($0))
+      }
   }
 
   private static func effectSetDigest(_ effects: [String]) -> String {
@@ -880,9 +885,10 @@ package enum HardwareEvidenceProjector {
   private static func validRecoveryEpochID(_ value: String) -> Bool {
     guard value.hasPrefix("recovery-epoch-") else { return false }
     let suffix = value.dropFirst("recovery-epoch-".count)
-    return suffix.count == 32 && suffix.allSatisfy {
-      $0.isASCII && ($0.isNumber || ("a"..."f").contains(String($0)))
-    }
+    return suffix.count == 32
+      && suffix.allSatisfy {
+        $0.isASCII && ($0.isNumber || ("a"..."f").contains(String($0)))
+      }
   }
 
   private static func validAcceptanceID(_ value: String) -> Bool {
@@ -898,9 +904,10 @@ package enum HardwareEvidenceProjector {
     let suffix = value[suffixStart...]
     return prefix.allSatisfy {
       $0.isASCII && ($0.isUppercase || $0.isNumber)
-    } && suffix.allSatisfy {
-      $0.isASCII && ($0.isUppercase || $0.isNumber || $0 == "-")
     }
+      && suffix.allSatisfy {
+        $0.isASCII && ($0.isUppercase || $0.isNumber || $0 == "-")
+      }
   }
 
   private static func validOperationReference(_ value: String) -> Bool {
@@ -927,11 +934,7 @@ package enum HardwareEvidenceProjector {
   }
 
   private static func parseDate(_ value: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = formatter.date(from: value) { return date }
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.date(from: value)
+    ISO8601Timestamps.parse(value)
   }
 }
 

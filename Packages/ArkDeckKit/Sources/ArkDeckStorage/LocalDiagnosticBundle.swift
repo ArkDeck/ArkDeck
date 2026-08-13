@@ -1049,9 +1049,7 @@ package struct LocalDiagnosticBundleExporter: Sendable {
   }
 
   private static func timestamp() -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: Date())
+    ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
   }
 
 }

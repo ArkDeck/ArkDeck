@@ -12,14 +12,14 @@ import XCTest
 final class APIBaselineGateContractTests: XCTestCase {
   private func packageRoot() -> URL {
     // …/Tests/ArkDeckContractTests/APIBaselineGateContractTests.swift -> package root
-    URL(fileURLWithPath: #filePath)
+    URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
   }
 
   func testExternalConsumerBaselineBuildsAgainstThePublishedPublicAPI() throws {
-    let baseline = packageRoot().appendingPathComponent("APIBaseline")
+    let baseline = packageRoot().appending(path: "APIBaseline")
     var isDirectory: ObjCBool = false
     XCTAssertTrue(
       FileManager.default.fileExists(atPath: baseline.path, isDirectory: &isDirectory)
@@ -28,7 +28,7 @@ final class APIBaselineGateContractTests: XCTestCase {
 
     let output = Pipe()
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    process.executableURL = URL(filePath: "/usr/bin/xcrun")
     process.arguments = ["swift", "build", "--package-path", baseline.path]
     process.standardOutput = output
     process.standardError = output

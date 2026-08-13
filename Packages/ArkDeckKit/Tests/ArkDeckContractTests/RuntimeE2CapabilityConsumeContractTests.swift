@@ -64,18 +64,19 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
     else {
       throw XCTSkip("set \(Self.archiveEnvironmentKey) for the 7.0.0.35 real-input gate")
     }
-    let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+    let archiveURL = URL(filePath: archivePath).standardizedFileURL
     let profile = RockchipFlashProfile.dayu200
 
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "arkdeck-e2-consume-\(UUID().uuidString.lowercased())", isDirectory: true)
+    let root = FileManager.default.temporaryDirectory.appending(
+      path:
+        "arkdeck-e2-consume-\(UUID().uuidString.lowercased())", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: root, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     defer { try? FileManager.default.removeItem(at: root) }
 
     let artifactStore = try RuntimeArtifactStore(
-      rootURL: root.appendingPathComponent("artifacts", isDirectory: true),
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-01T00:00:00Z" })
     let artifact = try await artifactStore.publishFile(
       RuntimeArtifactFilePublicationRequest(
@@ -93,11 +94,11 @@ final class RuntimeE2CapabilityConsumeContractTests: XCTestCase {
     let lease = try await artifactStore.leaseReference(
       jobID: artifact.jobID, artifactID: artifact.artifactID)
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: root.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: root.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(
           factsPort: FactsPort(), availability: .available)

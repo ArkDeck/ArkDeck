@@ -23,11 +23,11 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-workspace-readonly", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
-    state = root.appendingPathComponent("state", isDirectory: true)
+      .appending(path: "arkdeck-workspace-readonly", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
+    state = root.appending(path: "state", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: root.appendingPathComponent("Sources", isDirectory: true),
+      at: root.appending(path: "Sources", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
     profile = try makeProfile(withSourceControl: true)
@@ -41,7 +41,8 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
   // MARK: - HFA-AC-17: argv, token for token
 
   func testGitStatusLowersRootBoundArgvTokenForToken() throws {
-    let plan = try lower("workspace.inspect-git-status@1", inputs: ["projectRef": .string("TestProject")])
+    let plan = try lower(
+      "workspace.inspect-git-status@1", inputs: ["projectRef": .string("TestProject")])
     guard case .process(_, let argv, _) = plan.kind else {
       return XCTFail("a host-only read must lower to a process plan")
     }
@@ -178,7 +179,7 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     }
     XCTAssertEqual(
       argv,
-      ["-n", "10,20p", root.appendingPathComponent("Sources/App.txt").path])
+      ["-n", "10,20p", root.appending(path: "Sources/App.txt").path])
   }
 
   func testAnUnboundedOrEscapingReadRangeIsRefused() {
@@ -238,7 +239,7 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
   }
 
   func testANonGitCheckpointSealsExactFilesAndCanBeReconciled() async throws {
-    let source = root.appendingPathComponent("Sources/App.txt")
+    let source = root.appending(path: "Sources/App.txt")
     try Data("old\n".utf8).write(to: source)
     let archiveProfile = try makeArchiveProfile()
     let archiveProvider = makeProvider(archiveProfile)
@@ -280,8 +281,9 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
       resolver: WorkspaceActionExecutableResolver(profile: archiveProfile))
     let receipt = try await dispatcher.dispatch(
       try archiveProvider.lower(action: action, context: context()))
-    guard case .verified(let summary) = try archiveProvider.verify(
-      receipt: receipt, action: action, context: context())
+    guard
+      case .verified(let summary) = try archiveProvider.verify(
+        receipt: receipt, action: action, context: context())
     else {
       return XCTFail("the archive must exist and preserve the exact source snapshot")
     }
@@ -300,7 +302,7 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     XCTAssertEqual(
       recoveredSummary["checkpointObject"], summary["checkpointObject"])
 
-    let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: archivePath))
+    let handle = try FileHandle(forWritingTo: URL(filePath: archivePath))
     try handle.truncate(atOffset: 512)
     try handle.close()
     let partial = try await archiveProvider.reconcile(
@@ -314,14 +316,14 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
   }
 
   func testWaterFlowPublishesThePinnedNonGitCheckpointRoute() throws {
-    let project = root.appendingPathComponent("WaterFlow", isDirectory: true)
+    let project = root.appending(path: "WaterFlow", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
-      at: project.appendingPathComponent("entry/src/main", isDirectory: true),
+      at: project.appending(path: "entry/src/main", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
-    try Data("{}".utf8).write(to: project.appendingPathComponent("build-profile.json5"))
+    try Data("{}".utf8).write(to: project.appending(path: "build-profile.json5"))
     try Data("{}".utf8).write(
-      to: project.appendingPathComponent("entry/src/main/module.json5"))
-    let script = project.appendingPathComponent("hvigorw.js")
+      to: project.appending(path: "entry/src/main/module.json5"))
+    let script = project.appending(path: "hvigorw.js")
     try Data("// fixture".utf8).write(to: script)
 
     let production = try WorkspaceProjectProfile.waterFlowDemo(
@@ -426,7 +428,7 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     WorkspaceOperationsProvider(
       profile: profile,
       attemptStore: try! WorkspacePatchAttemptStore(
-        rootURL: state.appendingPathComponent(UUID().uuidString, isDirectory: true)),
+        rootURL: state.appending(path: UUID().uuidString, directoryHint: .isDirectory)),
       nowUTC: { "2026-07-31T00:00:00Z" })
   }
 
@@ -451,7 +453,8 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
   private func lower(
     _ reference: String, inputs: [String: JSONValue]
   ) throws -> TypedProcessPlan {
-    try provider.lower(action: .workspace(try action(reference, inputs: inputs)), context: context())
+    try provider.lower(
+      action: .workspace(try action(reference, inputs: inputs)), context: context())
   }
 
   private func receipt(exitStatus: Int32, stdout: String) -> ProviderProcessReceipt {

@@ -18,8 +18,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     stateDirectory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-device-candidates-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString.prefix(8).lowercased(), isDirectory: true)
+      .appending(path: "arkdeck-device-candidates-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -40,13 +40,13 @@ final class DeviceCandidatesContractTests: XCTestCase {
     bootstrapConfigured: Bool = true
   ) throws -> (RuntimeControlPlaneHandler, RuntimeTargetStore) {
     let capabilityStore = try RuntimeCapabilityStore(
-      directoryURL: stateDirectory.appendingPathComponent("capabilities", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let targetStore = try RuntimeTargetStore(
-      directoryURL: stateDirectory.appendingPathComponent("targets", isDirectory: true))
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
     let resolver = try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc")
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: stateDirectory.appendingPathComponent("engine", isDirectory: true)),
+        stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: []),
       dispatcher: DescriptorBoundProcessDispatcher(resolver: resolver),
       capabilityStore: capabilityStore,
@@ -170,11 +170,13 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let canonical = try targetStore.adopt(
       stableIdentitySHA256: String(repeating: "a", count: 64),
       connectKey: canonicalKey, toolVersion: "3.2.0f",
-      nowUTC: "2026-08-07T00:00:00Z").record
+      nowUTC: "2026-08-07T00:00:00Z"
+    ).record
     let aliasIdentity = DeviceBootstrapMachine.stableIdentitySHA256(serial: aliasKey)
     let alias = try targetStore.adopt(
       stableIdentitySHA256: aliasIdentity, connectKey: aliasKey,
-      toolVersion: "3.2.0f", nowUTC: "2026-08-07T00:01:00Z").record
+      toolVersion: "3.2.0f", nowUTC: "2026-08-07T00:01:00Z"
+    ).record
     _ = try targetStore.appendAliasResolution(
       RuntimeTargetAliasResolutionDraft(
         aliasTargetID: alias.targetID,
@@ -207,7 +209,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
     guard case .array(let targets)? = targetList.result else {
       return XCTFail("target.list must return an array")
     }
-    XCTAssertEqual(targets.count, 1, "the alias remains durable but is not independently selectable")
+    XCTAssertEqual(
+      targets.count, 1, "the alias remains durable but is not independently selectable")
 
     let doctor = await handler.handleFrame(frame("doctor"))
     guard case .object(let report)? = doctor.result else {
@@ -309,7 +312,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
   func testApplicationFacadeOwnsTheBoundedAuthorizationTimeoutAndReadyVerdict() async throws {
     try FileManager.default.createDirectory(
       at: stateDirectory, withIntermediateDirectories: true)
-    let state = stateDirectory.appendingPathComponent("device-authorization-state.txt")
+    let state = stateDirectory.appending(path: "device-authorization-state.txt")
     try Data().write(to: state)
     let provider = DeviceListApplicationFacade.make(arguments: [
       "ArkDeck", "--ui-test-devices", "--ui-test-device-poll-fast",
@@ -318,23 +321,25 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
     let timedOut = await provider.waitForAuthorization(connectKey: "7f2c091a445e21")
     XCTAssertEqual(timedOut.authorization, .timedOut)
-    XCTAssertEqual(timedOut.presentation.candidates.first(where: {
-      $0.connectKey == "7f2c091a445e21"
-    })?.state, "Unauthorized")
+    XCTAssertEqual(
+      timedOut.presentation.candidates.first(where: {
+        $0.connectKey == "7f2c091a445e21"
+      })?.state, "Unauthorized")
 
     try Data("--ui-test-device-authorized".utf8).write(to: state)
     let ready = await provider.waitForAuthorization(connectKey: "7f2c091a445e21")
     XCTAssertEqual(ready.authorization, .ready)
-    XCTAssertTrue(ready.presentation.candidates.first(where: {
-      $0.connectKey == "7f2c091a445e21"
-    })?.isAuthorized == true)
+    XCTAssertTrue(
+      ready.presentation.candidates.first(where: {
+        $0.connectKey == "7f2c091a445e21"
+      })?.isAuthorized == true)
   }
 
   // The facade's provider protocol carries the joined candidate projection
   // and authorization reads only; no method can name a Runtime write.
   func testApplicationSurfaceCannotNameAWriteMethod() throws {
     let source = try String(
-      contentsOf: URL(fileURLWithPath: #filePath)
+      contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(path: "Sources/ArkDeckWorkflows/DeviceListApplicationFacade.swift"),
@@ -342,7 +347,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let protocolStart = try XCTUnwrap(
       source.range(of: "public protocol DeviceListApplicationProviding: Sendable {")?.upperBound)
     let protocolEnd = try XCTUnwrap(
-      source.range(of: "public enum DeviceListApplicationFacade", range: protocolStart..<source.endIndex)?
+      source.range(
+        of: "public enum DeviceListApplicationFacade", range: protocolStart..<source.endIndex)?
         .lowerBound)
     let protocolBody = String(source[protocolStart..<protocolEnd])
     XCTAssertEqual(
@@ -361,7 +367,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
   }
 
   func testAppColdStartPublishesDevicesBeforeSecondaryAndHiddenWorkspaces() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let source = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
@@ -434,7 +440,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let updaterStart = try XCTUnwrap(
       source.range(of: "private final class AutoUpdateViewModel")?.lowerBound)
     let updaterEnd = try XCTUnwrap(
-      source.range(of: "private struct FinderUpdateArtifactRevealer", range: updaterStart..<source.endIndex)?
+      source.range(
+        of: "private struct FinderUpdateArtifactRevealer", range: updaterStart..<source.endIndex)?
         .lowerBound)
     let updater = String(source[updaterStart..<updaterEnd])
     let updaterInitStart = try XCTUnwrap(updater.range(of: "init() {")?.lowerBound)
@@ -514,7 +521,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
   }
 
   func testProductTargetsOnlyMacOS26() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
@@ -548,7 +555,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
   }
 
   func testDaemonBuildsOneConcurrentDeviceInformationProjection() throws {
-    var repository = URL(fileURLWithPath: #filePath)
+    var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let daemon = try String(
       contentsOf: repository.appending(

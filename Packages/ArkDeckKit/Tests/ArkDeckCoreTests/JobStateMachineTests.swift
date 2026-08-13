@@ -70,7 +70,8 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertTrue(Set(contractStates).isDisjoint(with: recoveryStates))
   }
 
-  func testCoreTransitionGraphVersionsRecoveryEdgesWithoutMutatingTheLockedJournalContract() throws {
+  func testCoreTransitionGraphVersionsRecoveryEdgesWithoutMutatingTheLockedJournalContract() throws
+  {
     let contractPairs = try loadContractTransitionPairs()
     let swiftPairs = Set(
       JobExecutionMode.allCases.flatMap { mode in
@@ -938,7 +939,7 @@ final class JobStateMachineTests: XCTestCase {
   }
 
   private func loadContract(named name: String) throws -> [String: Any] {
-    let repositoryRoot = URL(fileURLWithPath: #filePath)
+    let repositoryRoot = URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()

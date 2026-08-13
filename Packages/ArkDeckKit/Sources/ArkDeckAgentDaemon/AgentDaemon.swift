@@ -1260,8 +1260,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let completed = try await nativeLibraryImports.commit(uploadID: uploadID)
-        guard let currentTarget = try targetStore.find(
-          targetID: completed.target.targetID),
+        guard
+          let currentTarget = try targetStore.find(
+            targetID: completed.target.targetID),
           currentTarget.bindingRevision == completed.target.bindingRevision,
           currentTarget.stablePhysicalIdentitySHA256
             == completed.target.stablePhysicalIdentitySHA256,
@@ -1441,7 +1442,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         let exported = try await artifactStore.export(
           jobID: jobID, artifactID: artifactID,
-          destinationDirectory: URL(fileURLWithPath: destination, isDirectory: true),
+          destinationDirectory: URL(filePath: destination, directoryHint: .isDirectory),
           allowSensitive: allowSensitive)
         return success(
           id: request.id,
@@ -1510,7 +1511,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
         // App launch path. Reading that completed snapshot and the compact
         // local observation history are independent, so both projections are
         // still composed in one XPC response without a serial I/O chain.
-        async let candidateRead = usesWarmSnapshot
+        async let candidateRead =
+          usesWarmSnapshot
           ? bootstrap.candidateSnapshotForPresentation()
           : bootstrap.refreshCandidateSnapshotForPresentation()
         // Historical device facts are optional decoration. A damaged or
@@ -1963,12 +1965,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   private static func addingUTCSeconds(_ seconds: Int, to value: String) -> String? {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    guard let date = formatter.date(from: value) else { return nil }
-    return formatter.string(from: date.addingTimeInterval(TimeInterval(seconds)))
+    guard let date = ISO8601Timestamps.parseCanonicalPlain(value) else { return nil }
+    return ISO8601Timestamps.string(from: date.addingTimeInterval(TimeInterval(seconds)))
   }
 
   private static func isMergedPRIssuerReference(_ reference: String) -> Bool {
@@ -2019,8 +2017,9 @@ public final class AgentDaemonServer: @unchecked Sendable {
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.stateDirectory = stateDirectory
-    self.socketURL = stateDirectory.appendingPathComponent(
-      ArkDeckAgentFilesystemLayout.socketFilename)
+    self.socketURL = stateDirectory.appending(
+      path:
+        ArkDeckAgentFilesystemLayout.socketFilename)
     self.handler = handler
     self.nowUTC = nowUTC
   }
@@ -2030,8 +2029,8 @@ public final class AgentDaemonServer: @unchecked Sendable {
       at: stateDirectory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
 
-    let lockURL = stateDirectory.appendingPathComponent("instance.lock")
-    let instanceURL = stateDirectory.appendingPathComponent("instance.json")
+    let lockURL = stateDirectory.appending(path: "instance.lock")
+    let instanceURL = stateDirectory.appending(path: "instance.json")
     lockFD = open(lockURL.path, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
     guard lockFD >= 0 else { throw AgentDaemonError.io("cannot open instance lock") }
     if flock(lockFD, LOCK_EX | LOCK_NB) != 0 {

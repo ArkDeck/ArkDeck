@@ -53,8 +53,10 @@ package struct HarnessLocalAgentCLIProfile: Sendable, Equatable {
   /// here, and a name that is absent in the parent is simply not passed.
   package let inheritedEnvironmentKeys: [String]
   private let argumentBuilder:
-    @Sendable (_ modelName: String, _ workingDirectory: String, _ prompt: String,
-      _ finalMessagePath: String?) -> [String]
+    @Sendable (
+      _ modelName: String, _ workingDirectory: String, _ prompt: String,
+      _ finalMessagePath: String?
+    ) -> [String]
 
   init(
     profileID: String,
@@ -208,14 +210,14 @@ package struct LocalAgentCLIProcessTransport: HarnessLocalAgentCLITransport {
       execution = try await executor.executeIdentityBound(
         ProcessIdentityBoundRequest(
           process: ProcessRequest(
-            executable: URL(fileURLWithPath: request.executablePath),
+            executable: URL(filePath: request.executablePath),
             arguments: request.profile.arguments(
               modelName: request.modelName,
               workingDirectory: request.workingDirectory,
               prompt: request.prompt,
               finalMessagePath: outputURL?.path),
             environment: environment,
-            workingDirectory: URL(fileURLWithPath: request.workingDirectory, isDirectory: true),
+            workingDirectory: URL(filePath: request.workingDirectory, directoryHint: .isDirectory),
             timeout: TimeInterval(request.timeoutSeconds)),
           expectedSHA256: request.executableSHA256),
         captureLimit: captureLimit)
@@ -234,7 +236,8 @@ package struct LocalAgentCLIProcessTransport: HarnessLocalAgentCLITransport {
       }
       let size: Int64
       do {
-        size = (try fileManager.attributesOfItem(atPath: outputURL.path)[.size] as? NSNumber)?
+        size =
+          (try fileManager.attributesOfItem(atPath: outputURL.path)[.size] as? NSNumber)?
           .int64Value ?? -1
       } catch {
         throw HarnessDecisionGatewayError.transportFailure("agentCLIFinalMessageUnavailable")
@@ -415,14 +418,14 @@ package struct LocalAgentCLIDecisionGateway: HarnessDecisionGateway {
     timeoutSeconds: Int = 180,
     transport: any HarnessLocalAgentCLITransport = LocalAgentCLIProcessTransport()
   ) throws {
-    let executable = URL(fileURLWithPath: executablePath)
+    let executable = URL(filePath: executablePath)
       .resolvingSymlinksInPath().standardizedFileURL.path
-    let workdir = URL(fileURLWithPath: workingDirectory, isDirectory: true)
+    let workdir = URL(filePath: workingDirectory, directoryHint: .isDirectory)
       .resolvingSymlinksInPath().standardizedFileURL.path
     var isDirectory: ObjCBool = false
     guard executablePath.hasPrefix("/"), executable == executablePath,
       FileManager.default.isExecutableFile(atPath: executable),
-      let bytes = try? Data(contentsOf: URL(fileURLWithPath: executable)),
+      let bytes = try? Data(contentsOf: URL(filePath: executable)),
       FileManager.default.fileExists(atPath: workdir, isDirectory: &isDirectory),
       isDirectory.boolValue,
       workingDirectory.hasPrefix("/"), workdir == workingDirectory,

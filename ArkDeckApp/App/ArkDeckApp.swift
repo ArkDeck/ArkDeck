@@ -69,8 +69,8 @@ enum AppStartupPerformance {
   }
 }
 
-private extension Duration {
-  var timeInterval: TimeInterval {
+extension Duration {
+  fileprivate var timeInterval: TimeInterval {
     let parts = components
     return TimeInterval(parts.seconds) + TimeInterval(parts.attoseconds) / 1e18
   }
@@ -673,13 +673,13 @@ private struct SettingsSceneLoader: View {
 }
 
 private struct SettingsSceneContent: View {
-  @ObservedObject var model: SettingsWorkspaceViewModel
+  var model: SettingsWorkspaceViewModel
   let hdcDiagnostics: HDCStatusViewModel
   let runtimeHistory: RuntimeHistoryViewModel
   let autoUpdate: AutoUpdateViewModel
 
   init(models: ArkDeckAppModelStore) {
-    _model = ObservedObject(wrappedValue: models.settingsWorkspace)
+    model = models.settingsWorkspace
     hdcDiagnostics = models.hdcDiagnostics
     runtimeHistory = models.runtimeHistory
     autoUpdate = models.autoUpdate

@@ -1,9 +1,9 @@
 import ArkDeckWorkflows
-import Combine
+import Observation
 import SwiftUI
 
 struct TraceWorkspaceView: View {
-  @ObservedObject var model: TraceWorkspaceViewModel
+  var model: TraceWorkspaceViewModel
 
   var body: some View {
     ScrollView {
@@ -244,10 +244,10 @@ struct TraceWorkspaceView: View {
           Button(model.isSubmitting ? traceString("trace.action.running") : startActionTitle) {
             model.submit()
           }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("trace.start")
-            .disabled(!reviewBlockers.isEmpty || model.isSubmitting)
-            .help(reviewBlockers.joined(separator: "\n"))
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier("trace.start")
+          .disabled(!reviewBlockers.isEmpty || model.isSubmitting)
+          .help(reviewBlockers.joined(separator: "\n"))
         }
         if let failure = model.submissionFailure {
           Label(failure, systemImage: "exclamationmark.triangle.fill")
@@ -327,26 +327,27 @@ struct TraceWorkspaceView: View {
 }
 
 @MainActor
-final class TraceWorkspaceViewModel: ObservableObject {
-  @Published private(set) var workspace = TraceWorkspacePresentation.loading
-  @Published private(set) var selectedTargetID = ""
-  @Published private(set) var configurationMode = TraceConfigurationMode.preset
-  @Published private(set) var selectedPresetID = TracePresetID.arkuiDeep
-  @Published private(set) var customTags: Set<String> = []
-  @Published private(set) var durationText = "15"
-  @Published private(set) var bufferText = "8192"
-  @Published private(set) var parameterMode = TraceParameterUISelection.unchanged
-  @Published private(set) var persistentChangeConfirmed = false
-  @Published private(set) var filtersCreateFileAsset = false
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
-  @Published private(set) var artifactFailuresByJobID: [String: String] = [:]
-  @Published private(set) var evidenceByJobID: [String: RuntimeJobEvidencePresentation] = [:]
-  @Published private(set) var activeJobID: String?
-  @Published private(set) var terminalSubmission: TraceJobTerminalPresentation?
-  @Published private(set) var submissionFailure: String?
-  @Published private(set) var isSubmitting = false
-  @Published private(set) var isCancelling = false
+@Observable
+final class TraceWorkspaceViewModel {
+  private(set) var workspace = TraceWorkspacePresentation.loading
+  private(set) var selectedTargetID = ""
+  private(set) var configurationMode = TraceConfigurationMode.preset
+  private(set) var selectedPresetID = TracePresetID.arkuiDeep
+  private(set) var customTags: Set<String> = []
+  private(set) var durationText = "15"
+  private(set) var bufferText = "8192"
+  private(set) var parameterMode = TraceParameterUISelection.unchanged
+  private(set) var persistentChangeConfirmed = false
+  private(set) var filtersCreateFileAsset = false
+  private(set) var isRefreshing = false
+  private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
+  private(set) var artifactFailuresByJobID: [String: String] = [:]
+  private(set) var evidenceByJobID: [String: RuntimeJobEvidencePresentation] = [:]
+  private(set) var activeJobID: String?
+  private(set) var terminalSubmission: TraceJobTerminalPresentation?
+  private(set) var submissionFailure: String?
+  private(set) var isSubmitting = false
+  private(set) var isCancelling = false
 
   private let provider: any TraceApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding

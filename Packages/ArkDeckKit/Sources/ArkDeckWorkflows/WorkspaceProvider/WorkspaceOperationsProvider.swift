@@ -15,7 +15,7 @@ public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codabl
   public let sha256: String
 
   public init(path: String, sha256: String) throws {
-    guard path.hasPrefix("/"), URL(fileURLWithPath: path).standardizedFileURL.path == path else {
+    guard path.hasPrefix("/"), URL(filePath: path).standardizedFileURL.path == path else {
       throw DeviceProviderError.factsUnavailable(
         "workspace executable path must be canonical and absolute")
     }
@@ -28,8 +28,8 @@ public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codabl
   }
 
   package static func hashing(path: String) throws -> WorkspaceExecutableIdentity {
-    let canonical = URL(fileURLWithPath: path).standardizedFileURL.path
-    let bytes = try Data(contentsOf: URL(fileURLWithPath: canonical))
+    let canonical = URL(filePath: path).standardizedFileURL.path
+    let bytes = try Data(contentsOf: URL(filePath: canonical))
     return try WorkspaceExecutableIdentity(
       path: canonical, sha256: WorkspaceProviderSupport.sha256(bytes))
   }
@@ -122,7 +122,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     buildProducts: [String: String] = [:],
     kind: WorkspaceProjectProfileKind = .primary
   ) throws {
-    let canonical = URL(fileURLWithPath: projectRoot)
+    let canonical = URL(filePath: projectRoot)
       .resolvingSymlinksInPath().standardizedFileURL.path
     var isDirectory: ObjCBool = false
     guard projectRoot.hasPrefix("/"),
@@ -169,7 +169,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     let patch = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/patch")
     let sourceControl: WorkspaceCommandPreset?
     if FileManager.default.fileExists(
-      atPath: URL(fileURLWithPath: root).appendingPathComponent(".git").path)
+      atPath: URL(filePath: root).appending(path: ".git").path)
     {
       let git = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/git")
       sourceControl = try WorkspaceCommandPreset(
@@ -191,9 +191,9 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
         "workspace.toolchainUnavailable: no fixed SwiftPM executable exists")
     }
     let swiftPackage = try WorkspaceExecutableIdentity.hashing(path: swiftPackagePath)
-    let swiftBin = URL(fileURLWithPath: swiftPackagePath).deletingLastPathComponent()
-    let swiftBuildRole = swiftBin.appendingPathComponent("swift-build").path
-    let swiftTestRole = swiftBin.appendingPathComponent("swift-test").path
+    let swiftBin = URL(filePath: swiftPackagePath).deletingLastPathComponent()
+    let swiftBuildRole = swiftBin.appending(path: "swift-build").path
+    let swiftTestRole = swiftBin.appending(path: "swift-test").path
     guard FileManager.default.fileExists(atPath: swiftBuildRole),
       FileManager.default.fileExists(atPath: swiftTestRole)
     else {
@@ -206,12 +206,12 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     let patching = try WorkspaceCommandPreset(
       presetID: "unified-diff", executable: patch,
       fixedArguments: [], timeoutSeconds: 120)
-    let packagePath = URL(fileURLWithPath: root)
-      .appendingPathComponent("Packages/ArkDeckKit").path
+    let packagePath = URL(filePath: root)
+      .appending(path: "Packages/ArkDeckKit").path
     guard
       FileManager.default.fileExists(
-        atPath: URL(fileURLWithPath: packagePath)
-          .appendingPathComponent("Package.swift").path)
+        atPath: URL(filePath: packagePath)
+          .appending(path: "Package.swift").path)
     else {
       throw DeviceProviderError.factsUnavailable(
         "workspace.projectProfileUnavailable: ArkDeck Package.swift is absent")
@@ -262,24 +262,26 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
     let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
     let protectedRoots = ["Desktop", "Documents", "Downloads"].map {
-      home.appendingPathComponent($0, isDirectory: true).standardizedFileURL.path
+      home.appending(path: $0, directoryHint: .isDirectory).standardizedFileURL.path
     }
-    guard !protectedRoots.contains(where: {
-      root == $0 || root.hasPrefix($0 + "/")
-    }) else {
+    guard
+      !protectedRoots.contains(where: {
+        root == $0 || root.hasPrefix($0 + "/")
+      })
+    else {
       throw DeviceProviderError.factsUnavailable(
         "workspace.projectProfileUnavailable: project root is under a "
           + "macOS privacy-managed user folder; configure a LaunchAgent-readable path")
     }
-    let canonicalScript = URL(fileURLWithPath: hvigorScriptPath)
+    let canonicalScript = URL(filePath: hvigorScriptPath)
       .resolvingSymlinksInPath().standardizedFileURL.path
     guard hvigorScriptPath.hasPrefix("/"),
       FileManager.default.fileExists(atPath: canonicalScript),
       FileManager.default.fileExists(
-        atPath: URL(fileURLWithPath: root).appendingPathComponent("build-profile.json5").path),
+        atPath: URL(filePath: root).appending(path: "build-profile.json5").path),
       FileManager.default.fileExists(
-        atPath: URL(fileURLWithPath: root)
-          .appendingPathComponent("entry/src/main/module.json5").path)
+        atPath: URL(filePath: root)
+          .appending(path: "entry/src/main/module.json5").path)
     else {
       throw DeviceProviderError.factsUnavailable(
         "workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent")
@@ -600,8 +602,9 @@ package final class WorkspacePatchAttemptStore: @unchecked Sendable {
       let encoder = CanonicalJSONEncoders.canonicalPretty()
       let data = try encoder.encode(attempt)
       let destination = try url(for: attempt.patchAttemptRef)
-      let temporary = rootURL.appendingPathComponent(
-        ".\(attempt.patchAttemptRef).tmp.\(getpid())")
+      let temporary = rootURL.appending(
+        path:
+          ".\(attempt.patchAttemptRef).tmp.\(getpid())")
       try data.write(to: temporary, options: [])
       let handle = try FileHandle(forWritingTo: temporary)
       try handle.synchronize()
@@ -635,8 +638,9 @@ package final class WorkspacePatchAttemptStore: @unchecked Sendable {
         throw DeviceProviderError.factsUnavailable(
           "workspace leased patch bytes changed before durable persistence")
       }
-      let temporary = rootURL.appendingPathComponent(
-        ".\(reference).patch.tmp.\(getpid())")
+      let temporary = rootURL.appending(
+        path:
+          ".\(reference).patch.tmp.\(getpid())")
       try bytes.write(to: temporary, options: [])
       let handle = try FileHandle(forWritingTo: temporary)
       try handle.synchronize()
@@ -650,17 +654,17 @@ package final class WorkspacePatchAttemptStore: @unchecked Sendable {
   /// archive. Hashing the opaque Job id keeps it from becoming a path surface.
   package func checkpointArchiveURL(jobID: String) -> URL {
     let digest = WorkspaceProviderSupport.sha256(Data(jobID.utf8))
-    return rootURL.appendingPathComponent("checkpoint-\(digest).tar")
+    return rootURL.appending(path: "checkpoint-\(digest).tar")
   }
 
   private func url(for reference: String) throws -> URL {
     try validate(reference)
-    return rootURL.appendingPathComponent("\(reference).json")
+    return rootURL.appending(path: "\(reference).json")
   }
 
   private func patchURL(for reference: String) throws -> URL {
     try validate(reference)
-    return rootURL.appendingPathComponent("\(reference).patch")
+    return rootURL.appending(path: "\(reference).patch")
   }
 
   private func validate(_ reference: String) throws {
@@ -708,7 +712,7 @@ package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
   }
 
   private func validated(_ identity: WorkspaceExecutableIdentity) throws -> ResolvedExecutable {
-    let bytes = try Data(contentsOf: URL(fileURLWithPath: identity.path))
+    let bytes = try Data(contentsOf: URL(filePath: identity.path))
     guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
       throw RuntimeDispatchFailure.failed(
         "workspace executable identity drifted: \(identity.path)")
@@ -832,7 +836,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     }
     do {
       for identity in profile.executableIdentities {
-        let bytes = try Data(contentsOf: URL(fileURLWithPath: identity.path))
+        let bytes = try Data(contentsOf: URL(filePath: identity.path))
         guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
           return .unavailable(reason: "workspace.toolIdentityDrift")
         }
@@ -1164,7 +1168,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         throw DeviceProviderError.unsupportedAction(
           "workspace patch attempt is not active in this ProjectProfile")
       }
-      let bytes = try Data(contentsOf: URL(fileURLWithPath: attempt.patchFilePath))
+      let bytes = try Data(contentsOf: URL(filePath: attempt.patchFilePath))
       guard WorkspaceProviderSupport.sha256(bytes) == attempt.patchSHA256 else {
         throw DeviceProviderError.unsupportedAction(
           "workspace original patch bytes are unavailable or changed")
@@ -1370,7 +1374,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
           code: "workspace.checkpointReadbackFailed",
           detail: "checkpoint archive path is not provider-owned")
       }
-      let archiveURL = URL(fileURLWithPath: intent.archivePath)
+      let archiveURL = URL(filePath: intent.archivePath)
       let evidence: (byteCount: Int, sha256: String)
       do {
         let handle = try FileHandle(forWritingTo: archiveURL)
@@ -1423,7 +1427,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       }
       let durablePatchPath = try attempts.persistPatch(
         reference: intent.patchAttemptRef,
-        sourceURL: URL(fileURLWithPath: intent.patchFilePath),
+        sourceURL: URL(filePath: intent.patchFilePath),
         expectedSHA256: intent.patchSHA256)
       let workspaceRevisionAfter =
         profile.kind == .evolution
@@ -1539,7 +1543,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         try WorkspaceProviderSupport.require(
           snapshots: checkpoint.sourceSnapshots, root: profile.projectRoot)
         let evidence = try WorkspaceProviderSupport.sealedArchiveEvidence(
-          at: URL(fileURLWithPath: checkpoint.archivePath))
+          at: URL(filePath: checkpoint.archivePath))
         return .confirmedCompleted(summary: [
           "checkpointObject": evidence.sha256,
           "checkpointKind": "sealedArchive",
@@ -1686,17 +1690,17 @@ package enum WorkspaceProviderSupport {
   package static func workspaceRevision(
     root: String, profileVersion: String, globs: [String]
   ) throws -> String {
-    let rootURL = URL(fileURLWithPath: root, isDirectory: true)
-    let gitURL = rootURL.appendingPathComponent(".git", isDirectory: true)
+    let rootURL = URL(filePath: root, directoryHint: .isDirectory)
+    let gitURL = rootURL.appending(path: ".git", directoryHint: .isDirectory)
     var material = "profileVersion\t\(profileVersion)\n"
     material += "head\t\(headOID(gitDirectory: gitURL) ?? "absent")\n"
-    let indexURL = gitURL.appendingPathComponent("index")
+    let indexURL = gitURL.appending(path: "index")
     let indexDigest = (try? Data(contentsOf: indexURL)).map(sha256) ?? "absent"
     material += "index\t\(indexDigest)\n"
     let paths = try files(root: root, profileGlobs: globs, requestGlobs: globs)
     for path in paths.sorted() {
       let relative = String(path.dropFirst(root.count).drop(while: { $0 == "/" }))
-      let digest = (try? Data(contentsOf: URL(fileURLWithPath: path))).map(sha256) ?? "absent"
+      let digest = (try? Data(contentsOf: URL(filePath: path))).map(sha256) ?? "absent"
       material += "file\t\(relative)\t\(digest)\n"
     }
     return sha256(Data(material.utf8))
@@ -1708,7 +1712,7 @@ package enum WorkspaceProviderSupport {
   private static func headOID(gitDirectory: URL) -> String? {
     guard
       let head = try? String(
-        contentsOf: gitDirectory.appendingPathComponent("HEAD"), encoding: .utf8)
+        contentsOf: gitDirectory.appending(path: "HEAD"), encoding: .utf8)
     else { return nil }
     let trimmed = head.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.hasPrefix("ref: ") else {
@@ -1716,14 +1720,14 @@ package enum WorkspaceProviderSupport {
     }
     let ref = String(trimmed.dropFirst("ref: ".count))
     if let loose = try? String(
-      contentsOf: gitDirectory.appendingPathComponent(ref), encoding: .utf8)
+      contentsOf: gitDirectory.appending(path: ref), encoding: .utf8)
     {
       let value = loose.trimmingCharacters(in: .whitespacesAndNewlines)
       if !value.isEmpty { return value }
     }
     guard
       let packed = try? String(
-        contentsOf: gitDirectory.appendingPathComponent("packed-refs"), encoding: .utf8)
+        contentsOf: gitDirectory.appending(path: "packed-refs"), encoding: .utf8)
     else { return nil }
     for line in packed.split(separator: "\n") where line.hasSuffix(" " + ref) {
       return String(line.prefix(while: { $0 != " " }))
@@ -1838,14 +1842,15 @@ package enum WorkspaceProviderSupport {
       throw DeviceProviderError.unsupportedAction(
         "workspace file scope globs are empty or unsafe")
     }
-    let rootURL = URL(fileURLWithPath: root)
+    let rootURL = URL(filePath: root)
       .resolvingSymlinksInPath().standardizedFileURL
     let canonicalRoot = rootURL.path
     let anchors = Set(requestGlobs.map(globEnumerationAnchor))
     var result: Set<String> = []
     var visitedEntries = 0
     for anchor in anchors.sorted(by: { ($0 ?? "") < ($1 ?? "") }) {
-      let anchorURL = anchor.map { rootURL.appendingPathComponent($0, isDirectory: true) }
+      let anchorURL =
+        anchor.map { rootURL.appending(path: $0, directoryHint: .isDirectory) }
         ?? rootURL
       let lexicalAnchor = anchorURL.standardizedFileURL.path
       guard lexicalAnchor == canonicalRoot || lexicalAnchor.hasPrefix(canonicalRoot + "/") else {
@@ -2000,7 +2005,7 @@ package enum WorkspaceProviderSupport {
     guard profileGlobs.contains(where: { matches(relativePath, glob: $0) }) else {
       throw DeviceProviderError.unsupportedAction("workspace.pathOutsideProfileScope")
     }
-    return URL(fileURLWithPath: root).appendingPathComponent(relativePath).path
+    return URL(filePath: root).appending(path: relativePath).path
   }
 
   /// A git revision expression, not a path and not an option. Anything that
@@ -2052,15 +2057,15 @@ package enum WorkspaceProviderSupport {
   }
 
   private static func validatePath(_ relativePath: String, root: String) throws {
-    let candidate = URL(fileURLWithPath: root).appendingPathComponent(relativePath)
+    let candidate = URL(filePath: root).appending(path: relativePath)
       .standardizedFileURL.path
     guard candidate.hasPrefix(root + "/") else {
       throw DeviceProviderError.unsupportedAction(
         "workspace path escapes the ProjectProfile root")
     }
-    var cursor = URL(fileURLWithPath: root)
+    var cursor = URL(filePath: root)
     for component in relativePath.split(separator: "/").dropLast() {
-      cursor.appendPathComponent(String(component))
+      cursor.append(path: String(component))
       if FileManager.default.fileExists(atPath: cursor.path) {
         let values = try cursor.resourceValues(forKeys: [.isSymbolicLinkKey])
         guard values.isSymbolicLink != true else {
@@ -2070,7 +2075,7 @@ package enum WorkspaceProviderSupport {
       }
     }
     if FileManager.default.fileExists(atPath: candidate) {
-      let values = try URL(fileURLWithPath: candidate).resourceValues(
+      let values = try URL(filePath: candidate).resourceValues(
         forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
       guard values.isRegularFile == true, values.isSymbolicLink != true else {
         throw DeviceProviderError.unsupportedAction(
@@ -2084,7 +2089,7 @@ package enum WorkspaceProviderSupport {
   ) throws -> [WorkspaceFileSnapshot] {
     try relativePaths.sorted().map { path in
       try validatePath(path, root: root)
-      let url = URL(fileURLWithPath: root).appendingPathComponent(path)
+      let url = URL(filePath: root).appending(path: path)
       guard FileManager.default.fileExists(atPath: url.path) else {
         return WorkspaceFileSnapshot(relativePath: path, sha256: nil)
       }
@@ -2098,7 +2103,7 @@ package enum WorkspaceProviderSupport {
   ) throws {
     var totalBytes = 0
     for path in relativePaths {
-      let url = URL(fileURLWithPath: root).appendingPathComponent(path)
+      let url = URL(filePath: root).appending(path: path)
       let values = try url.resourceValues(forKeys: [.fileSizeKey])
       totalBytes += values.fileSize ?? 0
       guard totalBytes <= 60 * 1024 * 1024 else {

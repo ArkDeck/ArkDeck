@@ -148,11 +148,11 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     let probes = try XCTUnwrap(
       Bundle.module.url(forResource: "Probes", withExtension: nil),
       "the Probes fixture directory must be copied into the test bundle")
-    return probes.appendingPathComponent("DeviceObservation/1.0.0", isDirectory: true)
+    return probes.appending(path: "DeviceObservation/1.0.0", directoryHint: .isDirectory)
   }
 
   private func data(_ relative: String) throws -> Data {
-    try Data(contentsOf: try packURL().appendingPathComponent(relative))
+    try Data(contentsOf: try packURL().appending(path: relative))
   }
 
   private func digest(_ data: Data) -> String {
@@ -191,9 +191,10 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     let listed = try FileManager.default
       .subpathsOfDirectory(atPath: root.path)
       .filter { !$0.hasSuffix(".gitattributes") }
-      .filter { var isDir: ObjCBool = false
+      .filter {
+        var isDir: ObjCBool = false
         _ = FileManager.default.fileExists(
-          atPath: root.appendingPathComponent($0).path, isDirectory: &isDir)
+          atPath: root.appending(path: $0).path, isDirectory: &isDir)
         return !isDir.boolValue
       }
     let resources = try loadResources()
@@ -222,22 +223,26 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     let registry = try loadRegistry()
     XCTAssertEqual(registry.toolContext.reportedVersion, Self.toolVersion)
     XCTAssertEqual(registry.toolContext.executableSHA256, Self.toolSHA256)
-    XCTAssertTrue(registry.toolContext.divergenceNote.contains("3.2.0d"),
-                  "the divergence from the sibling registries must be stated in the registry")
+    XCTAssertTrue(
+      registry.toolContext.divergenceNote.contains("3.2.0d"),
+      "the divergence from the sibling registries must be stated in the registry")
     for entry in registry.entries {
       XCTAssertEqual(entry.toolReportedVersion, Self.toolVersion)
-      XCTAssertTrue(entry.id.contains(Self.toolVersion),
-                    "entry id \(entry.id) must carry the tool version (D-2 obligation)")
-      XCTAssertFalse(entry.id.contains("3.2.0d"),
-                     "entry id \(entry.id) must not claim the sibling tool version")
+      XCTAssertTrue(
+        entry.id.contains(Self.toolVersion),
+        "entry id \(entry.id) must carry the tool version (D-2 obligation)")
+      XCTAssertFalse(
+        entry.id.contains("3.2.0d"),
+        "entry id \(entry.id) must not claim the sibling tool version")
     }
   }
 
   func testTheReadOnlySiblingPackIsByteIdentical() throws {
     let probes = try XCTUnwrap(Bundle.module.url(forResource: "Probes", withExtension: nil))
-    let sibling = probes.appendingPathComponent("1.0.0/registry.yaml")
-    XCTAssertEqual(digest(try Data(contentsOf: sibling)), Self.readOnlyPackRegistrySHA256,
-                   "registering a second family must not disturb the 1.0.0 read-only pack")
+    let sibling = probes.appending(path: "1.0.0/registry.yaml")
+    XCTAssertEqual(
+      digest(try Data(contentsOf: sibling)), Self.readOnlyPackRegistrySHA256,
+      "registering a second family must not disturb the 1.0.0 read-only pack")
   }
 
   // MARK: - 3. The registered grammar, exercised against every vector
@@ -312,12 +317,14 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
   func testEveryVectorClassifiesExactlyAsDeclared() throws {
     let entry = try XCTUnwrap(try loadRegistry().entries.first)
     let resources = try loadResources()
-    XCTAssertGreaterThanOrEqual(resources.vectors.count, 12,
-                                "the vector set must keep covering the whole matrix")
+    XCTAssertGreaterThanOrEqual(
+      resources.vectors.count, 12,
+      "the vector set must keep covering the whole matrix")
     for vector in resources.vectors {
       let bytes = try data(vector.file)
-      XCTAssertEqual(classify(bytes, using: entry), try expected(vector.expectedOutcome),
-                     "\(vector.file): \(vector.note)")
+      XCTAssertEqual(
+        classify(bytes, using: entry), try expected(vector.expectedOutcome),
+        "\(vector.file): \(vector.note)")
     }
   }
 
@@ -344,8 +351,9 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     XCTAssertEqual(classify(try data("vectors/single-offline.bin"), using: entry), .observedEmpty)
     XCTAssertEqual(classify(try data("vectors/all-offline-two.bin"), using: entry), .observedEmpty)
     // Presence is decided by the state column, never by row count.
-    XCTAssertEqual(classify(try data("vectors/mixed-connected-offline.bin"), using: entry),
-                   .observed(1))
+    XCTAssertEqual(
+      classify(try data("vectors/mixed-connected-offline.bin"), using: entry),
+      .observed(1))
     let mappings = Dictionary(
       uniqueKeysWithValues: entry.semanticMappings.map { ($0.input, $0.result) })
     XCTAssertEqual(mappings["rowsWithZeroConnected"], "observedEmpty")
@@ -395,16 +403,19 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     let registry = try loadRegistry()
     for entry in registry.entries {
       let provenance = entry.provenance
-      XCTAssertTrue(provenance.sourceChange.hasPrefix("CHG-"),
-                    "\(entry.id): sourceChange must be a change id")
+      XCTAssertTrue(
+        provenance.sourceChange.hasPrefix("CHG-"),
+        "\(entry.id): sourceChange must be a change id")
       XCTAssertFalse(provenance.sourceEvidence.isEmpty)
       // The whole point: no repository-rooted path, so archiving cannot break it.
-      XCTAssertFalse(provenance.sourceEvidence.hasPrefix("openspec/"),
-                     "\(entry.id): sourceEvidence must be relative to the change directory")
+      XCTAssertFalse(
+        provenance.sourceEvidence.hasPrefix("openspec/"),
+        "\(entry.id): sourceEvidence must be relative to the change directory")
       XCTAssertFalse(provenance.sourceEvidence.hasPrefix("/"))
       XCTAssertFalse(provenance.sourceEvidence.contains("openspec/changes/"))
-      XCTAssertFalse(provenance.sourceEvidence.contains("archive/"),
-                     "\(entry.id): an archive-dated directory would break on the next rename")
+      XCTAssertFalse(
+        provenance.sourceEvidence.contains("archive/"),
+        "\(entry.id): an archive-dated directory would break on the next rename")
     }
   }
 
@@ -412,23 +423,28 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
   func testNoRegistryByteNamesAnInRepoChangePath() throws {
     for file in ["registry.yaml", "resources.json"] {
       let text = String(decoding: try data(file), as: UTF8.self)
-      XCTAssertFalse(text.contains("openspec/changes/"),
-                     "\(file) still names an in-repo change path")
+      XCTAssertFalse(
+        text.contains("openspec/changes/"),
+        "\(file) still names an in-repo change path")
     }
   }
 
   // MARK: - 4. Fail-closed and privacy
 
   func testEveryNonStdoutControlStaysFailClosed() throws {
-    let controls = try JSONDecoder().decode(Controls.self, from: try data("controls/fail-closed-vectors.json"))
+    let controls = try JSONDecoder().decode(
+      Controls.self, from: try data("controls/fail-closed-vectors.json"))
     XCTAssertGreaterThanOrEqual(controls.cases.count, 10)
     for control in controls.cases {
-      XCTAssertTrue(["unknown", "unavailable"].contains(control.expected),
-                    "\(control.id) must never yield observedEmpty or a partial set")
+      XCTAssertTrue(
+        ["unknown", "unavailable"].contains(control.expected),
+        "\(control.id) must never yield observedEmpty or a partial set")
     }
     let ids = Set(controls.cases.map(\.id))
-    for required in ["stderr-non-empty", "nonzero-exit", "stdout-truncated", "timeout",
-                     "cancelled", "server-absent", "endpoint-drift", "server-identity-drift"] {
+    for required in [
+      "stderr-non-empty", "nonzero-exit", "stdout-truncated", "timeout",
+      "cancelled", "server-absent", "endpoint-drift", "server-identity-drift",
+    ] {
       XCTAssertTrue(ids.contains(required), "control \(required) is missing")
     }
   }
@@ -437,8 +453,10 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
     let entry = try XCTUnwrap(try loadRegistry().entries.first)
     XCTAssertEqual(entry.exactArgv, ["list", "targets", "-v"])
     XCTAssertEqual(entry.effectClassification, "readOnly")
-    for forbidden in ["serverStart", "serverStop", "serverRestart", "serverAdoption",
-                      "subserverLifecycle", "deviceMigration", "deviceMutation", "destructive"] {
+    for forbidden in [
+      "serverStart", "serverStop", "serverRestart", "serverAdoption",
+      "subserverLifecycle", "deviceMigration", "deviceMutation", "destructive",
+    ] {
       XCTAssertTrue(entry.forbiddenEffects.contains(forbidden))
     }
     XCTAssertEqual(try loadRegistry().unknownFamilyDisposition, "unknown")
@@ -452,8 +470,9 @@ final class HDCDeviceObservationRegistryContractTests: XCTestCase {
       let range = NSRange(text.startIndex..., in: text)
       for match in keyPattern.matches(in: text, range: range) {
         let found = String(text[Range(match.range, in: text)!])
-        XCTAssertTrue(Self.placeholderKeys.contains(found),
-                      "\(vector.file) carries a 32-hex token that is not a placeholder")
+        XCTAssertTrue(
+          Self.placeholderKeys.contains(found),
+          "\(vector.file) carries a 32-hex token that is not a placeholder")
       }
     }
     let identity = try XCTUnwrap(try loadRegistry().entries.first).identityPolicy

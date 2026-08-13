@@ -11,8 +11,8 @@ final class RuntimeArtifactContractTests: XCTestCase {
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory
-      .appendingPathComponent("arkdeck-artifact-tests", isDirectory: true)
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+      .appending(path: "arkdeck-artifact-tests", directoryHint: .isDirectory)
+      .appending(path: UUID().uuidString, directoryHint: .isDirectory)
   }
 
   override func tearDownWithError() throws {
@@ -152,13 +152,13 @@ final class RuntimeArtifactContractTests: XCTestCase {
     // The on-disk name is the derived ID, so even a hostile declared name
     // cannot place bytes outside the job directory.
     let hostile = try await store.publish(request(name: "../../etc/passwd"))
-    let jobDirectory = root.appendingPathComponent("job-1", isDirectory: true)
+    let jobDirectory = root.appending(path: "job-1", directoryHint: .isDirectory)
     let onDisk = try FileManager.default.contentsOfDirectory(atPath: jobDirectory.path)
     XCTAssertTrue(
       onDisk.contains(hostile.artifactID),
       "bytes live under the derived ID: \(onDisk)")
     XCTAssertFalse(
-      FileManager.default.fileExists(atPath: root.appendingPathComponent("etc").path))
+      FileManager.default.fileExists(atPath: root.appending(path: "etc").path))
     XCTAssertFalse(FileManager.default.fileExists(atPath: "/tmp/passwd"))
     // A malformed job identifier is rejected outright.
     await XCTAssertThrowsErrorAsync(
@@ -168,11 +168,11 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testSymlinkedJobDirectoryIsRejected() async throws {
     let store = try makeStore()
     let outside = root.deletingLastPathComponent()
-      .appendingPathComponent("arkdeck-artifact-outside-\(UUID().uuidString)")
+      .appending(path: "arkdeck-artifact-outside-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: outside) }
     try FileManager.default.createSymbolicLink(
-      at: root.appendingPathComponent("job-symlink"), withDestinationURL: outside)
+      at: root.appending(path: "job-symlink"), withDestinationURL: outside)
 
     await XCTAssertThrowsErrorAsync(
       try await store.publish(request(jobID: "job-symlink")))
@@ -184,16 +184,16 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testPayloadAndIndexDriftFailClosedOnReopen() async throws {
     let store = try makeStore()
     let metadata = try await store.publish(request())
-    let payload = root.appendingPathComponent("job-1/\(metadata.artifactID)")
+    let payload = root.appending(path: "job-1/\(metadata.artifactID)")
     try Data("tampered".utf8).write(to: payload)
     await XCTAssertThrowsErrorAsync(try await store.list(jobID: "job-1"))
 
     try FileManager.default.removeItem(at: root)
     let fresh = try makeStore()
     _ = try await fresh.publish(request())
-    let jobDirectory = root.appendingPathComponent("job-1", isDirectory: true)
-    let index = jobDirectory.appendingPathComponent("index.json")
-    let outside = root.appendingPathComponent("outside-index.json")
+    let jobDirectory = root.appending(path: "job-1", directoryHint: .isDirectory)
+    let index = jobDirectory.appending(path: "index.json")
+    let outside = root.appending(path: "outside-index.json")
     try FileManager.default.copyItem(at: index, to: outside)
     try FileManager.default.removeItem(at: index)
     try FileManager.default.createSymbolicLink(at: index, withDestinationURL: outside)
@@ -217,7 +217,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testFileBackedPublicationStreamsIntoATargetBoundLease() async throws {
     let store = try makeStore()
     let source = root.deletingLastPathComponent()
-      .appendingPathComponent("flash-source-\(UUID().uuidString).tar.gz")
+      .appending(path: "flash-source-\(UUID().uuidString).tar.gz")
     let bytes = Data(repeating: 0xab, count: 3 * 1_024 * 1_024 + 17)
     try bytes.write(to: source)
     defer { try? FileManager.default.removeItem(at: source) }
@@ -252,7 +252,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testFileBackedPublicationRejectsDigestDriftWithoutPublishing() async throws {
     let store = try makeStore()
     let source = root.deletingLastPathComponent()
-      .appendingPathComponent("flash-tampered-\(UUID().uuidString).tar.gz")
+      .appending(path: "flash-tampered-\(UUID().uuidString).tar.gz")
     try Data("wrong-flash-bundle".utf8).write(to: source)
     defer { try? FileManager.default.removeItem(at: source) }
     let request = RuntimeArtifactFilePublicationRequest(
@@ -279,7 +279,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
     }
     let store = try makeStore(home: "/Users/tester")
     let source = root.deletingLastPathComponent()
-      .appendingPathComponent("large-text-source-\(UUID().uuidString).log")
+      .appending(path: "large-text-source-\(UUID().uuidString).log")
     FileManager.default.createFile(atPath: source.path, contents: nil)
     let writer = try FileHandle(forWritingTo: source)
     defer {
@@ -332,18 +332,19 @@ final class RuntimeArtifactContractTests: XCTestCase {
     let lease = try await store.leaseReference(
       jobID: published.jobID, artifactID: published.artifactID)
     let resolved = try await store.resolveLease(lease)
-    XCTAssertFalse(try fileContains(Data("supersecret-value-that-must-not-persist".utf8), at: resolved.fileURL))
+    XCTAssertFalse(
+      try fileContains(Data("supersecret-value-that-must-not-persist".utf8), at: resolved.fileURL))
     XCTAssertFalse(try fileContains(Data("/Users/tester".utf8), at: resolved.fileURL))
     XCTAssertTrue(try fileContains(Data("<REDACTED>".utf8), at: resolved.fileURL))
     XCTAssertTrue(try fileContains(Data("<HOME>".utf8), at: resolved.fileURL))
   }
 
-
   func testTextFileStreamingRedactionKeepsOrdinaryKeyPrefixes() async throws {
     let store = try makeStore(home: "/Users/tester")
     let source = root.deletingLastPathComponent()
-      .appendingPathComponent("stream-prefix-\(UUID().uuidString).txt")
-    let sourceText = "tokenizer remains ordinary; secrettoken: second-secret-value\napi_key: abcdefghi\n/Users/tester/project\n"
+      .appending(path: "stream-prefix-\(UUID().uuidString).txt")
+    let sourceText =
+      "tokenizer remains ordinary; secrettoken: second-secret-value\napi_key: abcdefghi\n/Users/tester/project\n"
     try Data(sourceText.utf8).write(to: source)
     defer { try? FileManager.default.removeItem(at: source) }
 
@@ -356,9 +357,10 @@ final class RuntimeArtifactContractTests: XCTestCase {
         bindingSnapshot: ArtifactBindingSnapshot(
           targetID: "TGT-1", bindingRevision: 1, stableIdentitySHA256: nil),
         sourceFileURL: source))
-    let text = String(
-      data: try await store.read(jobID: published.jobID, artifactID: published.artifactID),
-      encoding: .utf8) ?? ""
+    let text =
+      String(
+        data: try await store.read(jobID: published.jobID, artifactID: published.artifactID),
+        encoding: .utf8) ?? ""
     XCTAssertTrue(text.contains("tokenizer remains ordinary"), text)
     XCTAssertTrue(text.contains("secrettoken: <REDACTED>"), text)
     XCTAssertTrue(text.contains("api_key: <REDACTED>"), text)
@@ -370,7 +372,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testExportRefusesOverwriteAndSanitizesName() async throws {
     let store = try makeStore()
     let hostile = try await store.publish(request(name: "../evil.json"))
-    let destination = root.appendingPathComponent("export", isDirectory: true)
+    let destination = root.appending(path: "export", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
     let exported = try await store.export(
       jobID: "job-1", artifactID: hostile.artifactID, destinationDirectory: destination)
@@ -405,9 +407,10 @@ final class RuntimeArtifactContractTests: XCTestCase {
         jobID: "job-redact",
         contents: "{\"token\":\"ghs_abcdef123456\",\"path\":\"/Users/tester/secret\"}"))
     XCTAssertTrue(metadata.redactionApplied, "redaction must be recorded, not silent")
-    let text = String(
-      data: try await store.read(jobID: "job-redact", artifactID: metadata.artifactID),
-      encoding: .utf8) ?? ""
+    let text =
+      String(
+        data: try await store.read(jobID: "job-redact", artifactID: metadata.artifactID),
+        encoding: .utf8) ?? ""
     XCTAssertFalse(text.contains("ghs_abcdef123456"), text)
     XCTAssertFalse(text.contains("/Users/tester"), text)
     XCTAssertTrue(text.contains("<HOME>"))
@@ -557,12 +560,12 @@ final class RuntimeArtifactContractTests: XCTestCase {
   func testShortArtifactIDInIndexFailsClosed() async throws {
     let store = try makeStore()
     let published = try await store.publish(request())
-    let jobDirectory = root.appendingPathComponent("job-1", isDirectory: true)
+    let jobDirectory = root.appending(path: "job-1", directoryHint: .isDirectory)
     let shortID = "ART-\(published.sha256.prefix(16))"
     try FileManager.default.moveItem(
-      at: jobDirectory.appendingPathComponent(published.artifactID),
-      to: jobDirectory.appendingPathComponent(shortID))
-    let indexURL = jobDirectory.appendingPathComponent("index.json")
+      at: jobDirectory.appending(path: published.artifactID),
+      to: jobDirectory.appending(path: shortID))
+    let indexURL = jobDirectory.appending(path: "index.json")
     var index = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(contentsOf: indexURL))
         as? [String: Any])
@@ -584,7 +587,7 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertEqual(verified[0].sha256, metadata.sha256)
     XCTAssertTrue(verified[0].reference.hasPrefix("arkdeck-artifact://job-1/"))
 
-    let bytesURL = root.appendingPathComponent("job-1/\(metadata.artifactID)")
+    let bytesURL = root.appending(path: "job-1/\(metadata.artifactID)")
     try Data("tampered".utf8).write(to: bytesURL)
     await XCTAssertThrowsErrorAsync(
       try await store.verifiedEvidenceArtifacts(jobID: "job-1"))

@@ -27,13 +27,14 @@ package enum OpenHarmonyLocalSigning {
 
   package static func defaultRootURL() -> URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent("ArkDeck/Signing/OpenHarmony", isDirectory: true)
+      .appending(path: "ArkDeck/Signing/OpenHarmony", directoryHint: .isDirectory)
   }
 
   package static func defaultAgentDaemonURL() -> URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent(
-        "ArkDeck/Helpers/\(ArkDeckHelperIdentity.daemonBundleName)/Contents/MacOS/"
+      .appending(
+        path:
+          "ArkDeck/Helpers/\(ArkDeckHelperIdentity.daemonBundleName)/Contents/MacOS/"
           + ArkDeckHelperIdentity.daemonExecutableName)
   }
 
@@ -282,7 +283,8 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
     var value: CFTypeRef?
     let result = (
       status: SecItemCopyMatching(request as CFDictionary, &value),
-      value: value)
+      value: value
+    )
     guard result.status == errSecSuccess, let data = result.value as? Data, !data.isEmpty else {
       throw OpenHarmonySigningError.secretUnavailable(
         "Keychain read status \(result.status)")
@@ -461,7 +463,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     nowUTC: @escaping @Sendable () -> String = OpenHarmonySigningPresetStore.utcNow
   ) {
     self.rootURL = rootURL.standardizedFileURL
-    self.receiptURL = self.rootURL.appendingPathComponent("preset-v1.json")
+    self.receiptURL = self.rootURL.appending(path: "preset-v1.json")
     self.secrets = secrets
     self.fileManager = fileManager
     self.nowUTC = nowUTC
@@ -514,7 +516,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
           configuration.managedMaterialDirectory?.path == directoryPath,
           managedMaterialDirectory.deletingLastPathComponent().path == expectedParent,
           [keystore.path, certificate.path, profile.path].allSatisfy({
-            URL(fileURLWithPath: $0).deletingLastPathComponent().path == directoryPath
+            URL(filePath: $0).deletingLastPathComponent().path == directoryPath
           })
         else {
           throw OpenHarmonySigningError.invalidConfiguration(
@@ -541,7 +543,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         else { return nil }
         return account
       }
-      let envelopeAccount = reusableEnvelope
+      let envelopeAccount =
+        reusableEnvelope
         ?? envelopePrefix + UUID().uuidString.lowercased()
       var legacyAccounts: [String] = []
       if let previousReceipt, previousReceipt.presetID == configuration.presetID {
@@ -555,11 +558,14 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         }
         legacyAccounts.append(contentsOf: previousReceipt.legacyPasswordAccounts ?? [])
       }
-      legacyAccounts = Array(Set(legacyAccounts.filter {
-        $0 == accountPrefix + "|keystore" || $0 == accountPrefix + "|key"
-          || ($0.hasPrefix(envelopePrefix)
-            && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil)
-      })).sorted()
+      legacyAccounts = Array(
+        Set(
+          legacyAccounts.filter {
+            $0 == accountPrefix + "|keystore" || $0 == accountPrefix + "|key"
+              || ($0.hasPrefix(envelopePrefix)
+                && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil)
+          })
+      ).sorted()
       let receipt = OpenHarmonySigningPresetReceipt(
         schemaVersion: "arkdeck-openharmony-signing/v1",
         installedAtUTC: nowUTC(), presetID: configuration.presetID,
@@ -627,7 +633,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
             in: 0..<envelope.keystorePassword.count)
           envelope.keyPassword.resetBytes(in: 0..<envelope.keyPassword.count)
         }
-        let keystoreURL = URL(fileURLWithPath: receipt.keystore.path)
+        let keystoreURL = URL(filePath: receipt.keystore.path)
         var normalizedKeystore = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
           envelope.keystorePassword, keystore: keystoreURL, fileManager: fileManager)
         defer { normalizedKeystore.resetBytes(in: 0..<normalizedKeystore.count) }
@@ -651,7 +657,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       defer { previousKeystore.resetBytes(in: 0..<previousKeystore.count) }
       var previousKey = try secrets.read(account: receipt.keyPasswordAccount)
       defer { previousKey.resetBytes(in: 0..<previousKey.count) }
-      let keystoreURL = URL(fileURLWithPath: receipt.keystore.path)
+      let keystoreURL = URL(filePath: receipt.keystore.path)
       var normalizedKeystore = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         previousKeystore, keystore: keystoreURL, fileManager: fileManager)
       defer { normalizedKeystore.resetBytes(in: 0..<normalizedKeystore.count) }
@@ -757,11 +763,11 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       try secrets.set(envelope, account: envelopeAccount)
       do {
         let migrated = Self.copyReceipt(
-            receipt, secretEnvelopeAccount: envelopeAccount,
-            legacyPasswordAccounts: legacy,
-            trustedDaemonApplicationSHA256: daemonIdentity,
-            keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
-            keyAlias: migratedKeyAlias)
+          receipt, secretEnvelopeAccount: envelopeAccount,
+          legacyPasswordAccounts: legacy,
+          trustedDaemonApplicationSHA256: daemonIdentity,
+          keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
+          keyAlias: migratedKeyAlias)
         try write(migrated)
       } catch {
         _ = try? secrets.remove(account: envelopeAccount)
@@ -806,7 +812,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         // legacy file-based Keychain to decrypt its obsolete item.
         pair = (
           OpenHarmonyLocalSigning.publicSDKReleasePassword(),
-          OpenHarmonyLocalSigning.publicSDKReleasePassword())
+          OpenHarmonyLocalSigning.publicSDKReleasePassword()
+        )
       } else {
         pair = try legacySecretPair(for: receipt)
       }
@@ -817,7 +824,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       var encoded = try Self.encodeEnvelope(
         keystorePassword: pair.keystore, keyPassword: pair.key)
       defer { encoded.resetBytes(in: 0..<encoded.count) }
-      let envelopeAccount = receipt.presetID + "|secret-envelope-"
+      let envelopeAccount =
+        receipt.presetID + "|secret-envelope-"
         + UUID().uuidString.lowercased()
       var legacy = receipt.legacyPasswordAccounts ?? []
       if let previousEnvelope = receipt.secretEnvelopeAccount {
@@ -860,7 +868,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       try validateTrustedDaemonIdentity(receipt)
       return (
         OpenHarmonyLocalSigning.publicSDKReleasePassword(),
-        OpenHarmonyLocalSigning.publicSDKReleasePassword())
+        OpenHarmonyLocalSigning.publicSDKReleasePassword()
+      )
     }
     guard receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema else {
       throw OpenHarmonySigningError.secretUnavailable(
@@ -879,7 +888,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       try Self.validateSecret(envelope.keyPassword)
       return (
         Data(envelope.keystorePassword.map { $0 }),
-        Data(envelope.keyPassword.map { $0 }))
+        Data(envelope.keyPassword.map { $0 })
+      )
     }
     let keystore = try secrets.read(account: receipt.keystorePasswordAccount)
     do {
@@ -936,12 +946,14 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     let envelopePresent = receipt?.secretEnvelopeAccount.map {
       secrets.contains(account: $0)
     }
-    let keyStorePresent = envelopePresent ?? receipt.map {
-      secrets.contains(account: $0.keystorePasswordAccount)
-    } ?? false
-    let keyPresent = envelopePresent ?? receipt.map {
-      secrets.contains(account: $0.keyPasswordAccount)
-    } ?? false
+    let keyStorePresent =
+      envelopePresent ?? receipt.map {
+        secrets.contains(account: $0.keystorePasswordAccount)
+      } ?? false
+    let keyPresent =
+      envelopePresent ?? receipt.map {
+        secrets.contains(account: $0.keyPasswordAccount)
+      } ?? false
     var diagnostics: [String] = []
     do { _ = try loadValidated() } catch { diagnostics.append("\(error)") }
     return OpenHarmonySigningPresetStatus(
@@ -969,7 +981,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       let managedMaterialURL: URL?
       if let managedPath = receipt?.managedMaterialDirectory {
         let expectedParent = rootURL.standardizedFileURL.path
-        let candidate = URL(fileURLWithPath: managedPath).standardizedFileURL
+        let candidate = URL(filePath: managedPath).standardizedFileURL
         guard managedPath == candidate.path,
           candidate.deletingLastPathComponent().path == expectedParent
         else {
@@ -993,9 +1005,11 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       let removedEnvelope = receipt?.secretEnvelopeAccount.map {
         removedAccounts.contains($0)
       }
-      let removedKeystore = removedEnvelope
+      let removedKeystore =
+        removedEnvelope
         ?? removedAccounts.contains(accountPrefix + "|keystore")
-      let removedKey = removedEnvelope
+      let removedKey =
+        removedEnvelope
         ?? removedAccounts.contains(accountPrefix + "|key")
       let removedReceipt: Bool
       if fileManager.fileExists(atPath: receiptURL.path) {
@@ -1011,11 +1025,12 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
           removedManagedMaterial = true
         }
       }
-      let preserved = receipt.map {
-        $0.managedMaterialDirectory == nil
-          ? [$0.keystore.path, $0.appCertificate.path, $0.signedProfile.path]
-          : []
-      } ?? []
+      let preserved =
+        receipt.map {
+          $0.managedMaterialDirectory == nil
+            ? [$0.keystore.path, $0.appCertificate.path, $0.signedProfile.path]
+            : []
+        } ?? []
       return OpenHarmonySigningPresetRemoval(
         removedReceipt: removedReceipt,
         removedKeystorePassword: removedKeystore,
@@ -1058,10 +1073,11 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     let expectedKeystoreAccount = expectedAccountPrefix + "|keystore"
     let expectedKeyAccount = expectedAccountPrefix + "|key"
     let envelopePrefix = expectedAccountPrefix + "|secret-envelope-"
-    let envelopeIsValid = receipt.secretEnvelopeAccount.map {
-      $0.hasPrefix(envelopePrefix)
-        && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil
-    } ?? true
+    let envelopeIsValid =
+      receipt.secretEnvelopeAccount.map {
+        $0.hasPrefix(envelopePrefix)
+          && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil
+      } ?? true
     let legacyAccountsAreValid = (receipt.legacyPasswordAccounts ?? []).allSatisfy {
       $0 == expectedKeystoreAccount || $0 == expectedKeyAccount
         || ($0.hasPrefix(envelopePrefix)
@@ -1082,12 +1098,12 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         "closed preset fields or Keychain accounts drifted")
     }
     if let managedPath = receipt.managedMaterialDirectory {
-      let managedURL = URL(fileURLWithPath: managedPath).standardizedFileURL
+      let managedURL = URL(filePath: managedPath).standardizedFileURL
       guard managedPath == managedURL.path,
         managedURL.deletingLastPathComponent().path == rootURL.standardizedFileURL.path,
         [receipt.keystore.path, receipt.appCertificate.path, receipt.signedProfile.path]
           .allSatisfy({
-            URL(fileURLWithPath: $0).deletingLastPathComponent().path == managedPath
+            URL(filePath: $0).deletingLastPathComponent().path == managedPath
           })
       else {
         throw OpenHarmonySigningError.receiptUnavailable(
@@ -1105,7 +1121,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       if let envelope = receipt.secretEnvelopeAccount {
         secretsPresent = secrets.contains(account: envelope)
       } else {
-        secretsPresent = secrets.contains(account: receipt.keystorePasswordAccount)
+        secretsPresent =
+          secrets.contains(account: receipt.keystorePasswordAccount)
           && secrets.contains(account: receipt.keyPasswordAccount)
       }
       guard secretsPresent else {
@@ -1202,7 +1219,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   private func write(_ receipt: OpenHarmonySigningPresetReceipt) throws {
     let encoder = CanonicalJSONEncoders.canonicalPretty()
     let bytes = try encoder.encode(receipt)
-    let temporary = rootURL.appendingPathComponent(".preset-\(UUID().uuidString).tmp")
+    let temporary = rootURL.appending(path: ".preset-\(UUID().uuidString).tmp")
     defer { try? fileManager.removeItem(at: temporary) }
     try bytes.write(to: temporary, options: [])
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
@@ -1221,9 +1238,10 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   }
 
   private static func validateIdentifier(_ value: String, name: String) throws {
-    guard value.range(
-      of: #"^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$"#,
-      options: .regularExpression) != nil
+    guard
+      value.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$"#,
+        options: .regularExpression) != nil
     else { throw OpenHarmonySigningError.invalidConfiguration("\(name) is malformed") }
   }
 
@@ -1273,7 +1291,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     mustBeExecutable: Bool = false, ownerPrivate: Bool = false
   ) throws {
     let actual = try measure(
-      URL(fileURLWithPath: expected.path), role: role,
+      URL(filePath: expected.path), role: role,
       mustBeExecutable: mustBeExecutable, ownerPrivate: ownerPrivate)
     guard actual == expected else {
       throw OpenHarmonySigningError.identityDrift(role)
@@ -1281,7 +1299,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   }
 
   package static func utcNow() -> String {
-    ISO8601DateFormatter().string(from: Date())
+    ISO8601Timestamps.string(from: Date())
   }
 }
 
@@ -1297,7 +1315,7 @@ package struct OpenHarmonySigningAttemptPaths: Codable, Sendable, Equatable {
   /// selecting its package/code-signing path. Keep this derived so durable
   /// actions written before this fix retain the same Codable shape.
   package var stagedUnsignedHAP: String {
-    URL(fileURLWithPath: directory).appendingPathComponent("unsigned.hap").path
+    URL(filePath: directory).appending(path: "unsigned.hap").path
   }
 
   /// `verify-app` requires a `.cer` certificate-chain output. Early durable
@@ -1305,10 +1323,10 @@ package struct OpenHarmonySigningAttemptPaths: Codable, Sendable, Equatable {
   /// Preserve their Codable payload while mechanically recovering into the
   /// one supported sibling; no caller-controlled path is broadened.
   package var supportedCertificateChainReadback: String {
-    let root = URL(fileURLWithPath: directory, isDirectory: true)
-    let legacy = root.appendingPathComponent("certificate-chain.pem").path
+    let root = URL(filePath: directory, directoryHint: .isDirectory)
+    let legacy = root.appending(path: "certificate-chain.pem").path
     guard certificateChainReadback == legacy else { return certificateChainReadback }
-    return root.appendingPathComponent("certificate-chain.cer").path
+    return root.appending(path: "certificate-chain.cer").path
   }
 }
 
@@ -1327,13 +1345,13 @@ package final class OpenHarmonySigningAttemptStore: @unchecked Sendable {
 
   package func paths(jobID: String) -> OpenHarmonySigningAttemptPaths {
     let digest = SHA256Hex.string(of: Data(jobID.utf8))
-    let directory = rootURL.appendingPathComponent(String(digest.prefix(32)), isDirectory: true)
+    let directory = rootURL.appending(path: String(digest.prefix(32)), directoryHint: .isDirectory)
     return OpenHarmonySigningAttemptPaths(
       directory: directory.path,
-      signedHAP: directory.appendingPathComponent("signed.hap").path,
-      certificateChainReadback: directory.appendingPathComponent("certificate-chain.cer").path,
-      profileReadback: directory.appendingPathComponent("profile-readback.p7b").path,
-      resultRecord: directory.appendingPathComponent("signing-result.json").path)
+      signedHAP: directory.appending(path: "signed.hap").path,
+      certificateChainReadback: directory.appending(path: "certificate-chain.cer").path,
+      profileReadback: directory.appending(path: "profile-readback.p7b").path,
+      resultRecord: directory.appending(path: "signing-result.json").path)
   }
 
   public func cleanup(jobID: String) {
@@ -1422,7 +1440,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
     let signerJAR: VerifiedRegularFileDescriptor
     do {
       signerJAR = try VerifiedRegularFileDescriptor.open(
-        path: URL(fileURLWithPath: current.signerJAR.path),
+        path: URL(filePath: current.signerJAR.path),
         expectedSHA256: current.signerJAR.sha256)
     } catch {
       throw RuntimeDispatchFailure.failed(
@@ -1466,7 +1484,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
     let stagedInput: VerifiedRegularFileDescriptor
     do {
       stagedInput = try VerifiedRegularFileDescriptor.open(
-        path: URL(fileURLWithPath: action.output.stagedUnsignedHAP),
+        path: URL(filePath: action.output.stagedUnsignedHAP),
         expectedSHA256: action.inputSHA256)
     } catch {
       try? FileManager.default.removeItem(atPath: action.output.directory)
@@ -1481,10 +1499,10 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
       ptyResult = try await IdentityBoundPTYExecutor().execute(
         ProcessIdentityBoundRequest(
           process: ProcessRequest(
-            executable: URL(fileURLWithPath: action.preset.javaExecutable.path),
+            executable: URL(filePath: action.preset.javaExecutable.path),
             arguments: try Self.identityBoundJARArguments(
               action.signArguments, action: action, descriptor: signerJAR),
-            workingDirectory: URL(fileURLWithPath: action.output.directory, isDirectory: true),
+            workingDirectory: URL(filePath: action.output.directory, directoryHint: .isDirectory),
             timeout: 600),
           expectedSHA256: action.preset.javaExecutable.sha256),
         interactions: [
@@ -1522,7 +1540,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
         hostManagedRecordID: action.output.resultRecord,
         hostManagedSummary: summary,
         landedArtifact: ProviderLandedArtifact(
-          localURL: URL(fileURLWithPath: action.output.signedHAP),
+          localURL: URL(filePath: action.output.signedHAP),
           byteCount: landed.byteCount, sha256: landed.sha256,
           leadingBytes: Data([0x50, 0x4b, 0x03, 0x04])))
     } catch {
@@ -1536,7 +1554,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
   ) async throws -> [String: String] {
     try OpenHarmonySigningPresetStore.remeasureForDispatch(action.preset)
     let signerJAR = try VerifiedRegularFileDescriptor.open(
-      path: URL(fileURLWithPath: action.preset.signerJAR.path),
+      path: URL(filePath: action.preset.signerJAR.path),
       expectedSHA256: action.preset.signerJAR.sha256)
     defer { signerJAR.close() }
     for path in [
@@ -1549,10 +1567,10 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
     let result = try await FoundationProcessExecutor().executeIdentityBound(
       ProcessIdentityBoundRequest(
         process: ProcessRequest(
-          executable: URL(fileURLWithPath: action.preset.javaExecutable.path),
+          executable: URL(filePath: action.preset.javaExecutable.path),
           arguments: try identityBoundJARArguments(
             action.verifyArguments, action: action, descriptor: signerJAR),
-          workingDirectory: URL(fileURLWithPath: action.output.directory, isDirectory: true),
+          workingDirectory: URL(filePath: action.output.directory, directoryHint: .isDirectory),
           timeout: 120),
         expectedSHA256: action.preset.javaExecutable.sha256),
       verifiedResources: [signerJAR],
@@ -1586,8 +1604,8 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
       schemaVersion: "arkdeck-openharmony-signing-result/v1", summary: summary)
     let encoder = CanonicalJSONEncoders.canonicalPretty()
     let bytes = try encoder.encode(record)
-    let temporary = URL(fileURLWithPath: action.output.directory)
-      .appendingPathComponent(".signing-result-\(UUID().uuidString).tmp")
+    let temporary = URL(filePath: action.output.directory)
+      .appending(path: ".signing-result-\(UUID().uuidString).tmp")
     defer { try? FileManager.default.removeItem(at: temporary) }
     try bytes.write(to: temporary, options: [])
     try FileManager.default.setAttributes(
@@ -1596,7 +1614,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
     try handle.synchronize()
     try handle.close()
     try FileManager.default.moveItem(
-      at: temporary, to: URL(fileURLWithPath: action.output.resultRecord))
+      at: temporary, to: URL(filePath: action.output.resultRecord))
     return summary
   }
 
@@ -1605,7 +1623,7 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
   ) throws -> [String: String] {
     let record = try JSONDecoder().decode(
       OpenHarmonySigningResultRecord.self,
-      from: Data(contentsOf: URL(fileURLWithPath: action.output.resultRecord)))
+      from: Data(contentsOf: URL(filePath: action.output.resultRecord)))
     guard record.schemaVersion == "arkdeck-openharmony-signing-result/v1",
       record.summary["sourceArtifactId"] == action.inputArtifactID,
       record.summary["sourceSha256"] == action.inputSHA256,
@@ -1638,16 +1656,17 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
         hostManagedRecordID: action.output.resultRecord,
         hostManagedSummary: summary,
         landedArtifact: ProviderLandedArtifact(
-          localURL: URL(fileURLWithPath: action.output.signedHAP),
+          localURL: URL(filePath: action.output.signedHAP),
           byteCount: signed.byteCount, sha256: signed.sha256,
-          leadingBytes: Data([0x50, 0x4b, 0x03, 0x04]))))
+          leadingBytes: Data([0x50, 0x4b, 0x03, 0x04])))
+    )
   }
 
   private static func measuredHAP(
     at path: String, maximumBytes: Int
   ) throws -> (byteCount: Int, sha256: String) {
     let measured = try measuredRegularFile(at: path, maximumBytes: maximumBytes)
-    let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
+    let handle = try FileHandle(forReadingFrom: URL(filePath: path))
     defer { try? handle.close() }
     guard try handle.read(upToCount: 4) == Data([0x50, 0x4b, 0x03, 0x04]) else {
       throw OpenHarmonySigningError.unsafeFile("HAP is not a ZIP container")
@@ -1658,8 +1677,8 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
   private static func stageUnsignedHAP(
     action: WorkspaceOpenHarmonySigningAction
   ) throws {
-    let source = URL(fileURLWithPath: action.inputFilePath)
-    let destination = URL(fileURLWithPath: action.output.stagedUnsignedHAP)
+    let source = URL(filePath: action.inputFilePath)
+    let destination = URL(filePath: action.output.stagedUnsignedHAP)
     try FileManager.default.copyItem(at: source, to: destination)
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o600], ofItemAtPath: destination.path)
@@ -1678,13 +1697,14 @@ package struct OpenHarmonySigningWorkspaceDispatcher: RuntimeProcessDispatching 
       info.st_mode & S_IFMT == S_IFREG, info.st_size > 0,
       info.st_size <= maximumBytes
     else { throw OpenHarmonySigningError.unsafeFile("postflight file is absent or invalid") }
-    let bytes = try Data(contentsOf: URL(fileURLWithPath: path), options: [.uncached])
+    let bytes = try Data(contentsOf: URL(filePath: path), options: [.uncached])
     guard bytes.count == Int(info.st_size) else {
       throw OpenHarmonySigningError.identityDrift("postflight file changed while hashing")
     }
     return (
       bytes.count,
-      SHA256Hex.string(of: bytes))
+      SHA256Hex.string(of: bytes)
+    )
   }
 
   private static func safePTYError(_ error: any Error) -> String {

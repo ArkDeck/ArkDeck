@@ -695,9 +695,7 @@ public struct UpdateFeedVerifier: Sendable {
   }
 
   private static func timestamp(_ value: String) throws -> Date {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    guard let date = formatter.date(from: value), formatter.string(from: date) == value else {
+    guard let date = ISO8601Timestamps.parseCanonicalPlain(value) else {
       throw UpdateFeedError.invalidTimestamp
     }
     return date
