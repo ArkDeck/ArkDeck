@@ -554,7 +554,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
   }
 
-  func testAppUsesGeneratedStringCatalogSymbolsUnderStrictMemorySafety() throws {
+  func testAppUsesModernXcode26SafetyAndConcurrencyDefaults() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let project = try String(
@@ -566,6 +566,12 @@ final class DeviceCandidatesContractTests: XCTestCase {
       2)
     XCTAssertEqual(
       project.components(separatedBy: "SWIFT_STRICT_MEMORY_SAFETY = YES;").count - 1,
+      2)
+    XCTAssertEqual(
+      project.components(separatedBy: "SWIFT_APPROACHABLE_CONCURRENCY = YES;").count - 1,
+      2)
+    XCTAssertEqual(
+      project.components(separatedBy: "SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;").count - 1,
       2)
 
     let appRoot = repository.appending(path: "ArkDeckApp")
