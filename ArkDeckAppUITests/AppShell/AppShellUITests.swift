@@ -1193,8 +1193,15 @@ final class AppShellUITests: XCTestCase {
       app.buttons["flash.execute.submit"].waitForExistenceFast(timeout: 15),
       "Flash must render the selected image and one real Flash action",
       file: file, line: line)
-    XCTAssertTrue(app.buttons["flash.execute.submit"].exists, file: file, line: line)
+    let submit = app.buttons["flash.execute.submit"]
+    XCTAssertTrue(submit.exists, file: file, line: line)
     XCTAssertFalse(element("flash.mode", in: app).exists, file: file, line: line)
+
+    let window = app.windows.firstMatch
+    XCTAssertLessThan(
+      submit.frame.width, window.frame.width * 0.5,
+      "the destructive Flash action must remain content-sized instead of filling the card",
+      file: file, line: line)
 
     let details = element("flash.workspace.details", in: app)
     XCTAssertTrue(details.exists, file: file, line: line)
@@ -1204,7 +1211,6 @@ final class AppShellUITests: XCTestCase {
       "Flash details must expose the four-stage Exact Plan summary",
       file: file, line: line)
 
-    let window = app.windows.firstMatch
     let attachment = XCTAttachment(screenshot: window.screenshot())
     attachment.name =
       "flash-en-\(Int(window.frame.width))x\(Int(window.frame.height))"

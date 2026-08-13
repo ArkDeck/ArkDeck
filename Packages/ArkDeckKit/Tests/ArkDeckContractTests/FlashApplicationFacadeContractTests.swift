@@ -47,6 +47,68 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     XCTAssertFalse(drifted.matches)
   }
 
+  func testLiveProgressProjectsBootloaderExtractionAndCurrentPartition() throws {
+    let target = FlashTargetPresentation(
+      id: "target-dayu200-a", bindingRevision: 4, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-08-06T08:00:00Z")
+    let plan = try executePresentation(target: target)
+
+    let entering = FlashLiveProgressProjector.project(
+      status: FlashSubmissionPresentation(
+        jobID: "job-live", state: "running", outcomeUnknown: false,
+        timeline: ["intent enter-loader-mode"]),
+      partitions: plan.partitions)
+    XCTAssertEqual(entering.phase, .enteringBootloader)
+    XCTAssertNil(entering.writePercentCompleted)
+
+    let extracting = FlashLiveProgressProjector.project(
+      status: FlashSubmissionPresentation(
+        jobID: "job-live", state: "running", outcomeUnknown: false,
+        timeline: [
+          "intent flash-partitions",
+          "progress flash-partitions phase=staging completed=0 total=9",
+        ]),
+      partitions: plan.partitions)
+    XCTAssertEqual(extracting.phase, .extractingImage)
+
+    let writing = FlashLiveProgressProjector.project(
+      status: FlashSubmissionPresentation(
+        jobID: "job-live", state: "running", outcomeUnknown: false,
+        timeline: [
+          "intent flash-partitions",
+          "progress flash-partitions phase=writing completed=4 total=9 unit=system percent=35",
+        ]),
+      partitions: plan.partitions)
+    XCTAssertEqual(writing.phase, .writingPartition)
+    XCTAssertEqual(writing.partitionName, "system")
+    XCTAssertEqual(writing.completedPartitionCount, 4)
+    XCTAssertEqual(writing.currentPartitionPercent, 35)
+    let ordered = plan.partitions.sorted { $0.writeOrder < $1.writeOrder }
+    let expectedBytes =
+      Double(ordered.prefix(4).reduce(Int64(0)) { $0 + $1.imageSizeBytes })
+      + Double(ordered[4].imageSizeBytes) * 0.35
+    let totalBytes = Double(ordered.reduce(Int64(0)) { $0 + $1.imageSizeBytes })
+    XCTAssertEqual(
+      try XCTUnwrap(writing.writeFractionCompleted),
+      expectedBytes / totalBytes,
+      accuracy: 0.000_001)
+  }
+
+  func testLiveProgressMovesPastACompletedFlashStep() {
+    let projected = FlashLiveProgressProjector.project(
+      status: FlashSubmissionPresentation(
+        jobID: "job-live", state: "running", outcomeUnknown: false,
+        timeline: [
+          "progress flash-partitions phase=writing completed=9 total=9 unit=userdata percent=100",
+          "verified flash-partitions []",
+          "intent verify-flash-readback",
+        ]),
+      partitions: [])
+
+    XCTAssertEqual(projected.phase, .verifyingPartitions)
+    XCTAssertNil(projected.writeFractionCompleted)
+  }
+
   func testRuntimeAvailabilityAndTargetFactsDecodeWithoutInventingDefaults() throws {
     let operations = try response([
       [
