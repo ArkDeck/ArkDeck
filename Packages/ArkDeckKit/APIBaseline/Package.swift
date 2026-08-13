@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 
 import PackageDescription
 
@@ -15,7 +15,7 @@ import PackageDescription
 // Gate: swift build --package-path Packages/ArkDeckKit/APIBaseline
 let package = Package(
   name: "ArkDeckKitAPIBaseline",
-  platforms: [.macOS(.v14)],
+  platforms: [.macOS(.v26)],
   dependencies: [
     .package(name: "ArkDeckKit", path: "..")
   ],

@@ -87,9 +87,10 @@ package enum ArkDeckAgentXPC {
   /// a device effect at any level.
   ///
   /// `device.candidates` is the discovery read behind the App's device list:
-  /// it enumerates HDC device candidates with their raw connection state and
-  /// joins already-adopted targets by connect key. It calls the bootstrap's
-  /// candidate read only — never `advance`, whose single-candidate path
+  /// it returns the daemon's timestamped HDC candidate observation with raw
+  /// connection state and joins already-adopted targets by connect key. An
+  /// explicit re-check may wait for a new observation, but both paths call
+  /// bootstrap reads only — never `advance`, whose single-candidate path
   /// adopts — so listing candidates over this transport cannot create,
   /// select or change a binding. Adoption itself stays on `target.adopt`,
   /// which remains refused here.

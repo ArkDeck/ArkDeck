@@ -85,11 +85,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let provider = DeviceListApplicationFacade.make(arguments: [])
     let clock = ContinuousClock()
     let startedAt = clock.now
-    let candidates = await provider.refreshCandidates()
-    let candidatesElapsed = startedAt.duration(to: clock.now)
-    let enrichStartedAt = clock.now
-    let presentation = await provider.enrichCandidates(candidates)
-    let enrichmentElapsed = enrichStartedAt.duration(to: clock.now)
+    let presentation = await provider.startupCandidates()
     let elapsed = startedAt.duration(to: clock.now)
 
     guard case .available = presentation.availability else {
@@ -101,8 +97,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "The connected-device row did not receive its historical model / firmware / transport")
     XCTAssertLessThanOrEqual(
       elapsed, .milliseconds(1_250),
-      "device information exceeded its 1.25-second share of the cold-start budget "
-        + "(candidates=\(candidatesElapsed), enrichment=\(enrichmentElapsed))")
+      "complete device information exceeded its 1.25-second share of the cold-start budget")
   }
 
   // Listing candidates adopts nothing — even when exactly one Connected
@@ -120,6 +115,8 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertEqual(rows.count, 1)
     guard case .object(let row) = rows[0] else { return XCTFail("row must be an object") }
     XCTAssertEqual(row["state"], .string("Connected"))
+    XCTAssertEqual(row["stateObservedAtUtc"], .string("2026-08-07T00:00:00Z"))
+    XCTAssertEqual(row["stateObservationHealth"], .string("current"))
     XCTAssertEqual(row["adoptedTargetId"], .null)
     XCTAssertEqual(row["bindingRevision"], .null)
 
@@ -270,59 +267,43 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertNil(full.candidates[1].adoptedTargetID)
   }
 
-  // Observed facts join only via a succeeded observe.device@1 job whose
-  // evidence names the same target: identity mismatch, wrong operation and
-  // non-terminal states all decorate nothing.
-  func testObservedFactsJoinRequiresMatchingSucceededObservation() throws {
-    let jobList = Data(
+  // The one candidate projection carries only observation facts bound to the
+  // same target. A mismatched nested target is ignored rather than decorating
+  // the wrong physical device.
+  func testObservedFactsProjectionRequiresMatchingTarget() throws {
+    let response = Data(
       #"""
       {"id":"t","ok":true,"result":[
-        {"jobId":"job-old","operation":"observe.device@1","targetId":"t-1",
-         "state":"succeeded","finishedAtUtc":"2026-08-01T00:00:00Z"},
-        {"jobId":"job-new","operation":"observe.device@1","targetId":"t-1",
-         "state":"succeeded","finishedAtUtc":"2026-08-06T00:00:00Z"},
-        {"jobId":"job-running","operation":"observe.device@1","targetId":"t-1",
-         "state":"running","finishedAtUtc":"2026-08-07T00:00:00Z"},
-        {"jobId":"job-flash","operation":"flash.dayu200","targetId":"t-1",
-         "state":"succeeded","finishedAtUtc":"2026-08-07T00:00:00Z"},
-        {"jobId":"job-other","operation":"observe.device@1","targetId":"t-2",
-         "state":"succeeded","finishedAtUtc":"2026-08-05T00:00:00Z"}
+        {"connectKey":"abc","state":"Connected","adoptedTargetId":"t-1",
+         "bindingRevision":3,"observedFacts":{"targetId":"t-1","model":"DAYU200",
+         "firmware":"OpenHarmony 5.0.0.71","transport":"USB",
+         "confirmedAtUtc":"2026-08-06T00:00:00Z"}},
+        {"connectKey":"def","state":"Connected","adoptedTargetId":"t-2",
+         "bindingRevision":1,"observedFacts":{"targetId":"t-1","model":"WRONG"}}
       ]}
       """#.utf8)
-    let latest = DeviceCandidatesResponseDecoding.latestSucceededObservationJobIDs(
-      jobList, adoptedTargetIDs: ["t-1"])
-    XCTAssertEqual(latest, ["t-1": "job-new"], "newest succeeded observation wins; t-2 is not adopted")
-
-    let evidence = Data(
-      #"""
-      {"id":"t","ok":true,"result":{"jobId":"job-new","observation":{
-        "targetId":"t-1","model":"DAYU200","firmware":"OpenHarmony 5.0.0.71",
-        "transport":"USB","confirmedAtUtc":"2026-08-06T00:00:00Z"}}}
-      """#.utf8)
-    let facts = try XCTUnwrap(
-      DeviceCandidatesResponseDecoding.observedFacts(evidence, targetID: "t-1"))
+    let presentation = DeviceCandidatesResponseDecoding.presentation(response)
+    let facts = try XCTUnwrap(presentation.candidates[0].observedFacts)
     XCTAssertEqual(facts.model, "DAYU200")
     XCTAssertEqual(facts.firmware, "OpenHarmony 5.0.0.71")
     XCTAssertEqual(facts.transport, "USB")
-
     XCTAssertNil(
-      DeviceCandidatesResponseDecoding.observedFacts(evidence, targetID: "t-2"),
-      "evidence observed on one device must never decorate another")
+      presentation.candidates[1].observedFacts,
+      "facts observed on one target must never decorate another")
+  }
 
-    let base = DeviceListPresentation(
-      availability: .available,
-      candidates: [
-        DeviceCandidatePresentation(
-          connectKey: "abc", state: "Connected", adoptedTargetID: "t-1", bindingRevision: 1),
-        DeviceCandidatePresentation(
-          connectKey: "def", state: "Unauthorized", adoptedTargetID: nil, bindingRevision: nil),
-      ])
-    let decorated = DeviceCandidatesResponseDecoding.decorated(
-      base, observedFactsByTargetID: ["t-1": facts])
-    XCTAssertEqual(decorated.candidates[0].observedFacts, facts)
-    XCTAssertNil(
-      decorated.candidates[1].observedFacts,
-      "an unadopted candidate carries no observation")
+  func testStaleCandidateObservationCannotBePresentedAsAuthorized() throws {
+    let response = Data(
+      #"{"id":"t","ok":true,"result":[{"connectKey":"abc","state":"Connected","stateObservedAtUtc":"2026-08-13T00:00:00Z","stateObservationHealth":"stale","adoptedTargetId":"t-1","bindingRevision":1}]}"#
+        .utf8)
+    let presentation = DeviceCandidatesResponseDecoding.presentation(response)
+    let candidate = try XCTUnwrap(presentation.candidates.first)
+    XCTAssertEqual(candidate.state, "Connected", "the raw historical HDC state is preserved")
+    XCTAssertEqual(candidate.stateObservedAtUTC, "2026-08-13T00:00:00Z")
+    XCTAssertEqual(candidate.stateObservationHealth, .stale)
+    XCTAssertFalse(
+      candidate.isAuthorized,
+      "a failed follow-up probe must not project a cached Connected state as current readiness")
   }
 
   func testApplicationFacadeOwnsTheBoundedAuthorizationTimeoutAndReadyVerdict() async throws {
@@ -349,7 +330,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     })?.isAuthorized == true)
   }
 
-  // The facade's provider protocol carries candidate, historical decoration
+  // The facade's provider protocol carries the joined candidate projection
   // and authorization reads only; no method can name a Runtime write.
   func testApplicationSurfaceCannotNameAWriteMethod() throws {
     let source = try String(
@@ -366,10 +347,12 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let protocolBody = String(source[protocolStart..<protocolEnd])
     XCTAssertEqual(
       protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 3)
+    XCTAssertTrue(protocolBody.contains("func startupCandidates()"))
     XCTAssertTrue(protocolBody.contains("func refreshCandidates()"))
-    XCTAssertTrue(protocolBody.contains("func enrichCandidates("))
     XCTAssertTrue(protocolBody.contains("func waitForAuthorization(connectKey: String)"))
     XCTAssertTrue(source.contains("method: \"device.candidates\""))
+    XCTAssertFalse(source.contains("method: \"job.list\""))
+    XCTAssertFalse(source.contains("method: \"job.evidence\""))
     for forbidden in [
       "method: \"target.adopt\"", "method: \"job.submit\"", "method: \"job.cancel\"",
     ] {
@@ -425,15 +408,12 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(secondary.contains("refreshVisibleProjection(for: storedSelection)"))
     XCTAssertTrue(
       deviceSource.contains(
-        "await finishRefresh(generation: generation, awaitEnrichment: true)"))
-    let enrichmentPublication = try XCTUnwrap(
-      deviceSource.range(of: "if awaitEnrichment {")?.lowerBound)
-    let manualEnrichment = try XCTUnwrap(
-      deviceSource.range(of: "Task { [weak self] in", range: enrichmentPublication..<deviceSource.endIndex)?
-        .lowerBound)
-    let startupEnrichment = String(deviceSource[enrichmentPublication..<manualEnrichment])
-    XCTAssertTrue(startupEnrichment.contains("await provider.enrichCandidates(base)"))
-    XCTAssertTrue(startupEnrichment.contains("startupInformationReady = true"))
+        "await finishRefresh(generation: generation, isStartup: true)"))
+    XCTAssertTrue(deviceSource.contains("await provider.startupCandidates()"))
+    XCTAssertTrue(deviceSource.contains("await provider.refreshCandidates()"))
+    XCTAssertTrue(deviceSource.contains("presentation = current"))
+    XCTAssertTrue(deviceSource.contains("startupInformationReady = true"))
+    XCTAssertFalse(deviceSource.contains("enrichCandidates"))
 
     XCTAssertFalse(source.contains(".onChange(of: storedSelection, initial: true)"))
     for lazyModel in [
@@ -467,6 +447,49 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(updater[updaterStartupStart...].contains("Task.detached(priority: .utility)"))
     XCTAssertTrue(updater[updaterStartupStart...].contains("AutoUpdateApplicationFacade.make()"))
 
+    // macOS 26 Observation scopes updates to the properties each boundary
+    // actually reads. Device discovery remains a Shell dependency because it
+    // owns first-screen rows; history, recovery and update changes terminate
+    // in smaller child views instead of invalidating the whole split view.
+    XCTAssertTrue(source.contains("@Observable\nprivate final class ArkDeckAppModelStore"))
+    XCTAssertTrue(source.contains("@State private var models = ArkDeckAppModelStore()"))
+    XCTAssertFalse(source.contains("@StateObject private var models"))
+    XCTAssertTrue(source.contains("private struct RuntimeHistoryJobInspector: View"))
+    XCTAssertTrue(source.contains("private struct RuntimeRecoveryBanner: View"))
+    XCTAssertTrue(source.contains("private struct UpdateAttentionToolbarContent: ToolbarContent"))
+    let shellStart = try XCTUnwrap(
+      source.range(of: "private struct AppShellView: View")?.lowerBound)
+    let shellEnd = try XCTUnwrap(
+      source.range(of: "private struct SettingsSceneLoader", range: shellStart..<source.endIndex)?
+        .lowerBound)
+    let shell = String(source[shellStart..<shellEnd])
+    for broadObservation in [
+      "@ObservedObject private var autoUpdate",
+      "@ObservedObject private var runtimeHistory",
+      "@ObservedObject private var deviceList",
+    ] {
+      XCTAssertFalse(shell.contains(broadObservation), broadObservation)
+    }
+    XCTAssertTrue(deviceSource.contains("@Observable\nfinal class DeviceListViewModel"))
+
+    // Apple's App Launch template supplies process and first-frame timing;
+    // these Points of Interest make the product's device milestones visible
+    // in the same trace without adding startup I/O.
+    XCTAssertTrue(source.contains("OSSignposter("))
+    XCTAssertTrue(source.contains("category: .pointsOfInterest"))
+    for milestone in [
+      "Startup Models Ready",
+      "First Window Appeared",
+      "Device Candidates Published",
+      "Complete Device Information Ready",
+      "Complete Device Information Displayed",
+    ] {
+      XCTAssertTrue(source.contains(milestone), milestone)
+    }
+    XCTAssertTrue(deviceSource.contains("AppStartupPerformance.beginDeviceDiscovery()"))
+    XCTAssertTrue(deviceSource.contains("AppStartupPerformance.deviceCandidatesPublished()"))
+    XCTAssertTrue(deviceSource.contains("AppStartupPerformance.deviceInformationReady()"))
+
     let demandStart = try XCTUnwrap(
       source.range(
         of: "private func refreshVisibleProjection(for storageValue:")?.lowerBound)
@@ -490,27 +513,55 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
   }
 
-  func testAppPublishesCandidateIdentityBeforeHistoricalDecoration() throws {
+  func testProductTargetsOnlyMacOS26() throws {
     var repository = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
-    let source = try String(
-      contentsOf: repository.appending(path: "ArkDeckApp/Features/Devices/DeviceWorkspace.swift"),
+    let package = try String(
+      contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
-    let finishStart = try XCTUnwrap(
-      source.range(of: "private func finishRefresh(")?.lowerBound)
-    let candidateRead = try XCTUnwrap(
-      source.range(of: "provider.refreshCandidates()", range: finishStart..<source.endIndex)?
-        .lowerBound)
-    let candidatePublish = try XCTUnwrap(
-      source.range(of: "presentation = base", range: candidateRead..<source.endIndex)?.lowerBound)
-    let enrichment = try XCTUnwrap(
-      source.range(of: "provider.enrichCandidates(base)", range: candidatePublish..<source.endIndex)?
-        .lowerBound)
+    let baselinePackage = try String(
+      contentsOf: repository.appending(path: "Packages/ArkDeckKit/APIBaseline/Package.swift"),
+      encoding: .utf8)
+    let project = try String(
+      contentsOf: repository.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
+    let processExecutor = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckProcess/ArkDeckProcess.swift"),
+      encoding: .utf8)
+    let ptyExecutor = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckProcess/IdentityBoundPTYExecutor.swift"),
+      encoding: .utf8)
 
-    XCTAssertLessThan(candidateRead, candidatePublish)
-    XCTAssertLessThan(candidatePublish, enrichment)
-    XCTAssertTrue(
-      String(source[candidatePublish..<enrichment]).contains("let provider = provider"),
-      "historical decoration must begin only after the candidate row is published")
+    for manifest in [package, baselinePackage] {
+      XCTAssertTrue(manifest.hasPrefix("// swift-tools-version: 6.2"))
+      XCTAssertTrue(manifest.contains("platforms: [.macOS(.v26)]"))
+      XCTAssertFalse(manifest.contains(".macOS(.v14)"))
+    }
+    XCTAssertEqual(project.components(separatedBy: "MACOSX_DEPLOYMENT_TARGET = 26.0;").count - 1, 4)
+    XCTAssertFalse(project.contains("MACOSX_DEPLOYMENT_TARGET = 14.0;"))
+    for executor in [processExecutor, ptyExecutor] {
+      XCTAssertTrue(executor.contains("posix_spawn_file_actions_addchdir("))
+      XCTAssertFalse(executor.contains("posix_spawn_file_actions_addchdir_np("))
+    }
+  }
+
+  func testDaemonBuildsOneConcurrentDeviceInformationProjection() throws {
+    var repository = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let daemon = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift"),
+      encoding: .utf8)
+    let candidates = try XCTUnwrap(daemon.range(of: "case \"device.candidates\":"))
+    let adoption = try XCTUnwrap(
+      daemon.range(of: "case \"target.adopt\":", range: candidates.lowerBound..<daemon.endIndex))
+    let projection = String(daemon[candidates.lowerBound..<adoption.lowerBound])
+
+    XCTAssertTrue(projection.contains("async let candidateRead"))
+    XCTAssertTrue(projection.contains("async let observationRead"))
+    XCTAssertTrue(projection.contains("latestSucceededDeviceObservations()"))
+    XCTAssertTrue(projection.contains("\"observedFacts\""))
   }
 }

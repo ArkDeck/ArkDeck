@@ -1,6 +1,6 @@
 import ArkDeckWorkflows
-import Combine
 import Foundation
+import Observation
 import SwiftUI
 
 /// Sidebar device rows and the authorization guidance detail.
@@ -11,7 +11,8 @@ import SwiftUI
 /// it is. Workflows owns the bounded authorization polling and terminal
 /// classification; the App renders its published window and result.
 @MainActor
-final class DeviceListViewModel: ObservableObject {
+@Observable
+final class DeviceListViewModel {
   static let maximumDisplayNameLength = 64
 
   /// One device's bounded trust wait. `polling` carries the App-owned
@@ -24,18 +25,18 @@ final class DeviceListViewModel: ObservableObject {
     case unavailable(connectKey: String, reason: String)
   }
 
-  @Published private(set) var presentation = DeviceListPresentation.loading
-  @Published private(set) var isRefreshing = false
-  @Published private(set) var startupInformationReady = false
-  @Published private(set) var authorizationWait = AuthorizationWait.idle
-  @Published private(set) var customDisplayNames: [String: String]
+  private(set) var presentation = DeviceListPresentation.loading
+  private(set) var isRefreshing = false
+  private(set) var startupInformationReady = false
+  private(set) var authorizationWait = AuthorizationWait.idle
+  private(set) var customDisplayNames: [String: String]
 
   private static let displayNamesDefaultsKey = "app.devices.customDisplayNames.v1"
   private let provider: any DeviceListApplicationProviding
   private let displayNamesDefaults: UserDefaults
   private let waitWindow: TimeInterval
-  private var waitTask: Task<Void, Never>?
-  private var refreshGeneration: UInt64 = 0
+  @ObservationIgnored private var waitTask: Task<Void, Never>?
+  @ObservationIgnored private var refreshGeneration: UInt64 = 0
 
   init(
     provider: any DeviceListApplicationProviding,
@@ -66,7 +67,8 @@ final class DeviceListViewModel: ObservableObject {
   /// same synchronous admission guard.
   func refreshForStartup() async {
     guard let generation = beginRefresh() else { return }
-    await finishRefresh(generation: generation, awaitEnrichment: true)
+    AppStartupPerformance.beginDeviceDiscovery()
+    await finishRefresh(generation: generation, isStartup: true)
   }
 
   private func beginRefresh() -> UInt64? {
@@ -78,34 +80,24 @@ final class DeviceListViewModel: ObservableObject {
 
   private func finishRefresh(
     generation: UInt64,
-    awaitEnrichment: Bool = false
+    isStartup: Bool = false
   ) async {
-    let base = await provider.refreshCandidates()
+    let current = isStartup
+      ? await provider.startupCandidates()
+      : await provider.refreshCandidates()
     guard generation == refreshGeneration else { return }
     isRefreshing = false
     guard !Task.isCancelled else { return }
 
-    // Candidate identity and trust are the startup-critical result. Publish
-    // them immediately; model / firmware / transport are historical
-    // decoration and must never hold the sidebar behind Job history reads.
-    presentation = base
-
-    let provider = provider
-    if awaitEnrichment {
-      // Startup gives this already bounded local-history join priority over
-      // every secondary dashboard read. The base row is visible first; once
-      // its firmware / transport decoration is published, the shell may fan
-      // out the independent Overview, History and update work concurrently.
-      let enriched = await provider.enrichCandidates(base)
-      guard generation == refreshGeneration, !Task.isCancelled else { return }
-      presentation = enriched
+    // Runtime publishes a timestamped HDC observation and the latest verified
+    // model / firmware / transport in one projection. One main-actor
+    // assignment makes the complete row visible without a second XPC request
+    // or render pass.
+    presentation = current
+    if isStartup {
+      AppStartupPerformance.deviceCandidatesPublished()
       startupInformationReady = true
-      return
-    }
-    Task { [weak self] in
-      let enriched = await provider.enrichCandidates(base)
-      guard let self, !Task.isCancelled, generation == self.refreshGeneration else { return }
-      self.presentation = enriched
+      AppStartupPerformance.deviceInformationReady()
     }
   }
 
@@ -253,6 +245,12 @@ struct DeviceSidebarRow: View {
     .accessibilityElement(children: .combine)
     .accessibilityValue(stateText)
     .accessibilityIdentifier("device.row.\(candidate.connectKey)")
+    .onAppear {
+      // End the startup interval at the presentation boundary, not when the
+      // model finishes its XPC read. This is the first SwiftUI lifecycle point
+      // at which the complete row is actually part of the visible hierarchy.
+      AppStartupPerformance.deviceInformationDisplayed()
+    }
   }
 
   private var observedSummary: String? {
@@ -262,6 +260,9 @@ struct DeviceSidebarRow: View {
   }
 
   private var stateText: String {
+    if candidate.stateObservationHealth == .stale {
+      return deviceString("device.state.needsRecheck")
+    }
     switch candidate.state {
     case "Connected":
       return deviceString(
@@ -276,6 +277,7 @@ struct DeviceSidebarRow: View {
   }
 
   private var stateSymbol: String {
+    if candidate.stateObservationHealth == .stale { return "arrow.clockwise.circle" }
     switch candidate.state {
     case "Connected": return candidate.isAdopted ? "checkmark.circle.fill" : "checkmark.circle"
     case "Unauthorized": return "exclamationmark.triangle.fill"
@@ -285,6 +287,7 @@ struct DeviceSidebarRow: View {
   }
 
   private var stateColor: Color {
+    if candidate.stateObservationHealth == .stale { return .orange }
     switch candidate.state {
     case "Connected": return .green
     case "Unauthorized": return .orange
@@ -385,32 +388,40 @@ struct DeviceDetailView: View {
 
   @ViewBuilder
   private var stateBlock: some View {
-    switch candidate.state {
-    case "Unauthorized":
+    if candidate.stateObservationHealth == .stale {
       deviceNotice(
-        deviceString("device.trust.waiting"),
-        systemImage: "exclamationmark.triangle.fill",
+        deviceString("device.state.needsRecheck"),
+        systemImage: "arrow.clockwise.circle",
         color: .orange,
-        identifier: "device.trust.waiting")
-    case "Offline":
-      deviceNotice(
-        deviceString("device.trust.offline"),
-        systemImage: "circle.dashed",
-        color: .secondary,
-        identifier: "device.trust.offline")
-    case "Connected":
-      deviceNotice(
-        deviceString(
-          candidate.isAdopted ? "device.trust.ready" : "device.trust.authorizedUnadopted"),
-        systemImage: "checkmark.circle.fill",
-        color: .green,
-        identifier: "device.trust.ready")
-    default:
-      deviceNotice(
-        String(format: deviceString("device.trust.unknownState"), candidate.state),
-        systemImage: "questionmark.circle",
-        color: .secondary,
-        identifier: "device.trust.unknownState")
+        identifier: "device.trust.needsRecheck")
+    } else {
+      switch candidate.state {
+      case "Unauthorized":
+        deviceNotice(
+          deviceString("device.trust.waiting"),
+          systemImage: "exclamationmark.triangle.fill",
+          color: .orange,
+          identifier: "device.trust.waiting")
+      case "Offline":
+        deviceNotice(
+          deviceString("device.trust.offline"),
+          systemImage: "circle.dashed",
+          color: .secondary,
+          identifier: "device.trust.offline")
+      case "Connected":
+        deviceNotice(
+          deviceString(
+            candidate.isAdopted ? "device.trust.ready" : "device.trust.authorizedUnadopted"),
+          systemImage: "checkmark.circle.fill",
+          color: .green,
+          identifier: "device.trust.ready")
+      default:
+        deviceNotice(
+          String(format: deviceString("device.trust.unknownState"), candidate.state),
+          systemImage: "questionmark.circle",
+          color: .secondary,
+          identifier: "device.trust.unknownState")
+      }
     }
   }
 
@@ -527,6 +538,12 @@ struct DeviceDetailView: View {
         Text(candidate.state)
           .font(.body.monospaced())
           .accessibilityIdentifier("device.fact.state")
+      }
+      if let stateObservedAtUTC = candidate.stateObservedAtUTC {
+        GridRow(alignment: .firstTextBaseline) {
+          Text(deviceString("device.fact.stateObservedAt")).foregroundStyle(.secondary)
+          Text(stateObservedAtUTC).font(.body.monospaced())
+        }
       }
       if let targetID = candidate.adoptedTargetID {
         GridRow(alignment: .firstTextBaseline) {

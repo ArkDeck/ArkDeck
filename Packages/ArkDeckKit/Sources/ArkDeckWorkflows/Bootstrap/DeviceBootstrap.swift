@@ -56,6 +56,30 @@ public struct BootstrapCandidate: Sendable, Equatable, Codable {
   }
 }
 
+/// A point-in-time HDC candidate observation owned by the login-session
+/// daemon. HDC 3.2 exposes a bounded `list targets -v` read but no target
+/// event stream, so the daemon keeps this observation warm outside the App's
+/// launch path. `observedAtUTC` makes the cache boundary explicit; a failed
+/// follow-up probe never rewrites the old observation as current.
+public struct BootstrapCandidateSnapshot: Sendable, Equatable {
+  public enum Health: String, Sendable, Equatable {
+    case current
+    case stale
+  }
+
+  public let candidates: [BootstrapCandidate]
+  public let observedAtUTC: String
+  public let health: Health
+
+  public init(
+    candidates: [BootstrapCandidate], observedAtUTC: String, health: Health
+  ) {
+    self.candidates = candidates
+    self.observedAtUTC = observedAtUTC
+    self.health = health
+  }
+}
+
 public enum BootstrapHumanActionKind: String, Sendable, Equatable {
   case trustDevice
   case physicalReconnect
@@ -772,15 +796,21 @@ public protocol BootstrapObservationPort: Sendable {
 public actor DeviceBootstrapMachine {
   private struct CandidateEnumeration: Sendable {
     let id: UInt64
-    let task: Task<[BootstrapCandidate], Error>
+    let task: Task<BootstrapCandidateSnapshot, Error>
   }
 
   public private(set) var phase: BootstrapPhase = .discoverHostTools
   private let observation: any BootstrapObservationPort
   private let targetStore: RuntimeTargetStore
   private let nowUTC: @Sendable () -> String
+  private let candidateClock = ContinuousClock()
+  private let candidateSnapshotFreshnessWindow: Duration = .seconds(5)
   private var candidateEnumeration: CandidateEnumeration?
   private var nextCandidateEnumerationID: UInt64 = 0
+  private var latestCandidateSnapshot: BootstrapCandidateSnapshot?
+  private var latestCandidateSnapshotObservedAt: ContinuousClock.Instant?
+  private var latestCandidateRefreshFailed = false
+  private var candidateMonitoringTask: Task<Void, Never>?
 
   public init(
     observation: any BootstrapObservationPort,
@@ -798,24 +828,103 @@ public actor DeviceBootstrapMachine {
   /// when exactly one Connected candidate is present, this method is
   /// deliberately incapable of producing a binding.
   public func enumerateCandidates() async throws -> [BootstrapCandidate] {
+    try await refreshCandidateSnapshot().candidates
+  }
+
+  /// Returns the latest completed HDC observation immediately and starts a
+  /// coalesced follow-up read. Only the first request of a new daemon session
+  /// can wait for HDC; normal App cold starts consume the continuously warmed
+  /// snapshot rather than joining a command with a multi-second tail.
+  public func candidateSnapshotForPresentation() async throws -> BootstrapCandidateSnapshot {
+    guard let latestCandidateSnapshot else {
+      return try await refreshCandidateSnapshot()
+    }
+    scheduleCandidateRefresh()
+    let isWithinFreshnessWindow = latestCandidateSnapshotObservedAt.map {
+      $0.duration(to: candidateClock.now) <= candidateSnapshotFreshnessWindow
+    } ?? false
+    return BootstrapCandidateSnapshot(
+      candidates: latestCandidateSnapshot.candidates,
+      observedAtUTC: latestCandidateSnapshot.observedAtUTC,
+      health: !latestCandidateRefreshFailed && isWithinFreshnessWindow ? .current : .stale)
+  }
+
+  /// Explicit UI re-checks wait for one coalesced official HDC read. Startup
+  /// uses the warm snapshot above; keeping these paths distinct preserves the
+  /// button's promise without putting its worst-case latency back on launch.
+  public func refreshCandidateSnapshotForPresentation() async throws
+    -> BootstrapCandidateSnapshot
+  {
+    try await refreshCandidateSnapshot()
+  }
+
+  /// HDC has no public device-event stream. Keep its official read-only
+  /// candidate command warm in the long-lived daemon instead of making every
+  /// App process pay the command startup and server round trip.
+  public func startCandidateMonitoring(interval: Duration = .seconds(2)) {
+    guard candidateMonitoringTask == nil else { return }
+    candidateMonitoringTask = Task.detached(priority: .utility) { [weak self] in
+      let clock = ContinuousClock()
+      while !Task.isCancelled {
+        guard let self else { return }
+        _ = try? await self.refreshCandidateSnapshot()
+        do {
+          try await clock.sleep(for: interval)
+        } catch {
+          return
+        }
+      }
+    }
+  }
+
+  private func scheduleCandidateRefresh() {
+    guard candidateEnumeration == nil else { return }
+    Task { [weak self] in
+      guard let self else { return }
+      _ = try? await self.refreshCandidateSnapshot()
+    }
+  }
+
+  private func refreshCandidateSnapshot() async throws -> BootstrapCandidateSnapshot {
     if let candidateEnumeration {
-      return try await candidateEnumeration.task.value
+      return try await resolveCandidateEnumeration(candidateEnumeration)
     }
 
     nextCandidateEnumerationID &+= 1
     let enumerationID = nextCandidateEnumerationID
     let observation = observation
-    let task = Task { try await observation.listCandidates() }
-    candidateEnumeration = CandidateEnumeration(id: enumerationID, task: task)
+    let nowUTC = nowUTC
+    let task = Task {
+      let candidates = try await observation.listCandidates()
+      return BootstrapCandidateSnapshot(
+        candidates: candidates, observedAtUTC: nowUTC(), health: .current)
+    }
+    let enumeration = CandidateEnumeration(id: enumerationID, task: task)
+    candidateEnumeration = enumeration
+    return try await resolveCandidateEnumeration(enumeration)
+  }
+
+  /// Publishes the shared result before returning it to any waiter. Actor
+  /// reentrancy means a caller coalescing onto an existing task can resume
+  /// before the caller that created that task; making every waiter run the
+  /// same idempotent commit closes the window where a completed refresh was
+  /// returned while the presentation cache still held the previous value.
+  private func resolveCandidateEnumeration(
+    _ enumeration: CandidateEnumeration
+  ) async throws -> BootstrapCandidateSnapshot {
     do {
-      let candidates = try await task.value
-      if candidateEnumeration?.id == enumerationID {
+      let snapshot = try await enumeration.task.value
+      if candidateEnumeration?.id == enumeration.id {
         candidateEnumeration = nil
+        latestCandidateSnapshot = snapshot
+        latestCandidateSnapshotObservedAt = candidateClock.now
+        latestCandidateRefreshFailed = false
       }
-      return candidates
+      return snapshot
     } catch {
-      if candidateEnumeration?.id == enumerationID {
+      if candidateEnumeration?.id == enumeration.id {
         candidateEnumeration = nil
+        latestCandidateRefreshFailed = latestCandidateSnapshot != nil
       }
       throw error
     }

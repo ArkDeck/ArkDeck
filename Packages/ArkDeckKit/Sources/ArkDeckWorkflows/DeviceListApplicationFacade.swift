@@ -1,9 +1,9 @@
 // App-facing device discovery read.
 //
-// One question, answered honestly: which device candidates does HDC see
-// right now, with which raw connection state, and which of them are already
+// One question, answered honestly: which device candidates did HDC most
+// recently observe, at what time, with which raw state, and which are already
 // adopted targets. The projection is fed by the daemon's `device.candidates`
-// method, which enumerates via the bootstrap's candidate read and never
+// method, which reads via the bootstrap's observation path and never
 // touches `advance` — so nothing reachable from this facade can create,
 // select or change a binding. Adoption stays a CLI act (`target.adopt` is
 // refused by the App transport's allowlist).
@@ -38,25 +38,38 @@ public struct DeviceObservedFactsPresentation: Sendable, Equatable {
 /// `observedFacts` is nil when no succeeded observation evidence exists for
 /// the adopted target — absence renders as absence, never as a placeholder.
 public struct DeviceCandidatePresentation: Sendable, Equatable, Identifiable {
+  public enum StateObservationHealth: String, Sendable, Equatable {
+    case current
+    case stale
+  }
+
   public let connectKey: String
   public let state: String
+  public let stateObservedAtUTC: String?
+  public let stateObservationHealth: StateObservationHealth
   public let adoptedTargetID: String?
   public let bindingRevision: Int?
   public let observedFacts: DeviceObservedFactsPresentation?
 
   public init(
     connectKey: String, state: String, adoptedTargetID: String?, bindingRevision: Int?,
-    observedFacts: DeviceObservedFactsPresentation? = nil
+    observedFacts: DeviceObservedFactsPresentation? = nil,
+    stateObservedAtUTC: String? = nil,
+    stateObservationHealth: StateObservationHealth = .current
   ) {
     self.connectKey = connectKey
     self.state = state
+    self.stateObservedAtUTC = stateObservedAtUTC
+    self.stateObservationHealth = stateObservationHealth
     self.adoptedTargetID = adoptedTargetID
     self.bindingRevision = bindingRevision
     self.observedFacts = observedFacts
   }
 
   public var id: String { connectKey }
-  public var isAuthorized: Bool { state == "Connected" }
+  public var isAuthorized: Bool {
+    state == "Connected" && stateObservationHealth == .current
+  }
   public var needsPhysicalTrust: Bool { state == "Unauthorized" || state == "Offline" }
   public var isAdopted: Bool { adoptedTargetID != nil }
 }
@@ -98,8 +111,8 @@ public struct DeviceAuthorizationWaitResult: Sendable, Equatable {
 
 public protocol DeviceListApplicationProviding: Sendable {
   var authorizationWaitWindowSeconds: TimeInterval { get }
+  func startupCandidates() async -> DeviceListPresentation
   func refreshCandidates() async -> DeviceListPresentation
-  func enrichCandidates(_ presentation: DeviceListPresentation) async -> DeviceListPresentation
   func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult
 }
 
@@ -118,20 +131,26 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
   nonisolated let authorizationWaitWindowSeconds: TimeInterval = 180
   private let authorizationProbeInterval: Duration = .seconds(5)
 
+  func startupCandidates() async -> DeviceListPresentation {
+    await candidates(useWarmSnapshot: true)
+  }
+
   func refreshCandidates() async -> DeviceListPresentation {
-    switch await DeviceListXPCReadTransport.request(method: "device.candidates") {
+    await candidates(useWarmSnapshot: false)
+  }
+
+  private func candidates(useWarmSnapshot: Bool) async -> DeviceListPresentation {
+    let params: [String: JSONValue]? = useWarmSnapshot
+      ? ["useWarmSnapshot": .bool(true)] : nil
+    switch await DeviceListXPCReadTransport.request(
+      method: "device.candidates", params: params)
+    {
     case .failure(.transport(let reason)):
       return DeviceListPresentation(
         availability: .unavailable(reason: reason), candidates: [])
     case .success(let data):
       return DeviceCandidatesResponseDecoding.presentation(data)
     }
-  }
-
-  func enrichCandidates(
-    _ presentation: DeviceListPresentation
-  ) async -> DeviceListPresentation {
-    await joinObservedFacts(into: presentation)
   }
 
   func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult {
@@ -191,37 +210,6 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
     }
   }
 
-  /// Decorates adopted candidates with the model / firmware / transport their
-  /// most recent succeeded `observe.device@1` job recorded, via the already
-  /// allowlisted `job.list` + `job.evidence` reads. The candidate list is the
-  /// primary fact and stays fail-loud; this decoration is historical evidence
-  /// that may legitimately not exist yet (a freshly adopted device has run no
-  /// observation), so a missing or unreadable evidence record leaves the
-  /// candidate undecorated instead of failing the list.
-  private func joinObservedFacts(
-    into base: DeviceListPresentation
-  ) async -> DeviceListPresentation {
-    guard case .available = base.availability else { return base }
-    let adoptedIDs = Set(base.candidates.compactMap(\.adoptedTargetID))
-    guard !adoptedIDs.isEmpty else { return base }
-    guard
-      case .success(let jobData) = await DeviceListXPCReadTransport.request(
-        method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
-    else { return base }
-    let latest = DeviceCandidatesResponseDecoding.latestSucceededObservationJobIDs(
-      jobData, adoptedTargetIDs: adoptedIDs)
-    var facts: [String: DeviceObservedFactsPresentation] = [:]
-    for (targetID, jobID) in latest {
-      guard
-        case .success(let evidenceData) = await DeviceListXPCReadTransport.request(
-          method: "job.evidence", params: ["jobId": .string(jobID)]),
-        let observed = DeviceCandidatesResponseDecoding.observedFacts(
-          evidenceData, targetID: targetID)
-      else { continue }
-      facts[targetID] = observed
-    }
-    return DeviceCandidatesResponseDecoding.decorated(base, observedFactsByTargetID: facts)
-  }
 }
 
 /// Incomplete facts are a reported failure, never a silently empty list: an
@@ -255,84 +243,35 @@ enum DeviceCandidatesResponseDecoding {
           availability: .unavailable(reason: "Runtime response carries an incomplete candidate"),
           candidates: [])
       }
+      let targetID = row["adoptedTargetId"] as? String
+      let observedFacts: DeviceObservedFactsPresentation?
+      if let targetID,
+        let observed = row["observedFacts"] as? [String: Any],
+        observed["targetId"] as? String == targetID
+      {
+        let facts = DeviceObservedFactsPresentation(
+          model: observed["model"] as? String,
+          firmware: observed["firmware"] as? String,
+          transport: observed["transport"] as? String,
+          confirmedAtUTC: observed["confirmedAtUtc"] as? String)
+        observedFacts =
+          facts.model != nil || facts.firmware != nil || facts.transport != nil
+          ? facts : nil
+      } else {
+        observedFacts = nil
+      }
       candidates.append(
         DeviceCandidatePresentation(
           connectKey: connectKey,
           state: state,
-          adoptedTargetID: row["adoptedTargetId"] as? String,
-          bindingRevision: (row["bindingRevision"] as? NSNumber)?.intValue))
+          adoptedTargetID: targetID,
+          bindingRevision: (row["bindingRevision"] as? NSNumber)?.intValue,
+          observedFacts: observedFacts,
+          stateObservedAtUTC: row["stateObservedAtUtc"] as? String,
+          stateObservationHealth: DeviceCandidatePresentation.StateObservationHealth(
+            rawValue: row["stateObservationHealth"] as? String ?? "current") ?? .stale))
     }
     return DeviceListPresentation(availability: .available, candidates: candidates)
-  }
-
-  /// The newest succeeded `observe.device@1` job per adopted target, chosen
-  /// by `finishedAtUtc` (ISO-8601 UTC strings order lexicographically). A
-  /// malformed job list yields no decoration, never a failure: the candidate
-  /// list already rendered, and this join is evidence lookup on top of it.
-  static func latestSucceededObservationJobIDs(
-    _ data: Data, adoptedTargetIDs: Set<String>
-  ) -> [String: String] {
-    guard
-      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      object["ok"] as? Bool == true,
-      let rows = object["result"] as? [[String: Any]]
-    else { return [:] }
-    var newest: [String: (jobID: String, finishedAtUTC: String)] = [:]
-    for row in rows {
-      guard
-        let jobID = row["jobId"] as? String,
-        let operation = row["operation"] as? String, operation == "observe.device@1",
-        let state = row["state"] as? String, state == "succeeded",
-        let targetID = row["targetId"] as? String, adoptedTargetIDs.contains(targetID)
-      else { continue }
-      let finished = row["finishedAtUtc"] as? String ?? ""
-      if let current = newest[targetID], current.finishedAtUTC >= finished { continue }
-      newest[targetID] = (jobID, finished)
-    }
-    return newest.mapValues(\.jobID)
-  }
-
-  /// Reads the observation block out of a `job.evidence` envelope, accepting
-  /// it only when the evidence names the same target it is being joined to —
-  /// facts observed on one device must never decorate another.
-  static func observedFacts(
-    _ data: Data, targetID: String
-  ) -> DeviceObservedFactsPresentation? {
-    guard
-      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      object["ok"] as? Bool == true,
-      let envelope = object["result"] as? [String: Any],
-      let observation = envelope["observation"] as? [String: Any],
-      observation["targetId"] as? String == targetID
-    else { return nil }
-    let facts = DeviceObservedFactsPresentation(
-      model: observation["model"] as? String,
-      firmware: observation["firmware"] as? String,
-      transport: observation["transport"] as? String,
-      confirmedAtUTC: observation["confirmedAtUtc"] as? String)
-    let hasAnyFact =
-      facts.model != nil || facts.firmware != nil || facts.transport != nil
-    return hasAnyFact ? facts : nil
-  }
-
-  static func decorated(
-    _ base: DeviceListPresentation,
-    observedFactsByTargetID: [String: DeviceObservedFactsPresentation]
-  ) -> DeviceListPresentation {
-    guard !observedFactsByTargetID.isEmpty else { return base }
-    return DeviceListPresentation(
-      availability: base.availability,
-      candidates: base.candidates.map { candidate in
-        guard let targetID = candidate.adoptedTargetID,
-          let facts = observedFactsByTargetID[targetID]
-        else { return candidate }
-        return DeviceCandidatePresentation(
-          connectKey: candidate.connectKey,
-          state: candidate.state,
-          adoptedTargetID: candidate.adoptedTargetID,
-          bindingRevision: candidate.bindingRevision,
-          observedFacts: facts)
-      })
   }
 }
 
@@ -393,10 +332,8 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
       ])
   }
 
-  func enrichCandidates(
-    _ presentation: DeviceListPresentation
-  ) async -> DeviceListPresentation {
-    presentation
+  func startupCandidates() async -> DeviceListPresentation {
+    await refreshCandidates()
   }
 
   func waitForAuthorization(connectKey: String) async -> DeviceAuthorizationWaitResult {

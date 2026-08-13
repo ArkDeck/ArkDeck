@@ -554,6 +554,10 @@ Task.detached {
         provider: hdcProvider, dispatcher: hdcDispatcher),
       targetStore: targetStore,
       nowUTC: utcNow)
+    // HDC 3.2 has no public target event stream. The daemon therefore owns a
+    // continuous read-only observation loop and lets App launches consume its
+    // last completed, timestamped snapshot without joining an HDC command.
+    await bootstrap.startCandidateMonitoring()
     let recovered = try await engine.recoverActiveJobs()
     if !recovered.isEmpty {
       print("recovered \(recovered.count) active job(s); unknown outcomes parked")
