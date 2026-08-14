@@ -91,6 +91,9 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
   ) throws -> RuntimeJobEngine {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
+    let resolvedArtifactStore = try artifactStore ?? RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-07-31T00:00:00Z" })
     let providers = DeviceProviderRegistry(providers: [
       HDCObservationProviderAdapter(factsPort: witness),
       workspaceProvider(tool: workspaceTool),
@@ -102,7 +105,7 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       dispatcher: RecordingDispatcher(
         log: dispatcherLog, stdout: stdout, exitStatus: exitStatus),
       capabilityStore: capabilityStore,
-      artifactStore: artifactStore,
+      artifactStore: resolvedArtifactStore,
       nowUTC: { "2026-07-31T00:00:00Z" })
   }
 

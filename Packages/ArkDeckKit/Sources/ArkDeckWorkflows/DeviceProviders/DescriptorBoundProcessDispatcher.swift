@@ -16,11 +16,43 @@ import Foundation
 package struct ResolvedExecutable: Sendable, Equatable {
   public let path: String
   public let sha256: String
+  package let verifiedResources: [ResolvedExecutableResource]
+  package let verifiedTrees: [ResolvedExecutableTreeResource]
+  package let canonicalNamespaceRoot: String?
 
   public init(path: String, sha256: String) {
     self.path = path
     self.sha256 = sha256
+    verifiedResources = []
+    verifiedTrees = []
+    canonicalNamespaceRoot = nil
   }
+
+  package init(
+    path: String,
+    sha256: String,
+    verifiedResources: [ResolvedExecutableResource],
+    verifiedTrees: [ResolvedExecutableTreeResource] = [],
+    canonicalNamespaceRoot: String? = nil
+  ) {
+    self.path = path
+    self.sha256 = sha256
+    self.verifiedResources = verifiedResources
+    self.verifiedTrees = verifiedTrees
+    self.canonicalNamespaceRoot = canonicalNamespaceRoot
+  }
+}
+
+package struct ResolvedExecutableTreeResource: Sendable, Equatable {
+  package let path: String
+  package let sha256: String
+}
+
+package struct ResolvedExecutableResource: Sendable, Equatable {
+  package let path: String
+  package let sha256: String
+  package let byteCount: Int
+  package let requireExecutable: Bool
 }
 
 /// Resolves the tool binary for a provider at dispatch time. Production
@@ -85,15 +117,18 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let outputByteBudget: Int
   private let childEnvironment: [String: String]
+  private let processExecutor: FoundationProcessExecutor
 
   package init(
     resolver: any RuntimeExecutableResolving,
     outputByteBudget: Int = 8 * 1024 * 1024,
-    childEnvironment: [String: String] = [:]
+    childEnvironment: [String: String] = [:],
+    processExecutor: FoundationProcessExecutor = FoundationProcessExecutor()
   ) {
     self.resolver = resolver
     self.outputByteBudget = outputByteBudget
     self.childEnvironment = childEnvironment
+    self.processExecutor = processExecutor
   }
 
   /// HDC dispatcher for the daemon composition root. The spawn base
@@ -118,12 +153,12 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
   }
 
   public func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-    let invocations: [TypedProcessInvocation]
+    let loweredInvocations: [TypedProcessInvocation]
     let isSequence: Bool
     switch plan.kind {
     case .process(_, let argv, let timeoutSeconds):
       isSequence = false
-      invocations = [
+      loweredInvocations = [
         TypedProcessInvocation(arguments: argv, timeoutSeconds: timeoutSeconds)
       ]
     case .processSequence(_, let sequence):
@@ -131,12 +166,18 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       guard !sequence.isEmpty else {
         throw RuntimeDispatchFailure.failed("provider produced an empty process sequence")
       }
-      invocations = sequence
+      loweredInvocations = sequence
     case .hostManaged:
       throw RuntimeDispatchFailure.failed(
         "hostManaged plans execute inside their own host, not this dispatcher")
     }
+    let verifiedAnalyzerSource = try verifiedAnalyzerSource(
+      for: plan.action, loweredInvocations: loweredInvocations)
+    defer { verifiedAnalyzerSource?.close() }
+    let invocations = try analyzerSourceBoundInvocations(
+      loweredInvocations, action: plan.action, source: verifiedAnalyzerSource)
     let executable = try resolver.resolveExecutable(for: plan.action)
+    let executableLaunchMode = executableLaunchMode(for: plan.action)
     if let landing = plan.hostLanding {
       do {
         try landing.prepareDestination()
@@ -151,9 +192,33 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     var aggregateStderr = Data()
     var anyTruncated = false
     for invocation in invocations {
-      let subreceipt = try await execute(
-        invocation, executable: executable, argumentZero: plan.argumentZero,
-        workingDirectory: plan.workingDirectory)
+      let subreceipt: ProviderSubprocessReceipt
+      do {
+        subreceipt = try await execute(
+          invocation, executable: executable, argumentZero: plan.argumentZero,
+          workingDirectory: plan.workingDirectory,
+          executableLaunchMode: executableLaunchMode,
+          verifiedAnalyzerSource: verifiedAnalyzerSource)
+      } catch let failure as RuntimeDispatchFailure where isArkTraceSummary(plan.action) {
+        // RuntimeDispatchFailure details produced below may embed the
+        // authorized executable path. Preserve only the outcome class at the
+        // durable/public ArkTrace boundary.
+        switch failure {
+        case .outcomeUnknown:
+          throw RuntimeDispatchFailure.outcomeUnknown("analyzer process outcome unknown")
+        case .confirmedNotExecuted, .confirmedNotExecutedWithDiagnostic, .failed:
+          throw RuntimeDispatchFailure.failed("analyzer process identity refused")
+        }
+      } catch let cancellation as RuntimeDispatchCancellationResolution {
+        throw cancellation
+      } catch let failure as RuntimeDispatchFailure {
+        throw failure
+      } catch where isArkTraceSummary(plan.action) {
+        // Process-layer diagnostics can contain the authorized executable
+        // pathname. The trace operation's durable/public failure is a closed,
+        // path-free code; low-level details stay inside the process boundary.
+        throw RuntimeDispatchFailure.failed("analyzer process identity refused")
+      }
       subprocesses.append(subreceipt)
       aggregateStdout.append(subreceipt.stdout)
       aggregateStderr.append(subreceipt.stderr)
@@ -176,11 +241,72 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       subprocesses: isSequence ? subprocesses : [])
   }
 
+  private func isArkTraceSummary(_ action: TypedProviderAction) -> Bool {
+    guard case .analyzer(.analyze(let invocation)) = action else { return false }
+    return invocation.analyzerRef == "trace-summary@1"
+  }
+
+  /// Binds Analyzer input bytes once, before executable resolution and spawn.
+  /// The child receives the retained inode alias rather than the mutable
+  /// Artifact pathname, while the descriptor remains open through process
+  /// drain. This is the same lease whose identity was recorded in the typed
+  /// Analyzer action; no later path lookup can select different trace bytes.
+  private func verifiedAnalyzerSource(
+    for action: TypedProviderAction,
+    loweredInvocations: [TypedProcessInvocation]
+  ) throws -> VerifiedRegularFileDescriptor? {
+    guard case .analyzer(.analyze(let invocation)) = action else { return nil }
+    guard invocation.sourceByteCount > 0,
+      invocation.arguments.last?.hasPrefix("/") == true,
+      loweredInvocations.count == 1,
+      loweredInvocations[0].arguments == invocation.arguments
+    else {
+      throw RuntimeDispatchFailure.failed("analyzer input Artifact identity refused")
+    }
+    do {
+      let source = try VerifiedRegularFileDescriptor.open(
+        path: URL(filePath: invocation.arguments.last!),
+        expectedSHA256: invocation.sourceSHA256,
+        maximumBytes: invocation.sourceByteCount)
+      guard source.byteCount == invocation.sourceByteCount else {
+        source.close()
+        throw VerifiedRegularFileError.identityChanged
+      }
+      return source
+    } catch {
+      throw RuntimeDispatchFailure.failed("analyzer input Artifact identity refused")
+    }
+  }
+
+  private func analyzerSourceBoundInvocations(
+    _ invocations: [TypedProcessInvocation],
+    action: TypedProviderAction,
+    source: VerifiedRegularFileDescriptor?
+  ) throws -> [TypedProcessInvocation] {
+    guard case .analyzer(.analyze(let analyzer)) = action else { return invocations }
+    guard let source, invocations.count == 1,
+      invocations[0].arguments == analyzer.arguments,
+      !analyzer.arguments.isEmpty
+    else {
+      throw RuntimeDispatchFailure.failed("analyzer input Artifact identity refused")
+    }
+    var arguments = analyzer.arguments
+    arguments[arguments.index(before: arguments.endIndex)] = source.inodePath
+    return [
+      TypedProcessInvocation(
+        arguments: arguments,
+        timeoutSeconds: invocations[0].timeoutSeconds,
+        continueAfterNonZero: invocations[0].continueAfterNonZero)
+    ]
+  }
+
   private func execute(
     _ invocation: TypedProcessInvocation,
     executable: ResolvedExecutable,
     argumentZero: String?,
-    workingDirectory: String?
+    workingDirectory: String?,
+    executableLaunchMode: ProcessExecutableLaunchMode,
+    verifiedAnalyzerSource: VerifiedRegularFileDescriptor?
   ) async throws -> ProviderSubprocessReceipt {
     let request = ProcessRequest(
       executable: URL(filePath: executable.path),
@@ -188,14 +314,59 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       arguments: invocation.arguments,
       environment: childEnvironment,
       workingDirectory: workingDirectory.map { URL(filePath: $0, directoryHint: .isDirectory) },
-      timeout: invocation.timeoutSeconds.map(TimeInterval.init))
-    let executor = FoundationProcessExecutor()
+      timeout: invocation.timeoutSeconds.map(TimeInterval.init),
+      executableLaunchMode: executableLaunchMode)
+    let executor = processExecutor
+    let verifiedNamespace: VerifiedDirectoryDescriptor?
+    do {
+      verifiedNamespace = try executable.canonicalNamespaceRoot.map {
+        try VerifiedDirectoryDescriptor.openOwnerOnly(path: URL(filePath: $0))
+      }
+    } catch {
+      throw RuntimeDispatchFailure.failed("dispatch bundle namespace identity refused")
+    }
+    defer { verifiedNamespace?.close() }
+    guard executable.verifiedTrees.allSatisfy({
+      ArkTraceDistributionTreeHasher.matches(
+        rootPath: $0.path, expectedSHA256: $0.sha256)
+    }) else {
+      throw RuntimeDispatchFailure.failed("dispatch resource identity refused")
+    }
+    let verifiedResources: [VerifiedRegularFileDescriptor]
+    do {
+      verifiedResources = try executable.verifiedResources.map {
+        let descriptor = try VerifiedRegularFileDescriptor.open(
+          path: URL(filePath: $0.path),
+          expectedSHA256: $0.sha256,
+          maximumBytes: $0.byteCount,
+          requireExecutable: $0.requireExecutable)
+        guard descriptor.byteCount == $0.byteCount else {
+          descriptor.close()
+          throw VerifiedRegularFileError.identityChanged
+        }
+        return descriptor
+      }
+    } catch {
+      throw RuntimeDispatchFailure.failed("dispatch resource identity refused")
+    }
+    defer { verifiedResources.forEach { $0.close() } }
+    let launchResources = verifiedResources + (verifiedAnalyzerSource.map { [$0] } ?? [])
     let result: ProcessIdentityBoundExecutionResult
     do {
       result = try await executor.executeIdentityBound(
         ProcessIdentityBoundRequest(process: request, expectedSHA256: executable.sha256),
+        verifiedResources: launchResources,
+        verifiedNamespace: verifiedNamespace,
         captureLimit: outputByteBudget)
     } catch let error as ProcessExecutionError {
+      if Task.isCancelled, case .launchAuthorizationInvalidated = error {
+        // The identity-bound executor checks cancellation both before spawn
+        // and while the child is START_SUSPENDED. In either position no
+        // provider code has run and the executor has reaped any suspended
+        // leader, so this is the same positive no-survivor proof as a drained
+        // process group—not an ordinary launch failure.
+        throw RuntimeDispatchCancellationResolution.drained
+      }
       // Identity/authorization refusals are definite failures: the child
       // never launched, so nothing external happened.
       throw RuntimeDispatchFailure.failed("dispatch refused: \(error)")
@@ -217,13 +388,32 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     case .timedOut:
       throw RuntimeDispatchFailure.outcomeUnknown("process timed out before completion")
     case .cancelled:
-      throw RuntimeDispatchFailure.outcomeUnknown("process cancelled mid-flight")
+      switch execution.processGroupTermination {
+      case .noSurvivingMembers:
+        throw RuntimeDispatchCancellationResolution.drained
+      case .notRequested, .unconfirmed:
+        throw RuntimeDispatchCancellationResolution.unconfirmed
+      }
     case .signalled(let signal):
       throw RuntimeDispatchFailure.outcomeUnknown(
         RockchipHostProcessDiagnostics.signalDeath(signal))
     case .waitFailed(let code), .unrecognizedWaitStatus(let code):
       throw RuntimeDispatchFailure.outcomeUnknown("process wait status unresolved (\(code))")
     }
+  }
+
+  private func executableLaunchMode(
+    for action: TypedProviderAction
+  ) -> ProcessExecutableLaunchMode {
+    // The reviewed ArkTrace CLI is an inner executable of a signed App and
+    // must retain its canonical bundle path. All pre-existing standalone
+    // analyzers retain the stable inode-path launch contract.
+    if case .analyzer(.analyze(let invocation)) = action,
+      invocation.analyzerRef == "trace-summary@1"
+    {
+      return .verifiedCanonicalPath
+    }
+    return .stableInodePath
   }
 }
 

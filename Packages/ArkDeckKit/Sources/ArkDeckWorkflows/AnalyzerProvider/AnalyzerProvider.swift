@@ -39,24 +39,94 @@ package struct AnalyzerProfile: Sendable, Equatable {
   package let analyzerVersion: String
   package let executablePath: String
   public let executableSHA256: String
+  package let canonicalNamespaceRoot: String?
   package let fixedArguments: [String]
   package let timeoutSeconds: Int
+  package let outputByteBudget: Int
+  package let pinnedFiles: [AnalyzerPinnedFile]
+  package let pinnedTrees: [AnalyzerPinnedTree]
+  package let preflightAvailability: ProviderOperationAvailability
+  package let arkTraceSummaryContract: ArkTraceSummaryInvocationContract?
 
   public init(
     analyzerRef: String,
     analyzerVersion: String,
     executablePath: String,
     executableSHA256: String,
+    canonicalNamespaceRoot: String? = nil,
     fixedArguments: [String] = [],
-    timeoutSeconds: Int = 60
+    timeoutSeconds: Int = 60,
+    outputByteBudget: Int = 8 * 1024 * 1024,
+    pinnedFiles: [AnalyzerPinnedFile] = [],
+    pinnedTrees: [AnalyzerPinnedTree] = [],
+    preflightAvailability: ProviderOperationAvailability = .available,
+    arkTraceSummaryContract: ArkTraceSummaryInvocationContract? = nil
   ) {
     self.analyzerRef = analyzerRef
     self.analyzerVersion = analyzerVersion
     self.executablePath = executablePath
     self.executableSHA256 = executableSHA256
+    self.canonicalNamespaceRoot = canonicalNamespaceRoot
     self.fixedArguments = fixedArguments
     self.timeoutSeconds = timeoutSeconds
+    self.outputByteBudget = outputByteBudget
+    self.pinnedFiles = pinnedFiles
+    self.pinnedTrees = pinnedTrees
+    self.preflightAvailability = preflightAvailability
+    self.arkTraceSummaryContract = arkTraceSummaryContract
   }
+}
+
+package struct AnalyzerPinnedTree: Sendable, Equatable {
+  package let path: String
+  package let sha256: String
+}
+
+package struct AnalyzerPinnedFile: Sendable, Equatable {
+  package let path: String
+  package let sha256: String
+  package let byteCount: Int
+  package let requireExecutable: Bool
+
+  package init(
+    path: String,
+    sha256: String,
+    byteCount: Int,
+    requireExecutable: Bool = false
+  ) {
+    self.path = path
+    self.sha256 = sha256
+    self.byteCount = byteCount
+    self.requireExecutable = requireExecutable
+  }
+}
+
+package enum AnalyzerProfileValidationError: Error, Equatable, CustomStringConvertible {
+  case unknownAnalyzerRef(String)
+  case duplicateAnalyzerRef(String)
+  case invalidProfile(String)
+
+  package var description: String {
+    switch self {
+    case .unknownAnalyzerRef(let reference):
+      return "unknown analyzer reference: \(reference)"
+    case .duplicateAnalyzerRef(let reference):
+      return "duplicate analyzer reference: \(reference)"
+    case .invalidProfile(let reason):
+      return "invalid analyzer profile: \(reason)"
+    }
+  }
+}
+
+package struct ArkTraceSummaryInvocationContract: Sendable, Equatable, Codable {
+  package let toolVersion: String
+  package let parserVersion: String
+  package let parserUpstreamRevision: String
+  package let parserSHA256: String
+  package let parserBuildRecipeVersion: String
+  package let parserAdapterVersion: String
+  package let schemaAdapterVersion: String
+  package let indexSchemaVersion: Int
 }
 
 public struct AnalyzerInvocation: Sendable, Equatable, Codable {
@@ -65,13 +135,78 @@ public struct AnalyzerInvocation: Sendable, Equatable, Codable {
   public let executableSHA256: String
   public let arguments: [String]
   package let timeoutSeconds: Int
+  package let outputByteBudget: Int?
   package let sourceArtifactID: String
   package let sourceSHA256: String
   package let sourceByteCount: Int
+  package let arkTraceSummaryContract: ArkTraceSummaryInvocationContract?
+
+  package init(
+    analyzerRef: String,
+    analyzerVersion: String,
+    executableSHA256: String,
+    arguments: [String],
+    timeoutSeconds: Int,
+    outputByteBudget: Int?,
+    sourceArtifactID: String,
+    sourceSHA256: String,
+    sourceByteCount: Int,
+    arkTraceSummaryContract: ArkTraceSummaryInvocationContract? = nil
+  ) {
+    self.analyzerRef = analyzerRef
+    self.analyzerVersion = analyzerVersion
+    self.executableSHA256 = executableSHA256
+    self.arguments = arguments
+    self.timeoutSeconds = timeoutSeconds
+    self.outputByteBudget = outputByteBudget
+    self.sourceArtifactID = sourceArtifactID
+    self.sourceSHA256 = sourceSHA256
+    self.sourceByteCount = sourceByteCount
+    self.arkTraceSummaryContract = arkTraceSummaryContract
+  }
+}
+
+/// The path-free identity retained behind an Analyzer write-ahead intent.
+///
+/// This value exists only so a restarted Runtime can ask the Analyzer
+/// provider whether an outcome-unknown host-only action executed. It carries
+/// no executable or argv and therefore cannot be lowered or dispatched as a
+/// new analysis.
+public struct AnalyzerRecoveryIdentity: Sendable, Equatable, Codable {
+  package let analyzerRef: String
+  package let analyzerVersion: String
+  package let sourceArtifactID: String
+  package let sourceSHA256: String
+  package let sourceByteCount: Int
+
+  package init(
+    analyzerRef: String,
+    analyzerVersion: String,
+    sourceArtifactID: String,
+    sourceSHA256: String,
+    sourceByteCount: Int
+  ) {
+    self.analyzerRef = analyzerRef
+    self.analyzerVersion = analyzerVersion
+    self.sourceArtifactID = sourceArtifactID
+    self.sourceSHA256 = sourceSHA256
+    self.sourceByteCount = sourceByteCount
+  }
+
+  package init(_ invocation: AnalyzerInvocation) {
+    self.init(
+      analyzerRef: invocation.analyzerRef,
+      analyzerVersion: invocation.analyzerVersion,
+      sourceArtifactID: invocation.sourceArtifactID,
+      sourceSHA256: invocation.sourceSHA256,
+      sourceByteCount: invocation.sourceByteCount)
+  }
 }
 
 public enum AnalyzerProviderAction: Sendable, Equatable, Codable {
   case analyze(AnalyzerInvocation)
+  /// Recovery-only. `AnalyzerProvider.lower` deliberately rejects this case.
+  case reconcile(AnalyzerRecoveryIdentity)
 }
 
 package struct AnalyzerProvider: DeviceProvider {
@@ -101,10 +236,19 @@ package struct AnalyzerProvider: DeviceProvider {
   }
 
   private let profiles: [String: AnalyzerProfile]
+  private let unavailableReasons: [String: String]
 
-  public init(profiles: [AnalyzerProfile] = []) {
-    self.profiles = Dictionary(
-      profiles.map { ($0.analyzerRef, $0) }, uniquingKeysWith: { first, _ in first })
+  public init() {
+    self.profiles = [:]
+    self.unavailableReasons = [:]
+  }
+
+  public init(
+    profiles: [AnalyzerProfile],
+    unavailableReasons: [String: String] = [:]
+  ) throws {
+    self.profiles = try Self.validatedProfiles(profiles)
+    self.unavailableReasons = unavailableReasons
   }
 
   public var providerID: String { CatalogProvider.analyzer.rawValue }
@@ -118,12 +262,38 @@ package struct AnalyzerProvider: DeviceProvider {
     guard let profile = profiles[analyzerRef] else {
       // Machine-readable, and nothing is admitted: no capability is spent on
       // an analyzer this host has not been given (PRODUCT-LOOP §8).
-      return .unavailable(reason: "analyzer.profileUnavailable")
+      return .unavailable(
+        reason: unavailableReasons[analyzerRef] ?? "analyzer.profileUnavailable")
     }
-    guard let bytes = try? Data(contentsOf: URL(filePath: profile.executablePath)),
-      AnalyzerProvider.sha256(bytes) == profile.executableSHA256
+    guard profile.preflightAvailability == .available else {
+      return profile.preflightAvailability
+    }
+    guard ArkTraceProfileFileReader.matches(
+      path: profile.executablePath,
+      sha256: profile.executableSHA256,
+      byteCount: nil,
+      maximumByteCount: 128 * 1024 * 1024,
+      requireExecutable: true)
     else {
       return .unavailable(reason: "analyzer.toolIdentityDrift")
+    }
+    for pinned in profile.pinnedFiles {
+      guard ArkTraceProfileFileReader.matches(
+        path: pinned.path,
+        sha256: pinned.sha256,
+        byteCount: pinned.byteCount,
+        maximumByteCount: 128 * 1024 * 1024,
+        requireExecutable: pinned.requireExecutable)
+      else {
+        return .unavailable(reason: "analyzer.profileIdentityDrift")
+      }
+    }
+    for pinned in profile.pinnedTrees {
+      guard ArkTraceDistributionTreeHasher.matches(
+        rootPath: pinned.path, expectedSHA256: pinned.sha256)
+      else {
+        return .unavailable(reason: "analyzer.profileIdentityDrift")
+      }
     }
     return .available
   }
@@ -163,9 +333,12 @@ package struct AnalyzerProvider: DeviceProvider {
       throw DeviceProviderError.unsupportedAction(
         "analyzer input Artifact lease was not resolved before materialization")
     }
-    let bytes = try Data(contentsOf: artifact.fileURL)
-    guard bytes.count == artifact.byteCount,
-      AnalyzerProvider.sha256(bytes) == artifact.sha256
+    guard artifact.byteCount > 0,
+      artifact.byteCount <= 512 * 1024 * 1024,
+      let snapshot = try? ArkTraceProfileFileReader.read(
+        path: artifact.fileURL.path, maximumByteCount: artifact.byteCount),
+      snapshot.data.count == artifact.byteCount,
+      AnalyzerProvider.sha256(snapshot.data) == artifact.sha256
     else {
       // The lease is the claim; the bytes are the fact. A mismatch means the
       // analysis would describe something other than what was collected.
@@ -180,9 +353,11 @@ package struct AnalyzerProvider: DeviceProvider {
           executableSHA256: profile.executableSHA256,
           arguments: profile.fixedArguments + [artifact.fileURL.path],
           timeoutSeconds: profile.timeoutSeconds,
+          outputByteBudget: profile.outputByteBudget,
           sourceArtifactID: artifact.artifactID,
           sourceSHA256: artifact.sha256,
-          sourceByteCount: artifact.byteCount)))
+          sourceByteCount: artifact.byteCount,
+          arkTraceSummaryContract: profile.arkTraceSummaryContract)))
   }
 
   package func lower(
@@ -214,6 +389,16 @@ package struct AnalyzerProvider: DeviceProvider {
         detail:
           "\(invocation.analyzerRef) exited \(receipt.exitStatus.map(String.init) ?? "unknown")")
     }
+    guard !receipt.stdoutTruncated else {
+      return .failed(
+        code: "analyzer.truncatedResult",
+        detail: "\(invocation.analyzerRef) output was truncated")
+    }
+    if let budget = invocation.outputByteBudget, receipt.stdout.count > budget {
+      return .failed(
+        code: "analyzer.outputLimitExceeded",
+        detail: "\(invocation.analyzerRef) output exceeded its byte budget")
+    }
     guard !receipt.stdout.isEmpty else {
       // An empty derived artifact is not a conclusion. Publishing one would
       // let a later reader treat "the analyzer produced nothing" as
@@ -242,11 +427,20 @@ package struct AnalyzerProvider: DeviceProvider {
           code: "analyzer.schemaMismatch",
           detail: "\(invocation.analyzerRef) produced JSON outside its versioned schema")
       }
+    } else if invocation.analyzerRef == "trace-summary@1" {
+      guard receipt.stderr.isEmpty,
+        ArkTraceSummaryEnvelopeValidator.validate(
+          receipt.stdout, invocation: invocation)
+      else {
+        return .failed(
+          code: "analyzer.schemaMismatch",
+          detail: "\(invocation.analyzerRef) produced JSON outside ArkTrace contract 1.0")
+      }
     }
     // Provenance travels with the derived artifact: which artifact it came
     // from, that artifact's digest, which analyzer at which version, and the
     // digest of what was produced.
-    return .verified(summary: [
+    var summary = [
       "analyzerRef": invocation.analyzerRef,
       "analyzerVersion": invocation.analyzerVersion,
       "sourceArtifactId": invocation.sourceArtifactID,
@@ -255,7 +449,22 @@ package struct AnalyzerProvider: DeviceProvider {
       "derivedSha256": AnalyzerProvider.sha256(receipt.stdout),
       "derivedByteCount": String(receipt.stdout.count),
       "truncated": receipt.stdoutTruncated ? "true" : "false",
-    ])
+    ]
+    if let contract = invocation.arkTraceSummaryContract {
+      summary["toolSha256"] = invocation.executableSHA256
+      summary["parserSha256"] = contract.parserSHA256
+      summary["parserVersion"] = contract.parserVersion
+      summary["parserUpstreamRevision"] = contract.parserUpstreamRevision
+      summary["parserBuildRecipeVersion"] = contract.parserBuildRecipeVersion
+      summary["parserAdapterVersion"] = contract.parserAdapterVersion
+      summary["schemaAdapterVersion"] = contract.schemaAdapterVersion
+      summary["indexSchemaVersion"] = String(contract.indexSchemaVersion)
+      summary["requestTimeoutMs"] = String(invocation.timeoutSeconds * 1_000)
+      summary["requestMaxRows"] = "1000"
+      summary["requestMaxEvents"] = "10000"
+      summary["requestMaxOutputBytes"] = String(invocation.outputByteBudget ?? 0)
+    }
+    return .verified(summary: summary)
   }
 
   /// Analysis writes nothing outside its own derived artifact, so there is no
@@ -265,8 +474,21 @@ package struct AnalyzerProvider: DeviceProvider {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome {
-    guard case .analyzer = intent.action else {
+    let recoveryIdentity: AnalyzerRecoveryIdentity
+    switch intent.action {
+    case .analyzer(.analyze(let invocation)):
+      recoveryIdentity = AnalyzerRecoveryIdentity(invocation)
+    case .analyzer(.reconcile(let identity)):
+      recoveryIdentity = identity
+    default:
       return .stillUnknown(reason: "analyzer reconcile received a foreign action")
+    }
+    guard let artifact = context.resolvedInputArtifact,
+      artifact.artifactID == recoveryIdentity.sourceArtifactID,
+      artifact.sha256 == recoveryIdentity.sourceSHA256,
+      artifact.byteCount == recoveryIdentity.sourceByteCount
+    else {
+      return .stillUnknown(reason: "analyzer reconcile source identity does not match")
     }
     return .confirmedNotExecuted
   }
@@ -289,6 +511,46 @@ package struct AnalyzerProvider: DeviceProvider {
   static func sha256(_ bytes: Data) -> String {
     SHA256Hex.string(of: bytes)
   }
+
+  package static func validatedProfiles(
+    _ profiles: [AnalyzerProfile]
+  ) throws -> [String: AnalyzerProfile] {
+    let known = Set(analyzerForOperation.values)
+    var result: [String: AnalyzerProfile] = [:]
+    for profile in profiles {
+      guard known.contains(profile.analyzerRef) else {
+        throw AnalyzerProfileValidationError.unknownAnalyzerRef(profile.analyzerRef)
+      }
+      guard result[profile.analyzerRef] == nil else {
+        throw AnalyzerProfileValidationError.duplicateAnalyzerRef(profile.analyzerRef)
+      }
+      guard profile.executablePath.hasPrefix("/"),
+        profile.executableSHA256.count == 64,
+        profile.executableSHA256.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+        !profile.analyzerVersion.isEmpty,
+        profile.timeoutSeconds > 0,
+        profile.timeoutSeconds <= 120,
+        profile.outputByteBudget >= 1_024,
+        profile.outputByteBudget <= 64 * 1024 * 1024,
+        Set(profile.pinnedFiles.map(\.path)).count == profile.pinnedFiles.count,
+        profile.pinnedFiles.allSatisfy({
+          $0.path.hasPrefix("/") && $0.byteCount > 0
+            && $0.sha256.count == 64
+            && $0.sha256.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+        }),
+        Set(profile.pinnedTrees.map(\.path)).count == profile.pinnedTrees.count,
+        profile.pinnedTrees.allSatisfy({
+          $0.path.hasPrefix("/") && $0.sha256.count == 64
+            && $0.sha256.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+        }),
+        (profile.analyzerRef == "trace-summary@1") == (profile.arkTraceSummaryContract != nil)
+      else {
+        throw AnalyzerProfileValidationError.invalidProfile(profile.analyzerRef)
+      }
+      result[profile.analyzerRef] = profile
+    }
+    return result
+  }
 }
 
 /// Resolves the pinned executable for an analysis plan. Identity is checked
@@ -297,23 +559,42 @@ package struct AnalyzerProvider: DeviceProvider {
 package struct AnalyzerExecutableResolver: RuntimeExecutableResolving {
   private let table: [String: ResolvedExecutable]
 
-  /// One pinned binary per host, with each analyzer selecting its behaviour
-  /// through fixed arguments. Registering two analyzers backed by different
-  /// binaries is not expressible here on purpose: the dispatcher resolves by
-  /// provider, so a second binary would be checked against the first one's
-  /// digest and refused. A host that needs that should register one tool with
-  /// subcommands, which is what `fixedArguments` is for.
-  public init(profiles: [AnalyzerProfile]) {
-    self.table = [
-      "analyzer": profiles.first.map {
-        ResolvedExecutable(path: $0.executablePath, sha256: $0.executableSHA256)
-      }
-    ].compactMapValues { $0 }
+  /// Resolver selection is made from the closed typed action. Profile order,
+  /// provider ID, caller input and PATH never choose analyzer bytes.
+  public init(profiles: [AnalyzerProfile]) throws {
+    let validated = try AnalyzerProvider.validatedProfiles(profiles)
+    self.table = validated.mapValues {
+      ResolvedExecutable(
+        path: $0.executablePath,
+        sha256: $0.executableSHA256,
+        verifiedResources: $0.pinnedFiles.map {
+          ResolvedExecutableResource(
+            path: $0.path, sha256: $0.sha256,
+            byteCount: max(1, $0.byteCount),
+            requireExecutable: $0.requireExecutable)
+        },
+        verifiedTrees: $0.pinnedTrees.map {
+          ResolvedExecutableTreeResource(path: $0.path, sha256: $0.sha256)
+        },
+        canonicalNamespaceRoot: $0.canonicalNamespaceRoot)
+    }
   }
 
   package func resolveExecutable(providerID: String) throws -> ResolvedExecutable {
-    guard let executable = table[providerID] else {
+    guard providerID == "analyzer",
+      let executable = table.sorted(by: { $0.key < $1.key }).first?.value
+    else {
       throw DeviceProviderError.unsupportedAction("analyzer.executableUnavailable")
+    }
+    return executable
+  }
+
+  package func resolveExecutable(for action: TypedProviderAction) throws -> ResolvedExecutable {
+    guard case .analyzer(.analyze(let invocation)) = action,
+      let executable = table[invocation.analyzerRef],
+      executable.sha256 == invocation.executableSHA256
+    else {
+      throw DeviceProviderError.unsupportedAction("analyzer.actionIdentityUnavailable")
     }
     return executable
   }

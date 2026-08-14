@@ -434,6 +434,34 @@ public struct RuntimeCleanupDebtContinuation: Sendable, Equatable {
   public let detail: String
 }
 
+private struct RuntimeHostDispatchCancellation: Error {}
+
+/// A cancellation receipt from the process boundary.  Only the positive
+/// `drained` case is strong enough to close an Analyzer intent as cancelled;
+/// an unconfirmed process-group teardown remains an unknown external outcome.
+enum RuntimeDispatchCancellationResolution: Error, Sendable, Equatable {
+  case drained
+  case unconfirmed
+}
+
+private enum ActiveRuntimeDispatchCancellationMode: Sendable {
+  /// The Analyzer child may still be cancelled and drained immediately.
+  case immediateAnalyzerOpen
+  /// A verified Analyzer result has crossed the success/publication
+  /// linearization point. A later request cannot turn a committed success
+  /// into a cancelled Job with a published Artifact.
+  case analyzerCommitLinearized
+  /// Catalog safe-boundary actions record the request durably but finish the
+  /// current external step without Task cancellation.
+  case safeBoundary
+}
+
+private struct ActiveRuntimeDispatch: Sendable {
+  let id: UUID
+  var cancellationMode: ActiveRuntimeDispatchCancellationMode
+  let task: Task<ProviderProcessReceipt, Error>
+}
+
 /// Dispatch port: how a lowered process plan actually runs. Production
 /// binds the descriptor-verifying executor (MU-3); tests inject fakes,
 /// including crash and hang shapes.
@@ -632,9 +660,36 @@ public actor RuntimeJobEngine {
   private static let confirmedNotExecutedSemanticCode = "confirmedNotExecuted"
 
   public struct Configuration: Sendable {
+    package struct TestHooks: Sendable {
+      package let beforeDispatchInstall: (@Sendable (String, String) async -> Void)?
+      package let afterAnalyzerCommitLinearization:
+        (@Sendable (String, String) async -> Void)?
+      package let afterAnalyzerArtifactPublication:
+        (@Sendable (String, String) async -> Void)?
+      package let beforeMutationCapabilityCommit:
+        (@Sendable (String) async -> Void)?
+
+      package init(
+        beforeDispatchInstall: (@Sendable (String, String) async -> Void)? = nil,
+        afterAnalyzerCommitLinearization:
+          (@Sendable (String, String) async -> Void)? = nil,
+        afterAnalyzerArtifactPublication:
+          (@Sendable (String, String) async -> Void)? = nil,
+        beforeMutationCapabilityCommit: (@Sendable (String) async -> Void)? = nil
+      ) {
+        self.beforeDispatchInstall = beforeDispatchInstall
+        self.afterAnalyzerCommitLinearization = afterAnalyzerCommitLinearization
+        self.afterAnalyzerArtifactPublication = afterAnalyzerArtifactPublication
+        self.beforeMutationCapabilityCommit = beforeMutationCapabilityCommit
+      }
+
+      package static let none = TestHooks()
+    }
+
     public let stateDirectory: URL
     public let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
     public let admissionFaultInjector: RuntimeAdmissionFaultInjector
+    package let testHooks: TestHooks
 
     public init(
       stateDirectory: URL,
@@ -644,6 +699,19 @@ public actor RuntimeJobEngine {
       self.stateDirectory = stateDirectory
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
       self.admissionFaultInjector = admissionFaultInjector
+      self.testHooks = .none
+    }
+
+    package init(
+      stateDirectory: URL,
+      defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy(),
+      admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
+      testHooks: TestHooks
+    ) {
+      self.stateDirectory = stateDirectory
+      self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
+      self.admissionFaultInjector = admissionFaultInjector
+      self.testHooks = testHooks
     }
   }
 
@@ -783,6 +851,7 @@ public actor RuntimeJobEngine {
   private let nowUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
   private var cancellationRequests: Set<String> = []
+  private var activeDispatches: [String: ActiveRuntimeDispatch] = [:]
   private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
   private var activeProcessProgressKeys: Set<ProcessProgressKey> = []
   private var latestProcessProgress: [ProcessProgressKey: RuntimeProcessProgress] = [:]
@@ -837,10 +906,7 @@ public actor RuntimeJobEngine {
           reasons.append(reason)
         }
       }
-      if descriptor.reference == "debug.hap@1"
-        || descriptor.reference == "deploy.native-library.app-owned@1"
-        || descriptor.reference == "flash.dayu200"
-        || RuntimeArtifactService.workspaceOperationReferences.contains(descriptor.reference),
+      if RuntimeArtifactService.requiresArtifactStore(reference: descriptor.reference),
         artifactStore == nil
       {
         reasons.append("runtime.artifactStoreUnavailable")
@@ -1143,6 +1209,18 @@ public actor RuntimeJobEngine {
         try await executeStepsWithTraceEvidence(
           jobID: jobID, descriptor: descriptor, provider: provider)
       }
+    } catch is RuntimeHostDispatchCancellation {
+      let current = jobs[jobID] ?? runtime
+      cancellationRequests.remove(jobID)
+      guard current.record.state == JobState.cancelled.rawValue else {
+        throw RuntimeJobEngineError.internalFailure(
+          "analyzer cancellation returned without a durable cancelled state")
+      }
+      jobs[jobID] = current
+      try await recordCapabilityOutcome(
+        for: current.record, outcome: .confirmed,
+        state: JobState.cancelled.rawValue)
+      return statusAndReleaseTerminalRuntime(current.record, provider: provider)
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
       let executionState = Self.executionState(of: current.record)
@@ -1221,8 +1299,10 @@ public actor RuntimeJobEngine {
     let executionState = Self.executionState(of: current.record)
     if cancellationRequests.contains(jobID) {
       cancellationRequests.remove(jobID)
-      try transition(
-        &current, from: executionState, to: .cancelRequested, reason: "client-cancel")
+      if current.record.state != JobState.cancelRequested.rawValue {
+        try transition(
+          &current, from: executionState, to: .cancelRequested, reason: "client-cancel")
+      }
       try transition(
         &current, from: .cancelRequested, to: .cancellingAtSafeBoundary,
         reason: "safe-boundary")
@@ -2373,6 +2453,33 @@ public actor RuntimeJobEngine {
     guard var runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
     }
+    let isImmediateAnalyzer: Bool = {
+      guard step.cancellation == .immediate else { return false }
+      if case .analyzer = action { return true }
+      return false
+    }()
+    if let beforeDispatchInstall = configuration.testHooks.beforeDispatchInstall {
+      await beforeDispatchInstall(jobID, step.stepID)
+      guard let refreshed = jobs[jobID] else {
+        throw RuntimeJobEngineError.jobNotFound(jobID)
+      }
+      runtime = refreshed
+    }
+    // All production awaits that resolve Artifact/fact inputs happen before
+    // this method.  The package-only hook above makes that reentrancy window
+    // deterministic in the cancellation contract test.
+    // Recheck the actor-owned durable cancellation decision at the last
+    // synchronous boundary before an intent or child Task can be installed.
+    if cancellationRequests.contains(jobID)
+      || runtime.record.state == JobState.cancelRequested.rawValue
+    {
+      try completeCancellationAtSafeBoundary(
+        jobID: jobID, baseline: runtime, step: nil, intentEventID: nil,
+        reason: isImmediateAnalyzer
+          ? "client-cancel before analyzer dispatch"
+          : "client-cancel before the next Catalog safe boundary")
+      throw RuntimeHostDispatchCancellation()
+    }
     let workflowStep = try Self.journalStep(
       for: step, jobID: jobID, inputs: runtime.record.request.inputs,
       action: action, resolvedInputArtifact: context.resolvedInputArtifact,
@@ -2439,11 +2546,59 @@ public actor RuntimeJobEngine {
       activeProcessProgressKeys.remove(progressKey)
       latestProcessProgress.removeValue(forKey: progressKey)
     }
-    do {
-      receipt = try await dispatcher.dispatch(plan) { [weak self] progress in
-        await self?.recordProcessProgress(
-          progress, jobID: jobID, stepID: step.stepID)
+    let progressHandler: RuntimeProcessProgressHandler = { [weak self] progress in
+      await self?.recordProcessProgress(
+        progress, jobID: jobID, stepID: step.stepID)
+    }
+    let dispatchTask = Task { [dispatcher, progressHandler] in
+      try await dispatcher.dispatch(plan, progress: progressHandler)
+    }
+    let activeDispatchID = UUID()
+    activeDispatches[jobID] = ActiveRuntimeDispatch(
+      id: activeDispatchID,
+      cancellationMode: isImmediateAnalyzer ? .immediateAnalyzerOpen : .safeBoundary,
+      task: dispatchTask)
+    defer {
+      if activeDispatches[jobID]?.id == activeDispatchID {
+        activeDispatches.removeValue(forKey: jobID)
       }
+    }
+    do {
+      receipt = try await dispatchTask.value
+      if cancellationRequests.contains(jobID), isImmediateAnalyzer {
+        // The task completed without a cancellation receipt.  Do not infer
+        // descendant cleanup from a leader/result race; preserve the intent
+        // for explicit recovery instead of publishing a cancelled success.
+        var current = jobs[jobID] ?? runtime
+        current.record.timeline.append(
+          "analyzer cancellation raced completion without process-group drain proof")
+        jobs[jobID] = current
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "analyzer cancellation lacks process-group drain proof")
+      }
+    } catch let resolution as RuntimeDispatchCancellationResolution {
+      guard cancellationRequests.contains(jobID), isImmediateAnalyzer else {
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "process cancellation occurred without an admitted immediate cancellation")
+      }
+      switch resolution {
+      case .drained:
+        try completeCancellationAtSafeBoundary(
+          jobID: jobID, baseline: runtime, step: step,
+          intentEventID: intentEventID,
+          reason: "client-cancel after analyzer process-group drain")
+        throw RuntimeHostDispatchCancellation()
+      case .unconfirmed:
+        var current = jobs[jobID] ?? runtime
+        current.record.timeline.append(
+          "analyzer cancellation process-group drain unconfirmed; intent retained")
+        jobs[jobID] = current
+        throw RuntimeDispatchFailure.outcomeUnknown(
+          "analyzer process-group drain unconfirmed")
+      }
+    } catch is CancellationError {
+      throw RuntimeDispatchFailure.outcomeUnknown(
+        "dispatch task cancellation carried no process-group drain proof")
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
       let confirmedNotExecuted: Bool
@@ -2517,6 +2672,37 @@ public actor RuntimeJobEngine {
     var current = jobs[jobID] ?? runtime
     switch outcome {
     case .verified(let summary):
+      if isImmediateAnalyzer,
+        var active = activeDispatches[jobID], active.id == activeDispatchID
+      {
+        active.cancellationMode = .analyzerCommitLinearized
+        activeDispatches[jobID] = active
+        if let hook = configuration.testHooks.afterAnalyzerCommitLinearization {
+          await hook(jobID, step.stepID)
+        }
+        // A cancellation accepted before this linearization would already
+        // have cancelled the dispatch Task or set the durable state. Never
+        // publish across that boundary.
+        guard !cancellationRequests.contains(jobID),
+          jobs[jobID]?.record.state != JobState.cancelRequested.rawValue
+        else {
+          throw RuntimeDispatchFailure.outcomeUnknown(
+            "analyzer cancellation crossed the success commit boundary")
+        }
+      }
+      let publishesBeforeOutcome = descriptor.reference == AnalyzerProvider.traceSummary
+      if publishesBeforeOutcome {
+        // The exact validated Analyzer bytes become durable before the
+        // journal can call the step succeeded. A crash may therefore leave
+        // an honest outstanding read-only intent with a complete Artifact,
+        // but can never leave a durable success whose required Artifact is
+        // absent and whose stdout was lost.
+        try await publishDeclaredArtifacts(
+          jobID: jobID, step: step, summary: summary, receipt: receipt)
+        if let hook = configuration.testHooks.afterAnalyzerArtifactPublication {
+          await hook(jobID, step.stepID)
+        }
+      }
       let outcomeAt = nowUTC()
       try current.journal.appendAndSynchronize(
         JournalEvent.stepOutcome(
@@ -2536,8 +2722,10 @@ public actor RuntimeJobEngine {
         jobID: jobID, step: step, action: action, summary: summary,
         context: context, facts: evidenceFacts, outcomeAtUTC: outcomeAt,
         descriptor: descriptor)
-      try await publishDeclaredArtifacts(
-        jobID: jobID, step: step, summary: summary, receipt: receipt)
+      if !publishesBeforeOutcome {
+        try await publishDeclaredArtifacts(
+          jobID: jobID, step: step, summary: summary, receipt: receipt)
+      }
     case .failed(let code, let detail):
       try current.journal.appendAndSynchronize(
         JournalEvent.stepOutcome(
@@ -2596,6 +2784,77 @@ public actor RuntimeJobEngine {
       jobs[jobID] = current
       throw RuntimeDispatchFailure.outcomeUnknown(reason)
     }
+  }
+
+  /// Closes the outstanding Analyzer intent only after its cancelled process
+  /// task has returned. Analyzer execution has no external write effect; the
+  /// Runtime is the sole publisher, and this correlated failed outcome is
+  /// persisted before control can reach publication.
+  private func completeCancellationAtSafeBoundary(
+    jobID: String,
+    baseline: JobRuntime,
+    step: CatalogStepDescriptor?,
+    intentEventID: String?,
+    reason: String
+  ) throws {
+    var current = jobs[jobID] ?? baseline
+    if let step, let intentEventID {
+      try current.journal.appendAndSynchronize(
+        JournalEvent.stepOutcome(
+          eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
+          sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+          stepID: step.stepID, attempt: 1,
+          correlatesToIntentEventID: intentEventID,
+          result: "failed", outcomeCertainty: .confirmed,
+          semanticCode: "cancelled",
+          schemaVersion: Self.journalSchemaVersion(of: current.record)))
+      current.nextSequence += 1
+      current.record.timeline.append(
+        "cancelled \(step.stepID); dispatch reached a confirmed safe boundary before publication")
+    }
+    current.record.recoveryStepID = nil
+    current.record.recoveryIntentEventID = nil
+    current.record.recoveryAction = nil
+    if current.record.state != JobState.cancelRequested.rawValue {
+      let state = Self.executionState(of: current.record)
+      try transition(
+        &current, from: state, to: .cancelRequested,
+        reason: "durable \(reason)")
+    }
+    try transition(
+      &current, from: .cancelRequested, to: .cancellingAtSafeBoundary,
+      reason: "dispatch has a confirmed safe boundary")
+    try transition(
+      &current, from: .cancellingAtSafeBoundary, to: .cancelled,
+      reason: "cancelled intent closed without publication")
+    current.record.operationFailure = RuntimeOperationFailure(
+      code: .cancelled, category: .cancelled,
+      retryability: .notAutomatic, recovery: .none)
+    current.record.finishedAtUTC = nowUTC()
+    try persistRuntimeRecord(current.record)
+    jobs[jobID] = current
+  }
+
+  /// Returns the actor's current Job projection at an external-effect safe
+  /// boundary. Callers use this after their last `await` and before a
+  /// capability use, WAL intent, or child installation, so an older local
+  /// projection can never overwrite a durable cancellation decision.
+  private func refreshedRuntimeAtCancellationSafeBoundary(
+    jobID: String,
+    reason: String
+  ) throws -> JobRuntime {
+    guard let current = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    if cancellationRequests.contains(jobID)
+      || current.record.state == JobState.cancelRequested.rawValue
+    {
+      try completeCancellationAtSafeBoundary(
+        jobID: jobID, baseline: current, step: nil, intentEventID: nil,
+        reason: reason)
+      throw RuntimeHostDispatchCancellation()
+    }
+    return current
   }
 
   /// Consumes a fragment only after its successful outcome is durable.
@@ -2749,11 +3008,13 @@ public actor RuntimeJobEngine {
       return  // this step owns no declared product
     }
     guard let artifactStore else {
-      if descriptor.reference == "flash.dayu200" {
-        throw RuntimeArtifactPublicationFailure(
-          detail: "Artifact store is required for \(descriptor.reference)")
-      }
-      return
+      // Reaching a mapped step without a store can never be success: the
+      // Catalog product is part of that step's durable result, not optional
+      // telemetry. In particular, trace-summary writes its exact validated
+      // bytes before the correlated succeeded outcome; a nil store must not
+      // turn that commit into a no-op followed by false success.
+      throw RuntimeArtifactPublicationFailure(
+        detail: "Artifact store is required for \(descriptor.reference)")
     }
     let binding: ArtifactBindingSnapshot
     if descriptor.reference == OpenHarmonyLocalSigning.operationReference,
@@ -2873,13 +3134,17 @@ public actor RuntimeJobEngine {
             }
             contents = received
           }
+          let traceSummaryDerivation = RuntimeArtifactService.traceSummaryDerivation(
+            name: name, descriptor: descriptor, summary: summary)
           metadata = try await artifactStore.publish(
             RuntimeArtifactPublicationRequest(
               jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
               name: name, mediaType: declaration.mediaType, privacy: declaration.privacy,
               retentionClass: declaration.retentionClass,
               sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
-              bindingSnapshot: binding, contents: contents))
+              bindingSnapshot: binding, contents: contents,
+              derivation: traceSummaryDerivation,
+              preservesValidatedMachineBytes: traceSummaryDerivation != nil))
           if let landed { try? FileManager.default.removeItem(at: landed.localURL) }
         }
         appendTimeline(jobID: jobID, entry: "artifact \(name) -> \(metadata.artifactID)")
@@ -3025,6 +3290,19 @@ public actor RuntimeJobEngine {
   public func requestCancel(jobID: String) throws {
     guard var runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
 
+    guard let currentState = JobState(rawValue: runtime.record.state),
+      !currentState.isTerminal,
+      currentState != .finalizing
+    else {
+      return
+    }
+    // The verified Analyzer receipt and the Runtime-owned publication form
+    // one success commit. Once that point is crossed, a later request cannot
+    // rewrite the Job as cancelled while the exact Artifact is committed.
+    if activeDispatches[jobID]?.cancellationMode == .analyzerCommitLinearized {
+      return
+    }
+
     // A submitted Job has no provider intent and no external effect yet. It
     // therefore has no executing run() task that could ever consume an
     // in-memory cancellation request. Complete this zero-dispatch decision
@@ -3061,6 +3339,21 @@ public actor RuntimeJobEngine {
     // safe boundary. Unknown/outstanding-effect states are never rewritten
     // into a certain terminal outcome merely because a client asked to stop.
     cancellationRequests.insert(jobID)
+    if let state = JobState(rawValue: runtime.record.state),
+      state != .cancelRequested,
+      state != .cancellingAtSafeBoundary,
+      !state.isTerminal,
+      JobStateMachine.isAllowedTransition(from: state, to: .cancelRequested, mode: .execute)
+    {
+      try transition(
+        &runtime, from: state, to: .cancelRequested,
+        reason: "durable client cancellation intent")
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
+    }
+    if activeDispatches[jobID]?.cancellationMode == .immediateAnalyzerOpen {
+      activeDispatches[jobID]?.task.cancel()
+    }
   }
 
   public func status(jobID: String) async throws -> RuntimeJobStatus {
@@ -4188,8 +4481,16 @@ public actor RuntimeJobEngine {
   // MARK: Helpers
 
   private static func executionState(of record: RuntimeJobRecord) -> JobState {
-    record.state == JobState.recoveringByCompleteOverwrite.rawValue
-      ? .recoveringByCompleteOverwrite : .running
+    switch JobState(rawValue: record.state) {
+    case .recoveringByCompleteOverwrite:
+      return .recoveringByCompleteOverwrite
+    case .cancelRequested:
+      return .cancelRequested
+    case .cancellingAtSafeBoundary:
+      return .cancellingAtSafeBoundary
+    default:
+      return .running
+    }
   }
 
   static func isDayu200Flash(_ record: RuntimeJobRecord) -> Bool {
@@ -4555,7 +4856,7 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.rejected(
         .invalidInput, "\(descriptor.reference) is runtime unavailable: \(reason)")
     }
-    if RuntimeArtifactService.workspaceOperationReferences.contains(descriptor.reference),
+    if RuntimeArtifactService.requiresArtifactStore(reference: descriptor.reference),
       artifactStore == nil
     {
       throw RuntimeJobEngineError.rejected(
@@ -5612,9 +5913,9 @@ public actor RuntimeJobEngine {
     effect: WorkflowEffect,
     validatedFacts: ProviderFacts?
   ) async throws {
-    guard var runtime = jobs[jobID] else {
-      throw RuntimeDispatchFailure.failed("job disappeared before capability consumption")
-    }
+    var runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+      jobID: jobID,
+      reason: "client-cancel before capability verification")
     let persistedEvidence = runtime.record.admissionEvidence
     if let evidence = persistedEvidence {
       guard
@@ -5654,6 +5955,9 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: fresh typed plan could not be materialized: \(error)")
     }
+    runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+      jobID: jobID,
+      reason: "client-cancel after mutation plan materialization")
     guard freshMaterialized.planDigest == planDigest,
       freshMaterialized.stableTargetIdentitySHA256
         == runtime.record.materializedStableTargetIdentitySHA256,
@@ -5663,6 +5967,9 @@ public actor RuntimeJobEngine {
         "authorizationRequired: fresh typed plan, target or binding drifted before dispatch")
     }
     let resolvedArtifact = try await resolvedInputArtifact(jobID: jobID)
+    runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+      jobID: jobID,
+      reason: "client-cancel after Artifact lease resolution")
     let artifactFacts: [String: String] =
       resolvedArtifact.map {
         [
@@ -5730,6 +6037,9 @@ public actor RuntimeJobEngine {
       let liveRecovery = try await freshCompleteOverwriteRecoveryProof(
         runtime: runtime, descriptor: descriptor, effect: effect,
         validatedFacts: validatedFacts, deviceLineage: deviceLineage)
+      runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+        jobID: jobID,
+        reason: "client-cancel after complete-overwrite proof")
       if let evidence = persistedEvidence {
         guard evidence.completeOverwriteRecovery == liveRecovery.context else {
           throw RuntimeDispatchFailure.failed(
@@ -5771,6 +6081,9 @@ public actor RuntimeJobEngine {
           reservationID: runtime.record.request.idempotencyKey,
           jobID: jobID,
           recoveryContext: liveRecovery.context)
+        runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+          jobID: jobID,
+          reason: "client-cancel after mutation-lineage validation")
       }
       guard
         let status = try await capabilityStore.inspect(
@@ -5778,6 +6091,9 @@ public actor RuntimeJobEngine {
       else {
         throw RuntimeCapabilityStoreError.capabilityNotFound(authorization.capabilityID)
       }
+      runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+        jobID: jobID,
+        reason: "client-cancel after capability inspection")
       if status.capability.issuer.kind == .runtimeDefaultPolicy {
         let fingerprint = Self.automaticCapabilityPolicyFingerprint(
           query: query, recoveryContext: liveRecovery.context)
@@ -5789,6 +6105,12 @@ public actor RuntimeJobEngine {
             "completeOverwriteRecovery.freshProofDrifted")
         }
       }
+      if let hook = configuration.testHooks.beforeMutationCapabilityCommit {
+        await hook(jobID)
+      }
+      runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+        jobID: jobID,
+        reason: "client-cancel at final capability-consumption boundary")
       let consumption = try await capabilityStore.consume(
         capabilityID: authorization.capabilityID,
         reservationID: runtime.record.request.idempotencyKey,
@@ -5816,6 +6138,10 @@ public actor RuntimeJobEngine {
         runtimeCapabilityCorrelation: correlation)
       admissionEvidence.completeOverwriteRecovery = liveRecovery.context
       admissionEvidence.recoveryProviderExecutableSHA256 = liveRecovery.providerSHA256
+      guard let latestAfterConsumption = jobs[jobID] else {
+        throw RuntimeJobEngineError.jobNotFound(jobID)
+      }
+      runtime = latestAfterConsumption
       runtime.record.admissionEvidence = admissionEvidence
       runtime.record.timeline.append(
         "capability consumed before first mutation")
@@ -5824,6 +6150,14 @@ public actor RuntimeJobEngine {
       // re-prove and resume this boundary without replaying old intent.
       jobs[jobID] = runtime
       try persistRuntimeRecord(runtime.record)
+      if cancellationRequests.contains(jobID)
+        || runtime.record.state == JobState.cancelRequested.rawValue
+      {
+        try completeCancellationAtSafeBoundary(
+          jobID: jobID, baseline: runtime, step: nil, intentEventID: nil,
+          reason: "client-cancel after durable capability consumption but before dispatch")
+        throw RuntimeHostDispatchCancellation()
+      }
       if let recovery = liveRecovery.context {
         try transition(
           &runtime, from: .running, to: .recoveringByCompleteOverwrite,
@@ -5834,6 +6168,8 @@ public actor RuntimeJobEngine {
         try persistRuntimeRecord(runtime.record)
         jobs[jobID] = runtime
       }
+    } catch is RuntimeHostDispatchCancellation {
+      throw RuntimeHostDispatchCancellation()
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: capability denied before mutation: \(error)")
@@ -5903,6 +6239,9 @@ public actor RuntimeJobEngine {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: leased archive digest drifted from the campaign pin")
     }
+    runtime = try refreshedRuntimeAtCancellationSafeBoundary(
+      jobID: jobID,
+      reason: "client-cancel after campaign Artifact lease resolution")
     guard let planDigest = runtime.record.materializedPlanDigest else {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: campaign mutation has no materialized plan digest")

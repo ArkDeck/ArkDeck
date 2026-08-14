@@ -485,21 +485,41 @@ Task.detached {
     // improvised.  The shipped daemon can serve the closed one-shot mode,
     // but its path still has to be named so packaging drift fails closed.
     //   ARKDECK_ANALYZER_PATH=/abs/path/to/arkdeck-agentd
-    let analyzerProfiles: [AnalyzerProfile]
+    var analyzerProfiles: [AnalyzerProfile] = []
+    var analyzerUnavailableReasons: [String: String] = [:]
     if let analyzerPath = ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"] {
       let resolver = try FixedExecutableResolver.hashing(
         path: analyzerPath, providerID: "analyzer")
       let executable = try resolver.resolveExecutable(providerID: "analyzer")
-      analyzerProfiles = [
+      analyzerProfiles.append(
         AnalyzerProfile(
           analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
           analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
           executablePath: executable.path,
           executableSHA256: executable.sha256,
-          fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: 30)
-      ]
+          fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: 30))
+    }
+    if let descriptorPath = ProcessInfo.processInfo.environment[
+      "ARKDECK_ARKTRACE_DESCRIPTOR"]
+    {
+      do {
+        let loader = ArkTraceSummaryAnalyzerProfileLoader(
+          doctor: ProductionArkTraceDoctorProbe(
+            homeURL: resolvedStateDirectory.appending(
+              path: "arktrace-availability-home", directoryHint: .isDirectory)),
+          snapshotRootURL: resolvedStateDirectory.appending(
+            path: "arktrace-profile-snapshots", directoryHint: .isDirectory))
+        analyzerProfiles.append(
+          try await loader.load(descriptorURL: URL(filePath: descriptorPath)))
+      } catch let error as ArkTraceSummaryProfileError {
+        analyzerUnavailableReasons["trace-summary@1"] = error.reason
+      } catch {
+        analyzerUnavailableReasons["trace-summary@1"] =
+          ArkTraceSummaryProfileError.descriptorInvalid.reason
+      }
     } else {
-      analyzerProfiles = []
+      analyzerUnavailableReasons["trace-summary@1"] =
+        ArkTraceSummaryProfileError.notFound.reason
     }
     let workspaceProvider = WorkspaceProvider(
       registry: WorkspaceProjectRegistry(roots: workspaceRoots),
@@ -514,11 +534,13 @@ Task.detached {
     // operations then report UNAVAILABLE with a machine-readable reason
     // instead of being absent from `operation.list` (PRODUCT-LOOP §8,
     // CHG-2026-055 TASK-HFA-007).
-    let analyzerProvider = AnalyzerProvider(profiles: analyzerProfiles)
+    let analyzerProvider = try AnalyzerProvider(
+      profiles: analyzerProfiles,
+      unavailableReasons: analyzerUnavailableReasons)
     var analyzerDispatcher: DescriptorBoundProcessDispatcher?
     if !analyzerProfiles.isEmpty {
       analyzerDispatcher = DescriptorBoundProcessDispatcher(
-        resolver: AnalyzerExecutableResolver(profiles: analyzerProfiles))
+        resolver: try AnalyzerExecutableResolver(profiles: analyzerProfiles))
     }
     let providers = DeviceProviderRegistry(providers: [
       hdcProvider, rockchipProvider, workspaceProvider, analyzerProvider,

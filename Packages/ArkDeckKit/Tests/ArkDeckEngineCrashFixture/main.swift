@@ -88,6 +88,9 @@ struct StoppingDispatcher: RuntimeProcessDispatching {
 let engineState = directory.appending(path: "engine-state", directoryHint: .isDirectory)
 let capabilityStore = try RuntimeCapabilityStore(
   directoryURL: directory.appending(path: "capabilities", directoryHint: .isDirectory))
+let artifactStore = try RuntimeArtifactStore(
+  rootURL: directory.appending(path: "artifacts", directoryHint: .isDirectory),
+  nowUTC: { "2026-07-29T00:30:00Z" })
 let engine = try RuntimeJobEngine(
   configuration: .init(stateDirectory: engineState),
   providers: DeviceProviderRegistry(providers: [
@@ -95,6 +98,7 @@ let engine = try RuntimeJobEngine(
   ]),
   dispatcher: StoppingDispatcher(window: window, directory: directory),
   capabilityStore: capabilityStore,
+  artifactStore: artifactStore,
   nowUTC: { "2026-07-29T00:30:00Z" })
 
 let request = Data(

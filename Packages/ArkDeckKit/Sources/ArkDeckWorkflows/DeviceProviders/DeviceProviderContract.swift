@@ -660,6 +660,11 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
           "sourceSha256": .string(invocation.sourceSHA256),
           "sourceByteCount": .integer(Int64(invocation.sourceByteCount)),
         ])
+    case .analyzer(.reconcile):
+      // A recovery identity is materialized only from an already-durable
+      // original intent. It can never become a fresh write-ahead action.
+      throw DeviceProviderError.unsupportedAction(
+        "analyzer recovery identity cannot be persisted as a new action")
     }
   }
 
@@ -1135,6 +1140,36 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
             durationSeconds: integer("durationSeconds"),
             filters: stringArray("filters"),
             byteBudget: integer("byteBudget"))))
+    case "analyzer.analyze":
+      let expectedKeys: Set<String> = [
+        "analyzerRef", "analyzerVersion", "sourceArtifactId", "sourceSha256",
+        "sourceByteCount",
+      ]
+      guard Set(arguments.keys) == expectedKeys else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted analyzer.analyze has a non-closed recovery identity")
+      }
+      let analyzerRef = try string("analyzerRef")
+      let analyzerVersion = try string("analyzerVersion")
+      let sourceArtifactID = try string("sourceArtifactId")
+      let sourceSHA256 = try string("sourceSha256")
+      let sourceByteCount = try integer("sourceByteCount")
+      guard !analyzerRef.isEmpty, !analyzerVersion.isEmpty,
+        !sourceArtifactID.isEmpty, sourceByteCount > 0,
+        sourceSHA256.count == 64,
+        sourceSHA256.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "persisted analyzer.analyze has an invalid recovery identity")
+      }
+      return .analyzer(
+        .reconcile(
+          AnalyzerRecoveryIdentity(
+            analyzerRef: analyzerRef,
+            analyzerVersion: analyzerVersion,
+            sourceArtifactID: sourceArtifactID,
+            sourceSHA256: sourceSHA256,
+            sourceByteCount: sourceByteCount)))
     default:
       throw DeviceProviderError.unsupportedAction(
         "persisted typed provider action kind \(kind) is unknown")

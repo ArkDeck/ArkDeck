@@ -432,6 +432,188 @@ final class ProcessExecutorContractTests: XCTestCase {
     XCTAssertEqual(launches.count, 1)
   }
 
+  func testVerifiedCanonicalPathLaunchResumesOnlyTheMappedAuthorizedExecutable() async throws {
+    let executable = URL(filePath: "/usr/bin/printf")
+    let expectedHash = try sha256(of: executable)
+    let result = try await executor.executeIdentityBound(
+      ProcessIdentityBoundRequest(
+        process: ProcessRequest(
+          executable: executable,
+          arguments: ["canonical-bundle-path"],
+          executableLaunchMode: .verifiedCanonicalPath),
+        expectedSHA256: expectedHash))
+
+    XCTAssertEqual(result.execution.termination, .exited(0))
+    XCTAssertEqual(
+      String(decoding: result.execution.stdout.data, as: UTF8.self),
+      "canonical-bundle-path")
+    XCTAssertEqual(result.executableIdentity.authorizedPath, executable.path)
+    XCTAssertEqual(result.executableIdentity.sha256, expectedHash)
+  }
+
+  func testVerifiedCanonicalPathRejectsPostSpawnPathReplacementBeforeChildExecutes() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let executable = try copyExecutable("/usr/bin/touch", into: directory, named: "bundle-tool")
+    let expectedHash = try sha256(of: executable)
+    let launchSentinel = directory.appending(path: "child-executed")
+    let executor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, _, _ in
+        try? FileManager.default.removeItem(at: executable)
+        try? FileManager.default.copyItem(at: URL(filePath: "/usr/bin/printf"), to: executable)
+      })
+
+    do {
+      _ = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: executable,
+            arguments: [launchSentinel.path],
+            executableLaunchMode: .verifiedCanonicalPath),
+          expectedSHA256: expectedHash))
+      XCTFail("post-spawn path replacement must fail before the suspended child executes")
+    } catch let error as ProcessExecutionError {
+      XCTAssertEqual(error, .executableIdentityChanged)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: launchSentinel.path))
+  }
+
+  func testVerifiedCanonicalNamespaceRejectsWholeBundleReplacementBeforeSpawn() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let authorizedBundle = directory.appending(path: "ArkTraceCLI.app", directoryHint: .isDirectory)
+    let heldBundle = directory.appending(path: "held.app", directoryHint: .isDirectory)
+    let replacementBundle = directory.appending(
+      path: "replacement.app", directoryHint: .isDirectory)
+    let authorizedExecutableDirectory = authorizedBundle.appending(
+      path: "Contents/MacOS", directoryHint: .isDirectory)
+    let replacementExecutableDirectory = replacementBundle.appending(
+      path: "Contents/MacOS", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: authorizedExecutableDirectory, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: replacementExecutableDirectory, withIntermediateDirectories: true)
+    let executable = try copyExecutable(
+      "/usr/bin/touch", into: authorizedExecutableDirectory, named: "arktrace")
+    _ = try copyExecutable(
+      "/usr/bin/touch", into: replacementExecutableDirectory, named: "arktrace")
+    let namespace = try VerifiedDirectoryDescriptor.openOwnerOnly(path: authorizedBundle)
+    defer { namespace.close() }
+    try FileManager.default.moveItem(at: authorizedBundle, to: heldBundle)
+    try FileManager.default.moveItem(at: replacementBundle, to: authorizedBundle)
+    let sentinel = directory.appending(path: "replacement-child-executed")
+
+    do {
+      _ = try await executor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: executable, arguments: [sentinel.path],
+            executableLaunchMode: .verifiedCanonicalPath),
+          expectedSHA256: try sha256(of: executable)),
+        verifiedResources: [], verifiedNamespace: namespace)
+      XCTFail("whole-bundle replacement must invalidate the retained namespace")
+    } catch let error as VerifiedRegularFileError {
+      XCTAssertEqual(error, .identityChanged)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: sentinel.path))
+  }
+
+  func testVerifiedCanonicalNamespaceRejectsWholeBundleReplacementBeforeResume() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let authorizedBundle = directory.appending(path: "ArkTraceCLI.app", directoryHint: .isDirectory)
+    let heldBundle = directory.appending(path: "held.app", directoryHint: .isDirectory)
+    let replacementBundle = directory.appending(
+      path: "replacement.app", directoryHint: .isDirectory)
+    let authorizedExecutableDirectory = authorizedBundle.appending(
+      path: "Contents/MacOS", directoryHint: .isDirectory)
+    let replacementExecutableDirectory = replacementBundle.appending(
+      path: "Contents/MacOS", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: authorizedExecutableDirectory, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: replacementExecutableDirectory, withIntermediateDirectories: true)
+    let executable = try copyExecutable(
+      "/usr/bin/touch", into: authorizedExecutableDirectory, named: "arktrace")
+    _ = try copyExecutable(
+      "/usr/bin/touch", into: replacementExecutableDirectory, named: "arktrace")
+    let expectedHash = try sha256(of: executable)
+    let namespace = try VerifiedDirectoryDescriptor.openOwnerOnly(path: authorizedBundle)
+    defer { namespace.close() }
+    let sentinel = directory.appending(path: "replacement-child-executed")
+    let replacingExecutor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, _, _ in
+        try? FileManager.default.moveItem(at: authorizedBundle, to: heldBundle)
+        try? FileManager.default.moveItem(at: replacementBundle, to: authorizedBundle)
+      })
+
+    do {
+      _ = try await replacingExecutor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: executable, arguments: [sentinel.path],
+            executableLaunchMode: .verifiedCanonicalPath),
+          expectedSHA256: expectedHash),
+        verifiedResources: [], verifiedNamespace: namespace)
+      XCTFail("suspended child must not resume through a replacement bundle namespace")
+    } catch let error as VerifiedRegularFileError {
+      XCTAssertEqual(error, .identityChanged)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: sentinel.path))
+  }
+
+  func testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume() async throws {
+    let directory = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let bundle = directory.appending(path: "ArkTraceCLI.app", directoryHint: .isDirectory)
+    let executableDirectory = bundle.appending(
+      path: "Contents/MacOS", directoryHint: .isDirectory)
+    let resourceDirectory = bundle.appending(
+      path: "Contents/Resources", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: executableDirectory, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+      at: resourceDirectory, withIntermediateDirectories: true)
+    let executable = try copyExecutable(
+      "/usr/bin/touch", into: executableDirectory, named: "arktrace")
+    let resource = resourceDirectory.appending(path: "manifest.json")
+    let heldResource = resourceDirectory.appending(path: "held-manifest.json")
+    let original = Data("reviewed resource".utf8)
+    try original.write(to: resource)
+    let verifiedResource = try VerifiedRegularFileDescriptor.open(
+      path: resource, expectedSHA256: try sha256(of: resource),
+      maximumBytes: original.count)
+    defer { verifiedResource.close() }
+    let namespace = try VerifiedDirectoryDescriptor.openOwnerOnly(path: bundle)
+    defer { namespace.close() }
+    let sentinel = directory.appending(path: "resource-replacement-child-executed")
+    let replacingExecutor = FoundationProcessExecutor(
+      identityBoundPreSpawnHook: { _ in },
+      launchObserver: { _ in },
+      identityBoundSpawnObserver: { _, _, _ in
+        try? FileManager.default.moveItem(at: resource, to: heldResource)
+        try? Data("replacement resource".utf8).write(to: resource)
+      })
+
+    do {
+      _ = try await replacingExecutor.executeIdentityBound(
+        ProcessIdentityBoundRequest(
+          process: ProcessRequest(
+            executable: executable, arguments: [sentinel.path],
+            executableLaunchMode: .verifiedCanonicalPath),
+          expectedSHA256: try sha256(of: executable)),
+        verifiedResources: [verifiedResource], verifiedNamespace: namespace)
+      XCTFail("a pinned resource replacement must be rejected before SIGCONT")
+    } catch let error as VerifiedRegularFileError {
+      XCTAssertEqual(error, .identityChanged)
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: sentinel.path))
+  }
+
   func testIdentityBoundLaunchRejectsPathSubstitutionBeforeAnyChildStarts() async throws {
     let directory = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -458,6 +640,42 @@ final class ProcessExecutorContractTests: XCTestCase {
     }
     XCTAssertEqual(launches.count, 0)
     XCTAssertFalse(FileManager.default.fileExists(atPath: launchSentinel.path))
+  }
+
+  func testVerifiedDescriptorRejectsAncestorReplacementWithExternalSymlink() throws {
+    let lexicalDirectory = try makeTemporaryDirectory()
+    guard let physicalDirectory = realpath(lexicalDirectory.path, nil) else {
+      return XCTFail("temporary directory must have a physical path")
+    }
+    defer { free(physicalDirectory) }
+    let directory = URL(
+      filePath: String(cString: physicalDirectory), directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let authorizedParent = directory.appending(path: "authorized", directoryHint: .isDirectory)
+    let heldParent = directory.appending(path: "held", directoryHint: .isDirectory)
+    let externalParent = directory.appending(path: "external", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: authorizedParent, withIntermediateDirectories: false)
+    try FileManager.default.createDirectory(at: externalParent, withIntermediateDirectories: false)
+    let authorized = try copyExecutable(
+      "/usr/bin/printf", into: authorizedParent, named: "verified-tool")
+    let descriptor = try VerifiedRegularFileDescriptor.open(
+      path: authorized, expectedSHA256: try sha256(of: authorized), requireExecutable: true)
+    defer { descriptor.close() }
+
+    try FileManager.default.moveItem(at: authorizedParent, to: heldParent)
+    _ = try copyExecutable(
+      "/usr/bin/printf", into: externalParent, named: "verified-tool")
+    try FileManager.default.createSymbolicLink(
+      at: authorizedParent, withDestinationURL: externalParent)
+
+    do {
+      try descriptor.revalidate()
+      XCTFail("an ancestor symlink replacement must not rebind an authorized descriptor")
+    } catch let error as VerifiedRegularFileError {
+      guard case .openFailed = error else {
+        return XCTFail("unexpected ancestor replacement error: \(error)")
+      }
+    }
   }
 
   func testIdentityBoundLaunchRejectsSameInodeByteMutationBeforeAnyChildStarts() async throws {

@@ -11,6 +11,44 @@ import ArkDeckRuntime
 import Foundation
 
 enum RuntimeArtifactService {
+  static func traceSummaryDerivation(
+    name: String,
+    descriptor: CatalogOperationDescriptor,
+    summary: [String: String]
+  ) -> RuntimeArtifactDerivation? {
+    guard name == "trace-summary.json",
+      descriptor.reference == AnalyzerProvider.traceSummary,
+      let analyzerRef = summary["analyzerRef"],
+      let analyzerVersion = summary["analyzerVersion"],
+      let sourceArtifactID = summary["sourceArtifactId"],
+      let sourceSHA256 = summary["sourceSha256"],
+      let sourceByteCount = summary["sourceByteCount"].flatMap(Int.init),
+      let toolSHA256 = summary["toolSha256"],
+      let parserSHA256 = summary["parserSha256"],
+      let parserVersion = summary["parserVersion"],
+      let parserUpstreamRevision = summary["parserUpstreamRevision"],
+      let parserBuildRecipeVersion = summary["parserBuildRecipeVersion"],
+      let parserAdapterVersion = summary["parserAdapterVersion"],
+      let schemaAdapterVersion = summary["schemaAdapterVersion"],
+      let indexSchemaVersion = summary["indexSchemaVersion"].flatMap(Int.init),
+      let timeoutMs = summary["requestTimeoutMs"].flatMap(Int.init),
+      let maxRows = summary["requestMaxRows"].flatMap(Int.init),
+      let maxEvents = summary["requestMaxEvents"].flatMap(Int.init),
+      let maxOutputBytes = summary["requestMaxOutputBytes"].flatMap(Int.init)
+    else { return nil }
+    return RuntimeArtifactDerivation(
+      analyzerRef: analyzerRef, analyzerVersion: analyzerVersion,
+      sourceArtifactID: sourceArtifactID, sourceSHA256: sourceSHA256,
+      sourceByteCount: sourceByteCount, toolSHA256: toolSHA256,
+      parserSHA256: parserSHA256, parserVersion: parserVersion,
+      parserUpstreamRevision: parserUpstreamRevision,
+      parserBuildRecipeVersion: parserBuildRecipeVersion,
+      parserAdapterVersion: parserAdapterVersion,
+      schemaAdapterVersion: schemaAdapterVersion, indexSchemaVersion: indexSchemaVersion,
+      timeoutMs: timeoutMs, maxRows: maxRows, maxEvents: maxEvents,
+      maxOutputBytes: maxOutputBytes)
+  }
+
   /// Declared products whose bytes come from a device file transfer rather
   /// than from a captured stream. They publish from the host file the
   /// dispatcher measured, and a missing file is a recorded absence — there
@@ -116,6 +154,16 @@ enum RuntimeArtifactService {
     "capture.diagnostics@1": ["capture.log", "artifact-index.json", "capture-summary.json"],
     "flash.dayu200": ["flash-report.json"],
   ]
+
+  /// A Runtime without an Artifact store cannot admit an operation whose
+  /// contract consumes or produces durable Artifact bytes. Keep this derived
+  /// from the same publication tables used at execution so a new mapped
+  /// product cannot accidentally inherit an optional-store admission path.
+  static func requiresArtifactStore(reference: String) -> Bool {
+    workspaceOperationReferences.contains(reference)
+      || artifactMapping[reference] != nil
+      || finalizeArtifacts[reference] != nil
+  }
 
   static func finalArtifactContents(
     name: String,
@@ -293,6 +341,12 @@ enum RuntimeArtifactService {
         analyzerOutputByteCount: outputByteCount, result: result)
       let encoder = CanonicalJSONEncoders.canonical()
       return (try? encoder.encode(envelope)) ?? Data("{}".utf8)
+    case "trace-summary.json"
+    where descriptor.reference == AnalyzerProvider.traceSummary:
+      // ArkTrace's validated machine envelope is already deterministic and
+      // carries its own complete request/tool/parser/source provenance.
+      // Publishing a wrapper would change those reviewed bytes.
+      return receipt.stdout
     case "build.log", "test-output.log":
       var output = receipt.stdout
       output.append(receipt.stderr)
