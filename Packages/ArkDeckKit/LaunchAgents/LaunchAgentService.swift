@@ -564,8 +564,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     harnessModel: ValidatedHarnessModel?
   ) throws -> Data {
     guard
-      let template = Bundle.module.url(
-        forResource: ArkDeckLaunchAgent.label, withExtension: "plist")
+      let template = Self.bundledTemplateURL()
     else {
       throw LaunchAgentServiceError.invalidTemplate("bundled plist is missing")
     }
@@ -617,6 +616,47 @@ public final class LaunchAgentService: @unchecked Sendable {
     document["StandardErrorPath"] = stderrPath
     return try PropertyListSerialization.data(
       fromPropertyList: document, format: .xml, options: 0)
+  }
+
+  /// Distributed helpers keep SwiftPM resources in the code-signable macOS
+  /// app location (`Contents/Resources`). Avoid `Bundle.module` because its
+  /// generated fallback embeds the build worktree and traps after that path is
+  /// removed. The sibling candidates retain direct `swift test`/CLI support.
+  private static func resourceBundle() -> Bundle? {
+    resourceBundleCandidates(named: "ArkDeckKit_ArkDeckLaunchAgent.bundle")
+      .lazy.compactMap(Bundle.init(url:)).first
+  }
+
+  private static func bundledTemplateURL() -> URL? {
+    if let packaged = resourceBundle()?.url(
+      forResource: ArkDeckLaunchAgent.label, withExtension: "plist")
+    {
+      return packaged
+    }
+    let sourceFallback = URL(filePath: #filePath)
+      .deletingLastPathComponent()
+      .appending(
+        path: ArkDeckLaunchAgent.label + ".plist", directoryHint: .notDirectory)
+    return FileManager.default.fileExists(atPath: sourceFallback.path)
+      ? sourceFallback : nil
+  }
+
+  private static func resourceBundleCandidates(named name: String) -> [URL] {
+    let main = Bundle.main.bundleURL
+    var candidates: [URL] = []
+    if let resources = Bundle.main.resourceURL {
+      candidates.append(resources.appending(path: name, directoryHint: .isDirectory))
+    }
+    if let executable = Bundle.main.executableURL {
+      candidates.append(
+        executable.deletingLastPathComponent()
+          .appending(path: name, directoryHint: .isDirectory))
+    }
+    candidates.append(main.appending(path: name, directoryHint: .isDirectory))
+    candidates.append(
+      main.deletingLastPathComponent().appending(path: name, directoryHint: .isDirectory))
+    var seen: Set<String> = []
+    return candidates.filter { seen.insert($0.standardizedFileURL.path).inserted }
   }
 
   private func validatedExecutable(_ candidate: URL, name: String) throws -> URL {

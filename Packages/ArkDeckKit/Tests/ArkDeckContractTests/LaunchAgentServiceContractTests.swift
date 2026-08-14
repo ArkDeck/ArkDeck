@@ -87,6 +87,9 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       "xcrun notarytool submit",
       "xcrun stapler staple",
       "spctl --assess --type execute",
+      "cp -R \"$workflows_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
+      "cp -R \"$workflows_resource_bundle\" \"$daemon_bundle/Contents/Resources/\"",
+      "cp -R \"$launch_agent_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
     ] {
       XCTAssertTrue(
         releaseScript.contains(requiredStep),
