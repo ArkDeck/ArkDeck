@@ -1085,6 +1085,468 @@ class PullRequestPathTests(unittest.TestCase):
             lambda: check_pr_paths.preflight_paths(root, base_oid, head_oid),
         )
 
+    def write_vertical_change(
+        self,
+        root: Path,
+        *,
+        task_id: str = "TASK-NEW-001",
+        change_name: str = "chg-new-provider",
+        include_evidence: bool = True,
+        missing_document: str | None = None,
+        describe_packages: bool = True,
+        extra_allowed: tuple[str, ...] = (),
+    ) -> None:
+        change = root / "openspec" / "changes" / change_name
+        change.mkdir(parents=True, exist_ok=True)
+        allowed = [
+            f"openspec/changes/{change_name}/**",
+            f"evidence/runs/{task_id}/**",
+        ]
+        if describe_packages:
+            allowed.insert(0, "Packages/**")
+        allowed[0:0] = extra_allowed
+        task_lines = [
+            f"## {task_id} — vertical provider",
+            "- Status:in-progress",
+            "- Allowed paths:",
+            *(f"  - `{pattern}`" for pattern in allowed),
+        ]
+        documents = {
+            "proposal.md": "# Proposal\n",
+            "design.md": "# Design\n",
+            "tasks.md": "\n".join(task_lines) + "\n",
+            "verification.md": "# Verification\n",
+        }
+        for name, contents in documents.items():
+            if name != missing_document:
+                (change / name).write_text(contents, encoding="utf-8")
+        if include_evidence:
+            evidence = root / "evidence" / "runs" / task_id / "run.md"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text("real evidence\n", encoding="utf-8")
+
+    def test_preflight_accepts_vertical_change_documents_only_as_base_task_supplement(self):
+        tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("provider\n", encoding="utf-8")
+        self.write_vertical_change(root)
+        head_oid = self.commit(root, "feat(TASK-BASE-001): add vertical provider")
+
+        result = check_pr_paths.preflight_paths(root, base_oid, head_oid)
+
+        self.assertEqual(result.declaration_source, "explicit")
+        self.assertEqual(result.check.task_id, "TASK-BASE-001")
+        self.assertIn(
+            "openspec/changes/chg-new-provider/**",
+            result.check.allowed_patterns,
+        )
+        self.assertIn(
+            "evidence/runs/TASK-NEW-001/**",
+            result.check.allowed_patterns,
+        )
+
+    def test_vertical_change_supplement_is_fail_closed(self):
+        cases = (
+            ("missing evidence", {"include_evidence": False}, "must include evidence"),
+            (
+                "missing review document",
+                {"missing_document": "design.md"},
+                "missing required review documents",
+            ),
+            (
+                "head task omits production path",
+                {"describe_packages": False},
+                "does not describe the complete diff",
+            ),
+        )
+        for label, options, expected in cases:
+            with self.subTest(label=label):
+                tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(root, **options)
+                head_oid = self.commit(
+                    root, "feat(TASK-BASE-001): malformed vertical provider"
+                )
+
+                self.assert_error(
+                    expected,
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_cannot_be_proposal_only(self):
+        tasks = """\
+## TASK-BASE-001 — docs authority
+- Allowed paths:`docs/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        note = root / "docs" / "note.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("note\n", encoding="utf-8")
+        self.write_vertical_change(root, describe_packages=False)
+        head_oid = self.commit(root, "docs(TASK-BASE-001): proposal only")
+
+        self.assert_error(
+            "requires a base-authorised production or test implementation path",
+            lambda: check_pr_paths.preflight_paths(root, base_oid, head_oid),
+        )
+
+    def test_vertical_change_supplement_rejects_an_existing_change_namespace(self):
+        tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        existing = root / "openspec" / "changes" / "chg-new-provider"
+        existing.mkdir(parents=True)
+        (existing / "history.md").write_text("base\n", encoding="utf-8")
+        base_oid = self.commit(root, "add existing change namespace")
+        source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("provider\n", encoding="utf-8")
+        self.write_vertical_change(root)
+        head_oid = self.commit(root, "feat(TASK-BASE-001): reuse change namespace")
+
+        self.assert_error(
+            "already exists in the base tree",
+            lambda: check_pr_paths.preflight_paths(root, base_oid, head_oid),
+        )
+
+    def test_vertical_change_supplement_uses_committed_task_bytes(self):
+        tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("provider\n", encoding="utf-8")
+        self.write_vertical_change(root, describe_packages=False)
+        head_oid = self.commit(root, "feat(TASK-BASE-001): incomplete description")
+        task_file = root / "openspec" / "changes" / "chg-new-provider" / "tasks.md"
+        task_file.write_text(
+            task_file.read_text(encoding="utf-8") + "  - `Packages/**`\n",
+            encoding="utf-8",
+        )
+        context = check_pr_paths.PullRequestContext(
+            title="feat(TASK-BASE-001): incomplete description",
+            body="",
+            head_ref="agent/fixture",
+            base_oid=base_oid,
+            head_oid=head_oid,
+        )
+        changed = check_pr_paths.git_changed_paths(root, base_oid, head_oid)
+
+        self.assert_error(
+            "does not describe the complete diff",
+            lambda: check_pr_paths.check_paths(root, context, changed),
+        )
+
+    def test_vertical_change_supplement_rejects_symlink_or_executable_evidence(self):
+        for label in ("symlink", "executable"):
+            with self.subTest(label=label):
+                tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(root)
+                evidence = root / "evidence" / "runs" / "TASK-NEW-001" / "run.md"
+                if label == "symlink":
+                    evidence.unlink()
+                    evidence.symlink_to("../../outside.md")
+                else:
+                    evidence.chmod(0o755)
+                head_oid = self.commit(
+                    root, f"feat(TASK-BASE-001): {label} evidence"
+                )
+
+                self.assert_error(
+                    "must be non-executable regular files",
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_rejects_glob_slugs_and_sibling_escape(self):
+        for change_name in ("chg-new*", "chg-new?", "chg-new[abc]"):
+            with self.subTest(change_name=change_name):
+                tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(root, change_name=change_name)
+                sibling = (
+                    root
+                    / "openspec"
+                    / "changes"
+                    / "chg-new-escape"
+                    / "payload.md"
+                )
+                sibling.parent.mkdir(parents=True)
+                sibling.write_text("escape\n", encoding="utf-8")
+                head_oid = self.commit(
+                    root, "feat(TASK-BASE-001): glob change namespace"
+                )
+
+                self.assert_error(
+                    "paths outside Allowed paths",
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_requires_an_exact_four_file_change_tree(self):
+        tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+        temporary, root, base_oid = self.make_repo(tasks)
+        self.addCleanup(temporary.cleanup)
+        source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+        source.parent.mkdir(parents=True)
+        source.write_text("provider\n", encoding="utf-8")
+        self.write_vertical_change(root)
+        extra = root / "openspec" / "changes" / "chg-new-provider" / "payload.md"
+        extra.write_text("not a review document\n", encoding="utf-8")
+        head_oid = self.commit(root, "feat(TASK-BASE-001): extra change payload")
+
+        self.assert_error(
+            "must contain exactly the four review documents",
+            lambda: check_pr_paths.preflight_paths(root, base_oid, head_oid),
+        )
+
+    def test_vertical_change_supplement_rejects_a_second_base_authorised_change_root(self):
+        for second_name in ("chg-second", "chg-Second", "chg-other*"):
+            with self.subTest(second_name=second_name):
+                tasks = """\
+## TASK-BASE-001 — packages and change authority
+- Allowed paths:
+  - `Packages/**`
+  - `openspec/changes/**`
+"""
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(root)
+                second = (
+                    root
+                    / "openspec"
+                    / "changes"
+                    / second_name
+                    / "payload.md"
+                )
+                second.parent.mkdir(parents=True)
+                second.write_text("second change\n", encoding="utf-8")
+                head_oid = self.commit(
+                    root, "feat(TASK-BASE-001): two change roots"
+                )
+
+                self.assert_error(
+                    "must introduce exactly its one change directory",
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_counts_direct_change_files_and_symlinks(self):
+        for entry_kind in ("file", "symlink"):
+            with self.subTest(entry_kind=entry_kind):
+                tasks = """\
+## TASK-BASE-001 — packages and change authority
+- Allowed paths:
+  - `Packages/**`
+  - `openspec/changes/**`
+"""
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(
+                    root,
+                    extra_allowed=("openspec/changes/chg-second",),
+                )
+                second = root / "openspec" / "changes" / "chg-second"
+                if entry_kind == "file":
+                    second.write_text("not a directory\n", encoding="utf-8")
+                else:
+                    second.symlink_to("missing-target")
+                head_oid = self.commit(
+                    root,
+                    f"feat(TASK-BASE-001): direct change {entry_kind}",
+                )
+
+                self.assert_error(
+                    "must introduce exactly its one change directory",
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_rejects_archived_task_or_slug_reuse(self):
+        cases = (
+            (
+                "task ID",
+                "chg-historical-provider",
+                "TASK-OLD-001",
+                "chg-fresh-provider",
+                "TASK-OLD-001",
+                "reuses an archived Task ID",
+            ),
+            (
+                "change slug",
+                "chg-old-provider",
+                "TASK-HISTORICAL-001",
+                "chg-old-provider",
+                "TASK-NEW-001",
+                "resurrects an archived change slug",
+            ),
+        )
+        for (
+            label,
+            archived_slug,
+            archived_task,
+            new_slug,
+            new_task,
+            expected,
+        ) in cases:
+            with self.subTest(label=label):
+                tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+                temporary, root, _ = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                archived = (
+                    root
+                    / "openspec"
+                    / "changes"
+                    / "archive"
+                    / f"2026-01-01-{archived_slug}"
+                    / "tasks.md"
+                )
+                archived.parent.mkdir(parents=True)
+                archived.write_text(
+                    f"## {archived_task} — historical\n"
+                    "- Allowed paths:`Packages/**`\n",
+                    encoding="utf-8",
+                )
+                base_oid = self.commit(root, "archive historical change")
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(
+                    root,
+                    task_id=new_task,
+                    change_name=new_slug,
+                )
+                head_oid = self.commit(
+                    root, "feat(TASK-BASE-001): reuse historical identity"
+                )
+
+                self.assert_error(
+                    expected,
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_counts_direct_archive_files_and_symlinks(self):
+        for entry_kind in ("file", "symlink"):
+            with self.subTest(entry_kind=entry_kind):
+                tasks = """\
+## TASK-BASE-001 — packages authority
+- Allowed paths:`Packages/**`
+"""
+                temporary, root, _ = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                archived = (
+                    root
+                    / "openspec"
+                    / "changes"
+                    / "archive"
+                    / "2026-01-01-chg-old-provider"
+                )
+                archived.parent.mkdir(parents=True)
+                if entry_kind == "file":
+                    archived.write_text("archive marker\n", encoding="utf-8")
+                else:
+                    archived.symlink_to("missing-target")
+                base_oid = self.commit(root, "add direct archive marker")
+                source = root / "Packages" / "ArkDeckKit" / "Provider.swift"
+                source.parent.mkdir(parents=True)
+                source.write_text("provider\n", encoding="utf-8")
+                self.write_vertical_change(
+                    root,
+                    change_name="chg-old-provider",
+                )
+                head_oid = self.commit(
+                    root, "feat(TASK-BASE-001): reuse direct archive marker"
+                )
+
+                self.assert_error(
+                    "resurrects an archived change slug",
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
+    def test_vertical_change_supplement_rejects_governance_only_sensitive_paths(self):
+        for path in ("AGENTS.md", ".gitignore"):
+            with self.subTest(path=path):
+                tasks = f"""\
+## TASK-BASE-001 — governance authority
+- Allowed paths:`{path}`
+"""
+                temporary, root, base_oid = self.make_repo(tasks)
+                self.addCleanup(temporary.cleanup)
+                target = root / path
+                target.write_text("governance only\n", encoding="utf-8")
+                self.write_vertical_change(
+                    root,
+                    describe_packages=False,
+                    extra_allowed=(path,),
+                )
+                head_oid = self.commit(
+                    root, "docs(TASK-BASE-001): governance-only change"
+                )
+
+                self.assert_error(
+                    "requires a base-authorised production or test implementation path",
+                    lambda root=root, base_oid=base_oid, head_oid=head_oid: (
+                        check_pr_paths.preflight_paths(root, base_oid, head_oid)
+                    ),
+                )
+
     def test_preflight_allows_taskless_non_sensitive_diff_and_rejects_empty_diff(self):
         temporary, root, base_oid = self.make_repo(None)
         self.addCleanup(temporary.cleanup)

@@ -149,8 +149,14 @@
   Task ID。最终 commit 完成后、push 前必须运行
   `python3 scripts/check_pr_paths.py --repo-root . --preflight
   --base-revision origin/main --head-revision HEAD`;该命令只接受 Allowed paths 覆盖完整
-  diff 的 base-tree active Task。不得声明仅由当前 head 新建/恢复的 Task,不得为通过门禁
-  扩张 Allowed paths。`agent-pr` workflow 使用同一 preflight 结果创建初始 PR 正文,
+  diff 的 base-tree active Task。新 operation/provider/integration profile 的垂直 PR 仍须在
+  commit subject 声明一个 base-tree active Task；该 Task 必须覆盖全部生产/测试路径。
+  checker 仅可把同车新建且 base 中完全不存在的单一 `openspec/changes/chg-*/` 四件套，
+  以及与该 change 唯一新 Task ID 精确同名的 `evidence/runs/<TASK-ID>/`，作为受限的
+  自描述 supplement；新 Task 的 Allowed paths 必须描述完整 diff，但不产生任何路径权限，
+  且 change 目录必须精确只有四件套，diff 必须同时含 base Task 已授权的
+  `Packages/**`、App/UI、Catalog 或 Xcode 生产/测试实现路径。除此之外不得声明仅由当前
+  head 新建/恢复的 Task,不得为通过门禁扩张 Allowed paths。`agent-pr` workflow 使用同一 preflight 结果创建初始 PR 正文,
   Agent 不得先 push 再依赖编辑 PR 正文补 `Task:`。
 - **本地闸由与 GitHub 共用的路径分类器选择编译车道**。统一入口始终执行 SDD、
   catalog generator unittest 与零漂移三道门；随后按 `origin/main...HEAD + worktree`
