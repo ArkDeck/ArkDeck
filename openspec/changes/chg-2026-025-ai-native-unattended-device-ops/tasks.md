@@ -3903,3 +3903,70 @@ durable 序数预算，而不是无密码学 provenance 的会话断言。
   但性能数字只作优化证据，不替代测试正确性。
 - 设备连接、HDC/RockUSB/Flash dispatch 与真实硬件 evidence 均为 0；CI 绿色只表示验证通过，
   不构成维护者批准，也不产生 `REAL_DEVICE_PASS`。
+
+## TASK-AIN-023 — 双语项目资料事实同步
+
+- Status:in-progress（维护者要求为根目录双语 README 建立统一维护边界；本 Task 只有在
+  定义 PR 经维护者 review/merge 进入 protected `main` 后，才能被后续文档 PR 声明。
+  Task 定义本身不授权同一 PR 修改 README）
+- Compatibility note:这是维护者针对本次双语资料失真的显式文档维护例外；它不恢复
+  readiness/verification/archive 链，不把文档完成计为 Golden Journey 进度，也不扩张为
+  通用文档治理框架
+- Golden Journey:GJ-1—GJ-5 共用的项目发现与首次安装入口；本 Task 只确保公开资料如实
+  描述当前产品，不改变任何 Journey 状态，亦不替代当前 Catalog digest 的真机验证
+- Platform:macos、GitHub repository documentation
+- Root cause:根目录 README 在生产实现连续演进后出现多处事实漂移：最低系统仍写
+  macOS 14，而 Package/App 已要求 macOS 26；工具链未反映 Xcode 26.6 / Swift 6.3；
+  调用方不能提交任意命令与 Runtime 内部执行 typed argv 的边界表述不精确；SwiftPM
+  Debug 可执行文件又被误写成可直接安装的生产 LaunchAgent，未体现签名 helper 硬门。
+  中文 README 还缺少英文已有的路径感知 CI 说明，两个语言版本已失去结构与事实对齐
+- Depends on:protected `main` 当前 Package manifest、Xcode project、App navigation、
+  published Catalog、CLI usage、LaunchAgent production validation 与 PRODUCT-LOOP 状态规则；
+  不新增或修改 operation、provider、integration/device profile 或 destructive policy
+- Production reachability:工程师阅读 README → 选择受支持的 host/toolchain → 构建 App/Package
+  或安装已签名 Runtime helper → 观察并接管精确设备 → 仅通过 published typed operation
+  进入现有 Runtime；README 不生成 trusted fact、capability、argv、远端路径或硬件 evidence
+- Trusted fact sources:版本与平台来自 `Packages/ArkDeckKit/Package.swift`、
+  `ArkDeck.xcodeproj/project.pbxproj` 与 CI workflow；功能清单来自 `Catalog/operations/**`；
+  App/CLI/daemon 表面来自生产 source；LaunchAgent 安装条件来自生产 validator 与签名指南；
+  Golden Journey 声明只引用 `PRODUCT-LOOP.md`，不从历史 evidence 推断当前通过
+- Allowed paths:
+  - `README.md`
+  - `README.zh-CN.md`
+- Forbidden paths:
+  - `AGENTS.md`、`PRODUCT-LOOP.md`、`.github/**`、`scripts/**`
+  - `Catalog/**`、`Packages/**`、`ArkDeckApp/**`、`ArkDeckAppUITests/**`、
+    `ArkDeck.xcodeproj/**`、`openspec/**`
+  - 产品行为、Catalog digest、支持矩阵、Task 状态、真实设备 evidence 与任何安全不变量
+- Risk:low（仅同步公开资料；主要风险是过度承诺尚未实现/未在当前 digest 真机通过的能力，
+  因此所有描述必须能回指 protected-main 事实源，并保留 preview 与平台边界）
+- Hardware required:no（文档 PR 不连接 USB/HDC/RockUSB，不执行 device operation；
+  历史真机记录只用于避免错误表述，不在本 Task 中重判或生成）
+- Decision-Grade:D0
+
+### Deliverables
+
+- 中英文 README 使用相同的信息架构、版本、支持边界、功能集合、入口表和安装路径；中文采用
+  自然表达，不逐句硬译，但不得省略英文的约束或额外扩大能力。
+- 将最低平台与工具链同步为 macOS 26、Apple silicon、Xcode 26.6、Swift 6.3，并保留
+  `0.1.0` preview、DAYU200 单板刷机与 Windows/Linux 未开始的真实边界。
+- 明确 caller 只能提交 published operation + typed inputs；Runtime 负责 materialize
+  executable/argv/provider-owned path，禁止把该边界误写成 Runtime 从不执行 HDC argv。
+- 把 SwiftPM build/test 与生产 Runtime 安装拆开：裸 Debug binary 不是可安装 helper；
+  `agentd install` 只接受满足 Developer ID、hardened runtime、provisioning profile 与共享
+  Keychain entitlement 的 `ArkDeckAgent.app`，并链接现有无头运行时指南。
+- 同步 App navigation、CLI/daemon 职责、Catalog 能力、Artifact 隐私与路径感知本地 CI；
+  Golden Journey 只说明定义与状态规则，不宣称文档 PR 取得当前 digest 真机通过。
+
+### Verification
+
+- 对 Package/Xcode/CI 版本、App navigation、Catalog operation、CLI usage 与 LaunchAgent
+  validator 运行逐项事实断言；中英文 heading、code fence、链接目标与关键约束成对检查。
+- `git diff --check` 与所有相对链接存在性检查通过。
+- `python3 scripts/ci/plan.py --repo-root . --base-revision origin/main
+  --head-revision HEAD --merge-base --include-worktree --run-local` 选择 docs-only 路径，且
+  SDD、catalog generator unittest、zero-drift 三道通用门全绿。
+- 最终文档 commit 使用 `TASK-AIN-023`，并在 push 前通过 base-tree
+  `scripts/check_pr_paths.py --preflight`；不得在文档 PR 修改本 Task 或扩张 Allowed paths。
+- 设备连接、HDC/RockUSB/Flash dispatch、真实 Artifact 与 hardware evidence 均为 0；
+  验证结论只覆盖资料与 protected-main 事实一致，不产生 `REAL_DEVICE_PASS`。
