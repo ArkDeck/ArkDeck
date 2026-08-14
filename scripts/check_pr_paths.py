@@ -9,6 +9,13 @@ requires an explicit Task in the final commit subject; the Agent PR workflow
 may use ``--infer-task`` only as a fail-closed fallback when exactly one
 base-tree active Task covers the complete diff.
 
+A vertical change that introduces a new OpenSpec Task is not allowed to use
+that head-only Task as authority.  Instead, its commit must declare one
+base-tree active Task that covers every production/test path.  The guard may
+then admit only the new change's own four review documents and its matching
+``evidence/runs/<new-task-id>/`` namespace as a self-describing supplement.
+The head Task must describe the complete diff, but never authorises it.
+
 Known residual (TASK-DEC-004, ledger B-H2): both workflows check out the
 head being reviewed and run *this file* from that checkout, so a task whose
 Allowed paths include `scripts/**` can change the checker and its tests in
@@ -66,6 +73,19 @@ LIST_CONNECTIVES = frozenset({"与", "和"})
 # A 40-hex token is a pinned blob recorded next to the file it pins, never a
 # path: no repository path is named that way.
 PINNED_BLOB_RE = re.compile(r"^[0-9a-f]{40}$")
+VERTICAL_CHANGE_DIRECTORY_RE = re.compile(
+    r"^openspec/changes/(chg-[a-z0-9]+(?:-[a-z0-9]+)*)$"
+)
+VERTICAL_CHANGE_REQUIRED_FILES = frozenset(
+    {"proposal.md", "design.md", "tasks.md", "verification.md"}
+)
+VERTICAL_IMPLEMENTATION_PATTERNS = (
+    "Packages/**",
+    "ArkDeckApp/**",
+    "ArkDeckAppUITests/**",
+    "ArkDeck.xcodeproj/**",
+    "Catalog/**",
+)
 
 # The sensitive-path table lives next to this script so guard code and guard
 # data travel in the same checkout and the same `scripts/**` protection domain
@@ -75,17 +95,15 @@ CONFIG_SCHEMA = "arkdeck-automation-config/v1"
 CONFIG_PATH = Path(__file__).resolve().parent / "automation_config.json"
 CONFIG_KEYS = frozenset({"schema", "sensitive_paths"})
 
-# Maintainer-authorized one-time bootstrap for the change that introduces
-# preflight itself. It is deliberately a three-part fuse: exact old main,
-# exact agent branch, and exact complete diff. Once this pull request lands,
-# main moves away from this OID and the exception can never match again.
-BOOTSTRAP_EXCEPTION_BASE_OID = "f5a37c22db3539db3c1ba6f331103bd66fe8e0d8"
-BOOTSTRAP_EXCEPTION_HEAD_REF = "agent/pr-path-preflight"
+# Maintainer-authorized one-time bootstrap for the vertical-change preflight
+# upgrade. It is deliberately a three-part fuse: exact old main, exact agent
+# branch, and exact complete diff. Once this pull request lands, main moves
+# away from this OID and the exception can never match again.
+BOOTSTRAP_EXCEPTION_BASE_OID = "b07cd5ca00c0efef3403ad044903219022fecf63"
+BOOTSTRAP_EXCEPTION_HEAD_REF = "agent/vertical-change-preflight-bot"
 BOOTSTRAP_EXCEPTION_PATHS = (
-    ".github/workflows/agent-pr.yml",
     "AGENTS.md",
     "scripts/check_pr_paths.py",
-    "scripts/test_agent_pr_workflow.py",
     "scripts/test_check_pr_paths.py",
 )
 
@@ -906,11 +924,217 @@ def check_paths(
         if path not in relocation_paths and not path_matches(path, allowed_patterns)
     )
     if offenders:
-        raise CheckError(
-            f"declared task {task_id} has paths outside Allowed paths: "
-            + ", ".join(offenders)
+        supplement_patterns = vertical_change_supplement_patterns(
+            repo_root,
+            context,
+            repository_paths,
+            offenders,
+            base_definitions=base_definitions,
+            base_allowed_patterns=allowed_patterns,
         )
+        if supplement_patterns is None:
+            raise CheckError(
+                f"declared task {task_id} has paths outside Allowed paths: "
+                + ", ".join(offenders)
+            )
+        allowed_patterns = allowed_patterns + supplement_patterns
     return CheckResult(task_id, repository_paths, allowed_patterns)
+
+
+def vertical_change_supplement_patterns(
+    repo_root: Path,
+    context: PullRequestContext,
+    repository_paths: Sequence[str],
+    offenders: Sequence[str],
+    *,
+    base_definitions: dict[str, TaskDefinition],
+    base_allowed_patterns: Sequence[str],
+) -> tuple[str, ...] | None:
+    """Validate a narrow head-only change/evidence supplement.
+
+    The base Task remains the only authority for production and test paths.
+    A new Task can describe the complete vertical delivery, but the only paths
+    it may add beyond the base allowlist are its own previously absent change
+    directory and its exactly matching evidence namespace.
+    """
+
+    # Do not let an uncommitted checkout edit supply the descriptive Task used
+    # to judge a committed PR head.  The head commit is always present when its
+    # OID is being reviewed, including in shallow CI checkouts.
+    committed_head_definitions = load_task_definitions_at_commit(
+        repo_root, context.head_oid
+    )
+    new_task_ids = sorted(set(committed_head_definitions) - set(base_definitions))
+    if len(new_task_ids) != 1:
+        return None
+    new_task = committed_head_definitions[new_task_ids[0]]
+    try:
+        change_directory = new_task.change_directory.relative_to(repo_root).as_posix()
+    except ValueError:
+        return None
+    if VERTICAL_CHANGE_DIRECTORY_RE.fullmatch(change_directory) is None:
+        return None
+    if git_tree_entries(repo_root, context.base_oid, change_directory):
+        raise CheckError(
+            "vertical change supplement directory already exists in the base tree: "
+            + change_directory
+        )
+
+    def active_change_roots(oid: str) -> frozenset[str]:
+        roots: set[str] = set()
+        for entry in git_tree_entries(repo_root, oid, "openspec/changes"):
+            parts = entry.path.split("/")
+            if (
+                len(parts) >= 3
+                and parts[:2] == ["openspec", "changes"]
+                and parts[2].startswith("chg-")
+            ):
+                roots.add("/".join(parts[:3]))
+        return frozenset(roots)
+
+    added_change_roots = active_change_roots(context.head_oid) - active_change_roots(
+        context.base_oid
+    )
+    if added_change_roots != {change_directory}:
+        rendered = ", ".join(sorted(added_change_roots)) or "none"
+        raise CheckError(
+            "vertical change supplement must introduce exactly its one change "
+            f"directory; added change roots: {rendered}"
+        )
+
+    archive_entries = git_tree_entries(
+        repo_root, context.base_oid, "openspec/changes/archive"
+    )
+    archived_task_ids: set[str] = set()
+    archived_change_slugs: set[str] = set()
+    archived_slug_re = re.compile(
+        r"(chg-[a-z0-9]+(?:-[a-z0-9]+)*)$"
+    )
+    for entry in archive_entries:
+        parts = entry.path.split("/")
+        if len(parts) >= 4 and parts[:3] == ["openspec", "changes", "archive"]:
+            slug_match = archived_slug_re.search(parts[3])
+            if slug_match is not None:
+                archived_change_slugs.add(slug_match.group(1))
+        if entry.path.endswith("/tasks.md") and entry.object_type == "blob":
+            raw_text = _run_git(
+                repo_root,
+                ["cat-file", "blob", entry.oid],
+                context=f"git cat-file archived tasks {entry.path}",
+            )
+            try:
+                task_text = raw_text.decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise CheckError(
+                    f"archived tasks file {entry.path} is not UTF-8: {error}"
+                ) from error
+            archived_task_ids.update(TASK_HEADER_RE.findall(task_text))
+    change_slug = change_directory.rsplit("/", 1)[-1]
+    if new_task.task_id in archived_task_ids:
+        raise CheckError(
+            "vertical change supplement reuses an archived Task ID: "
+            + new_task.task_id
+        )
+    if change_slug in archived_change_slugs:
+        raise CheckError(
+            "vertical change supplement resurrects an archived change slug: "
+            + change_slug
+        )
+
+    evidence_directory = f"evidence/runs/{new_task.task_id}"
+    supplement_patterns = (
+        f"{change_directory}/**",
+        f"{evidence_directory}/**",
+    )
+    if any(
+        not (
+            path.startswith(f"{change_directory}/")
+            or path.startswith(f"{evidence_directory}/")
+        )
+        for path in offenders
+    ):
+        return None
+    if not any(
+        path.startswith(f"{evidence_directory}/") for path in repository_paths
+    ):
+        raise CheckError(
+            "vertical change supplement must include evidence under "
+            f"{evidence_directory}/"
+        )
+
+    # A supplement cannot turn a proposal-only diff into a vertical delivery.
+    # At least one base-authorised sensitive product/guard path must travel in
+    # the same commit.
+    base_authorised = tuple(
+        path
+        for path in repository_paths
+        if path_matches(path, base_allowed_patterns)
+    )
+    if not any(
+        path_matches(path, VERTICAL_IMPLEMENTATION_PATTERNS)
+        for path in base_authorised
+    ):
+        raise CheckError(
+            "vertical change supplement requires a base-authorised production "
+            "or test implementation path in the same diff"
+        )
+
+    if git_tree_entries(repo_root, context.base_oid, evidence_directory):
+        raise CheckError(
+            "vertical change supplement evidence directory already exists in the "
+            "base tree: " + evidence_directory
+        )
+    head_entries = git_tree_entries(repo_root, context.head_oid, change_directory)
+    evidence_entries = git_tree_entries(
+        repo_root, context.head_oid, evidence_directory
+    )
+    if not evidence_entries:
+        raise CheckError(
+            "vertical change supplement has no committed evidence under "
+            f"{evidence_directory}/"
+        )
+    unsafe_supplement_entries = sorted(
+        entry.path
+        for entry in (*head_entries, *evidence_entries)
+        if entry.object_type != "blob" or entry.mode != "100644"
+    )
+    if unsafe_supplement_entries:
+        raise CheckError(
+            "vertical change supplement files must be non-executable regular files: "
+            + ", ".join(unsafe_supplement_entries)
+        )
+    entry_by_path = {entry.path: entry for entry in head_entries}
+    required_paths = {
+        f"{change_directory}/{filename}"
+        for filename in VERTICAL_CHANGE_REQUIRED_FILES
+    }
+    missing = sorted(required_paths - set(entry_by_path))
+    if missing:
+        raise CheckError(
+            "vertical change supplement is missing required review documents: "
+            + ", ".join(missing)
+        )
+    extra_change_paths = sorted(set(entry_by_path) - required_paths)
+    if extra_change_paths:
+        raise CheckError(
+            "vertical change supplement directory must contain exactly the four "
+            "review documents; extra paths: " + ", ".join(extra_change_paths)
+        )
+    try:
+        descriptive_patterns = extract_allowed_patterns(repo_root, new_task)
+    except CheckError as error:
+        raise CheckError(
+            f"vertical change supplement task {new_task.task_id} is malformed: {error}"
+        ) from error
+    undescribed = sorted(
+        path for path in repository_paths if not path_matches(path, descriptive_patterns)
+    )
+    if undescribed:
+        raise CheckError(
+            f"vertical change supplement task {new_task.task_id} does not describe "
+            "the complete diff: " + ", ".join(undescribed)
+        )
+    return supplement_patterns
 
 
 def one_time_bootstrap_result(
