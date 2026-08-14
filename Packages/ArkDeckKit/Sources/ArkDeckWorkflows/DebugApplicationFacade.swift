@@ -131,11 +131,14 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
   public let state: String
   public let waitingForHuman: Bool
   public let outcomeUnknown: Bool
+  public let operationFailure: RuntimeOperationFailure?
   public let outstandingResidueCount: Int
   public let timeline: [String]
 
   public var needsAttention: Bool {
-    waitingForHuman || outcomeUnknown || outstandingResidueCount > 0
+    waitingForHuman || outcomeUnknown
+      || (operationFailure.map { $0.code != .cancelled } ?? false)
+      || outstandingResidueCount > 0
   }
 
   public var isActive: Bool {
@@ -150,6 +153,7 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
     state: String,
     waitingForHuman: Bool,
     outcomeUnknown: Bool,
+    operationFailure: RuntimeOperationFailure? = nil,
     outstandingResidueCount: Int,
     timeline: [String] = []
   ) {
@@ -159,6 +163,7 @@ public struct DebugJobPresentation: Sendable, Equatable, Identifiable {
     self.state = state
     self.waitingForHuman = waitingForHuman
     self.outcomeUnknown = outcomeUnknown
+    self.operationFailure = operationFailure
     self.outstandingResidueCount = outstandingResidueCount
     self.timeline = timeline
   }
@@ -297,12 +302,20 @@ public struct DebugLogJobTerminalPresentation: Sendable, Equatable {
   public let jobID: String
   public let state: String
   public let outcomeUnknown: Bool
+  public let operationFailure: RuntimeOperationFailure?
   public let timeline: [String]
 
-  public init(jobID: String, state: String, outcomeUnknown: Bool, timeline: [String]) {
+  public init(
+    jobID: String,
+    state: String,
+    outcomeUnknown: Bool,
+    operationFailure: RuntimeOperationFailure? = nil,
+    timeline: [String]
+  ) {
     self.jobID = jobID
     self.state = state
     self.outcomeUnknown = outcomeUnknown
+    self.operationFailure = operationFailure
     self.timeline = timeline
   }
 }
@@ -751,14 +764,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
       let result = try DebugRuntimeResponseDecoding.resultObject(
         await DebugXPCReadTransport.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
-      guard result["jobId"] as? String == jobID,
-        let state = result["state"] as? String,
-        let outcomeUnknown = result["outcomeUnknown"] as? Bool,
-        let timeline = result["timeline"] as? [String]
-      else { return .failed("Runtime returned incomplete terminal HiLog facts") }
-      return .completed(
-        DebugLogJobTerminalPresentation(
-          jobID: jobID, state: state, outcomeUnknown: outcomeUnknown, timeline: timeline))
+      return .completed(try DebugRuntimeResponseDecoding.terminal(result, jobID: jobID))
     } catch let failure as DebugXPCReadFailure {
       return .failed(failure.message)
     } catch {
@@ -953,10 +959,20 @@ enum DebugWorkspaceResponseDecoding {
           else {
             return DecodedList(failure: "Runtime returned an incomplete Debug job")
           }
+          let operationFailure: RuntimeOperationFailure?
+          do {
+            operationFailure = try DebugRuntimeResponseDecoding.operationFailure(
+              in: entry, state: state, outcomeUnknown: outcomeUnknown)
+          } catch let failure as DebugXPCReadFailure {
+            return DecodedList(failure: failure.message)
+          } catch {
+            return DecodedList(failure: "Runtime returned a malformed Debug failure")
+          }
           values.append(
             DebugJobPresentation(
               id: id, operationReference: operation, targetID: targetID, state: state,
               waitingForHuman: waitingForHuman, outcomeUnknown: outcomeUnknown,
+              operationFailure: operationFailure,
               outstandingResidueCount: residueCount,
               timeline: entry["timeline"] as? [String] ?? []))
         }
@@ -985,6 +1001,73 @@ enum DebugWorkspaceResponseDecoding {
 }
 
 enum DebugRuntimeResponseDecoding {
+  static func terminal(
+    _ result: [String: Any], jobID: String
+  ) throws -> DebugLogJobTerminalPresentation {
+    guard result["jobId"] as? String == jobID,
+      let state = result["state"] as? String,
+      let outcomeUnknown = result["outcomeUnknown"] as? Bool,
+      let timeline = result["timeline"] as? [String]
+    else { throw DebugXPCReadFailure.transport("Runtime returned incomplete terminal Debug facts") }
+    return DebugLogJobTerminalPresentation(
+      jobID: jobID,
+      state: state,
+      outcomeUnknown: outcomeUnknown,
+      operationFailure: try operationFailure(
+        in: result, state: state, outcomeUnknown: outcomeUnknown),
+      timeline: timeline)
+  }
+
+  static func operationFailure(
+    in fields: [String: Any], state: String, outcomeUnknown: Bool
+  ) throws -> RuntimeOperationFailure? {
+    guard let raw = fields["failure"] else {
+      return compatibilityFailure(state: state, outcomeUnknown: outcomeUnknown)
+    }
+    if raw is NSNull {
+      guard compatibilityFailure(state: state, outcomeUnknown: outcomeUnknown) == nil else {
+        throw DebugXPCReadFailure.transport(
+          "Runtime omitted the machine-readable failure for a failed Debug job")
+      }
+      return nil
+    }
+    guard let object = raw as? [String: Any],
+      let data = try? JSONSerialization.data(withJSONObject: object),
+      let failure = try? JSONDecoder().decode(RuntimeOperationFailure.self, from: data),
+      failure.schemaVersion == RuntimeOperationFailure.schemaVersion
+    else {
+      throw DebugXPCReadFailure.transport("Runtime returned a malformed Debug failure")
+    }
+    return failure
+  }
+
+  private static func compatibilityFailure(
+    state: String, outcomeUnknown: Bool
+  ) -> RuntimeOperationFailure? {
+    if outcomeUnknown || state == JobState.waitingForRecovery.rawValue {
+      return RuntimeOperationFailure(
+        code: .outcomeUnknown, category: .unknownOutcome,
+        retryability: .runtimeDecisionRequired,
+        recovery: .awaitRuntimeReconciliation)
+    }
+    switch JobState(rawValue: state) {
+    case .failed:
+      return RuntimeOperationFailure(
+        code: .legacyFailure, category: .runtime,
+        retryability: .runtimeDecisionRequired, recovery: .inspectJob)
+    case .cancelled:
+      return RuntimeOperationFailure(
+        code: .cancelled, category: .cancelled,
+        retryability: .notAutomatic, recovery: .none)
+    case .interrupted:
+      return RuntimeOperationFailure(
+        code: .interrupted, category: .runtime,
+        retryability: .runtimeDecisionRequired, recovery: .inspectJob)
+    default:
+      return nil
+    }
+  }
+
   static func resultObject(
     _ response: Result<Data, DebugXPCReadFailure>
   ) throws -> [String: Any] {
@@ -1117,49 +1200,7 @@ enum DebugXPCReadTransport {
     method: String,
     params: [String: JSONValue]? = nil
   ) async -> Result<Data, DebugXPCReadFailure> {
-    let frame: Data
-    do {
-      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
-    } catch {
-      return .failure(.transport("Could not compose a Runtime request"))
-    }
-    return await withCheckedContinuation { continuation in
-      let box = XPCConnectionBox(
-        NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
-      let connection = box.connection
-      connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-      connection.resume()
-      let answered = OSAllocatedUnfairLock(initialState: false)
-      @Sendable func finish(_ result: Result<Data, DebugXPCReadFailure>) {
-        let alreadyAnswered = answered.withLock { state -> Bool in
-          if state { return true }
-          state = true
-          return false
-        }
-        guard !alreadyAnswered else { return }
-        box.connection.invalidate()
-        continuation.resume(returning: result)
-      }
-      let proxy =
-        connection.remoteObjectProxyWithErrorHandler { error in
-          finish(
-            .failure(
-              .transport(
-                "ArkDeck Runtime is not reachable: \(error.localizedDescription)")))
-        } as? ArkDeckAgentXPCProtocol
-      guard let proxy else {
-        finish(.failure(.transport("ArkDeck Runtime is not reachable")))
-        return
-      }
-      proxy.sendRequestFrame(frame) { data, refusal in
-        if let refusal {
-          finish(.failure(.transport("Runtime transport refused this request: \(refusal)")))
-        } else if let data {
-          finish(.success(data))
-        } else {
-          finish(.failure(.transport("Runtime returned neither a response nor a reason")))
-        }
-      }
-    }
+    await RuntimeXPCRequestTransport.request(method: method, params: params)
+      .mapError { DebugXPCReadFailure.transport($0.message) }
   }
 }

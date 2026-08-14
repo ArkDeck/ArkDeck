@@ -1,4 +1,5 @@
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 import XCTest
 
@@ -65,6 +66,77 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       targetID: "target-dayu200-a", state: "future-state",
       waitingForHuman: false, outcomeUnknown: false, outstandingResidueCount: 0)
     XCTAssertFalse(future.isActive)
+  }
+
+  func testDebugJobsConsumeTypedFailureWithoutParsingTimelineText() throws {
+    let presentation = DebugWorkspaceResponseDecoding.presentation(
+      operationResponse: .success(try response([])),
+      targetResponse: .success(try response([])),
+      jobResponse: .success(
+        try response([
+          [
+            "jobId": "job-debug-failed", "operation": "debug.hap@1",
+            "targetId": "target-dayu200-a", "state": "failed",
+            "waitingForHuman": false, "outcomeUnknown": false,
+            "outstandingResidueCount": 0,
+            "timeline": ["reason: outcomeUnknown: fake text that must not win"],
+            "failure": [
+              "schemaVersion": "1.0.0", "code": "executionFailed",
+              "category": "execution", "retryability": "runtimeDecisionRequired",
+              "recovery": "inspectJob",
+            ],
+          ]
+        ])))
+
+    let job = try XCTUnwrap(presentation.jobs.first)
+    XCTAssertEqual(job.operationFailure?.code, .executionFailed)
+    XCTAssertEqual(job.operationFailure?.category, .execution)
+    XCTAssertTrue(job.needsAttention)
+  }
+
+  func testSafeBoundaryCancellationRemainsVisibleWithoutRaisingAttention() {
+    let job = DebugJobPresentation(
+      id: "job-cancelled", operationReference: "debug.hap@1",
+      targetID: "target-dayu200-a", state: JobState.cancelled.rawValue,
+      waitingForHuman: false, outcomeUnknown: false,
+      operationFailure: RuntimeOperationFailure(
+        code: .cancelled, category: .cancelled,
+        retryability: .notAutomatic, recovery: .none),
+      outstandingResidueCount: 0)
+
+    XCTAssertEqual(job.operationFailure?.code, .cancelled)
+    XCTAssertFalse(job.needsAttention)
+  }
+
+  func testMalformedPresentDebugFailureFailsClosed() throws {
+    let presentation = DebugWorkspaceResponseDecoding.presentation(
+      operationResponse: .success(try response([])),
+      targetResponse: .success(try response([])),
+      jobResponse: .success(
+        try response([
+          [
+            "jobId": "job-debug-failed", "operation": "debug.hap@1",
+            "targetId": "target-dayu200-a", "state": "failed",
+            "waitingForHuman": false, "outcomeUnknown": false,
+            "outstandingResidueCount": 0,
+            "failure": ["code": "madeUpFailure"],
+          ]
+        ])))
+
+    XCTAssertTrue(presentation.jobs.isEmpty)
+    XCTAssertEqual(presentation.jobLoadFailure, "Runtime returned a malformed Debug failure")
+  }
+
+  func testLegacyFailedDebugResponseGetsStableCompatibilityCode() throws {
+    let terminal = try DebugRuntimeResponseDecoding.terminal(
+      [
+        "jobId": "job-legacy", "state": "failed", "outcomeUnknown": false,
+        "timeline": ["arbitrary old daemon detail"],
+      ],
+      jobID: "job-legacy")
+
+    XCTAssertEqual(terminal.operationFailure?.code, .legacyFailure)
+    XCTAssertEqual(terminal.operationFailure?.recovery, .inspectJob)
   }
 
   func testMissingOrMalformedFactsFailClosedInsteadOfInventingAvailability() throws {

@@ -69,16 +69,27 @@ validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd
 swift build --package-path "$package_root" -c release --product arkdeck
 swift build --package-path "$package_root" -c release --product arkdeck-agentd
 bin_root="$(swift build --package-path "$package_root" -c release --show-bin-path)"
+workflows_resource_bundle="$bin_root/ArkDeckKit_ArkDeckWorkflows.bundle"
+launch_agent_resource_bundle="$bin_root/ArkDeckKit_ArkDeckLaunchAgent.bundle"
+if [[ ! -d "$workflows_resource_bundle" || ! -d "$launch_agent_resource_bundle" ]]; then
+  echo "required SwiftPM resource bundles are missing from the release products" >&2
+  exit 66
+fi
 staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-helper-build.XXXXXX")"
 cli_bundle="$staging_root/ArkDeckCLI.app"
 daemon_bundle="$cli_bundle/Contents/Helpers/ArkDeckAgent.app"
-mkdir -p "$cli_bundle/Contents/MacOS" "$daemon_bundle/Contents/MacOS"
+mkdir -p \
+  "$cli_bundle/Contents/MacOS" "$cli_bundle/Contents/Resources" \
+  "$daemon_bundle/Contents/MacOS" "$daemon_bundle/Contents/Resources"
 cp "$distribution_root/ArkDeckCLI-Info.plist" "$cli_bundle/Contents/Info.plist"
 cp "$distribution_root/ArkDeckAgent-Info.plist" "$daemon_bundle/Contents/Info.plist"
 cp "$cli_profile" "$cli_bundle/Contents/embedded.provisionprofile"
 cp "$daemon_profile" "$daemon_bundle/Contents/embedded.provisionprofile"
 cp "$bin_root/arkdeck" "$cli_bundle/Contents/MacOS/arkdeck"
 cp "$bin_root/arkdeck-agentd" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
+cp -R "$workflows_resource_bundle" "$cli_bundle/Contents/Resources/"
+cp -R "$workflows_resource_bundle" "$daemon_bundle/Contents/Resources/"
+cp -R "$launch_agent_resource_bundle" "$cli_bundle/Contents/Resources/"
 chmod 700 "$cli_bundle/Contents/MacOS/arkdeck" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
 
 codesign --force --sign "$identity" --options runtime --timestamp \

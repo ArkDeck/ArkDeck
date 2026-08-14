@@ -6,10 +6,7 @@ package struct HDCNativeCodeSignHelperArtifact: Sendable {
 
   package static func bundled() throws -> HDCNativeCodeSignHelperArtifact {
     guard
-      let fileURL = Bundle.module.url(
-        forResource: "arkdeck-code-sign-enable",
-        withExtension: nil,
-        subdirectory: "OpenHarmonyNativeCodeSign")
+      let fileURL = bundledHelperURL()
     else {
       throw DeviceProviderError.unsupportedAction(
         "bundled OpenHarmony code-sign helper is missing")
@@ -32,6 +29,52 @@ package struct HDCNativeCodeSignHelperArtifact: Sendable {
         buildID: artifact.buildID,
         sha256: artifact.sha256,
         byteCount: artifact.byteCount))
+  }
+
+  /// SwiftPM's generated `Bundle.module` accessor only checks the executable
+  /// bundle root and its original build directory. A distributed macOS app
+  /// must seal package resources under `Contents/Resources`, while its build
+  /// directory may no longer exist after installation. Resolve both the
+  /// conventional app layout and SwiftPM's local build layout without calling
+  /// the fatal generated accessor.
+  private static func resourceBundle() -> Bundle? {
+    resourceBundleCandidates(named: "ArkDeckKit_ArkDeckWorkflows.bundle")
+      .lazy.compactMap(Bundle.init(url:)).first
+  }
+
+  private static func bundledHelperURL() -> URL? {
+    if let packaged = resourceBundle()?.url(
+      forResource: "arkdeck-code-sign-enable", withExtension: nil,
+      subdirectory: "OpenHarmonyNativeCodeSign")
+    {
+      return packaged
+    }
+    let sourceFallback = URL(filePath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appending(
+        path: "Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable",
+        directoryHint: .notDirectory)
+    return FileManager.default.fileExists(atPath: sourceFallback.path)
+      ? sourceFallback : nil
+  }
+
+  private static func resourceBundleCandidates(named name: String) -> [URL] {
+    let main = Bundle.main.bundleURL
+    var candidates: [URL] = []
+    if let resources = Bundle.main.resourceURL {
+      candidates.append(resources.appending(path: name, directoryHint: .isDirectory))
+    }
+    if let executable = Bundle.main.executableURL {
+      candidates.append(
+        executable.deletingLastPathComponent()
+          .appending(path: name, directoryHint: .isDirectory))
+    }
+    candidates.append(main.appending(path: name, directoryHint: .isDirectory))
+    candidates.append(
+      main.deletingLastPathComponent().appending(path: name, directoryHint: .isDirectory))
+    var seen: Set<String> = []
+    return candidates.filter { seen.insert($0.standardizedFileURL.path).inserted }
   }
 
   private static func isStaticExecutable(_ data: Data) -> Bool {

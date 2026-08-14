@@ -253,6 +253,8 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let status = try response([
       "jobId": "job-1",
       "operation": "observe.device@1",
+      "targetId": "target-dayu200-a",
+      "sessionId": "session-job-1",
       "timeline": ["queued", "running", "succeeded"],
     ])
     let evidence = try response([
@@ -311,6 +313,32 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(detail.artifacts.count, 1)
     XCTAssertEqual(detail.artifacts.first?.role, "raw")
     XCTAssertEqual(detail.artifacts.first?.byteCount, 128)
+    XCTAssertEqual(detail.correlationAvailability, .available)
+    XCTAssertEqual(detail.correlation?.jobID, "job-1")
+    XCTAssertEqual(detail.correlation?.sessionID, "session-job-1")
+    XCTAssertEqual(detail.correlation?.targetID, "target-dayu200-a")
+    XCTAssertEqual(detail.correlation?.artifacts.map(\.id), ["artifact-1"])
+  }
+
+  func testCorrelationFailsIndependentlyWhenAnOlderStatusHasNoSessionIdentity() throws {
+    let detail = RuntimeJobDetailResponseDecoding.presentation(
+      jobID: "job-old",
+      operationReference: "observe.device@1",
+      statusResponse: try response([
+        "jobId": "job-old", "operation": "observe.device@1",
+        "targetId": "target-dayu200-a", "timeline": ["succeeded"],
+      ]),
+      evidenceResponse: .failure("not relevant"),
+      artifactResponse: try response([]))
+
+    XCTAssertEqual(detail.timelineAvailability, .available)
+    XCTAssertEqual(detail.timeline, ["succeeded"])
+    XCTAssertEqual(detail.artifactAvailability, .available)
+    guard case .unavailable(let reason) = detail.correlationAvailability else {
+      return XCTFail("missing Session identity must not create a correlation")
+    }
+    XCTAssertTrue(reason.contains("Session identity"))
+    XCTAssertNil(detail.correlation)
   }
 
   func testTraceBeforeAndAfterFactsReachHistoryWithoutClaimingRestore() throws {

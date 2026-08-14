@@ -117,6 +117,12 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  private struct FailingDispatcher: RuntimeProcessDispatching {
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      throw RuntimeDispatchFailure.failed("fixture detail that clients must not classify")
+    }
+  }
+
   /// Holds every dispatch until the fixture releases it, and announces each
   /// arrival. This replaced a fixed 150 ms sleep per dispatch: the sleep both
   /// left the "is the request still in flight?" question to a wall-clock bet
@@ -133,6 +139,33 @@ final class AgentDaemonContractTests: XCTestCase {
     }
 
     /// Let the parked dispatch — and every later one — through.
+    func release() { gate.open() }
+  }
+
+  private final class ProgressGatedDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
+    let dispatchArrived = DispatchSemaphore(value: 0)
+    private let gate = DispatchGate()
+
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      dispatchArrived.signal()
+      await gate.wait()
+      return try await HappyDispatcher().dispatch(plan)
+    }
+
+    func dispatch(
+      _ plan: TypedProcessPlan,
+      progress: @escaping RuntimeProcessProgressHandler
+    ) async throws -> ProviderProcessReceipt {
+      await progress(
+        RuntimeProcessProgress(
+          phase: .writing,
+          unitName: "system",
+          completedUnitCount: 4,
+          totalUnitCount: 9,
+          currentUnitPercent: 35))
+      return try await dispatch(plan)
+    }
+
     func release() { gate.open() }
   }
 
@@ -304,6 +337,77 @@ final class AgentDaemonContractTests: XCTestCase {
       XCTAssertFalse(invalid.ok)
       XCTAssertEqual(invalid.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
     }
+  }
+
+  func testJobStatusPublishesTypedProgressWhileTheProcessStepIsActive() async throws {
+    let dispatcher = ProgressGatedDispatcher()
+    let (handler, engine) = try makeStack(dispatcher: dispatcher)
+    let operation = Data(
+      """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-typed-progress","idempotencyKey":"idem-typed-progress",\
+      "target":{"targetId":"TGT-TYPED-PROGRESS","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """.utf8)
+    let accepted = try await engine.submit(operation)
+    let running = Task { try await engine.run(jobID: accepted.jobID) }
+
+    let arrived = await waitForSemaphore(
+      dispatcher.dispatchArrived, timeout: daemonRendezvousTimeout)
+    XCTAssertEqual(arrived, .success)
+    let response = try await request(
+      handler, method: "job.status",
+      params: ["jobId": .string(accepted.jobID)])
+    guard case .object(let fields)? = response.result,
+      case .object(let progress)? = fields["processProgress"]
+    else {
+      dispatcher.release()
+      _ = try await running.value
+      return XCTFail("active Runtime progress must keep its typed wire shape")
+    }
+    XCTAssertNotEqual(progress["stepId"], .string(""))
+    XCTAssertEqual(progress["phase"], .string("writing"))
+    XCTAssertEqual(progress["unitName"], .string("system"))
+    XCTAssertEqual(progress["completedUnitCount"], .integer(4))
+    XCTAssertEqual(progress["totalUnitCount"], .integer(9))
+    XCTAssertEqual(progress["currentUnitPercent"], .integer(35))
+
+    dispatcher.release()
+    _ = try await running.value
+    let terminal = try await request(
+      handler, method: "job.status",
+      params: ["jobId": .string(accepted.jobID)])
+    guard case .object(let terminalFields)? = terminal.result else {
+      return XCTFail("terminal Runtime status must remain available")
+    }
+    XCTAssertEqual(terminalFields["processProgress"], .null)
+  }
+
+  func testFailedJobPublishesStableTypedFailureWithoutUsingTimelineAsProtocol() async throws {
+    let (handler, engine) = try makeStack(dispatcher: FailingDispatcher())
+    let operation = Data(
+      """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-typed-failure","idempotencyKey":"idem-typed-failure",\
+      "target":{"targetId":"TGT-TYPED-FAILURE","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """.utf8)
+    let accepted = try await engine.submit(operation)
+    let terminal = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(terminal.state, JobState.failed.rawValue)
+
+    let response = try await request(
+      handler, method: "job.status", params: ["jobId": .string(accepted.jobID)])
+    guard case .object(let fields)? = response.result,
+      case .object(let failure)? = fields["failure"]
+    else { return XCTFail("failed Runtime status must carry typed failure facts") }
+    XCTAssertEqual(failure["schemaVersion"], .string("1.0.0"))
+    XCTAssertEqual(failure["code"], .string("executionFailed"))
+    XCTAssertEqual(failure["category"], .string("execution"))
+    XCTAssertEqual(failure["retryability"], .string("runtimeDecisionRequired"))
+    XCTAssertEqual(failure["recovery"], .string("inspectJob"))
+    XCTAssertNil(failure["summary"])
+    XCTAssertNil(failure["diagnostic"])
   }
 
   func testOperationSurfaceComesFromCatalog() async throws {
