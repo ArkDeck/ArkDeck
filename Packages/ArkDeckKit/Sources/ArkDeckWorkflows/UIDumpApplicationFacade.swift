@@ -419,49 +419,7 @@ private enum UIDumpXPCReadTransport {
   static func request(
     method: String, params: [String: JSONValue]? = nil
   ) async -> Result<Data, UIDumpXPCReadFailure> {
-    let frame: Data
-    do {
-      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
-    } catch {
-      return .failure(.transport("Could not compose a Runtime request"))
-    }
-    return await withCheckedContinuation { continuation in
-      let box = XPCConnectionBox(
-        NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
-      let connection = box.connection
-      connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-      connection.resume()
-      let answered = OSAllocatedUnfairLock(initialState: false)
-      @Sendable func finish(_ result: Result<Data, UIDumpXPCReadFailure>) {
-        let alreadyAnswered = answered.withLock { state -> Bool in
-          if state { return true }
-          state = true
-          return false
-        }
-        guard !alreadyAnswered else { return }
-        box.connection.invalidate()
-        continuation.resume(returning: result)
-      }
-      let proxy =
-        connection.remoteObjectProxyWithErrorHandler { error in
-          finish(
-            .failure(
-              .transport(
-                "ArkDeck Runtime is not reachable: \(error.localizedDescription)")))
-        } as? ArkDeckAgentXPCProtocol
-      guard let proxy else {
-        finish(.failure(.transport("ArkDeck Runtime is not reachable")))
-        return
-      }
-      proxy.sendRequestFrame(frame) { data, refusal in
-        if let refusal {
-          finish(.failure(.transport("Runtime transport refused this request: \(refusal)")))
-        } else if let data {
-          finish(.success(data))
-        } else {
-          finish(.failure(.transport("Runtime returned neither a response nor a reason")))
-        }
-      }
-    }
+    await RuntimeXPCRequestTransport.request(method: method, params: params)
+      .mapError { UIDumpXPCReadFailure.transport($0.message) }
   }
 }

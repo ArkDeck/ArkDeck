@@ -442,10 +442,18 @@ private struct DebugLogsWorkspace: View {
                 .foregroundStyle(.red)
                 .textSelection(.enabled)
             } else if let terminal = model.logTerminal {
-              Label(
-                "\(terminal.state) · \(terminal.jobID)",
-                systemImage: terminal.state == "succeeded" ? "checkmark.circle.fill" : "info.circle"
-              )
+              VStack(alignment: .leading, spacing: 4) {
+                Label(
+                  "\(terminal.state) · \(terminal.jobID)",
+                  systemImage: terminal.state == "succeeded"
+                    ? "checkmark.circle.fill" : "info.circle"
+                )
+                if let failure = terminal.operationFailure {
+                  Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("debug.logs.typedFailure")
+                }
+              }
               .font(.footnote)
               .foregroundStyle(terminal.state == "succeeded" ? .green : .secondary)
             }
@@ -889,12 +897,19 @@ private struct DebugAppsWorkspace: View {
               .textSelection(.enabled)
           }
           if let terminal = model.hapTerminal {
-            Label(
-              "\(terminal.state) · \(terminal.jobID)",
-              systemImage: terminal.state == "succeeded"
-                ? "checkmark.circle.fill" : "exclamationmark.circle"
-            )
-            .font(.footnote.monospaced())
+            VStack(alignment: .leading, spacing: 4) {
+              Label(
+                "\(terminal.state) · \(terminal.jobID)",
+                systemImage: terminal.state == "succeeded"
+                  ? "checkmark.circle.fill" : "exclamationmark.circle"
+              )
+              if let failure = terminal.operationFailure {
+                Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+                  .fixedSize(horizontal: false, vertical: true)
+                  .accessibilityIdentifier("debug.apps.typedFailure")
+              }
+            }
+            .font(.footnote)
             .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
           }
         }
@@ -1112,12 +1127,19 @@ private struct DebugNetworkWorkspace: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         if let terminal = model.portRuleTerminal {
-          Label(
-            "\(terminal.state) · \(terminal.jobID)",
-            systemImage: terminal.state == "succeeded"
-              ? "checkmark.circle" : "exclamationmark.circle"
-          )
-          .font(.footnote.monospaced())
+          VStack(alignment: .leading, spacing: 4) {
+            Label(
+              "\(terminal.state) · \(terminal.jobID)",
+              systemImage: terminal.state == "succeeded"
+                ? "checkmark.circle" : "exclamationmark.circle"
+            )
+            if let failure = terminal.operationFailure {
+              Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("debug.network.typedFailure")
+            }
+          }
+          .font(.footnote)
           .foregroundStyle(terminal.state == "succeeded" ? .green : .orange)
         }
       }
@@ -1434,8 +1456,8 @@ private struct DebugAvailabilityCard: View {
             LocalizedStringResource.DebugLocalizable.debugAvailabilityEffect(
               operation.minimumEffect)
           )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
         } else {
           DebugBlockedReason(text: DebugL10n.text("debug.availability.missing"))
         }
@@ -1488,7 +1510,13 @@ private struct DebugRecentJobsCard: View {
                   .accessibilityIdentifier("debug.jobs.cancel.\(job.id)")
                 }
               }
-              if let latest = job.timeline.last {
+              if let failure = job.operationFailure {
+                Text(DebugL10n.text("debug.failure.\(failure.code.rawValue)"))
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(3)
+                  .accessibilityIdentifier("debug.jobs.typedFailure.\(job.id)")
+              } else if let latest = job.timeline.last {
                 Text(latest)
                   .font(.caption.monospaced())
                   .foregroundStyle(.secondary)

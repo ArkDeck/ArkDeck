@@ -111,45 +111,9 @@ private enum AutomationXPCTransport {
     method: String,
     params: [String: JSONValue]? = nil
   ) async -> AutomationTransportResult {
-    let frame: Data
-    do {
-      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
-    } catch {
-      return .failure("Could not compose an Automation Runtime request")
-    }
-    return await withCheckedContinuation { continuation in
-      let box = XPCConnectionBox(
-        NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
-      let connection = box.connection
-      connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-      connection.resume()
-      let answered = OSAllocatedUnfairLock(initialState: false)
-      @Sendable func finish(_ result: AutomationTransportResult) {
-        let alreadyAnswered = answered.withLock { value -> Bool in
-          if value { return true }
-          value = true
-          return false
-        }
-        guard !alreadyAnswered else { return }
-        box.connection.invalidate()
-        continuation.resume(returning: result)
-      }
-      let proxy = connection.remoteObjectProxyWithErrorHandler { error in
-        finish(.failure("ArkDeck Runtime is not reachable: \(error.localizedDescription)"))
-      } as? ArkDeckAgentXPCProtocol
-      guard let proxy else {
-        finish(.failure("ArkDeck Runtime is not reachable"))
-        return
-      }
-      proxy.sendRequestFrame(frame) { data, refusal in
-        if let refusal {
-          finish(.failure("Runtime refused the Automation request: \(refusal)"))
-        } else if let data {
-          finish(.success(data))
-        } else {
-          finish(.failure("Runtime returned no Automation response"))
-        }
-      }
+    switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
+    case .success(let data): .success(data)
+    case .failure(let failure): .failure(failure.message)
     }
   }
 }

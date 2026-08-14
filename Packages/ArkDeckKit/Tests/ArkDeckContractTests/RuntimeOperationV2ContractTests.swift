@@ -67,6 +67,21 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     XCTAssertEqual(encodedOnce, encodedTwice)
   }
 
+  func testOperationFailureRoundTripUsesClosedMachineReadableFacts() throws {
+    let failure = RuntimeOperationFailure(
+      code: .outcomeUnknown,
+      category: .unknownOutcome,
+      retryability: .runtimeDecisionRequired,
+      recovery: .awaitRuntimeReconciliation)
+    let data = try JSONEncoder().encode(failure)
+    let decoded = try JSONDecoder().decode(RuntimeOperationFailure.self, from: data)
+
+    XCTAssertEqual(decoded, failure)
+    XCTAssertEqual(decoded.schemaVersion, "1.0.0")
+    XCTAssertFalse(String(data: data, encoding: .utf8)?.contains("summary") == true)
+    XCTAssertFalse(String(data: data, encoding: .utf8)?.contains("diagnostic") == true)
+  }
+
   func testDAYU200SingletonRequestOmitsVersionOnTheWire() throws {
     let request = try RuntimeOperationRequest(
       requestID: "req-flash-singleton",
@@ -79,7 +94,8 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     let operation = try XCTUnwrap(object["operation"] as? [String: Any])
     XCTAssertEqual(operation["id"] as? String, "flash.dayu200")
     XCTAssertNil(operation["version"])
-    XCTAssertEqual(try RuntimeOperationCodec.decodeRequest(encoded).operation.reference,
+    XCTAssertEqual(
+      try RuntimeOperationCodec.decodeRequest(encoded).operation.reference,
       "flash.dayu200")
   }
 
@@ -142,7 +158,8 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
   func testOversizedRequestIsRejected() {
     var text = String(decoding: minimalJSON(extra: ",\n  \"pad\": \"@\""), as: UTF8.self)
     text = text.replacingOccurrences(
-      of: "\"@\"", with: "\"\(String(repeating: "x", count: RuntimeOperationCodec.maximumRequestBytes))\"")
+      of: "\"@\"",
+      with: "\"\(String(repeating: "x", count: RuntimeOperationCodec.maximumRequestBytes))\"")
     assertRejected(Data(text.utf8), code: .requestTooLarge)
   }
 

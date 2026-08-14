@@ -1749,13 +1749,26 @@ public struct RuntimeControlPlaneHandler: Sendable {
     stateOverride: String? = nil,
     includeTimeline: Bool = true
   ) -> JSONValue {
-    .object([
+    let encodedFailure: JSONValue
+    if let failure = status.operationFailure {
+      encodedFailure = .object([
+        "schemaVersion": .string(failure.schemaVersion),
+        "code": .string(failure.code.rawValue),
+        "category": .string(failure.category.rawValue),
+        "retryability": .string(failure.retryability.rawValue),
+        "recovery": .string(failure.recovery.rawValue),
+      ])
+    } else {
+      encodedFailure = .null
+    }
+    return .object([
       "jobId": .string(status.jobID),
       "operation": .string(status.operationReference),
       "targetId": .string(status.targetID),
       "state": .string(stateOverride ?? status.state),
       "waitingForHuman": .bool(status.waitingForHuman),
       "outcomeUnknown": .bool(status.outcomeUnknown),
+      "failure": encodedFailure,
       "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
       "timeline": includeTimeline ? .array(status.timeline.map(JSONValue.string)) : .null,
       "processProgress": encodeProcessProgress(status.processProgress),

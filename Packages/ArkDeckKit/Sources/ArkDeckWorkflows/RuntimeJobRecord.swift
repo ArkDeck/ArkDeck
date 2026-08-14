@@ -24,6 +24,10 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public let materializedBindingRevision: Int?
   public var state: String = "queued"
   public var outcomeUnknown: Bool = false
+  /// Durable machine-readable failure facts. Older records decode this as
+  /// nil and receive a conservative state-based compatibility projection;
+  /// no caller needs to parse `timeline` to classify the outcome.
+  public var operationFailure: RuntimeOperationFailure?
   public var recoveryStepID: String?
   var recoveryAction: PersistedTypedProviderAction?
   var recoveryIntentEventID: String?

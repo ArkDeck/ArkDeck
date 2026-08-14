@@ -223,6 +223,27 @@ public struct RuntimeArtifactPresentation: Sendable, Equatable, Identifiable {
   public let redactionApplied: Bool
 }
 
+/// One immutable Artifact reference inside the selected Job's diagnostic
+/// correlation view. Bytes remain owned by RuntimeArtifactStore.
+public struct RuntimeArtifactCorrelationPresentation: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let name: String
+  public let role: String?
+  public let sha256: String
+}
+
+/// A logical, read-only diagnostic bundle assembled from one status response
+/// and its exact job-bound Artifact inventory. It grants no targeting,
+/// admission, capability, retry or recovery authority, copies no Artifact
+/// bytes, and does not create a second durable bundle.
+public struct RuntimeJobCorrelationPresentation: Sendable, Equatable {
+  public let jobID: String
+  public let sessionID: String
+  public let operationReference: String
+  public let targetID: String
+  public let artifacts: [RuntimeArtifactCorrelationPresentation]
+}
+
 public struct RuntimeJobDetailPresentation: Sendable, Equatable {
   public let jobID: String
   public let timelineAvailability: RuntimeJobDetailSectionAvailability
@@ -231,6 +252,8 @@ public struct RuntimeJobDetailPresentation: Sendable, Equatable {
   public let evidence: RuntimeJobEvidencePresentation?
   public let artifactAvailability: RuntimeJobDetailSectionAvailability
   public let artifacts: [RuntimeArtifactPresentation]
+  public let correlationAvailability: RuntimeJobDetailSectionAvailability
+  public let correlation: RuntimeJobCorrelationPresentation?
 }
 
 public enum RuntimeArtifactExportResult: Sendable, Equatable {
@@ -535,59 +558,9 @@ private enum RuntimeHistoryXPCReadTransport {
     method: String,
     params: [String: JSONValue]? = nil
   ) async -> RuntimeHistoryTransportResult {
-    let frame: Data
-    do {
-      frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
-    } catch {
-      return .failure("Could not compose a Runtime read request")
-    }
-    return await send(frame)
-  }
-
-  private static func send(_ frame: Data) async -> RuntimeHistoryTransportResult {
-    await withCheckedContinuation { continuation in
-      // NSXPCConnection predates Sendable and is safe to message from any
-      // thread; the box carries that fact rather than widening the actor.
-      let box = XPCConnectionBox(
-        NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
-      let connection = box.connection
-      connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-      connection.resume()
-
-      // Exactly one resume: an interruption and a reply can both arrive, and
-      // resuming a continuation twice is a crash, not a recoverable error.
-      let answered = OSAllocatedUnfairLock(initialState: false)
-      @Sendable func finish(_ result: RuntimeHistoryTransportResult) {
-        let alreadyAnswered = answered.withLock { state -> Bool in
-          if state { return true }
-          state = true
-          return false
-        }
-        guard !alreadyAnswered else { return }
-        box.connection.invalidate()
-        continuation.resume(returning: result)
-      }
-
-      let proxy =
-        connection.remoteObjectProxyWithErrorHandler { error in
-          finish(
-            .failure(
-              "ArkDeck Runtime is not reachable: \(error.localizedDescription)"))
-        } as? ArkDeckAgentXPCProtocol
-
-      guard let proxy else {
-        finish(.failure("ArkDeck Runtime is not reachable"))
-        return
-      }
-      proxy.sendRequestFrame(frame) { data, refusal in
-        if let refusal {
-          finish(.failure("The Runtime transport refused this request: \(refusal)"))
-        } else if let data {
-          finish(.success(data))
-        } else {
-          finish(.failure("The Runtime transport returned neither a response nor a reason"))
-        }
-      }
+    switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
+    case .success(let data): .success(data)
+    case .failure(let failure): .failure(failure.message)
     }
   }
 }
@@ -712,6 +685,12 @@ enum RuntimeJobDetailResponseDecoding {
     case unavailable(String)
   }
 
+  private struct StatusFacts {
+    let targetID: String
+    let sessionID: String?
+    let timeline: [String]
+  }
+
   static func presentation(
     jobID: String,
     operationReference: String,
@@ -719,7 +698,7 @@ enum RuntimeJobDetailResponseDecoding {
     evidenceResponse: RuntimeHistoryTransportResult,
     artifactResponse: RuntimeHistoryTransportResult
   ) -> RuntimeJobDetailPresentation {
-    let timeline = decodeTimeline(
+    let status = decodeStatus(
       jobID: jobID,
       operationReference: operationReference,
       response: statusResponse)
@@ -734,10 +713,10 @@ enum RuntimeJobDetailResponseDecoding {
 
     let timelineAvailability: RuntimeJobDetailSectionAvailability
     let timelineValue: [String]
-    switch timeline {
+    switch status {
     case .available(let value):
       timelineAvailability = .available
-      timelineValue = value
+      timelineValue = value.timeline
     case .unavailable(let reason):
       timelineAvailability = .unavailable(reason: reason)
       timelineValue = []
@@ -765,6 +744,34 @@ enum RuntimeJobDetailResponseDecoding {
       artifactValues = []
     }
 
+    let correlationAvailability: RuntimeJobDetailSectionAvailability
+    let correlation: RuntimeJobCorrelationPresentation?
+    switch (status, artifacts) {
+    case (.available(let status), .available(let artifacts)):
+      guard let sessionID = status.sessionID, !sessionID.isEmpty else {
+        correlationAvailability = .unavailable(
+          reason: "Job status did not report a Session identity")
+        correlation = nil
+        break
+      }
+      correlationAvailability = .available
+      correlation = RuntimeJobCorrelationPresentation(
+        jobID: jobID,
+        sessionID: sessionID,
+        operationReference: operationReference,
+        targetID: status.targetID,
+        artifacts: artifacts.map {
+          RuntimeArtifactCorrelationPresentation(
+            id: $0.id, name: $0.name, role: $0.role, sha256: $0.sha256)
+        })
+    case (.unavailable(let reason), _):
+      correlationAvailability = .unavailable(reason: reason)
+      correlation = nil
+    case (_, .unavailable(let reason)):
+      correlationAvailability = .unavailable(reason: reason)
+      correlation = nil
+    }
+
     return RuntimeJobDetailPresentation(
       jobID: jobID,
       timelineAvailability: timelineAvailability,
@@ -772,14 +779,16 @@ enum RuntimeJobDetailResponseDecoding {
       evidenceAvailability: evidenceAvailability,
       evidence: evidenceValue,
       artifactAvailability: artifactAvailability,
-      artifacts: artifactValues)
+      artifacts: artifactValues,
+      correlationAvailability: correlationAvailability,
+      correlation: correlation)
   }
 
-  private static func decodeTimeline(
+  private static func decodeStatus(
     jobID: String,
     operationReference: String,
     response: RuntimeHistoryTransportResult?
-  ) -> Section<[String]> {
+  ) -> Section<StatusFacts> {
     guard let response else {
       return .unavailable("This detail reader did not request the Job timeline")
     }
@@ -794,11 +803,16 @@ enum RuntimeJobDetailResponseDecoding {
     }
     guard value["jobId"] as? String == jobID,
       value["operation"] as? String == operationReference,
+      let targetID = value["targetId"] as? String,
       let timeline = value["timeline"] as? [String]
     else {
       return .unavailable("Job status did not match the selected Job")
     }
-    return .available(timeline)
+    return .available(
+      StatusFacts(
+        targetID: targetID,
+        sessionID: value["sessionId"] as? String,
+        timeline: timeline))
   }
 
   private static func decodeEvidence(
@@ -1072,7 +1086,22 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
             createdAtUTC: "2026-08-06T08:00:03Z",
             redactionApplied: true)
         ]
-        : [])
+        : [],
+      correlationAvailability: .available,
+      correlation: RuntimeJobCorrelationPresentation(
+        jobID: jobID,
+        sessionID: "session-\(jobID)",
+        operationReference: operationReference,
+        targetID: "fixture-target",
+        artifacts: isFlash
+          ? [
+            RuntimeArtifactCorrelationPresentation(
+              id: "artifact-fixture-flash-log",
+              name: "flash-report.json",
+              role: "derived",
+              sha256: String(repeating: "b", count: 64))
+          ]
+          : []))
   }
 
   func exportArtifact(

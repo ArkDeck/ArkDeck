@@ -73,6 +73,9 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   public let state: String
   public let waitingForHuman: Bool
   public let outcomeUnknown: Bool
+  /// Machine-readable terminal or unresolved failure facts. This projection
+  /// is diagnostic only and never authorizes retry, dispatch or recovery.
+  public let operationFailure: RuntimeOperationFailure?
   /// How much of this job's device residue is still outstanding. A
   /// `succeeded` job with a non-zero count did what was asked and left the
   /// device dirty; `succeeded` must never be read as "device clean"
@@ -110,6 +113,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     state: String,
     waitingForHuman: Bool,
     outcomeUnknown: Bool,
+    operationFailure: RuntimeOperationFailure? = nil,
     outstandingResidueCount: Int?,
     timeline: [String],
     processProgress: RuntimeJobProcessProgress? = nil,
@@ -129,6 +133,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     self.state = state
     self.waitingForHuman = waitingForHuman
     self.outcomeUnknown = outcomeUnknown
+    self.operationFailure = operationFailure
     self.outstandingResidueCount = outstandingResidueCount
     self.timeline = timeline
     self.processProgress = processProgress
@@ -1143,6 +1148,10 @@ public actor RuntimeJobEngine {
       let executionState = Self.executionState(of: current.record)
       switch failure {
       case .outcomeUnknown(let reason):
+        current.record.operationFailure = RuntimeOperationFailure(
+          code: .outcomeUnknown, category: .unknownOutcome,
+          retryability: .runtimeDecisionRequired,
+          recovery: .awaitRuntimeReconciliation)
         try transition(
           &current, from: executionState, to: .waitingForRecovery,
           reason: "outcomeUnknown: \(reason)")
@@ -1156,6 +1165,10 @@ public actor RuntimeJobEngine {
         return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       case .confirmedNotExecuted(let reason),
         .confirmedNotExecutedWithDiagnostic(let reason, _):
+        current.record.operationFailure = RuntimeOperationFailure(
+          code: .executionConfirmedNotPerformed, category: .externalTool,
+          retryability: .runtimeDecisionRequired,
+          recovery: .submitNewTypedRequestAfterRuntimeProof)
         // The state graph routes every terminal outcome through
         // finalizing: a job always gets its wrap-up phase, success or not.
         try transition(&current, from: executionState, to: .finalizing, reason: reason)
@@ -1170,6 +1183,9 @@ public actor RuntimeJobEngine {
           state: JobState.failed.rawValue)
         return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       case .failed(let reason):
+        current.record.operationFailure = RuntimeOperationFailure(
+          code: .executionFailed, category: .execution,
+          retryability: .runtimeDecisionRequired, recovery: .inspectJob)
         try transition(&current, from: executionState, to: .finalizing, reason: reason)
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
@@ -1182,6 +1198,9 @@ public actor RuntimeJobEngine {
       }
     } catch let failure as RuntimeArtifactPublicationFailure {
       var current = jobs[jobID] ?? runtime
+      current.record.operationFailure = RuntimeOperationFailure(
+        code: .artifactPublicationFailed, category: .storage,
+        retryability: .notAutomatic, recovery: .inspectJob)
       try transition(
         &current, from: Self.executionState(of: current.record), to: .finalizing,
         reason: "artifact publication failed: \(failure.detail)")
@@ -1209,6 +1228,9 @@ public actor RuntimeJobEngine {
         reason: "safe-boundary")
       try transition(
         &current, from: .cancellingAtSafeBoundary, to: .cancelled, reason: "steps-drained")
+      current.record.operationFailure = RuntimeOperationFailure(
+        code: .cancelled, category: .cancelled,
+        retryability: .notAutomatic, recovery: .none)
     } else {
       try transition(
         &current, from: executionState, to: .finalizing, reason: "steps-complete")
@@ -1217,6 +1239,9 @@ public actor RuntimeJobEngine {
         try await publishFinalizeArtifacts(jobID: jobID, descriptor: descriptor)
       } catch let failure as RuntimeArtifactPublicationFailure {
         current = jobs[jobID] ?? current
+        current.record.operationFailure = RuntimeOperationFailure(
+          code: .artifactFinalizationFailed, category: .storage,
+          retryability: .notAutomatic, recovery: .inspectJob)
         try transition(
           &current, from: .finalizing, to: .failed,
           reason: "artifact finalization failed: \(failure.detail)")
@@ -1229,6 +1254,7 @@ public actor RuntimeJobEngine {
         return statusAndReleaseTerminalRuntime(current.record, provider: provider)
       }
       current = jobs[jobID] ?? current
+      current.record.operationFailure = nil
       if current.record.admissionEvidence?.completeOverwriteRecovery != nil {
         let epoch = try await establishSupersedingRecoveryEpoch(
           runtime: &current, descriptor: descriptor)
@@ -3014,6 +3040,9 @@ public actor RuntimeJobEngine {
       try transition(
         &runtime, from: .cancellingAtSafeBoundary, to: .cancelled,
         reason: "never-started job closed with zero dispatch")
+      runtime.record.operationFailure = RuntimeOperationFailure(
+        code: .cancelled, category: .cancelled,
+        retryability: .notAutomatic, recovery: .none)
       runtime.record.finishedAtUTC = nowUTC()
       try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
@@ -6294,6 +6323,7 @@ public actor RuntimeJobEngine {
       // a request for approval.
       waitingForHuman: false,
       outcomeUnknown: record.outcomeUnknown,
+      operationFailure: Self.projectedOperationFailure(for: record),
       outstandingResidueCount: record.outstandingResidueCount,
       timeline: record.timeline,
       processProgress: liveProcessProgress(for: record.jobID),
@@ -6306,6 +6336,34 @@ public actor RuntimeJobEngine {
       supersededByRecoveryEpochID: supersededByRecoveryEpochID,
       recoveryEpochID: recoveryEpochID,
       resolvedByTargetAliasResolutionID: resolvedByTargetAliasResolutionID)
+  }
+
+  private static func projectedOperationFailure(
+    for record: RuntimeJobRecord
+  ) -> RuntimeOperationFailure? {
+    if let failure = record.operationFailure { return failure }
+    if record.outcomeUnknown || record.state == JobState.waitingForRecovery.rawValue {
+      return RuntimeOperationFailure(
+        code: .outcomeUnknown, category: .unknownOutcome,
+        retryability: .runtimeDecisionRequired,
+        recovery: .awaitRuntimeReconciliation)
+    }
+    switch JobState(rawValue: record.state) {
+    case .failed:
+      return RuntimeOperationFailure(
+        code: .legacyFailure, category: .runtime,
+        retryability: .runtimeDecisionRequired, recovery: .inspectJob)
+    case .cancelled:
+      return RuntimeOperationFailure(
+        code: .cancelled, category: .cancelled,
+        retryability: .notAutomatic, recovery: .none)
+    case .interrupted:
+      return RuntimeOperationFailure(
+        code: .interrupted, category: .runtime,
+        retryability: .runtimeDecisionRequired, recovery: .inspectJob)
+    default:
+      return nil
+    }
   }
 
   private func liveProcessProgress(for jobID: String) -> RuntimeJobProcessProgress? {

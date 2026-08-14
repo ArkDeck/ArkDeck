@@ -117,6 +117,12 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  private struct FailingDispatcher: RuntimeProcessDispatching {
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      throw RuntimeDispatchFailure.failed("fixture detail that clients must not classify")
+    }
+  }
+
   /// Holds every dispatch until the fixture releases it, and announces each
   /// arrival. This replaced a fixed 150 ms sleep per dispatch: the sleep both
   /// left the "is the request still in flight?" question to a wall-clock bet
@@ -375,6 +381,33 @@ final class AgentDaemonContractTests: XCTestCase {
       return XCTFail("terminal Runtime status must remain available")
     }
     XCTAssertEqual(terminalFields["processProgress"], .null)
+  }
+
+  func testFailedJobPublishesStableTypedFailureWithoutUsingTimelineAsProtocol() async throws {
+    let (handler, engine) = try makeStack(dispatcher: FailingDispatcher())
+    let operation = Data(
+      """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-typed-failure","idempotencyKey":"idem-typed-failure",\
+      "target":{"targetId":"TGT-TYPED-FAILURE","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """.utf8)
+    let accepted = try await engine.submit(operation)
+    let terminal = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(terminal.state, JobState.failed.rawValue)
+
+    let response = try await request(
+      handler, method: "job.status", params: ["jobId": .string(accepted.jobID)])
+    guard case .object(let fields)? = response.result,
+      case .object(let failure)? = fields["failure"]
+    else { return XCTFail("failed Runtime status must carry typed failure facts") }
+    XCTAssertEqual(failure["schemaVersion"], .string("1.0.0"))
+    XCTAssertEqual(failure["code"], .string("executionFailed"))
+    XCTAssertEqual(failure["category"], .string("execution"))
+    XCTAssertEqual(failure["retryability"], .string("runtimeDecisionRequired"))
+    XCTAssertEqual(failure["recovery"], .string("inspectJob"))
+    XCTAssertNil(failure["summary"])
+    XCTAssertNil(failure["diagnostic"])
   }
 
   func testOperationSurfaceComesFromCatalog() async throws {

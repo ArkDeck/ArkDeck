@@ -114,11 +114,12 @@ struct RuntimeHistoryView: View {
     } message: { artifact in
       Text(
         String(
-          localized: LocalizedStringResource.HistoryLocalizable.historyArtifactsExportPreviewMessage(
-            artifact.name,
-            ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file),
-            artifact.privacy,
-            artifact.sha256)))
+          localized: LocalizedStringResource.HistoryLocalizable
+            .historyArtifactsExportPreviewMessage(
+              artifact.name,
+              ByteCountFormatter.string(fromByteCount: artifact.byteCount, countStyle: .file),
+              artifact.privacy,
+              artifact.sha256)))
     }
   }
 
@@ -399,6 +400,7 @@ struct RuntimeHistoryView: View {
         VStack(alignment: .leading, spacing: 18) {
           detailHeader(job)
           summarySection(job)
+          correlationSection(job)
           timelineSection(job)
           evidenceSections(job)
           recoverySection(job)
@@ -434,6 +436,74 @@ struct RuntimeHistoryView: View {
       }
       if job.waitingForHuman {
         attention("history.detail.waitingForHuman", id: "history.detail.waitingForHuman")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func correlationSection(_ job: RuntimeJobSummaryPresentation) -> some View {
+    if let detail = detailsByJobID[job.id] {
+      historySection("history.detail.correlation") {
+        switch detail.correlationAvailability {
+        case .unavailable(let reason):
+          unavailableSection(reason)
+        case .available:
+          if let correlation = detail.correlation {
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+              row(
+                "history.detail.job", correlation.jobID,
+                id: "history.correlation.job", monospaced: true)
+              row(
+                "history.detail.session", correlation.sessionID,
+                id: "history.correlation.session", monospaced: true)
+              row(
+                "history.detail.operation",
+                displayedOperationReference(correlation.operationReference),
+                id: "history.correlation.operation", monospaced: true)
+              row(
+                "history.detail.target", correlation.targetID,
+                id: "history.correlation.target", monospaced: true)
+            }
+            Button(historyLocalized("history.correlation.showSession")) {
+              sessionFilter = correlation.sessionID
+            }
+            .accessibilityIdentifier("history.correlation.showSession")
+            if correlation.artifacts.isEmpty {
+              Text(historyLocalized("history.correlation.noArtifacts"))
+                .foregroundStyle(.secondary)
+            } else {
+              VStack(alignment: .leading, spacing: 7) {
+                Text(
+                  String(
+                    localized:
+                      LocalizedStringResource.HistoryLocalizable.historyCorrelationArtifactCount(
+                        correlation.artifacts.count))
+                )
+                .font(.caption.weight(.semibold))
+                ForEach(correlation.artifacts) { artifact in
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text("\(artifact.name) · \(artifact.role ?? "—")")
+                      .font(.caption)
+                    Text(artifact.id)
+                      .font(.caption.monospaced())
+                      .textSelection(.enabled)
+                    Text(artifact.sha256)
+                      .font(.caption2.monospaced())
+                      .lineLimit(1)
+                      .truncationMode(.middle)
+                      .help(artifact.sha256)
+                      .textSelection(.enabled)
+                  }
+                  .accessibilityIdentifier("history.correlation.artifact.\(artifact.id)")
+                }
+              }
+            }
+            Text(historyLocalized("history.correlation.readOnly"))
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
       }
     }
   }
