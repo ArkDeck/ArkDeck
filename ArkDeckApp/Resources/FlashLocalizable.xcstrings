@@ -182,6 +182,7 @@
     "flash.workspace.action.power": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Keep the device connected and on stable power. Do not close the Mac during flashing."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"请保持设备连接和稳定供电，刷机期间不要合盖。"}}}},
     "flash.workspace.action.submit": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Erase data and start flashing"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"擦除数据并开始刷机"}}}},
     "flash.workspace.details": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Show flash details"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"查看刷机详情"}}}},
+    "flash.workspace.details.hide": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Hide flash details"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"收起刷机详情"}}}},
     "flash.workspace.details.configuration": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Target, profile, and prerequisites"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"目标、配置与前置条件"}}}},
     "flash.workspace.device.detail": {"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"%@ · binding revision %d"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%@ · 绑定修订号 %d"}}}},
     "flash.workspace.device.none": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No current device"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有当前设备"}}}},

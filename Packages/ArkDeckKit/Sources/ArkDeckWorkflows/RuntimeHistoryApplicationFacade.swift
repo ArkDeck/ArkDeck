@@ -1021,12 +1021,15 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
     let isFlash = operationReference == "flash.dayu200"
+    let isInterruptedHistoryFixture = jobID == "job-fixture-0002"
     return RuntimeJobDetailPresentation(
       jobID: jobID,
       timelineAvailability: .available,
-      timeline: isFlash
-        ? ["queued", "preflight", "running", "waitingForDevice"]
-        : ["queued", "running", "succeeded"],
+      timeline: isInterruptedHistoryFixture
+        ? ["queued", "running", "interrupted"]
+        : isFlash
+          ? ["queued", "preflight", "running", "waitingForDevice"]
+          : ["queued", "running", "succeeded"],
       evidenceAvailability: .available,
       evidence: RuntimeJobEvidencePresentation(
         catalogDigest: String(repeating: "a", count: 64),

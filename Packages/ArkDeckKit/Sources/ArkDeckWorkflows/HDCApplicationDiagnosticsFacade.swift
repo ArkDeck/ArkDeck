@@ -42,7 +42,9 @@ public enum HDCApplicationDiagnosticsFacade {
       if arguments.contains("--ui-test-reset-hdc-selection") {
         HDCApplicationDiagnosticsConfiguration.clearUserConfiguredExecutable()
       }
-      return HDCProductionApplicationDiagnostics()
+      return HDCProductionApplicationDiagnostics(
+        runtimeProjectionEnabled: !arguments.contains(
+          "--ui-test-hdc-local-production-presentation"))
     }
     return HDCFixtureApplicationDiagnostics(arguments: arguments)
   }
@@ -73,6 +75,7 @@ private struct HDCDeviceObservationSessionKey: Sendable, Equatable {
 /// cannot construct an HDC command or lifecycle capability.
 private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProviding {
   nonisolated let lifecycleDispatchIsProductionComposed = true
+  private let runtimeProjectionEnabled: Bool
   private let provider = HDCApplicationDiagnosticsProvider.shared
   private let host = HDCApplicationDiagnosticsHost.shared
   private var attemptedSessionBootstrap = false
@@ -85,6 +88,10 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
   private var activeCandidateCatalogID: String?
   private var deviceObservationSession: HDCDeviceObservationApplicationSession?
   private var deviceObservationSessionKey: HDCDeviceObservationSessionKey?
+
+  init(runtimeProjectionEnabled: Bool = true) {
+    self.runtimeProjectionEnabled = runtimeProjectionEnabled
+  }
 
   func refresh() async -> HDCDiagnosticsPresentation {
     if let runtime = await runtimeManagedPresentation() { return runtime }
@@ -146,6 +153,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
   }
 
   private func runtimeManagedPresentation() async -> HDCDiagnosticsPresentation? {
+    guard runtimeProjectionEnabled else { return nil }
     let presentation = await runtimeOverlay(.unprobed)
     return presentation.isRuntimeManaged ? presentation : nil
   }
@@ -153,6 +161,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
   private func runtimeOverlay(
     _ presentation: HDCDiagnosticsPresentation
   ) async -> HDCDiagnosticsPresentation {
+    guard runtimeProjectionEnabled else { return presentation }
     async let status = DeviceListXPCReadTransport.request(method: "runtime.hdc-status")
     async let candidates = DeviceListXPCReadTransport.request(method: "device.candidates")
     return HDCRuntimeDiagnosticsResponseDecoding.overlay(

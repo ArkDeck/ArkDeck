@@ -382,8 +382,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
       source.range(of: "@main", range: storeStart..<source.endIndex)?.lowerBound)
     let startup = String(source[storeStart..<storeEnd])
 
-    XCTAssertTrue(startup.contains("Task { [deviceList] in"))
-    XCTAssertTrue(startup.contains("await deviceList.refreshForStartup()"))
+    XCTAssertTrue(startup.contains("deviceList.refreshForStartup()"))
     for nonCritical in [
       "runtimeHistory.refresh()",
       "autoUpdate.startup()",
@@ -412,9 +411,10 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(secondary.contains("autoUpdate.startup()"))
     XCTAssertTrue(secondary.contains("ApplicationIconChoice.applyStoredSelection()"))
     XCTAssertTrue(secondary.contains("refreshVisibleProjection(for: storedSelection)"))
+    XCTAssertTrue(deviceSource.contains("Task.detached(priority: .userInitiated)"))
     XCTAssertTrue(
       deviceSource.contains(
-        "await finishRefresh(generation: generation, isStartup: true)"))
+        "finishRefresh(current, generation: generation, isStartup: true)"))
     XCTAssertTrue(deviceSource.contains("await provider.startupCandidates()"))
     XCTAssertTrue(deviceSource.contains("await provider.refreshCandidates()"))
     XCTAssertTrue(deviceSource.contains("presentation = current"))

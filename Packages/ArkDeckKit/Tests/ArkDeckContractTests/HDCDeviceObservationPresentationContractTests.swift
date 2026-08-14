@@ -618,7 +618,6 @@ final class HDCDeviceObservationPresentationContractTests: XCTestCase {
     XCTAssertLessThan(admitIndex, taskIndex)
     XCTAssertLessThan(taskIndex, providerIndex)
     XCTAssertLessThan(providerIndex, releaseIndex)
-
     XCTAssertFalse(model.contains("Timer"))
     XCTAssertFalse(model.contains("Task.sleep"))
     XCTAssertFalse(model.localizedCaseInsensitiveContains("automatic retry"))

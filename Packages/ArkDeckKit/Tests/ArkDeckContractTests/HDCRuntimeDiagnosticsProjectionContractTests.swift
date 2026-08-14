@@ -100,6 +100,12 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
     let runtimeCheck = try XCTUnwrap(refresh.range(of: "runtimeManagedPresentation()"))
     let localBootstrap = try XCTUnwrap(refresh.range(of: "attachSessionIfConfigured()"))
     XCTAssertLessThan(runtimeCheck.lowerBound, localBootstrap.lowerBound)
+    XCTAssertTrue(
+      workflows.contains("--ui-test-hdc-local-production-presentation"),
+      "the signed UI regression must be able to inspect local production composition "
+        + "without depending on ambient Runtime state")
+    XCTAssertTrue(
+      workflows.contains("guard runtimeProjectionEnabled else { return presentation }"))
 
     let overview = try repositorySource("ArkDeckApp/Features/HDC/HDCStatusView.swift")
     let settings = try repositorySource("ArkDeckApp/Features/Settings/SettingsRootView.swift")

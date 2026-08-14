@@ -1,4 +1,3 @@
-import AppKit
 import XCTest
 
 /// HDC diagnostics, lifecycle safety and device observation.
@@ -221,12 +220,13 @@ final class HDCStatusUITests: XCTestCase {
   func testProductionLaunchUsesDurableSessionDiagnosticsAndNoFixtureValues() {
     let app = launch(
       arguments: [
-        "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path", "/usr/bin/true",
+        "--ui-test-reset-hdc-selection", "--ui-test-hdc-local-production-presentation",
+        "--arkdeck-hdc-user-configured-path", "/usr/bin/true",
       ],
       fixture: false)
     expandAdvancedDiagnostics(app)
     assertDisplayedValue(
-      app.staticTexts["hdc.toolchain.path"], equals: "/usr/bin/true", timeout: 15)
+      element("hdc.toolchain.path", in: app), equals: "/usr/bin/true", timeout: 15)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
       equals: "No recovery impact preview has been requested", timeout: 15)
@@ -262,14 +262,15 @@ final class HDCStatusUITests: XCTestCase {
     let fakeExecutable = repositoryFakeHDCExecutable()
     let app = launch(
       arguments: [
-        "--ui-test-reset-hdc-selection", "--arkdeck-hdc-user-configured-path", fakeExecutable.path,
+        "--ui-test-reset-hdc-selection", "--ui-test-hdc-local-production-presentation",
+        "--arkdeck-hdc-user-configured-path", fakeExecutable.path,
       ], fixture: false)
     expandAdvancedDiagnostics(app)
 
     assertDisplayedValue(
-      app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
+      element("hdc.toolchain.path", in: app), equals: fakeExecutable.path, timeout: 15)
     assertDisplayedValue(
-      app.staticTexts["hdc.toolchain.clientVersion"],
+      element("hdc.toolchain.clientVersion", in: app),
       equals: "unknown (registered client probe requires an existing server identity)",
       timeout: 15)
   }
@@ -277,61 +278,82 @@ final class HDCStatusUITests: XCTestCase {
   /// PORT-FILE-ACCESS-001. The relaunch *is* the assertion — the bookmark has
   /// to survive it — so this one deliberately launches twice.
   func testUserPickerPersistsBookmarkAcrossRelaunch() throws {
-    XCTAssertTrue(
-      FileManager.default.isExecutableFile(atPath: repositoryFakeHDCExecutable().path),
-      "swift test must build the repository fake before the signed UI gate")
-    let pickerExecutable = try stagedPickerExecutable()
-    let fakeExecutable = pickerExecutable.resolvingSymlinksInPath().standardizedFileURL
-    XCTAssertTrue(
-      FileManager.default.isExecutableFile(atPath: fakeExecutable.path),
-      "staging the picker fixture must keep it executable")
+    let fixtureRoot = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-hdc-picker-\(UUID().uuidString)", directoryHint: .isDirectory)
+      .resolvingSymlinksInPath().standardizedFileURL
+    defer { try? FileManager.default.removeItem(at: fixtureRoot) }
+    try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: true)
+    let pickerExecutable = fixtureRoot.appending(path: "hdc-picker-fixture")
+    try FileManager.default.copyItem(at: URL(filePath: "/usr/bin/true"), to: pickerExecutable)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o700], ofItemAtPath: pickerExecutable.path)
+    XCTAssertTrue(FileManager.default.isExecutableFile(atPath: pickerExecutable.path))
 
-    let app = launch(arguments: ["--ui-test-reset-hdc-selection"], fixture: false)
-    let choose = app.buttons["hdc.toolchain.chooseExecutable"]
-    XCTAssertTrue(choose.waitForExistenceFast(timeout: 15))
-    choose.click()
+    let selected = launch(
+      arguments: [
+        "--ui-test-reset-hdc-selection", "--ui-test-hdc-local-production-presentation",
+      ], fixture: false)
+    expandAdvancedDiagnostics(selected)
+    let chooseExecutable = element("hdc.toolchain.chooseExecutable", in: selected)
+    XCTAssertTrue(chooseExecutable.waitForExistenceFast(timeout: 5))
+    assertEnabled(chooseExecutable, equals: true, timeout: 15)
+    chooseExecutable.click()
 
-    let openPanel = app.sheets.firstMatch
-    XCTAssertTrue(openPanel.waitForExistenceFast(timeout: 5), "Open panel must become interactive")
-    app.typeKey("g", modifierFlags: [.command, .shift])
-    let pathField = openPanel.textFields.firstMatch
-    XCTAssertTrue(pathField.waitForExistenceFast(timeout: 5), "Open panel must expose Go to Folder")
-    pathField.click()
-    pathField.typeKey("a", modifierFlags: [.command])
-    try withTemporaryGeneralPasteboardString(pickerExecutable.path) {
-      pathField.typeKey("v", modifierFlags: [.command])
+    let openPanel = selected.sheets.firstMatch
+    guard openPanel.waitForExistenceFast(timeout: 5) else {
+      XCTFail("Open panel must become interactive")
+      return
     }
+    selected.typeKey("g", modifierFlags: [.command, .shift])
+    let pathField = openPanel.textFields.firstMatch
+    guard pathField.waitForExistenceFast(timeout: 5) else {
+      XCTFail("Open panel must expose Go to Folder")
+      return
+    }
+    // macOS can restore a per-window input source when the remote Open Panel
+    // text field takes focus. Re-select the already-enabled plain layout here
+    // so a third-party candidate window cannot consume the path or Return key.
+    KeyboardInputSourcePin.pinPlainKeyboardLayout()
+    // Go to Folder gives PathTextField keyboard focus. Asking XCUITest to
+    // click this remote-service element on macOS 26.6 can instead try to
+    // scroll the browser behind it and fail before sending any input.
+    pathField.typeKey("a", modifierFlags: .command)
+    pathField.typeText(pickerExecutable.path)
     pathField.typeKey(.return, modifierFlags: [])
-    // Go to Folder resolves asynchronously, so a Return sent straight after it
-    // lands before the panel has a selection and is simply dropped. Press the
-    // panel's own Open button, once it reports that it has something to open —
-    // which also says, in one assertion, whether the panel accepted the path.
-    // Two waits by necessity, not by habit: resolving a control inside the
-    // remote open-panel service costs seconds per query, but the enabled
-    // predicate cannot double as the existence check — isEnabled on an
-    // unresolved element is a query failure, not false.
+    let selectedFile = openPanel.textFields.matching(
+      NSPredicate(format: "value == %@", pickerExecutable.lastPathComponent)
+    ).firstMatch
+    guard selectedFile.waitForExistenceFast(timeout: 10) else {
+      XCTFail("Open panel must select the requested executable")
+      return
+    }
+    selectedFile.click()
     let openButton = openPanel.buttons["OKButton"]
-    XCTAssertTrue(
-      openButton.waitForExistenceFast(timeout: 5), "Open panel must expose its Open button")
+    guard openButton.waitForExistenceFast(timeout: 5) else {
+      XCTFail("Open panel must expose its final Open button")
+      return
+    }
     assertEnabled(openButton, equals: true, timeout: 10)
     openButton.click()
-
-    // The open panel has to be gone before anything below the fold can be
-    // clicked: while it is up the disclosure is present and on screen but has
-    // no hit point, which reports as "unable to find hit point" rather than as
-    // an occlusion.
     XCTAssertTrue(
-      app.sheets.firstMatch.waitForNonExistenceFast(timeout: 10),
-      "the open panel must close before the Overview is driven again")
-    expandAdvancedDiagnostics(app)
-    assertDisplayedValue(
-      app.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
-    app.terminate()
+      openPanel.waitForNonExistenceFast(timeout: 10),
+      "the open panel must close before its selection is asserted")
 
-    let reopened = launch(arguments: [], fixture: false)
+    let selectionError = element("hdc.toolchain.configurationError", in: selected)
+    if selectionError.waitForExistenceFast(timeout: 3) {
+      XCTFail("HDC picker returned an error: \(displayedText(for: selectionError))")
+      selected.terminate()
+      return
+    }
+    assertDisplayedValue(
+      element("hdc.toolchain.path", in: selected), equals: pickerExecutable.path, timeout: 15)
+    selected.terminate()
+
+    let reopened = launch(
+      arguments: ["--ui-test-hdc-local-production-presentation"], fixture: false)
     expandAdvancedDiagnostics(reopened)
     assertDisplayedValue(
-      reopened.staticTexts["hdc.toolchain.path"], equals: fakeExecutable.path, timeout: 15)
+      element("hdc.toolchain.path", in: reopened), equals: pickerExecutable.path, timeout: 15)
   }
 
   // OBS-APPFACE-001 / AP4: a source audit, so it launches nothing at all.
@@ -461,7 +483,7 @@ final class HDCStatusUITests: XCTestCase {
     // The absolute path now lives in the collapsed Advanced Diagnostics
     // section, so readiness is anchored on a field the Overview always shows.
     XCTAssertTrue(
-      app.staticTexts["hdc.endpoint"].waitForExistenceFast(timeout: 15),
+      element("hdc.endpoint", in: app).waitForExistenceFast(timeout: 15),
       "ArkDeck must render an accessible HDC diagnostics root before assertions")
     return app
   }
@@ -476,13 +498,13 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertTrue(
       toggle.waitForExistenceFast(timeout: 15),
       "Overview must expose the Advanced Diagnostics disclosure", file: file, line: line)
-    guard !app.staticTexts["hdc.toolchain.path"].exists else { return }
+    guard !element("hdc.toolchain.path", in: app).exists else { return }
     // NavigationSplitView accessibility geometry is unreliable on macOS 26;
     // the product's public shortcut reaches the same action without spending
     // up to 25 AppKit scroll/idle cycles or risking a click on the Job bar.
     app.typeKey("d", modifierFlags: [.command, .shift])
     XCTAssertTrue(
-      app.staticTexts["hdc.toolchain.path"].waitForExistenceFast(timeout: 5),
+      element("hdc.toolchain.path", in: app).waitForExistenceFast(timeout: 5),
       "expanding Advanced Diagnostics must reveal the raw toolchain facts",
       file: file, line: line)
   }
@@ -491,6 +513,10 @@ final class HDCStatusUITests: XCTestCase {
     [element.label, element.value as? String]
       .compactMap { $0 }
       .joined(separator: " ")
+  }
+
+  private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+    app.descendants(matching: .any).matching(identifier: identifier).firstMatch
   }
 
   private func displayedValues(for element: XCUIElement) -> [String] {
@@ -547,48 +573,6 @@ final class HDCStatusUITests: XCTestCase {
     return haystack.components(separatedBy: needle).count - 1
   }
 
-  /// The picker is driven through the system open panel's Go to Folder, and
-  /// that will not commit a selection anywhere under this checkout: the panel
-  /// navigates to the file and leaves its Open button disabled, so the panel
-  /// never closes and every later step of the test is measured against a
-  /// window that still has a sheet over it. Until now the test avoided that by
-  /// preferring a hard link an operator had created at the repository root by
-  /// hand, and silently fell back to `Packages/ArkDeckKit/.build` when that
-  /// link was absent — which it is in any fresh clone or worktree.
-  ///
-  /// It is the location and nothing else. The same bytes, reached the same
-  /// way, were measured selectable from the runner's temp and from
-  /// `~/Library/Caches`, and refused from the checkout — with a `.build/debug`
-  /// copy in temp selectable, the checkout's copy refused whether or not the
-  /// path went through that `debug` symlink, and a path of the checkout's own
-  /// depth outside it selectable. So it is neither the dot-prefixed directory
-  /// nor the symlink nor the depth, which is what the earlier wording implied.
-  /// What makes the checkout refuse is not established here; it sits under
-  /// `~/Dropbox`, and a copy outside that tree is taken.
-  ///
-  /// A copy, not a link. Granting the App access through the picker leaves
-  /// `com.apple.quarantine` on the chosen file, and a hard link carries that
-  /// onto the repository fake's own inode, where it stops every contract test
-  /// that spawns the fake — Gatekeeper refuses to launch it and the failures
-  /// read as process timeouts. A copy takes the quarantine on a throwaway
-  /// inode that teardown deletes.
-  private func stagedPickerExecutable() throws -> URL {
-    if let explicit = ProcessInfo.processInfo.environment["ARKDECK_FAKE_HDC_EXECUTABLE"] {
-      return URL(filePath: explicit).standardizedFileURL
-    }
-    let source = repositoryFakeHDCExecutable()
-    let directory = FileManager.default.temporaryDirectory
-      .appending(path: "arkdeck-picker-fixture-\(ProcessInfo.processInfo.processIdentifier)")
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let staged = directory.appending(path: source.lastPathComponent)
-    if FileManager.default.fileExists(atPath: staged.path) {
-      try FileManager.default.removeItem(at: staged)
-    }
-    try FileManager.default.copyItem(at: source, to: staged)
-    addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
-    return staged.standardizedFileURL
-  }
-
   private func repositoryRoot() -> URL {
     URL(filePath: #filePath)
       .deletingLastPathComponent()
@@ -602,30 +586,4 @@ final class HDCStatusUITests: XCTestCase {
       .resolvingSymlinksInPath().standardizedFileURL
   }
 
-  private func withTemporaryGeneralPasteboardString(
-    _ value: String,
-    perform: () -> Void
-  ) throws {
-    let pasteboard = NSPasteboard.general
-    let savedItems = pasteboard.pasteboardItems?.map { item in
-      let copy = NSPasteboardItem()
-      for type in item.types {
-        if let data = item.data(forType: type) {
-          copy.setData(data, forType: type)
-        }
-      }
-      return copy
-    }
-    pasteboard.clearContents()
-    guard pasteboard.setString(value, forType: .string) else {
-      throw CocoaError(.fileWriteUnknown)
-    }
-    defer {
-      pasteboard.clearContents()
-      if let savedItems {
-        pasteboard.writeObjects(savedItems)
-      }
-    }
-    perform()
-  }
 }
