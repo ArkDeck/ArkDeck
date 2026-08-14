@@ -14,7 +14,8 @@
 
 <p align="center">
   <a href="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml"><img src="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml/badge.svg" alt="Swift CI"></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2014%2B%20Apple%20silicon-blue" alt="Platform: macOS 14+ on Apple silicon">
+  <img src="https://img.shields.io/badge/platform-macOS%2026%20Apple%20silicon-blue" alt="Platform: macOS 26 on Apple silicon">
+  <img src="https://img.shields.io/badge/toolchain-Xcode%2026.6%20%7C%20Swift%206.3-5f4b8b" alt="Toolchain: Xcode 26.6 and Swift 6.3">
   <img src="https://img.shields.io/badge/status-0.1.0%20preview-orange" alt="Status: 0.1.0 preview">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 </p>
@@ -22,25 +23,25 @@
 <!-- TODO: screenshot placeholder — add a capture of the app here once one exists,
      e.g. <p align="center"><img src="docs/assets/app-debug.png" width="760" alt="ArkDeck Debug workspace"></p> -->
 
-ArkDeck is a workbench for OpenHarmony development boards. Plug one in and you can install and debug HAPs, capture logs, screenshots, UI dumps and traces, deploy native libraries, and — when a board stops booting — flash a DAYU200 back to a known-good image.
+ArkDeck is a local-first workbench for real OpenHarmony development boards. Its macOS app, CLI and per-user daemon share one runtime for adopting a specific device, running versioned operations, keeping durable job history and collecting artifacts. The current catalog covers HAP debugging, diagnostics, native-library deployment and DAYU200 recovery flashing.
 
-The unusual part is how it talks to the device. Nothing in ArkDeck runs raw `hdc` or shell commands on your behalf: callers submit typed operations from a versioned catalog, and a local daemon resolves the actual executables, arguments and device paths, checks the device's identity, and refuses to continue when something doesn't line up. That is what makes it reasonable to let an AI agent loose on real hardware: the worst a confused agent can do is submit an operation the runtime rejects.
+Callers cannot submit arbitrary `hdc` or shell command strings, executable paths, remote paths or trusted device facts. They submit a published operation and typed inputs; the daemon materializes the executable, argument array and provider-owned paths, checks the bound device and stops when required facts are missing or have drifted. AI agents use the same bounded operation surface as the app and CLI.
 
 ## What it does
 
-- Adopts one specific device by identity, rather than whatever happens to be plugged in, and keeps that binding across restarts.
-- Installs, launches and inspects HAPs end to end, with results collected into a local artifact store.
-- Captures HiLog, screenshots, ArkUI component trees, traces and crash records on demand.
-- Deploys app-owned native libraries atomically and rolls back when verification fails.
-- Flashes a DAYU200 (RK3568) from a verified image bundle, then reboots and re-adopts it.
-- Runs an AI debug loop that reads the evidence, patches in an isolated workspace, and retests through the same typed operations, stopping at success or at a declared budget.
+- Observes HDC and adopts one exact device by durable identity instead of selecting whichever device is currently connected.
+- Installs, starts, verifies and cleans up HAPs from leased artifacts, with optional bounded diagnostics.
+- Captures bounded HiLog, screenshots, ArkUI component trees, traces and crash records into an immutable local artifact store.
+- Creates verified, target-bound port forwards and atomically deploys app-owned native libraries with rollback.
+- Flashes a DAYU200 (RK3568) from a verified image bundle, then rebinds the device and verifies the resulting system.
+- Runs a budgeted AI debug loop that analyzes artifacts, changes an isolated declared workspace, rebuilds, signs, retests and stops at success or a safety/budget boundary.
 
 Three surfaces drive the same runtime:
 
 | Surface | What it is |
 | --- | --- |
-| macOS app | Workspaces for device setup, Flash, Debug, UI Dump, Trace, Automation, History and Settings |
-| `arkdeck` | The CLI: daemon setup, device adoption, operations, jobs, artifacts and harness tasks |
+| macOS app | Overview and device views, plus Flash, Debug, UI Dump, Trace, Automation and History workspaces; app settings live in the standard Settings window |
+| `arkdeck` | Daemon and signing setup, device adoption, operation and job control, artifact access, typed agent runs and bounded debug tasks |
 | `arkdeck-agentd` | The per-user daemon that owns execution, recovery, and the private control socket |
 
 ## Why it's built this way
@@ -49,7 +50,7 @@ Boards get bricked by honest mistakes: a flash aimed at the wrong serial number,
 
 - Mutating work requires a confirmed, persisted device binding; a transport address alone is never treated as an identity.
 - Intent is journaled before each external effect, so a daemon crash or restart never loses track of what was in flight.
-- Flashing runs under a short-lived capability tied to one device, one plan and one toolchain.
+- Destructive work runs under a short-lived Runtime-owned capability tied to the exact operation, device, inputs, plan, artifacts and toolchain.
 - When facts are stale or an outcome is unknown, the runtime stops instead of guessing.
 
 Raw artifacts stay on your machine and are immutable once written; exporting anything is an explicit step.
@@ -58,11 +59,11 @@ Raw artifacts stay on your machine and are immutable once written; exporting any
 
 ArkDeck is an early preview (`0.1.0`). Current limitations:
 
-- macOS 14 or later on Apple silicon is the only supported host.
+- macOS 26 on Apple silicon is the only supported host.
 - Flashing supports exactly one board today: the DAYU200 (RK3568).
-- Interfaces, catalog schemas and setup steps may change before a first stable release.
+- Windows and Linux ports have not started, and interfaces, catalog schemas and setup steps may change before a first stable release.
 
-Progress is measured by five journeys that must pass on a physical board (the repo calls them Golden Journeys): device observation, HAP debugging, native library deployment, flash recovery, and an autonomous AI debug loop. Mocks and simulators don't count. Definitions and current state live in [PRODUCT-LOOP.md](./PRODUCT-LOOP.md).
+Progress is measured by five journeys that must pass on a physical board (the repo calls them Golden Journeys): device observation, HAP debugging, native library deployment, flash recovery, and an autonomous AI debug loop. Mocks and simulators don't count. Their definitions and status rules live in [PRODUCT-LOOP.md](./PRODUCT-LOOP.md).
 
 ## Architecture
 
@@ -83,8 +84,8 @@ Module boundaries are documented in [Architecture Rules](./docs/ArchitectureRule
 
 You need:
 
-- macOS 14 or later on Apple silicon
-- Xcode with a Swift 6 toolchain
+- macOS 26 on Apple silicon
+- Xcode 26.6 with Swift 6.3
 - an OpenHarmony `hdc` executable, for real-device work
 - a USB-connected device with first-use trust already granted
 
@@ -116,25 +117,29 @@ ArkDeckKit tests use a stable cache outside individual worktrees. App and UI
 test changes compile the Xcode scheme with `build-for-testing`; this does not
 launch a simulator or claim device acceptance.
 
-For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. The Debug configuration covers app and runtime development; actually flashing a DAYU200 additionally needs the reviewed Rockchip component and the release packaging path.
+For the desktop app, open `ArkDeck.xcodeproj` in Xcode and run the shared `ArkDeck` scheme. This is enough for app development and host-side tests. Installing the background runtime is a separate signed-helper flow; flashing a DAYU200 also requires the reviewed Rockchip component and release packaging path.
 
-### Starting the runtime
+### Installing the runtime
 
-Install the per-user daemon, pointing it at your `hdc`:
+The bare SwiftPM executables are development artifacts and cannot be installed as the production LaunchAgent. `agentd install` accepts only an `ArkDeckAgent.app` helper with the expected Developer ID, hardened runtime, embedded provisioning profile and shared Keychain entitlement. Build that helper with team-authorized signing and notarization inputs as described in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md), or use a signed project release package when one is available.
+
+From a signed `ArkDeckCLI.app`, install the per-user daemon and point it at your `hdc`:
 
 ```bash
-Packages/ArkDeckKit/.build/debug/arkdeck agentd install --hdc /absolute/path/to/hdc
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck \
+  agentd install --hdc /absolute/path/to/hdc
 ```
 
 Then check that everything is wired up:
 
 ```bash
-Packages/ArkDeckKit/.build/debug/arkdeck agentd status
-Packages/ArkDeckKit/.build/debug/arkdeck doctor
-Packages/ArkDeckKit/.build/debug/arkdeck device list
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck agentd status
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck doctor
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck device list
+/absolute/path/to/ArkDeckCLI.app/Contents/MacOS/arkdeck operation list
 ```
 
-`agentd install` verifies and pins both the daemon and the `hdc` binary. Workspace layout, local HAP signing, diagnostics and uninstall are covered in the [headless runtime guide](./Packages/ArkDeckKit/LaunchAgents/README.md).
+`agentd install` verifies and pins both the daemon and the `hdc` binary. Use `arkdeck device adopt --candidate <connect-key>` after reviewing the candidate reported by `device list`; ArkDeck will not guess when the choice is absent or ambiguous. Workspace setup, local HAP signing, diagnostics and uninstall are also covered in the headless runtime guide.
 
 ## Repository map
 
