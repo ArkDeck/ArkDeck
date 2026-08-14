@@ -65,9 +65,11 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       status: FlashSubmissionPresentation(
         jobID: "job-live", state: "running", outcomeUnknown: false,
         timeline: [
-          "intent flash-partitions",
-          "progress flash-partitions phase=staging completed=0 total=9",
-        ]),
+          "intent flash-partitions"
+        ],
+        processProgress: RuntimeJobProcessProgress(
+          stepID: "flash-partitions", phase: .staging,
+          completedUnitCount: 0, totalUnitCount: 9)),
       partitions: plan.partitions)
     XCTAssertEqual(extracting.phase, .extractingImage)
 
@@ -75,9 +77,11 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       status: FlashSubmissionPresentation(
         jobID: "job-live", state: "running", outcomeUnknown: false,
         timeline: [
-          "intent flash-partitions",
-          "progress flash-partitions phase=writing completed=4 total=9 unit=system percent=35",
-        ]),
+          "intent flash-partitions"
+        ],
+        processProgress: RuntimeJobProcessProgress(
+          stepID: "flash-partitions", phase: .writing, unitName: "system",
+          completedUnitCount: 4, totalUnitCount: 9, currentUnitPercent: 35)),
       partitions: plan.partitions)
     XCTAssertEqual(writing.phase, .writingPartition)
     XCTAssertEqual(writing.partitionName, "system")
@@ -107,6 +111,55 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
 
     XCTAssertEqual(projected.phase, .verifyingPartitions)
     XCTAssertNil(projected.writeFractionCompleted)
+  }
+
+  func testLiveProgressNeverInterpretsTimelineTextAsProviderProgress() {
+    let projected = FlashLiveProgressProjector.project(
+      status: FlashSubmissionPresentation(
+        jobID: "job-live", state: "running", outcomeUnknown: false,
+        timeline: [
+          "intent flash-partitions",
+          "progress flash-partitions phase=writing completed=4 total=9 unit=system percent=99",
+        ]),
+      partitions: [])
+
+    XCTAssertEqual(projected.phase, .extractingImage)
+    XCTAssertNil(projected.partitionName)
+    XCTAssertNil(projected.currentPartitionPercent)
+  }
+
+  func testFlashStatusDecoderAcceptsTypedProgressAndRejectsMalformedProgress() throws {
+    let fields: [String: Any] = [
+      "jobId": "job-live",
+      "state": "running",
+      "outcomeUnknown": false,
+      "timeline": ["intent flash-partitions"],
+      "processProgress": [
+        "stepId": "flash-partitions",
+        "phase": "writing",
+        "unitName": "system",
+        "completedUnitCount": 4,
+        "totalUnitCount": 9,
+        "currentUnitPercent": 35,
+      ],
+    ]
+    let decoded = try XCTUnwrap(
+      FlashJobStatusResponseDecoding.presentation(fields, expectedJobID: "job-live"))
+    XCTAssertEqual(
+      decoded.processProgress,
+      RuntimeJobProcessProgress(
+        stepID: "flash-partitions", phase: .writing, unitName: "system",
+        completedUnitCount: 4, totalUnitCount: 9, currentUnitPercent: 35))
+
+    var malformed = fields
+    malformed["processProgress"] = [
+      "stepId": "flash-partitions",
+      "phase": "writing",
+      "completedUnitCount": 10,
+      "totalUnitCount": 9,
+    ]
+    XCTAssertNil(
+      FlashJobStatusResponseDecoding.presentation(malformed, expectedJobID: "job-live"))
   }
 
   func testRuntimeAvailabilityAndTargetFactsDecodeWithoutInventingDefaults() throws {

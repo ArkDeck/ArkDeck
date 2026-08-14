@@ -266,12 +266,20 @@ public struct FlashSubmissionPresentation: Sendable, Equatable {
   public let state: String
   public let outcomeUnknown: Bool
   public let timeline: [String]
+  public let processProgress: RuntimeJobProcessProgress?
 
-  public init(jobID: String, state: String, outcomeUnknown: Bool, timeline: [String]) {
+  public init(
+    jobID: String,
+    state: String,
+    outcomeUnknown: Bool,
+    timeline: [String],
+    processProgress: RuntimeJobProcessProgress? = nil
+  ) {
     self.jobID = jobID
     self.state = state
     self.outcomeUnknown = outcomeUnknown
     self.timeline = timeline
+    self.processProgress = processProgress
   }
 }
 
@@ -331,9 +339,8 @@ public enum FlashLiveProgressProjector {
     }
     let timeline = status.timeline
     let latestKnownStep = latestStep(in: timeline)
-    if latestKnownStep?.id == "flash-partitions",
-      let progress = latestProviderProgress(in: timeline),
-      progress.timelineIndex >= (latestKnownStep?.timelineIndex ?? -1)
+    if let progress = status.processProgress,
+      progress.stepID == "flash-partitions"
     {
       if progress.phase == .staging {
         return FlashLiveProgressPresentation(phase: .extractingImage)
@@ -342,9 +349,9 @@ public enum FlashLiveProgressProjector {
       return FlashLiveProgressPresentation(
         phase: .writingPartition,
         partitionName: progress.unitName,
-        completedPartitionCount: progress.completed,
-        totalPartitionCount: progress.total,
-        currentPartitionPercent: progress.percent,
+        completedPartitionCount: progress.completedUnitCount,
+        totalPartitionCount: progress.totalUnitCount,
+        currentPartitionPercent: progress.currentUnitPercent,
         writeFractionCompleted: fraction)
     }
     switch latestKnownStep?.id {
@@ -370,16 +377,6 @@ public enum FlashLiveProgressProjector {
 
   private struct TimelineStep {
     let id: String
-    let timelineIndex: Int
-  }
-
-  private struct ProviderProgress {
-    let timelineIndex: Int
-    let phase: RuntimeProcessProgressPhase
-    let unitName: String?
-    let completed: Int
-    let total: Int
-    let percent: Int?
   }
 
   private static let runtimeStepIDs = [
@@ -393,65 +390,100 @@ public enum FlashLiveProgressProjector {
   private static func latestStep(in timeline: [String]) -> TimelineStep? {
     for index in timeline.indices.reversed() {
       if let id = runtimeStepIDs.first(where: { timeline[index].contains($0) }) {
-        return TimelineStep(id: id, timelineIndex: index)
+        return TimelineStep(id: id)
       }
-    }
-    return nil
-  }
-
-  private static func latestProviderProgress(in timeline: [String]) -> ProviderProgress? {
-    for index in timeline.indices.reversed() {
-      let tokens = timeline[index].split(separator: " ").map(String.init)
-      guard tokens.count >= 5,
-        tokens[0] == "progress", tokens[1] == "flash-partitions"
-      else { continue }
-      let pairs = tokens.dropFirst(2).compactMap { token -> (String, String)? in
-        let parts = token.split(separator: "=", maxSplits: 1).map(String.init)
-        return parts.count == 2 ? (parts[0], parts[1]) : nil
-      }
-      var values: [String: String] = [:]
-      for (key, value) in pairs where values[key] == nil { values[key] = value }
-      guard let phaseText = values["phase"],
-        let phase = RuntimeProcessProgressPhase(rawValue: phaseText),
-        let completedText = values["completed"], let completed = Int(completedText),
-        let totalText = values["total"], let total = Int(totalText),
-        total > 0, (0...total).contains(completed),
-        values["percent"].flatMap(Int.init).map({ (0...100).contains($0) }) ?? true
-      else { continue }
-      return ProviderProgress(
-        timelineIndex: index, phase: phase,
-        unitName: values["unit"], completed: completed, total: total,
-        percent: values["percent"].flatMap(Int.init))
     }
     return nil
   }
 
   private static func writeFraction(
-    progress: ProviderProgress,
+    progress: RuntimeJobProcessProgress,
     partitions: [FlashPartitionPresentation]
   ) -> Double {
-    let currentFraction = Double(progress.percent ?? 0) / 100
+    let currentFraction = Double(progress.currentUnitPercent ?? 0) / 100
     let ordered = partitions.sorted { $0.writeOrder < $1.writeOrder }
-    if ordered.count == progress.total,
-      progress.completed == progress.total
+    if ordered.count == progress.totalUnitCount,
+      progress.completedUnitCount == progress.totalUnitCount
     {
       return 1
     }
-    if ordered.count == progress.total,
-      ordered.indices.contains(progress.completed),
-      ordered[progress.completed].partitionName == progress.unitName
+    if ordered.count == progress.totalUnitCount,
+      ordered.indices.contains(progress.completedUnitCount),
+      ordered[progress.completedUnitCount].partitionName == progress.unitName
     {
       let totalBytes = ordered.reduce(Int64(0)) { $0 + $1.imageSizeBytes }
       guard totalBytes > 0 else { return 0 }
-      let completedBytes = ordered.prefix(progress.completed).reduce(Int64(0)) {
+      let completedBytes = ordered.prefix(progress.completedUnitCount).reduce(Int64(0)) {
         $0 + $1.imageSizeBytes
       }
-      let currentBytes = Double(ordered[progress.completed].imageSizeBytes) * currentFraction
+      let currentBytes =
+        Double(ordered[progress.completedUnitCount].imageSizeBytes) * currentFraction
       return min(1, (Double(completedBytes) + currentBytes) / Double(totalBytes))
     }
     return min(
       1,
-      (Double(progress.completed) + currentFraction) / Double(progress.total))
+      (Double(progress.completedUnitCount) + currentFraction)
+        / Double(progress.totalUnitCount))
+  }
+}
+
+enum FlashJobStatusResponseDecoding {
+  static func presentation(
+    _ fields: [String: Any],
+    expectedJobID: String
+  ) -> FlashSubmissionPresentation? {
+    guard let returnedJobID = fields["jobId"] as? String,
+      returnedJobID == expectedJobID,
+      let state = fields["state"] as? String,
+      let outcomeUnknown = fields["outcomeUnknown"] as? Bool,
+      let timeline = fields["timeline"] as? [String]
+    else { return nil }
+
+    let processProgress: RuntimeJobProcessProgress?
+    if let rawProgress = fields["processProgress"], !(rawProgress is NSNull) {
+      guard let progressFields = rawProgress as? [String: Any],
+        let decoded = decodeProcessProgress(progressFields)
+      else { return nil }
+      processProgress = decoded
+    } else {
+      // Older daemon versions do not publish this observational field. The
+      // status remains usable, but the UI does not reinterpret timeline text
+      // as provider progress.
+      processProgress = nil
+    }
+
+    return FlashSubmissionPresentation(
+      jobID: expectedJobID,
+      state: state,
+      outcomeUnknown: outcomeUnknown,
+      timeline: timeline,
+      processProgress: processProgress)
+  }
+
+  private static func decodeProcessProgress(
+    _ fields: [String: Any]
+  ) -> RuntimeJobProcessProgress? {
+    guard let stepID = fields["stepId"] as? String, !stepID.isEmpty,
+      let phaseValue = fields["phase"] as? String,
+      let phase = RuntimeProcessProgressPhase(rawValue: phaseValue),
+      let completed = fields["completedUnitCount"] as? Int,
+      let total = fields["totalUnitCount"] as? Int,
+      total > 0, (0...total).contains(completed)
+    else { return nil }
+
+    let unitName = fields["unitName"] as? String
+    let percent = fields["currentUnitPercent"] as? Int
+    guard unitName.map({ !$0.isEmpty }) ?? true,
+      percent.map({ (0...100).contains($0) }) ?? true
+    else { return nil }
+
+    return RuntimeJobProcessProgress(
+      stepID: stepID,
+      phase: phase,
+      unitName: unitName,
+      completedUnitCount: completed,
+      totalUnitCount: total,
+      currentUnitPercent: percent)
   }
 }
 
@@ -693,17 +725,13 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       let terminal = try await FlashXPCResponseDecoding.resultObject(
         await FlashXPCTransport.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
-      guard let returnedJobID = terminal["jobId"] as? String,
-        returnedJobID == jobID,
-        let state = terminal["state"] as? String,
-        let outcomeUnknown = terminal["outcomeUnknown"] as? Bool,
-        let timeline = terminal["timeline"] as? [String]
+      guard
+        let presentation = FlashJobStatusResponseDecoding.presentation(
+          terminal, expectedJobID: jobID)
       else {
         return .failed("Runtime returned an incomplete terminal Flash status")
       }
-      return .completed(
-        FlashSubmissionPresentation(
-          jobID: jobID, state: state, outcomeUnknown: outcomeUnknown, timeline: timeline))
+      return .completed(presentation)
     } catch let failure as FlashResponseFailure {
       return .failed(failure.message)
     } catch {
@@ -716,18 +744,13 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       let current = try await FlashXPCResponseDecoding.resultObject(
         await FlashXPCTransport.request(
           method: "job.status", params: ["jobId": .string(jobID)]))
-      guard let returnedJobID = current["jobId"] as? String,
-        returnedJobID == jobID,
-        let state = current["state"] as? String,
-        let outcomeUnknown = current["outcomeUnknown"] as? Bool,
-        let timeline = current["timeline"] as? [String]
+      guard
+        let presentation = FlashJobStatusResponseDecoding.presentation(
+          current, expectedJobID: jobID)
       else {
         return .failed("Runtime returned an incomplete live Flash status")
       }
-      return .available(
-        FlashSubmissionPresentation(
-          jobID: jobID, state: state,
-          outcomeUnknown: outcomeUnknown, timeline: timeline))
+      return .available(presentation)
     } catch let failure as FlashResponseFailure {
       return .failed(failure.message)
     } catch {
@@ -871,8 +894,14 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
           "verified wait-loader-reconnect []",
           "verified rebind-loader-identity []",
           "intent flash-partitions",
-          "progress flash-partitions phase=writing completed=4 total=9 unit=system percent=35",
-        ]))
+        ],
+        processProgress: RuntimeJobProcessProgress(
+          stepID: "flash-partitions",
+          phase: .writing,
+          unitName: "system",
+          completedUnitCount: 4,
+          totalUnitCount: 9,
+          currentUnitPercent: 35)))
   }
 
   func bindCurrentLoader(target: FlashTargetPresentation) async -> FlashLoaderBindingResult {

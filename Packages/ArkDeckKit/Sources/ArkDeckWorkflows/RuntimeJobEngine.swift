@@ -80,6 +80,10 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   /// decoding.
   public var outstandingResidueCount: Int?
   public let timeline: [String]
+  /// Replaceable observational progress for the process step that is
+  /// currently executing. It is never authority for dispatch, success,
+  /// retry, or recovery; the durable journal remains authoritative.
+  public let processProgress: RuntimeJobProcessProgress?
   /// Read-only History facts. Runtime jobs are execute records today, but the
   /// optional wire shape preserves honest compatibility with older daemons
   /// and leaves room for a future persisted simulated mode without guessing.
@@ -108,6 +112,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     outcomeUnknown: Bool,
     outstandingResidueCount: Int?,
     timeline: [String],
+    processProgress: RuntimeJobProcessProgress? = nil,
     executionMode: String? = nil,
     sessionID: String? = nil,
     actualEffect: String? = nil,
@@ -126,6 +131,7 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
     self.outcomeUnknown = outcomeUnknown
     self.outstandingResidueCount = outstandingResidueCount
     self.timeline = timeline
+    self.processProgress = processProgress
     self.executionMode = executionMode
     self.sessionID = sessionID
     self.actualEffect = actualEffect
@@ -446,9 +452,47 @@ extension RuntimeProcessDispatching {
   }
 }
 
-public enum RuntimeProcessProgressPhase: String, Sendable, Equatable {
+public enum RuntimeProcessProgressPhase: String, Sendable, Equatable, Codable {
   case staging
   case writing
+}
+
+/// Wire-safe projection of one active process step's observational progress.
+/// The step identity keeps consumers from applying provider progress to a
+/// different operation phase after a status refresh.
+public struct RuntimeJobProcessProgress: Sendable, Equatable, Codable {
+  public let stepID: String
+  public let phase: RuntimeProcessProgressPhase
+  public let unitName: String?
+  public let completedUnitCount: Int
+  public let totalUnitCount: Int
+  public let currentUnitPercent: Int?
+
+  public init(
+    stepID: String,
+    phase: RuntimeProcessProgressPhase,
+    unitName: String? = nil,
+    completedUnitCount: Int,
+    totalUnitCount: Int,
+    currentUnitPercent: Int? = nil
+  ) {
+    self.stepID = stepID
+    self.phase = phase
+    self.unitName = unitName
+    self.completedUnitCount = completedUnitCount
+    self.totalUnitCount = totalUnitCount
+    self.currentUnitPercent = currentUnitPercent
+  }
+
+  package init(stepID: String, progress: RuntimeProcessProgress) {
+    self.init(
+      stepID: stepID,
+      phase: progress.phase,
+      unitName: progress.unitName,
+      completedUnitCount: progress.completedUnitCount,
+      totalUnitCount: progress.totalUnitCount,
+      currentUnitPercent: progress.currentUnitPercent)
+  }
 }
 
 /// Closed, observational progress from inside one already-admitted provider
@@ -737,8 +781,7 @@ public actor RuntimeJobEngine {
   private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
   private var activeProcessProgressKeys: Set<ProcessProgressKey> = []
   private var latestProcessProgress: [ProcessProgressKey: RuntimeProcessProgress] = [:]
-  private var latestSucceededDeviceObservationCache:
-    [String: RuntimeEvidenceObservation]?
+  private var latestSucceededDeviceObservationCache: [String: RuntimeEvidenceObservation]?
 
   public init(
     configuration: Configuration,
@@ -6253,6 +6296,7 @@ public actor RuntimeJobEngine {
       outcomeUnknown: record.outcomeUnknown,
       outstandingResidueCount: record.outstandingResidueCount,
       timeline: record.timeline,
+      processProgress: liveProcessProgress(for: record.jobID),
       executionMode: "execute",
       sessionID: record.sessionID,
       actualEffect: record.actualEffect,
@@ -6262,6 +6306,18 @@ public actor RuntimeJobEngine {
       supersededByRecoveryEpochID: supersededByRecoveryEpochID,
       recoveryEpochID: recoveryEpochID,
       resolvedByTargetAliasResolutionID: resolvedByTargetAliasResolutionID)
+  }
+
+  private func liveProcessProgress(for jobID: String) -> RuntimeJobProcessProgress? {
+    let active: [RuntimeJobProcessProgress] = latestProcessProgress.compactMap {
+      key, progress in
+      guard key.jobID == jobID, activeProcessProgressKeys.contains(key) else { return nil }
+      return RuntimeJobProcessProgress(stepID: key.stepID, progress: progress)
+    }
+    // Runtime executes provider steps serially per Job. If that invariant is
+    // ever broken, omit this observational projection instead of choosing an
+    // arbitrary process and presenting misleading progress.
+    return active.count == 1 ? active[0] : nil
   }
 
   private struct RecoveryEpochIndexes {

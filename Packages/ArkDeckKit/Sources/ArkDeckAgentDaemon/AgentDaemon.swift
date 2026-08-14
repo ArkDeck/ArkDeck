@@ -1758,6 +1758,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "outcomeUnknown": .bool(status.outcomeUnknown),
       "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
       "timeline": includeTimeline ? .array(status.timeline.map(JSONValue.string)) : .null,
+      "processProgress": encodeProcessProgress(status.processProgress),
       "executionMode": status.executionMode.map(JSONValue.string) ?? .null,
       "sessionId": status.sessionID.map(JSONValue.string) ?? .null,
       "actualEffect": status.actualEffect.map(JSONValue.string) ?? .null,
@@ -1769,6 +1770,21 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "recoveryEpochId": status.recoveryEpochID.map(JSONValue.string) ?? .null,
       "resolvedByTargetAliasResolutionId": status.resolvedByTargetAliasResolutionID
         .map(JSONValue.string) ?? .null,
+    ])
+  }
+
+  private static func encodeProcessProgress(
+    _ progress: RuntimeJobProcessProgress?
+  ) -> JSONValue {
+    guard let progress else { return .null }
+    return .object([
+      "stepId": .string(progress.stepID),
+      "phase": .string(progress.phase.rawValue),
+      "unitName": progress.unitName.map(JSONValue.string) ?? .null,
+      "completedUnitCount": .integer(Int64(progress.completedUnitCount)),
+      "totalUnitCount": .integer(Int64(progress.totalUnitCount)),
+      "currentUnitPercent": progress.currentUnitPercent
+        .map { .integer(Int64($0)) } ?? .null,
     ])
   }
 
