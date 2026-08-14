@@ -20,6 +20,8 @@ enum AppStartupPerformance {
   private static var startupState: OSSignpostIntervalState?
   private static var startupBeganAt: ContinuousClock.Instant?
   private static var deviceDiscoveryState: OSSignpostIntervalState?
+  private static let uiTestEvidenceEnvironmentKey =
+    "ARKDECK_UI_TEST_STARTUP_EVIDENCE_PATH"
 
   static func beginStartup() {
     guard startupState == nil else { return }
@@ -57,8 +59,8 @@ enum AppStartupPerformance {
     }
   }
 
-  static func deviceInformationDisplayed() {
-    guard let state = startupState, let startupBeganAt else { return }
+  static func deviceInformationDisplayed() -> TimeInterval? {
+    guard let state = startupState, let startupBeganAt else { return nil }
     signposter.emitEvent("Complete Device Information Displayed")
     let seconds = startupBeganAt.duration(to: clock.now).timeInterval
     logger.notice(
@@ -66,6 +68,8 @@ enum AppStartupPerformance {
     signposter.endInterval("App Startup to Device Information", state)
     startupState = nil
     AppStartupPerformance.startupBeganAt = nil
+    return ProcessInfo.processInfo.environment[uiTestEvidenceEnvironmentKey] == nil
+      ? nil : seconds
   }
 }
 
@@ -119,9 +123,7 @@ private final class ArkDeckAppModelStore {
     // read while SwiftUI builds the window instead of waiting for `.task`
     // after first appearance. The task inherits the main actor only for
     // publication; the provider actor owns the Runtime/XPC wait.
-    Task { [deviceList] in
-      await deviceList.refreshForStartup()
-    }
+    deviceList.refreshForStartup()
   }
 }
 

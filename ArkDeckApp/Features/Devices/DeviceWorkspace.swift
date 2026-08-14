@@ -57,18 +57,29 @@ final class DeviceListViewModel {
 
   func refresh() {
     guard let generation = beginRefresh() else { return }
+    let provider = provider
     Task { [weak self] in
-      await self?.finishRefresh(generation: generation)
+      let current = await provider.refreshCandidates()
+      self?.finishRefresh(current, generation: generation)
     }
   }
 
   /// The App's startup task awaits this read as its only startup I/O. Manual
   /// refresh keeps the fire-and-forget UI action above; both paths share the
   /// same synchronous admission guard.
-  func refreshForStartup() async {
+  func refreshForStartup() {
     guard let generation = beginRefresh() else { return }
     AppStartupPerformance.beginDeviceDiscovery()
-    await finishRefresh(generation: generation, isStartup: true)
+    let provider = provider
+    // A task created on the App's main actor does not start until the first
+    // window has finished its initial SwiftUI/AppKit work. Start only the
+    // Sendable, read-only provider call off that actor, then return to the
+    // model for the single publication below.
+    Task.detached(priority: .userInitiated) { [weak self] in
+      let current = await provider.startupCandidates()
+      guard !Task.isCancelled else { return }
+      await self?.finishRefresh(current, generation: generation, isStartup: true)
+    }
   }
 
   private func beginRefresh() -> UInt64? {
@@ -79,12 +90,10 @@ final class DeviceListViewModel {
   }
 
   private func finishRefresh(
+    _ current: DeviceListPresentation,
     generation: UInt64,
     isStartup: Bool = false
-  ) async {
-    let current = isStartup
-      ? await provider.startupCandidates()
-      : await provider.refreshCandidates()
+  ) {
     guard generation == refreshGeneration else { return }
     isRefreshing = false
     guard !Task.isCancelled else { return }
@@ -207,6 +216,7 @@ final class DeviceListViewModel {
 struct DeviceSidebarRow: View {
   let candidate: DeviceCandidatePresentation
   let displayName: String
+  @State private var startupEvidenceSeconds: TimeInterval?
 
   var body: some View {
     Label {
@@ -243,13 +253,14 @@ struct DeviceSidebarRow: View {
         .foregroundStyle(stateColor)
     }
     .accessibilityElement(children: .combine)
-    .accessibilityValue(stateText)
+    .accessibilityValue(
+      startupEvidenceSeconds.map { "startup-seconds:\($0)" } ?? stateText)
     .accessibilityIdentifier("device.row.\(candidate.connectKey)")
     .onAppear {
       // End the startup interval at the presentation boundary, not when the
       // model finishes its XPC read. This is the first SwiftUI lifecycle point
       // at which the complete row is actually part of the visible hierarchy.
-      AppStartupPerformance.deviceInformationDisplayed()
+      startupEvidenceSeconds = AppStartupPerformance.deviceInformationDisplayed()
     }
   }
 
@@ -357,6 +368,7 @@ struct DeviceDetailView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("device.detail.statusSection")
   }
 
@@ -374,6 +386,7 @@ struct DeviceDetailView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .topLeading)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("device.detail.factsSection")
   }
 
@@ -512,6 +525,7 @@ struct DeviceDetailView: View {
       trustStep(2, "device.trust.step2")
       trustStep(3, "device.trust.step3")
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("device.trust.steps")
   }
 

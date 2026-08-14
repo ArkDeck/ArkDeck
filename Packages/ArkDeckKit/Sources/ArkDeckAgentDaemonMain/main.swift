@@ -565,6 +565,11 @@ Task.detached {
       print("recovered \(recovered.count) active job(s); unknown outcomes parked")
       fflush(stdout)
     }
+    // The App's first device row includes the last verified model, firmware
+    // and transport. Pay the bounded SQLite history read once while the
+    // long-lived daemon starts, then keep the engine's compact observation
+    // cache current as new observe.device Jobs succeed.
+    _ = try? await engine.latestSucceededDeviceObservations()
     if let recovery = startupLoaderBindingRecovery,
       let pendingJobID = try await engine.loaderTransitionAwaitingBinding(
         targetID: recovery.targetID,

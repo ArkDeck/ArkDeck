@@ -34,8 +34,9 @@ enum KeyboardInputSourcePin {
   /// tests should still run and report their own results rather than refuse to
   /// start; the prompt is a host condition, not a product one.
   static func pinPlainKeyboardLayout() {
-    guard previousSource == nil else { return }
-    previousSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
+    if previousSource == nil {
+      previousSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
+    }
     guard
       let plain = enabledSource(withID: "com.apple.keylayout.US")
         ?? enabledSource(withID: "com.apple.keylayout.ABC")

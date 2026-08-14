@@ -737,6 +737,8 @@ public actor RuntimeJobEngine {
   private var flashArchiveProfileCache = RuntimeFlashArchiveProfileCache()
   private var activeProcessProgressKeys: Set<ProcessProgressKey> = []
   private var latestProcessProgress: [ProcessProgressKey: RuntimeProcessProgress] = [:]
+  private var latestSucceededDeviceObservationCache:
+    [String: RuntimeEvidenceObservation]?
 
   public init(
     configuration: Configuration,
@@ -1203,6 +1205,7 @@ public actor RuntimeJobEngine {
     current.record.finishedAtUTC = nowUTC()
     try persistRuntimeRecord(current.record)
     jobs[jobID] = current
+    updateLatestSucceededDeviceObservationCache(from: current.record)
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
     return statusAndReleaseTerminalRuntime(
@@ -3202,6 +3205,10 @@ public actor RuntimeJobEngine {
   public func latestSucceededDeviceObservations(
     pageSize: Int = 250
   ) throws -> [String: RuntimeEvidenceObservation] {
+    let usesStartupCache = pageSize == 250
+    if usesStartupCache, let latestSucceededDeviceObservationCache {
+      return latestSucceededDeviceObservationCache
+    }
     let page = try admissionService.listJobs(
       pageSize: pageSize, cursor: nil, newestFirst: true)
     var observations: [String: RuntimeEvidenceObservation] = [:]
@@ -3217,7 +3224,25 @@ public actor RuntimeJobEngine {
       else { continue }
       observations[targetID] = observation
     }
+    if usesStartupCache {
+      latestSucceededDeviceObservationCache = observations
+    }
     return observations
+  }
+
+  private func updateLatestSucceededDeviceObservationCache(
+    from record: RuntimeJobRecord
+  ) {
+    guard var cache = latestSucceededDeviceObservationCache,
+      record.operationReference == "observe.device@1",
+      record.state == JobState.succeeded.rawValue,
+      !record.outcomeUnknown,
+      let observation = record.evidenceObservation,
+      let targetID = observation.targetID,
+      targetID == record.request.target.targetID
+    else { return }
+    cache[targetID] = observation
+    latestSucceededDeviceObservationCache = cache
   }
 
   public func listCleanupDebt() async throws -> [CleanupDebtRecord] {

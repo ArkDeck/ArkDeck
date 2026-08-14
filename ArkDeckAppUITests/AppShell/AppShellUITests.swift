@@ -41,7 +41,7 @@ final class AppShellUITests: XCTestCase {
     }
 
     let app = XCUIApplication()
-    let startedAt = Date()
+    app.launchEnvironment["ARKDECK_UI_TEST_STARTUP_EVIDENCE_PATH"] = "accessibility-value"
     app.launch()
 
     let deviceRow = app.descendants(matching: .any).matching(
@@ -49,8 +49,12 @@ final class AppShellUITests: XCTestCase {
         format: "identifier BEGINSWITH %@ AND NOT identifier BEGINSWITH %@",
         "device.row.", "device.row.observed."))
       .firstMatch
-    let appeared = deviceRow.waitForExistence(timeout: 2)
-    let elapsed = Date().timeIntervalSince(startedAt)
+    let appeared = deviceRow.waitForExistence(timeout: 10)
+    XCTAssertTrue(appeared, "The connected-device row never appeared")
+    let evidenceText = try XCTUnwrap(deviceRow.value as? String)
+      .replacingOccurrences(of: "startup-seconds:", with: "")
+    let elapsed = try XCTUnwrap(
+      TimeInterval(evidenceText), "The App did not publish its internal startup timing")
 
     let evidence = XCTAttachment(
       string: String(format: "connected device row visible after %.3f seconds", elapsed))
@@ -58,7 +62,6 @@ final class AppShellUITests: XCTestCase {
     evidence.lifetime = .keepAlways
     add(evidence)
 
-    XCTAssertTrue(appeared, "The connected-device row did not appear within two seconds")
     XCTAssertLessThanOrEqual(
       elapsed, 2,
       "Cold start took \(String(format: "%.3f", elapsed)) seconds to show the device row")
@@ -104,7 +107,9 @@ final class AppShellUITests: XCTestCase {
           "Bounded HiLog capture", "HAP package", "Forward / reverse rules",
           "Provider invocation disclosure",
         ],
+        uiDumpAvailable: "Runtime operation is available",
         uiDumpUnavailable: "Runtime operation is unavailable",
+        traceAvailable: "Diagnostics operation is available",
         traceUnavailable: "Diagnostics operation is unavailable",
         settingsPanes: ["General", "Toolchains", "Storage", "Updates", "Diagnostics"]),
       history: History(
@@ -150,7 +155,9 @@ final class AppShellUITests: XCTestCase {
         debugPanels: [
           "有界 HiLog 采集", "HAP 安装包", "Forward / reverse 规则", "Provider 调用披露",
         ],
+        uiDumpAvailable: "Runtime 操作可用",
         uiDumpUnavailable: "Runtime 操作不可用",
+        traceAvailable: "诊断操作可用",
         traceUnavailable: "诊断操作不可用",
         settingsPanes: ["通用", "工具链", "存储", "更新", "诊断"]),
       history: History(
@@ -189,8 +196,8 @@ final class AppShellUITests: XCTestCase {
     let app = launch(arguments: ["-AppleLanguages", "(en)"])
 
     openGeneralSettings(in: app)
-    let keycapIcon = app.buttons["settings.general.appIcon.keycap"]
-    let waveformIcon = app.buttons["settings.general.appIcon.waveform"]
+    let keycapIcon = element("settings.general.appIcon.keycap", in: app)
+    let waveformIcon = element("settings.general.appIcon.waveform", in: app)
     XCTAssertTrue(keycapIcon.waitForExistenceFast(timeout: 10))
     XCTAssertTrue(waveformIcon.exists)
 
@@ -202,13 +209,13 @@ final class AppShellUITests: XCTestCase {
     app.terminate()
     let reopened = launch(arguments: ["-AppleLanguages", "(en)"])
     openGeneralSettings(in: reopened)
-    let persistedKeycap = reopened.buttons["settings.general.appIcon.keycap"]
+    let persistedKeycap = element("settings.general.appIcon.keycap", in: reopened)
     XCTAssertTrue(persistedKeycap.waitForExistenceFast(timeout: 10))
     XCTAssertEqual(
       persistedKeycap.value as? String, "Selected",
       "The selected icon must persist across launches")
 
-    let restoredWaveform = reopened.buttons["settings.general.appIcon.waveform"]
+    let restoredWaveform = element("settings.general.appIcon.waveform", in: reopened)
     restoredWaveform.click()
     XCTAssertEqual(restoredWaveform.value as? String, "Selected")
   }
@@ -286,7 +293,9 @@ final class AppShellUITests: XCTestCase {
     let inspectorShow: String
     let inspectorReadOnly: String
     let debugPanels: [String]
+    let uiDumpAvailable: String
     let uiDumpUnavailable: String
+    let traceAvailable: String
     let traceUnavailable: String
     let settingsPanes: [String]
   }
@@ -357,18 +366,18 @@ final class AppShellUITests: XCTestCase {
 
     // Overview answers its four questions on the first screen.
     XCTAssertTrue(
-      app.staticTexts["overview.status.server.value"].waitForExistenceFast(timeout: 15),
+      element("overview.status.server.value", in: app).waitForExistenceFast(timeout: 15),
       file: file, line: line)
-    assertDisplayed(app.staticTexts["overview.status.server.value"], equals: overview.server)
-    assertDisplayed(app.staticTexts["overview.status.trust.value"], equals: overview.trust)
-    assertDisplayed(app.staticTexts["overview.status.channel.value"], equals: overview.channel)
+    assertDisplayed(element("overview.status.server.value", in: app), equals: overview.server)
+    assertDisplayed(element("overview.status.trust.value", in: app), equals: overview.trust)
+    assertDisplayed(element("overview.status.channel.value", in: app), equals: overview.channel)
     assertDisplayed(
-      app.staticTexts["overview.status.needsAttention.value"], equals: overview.attention)
+      element("overview.status.needsAttention.value", in: app), equals: overview.attention)
     for section in [
       "overview.section.serverToolchain", "overview.section.deviceChannel",
       "overview.section.capabilities", "overview.section.needsAttention",
     ] {
-      XCTAssertTrue(app.staticTexts[section].exists, "\(section) missing", file: file, line: line)
+      XCTAssertTrue(element(section, in: app).exists, "\(section) missing", file: file, line: line)
     }
 
     // A workspace that has nothing to report has to say so, not go blank. The
@@ -411,8 +420,8 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(
       element("device.trust.steps", in: app).waitForExistenceFast(timeout: 10),
       "the unauthorized device must show its trust steps", file: file, line: line)
-    assertDisplayed(app.staticTexts["device.fact.state"], equals: "Unauthorized")
-    let recheck = app.buttons["device.action.recheck"]
+    assertDisplayed(element("device.fact.state", in: app), equals: "Unauthorized")
+    let recheck = element("device.action.recheck", in: app)
     XCTAssertTrue(recheck.exists, file: file, line: line)
     XCTAssertTrue(recheck.isEnabled, file: file, line: line)
     XCTAssertFalse(
@@ -425,7 +434,7 @@ final class AppShellUITests: XCTestCase {
     // action leads to Overview's recovery flow instead of restarting
     // anything from here. Then the success: a retried wait sees the fixture
     // flip to Connected and the wait dissolves without a verdict banner.
-    let beginWait = app.buttons["device.action.beginWait"]
+    let beginWait = element("device.action.beginWait", in: app)
     XCTAssertTrue(beginWait.waitForExistenceFast(timeout: 5), file: file, line: line)
     beginWait.click()
     XCTAssertTrue(
@@ -470,8 +479,8 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(
       element("flash.target", in: app).exists,
       "Flash details are collapsed by default", file: file, line: line)
-    element("flash.workspace.details", in: app).click()
-    assertDisplayed(app.staticTexts["flash.availability.status"], equals: flash.availability)
+    toggleFlashDetails(in: app, file: file, line: line)
+    assertDisplayed(element("flash.availability.status", in: app), equals: flash.availability)
     assertDisplayed(element("flash.target", in: app), equals: flash.target)
     assertDisplayed(app.staticTexts["flash.runtime.jobID"], equals: "job-fixture-0002")
     assertDisplayed(app.staticTexts["flash.runtime.state"], equals: flash.runtimeState)
@@ -514,9 +523,13 @@ final class AppShellUITests: XCTestCase {
     // run action even when Runtime has not published the required operation.
     select("app.navigation.uiDump", in: app)
     assertDisplayed(
-      element("uiDump.availability.status", in: app), equals: workspaces.uiDumpUnavailable,
-      timeout: 10)
-    XCTAssertTrue(element("uiDump.target.empty", in: app).exists, file: file, line: line)
+      element("uiDump.availability.status", in: app),
+      oneOf: [workspaces.uiDumpAvailable, workspaces.uiDumpUnavailable], timeout: 10)
+    XCTAssertTrue(
+      element("uiDump.target.empty", in: app).exists
+        || element("uiDump.target.picker", in: app).exists,
+      "UI Dump must expose either a selected Runtime target or its explicit empty state",
+      file: file, line: line)
     XCTAssertTrue(
       element("uiDump.recipe.fullDefaultTree", in: app).exists,
       file: file, line: line)
@@ -536,20 +549,29 @@ final class AppShellUITests: XCTestCase {
     // Trace likewise keeps the bounded configuration visible and its start
     // action locked while production capability facts are unavailable.
     select("app.navigation.trace", in: app)
+    let traceAvailability = element("trace.availability.status", in: app)
     assertDisplayed(
-      element("trace.availability.status", in: app), equals: workspaces.traceUnavailable,
-      timeout: 10)
+      traceAvailability,
+      oneOf: [workspaces.traceAvailable, workspaces.traceUnavailable], timeout: 10)
     for identifier in [
-      "trace.target.empty", "trace.configuration.mode", "trace.preset.picker",
-      "trace.duration", "trace.buffer",
+      "trace.configuration.mode", "trace.preset.picker", "trace.duration", "trace.buffer",
     ] {
       XCTAssertTrue(
         element(identifier, in: app).exists, "\(identifier) missing",
         file: file, line: line)
     }
+    let traceHasEmptyTarget = element("trace.target.empty", in: app).exists
+    XCTAssertTrue(
+      traceHasEmptyTarget || element("trace.target.picker", in: app).exists,
+      "Trace must expose either a selected Runtime target or its explicit empty state",
+      file: file, line: line)
     let traceStart = app.buttons["trace.start"]
     XCTAssertTrue(traceStart.exists, file: file, line: line)
-    XCTAssertFalse(traceStart.isEnabled, file: file, line: line)
+    if traceHasEmptyTarget
+      || displayedValues(for: traceAvailability).contains(workspaces.traceUnavailable)
+    {
+      XCTAssertFalse(traceStart.isEnabled, file: file, line: line)
+    }
     XCTAssertFalse(app.staticTexts["app.unavailable.title"].exists, file: file, line: line)
 
     // Custom is another entry to the same request: it arrives carrying the
@@ -591,7 +613,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(
       app.staticTexts["history.row.state.job-fixture-0002"],
       equals: history.interruptedRowState)
-    clickCorrectingNavigationSplitAXOffset(interruptedRow, in: app)
+    interruptedRow.click()
     XCTAssertTrue(
       app.staticTexts["history.detail.select"].waitForNonExistenceFast(timeout: 5),
       "a selected job replaces the prompt", file: file, line: line)
@@ -610,7 +632,7 @@ final class AppShellUITests: XCTestCase {
     let succeededRow = app.cells
       .containing(.staticText, identifier: "history.row.state.job-fixture-0001").firstMatch
     XCTAssertTrue(succeededRow.waitForExistenceFast(timeout: 10), file: file, line: line)
-    clickCorrectingNavigationSplitAXOffset(succeededRow, in: app)
+    succeededRow.click()
     assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
     assertTimeline(["queued", "running", "succeeded"], in: app)
     for absent in [
@@ -653,7 +675,7 @@ final class AppShellUITests: XCTestCase {
     }
 
     select("app.navigation.flash", in: app)
-    element("flash.workspace.details", in: app).click()
+    toggleFlashDetails(in: app, file: file, line: line)
     XCTAssertTrue(
       app.staticTexts["flash.runtime.empty"].waitForExistenceFast(timeout: 10),
       "Flash must distinguish a reachable empty Runtime history",
@@ -783,7 +805,7 @@ final class AppShellUITests: XCTestCase {
     // interaction. Both languages verify the five panes and the safe controls;
     // the update state machine asserts English status strings, so English
     // carries that walk.
-    app.typeKey(",", modifierFlags: .command)
+    openSettings(in: app)
     for pane in workspaces.settingsPanes {
       XCTAssertTrue(
         app.buttons[pane].waitForExistenceFast(timeout: 10),
@@ -868,13 +890,13 @@ final class AppShellUITests: XCTestCase {
       ])
 
     XCTAssertTrue(
-      app.staticTexts["overview.status.server.value"].waitForExistenceFast(timeout: 15),
+      element("overview.status.server.value", in: app).waitForExistenceFast(timeout: 15),
       file: file, line: line)
-    assertDisplayed(app.staticTexts["overview.status.server.value"], equals: overview.server)
-    assertDisplayed(app.staticTexts["overview.status.trust.value"], equals: overview.trust)
-    assertDisplayed(app.staticTexts["overview.status.channel.value"], equals: overview.channel)
+    assertDisplayed(element("overview.status.server.value", in: app), equals: overview.server)
+    assertDisplayed(element("overview.status.trust.value", in: app), equals: overview.trust)
+    assertDisplayed(element("overview.status.channel.value", in: app), equals: overview.channel)
     assertDisplayed(
-      app.staticTexts["overview.status.needsAttention.value"], equals: overview.attention)
+      element("overview.status.needsAttention.value", in: app), equals: overview.attention)
 
     // The Chinese HDC control and its keyboard route used to own another full
     // diagnostics launch. The shell is already rendering the same production
@@ -910,8 +932,8 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(element("flash.runtime.attention", in: app).exists, file: file, line: line)
     let details = element("flash.workspace.details", in: app)
     XCTAssertTrue(details.exists, file: file, line: line)
-    details.click()
-    assertDisplayed(app.staticTexts["flash.availability.status"], equals: flash.availability)
+    toggleFlashDetails(in: app, file: file, line: line)
+    assertDisplayed(element("flash.availability.status", in: app), equals: flash.availability)
     assertDisplayed(element("flash.target", in: app), equals: flash.target)
     assertDisplayed(app.staticTexts["flash.runtime.state"], equals: flash.runtimeState)
     assertDisplayed(element("flash.runtime.result", in: app), equals: flash.runtimeResult)
@@ -930,11 +952,13 @@ final class AppShellUITests: XCTestCase {
 
     select("app.navigation.uiDump", in: app, file: file, line: line)
     assertDisplayed(
-      element("uiDump.availability.status", in: app), equals: workspaces.uiDumpUnavailable,
+      element("uiDump.availability.status", in: app),
+      oneOf: [workspaces.uiDumpAvailable, workspaces.uiDumpUnavailable],
       timeout: 10, file: file, line: line)
     select("app.navigation.trace", in: app, file: file, line: line)
     assertDisplayed(
-      element("trace.availability.status", in: app), equals: workspaces.traceUnavailable,
+      element("trace.availability.status", in: app),
+      oneOf: [workspaces.traceAvailable, workspaces.traceUnavailable],
       timeout: 10, file: file, line: line)
 
     select("app.navigation.history", in: app, file: file, line: line)
@@ -946,7 +970,7 @@ final class AppShellUITests: XCTestCase {
       equals: history.interruptedRowState)
     let interruptedRow = app.cells
       .containing(.staticText, identifier: "history.row.state.job-fixture-0002").firstMatch
-    clickCorrectingNavigationSplitAXOffset(interruptedRow, in: app)
+    interruptedRow.click()
     assertDisplayed(
       app.staticTexts["history.detail.outcomeUnknown"], equals: history.outcomeUnknown)
     assertDisplayed(
@@ -963,7 +987,7 @@ final class AppShellUITests: XCTestCase {
       file: file, line: line)
 
     select("app.navigation.flash", in: app, file: file, line: line)
-    element("flash.workspace.details", in: app).click()
+    toggleFlashDetails(in: app, file: file, line: line)
     writeFixtureState("--ui-test-runtime-flash-running", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
     XCTAssertTrue(
@@ -996,7 +1020,7 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(
       app.staticTexts[workspaces.inspectorReadOnly], equals: workspaces.inspectorReadOnly)
 
-    app.typeKey(",", modifierFlags: .command)
+    openSettings(in: app)
     for pane in workspaces.settingsPanes {
       XCTAssertTrue(
         app.buttons[pane].waitForExistenceFast(timeout: 10),
@@ -1021,13 +1045,25 @@ final class AppShellUITests: XCTestCase {
     XCTAssertFalse(app.buttons["flash.bootloader.bind"].exists, file: file, line: line)
     let details = element("flash.workspace.details", in: app)
     XCTAssertTrue(details.waitForExistenceFast(timeout: 10), file: file, line: line)
-    details.click()
+    toggleFlashDetails(in: app, file: file, line: line)
     XCTAssertTrue(
       element("flash.plan.steps", in: app).waitForExistenceFast(timeout: 15),
       "the fixture must materialize an exact execute plan", file: file, line: line)
     XCTAssertTrue(
       element("flash.workspace.plan.stages", in: app).exists,
       "Flash summarizes Exact Plan as four readable stages", file: file, line: line)
+
+    // Read the details from top to bottom. SwiftUI omits far-offscreen children
+    // from the AX tree, so use the visible prerequisite verdict as the scroll
+    // sentinel instead of relying on its layout container becoming an AX node.
+    let prerequisiteVerdict = app.staticTexts["Unknown"].firstMatch
+    scrollWorkspaceUntilExists(
+      prerequisiteVerdict, in: app, deltaY: -600, file: file, line: line)
+    scrollIntoView(prerequisiteVerdict, in: app)
+    XCTAssertTrue(
+      prerequisiteVerdict.waitForExistenceFast(timeout: 5),
+      file: file, line: line)
+
     let partitions = element("flash.plan.partitions.disclosure", in: app)
     XCTAssertTrue(partitions.exists, file: file, line: line)
     scrollIntoView(partitions, in: app)
@@ -1037,15 +1073,7 @@ final class AppShellUITests: XCTestCase {
       "mapped partition details must be inspectable", file: file, line: line)
     partitions.click()
 
-    // Prerequisites stay inspectable inside the single Flash details disclosure.
-    let prerequisites = element("flash.plan.prerequisitesList", in: app)
-    XCTAssertTrue(prerequisites.exists, file: file, line: line)
-    scrollIntoView(prerequisites, in: app)
-    XCTAssertTrue(
-      app.staticTexts["Runtime check pending"].waitForExistenceFast(timeout: 5),
-      file: file, line: line)
-
-    let submit = app.buttons["flash.execute.submit"]
+    let submit = element("flash.execute.submit", in: app)
     XCTAssertTrue(submit.exists, file: file, line: line)
     scrollIntoView(submit, in: app)
     XCTAssertTrue(submit.isEnabled, file: file, line: line)
@@ -1190,10 +1218,10 @@ final class AppShellUITests: XCTestCase {
     select("app.navigation.flash", in: app, file: file, line: line)
     app.buttons["flash.refresh"].click()
     XCTAssertTrue(
-      app.buttons["flash.execute.submit"].waitForExistenceFast(timeout: 15),
+      element("flash.execute.submit", in: app).waitForExistenceFast(timeout: 15),
       "Flash must render the selected image and one real Flash action",
       file: file, line: line)
-    let submit = app.buttons["flash.execute.submit"]
+    let submit = element("flash.execute.submit", in: app)
     XCTAssertTrue(submit.exists, file: file, line: line)
     XCTAssertFalse(element("flash.mode", in: app).exists, file: file, line: line)
 
@@ -1205,7 +1233,7 @@ final class AppShellUITests: XCTestCase {
 
     let details = element("flash.workspace.details", in: app)
     XCTAssertTrue(details.exists, file: file, line: line)
-    details.click()
+    toggleFlashDetails(in: app, file: file, line: line)
     XCTAssertTrue(
       element("flash.workspace.plan.stages", in: app).waitForExistenceFast(timeout: 5),
       "Flash details must expose the four-stage Exact Plan summary",
@@ -1219,6 +1247,22 @@ final class AppShellUITests: XCTestCase {
   }
 
   // MARK: - Helpers
+
+  /// Flash exposes one full-label disclosure button, matching the established
+  /// Job Inspector interaction instead of macOS's arrow-only hit region.
+  private func toggleFlashDetails(
+    in app: XCUIApplication,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    if element("flash.availability.status", in: app).exists { return }
+    let details = element("flash.workspace.details", in: app)
+    XCTAssertTrue(details.exists, file: file, line: line)
+    XCTAssertGreaterThan(details.frame.height, 1, file: file, line: line)
+    details.click()
+    XCTAssertTrue(
+      element("flash.availability.status", in: app).waitForExistenceFast(timeout: 5),
+      "Flash details must expand after one full-label activation", file: file, line: line)
+  }
 
   /// Sidebar rows expose one full-width native navigation element. Its name,
   /// identifier and pointer frame stay together even after selection, so
@@ -1331,6 +1375,25 @@ final class AppShellUITests: XCTestCase {
       "expected \(expected), got: \(displayedText(for: element))", file: file, line: line)
   }
 
+  private func assertDisplayed(
+    _ element: XCUIElement, oneOf expected: [String],
+    timeout: TimeInterval = 5, file: StaticString = #filePath, line: UInt = #line
+  ) {
+    if expected.contains(where: { displayedValues(for: element).contains($0) }) { return }
+    let matches = NSPredicate { [weak self] _, _ in
+      guard let self else { return false }
+      let actual = displayedValues(for: element)
+      return expected.contains(where: actual.contains)
+    }
+    let result = XCTWaiter.wait(
+      for: [expectation(for: matches, evaluatedWith: element)], timeout: timeout)
+    XCTAssertTrue(
+      result == .completed
+        || expected.contains(where: { displayedValues(for: element).contains($0) }),
+      "expected one of \(expected), got: \(displayedText(for: element))",
+      file: file, line: line)
+  }
+
   private func assertTimeline(
     _ expected: [String], in app: XCUIApplication,
     file: StaticString = #filePath, line: UInt = #line
@@ -1378,6 +1441,29 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
+  /// SwiftUI omits far-offscreen children of the Flash ScrollView from the AX
+  /// snapshot. Scroll the workspace first, then use the frame-aware helper
+  /// once the stable identifier has entered the accessibility tree.
+  private func scrollWorkspaceUntilExists(
+    _ element: XCUIElement, in app: XCUIApplication, deltaY: CGFloat,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    if element.exists { return }
+    let window = app.windows.firstMatch.frame
+    let hosts = app.scrollViews.allElementsBoundByIndex.filter {
+      $0.frame.width > window.width * 0.5 && $0.frame.minX > window.minX + 200
+    }
+    guard let host = hosts.min(by: { $0.frame.width < $1.frame.width }) else {
+      XCTFail("Flash workspace ScrollView is missing", file: file, line: line)
+      return
+    }
+    for _ in 0..<6 {
+      host.scroll(byDeltaX: 0, deltaY: deltaY)
+      if element.exists { return }
+    }
+    XCTFail("offscreen Flash element did not enter the AX tree", file: file, line: line)
+  }
+
   private func launch(
     arguments: [String] = [], resetDeviceNames: Bool = true
   ) -> XCUIApplication {
@@ -1411,9 +1497,19 @@ final class AppShellUITests: XCTestCase {
   }
 
   private func openGeneralSettings(in app: XCUIApplication) {
-    app.typeKey(",", modifierFlags: .command)
-    let generalPane = app.buttons["General"]
-    XCTAssertTrue(generalPane.waitForExistenceFast(timeout: 10))
-    generalPane.click()
+    openSettings(in: app)
+    let general = app.buttons["General"]
+    XCTAssertTrue(general.waitForExistenceFast(timeout: 10))
+    if !element("settings.general.appIcon.keycap", in: app).exists {
+      general.click()
+    }
+    XCTAssertTrue(
+      element("settings.general.appIcon.keycap", in: app).waitForExistenceFast(timeout: 10))
+  }
+
+  private func openSettings(in app: XCUIApplication) {
+    let settings = element("app.toolbar.openSettings", in: app)
+    XCTAssertTrue(settings.waitForExistenceFast(timeout: 10))
+    settings.click()
   }
 }

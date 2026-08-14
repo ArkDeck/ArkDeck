@@ -108,6 +108,7 @@ struct FlashPrerequisitesList: View {
         prerequisiteRow(prerequisite)
       }
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.plan.prerequisitesList")
   }
 

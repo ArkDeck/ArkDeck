@@ -351,6 +351,7 @@ struct FlashWorkspaceView: View {
           flashAction(plan)
         }
       }
+      .accessibilityElement(children: .contain)
       .accessibilityIdentifier("flash.workspace.imageAction")
     }
   }
@@ -768,7 +769,6 @@ struct FlashWorkspaceView: View {
         }
       }
     }
-    .accessibilityIdentifier("flash.workspace.result")
   }
 
   private func resultDescription(succeeded: Bool) -> String {
@@ -783,25 +783,36 @@ struct FlashWorkspaceView: View {
   }
 
   private var flashDetails: some View {
-    DisclosureGroup(isExpanded: $isDetailsExpanded) {
-      VStack(alignment: .leading, spacing: 18) {
-        availabilitySection
-        deviceAccessSection
-        detailsInputs
-        if let plan = model.plan {
-          exactPlanDetails(plan)
-        }
-        FlashRuntimeActivityView(
-          presentation: runtimeHistory,
-          plan: model.plan,
-          onOpenHistory: onOpenHistory)
+    VStack(alignment: .leading, spacing: 0) {
+      Button {
+        isDetailsExpanded.toggle()
+      } label: {
+        Label(
+          flashText(
+            isDetailsExpanded ? "flash.workspace.details.hide" : "flash.workspace.details"),
+          systemImage: isDetailsExpanded ? "chevron.down" : "chevron.right")
+          .font(.callout.weight(.semibold))
+          .contentShape(Rectangle())
       }
-      .padding(.top, 12)
-    } label: {
-      Text(flashText("flash.workspace.details"))
-        .font(.callout.weight(.semibold))
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("flash.workspace.details")
+
+      if isDetailsExpanded {
+        VStack(alignment: .leading, spacing: 18) {
+          availabilitySection
+          deviceAccessSection
+          detailsInputs
+          if let plan = model.plan {
+            exactPlanDetails(plan)
+          }
+          FlashRuntimeActivityView(
+            presentation: runtimeHistory,
+            plan: model.plan,
+            onOpenHistory: onOpenHistory)
+        }
+        .padding(.top, 12)
+      }
     }
-    .accessibilityIdentifier("flash.workspace.details")
   }
 
   private var detailsInputs: some View {
@@ -846,6 +857,7 @@ struct FlashWorkspaceView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.top, 4)
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("flash.plan.steps")
   }
 
