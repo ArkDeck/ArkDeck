@@ -217,6 +217,53 @@ final class RuntimeOwnedWorkspaceContractTests: XCTestCase {
     XCTAssertEqual(try manager.inspect(intent), .absent)
   }
 
+  func testIsolationRevisionUsesTheCanonicalCopiedRootBehindAnAlias() async throws {
+    let sourceRoot = try temporaryDirectory("canonical-source")
+    try FileManager.default.createDirectory(
+      at: sourceRoot.appending(path: "Sources"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: sourceRoot.appending(path: "Sources/App.txt"))
+    try Data([0x50, 0x4b, 0x03, 0x04, 0x41]).write(
+      to: sourceRoot.appending(path: "Sources/Input.hap"))
+
+    let stateContainer = try temporaryDirectory("canonical-state")
+    let physicalState = stateContainer.appending(path: "physical", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: physicalState, withIntermediateDirectories: false)
+    let logicalState = stateContainer.appending(path: "logical", directoryHint: .isDirectory)
+    try FileManager.default.createSymbolicLink(
+      atPath: logicalState.path, withDestinationPath: physicalState.lastPathComponent)
+
+    let profile = try workspaceProfile(root: sourceRoot)
+    let sourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: profile.allowedFileGlobs)
+    let isolatedRevision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: ["Sources/App.txt"])
+    let registry = WorkspaceProjectProfileRegistry(profile: profile)
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: logicalState.appending(path: "evolution", directoryHint: .isDirectory),
+      profileRegistry: registry)
+    let intent = WorkspaceIsolationIntent(
+      runtimeOwnerID: "runtime-job-canonical-root",
+      sourceProjectRef: profile.projectRef,
+      expectedWorkspaceRevision: sourceRevision,
+      isolatedWorkspaceRevision: isolatedRevision,
+      createdAtUTC: timestamp,
+      allowedFileGlobs: ["Sources/App.txt"])
+
+    let prepared = try await manager.prepare(intent)
+    XCTAssertEqual(prepared.workspaceID, intent.workspaceID)
+    let copiedProfile = try XCTUnwrap(registry.profile(for: intent.workspaceProjectRef))
+    XCTAssertEqual(copiedProfile.kind, .evolution)
+    XCTAssertTrue(copiedProfile.projectRoot.hasPrefix(physicalState.path + "/"))
+    XCTAssertEqual(
+      try WorkspaceProviderSupport.workspaceRevision(
+        root: copiedProfile.projectRoot, profileVersion: copiedProfile.profileID,
+        globs: ["Sources/App.txt"]),
+      isolatedRevision)
+    XCTAssertEqual(try manager.inspect(intent), .prepared(prepared))
+  }
+
   private static let fixedTimestamp = "2026-08-15T00:00:00Z"
   private var timestamp: String { Self.fixedTimestamp }
 
