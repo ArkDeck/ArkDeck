@@ -80,6 +80,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   /// `task.*` then fails closed instead of half-existing.
   let harnessCoordinator: HarnessTaskCoordinator?
   private let hapImports: HAPArtifactImportCoordinator
+  private let workspacePatchImports: WorkspacePatchArtifactImportCoordinator
   private let flashBundleImports: FlashBundleArtifactImportCoordinator
   private let nativeLibraryImports: NativeLibraryArtifactImportCoordinator
   /// Test seam: records which methods a client invoked. Production passes
@@ -159,6 +160,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.debugInvocationController = debugInvocationController
     self.harnessCoordinator = harnessCoordinator
     self.hapImports = HAPArtifactImportCoordinator()
+    self.workspacePatchImports = WorkspacePatchArtifactImportCoordinator()
     if let flashBundleImportDirectory {
       self.flashBundleImports = FlashBundleArtifactImportCoordinator(
         directoryURL: flashBundleImportDirectory,
@@ -1028,6 +1030,139 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
       }
       let aborted = await hapImports.abort(uploadID: uploadID)
+      return success(
+        id: request.id, result: .object(["aborted": .bool(aborted)]))
+
+    case "artifact.importWorkspacePatch.begin":
+      guard artifactStore != nil, let targetStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "artifact store and target store are required for workspace patch import")
+      }
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .string(let name)? = request.params?["name"],
+        case .integer(let byteCountValue)? = request.params?["byteCount"],
+        case .string(let sha256)? = request.params?["sha256"],
+        byteCountValue >= 0, byteCountValue <= Int64(Int.max)
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "targetId, name, byteCount and sha256 are required")
+      }
+      do {
+        guard try targetStore.find(targetID: targetID) != nil else {
+          return failure(
+            id: request.id, code: .notFound, message: "unknown target \(targetID)")
+        }
+        let uploadID = try await workspacePatchImports.begin(
+          targetID: targetID, name: name,
+          byteCount: Int(byteCountValue), sha256: sha256)
+        return success(
+          id: request.id,
+          result: .object([
+            "uploadId": .string(uploadID),
+            "maximumChunkBytes": .integer(
+              Int64(WorkspacePatchArtifactImportCoordinator.maximumChunkBytes)),
+            "targetId": .string(targetID),
+          ]))
+      } catch let error as WorkspacePatchArtifactImportError {
+        return failure(id: request.id, code: .invalidParams, message: error.description)
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.importWorkspacePatch.append":
+      guard artifactStore != nil, targetStore != nil else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "artifact store and target store are required for workspace patch import")
+      }
+      guard case .string(let uploadID)? = request.params?["uploadId"],
+        case .integer(let offsetValue)? = request.params?["offset"],
+        offsetValue >= 0, offsetValue <= Int64(Int.max),
+        case .string(let base64)? = request.params?["base64"],
+        base64.utf8.count
+          <= ((WorkspacePatchArtifactImportCoordinator.maximumChunkBytes + 2) / 3) * 4,
+        let chunk = Data(base64Encoded: base64, options: [])
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "uploadId, non-negative offset and a bounded base64 chunk are required")
+      }
+      do {
+        let nextOffset = try await workspacePatchImports.append(
+          uploadID: uploadID, offset: Int(offsetValue), chunk: chunk)
+        return success(
+          id: request.id,
+          result: .object(["nextOffset": .integer(Int64(nextOffset))]))
+      } catch let error as WorkspacePatchArtifactImportError {
+        return failure(id: request.id, code: .rejected, message: error.description)
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.importWorkspacePatch.commit":
+      guard let artifactStore, let targetStore else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "artifact store and target store are required for workspace patch import")
+      }
+      guard case .string(let uploadID)? = request.params?["uploadId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
+      }
+      do {
+        let completed = try await workspacePatchImports.commit(uploadID: uploadID)
+        guard try targetStore.find(targetID: completed.targetID) != nil else {
+          return failure(
+            id: request.id, code: .conflict,
+            message: "target was removed during workspace patch import")
+        }
+        let jobID =
+          "input-workspace-patch-\(completed.targetID)-"
+          + String(completed.sha256.prefix(16))
+        let metadata = try await artifactStore.publish(
+          RuntimeArtifactPublicationRequest(
+            jobID: jobID,
+            sessionID: "session-\(jobID)",
+            stepID: "import-workspace-patch",
+            name: completed.name,
+            mediaType: "text/x-diff",
+            privacy: .standard,
+            retentionClass: .pinnedUntilVerified,
+            sourceOperation: "artifact.import-workspace-patch",
+            providerID: "host",
+            bindingSnapshot: ArtifactBindingSnapshot(
+              targetID: completed.targetID,
+              bindingRevision: nil,
+              stableIdentitySHA256: nil),
+            contents: completed.contents))
+        let lease = try await artifactStore.leaseReference(
+          jobID: metadata.jobID, artifactID: metadata.artifactID)
+        return success(
+          id: request.id,
+          result: .object([
+            "jobId": .string(metadata.jobID),
+            "artifactId": .string(metadata.artifactID),
+            "lease": .string(lease),
+            "name": .string(metadata.name),
+            "byteCount": .integer(Int64(metadata.byteCount)),
+            "sha256": .string(metadata.sha256),
+            "targetId": .string(completed.targetID),
+            "touchedFiles": .array(completed.touchedFiles.map(JSONValue.string)),
+          ]))
+      } catch let error as WorkspacePatchArtifactImportError {
+        return failure(id: request.id, code: .rejected, message: error.description)
+      } catch let error as RuntimeArtifactError {
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
+      }
+
+    case "artifact.importWorkspacePatch.abort":
+      guard case .string(let uploadID)? = request.params?["uploadId"] else {
+        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
+      }
+      let aborted = await workspacePatchImports.abort(uploadID: uploadID)
       return success(
         id: request.id, result: .object(["aborted": .bool(aborted)]))
 

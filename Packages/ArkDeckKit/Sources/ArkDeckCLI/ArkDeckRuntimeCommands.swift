@@ -946,7 +946,8 @@ enum RuntimeCLI {
         exitCode: EX_USAGE,
         message:
           "missing artifact subcommand "
-          + "(import-hap|import-flash-bundle|import-native-library|list|inspect|read|export)")
+          + "(import-hap|import-workspace-patch|import-flash-bundle|"
+          + "import-native-library|list|inspect|read|export)")
     }
     var rest = Array(arguments.dropFirst())
     let json = rest.contains("--json")
@@ -1013,6 +1014,71 @@ enum RuntimeCLI {
       }
       let result = try client.request(
         method: "artifact.importHap.commit",
+        params: ["uploadId": .string(uploadID)])
+      committed = true
+      emit(result, json: json)
+      return
+    }
+    if subcommand == "import-workspace-patch" {
+      guard let targetIndex = rest.firstIndex(of: "--target"),
+        targetIndex + 1 < rest.count,
+        let fileIndex = rest.firstIndex(of: "--file"),
+        fileIndex + 1 < rest.count
+      else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message:
+            "artifact import-workspace-patch requires --target <id> --file <change.patch>")
+      }
+      let targetID = rest[targetIndex + 1]
+      let payload = try readWorkspacePatchImportPayload(path: rest[fileIndex + 1])
+      let begin = try client.request(
+        method: "artifact.importWorkspacePatch.begin",
+        params: [
+          "targetId": .string(targetID),
+          "name": .string(payload.name),
+          "byteCount": .integer(Int64(payload.contents.count)),
+          "sha256": .string(payload.sha256),
+        ])
+      guard case .object(let beginFields) = begin,
+        case .string(let uploadID)? = beginFields["uploadId"],
+        case .integer(let maximumChunkValue)? = beginFields["maximumChunkBytes"],
+        maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
+      else {
+        throw AgentClientError.malformedResponse(
+          "artifact.importWorkspacePatch.begin returned no bounded upload identity")
+      }
+      var committed = false
+      defer {
+        if !committed {
+          _ = try? client.request(
+            method: "artifact.importWorkspacePatch.abort",
+            params: ["uploadId": .string(uploadID)])
+        }
+      }
+      let maximumChunk = Int(maximumChunkValue)
+      var offset = 0
+      while offset < payload.contents.count {
+        let end = min(payload.contents.count, offset + maximumChunk)
+        let chunk = payload.contents.subdata(in: offset..<end)
+        let appended = try client.request(
+          method: "artifact.importWorkspacePatch.append",
+          params: [
+            "uploadId": .string(uploadID),
+            "offset": .integer(Int64(offset)),
+            "base64": .string(chunk.base64EncodedString()),
+          ])
+        guard case .object(let fields) = appended,
+          case .integer(let nextOffset)? = fields["nextOffset"],
+          nextOffset == Int64(end)
+        else {
+          throw AgentClientError.malformedResponse(
+            "artifact.importWorkspacePatch.append returned a mismatched offset")
+        }
+        offset = end
+      }
+      let result = try client.request(
+        method: "artifact.importWorkspacePatch.commit",
         params: ["uploadId": .string(uploadID)])
       committed = true
       emit(result, json: json)
@@ -1379,6 +1445,80 @@ enum RuntimeCLI {
     }
     let digest = SHA256Hex.string(of: contents)
     return HAPImportPayload(name: name, contents: contents, sha256: digest)
+  }
+
+  private static func readWorkspacePatchImportPayload(path: String) throws -> HAPImportPayload {
+    let url = URL(filePath: path).standardizedFileURL
+    let name = url.lastPathComponent
+    guard name.count <= 128,
+      name.range(
+        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.(patch|diff)$"#,
+        options: .regularExpression) != nil
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message: "workspace patch file must have a safe .patch or .diff basename")
+    }
+    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "cannot open workspace patch file (errno \(errno))")
+    }
+    defer { Darwin.close(descriptor) }
+    var before = stat()
+    let maximumBytes = 512 * 1_024
+    guard fstat(descriptor, &before) == 0,
+      before.st_mode & S_IFMT == S_IFREG,
+      before.st_size > 0,
+      before.st_size <= maximumBytes
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE,
+        message:
+          "workspace patch must be a non-empty regular file no larger than "
+          + "\(maximumBytes) bytes")
+    }
+    var contents = Data()
+    contents.reserveCapacity(Int(before.st_size))
+    var buffer = [UInt8](repeating: 0, count: 128 * 1_024)
+    while contents.count < Int(before.st_size) {
+      let remaining = Int(before.st_size) - contents.count
+      let count = Darwin.read(descriptor, &buffer, min(buffer.count, remaining))
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw CLIError(
+          exitCode: EX_USAGE, message: "workspace patch changed while it was being imported")
+      }
+      contents.append(contentsOf: buffer[0..<count])
+    }
+    var extra: UInt8 = 0
+    let extraCount = Darwin.read(descriptor, &extra, 1)
+    var after = stat()
+    guard extraCount == 0,
+      fstat(descriptor, &after) == 0,
+      contents.count == Int(before.st_size),
+      after.st_dev == before.st_dev,
+      after.st_ino == before.st_ino,
+      after.st_size == before.st_size,
+      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
+      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
+      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
+      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
+    else {
+      throw CLIError(
+        exitCode: EX_USAGE, message: "workspace patch changed while it was being imported")
+    }
+    do {
+      _ = try WorkspaceProviderSupport.patchPaths(from: contents)
+    } catch {
+      throw CLIError(
+        exitCode: EX_DATAERR,
+        message: "workspace patch is not a safe bounded UTF-8 unified diff")
+    }
+    return HAPImportPayload(
+      name: name,
+      contents: contents,
+      sha256: SHA256Hex.string(of: contents))
   }
 
   private static func readNativeLibraryImportPayload(
