@@ -81,6 +81,27 @@ public struct RuntimeArtifactMetadata: Sendable, Equatable, Codable {
   public let retention: ArtifactRetention
   public let status: ArtifactStatus
   public let redactionApplied: Bool
+  package var derivation: RuntimeArtifactDerivation? = nil
+}
+
+package struct RuntimeArtifactDerivation: Sendable, Equatable, Codable {
+  package let analyzerRef: String
+  package let analyzerVersion: String
+  package let sourceArtifactID: String
+  package let sourceSHA256: String
+  package let sourceByteCount: Int
+  package let toolSHA256: String
+  package let parserSHA256: String
+  package let parserVersion: String
+  package let parserUpstreamRevision: String
+  package let parserBuildRecipeVersion: String
+  package let parserAdapterVersion: String
+  package let schemaAdapterVersion: String
+  package let indexSchemaVersion: Int
+  package let timeoutMs: Int
+  package let maxRows: Int
+  package let maxEvents: Int
+  package let maxOutputBytes: Int
 }
 
 public struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
@@ -211,6 +232,11 @@ public struct RuntimeArtifactPublicationRequest: Sendable {
   public let providerID: String
   public let bindingSnapshot: ArtifactBindingSnapshot
   public let contents: Data
+  package let derivation: RuntimeArtifactDerivation?
+  /// The bytes have already passed a closed, path-free machine-envelope
+  /// validator and are themselves the reviewed product. Generic text
+  /// redaction must not rewrite them after their digest was attested.
+  package let preservesValidatedMachineBytes: Bool
 
   public init(
     jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
@@ -229,6 +255,30 @@ public struct RuntimeArtifactPublicationRequest: Sendable {
     self.providerID = providerID
     self.bindingSnapshot = bindingSnapshot
     self.contents = contents
+    self.derivation = nil
+    self.preservesValidatedMachineBytes = false
+  }
+
+  package init(
+    jobID: String, sessionID: String, stepID: String, name: String, mediaType: String,
+    privacy: CatalogArtifactPrivacy, retentionClass: CatalogArtifactRetentionClass,
+    sourceOperation: String, providerID: String, bindingSnapshot: ArtifactBindingSnapshot,
+    contents: Data, derivation: RuntimeArtifactDerivation?,
+    preservesValidatedMachineBytes: Bool = false
+  ) {
+    self.jobID = jobID
+    self.sessionID = sessionID
+    self.stepID = stepID
+    self.name = name
+    self.mediaType = mediaType
+    self.privacy = privacy
+    self.retentionClass = retentionClass
+    self.sourceOperation = sourceOperation
+    self.providerID = providerID
+    self.bindingSnapshot = bindingSnapshot
+    self.contents = contents
+    self.derivation = derivation
+    self.preservesValidatedMachineBytes = preservesValidatedMachineBytes
   }
 }
 
@@ -433,7 +483,23 @@ public actor RuntimeArtifactStore {
   public func publish(_ request: RuntimeArtifactPublicationRequest) throws
     -> RuntimeArtifactMetadata
   {
-    let (payload, redacted) = redaction.redact(request.contents, mediaType: request.mediaType)
+    let payload: Data
+    let redacted: Bool
+    if request.preservesValidatedMachineBytes {
+      guard request.name == "trace-summary.json",
+        request.mediaType == "application/json",
+        request.sourceOperation == AnalyzerProvider.traceSummary,
+        request.derivation != nil
+      else {
+        throw RuntimeArtifactError.evidenceVerificationFailed(
+          "exact machine-byte publication lacks a closed ArkTrace derivation")
+      }
+      payload = request.contents
+      redacted = false
+    } else {
+      (payload, redacted) = redaction.redact(
+        request.contents, mediaType: request.mediaType)
+    }
     let digest = SHA256Hex.string(of: payload)
     let identityInput = Data("\(request.jobID)\u{0}\(request.name)\u{0}\(digest)".utf8)
     let identity =
@@ -442,7 +508,7 @@ public actor RuntimeArtifactStore {
     let createdAtUTC = nowUTC()
     let retention = try retentionPolicy.retention(
       for: request.retentionClass, createdAtUTC: createdAtUTC)
-    let metadata = RuntimeArtifactMetadata(
+    var metadata = RuntimeArtifactMetadata(
       artifactID: artifactID,
       jobID: request.jobID,
       sessionID: request.sessionID,
@@ -459,6 +525,7 @@ public actor RuntimeArtifactStore {
       retention: retention,
       status: .published,
       redactionApplied: redacted)
+    metadata.derivation = request.derivation
 
     let jobDirectory = try directory(for: request.jobID)
     let existing = try loadIndex(jobID: request.jobID).artifacts.first {
@@ -1465,6 +1532,7 @@ public actor RuntimeArtifactStore {
       && existing.retention.pinned == proposed.retention.pinned
       && existing.status == proposed.status
       && existing.redactionApplied == proposed.redactionApplied
+      && existing.derivation == proposed.derivation
   }
 
   private static func isSafeArtifactID(_ value: String) -> Bool {

@@ -167,6 +167,102 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     }
   }
 
+  private final class BlockingHAPSendDispatcher:
+    RuntimeProcessDispatching, @unchecked Sendable
+  {
+    private let delegate = ScriptedDispatcher(script: .observationHappy)
+    private let lock = NSLock()
+    private var started = false
+    private var released = false
+    private var cancelled = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var operationContinuation: CheckedContinuation<Void, Never>?
+
+    var observedCancellation: Bool { lock.withLock { cancelled } }
+
+    func waitUntilStarted() async {
+      await withCheckedContinuation { continuation in
+        let resumeNow = lock.withLock { () -> Bool in
+          if started { return true }
+          startWaiters.append(continuation)
+          return false
+        }
+        if resumeNow { continuation.resume() }
+      }
+    }
+
+    func release() {
+      let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+        released = true
+        defer { operationContinuation = nil }
+        return operationContinuation
+      }
+      continuation?.resume()
+    }
+
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      guard case .hdc(.sendArtifactToStaging) = plan.action else {
+        return try await delegate.dispatch(plan)
+      }
+      let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+        started = true
+        let captured = startWaiters
+        startWaiters.removeAll()
+        return captured
+      }
+      waiters.forEach { $0.resume() }
+      try await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+          let resumeNow = lock.withLock { () -> Bool in
+            if released || cancelled { return true }
+            operationContinuation = continuation
+            return false
+          }
+          if resumeNow { continuation.resume() }
+        }
+        try Task.checkCancellation()
+      } onCancel: {
+        let continuation = self.lock.withLock { () -> CheckedContinuation<Void, Never>? in
+          self.cancelled = true
+          defer { self.operationContinuation = nil }
+          return self.operationContinuation
+        }
+        continuation?.resume()
+      }
+      return ProviderProcessReceipt(
+        exitStatus: 0, stdout: Data(), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.01)
+    }
+  }
+
+  private actor EngineAsyncBarrier {
+    private var reached = false
+    private var released = false
+    private var reachedWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func waitAtBoundary() async {
+      reached = true
+      let waiters = reachedWaiters
+      reachedWaiters.removeAll()
+      waiters.forEach { $0.resume() }
+      if released { return }
+      await withCheckedContinuation { releaseWaiters.append($0) }
+    }
+
+    func waitUntilReached() async {
+      if reached { return }
+      await withCheckedContinuation { reachedWaiters.append($0) }
+    }
+
+    func release() {
+      released = true
+      let waiters = releaseWaiters
+      releaseWaiters.removeAll()
+      waiters.forEach { $0.resume() }
+    }
+  }
+
   private final class AdvancingClock: @unchecked Sendable {
     private let lock = NSLock()
     private var tick = 0
@@ -184,12 +280,13 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   }
 
   private func makeEngine(
-    dispatcher: ScriptedDispatcher,
+    dispatcher: any RuntimeProcessDispatching,
     nowUTC: String = "2026-07-29T00:00:00Z",
     engineNowUTC: (@Sendable () -> String)? = nil,
     admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
     powerActivityController: PowerActivityController? = nil,
-    stateRoot: URL? = nil
+    stateRoot: URL? = nil,
+    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore) {
     let stateRoot = stateRoot ?? self.stateDirectory!
     let capabilityStore = try RuntimeCapabilityStore(
@@ -201,7 +298,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: stateRoot,
-        admissionFaultInjector: admissionFaultInjector),
+        admissionFaultInjector: admissionFaultInjector,
+        testHooks: testHooks),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(factsPort: FactsPort())
       ]),
@@ -1378,6 +1476,78 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(afterRestart.state, "cancelled")
     XCTAssertEqual(afterRestart.timeline, status.timeline)
     XCTAssertEqual(restartedDispatcher.dispatchCount, 0)
+  }
+
+  func testCancellationDoesNotInterruptAnAtSafeBoundaryMutation() async throws {
+    let dispatcher = BlockingHAPSendDispatcher()
+    let (engine, _) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease()
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-in-flight-safe-boundary-cancel",
+        idempotencyKey: "idem-hap-in-flight-safe-boundary-cancel"))
+    let run = Task { try await engine.run(jobID: acceptance.jobID) }
+
+    await dispatcher.waitUntilStarted()
+    try await engine.requestCancel(jobID: acceptance.jobID)
+    await Task.yield()
+    XCTAssertFalse(
+      dispatcher.observedCancellation,
+      "atSafeBoundary device mutation must finish its active process before cancellation")
+    dispatcher.release()
+
+    let status = try await run.value
+    XCTAssertEqual(status.state, JobState.cancelled.rawValue)
+    XCTAssertFalse(status.outcomeUnknown)
+    XCTAssertFalse(dispatcher.observedCancellation)
+    XCTAssertTrue(status.timeline.contains("running->cancelRequested"))
+    XCTAssertTrue(status.timeline.contains("cancelRequested->cancellingAtSafeBoundary"))
+    XCTAssertTrue(status.timeline.contains("cancellingAtSafeBoundary->cancelled"))
+  }
+
+  func testCancellationAtFinalCapabilityBoundaryConsumesNothingAndDispatchesNothingElse()
+    async throws
+  {
+    let barrier = EngineAsyncBarrier()
+    let dispatcher = ScriptedDispatcher(script: .observationHappy)
+    let (engine, capabilityStore) = try makeEngine(
+      dispatcher: dispatcher,
+      testHooks: .init(
+        beforeMutationCapabilityCommit: { _ in await barrier.waitAtBoundary() }))
+    let lease = try await publishHAPLease()
+    let acceptance = try await engine.submit(
+      hapRequest(
+        lease: lease,
+        requestID: "req-hap-capability-boundary-cancel",
+        idempotencyKey: "idem-hap-capability-boundary-cancel"))
+    let run = Task { try await engine.run(jobID: acceptance.jobID) }
+
+    await barrier.waitUntilReached()
+    let dispatchesAtBoundary = dispatcher.dispatchCount
+    let capabilitiesBefore = try await capabilityStore.list()
+    let capabilityBefore = try XCTUnwrap(capabilitiesBefore.first)
+    let journalURL = stateDirectory.appending(
+      path: "jobs/\(acceptance.jobID)/journal.jsonl")
+    let intentsAtBoundary = try DurableJournalRecovery.inspect(url: journalURL)
+      .events.filter { $0.kind == .stepIntent }.count
+
+    try await engine.requestCancel(jobID: acceptance.jobID)
+    await barrier.release()
+    let status = try await run.value
+
+    XCTAssertEqual(status.state, JobState.cancelled.rawValue)
+    XCTAssertFalse(status.outcomeUnknown)
+    XCTAssertEqual(dispatcher.dispatchCount, dispatchesAtBoundary)
+    let inspectedAfter = try await capabilityStore.inspect(
+      capabilityID: capabilityBefore.capability.capabilityID)
+    let capabilityAfter = try XCTUnwrap(inspectedAfter)
+    XCTAssertEqual(capabilityAfter.remainingUses, capabilityBefore.remainingUses)
+    XCTAssertTrue(capabilityAfter.lineage.isEmpty)
+    XCTAssertEqual(
+      try DurableJournalRecovery.inspect(url: journalURL)
+        .events.filter { $0.kind == .stepIntent }.count,
+      intentsAtBoundary)
   }
 
   // MARK: - Crash windows (process-level fixture)

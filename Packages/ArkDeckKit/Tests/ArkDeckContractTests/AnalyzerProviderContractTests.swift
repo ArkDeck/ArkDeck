@@ -11,6 +11,7 @@
 // answerable.
 
 import XCTest
+import Darwin
 
 @testable import ArkDeckCore
 @testable import ArkDeckHarness
@@ -34,7 +35,15 @@ final class AnalyzerProviderContractTests: XCTestCase {
   private var root: URL!
 
   override func setUpWithError() throws {
-    root = FileManager.default.temporaryDirectory
+    guard let physicalTemporaryPath = realpath(
+      FileManager.default.temporaryDirectory.path, nil)
+    else {
+      throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+    defer { free(physicalTemporaryPath) }
+    root = URL(
+      filePath: String(cString: physicalTemporaryPath), directoryHint: .isDirectory
+    )
       .appending(path: "arkdeck-analyzer-tests", directoryHint: .isDirectory)
       .appending(path: UUID().uuidString.prefix(8).lowercased(), directoryHint: .isDirectory)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -101,6 +110,26 @@ final class AnalyzerProviderContractTests: XCTestCase {
       // The lease is the claim; the bytes are the fact.
       XCTAssertTrue("\(error)".contains("do not match their lease"))
     }
+  }
+
+  func testArtifactMutationAndSymlinkAreRefusedImmediatelyBeforeLowering() throws {
+    let provider = try makeProvider()
+    let artifact = try sourceArtifact(contents: "immutable lease bytes\n")
+    try Data("mutated after lease\n".utf8).write(to: artifact.fileURL)
+    XCTAssertThrowsError(
+      try provider.action(
+        for: step(), operation: descriptor(), inputs: [:], context: context(artifact)))
+
+    let physical = try sourceArtifact(contents: "physical bytes\n")
+    let linkedURL = root.appending(path: "linked-source.txt")
+    try FileManager.default.createSymbolicLink(
+      at: linkedURL, withDestinationURL: physical.fileURL)
+    let linked = ProviderResolvedInputArtifact(
+      artifactID: physical.artifactID, fileURL: linkedURL,
+      sha256: physical.sha256, byteCount: physical.byteCount)
+    XCTAssertThrowsError(
+      try provider.action(
+        for: step(), operation: descriptor(), inputs: [:], context: context(linked)))
   }
 
   func testAnEmptyOrUnstructuredResultIsAFailureAndNotAConclusion() throws {
@@ -172,7 +201,7 @@ final class AnalyzerProviderContractTests: XCTestCase {
   }
 
   func testAToolThatDriftedFromItsPinIsUnavailable() throws {
-    let provider = AnalyzerProvider(profiles: [
+    let provider = try AnalyzerProvider(profiles: [
       AnalyzerProfile(
         analyzerRef: "crash-signature@1",
         analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
@@ -184,6 +213,76 @@ final class AnalyzerProviderContractTests: XCTestCase {
       return XCTFail("a drifted tool must not be admitted")
     }
     XCTAssertEqual(reason, "analyzer.toolIdentityDrift")
+  }
+
+  func testActionSpecificResolverSelectsEachPinnedAnalyzerIndependentOfProfileOrder() throws {
+    let cat = try executableProfile(
+      analyzerRef: "crash-signature@1", path: "/bin/cat", fixedArguments: ["--emit-json"])
+    let echo = try executableProfile(
+      analyzerRef: "trace-summary@1", path: "/bin/echo",
+      fixedArguments: ["summary", "--json", "--max-rows", "1000"])
+    let artifact = try sourceArtifact(contents: "trace bytes")
+
+    func resolved(_ profiles: [AnalyzerProfile], operationReference: String) throws
+      -> ResolvedExecutable
+    {
+      let provider = try AnalyzerProvider(profiles: profiles)
+      let operation = try XCTUnwrap(
+        RuntimeOperationCatalog.descriptor(reference: operationReference))
+      let action = try provider.action(
+        for: operation.steps[0], operation: operation, inputs: [:], context: context(artifact))
+      return try AnalyzerExecutableResolver(profiles: profiles).resolveExecutable(for: action)
+    }
+
+    XCTAssertEqual(
+      try resolved([cat, echo], operationReference: AnalyzerProvider.crashSignature).path,
+      "/bin/cat")
+    XCTAssertEqual(
+      try resolved([cat, echo], operationReference: AnalyzerProvider.traceSummary).path,
+      "/bin/echo")
+    XCTAssertEqual(
+      try resolved([echo, cat], operationReference: AnalyzerProvider.crashSignature).path,
+      "/bin/cat")
+    XCTAssertEqual(
+      try resolved([echo, cat], operationReference: AnalyzerProvider.traceSummary).path,
+      "/bin/echo")
+  }
+
+  func testDuplicateUnknownAndActionIdentityDriftProfilesFailClosed() throws {
+    let crash = try executableProfile(analyzerRef: "crash-signature@1", path: "/bin/cat")
+    XCTAssertThrowsError(try AnalyzerProvider(profiles: [crash, crash])) { error in
+      XCTAssertEqual(error as? AnalyzerProfileValidationError, .duplicateAnalyzerRef(crash.analyzerRef))
+    }
+    let unknown = try executableProfile(analyzerRef: "caller-selected@1", path: "/bin/cat")
+    XCTAssertThrowsError(try AnalyzerExecutableResolver(profiles: [unknown])) { error in
+      XCTAssertEqual(
+        error as? AnalyzerProfileValidationError, .unknownAnalyzerRef(unknown.analyzerRef))
+    }
+
+    let resolver = try AnalyzerExecutableResolver(profiles: [crash])
+    let forged = TypedProviderAction.analyzer(
+      .analyze(
+        AnalyzerInvocation(
+          analyzerRef: crash.analyzerRef,
+          analyzerVersion: crash.analyzerVersion,
+          executableSHA256: String(repeating: "0", count: 64),
+          arguments: ["--emit-json", "/tmp/input"],
+          timeoutSeconds: 30,
+          outputByteBudget: 8 * 1024 * 1024,
+          sourceArtifactID: "art-source",
+          sourceSHA256: String(repeating: "1", count: 64),
+          sourceByteCount: 1)))
+    XCTAssertThrowsError(try resolver.resolveExecutable(for: forged))
+  }
+
+  func testDurableAnalyzerInvocationWithoutAdditiveOutputBudgetStillDecodes() throws {
+    let historical = Data(
+      #"{"analyzerRef":"crash-signature@1","analyzerVersion":"1.0.0","executableSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","arguments":["--emit-json","/private/runtime/input"],"timeoutSeconds":30,"sourceArtifactID":"art-source","sourceSHA256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","sourceByteCount":12}"#.utf8)
+    let decoded = try JSONDecoder().decode(AnalyzerInvocation.self, from: historical)
+    XCTAssertNil(decoded.outputByteBudget)
+    XCTAssertNil(decoded.arkTraceSummaryContract)
+    XCTAssertEqual(decoded.analyzerRef, "crash-signature@1")
+    XCTAssertEqual(decoded.sourceByteCount, 12)
   }
 
   func testAnAnalysisPlanIsRefusedWhenNoAnalyzerRouteIsRegistered() async throws {
@@ -313,13 +412,39 @@ final class AnalyzerProviderContractTests: XCTestCase {
   }
 
   private func makeProvider() throws -> AnalyzerProvider {
-    AnalyzerProvider(profiles: [
+    try AnalyzerProvider(profiles: [
       AnalyzerProfile(
         analyzerRef: "crash-signature@1",
         analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
         executablePath: "/bin/cat", executableSHA256: try toolDigest(),
         fixedArguments: ["--emit-json"])
     ])
+  }
+
+  private func executableProfile(
+    analyzerRef: String,
+    path: String,
+    fixedArguments: [String] = []
+  ) throws -> AnalyzerProfile {
+    let bytes = try Data(contentsOf: URL(filePath: path))
+    let traceContract =
+      analyzerRef == "trace-summary@1"
+      ? ArkTraceSummaryInvocationContract(
+        toolVersion: "0.1.0", parserVersion: "4.3.7",
+        parserUpstreamRevision: String(repeating: "1", count: 40),
+        parserSHA256: String(repeating: "2", count: 64),
+        parserBuildRecipeVersion: String(repeating: "3", count: 64),
+        parserAdapterVersion: "1", schemaAdapterVersion: "2", indexSchemaVersion: 2)
+      : nil
+    return AnalyzerProfile(
+      analyzerRef: analyzerRef,
+      analyzerVersion: "1.0.0",
+      executablePath: path,
+      executableSHA256: AnalyzerProvider.sha256(bytes),
+      fixedArguments: fixedArguments,
+      timeoutSeconds: 30,
+      outputByteBudget: 8 * 1024 * 1024,
+      arkTraceSummaryContract: traceContract)
   }
 
   private func descriptor() -> CatalogOperationDescriptor {

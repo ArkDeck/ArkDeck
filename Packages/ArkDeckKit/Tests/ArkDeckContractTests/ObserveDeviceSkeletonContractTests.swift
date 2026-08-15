@@ -92,6 +92,9 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     let resolver = try FixedExecutableResolver.hashing(
       path: toolURL.path, providerID: "hdc")
     let dispatcher = DescriptorBoundProcessDispatcher(resolver: resolver)
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-07-29T00:00:00Z" })
     let provider = HDCObservationProviderAdapter(
       factsPort: StoreFactsPort(store: targetStore))
     let providers = DeviceProviderRegistry(providers: [provider])
@@ -99,6 +102,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
       configuration: .init(
         stateDirectory: stateDirectory.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers, dispatcher: dispatcher, capabilityStore: capabilityStore,
+      artifactStore: artifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let bootstrap = DeviceBootstrapMachine(
       observation: ScriptedBootstrap(), targetStore: targetStore,
@@ -106,7 +110,7 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providers.registeredProviderIDs, nowUTC: { "2026-07-29T00:00:00Z" },
-      targetStore: targetStore, bootstrap: bootstrap)
+      targetStore: targetStore, bootstrap: bootstrap, artifactStore: artifactStore)
     return (handler, engine, targetStore)
   }
 

@@ -116,6 +116,17 @@ public struct SemanticallyEvaluatedProcessResult<SemanticResult: Sendable>: Send
 
 extension SemanticallyEvaluatedProcessResult: Equatable where SemanticResult: Equatable {}
 
+package enum ProcessExecutableLaunchMode: Sendable, Equatable {
+  /// Launch the already-open executable through its stable device/inode path.
+  /// This is the narrowest default for ordinary standalone tools.
+  case stableInodePath
+  /// Launch through the authorized canonical path while initially suspended,
+  /// prove that the child's first executable mapping is the verified
+  /// device/inode, and only then allow it to execute. Signed bundle tools need
+  /// their bundle-relative path preserved for platform runtime semantics.
+  case verifiedCanonicalPath
+}
+
 public struct ProcessRequest: Sendable, Equatable {
   public let executable: URL
   /// Optional semantic `argv[0]` for a descriptor-bound multi-call binary.
@@ -128,6 +139,7 @@ public struct ProcessRequest: Sendable, Equatable {
   /// The parent process never changes its global current directory.
   public let workingDirectory: URL?
   public let timeout: TimeInterval?
+  package let executableLaunchMode: ProcessExecutableLaunchMode
 
   /// `environment` is overlaid on the fail-closed base environment
   /// (`FoundationProcessExecutor.baseChildEnvironmentKeys` filtered from the
@@ -149,6 +161,25 @@ public struct ProcessRequest: Sendable, Equatable {
     self.environment = environment
     self.workingDirectory = workingDirectory
     self.timeout = timeout
+    executableLaunchMode = .stableInodePath
+  }
+
+  package init(
+    executable: URL,
+    argumentZero: String? = nil,
+    arguments: [String] = [],
+    environment: [String: String] = [:],
+    workingDirectory: URL? = nil,
+    timeout: TimeInterval? = nil,
+    executableLaunchMode: ProcessExecutableLaunchMode
+  ) {
+    self.executable = executable
+    self.argumentZero = argumentZero
+    self.arguments = arguments
+    self.environment = environment
+    self.workingDirectory = workingDirectory
+    self.timeout = timeout
+    self.executableLaunchMode = executableLaunchMode
   }
 }
 
@@ -310,6 +341,7 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case executableInodePathUnavailable
   case executableHashMismatch(expected: String, actual: String)
   case executableDescriptorInvalid
+  case executableMappedIdentityMismatch
   case launchAuthorizationInvalidated
   case launchFailed(String)
 
@@ -347,6 +379,8 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
       "Process executable hash mismatch: expected \(expected), observed \(actual)"
     case .executableDescriptorInvalid:
       "Process executable descriptor became invalid before spawn"
+    case .executableMappedIdentityMismatch:
+      "Suspended process executable mapping did not match the authorized descriptor identity"
     case .launchAuthorizationInvalidated:
       "Process launch authorization was invalidated or already consumed"
     case .launchFailed(let message):
@@ -493,13 +527,15 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
   public func executeIdentityBound(
     _ request: ProcessIdentityBoundRequest,
     verifiedResources: [VerifiedRegularFileDescriptor],
+    verifiedNamespace: VerifiedDirectoryDescriptor? = nil,
     captureLimit: Int = 64 * 1024,
     onOutput: @escaping ProcessOutputHandler = { _ in }
   ) async throws -> ProcessIdentityBoundExecutionResult {
     let prepared = try prepareIdentityBoundLaunch(request)
     return try await executePreparedIdentityBoundLaunchImpl(
       prepared, gate: nil, captureLimit: captureLimit,
-      verifiedResources: verifiedResources, onOutput: onOutput)
+      verifiedResources: verifiedResources,
+      verifiedNamespace: verifiedNamespace, onOutput: onOutput)
   }
 
   public func executeIdentityBound<Evaluator: ProcessSemanticEvaluating>(
@@ -616,6 +652,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     gate: ProcessAtomicLaunchGate?,
     captureLimit: Int,
     verifiedResources: [VerifiedRegularFileDescriptor] = [],
+    verifiedNamespace: VerifiedDirectoryDescriptor? = nil,
     onOutput: @escaping ProcessOutputHandler
   ) async throws -> ProcessIdentityBoundExecutionResult {
     let control = ProcessControl()
@@ -630,6 +667,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
           captureLimit: max(0, captureLimit),
           control: control,
           verifiedResources: verifiedResources,
+          verifiedNamespace: verifiedNamespace,
           onOutput: onOutput)
       },
       onCancel: {
@@ -708,6 +746,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     captureLimit: Int,
     control: ProcessControl,
     verifiedResources: [VerifiedRegularFileDescriptor],
+    verifiedNamespace: VerifiedDirectoryDescriptor?,
     onOutput: @escaping ProcessOutputHandler
   ) async throws -> ProcessIdentityBoundExecutionResult {
     guard !control.hasStopRequest else {
@@ -716,13 +755,17 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     try prepared.consume()
     defer { prepared.close() }
     let executable = prepared.executable
+    try verifiedNamespace?.revalidate()
     try executable.revalidate(path: prepared.request.process.executable)
     try await identityBoundFinalLaunchHook(executable.receipt)
     guard !control.hasStopRequest else {
       throw ProcessExecutionError.launchAuthorizationInvalidated
     }
 
+    let preservesCanonicalPath =
+      prepared.request.process.executableLaunchMode == .verifiedCanonicalPath
     let launch = {
+      try verifiedNamespace?.revalidate()
       try executable.revalidate(path: prepared.request.process.executable)
       for resource in verifiedResources { try resource.revalidate() }
       guard !control.hasStopRequest else {
@@ -730,11 +773,33 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       }
       return try self.spawn(
         prepared.request.process,
-        executablePath: executable.inodeLaunchPath)
+        executablePath:
+          preservesCanonicalPath
+          ? prepared.request.process.executable.path : executable.inodeLaunchPath,
+        startSuspended: preservesCanonicalPath)
     }
     let spawned = try gate.map { try $0.consume(launch) } ?? launch()
     identityBoundSpawnObserver(
       executable.receipt, prepared.request.process, spawned.processIdentifier)
+    if preservesCanonicalPath {
+      do {
+        try verifiedNamespace?.revalidate()
+        try executable.revalidate(path: prepared.request.process.executable)
+        for resource in verifiedResources { try resource.revalidate() }
+        guard !control.hasStopRequest else {
+          throw ProcessExecutionError.launchAuthorizationInvalidated
+        }
+        try verifySuspendedExecutableMapping(
+          processIdentifier: spawned.processIdentifier,
+          receipt: executable.receipt)
+        guard Darwin.kill(spawned.processIdentifier, SIGCONT) == 0 else {
+          throw ProcessExecutionError.launchFailed("could not resume verified process")
+        }
+      } catch {
+        terminateSuspendedProcess(spawned)
+        throw error
+      }
+    }
     let execution = await collectExecution(
       of: spawned,
       request: prepared.request.process,
@@ -777,7 +842,8 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
 
   private func spawn(
     _ request: ProcessRequest,
-    executablePath: String? = nil
+    executablePath: String? = nil,
+    startSuspended: Bool = false
   ) throws -> SpawnedProcess {
     var arguments = try makeCStringVector(
       [request.argumentZero ?? request.executable.path] + request.arguments)
@@ -841,7 +907,11 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       throw ProcessExecutionError.launchFailed("could not initialize posix_spawn attributes")
     }
     initializedAttributes = true
-    guard posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETPGROUP)) == 0,
+    var spawnFlags = Int16(POSIX_SPAWN_SETPGROUP)
+    if startSuspended {
+      spawnFlags |= Int16(POSIX_SPAWN_START_SUSPENDED)
+    }
+    guard posix_spawnattr_setflags(&attributes, spawnFlags) == 0,
       posix_spawnattr_setpgroup(&attributes, 0) == 0
     else {
       throw ProcessExecutionError.launchFailed("could not configure posix_spawn process group")
@@ -880,6 +950,40 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       stdout: stdout,
       stderr: stderr
     )
+  }
+
+  /// A START_SUSPENDED child has not executed user code. The first executable
+  /// VM region therefore provides a kernel-backed identity handoff from the
+  /// canonical bundle path to the descriptor verified before spawn.
+  private func verifySuspendedExecutableMapping(
+    processIdentifier: pid_t,
+    receipt: ProcessExecutableIdentityReceipt
+  ) throws {
+    var information = proc_regionwithpathinfo()
+    let expectedSize = Int32(MemoryLayout<proc_regionwithpathinfo>.size)
+    let actualSize = proc_pidinfo(
+      processIdentifier,
+      PROC_PIDREGIONPATHINFO,
+      0,
+      &information,
+      expectedSize)
+    let mapped = information.prp_vip.vip_vi.vi_stat
+    guard actualSize == expectedSize,
+      information.prp_prinfo.pri_protection & UInt32(VM_PROT_EXECUTE) != 0,
+      UInt64(mapped.vst_dev) == receipt.device,
+      UInt64(mapped.vst_ino) == receipt.inode
+    else {
+      throw ProcessExecutionError.executableMappedIdentityMismatch
+    }
+  }
+
+  private func terminateSuspendedProcess(_ spawned: SpawnedProcess) {
+    Darwin.kill(-spawned.processIdentifier, SIGKILL)
+    Darwin.kill(spawned.processIdentifier, SIGKILL)
+    var status: Int32 = 0
+    while Darwin.waitpid(spawned.processIdentifier, &status, 0) < 0, errno == EINTR {}
+    Darwin.close(spawned.stdout)
+    Darwin.close(spawned.stderr)
   }
 
   /// A stop request kills the child's process group, so the write end closes

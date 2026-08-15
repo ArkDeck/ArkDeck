@@ -184,6 +184,7 @@ final class AgentDaemonContractTests: XCTestCase {
   private func makeStack(
     targetStore: RuntimeTargetStore? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
+    includeDefaultArtifactStore: Bool = true,
     flashBundleImportPolicy: FlashBundleImportPolicy = .production,
     flashPrerequisiteObserver: (any RockchipFlashPrerequisiteObserving)? = nil,
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
@@ -193,6 +194,16 @@ final class AgentDaemonContractTests: XCTestCase {
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
+    let resolvedArtifactStore: RuntimeArtifactStore?
+    if let artifactStore {
+      resolvedArtifactStore = artifactStore
+    } else if includeDefaultArtifactStore {
+      resolvedArtifactStore = try RuntimeArtifactStore(
+        rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+        nowUTC: { "2026-07-29T00:00:00Z" })
+    } else {
+      resolvedArtifactStore = nil
+    }
     let providers = DeviceProviderRegistry(providers: [
       HDCObservationProviderAdapter(factsPort: FactsPort())
     ])
@@ -202,7 +213,7 @@ final class AgentDaemonContractTests: XCTestCase {
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
-      artifactStore: artifactStore,
+      artifactStore: resolvedArtifactStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
@@ -211,7 +222,7 @@ final class AgentDaemonContractTests: XCTestCase {
       targetStore: targetStore,
       bootstrap: nil,
       hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
-      artifactStore: artifactStore,
+      artifactStore: resolvedArtifactStore,
       flashBundleImportDirectory: stateDirectory.appending(
         path:
           "flash-bundle-imports-\(UUID().uuidString)", directoryHint: .isDirectory),
@@ -1823,7 +1834,7 @@ final class AgentDaemonContractTests: XCTestCase {
   /// refuses rather than answering with an empty list (which would read as
   /// "this job produced nothing").
   func testArtifactMethodsAreIDOnlyAndFailClosedWithoutAStore() async throws {
-    let (handler, _) = try makeStack()
+    let (handler, _) = try makeStack(includeDefaultArtifactStore: false)
     for method in [
       "artifact.importHap.begin", "artifact.importHap.append",
       "artifact.importHap.commit", "artifact.importNativeLibrary.begin",

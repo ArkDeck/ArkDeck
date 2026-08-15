@@ -629,18 +629,35 @@ struct RuntimeRecoveryService {
       // lane. Complete only these already-durable decisions; recovery never
       // dispatches in any branch.
       switch inspection.currentState {
-      case .cancelRequested, .cancellingAtSafeBoundary:
+      case .cancelRequested, .cancellingAtSafeBoundary, .cancelled:
+        let hasDurableCancelRequest = inspection.events.contains(where: {
+          $0.kind == .stateTransition
+            && $0.stateTransition?.to == .cancelRequested
+        })
+        guard hasDurableCancelRequest else {
+          throw RuntimeJobEngineError.internalFailure(
+            "terminal cancellation lacks its durable request transition")
+        }
         if inspection.currentState == .cancelRequested {
           try appendTransition(
             to: journal, record: record, sequence: &nextSequence,
             from: .cancelRequested, to: .cancellingAtSafeBoundary,
             reason: "process loss with no outstanding intent is a confirmed safe boundary")
         }
-        try appendTransition(
-          to: journal, record: record, sequence: &nextSequence,
-          from: .cancellingAtSafeBoundary, to: .cancelled,
-          reason: "complete durable cancellation after restart")
-        inspection = try DurableJournalRecovery.inspect(url: journalURL)
+        if inspection.currentState != .cancelled {
+          try appendTransition(
+            to: journal, record: record, sequence: &nextSequence,
+            from: .cancellingAtSafeBoundary, to: .cancelled,
+            reason: "complete durable cancellation after restart")
+          inspection = try DurableJournalRecovery.inspect(url: journalURL)
+        }
+        record.operationFailure = RuntimeOperationFailure(
+          code: .cancelled, category: .cancelled,
+          retryability: .notAutomatic, recovery: .none)
+        record.outcomeUnknown = false
+        record.recoveryStepID = nil
+        record.recoveryIntentEventID = nil
+        record.recoveryAction = nil
         record.finishedAtUTC = nowUTC()
         record.timeline.append(
           "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch"
