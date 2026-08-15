@@ -539,14 +539,16 @@ package enum ArkTraceAnalysisEnvelopeValidator {
     var truncated: [String] = []
     for name in names {
       guard let count = counts[name], let isTruncated = validateSectionStatus(
-        object[name], returnedCount: count) else { return nil }
+        object[name], returnedCount: count,
+        permitsAggregation: name == "cpuUtilization" || name == "threadStateDistribution"
+      ) else { return nil }
       if isTruncated { truncated.append(name) }
     }
     return truncated.sorted()
   }
 
   private static func validateSectionStatus(
-    _ value: JSONValue?, returnedCount: Int
+    _ value: JSONValue?, returnedCount: Int, permitsAggregation: Bool = false
   ) -> Bool? {
     guard let value, let object = object(value),
       exactKeys(object, ["returnedCount", "matchedCount", "truncated"]),
@@ -557,7 +559,7 @@ package enum ArkTraceAnalysisEnvelopeValidator {
       guard truncated else { return nil }
     } else {
       guard let matched = integer(object["matchedCount"]), matched >= Int64(returnedCount),
-        matched == Int64(returnedCount) || truncated
+        matched == Int64(returnedCount) || truncated || permitsAggregation
       else { return nil }
     }
     return truncated
@@ -899,9 +901,10 @@ package enum ArkTraceAnalysisEnvelopeValidator {
     ]), validKey(object["threadKey"], field: "itid"),
       validateEventKey(object["runnableEventKey"]), validateEventKey(object["runningEventKey"]),
       let runnableEnd = integer(object["runnableEndNs"]), runnableEnd >= 0,
-      let runningStart = integer(object["runningStartNs"]), runningStart >= runnableEnd,
+      let runningStart = integer(object["runningStartNs"]), runningStart == runnableEnd,
       runnableEnd >= range.0, runningStart <= range.1,
-      integer(object["latencyNs"]) == runningStart - runnableEnd
+      let latency = integer(object["latencyNs"]), latency >= 0,
+      latency <= runnableEnd - range.0
     else { return false }
     return true
   }

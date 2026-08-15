@@ -250,6 +250,119 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
       try encoded(document), invocation: invocation))
   }
 
+  func testAnalysisAcceptsAggregatedSourceCountsAndRunnableIntervalLatency() throws {
+    let request = try self.request(
+      kind: .range, startNs: 0, endNs: 100_000_000,
+      maxRows: 10, maxEvents: 50_000, limit: 10)
+    let invocation = invocation(request)
+    var document = root(request)
+    document = replacingNestedObject(document, first: "result", second: "analysis") {
+      analysis in
+      analysis["cpuUtilization"] = .array([
+        .object([
+          "cpu": .integer(0), "rawRunningNs": .integer(10),
+          "occupiedNs": .integer(10), "sliceCount": .integer(17_484),
+          "utilization": .number(0.000_000_1),
+        ])
+      ])
+      analysis["threadStateDistribution"] = .array([
+        .object([
+          "threadKey": .object(["itid": .integer(17)]), "processKey": .null,
+          "tid": .null, "pid": .null, "rawState": .string("Runnable"),
+          "normalizedState": .string("runnable"), "durationNs": .integer(20_000_000),
+          "percentageOfRange": .number(0.2), "intervalCount": .integer(28_067),
+        ])
+      ])
+      analysis["schedulingLatency"] = .object([
+        "supported": .bool(true), "unsupportedReason": .null,
+        "count": .integer(1),
+        "percentiles": .object([
+          "p50Ns": .integer(20_000_000), "p90Ns": .integer(20_000_000),
+          "p95Ns": .integer(20_000_000), "p99Ns": .integer(20_000_000),
+          "maxNs": .integer(20_000_000),
+        ]),
+        "topSamples": .array([
+          .object([
+            "threadKey": .object(["itid": .integer(17)]),
+            "runnableEventKey": .object([
+              "table": .string("thread_state"), "rowID": .integer(1),
+            ]),
+            "runningEventKey": .object([
+              "table": .string("sched_slice"), "rowID": .integer(2),
+            ]),
+            "runnableEndNs": .integer(80_000_000),
+            "runningStartNs": .integer(80_000_000),
+            "latencyNs": .integer(20_000_000),
+          ])
+        ]),
+        "truncated": .bool(false),
+      ])
+      guard case .object(var sections)? = analysis["sections"] else { return }
+      sections["cpuUtilization"] = .object([
+        "returnedCount": .integer(1), "matchedCount": .integer(17_484),
+        "truncated": .bool(false),
+      ])
+      sections["threadStateDistribution"] = .object([
+        "returnedCount": .integer(1), "matchedCount": .integer(28_067),
+        "truncated": .bool(false),
+      ])
+      sections["schedulingLatency"] = status(returned: 1)
+      analysis["sections"] = .object(sections)
+    }
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document), invocation: invocation))
+
+    let unexplainedProcessAggregation = replacingNestedObject(
+      document, first: "result", second: "analysis"
+    ) { analysis in
+      analysis["topProcesses"] = .array([
+        .object([
+          "processKey": .object(["ipid": .integer(1)]), "pid": .integer(42),
+          "name": .string("worker"), "runningNs": .integer(10),
+          "shareOfOneCPU": .number(0.000_000_1), "sliceCount": .integer(2),
+        ])
+      ])
+      guard case .object(var sections)? = analysis["sections"] else { return }
+      sections["topProcesses"] = .object([
+        "returnedCount": .integer(1), "matchedCount": .integer(2),
+        "truncated": .bool(false),
+      ])
+      analysis["sections"] = .object(sections)
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(unexplainedProcessAggregation), invocation: invocation))
+
+    let nonAdjacent = replacingNestedObject(
+      document, first: "result", second: "analysis"
+    ) { analysis in
+      guard case .object(var latency)? = analysis["schedulingLatency"],
+        case .array(var samples)? = latency["topSamples"],
+        case .object(var sample) = samples[0]
+      else { return }
+      sample["runningStartNs"] = .integer(80_000_001)
+      samples[0] = .object(sample)
+      latency["topSamples"] = .array(samples)
+      analysis["schedulingLatency"] = .object(latency)
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(nonAdjacent), invocation: invocation))
+
+    let impossibleDuration = replacingNestedObject(
+      document, first: "result", second: "analysis"
+    ) { analysis in
+      guard case .object(var latency)? = analysis["schedulingLatency"],
+        case .array(var samples)? = latency["topSamples"],
+        case .object(var sample) = samples[0]
+      else { return }
+      sample["latencyNs"] = .integer(80_000_001)
+      samples[0] = .object(sample)
+      latency["topSamples"] = .array(samples)
+      analysis["schedulingLatency"] = .object(latency)
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(impossibleDuration), invocation: invocation))
+  }
+
   func testContextEmbeddedSummaryUsesTheRequestBudgetsRatherThanSummaryOperationDefaults()
     throws
   {
