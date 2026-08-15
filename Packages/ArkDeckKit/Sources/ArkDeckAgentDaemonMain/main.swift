@@ -510,15 +510,21 @@ Task.detached {
           snapshotRootURL: resolvedStateDirectory.appending(
             path: "arktrace-profile-snapshots", directoryHint: .isDirectory))
         analyzerProfiles.append(
-          try await loader.load(descriptorURL: URL(filePath: descriptorPath)))
+          contentsOf: try await loader.loadProfiles(
+            descriptorURL: URL(filePath: descriptorPath)))
       } catch let error as ArkTraceSummaryProfileError {
         analyzerUnavailableReasons["trace-summary@1"] = error.reason
+        analyzerUnavailableReasons["trace-analysis@1"] = error.reason
       } catch {
         analyzerUnavailableReasons["trace-summary@1"] =
+          ArkTraceSummaryProfileError.descriptorInvalid.reason
+        analyzerUnavailableReasons["trace-analysis@1"] =
           ArkTraceSummaryProfileError.descriptorInvalid.reason
       }
     } else {
       analyzerUnavailableReasons["trace-summary@1"] =
+        ArkTraceSummaryProfileError.notFound.reason
+      analyzerUnavailableReasons["trace-analysis@1"] =
         ArkTraceSummaryProfileError.notFound.reason
     }
     let workspaceProvider = WorkspaceProvider(

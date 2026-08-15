@@ -46,7 +46,7 @@ package enum ArkTraceSummaryEnvelopeValidator {
     var integerValidator = StrictJSONIntegerTokenValidator(data: data)
     try integerValidator.validate()
     guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-      !containsPrivatePath(root, sourcePath: sourcePath),
+      !containsPrivatePathInMachineValue(root, sourcePath: sourcePath),
       exactKeys(root, [
         "schemaVersion", "tool", "request", "trace", "provenance", "limits",
         "dataQuality", "truncation", "result",
@@ -159,7 +159,7 @@ package enum ArkTraceSummaryEnvelopeValidator {
       if warning["scope"] is NSNull {
         scope = ""
       } else {
-        guard let value = string(warning["scope"]), qualityScopes.contains(value) else {
+        guard let value = string(warning["scope"]), machineQualityScopes.contains(value) else {
           throw ValidationError.invalid
         }
         scope = value
@@ -326,15 +326,22 @@ package enum ArkTraceSummaryEnvelopeValidator {
     value is NSNull || integer(value).map { (0...10_000).contains($0) } == true
   }
 
-  private static func containsPrivatePath(_ value: Any, sourcePath: String) -> Bool {
+  package static func containsPrivatePathInMachineValue(
+    _ value: Any,
+    sourcePath: String
+  ) -> Bool {
     if let string = value as? String {
       return containsPrivatePath(string, sourcePath: sourcePath)
     }
     if let array = value as? [Any] {
-      return array.contains { containsPrivatePath($0, sourcePath: sourcePath) }
+      return array.contains {
+        containsPrivatePathInMachineValue($0, sourcePath: sourcePath)
+      }
     }
     if let object = value as? [String: Any] {
-      return object.values.contains { containsPrivatePath($0, sourcePath: sourcePath) }
+      return object.values.contains {
+        containsPrivatePathInMachineValue($0, sourcePath: sourcePath)
+      }
     }
     return false
   }
@@ -443,7 +450,7 @@ package enum ArkTraceSummaryEnvelopeValidator {
       && !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
   }
 
-  private static let qualityScopes: Set<String> = [
+  package static let machineQualityScopes: Set<String> = [
     "process.start_ts", "process.end_ts", "process.lifecycle", "process.name",
     "thread.start_ts", "thread.end_ts", "thread.ipid", "thread.lifecycle",
     "thread.name", "thread.processName",

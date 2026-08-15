@@ -2690,7 +2690,9 @@ public actor RuntimeJobEngine {
             "analyzer cancellation crossed the success commit boundary")
         }
       }
-      let publishesBeforeOutcome = descriptor.reference == AnalyzerProvider.traceSummary
+      let publishesBeforeOutcome = [
+        AnalyzerProvider.traceSummary, AnalyzerProvider.traceAnalysis,
+      ].contains(descriptor.reference)
       if publishesBeforeOutcome {
         // The exact validated Analyzer bytes become durable before the
         // journal can call the step succeeded. A crash may therefore leave
@@ -3134,8 +3136,10 @@ public actor RuntimeJobEngine {
             }
             contents = received
           }
-          let traceSummaryDerivation = RuntimeArtifactService.traceSummaryDerivation(
+          let traceDerivation = RuntimeArtifactService.traceSummaryDerivation(
             name: name, descriptor: descriptor, summary: summary)
+            ?? RuntimeArtifactService.traceAnalysisDerivation(
+              name: name, descriptor: descriptor, summary: summary)
           metadata = try await artifactStore.publish(
             RuntimeArtifactPublicationRequest(
               jobID: jobID, sessionID: runtime.record.sessionID, stepID: step.stepID,
@@ -3143,8 +3147,8 @@ public actor RuntimeJobEngine {
               retentionClass: declaration.retentionClass,
               sourceOperation: descriptor.reference, providerID: descriptor.provider.rawValue,
               bindingSnapshot: binding, contents: contents,
-              derivation: traceSummaryDerivation,
-              preservesValidatedMachineBytes: traceSummaryDerivation != nil))
+              derivation: traceDerivation,
+              preservesValidatedMachineBytes: traceDerivation != nil))
           if let landed { try? FileManager.default.removeItem(at: landed.localURL) }
         }
         appendTimeline(jobID: jobID, entry: "artifact \(name) -> \(metadata.artifactID)")
@@ -4777,7 +4781,7 @@ public actor RuntimeJobEngine {
       else { return nil }
       lease = value
     case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
-      "analyzer.summarize-trace@1":
+      "analyzer.summarize-trace@1", "analyzer.analyze-trace@1":
       guard
         case .string(let value)? =
           runtime.record.request.inputs["sourceArtifactRef"]
@@ -4921,7 +4925,7 @@ public actor RuntimeJobEngine {
       leaseInputName = "unsignedHapArtifactLease"
       artifactLabel = "unsigned HAP"
     case "analyzer.extract-crash-signature@1", "analyzer.summarize-hilog@1",
-      "analyzer.summarize-trace@1":
+      "analyzer.summarize-trace@1", "analyzer.analyze-trace@1":
       leaseInputName = "sourceArtifactRef"
       artifactLabel = "analyzer source artifact"
     default:
@@ -5224,6 +5228,16 @@ public actor RuntimeJobEngine {
     _ inputs: [String: JSONValue],
     descriptor: CatalogOperationDescriptor
   ) throws {
+    if descriptor.reference == AnalyzerProvider.traceAnalysis {
+      do {
+        _ = try AnalyzerProvider.analysisRequest(inputs)
+      } catch {
+        throw RuntimeJobEngineError.rejected(
+          .invalidInput,
+          "ArkTrace analysis request violates its closed cross-field contract")
+      }
+      return
+    }
     if descriptor.reference == "capture.diagnostics@1" {
       // The trace leg used to be refused here because neither half of its
       // verification existed. Both are published now: `capture-trace` is

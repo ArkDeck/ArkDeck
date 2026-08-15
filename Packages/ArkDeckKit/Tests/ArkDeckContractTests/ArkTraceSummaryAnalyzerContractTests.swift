@@ -263,10 +263,13 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
     let home = root.appending(path: "reviewed-doctor-home", directoryHint: .isDirectory)
     let snapshots = root.appending(
       path: "reviewed-profile-snapshots", directoryHint: .isDirectory)
-    let profile = try await ArkTraceSummaryAnalyzerProfileLoader(
+    let profiles = try await ArkTraceSummaryAnalyzerProfileLoader(
       doctor: ProductionArkTraceDoctorProbe(homeURL: home),
       snapshotRootURL: snapshots)
-      .load(descriptorURL: URL(filePath: descriptorPath))
+      .loadProfiles(descriptorURL: URL(filePath: descriptorPath))
+    let profile = try XCTUnwrap(profiles.first { $0.analyzerRef == "trace-summary@1" })
+    let analysisProfile = try XCTUnwrap(
+      profiles.first { $0.analyzerRef == "trace-analysis@1" })
 
     XCTAssertEqual(profile.analyzerRef, "trace-summary@1")
     XCTAssertEqual(profile.analyzerVersion, "0.1.0+1")
@@ -276,8 +279,11 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
       profile.pinnedFiles.allSatisfy { $0.path.hasPrefix(snapshots.path + "/") })
     XCTAssertTrue(profile.pinnedFiles.contains(where: { $0.path.hasSuffix("CodeResources") }))
     XCTAssertTrue(profile.pinnedFiles.contains(where: { $0.path.hasSuffix("notarization-receipt.json") }))
+    XCTAssertEqual(analysisProfile.executablePath, profile.executablePath)
+    XCTAssertEqual(analysisProfile.pinnedFiles, profile.pinnedFiles)
+    XCTAssertEqual(analysisProfile.pinnedTrees, profile.pinnedTrees)
 
-    let provider = try AnalyzerProvider(profiles: [profile])
+    let provider = try AnalyzerProvider(profiles: profiles)
     let operation = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.traceSummary))
     XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
@@ -310,6 +316,63 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
     print(
       "ARKTRACE_REVIEWED_SUMMARY bytes=\(receipt.stdout.count) "
         + "sha256=\(AnalyzerProvider.sha256(receipt.stdout))")
+
+    let summaryJSON = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: receipt.stdout) as? [String: Any])
+    let traceJSON = try XCTUnwrap(summaryJSON["trace"] as? [String: Any])
+    let traceDurationNs = try XCTUnwrap((traceJSON["durationNs"] as? NSNumber)?.int64Value)
+    let preferredStartNs: Int64 = 10_100_000_000
+    let preferredEndNs: Int64 = 10_300_000_000
+    let reviewedStartNs = traceDurationNs >= preferredEndNs ? preferredStartNs : 0
+    let reviewedEndNs = traceDurationNs >= preferredEndNs
+      ? preferredEndNs : min(traceDurationNs, 100_000_000)
+    XCTAssertGreaterThan(reviewedEndNs, reviewedStartNs)
+    let analysisOperation = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.traceAnalysis))
+    let commonInputs: [String: JSONValue] = [
+      "startNs": .integer(reviewedStartNs), "endNs": .integer(reviewedEndNs),
+      "timeoutMs": .integer(30_000), "maxRows": .integer(10_000),
+      "maxEvents": .integer(10_000), "maxOutputBytes": .integer(8_388_608),
+    ]
+    let analysisDispatcher = DescriptorBoundProcessDispatcher(
+      resolver: try AnalyzerExecutableResolver(profiles: profiles))
+    for kind in ["context", "range"] {
+      var inputs = commonInputs
+      inputs["kind"] = .string(kind)
+      if kind != "context" { inputs["limit"] = .integer(10) }
+      let analysisContext = ProviderExecutionContext(
+        jobID: "job-reviewed-arktrace-\(kind)", stepID: analysisOperation.steps[0].stepID,
+        targetID: "TGT-REVIEWED-ARKTRACE", bindingRevision: nil,
+        nowUTC: "2026-08-15T00:00:00Z", resolvedInputArtifact: artifact)
+      let analysisAction = try provider.action(
+        for: analysisOperation.steps[0], operation: analysisOperation,
+        inputs: inputs, context: analysisContext)
+      let analysisReceipt = try await analysisDispatcher.dispatch(
+        provider.lower(action: analysisAction, context: analysisContext))
+      let analysisOutcome = try provider.verify(
+        receipt: analysisReceipt, action: analysisAction, context: analysisContext)
+      guard case .verified(let analysisSummary) = analysisOutcome else {
+        return XCTFail("reviewed signed distribution did not verify \(kind) output")
+      }
+      XCTAssertEqual(analysisSummary["sourceSha256"], artifact.sha256)
+      XCTAssertEqual(analysisSummary["toolSha256"], analysisProfile.executableSHA256)
+      XCTAssertTrue(analysisReceipt.stderr.isEmpty)
+      if reviewedStartNs == preferredStartNs {
+        let envelope = try XCTUnwrap(
+          try JSONSerialization.jsonObject(with: analysisReceipt.stdout) as? [String: Any])
+        let result = try XCTUnwrap(envelope["result"] as? [String: Any])
+        if kind == "context" {
+          XCTAssertFalse(try XCTUnwrap(result["slices"] as? [Any]).isEmpty)
+        } else {
+          let analysis = try XCTUnwrap(result["analysis"] as? [String: Any])
+          XCTAssertFalse(try XCTUnwrap(analysis["longSlices"] as? [Any]).isEmpty)
+          XCTAssertFalse(try XCTUnwrap(analysis["hotIntervals"] as? [Any]).isEmpty)
+        }
+      }
+      print(
+        "ARKTRACE_REVIEWED_ANALYSIS kind=\(kind) bytes=\(analysisReceipt.stdout.count) "
+          + "sha256=\(AnalyzerProvider.sha256(analysisReceipt.stdout))")
+    }
   }
 
   func testDescriptorDispatcherKeepsTheExactAnalyzerSourceLeaseThroughChildOpen() async throws {
@@ -406,9 +469,12 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
     _ = try ArkTraceProfileFileReader.read(
       path: fixture.descriptorURL.path, maximumByteCount: 16 * 1024)
     let doctor = StubArkTraceDoctorProbe(result: true)
-    let profile = try await ArkTraceSummaryAnalyzerProfileLoader(
+    let profiles = try await ArkTraceSummaryAnalyzerProfileLoader(
       doctor: doctor, trustChecker: StubArkTraceDistributionTrustChecker())
-      .load(descriptorURL: fixture.descriptorURL)
+      .loadProfiles(descriptorURL: fixture.descriptorURL)
+    let profile = try XCTUnwrap(profiles.first { $0.analyzerRef == "trace-summary@1" })
+    let analysisProfile = try XCTUnwrap(
+      profiles.first { $0.analyzerRef == "trace-analysis@1" })
 
     XCTAssertEqual(profile.analyzerRef, "trace-summary@1")
     XCTAssertEqual(profile.outputByteBudget, 8 * 1024 * 1024)
@@ -426,16 +492,29 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
       fixture.distributionRoot.appending(path: "ArkTraceCLI.app").path)
     XCTAssertFalse(doctor.contracts[0].executable.verifiedResources.isEmpty)
     XCTAssertFalse(doctor.contracts[0].executable.verifiedTrees.isEmpty)
+    XCTAssertEqual(analysisProfile.executablePath, profile.executablePath)
+    XCTAssertEqual(analysisProfile.executableSHA256, profile.executableSHA256)
+    XCTAssertEqual(analysisProfile.canonicalNamespaceRoot, profile.canonicalNamespaceRoot)
+    XCTAssertEqual(analysisProfile.pinnedFiles, profile.pinnedFiles)
+    XCTAssertEqual(analysisProfile.pinnedTrees, profile.pinnedTrees)
+    XCTAssertEqual(analysisProfile.arkTraceAnalysisContract, profile.arkTraceSummaryContract)
+    XCTAssertNil(analysisProfile.arkTraceSummaryContract)
 
-    let provider = try AnalyzerProvider(profiles: [profile])
+    let provider = try AnalyzerProvider(profiles: profiles)
     let operation = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.traceSummary))
+    let analysisOperation = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.traceAnalysis))
     XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
+    XCTAssertEqual(provider.runtimeAvailability(for: analysisOperation), .available)
 
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o644], ofItemAtPath: fixture.toolURL.path)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
+      .unavailable(reason: "analyzer.toolIdentityDrift"))
+    XCTAssertEqual(
+      provider.runtimeAvailability(for: analysisOperation),
       .unavailable(reason: "analyzer.toolIdentityDrift"))
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: fixture.toolURL.path)
@@ -443,6 +522,9 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
       [.posixPermissions: 0o644], ofItemAtPath: fixture.parserURL.path)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
+      .unavailable(reason: "analyzer.profileIdentityDrift"))
+    XCTAssertEqual(
+      provider.runtimeAvailability(for: analysisOperation),
       .unavailable(reason: "analyzer.profileIdentityDrift"))
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: fixture.parserURL.path)

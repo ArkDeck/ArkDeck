@@ -701,6 +701,30 @@ package struct ArkTraceSummaryAnalyzerProfileLoader: Sendable {
         indexSchemaVersion: 2))
   }
 
+  /// One reviewed ArkTrace distribution generation serves two additive
+  /// operation contracts. Loading and doctor-probing happen once; the
+  /// returned profiles share every executable/resource/tree pin, while each
+  /// operation keeps its own request lowering and result validator.
+  package func loadProfiles(descriptorURL: URL) async throws -> [AnalyzerProfile] {
+    let summary = try await load(descriptorURL: descriptorURL)
+    guard let contract = summary.arkTraceSummaryContract else {
+      throw ArkTraceSummaryProfileError.contractMismatch
+    }
+    let analysis = AnalyzerProfile(
+      analyzerRef: "trace-analysis@1",
+      analyzerVersion: summary.analyzerVersion,
+      executablePath: summary.executablePath,
+      executableSHA256: summary.executableSHA256,
+      canonicalNamespaceRoot: summary.canonicalNamespaceRoot,
+      fixedArguments: [],
+      timeoutSeconds: 120,
+      outputByteBudget: 64 * 1024 * 1024,
+      pinnedFiles: summary.pinnedFiles,
+      pinnedTrees: summary.pinnedTrees,
+      arkTraceAnalysisContract: contract)
+    return [summary, analysis]
+  }
+
   private func materializePrivateSnapshot(
     sourceRoot: URL,
     snapshotRoot: URL

@@ -288,6 +288,7 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
     XCTAssertEqual(
       RuntimeOperationCatalog.operations.filter { $0.binding == .none }.map(\.reference),
       [
+        "analyzer.analyze-trace@1",
         "analyzer.extract-crash-signature@1",
         "analyzer.summarize-hilog@1",
         "analyzer.summarize-trace@1",

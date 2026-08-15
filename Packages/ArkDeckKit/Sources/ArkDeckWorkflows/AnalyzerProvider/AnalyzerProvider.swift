@@ -47,6 +47,7 @@ package struct AnalyzerProfile: Sendable, Equatable {
   package let pinnedTrees: [AnalyzerPinnedTree]
   package let preflightAvailability: ProviderOperationAvailability
   package let arkTraceSummaryContract: ArkTraceSummaryInvocationContract?
+  package let arkTraceAnalysisContract: ArkTraceSummaryInvocationContract?
 
   public init(
     analyzerRef: String,
@@ -60,7 +61,8 @@ package struct AnalyzerProfile: Sendable, Equatable {
     pinnedFiles: [AnalyzerPinnedFile] = [],
     pinnedTrees: [AnalyzerPinnedTree] = [],
     preflightAvailability: ProviderOperationAvailability = .available,
-    arkTraceSummaryContract: ArkTraceSummaryInvocationContract? = nil
+    arkTraceSummaryContract: ArkTraceSummaryInvocationContract? = nil,
+    arkTraceAnalysisContract: ArkTraceSummaryInvocationContract? = nil
   ) {
     self.analyzerRef = analyzerRef
     self.analyzerVersion = analyzerVersion
@@ -74,6 +76,7 @@ package struct AnalyzerProfile: Sendable, Equatable {
     self.pinnedTrees = pinnedTrees
     self.preflightAvailability = preflightAvailability
     self.arkTraceSummaryContract = arkTraceSummaryContract
+    self.arkTraceAnalysisContract = arkTraceAnalysisContract
   }
 }
 
@@ -129,6 +132,99 @@ package struct ArkTraceSummaryInvocationContract: Sendable, Equatable, Codable {
   package let indexSchemaVersion: Int
 }
 
+package enum ArkTraceAnalysisKind: String, Sendable, Equatable, Codable, CaseIterable {
+  case context
+  case cpu
+  case scheduling
+  case slices
+  case range
+  case hotIntervals = "hot-intervals"
+
+  package var cliAnalysisKind: String? {
+    self == .context ? nil : rawValue
+  }
+}
+
+package struct ArkTraceAnalysisRequest: Sendable, Equatable, Codable {
+  package static let halfWindowNs: Int64 = 50_000_000
+
+  package let kind: ArkTraceAnalysisKind
+  package let timestampNs: Int64?
+  package let startNs: Int64?
+  package let endNs: Int64?
+  package let processKey: Int64?
+  package let pid: Int64?
+  package let threadKey: Int64?
+  package let tid: Int64?
+  package let thresholdNs: Int64
+  package let limit: Int
+  package let timeoutMs: Int
+  package let maxRows: Int
+  package let maxEvents: Int
+  package let maxOutputBytes: Int
+
+  package var processTimeoutSeconds: Int {
+    max(1, min(120, (timeoutMs + 999) / 1_000))
+  }
+
+  /// Path-free canonical identity carried by the durable recovery record.
+  /// Delimiters are unambiguous because every free-form value has already
+  /// been reduced to a closed enum or an exact integer.
+  package var recoveryDigestSHA256: String {
+    var fields = ["arktrace-analysis-request@1", kind.rawValue]
+    fields.append(timestampNs.map(String.init) ?? "null")
+    fields.append(startNs.map(String.init) ?? "null")
+    fields.append(endNs.map(String.init) ?? "null")
+    fields.append(processKey.map(String.init) ?? "null")
+    fields.append(pid.map(String.init) ?? "null")
+    fields.append(threadKey.map(String.init) ?? "null")
+    fields.append(tid.map(String.init) ?? "null")
+    fields.append(contentsOf: [
+      String(thresholdNs), String(limit), String(timeoutMs), String(maxRows),
+      String(maxEvents), String(maxOutputBytes),
+    ])
+    return AnalyzerProvider.sha256(Data(fields.joined(separator: "\u{0}").utf8))
+  }
+
+  package var normalizedRange: (startNs: Int64, endNs: Int64)? {
+    if let startNs, let endNs { return (startNs, endNs) }
+    guard let timestampNs else { return nil }
+    let start = max(0, timestampNs - min(timestampNs, Self.halfWindowNs))
+    let (end, overflow) = timestampNs.addingReportingOverflow(Self.halfWindowNs)
+    guard !overflow, start < end else { return nil }
+    return (start, end)
+  }
+
+  package func arguments(sourcePath: String) -> [String] {
+    var result = [
+      kind == .context ? "context" : "analyze",
+      "--json", "--no-cache", "--timeout-ms", String(timeoutMs),
+      "--max-rows", String(maxRows), "--max-events", String(maxEvents),
+      "--max-output-bytes", String(maxOutputBytes),
+    ]
+    if kind == .context, let timestampNs {
+      result += ["--timestamp-ns", String(timestampNs), "--window-ms", "50"]
+    } else if let normalizedRange {
+      if kind != .context, let cliKind = kind.cliAnalysisKind {
+        result += ["--kind", cliKind]
+      }
+      result += [
+        "--start-ns", String(normalizedRange.startNs),
+        "--end-ns", String(normalizedRange.endNs),
+      ]
+    }
+    if let processKey { result += ["--process-key", String(processKey)] }
+    if let pid { result += ["--pid", String(pid)] }
+    if let threadKey { result += ["--thread-key", String(threadKey)] }
+    if let tid { result += ["--tid", String(tid)] }
+    if kind != .context {
+      result += ["--threshold-ns", String(thresholdNs), "--limit", String(limit)]
+    }
+    result.append(sourcePath)
+    return result
+  }
+}
+
 public struct AnalyzerInvocation: Sendable, Equatable, Codable {
   package let analyzerRef: String
   package let analyzerVersion: String
@@ -140,6 +236,8 @@ public struct AnalyzerInvocation: Sendable, Equatable, Codable {
   package let sourceSHA256: String
   package let sourceByteCount: Int
   package let arkTraceSummaryContract: ArkTraceSummaryInvocationContract?
+  package let arkTraceAnalysisRequest: ArkTraceAnalysisRequest?
+  package let arkTraceAnalysisContract: ArkTraceSummaryInvocationContract?
 
   package init(
     analyzerRef: String,
@@ -151,7 +249,9 @@ public struct AnalyzerInvocation: Sendable, Equatable, Codable {
     sourceArtifactID: String,
     sourceSHA256: String,
     sourceByteCount: Int,
-    arkTraceSummaryContract: ArkTraceSummaryInvocationContract? = nil
+    arkTraceSummaryContract: ArkTraceSummaryInvocationContract? = nil,
+    arkTraceAnalysisRequest: ArkTraceAnalysisRequest? = nil,
+    arkTraceAnalysisContract: ArkTraceSummaryInvocationContract? = nil
   ) {
     self.analyzerRef = analyzerRef
     self.analyzerVersion = analyzerVersion
@@ -163,6 +263,8 @@ public struct AnalyzerInvocation: Sendable, Equatable, Codable {
     self.sourceSHA256 = sourceSHA256
     self.sourceByteCount = sourceByteCount
     self.arkTraceSummaryContract = arkTraceSummaryContract
+    self.arkTraceAnalysisRequest = arkTraceAnalysisRequest
+    self.arkTraceAnalysisContract = arkTraceAnalysisContract
   }
 }
 
@@ -178,19 +280,22 @@ public struct AnalyzerRecoveryIdentity: Sendable, Equatable, Codable {
   package let sourceArtifactID: String
   package let sourceSHA256: String
   package let sourceByteCount: Int
+  package let requestDigestSHA256: String?
 
   package init(
     analyzerRef: String,
     analyzerVersion: String,
     sourceArtifactID: String,
     sourceSHA256: String,
-    sourceByteCount: Int
+    sourceByteCount: Int,
+    requestDigestSHA256: String? = nil
   ) {
     self.analyzerRef = analyzerRef
     self.analyzerVersion = analyzerVersion
     self.sourceArtifactID = sourceArtifactID
     self.sourceSHA256 = sourceSHA256
     self.sourceByteCount = sourceByteCount
+    self.requestDigestSHA256 = requestDigestSHA256
   }
 
   package init(_ invocation: AnalyzerInvocation) {
@@ -199,7 +304,8 @@ public struct AnalyzerRecoveryIdentity: Sendable, Equatable, Codable {
       analyzerVersion: invocation.analyzerVersion,
       sourceArtifactID: invocation.sourceArtifactID,
       sourceSHA256: invocation.sourceSHA256,
-      sourceByteCount: invocation.sourceByteCount)
+      sourceByteCount: invocation.sourceByteCount,
+      requestDigestSHA256: invocation.arkTraceAnalysisRequest?.recoveryDigestSHA256)
   }
 }
 
@@ -213,6 +319,7 @@ package struct AnalyzerProvider: DeviceProvider {
   package static let crashSignature = "analyzer.extract-crash-signature@1"
   package static let hilogSummary = "analyzer.summarize-hilog@1"
   package static let traceSummary = "analyzer.summarize-trace@1"
+  package static let traceAnalysis = "analyzer.analyze-trace@1"
 
   /// Which analyzer each published operation is allowed to name. The mapping
   /// lives here rather than in the request: an operation cannot be pointed at
@@ -221,6 +328,7 @@ package struct AnalyzerProvider: DeviceProvider {
     crashSignature: "crash-signature@1",
     hilogSummary: "hilog-summary@1",
     traceSummary: "trace-summary@1",
+    traceAnalysis: "trace-analysis@1",
   ]
 
   /// The artifact each analyzer publishes. One table, used by both the
@@ -231,6 +339,7 @@ package struct AnalyzerProvider: DeviceProvider {
     case "crash-signature@1": return "crash-signature.json"
     case "hilog-summary@1": return "hilog-summary.json"
     case "trace-summary@1": return "trace-summary.json"
+    case "trace-analysis@1": return "trace-analysis.json"
     default: return "analysis.json"
     }
   }
@@ -345,19 +454,36 @@ package struct AnalyzerProvider: DeviceProvider {
       throw DeviceProviderError.unsupportedAction(
         "analyzer input Artifact bytes do not match their lease")
     }
+    let analysisRequest: ArkTraceAnalysisRequest?
+    let arguments: [String]
+    let timeoutSeconds: Int
+    let outputByteBudget: Int
+    if analyzerRef == "trace-analysis@1" {
+      analysisRequest = try Self.analysisRequest(inputs)
+      arguments = analysisRequest!.arguments(sourcePath: artifact.fileURL.path)
+      timeoutSeconds = analysisRequest!.processTimeoutSeconds
+      outputByteBudget = analysisRequest!.maxOutputBytes
+    } else {
+      analysisRequest = nil
+      arguments = profile.fixedArguments + [artifact.fileURL.path]
+      timeoutSeconds = profile.timeoutSeconds
+      outputByteBudget = profile.outputByteBudget
+    }
     return .analyzer(
       .analyze(
         AnalyzerInvocation(
           analyzerRef: profile.analyzerRef,
           analyzerVersion: profile.analyzerVersion,
           executableSHA256: profile.executableSHA256,
-          arguments: profile.fixedArguments + [artifact.fileURL.path],
-          timeoutSeconds: profile.timeoutSeconds,
-          outputByteBudget: profile.outputByteBudget,
+          arguments: arguments,
+          timeoutSeconds: timeoutSeconds,
+          outputByteBudget: outputByteBudget,
           sourceArtifactID: artifact.artifactID,
           sourceSHA256: artifact.sha256,
           sourceByteCount: artifact.byteCount,
-          arkTraceSummaryContract: profile.arkTraceSummaryContract)))
+          arkTraceSummaryContract: profile.arkTraceSummaryContract,
+          arkTraceAnalysisRequest: analysisRequest,
+          arkTraceAnalysisContract: profile.arkTraceAnalysisContract)))
   }
 
   package func lower(
@@ -436,6 +562,15 @@ package struct AnalyzerProvider: DeviceProvider {
           code: "analyzer.schemaMismatch",
           detail: "\(invocation.analyzerRef) produced JSON outside ArkTrace contract 1.0")
       }
+    } else if invocation.analyzerRef == "trace-analysis@1" {
+      guard receipt.stderr.isEmpty,
+        ArkTraceAnalysisEnvelopeValidator.validate(
+          receipt.stdout, invocation: invocation)
+      else {
+        return .failed(
+          code: "analyzer.schemaMismatch",
+          detail: "\(invocation.analyzerRef) produced JSON outside ArkTrace analysis contract 1.0")
+      }
     }
     // Provenance travels with the derived artifact: which artifact it came
     // from, that artifact's digest, which analyzer at which version, and the
@@ -464,6 +599,33 @@ package struct AnalyzerProvider: DeviceProvider {
       summary["requestMaxEvents"] = "10000"
       summary["requestMaxOutputBytes"] = String(invocation.outputByteBudget ?? 0)
     }
+    if let contract = invocation.arkTraceAnalysisContract,
+      let request = invocation.arkTraceAnalysisRequest
+    {
+      summary["toolSha256"] = invocation.executableSHA256
+      summary["parserSha256"] = contract.parserSHA256
+      summary["parserVersion"] = contract.parserVersion
+      summary["parserUpstreamRevision"] = contract.parserUpstreamRevision
+      summary["parserBuildRecipeVersion"] = contract.parserBuildRecipeVersion
+      summary["parserAdapterVersion"] = contract.parserAdapterVersion
+      summary["schemaAdapterVersion"] = contract.schemaAdapterVersion
+      summary["indexSchemaVersion"] = String(contract.indexSchemaVersion)
+      summary["requestCommand"] = request.kind == .context ? "context" : "analyze"
+      summary["requestKind"] = request.kind.rawValue
+      summary["requestTimestampNs"] = request.timestampNs.map(String.init) ?? "null"
+      summary["requestStartNs"] = request.startNs.map(String.init) ?? "null"
+      summary["requestEndNs"] = request.endNs.map(String.init) ?? "null"
+      summary["requestProcessKey"] = request.processKey.map(String.init) ?? "null"
+      summary["requestPid"] = request.pid.map(String.init) ?? "null"
+      summary["requestThreadKey"] = request.threadKey.map(String.init) ?? "null"
+      summary["requestTid"] = request.tid.map(String.init) ?? "null"
+      summary["requestThresholdNs"] = String(request.thresholdNs)
+      summary["requestLimit"] = String(request.limit)
+      summary["requestTimeoutMs"] = String(request.timeoutMs)
+      summary["requestMaxRows"] = String(request.maxRows)
+      summary["requestMaxEvents"] = String(request.maxEvents)
+      summary["requestMaxOutputBytes"] = String(request.maxOutputBytes)
+    }
     return .verified(summary: summary)
   }
 
@@ -482,6 +644,14 @@ package struct AnalyzerProvider: DeviceProvider {
       recoveryIdentity = identity
     default:
       return .stillUnknown(reason: "analyzer reconcile received a foreign action")
+    }
+    if recoveryIdentity.analyzerRef == "trace-analysis@1" {
+      guard let digest = recoveryIdentity.requestDigestSHA256,
+        digest.count == 64,
+        digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
+      else {
+        return .stillUnknown(reason: "analyzer reconcile request identity is incomplete")
+      }
     }
     guard let artifact = context.resolvedInputArtifact,
       artifact.artifactID == recoveryIdentity.sourceArtifactID,
@@ -510,6 +680,82 @@ package struct AnalyzerProvider: DeviceProvider {
 
   static func sha256(_ bytes: Data) -> String {
     SHA256Hex.string(of: bytes)
+  }
+
+  package static func analysisRequest(
+    _ inputs: [String: JSONValue]
+  ) throws -> ArkTraceAnalysisRequest {
+    func integer(_ key: String) -> Int64? {
+      switch inputs[key] {
+      case .integer(let value): return value
+      case .unsignedInteger(let value): return Int64(exactly: value)
+      default: return nil
+      }
+    }
+    let optionalIntegerKeys = [
+      "timestampNs", "startNs", "endNs", "processKey", "pid", "threadKey", "tid",
+      "thresholdNs", "limit",
+    ]
+    let allowedKeys = Set(optionalIntegerKeys + [
+      "sourceArtifactRef", "kind", "timeoutMs", "maxRows", "maxEvents", "maxOutputBytes",
+    ])
+    guard inputs.keys.allSatisfy(allowedKeys.contains),
+      optionalIntegerKeys.allSatisfy({ inputs[$0] == nil || integer($0) != nil })
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "analyzer analysis inputs violate the closed request contract")
+    }
+    guard case .string(let rawKind)? = inputs["kind"],
+      let kind = ArkTraceAnalysisKind(rawValue: rawKind),
+      let timeout = integer("timeoutMs").flatMap({ Int(exactly: $0) }),
+      let maxRows = integer("maxRows").flatMap({ Int(exactly: $0) }),
+      let maxEvents = integer("maxEvents").flatMap({ Int(exactly: $0) }),
+      let maxOutput = integer("maxOutputBytes").flatMap({ Int(exactly: $0) })
+    else {
+      throw DeviceProviderError.unsupportedAction("analyzer analysis inputs are incomplete")
+    }
+    let timestamp = integer("timestampNs")
+    let start = integer("startNs")
+    let end = integer("endNs")
+    let threshold = integer("thresholdNs") ?? 0
+    let defaultLimit = min(1_000, min(maxRows, maxEvents))
+    let limit = integer("limit").flatMap({ Int(exactly: $0) }) ?? defaultLimit
+    let hasTimestamp = inputs["timestampNs"] != nil
+    let hasStart = inputs["startNs"] != nil
+    let hasEnd = inputs["endNs"] != nil
+    guard (hasTimestamp && !hasStart && !hasEnd)
+      || (!hasTimestamp && hasStart && hasEnd),
+      (start == nil && end == nil) || (start != nil && end != nil && start! < end!),
+      timeout >= 100, timeout <= 120_000,
+      maxRows >= 1, maxRows <= 100_000,
+      maxEvents >= 1, maxEvents <= 100_000,
+      maxOutput >= 1_024, maxOutput <= 64 * 1_024 * 1_024,
+      threshold >= 0, limit >= 1,
+      limit <= min(1_000, min(maxRows, maxEvents)),
+      timestamp.map({ $0 >= 0 }) ?? true,
+      start.map({ $0 >= 0 }) ?? true,
+      end.map({ $0 >= 1 }) ?? true,
+      integer("pid").map({ $0 >= 0 }) ?? true,
+      integer("tid").map({ $0 >= 0 }) ?? true,
+      integer("processKey") != 0,
+      integer("threadKey") != 0,
+      !(inputs["processKey"] != nil && inputs["pid"] != nil),
+      !(inputs["threadKey"] != nil && inputs["tid"] != nil),
+      kind != .context || (inputs["thresholdNs"] == nil && inputs["limit"] == nil)
+    else {
+      throw DeviceProviderError.unsupportedAction(
+        "analyzer analysis inputs violate the closed request contract")
+    }
+    let request = ArkTraceAnalysisRequest(
+      kind: kind, timestampNs: timestamp, startNs: start, endNs: end,
+      processKey: integer("processKey"), pid: integer("pid"),
+      threadKey: integer("threadKey"), tid: integer("tid"),
+      thresholdNs: threshold, limit: limit, timeoutMs: timeout,
+      maxRows: maxRows, maxEvents: maxEvents, maxOutputBytes: maxOutput)
+    guard request.normalizedRange != nil else {
+      throw DeviceProviderError.unsupportedAction("analyzer analysis time selection is invalid")
+    }
+    return request
   }
 
   package static func validatedProfiles(
@@ -543,7 +789,8 @@ package struct AnalyzerProvider: DeviceProvider {
           $0.path.hasPrefix("/") && $0.sha256.count == 64
             && $0.sha256.allSatisfy({ $0.isHexDigit && !$0.isUppercase })
         }),
-        (profile.analyzerRef == "trace-summary@1") == (profile.arkTraceSummaryContract != nil)
+        (profile.analyzerRef == "trace-summary@1") == (profile.arkTraceSummaryContract != nil),
+        (profile.analyzerRef == "trace-analysis@1") == (profile.arkTraceAnalysisContract != nil)
       else {
         throw AnalyzerProfileValidationError.invalidProfile(profile.analyzerRef)
       }

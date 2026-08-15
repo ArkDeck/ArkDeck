@@ -651,15 +651,19 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     case .analyzer(.analyze(let invocation)):
       // The journal records which analyzer ran over which artifact, never
       // the host path the bytes happened to live at.
+      var arguments: [String: JSONValue] = [
+        "analyzerRef": .string(invocation.analyzerRef),
+        "analyzerVersion": .string(invocation.analyzerVersion),
+        "sourceArtifactId": .string(invocation.sourceArtifactID),
+        "sourceSha256": .string(invocation.sourceSHA256),
+        "sourceByteCount": .integer(Int64(invocation.sourceByteCount)),
+      ]
+      if let request = invocation.arkTraceAnalysisRequest {
+        arguments["requestDigestSha256"] = .string(request.recoveryDigestSHA256)
+      }
       self.init(
         kind: "analyzer.analyze",
-        arguments: [
-          "analyzerRef": .string(invocation.analyzerRef),
-          "analyzerVersion": .string(invocation.analyzerVersion),
-          "sourceArtifactId": .string(invocation.sourceArtifactID),
-          "sourceSha256": .string(invocation.sourceSHA256),
-          "sourceByteCount": .integer(Int64(invocation.sourceByteCount)),
-        ])
+        arguments: arguments)
     case .analyzer(.reconcile):
       // A recovery identity is materialized only from an already-durable
       // original intent. It can never become a fresh write-ahead action.
@@ -1141,15 +1145,22 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
             filters: stringArray("filters"),
             byteBudget: integer("byteBudget"))))
     case "analyzer.analyze":
-      let expectedKeys: Set<String> = [
+      let analyzerRef = try string("analyzerRef")
+      var expectedKeys: Set<String> = [
         "analyzerRef", "analyzerVersion", "sourceArtifactId", "sourceSha256",
         "sourceByteCount",
       ]
+      let requestDigest: String?
+      if analyzerRef == "trace-analysis@1" {
+        expectedKeys.insert("requestDigestSha256")
+        requestDigest = try string("requestDigestSha256")
+      } else {
+        requestDigest = nil
+      }
       guard Set(arguments.keys) == expectedKeys else {
         throw DeviceProviderError.unsupportedAction(
           "persisted analyzer.analyze has a non-closed recovery identity")
       }
-      let analyzerRef = try string("analyzerRef")
       let analyzerVersion = try string("analyzerVersion")
       let sourceArtifactID = try string("sourceArtifactId")
       let sourceSHA256 = try string("sourceSha256")
@@ -1157,7 +1168,11 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       guard !analyzerRef.isEmpty, !analyzerVersion.isEmpty,
         !sourceArtifactID.isEmpty, sourceByteCount > 0,
         sourceSHA256.count == 64,
-        sourceSHA256.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
+        sourceSHA256.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) }),
+        requestDigest.map({
+          $0.count == 64
+            && $0.allSatisfy({ $0.isNumber || ("a"..."f").contains(String($0)) })
+        }) ?? true
       else {
         throw DeviceProviderError.unsupportedAction(
           "persisted analyzer.analyze has an invalid recovery identity")
@@ -1169,7 +1184,8 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
             analyzerVersion: analyzerVersion,
             sourceArtifactID: sourceArtifactID,
             sourceSHA256: sourceSHA256,
-            sourceByteCount: sourceByteCount)))
+            sourceByteCount: sourceByteCount,
+            requestDigestSHA256: requestDigest)))
     default:
       throw DeviceProviderError.unsupportedAction(
         "persisted typed provider action kind \(kind) is unknown")

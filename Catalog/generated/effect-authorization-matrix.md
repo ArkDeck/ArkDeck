@@ -3,10 +3,11 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `fd68536c229194cb7211a5056a8ede2b83d2c3e7ffea37ed7f34fd41714eaf17`
+Catalog digest: `328cade24b399a20b0c467195ea724f832854bbae7c65ab3dcbb8160318b1d2d`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `analyzer.analyze-trace@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
 | `analyzer.extract-crash-signature@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
 | `analyzer.summarize-hilog@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
 | `analyzer.summarize-trace@1` | analyzer | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 67108864 |
