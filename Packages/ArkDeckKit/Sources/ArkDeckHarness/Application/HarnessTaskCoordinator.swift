@@ -3159,15 +3159,20 @@ public actor HarnessTaskCoordinator {
       let descriptor = RuntimeOperationCatalog.descriptor(
         reference: intent.operationReference)
       var authorizationReference: RuntimeCapabilityReference?
-      if let descriptor, descriptor.minimumEffect >= .deviceMutation,
-        let capabilityID = await policyGuard.capabilityPort?.standingCapabilityID(
-          operationReference: intent.operationReference,
-          targetID: intent.targetID,
-          expectedBindingRevision: descriptor.binding == WorkflowBindingRequirement.none
-            ? nil : intent.expectedBindingRevision,
-          inputs: decision.inputs) ?? nil
-      {
-        authorizationReference = RuntimeCapabilityReference(capabilityID: capabilityID)
+      if let descriptor {
+        let effect = CatalogOperationEffectResolver.effectiveEffect(
+          descriptor: descriptor, inputs: decision.inputs)
+        if effect >= .deviceMutation,
+          descriptor.authorization[effect] == .standingCapability,
+          let capabilityID = await policyGuard.capabilityPort?.standingCapabilityID(
+            operationReference: intent.operationReference,
+            targetID: intent.targetID,
+            expectedBindingRevision: descriptor.binding == WorkflowBindingRequirement.none
+              ? nil : intent.expectedBindingRevision,
+            inputs: decision.inputs) ?? nil
+        {
+          authorizationReference = RuntimeCapabilityReference(capabilityID: capabilityID)
+        }
       }
       let request = try RuntimeOperationRequest(
         requestID: intent.requestID,
@@ -3179,12 +3184,12 @@ public actor HarnessTaskCoordinator {
         operation: RuntimeOperationReference(id: String(parts[0]), version: version),
         inputs: decision.inputs,
         requestedOutputs: [.rawArtifacts, .derivedArtifacts],
-        // Names an installed grant when the step needs one (CHG-2026-055,
-        // TASK-HFA-009 r2). The harness still never mints, drafts or widens a
-        // capability — it points at one a maintainer issued, and the engine
-        // re-checks scope, revision, expiry and plan before consuming it. An
-        // E0 step names nothing, which is why this is nil far more often than
-        // not.
+        // Names an installed grant only when the Catalog policy is
+        // `standingCapability` (CHG-2026-055, TASK-HFA-009 r2/r4). A
+        // `runtimeCapability` request must carry nil here: the engine mints
+        // and binds its own exact envelope after materialization, and rejects
+        // any caller-supplied replacement. The harness still never mints,
+        // drafts or widens a capability.
         authorization: authorizationReference,
         // Correlation only. The runtime derives no authority, scope or
         // identity from provenance, which is exactly why the harness id may

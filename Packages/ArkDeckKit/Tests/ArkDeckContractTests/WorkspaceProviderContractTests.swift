@@ -883,12 +883,10 @@ final class WorkspaceProviderContractTests: XCTestCase {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: state.appending(path: "checkpoint-artifacts"),
       nowUTC: { "2026-07-31T00:00:00Z" })
-    try await installWorkspaceGrant(
-      into: capabilityStore, operations: ["workspace.create-checkpoint"],
-      profile: checkpointProfile)
+    let checkpointEngineRoot = state.appending(path: "checkpoint-engine")
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: state.appending(path: "checkpoint-engine")),
+        stateDirectory: checkpointEngineRoot),
       providers: DeviceProviderRegistry(providers: [checkpointProvider]),
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: checkpointDispatcher, rockchip: checkpointDispatcher,
@@ -914,7 +912,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
         "checkpointFilePaths": .array([.string(relativePath)]),
       ],
       requestID: "request-runtime-checkpoint",
-      idempotencyKey: "idempotency-runtime-checkpoint")
+      idempotencyKey: "idempotency-runtime-checkpoint",
+      authorization: nil)
 
     // ...and the narrow file-set digest is refused, so the two meanings cannot
     // quietly swap back.
@@ -929,7 +928,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
         "checkpointFilePaths": .array([.string(relativePath)]),
       ],
       requestID: "request-runtime-checkpoint-narrow",
-      idempotencyKey: "idempotency-runtime-checkpoint-narrow")
+      idempotencyKey: "idempotency-runtime-checkpoint-narrow",
+      authorization: nil)
     do {
       _ = try await engine.submit(try JSONEncoder().encode(narrow))
       XCTFail("the narrow file-set digest must not authorize a checkpoint")
@@ -937,7 +937,26 @@ final class WorkspaceProviderContractTests: XCTestCase {
       XCTAssertTrue("\(error)".contains("workspace.revisionConflict"), "\(error)")
     }
 
+    let callerInjected = try operationRequest(
+      id: "workspace.create-checkpoint",
+      inputs: request.inputs,
+      requestID: "request-runtime-checkpoint-caller-capability",
+      idempotencyKey: "idempotency-runtime-checkpoint-caller-capability")
+    do {
+      _ = try await engine.submit(try JSONEncoder().encode(callerInjected))
+      XCTFail("a caller capability must not replace the Runtime-owned checkpoint policy")
+    } catch {
+      XCTAssertTrue(
+        "\(error)".contains("caller-supplied capabilities cannot admit a Runtime-owned policy"),
+        "\(error)")
+    }
+    let capabilitiesBeforePolicyIssuance = try await capabilityStore.list()
+    XCTAssertTrue(capabilitiesBeforePolicyIssuance.isEmpty)
+
     let acceptance = try await engine.submit(try JSONEncoder().encode(request))
+    let admitted = try RuntimeJobRecord.load(
+      from: checkpointEngineRoot.appending(
+        path: "jobs/\(acceptance.jobID)", directoryHint: .isDirectory))
     let status = try await engine.run(jobID: acceptance.jobID)
     XCTAssertEqual(status.state, "succeeded", status.timeline.joined(separator: " | "))
 
@@ -952,11 +971,31 @@ final class WorkspaceProviderContractTests: XCTestCase {
     XCTAssertEqual(receipt["checkpointKind"], .string("sealedArchive"))
     XCTAssertNotNil(receipt["checkpointObject"])
 
-    let inspectedGrant = try await capabilityStore.inspect(
-      capabilityID: Self.workspaceGrantID)
-    let grant = try XCTUnwrap(inspectedGrant)
-    XCTAssertEqual(grant.consumptionCount, 1)
-    XCTAssertEqual(grant.lineage.map(\.outcome), [.confirmed])
+    let capabilities = try await capabilityStore.list()
+    XCTAssertEqual(capabilities.count, 1)
+    let issued = try XCTUnwrap(capabilities.first)
+    XCTAssertEqual(issued.capability.issuer.kind, .runtimeDefaultPolicy)
+    XCTAssertEqual(
+      issued.capability.operationScope,
+      [.init(operationID: "workspace.create-checkpoint", version: 1)])
+    XCTAssertEqual(issued.capability.maximumUses, 1)
+    XCTAssertEqual(issued.capability.exactPlanDigest, admitted.materializedPlanDigest)
+    XCTAssertEqual(issued.capability.exactInputs, request.inputs)
+    guard case .workspaceIdentity(
+      _, let expectedRevision, let scopesDigest) = issued.capability.targetScope
+    else {
+      return XCTFail("checkpoint capability must bind the workspace subject")
+    }
+    guard case .string(let requestedRevision)? = request.inputs["expectedWorkspaceRevision"] else {
+      return XCTFail("checkpoint request must carry its exact workspace revision")
+    }
+    XCTAssertEqual(expectedRevision, requestedRevision)
+    XCTAssertEqual(
+      scopesDigest,
+      WorkspaceProviderSupport.sha256(
+        Data(checkpointProfile.allowedFileGlobs.sorted().joined(separator: "\n").utf8)))
+    XCTAssertEqual(issued.consumptionCount, 1)
+    XCTAssertEqual(issued.lineage.map(\.outcome), [.confirmed])
   }
 
   func testWorkspaceIsUnavailableWithoutArtifactStoreBeforeAdmission() async throws {

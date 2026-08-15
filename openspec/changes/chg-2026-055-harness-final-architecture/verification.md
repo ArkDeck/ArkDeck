@@ -352,6 +352,13 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   断言草稿精确携带 workspace identity、观测 revision、scope digest 与 typed input constraints,
   同时 capability store 为空、Job 为零、workspace 字节不变。草稿中的 standing target 不固定
   revision,request 自己声明的 `expectedWorkspaceRevision` 仍被 exact input constraint 固定。
+  **source-preserving checkpoint policy(r4,2026-08-15):PASS(host contract)** ——
+  `testCatalogToRuntimeArchiveCheckpointPublishesReceiptAndConfirmsCapabilityLineage` 从无 caller
+  authorization 的真实 Runtime submit/run 路径出发,断言 Runtime 只签发一张
+  `workspace.create-checkpoint@1` 单次能力,并逐项等于 admitted plan digest、typed inputs、
+  request revision 与 ProjectProfile source-scope digest;窄文件集 digest 冒充 workspace
+  revision 仍在签发前被 `workspace.revisionConflict` 拒绝。此结论不代替合入后 Phase 6
+  DAYU200 重放,真机 dispatch 当前仍未发生。
 
 ## HFA-AC-19 device 主体准入逐条不变、capability 只收窄(TASK-HFA-009)
 
@@ -375,6 +382,13 @@ r2(2026-08-01):TASK-HFA-005 真机闭环完成,HFA-AC-11/12=`PASS`,GJ-5=
   `testCapabilityDraftStillPinsADeviceSubjectToItsCurrentBinding` 保留 device store lookup 与 exact
   binding;既有 daemon draft 测试仍验证 `bindingRevision`/`stableIdentitySHA256`,新增 workspace
   字段在 device wire payload 中用 `encodeIfPresent` 省略,未把旧消费者改成接收 `null`。
+  **r4 收窄证明(2026-08-15):PASS(host contract)** ——
+  `testSourceChangingWorkspaceMutationsRequireAGrantAndForbidSelfIssuance` 逐条锁住 apply/build/test/
+  revert 的 standing policy 与 `defaultPolicyIssuance: disabled`;
+  `testCheckpointUsesRuntimeOwnedPolicyWithoutWideningSourceMutationGrants` 只允许单步
+  `createWorkspaceCheckpoint` 走 Runtime policy。引擎 additionally pins exact materialized plan
+  digest for this E1 policy capability,caller-supplied capability 仍被既有 Runtime-owned policy
+  boundary 拒绝。device descriptors 与 E2 destructive exact-plan 分支未修改。
 
 ## HFA-AC-20 Memory 晋升条件与作用域过滤(TASK-HFA-010)
 

@@ -105,10 +105,10 @@ final class WorkspaceCapabilityGateContractTests: XCTestCase {
 
   // MARK: - The catalog half
 
-  func testEveryWorkspaceMutationRequiresAGrantAndForbidsSelfIssuance() throws {
+  func testSourceChangingWorkspaceMutationsRequireAGrantAndForbidSelfIssuance() throws {
     let mutations = [
       "workspace.apply-patch@1", "workspace.build-openharmony@1", "workspace.run-tests@1",
-      "workspace.revert-patch@1", "workspace.create-checkpoint@1",
+      "workspace.revert-patch@1",
     ]
     for reference in mutations {
       let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
@@ -119,6 +119,18 @@ final class WorkspaceCapabilityGateContractTests: XCTestCase {
       // be a single point of failure for a gate that authorizes itself.
       XCTAssertFalse(descriptor.defaultPolicyIssuanceEnabled, reference)
     }
+  }
+
+  func testCheckpointUsesRuntimeOwnedPolicyWithoutWideningSourceMutationGrants() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.create-checkpoint@1"))
+    XCTAssertEqual(descriptor.minimumEffect, .deviceMutation)
+    XCTAssertEqual(descriptor.authorization[.deviceMutation], .runtimeCapability)
+    XCTAssertTrue(descriptor.defaultPolicyIssuanceEnabled)
+    XCTAssertEqual(descriptor.binding, .none)
+    XCTAssertEqual(descriptor.concurrencyKey, .hostExclusive)
+    XCTAssertEqual(descriptor.steps.map(\.kind), [.createWorkspaceCheckpoint])
+    XCTAssertTrue(descriptor.steps.allSatisfy { $0.binding == .none })
   }
 
   func testTheReadOnlyWorkspaceFamilyStillNeedsNoGrant() throws {

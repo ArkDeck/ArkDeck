@@ -415,6 +415,19 @@
 ## TASK-HFA-009 — Workspace 执行主体:capability subject 扩展与 exact base revision 绑定
 
 - Status:done
+- r4 follow-up(2026-08-15):Phase 6 的同一 exact checkpoint 请求在生产 Runtime
+  准入处停为 `authorizationRequired`:r2 把五个 workspace E1 operation 全部改为
+  standing capability,而当前产品又刻意不向 Agent 暴露 capability draft/install/revoke
+  管理面。把一张 JSON grant 提交进仓库也不会被 Runtime 安装,不能构成治理路径。
+  本 follow-up 只为**不会改 ref/index/worktree/声明源码字节**的
+  `workspace.create-checkpoint@1` 开启 Runtime-owned policy;能力在完整 plan materialize
+  后签发,并精确绑定 operation、typed inputs、workspace identity、请求 revision、允许的
+  source scopes digest 与 materialized plan digest,单次消费并写入既有 lineage ledger。
+  `apply-patch` / `build-openharmony` / `run-tests` / `revert-patch` 四条会改变或消费源码的
+  路径仍为 standing capability + 禁止 Runtime 自签,device/E2 规则也不变。evidence =
+  `evidence/runs/TASK-HFA-009/run-r4.md`。本 PR 只交付 host contract 与 policy 修复,
+  **不声称**已经在 DAYU200 上执行 checkpoint;合入并部署新 agentd 后才重放原 Phase 6
+  exact request。
 - r3 follow-up(2026-08-01):r2 把 workspace 变更翻到 standing capability 后,
   生产签发入口仍把 `--target demo-app` 无条件当作已收养设备查询 binding revision,
   daemon 的 draft engine 也只接受 device identity + binding。结果是安全闸能拒绝,维护者却
