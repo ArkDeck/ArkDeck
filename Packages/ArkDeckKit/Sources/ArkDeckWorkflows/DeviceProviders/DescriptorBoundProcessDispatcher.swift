@@ -199,7 +199,7 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
           workingDirectory: plan.workingDirectory,
           executableLaunchMode: executableLaunchMode,
           verifiedAnalyzerSource: verifiedAnalyzerSource)
-      } catch let failure as RuntimeDispatchFailure where isArkTraceSummary(plan.action) {
+      } catch let failure as RuntimeDispatchFailure where isArkTraceOperation(plan.action) {
         // RuntimeDispatchFailure details produced below may embed the
         // authorized executable path. Preserve only the outcome class at the
         // durable/public ArkTrace boundary.
@@ -213,7 +213,7 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
         throw cancellation
       } catch let failure as RuntimeDispatchFailure {
         throw failure
-      } catch where isArkTraceSummary(plan.action) {
+      } catch where isArkTraceOperation(plan.action) {
         // Process-layer diagnostics can contain the authorized executable
         // pathname. The trace operation's durable/public failure is a closed,
         // path-free code; low-level details stay inside the process boundary.
@@ -241,9 +241,9 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
       subprocesses: isSequence ? subprocesses : [])
   }
 
-  private func isArkTraceSummary(_ action: TypedProviderAction) -> Bool {
+  private func isArkTraceOperation(_ action: TypedProviderAction) -> Bool {
     guard case .analyzer(.analyze(let invocation)) = action else { return false }
-    return invocation.analyzerRef == "trace-summary@1"
+    return ["trace-summary@1", "trace-analysis@1"].contains(invocation.analyzerRef)
   }
 
   /// Binds Analyzer input bytes once, before executable resolution and spawn.
@@ -409,7 +409,7 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     // must retain its canonical bundle path. All pre-existing standalone
     // analyzers retain the stable inode-path launch contract.
     if case .analyzer(.analyze(let invocation)) = action,
-      invocation.analyzerRef == "trace-summary@1"
+      ["trace-summary@1", "trace-analysis@1"].contains(invocation.analyzerRef)
     {
       return .verifiedCanonicalPath
     }

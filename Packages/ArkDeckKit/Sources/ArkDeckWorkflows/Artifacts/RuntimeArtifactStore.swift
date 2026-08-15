@@ -102,6 +102,61 @@ package struct RuntimeArtifactDerivation: Sendable, Equatable, Codable {
   package let maxRows: Int
   package let maxEvents: Int
   package let maxOutputBytes: Int
+  package let requestCommand: String?
+  package let requestKind: String?
+  package let requestTimestampNs: Int64?
+  package let requestStartNs: Int64?
+  package let requestEndNs: Int64?
+  package let requestProcessKey: Int64?
+  package let requestPID: Int64?
+  package let requestThreadKey: Int64?
+  package let requestTID: Int64?
+  package let requestThresholdNs: Int64?
+  package let requestLimit: Int?
+
+  package init(
+    analyzerRef: String, analyzerVersion: String,
+    sourceArtifactID: String, sourceSHA256: String, sourceByteCount: Int,
+    toolSHA256: String, parserSHA256: String, parserVersion: String,
+    parserUpstreamRevision: String, parserBuildRecipeVersion: String,
+    parserAdapterVersion: String, schemaAdapterVersion: String,
+    indexSchemaVersion: Int, timeoutMs: Int, maxRows: Int, maxEvents: Int,
+    maxOutputBytes: Int, requestCommand: String? = nil, requestKind: String? = nil,
+    requestTimestampNs: Int64? = nil, requestStartNs: Int64? = nil,
+    requestEndNs: Int64? = nil, requestProcessKey: Int64? = nil,
+    requestPID: Int64? = nil, requestThreadKey: Int64? = nil,
+    requestTID: Int64? = nil, requestThresholdNs: Int64? = nil,
+    requestLimit: Int? = nil
+  ) {
+    self.analyzerRef = analyzerRef
+    self.analyzerVersion = analyzerVersion
+    self.sourceArtifactID = sourceArtifactID
+    self.sourceSHA256 = sourceSHA256
+    self.sourceByteCount = sourceByteCount
+    self.toolSHA256 = toolSHA256
+    self.parserSHA256 = parserSHA256
+    self.parserVersion = parserVersion
+    self.parserUpstreamRevision = parserUpstreamRevision
+    self.parserBuildRecipeVersion = parserBuildRecipeVersion
+    self.parserAdapterVersion = parserAdapterVersion
+    self.schemaAdapterVersion = schemaAdapterVersion
+    self.indexSchemaVersion = indexSchemaVersion
+    self.timeoutMs = timeoutMs
+    self.maxRows = maxRows
+    self.maxEvents = maxEvents
+    self.maxOutputBytes = maxOutputBytes
+    self.requestCommand = requestCommand
+    self.requestKind = requestKind
+    self.requestTimestampNs = requestTimestampNs
+    self.requestStartNs = requestStartNs
+    self.requestEndNs = requestEndNs
+    self.requestProcessKey = requestProcessKey
+    self.requestPID = requestPID
+    self.requestThreadKey = requestThreadKey
+    self.requestTID = requestTID
+    self.requestThresholdNs = requestThresholdNs
+    self.requestLimit = requestLimit
+  }
 }
 
 public struct RuntimeVerifiedArtifactEvidence: Sendable, Equatable, Codable {
@@ -486,10 +541,22 @@ public actor RuntimeArtifactStore {
     let payload: Data
     let redacted: Bool
     if request.preservesValidatedMachineBytes {
-      guard request.name == "trace-summary.json",
-        request.mediaType == "application/json",
-        request.sourceOperation == AnalyzerProvider.traceSummary,
-        request.derivation != nil
+      guard let derivation = request.derivation else {
+        throw RuntimeArtifactError.evidenceVerificationFailed(
+          "exact machine-byte publication lacks a closed ArkTrace derivation")
+      }
+      let isClosedArkTraceArtifact =
+        (request.name == "trace-summary.json"
+          && request.sourceOperation == AnalyzerProvider.traceSummary
+          && derivation.analyzerRef == "trace-summary@1"
+          && derivation.requestCommand == nil)
+        || (request.name == "trace-analysis.json"
+          && request.sourceOperation == AnalyzerProvider.traceAnalysis
+          && derivation.analyzerRef == "trace-analysis@1"
+          && derivation.requestCommand != nil
+          && derivation.requestKind != nil)
+      guard isClosedArkTraceArtifact,
+        request.mediaType == "application/json"
       else {
         throw RuntimeArtifactError.evidenceVerificationFailed(
           "exact machine-byte publication lacks a closed ArkTrace derivation")

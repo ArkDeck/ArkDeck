@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "analyzer.analyze-trace",
+  "version": 1,
+  "title": "Run bounded typed context or deterministic analysis over a trace artifact",
+  "provider": "analyzer",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "sourceArtifactRef": {
+        "type": "artifactLease",
+        "required": true,
+        "description": "Existing immutable trace artifact resolved by the Runtime lease boundary."
+      },
+      "kind": {
+        "type": "string",
+        "required": true,
+        "enum": [
+          "context",
+          "cpu",
+          "scheduling",
+          "slices",
+          "range",
+          "hot-intervals"
+        ],
+        "description": "Closed ArkTrace context or deterministic analysis family."
+      },
+      "timestampNs": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0,
+        "description": "Center timestamp for the reviewed 100 ms context/range window; mutually exclusive with startNs/endNs."
+      },
+      "startNs": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0,
+        "description": "Inclusive range start; required together with endNs and mutually exclusive with timestampNs."
+      },
+      "endNs": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "description": "Exclusive range end; required together with startNs and greater than startNs."
+      },
+      "processKey": {
+        "type": "integer",
+        "required": false,
+        "description": "Stable process internal identity; zero is the absent sentinel and is rejected."
+      },
+      "pid": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0
+      },
+      "threadKey": {
+        "type": "integer",
+        "required": false,
+        "description": "Stable thread internal identity; zero is the absent sentinel and is rejected."
+      },
+      "tid": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0
+      },
+      "thresholdNs": {
+        "type": "integer",
+        "required": false,
+        "minimum": 0,
+        "description": "Minimum long-slice duration for analysis kinds; absent means zero."
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 1000,
+        "description": "Per-analysis section limit, additionally bounded by maxRows and maxEvents."
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "required": true,
+        "minimum": 100,
+        "maximum": 120000
+      },
+      "maxRows": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "maximum": 100000
+      },
+      "maxEvents": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "maximum": 100000
+      },
+      "maxOutputBytes": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1024,
+        "maximum": 67108864
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "analysis": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "analyze-trace",
+      "kind": "runDeterministicAnalyzer",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Reads one immutable trace artifact and publishes one exact validated context/analysis JSON artifact."
+    }
+  ],
+  "timeoutSeconds": 120,
+  "outputByteBudget": 67108864,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "trace-analysis.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ]
+}

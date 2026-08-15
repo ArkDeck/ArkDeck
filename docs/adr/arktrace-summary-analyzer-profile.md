@@ -1,8 +1,8 @@
-# ArkTrace summary analyzer profile
+# ArkTrace analyzer profile
 
-ArkDeck exposes the existing `analyzer.summarize-trace@1` operation only when the daemon owner
-selects a reviewed ArkTrace CLI distribution descriptor. Requests cannot provide this descriptor,
-an executable, arguments, or a search path.
+ArkDeck exposes `analyzer.summarize-trace@1` and `analyzer.analyze-trace@1` only when the daemon
+owner selects a reviewed ArkTrace CLI distribution descriptor. Requests cannot provide this
+descriptor, an executable, arguments, or a search path.
 
 ## Install and select
 
@@ -47,10 +47,12 @@ restart; ArkDeck revalidates the retained bytes and materializes/reuses the matc
 generation rather than trusting prior availability. Never repair or replace either the selected
 external install or a daemon-private generation in place.
 
-The summary invocation remains host-only and binding-free. ArkDeck owns the complete argument
-array and appends the resolved immutable Artifact path as one argument token. No shell, `PATH`,
-HDC, GUI, device binding, or caller-provided argument participates in executable selection or
-lowering.
+Both invocations remain host-only and binding-free. ArkDeck owns each complete argument array and
+appends the resolved immutable Artifact path as one argument token. Summary keeps its original
+fixed command. Deep analysis accepts only a closed kind, an exactly-one timestamp/range selection,
+stable identity filters and explicit limits; the Provider lowers those typed values to fixed
+`context` or `analyze` flags. No shell, `PATH`, HDC, GUI, device binding, caller path, executable or
+free-form argument participates in selection or lowering.
 
 The signed App's CLI is launched through the private generation's canonical bundle path in a
 suspended state. Before the child executes, ArkDeck compares the kernel's first executable mapping
@@ -60,10 +62,12 @@ the stable device/inode launch path. The source Artifact is likewise opened once
 passed as its stable `/.vol/<device>/<inode>` alias while the descriptor remains held through
 child drain.
 
-On success, ArkDeck accepts only the closed ArkTrace JSON 1.0 summary envelope. Tool, fixed
+On success, ArkDeck accepts only the applicable closed ArkTrace JSON 1.0 envelope. Tool, exact
 request and limits, source Artifact SHA/byte count, parser identity/build recipe, adapter/index
-provenance, typed data-quality evidence, truncation evidence and summary range/counts are all
+provenance, typed data-quality evidence, truncation evidence and all result section budgets are
 validated together. Captured or over-budget stdout and any stderr are refused. The derived
-`trace-summary.json` is the exact validated stdout byte sequence; Runtime does not wrap or
-re-encode it. Durable action and Artifact evidence retain source, tool, parser, request and derived
-hash/byte-count lineage without publishing host paths.
+`trace-summary.json` or `trace-analysis.json` is the exact validated stdout byte sequence; Runtime
+does not wrap, redact or re-encode it. Durable action and Artifact evidence retain source, tool,
+parser, request and derived hash/byte-count lineage without publishing host paths. The analysis
+recovery identity additionally binds a canonical, path-free request digest; restart can never
+reconcile a different time/filter/limit selection as the original action.

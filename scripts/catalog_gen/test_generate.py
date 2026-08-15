@@ -43,6 +43,7 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual(
             sorted(generate.operation_reference(op) for op in operations),
             [
+                "analyzer.analyze-trace@1",
                 "analyzer.extract-crash-signature@1",
                 "analyzer.summarize-hilog@1",
                 "analyzer.summarize-trace@1",

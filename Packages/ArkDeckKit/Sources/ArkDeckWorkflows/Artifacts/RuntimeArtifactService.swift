@@ -49,6 +49,69 @@ enum RuntimeArtifactService {
       maxOutputBytes: maxOutputBytes)
   }
 
+  static func traceAnalysisDerivation(
+    name: String,
+    descriptor: CatalogOperationDescriptor,
+    summary: [String: String]
+  ) -> RuntimeArtifactDerivation? {
+    func optionalInt64(_ key: String) -> (present: Bool, value: Int64?) {
+      guard let raw = summary[key] else { return (false, nil) }
+      if raw == "null" { return (true, nil) }
+      guard let value = Int64(raw) else { return (false, nil) }
+      return (true, value)
+    }
+    let timestamp = optionalInt64("requestTimestampNs")
+    let start = optionalInt64("requestStartNs")
+    let end = optionalInt64("requestEndNs")
+    let processKey = optionalInt64("requestProcessKey")
+    let pid = optionalInt64("requestPid")
+    let threadKey = optionalInt64("requestThreadKey")
+    let tid = optionalInt64("requestTid")
+    guard name == "trace-analysis.json",
+      descriptor.reference == AnalyzerProvider.traceAnalysis,
+      let analyzerRef = summary["analyzerRef"],
+      let analyzerVersion = summary["analyzerVersion"],
+      let sourceArtifactID = summary["sourceArtifactId"],
+      let sourceSHA256 = summary["sourceSha256"],
+      let sourceByteCount = summary["sourceByteCount"].flatMap(Int.init),
+      let toolSHA256 = summary["toolSha256"],
+      let parserSHA256 = summary["parserSha256"],
+      let parserVersion = summary["parserVersion"],
+      let parserUpstreamRevision = summary["parserUpstreamRevision"],
+      let parserBuildRecipeVersion = summary["parserBuildRecipeVersion"],
+      let parserAdapterVersion = summary["parserAdapterVersion"],
+      let schemaAdapterVersion = summary["schemaAdapterVersion"],
+      let indexSchemaVersion = summary["indexSchemaVersion"].flatMap(Int.init),
+      let timeoutMs = summary["requestTimeoutMs"].flatMap(Int.init),
+      let maxRows = summary["requestMaxRows"].flatMap(Int.init),
+      let maxEvents = summary["requestMaxEvents"].flatMap(Int.init),
+      let maxOutputBytes = summary["requestMaxOutputBytes"].flatMap(Int.init),
+      let requestCommand = summary["requestCommand"],
+      let requestKind = summary["requestKind"],
+      timestamp.present, start.present, end.present, processKey.present,
+      pid.present, threadKey.present, tid.present,
+      let thresholdNs = summary["requestThresholdNs"].flatMap(Int64.init),
+      let limit = summary["requestLimit"].flatMap(Int.init)
+    else { return nil }
+    return RuntimeArtifactDerivation(
+      analyzerRef: analyzerRef, analyzerVersion: analyzerVersion,
+      sourceArtifactID: sourceArtifactID, sourceSHA256: sourceSHA256,
+      sourceByteCount: sourceByteCount, toolSHA256: toolSHA256,
+      parserSHA256: parserSHA256, parserVersion: parserVersion,
+      parserUpstreamRevision: parserUpstreamRevision,
+      parserBuildRecipeVersion: parserBuildRecipeVersion,
+      parserAdapterVersion: parserAdapterVersion,
+      schemaAdapterVersion: schemaAdapterVersion, indexSchemaVersion: indexSchemaVersion,
+      timeoutMs: timeoutMs, maxRows: maxRows, maxEvents: maxEvents,
+      maxOutputBytes: maxOutputBytes,
+      requestCommand: requestCommand, requestKind: requestKind,
+      requestTimestampNs: timestamp.value, requestStartNs: start.value,
+      requestEndNs: end.value, requestProcessKey: processKey.value,
+      requestPID: pid.value, requestThreadKey: threadKey.value,
+      requestTID: tid.value,
+      requestThresholdNs: thresholdNs, requestLimit: limit)
+  }
+
   /// Declared products whose bytes come from a device file transfer rather
   /// than from a captured stream. They publish from the host file the
   /// dispatcher measured, and a missing file is a recorded absence — there
@@ -89,6 +152,9 @@ enum RuntimeArtifactService {
     ],
     "analyzer.summarize-trace@1": [
       "summarize-trace": ["trace-summary.json"]
+    ],
+    "analyzer.analyze-trace@1": [
+      "analyze-trace": ["trace-analysis.json"]
     ],
     "workspace.inspect-source@1": [
       "inspect-workspace-source": ["source-inspection.txt"]
@@ -346,6 +412,11 @@ enum RuntimeArtifactService {
       // ArkTrace's validated machine envelope is already deterministic and
       // carries its own complete request/tool/parser/source provenance.
       // Publishing a wrapper would change those reviewed bytes.
+      return receipt.stdout
+    case "trace-analysis.json"
+    where descriptor.reference == AnalyzerProvider.traceAnalysis:
+      // Context and deterministic analysis share the same closed ArkTrace
+      // machine-envelope boundary. Preserve the validator-approved bytes.
       return receipt.stdout
     case "build.log", "test-output.log":
       var output = receipt.stdout

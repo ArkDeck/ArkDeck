@@ -949,7 +949,9 @@ private enum WorkflowStepValidator {
       // A closed vocabulary: an analyzer that is not registered here cannot
       // be named, so no input can select an arbitrary program.
       _ = try reader.enumeration(
-        "analyzerRef", allowed: ["crash-signature@1", "hilog-summary@1", "trace-summary@1"])
+        "analyzerRef", allowed: [
+          "crash-signature@1", "hilog-summary@1", "trace-summary@1", "trace-analysis@1",
+        ])
       try reader.identifier("inputArtifactId")
       try reader.identifier("artifactId")
     case .inspectWorkspaceSource:

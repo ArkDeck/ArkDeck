@@ -4,9 +4,51 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "fd68536c229194cb7211a5056a8ede2b83d2c3e7ffea37ed7f34fd41714eaf17"
+  public static let catalogDigest = "328cade24b399a20b0c467195ea724f832854bbae7c65ab3dcbb8160318b1d2d"
 
   public static let operations: [CatalogOperationDescriptor] = [
+    CatalogOperationDescriptor(
+      id: "analyzer.analyze-trace",
+      version: 1,
+      title: "Run bounded typed context or deterministic analysis over a trace artifact",
+      provider: .analyzer,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "endNs", type: .integer, isRequired: false, minimum: 1),
+        CatalogFieldDescriptor(name: "kind", type: .string, isRequired: true, enumValues: ["context", "cpu", "scheduling", "slices", "range", "hot-intervals"]),
+        CatalogFieldDescriptor(name: "limit", type: .integer, isRequired: false, minimum: 1, maximum: 1000),
+        CatalogFieldDescriptor(name: "maxEvents", type: .integer, isRequired: true, minimum: 1, maximum: 100000),
+        CatalogFieldDescriptor(name: "maxOutputBytes", type: .integer, isRequired: true, minimum: 1024, maximum: 67108864),
+        CatalogFieldDescriptor(name: "maxRows", type: .integer, isRequired: true, minimum: 1, maximum: 100000),
+        CatalogFieldDescriptor(name: "pid", type: .integer, isRequired: false, minimum: 0),
+        CatalogFieldDescriptor(name: "processKey", type: .integer, isRequired: false),
+        CatalogFieldDescriptor(name: "sourceArtifactRef", type: .artifactLease, isRequired: true),
+        CatalogFieldDescriptor(name: "startNs", type: .integer, isRequired: false, minimum: 0),
+        CatalogFieldDescriptor(name: "threadKey", type: .integer, isRequired: false),
+        CatalogFieldDescriptor(name: "thresholdNs", type: .integer, isRequired: false, minimum: 0),
+        CatalogFieldDescriptor(name: "tid", type: .integer, isRequired: false, minimum: 0),
+        CatalogFieldDescriptor(name: "timeoutMs", type: .integer, isRequired: true, minimum: 100, maximum: 120000),
+        CatalogFieldDescriptor(name: "timestampNs", type: .integer, isRequired: false, minimum: 0)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "analysis", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "analyze-trace", kind: .runDeterministicAnalyzer, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 120,
+      outputByteBudget: 67108864,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "trace-analysis.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
     CatalogOperationDescriptor(
       id: "analyzer.extract-crash-signature",
       version: 1,
