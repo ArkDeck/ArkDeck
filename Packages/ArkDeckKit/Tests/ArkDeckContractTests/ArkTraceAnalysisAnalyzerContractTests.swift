@@ -145,6 +145,47 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
     }
   }
 
+  func testContextAcceptsCanonicalArkTraceSummaryTruncationOrder() throws {
+    let request = try request(
+      kind: .context, startNs: 0, endNs: 100_000_000)
+    let invocation = invocation(request)
+    var productionOrdered = root(request)
+    productionOrdered = replacingObject(productionOrdered, key: "truncation") { truncation in
+      truncation["truncated"] = .bool(true)
+      truncation["sections"] = .array([.string("summary")])
+    }
+    productionOrdered = replacingObject(productionOrdered, key: "result") { result in
+      guard case .object(var summary)? = result["summary"],
+        case .object(var capabilities)? = summary["capabilities"],
+        case .object(var truncation)? = result["truncation"]
+      else { return }
+      capabilities["threadStates"] = .bool(true)
+      capabilities["namedSlices"] = .bool(true)
+      summary["capabilities"] = .object(capabilities)
+      summary["threadStateCount"] = .integer(0)
+      summary["namedSliceCount"] = .integer(0)
+      summary["truncatedSections"] = .array([
+        .string("processCount"), .string("threadCount"),
+        .string("threadStateCount"), .string("namedSliceCount"),
+      ])
+      truncation["summary"] = status(returned: 1, matched: 1, truncated: true)
+      result["summary"] = .object(summary)
+      result["truncation"] = .object(truncation)
+    }
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(productionOrdered), invocation: invocation))
+
+    var lexical = productionOrdered
+    lexical = replacingNestedObject(lexical, first: "result", second: "summary") { summary in
+      summary["truncatedSections"] = .array([
+        .string("namedSliceCount"), .string("processCount"),
+        .string("threadCount"), .string("threadStateCount"),
+      ])
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(lexical), invocation: invocation))
+  }
+
   func testClosedEnvelopeRejectsRequestProvenanceBudgetAndPrivacyDrift() throws {
     let request = try request(kind: .range, startNs: 0, endNs: 100_000_000)
     let invocation = invocation(request)
@@ -1002,10 +1043,13 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
     .object(["status": .string("ok"), "warnings": .array([])])
   }
 
-  private func status(returned: Int) -> JSONValue {
+  private func status(
+    returned: Int, matched: Int? = nil, truncated: Bool = false
+  ) -> JSONValue {
     .object([
       "returnedCount": .integer(Int64(returned)),
-      "matchedCount": .integer(Int64(returned)), "truncated": .bool(false),
+      "matchedCount": .integer(Int64(matched ?? returned)),
+      "truncated": .bool(truncated),
     ])
   }
 

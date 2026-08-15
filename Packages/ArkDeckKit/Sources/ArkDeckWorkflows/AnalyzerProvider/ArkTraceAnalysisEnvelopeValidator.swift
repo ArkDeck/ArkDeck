@@ -494,14 +494,18 @@ package enum ArkTraceAnalysisEnvelopeValidator {
   private static func validateSummaryTruncatedSections(
     _ value: JSONValue?, summary: Object
   ) -> Bool {
-    guard let sections = stringArray(value, maximumCount: 8), sections == sections.sorted(),
+    guard let sections = stringArray(value, maximumCount: 8),
       Set(sections).count == sections.count
     else { return false }
-    let allowed = Set([
+    // ArkTrace preserves the declared TraceSummarySection order. That order
+    // is stable and machine-facing, but deliberately differs from lexical
+    // order (for example process/thread counts precede named slices).
+    let ordered = [
       "cpuCount", "processCount", "threadCount", "cpuSliceCount", "threadStateCount",
       "namedSliceCount", "counterSeriesCount", "eventCountBySource",
-    ])
-    guard sections.allSatisfy(allowed.contains) else { return false }
+    ]
+    let positions = sections.compactMap { ordered.firstIndex(of: $0) }
+    guard positions.count == sections.count, positions == positions.sorted() else { return false }
     let unavailable = [
       "cpuCount", "cpuSliceCount", "threadStateCount", "namedSliceCount",
       "counterSeriesCount", "eventCountBySource",
