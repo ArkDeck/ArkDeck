@@ -1841,6 +1841,8 @@ final class AgentDaemonContractTests: XCTestCase {
       "artifact.importNativeLibrary.append",
       "artifact.importNativeLibrary.commit", "artifact.importFlashBundle.begin",
       "artifact.importFlashBundle.append", "artifact.importFlashBundle.commit",
+      "artifact.importWorkspacePatch.begin", "artifact.importWorkspacePatch.append",
+      "artifact.importWorkspacePatch.commit",
       "artifact.list", "artifact.inspect",
       "artifact.read", "artifact.export",
     ] {
@@ -1859,6 +1861,160 @@ final class AgentDaemonContractTests: XCTestCase {
     let noJob = await handler.handleFrame(
       Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"b\",\"method\":\"artifact.list\"}".utf8))
     XCTAssertFalse(noJob.ok)
+  }
+
+  func testWorkspacePatchImportPublishesBoundedTargetCorrelatedLease() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-08-15T00:00:00Z"
+    ).record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-15T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore)
+    let patch = Data(
+      """
+      diff --git a/entry/src/main/ets/pages/Index.ets b/entry/src/main/ets/pages/Index.ets
+      --- a/entry/src/main/ets/pages/Index.ets
+      +++ b/entry/src/main/ets/pages/Index.ets
+      @@ -1,2 +1 @@
+      -console.info('diagnostic')
+       keep()
+      """.utf8)
+    let digest = SHA256.hash(data: patch)
+      .map { String(format: "%02x", $0) }.joined()
+
+    let begin = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("remove-diagnostic.patch"),
+        "byteCount": .integer(Int64(patch.count)),
+        "sha256": .string(digest),
+      ])
+    XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
+    guard case .object(let beginFields)? = begin.result,
+      case .string(let uploadID)? = beginFields["uploadId"]
+    else {
+      return XCTFail("begin must return an upload identity")
+    }
+    let append = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.append",
+      params: [
+        "uploadId": .string(uploadID),
+        "offset": .integer(0),
+        "base64": .string(patch.base64EncodedString()),
+      ])
+    XCTAssertTrue(append.ok, append.error?.message ?? "-")
+
+    let commit = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.commit",
+      params: ["uploadId": .string(uploadID)])
+    XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
+    guard case .object(let fields)? = commit.result,
+      case .string(let jobID)? = fields["jobId"],
+      case .string(let artifactID)? = fields["artifactId"],
+      case .string(let lease)? = fields["lease"],
+      case .array(let touchedFiles)? = fields["touchedFiles"]
+    else {
+      return XCTFail("commit must return the immutable patch identity")
+    }
+    XCTAssertEqual(fields["sha256"], .string(digest))
+    XCTAssertEqual(fields["targetId"], .string(target.targetID))
+    XCTAssertEqual(touchedFiles, [.string("entry/src/main/ets/pages/Index.ets")])
+    XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
+    XCTAssertFalse(lease.contains(stateDirectory.path))
+
+    let metadata = try await artifactStore.inspect(jobID: jobID, artifactID: artifactID)
+    XCTAssertEqual(metadata.mediaType, "text/x-diff")
+    XCTAssertEqual(metadata.sourceOperation, "artifact.import-workspace-patch")
+    XCTAssertEqual(metadata.bindingSnapshot.targetID, target.targetID)
+    XCTAssertNil(metadata.bindingSnapshot.bindingRevision)
+    XCTAssertNil(metadata.bindingSnapshot.stableIdentitySHA256)
+    let resolution = try await artifactStore.resolveLease(lease)
+    XCTAssertEqual(resolution.sha256, digest)
+    XCTAssertEqual(try Data(contentsOf: resolution.fileURL), patch)
+  }
+
+  func testWorkspacePatchImportRejectsUnknownTargetAndUnsafeDiffWithoutPublication() async throws {
+    let targetStore = try RuntimeTargetStore(
+      directoryURL: stateDirectory.appending(path: "targets", directoryHint: .isDirectory))
+    let target = try targetStore.adopt(
+      stableIdentitySHA256: String(repeating: "b", count: 64),
+      connectKey: "150100424a544e4600",
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-08-15T00:00:00Z"
+    ).record
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-15T00:00:00Z" })
+    let (handler, _) = try makeStack(
+      targetStore: targetStore, artifactStore: artifactStore)
+    let unsafe = Data(
+      """
+      diff --git a/entry.bin b/entry.bin
+      GIT binary patch
+      literal 1
+      A
+      """.utf8)
+    let digest = SHA256.hash(data: unsafe)
+      .map { String(format: "%02x", $0) }.joined()
+
+    let unknown = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.begin",
+      params: [
+        "targetId": .string("TGT-unknown"),
+        "name": .string("unsafe.patch"),
+        "byteCount": .integer(Int64(unsafe.count)),
+        "sha256": .string(digest),
+      ])
+    XCTAssertFalse(unknown.ok)
+    XCTAssertEqual(unknown.error?.code, "notFound")
+
+    let begin = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.begin",
+      params: [
+        "targetId": .string(target.targetID),
+        "name": .string("unsafe.patch"),
+        "byteCount": .integer(Int64(unsafe.count)),
+        "sha256": .string(digest),
+      ])
+    guard case .object(let beginFields)? = begin.result,
+      case .string(let uploadID)? = beginFields["uploadId"]
+    else {
+      return XCTFail("begin must return an upload identity")
+    }
+    let append = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.append",
+      params: [
+        "uploadId": .string(uploadID),
+        "offset": .integer(0),
+        "base64": .string(unsafe.base64EncodedString()),
+      ])
+    XCTAssertTrue(append.ok)
+    let commit = try await request(
+      handler,
+      method: "artifact.importWorkspacePatch.commit",
+      params: ["uploadId": .string(uploadID)])
+    XCTAssertFalse(commit.ok)
+    XCTAssertEqual(commit.error?.code, "rejected")
+    XCTAssertTrue((commit.error?.message ?? "").contains("unified diff"))
+
+    let expectedJob =
+      "input-workspace-patch-\(target.targetID)-\(digest.prefix(16))"
+    let artifacts = try await artifactStore.list(jobID: expectedJob)
+    XCTAssertTrue(artifacts.isEmpty)
   }
 
   func testChunkedHAPImportPublishesATargetBoundIDOnlyLease() async throws {

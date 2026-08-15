@@ -1090,6 +1090,7 @@ struct ArkDeckCommandLine {
         arkdeck capability list [--json]
         arkdeck capability inspect --capability <id> [--json]
         arkdeck artifact import-hap --target <id> --file <unsigned-or-signed.hap> [--json]
+        arkdeck artifact import-workspace-patch --target <id> --file <change.patch> [--json]
         arkdeck artifact import-flash-bundle --target <id> --file <images.tar.gz> \
       [--device-profile <dayu200>] [--json]
         arkdeck artifact import-native-library --target <id> --file <libname.so> [--json]
