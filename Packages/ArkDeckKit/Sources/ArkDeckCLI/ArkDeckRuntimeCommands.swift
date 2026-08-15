@@ -90,7 +90,7 @@ enum RuntimeCLI {
       try options.validateAllowed([
         "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
         "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
-        "--harness-cli", "--harness-cli-timeout-seconds",
+        "--harness-cli", "--harness-cli-timeout-seconds", "--arktrace-descriptor",
       ])
       let previousStatus = subcommand == "update" ? try? service.status() : nil
       let daemonBundlePath = options.value("--daemon") ?? defaultAgentDaemonBundlePath()
@@ -203,11 +203,29 @@ enum RuntimeCLI {
             cliTimeoutSeconds: $0.cliTimeoutSeconds)
         }
       }
+      let arkTraceDescriptor: URL?
+      if let supplied = options.value("--arktrace-descriptor") {
+        if supplied == "none" {
+          arkTraceDescriptor = nil
+        } else {
+          guard supplied.hasPrefix("/") else {
+            throw CLIError(
+              exitCode: EX_USAGE,
+              message: "--arktrace-descriptor must be an absolute path or none")
+          }
+          arkTraceDescriptor = URL(filePath: supplied)
+        }
+      } else if subcommand == "update" {
+        arkTraceDescriptor = try service.arkTraceDescriptorForPreservingUpdate()
+      } else {
+        arkTraceDescriptor = nil
+      }
       let receipt = try service.install(
         daemonBundleSource: URL(filePath: daemonBundlePath, directoryHint: .isDirectory),
         hdcExecutable: URL(filePath: hdcPath), workspace: workspace,
         harnessSensitiveEvidence: harnessSensitiveEvidence,
         harnessModel: harnessModel,
+        arkTraceDescriptor: arkTraceDescriptor,
         beforeBootstrap: beforeBootstrap)
       emit(try encodedJSON(receipt), json: json)
 

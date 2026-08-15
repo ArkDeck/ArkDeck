@@ -212,6 +212,122 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ])
   }
 
+  func testInstallPinsArkTraceDescriptorAndUpdatePreservesOrExplicitlyRemovesIt() throws {
+    let descriptor = root.appending(path: "ArkTrace/distribution-descriptor.json")
+    try makeArkTraceDescriptor(descriptor)
+
+    let receipt = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      arkTraceDescriptor: descriptor)
+    let physicalDescriptorPath =
+      descriptor.path == "/var" || descriptor.path.hasPrefix("/var/")
+      ? "/private" + descriptor.path : descriptor.path
+    let expected = LaunchAgentArkTraceDescriptorStatus(
+      descriptorPath: physicalDescriptorPath,
+      descriptorSHA256: try digest(descriptor),
+      descriptorByteCount: try Data(contentsOf: descriptor).count)
+    XCTAssertEqual(receipt.arkTraceDescriptor, expected)
+    var environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_ARKTRACE_DESCRIPTOR"], physicalDescriptorPath)
+    XCTAssertEqual(try service.status().arkTraceDescriptor, expected)
+
+    try RuntimeCLI.runAgentDaemon(
+      ["update", "--daemon", daemonBundle.path, "--json"], service: service)
+    environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_ARKTRACE_DESCRIPTOR"], physicalDescriptorPath)
+    XCTAssertEqual(try service.status().arkTraceDescriptor, expected)
+
+    try RuntimeCLI.runAgentDaemon(
+      [
+        "update", "--daemon", daemonBundle.path,
+        "--arktrace-descriptor", "none", "--json",
+      ], service: service)
+    environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertNil(environment["ARKDECK_ARKTRACE_DESCRIPTOR"])
+    XCTAssertNil(try service.status().arkTraceDescriptor)
+  }
+
+  func testArkTraceDescriptorFailsClosedOnUnsafePathSchemaAndIdentityDrift() throws {
+    let descriptor = root.appending(path: "ArkTrace/distribution-descriptor.json")
+    try makeArkTraceDescriptor(descriptor)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o666], ofItemAtPath: descriptor.path)
+    XCTAssertThrowsError(
+      try service.install(
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+        arkTraceDescriptor: descriptor)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("owner-controlled"), "unexpected error: \(error)")
+    }
+    XCTAssertTrue(runner.commands.isEmpty)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: paths.plist.path))
+
+    try makeArkTraceDescriptor(descriptor)
+    let symbolic = root.appending(path: "ArkTrace/symbolic-descriptor.json")
+    try FileManager.default.createSymbolicLink(at: symbolic, withDestinationURL: descriptor)
+    XCTAssertThrowsError(
+      try service.install(
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+        arkTraceDescriptor: symbolic)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("physical regular file"), "unexpected error: \(error)")
+    }
+    XCTAssertTrue(runner.commands.isEmpty)
+
+    let external = root.appending(path: "external", directoryHint: .isDirectory)
+    let externalDescriptor = external.appending(path: "distribution-descriptor.json")
+    try makeArkTraceDescriptor(externalDescriptor)
+    let symbolicParent = root.appending(path: "symbolic-parent", directoryHint: .isDirectory)
+    try FileManager.default.createSymbolicLink(at: symbolicParent, withDestinationURL: external)
+    XCTAssertThrowsError(
+      try service.install(
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+        arkTraceDescriptor: symbolicParent.appending(path: "distribution-descriptor.json"))
+    ) { error in
+      XCTAssertTrue(
+        "\(error)".contains("symbolic ancestor"), "unexpected error: \(error)")
+    }
+    XCTAssertTrue(runner.commands.isEmpty)
+
+    try Data(#"{"formatVersion":1}"#.utf8).write(to: descriptor, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: descriptor.path)
+    XCTAssertThrowsError(
+      try service.install(
+        daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+        arkTraceDescriptor: descriptor)
+    ) { error in
+      XCTAssertTrue("\(error)".contains("schema is invalid"), "unexpected error: \(error)")
+    }
+
+    try makeArkTraceDescriptor(descriptor)
+    _ = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      arkTraceDescriptor: descriptor)
+    try Data(
+      #"{"distributionRoot":"/changed","formatVersion":1,"manifestSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#.utf8
+    ).write(to: descriptor, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: descriptor.path)
+    let status = try service.status()
+    XCTAssertFalse(status.ready)
+    XCTAssertTrue(
+      status.diagnostics.contains(
+        "ArkTrace distribution descriptor drifted since installation"),
+      "unexpected diagnostics: \(status.diagnostics)")
+    XCTAssertThrowsError(
+      try RuntimeCLI.runAgentDaemon(
+        ["update", "--daemon", daemonBundle.path, "--json"], service: service)
+    ) { error in
+      XCTAssertTrue(
+        "\(error)".contains("pass --arktrace-descriptor explicitly"),
+        "unexpected error: \(error)")
+    }
+  }
+
   func testIdenticalExecutableUpdateRevalidatesBundleAndCredentialIdentity() throws {
     _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     runner.removeAllCommands()
@@ -581,6 +697,16 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     try PropertyListSerialization.data(
       fromPropertyList: info, format: .xml, options: 0
     ).write(to: contents.appending(path: "Info.plist"))
+  }
+
+  private func makeArkTraceDescriptor(_ url: URL) throws {
+    try FileManager.default.createDirectory(
+      at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data(
+      #"{"distributionRoot":"/reviewed/ArkTraceCLI-0.1.0","formatVersion":1,"manifestSHA256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}"#.utf8
+    ).write(to: url, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: url.path)
   }
 
   private func plist(at url: URL) throws -> [String: Any] {
