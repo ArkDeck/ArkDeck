@@ -47,6 +47,22 @@ arkdeck agentd update
 
 HDC 路径变化时同时传 `--hdc /new/absolute/path/to/hdc`。
 
+要启用已合入的 ArkTrace typed analyzer profile，请把已审阅、版本化 ArkTrace
+distribution 的 owner-controlled descriptor 交给同一个安装边界，而不是手工编辑 plist：
+
+```text
+arkdeck agentd update \
+  --arktrace-descriptor /absolute/path/to/distribution-descriptor.json
+arkdeck operation list --json
+```
+
+安装器逐组件拒绝 symlink，要求 descriptor 及其祖先只能由当前用户或 root 控制、不可由
+group/other 写入，并锁定 descriptor 的 SHA-256 和 byte count 到 install receipt/status。
+`update` 未重述参数时只在 live bytes 与上次 install receipt 完全一致时保留当前选择，漂移时
+必须显式重新选择；`--arktrace-descriptor none` 显式撤销。daemon 启动后仍会
+执行 ArkTrace profile 自身更强的完整 distribution、Developer ID/notarization、tree、parser、
+doctor 与 runtime drift 验证；operation 只有在这些检查全部通过后才会标为 available。
+
 要让内置 WaterFlow ProjectProfile、workspace operations 和本地 analyzer 在关闭 Terminal 后
 继续可用，安装时一次性传入两个受验证的绝对目录：
 

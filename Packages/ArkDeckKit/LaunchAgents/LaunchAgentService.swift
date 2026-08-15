@@ -24,6 +24,8 @@ public enum ArkDeckLaunchAgent {
     "ARKDECK_HARNESS_CLI_TIMEOUT_SECONDS"
   public static let harnessEgressProjectsEnvironmentKey =
     "ARKDECK_HARNESS_EGRESS_PROJECTS"
+  public static let arkTraceDescriptorEnvironmentKey =
+    "ARKDECK_ARKTRACE_DESCRIPTOR"
   public static let waterFlowProjectRef = "demo-app"
   public static let harnessLocalModelProviders = ["claude-code", "codex"]
 }
@@ -117,12 +119,16 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
   /// Optional keeps receipts written before headless model composition was
   /// productized decodable. Local CLI configuration contains no credential.
   public let harnessModel: LaunchAgentHarnessModelStatus?
+  /// Optional keeps receipts written before the reviewed ArkTrace profile was
+  /// selectable through the production LaunchAgent installer decodable.
+  public let arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
 
   public init(
     installedAtUTC: String, daemonPath: String, daemonSHA256: String,
     hdcPath: String, hdcSHA256: String, workspaceProjectPath: String? = nil,
     devecoSDKPath: String? = nil, harnessSensitiveEvidence: [String] = [],
-    harnessModel: LaunchAgentHarnessModelStatus? = nil
+    harnessModel: LaunchAgentHarnessModelStatus? = nil,
+    arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus? = nil
   ) {
     self.schemaVersion = "arkdeck-launchagent-install/v1"
     self.installedAtUTC = installedAtUTC
@@ -134,6 +140,7 @@ public struct LaunchAgentInstallReceipt: Codable, Sendable, Equatable {
     self.devecoSDKPath = devecoSDKPath
     self.harnessSensitiveEvidence = harnessSensitiveEvidence
     self.harnessModel = harnessModel
+    self.arkTraceDescriptor = arkTraceDescriptor
   }
 }
 
@@ -178,6 +185,18 @@ public struct LaunchAgentHarnessModelStatus: Codable, Sendable, Equatable {
   public let egressProjects: [String]
 }
 
+public struct LaunchAgentArkTraceDescriptorStatus: Codable, Sendable, Equatable {
+  public let descriptorPath: String
+  public let descriptorSHA256: String
+  public let descriptorByteCount: Int
+
+  public init(descriptorPath: String, descriptorSHA256: String, descriptorByteCount: Int) {
+    self.descriptorPath = descriptorPath
+    self.descriptorSHA256 = descriptorSHA256
+    self.descriptorByteCount = descriptorByteCount
+  }
+}
+
 public struct LaunchAgentStatus: Codable, Sendable, Equatable {
   public let installed: Bool
   public let loaded: Bool
@@ -191,6 +210,7 @@ public struct LaunchAgentStatus: Codable, Sendable, Equatable {
   public let devecoSDKPath: String?
   public let harnessSensitiveEvidence: [String]
   public let harnessModel: LaunchAgentHarnessModelStatus?
+  public let arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
   public let socketPath: String
   public let socketPresent: Bool
   public let standardOutputPath: String
@@ -278,6 +298,22 @@ public final class LaunchAgentService: @unchecked Sendable {
     harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
+    try install(
+      daemonBundleSource: daemonBundleSource, hdcExecutable: hdcExecutable,
+      workspace: workspace, harnessSensitiveEvidence: harnessSensitiveEvidence,
+      harnessModel: harnessModel, arkTraceDescriptor: nil,
+      beforeBootstrap: beforeBootstrap)
+  }
+
+  @discardableResult
+  public func install(
+    daemonBundleSource: URL, hdcExecutable: URL,
+    workspace: LaunchAgentWorkspaceConfiguration? = nil,
+    harnessSensitiveEvidence: [String] = [],
+    harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
+    arkTraceDescriptor: URL?,
+    beforeBootstrap: (@Sendable () throws -> Void)? = nil
+  ) throws -> LaunchAgentInstallReceipt {
     let daemonBundleSource = try daemonBundleValidator(daemonBundleSource)
     let daemonSource = daemonBundleSource.appending(
       path:
@@ -288,6 +324,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     let harnessModel = try harnessModel.map {
       try validatedHarnessModel($0, workspace: workspace)
     }
+    let arkTraceDescriptor = try arkTraceDescriptor.map(validatedArkTraceDescriptor)
     let daemonSHA256 = try sha256(daemonSource)
     let hdcSHA256 = try sha256(hdcExecutable)
     try createOwnedDirectory(paths.plist.deletingLastPathComponent())
@@ -322,7 +359,8 @@ public final class LaunchAgentService: @unchecked Sendable {
       stderrPath: paths.standardError.path,
       workspace: workspace,
       harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel)
+      harnessModel: harnessModel,
+      arkTraceDescriptor: arkTraceDescriptor)
     try renderedPlist.write(to: paths.plist, options: .atomic)
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.plist.path)
 
@@ -333,7 +371,8 @@ public final class LaunchAgentService: @unchecked Sendable {
       workspaceProjectPath: workspace?.projectRoot.path,
       devecoSDKPath: workspace?.devecoSDKRoot.path,
       harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel?.status)
+      harnessModel: harnessModel?.status,
+      arkTraceDescriptor: arkTraceDescriptor?.status)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     try encoder.encode(receipt).write(to: paths.receipt, options: .atomic)
@@ -391,6 +430,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     var devecoSDKPath: String?
     var harnessSensitiveEvidence: [String] = []
     var harnessModel: LaunchAgentHarnessModelStatus?
+    var arkTraceDescriptor: LaunchAgentArkTraceDescriptorStatus?
 
     if installed {
       do {
@@ -401,6 +441,7 @@ public final class LaunchAgentService: @unchecked Sendable {
         devecoSDKPath = configuration.workspace?.devecoSDKRoot.path
         harnessSensitiveEvidence = configuration.harnessSensitiveEvidence
         harnessModel = configuration.harnessModel?.status
+        arkTraceDescriptor = configuration.arkTraceDescriptor?.status
         do {
           let validatedBundle = try daemonBundleValidator(paths.installedDaemonBundle)
           if validatedBundle.path != paths.installedDaemonBundle.path {
@@ -459,6 +500,9 @@ public final class LaunchAgentService: @unchecked Sendable {
         if receipt.harnessModel != harnessModel {
           diagnostics.append("Harness local model configuration drifted since installation")
         }
+        if receipt.arkTraceDescriptor != arkTraceDescriptor {
+          diagnostics.append("ArkTrace distribution descriptor drifted since installation")
+        }
       } catch {
         diagnostics.append("install receipt is unavailable or invalid: \(error)")
       }
@@ -481,11 +525,28 @@ public final class LaunchAgentService: @unchecked Sendable {
       workspaceProjectPath: workspaceProjectPath, devecoSDKPath: devecoSDKPath,
       harnessSensitiveEvidence: harnessSensitiveEvidence,
       harnessModel: harnessModel,
+      arkTraceDescriptor: arkTraceDescriptor,
       socketPath: paths.socket.path, socketPresent: socketPresent,
       standardOutputPath: paths.standardOutput.path,
       standardErrorPath: paths.standardError.path,
       diagnostics: diagnostics,
       ready: installed && loaded && socketPresent && diagnostics.isEmpty)
+  }
+
+  /// Returns the descriptor selected by the last successful installation,
+  /// but only while the live plist and descriptor bytes still match that
+  /// installation receipt. An ordinary daemon update must not silently turn
+  /// a drifted descriptor into the new trusted baseline.
+  public func arkTraceDescriptorForPreservingUpdate() throws -> URL? {
+    let configuration = try configuredPaths()
+    let receiptData = try Data(contentsOf: paths.receipt)
+    let receipt = try JSONDecoder().decode(
+      LaunchAgentInstallReceipt.self, from: receiptData)
+    guard receipt.arkTraceDescriptor == configuration.arkTraceDescriptor?.status else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor drifted since installation; pass --arktrace-descriptor explicitly to select reviewed bytes")
+    }
+    return configuration.arkTraceDescriptor?.url
   }
 
   private struct ConfiguredPaths {
@@ -494,11 +555,23 @@ public final class LaunchAgentService: @unchecked Sendable {
     let workspace: LaunchAgentWorkspaceConfiguration?
     let harnessSensitiveEvidence: [String]
     let harnessModel: ValidatedHarnessModel?
+    let arkTraceDescriptor: ValidatedArkTraceDescriptor?
   }
 
   private struct ValidatedHarnessModel {
     let configuration: LaunchAgentHarnessModelConfiguration
     let status: LaunchAgentHarnessModelStatus
+  }
+
+  private struct ValidatedArkTraceDescriptor {
+    let url: URL
+    let status: LaunchAgentArkTraceDescriptorStatus
+  }
+
+  private struct ArkTraceDescriptorDocument: Decodable {
+    let distributionRoot: String
+    let formatVersion: Int
+    let manifestSHA256: String
   }
 
   private func configuredPaths() throws -> ConfiguredPaths {
@@ -552,16 +625,20 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     let harnessModel = try configuredHarnessModel(
       environment: environment, workspace: workspace)
+    let arkTraceDescriptor = try environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey]
+      .map { try validatedArkTraceDescriptor(URL(filePath: $0)) }
     return ConfiguredPaths(
       daemon: daemon, hdc: hdc, workspace: workspace,
       harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel)
+      harnessModel: harnessModel,
+      arkTraceDescriptor: arkTraceDescriptor)
   }
 
   private func renderTemplate(
     daemonPath: String, hdcPath: String, stdoutPath: String, stderrPath: String,
     workspace: LaunchAgentWorkspaceConfiguration?, harnessSensitiveEvidence: [String],
-    harnessModel: ValidatedHarnessModel?
+    harnessModel: ValidatedHarnessModel?,
+    arkTraceDescriptor: ValidatedArkTraceDescriptor?
   ) throws -> Data {
     guard
       let template = Self.bundledTemplateURL()
@@ -609,6 +686,10 @@ public final class LaunchAgentService: @unchecked Sendable {
         String(harnessModel.configuration.cliTimeoutSeconds)
       environment[ArkDeckLaunchAgent.harnessEgressProjectsEnvironmentKey] =
         ArkDeckLaunchAgent.waterFlowProjectRef
+    }
+    if let arkTraceDescriptor {
+      environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey] =
+        arkTraceDescriptor.url.path
     }
     document["ProgramArguments"] = arguments
     document["EnvironmentVariables"] = environment
@@ -673,6 +754,154 @@ public final class LaunchAgentService: @unchecked Sendable {
         "\(name) is missing, is not a regular file, or is not executable: \(canonical.path)")
     }
     return canonical
+  }
+
+  /// Pins the small owner-selected profile descriptor that the daemon will
+  /// revalidate against the full signed ArkTrace distribution. This boundary
+  /// deliberately validates the descriptor through one `openat(O_NOFOLLOW)`
+  /// component walk; resolving a path first and opening it later would allow
+  /// an exchanged ancestor to select different bytes.
+  private func validatedArkTraceDescriptor(
+    _ candidate: URL
+  ) throws -> ValidatedArkTraceDescriptor {
+    let maximumByteCount = 16 * 1_024
+    guard candidate.isFileURL, candidate.path.hasPrefix("/") else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor path must be absolute")
+    }
+    let physicalPath = Self.physicalAbsolutePath(candidate.path)
+    let components = physicalPath.split(
+      separator: "/", omittingEmptySubsequences: true).map(String.init)
+    guard !components.isEmpty,
+      components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor path is invalid")
+    }
+
+    var directory = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard directory >= 0 else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor root is unavailable")
+    }
+    var descriptor: Int32 = -1
+    defer {
+      if descriptor >= 0 { Darwin.close(descriptor) }
+      if directory >= 0 { Darwin.close(directory) }
+    }
+    for component in components.dropLast() {
+      let next = component.withCString {
+        Darwin.openat(
+          directory, $0,
+          O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+      }
+      guard next >= 0 else {
+        throw LaunchAgentServiceError.configuration(
+          "ArkTrace distribution descriptor has an unavailable or symbolic ancestor")
+      }
+      var metadata = stat()
+      guard fstat(next, &metadata) == 0,
+        metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+        (metadata.st_uid == uid || metadata.st_uid == 0),
+        metadata.st_mode & 0o022 == 0
+      else {
+        Darwin.close(next)
+        throw LaunchAgentServiceError.configuration(
+          "ArkTrace distribution descriptor ancestors must be owner-controlled")
+      }
+      Darwin.close(directory)
+      directory = next
+    }
+    descriptor = components.last!.withCString {
+      Darwin.openat(
+        directory, $0, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+    }
+    guard descriptor >= 0 else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor must be a physical regular file")
+    }
+    var initial = stat()
+    guard fstat(descriptor, &initial) == 0,
+      initial.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+      (initial.st_uid == uid || initial.st_uid == 0),
+      initial.st_mode & 0o022 == 0,
+      initial.st_size > 0,
+      initial.st_size <= maximumByteCount
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor must be bounded and owner-controlled")
+    }
+
+    let byteCount = Int(initial.st_size)
+    var bytes = Data(count: byteCount)
+    var offset = 0
+    while offset < byteCount {
+      let count = bytes.withUnsafeMutableBytes { buffer in
+        pread(
+          descriptor, buffer.baseAddress!.advanced(by: offset),
+          byteCount - offset, off_t(offset))
+      }
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw LaunchAgentServiceError.configuration(
+          "ArkTrace distribution descriptor could not be read completely")
+      }
+      offset += count
+    }
+    var extra: UInt8 = 0
+    guard pread(descriptor, &extra, 1, off_t(byteCount)) == 0 else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor changed while it was read")
+    }
+    var final = stat()
+    guard fstat(descriptor, &final) == 0,
+      final.st_dev == initial.st_dev,
+      final.st_ino == initial.st_ino,
+      final.st_uid == initial.st_uid,
+      final.st_mode == initial.st_mode,
+      final.st_size == initial.st_size,
+      final.st_mtimespec.tv_sec == initial.st_mtimespec.tv_sec,
+      final.st_mtimespec.tv_nsec == initial.st_mtimespec.tv_nsec,
+      final.st_ctimespec.tv_sec == initial.st_ctimespec.tv_sec,
+      final.st_ctimespec.tv_nsec == initial.st_ctimespec.tv_nsec
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor identity changed while it was read")
+    }
+
+    do {
+      var duplicateValidator = StrictJSONDuplicateValidator(data: bytes)
+      try duplicateValidator.validate()
+    } catch {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor schema is invalid")
+    }
+    guard
+      let document = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+      Set(document.keys) == Set(["distributionRoot", "formatVersion", "manifestSHA256"]),
+      let typed = try? JSONDecoder().decode(ArkTraceDescriptorDocument.self, from: bytes),
+      typed.distributionRoot.hasPrefix("/"), typed.distributionRoot.utf8.count <= 4_096,
+      typed.formatVersion == 1,
+      typed.manifestSHA256.range(
+        of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
+    else {
+      throw LaunchAgentServiceError.configuration(
+        "ArkTrace distribution descriptor schema is invalid")
+    }
+    let sha256 = SHA256.hash(data: bytes)
+      .map { String(format: "%02x", $0) }.joined()
+    let status = LaunchAgentArkTraceDescriptorStatus(
+      descriptorPath: physicalPath, descriptorSHA256: sha256,
+      descriptorByteCount: byteCount)
+    return ValidatedArkTraceDescriptor(
+      url: URL(filePath: physicalPath), status: status)
+  }
+
+  private static func physicalAbsolutePath(_ path: String) -> String {
+    if path == "/var" || path.hasPrefix("/var/") { return "/private" + path }
+    if path == "/tmp" || path.hasPrefix("/tmp/") { return "/private" + path }
+    if path == "/etc" || path.hasPrefix("/etc/") { return "/private" + path }
+    return path
   }
 
   private static func validateProductionDaemonBundle(

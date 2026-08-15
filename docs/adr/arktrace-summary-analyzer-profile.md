@@ -19,9 +19,18 @@ descriptor, an executable, arguments, or a search path.
    }
    ```
 
-3. Start `arkdeck-agentd` with `ARKDECK_ARKTRACE_DESCRIPTOR` set to the descriptor's absolute
-   physical path. The descriptor and every distribution component must be regular, non-symlinked
-   bytes under the selected root.
+3. Select the descriptor through the production LaunchAgent boundary:
+
+   ```text
+   arkdeck agentd update --arktrace-descriptor /absolute/path/to/distribution-descriptor.json
+   ```
+
+   The installer writes `ARKDECK_ARKTRACE_DESCRIPTOR` only after an owner-controlled,
+   descriptor-bound `openat(O_NOFOLLOW)` walk and records the exact descriptor hash and byte count.
+   An update preserves the selection only while its live bytes still match the prior install
+   receipt; drift requires an explicit reviewed selection. `--arktrace-descriptor none` removes it.
+   The descriptor and every distribution component must remain regular, non-symlinked bytes under
+   the selected root.
 
 At daemon start, ArkDeck validates the descriptor and closed manifest contract, remeasures the
 tool and bundled parser identities, and runs the identity-bound, bounded
@@ -42,10 +51,11 @@ Availability failures are stable machine reasons: `analyzer.arktraceNotFound`,
 not admit a Job or consume Runtime capability.
 
 For an upgrade, install and verify a new versioned directory, write a new exact descriptor, then
-restart the daemon with that descriptor. For rollback, select a retained prior descriptor and
-restart; ArkDeck revalidates the retained bytes and materializes/reuses the matching private tree
-generation rather than trusting prior availability. Never repair or replace either the selected
-external install or a daemon-private generation in place.
+run `arkdeck agentd update --arktrace-descriptor <new-descriptor>`. For rollback, select a retained
+prior descriptor through the same update command; ArkDeck revalidates the retained bytes and
+materializes/reuses the matching private tree generation rather than trusting prior availability.
+Never repair or replace either the selected external install or a daemon-private generation in
+place.
 
 Both invocations remain host-only and binding-free. ArkDeck owns each complete argument array and
 appends the resolved immutable Artifact path as one argument token. Summary keeps its original
