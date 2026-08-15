@@ -8,6 +8,7 @@ import ArkDeckCore
 import ArkDeckHarness
 import ArkDeckWorkflows
 import CryptoKit
+import Darwin
 import Foundation
 
 public enum EvolutionWorkspaceError: Error, Equatable, Sendable {
@@ -21,9 +22,20 @@ public enum EvolutionWorkspaceError: Error, Equatable, Sendable {
   case workspaceAlreadyDestroyed(String)
 }
 
-package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @unchecked Sendable {
+package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort,
+  WorkspaceIsolationManaging, @unchecked Sendable
+{
   private struct Manifest: Codable, Equatable {
     let workspace: HarnessEvolutionWorkspace
+    /// Present on manifests written by the current implementation. Keeping it
+    /// optional preserves exact decoding of older Harness workspaces, whose
+    /// task record still supplies the policy during adoption.
+    let allowedPaths: [String]?
+
+    init(workspace: HarnessEvolutionWorkspace, allowedPaths: [String]? = nil) {
+      self.workspace = workspace
+      self.allowedPaths = allowedPaths?.sorted()
+    }
   }
 
   private struct AttemptManifest: Codable, Equatable {
@@ -134,12 +146,36 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
     policy: HarnessEvolutionPolicy,
     createdAtUTC: String
   ) async throws -> HarnessEvolutionWorkspace {
+    try await prepareWorkspaceBound(
+      htaskID: htaskID,
+      sourceProjectRef: sourceProjectRef,
+      policy: policy,
+      expectedSourceRevision: nil,
+      createdAtUTC: createdAtUTC)
+  }
+
+  private func prepareWorkspaceBound(
+    htaskID: String,
+    sourceProjectRef: String,
+    policy: HarnessEvolutionPolicy,
+    expectedSourceRevision: String?,
+    createdAtUTC: String
+  ) async throws -> HarnessEvolutionWorkspace {
     try lock.withLock {
       guard WorkspaceProviderSupport.isIdentifier(htaskID) else {
         throw EvolutionWorkspaceError.malformedTaskID
       }
       guard let source = profiles.profile(for: sourceProjectRef), source.kind == .primary else {
         throw EvolutionWorkspaceError.sourceProfileUnavailable(sourceProjectRef)
+      }
+      if let expectedSourceRevision {
+        let actualSourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+          root: source.projectRoot, profileVersion: source.profileID,
+          globs: source.allowedFileGlobs)
+        guard actualSourceRevision == expectedSourceRevision else {
+          throw EvolutionWorkspaceError.baseRevisionMismatch(
+            expected: expectedSourceRevision, actual: actualSourceRevision)
+        }
       }
       for scope in policy.allowedPaths
       where !Self.isNarrower(scope, thanAny: source.allowedFileGlobs) {
@@ -170,7 +206,9 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
       if FileManager.default.fileExists(atPath: manifestURL.path) {
         let stored = try JSONDecoder().decode(
           Manifest.self, from: Data(contentsOf: manifestURL))
-        guard stored.workspace == workspace else {
+        guard stored.workspace == workspace,
+          stored.allowedPaths == nil || stored.allowedPaths == policy.allowedPaths.sorted()
+        else {
           throw EvolutionWorkspaceError.workspaceManifestConflict
         }
         guard FileManager.default.fileExists(atPath: workspaceRoot.path) else {
@@ -206,11 +244,22 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
           throw EvolutionWorkspaceError.baseRevisionMismatch(
             expected: policy.baseRevision, actual: copiedRevision)
         }
+        if let expectedSourceRevision {
+          let copiedSourceRevision = try WorkspaceProviderSupport.workspaceRevision(
+            root: workspaceRoot.path, profileVersion: source.profileID,
+            globs: source.allowedFileGlobs)
+          guard copiedSourceRevision == expectedSourceRevision else {
+            throw EvolutionWorkspaceError.baseRevisionMismatch(
+              expected: expectedSourceRevision, actual: copiedSourceRevision)
+          }
+        }
         let profile = try Self.derivedProfile(
           from: source, workspaceRoot: workspaceRoot,
           projectRef: projectRef, allowedPaths: policy.allowedPaths)
         try profiles.register(profile)
-        try Self.write(Manifest(workspace: workspace), to: manifestURL)
+        try Self.write(
+          Manifest(workspace: workspace, allowedPaths: policy.allowedPaths),
+          to: manifestURL)
         try FileManager.default.createDirectory(
           at: taskRoot.appending(path: "attempts", directoryHint: .isDirectory),
           withIntermediateDirectories: false,
@@ -222,6 +271,158 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
         }
         throw error
       }
+    }
+  }
+
+  package func prepare(_ intent: WorkspaceIsolationIntent) async throws
+    -> WorkspaceIsolationResult
+  {
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: intent.isolatedWorkspaceRevision,
+      allowedPaths: intent.allowedFileGlobs,
+      maxAttempts: 1,
+      maxChangedFiles: min(intent.allowedFileGlobs.count, 64),
+      maxDiffLines: 100_000,
+      allowedOperations: [
+        "workspace.apply-patch@1",
+        "workspace.build-openharmony@1",
+        "workspace.run-tests@1",
+        "workspace.revert-patch@1",
+      ])
+    let workspace = try await prepareWorkspaceBound(
+      htaskID: intent.runtimeOwnerID,
+      sourceProjectRef: intent.sourceProjectRef,
+      policy: policy,
+      expectedSourceRevision: intent.expectedWorkspaceRevision,
+      createdAtUTC: intent.createdAtUTC)
+    guard workspace.workspaceID == intent.workspaceID,
+      workspace.projectRef == intent.workspaceProjectRef,
+      workspace.allowedPathsDigest == intent.allowedFileScopesDigest
+    else {
+      throw EvolutionWorkspaceError.workspaceManifestConflict
+    }
+    guard case .prepared(let result) = try inspect(intent) else {
+      throw EvolutionWorkspaceError.workspaceManifestConflict
+    }
+    return result
+  }
+
+  package func inspect(
+    _ intent: WorkspaceIsolationIntent
+  ) throws -> WorkspaceIsolationInspection {
+    lock.withLock {
+      let taskRoot = rootURL.appending(
+        path: intent.workspaceID, directoryHint: .isDirectory)
+      let manifestURL = taskRoot.appending(path: "workspace.json")
+      let workspaceRoot = taskRoot.appending(
+        path: "workspace", directoryHint: .isDirectory)
+      let anyMaterial = FileManager.default.fileExists(atPath: taskRoot.path)
+      guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+        return anyMaterial ? .conflicted("workspace isolation manifest is absent") : .absent
+      }
+      let stored: Manifest
+      do {
+        stored = try JSONDecoder().decode(
+          Manifest.self, from: Data(contentsOf: manifestURL))
+      } catch {
+        return .conflicted("workspace isolation manifest is unreadable")
+      }
+      guard stored.workspace.workspaceID == intent.workspaceID,
+        stored.workspace.htaskID == intent.runtimeOwnerID,
+        stored.workspace.sourceProjectRef == intent.sourceProjectRef,
+        stored.workspace.projectRef == intent.workspaceProjectRef,
+        stored.workspace.baseRevision == intent.isolatedWorkspaceRevision,
+        stored.workspace.allowedPathsDigest == intent.allowedFileScopesDigest,
+        stored.allowedPaths == intent.allowedFileGlobs.sorted(),
+        FileManager.default.fileExists(atPath: workspaceRoot.path),
+        let source = profiles.profile(for: intent.sourceProjectRef),
+        source.kind == .primary
+      else {
+        return .conflicted("workspace isolation identity disagrees with its typed action")
+      }
+      let revision: String
+      do {
+        revision = try WorkspaceProviderSupport.workspaceRevision(
+          root: workspaceRoot.path, profileVersion: source.profileID,
+          globs: intent.allowedFileGlobs)
+        guard revision == intent.isolatedWorkspaceRevision else {
+          return .conflicted("workspace isolation copied revision drifted")
+        }
+        let profile = try Self.derivedProfile(
+          from: source, workspaceRoot: workspaceRoot,
+          projectRef: intent.workspaceProjectRef,
+          allowedPaths: intent.allowedFileGlobs)
+        try profiles.register(profile)
+      } catch {
+        return .conflicted("workspace isolation cannot be revalidated")
+      }
+      return .prepared(
+        WorkspaceIsolationResult(
+          workspaceID: intent.workspaceID,
+          projectRef: intent.workspaceProjectRef,
+          sourceProjectRef: intent.sourceProjectRef,
+          sourceWorkspaceRevision: intent.expectedWorkspaceRevision,
+          workspaceRevision: revision,
+          allowedFileScopesDigest: intent.allowedFileScopesDigest))
+    }
+  }
+
+  /// Daemon startup adoption for Runtime-owned copies. Harness-owned copies
+  /// are restored from task records by HarnessTaskCoordinator; these copies
+  /// have no Harness task, so their complete narrowing policy lives in the
+  /// versioned manifest instead.
+  package func adoptRuntimeWorkspaces() -> [String] {
+    lock.withLock {
+      let entries =
+        (try? FileManager.default.contentsOfDirectory(
+          at: rootURL, includingPropertiesForKeys: [.isDirectoryKey], options: []))
+        ?? []
+      guard entries.count <= 4_096 else {
+        return ["runtime workspace entry bound exceeded"]
+      }
+      var failures: [String] = []
+      for enumerated in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+        // FileManager may canonicalize `/var` to `/private/var` (and `/tmp`
+        // likewise) while enumerating. Workspace revisions are intentionally
+        // relative to the configured namespace, so re-anchor the trusted leaf
+        // name below the same root URL used during creation.
+        let entry = rootURL.appending(
+          path: enumerated.lastPathComponent, directoryHint: .isDirectory)
+        let manifestURL = entry.appending(path: "workspace.json")
+        guard let data = try? Data(contentsOf: manifestURL),
+          let stored = try? JSONDecoder().decode(Manifest.self, from: data),
+          stored.workspace.htaskID.hasPrefix("runtime-")
+        else { continue }
+        guard let allowedPaths = stored.allowedPaths,
+          let source = profiles.profile(for: stored.workspace.sourceProjectRef),
+          source.kind == .primary
+        else {
+          failures.append("\(stored.workspace.workspaceID):metadata")
+          continue
+        }
+        let workspaceRoot = entry.appending(path: "workspace", directoryHint: .isDirectory)
+        do {
+          let revision = try WorkspaceProviderSupport.workspaceRevision(
+            root: workspaceRoot.path, profileVersion: source.profileID,
+            globs: allowedPaths)
+          guard revision == stored.workspace.baseRevision else {
+            failures.append("\(stored.workspace.workspaceID):revision")
+            continue
+          }
+          guard Self.allowedPathsDigest(allowedPaths) == stored.workspace.allowedPathsDigest else {
+            failures.append("\(stored.workspace.workspaceID):scopes")
+            continue
+          }
+          try profiles.register(
+            Self.derivedProfile(
+              from: source, workspaceRoot: workspaceRoot,
+              projectRef: stored.workspace.projectRef,
+              allowedPaths: allowedPaths))
+        } catch {
+          failures.append("\(stored.workspace.workspaceID):profile")
+        }
+      }
+      return failures
     }
   }
 
@@ -511,23 +712,45 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
   }
 
   private static func copyIsolatedTree(from source: URL, to destination: URL) throws {
+    let maximumEntries = 100_000
+    let maximumFileBytes: Int64 = 512 * 1_024 * 1_024
+    let maximumTreeBytes: Int64 = 4 * 1_024 * 1_024 * 1_024
+    let maximumRelativePathBytes = 4_096
     let sourcePath = source.resolvingSymlinksInPath().standardizedFileURL.path
     let canonicalSource = URL(filePath: sourcePath, directoryHint: .isDirectory)
-    let destinationPath = destination.standardizedFileURL.path
+    let destinationParent = destination.deletingLastPathComponent()
+      .resolvingSymlinksInPath().standardizedFileURL
+    let canonicalDestination = destinationParent.appending(
+      path: destination.lastPathComponent, directoryHint: .isDirectory)
+    let destinationPath = canonicalDestination.path
     guard destinationPath != sourcePath, !destinationPath.hasPrefix(sourcePath + "/") else {
       throw EvolutionWorkspaceError.unsafeSourceEntry("destinationInsideSource")
     }
     try FileManager.default.createDirectory(
-      at: destination, withIntermediateDirectories: false,
+      at: canonicalDestination, withIntermediateDirectories: false,
       attributes: [.posixPermissions: 0o700])
+    var enumerationFailed = false
     guard
       let enumerator = FileManager.default.enumerator(
         at: canonicalSource,
-        includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-        options: [], errorHandler: { _, _ in false })
+        includingPropertiesForKeys: [
+          .fileSizeKey, .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey,
+        ],
+        options: [],
+        errorHandler: { _, _ in
+          enumerationFailed = true
+          return false
+        })
     else { throw EvolutionWorkspaceError.unsafeSourceEntry("enumerationUnavailable") }
     var enumeratedRootPath: String?
+    var entryCount = 0
+    var totalBytes: Int64 = 0
     for case let entry as URL in enumerator {
+      try Task.checkCancellation()
+      entryCount += 1
+      guard entryCount <= maximumEntries else {
+        throw EvolutionWorkspaceError.unsafeSourceEntry("entryCountExceeded")
+      }
       if enumeratedRootPath == nil {
         enumeratedRootPath = entry.deletingLastPathComponent().path
       }
@@ -535,11 +758,16 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
         entry.path.hasPrefix(enumeratedRootPath + "/")
       else { throw EvolutionWorkspaceError.unsafeSourceEntry("enumerationEscapedRoot") }
       let relative = String(entry.path.dropFirst(enumeratedRootPath.count + 1))
+      guard !relative.isEmpty, relative.utf8.count <= maximumRelativePathBytes else {
+        throw EvolutionWorkspaceError.unsafeSourceEntry("relativePathExceeded")
+      }
       if relative == ".build" || relative.hasPrefix(".build/") {
         if relative == ".build" { enumerator.skipDescendants() }
         continue
       }
-      let values = try entry.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+      let values = try entry.resourceValues(forKeys: [
+        .fileSizeKey, .isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey,
+      ])
       // A Git worktree's `.git` is a pointer file into another checkout.
       // Copying it would make the isolated tree address primary metadata.
       // A self-contained `.git` directory is copied by value and remains
@@ -547,26 +775,107 @@ package final class EvolutionWorkspaceManager: HarnessEvolutionWorkspacePort, @u
       if relative == ".git", values.isDirectory != true { continue }
       if values.isSymbolicLink == true {
         let target = try FileManager.default.destinationOfSymbolicLink(atPath: entry.path)
-        let resolvedTarget: URL
-        if target.hasPrefix("/") {
-          resolvedTarget = URL(filePath: target)
-        } else {
-          resolvedTarget = entry.deletingLastPathComponent().appending(path: target)
+        guard !target.hasPrefix("/") else {
+          throw EvolutionWorkspaceError.unsafeSourceEntry(relative)
         }
+        let resolvedTarget = entry.deletingLastPathComponent().appending(path: target)
         let resolvedPath = resolvedTarget.resolvingSymlinksInPath().standardizedFileURL.path
         guard resolvedPath == sourcePath || resolvedPath.hasPrefix(sourcePath + "/") else {
           throw EvolutionWorkspaceError.unsafeSourceEntry(relative)
         }
       }
-      let output = destination.appending(path: relative)
+      let output = canonicalDestination.appending(path: relative)
       if values.isDirectory == true, values.isSymbolicLink != true {
         try FileManager.default.createDirectory(
           at: output, withIntermediateDirectories: false,
           attributes: [.posixPermissions: 0o700])
+      } else if values.isSymbolicLink == true {
+        let target = try FileManager.default.destinationOfSymbolicLink(atPath: entry.path)
+        try FileManager.default.createSymbolicLink(
+          atPath: output.path, withDestinationPath: target)
+      } else if values.isRegularFile == true {
+        let copiedBytes = try copyBoundedRegularFile(
+          from: entry, to: output, maximumBytes: maximumFileBytes)
+        let (nextTotal, overflow) = totalBytes.addingReportingOverflow(copiedBytes)
+        guard !overflow, nextTotal <= maximumTreeBytes else {
+          throw EvolutionWorkspaceError.unsafeSourceEntry("treeBytesExceeded")
+        }
+        totalBytes = nextTotal
       } else {
-        try FileManager.default.copyItem(at: entry, to: output)
+        throw EvolutionWorkspaceError.unsafeSourceEntry(relative)
       }
     }
+    guard !enumerationFailed else {
+      throw EvolutionWorkspaceError.unsafeSourceEntry("enumerationFailed")
+    }
+  }
+
+  private static func copyBoundedRegularFile(
+    from source: URL, to destination: URL, maximumBytes: Int64
+  ) throws -> Int64 {
+    let sourceDescriptor = Darwin.open(
+      source.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+    guard sourceDescriptor >= 0 else {
+      throw EvolutionWorkspaceError.unsafeSourceEntry(source.lastPathComponent)
+    }
+    defer { Darwin.close(sourceDescriptor) }
+    var initial = stat()
+    guard Darwin.fstat(sourceDescriptor, &initial) == 0,
+      (initial.st_mode & S_IFMT) == S_IFREG,
+      initial.st_size >= 0, initial.st_size <= maximumBytes
+    else {
+      throw EvolutionWorkspaceError.unsafeSourceEntry(source.lastPathComponent)
+    }
+
+    let mode = mode_t(initial.st_mode & 0o777)
+    let destinationDescriptor = Darwin.open(
+      destination.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, mode)
+    guard destinationDescriptor >= 0 else {
+      throw EvolutionWorkspaceError.unsafeSourceEntry(destination.lastPathComponent)
+    }
+    defer { Darwin.close(destinationDescriptor) }
+
+    var remaining = initial.st_size
+    var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+    while remaining > 0 {
+      try Task.checkCancellation()
+      let requested = min(buffer.count, Int(remaining))
+      let readCount = buffer.withUnsafeMutableBytes {
+        Darwin.read(sourceDescriptor, $0.baseAddress, requested)
+      }
+      guard readCount > 0 else {
+        throw EvolutionWorkspaceError.unsafeSourceEntry(source.lastPathComponent)
+      }
+      var written = 0
+      while written < readCount {
+        let writeCount = buffer.withUnsafeBytes {
+          Darwin.write(
+            destinationDescriptor, $0.baseAddress?.advanced(by: written), readCount - written)
+        }
+        guard writeCount > 0 else {
+          throw EvolutionWorkspaceError.unsafeSourceEntry(destination.lastPathComponent)
+        }
+        written += writeCount
+      }
+      remaining -= Int64(readCount)
+    }
+    var extra: UInt8 = 0
+    guard Darwin.read(sourceDescriptor, &extra, 1) == 0 else {
+      throw EvolutionWorkspaceError.unsafeSourceEntry(source.lastPathComponent)
+    }
+    var final = stat()
+    guard Darwin.fstat(sourceDescriptor, &final) == 0,
+      final.st_dev == initial.st_dev, final.st_ino == initial.st_ino,
+      final.st_mode == initial.st_mode, final.st_size == initial.st_size,
+      final.st_mtimespec.tv_sec == initial.st_mtimespec.tv_sec,
+      final.st_mtimespec.tv_nsec == initial.st_mtimespec.tv_nsec,
+      final.st_ctimespec.tv_sec == initial.st_ctimespec.tv_sec,
+      final.st_ctimespec.tv_nsec == initial.st_ctimespec.tv_nsec,
+      Darwin.fchmod(destinationDescriptor, mode) == 0
+    else {
+      throw EvolutionWorkspaceError.unsafeSourceEntry(source.lastPathComponent)
+    }
+    return initial.st_size
   }
 
   private static func isNarrower(_ requested: String, thanAny permitted: [String]) -> Bool {

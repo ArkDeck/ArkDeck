@@ -61,6 +61,7 @@ class RealCatalogTests(unittest.TestCase):
                 "workspace.inspect-diff@1",
                 "workspace.inspect-git-status@1",
                 "workspace.inspect-source@1",
+                "workspace.prepare-isolated-copy@1",
                 "workspace.read-source-range@1",
                 "workspace.revert-patch@1",
                 "workspace.run-tests@1",

@@ -146,6 +146,10 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   /// Host-only: read declared workspace source. No device, no shell; the
   /// provider joins the scope glob to the project root it resolved itself.
   case inspectWorkspaceSource
+  /// Host-only: copy one exact ProjectProfile revision into a Runtime-owned
+  /// private namespace. The returned projectRef is opaque; no host path is
+  /// admitted from or disclosed to the caller.
+  case prepareWorkspaceIsolation
   case applyWorkspacePatch
   case buildWorkspaceOpenHarmony
   /// Host-only local signing of one Runtime-owned HAP Artifact. Tool and
@@ -349,6 +353,13 @@ package enum WorkflowStepRegistry {
       ])
     case .inspectWorkspaceSource:
       host(required: ["projectRef", "symbol", "fileScope", "artifactId"])
+    case .prepareWorkspaceIsolation:
+      metadata(
+        .hostOnly, .atSafeBoundary, .none,
+        required: [
+          "sourceProjectRef", "expectedWorkspaceRevision", "allowedFileScopesDigest",
+          "workspaceRevision", "workspaceProjectRef", "artifactId",
+        ])
     case .inspectWorkspaceGitStatus:
       host(required: ["projectRef", "artifactId"])
     case .inspectWorkspaceDiff:
@@ -960,6 +971,13 @@ private enum WorkflowStepValidator {
       // A glob, not a path: the provider joins it to the project root it
       // resolved itself, so a caller cannot address the filesystem.
       _ = try reader.string("fileScope", minimumLength: 1, maximumLength: 120)
+      try reader.identifier("artifactId")
+    case .prepareWorkspaceIsolation:
+      try reader.identifier("sourceProjectRef")
+      try reader.sha256("expectedWorkspaceRevision")
+      try reader.sha256("workspaceRevision")
+      try reader.sha256("allowedFileScopesDigest")
+      try reader.identifier("workspaceProjectRef")
       try reader.identifier("artifactId")
     case .applyWorkspacePatch:
       try reader.identifier("projectRef")

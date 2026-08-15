@@ -56,6 +56,7 @@ steps:
   - { kind: unlockDevice, minimum_effect: destructive, cancellation: criticalNonInterruptible, binding: confirmedDevice, profile_exposable: true }
   - { kind: finalizeSession, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
   - { kind: inspectWorkspaceSource, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
+  - { kind: prepareWorkspaceIsolation, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
   - { kind: applyWorkspacePatch, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }
   - { kind: buildWorkspaceOpenHarmony, minimum_effect: hostOnly, cancellation: immediate, binding: none, profile_exposable: false }
   - { kind: signWorkspaceOpenHarmonyHap, minimum_effect: hostOnly, cancellation: atSafeBoundary, binding: none, profile_exposable: false }

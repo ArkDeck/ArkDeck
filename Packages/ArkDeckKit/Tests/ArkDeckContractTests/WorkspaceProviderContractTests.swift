@@ -196,7 +196,8 @@ final class WorkspaceProviderContractTests: XCTestCase {
       build.fixedArguments,
       [
         "--package-path",
-        repository.appending(path: "Packages/ArkDeckKit").path,
+        URL(filePath: production.projectRoot, directoryHint: .isDirectory)
+          .appending(path: "Packages/ArkDeckKit").path,
       ])
     let tests = try XCTUnwrap(production.testPresets["arkdeck-tests"])
     XCTAssertEqual(tests.executable, build.executable)

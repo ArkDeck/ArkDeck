@@ -453,10 +453,16 @@ Task.detached {
             path:
               "evolution-workspaces", directoryHint: .isDirectory),
           profileRegistry: profiles)
+        let unadoptedRuntimeWorkspaces = evolution.adoptRuntimeWorkspaces()
+        for workspaceID in unadoptedRuntimeWorkspaces {
+          print("runtime workspace not adopted for \(workspaceID)")
+        }
+        if !unadoptedRuntimeWorkspaces.isEmpty { fflush(stdout) }
         workspaceOperations = WorkspaceOperationsProvider(
           profile: profile, profileRegistry: profiles,
           attemptStore: attempts, signingPresetStore: signingPresetStore,
-          signingAttemptStore: signingAttemptStore, nowUTC: utcNow)
+          signingAttemptStore: signingAttemptStore,
+          isolationManager: evolution, nowUTC: utcNow)
         workspaceOperationResolver = WorkspaceActionExecutableResolver(profile: profile)
         workspaceRepairConfiguration = (profile, profiles, attempts, evolution)
       } catch {
@@ -477,6 +483,10 @@ Task.detached {
       workspaceDispatcher = DescriptorBoundProcessDispatcher(
         resolver: FixedExecutableResolver(
           table: ["workspace": inspectorExecutable]))
+    }
+    if let evolution = workspaceRepairConfiguration?.evolution {
+      workspaceDispatcher = RuntimeOwnedWorkspaceDispatcher(
+        fallback: workspaceDispatcher, manager: evolution)
     }
     workspaceDispatcher = OpenHarmonySigningWorkspaceDispatcher(
       fallback: workspaceDispatcher, presetStore: signingPresetStore)

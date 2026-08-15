@@ -3055,6 +3055,14 @@ public actor RuntimeJobEngine {
       guard let declaration = descriptor.artifacts.first(where: { $0.name == name }) else {
         continue
       }
+      if RuntimeArtifactService.fileBackedArtifacts.contains(name),
+        receipt.landedArtifact == nil, !declaration.isRequired
+      {
+        // Optional ProjectProfile products are absent by contract when that
+        // profile declares no output path. Do not fabricate bytes from stdout
+        // and do not turn the required build log into a failure.
+        continue
+      }
       // A received product is the received bytes or it is nothing. The
       // receipt's stdout for a receive step is hdc's progress line, so
       // falling back to it would publish a transfer banner under the
@@ -5101,6 +5109,19 @@ public actor RuntimeJobEngine {
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostManaged",
               executableSHA256: descriptor.providerExecutableSHA256,
+              argumentZero: nil, workingDirectory: nil,
+              argumentSummary: nil, processInvocations: nil,
+              timeoutSeconds: nil,
+              hostManagedDescriptor:
+                "\(descriptor.identifier)#action-sha256:\(descriptor.actionSHA256)"))
+        case .hostWorkspace(let descriptor):
+          materializedSteps.append(
+            MaterializedPlanStep(
+              stepID: step.stepID, kind: step.kind.rawValue,
+              effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
+              binding: step.binding.rawValue, isOptional: step.isOptional,
+              journalArguments: workflowStep.arguments, processKind: "hostWorkspace",
+              executableSHA256: nil,
               argumentZero: nil, workingDirectory: nil,
               argumentSummary: nil, processInvocations: nil,
               timeoutSeconds: nil,
@@ -7334,6 +7355,19 @@ public actor RuntimeJobEngine {
         "symbol": .string(inspection.symbol),
         "fileScope": .string(inspection.fileScope),
         "artifactId": .string("source-inspection.txt"),
+      ]
+    case .prepareWorkspaceIsolation:
+      guard case .workspace(.prepareIsolatedCopy(let isolation))? = action else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has no exact typed workspace isolation action")
+      }
+      arguments = [
+        "sourceProjectRef": .string(isolation.sourceProjectRef),
+        "expectedWorkspaceRevision": .string(isolation.expectedWorkspaceRevision),
+        "workspaceRevision": .string(isolation.isolatedWorkspaceRevision),
+        "allowedFileScopesDigest": .string(isolation.allowedFileScopesDigest),
+        "workspaceProjectRef": .string(isolation.workspaceProjectRef),
+        "artifactId": .string("isolated-workspace.json"),
       ]
     case .createWorkspaceCheckpoint:
       let projectRef: String

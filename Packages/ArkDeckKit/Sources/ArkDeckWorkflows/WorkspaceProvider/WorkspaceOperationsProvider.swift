@@ -561,7 +561,7 @@ public struct WorkspaceRevertIntent: Sendable, Equatable, Codable {
 extension WorkspaceProviderAction {
   var operationInvocation: WorkspaceResolvedInvocation? {
     switch self {
-    case .inspectSource:
+    case .inspectSource, .prepareIsolatedCopy:
       return nil
     case .signOpenHarmonyHap:
       return nil
@@ -767,6 +767,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
   private let attempts: WorkspacePatchAttemptStore
   private let signingPresets: OpenHarmonySigningPresetStore?
   private let signingAttempts: OpenHarmonySigningAttemptStore?
+  private let isolationManager: (any WorkspaceIsolationManaging)?
   private let nowUTC: @Sendable () -> String
 
   public init(
@@ -774,6 +775,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     attemptStore: WorkspacePatchAttemptStore,
     signingPresetStore: OpenHarmonySigningPresetStore? = nil,
     signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
+    isolationManager: (any WorkspaceIsolationManaging)? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.profile = profile
@@ -781,6 +783,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     self.attempts = attemptStore
     self.signingPresets = signingPresetStore
     self.signingAttempts = signingAttemptStore
+    self.isolationManager = isolationManager
     self.nowUTC = nowUTC
   }
 
@@ -790,6 +793,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     attemptStore: WorkspacePatchAttemptStore,
     signingPresetStore: OpenHarmonySigningPresetStore? = nil,
     signingAttemptStore: OpenHarmonySigningAttemptStore? = nil,
+    isolationManager: (any WorkspaceIsolationManaging)? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.profile = profile
@@ -797,6 +801,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     self.attempts = attemptStore
     self.signingPresets = signingPresetStore
     self.signingAttempts = signingAttemptStore
+    self.isolationManager = isolationManager
     self.nowUTC = nowUTC
   }
 
@@ -808,6 +813,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     }
     let hasPreset: Bool
     switch operation.reference {
+    case "workspace.prepare-isolated-copy@1":
+      hasPreset = isolationManager != nil && profile.kind == .primary
     case "workspace.apply-patch@1", "workspace.revert-patch@1":
       hasPreset = true
     case "workspace.build-openharmony@1":
@@ -871,7 +878,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
-        signingAttemptStore: signingAttempts, nowUTC: nowUTC
+        signingAttemptStore: signingAttempts, isolationManager: isolationManager,
+        nowUTC: nowUTC
       ).workspaceAuthorizationFacts(for: operation, inputs: inputs)
     }
     return WorkspaceAuthorizationFacts(
@@ -909,7 +917,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
-        signingAttemptStore: signingAttempts, nowUTC: nowUTC
+        signingAttemptStore: signingAttempts, isolationManager: isolationManager,
+        nowUTC: nowUTC
       ).action(for: step, operation: operation, inputs: inputs, context: context)
     }
     guard projectRef == profile.projectRef else {
@@ -943,6 +952,36 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       }
     }
     switch (operation.reference, step.kind) {
+    case ("workspace.prepare-isolated-copy@1", .prepareWorkspaceIsolation):
+      guard profile.kind == .primary, isolationManager != nil else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.isolationManagerUnavailable")
+      }
+      let requestGlobs = try stringArray("allowedFileGlobs", in: inputs)
+      guard !requestGlobs.isEmpty,
+        requestGlobs.allSatisfy({ requested in
+          profile.allowedFileGlobs.contains(where: {
+            WorkspaceProviderSupport.isNarrower(requested, than: $0)
+          })
+        })
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace.isolationScopeOutsideProjectProfile")
+      }
+      let revision = try string("expectedWorkspaceRevision", in: inputs)
+      let isolatedRevision = try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: requestGlobs)
+      return .workspace(
+        .prepareIsolatedCopy(
+          WorkspaceIsolationIntent(
+            runtimeOwnerID: "runtime-\(context.jobID)",
+            sourceProjectRef: projectRef,
+            expectedWorkspaceRevision: revision,
+            isolatedWorkspaceRevision: isolatedRevision,
+            createdAtUTC: context.nowUTC,
+            allowedFileGlobs: requestGlobs)))
+
     case ("workspace.apply-patch@1", .applyWorkspacePatch):
       guard let artifact = context.resolvedInputArtifact else {
         throw DeviceProviderError.unsupportedAction(
@@ -1195,6 +1234,21 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> TypedProcessPlan {
+    if case .workspace(.prepareIsolatedCopy(let isolation)) = action {
+      guard isolationManager != nil,
+        isolation.runtimeOwnerID == "runtime-\(context.jobID)"
+      else {
+        throw DeviceProviderError.unsupportedAction(
+          "workspace isolation action is not owned by this Job")
+      }
+      return TypedProcessPlan(
+        action: action,
+        kind: .hostWorkspace(
+          HostWorkspaceProcessDescriptor(
+            identifier: "workspace.prepare-isolated-copy/v1",
+            jobID: context.jobID, stepID: context.stepID,
+            actionSHA256: isolation.actionSHA256)))
+    }
     if case .workspace(.signOpenHarmonyHap(let signing)) = action {
       guard signing.output == signingAttempts?.paths(jobID: context.jobID),
         signing.jobID == context.jobID,
@@ -1223,7 +1277,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
-        signingAttemptStore: signingAttempts, nowUTC: nowUTC
+        signingAttemptStore: signingAttempts, isolationManager: isolationManager,
+        nowUTC: nowUTC
       ).lower(action: action, context: context)
     }
     guard case .workspace(let workspace) = action,
@@ -1252,6 +1307,17 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     default:
       break
     }
+    let hostLanding: HostLandingExpectation?
+    if profile.kind == .evolution,
+      case .buildOpenHarmony(let build) = workspace,
+      let relativeProduct = profile.buildProducts[build.presetID]
+    {
+      hostLanding = HostLandingExpectation(
+        destination: URL(filePath: profile.projectRoot).appending(path: relativeProduct),
+        maximumBytes: 64 * 1_024 * 1_024)
+    } else {
+      hostLanding = nil
+    }
     return TypedProcessPlan(
       action: action,
       kind: .process(
@@ -1259,7 +1325,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         argumentSummary: invocation.arguments,
         timeoutSeconds: invocation.timeoutSeconds),
       argumentZero: invocation.argumentZero,
-      workingDirectory: invocation.projectRoot)
+      workingDirectory: invocation.projectRoot,
+      hostLanding: hostLanding)
   }
 
   package func verify(
@@ -1267,6 +1334,37 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     action: TypedProviderAction,
     context: ProviderExecutionContext
   ) throws -> ProviderSemanticOutcome {
+    if case .workspace(.prepareIsolatedCopy(let isolation)) = action {
+      guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
+        receipt.hostManagedRecordID == isolation.workspaceID,
+        receipt.hostManagedSummary["projectRef"] == isolation.workspaceProjectRef,
+        receipt.hostManagedSummary["workspaceRevision"]
+          == isolation.isolatedWorkspaceRevision,
+        receipt.hostManagedSummary["sourceWorkspaceRevision"]
+          == isolation.expectedWorkspaceRevision
+      else {
+        return .failed(
+          code: "workspace.isolationReceiptInvalid",
+          detail: "isolated workspace receipt is absent or disagrees with the typed action")
+      }
+      guard let isolationManager else {
+        return .failed(
+          code: "workspace.isolationManagerUnavailable",
+          detail: "isolated workspace lifecycle is unavailable")
+      }
+      switch try isolationManager.inspect(isolation) {
+      case .prepared(let prepared) where prepared.summary == receipt.hostManagedSummary:
+        return .verified(summary: prepared.summary)
+      case .absent:
+        return .failed(
+          code: "workspace.isolationReadbackAbsent",
+          detail: "isolated workspace was not durable after preparation")
+      case .prepared, .conflicted:
+        return .failed(
+          code: "workspace.isolationReadbackDrifted",
+          detail: "isolated workspace manifest or copied revision drifted")
+      }
+    }
     if case .workspace(.signOpenHarmonyHap(let signing)) = action {
       guard receipt.exitStatus == 0, !receipt.stdoutTruncated,
         receipt.hostManagedRecordID == signing.output.resultRecord,
@@ -1304,7 +1402,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
-        signingAttemptStore: signingAttempts, nowUTC: nowUTC
+        signingAttemptStore: signingAttempts, isolationManager: isolationManager,
+        nowUTC: nowUTC
       ).verify(receipt: receipt, action: action, context: context)
     }
     guard case .workspace(let workspace) = action else {
@@ -1399,11 +1498,29 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       checkpointSummary["checkpointKind"] = "sealedArchive"
       checkpointSummary["checkpointByteCount"] = String(evidence.byteCount)
       return .verified(summary: checkpointSummary)
-    case .buildOpenHarmony:
+    case .prepareIsolatedCopy:
+      return .failed(
+        code: "workspace.isolationRoutingFailed",
+        detail: "isolated workspace verification did not use its typed route")
+    case .buildOpenHarmony(let invocation):
       guard receipt.exitStatus == 0 else {
         return failed("workspace.buildFailed", receipt)
       }
-      return .verified(summary: outputSummary(receipt))
+      var summary = outputSummary(receipt)
+      if profile.kind == .evolution, profile.buildProducts[invocation.presetID] != nil {
+        guard let landed = receipt.landedArtifact,
+          let sha256 = landed.sha256,
+          landed.byteCount > 0,
+          landed.leadingBytes.starts(with: [0x50, 0x4b, 0x03, 0x04])
+        else {
+          return .failed(
+            code: "workspace.buildProductMissing",
+            detail: "build succeeded without its declared bounded HAP product")
+        }
+        summary["unsignedHapSha256"] = sha256
+        summary["unsignedHapByteCount"] = String(landed.byteCount)
+      }
+      return .verified(summary: summary)
     case .runTests:
       guard receipt.exitStatus == 0 else {
         return failed("workspace.testsFailed", receipt)
@@ -1482,6 +1599,19 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     intent: ProviderDurableIntentReference,
     context: ProviderExecutionContext
   ) async throws -> ProviderReconcileOutcome {
+    if case .workspace(.prepareIsolatedCopy(let isolation)) = intent.action {
+      guard let isolationManager else {
+        return .stillUnknown(reason: "workspace isolation lifecycle is unavailable")
+      }
+      switch try isolationManager.inspect(isolation) {
+      case .absent:
+        return .confirmedNotExecuted
+      case .prepared(let prepared):
+        return .confirmedCompleted(summary: prepared.summary)
+      case .conflicted(let reason):
+        return .stillUnknown(reason: reason)
+      }
+    }
     if case .workspace(.signOpenHarmonyHap(let signing)) = intent.action {
       let hasOutput = FileManager.default.fileExists(atPath: signing.output.signedHAP)
       let hasResult = FileManager.default.fileExists(atPath: signing.output.resultRecord)
@@ -1514,7 +1644,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       return try await WorkspaceOperationsProvider(
         profile: selected, profileRegistry: profileRegistry,
         attemptStore: attempts, signingPresetStore: signingPresets,
-        signingAttemptStore: signingAttempts, nowUTC: nowUTC
+        signingAttemptStore: signingAttempts, isolationManager: isolationManager,
+        nowUTC: nowUTC
       ).reconcile(intent: intent, context: context)
     }
     guard case .workspace(let workspace) = intent.action else {
@@ -1583,7 +1714,7 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       if current == revert.attempt.after { return .confirmedNotExecuted }
       return .stillUnknown(
         reason: "workspace revert files are neither the exact postimage nor original preimage")
-    case .inspectSource:
+    case .inspectSource, .prepareIsolatedCopy:
       return .confirmedNotExecuted
     case .buildOpenHarmony, .runTests, .symbolizeCrash:
       return .stillUnknown(
@@ -1665,6 +1796,20 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
 }
 
 package enum WorkspaceProviderSupport {
+  package static func isNarrower(_ requested: String, than profileScope: String) -> Bool {
+    if requested == profileScope { return true }
+    if profileScope.hasSuffix("/**") {
+      let prefix = String(profileScope.dropLast(3))
+      return requested == prefix || requested.hasPrefix(prefix + "/")
+    }
+    if profileScope.hasSuffix("/*") {
+      let prefix = String(profileScope.dropLast(2))
+      guard requested.hasPrefix(prefix + "/") else { return false }
+      return !requested.dropFirst(prefix.count + 1).contains("/")
+    }
+    return false
+  }
+
   /// The workspace's identity: which tree this is, independent of what it
   /// currently contains (CHG-2026-055, TASK-HFA-009).
   package static func workspaceIdentity(root: String, profileID: String) -> String {

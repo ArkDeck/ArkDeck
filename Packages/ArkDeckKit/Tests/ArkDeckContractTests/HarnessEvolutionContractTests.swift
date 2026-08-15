@@ -523,6 +523,71 @@ final class HarnessEvolutionContractTests: XCTestCase {
     }
   }
 
+  func testEvolutionWorkspaceRejectsAbsoluteSymlinkBackIntoThePrimaryTree() async throws {
+    let source = try temporaryDirectory("absolute-symlink-source")
+    let state = try temporaryDirectory("absolute-symlink-state")
+    try FileManager.default.createDirectory(
+      at: source.appending(path: "Sources/Safe"), withIntermediateDirectories: true)
+    let app = source.appending(path: "Sources/Safe/App.txt")
+    try Data("old\n".utf8).write(to: app)
+    try FileManager.default.createDirectory(
+      at: source.appending(path: "Other"), withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(
+      atPath: source.appending(path: "Other/primary-link").path,
+      withDestinationPath: app.path)
+    let profile = try workspaceProfile(root: source)
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: ["Sources/Safe/**"]),
+      allowedPaths: ["Sources/Safe/**"],
+      allowedOperations: ["workspace.apply-patch@1"])
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: state.appending(path: "evolution"),
+      profileRegistry: WorkspaceProjectProfileRegistry(profile: profile))
+
+    do {
+      _ = try await manager.prepareWorkspace(
+        htaskID: "HTASK-ABSOLUTE-SYMLINK", sourceProjectRef: profile.projectRef,
+        policy: policy, createdAtUTC: timestamp)
+      XCTFail("an absolute symlink must never retain a reference to the primary tree")
+    } catch let error as EvolutionWorkspaceError {
+      XCTAssertEqual(error, .unsafeSourceEntry("Other/primary-link"))
+    }
+  }
+
+  func testEvolutionWorkspaceRefusesAnOversizedSourceFileBeforeCopyingIt() async throws {
+    let source = try temporaryDirectory("oversized-source")
+    let state = try temporaryDirectory("oversized-state")
+    try FileManager.default.createDirectory(
+      at: source.appending(path: "Sources/Safe"), withIntermediateDirectories: true)
+    try Data("old\n".utf8).write(to: source.appending(path: "Sources/Safe/App.txt"))
+    let oversized = source.appending(path: "oversized.bin")
+    XCTAssertTrue(FileManager.default.createFile(atPath: oversized.path, contents: nil))
+    let handle = try FileHandle(forWritingTo: oversized)
+    try handle.truncate(atOffset: UInt64(512 * 1_024 * 1_024 + 1))
+    try handle.close()
+    let profile = try workspaceProfile(root: source)
+    let policy = try HarnessEvolutionPolicy(
+      baseRevision: try WorkspaceProviderSupport.workspaceRevision(
+        root: profile.projectRoot, profileVersion: profile.profileID,
+        globs: ["Sources/Safe/**"]),
+      allowedPaths: ["Sources/Safe/**"],
+      allowedOperations: ["workspace.apply-patch@1"])
+    let manager = try EvolutionWorkspaceManager(
+      rootURL: state.appending(path: "evolution"),
+      profileRegistry: WorkspaceProjectProfileRegistry(profile: profile))
+
+    do {
+      _ = try await manager.prepareWorkspace(
+        htaskID: "HTASK-OVERSIZED", sourceProjectRef: profile.projectRef,
+        policy: policy, createdAtUTC: timestamp)
+      XCTFail("an oversized source file must be rejected before an unbounded copy")
+    } catch let error as EvolutionWorkspaceError {
+      XCTAssertEqual(error, .unsafeSourceEntry("oversized.bin"))
+    }
+  }
+
   func testWorkspacePolicyDirectlyDrivesIsolationWithoutAModeProjection() throws {
     let base = String(repeating: "a", count: 64)
     let deviceOnly = HarnessTaskSubmission(

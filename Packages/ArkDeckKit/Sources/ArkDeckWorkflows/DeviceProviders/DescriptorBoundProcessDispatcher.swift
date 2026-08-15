@@ -167,9 +167,9 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
         throw RuntimeDispatchFailure.failed("provider produced an empty process sequence")
       }
       loweredInvocations = sequence
-    case .hostManaged:
+    case .hostManaged, .hostWorkspace:
       throw RuntimeDispatchFailure.failed(
-        "hostManaged plans execute inside their own host, not this dispatcher")
+        "host-managed plans execute inside their own host, not this dispatcher")
     }
     let verifiedAnalyzerSource = try verifiedAnalyzerSource(
       for: plan.action, loweredInvocations: loweredInvocations)

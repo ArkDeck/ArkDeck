@@ -49,6 +49,7 @@
         "unlockDevice",
         "finalizeSession",
         "inspectWorkspaceSource",
+        "prepareWorkspaceIsolation",
         "applyWorkspacePatch",
         "buildWorkspaceOpenHarmony",
         "signWorkspaceOpenHarmonyHap",
@@ -2408,6 +2409,25 @@
           "if": {
             "properties": {
               "kind": {
+                "const": "prepareWorkspaceIsolation"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/prepareWorkspaceIsolationArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
                 "const": "inspectWorkspaceGitStatus"
               }
             },
@@ -3075,6 +3095,38 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 120
+        },
+        "artifactId": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "prepareWorkspaceIsolationArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceProjectRef",
+        "expectedWorkspaceRevision",
+        "allowedFileScopesDigest",
+        "workspaceRevision",
+        "workspaceProjectRef",
+        "artifactId"
+      ],
+      "properties": {
+        "sourceProjectRef": {
+          "$ref": "#/$defs/id"
+        },
+        "expectedWorkspaceRevision": {
+          "$ref": "#/$defs/sha256"
+        },
+        "allowedFileScopesDigest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "workspaceRevision": {
+          "$ref": "#/$defs/sha256"
+        },
+        "workspaceProjectRef": {
+          "$ref": "#/$defs/id"
         },
         "artifactId": {
           "$ref": "#/$defs/id"
