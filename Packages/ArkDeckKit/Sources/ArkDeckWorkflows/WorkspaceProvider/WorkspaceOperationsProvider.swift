@@ -1836,15 +1836,19 @@ package enum WorkspaceProviderSupport {
     root: String, profileVersion: String, globs: [String]
   ) throws -> String {
     let rootURL = URL(filePath: root, directoryHint: .isDirectory)
+      .resolvingSymlinksInPath().standardizedFileURL
+    let canonicalRoot = rootURL.path
     let gitURL = rootURL.appending(path: ".git", directoryHint: .isDirectory)
     var material = "profileVersion\t\(profileVersion)\n"
     material += "head\t\(headOID(gitDirectory: gitURL) ?? "absent")\n"
     let indexURL = gitURL.appending(path: "index")
     let indexDigest = (try? Data(contentsOf: indexURL)).map(sha256) ?? "absent"
     material += "index\t\(indexDigest)\n"
-    let paths = try files(root: root, profileGlobs: globs, requestGlobs: globs)
+    let paths = try files(
+      root: canonicalRoot, profileGlobs: globs, requestGlobs: globs)
     for path in paths.sorted() {
-      let relative = String(path.dropFirst(root.count).drop(while: { $0 == "/" }))
+      let relative = String(
+        path.dropFirst(canonicalRoot.count).drop(while: { $0 == "/" }))
       let digest = (try? Data(contentsOf: URL(filePath: path))).map(sha256) ?? "absent"
       material += "file\t\(relative)\t\(digest)\n"
     }
