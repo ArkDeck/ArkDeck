@@ -718,7 +718,7 @@ final class DeviceProviderContractTests: XCTestCase {
         invocations = [argv]
       case .processSequence(_, let sequence):
         invocations = sequence.map(\.arguments)
-      case .hostManaged:
+      case .hostManaged, .hostWorkspace:
         return XCTFail("\(action) must lower to a process plan")
       }
       for argv in invocations {

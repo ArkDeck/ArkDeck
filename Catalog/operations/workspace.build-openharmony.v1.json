@@ -40,6 +40,11 @@
       "buildLog": {
         "type": "artifactReference",
         "required": true
+      },
+      "unsignedHap": {
+        "type": "artifactReference",
+        "required": false,
+        "description": "Immutable HAP when the selected ProjectProfile declares a build product."
       }
     }
   },
@@ -67,6 +72,14 @@
       "mediaType": "text/plain",
       "privacy": "standard",
       "required": true
+    },
+    {
+      "name": "unsigned.hap",
+      "role": "derived",
+      "mediaType": "application/vnd.openharmony.hap",
+      "privacy": "standard",
+      "required": false,
+      "retentionClass": "pinnedUntilVerified"
     }
   ],
   "profiles": [

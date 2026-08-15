@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `699db12e52b7a0de60e966fdbbe94ac2931d0475d2fe0054c074419546c7fdb5`
+Catalog digest: `d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9e`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -25,6 +25,7 @@ Catalog digest: `699db12e52b7a0de60e966fdbbe94ac2931d0475d2fe0054c074419546c7fdb
 | `workspace.inspect-diff@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-git-status@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-source@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |
+| `workspace.prepare-isolated-copy@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 900 | 1048576 |
 | `workspace.read-source-range@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.revert-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.run-tests@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |

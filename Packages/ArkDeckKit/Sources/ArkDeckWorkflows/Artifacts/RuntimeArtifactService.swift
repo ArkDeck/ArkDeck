@@ -117,7 +117,7 @@ enum RuntimeArtifactService {
   /// dispatcher measured, and a missing file is a recorded absence — there
   /// is no path from "the step ran" to a published trace.
   static let fileBackedArtifacts: Set<String> = [
-    "trace.htrace", "screenshot.png", "signed.hap",
+    "trace.htrace", "screenshot.png", "signed.hap", "unsigned.hap",
   ]
 
   /// A confirmed process failure still owns useful bounded diagnostics.
@@ -129,6 +129,7 @@ enum RuntimeArtifactService {
   ]
 
   static let workspaceOperationReferences: Set<String> = [
+    "workspace.prepare-isolated-copy@1",
     "workspace.apply-patch@1",
     "workspace.build-openharmony@1",
     "workspace.create-checkpoint@1",
@@ -159,11 +160,14 @@ enum RuntimeArtifactService {
     "workspace.inspect-source@1": [
       "inspect-workspace-source": ["source-inspection.txt"]
     ],
+    "workspace.prepare-isolated-copy@1": [
+      "prepare-isolated-copy": ["isolated-workspace.json"]
+    ],
     "workspace.apply-patch@1": [
       "apply-patch": ["applied-patch.json"]
     ],
     "workspace.build-openharmony@1": [
-      "build-project": ["build.log"]
+      "build-project": ["build.log", "unsigned.hap"]
     ],
     OpenHarmonyLocalSigning.operationReference: [
       "sign-workspace-hap": ["signed.hap", "signing-report.json"]

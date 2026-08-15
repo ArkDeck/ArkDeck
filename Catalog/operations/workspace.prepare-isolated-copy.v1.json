@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "workspace.prepare-isolated-copy",
+  "version": 1,
+  "title": "Prepare an exact Runtime-owned isolated ProjectProfile copy",
+  "provider": "workspace",
+  "effect": {
+    "minimum": "hostOnly",
+    "permitted": [
+      "hostOnly"
+    ]
+  },
+  "authorization": {
+    "hostOnly": "defaultReadOnly"
+  },
+  "binding": "none",
+  "concurrencyKey": "host-exclusive",
+  "inputs": {
+    "fields": {
+      "projectRef": {
+        "type": "string",
+        "required": true,
+        "maxLength": 128,
+        "description": "Primary ProjectProfile to copy; the provider resolves its root."
+      },
+      "allowedFileGlobs": {
+        "type": "stringArray",
+        "required": true,
+        "maxItems": 64,
+        "maxLength": 512,
+        "description": "Exact scopes for the copy; each must narrow the source ProjectProfile."
+      },
+      "expectedWorkspaceRevision": {
+        "type": "string",
+        "required": true,
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 64,
+        "description": "Exact source revision copied and remeasured before publication."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "isolatedWorkspace": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "prepare-isolated-copy",
+      "kind": "prepareWorkspaceIsolation",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Copies only into the composition-owned workspace root and publishes no host path."
+    }
+  ],
+  "timeoutSeconds": 900,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "isolated-workspace.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true,
+      "retentionClass": "pinnedUntilVerified"
+    }
+  ],
+  "profiles": [
+    "workspace-host@1"
+  ]
+}

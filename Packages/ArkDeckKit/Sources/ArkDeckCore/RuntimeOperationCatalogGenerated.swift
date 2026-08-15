@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "699db12e52b7a0de60e966fdbbe94ac2931d0475d2fe0054c074419546c7fdb5"
+  public static let catalogDigest = "d76ad7750eeb39423de804fffca2ff262edec39fac41638b487571f2cd9bad9e"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -561,7 +561,8 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
       ],
       outputs: [
-        CatalogFieldDescriptor(name: "buildLog", type: .artifactReference, isRequired: true)
+        CatalogFieldDescriptor(name: "buildLog", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "unsignedHap", type: .artifactReference, isRequired: false)
       ],
       steps: [
         CatalogStepDescriptor(stepID: "build-project", kind: .buildWorkspaceOpenHarmony, effect: .deviceMutation, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none)
@@ -570,7 +571,8 @@ extension RuntimeOperationCatalog {
       outputByteBudget: 134217728,
       preflightAttempts: 1,
       artifacts: [
-        CatalogArtifactDescriptor(name: "build.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+        CatalogArtifactDescriptor(name: "build.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "unsigned.hap", role: .derived, mediaType: "application/vnd.openharmony.hap", privacy: .standard, isRequired: false, retentionClass: .pinnedUntilVerified)
       ],
       profiles: ["workspace-host@1"]
     ),
@@ -689,6 +691,36 @@ extension RuntimeOperationCatalog {
       preflightAttempts: 1,
       artifacts: [
         CatalogArtifactDescriptor(name: "source-inspection.txt", role: .raw, mediaType: "text/plain", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "workspace.prepare-isolated-copy",
+      version: 1,
+      title: "Prepare an exact Runtime-owned isolated ProjectProfile copy",
+      provider: .workspace,
+      minimumEffect: .hostOnly,
+      permittedEffects: [.hostOnly],
+      authorization: [.hostOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .none,
+      concurrencyKey: .hostExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "allowedFileGlobs", type: .stringArray, isRequired: true, maxLength: 512, maxItems: 64),
+        CatalogFieldDescriptor(name: "expectedWorkspaceRevision", type: .string, isRequired: true, pattern: "^[0-9a-f]{64}$", maxLength: 64),
+        CatalogFieldDescriptor(name: "projectRef", type: .string, isRequired: true, maxLength: 128)
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "isolatedWorkspace", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "prepare-isolated-copy", kind: .prepareWorkspaceIsolation, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 900,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "isolated-workspace.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .pinnedUntilVerified)
       ],
       profiles: ["workspace-host@1"]
     ),

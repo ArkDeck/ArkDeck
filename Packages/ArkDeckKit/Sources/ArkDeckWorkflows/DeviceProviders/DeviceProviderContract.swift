@@ -173,6 +173,103 @@ public struct WorkspaceSourceInspection: Sendable, Equatable, Codable {
   }
 }
 
+/// The complete, path-free authority for one Runtime-owned isolated copy.
+/// The provider resolves the source ProjectProfile and the composition-owned
+/// workspace store supplies every host path; callers can only narrow source
+/// scopes and pin the exact revision they inspected.
+public struct WorkspaceIsolationIntent: Sendable, Equatable, Codable {
+  public let runtimeOwnerID: String
+  public let sourceProjectRef: String
+  /// Full primary-profile revision admitted by the caller.
+  public let expectedWorkspaceRevision: String
+  /// Revision of the narrowed scopes copied into the derived profile.
+  public let isolatedWorkspaceRevision: String
+  public let allowedFileGlobs: [String]
+  public let createdAtUTC: String
+  public let workspaceID: String
+  public let workspaceProjectRef: String
+  public let allowedFileScopesDigest: String
+
+  package init(
+    runtimeOwnerID: String,
+    sourceProjectRef: String,
+    expectedWorkspaceRevision: String,
+    isolatedWorkspaceRevision: String,
+    createdAtUTC: String,
+    allowedFileGlobs: [String]
+  ) {
+    self.runtimeOwnerID = runtimeOwnerID
+    self.sourceProjectRef = sourceProjectRef
+    self.expectedWorkspaceRevision = expectedWorkspaceRevision
+    self.isolatedWorkspaceRevision = isolatedWorkspaceRevision
+    self.allowedFileGlobs = allowedFileGlobs.sorted()
+    self.createdAtUTC = createdAtUTC
+    let seed = Data(
+      "\(runtimeOwnerID)|\(sourceProjectRef)|\(isolatedWorkspaceRevision)".utf8)
+    let digest = SHA256Hex.string(of: seed)
+    workspaceID = "evo-\(digest.prefix(24))"
+    workspaceProjectRef = "evolution-\(digest.prefix(20))"
+    allowedFileScopesDigest = SHA256Hex.string(
+      of: Data(self.allowedFileGlobs.joined(separator: "\n").utf8))
+  }
+
+  package var actionSHA256: String {
+    let encoder = CanonicalJSONEncoders.canonical()
+    return SHA256Hex.string(of: (try? encoder.encode(self)) ?? Data())
+  }
+}
+
+public struct WorkspaceIsolationResult: Sendable, Equatable {
+  public let workspaceID: String
+  public let projectRef: String
+  public let sourceProjectRef: String
+  public let sourceWorkspaceRevision: String
+  public let workspaceRevision: String
+  public let allowedFileScopesDigest: String
+
+  public init(
+    workspaceID: String,
+    projectRef: String,
+    sourceProjectRef: String,
+    sourceWorkspaceRevision: String,
+    workspaceRevision: String,
+    allowedFileScopesDigest: String
+  ) {
+    self.workspaceID = workspaceID
+    self.projectRef = projectRef
+    self.sourceProjectRef = sourceProjectRef
+    self.sourceWorkspaceRevision = sourceWorkspaceRevision
+    self.workspaceRevision = workspaceRevision
+    self.allowedFileScopesDigest = allowedFileScopesDigest
+  }
+
+  package var summary: [String: String] {
+    [
+      "workspaceId": workspaceID,
+      "projectRef": projectRef,
+      "sourceProjectRef": sourceProjectRef,
+      "sourceWorkspaceRevision": sourceWorkspaceRevision,
+      "workspaceRevision": workspaceRevision,
+      "allowedFileScopesDigest": allowedFileScopesDigest,
+      "isolation": "runtimeOwned",
+    ]
+  }
+}
+
+public enum WorkspaceIsolationInspection: Sendable, Equatable {
+  case absent
+  case prepared(WorkspaceIsolationResult)
+  case conflicted(String)
+}
+
+/// Composition-owned isolated workspace lifecycle. ArkDeckWorkflows owns the
+/// typed contract; ArkDeckAgentComposition supplies the persistent copier so
+/// the runtime plane never learns Harness internals or accepts a host path.
+package protocol WorkspaceIsolationManaging: Sendable {
+  func prepare(_ intent: WorkspaceIsolationIntent) async throws -> WorkspaceIsolationResult
+  func inspect(_ intent: WorkspaceIsolationIntent) throws -> WorkspaceIsolationInspection
+}
+
 extension WorkspaceProviderAction {
   /// Whether this action changes the workspace (CHG-2026-055, TASK-HFA-009 r2).
   ///
@@ -187,8 +284,8 @@ extension WorkspaceProviderAction {
     case .applyPatch, .buildOpenHarmony, .runTests, .revertPatch,
       .createCheckpoint, .createArchiveCheckpoint:
       return true
-    case .inspectSource, .signOpenHarmonyHap, .symbolizeCrash, .inspectGitStatus,
-      .inspectDiff, .readSourceRange:
+    case .inspectSource, .prepareIsolatedCopy, .signOpenHarmonyHap,
+      .symbolizeCrash, .inspectGitStatus, .inspectDiff, .readSourceRange:
       return false
     }
   }
@@ -221,6 +318,7 @@ public struct WorkspaceAuthorizationFacts: Sendable, Equatable {
 
 public enum WorkspaceProviderAction: Sendable, Equatable, Codable {
   case inspectSource(WorkspaceSourceInspection)
+  case prepareIsolatedCopy(WorkspaceIsolationIntent)
   case applyPatch(WorkspacePatchIntent)
   case buildOpenHarmony(WorkspaceResolvedInvocation)
   case signOpenHarmonyHap(WorkspaceOpenHarmonySigningAction)
@@ -1322,6 +1420,24 @@ public struct HostManagedProcessDescriptor: Sendable, Equatable {
   }
 }
 
+/// Descriptor for one composition-owned host action that has no device
+/// identity. Unlike `HostManagedProcessDescriptor`, this cannot carry a
+/// connect key or binding revision; its entire authority is the persisted
+/// typed workspace action and the same Job/step correlation.
+public struct HostWorkspaceProcessDescriptor: Sendable, Equatable {
+  public let identifier: String
+  public let jobID: String
+  public let stepID: String
+  package let actionSHA256: String
+
+  package init(identifier: String, jobID: String, stepID: String, actionSHA256: String) {
+    self.identifier = identifier
+    self.jobID = jobID
+    self.stepID = stepID
+    self.actionSHA256 = actionSHA256
+  }
+}
+
 /// What a plan must leave behind on the host, declared by the provider that
 /// also put the destination into the argv. A device-to-host transfer is the
 /// one case where the process receipt cannot carry the evidence: `hdc file
@@ -1432,6 +1548,7 @@ public struct TypedProcessPlan: Sendable, Equatable {
     case process(executableSHA256: String, argumentSummary: [String], timeoutSeconds: Int?)
     case processSequence(executableSHA256: String, invocations: [TypedProcessInvocation])
     case hostManaged(HostManagedProcessDescriptor)
+    case hostWorkspace(HostWorkspaceProcessDescriptor)
   }
 
   public let action: TypedProviderAction

@@ -600,6 +600,10 @@ final class WorkflowStepContractTests: XCTestCase {
       arguments["publicationPolicy"] = .string("atomicAfterValidation")
     case .signWorkspaceOpenHarmonyHap:
       arguments["signingPresetRef"] = .string("openharmony-release@1")
+    case .prepareWorkspaceIsolation:
+      arguments["expectedWorkspaceRevision"] = .string(String(repeating: "a", count: 64))
+      arguments["workspaceRevision"] = .string(String(repeating: "b", count: 64))
+      arguments["allowedFileScopesDigest"] = .string(String(repeating: "c", count: 64))
     default:
       break
     }
