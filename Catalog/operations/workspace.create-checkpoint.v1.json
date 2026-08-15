@@ -11,7 +11,7 @@
     ]
   },
   "authorization": {
-    "deviceMutation": "standingCapability"
+    "deviceMutation": "runtimeCapability"
   },
   "binding": "none",
   "concurrencyKey": "host-exclusive",
@@ -75,5 +75,5 @@
       "notes": "Writes either a Git object or a provider-owned archive and never changes declared workspace source."
     }
   ],
-  "defaultPolicyIssuance": "disabled"
+  "defaultPolicyIssuance": "enabled"
 }

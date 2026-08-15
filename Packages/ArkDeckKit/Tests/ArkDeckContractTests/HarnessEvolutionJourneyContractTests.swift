@@ -688,7 +688,9 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
       inputString(checkpointRequest, "expectedWorkspaceRevision"), journeyBaseRevision)
     XCTAssertEqual(
       checkpointRequest.inputs["checkpointFilePaths"], .array([.string("Sources/App.txt")]))
-    XCTAssertEqual(checkpointRequest.authorization?.capabilityID, "CAP-RT-WORKSPACE-FIXTURE")
+    XCTAssertNil(
+      checkpointRequest.authorization,
+      "the Runtime-owned checkpoint policy rejects caller-supplied standing grants")
     XCTAssertEqual(
       stack.workspace.preparedAttemptDirectories.map(\.ordinal), [2],
       "the strategy Attempt gets its isolated directory; the journey identity does not")
@@ -699,6 +701,9 @@ final class HarnessEvolutionJourneyContractTests: XCTestCase {
     XCTAssertEqual(applyWake.action, .dispatched)
     let applyRequest = try await latestRequest(stack)
     XCTAssertEqual(applyRequest.operation.reference, DebugCrashTaskHandler.applyPatch)
+    XCTAssertEqual(
+      applyRequest.authorization?.capabilityID, "CAP-RT-WORKSPACE-FIXTURE",
+      "source-changing apply remains bound to the maintainer-issued standing grant")
     XCTAssertEqual(inputString(applyRequest, "projectRef"), "evolution-demo-app")
     XCTAssertEqual(
       inputString(applyRequest, "patchArtifactRef"), "lease-v1:patch:ART-DIFF",

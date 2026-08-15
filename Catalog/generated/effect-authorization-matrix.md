@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `328cade24b399a20b0c467195ea724f832854bbae7c65ab3dcbb8160318b1d2d`
+Catalog digest: `699db12e52b7a0de60e966fdbbe94ac2931d0475d2fe0054c074419546c7fdb5`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ Catalog digest: `328cade24b399a20b0c467195ea724f832854bbae7c65ab3dcbb8160318b1d2
 | `port-forward.remove@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 120 | 1048576 |
 | `workspace.apply-patch@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 180 | 16777216 |
 | `workspace.build-openharmony@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 900 | 134217728 |
-| `workspace.create-checkpoint@1` | workspace | deviceMutation | deviceMutation: standingCapability | disabled | none | host-exclusive | 120 | 1048576 |
+| `workspace.create-checkpoint@1` | workspace | deviceMutation | deviceMutation: runtimeCapability | enabled | none | host-exclusive | 120 | 1048576 |
 | `workspace.inspect-diff@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-git-status@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 60 | 1048576 |
 | `workspace.inspect-source@1` | workspace | hostOnly | hostOnly: defaultReadOnly | enabled | none | host-exclusive | 120 | 1048576 |

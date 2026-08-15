@@ -2270,30 +2270,46 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// A host-only operation must be host-only all the way down. A device step
-  /// or an effect above `hostOnly` inside one would reach the device through a
+  /// An unbound operation must be host-only all the way down unless it is one
+  /// of the two reviewed workspace mutation authorities below. A device step
+  /// or an unrelated effect above `hostOnly` would reach the device through a
   /// path that skipped facts, binding and identity - so it is refused here,
   /// before anything is materialized, in addition to the generator's static
   /// check.
   static func validateHostOnlyDescriptor(_ descriptor: CatalogOperationDescriptor) throws {
-    // A workspace mutation is the one thing without a device binding that may
-    // exceed `hostOnly` (CHG-2026-055, TASK-HFA-009 r2). It is the E1 risk
-    // class applied to a tree instead of a device, and it is only reachable
-    // with a workspace-scoped standing capability. Everything else keeps the
-    // original rule.
-    let mutatingWorkspace =
+    // Source-changing workspace mutations remain reachable only with a
+    // workspace-scoped standing capability (TASK-HFA-009 r2). The sole
+    // Runtime-owned exception is the source-preserving checkpoint operation:
+    // its one step writes a provider-owned rollback object/archive, never a
+    // ref, index, worktree or declared source byte (TASK-HFA-009 r4).
+    let standingWorkspaceMutation =
       descriptor.provider == .workspace
       && descriptor.permittedEffects.allSatisfy({ $0 <= .deviceMutation })
       && descriptor.authorization[.deviceMutation] == .standingCapability
+    let runtimeCheckpoint =
+      descriptor.reference == "workspace.create-checkpoint@1"
+      && descriptor.provider == .workspace
+      && descriptor.minimumEffect == .deviceMutation
+      && descriptor.permittedEffects == [.deviceMutation]
+      && descriptor.authorization[.deviceMutation] == .runtimeCapability
+      && descriptor.defaultPolicyIssuanceEnabled
+      && descriptor.concurrencyKey == .hostExclusive
+      && descriptor.steps.count == 1
+      && descriptor.steps[0].kind == .createWorkspaceCheckpoint
+      && descriptor.steps[0].effect == .deviceMutation
+      && descriptor.steps[0].binding == .none
+    let unboundWorkspaceMutation = standingWorkspaceMutation || runtimeCheckpoint
     guard
       descriptor.minimumEffect <= .hostOnly
-        || (mutatingWorkspace && descriptor.minimumEffect == .deviceMutation)
+        || (unboundWorkspaceMutation && descriptor.minimumEffect == .deviceMutation)
     else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput,
         "\(descriptor.reference) declares binding none but permits an effect above hostOnly")
     }
-    guard descriptor.permittedEffects.allSatisfy({ $0 <= .hostOnly }) || mutatingWorkspace else {
+    guard
+      descriptor.permittedEffects.allSatisfy({ $0 <= .hostOnly }) || unboundWorkspaceMutation
+    else {
       throw RuntimeJobEngineError.rejected(
         .invalidInput,
         "\(descriptor.reference) declares binding none but permits an effect above hostOnly")
@@ -2306,7 +2322,7 @@ public actor RuntimeJobEngine {
           .invalidInput,
           "\(descriptor.reference) is host-only but step \(step.stepID) requires a device binding")
       }
-      guard step.effect <= .hostOnly || (mutatingWorkspace && step.effect == .deviceMutation)
+      guard step.effect <= .hostOnly || (unboundWorkspaceMutation && step.effect == .deviceMutation)
       else {
         throw RuntimeJobEngineError.rejected(
           .invalidInput,
@@ -5779,6 +5795,9 @@ public actor RuntimeJobEngine {
         targetScope = .stablePhysicalIdentity(
           sha256: query.targetStableIdentitySHA256 ?? "")
       }
+      let pinsExactPlan =
+        query.effect == .destructive
+        || descriptor.authorization[query.effect] == .runtimeCapability
       do {
         capability = try RuntimeCapability(
           capabilityID: capabilityID,
@@ -5793,12 +5812,12 @@ public actor RuntimeJobEngine {
           exactArtifactFacts: query.effect == .destructive ? query.artifactFacts : nil,
           issuedAtUTC: issuedAtUTC,
           expiresAtUTC: expiresAtUTC,
-          maximumUses: query.effect == .destructive ? 1 : 10_000,
+          maximumUses: pinsExactPlan ? 1 : 10_000,
           issuer: RuntimeCapabilityIssuer(
             kind: .runtimeDefaultPolicy,
             reference:
               "catalog:\(RuntimeOperationCatalog.catalogDigest):\(descriptor.reference)"),
-          exactPlanDigest: query.effect == .destructive ? query.planDigest : nil,
+          exactPlanDigest: pinsExactPlan ? query.planDigest : nil,
           exactBindingRevision: query.targetBindingRevision)
       } catch {
         throw RuntimeJobEngineError.rejected(

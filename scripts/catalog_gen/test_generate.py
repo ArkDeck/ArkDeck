@@ -142,6 +142,16 @@ class RealCatalogTests(unittest.TestCase):
         system = next(op for op in operations if op["id"] == "deploy.native-library.system")
         self.assertEqual(system.get("defaultPolicyIssuance"), "enabled")
 
+    def test_workspace_checkpoint_uses_runtime_owned_exact_policy(self):
+        operations, _ = _real_operations()
+        checkpoint = next(
+            op for op in operations if op["id"] == "workspace.create-checkpoint"
+        )
+        self.assertEqual(
+            checkpoint["authorization"], {"deviceMutation": "runtimeCapability"}
+        )
+        self.assertEqual(checkpoint.get("defaultPolicyIssuance"), "enabled")
+
     def test_every_stdout_step_has_an_exact_registered_action(self):
         operations, _ = _real_operations()
         registry = generate.load_stdout_action_registry()

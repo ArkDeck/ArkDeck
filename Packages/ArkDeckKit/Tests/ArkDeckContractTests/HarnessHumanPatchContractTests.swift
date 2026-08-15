@@ -229,8 +229,9 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertEqual(requests.count, 1)
     XCTAssertEqual(
       requests[0].operation.reference, DebugCrashTaskHandler.createCheckpoint)
-    XCTAssertEqual(
-      requests[0].authorization?.capabilityID, "CAP-RT-WORKSPACE-HUMAN-PATCH")
+    XCTAssertNil(
+      requests[0].authorization,
+      "Runtime-owned checkpoint policy must not carry a caller standing grant")
     XCTAssertEqual(
       requests[0].inputs["expectedWorkspaceRevision"],
       .string(proposal.baseWorkspaceRevision))
@@ -414,37 +415,24 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     XCTAssertTrue(attempts.isEmpty)
   }
 
-  func testPolicyAuthorizationRetryReusesDecisionAndPreparedLease() async throws {
+  func testRuntimeOwnedCheckpointNeedsNoStandingGrantAndCarriesNoCallerAuthorization() async throws {
     let proposal = try makeProposal()
     let bytes = try proposalJSON(proposal)
     let repair = HumanPatchRepairPort()
     let grant = HumanPatchGrant(enabled: false)
     let jobs = HumanPatchJobPort()
-    let (coordinator, store) = try await makeStack(
+    let (coordinator, _) = try await makeStack(
       jobs: jobs, repair: repair, capabilities: grant)
 
     _ = try await coordinator.reconcile(taskID)
-    let first = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
-    let firstStored = try await store.decision(taskID, round: 2)
-    let firstDecision = try XCTUnwrap(firstStored)
-    let firstPrepareCount = await repair.preparations()
-    let firstRequests = await jobs.requests()
-    XCTAssertEqual(first.action, .stoppedForHuman)
-    XCTAssertTrue(first.reasonCode.contains("authorizationRequired"))
-    XCTAssertEqual(firstPrepareCount, 1)
-    XCTAssertTrue(firstRequests.isEmpty)
-
-    await grant.setEnabled(true)
-    let retried = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
-    let retriedStored = try await store.decision(taskID, round: 2)
-    let retriedDecision = try XCTUnwrap(retriedStored)
+    let dispatched = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
     let requests = await jobs.requests()
-    let retriedPrepareCount = await repair.preparations()
-    XCTAssertEqual(retried.action, .dispatched)
-    XCTAssertEqual(retriedPrepareCount, 1, "retry must not republish patch bytes")
-    XCTAssertEqual(firstDecision.decisionID, retriedDecision.decisionID)
-    XCTAssertEqual(firstDecision.inputs, retriedDecision.inputs)
+    let prepareCount = await repair.preparations()
+    XCTAssertEqual(dispatched.action, .dispatched)
+    XCTAssertEqual(prepareCount, 1)
     XCTAssertEqual(requests.count, 1)
+    XCTAssertEqual(requests[0].operation.reference, DebugCrashTaskHandler.createCheckpoint)
+    XCTAssertNil(requests[0].authorization)
   }
 
   func testExpiredAuthorizationRetryDoesNotResumePrepareOrDispatch() async throws {
@@ -452,14 +440,17 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let bytes = try proposalJSON(proposal)
     let repair = HumanPatchRepairPort()
     let grant = HumanPatchGrant(enabled: false)
-    let jobs = HumanPatchJobPort()
+    let jobs = CheckpointSequenceJobPort()
     let (coordinator, store) = try await makeStack(
       jobs: jobs, repair: repair, capabilities: grant)
 
     _ = try await coordinator.reconcile(taskID)
-    let first = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
+    let checkpoint = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
+    XCTAssertEqual(checkpoint.action, .dispatched)
+    let first = try await coordinator.reconcile(taskID)
     XCTAssertEqual(first.action, .stoppedForHuman)
-    let decisionBefore = try await store.decision(taskID, round: 2)
+    XCTAssertTrue(first.reasonCode.contains(DebugCrashTaskHandler.applyPatch))
+    let decisionBefore = try await store.decision(taskID, round: 3)
     let attemptsBefore = try await store.attempts(taskID)
 
     await grant.setEnabled(true)
@@ -471,14 +462,14 @@ final class HarnessHumanPatchContractTests: XCTestCase {
       taskID, proposalJSON: bytes)
     let prepareCount = await repair.preparations()
     let requests = await jobs.requests()
-    let decisionAfter = try await store.decision(taskID, round: 2)
+    let decisionAfter = try await store.decision(taskID, round: 3)
     let attemptsAfter = try await store.attempts(taskID)
 
     XCTAssertEqual(retried.action, .stoppedBudgetExhausted)
     XCTAssertEqual(retried.reasonCode, "maxWallClockExhausted")
     XCTAssertEqual(retried.snapshot.lifecycle, .failed)
     XCTAssertEqual(prepareCount, 1)
-    XCTAssertTrue(requests.isEmpty)
+    XCTAssertEqual(requests.map(\.operation.reference), [DebugCrashTaskHandler.createCheckpoint])
     XCTAssertEqual(decisionAfter, decisionBefore)
     XCTAssertEqual(attemptsAfter, attemptsBefore)
   }
@@ -554,7 +545,7 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let bytes = try proposalJSON(proposal)
     let repair = HumanPatchRepairPort()
     let grant = HumanPatchGrant(enabled: false)
-    let jobs = HumanPatchJobPort()
+    let jobs = CheckpointSequenceJobPort()
     let (coordinator, _) = try await makeStack(
       jobs: jobs, repair: repair, capabilities: grant)
 
@@ -570,6 +561,9 @@ final class HarnessHumanPatchContractTests: XCTestCase {
 
     _ = try await coordinator.reconcile(taskID)
     _ = try await coordinator.proposePatch(taskID, proposalJSON: bytes)
+    let blockedApply = try await coordinator.reconcile(taskID)
+    XCTAssertEqual(blockedApply.action, .stoppedForHuman)
+    XCTAssertTrue(blockedApply.reasonCode.contains(DebugCrashTaskHandler.applyPatch))
     var changed = try JSONDecoder().decode(JSONValue.self, from: bytes)
     guard case .object(var fields) = changed else {
       return XCTFail("proposal must be an object")
@@ -588,7 +582,9 @@ final class HarnessHumanPatchContractTests: XCTestCase {
     let finalRequests = await jobs.requests()
     XCTAssertEqual(status.lifecycle, .humanRequired)
     XCTAssertEqual(finalPrepareCount, 1)
-    XCTAssertTrue(finalRequests.isEmpty)
+    XCTAssertEqual(
+      finalRequests.map(\.operation.reference),
+      [DebugCrashTaskHandler.createCheckpoint])
   }
 
   // MARK: - External producer lane

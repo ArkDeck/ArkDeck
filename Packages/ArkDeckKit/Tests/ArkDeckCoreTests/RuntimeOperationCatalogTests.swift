@@ -138,20 +138,27 @@ final class RuntimeOperationCatalogTests: XCTestCase {
     for operation in RuntimeOperationCatalog.operations
     where operation.permittedEffects.contains(where: { $0 >= .deviceMutation }) {
       if operation.provider == .workspace {
-        // A workspace mutation: no device, serialized against the tree, and
-        // unreachable without a grant a maintainer issued for that tree.
+        // A workspace mutation: no device and serialized against the tree.
+        // The checkpoint is the one source-preserving safety primitive: the
+        // Runtime issues an exact policy envelope only after materialization.
+        // Source-changing operations still require a maintainer grant.
         XCTAssertEqual(
           operation.concurrencyKey, .hostExclusive,
           "\(operation.reference): a workspace mutation is serialized on the host")
         XCTAssertEqual(
           operation.binding, WorkflowBindingRequirement.none,
           "\(operation.reference): a workspace mutation has no device to bind")
-        XCTAssertEqual(
-          operation.authorization[.deviceMutation], .standingCapability,
-          "\(operation.reference): a workspace mutation must require a capability")
-        XCTAssertFalse(
-          operation.defaultPolicyIssuanceEnabled,
-          "\(operation.reference): the runtime must not issue its own workspace grant")
+        if operation.reference == "workspace.create-checkpoint@1" {
+          XCTAssertEqual(operation.authorization[.deviceMutation], .runtimeCapability)
+          XCTAssertTrue(operation.defaultPolicyIssuanceEnabled)
+        } else {
+          XCTAssertEqual(
+            operation.authorization[.deviceMutation], .standingCapability,
+            "\(operation.reference): a source-changing mutation must require a grant")
+          XCTAssertFalse(
+            operation.defaultPolicyIssuanceEnabled,
+            "\(operation.reference): the runtime must not issue its own workspace grant")
+        }
         XCTAssertFalse(
           operation.steps.contains { $0.binding == .confirmedDevice },
           "\(operation.reference): an unbound operation must contain no device step")
