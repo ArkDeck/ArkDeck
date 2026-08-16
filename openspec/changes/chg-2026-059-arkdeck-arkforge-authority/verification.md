@@ -1,6 +1,6 @@
 # Verification — CHG-2026-059
 
-> Change:CHG-2026-059-arkdeck-arkforge-authority@r5
+> Change:CHG-2026-059-arkdeck-arkforge-authority@r6
 > Status:planned；proposal merge 只批准 scope，不代表实现或真机通过
 
 ## Environment
