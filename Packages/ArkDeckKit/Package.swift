@@ -63,6 +63,7 @@ let package = Package(
       dependencies: [
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
         "ArkDeckStorage",
+              "ArkForgeIPC",
       ],
       exclude: ["AgentComposition"],
       resources: [
