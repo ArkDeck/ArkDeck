@@ -119,6 +119,9 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       evidenceObservation: observation,
       firstEvidenceStepAtUTC: "2026-07-29T00:00:02Z",
       outcomeUnknown: outcomeUnknown,
+      // These fixtures carry a full evidence observation, which only exists
+      // when the daemon snapshot was read.
+      runtimeFactsObserved: true,
       humanActions: [],
       terminalState: terminalState ?? (outcomeUnknown ? "outcomeUnknown" : "succeeded"),
       artifacts: [artifact],

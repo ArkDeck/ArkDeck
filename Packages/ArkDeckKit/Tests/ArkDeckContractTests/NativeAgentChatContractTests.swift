@@ -1,9 +1,9 @@
-import ArkDeckAgentClient
 import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
 import XCTest
 
+@testable import ArkDeckAgentClient
 @testable import ArkDeckAgentComposition
 @testable import ArkDeckCLI
 @testable import ArkDeckHarness
@@ -272,6 +272,81 @@ final class NativeAgentChatContractTests: XCTestCase {
         reason.contains("failed twice consecutively"),
         "an authorization refusal is not a repeated-failure stop: \(reason)")
     }
+  }
+
+  /// A job that reached the mutation lane and never reported how it ended must
+  /// stop the chat, on the first occurrence.
+  ///
+  /// `job.submit` succeeds, so a job exists against the device; `job.run` then
+  /// drops (daemon restart, UDS close, deadline). The executor's best-effort
+  /// `job.cancel` on that path is itself unanswerable and its result is
+  /// discarded, so the device may be mid-effect.
+  ///
+  /// The latch could not see this. With no daemon snapshot to read, the
+  /// receipt's `outcomeUnknown` falls back to `false` — the same token the
+  /// Runtime uses to say it *did* determine the outcome — so the stop condition
+  /// at `finish` was never met, and the only thing left was the consecutive-
+  /// failure counter, which needs two in a row and is reset by any success.
+  /// The next tool call went out against a device nobody had established the
+  /// state of.
+  func testAJobThatNeverReportedItsOutcomeStopsTheChatImmediately() async throws {
+    let exactTarget = "device-target-secret"
+    for terminalState in ["transportFailure", "running", "waitingForRecovery"] {
+      let port = UndeterminedOutcomeRuntimePort(
+        targetID: exactTarget, terminalState: terminalState)
+      let owner = NativeAgentChatRuntimeTools(port: port)
+      let definitions = owner.definitions()
+      let overview = try XCTUnwrap(
+        definitions.first { $0.name == "arkdeck_runtime_overview" })
+      let observe = try XCTUnwrap(
+        definitions.first { $0.name == "arkdeck_observe_device" })
+      _ = try await overview.execute(.object([:]))
+      let targetRef = HarnessDecisionContext.pseudonym(forTargetID: exactTarget)
+
+      // First attempt: the Runtime never says how the job ended.
+      _ = try await observe.execute(.object(["targetRef": .string(targetRef)]))
+
+      // Second attempt must already be blocked. One is enough: the whole point
+      // is that a device may be carrying a partial effect right now.
+      do {
+        _ = try await observe.execute(.object(["targetRef": .string(targetRef)]))
+        XCTFail("\(terminalState): the chat must not dispatch again")
+      } catch let error as AgentChatRuntimeToolError {
+        guard case .blocked(let reason) = error else {
+          return XCTFail("\(terminalState): expected a blocked stop, got \(error)")
+        }
+        XCTAssertTrue(
+          reason.contains("never reported"), "\(terminalState): \(reason)")
+        XCTAssertTrue(reason.contains("JOB-7"), "\(terminalState): \(reason)")
+        XCTAssertFalse(
+          reason.contains("failed twice consecutively"),
+          "\(terminalState): an undetermined outcome is not a repeated-failure stop")
+      }
+    }
+  }
+
+  /// The other side of that rule, so the stop is not simply "any receipt".
+  ///
+  /// A job the Runtime did settle — it answered, and said `failed` — leaves the
+  /// chat free to continue. Otherwise every ordinary failed operation would end
+  /// the session and the latch above would prove nothing about undetermined
+  /// outcomes specifically.
+  func testASettledFailureLeavesTheChatRunning() async throws {
+    let exactTarget = "device-target-secret"
+    let port = UndeterminedOutcomeRuntimePort(
+      targetID: exactTarget, terminalState: "failed", runtimeFactsObserved: true)
+    let owner = NativeAgentChatRuntimeTools(port: port)
+    let definitions = owner.definitions()
+    let overview = try XCTUnwrap(
+      definitions.first { $0.name == "arkdeck_runtime_overview" })
+    let observe = try XCTUnwrap(
+      definitions.first { $0.name == "arkdeck_observe_device" })
+    _ = try await overview.execute(.object([:]))
+    let targetRef = HarnessDecisionContext.pseudonym(forTargetID: exactTarget)
+
+    _ = try await observe.execute(.object(["targetRef": .string(targetRef)]))
+    // Still admitted: one settled failure is not a stop condition.
+    _ = try await observe.execute(.object(["targetRef": .string(targetRef)]))
   }
 
   func testNativeToolsLowerOnlyToTheClosedReadOnlyOperations() async throws {
@@ -738,6 +813,55 @@ private struct AuthorizationRefusedRuntimePort: AgentChatRuntimePort {
     throw RuntimeAgentExecutorError.operationRejected(
       "\(RuntimeOperationErrorCode.authorizationRequired.rawValue): "
         + "capability denied before mutation")
+  }
+
+  func resume(
+    resumeToken: String, selection: String?
+  ) throws -> RuntimeAgentExecutionOutcome {
+    throw OverviewRuntimePortError.unexpectedExecution
+  }
+}
+
+/// A Runtime that accepted the job and then stopped answering for it — the
+/// executor's `transportFailure` / non-terminal shape. `job.submit` succeeded,
+/// so `jobID` is set; no `job.evidence` snapshot was ever read, so every
+/// Runtime-owned field is at its fallback, including `outcomeUnknown: false`.
+private struct UndeterminedOutcomeRuntimePort: AgentChatRuntimePort {
+  let targetID: String
+  let terminalState: String
+  var runtimeFactsObserved = false
+
+  func request(method: String, params: [String: JSONValue]?) throws -> JSONValue {
+    try OverviewRuntimePort(targetID: targetID).request(method: method, params: params)
+  }
+
+  func run(_ request: RuntimeAgentExecutionRequest) throws -> RuntimeAgentExecutionOutcome {
+    .failed(
+      reason: "bounded job.run failed; typed cancellation requested",
+      receipt: RuntimeAgentExecutionReceipt(
+        executor: .agent,
+        executorID: "arkdeck-device-runtime-agent",
+        operationReference: request.reference,
+        jobID: "JOB-7",
+        targetID: targetID,
+        bindingRevision: 7,
+        catalogDigest: RuntimeOperationCatalog.catalogDigest,
+        providerID: "",
+        executionMode: "execute",
+        actualEffect: nil,
+        authority: nil,
+        stepKinds: [],
+        evidenceObservation: nil,
+        firstEvidenceStepAtUTC: nil,
+        // Exactly what the executor writes with no daemon snapshot to read.
+        outcomeUnknown: false,
+        runtimeFactsObserved: runtimeFactsObserved,
+        humanActions: [],
+        terminalState: terminalState,
+        artifacts: [],
+        evidenceBlockers: [],
+        startedAtUTC: "2026-07-29T00:00:01Z",
+        finishedAtUTC: "2026-07-29T00:00:03Z"))
   }
 
   func resume(

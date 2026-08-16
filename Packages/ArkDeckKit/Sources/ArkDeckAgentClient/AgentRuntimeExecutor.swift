@@ -47,6 +47,16 @@ package struct RuntimeAgentExecutionReceipt: Codable, Sendable, Equatable {
   public let evidenceObservation: RuntimeHardwareEvidenceObservation?
   public let firstEvidenceStepAtUTC: String?
   public let outcomeUnknown: Bool
+  /// Whether the daemon-owned snapshot behind the Runtime-owned fields was
+  /// actually obtained.
+  ///
+  /// `outcomeUnknown` is one of those fields, and it is a `Bool`, so when the
+  /// snapshot is missing the receipt has to write *some* value — and `false`
+  /// there reads exactly like "the Runtime determined the outcome". This says
+  /// which of the two it was, so no reader has to infer it from a default.
+  /// Sibling fields express the same thing by staying nil (`actualEffect`,
+  /// `authority`); this one cannot.
+  public let runtimeFactsObserved: Bool
   package let humanActions: [RuntimeHumanActionReceipt]
   public let terminalState: String
   public let artifacts: [RuntimeHardwareEvidenceArtifact]
@@ -836,6 +846,7 @@ package struct AgentRuntimeExecutor: Sendable {
       evidenceObservation: trustedFacts?.observation,
       firstEvidenceStepAtUTC: trustedFacts?.firstEvidenceStepAtUTC,
       outcomeUnknown: trustedFacts?.outcomeUnknown ?? false,
+      runtimeFactsObserved: trustedFacts != nil,
       humanActions: actions,
       terminalState: trustedFacts?.terminalState ?? state,
       artifacts: trustedFacts?.artifacts ?? [],
