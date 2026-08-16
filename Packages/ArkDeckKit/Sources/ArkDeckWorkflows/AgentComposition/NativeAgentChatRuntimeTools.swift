@@ -747,6 +747,21 @@ package actor NativeAgentChatRuntimeTools {
     if receipt.outcomeUnknown {
       stoppedReason =
         "Runtime reported outcomeUnknown. No new operation will be dispatched from this chat."
+    } else if Self.outcomeWasNeverDetermined(receipt) {
+      // A job exists on the target's mutation lane and the Runtime never told
+      // us how it ended — `job.run` dropped, or it came back non-terminal. The
+      // best-effort `job.cancel` on those paths is itself unanswerable, so the
+      // device may be mid-effect.
+      //
+      // This used to fall through to the consecutive-failure counter, which
+      // needs two in a row and is reset by any success, so the very next tool
+      // call was admitted against a device whose state nobody had established.
+      // `outcomeUnknown` could not catch it: with no daemon snapshot to read it
+      // defaults to `false`, which is the same token the Runtime uses to say it
+      // *did* determine the outcome.
+      stoppedReason =
+        "Runtime never reported how job \(receipt.jobID ?? "-") ended "
+        + "(\(receipt.terminalState)). No new operation will be dispatched from this chat."
     }
     if artifactBytesObserved >= Self.maximumArtifactBytes, stoppedReason == nil {
       stoppedReason = "The 64 MiB Agent Artifact budget is exhausted."
@@ -775,6 +790,25 @@ package actor NativeAgentChatRuntimeTools {
       display:
         "\(operationReference) → \(receipt.terminalState), job=\(job)"
         + (stoppedReason.map { "; \($0)" } ?? ""))
+  }
+
+  /// The states in which the Runtime itself said how the job ended. Anything
+  /// else on a job that was actually submitted means nobody established what
+  /// the device carries — including `waitingForRecovery`, which is the Runtime
+  /// saying so in as many words.
+  private static let determinedTerminalStates: Set<String> = [
+    "succeeded", "failed", "cancelled",
+  ]
+
+  private static func outcomeWasNeverDetermined(
+    _ receipt: RuntimeAgentExecutionReceipt
+  ) -> Bool {
+    // Nothing reached the mutation lane, so there is no device state in doubt.
+    // This is the `rejected`/`adoptRefused` shape.
+    guard receipt.jobID != nil else { return false }
+    // The Runtime answered; `outcomeUnknown` above already spoke for it.
+    if receipt.runtimeFactsObserved { return false }
+    return !determinedTerminalStates.contains(receipt.terminalState)
   }
 
   private func assertCanRunOperation() throws {
