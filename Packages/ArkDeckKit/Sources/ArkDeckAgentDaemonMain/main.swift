@@ -603,6 +603,28 @@ Task.detached {
       print("recovered \(recovered.count) active job(s); unknown outcomes parked")
       fflush(stdout)
     }
+    // `collectGarbage` had no production caller at all, so expired Artifacts
+    // were never reclaimed and the store grew monotonically into its quota with
+    // no in-product way back. Startup is where the active set is known exactly:
+    // nothing has been submitted yet, so anything outside the recovered set is
+    // terminal. Recovered jobs are passed through as active, which is the
+    // conservative direction — the collector keeps what it is unsure about, and
+    // it already refuses to touch pinned evidence.
+    //
+    // A failure here must not stop the daemon from serving, but it is not
+    // swallowed either: an un-reclaimable store is exactly what this call
+    // exists to make visible before the quota wall is hit.
+    do {
+      let reclaimed = try await artifactStore.collectGarbage(
+        activeJobIDs: Set(recovered.map(\.jobID)), nowUTC: utcNow())
+      if !reclaimed.isEmpty {
+        print("reclaimed \(reclaimed.count) expired artifact(s)")
+        fflush(stdout)
+      }
+    } catch {
+      print("artifact retention sweep failed; the store may approach its quota: \(error)")
+      fflush(stdout)
+    }
     // The App's first device row includes the last verified model, firmware
     // and transport. Pay the bounded SQLite history read once while the
     // long-lived daemon starts, then keep the engine's compact observation

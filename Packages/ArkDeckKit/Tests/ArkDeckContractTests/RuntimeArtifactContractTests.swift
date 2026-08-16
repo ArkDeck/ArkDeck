@@ -516,6 +516,33 @@ final class RuntimeArtifactContractTests: XCTestCase {
     XCTAssertTrue(expiredList.isEmpty)
   }
 
+  /// `pinnedUntilVerified` yields `deadlineUTC: nil, pinned: true`, and nothing
+  /// in the repository ever un-pins: `collectGarbage` only reclaims
+  /// `expired && !pinned`, so every artifact in this set is retained forever.
+  /// That is a deliberate evidence-retention choice, not an accident — but it
+  /// means each addition permanently enlarges the floor of the store, so the
+  /// set is pinned here and grows only on purpose. Un-pinning after
+  /// verification is a separate design question and is not implemented.
+  func testTheSetOfPermanentlyRetainedArtifactsIsDeclaredRatherThanIncidental() {
+    var pinnedArtifacts: [String] = []
+    for descriptor in RuntimeOperationCatalog.operations {
+      for artifact in descriptor.artifacts where artifact.retentionClass == .pinnedUntilVerified {
+        pinnedArtifacts.append("\(descriptor.reference)/\(artifact.name)")
+      }
+    }
+    XCTAssertEqual(
+      pinnedArtifacts.sorted(),
+      [
+        "deploy.native-library.system@1/backup-receipt.json",
+        "workspace.apply-patch@1/applied-patch.json",
+        "workspace.build-openharmony@1/unsigned.hap",
+        "workspace.prepare-isolated-copy@1/isolated-workspace.json",
+        "workspace.sign-openharmony-hap@1/signed.hap",
+        "workspace.sign-openharmony-hap@1/signing-report.json",
+      ],
+      "a new pinnedUntilVerified artifact is never reclaimed; add it here deliberately")
+  }
+
   func testGarbageCollectionComparesParsedUTCInsteadOfTimestampText() async throws {
     let store = try RuntimeArtifactStore(
       rootURL: root,
