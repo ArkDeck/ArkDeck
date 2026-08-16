@@ -160,6 +160,20 @@ enum RuntimeArtifactService {
     "workspace.inspect-source@1": [
       "inspect-workspace-source": ["source-inspection.txt"]
     ],
+    // The three reads below declare a required Artifact in the Catalog but had
+    // no entry here, so the bytes they observed were never published and the
+    // required product was silently absent. Same omission as the missing
+    // journal arms in `RuntimeJobEngine`: a published operation depends on two
+    // hand-maintained tables, and neither is checked against the Catalog.
+    "workspace.inspect-git-status@1": [
+      "inspect-git-status": ["git-status.txt"]
+    ],
+    "workspace.inspect-diff@1": [
+      "inspect-diff": ["diff-summary.txt"]
+    ],
+    "workspace.read-source-range@1": [
+      "read-source-range": ["source-range.txt"]
+    ],
     "workspace.prepare-isolated-copy@1": [
       "prepare-isolated-copy": ["isolated-workspace.json"]
     ],
@@ -389,7 +403,8 @@ enum RuntimeArtifactService {
       ])
       let encoder = CanonicalJSONEncoders.canonicalPretty()
       return (try? encoder.encode(fields)) ?? Data("{}".utf8)
-    case "source-inspection.txt", "symbolized-crash.txt":
+    case "source-inspection.txt", "symbolized-crash.txt",
+      "git-status.txt", "diff-summary.txt", "source-range.txt":
       // The inspection itself is the Artifact, not a synthetic summary.
       return receipt.stdout
     case "crash-signature.json"
