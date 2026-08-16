@@ -56,8 +56,16 @@ public enum ArkForgeClientError: Error, CustomStringConvertible {
 /// which leaves the authority free to answer, to refuse, or to say nothing —
 /// three outcomes the daemon distinguishes (design §3.1). So this client
 /// exposes a stream you pull from, not a delegate the daemon pushes to.
-public final class ArkForgeDaemonClient {
+/// `@unchecked Sendable` with the lock that earns it.
+///
+/// This owns a socket and a read buffer, neither of which may be used from two
+/// places at once: two interleaved `call`s would each read a frame the other
+/// was waiting for. The lock below serializes the whole request surface, which
+/// is what makes it safe to hand to an actor — the alternative, declaring it
+/// Sendable and hoping, is the bug this prevents rather than documents.
+public final class ArkForgeDaemonClient: @unchecked Sendable {
   private let descriptor: Int32
+  private let exchange = NSLock()
   private var pending: [UInt8] = []
   public let helloAck: ArkForgeHelloAck
 
@@ -151,6 +159,8 @@ public final class ArkForgeDaemonClient {
 
   /// Sends a request and reads exactly one response.
   public func call(_ request: ArkForgeRequest) throws -> ArkForgeResponse {
+    exchange.lock()
+    defer { exchange.unlock() }
     try Self.writeFrame(descriptor, request.encoded)
     guard let frame = try Self.readFrame(descriptor, pending: &pending) else {
       throw ArkForgeClientError.transport("daemon closed while answering \(request.api)")
@@ -230,6 +240,8 @@ public final class ArkForgeDaemonClient {
     _ body: ArkForgeWatchJobRequest, requestID: String,
     handle: (ArkForgeJobEvent) throws -> Bool
   ) throws {
+    exchange.lock()
+    defer { exchange.unlock() }
     try Self.writeFrame(
       descriptor,
       ArkForgeRequest(requestID: requestID, api: .watchJob, payload: body.encoded).encoded)
