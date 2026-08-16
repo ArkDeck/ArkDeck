@@ -7356,6 +7356,53 @@ public actor RuntimeJobEngine {
         "fileScope": .string(inspection.fileScope),
         "artifactId": .string("source-inspection.txt"),
       ]
+    // The three read-only workspace observations below follow
+    // `inspectWorkspaceSource` exactly: the journal records the declared
+    // inputs and the artifact they land in, and never the resolved project
+    // root, which is host-private. Their step kinds, argument contracts
+    // (`WorkflowStep.swift`) and provider lowering all shipped, but this table
+    // was never given an arm, so every one of them reached the `default` below
+    // and threw `internalFailure` — a published operation that could not be
+    // dispatched (PRODUCT-LOOP §8).
+    case .inspectWorkspaceGitStatus:
+      guard case .string(let projectRef)? = inputs["projectRef"] else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace git-status inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "artifactId": .string("git-status.txt"),
+      ]
+    case .inspectWorkspaceDiff:
+      guard case .string(let projectRef)? = inputs["projectRef"],
+        case .string(let baseRevision)? = inputs["baseRevision"],
+        case .string(let pathScope)? = inputs["pathScope"]
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace diff inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "baseRevision": .string(baseRevision),
+        "pathScope": .string(pathScope),
+        "artifactId": .string("diff-summary.txt"),
+      ]
+    case .readWorkspaceSourceRange:
+      guard case .string(let projectRef)? = inputs["projectRef"],
+        case .string(let filePath)? = inputs["filePath"],
+        case .integer(let lineStart)? = inputs["lineStart"],
+        case .integer(let lineEnd)? = inputs["lineEnd"]
+      else {
+        throw RuntimeJobEngineError.internalFailure(
+          "\(step.stepID) has incomplete workspace source-range inputs")
+      }
+      arguments = [
+        "projectRef": .string(projectRef),
+        "filePath": .string(filePath),
+        "lineStart": .integer(lineStart),
+        "lineEnd": .integer(lineEnd),
+        "artifactId": .string("source-range.txt"),
+      ]
     case .prepareWorkspaceIsolation:
       guard case .workspace(.prepareIsolatedCopy(let isolation))? = action else {
         throw RuntimeJobEngineError.internalFailure(

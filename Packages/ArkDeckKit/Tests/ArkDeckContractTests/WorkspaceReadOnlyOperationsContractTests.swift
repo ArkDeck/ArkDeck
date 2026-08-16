@@ -13,6 +13,8 @@
 import XCTest
 
 @testable import ArkDeckCore
+@testable import ArkDeckRuntime
+@testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
 final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
@@ -376,7 +378,105 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     }
   }
 
+  // MARK: - Engine dispatch
+
+  /// Every other test in this file stops at the provider: it lowers an action
+  /// and asserts the argv. That left the engine leg untested, and the engine
+  /// leg was missing — none of these three step kinds had an arm in the
+  /// journal argument table, so each one reached its `default` and threw
+  /// `internalFailure`. Three published, available operations could not be
+  /// dispatched at all. Submitting through the engine is what proves the
+  /// operation is real, so this test does that rather than lowering again.
+  func testEachPublishedReadIsDispatchableThroughTheEngine() async throws {
+    for (reference, inputs, artifactName) in [
+      (
+        "workspace.inspect-git-status@1",
+        ["projectRef": JSONValue.string("TestProject")],
+        "git-status.txt"
+      ),
+      (
+        "workspace.inspect-diff@1",
+        [
+          "projectRef": JSONValue.string("TestProject"),
+          "baseRevision": .string("HEAD"),
+          "pathScope": .string("Sources"),
+        ],
+        "diff-summary.txt"
+      ),
+      (
+        "workspace.read-source-range@1",
+        [
+          "projectRef": JSONValue.string("TestProject"),
+          "filePath": .string("Sources/Water.swift"),
+          "lineStart": .integer(1),
+          "lineEnd": .integer(40),
+        ],
+        "source-range.txt"
+      ),
+    ] {
+      let engine = try makeEngine()
+      let acceptance = try await engine.submit(try engineRequest(reference, inputs: inputs))
+      let status = try await engine.run(jobID: acceptance.jobID)
+      XCTAssertEqual(
+        status.state, "succeeded",
+        "\(reference) must dispatch, not fail in the engine: \(status.timeline)")
+
+      // The observation lands in the artifact the catalog declares required.
+      let stored = try await engineArtifacts.list(jobID: acceptance.jobID)
+      XCTAssertTrue(
+        stored.contains { $0.name == artifactName },
+        "\(reference) must publish \(artifactName), got \(stored.map(\.name))")
+    }
+  }
+
   // MARK: - Helpers
+
+  private struct EngineDispatcher: RuntimeProcessDispatching {
+    let stdout: Data
+    func unavailableReason(providerID: String) -> String? { nil }
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      ProviderProcessReceipt(
+        exitStatus: 0, stdout: stdout, stderr: Data(), stdoutTruncated: false,
+        durationSeconds: 0.01)
+    }
+  }
+
+  private var engineArtifacts: RuntimeArtifactStore!
+
+  private func makeEngine() throws -> RuntimeJobEngine {
+    let scope = state.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    engineArtifacts = try RuntimeArtifactStore(
+      rootURL: scope.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-07-31T00:00:00Z" })
+    return try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: scope.appending(path: "engine", directoryHint: .isDirectory)),
+      providers: DeviceProviderRegistry(providers: [
+        WorkspaceProvider(
+          registry: WorkspaceProjectRegistry(roots: ["TestProject": root.path]),
+          operations: provider)
+      ]),
+      dispatcher: EngineDispatcher(stdout: Data("observation\n".utf8)),
+      capabilityStore: try RuntimeCapabilityStore(
+        directoryURL: scope.appending(path: "capabilities", directoryHint: .isDirectory)),
+      artifactStore: engineArtifacts,
+      nowUTC: { "2026-07-31T00:00:00Z" })
+  }
+
+  private func engineRequest(
+    _ reference: String, inputs: [String: JSONValue]
+  ) throws -> Data {
+    let parts = reference.split(separator: "@")
+    let request = try RuntimeOperationRequest(
+      requestID: "req-\(UUID().uuidString.prefix(8).lowercased())",
+      idempotencyKey: "idem-\(UUID().uuidString.lowercased())",
+      target: DurableTargetReference(targetID: "TestProject", expectedBindingRevision: nil),
+      operation: RuntimeOperationReference(id: String(parts[0]), version: Int(parts[1])!),
+      inputs: inputs)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(request)
+  }
 
   private func makeProfile(withSourceControl: Bool) throws -> WorkspaceProjectProfile {
     let grep = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/grep")
