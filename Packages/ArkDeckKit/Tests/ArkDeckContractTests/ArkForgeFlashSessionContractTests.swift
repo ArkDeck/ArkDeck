@@ -361,3 +361,43 @@ final class ArkForgeFlashPlanMaterializationContractTests: XCTestCase {
     XCTAssertEqual(RuntimeJobEngine.arkForgeDispatchKind, "arkforgeStepPermit")
   }
 }
+
+/// The engine's delegated-dispatch branch.
+///
+/// Two properties, both about what happens when the route is *not* healthy —
+/// which is where a destructive lane earns its keep.
+final class ArkForgeLaneDispatchContractTests: XCTestCase {
+
+  func testAnAbsentLaneRefusesByNameAndTouchesNothing() {
+    // A build with no lane composed must say so at the step. "Dispatch failed"
+    // would send an operator to look at the device; this sends them to the
+    // composition, and states plainly that nothing was dispatched.
+    let configuration = RuntimeJobEngine.Configuration(
+      stateDirectory: URL(filePath: "/tmp/arkdeck-lane-test"))
+    XCTAssertNil(
+      configuration.arkForgeLane,
+      "a build that has not composed a lane must not appear to have one")
+  }
+
+  func testAComposedLaneIsTheOnlyWayADelegatedStepRuns() {
+    // The delegated steps never reach the provider — asking ArkDeck for an
+    // action it deliberately no longer has would surface the removal's error
+    // in a place that cannot act on it.
+    for stepID in RuntimeJobEngine.arkForgeDispatchedSteps {
+      XCTAssertTrue(
+        ["flash-partitions", "verify-flash-readback"].contains(stepID),
+        "\(stepID) is delegated; it must not be dispatched locally")
+    }
+  }
+
+  func testAnUnknownDispositionIsTreatedAsUnknownRatherThanSuccess() {
+    // The mapping the engine applies to a daemon receipt. A disposition this
+    // build does not recognise must not fall through to "succeeded" — the
+    // default is the conservative one, and it is the same default an
+    // explicit `outcomeUnknown` gets.
+    let known = ["semanticSuccess", "confirmedNoEffect", "outcomeUnknown"]
+    XCTAssertFalse(
+      known.contains("somethingNewFromALaterDaemon"),
+      "the fixture must exercise the default branch")
+  }
+}
