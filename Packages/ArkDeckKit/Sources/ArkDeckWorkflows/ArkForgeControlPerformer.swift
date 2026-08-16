@@ -2,6 +2,32 @@ import ArkDeckCore
 import ArkForgeIPC
 import Foundation
 
+/// The device a delegated step was admitted against, carried from the engine
+/// to the lane.
+///
+/// Passed rather than resolved. The engine holds this already — it is the
+/// context the step was admitted under — and letting the lane look it up again
+/// would allow the two to disagree about which device is under the write,
+/// which is the one disagreement that cannot be allowed here.
+package struct ArkForgeLaneDeviceBinding: Sendable, Equatable {
+  package let connectKey: String
+  package let stableIdentitySHA256: String
+  package let targetID: String
+  package let bindingRevision: Int
+  package let usbTopology: String
+
+  package init(
+    connectKey: String, stableIdentitySHA256: String, targetID: String,
+    bindingRevision: Int, usbTopology: String
+  ) {
+    self.connectKey = connectKey
+    self.stableIdentitySHA256 = stableIdentitySHA256
+    self.targetID = targetID
+    self.bindingRevision = bindingRevision
+    self.usbTopology = usbTopology
+  }
+}
+
 /// Performs the semantic control actions `arkforged` asks for, using the HDC
 /// actions ArkDeck kept.
 ///

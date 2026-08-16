@@ -475,7 +475,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       ])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
-      performer: SilentPerformer(),
+      makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeAuthority: { _, _ in
         ArkForgeExecutionAuthority(
@@ -489,10 +489,15 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
           now: { 0 })
       })
 
+    let binding = ArkForgeLaneDeviceBinding(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+      targetID: "TGT-1", bindingRevision: 2, usbTopology: "0x14200000")
     let first = try await host.perform(
-      stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+      stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+      binding: binding)
     let second = try await host.perform(
-      stepID: "verify-flash-readback", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+      stepID: "verify-flash-readback", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+      binding: binding)
 
     XCTAssertEqual(first.stepID, "flash-partitions")
     XCTAssertEqual(second.stepID, "verify-flash-readback")
@@ -505,7 +510,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let daemon = CountingDaemon(counter: StartCounter(), events: [])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
-      performer: SilentPerformer(),
+      makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeAuthority: { _, _ in
         ArkForgeExecutionAuthority(
@@ -521,7 +526,10 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
     do {
       _ = try await host.perform(
-        stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+        stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+        binding: ArkForgeLaneDeviceBinding(
+          connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+          targetID: "TGT-1", bindingRevision: 2, usbTopology: "0x14200000"))
       XCTFail("a step with no receipt must not be reported as performed")
     } catch {
       XCTAssertEqual(
