@@ -44,7 +44,14 @@ package actor ArkForgeFlashSession {
   /// HDC work and shaping is a contract. The port refuses a receipt that would
   /// leak; this is what produces the observation it refuses or accepts.
   package protocol ControlPerformer: Sendable {
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    /// Takes the whole request, not just the action.
+    ///
+    /// `READ_BUILD_FACTS` is the reason: the daemon states which fact it needs
+    /// confirmed, and a performer given only the action would have to invent
+    /// an expectation — which is exactly the postflight failure AF-011 exists
+    /// to stop, since an invented expectation is one the device is guaranteed
+    /// to meet.
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
   }
 
@@ -183,7 +190,7 @@ package actor ArkForgeFlashSession {
   ) async throws {
     let observation: ArkForgeManagedControlPort.Observation
     do {
-      observation = try await performer.perform(request.action, stepID: request.stepID)
+      observation = try await performer.perform(request)
     } catch {
       // Failing to perform is not "nothing happened": the action may have taken
       // effect before the failure. Reported as unaccepted with the reason,

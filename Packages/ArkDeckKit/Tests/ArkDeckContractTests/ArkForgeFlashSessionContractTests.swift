@@ -71,14 +71,14 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
 
   private struct StubPerformer: ArkForgeFlashSession.ControlPerformer {
     let observation: ArkForgeManagedControlPort.Observation
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
     { observation }
   }
 
   private struct FailingPerformer: ArkForgeFlashSession.ControlPerformer {
     struct Boom: Error {}
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
     { throw Boom() }
   }
@@ -572,7 +572,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
   }
 
   private struct SilentPerformer: ArkForgeFlashSession.ControlPerformer {
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
     { .init(accepted: true, facts: [:], evidenceSHA256: []) }
   }
