@@ -336,3 +336,28 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
     XCTAssertTrue(receipt.typedSkipReason.isEmpty)
   }
 }
+
+/// The materialization seam: a flash plan exists again, and says who performs it.
+///
+/// Before this, `flash.dayu200` was refused at plan preflight — the two steps
+/// had no ArkDeck action to ask for, and asking threw. A plan that cannot be
+/// materialized cannot be reviewed, journalled, or shown to anyone, so the
+/// refusal was correct but terminal.
+final class ArkForgeFlashPlanMaterializationContractTests: XCTestCase {
+
+  func testTheTwoDelegatedStepsAreNamedRatherThanInferredFromTheirKind() {
+    // `flashPartition` and `verifyRemoteState` are catalog kinds other
+    // operations also use. Delegating by kind would move somebody else's step
+    // to a daemon that knows nothing about it.
+    XCTAssertEqual(
+      RuntimeJobEngine.arkForgeDispatchedSteps, ["flash-partitions", "verify-flash-readback"])
+  }
+
+  func testTheDispatchKindIsDistinctFromEveryLocalOne() {
+    // A plan digest that could not tell "ArkDeck ran this" from "arkforged ran
+    // this" would let the two be swapped without the digest moving.
+    let local = ["process", "processSequence", "hostManaged", "hostWorkspace"]
+    XCTAssertFalse(local.contains(RuntimeJobEngine.arkForgeDispatchKind))
+    XCTAssertEqual(RuntimeJobEngine.arkForgeDispatchKind, "arkforgeStepPermit")
+  }
+}
