@@ -696,9 +696,19 @@ package struct ArkTraceSummaryAnalyzerProfileLoader: Sendable {
         parserUpstreamRevision: manifest.traceStreamer.upstreamRevision,
         parserSHA256: manifest.traceStreamer.binarySHA256,
         parserBuildRecipeVersion: manifest.traceStreamer.buildRecipeVersion,
+        // The three adapter/schema versions are the one part of this contract
+        // the manifest does not carry, so they are asserted here instead: the
+        // operator who reviews a distribution states which envelope generation
+        // it produces, and `validateProvenance` refuses anything else. That
+        // makes them a release coupling, not a free-standing constant — an
+        // ArkTrace change that moves `TraceDatabaseStagingPreparer.indexVersion`
+        // must land here in the same window as the re-pin, or every job fails
+        // after admission with `analyzer.schemaMismatch` while the operation
+        // still reports itself available. ArkTrace 95ab38d moved the index
+        // schema from 2 to 3.
         parserAdapterVersion: "1",
         schemaAdapterVersion: "2",
-        indexSchemaVersion: 2))
+        indexSchemaVersion: 3))
   }
 
   /// One reviewed ArkTrace distribution generation serves two additive
