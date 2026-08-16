@@ -1,0 +1,9 @@
+{
+  "name": "feature1",
+  "version": "1.0.0",
+  "description": "Feature module used to exercise multi-package install.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}
