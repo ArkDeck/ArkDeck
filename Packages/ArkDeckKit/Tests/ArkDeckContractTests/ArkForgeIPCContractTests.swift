@@ -60,6 +60,27 @@ final class ArkForgeIPCContractTests: XCTestCase {
       "the daemon reports the bundled component this change pins (AD-023)")
   }
 
+  func testAReadyHandshakeFromALiveDaemonDecodes() throws {
+    // The other side of the standing facts, captured on 2026-08-16 from a
+    // daemon started with a pairing secret on stdin and the bundled tool
+    // bound. Worth pinning beside the not-ready frame: `executionReady` is a
+    // *derived* fact — empty blockers — and a decoder that read the two
+    // independently could report ready with a blocker still listed.
+    let hex =
+      "080118022205302e312e303001420d726b646576656c6f70746f6f6c4a40323331"
+      + "613035656639616165313766396338623864333830316233656332663461343635"
+      + "33323931373832303231666536353531373631306161313163373965"
+    let ack = try ArkForgeHelloAck.decode(bytes(hex))
+
+    XCTAssertTrue(ack.executionReady)
+    XCTAssertTrue(
+      ack.executionBlockers.isEmpty,
+      "ready and blockers are one fact stated twice; they cannot disagree")
+    XCTAssertEqual(ack.toolchainID, "rkdeveloptool")
+    XCTAssertTrue(ArkForgeToolchainPin.matchesPin(reportedSHA256: ack.toolchainSHA256))
+    XCTAssertNil(ack.refusal)
+  }
+
   func testAnOKResponseFromALiveDaemonDecodes() throws {
     // discoverDevices with no transport: OK, empty payload, stream ended.
     let response = try ArkForgeResponse.decode(bytes("0a055245512d31100318013001"))

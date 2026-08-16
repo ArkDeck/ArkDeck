@@ -660,6 +660,23 @@ public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
 public actor RuntimeJobEngine {
   private static let confirmedNotExecutedSemanticCode = "confirmedNotExecuted"
 
+  /// The route a delegated step takes instead of an ArkDeck provider action.
+  ///
+  /// Injected rather than constructed here: building one needs a running
+  /// `arkforged`, a pairing secret and an approved plan, none of which the
+  /// engine owns. Absent means this build cannot perform those steps, and the
+  /// engine says so at the step rather than pretending otherwise.
+  package protocol ArkForgeLane: Sendable {
+    /// Performs one delegated step and returns the daemon's semantic receipt.
+    ///
+    /// Throwing here is a dispatch failure like any other. What must never
+    /// happen is returning a receipt the daemon did not publish — the receipt
+    /// is the evidence, and inventing one would make a write look confirmed.
+    func perform(
+      stepID: String, jobID: String, planID: String, planSHA256: String
+    ) async throws -> ArkForgeActionReceiptSummary
+  }
+
   public struct Configuration: Sendable {
     package struct TestHooks: Sendable {
       package let beforeDispatchInstall: (@Sendable (String, String) async -> Void)?
@@ -691,6 +708,9 @@ public actor RuntimeJobEngine {
     public let defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy
     public let admissionFaultInjector: RuntimeAdmissionFaultInjector
     package let testHooks: TestHooks
+    /// Absent in every build that has not composed one. A delegated step then
+    /// refuses by name instead of failing somewhere less legible.
+    package let arkForgeLane: (any ArkForgeLane)?
 
     public init(
       stateDirectory: URL,
@@ -701,18 +721,21 @@ public actor RuntimeJobEngine {
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
       self.admissionFaultInjector = admissionFaultInjector
       self.testHooks = .none
+      self.arkForgeLane = nil
     }
 
     package init(
       stateDirectory: URL,
       defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy(),
       admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
-      testHooks: TestHooks
+      testHooks: TestHooks = .none,
+      arkForgeLane: (any ArkForgeLane)? = nil
     ) {
       self.stateDirectory = stateDirectory
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
       self.admissionFaultInjector = admissionFaultInjector
       self.testHooks = testHooks
+      self.arkForgeLane = arkForgeLane
     }
   }
 
@@ -1693,6 +1716,30 @@ public actor RuntimeJobEngine {
         expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
           for: descriptor, artifact: resolvedArtifact,
           artifactLeaseID: flashArtifactLeaseID))
+      // A delegated step never reaches the provider: arkforged performs it
+      // under a StepPermit this authority signs, and asking ArkDeck for an
+      // action it deliberately no longer has would only produce the removal's
+      // error message in a place that cannot act on it.
+      if Self.arkForgeDispatchedSteps.contains(step.stepID) {
+        if step.effect >= .deviceMutation {
+          // The capability is consumed before the write, exactly as on the
+          // local path. Delegating the mechanics does not delegate admission.
+          try await consumeCapabilityBeforeMutation(
+            jobID: jobID, descriptor: descriptor,
+            effect: Self.effectiveEffect(
+              descriptor: descriptor,
+              inputs: jobs[jobID]?.record.request.inputs ?? [:]),
+            validatedFacts: resolvedFacts)
+        }
+        try await dispatchThroughArkForge(
+          jobID: jobID, step: step, descriptor: descriptor, context: context)
+        completedStepIDs.insert(step.stepID)
+        if var runtime = jobs[jobID] {
+          runtime.completedStepIDs = completedStepIDs
+          jobs[jobID] = runtime
+        }
+        continue
+      }
       let action: TypedProviderAction
       do {
         action = try provider.action(
@@ -2468,6 +2515,98 @@ public actor RuntimeJobEngine {
         mediaType: declaration.mediaType, privacy: declaration.privacy,
         retentionClass: declaration.retentionClass, sourceOperation: descriptor.reference,
         providerID: descriptor.provider.rawValue, bindingSnapshot: binding, reason: reason)
+    }
+  }
+
+  /// Hands one delegated step to `arkforged` and records what came back.
+  ///
+  /// The receipt is the daemon's, unchanged. This method does not judge it: a
+  /// disposition of `outcomeUnknown` is journalled as such rather than retried,
+  /// because a write whose outcome is unknown is precisely what must not be
+  /// replayed (ArkForge `architecture.md` 14.1).
+  private func dispatchThroughArkForge(
+    jobID: String, step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor, context: ProviderExecutionContext
+  ) async throws {
+    guard let lane = configuration.arkForgeLane else {
+      // Named rather than generic. This build simply has no route to the
+      // daemon, which is a composition fact an operator can act on — unlike
+      // "dispatch failed", which sends them looking at the device.
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput,
+        "\(step.stepID) is performed by arkforged under a StepPermit, and this build has no "
+          + "ArkForge lane composed; nothing was dispatched and the device was not touched "
+          + "(CHG-2026-059)")
+    }
+    guard let runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let receipt = try await lane.perform(
+      stepID: step.stepID, jobID: jobID,
+      planID: "\(runtime.record.request.operation)",
+      planSHA256: runtime.record.materializedPlanDigest ?? "")
+
+    // The daemon's disposition is journalled as it stands. `outcomeUnknown` is
+    // not a failure to retry — it is a job that needs reconciling, and turning
+    // it into a retry is the one thing this whole change refuses to do.
+    let (result, certainty): (String, JournalOutcomeCertainty) = {
+      switch receipt.disposition {
+      case "semanticSuccess": return ("succeeded", .confirmed)
+      case "confirmedNoEffect": return ("failed", .confirmed)
+      case "outcomeUnknown": return ("failed", .outcomeUnknown)
+      default: return ("failed", .outcomeUnknown)
+      }
+    }()
+    guard var current = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let workflowStep = try Self.journalStep(
+      for: step, jobID: jobID, inputs: current.record.request.inputs,
+      action: nil, resolvedInputArtifact: context.resolvedInputArtifact,
+      operationReference: descriptor.reference)
+    let intentEventID = "intent-\(step.stepID)"
+    let isDeviceBound = step.binding == .confirmedDevice
+    let journalIdentity = context.expectedIdentitySHA256 ?? String(repeating: "0", count: 64)
+    try current.journal.appendAndSynchronize(
+      try JournalEvent.stepIntent(
+        eventID: intentEventID, sequence: current.nextSequence,
+        sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+        step: workflowStep,
+        target: JournalTarget(
+          scope: isDeviceBound ? "device" : "host",
+          targetID: current.record.request.target.targetID,
+          connectKey: isDeviceBound ? "sha256:\(journalIdentity)" : nil,
+          identitySnapshotHash: isDeviceBound ? journalIdentity : nil),
+        attempt: 1,
+        bindingRevision: isDeviceBound
+          ? (current.record.request.target.expectedBindingRevision ?? 1) : nil,
+        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+    current.nextSequence += 1
+    // Where this step stopped, so a restart knows. What it deliberately does
+    // *not* carry is a `recoveryAction`: there is no ArkDeck action to persist,
+    // and inventing one would be a record claiming this process could redo the
+    // write. The authoritative record for a delegated step is the permit in
+    // arkforged's durable ledger, keyed by the same (job, step, attempt) this
+    // intent names — so recovery asks the daemon what became of it rather than
+    // reconstructing an intent from a catalog.
+    current.record.recoveryStepID = step.stepID
+    current.record.recoveryIntentEventID = intentEventID
+    try persistRuntimeRecord(current.record)
+    try current.journal.appendAndSynchronize(
+      JournalEvent.stepOutcome(
+        eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
+        sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+        stepID: step.stepID, attempt: 1,
+        correlatesToIntentEventID: intentEventID,
+        result: result, outcomeCertainty: certainty,
+        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+    current.nextSequence += 1
+    jobs[jobID] = current
+
+    if certainty == .outcomeUnknown {
+      throw RuntimeDispatchFailure.failed(
+        "\(step.stepID) returned \(receipt.disposition) from arkforged; the job needs "
+          + "reconciliation and this permit must not be signed again")
     }
   }
 

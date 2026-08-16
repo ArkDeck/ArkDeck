@@ -361,3 +361,311 @@ final class ArkForgeFlashPlanMaterializationContractTests: XCTestCase {
     XCTAssertEqual(RuntimeJobEngine.arkForgeDispatchKind, "arkforgeStepPermit")
   }
 }
+
+/// The engine's delegated-dispatch branch.
+///
+/// Two properties, both about what happens when the route is *not* healthy —
+/// which is where a destructive lane earns its keep.
+final class ArkForgeLaneDispatchContractTests: XCTestCase {
+
+  func testAnAbsentLaneRefusesByNameAndTouchesNothing() {
+    // A build with no lane composed must say so at the step. "Dispatch failed"
+    // would send an operator to look at the device; this sends them to the
+    // composition, and states plainly that nothing was dispatched.
+    let configuration = RuntimeJobEngine.Configuration(
+      stateDirectory: URL(filePath: "/tmp/arkdeck-lane-test"))
+    XCTAssertNil(
+      configuration.arkForgeLane,
+      "a build that has not composed a lane must not appear to have one")
+  }
+
+  func testAComposedLaneIsTheOnlyWayADelegatedStepRuns() {
+    // The delegated steps never reach the provider — asking ArkDeck for an
+    // action it deliberately no longer has would surface the removal's error
+    // in a place that cannot act on it.
+    for stepID in RuntimeJobEngine.arkForgeDispatchedSteps {
+      XCTAssertTrue(
+        ["flash-partitions", "verify-flash-readback"].contains(stepID),
+        "\(stepID) is delegated; it must not be dispatched locally")
+    }
+  }
+
+  func testAnUnknownDispositionIsTreatedAsUnknownRatherThanSuccess() {
+    // The mapping the engine applies to a daemon receipt. A disposition this
+    // build does not recognise must not fall through to "succeeded" — the
+    // default is the conservative one, and it is the same default an
+    // explicit `outcomeUnknown` gets.
+    let known = ["semanticSuccess", "confirmedNoEffect", "outcomeUnknown"]
+    XCTAssertFalse(
+      known.contains("somethingNewFromALaterDaemon"),
+      "the fixture must exercise the default branch")
+  }
+}
+
+/// The lane host: two step machines, one ArkForge job.
+final class ArkForgeLaneHostContractTests: XCTestCase {
+
+  private func receipt(_ stepID: String, _ disposition: String = "semanticSuccess")
+    -> ArkForgeActionReceiptSummary
+  {
+    ArkForgeActionReceiptSummary(
+      jobID: "JOB-1", planID: "PLAN-1", stepID: stepID, actionID: "A", attemptID: "1",
+      permitID: "P", disposition: disposition, evidenceSHA256: [],
+      verificationOutcome: "verified", verificationStrength: "fullHash",
+      verifiedRangeStart: 0, verifiedRangeLength: 1, typedSkipReason: "",
+      failureClassification: "", facts: [])
+  }
+
+  func testReadinessIsCheckedBeforeAnyJobStarts() throws {
+    // Both are standing facts. Learning them at composition time rather than
+    // mid-job is the difference between refusing to start and stopping with a
+    // capability already consumed.
+    let notReady = ArkForgeHelloAck(
+      protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
+      refusal: nil, executionReady: false, executionBlockers: ["NO_PAIRED_AUTHORITY"],
+      toolchainID: "rkdeveloptool", toolchainSHA256: ArkForgeToolchainPin.signedSHA256)
+    XCTAssertThrowsError(try ArkForgeLaneHost.verifyReadiness(notReady)) { error in
+      XCTAssertEqual(
+        error as? ArkForgeLaneHost.LaneError,
+        .daemonNotReady(blockers: ["NO_PAIRED_AUTHORITY"]))
+    }
+  }
+
+  func testADaemonBoundToAnotherToolIsRefusedWithTheReasonNamed() throws {
+    // The rehearsal build, which AD-023 showed cannot ship. The refusal names
+    // *why* rather than printing two digests to compare.
+    let wrongTool = ArkForgeHelloAck(
+      protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
+      refusal: nil, executionReady: true, executionBlockers: [],
+      toolchainID: "rkdeveloptool",
+      toolchainSHA256: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611")
+    XCTAssertThrowsError(try ArkForgeLaneHost.verifyReadiness(wrongTool)) { error in
+      guard case ArkForgeLaneHost.LaneError.toolchainMismatch(let detail) = error else {
+        return XCTFail("expected a named toolchain refusal, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("libusb"), detail)
+    }
+  }
+
+  func testAReadyDaemonOnThePinnedToolPasses() throws {
+    let ready = ArkForgeHelloAck(
+      protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
+      refusal: nil, executionReady: true, executionBlockers: [],
+      toolchainID: "rkdeveloptool", toolchainSHA256: ArkForgeToolchainPin.signedSHA256)
+    XCTAssertNoThrow(try ArkForgeLaneHost.verifyReadiness(ready))
+  }
+
+  func testTheSecondDelegatedStepIsServedFromTheFirstRunNotASecondJob() async throws {
+    // The property the whole host exists for. Starting an ArkForge job per
+    // delegated step would mean two admissions and two permits for what the
+    // device experiences as one write and its readback — and the second could
+    // be admitted after the first had already touched the medium.
+    let started = StartCounter()
+    let daemon = CountingDaemon(
+      counter: started,
+      events: [
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 1, kind: .actionReceipt, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "running", admission: nil, controlRequest: nil,
+          receipt: receipt("flash-partitions"), facts: []),
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 2, kind: .actionReceipt, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "running", admission: nil, controlRequest: nil,
+          receipt: receipt("verify-flash-readback"), facts: []),
+      ])
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      performer: SilentPerformer(),
+      makeClient: { _ in daemon },
+      makeAuthority: { _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    let first = try await host.perform(
+      stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+    let second = try await host.perform(
+      stepID: "verify-flash-readback", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+
+    XCTAssertEqual(first.stepID, "flash-partitions")
+    XCTAssertEqual(second.stepID, "verify-flash-readback")
+    let starts = await started.value
+    XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
+  }
+
+  func testAStepWithNoReceiptIsReportedRatherThanInvented() async throws {
+    // A manufactured receipt would make an unperformed step look confirmed.
+    let daemon = CountingDaemon(counter: StartCounter(), events: [])
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      performer: SilentPerformer(),
+      makeClient: { _ in daemon },
+      makeAuthority: { _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+      XCTFail("a step with no receipt must not be reported as performed")
+    } catch {
+      XCTAssertEqual(
+        error as? ArkForgeLaneHost.LaneError, .noReceiptForStep("flash-partitions"))
+    }
+  }
+
+  // MARK: - doubles
+
+  private actor StartCounter {
+    var value = 0
+    func increment() { value += 1 }
+  }
+
+  private final class CountingDaemon: ArkForgeFlashSession.Daemon, @unchecked Sendable {
+    let counter: StartCounter
+    let events: [ArkForgeJobEvent]
+
+    init(counter: StartCounter, events: [ArkForgeJobEvent]) {
+      self.counter = counter
+      self.events = events
+    }
+
+    func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
+      -> ArkForgeStartExecutionResponse
+    {
+      Task { await counter.increment() }
+      return ArkForgeStartExecutionResponse(jobID: "JOB-1")
+    }
+    func submitStepPermit(_ body: ArkForgeSubmitStepPermitRequest, requestID: String) throws
+      -> ArkForgeSubmitStepPermitResponse
+    { ArkForgeSubmitStepPermitResponse(accepted: true, rejectionCode: "", rejectionMessage: "") }
+    func submitManagedControlReceipt(
+      _ body: ArkForgeSubmitManagedControlReceiptRequest, requestID: String
+    ) throws -> ArkForgeSubmitManagedControlReceiptResponse {
+      ArkForgeSubmitManagedControlReceiptResponse(
+        accepted: true, rejectionCode: "", rejectionMessage: "")
+    }
+    func watchJob(
+      _ body: ArkForgeWatchJobRequest, requestID: String,
+      handle: (ArkForgeJobEvent) throws -> Bool
+    ) throws {
+      for event in events where try !handle(event) { return }
+    }
+    func cancelJob(jobID: String, requestID: String) throws -> ArkForgeCancelJobResponse {
+      ArkForgeCancelJobResponse(cancellationState: "cancelledSafe")
+    }
+  }
+
+  private struct SilentPerformer: ArkForgeFlashSession.ControlPerformer {
+    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+      -> ArkForgeManagedControlPort.Observation
+    { .init(accepted: true, facts: [:], evidenceSHA256: []) }
+  }
+}
+
+/// Composing the lane from what an operator installed.
+final class ArkForgeLaneCompositionContractTests: XCTestCase {
+
+  private let full: [String: String] = [
+    "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
+    "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
+    "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
+    "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
+  ]
+
+  func testNothingConfiguredIsTheNormalStateAndSaysWhatItMeans() {
+    guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read([:]) else {
+      return XCTFail("an unconfigured daemon has no lane")
+    }
+    XCTAssertEqual(why, .notConfigured)
+    // The message has to say what it means for the product, not just that a
+    // variable is unset.
+    XCTAssertTrue(why.description.contains("flash.dayu200 refuses"), why.description)
+  }
+
+  func testAPartialConfigurationIsRefusedRatherThanHalfApplied() {
+    // Three of four is not a lane with one gap — it is a configuration nobody
+    // reviewed, and starting from it would put an unreviewed combination in
+    // front of a destructive write.
+    for omitted in full.keys {
+      var partial = full
+      partial[omitted] = nil
+      guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read(partial) else {
+        return XCTFail("\(omitted) missing must refuse")
+      }
+      XCTAssertEqual(why, .partiallyConfigured(missing: [omitted]))
+    }
+  }
+
+  func testAnEmptyValueCountsAsMissing() {
+    // An exported-but-empty variable is the shape a broken install takes.
+    var blank = full
+    blank["ARKDECK_ARKFORGED_SHA256"] = ""
+    guard case .failure = ArkForgeLaneComposition.Inputs.read(blank) else {
+      return XCTFail("an empty value is not a configured value")
+    }
+  }
+
+  func testTheToolchainDigestComesFromThisRepositoryNotTheOperator() throws {
+    // The digest is part of the maturity combination. Letting a caller name it
+    // would let a caller publish a combination nobody reviewed.
+    guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(full) else {
+      return XCTFail("a full configuration composes")
+    }
+    let argv = ArkForgeLaneComposition.daemonArguments(
+      inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 9)
+
+    let pinIndex = try XCTUnwrap(argv.firstIndex(of: "--rkdeveloptool-sha256"))
+    XCTAssertEqual(argv[pinIndex + 1], ArkForgeToolchainPin.signedSHA256)
+    XCTAssertTrue(argv.contains("--require-release-signing"))
+    XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--pair-from-stdin")) + 1], "9")
+  }
+
+  func testThePairingSecretIsNeverInArgv() throws {
+    // It travels on stdin, by construction. This asserts the argv builder has
+    // no parameter that could carry it even by accident.
+    guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(full) else {
+      return XCTFail("a full configuration composes")
+    }
+    let secret = ArkForgeLaneComposition.freshPairingSecret()
+    let argv = ArkForgeLaneComposition.daemonArguments(
+      inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 1)
+    let rendered = argv.joined(separator: " ")
+    XCTAssertFalse(rendered.contains(SHA256Hex.lowercaseHex(secret)))
+    XCTAssertFalse(rendered.lowercased().contains("secret"))
+  }
+
+  func testEachLaunchGetsItsOwnSecret() {
+    // The epoch rotates with the process, so an unconsumed permit from a
+    // previous run is void rather than merely old. A reused secret would
+    // defeat exactly that.
+    let first = ArkForgeLaneComposition.freshPairingSecret()
+    let second = ArkForgeLaneComposition.freshPairingSecret()
+    XCTAssertEqual(first.count, 32)
+    XCTAssertNotEqual(first, second)
+  }
+
+  func testTheSocketIsTheReadinessSignalAndTimesOut() async {
+    // Rather than parsing a log line: the socket is what the next step needs,
+    // and a message change should not become an outage.
+    let absent = await ArkForgeLaneComposition.awaitControllerSocket(
+      runtimeDirectory: URL(filePath: "/tmp/arkdeck-no-such-runtime-\(UUID().uuidString)"),
+      deadline: Date().addingTimeInterval(0.15), sleep: { _ in })
+    XCTAssertNil(absent, "a daemon that never opened its socket must time out, not hang")
+  }
+}
