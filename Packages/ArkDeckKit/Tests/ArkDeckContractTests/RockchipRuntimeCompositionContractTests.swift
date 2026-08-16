@@ -754,10 +754,20 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           emptyFirstTargetList: false)),
       usbProbe: TopologyBoundUSBProbe(connectKey: nextConnectKey, topology: "42"),
       postFlashHDCBindingStore: buildStore)
-    await XCTAssertThrowsErrorAsync(
-      try await badBuildExecutor.execute(
+    // Spelled out rather than routed through XCTAssertThrowsErrorAsync so the
+    // refusal has to name the mismatch: a nonempty version that simply differs
+    // from the profile pin must fail closed, and say which readback disagreed.
+    do {
+      _ = try await badBuildExecutor.execute(
         action: action, descriptor: hostDescriptor(plan),
-        rockchipExecutable: component, actionDirectory: root))
+        rockchipExecutable: component, actionDirectory: root)
+      XCTFail("a nonempty version that differs from the profile pin must fail closed")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .failed(let detail) = failure else {
+        return XCTFail("version mismatch must be a confirmed failure: \(failure)")
+      }
+      XCTAssertTrue(detail.contains("does not match"), detail)
+    }
     XCTAssertNil(try buildStore.loadIfPresent())
 
     let topologyStore = RockchipPostFlashHDCBindingStore(
@@ -2175,38 +2185,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     let reason = try XCTUnwrap(host.unavailableReason())
     XCTAssertTrue(reason.contains("record root is unavailable"), reason)
-  }
-
-  func testPostFlashBuildVerificationRejectsNonemptyButInexactProfileVersion() async throws {
-    let root = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let hdcSHA = String(repeating: "d", count: 64)
-    let rockchipSHA = String(repeating: "c", count: 64)
-    let log = CommandLog(buildVersion: "OpenHarmony-7.0.0.34")
-    let executor = FoundationRockchipRuntimeActionExecutor(
-      hdcResolver: FixedExecutableResolver(
-        table: ["hdc": ResolvedExecutable(path: "/product/hdc", sha256: hdcSHA)]),
-      runner: ScriptedCommandRunner(log: log),
-      usbProbe: FixedUSBProbe(identity: String(repeating: "a", count: 64)))
-    let action = RockchipProviderAction.verifyBuild(
-      connectKey: "device-1",
-      expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
-      expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion)
-    let plan = try rockchipPlan(
-      action: action, stepID: "verify-exact-build", toolSHA256: rockchipSHA)
-    do {
-      _ = try await executor.execute(
-        action: action, descriptor: hostDescriptor(plan),
-        rockchipExecutable: ResolvedExecutable(
-          path: "/product/rkdeveloptool", sha256: rockchipSHA),
-        actionDirectory: root)
-      XCTFail("a nonempty version that differs from the profile pin must fail closed")
-    } catch let failure as RuntimeDispatchFailure {
-      guard case .failed(let detail) = failure else {
-        return XCTFail("version mismatch must be a confirmed failure: \(failure)")
-      }
-      XCTAssertTrue(detail.contains("does not match"))
-    }
   }
 
   private func rockchipPlan(

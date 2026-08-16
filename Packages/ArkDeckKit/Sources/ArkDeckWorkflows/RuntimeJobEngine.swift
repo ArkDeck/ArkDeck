@@ -6980,7 +6980,7 @@ public actor RuntimeJobEngine {
       switch action {
       case .rockchip(.rebindLoader):
         arguments = ["evidencePolicy": .string("rockusbLoaderIdentity")]
-      case .rockchip(.verifyBuild), .rockchip(.verifyBoundBuild):
+      case .rockchip(.verifyBoundBuild):
         arguments = ["evidencePolicy": .string("postFlashBuild")]
       default:
         arguments = ["evidencePolicy": .string("coreMinimum")]

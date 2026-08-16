@@ -925,7 +925,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         id: stepID, kind: .probeDevice, declaredEffect: .readOnly,
         declaredCancellation: .immediate,
         declaredBindingRequirement: .confirmedDevice,
-        arguments: ["evidencePolicy": .string("verifyBuild")])
+        arguments: ["evidencePolicy": .string("postFlashBuild")])
     default:
       throw NSError(domain: "fixture", code: 1)
     }
@@ -960,9 +960,16 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       legacyKind = nil
       action = .waitForHDCReconnect(connectKey: "fixture-connect-key")
     case "rebind-and-verify-build":
+      // The bound verification, which is what a real post-flash proof holds:
+      // the unbound one this fixture used to write proved no device identity
+      // and no longer exists.
       legacyKind = nil
-      action = .verifyBuild(
-        connectKey: "fixture-connect-key", expectedProductModel: "DAYU200",
+      action = .verifyBoundBuild(
+        expectation: RockchipHDCReconnectExpectation(
+          previousConnectKey: "fixture-connect-key",
+          previousIdentitySHA256: identity,
+          usbTopology: "42"),
+        expectedProductModel: "DAYU200",
         expectedBuildVersion: "OpenHarmony fixture")
     default: throw NSError(domain: "fixture", code: 2)
     }
