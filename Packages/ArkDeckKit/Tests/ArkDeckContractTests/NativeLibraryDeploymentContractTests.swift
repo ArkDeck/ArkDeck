@@ -694,6 +694,140 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertTrue(capabilities.isEmpty)
   }
 
+  /// `verify-loaded-library` must say whether it actually looked at the loader.
+  ///
+  /// The step's published note promises "loaded-library/build-id verification
+  /// per verificationProfile", and under any profile below `hashProcessAndMaps`
+  /// it reads no `/proc/*/maps` at all — the target path and the loader-visible
+  /// path are different mount views, so a matching on-disk hash plus a live PID
+  /// does not mean the loader mapped the new library. That weaker run used to
+  /// return a `.verified` byte-identical to a run that did prove it, because
+  /// `loaderVerified` was written only inside the strong branch and absence
+  /// carried the whole difference. The GJ-3 run records quote
+  /// `loaderVerified=true` as their proof, so absence was invisible there.
+  ///
+  /// The compensation path is the standard this measures against:
+  /// `.rollbackNativeLibrary` issues its maps read and requires `mapsMatched`
+  /// whatever the profile says. The success path may prove less; it may not be
+  /// silent about proving less.
+  func testLoaderVerificationStatesWhetherItObservedTheLoader() throws {
+    let bytes = NativeLibraryTestFixture.arm64ELF()
+    let file = stateDirectory.appending(path: "libarkdeck_gj.so")
+    try FileManager.default.createDirectory(
+      at: stateDirectory, withIntermediateDirectories: true)
+    try bytes.write(to: file)
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(
+        reference: "deploy.native-library.app-owned@1"))
+    let provider = HDCObservationProviderAdapter(
+      factsPort: FactsPort(),
+      appOwnedNativeLibraryAvailability: .available)
+    let step = try XCTUnwrap(
+      descriptor.steps.first { $0.stepID == "verify-loaded-library" })
+    let context = ProviderExecutionContext(
+      jobID: "job-native-loader", stepID: step.stepID,
+      targetID: "TGT-001", bindingRevision: 7,
+      connectKey: "150100424a544e4600",
+      expectedIdentitySHA256: Self.identity,
+      toolVersion: "3.2.0f", toolSHA256: String(repeating: "a", count: 64),
+      nowUTC: "2026-07-30T00:00:00Z",
+      resolvedInputArtifact: ProviderResolvedInputArtifact(
+        artifactID: "ART-1", fileURL: file,
+        sha256: NativeLibraryTestFixture.sha256(bytes), byteCount: bytes.count))
+    let publishedHash = NativeLibraryTestFixture.sha256(bytes)
+
+    /// `profile == nil` omits the input entirely, which is the shape a caller
+    /// that never names a profile actually submits.
+    func deployment(profile: String?) throws -> HDCAppOwnedNativeLibraryDeployment {
+      var inputs: [String: JSONValue] = [
+        "libraryArtifactLease": .string("lease-v1:input:ART-1"),
+        "targetBundle": .string("com.example.nativegj"),
+        "libraryLogicalName": .string("libarkdeck_gj.so"),
+        "expectedABI": .string("arm64-v8a"),
+      ]
+      if let profile { inputs["verificationProfile"] = .string(profile) }
+      let action = try provider.action(
+        for: step, operation: descriptor, inputs: inputs, context: context)
+      guard case .hdc(.inspectNativeLibrary(let resolved, .targetLoaded)) = action else {
+        throw XCTSkip("verify-loaded-library must materialize a loader inspection")
+      }
+      return resolved
+    }
+
+    func mapsReads(_ deployment: HDCAppOwnedNativeLibraryDeployment) throws -> Int {
+      let plan = try provider.lower(
+        action: .hdc(.inspectNativeLibrary(deployment, expectation: .targetLoaded)),
+        context: context)
+      guard case .processSequence(_, let invocations) = plan.kind else {
+        throw XCTSkip("loader inspection must lower to an exact sequence")
+      }
+      return invocations.filter { $0.arguments.contains("/proc/*/maps") }.count
+    }
+
+    func sub(_ stdout: String) -> ProviderSubprocessReceipt {
+      ProviderSubprocessReceipt(
+        exitStatus: 0, stdout: Data(stdout.utf8), stderr: Data(),
+        stdoutTruncated: false, durationSeconds: 0.01)
+    }
+
+    func verdict(
+      _ deployment: HDCAppOwnedNativeLibraryDeployment, mapsObserved: Bool
+    ) throws -> ProviderSemanticOutcome {
+      let attested = sub("ARKDECK_CODE_SIGN_VERIFIED sha256:\(publishedHash)\n")
+      var subprocesses = [
+        sub("\(publishedHash)  target\n"), attested, attested,
+      ]
+      if deployment.verificationProfile != .hashOnly {
+        subprocesses.append(sub("4321\n"))
+      }
+      if mapsObserved {
+        subprocesses.append(
+          sub("/proc/4321/maps:7f000 \(deployment.loaderVisiblePath)\n"))
+      }
+      return try provider.verify(
+        receipt: ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data(), stderr: Data(), stdoutTruncated: false,
+          durationSeconds: 0.1, subprocesses: subprocesses),
+        action: .hdc(.inspectNativeLibrary(deployment, expectation: .targetLoaded)),
+        context: context)
+    }
+
+    // The strong profile is the only one that reads the loader, and the only
+    // one whose verdict may claim it.
+    let strong = try deployment(profile: "hashProcessAndMaps")
+    XCTAssertEqual(strong.verificationProfile, .hashProcessAndMaps)
+    XCTAssertEqual(try mapsReads(strong), 1)
+    guard case .verified(let strongSummary) = try verdict(strong, mapsObserved: true) else {
+      return XCTFail("a mapped library under the strong profile must verify")
+    }
+    XCTAssertEqual(strongSummary["loaderVerified"], "true")
+
+    // Negative on the read itself: the two weaker profiles issue no maps read,
+    // which is what makes their `.verified` a weaker claim.
+    for profile in ["hashAndProcess", "hashOnly"] {
+      let weak = try deployment(profile: profile)
+      XCTAssertEqual(try mapsReads(weak), 0, profile)
+      guard case .verified(let summary) = try verdict(weak, mapsObserved: false) else {
+        return XCTFail("\(profile) still verifies what it did read")
+      }
+      XCTAssertEqual(summary["loaderVerified"], "notObserved", profile)
+    }
+
+    // And the shape a caller who names no profile gets: the runtime's own
+    // fallback, which is one of the weak ones. It must be labelled the same
+    // way — this is the run that reaches a device when nobody chose.
+    let defaulted = try deployment(profile: nil)
+    XCTAssertEqual(try mapsReads(defaulted), 0)
+    guard case .verified(let defaultedSummary) = try verdict(defaulted, mapsObserved: false)
+    else {
+      return XCTFail("the defaulted profile still verifies what it did read")
+    }
+    XCTAssertEqual(defaultedSummary["loaderVerified"], "notObserved")
+    XCTAssertNotEqual(
+      defaultedSummary["loaderVerified"], strongSummary["loaderVerified"],
+      "a run that never read the loader must not be recorded like one that did")
+  }
+
   func testPersistedNativeActionReusesExactClosedLegacyPaths() throws {
     let jobID = "job-native-legacy-paths"
     let bundleName = "com.example.nativegj"

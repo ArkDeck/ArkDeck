@@ -2267,6 +2267,18 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         "abi": deployment.artifactFacts.abi.rawValue,
       ]
       summary.merge(attestation) { current, _ in current }
+      // Always stated, never left to an absent key. Under a profile below
+      // `hashProcessAndMaps` this step reads no `/proc/*/maps` at all, so its
+      // `.verified` says only that the bytes on disk match and a process is
+      // alive — and the target path and the loader-visible path are different
+      // mount views, so neither implies the loader mapped the new library.
+      // Silence would be indistinguishable from a run that did prove it, which
+      // is exactly how a GJ-3 record could read `verified` over a library that
+      // was never loaded. The compensation path holds the stronger bar
+      // unconditionally: `.rollbackNativeLibrary` requires `mapsMatched`
+      // whatever the profile says, so a success path that quietly proves less
+      // must at least say so.
+      summary["loaderVerified"] = Self.loaderNotObserved
       if deployment.verificationProfile != .hashOnly {
         guard subprocesses.count >= 4,
           let pids = processIDs(subprocesses[3]), !pids.isEmpty
@@ -2322,6 +2334,11 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       return .verified(summary: [
         "restoredSha256": targetHash,
         "restored": "true",
+        // Same rule as the publish readback: under a weaker profile this read
+        // never looked at the loader, and "restored" must not be read as
+        // "restored and mapped".
+        "loaderVerified": deployment.verificationProfile == .hashProcessAndMaps
+          ? "true" : Self.loaderNotObserved,
       ])
     }
   }
@@ -2360,6 +2377,12 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
   private static let unattestedErrnoFields: Set<String> = [
     "errno=61", "errno=95",
   ]
+
+  /// `loaderVerified` when the readback never looked at `/proc/*/maps`.
+  /// A distinct value rather than an absent key, for the same reason
+  /// `publishedWithoutAttestation` has its own marker: silence is also what a
+  /// readback that never ran produces, and a reader cannot tell those apart.
+  static let loaderNotObserved = "notObserved"
 
   private func readbackAttestation(
     _ receipt: ProviderSubprocessReceipt
