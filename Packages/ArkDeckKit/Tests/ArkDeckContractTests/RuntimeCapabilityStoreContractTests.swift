@@ -22,6 +22,50 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     try RuntimeCapabilityStore(directoryURL: directoryURL)
   }
 
+  /// Revocation rebuilds the value and re-validates it, so every pin has to be
+  /// carried forward. `exactArtifactFacts` was not, so it defaulted to nil and
+  /// re-validation failed `runtimePolicyRequiresExactArtifactFacts` — the throw
+  /// surfaced as `storeCorrupted` and the capability **stayed active**. A
+  /// destructive Runtime-issued capability could therefore never be withdrawn,
+  /// which is the one kind that most needs to be.
+  func testADestructiveRuntimeIssuedCapabilityCanActuallyBeRevoked() async throws {
+    let store = try makeStore()
+    let identity = String(repeating: "a", count: 64)
+    let planDigest = String(repeating: "b", count: 64)
+    let artifactFacts = ["imageBundleSha256": String(repeating: "c", count: 64)]
+    try await store.install(
+      try RuntimeCapability(
+        capabilityID: "CAP-RT-DESTRUCTIVE-REVOKE",
+        targetScope: .stablePhysicalIdentity(sha256: identity),
+        operationScope: [.init(operationID: "flash.dayu200", version: nil)],
+        effectCeiling: .destructive,
+        exactInputs: ["imageBundleLease": .string("lease-1")],
+        exactArtifactFacts: artifactFacts,
+        issuedAtUTC: "2026-08-01T00:00:00Z",
+        expiresAtUTC: "2026-08-01T04:00:00Z",
+        maximumUses: 1,
+        issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:flash.dayu200"),
+        exactPlanDigest: planDigest))
+
+    try await store.revoke(
+      capabilityID: "CAP-RT-DESTRUCTIVE-REVOKE",
+      atUTC: "2026-08-01T01:00:00Z",
+      reason: "withdrawn")
+
+    let records = try await store.list()
+    let revoked = try XCTUnwrap(
+      records.first { $0.capability.capabilityID == "CAP-RT-DESTRUCTIVE-REVOKE" })
+    guard case .revoked(let atUTC, let reason) = revoked.capability.revocation else {
+      return XCTFail("the capability must be revoked, got \(revoked.capability.revocation)")
+    }
+    XCTAssertEqual(atUTC, "2026-08-01T01:00:00Z")
+    XCTAssertEqual(reason, "withdrawn")
+    // The pin must survive revocation, not merely be tolerated by it: a record
+    // that lost its artifact pin would no longer describe what was authorized.
+    XCTAssertEqual(revoked.capability.exactArtifactFacts, artifactFacts)
+    XCTAssertEqual(revoked.capability.exactPlanDigest, planDigest)
+  }
+
   private func e1Capability(
     id: String = "CAP-RT-STORE-001",
     maximumUses: Int = 2,

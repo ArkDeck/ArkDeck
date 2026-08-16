@@ -253,6 +253,12 @@ public actor RuntimeCapabilityStore {
           effectCeiling: existing.effectCeiling,
           inputConstraints: existing.inputConstraints,
           exactInputs: existing.exactInputs,
+          // Revocation rebuilds the value and must carry every pin forward.
+          // This one was dropped, so it defaulted to nil and re-validation
+          // failed `runtimePolicyRequiresExactArtifactFacts` — which meant a
+          // destructive Runtime-issued capability could not be revoked at all:
+          // the throw became `storeCorrupted` and the capability stayed active.
+          exactArtifactFacts: existing.exactArtifactFacts,
           issuedAtUTC: existing.issuedAtUTC,
           expiresAtUTC: existing.expiresAtUTC,
           maximumUses: existing.maximumUses,
