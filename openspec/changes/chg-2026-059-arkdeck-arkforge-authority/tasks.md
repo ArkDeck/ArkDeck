@@ -36,6 +36,7 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
   - `Packages/ArkDeckKit/LaunchAgents/LaunchAgentService.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `docs/design/rockchip-read-domain.md`
