@@ -144,7 +144,7 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
 
     var master: Int32 = -1
     var slave: Int32 = -1
-    guard openpty(&master, &slave, nil, nil, nil) == 0 else {
+    guard unsafe openpty(&master, &slave, nil, nil, nil) == 0 else {
       throw IdentityBoundPTYError.ptyAllocationFailed(errno)
     }
     defer {
@@ -154,52 +154,52 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
     // The parent owns the privacy boundary. Do not rely on the signer to win
     // a race between printing its prompt and disabling terminal echo.
     var terminal = termios()
-    guard tcgetattr(slave, &terminal) == 0 else {
+    guard unsafe tcgetattr(slave, &terminal) == 0 else {
       throw IdentityBoundPTYError.launchFailed("could not read PTY attributes")
     }
     terminal.c_lflag &= ~tcflag_t(ECHO | ECHONL)
-    guard tcsetattr(slave, TCSANOW, &terminal) == 0 else {
+    guard unsafe tcsetattr(slave, TCSANOW, &terminal) == 0 else {
       throw IdentityBoundPTYError.launchFailed("could not disable PTY echo")
     }
     _ = fcntl(master, F_SETFL, fcntl(master, F_GETFL) | O_NONBLOCK)
 
-    var arguments = try cStrings(
+    var arguments = try unsafe cStrings(
       [request.argumentZero ?? request.executable.path] + request.arguments)
-    defer { freeCStrings(&arguments) }
-    var environment = try cStrings(
+    defer { unsafe freeCStrings(&arguments) }
+    var environment = try unsafe cStrings(
       ProcessInfo.processInfo.environment
         .filter { FoundationProcessExecutor.baseChildEnvironmentKeys.contains($0.key) }
         .merging(request.environment) { _, requested in requested }
         .sorted(by: { $0.key < $1.key })
         .map { "\($0.key)=\($0.value)" })
-    defer { freeCStrings(&environment) }
+    defer { unsafe freeCStrings(&environment) }
 
     var fileActions: posix_spawn_file_actions_t?
     var attributes: posix_spawnattr_t?
-    guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+    guard unsafe posix_spawn_file_actions_init(&fileActions) == 0 else {
       throw IdentityBoundPTYError.launchFailed("could not initialize file actions")
     }
-    defer { posix_spawn_file_actions_destroy(&fileActions) }
+    defer { unsafe posix_spawn_file_actions_destroy(&fileActions) }
     if let directory = request.workingDirectory {
-      let result = directory.path.withCString {
-        posix_spawn_file_actions_addchdir(&fileActions, $0)
+      let result = unsafe directory.path.withCString {
+        unsafe posix_spawn_file_actions_addchdir(&fileActions, $0)
       }
       guard result == 0 else {
         throw IdentityBoundPTYError.launchFailed("could not bind working directory")
       }
     }
-    guard posix_spawn_file_actions_adddup2(&fileActions, slave, STDIN_FILENO) == 0,
-      posix_spawn_file_actions_adddup2(&fileActions, slave, STDOUT_FILENO) == 0,
-      posix_spawn_file_actions_adddup2(&fileActions, slave, STDERR_FILENO) == 0,
-      posix_spawn_file_actions_addclose(&fileActions, master) == 0,
-      posix_spawn_file_actions_addclose(&fileActions, slave) == 0,
-      posix_spawnattr_init(&attributes) == 0
+    guard unsafe posix_spawn_file_actions_adddup2(&fileActions, slave, STDIN_FILENO) == 0,
+      unsafe posix_spawn_file_actions_adddup2(&fileActions, slave, STDOUT_FILENO) == 0,
+      unsafe posix_spawn_file_actions_adddup2(&fileActions, slave, STDERR_FILENO) == 0,
+      unsafe posix_spawn_file_actions_addclose(&fileActions, master) == 0,
+      unsafe posix_spawn_file_actions_addclose(&fileActions, slave) == 0,
+      unsafe posix_spawnattr_init(&attributes) == 0
     else {
       throw IdentityBoundPTYError.launchFailed("could not configure PTY spawn")
     }
-    defer { posix_spawnattr_destroy(&attributes) }
-    guard posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETPGROUP)) == 0,
-      posix_spawnattr_setpgroup(&attributes, 0) == 0
+    defer { unsafe posix_spawnattr_destroy(&attributes) }
+    guard unsafe posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETPGROUP)) == 0,
+      unsafe posix_spawnattr_setpgroup(&attributes, 0) == 0
     else {
       throw IdentityBoundPTYError.launchFailed("could not configure child process group")
     }
@@ -207,15 +207,15 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
     try prepared.executable.revalidate(path: request.executable)
     for resource in verifiedResources { try resource.revalidate() }
     var pid: pid_t = 0
-    let spawnResult = arguments.withUnsafeMutableBufferPointer { argv in
-      environment.withUnsafeMutableBufferPointer { envp in
-        prepared.executable.inodeLaunchPath.withCString { executable in
-          posix_spawn(&pid, executable, &fileActions, &attributes, argv.baseAddress, envp.baseAddress)
+    let spawnResult = unsafe arguments.withUnsafeMutableBufferPointer { argv in
+      unsafe environment.withUnsafeMutableBufferPointer { envp in
+        unsafe prepared.executable.inodeLaunchPath.withCString { executable in
+          unsafe posix_spawn(&pid, executable, &fileActions, &attributes, argv.baseAddress, envp.baseAddress)
         }
       }
     }
     guard spawnResult == 0 else {
-      throw IdentityBoundPTYError.launchFailed(String(cString: strerror(spawnResult)))
+      throw unsafe IdentityBoundPTYError.launchFailed(String(cString: strerror(spawnResult)))
     }
     Darwin.close(slave)
     slave = -1
@@ -231,7 +231,7 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
     defer {
       if !childExited {
         terminateProcessGroup(pid)
-        _ = waitpid(pid, &status, 0)
+        _ = unsafe waitpid(pid, &status, 0)
       }
     }
 
@@ -246,14 +246,14 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
       }
 
       var descriptor = pollfd(fd: master, events: Int16(POLLIN | POLLHUP | POLLERR), revents: 0)
-      let polled = Darwin.poll(&descriptor, 1, 25)
+      let polled = unsafe Darwin.poll(&descriptor, 1, 25)
       if polled < 0, errno != EINTR {
         throw IdentityBoundPTYError.waitFailed(errno)
       }
       if polled > 0, descriptor.revents & Int16(POLLIN | POLLHUP) != 0 {
         var buffer = [UInt8](repeating: 0, count: 4_096)
-        let count = buffer.withUnsafeMutableBytes {
-          Darwin.read(master, $0.baseAddress, $0.count)
+        let count = unsafe buffer.withUnsafeMutableBytes {
+          unsafe Darwin.read(master, $0.baseAddress, $0.count)
         }
         if count > 0 {
           output.append(contentsOf: buffer.prefix(count))
@@ -295,7 +295,7 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
         }
       }
 
-      let waited = waitpid(pid, &status, WNOHANG)
+      let waited = unsafe waitpid(pid, &status, WNOHANG)
       if waited == pid {
         childExited = true
       } else if waited < 0, errno != EINTR {
@@ -432,8 +432,8 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
   private static func write(_ data: Data, to descriptor: Int32) throws {
     var offset = 0
     while offset < data.count {
-      let written = data.withUnsafeBytes { bytes in
-        Darwin.write(descriptor, bytes.baseAddress!.advanced(by: offset), data.count - offset)
+      let written = unsafe data.withUnsafeBytes { bytes in
+        unsafe Darwin.write(descriptor, bytes.baseAddress!.advanced(by: offset), data.count - offset)
       }
       if written > 0 {
         offset += written
@@ -449,11 +449,11 @@ package final class IdentityBoundPTYExecutor: @unchecked Sendable {
     guard values.allSatisfy({ !$0.contains("\0") }) else {
       throw ProcessExecutionError.invalidArgumentContainsNUL
     }
-    return values.map { strdup($0) } + [nil]
+    return unsafe values.map { unsafe strdup($0) } + [nil]
   }
 
   private static func freeCStrings(_ values: inout [UnsafeMutablePointer<CChar>?]) {
-    for value in values { free(value) }
-    values.removeAll(keepingCapacity: false)
+    for unsafe value in unsafe values { unsafe free(value) }
+    unsafe values.removeAll(keepingCapacity: false)
   }
 }

@@ -705,7 +705,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       var isDirectory: ObjCBool = false
       guard directory.isFileURL, path.hasPrefix("/"), !path.contains("\0"),
         directory.resolvingSymlinksInPath().standardizedFileURL.path == path,
-        FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+        unsafe FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
         isDirectory.boolValue
       else {
         throw ProcessExecutionError.workingDirectoryUnavailable(path)
@@ -845,27 +845,27 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     executablePath: String? = nil,
     startSuspended: Bool = false
   ) throws -> SpawnedProcess {
-    var arguments = try makeCStringVector(
+    var arguments = try unsafe makeCStringVector(
       [request.argumentZero ?? request.executable.path] + request.arguments)
-    defer { freeCStringVector(arguments) }
-    var environment = try makeCStringVector(
+    defer { unsafe freeCStringVector(arguments) }
+    var environment = try unsafe makeCStringVector(
       Self.baseChildEnvironment()
         .merging(request.environment) { _, requested in requested }
         .sorted(by: { $0.key < $1.key })
         .map { "\($0.key)=\($0.value)" }
     )
-    defer { freeCStringVector(environment) }
+    defer { unsafe freeCStringVector(environment) }
 
     var stdoutDescriptors: [Int32] = [-1, -1]
     var stderrDescriptors: [Int32] = [-1, -1]
     defer { closeAll(stdoutDescriptors + stderrDescriptors) }
-    guard Darwin.pipe(&stdoutDescriptors) == 0 else {
+    guard unsafe Darwin.pipe(&stdoutDescriptors) == 0 else {
       throw ProcessExecutionError.launchFailed(
-        "could not allocate output pipes: \(String(cString: strerror(errno)))")
+        "could not allocate output pipes: \(unsafe String(cString: strerror(errno)))")
     }
-    guard Darwin.pipe(&stderrDescriptors) == 0 else {
+    guard unsafe Darwin.pipe(&stderrDescriptors) == 0 else {
       throw ProcessExecutionError.launchFailed(
-        "could not allocate output pipes: \(String(cString: strerror(errno)))")
+        "could not allocate output pipes: \(unsafe String(cString: strerror(errno)))")
     }
 
     var fileActions: posix_spawn_file_actions_t?
@@ -874,36 +874,38 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     var initializedAttributes = false
     defer {
       if initializedFileActions {
-        posix_spawn_file_actions_destroy(&fileActions)
+        unsafe posix_spawn_file_actions_destroy(&fileActions)
       }
       if initializedAttributes {
-        posix_spawnattr_destroy(&attributes)
+        unsafe posix_spawnattr_destroy(&attributes)
       }
     }
 
-    guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+    guard unsafe posix_spawn_file_actions_init(&fileActions) == 0 else {
       throw ProcessExecutionError.launchFailed("could not initialize posix_spawn file actions")
     }
     initializedFileActions = true
     if let directory = request.workingDirectory {
-      let result = directory.path.withCString {
-        posix_spawn_file_actions_addchdir(&fileActions, $0)
+      let result = unsafe directory.path.withCString {
+        unsafe posix_spawn_file_actions_addchdir(&fileActions, $0)
       }
       guard result == 0 else {
         throw ProcessExecutionError.launchFailed(
-          "could not bind working directory: \(String(cString: strerror(result)))")
+          "could not bind working directory: \(unsafe String(cString: strerror(result)))")
       }
     }
-    guard posix_spawn_file_actions_adddup2(&fileActions, stdoutDescriptors[1], STDOUT_FILENO) == 0,
-      posix_spawn_file_actions_adddup2(&fileActions, stderrDescriptors[1], STDERR_FILENO) == 0,
-      posix_spawn_file_actions_addclose(&fileActions, stdoutDescriptors[0]) == 0,
-      posix_spawn_file_actions_addclose(&fileActions, stderrDescriptors[0]) == 0,
-      posix_spawn_file_actions_addclose(&fileActions, stdoutDescriptors[1]) == 0,
-      posix_spawn_file_actions_addclose(&fileActions, stderrDescriptors[1]) == 0
+    guard unsafe posix_spawn_file_actions_adddup2(
+      &fileActions, stdoutDescriptors[1], STDOUT_FILENO) == 0,
+      unsafe posix_spawn_file_actions_adddup2(
+        &fileActions, stderrDescriptors[1], STDERR_FILENO) == 0,
+      unsafe posix_spawn_file_actions_addclose(&fileActions, stdoutDescriptors[0]) == 0,
+      unsafe posix_spawn_file_actions_addclose(&fileActions, stderrDescriptors[0]) == 0,
+      unsafe posix_spawn_file_actions_addclose(&fileActions, stdoutDescriptors[1]) == 0,
+      unsafe posix_spawn_file_actions_addclose(&fileActions, stderrDescriptors[1]) == 0
     else {
       throw ProcessExecutionError.launchFailed("could not configure posix_spawn")
     }
-    guard posix_spawnattr_init(&attributes) == 0 else {
+    guard unsafe posix_spawnattr_init(&attributes) == 0 else {
       throw ProcessExecutionError.launchFailed("could not initialize posix_spawn attributes")
     }
     initializedAttributes = true
@@ -911,17 +913,17 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     if startSuspended {
       spawnFlags |= Int16(POSIX_SPAWN_START_SUSPENDED)
     }
-    guard posix_spawnattr_setflags(&attributes, spawnFlags) == 0,
-      posix_spawnattr_setpgroup(&attributes, 0) == 0
+    guard unsafe posix_spawnattr_setflags(&attributes, spawnFlags) == 0,
+      unsafe posix_spawnattr_setpgroup(&attributes, 0) == 0
     else {
       throw ProcessExecutionError.launchFailed("could not configure posix_spawn process group")
     }
 
     var processIdentifier: pid_t = 0
-    let spawnResult = arguments.withUnsafeMutableBufferPointer { argumentBuffer in
-      environment.withUnsafeMutableBufferPointer { environmentBuffer in
-        (executablePath ?? request.executable.path).withCString { executablePath in
-          posix_spawn(
+    let spawnResult = unsafe arguments.withUnsafeMutableBufferPointer { argumentBuffer in
+      unsafe environment.withUnsafeMutableBufferPointer { environmentBuffer in
+        unsafe (executablePath ?? request.executable.path).withCString { executablePath in
+          unsafe posix_spawn(
             &processIdentifier,
             executablePath,
             &fileActions,
@@ -938,7 +940,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     stderrDescriptors[1] = -1
 
     guard spawnResult == 0 else {
-      throw ProcessExecutionError.launchFailed(String(cString: strerror(spawnResult)))
+      throw unsafe ProcessExecutionError.launchFailed(String(cString: strerror(spawnResult)))
     }
     launchObserver(processIdentifier)
     let stdout = stdoutDescriptors[0]
@@ -961,7 +963,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
   ) throws {
     var information = proc_regionwithpathinfo()
     let expectedSize = Int32(MemoryLayout<proc_regionwithpathinfo>.size)
-    let actualSize = proc_pidinfo(
+    let actualSize = unsafe proc_pidinfo(
       processIdentifier,
       PROC_PIDREGIONPATHINFO,
       0,
@@ -981,7 +983,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
     Darwin.kill(-spawned.processIdentifier, SIGKILL)
     Darwin.kill(spawned.processIdentifier, SIGKILL)
     var status: Int32 = 0
-    while Darwin.waitpid(spawned.processIdentifier, &status, 0) < 0, errno == EINTR {}
+    while unsafe Darwin.waitpid(spawned.processIdentifier, &status, 0) < 0, errno == EINTR {}
     Darwin.close(spawned.stdout)
     Darwin.close(spawned.stderr)
   }
@@ -1025,7 +1027,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
           }
         }
         pollDescriptor.revents = 0
-        let pollResult = Darwin.poll(&pollDescriptor, 1, 25)
+        let pollResult = unsafe Darwin.poll(&pollDescriptor, 1, 25)
         if pollResult == -1 {
           if errno == EINTR {
             continue
@@ -1035,8 +1037,8 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
         if pollResult == 0 {
           continue
         }
-        let byteCount = buffer.withUnsafeMutableBytes { bytes in
-          Darwin.read(descriptor, bytes.baseAddress, bytes.count)
+        let byteCount = unsafe buffer.withUnsafeMutableBytes { bytes in
+          unsafe Darwin.read(descriptor, bytes.baseAddress, bytes.count)
         }
         if byteCount > 0 {
           capture.accept(
@@ -1066,7 +1068,7 @@ public final class FoundationProcessExecutor: @unchecked Sendable {
       DispatchQueue.global(qos: .utility).async {
         var status: Int32 = 0
         while true {
-          if Darwin.waitpid(processIdentifier, &status, 0) == processIdentifier {
+          if unsafe Darwin.waitpid(processIdentifier, &status, 0) == processIdentifier {
             continuation.resume(returning: .status(status))
             return
           }
@@ -1140,21 +1142,21 @@ package final class VerifiedExecutableDescriptor {
   package static func open(path: URL, expectedSHA256: String) throws -> VerifiedExecutableDescriptor
   {
     var pathMetadata = stat()
-    guard path.path.withCString({ lstat($0, &pathMetadata) }) == 0 else {
+    guard unsafe path.path.withCString({ unsafe lstat($0, &pathMetadata) }) == 0 else {
       throw ProcessExecutionError.executableOpenFailed(path.path, errno)
     }
     guard (pathMetadata.st_mode & mode_t(S_IFMT)) != mode_t(S_IFLNK) else {
       throw ProcessExecutionError.executableMustNotBeSymlink
     }
 
-    let descriptor = Darwin.open(path.path, O_EXEC | O_NOFOLLOW)
+    let descriptor = unsafe Darwin.open(path.path, O_EXEC | O_NOFOLLOW)
     guard descriptor >= 0 else {
       if errno == ELOOP {
         throw ProcessExecutionError.executableMustNotBeSymlink
       }
       throw ProcessExecutionError.executableOpenFailed(path.path, errno)
     }
-    let hashDescriptor = Darwin.open(path.path, O_RDONLY | O_NOFOLLOW)
+    let hashDescriptor = unsafe Darwin.open(path.path, O_RDONLY | O_NOFOLLOW)
     guard hashDescriptor >= 0 else {
       let openError = errno
       Darwin.close(descriptor)
@@ -1168,10 +1170,10 @@ package final class VerifiedExecutableDescriptor {
       }
       var descriptorMetadata = stat()
       var hashDescriptorMetadata = stat()
-      guard fstat(descriptor, &descriptorMetadata) == 0 else {
+      guard unsafe fstat(descriptor, &descriptorMetadata) == 0 else {
         throw ProcessExecutionError.executableDescriptorInvalid
       }
-      guard fstat(hashDescriptor, &hashDescriptorMetadata) == 0,
+      guard unsafe fstat(hashDescriptor, &hashDescriptorMetadata) == 0,
         hashDescriptorMetadata.st_dev == descriptorMetadata.st_dev,
         hashDescriptorMetadata.st_ino == descriptorMetadata.st_ino
       else {
@@ -1182,7 +1184,7 @@ package final class VerifiedExecutableDescriptor {
       }
       let executableBits = mode_t(S_IXUSR | S_IXGRP | S_IXOTH)
       guard descriptorMetadata.st_mode & executableBits != 0,
-        path.path.withCString({ access($0, X_OK) }) == 0
+        unsafe path.path.withCString({ unsafe access($0, X_OK) }) == 0
       else {
         throw ProcessExecutionError.executableMustBeExecutable
       }
@@ -1201,7 +1203,7 @@ package final class VerifiedExecutableDescriptor {
       let inode = UInt64(descriptorMetadata.st_ino)
       let inodeLaunchPath = "/.vol/\(device)/\(inode)"
       var inodePathMetadata = stat()
-      guard inodeLaunchPath.withCString({ lstat($0, &inodePathMetadata) }) == 0,
+      guard unsafe inodeLaunchPath.withCString({ unsafe lstat($0, &inodePathMetadata) }) == 0,
         inodePathMetadata.st_dev == descriptorMetadata.st_dev,
         inodePathMetadata.st_ino == descriptorMetadata.st_ino,
         (inodePathMetadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG)
@@ -1236,8 +1238,8 @@ package final class VerifiedExecutableDescriptor {
     }
     var descriptorMetadata = stat()
     var hashDescriptorMetadata = stat()
-    guard fstat(fileDescriptor, &descriptorMetadata) == 0,
-      fstat(hashDescriptor, &hashDescriptorMetadata) == 0,
+    guard unsafe fstat(fileDescriptor, &descriptorMetadata) == 0,
+      unsafe fstat(hashDescriptor, &hashDescriptorMetadata) == 0,
       descriptorMetadata.st_dev == openedDevice,
       descriptorMetadata.st_ino == openedInode,
       hashDescriptorMetadata.st_dev == openedDevice,
@@ -1248,7 +1250,7 @@ package final class VerifiedExecutableDescriptor {
     }
 
     var pathMetadata = stat()
-    guard path.path.withCString({ lstat($0, &pathMetadata) }) == 0,
+    guard unsafe path.path.withCString({ unsafe lstat($0, &pathMetadata) }) == 0,
       (pathMetadata.st_mode & mode_t(S_IFMT)) != mode_t(S_IFLNK),
       pathMetadata.st_dev == openedDevice,
       pathMetadata.st_ino == openedInode
@@ -1256,7 +1258,7 @@ package final class VerifiedExecutableDescriptor {
       throw ProcessExecutionError.executableIdentityChanged
     }
     var inodePathMetadata = stat()
-    guard inodeLaunchPath.withCString({ lstat($0, &inodePathMetadata) }) == 0,
+    guard unsafe inodeLaunchPath.withCString({ unsafe lstat($0, &inodePathMetadata) }) == 0,
       inodePathMetadata.st_dev == openedDevice,
       inodePathMetadata.st_ino == openedInode,
       (inodePathMetadata.st_mode & mode_t(S_IFMT)) == mode_t(S_IFREG)
@@ -1288,8 +1290,8 @@ package final class VerifiedExecutableDescriptor {
     var offset: off_t = 0
     var buffer = [UInt8](repeating: 0, count: 64 * 1024)
     while true {
-      let count = buffer.withUnsafeMutableBytes { bytes in
-        pread(fileDescriptor, bytes.baseAddress, bytes.count, offset)
+      let count = unsafe buffer.withUnsafeMutableBytes { bytes in
+        unsafe pread(fileDescriptor, bytes.baseAddress, bytes.count, offset)
       }
       if count == 0 { break }
       if count < 0 {
@@ -1614,21 +1616,21 @@ private final class PipeDrain: @unchecked Sendable {
 }
 
 private func makeCStringVector(_ strings: [String]) throws -> [UnsafeMutablePointer<CChar>?] {
-  var vector: [UnsafeMutablePointer<CChar>?] = []
+  var vector: [UnsafeMutablePointer<CChar>?] = unsafe []
   for string in strings {
-    guard !string.contains("\0"), let pointer = strdup(string) else {
-      freeCStringVector(vector)
+    guard !string.contains("\0"), let pointer = unsafe strdup(string) else {
+      unsafe freeCStringVector(vector)
       throw ProcessExecutionError.launchFailed("argument or environment contains a NUL byte")
     }
-    vector.append(pointer)
+    unsafe vector.append(pointer)
   }
-  vector.append(nil)
-  return vector
+  unsafe vector.append(nil)
+  return unsafe vector
 }
 
 private func freeCStringVector(_ vector: [UnsafeMutablePointer<CChar>?]) {
-  for pointer in vector {
-    free(pointer)
+  for unsafe pointer in unsafe vector {
+    unsafe free(pointer)
   }
 }
 
