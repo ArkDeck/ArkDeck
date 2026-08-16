@@ -693,6 +693,49 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     XCTAssertThrowsError(try GzipTarArchiveReader.summarize(fileAt: truncatedDeflateURL))
   }
 
+  /// A flash bundle is parsed before any authorization runs, so a crafted
+  /// header must not be able to terminate the host process. The GNU base-256
+  /// size field can carry `Int64.max` without tripping the parser's own
+  /// per-shift overflow guard; adding the 512-byte alignment to it then traps.
+  /// Only a non-regular-file type flag reaches that addition.
+  func testAMemberSizeThatCannotHoldItsAlignmentIsRefusedRatherThanTrapping() throws {
+    // 0x80 marks base-256; the remaining bytes are chosen so the parser's
+    // `value <= Int64.max >> 8` guard passes at every shift and lands on
+    // exactly `Int64.max`.
+    var sizeField = [UInt8](repeating: 0xFF, count: 12)
+    sizeField[0] = 0x80
+    sizeField[1] = 0x00
+    sizeField[2] = 0x00
+    sizeField[3] = 0x00
+    sizeField[4] = 0x7F
+
+    var header = [UInt8](repeating: 0, count: 512)
+    header.replaceSubrange(0..<9, with: Array("giant.img".utf8))
+    header.replaceSubrange(124..<136, with: sizeField)
+    header[156] = 0x35  // directory: not 0x30/0x00, so it takes the padding branch
+    header.replaceSubrange(257..<263, with: Array("ustar\0".utf8))
+    header.replaceSubrange(263..<265, with: Array("00".utf8))
+    header.replaceSubrange(148..<156, with: Array(repeating: 0x20, count: 8))
+    let checksum = header.reduce(0) { $0 + Int($1) }
+    header.replaceSubrange(148..<154, with: Array(String(format: "%06o", checksum).utf8))
+    header[154] = 0
+    header[155] = 0x20
+
+    var archive = Data(header)
+    archive.append(contentsOf: [UInt8](repeating: 0, count: 1024))
+    let url = try Self.writeTemporary(Self.gzip(archive))
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    XCTAssertThrowsError(try GzipTarArchiveReader.summarize(fileAt: url)) { error in
+      guard case .corruptTarHeader(let detail) = error as? GzipTarArchiveReaderError else {
+        return XCTFail("expected a corrupt-header refusal, got \(error)")
+      }
+      XCTAssertTrue(
+        detail.contains("alignment"),
+        "the refusal must name the unrepresentable size, got: \(detail)")
+    }
+  }
+
   // MARK: - helpers
 
   private func matchingObservation(_ profile: RockchipFlashProfile)
