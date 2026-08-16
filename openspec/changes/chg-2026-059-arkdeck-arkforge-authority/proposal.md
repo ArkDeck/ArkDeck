@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-059-arkdeck-arkforge-authority
-revision: 1
-status: proposed # 维护者 review + merge 本 proposal PR 后才生效；合入前 TASK-AFA-001 不开工
+revision: 2
+status: approved # r1 由 PR #1317 merge；r2 只修 tasks.md 的 Allowed paths 声明形式
 class: integration
 core_change_level: none
 owner: fuhanfeng

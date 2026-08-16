@@ -11,6 +11,17 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 - Requirements:`AFA-REQ-001`…`AFA-REQ-005`（单任务覆盖全部五条）
 - Acceptance:`AFA-AC-1..10`
 - Depends on:本 proposal r1 merge
+- Allowed paths:
+  - `Packages/ArkDeckKit/Package.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
+  - `Packages/ArkDeckKit/Sources/ArkForgeIPC/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Rockchip*.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
+  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+  - `docs/design/rockchip-read-domain.md`
+  - `openspec/changes/chg-2026-059-arkdeck-arkforge-authority/**`
 - Applicable failure patterns:
   - `AF-004`（producer 到真实 dispatcher/postflight 全链）——permit 必须真的到达
     `arkforged` 并真的驱动一次写入，不能以 mock 通过；
@@ -69,13 +80,6 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
    - 只发布 (ArkDeck authority, 本机平台, 该 toolchain digest, 该 evidence set)
      这一个组合为 ProductionVerified
 
-### Allowed paths
-
-- `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/**`
-- `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Rockchip*.swift`
-- `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
-- `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
-- `openspec/changes/chg-2026-059-arkdeck-arkforge-authority/**`
 
 ### Not allowed without a new change
 
