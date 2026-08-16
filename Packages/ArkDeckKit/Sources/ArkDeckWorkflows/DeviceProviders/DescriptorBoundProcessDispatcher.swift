@@ -198,7 +198,10 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
           invocation, executable: executable, argumentZero: plan.argumentZero,
           workingDirectory: plan.workingDirectory,
           executableLaunchMode: executableLaunchMode,
-          verifiedAnalyzerSource: verifiedAnalyzerSource)
+          verifiedAnalyzerSource: verifiedAnalyzerSource,
+          // A plan that bounded its own output wins over this dispatcher's
+          // configured default. Absent one, the default still applies.
+          captureLimit: plan.outputByteBudget ?? outputByteBudget)
       } catch let failure as RuntimeDispatchFailure where isArkTraceOperation(plan.action) {
         // RuntimeDispatchFailure details produced below may embed the
         // authorized executable path. Preserve only the outcome class at the
@@ -306,7 +309,8 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     argumentZero: String?,
     workingDirectory: String?,
     executableLaunchMode: ProcessExecutableLaunchMode,
-    verifiedAnalyzerSource: VerifiedRegularFileDescriptor?
+    verifiedAnalyzerSource: VerifiedRegularFileDescriptor?,
+    captureLimit: Int
   ) async throws -> ProviderSubprocessReceipt {
     let request = ProcessRequest(
       executable: URL(filePath: executable.path),
