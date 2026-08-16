@@ -7268,10 +7268,15 @@ public actor RuntimeJobEngine {
       ]
     case .verifyRemoteState:
       let probeID: String
-      if case .rockchip(.verifyFlashReadback(let bundle))? = action {
+      // The readback's expected state is the archive the plan was built for.
+      // It used to be read off the provider action; that action moved to
+      // arkforged with the lowering, so the identity now comes from the
+      // resolved input artifact instead. Same bytes, same digest, same
+      // journalled argument — only the source changed (CHG-2026-059 §5.1).
+      if step.stepID == "verify-flash-readback", let artifact = resolvedInputArtifact {
         arguments = [
           "probeId": .string("rockusb-partition-readback"),
-          "expectedState": .string("mapped-set:\(bundle.sha256)"),
+          "expectedState": .string("mapped-set:\(artifact.sha256)"),
         ]
         break
       } else if case .hdc(.verifyProcessState(let bundle))? = action {
@@ -7309,16 +7314,20 @@ public actor RuntimeJobEngine {
         "reconnectDeadlineMilliseconds": .integer(45_000),
       ]
     case .flashPartition:
-      guard case .rockchip(.flashPartitions(let bundle))? = action else {
+      // Same move as the readback above: the write's identity is the resolved
+      // artifact, not a provider action this authority no longer owns. The
+      // journalled arguments — including the confirmation and safe-boundary
+      // ids the authorization judgement reads — are unchanged.
+      guard let artifact = resolvedInputArtifact else {
         throw RuntimeJobEngineError.internalFailure(
-          "\(step.stepID) has no exact Rockchip flash action")
+          "\(step.stepID) has no resolved flash artifact")
       }
       arguments = [
         "providerOperationId": .string("rockusb.wl-write"),
         "partition": .string("dayu200_mapped_set"),
-        "imageArtifactId": .string(bundle.artifactID),
-        "imageSha256": .string(bundle.sha256),
-        "imageSize": .integer(Int64(bundle.byteCount)),
+        "imageArtifactId": .string(artifact.artifactID),
+        "imageSha256": .string(artifact.sha256),
+        "imageSize": .integer(Int64(artifact.byteCount)),
         "confirmationId": .string("runtimeE2Admission"),
         "safeBoundaryId": .string("perPartitionWriteBoundary"),
       ]

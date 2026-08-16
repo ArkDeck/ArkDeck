@@ -5,7 +5,14 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-AFA-001 — ArkDeck 做 authority，ArkForge 做 Rockchip 执行
 
-- Status:blocked（等 proposal merge）
+- Status:in-progress（proposal PR #1317 已 merge。已完成：第 2 步 permit 签发
+  （对着 ArkForge 三组交叉验证向量逐字节通过）、IPC 客户端（新 target `ArkForgeIPC`，
+  golden frame 取自真实 daemon）、工具切到 `231a05ef…`（design 第 10 节）。
+  以及第 1 步删 lowering（`wlx`/`rl`/`ppt` 及其判定逻辑全部移除，legacy journal
+  译为具名不可重放拒绝，读域教训索引到 `docs/design/rockchip-read-domain.md`）。
+  未开始：第 3 步对抗矩阵、第 4 步控制端口、第 5 步引擎接线、第 6 步真机。
+  当前 `flash.dayu200` 在授权前被拒——第 5 步接线前它没有执行器，5 条端到端
+  recovery 测试因此 skip 并注明依赖第 5 步。仅在本实现 PR 经维护者 review/merge 后生效）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:`AFA-REQ-001`…`AFA-REQ-005`（单任务覆盖全部五条）

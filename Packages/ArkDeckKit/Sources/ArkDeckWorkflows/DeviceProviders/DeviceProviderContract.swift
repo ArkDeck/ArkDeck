@@ -140,8 +140,11 @@ public enum RockchipProviderAction: Sendable, Equatable {
   case waitForHDCDisconnect(connectKey: String)
   case waitForLoader(stableIdentitySHA256: String)
   case rebindLoader(stableIdentitySHA256: String)
-  case flashPartitions(RockchipRuntimeFlashBundle)
-  case verifyFlashReadback(RockchipRuntimeFlashBundle)
+  // flashPartitions / verifyFlashReadback used to live here. They were the
+  // one pair in this enum that lowered a Rockchip command and a sector
+  // address, and CHG-2026-059 moved that to arkforged: ArkDeck approves a
+  // write, ArkForge performs it. Do not reintroduce them — a provider action
+  // that names a partition is a lowering, whatever it is called.
   case rebootToNormal(stableIdentitySHA256: String)
   case waitForHDCReconnect(connectKey: String)
   case waitForBoundHDCReconnect(expectation: RockchipHDCReconnectExpectation)
@@ -392,13 +395,11 @@ public enum TypedProviderAction: Sendable, Equatable {
       return .deviceMutation
     case .rockchip(.observeHDCNormalUSB), .rockchip(.waitForHDCDisconnect),
       .rockchip(.waitForLoader),
-      .rockchip(.rebindLoader), .rockchip(.verifyFlashReadback),
+      .rockchip(.rebindLoader),
       .rockchip(.waitForHDCReconnect), .rockchip(.waitForBoundHDCReconnect),
       .rockchip(.verifyBuild), .rockchip(.verifyBoundBuild),
       .rockchip(.capturePostFlashDiagnostics):
       return .readOnly
-    case .rockchip(.flashPartitions):
-      return .destructive
     }
   }
 }
@@ -407,6 +408,12 @@ public enum TypedProviderAction: Sendable, Equatable {
 /// a write-ahead intent. Recovery decodes this record; it never asks the
 /// current catalog/provider mapping to invent the old intent again.
 struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
+  /// The two kinds a pre-CHG-2026-059 journal can still hold. Named as data
+  /// so the decoder's refusal and any future archival tooling agree on the
+  /// exact strings; these are never written again.
+  static let legacyRockchipLoweringKinds =
+    ("rockchip.flashPartitions", "rockchip.verifyFlashReadback")
+
   let kind: String
   let arguments: [String: JSONValue]
 
@@ -701,14 +708,6 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "rockchip.rebindLoader",
         arguments: ["stableIdentitySha256": .string(identity)])
-    case .rockchip(.flashPartitions(let bundle)):
-      self.init(
-        kind: "rockchip.flashPartitions",
-        arguments: Self.rockchipBundleArguments(bundle))
-    case .rockchip(.verifyFlashReadback(let bundle)):
-      self.init(
-        kind: "rockchip.verifyFlashReadback",
-        arguments: Self.rockchipBundleArguments(bundle))
     case .rockchip(.rebootToNormal(let identity)):
       self.init(
         kind: "rockchip.rebootToNormal",
@@ -1208,10 +1207,17 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .rockchip(
         .rebindLoader(
           stableIdentitySHA256: try string("stableIdentitySha256")))
-    case "rockchip.flashPartitions":
-      return .rockchip(.flashPartitions(try rockchipBundle()))
-    case "rockchip.verifyFlashReadback":
-      return .rockchip(.verifyFlashReadback(try rockchipBundle()))
+    case Self.legacyRockchipLoweringKinds.0, Self.legacyRockchipLoweringKinds.1:
+      // A journal written before CHG-2026-059, holding an in-process Rockchip
+      // write intent. It cannot be re-derived — the lowering that produced it
+      // no longer exists — and it must never be replayed: the device may
+      // already carry its effect.
+      //
+      // Refused by name rather than through the `unknown kind` default, because
+      // those two answers mean opposite things to whoever is holding the board.
+      // "Unknown kind" reads as a corrupt journal; this one says the record is
+      // intact, its outcome is unknown, and a person has to settle it.
+      throw DeviceProviderError.legacyRockchipLoweringIntent(kind)
     case "rockchip.rebootToNormal":
       return .rockchip(
         .rebootToNormal(
@@ -1761,6 +1767,26 @@ public enum DeviceProviderError: Error, Equatable, Sendable {
   case unsupportedAction(String)
   case unsupportedStepKind(String)
   case factsUnavailable(String)
+  /// A durable intent from before CHG-2026-059 moved Rockchip lowering to
+  /// ArkForge. Distinct from `unsupportedAction` on purpose: this record is
+  /// intact and its outcome is unknown, which is not the same as a journal
+  /// nobody can parse.
+  case legacyRockchipLoweringIntent(String)
+}
+
+extension DeviceProviderError: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .unsupportedAction(let detail): return detail
+    case .unsupportedStepKind(let detail): return detail
+    case .factsUnavailable(let detail): return detail
+    case .legacyRockchipLoweringIntent(let kind):
+      return
+        "\(kind) is a legacy in-process Rockchip write intent, removed in CHG-2026-059. "
+        + "The record is intact; the intent is not replayable and cannot be re-derived, so "
+        + "this job's outcome is unknown until a person reconciles the device."
+    }
+  }
 }
 
 // MARK: - The provider protocol

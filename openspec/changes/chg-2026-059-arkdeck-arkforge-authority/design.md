@@ -560,3 +560,78 @@ user-selected E0 路径，直到另一个 change 引入 bundled component regist
 
 `revision` 保持 **r1**：r1 从未提交过 review——本 change 在 2026-08-16 之前
 一直是工作区里的未跟踪目录。改动发生在提交之前，不构成一次修订轮次。
+
+---
+
+## 10. 工具已切到 `231a05ef…`（2026-08-16 定）
+
+9.4 提出的选择已经拍板：**`flash.dayu200` 这条 lane 在第一次真机写入之前就切到
+本仓 `rockchip-component-build@1.0.0` 的产物**。
+
+### 10.1 为什么现在切
+
+toolchain 摘要是 maturity 组合键的一部分。现在换的代价是零——还没有任何写入证据；
+真机通过之后再换是一次完整重跑。而彩排用的 `038a8a0e…` 已被实测证明不可出厂
+（链接 Homebrew 的 libusb），所以「先用它跑通、以后再说」等于先发布一个必然要作废的组合。
+
+### 10.2 钉的是**已签名**的那份
+
+`openspec/integrations/rockchip/bundled-component/1.0.0/package.json` 记的是
+`be753c69…`，且 `"unsigned": true`——那是 Code Sign On Copy **之前**被摄入的字节。
+`arkforged` 哈希的是它将要执行的那个文件，也就是签名后的那份：
+
+| 用途 | 摘要 |
+|---|---|
+| `--rkdeveloptool-sha256`、计划里的 toolchain digest | `231a05ef…`（已签名，App 包内） |
+| 组件包记录、依赖白名单来源 | `be753c69…`（未签名摄入） |
+
+钉错一个，daemon 会以 `... hashes to X, and --rkdeveloptool-sha256 pins Y` 拒绝启动。
+两个摘要并排放在 `ArkForgeToolchainPin` 里，就是为了让这个差别是**可见的**而不是被发现的。
+
+### 10.3 实测
+
+2026-08-16 用捆绑组件启动真实 `arkforged`：
+
+~~~text
+dispatch: /Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool (231a05ef…)
+  signing: arm64 com.arkdeck.desktop.rkdeveloptool (runtime, team 8AQTYW5FKR, no entitlements)
+  self-test: rkdeveloptool ver 1.32 in 18 ms
+execution: not ready (NO_PAIRED_AUTHORITY)
+~~~
+
+它同时通过了 ArkForge 的 release 签名条款（`--require-release-signing`，AFD-0003）
+——彩排那份过不了。握手回报的 `toolchain_sha256` 就是 `231a05ef…`，
+本 change 的契约测试用这段真实字节断言它与 `ArkForgeToolchainPin` 一致。
+
+### 10.4 没有动的东西
+
+`RockchipDiscoveryIntegrationProfile.pinnedProduction` **保持 `038a8a0e…` 不变**。
+它描述的是 ADR-0003 说的那条 user-selected E0 遗留路径，会随第 1 步一起消失；
+在它还活着的时候改它的钉值，等于在一个即将删除的路径上引入一次未经验证的行为变化。
+新的钉值是新加的 `ArkForgeToolchainPin`，只服务于 ArkForge 这条 lane。
+
+---
+
+## 11. IPC 客户端（2026-08-16 已实现）
+
+第 3、5 步都要它，而它此前在 Swift 侧不存在。新增 target `ArkForgeIPC`
+（依赖 `ArkDeckCore`，已在架构矩阵里加一行）：
+
+- **proto3 wire 子集**，手写，与 ArkForge `crates/arkforge-ipc/src/wire.rs` 逐条对应。
+  三条规则承载兼容性契约：零值不写、嵌套消息即使为空也写、未知字段跳过而
+  **未知枚举值硬失败**（architecture.md 15.2）；
+- **消息集**：Hello/HelloAck、Request/Response/Error，以及执行面 API 6/7/8/12/13
+  用到的全部 payload；
+- **UDS 传输**：4 字节大端长度前缀，长度在分配**之前**检查上限；
+- **`ArkForgeDaemonClient`**：controller 会话、握手、请求/响应、`watchJob` 事件流。
+  它只搬字节：能编码 authority 签好的 permit、能编码 authority 选择的 refusal，
+  但没有任何办法自己构造其中任何一个。
+
+### 11.1 测试用的是真实 daemon 的字节
+
+契约测试里的 golden frame 是 2026-08-16 从真实运行的 `arkforged` 上抓的，
+不是照着 `.proto` 手工拼的。这个区别是有意的：只对着自己编码器测的 codec
+只会与自己一致，而本仓要避免的失败恰恰是「authority 说了一种 daemon 听不懂的方言」。
+
+抓到的三条：带工具绑定但未配对的 `HelloAck`、一条 OK 的 `Response`、
+一条 `startExecution` 的 `NO_PAIRED_AUTHORITY` 拒绝。

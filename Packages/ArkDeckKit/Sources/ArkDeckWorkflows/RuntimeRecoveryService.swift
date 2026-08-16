@@ -357,12 +357,31 @@ struct RuntimeRecoveryService {
     requiredStepIDs: [String],
     expectedPartitions: [String]
   ) throws -> (artifactSHA256: String, providerExecutableSHA256: String)? {
+    // Historical recognition rested on re-materializing the durable flash
+    // intent and checking the bundle it named against the host receipt. That
+    // intent's action was the in-process lowering, removed in CHG-2026-059,
+    // so a journal holding one now decodes to a refusal.
+    //
+    // The receipt on its own is not accepted in its place: it records a
+    // partition count and a digest but not the partition names, and this
+    // proof decides whether a device may be treated as already carrying a
+    // complete overwrite. A weaker proof wearing the old one's name is the
+    // failure mode worth avoiding here, so recognition is withheld and the
+    // job stays unresolved — which is what the refusal means.
+    //
+    // Step 5 restores this from the other side: arkforged's semantic receipts
+    // carry the write's own evidence, and recognition can be rebuilt on those
+    // rather than on an intent ArkDeck can no longer execute.
+    if requiredStepIDs.contains("flash-partitions") { return nil }
+
     let root =
       stateDirectory
       .appending(path: "rockchip-runtime", directoryHint: .isDirectory)
       .appending(path: record.jobID, directoryHint: .isDirectory)
     var executable: String?
-    var artifact: String?
+    // Never assigned while the flash step is withheld above; kept so the loop
+    // below stays the shape step 5 will re-source from arkforged's receipts.
+    let artifact: String? = nil
     for stepID in requiredStepIDs {
       let directory = root.appending(path: stepID, directoryHint: .isDirectory)
       let intent: RuntimeHistoricalRockchipIntent
@@ -399,15 +418,9 @@ struct RuntimeRecoveryService {
       else { return nil }
       if let executable, executable != intent.providerExecutableSHA256 { return nil }
       executable = intent.providerExecutableSHA256
-      if stepID == "flash-partitions" {
-        guard case .rockchip(.flashPartitions(let bundle)) = try intent.action.materialize(),
-          bundle.partitionNames == expectedPartitions,
-          Self.isSHA256(bundle.sha256), bundle.byteCount > 0,
-          receipt.summary["partitionCount"] == String(expectedPartitions.count),
-          receipt.summary["bundleSha256"] == bundle.sha256
-        else { return nil }
-        artifact = bundle.sha256
-      }
+      // `flash-partitions` never reaches here — the guard at the top of this
+      // function withholds recognition for it. Every other required step is
+      // still checked exactly as before.
     }
     guard let artifact, let executable else { return nil }
     return (artifact, executable)
