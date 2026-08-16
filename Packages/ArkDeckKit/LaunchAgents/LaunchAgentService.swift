@@ -26,6 +26,19 @@ public enum ArkDeckLaunchAgent {
     "ARKDECK_HARNESS_EGRESS_PROJECTS"
   public static let arkTraceDescriptorEnvironmentKey =
     "ARKDECK_ARKTRACE_DESCRIPTOR"
+  /// The four the ArkForge lane needs. All four or none: three of them is a
+  /// configuration nobody reviewed, and the daemon refuses to compose a lane
+  /// from a partial set rather than starting one somebody has to guess about.
+  public static let arkForgedPathEnvironmentKey = "ARKDECK_ARKFORGED_PATH"
+  public static let arkForgedSHA256EnvironmentKey = "ARKDECK_ARKFORGED_SHA256"
+  public static let arkForgeProfileEnvironmentKey = "ARKDECK_ARKFORGE_PROFILE_PATH"
+  public static let arkForgeVendorToolEnvironmentKey = "ARKDECK_RKDEVELOPTOOL_PATH"
+
+  /// Every key the lane reads, so callers cannot set some and forget others.
+  public static let arkForgeEnvironmentKeys = [
+    arkForgedPathEnvironmentKey, arkForgedSHA256EnvironmentKey,
+    arkForgeProfileEnvironmentKey, arkForgeVendorToolEnvironmentKey,
+  ]
   public static let waterFlowProjectRef = "demo-app"
   public static let harnessLocalModelProviders = ["claude-code", "codex"]
 }
@@ -194,6 +207,106 @@ public struct LaunchAgentArkTraceDescriptorStatus: Codable, Sendable, Equatable 
     self.descriptorPath = descriptorPath
     self.descriptorSHA256 = descriptorSHA256
     self.descriptorByteCount = descriptorByteCount
+  }
+}
+
+/// The ArkForge lane's installed configuration, as recorded in the receipt.
+///
+/// Every field is measured rather than taken on trust: the paths are
+/// canonical, the two executables are hashed at install time, and `status`
+/// compares those digests against what is on disk. That is the same discipline
+/// the HDC path and the ArkTrace descriptor already get, and it matters more
+/// here — one of these executables performs destructive writes.
+public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
+  public let daemonPath: String
+  public let daemonSHA256: String
+  public let deviceProfilePath: String
+  public let vendorToolPath: String
+  public let vendorToolSHA256: String
+
+  public init(
+    daemonPath: String, daemonSHA256: String, deviceProfilePath: String,
+    vendorToolPath: String, vendorToolSHA256: String
+  ) {
+    self.daemonPath = daemonPath
+    self.daemonSHA256 = daemonSHA256
+    self.deviceProfilePath = deviceProfilePath
+    self.vendorToolPath = vendorToolPath
+    self.vendorToolSHA256 = vendorToolSHA256
+  }
+
+  /// Why a lane configuration was refused. Each names something to fix.
+  public enum Refusal: Error, Equatable, CustomStringConvertible {
+    case notAbsolute(String)
+    case notARegularFile(String)
+    case symlink(String)
+    case digestMismatch(path: String, declared: String, measured: String)
+    case unreadable(String)
+
+    public var description: String {
+      switch self {
+      case .notAbsolute(let path):
+        return "\(path) is not an absolute path; the daemon resolves no PATH"
+      case .notARegularFile(let path):
+        return "\(path) is not a regular file"
+      case .symlink(let path):
+        return
+          "\(path) is a symlink; install the file, not a name for it — a name can be "
+          + "repointed after it was verified"
+      case .digestMismatch(let path, let declared, let measured):
+        return
+          "\(path) hashes to \(measured) and was declared as \(declared). An unpinned "
+          + "executable is one nobody chose"
+      case .unreadable(let path):
+        return "\(path) could not be read"
+      }
+    }
+  }
+
+  /// Measures the four inputs, or refuses.
+  ///
+  /// `declaredDaemonSHA256` is compared rather than trusted: the operator says
+  /// which bytes they mean, and this checks the file agrees. The vendor tool's
+  /// digest is *not* an operator input — it is measured here and checked
+  /// against this repository's pin by the lane, because the toolchain digest is
+  /// part of the maturity combination.
+  public static func measuring(
+    daemonPath: String, declaredDaemonSHA256: String, deviceProfilePath: String,
+    vendorToolPath: String
+  ) throws -> LaunchAgentArkForgeLaneStatus {
+    func verify(_ path: String) throws -> Data {
+      guard path.hasPrefix("/") else { throw Refusal.notAbsolute(path) }
+      let url = URL(filePath: path)
+      let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+      guard values?.isSymbolicLink != true else { throw Refusal.symlink(path) }
+      guard values?.isRegularFile == true else { throw Refusal.notARegularFile(path) }
+      guard let data = try? Data(contentsOf: url) else { throw Refusal.unreadable(path) }
+      return data
+    }
+
+    let daemon = try verify(daemonPath)
+    let measured = SHA256Hex.string(of: daemon)
+    guard measured == declaredDaemonSHA256.lowercased() else {
+      throw Refusal.digestMismatch(
+        path: daemonPath, declared: declaredDaemonSHA256, measured: measured)
+    }
+    _ = try verify(deviceProfilePath)
+    let tool = try verify(vendorToolPath)
+
+    return LaunchAgentArkForgeLaneStatus(
+      daemonPath: daemonPath, daemonSHA256: measured,
+      deviceProfilePath: deviceProfilePath, vendorToolPath: vendorToolPath,
+      vendorToolSHA256: SHA256Hex.string(of: tool))
+  }
+
+  /// The environment the daemon is started with.
+  public var environment: [String: String] {
+    [
+      ArkDeckLaunchAgent.arkForgedPathEnvironmentKey: daemonPath,
+      ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey: daemonSHA256,
+      ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey: deviceProfilePath,
+      ArkDeckLaunchAgent.arkForgeVendorToolEnvironmentKey: vendorToolPath,
+    ]
   }
 }
 

@@ -1,0 +1,165 @@
+import CryptoKit
+import Foundation
+import XCTest
+
+@testable import ArkDeckCore
+@testable import ArkDeckLaunchAgent
+@testable import ArkDeckWorkflows
+
+/// The install entry point for the ArkForge lane.
+///
+/// Every input is measured rather than trusted. That discipline already
+/// applies to the HDC path and the ArkTrace descriptor; it matters more here
+/// because one of these executables performs destructive writes, and an
+/// operator who mistypes a path should learn it at install time rather than
+/// when a board is half-written.
+final class ArkForgeLaneInstallContractTests: XCTestCase {
+
+  private var root: URL!
+
+  override func setUpWithError() throws {
+    root = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-lane-install-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  }
+
+  override func tearDownWithError() throws {
+    if let root { try? FileManager.default.removeItem(at: root) }
+  }
+
+  private func write(_ name: String, _ contents: String) throws -> (URL, String) {
+    let url = root.appending(path: name)
+    try Data(contents.utf8).write(to: url)
+    return (url, SHA256Hex.string(of: Data(contents.utf8)))
+  }
+
+  func testAMeasuredConfigurationCarriesBothDigests() throws {
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, toolDigest) = try write("rkdeveloptool", "tool-bytes")
+
+    let status = try LaunchAgentArkForgeLaneStatus.measuring(
+      daemonPath: daemon.path, declaredDaemonSHA256: daemonDigest,
+      deviceProfilePath: profile.path, vendorToolPath: tool.path)
+
+    XCTAssertEqual(status.daemonSHA256, daemonDigest)
+    // The vendor tool's digest is measured here, never supplied: the toolchain
+    // digest is part of the maturity combination, so an operator naming it
+    // would be an operator publishing a combination nobody reviewed.
+    XCTAssertEqual(status.vendorToolSHA256, toolDigest)
+    XCTAssertEqual(
+      Set(status.environment.keys), Set(ArkDeckLaunchAgent.arkForgeEnvironmentKeys))
+  }
+
+  func testADeclaredDigestThatDoesNotMatchIsRefused() throws {
+    let (daemon, _) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+
+    XCTAssertThrowsError(
+      try LaunchAgentArkForgeLaneStatus.measuring(
+        daemonPath: daemon.path, declaredDaemonSHA256: String(repeating: "b", count: 64),
+        deviceProfilePath: profile.path, vendorToolPath: tool.path)
+    ) { error in
+      guard case LaunchAgentArkForgeLaneStatus.Refusal.digestMismatch = error else {
+        return XCTFail("expected a digest refusal, got \(error)")
+      }
+    }
+  }
+
+  func testASymlinkIsRefusedRatherThanFollowed() throws {
+    // A name can be repointed after it was verified. The file is what was
+    // reviewed, so the file is what gets installed.
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+    let alias = root.appending(path: "arkforged-alias")
+    try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: daemon)
+
+    XCTAssertThrowsError(
+      try LaunchAgentArkForgeLaneStatus.measuring(
+        daemonPath: alias.path, declaredDaemonSHA256: daemonDigest,
+        deviceProfilePath: profile.path, vendorToolPath: tool.path)
+    ) { error in
+      XCTAssertEqual(
+        error as? LaunchAgentArkForgeLaneStatus.Refusal, .symlink(alias.path))
+    }
+  }
+
+  func testARelativePathIsRefused() throws {
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+    XCTAssertThrowsError(
+      try LaunchAgentArkForgeLaneStatus.measuring(
+        daemonPath: "arkforged", declaredDaemonSHA256: String(repeating: "a", count: 64),
+        deviceProfilePath: profile.path, vendorToolPath: tool.path)
+    ) { error in
+      XCTAssertEqual(
+        error as? LaunchAgentArkForgeLaneStatus.Refusal, .notAbsolute("arkforged"))
+    }
+  }
+
+  func testAMissingProfileIsRefusedEvenWhenBothExecutablesAreFine() throws {
+    // The profile is what tells arkforged which device it is looking at. A
+    // lane installed without one would start and then fail at the first job.
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+    XCTAssertThrowsError(
+      try LaunchAgentArkForgeLaneStatus.measuring(
+        daemonPath: daemon.path, declaredDaemonSHA256: daemonDigest,
+        deviceProfilePath: root.appending(path: "absent.yaml").path,
+        vendorToolPath: tool.path))
+  }
+
+  func testTheEnvironmentIsExactlyTheKeysTheLaneReads() throws {
+    // Set some and forget others is the failure mode this guards: the lane
+    // refuses a partial set, so a writer that emitted three keys would produce
+    // a daemon that silently has no lane.
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+    let status = try LaunchAgentArkForgeLaneStatus.measuring(
+      daemonPath: daemon.path, declaredDaemonSHA256: daemonDigest,
+      deviceProfilePath: profile.path, vendorToolPath: tool.path)
+
+    XCTAssertEqual(status.environment.count, 4)
+    for value in status.environment.values {
+      XCTAssertFalse(value.isEmpty, "an empty value counts as missing to the lane")
+    }
+  }
+
+  func testTheInstallerAndTheLaneNameTheSameKeys() {
+    // Two definitions of the same four strings: the installer writes them into
+    // the plist, the lane reads them at startup. Nothing but this makes them
+    // agree, and a mismatch is silent — the daemon would start with a plist
+    // full of keys the lane never looks at, and simply have no lane.
+    XCTAssertEqual(
+      Set(ArkDeckLaunchAgent.arkForgeEnvironmentKeys),
+      Set([
+        ArkForgeLaneComposition.EnvironmentKey.daemonPath,
+        ArkForgeLaneComposition.EnvironmentKey.daemonSHA256,
+        ArkForgeLaneComposition.EnvironmentKey.deviceProfilePath,
+        ArkForgeLaneComposition.EnvironmentKey.vendorToolPath,
+      ]))
+  }
+
+  func testWhatTheInstallerWritesIsExactlyWhatTheLaneAccepts() throws {
+    // End to end across the two halves: measure a configuration, hand its
+    // environment to the lane's reader, and require a composed lane out. This
+    // is the assertion that would have caught a renamed key.
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+    let installed = try LaunchAgentArkForgeLaneStatus.measuring(
+      daemonPath: daemon.path, declaredDaemonSHA256: daemonDigest,
+      deviceProfilePath: profile.path, vendorToolPath: tool.path)
+
+    guard case .success(let inputs) =
+      ArkForgeLaneComposition.Inputs.read(installed.environment)
+    else {
+      return XCTFail("what the installer wrote must be what the lane accepts")
+    }
+    XCTAssertEqual(inputs.daemonPath, daemon.path)
+    XCTAssertEqual(inputs.vendorToolPath, tool.path)
+  }
+}
