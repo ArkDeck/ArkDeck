@@ -40,6 +40,35 @@ enum RuntimeCLI {
     print(render(value, indent: 0))
   }
 
+  /// A terminal Job that did not succeed must not leave the process at exit 0.
+  ///
+  /// `arkdeck job ...` is the surface an unattended caller drives — PRODUCT-LOOP
+  /// §14 puts the human budget at 0 after adoption — and exit 0 is the universal
+  /// "it worked" signal. Reporting a failed, cancelled or outcome-unknown Job
+  /// that way makes a script or an agent read a device that was never touched as
+  /// one that was. The payload is still printed either way; only the exit status
+  /// changes. Non-terminal states stay 0: the Job is simply still running, which
+  /// is not an error.
+  static func terminalJobExit(_ value: JSONValue) -> (code: Int32, reason: String)? {
+    guard case .object(let fields) = value else { return nil }
+    // Checked before the state, because an unknown outcome is not a failure to
+    // retry: the effect is undetermined and the Job needs `job reconcile`.
+    // POL-RECOVERY-001 forbids replaying it, so it gets its own exit status.
+    if case .bool(true)? = fields["outcomeUnknown"] {
+      return (
+        75, "job outcome is unknown: reconcile it; the original effect is never replayed"
+      )
+    }
+    guard case .string(let state)? = fields["state"] else { return nil }
+    switch state {
+    case "failed", "cancelled", "interrupted":
+      return (1, "job terminal state is \(state)")
+    default:
+      // succeeded / recovered / planned, or any non-terminal state.
+      return nil
+    }
+  }
+
   private static func render(_ value: JSONValue, indent: Int) -> String {
     let pad = String(repeating: "  ", count: indent)
     switch value {
@@ -1700,9 +1729,12 @@ enum RuntimeCLI {
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job status requires --job <id>")
       }
-      emit(
-        try client.request(method: "job.status", params: ["jobId": .string(rest[index + 1])]),
-        json: json)
+      let statusResponse = try client.request(
+        method: "job.status", params: ["jobId": .string(rest[index + 1])])
+      emit(statusResponse, json: json)
+      if let terminal = terminalJobExit(statusResponse) {
+        throw CLIError(exitCode: terminal.code, message: terminal.reason)
+      }
     case "run":
       // Resuming a reconciled job is what settles its authorization lineage.
       // `reconcile` deliberately leaves a `confirmedCompleted` decision
@@ -1714,9 +1746,12 @@ enum RuntimeCLI {
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job run requires --job <id>")
       }
-      emit(
-        try client.request(method: "job.run", params: ["jobId": .string(rest[index + 1])]),
-        json: json)
+      let runResponse = try client.request(
+        method: "job.run", params: ["jobId": .string(rest[index + 1])])
+      emit(runResponse, json: json)
+      if let terminal = terminalJobExit(runResponse) {
+        throw CLIError(exitCode: terminal.code, message: terminal.reason)
+      }
     case "cancel":
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job cancel requires --job <id>")
@@ -1753,9 +1788,12 @@ enum RuntimeCLI {
         if rest.contains("--wait"), case .object(let fields) = submitted,
           case .string(let jobID)? = fields["jobId"]
         {
-          emit(
-            try client.request(method: "job.run", params: ["jobId": .string(jobID)]),
-            json: json2Bool(rest))
+          let waited = try client.request(
+            method: "job.run", params: ["jobId": .string(jobID)])
+          emit(waited, json: json2Bool(rest))
+          if let terminal = terminalJobExit(waited) {
+            throw CLIError(exitCode: terminal.code, message: terminal.reason)
+          }
         }
         return
       }
@@ -1820,8 +1858,12 @@ enum RuntimeCLI {
       if rest.contains("--wait"), case .object(let fields) = submitted,
         case .string(let jobID)? = fields["jobId"]
       {
-        emit(
-          try client.request(method: "job.run", params: ["jobId": .string(jobID)]), json: json)
+        let waited = try client.request(
+          method: "job.run", params: ["jobId": .string(jobID)])
+        emit(waited, json: json)
+        if let terminal = terminalJobExit(waited) {
+          throw CLIError(exitCode: terminal.code, message: terminal.reason)
+        }
       }
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported job subcommand")

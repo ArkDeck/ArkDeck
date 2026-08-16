@@ -803,8 +803,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         try await engine.requestCancel(jobID: jobID)
         return success(id: request.id, result: .object(["cancelRequested": .bool(true)]))
-      } catch {
+      } catch RuntimeJobEngineError.jobNotFound {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
+      } catch let error as RuntimeJobEngineError {
+        // The same correction `job.reconcile` already carries below. Cancelling
+        // persists a decision, so it can fail long after the job was found —
+        // and reporting that as `notFound` tells the caller the job does not
+        // exist while its steps may still be running. The caller then has no
+        // way to see which gate refused, and no reason to retry. Only a
+        // genuinely absent job is notFound.
+        return failure(id: request.id, code: .rejected, message: "\(error)")
+      } catch {
+        return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
     case "job.reconcile":
