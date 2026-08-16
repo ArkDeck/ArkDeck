@@ -126,6 +126,22 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     }
   }
 
+  /// Same target, same binding revision, different physical device. Every
+  /// field `validateEvidenceFacts` inspects is well formed and matches the
+  /// request, so nothing before the capability gate can tell the difference.
+  private struct ReboundFactsPort: HDCObservationFactsPort {
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      ProviderFacts(
+        providerID: "hdc", toolVersion: "3.2.0f",
+        toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
+        targetID: targetID, bindingRevision: 7,
+        deviceIdentitySHA256: String(repeating: "d", count: 64),
+        executionConnectKey: "150100424a544e4600",
+        deviceMode: "hdc", buildFingerprint: "fixture-build",
+        profileID: "dayu200", collectedAtUTC: "2026-07-30T00:00:00Z")
+    }
+  }
+
   private final class NativeDispatcher: RuntimeProcessDispatching, @unchecked Sendable {
     enum Mode: Equatable {
       case success
@@ -1019,6 +1035,82 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
     XCTAssertTrue(remainingDebt.isEmpty)
   }
 
+  /// A finished Job's residue is settleable through the daemon's own recovery.
+  ///
+  /// The sibling restart test recovers with `recoverPersistedJobs()`, which
+  /// production never calls — the daemon launches with `recoverActiveJobs()`,
+  /// and a terminal Job is by definition not active. Since
+  /// `continueCleanupDebt` is the only route to `settleCleanupDebt`, that made
+  /// a finished Job's residue permanently unsettleable: `cleanup-debt list`
+  /// reported it forever, `cleanup-debt continue` answered `jobNotFound`
+  /// forever, and the owned remote path stayed on the device.
+  ///
+  /// Recovering the production way here is the point of the test.
+  func testAFinishedJobsCleanupDebtIsSettleableAfterProductionRecovery() async throws {
+    let initial = try await runNative(mode: .cleanupFailure, suffix: "terminal-debt")
+    XCTAssertEqual(initial.status.state, "succeeded")
+    let recorded = try await initial.engine.listCleanupDebt()
+    let debt = try XCTUnwrap(recorded.first)
+
+    let dispatcher = NativeDispatcher(mode: .cleanupContinuation, newHash: initial.newHash)
+    let recovered = try makeRecoveredEngine(suffix: "terminal-debt", dispatcher: dispatcher)
+    let active = try await recovered.recoverActiveJobs()
+    XCTAssertTrue(
+      active.isEmpty, "a terminal Job is not active; that is exactly the case under test")
+
+    let continuation = try await recovered.continueCleanupDebt(
+      jobID: debt.jobID, identity: debt.remotePath)
+    XCTAssertEqual(continuation.state, .settled, continuation.detail)
+    XCTAssertEqual(dispatcher.actionNames(), ["inspect:cleanupComplete", "cleanup"])
+    let remaining = try await recovered.listCleanupDebt()
+    XCTAssertTrue(remaining.isEmpty)
+
+    // The Job was loaded for this one call and let go again, so terminal
+    // history stays a SQLite query rather than a retained journal writer.
+    let stillActive = try await recovered.recoverActiveJobs()
+    XCTAssertTrue(stillActive.isEmpty)
+  }
+
+  /// The residue's mutation is a device mutation, and it must not reach the
+  /// device once the device is no longer the one that was authorized.
+  ///
+  /// `continueCleanupDebt` lowers a `.deviceMutation` and dispatched it with no
+  /// authority check of any kind — the function named `capability` nowhere. The
+  /// facts port here reports the same target on the same binding revision with
+  /// a different device identity, which is precisely what nothing before the
+  /// gate inspects: `validateEvidenceFacts` requires the identity be a
+  /// well-formed digest, never that it match the identity the Job materialized.
+  func testCleanupDebtRefusesToMutateADeviceItWasNotAuthorizedAgainst() async throws {
+    let initial = try await runNative(mode: .cleanupFailure, suffix: "rebound-debt")
+    XCTAssertEqual(initial.status.state, "succeeded")
+    let recorded = try await initial.engine.listCleanupDebt()
+    let debt = try XCTUnwrap(recorded.first)
+
+    let dispatcher = NativeDispatcher(mode: .cleanupContinuation, newHash: initial.newHash)
+    let recovered = try makeRecoveredEngine(
+      suffix: "rebound-debt", dispatcher: dispatcher, factsPort: ReboundFactsPort())
+    _ = try await recovered.recoverActiveJobs()
+
+    do {
+      let continuation = try await recovered.continueCleanupDebt(
+        jobID: debt.jobID, identity: debt.remotePath)
+      XCTFail("a rebound device must not be cleaned up: \(continuation.detail)")
+    } catch {
+      XCTAssertTrue(
+        "\(error)".contains("authorizationRequired") || "\(error)".contains("evidence"),
+        "the refusal must name authority, got: \(error)")
+    }
+    XCTAssertFalse(
+      dispatcher.actionNames().contains("cleanup"),
+      "zero cleanup mutation may reach the transport: \(dispatcher.actionNames())")
+
+    // And the one retry is still available, because the refusal happened
+    // before the ledger opened it.
+    let remaining = try await recovered.listCleanupDebt()
+    XCTAssertEqual(remaining.count, 1)
+    XCTAssertNil(remaining.first?.retryAttemptStartedAtUTC)
+  }
+
   /// `DHA-VERITY-001` — the platform attests nothing, and publish still works.
   ///
   /// This is the measured DAYU200 / OpenHarmony 7.0.0.37 case. Before this,
@@ -1208,7 +1300,8 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
 
   private func makeRecoveredEngine(
     suffix: String,
-    dispatcher: NativeDispatcher
+    dispatcher: NativeDispatcher,
+    factsPort: any HDCObservationFactsPort = FactsPort()
   ) throws -> RuntimeJobEngine {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appending(
@@ -1226,7 +1319,7 @@ final class NativeLibraryDeploymentContractTests: XCTestCase {
             "engine-\(suffix)", directoryHint: .isDirectory)),
       providers: DeviceProviderRegistry(providers: [
         HDCObservationProviderAdapter(
-          factsPort: FactsPort(),
+          factsPort: factsPort,
           appOwnedNativeLibraryAvailability: .available)
       ]),
       dispatcher: dispatcher, capabilityStore: capabilityStore,

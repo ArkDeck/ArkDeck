@@ -3828,6 +3828,16 @@ public actor RuntimeJobEngine {
   /// Explicitly continues one cleanup debt. The debt ledger is the WAL for
   /// this bounded retry. If the retry becomes unobservable, later calls may
   /// only run the read-only path judgement and must never resend cleanup.
+  ///
+  /// The debt outlives the Job that recorded it. A Job goes terminal, its
+  /// runtime is released (`statusAndReleaseTerminalRuntime`), and the daemon
+  /// launches with `recoverActiveJobs()` — so the residue's own Job is exactly
+  /// the one not resident. This is the only route to `settleCleanupDebt`, so
+  /// requiring residency meant a finished Job's residue could never be
+  /// settled: listed forever, and the owned remote path left on the device.
+  /// One durable record is loaded on demand for that case and released again
+  /// below; that is a single replay for an operator-initiated call, not the
+  /// launch-time cost `recoverActiveJobs()` exists to avoid.
   public func continueCleanupDebt(
     jobID: String, identity: String
   ) async throws -> RuntimeCleanupDebtContinuation {
@@ -3840,6 +3850,20 @@ public actor RuntimeJobEngine {
       })
     else {
       throw RuntimeJobEngineError.jobNotFound("cleanup-debt:\(jobID):\(identity)")
+    }
+    var loadedForThisCall = false
+    if jobs[jobID] == nil, let persistedJob = try admissionService.job(jobID: jobID) {
+      _ = try await recover(records: [persistedJob])
+      loadedForThisCall = jobs[jobID] != nil
+    }
+    defer {
+      // Put the memory posture back exactly as it was found. Terminal history
+      // stays a SQLite query.
+      if loadedForThisCall, let loaded = jobs[jobID], !loaded.record.outcomeUnknown,
+        JobState(rawValue: loaded.record.state)?.isTerminal == true
+      {
+        jobs.removeValue(forKey: jobID)
+      }
     }
     guard let runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
@@ -3922,13 +3946,37 @@ public actor RuntimeJobEngine {
         jobID: jobID, identity: identity, state: .outcomeUnknown,
         detail: "earlier cleanup retry is outcomeUnknown; mutation resend is forbidden")
     }
-    _ = try await artifactStore.beginCleanupDebtRetry(
-      jobID: jobID, identity: identity)
     let plan = try provider.lower(action: action, context: context)
     guard plan.action == action, plan.action.effect == .deviceMutation else {
       throw RuntimeJobEngineError.internalFailure(
         "cleanup debt did not lower to its exact typed mutation")
     }
+    // A device mutation, and it used to reach the transport with no authority
+    // check of any kind — this whole function named `capability` nowhere.
+    //
+    // The residue belongs to a Job that already consumed a capability for this
+    // exact target and plan, so this is the "this Job already owns that use"
+    // path (`persistedEvidence`): no second capability is consumed, and the
+    // gate re-proves what may have drifted since — the persisted evidence
+    // still matches the Job's authorization, the plan still materializes to
+    // the same digest, and fresh facts still put the same device on the same
+    // binding. A Job that never held a runtime capability fails closed here.
+    guard
+      let descriptor = RuntimeOperationCatalog.descriptor(
+        reference: runtime.record.request.operation.reference)
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "catalog operation vanished for \(jobID)")
+    }
+    try await consumeCapabilityBeforeMutation(
+      jobID: jobID, descriptor: descriptor, effect: .deviceMutation,
+      validatedFacts: facts)
+    // Only now is the retry durable. Ordered after the gate on purpose: the
+    // ledger refuses a second attempt once `retryAttemptStartedAtUTC` is set,
+    // so opening it before an authority refusal would spend the one retry on a
+    // dispatch that never happened.
+    _ = try await artifactStore.beginCleanupDebtRetry(
+      jobID: jobID, identity: identity)
     do {
       let receipt = try await dispatcher.dispatch(plan)
       switch try provider.verify(receipt: receipt, action: action, context: context) {
