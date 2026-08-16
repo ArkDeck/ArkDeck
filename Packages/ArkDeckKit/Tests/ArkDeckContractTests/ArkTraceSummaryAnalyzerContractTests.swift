@@ -1002,6 +1002,18 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
     guard case .verified = nonURIFileLabelOutcome else {
       return XCTFail("a non-URI trace label beginning with file: must remain valid")
     }
+    let nonFileResourceURI = Data(
+      String(decoding: output, as: UTF8.self).replacingOccurrences(
+        of: "\"source\":\"token=secretvalue\"",
+        with: "\"source\":\"resource:///icon.svg\"").utf8)
+    let nonFileResourceURIOutcome = try provider.verify(
+      receipt: ProviderProcessReceipt(
+        exitStatus: 0, stdout: nonFileResourceURI, stderr: Data(), stdoutTruncated: false,
+        durationSeconds: 0.01),
+      action: action, context: context)
+    guard case .verified = nonFileResourceURIOutcome else {
+      return XCTFail("a non-file resource URI in trace data must remain valid")
+    }
   }
 
   func testArkTraceEnvelopeMismatchTruncationAndBudgetFailuresAreRejected() async throws {

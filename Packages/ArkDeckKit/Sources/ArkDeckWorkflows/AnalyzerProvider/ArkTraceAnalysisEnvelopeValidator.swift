@@ -494,14 +494,18 @@ package enum ArkTraceAnalysisEnvelopeValidator {
   private static func validateSummaryTruncatedSections(
     _ value: JSONValue?, summary: Object
   ) -> Bool {
-    guard let sections = stringArray(value, maximumCount: 8), sections == sections.sorted(),
+    guard let sections = stringArray(value, maximumCount: 8),
       Set(sections).count == sections.count
     else { return false }
-    let allowed = Set([
+    // ArkTrace preserves the declared TraceSummarySection order. That order
+    // is stable and machine-facing, but deliberately differs from lexical
+    // order (for example process/thread counts precede named slices).
+    let ordered = [
       "cpuCount", "processCount", "threadCount", "cpuSliceCount", "threadStateCount",
       "namedSliceCount", "counterSeriesCount", "eventCountBySource",
-    ])
-    guard sections.allSatisfy(allowed.contains) else { return false }
+    ]
+    let positions = sections.compactMap { ordered.firstIndex(of: $0) }
+    guard positions.count == sections.count, positions == positions.sorted() else { return false }
     let unavailable = [
       "cpuCount", "cpuSliceCount", "threadStateCount", "namedSliceCount",
       "counterSeriesCount", "eventCountBySource",
@@ -539,14 +543,16 @@ package enum ArkTraceAnalysisEnvelopeValidator {
     var truncated: [String] = []
     for name in names {
       guard let count = counts[name], let isTruncated = validateSectionStatus(
-        object[name], returnedCount: count) else { return nil }
+        object[name], returnedCount: count,
+        permitsAggregation: name == "cpuUtilization" || name == "threadStateDistribution"
+      ) else { return nil }
       if isTruncated { truncated.append(name) }
     }
     return truncated.sorted()
   }
 
   private static func validateSectionStatus(
-    _ value: JSONValue?, returnedCount: Int
+    _ value: JSONValue?, returnedCount: Int, permitsAggregation: Bool = false
   ) -> Bool? {
     guard let value, let object = object(value),
       exactKeys(object, ["returnedCount", "matchedCount", "truncated"]),
@@ -557,7 +563,7 @@ package enum ArkTraceAnalysisEnvelopeValidator {
       guard truncated else { return nil }
     } else {
       guard let matched = integer(object["matchedCount"]), matched >= Int64(returnedCount),
-        matched == Int64(returnedCount) || truncated
+        matched == Int64(returnedCount) || truncated || permitsAggregation
       else { return nil }
     }
     return truncated
@@ -736,10 +742,24 @@ package enum ArkTraceAnalysisEnvelopeValidator {
       optionalText(object["processName"], maximumBytes: 4_096),
       optionalText(object["unit"], maximumBytes: 4_096),
       let samples = array(object["samples"]),
-      samples.allSatisfy({ validateCounterSample($0, range: range) })
+      samples.allSatisfy({ validateCounterSample($0, range: range) }),
+      // A counter is a step function: its value holds until the next sample, so
+      // the value in force at the window's start was written before the window.
+      // One such carry-in sample is what makes the series readable at all; more
+      // than one would be backfill the window cannot justify.
+      samples.filter({ sampleStartsBeforeWindow($0, range: range) }).count <= 1
     else { return false }
     return scope == "cpu" ? !isNull(object["cpu"]) && isNull(object["processKey"])
       : isNull(object["cpu"]) && !isNull(object["processKey"])
+  }
+
+  private static func sampleStartsBeforeWindow(
+    _ value: JSONValue, range: (Int64, Int64)
+  ) -> Bool {
+    guard let object = object(value), let timestamp = integer(object["timestampNs"]) else {
+      return false
+    }
+    return timestamp < range.0
   }
 
   private static func validateCounterSample(
@@ -749,8 +769,15 @@ package enum ArkTraceAnalysisEnvelopeValidator {
       "key", "timestampNs", "value", "durationNs",
     ]), validateEventKey(object["key"]),
       let timestamp = integer(object["timestampNs"]),
-      timestamp >= range.0, timestamp < range.1,
+      timestamp < range.1,
       integer(object["value"]) != nil, optionalNonnegativeInteger(object["durationNs"])
+    else { return false }
+    if timestamp >= range.0 { return true }
+    // The sample predates the window, so it is only admissible as the value
+    // still in force at the window's start: its own validity has to reach the
+    // window. A bare timestamp before the window proves nothing and is refused.
+    guard let duration = integer(object["durationNs"]), duration >= 0,
+      let end = checkedSum(timestamp, duration), end > range.0
     else { return false }
     return true
   }
@@ -899,9 +926,10 @@ package enum ArkTraceAnalysisEnvelopeValidator {
     ]), validKey(object["threadKey"], field: "itid"),
       validateEventKey(object["runnableEventKey"]), validateEventKey(object["runningEventKey"]),
       let runnableEnd = integer(object["runnableEndNs"]), runnableEnd >= 0,
-      let runningStart = integer(object["runningStartNs"]), runningStart >= runnableEnd,
+      let runningStart = integer(object["runningStartNs"]), runningStart == runnableEnd,
       runnableEnd >= range.0, runningStart <= range.1,
-      integer(object["latencyNs"]) == runningStart - runnableEnd
+      let latency = integer(object["latencyNs"]), latency >= 0,
+      latency <= runnableEnd - range.0
     else { return false }
     return true
   }

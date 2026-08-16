@@ -384,13 +384,73 @@ package enum ArkTraceSummaryEnvelopeValidator {
 
   private static func containsAbsolutePathToken(_ string: String) -> Bool {
     let scalars = Array(string.unicodeScalars)
-    for index in scalars.indices
-    where scalars[index].value == UInt32(UInt8(ascii: "/")) {
+    var index = scalars.startIndex
+    while index < scalars.endIndex {
+      guard scalars[index].value == UInt32(UInt8(ascii: "/")) else {
+        index = scalars.index(after: index)
+        continue
+      }
+      // Trace-controlled labels legitimately carry non-file resource URIs
+      // such as `resource:///icon.svg`. Their authority separator is not a
+      // host filesystem path. `file:/...` remains rejected independently by
+      // containsFileURIToken, while a single slash after an arbitrary label
+      // (for example `HOME:/Users/...`) still reaches the path check below.
+      if let separatorEnd = uriSeparatorEnd(scalars, startingAt: index) {
+        index = scalars.index(after: separatorEnd)
+        continue
+      }
       if index == scalars.startIndex { return true }
       let previous = scalars[scalars.index(before: index)]
       if !isSemanticIdentifierScalar(previous) { return true }
+      index = scalars.index(after: index)
     }
     return false
+  }
+
+  private static func uriSeparatorEnd(
+    _ scalars: [Unicode.Scalar], startingAt start: Int
+  ) -> Int? {
+    guard start > scalars.startIndex else { return nil }
+    let colon = scalars.index(before: start)
+    guard scalars[colon].value == UInt32(UInt8(ascii: ":")), colon > scalars.startIndex
+    else { return nil }
+
+    var end = start
+    while scalars.index(after: end) < scalars.endIndex,
+      scalars[scalars.index(after: end)].value == UInt32(UInt8(ascii: "/"))
+    {
+      end = scalars.index(after: end)
+    }
+    guard scalars.distance(from: start, to: scalars.index(after: end)) >= 2,
+      colon > scalars.startIndex
+    else { return nil }
+
+    var schemeStart = colon
+    while schemeStart > scalars.startIndex {
+      let candidate = scalars.index(before: schemeStart)
+      guard isURISchemeContinuationScalar(scalars[candidate]) else { break }
+      schemeStart = candidate
+    }
+    guard schemeStart < colon, isASCIIAlphaScalar(scalars[schemeStart]),
+      scalars[schemeStart..<colon].allSatisfy(isURISchemeContinuationScalar)
+    else { return nil }
+    return end
+  }
+
+  private static func isASCIIAlphaScalar(_ scalar: Unicode.Scalar) -> Bool {
+    (scalar.value >= UInt32(UInt8(ascii: "A"))
+      && scalar.value <= UInt32(UInt8(ascii: "Z")))
+      || (scalar.value >= UInt32(UInt8(ascii: "a"))
+        && scalar.value <= UInt32(UInt8(ascii: "z")))
+  }
+
+  private static func isURISchemeContinuationScalar(_ scalar: Unicode.Scalar) -> Bool {
+    isASCIIAlphaScalar(scalar)
+      || (scalar.value >= UInt32(UInt8(ascii: "0"))
+        && scalar.value <= UInt32(UInt8(ascii: "9")))
+      || scalar.value == UInt32(UInt8(ascii: "+"))
+      || scalar.value == UInt32(UInt8(ascii: "-"))
+      || scalar.value == UInt32(UInt8(ascii: "."))
   }
 
   private static func isSemanticIdentifierScalar(_ scalar: Unicode.Scalar) -> Bool {

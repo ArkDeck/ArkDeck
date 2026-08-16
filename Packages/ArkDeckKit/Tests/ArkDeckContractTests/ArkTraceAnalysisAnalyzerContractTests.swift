@@ -145,6 +145,47 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
     }
   }
 
+  func testContextAcceptsCanonicalArkTraceSummaryTruncationOrder() throws {
+    let request = try request(
+      kind: .context, startNs: 0, endNs: 100_000_000)
+    let invocation = invocation(request)
+    var productionOrdered = root(request)
+    productionOrdered = replacingObject(productionOrdered, key: "truncation") { truncation in
+      truncation["truncated"] = .bool(true)
+      truncation["sections"] = .array([.string("summary")])
+    }
+    productionOrdered = replacingObject(productionOrdered, key: "result") { result in
+      guard case .object(var summary)? = result["summary"],
+        case .object(var capabilities)? = summary["capabilities"],
+        case .object(var truncation)? = result["truncation"]
+      else { return }
+      capabilities["threadStates"] = .bool(true)
+      capabilities["namedSlices"] = .bool(true)
+      summary["capabilities"] = .object(capabilities)
+      summary["threadStateCount"] = .integer(0)
+      summary["namedSliceCount"] = .integer(0)
+      summary["truncatedSections"] = .array([
+        .string("processCount"), .string("threadCount"),
+        .string("threadStateCount"), .string("namedSliceCount"),
+      ])
+      truncation["summary"] = status(returned: 1, matched: 1, truncated: true)
+      result["summary"] = .object(summary)
+      result["truncation"] = .object(truncation)
+    }
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(productionOrdered), invocation: invocation))
+
+    var lexical = productionOrdered
+    lexical = replacingNestedObject(lexical, first: "result", second: "summary") { summary in
+      summary["truncatedSections"] = .array([
+        .string("namedSliceCount"), .string("processCount"),
+        .string("threadCount"), .string("threadStateCount"),
+      ])
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(lexical), invocation: invocation))
+  }
+
   func testClosedEnvelopeRejectsRequestProvenanceBudgetAndPrivacyDrift() throws {
     let request = try request(kind: .range, startNs: 0, endNs: 100_000_000)
     let invocation = invocation(request)
@@ -250,6 +291,119 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
       try encoded(document), invocation: invocation))
   }
 
+  func testAnalysisAcceptsAggregatedSourceCountsAndRunnableIntervalLatency() throws {
+    let request = try self.request(
+      kind: .range, startNs: 0, endNs: 100_000_000,
+      maxRows: 10, maxEvents: 50_000, limit: 10)
+    let invocation = invocation(request)
+    var document = root(request)
+    document = replacingNestedObject(document, first: "result", second: "analysis") {
+      analysis in
+      analysis["cpuUtilization"] = .array([
+        .object([
+          "cpu": .integer(0), "rawRunningNs": .integer(10),
+          "occupiedNs": .integer(10), "sliceCount": .integer(17_484),
+          "utilization": .number(0.000_000_1),
+        ])
+      ])
+      analysis["threadStateDistribution"] = .array([
+        .object([
+          "threadKey": .object(["itid": .integer(17)]), "processKey": .null,
+          "tid": .null, "pid": .null, "rawState": .string("Runnable"),
+          "normalizedState": .string("runnable"), "durationNs": .integer(20_000_000),
+          "percentageOfRange": .number(0.2), "intervalCount": .integer(28_067),
+        ])
+      ])
+      analysis["schedulingLatency"] = .object([
+        "supported": .bool(true), "unsupportedReason": .null,
+        "count": .integer(1),
+        "percentiles": .object([
+          "p50Ns": .integer(20_000_000), "p90Ns": .integer(20_000_000),
+          "p95Ns": .integer(20_000_000), "p99Ns": .integer(20_000_000),
+          "maxNs": .integer(20_000_000),
+        ]),
+        "topSamples": .array([
+          .object([
+            "threadKey": .object(["itid": .integer(17)]),
+            "runnableEventKey": .object([
+              "table": .string("thread_state"), "rowID": .integer(1),
+            ]),
+            "runningEventKey": .object([
+              "table": .string("sched_slice"), "rowID": .integer(2),
+            ]),
+            "runnableEndNs": .integer(80_000_000),
+            "runningStartNs": .integer(80_000_000),
+            "latencyNs": .integer(20_000_000),
+          ])
+        ]),
+        "truncated": .bool(false),
+      ])
+      guard case .object(var sections)? = analysis["sections"] else { return }
+      sections["cpuUtilization"] = .object([
+        "returnedCount": .integer(1), "matchedCount": .integer(17_484),
+        "truncated": .bool(false),
+      ])
+      sections["threadStateDistribution"] = .object([
+        "returnedCount": .integer(1), "matchedCount": .integer(28_067),
+        "truncated": .bool(false),
+      ])
+      sections["schedulingLatency"] = status(returned: 1)
+      analysis["sections"] = .object(sections)
+    }
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document), invocation: invocation))
+
+    let unexplainedProcessAggregation = replacingNestedObject(
+      document, first: "result", second: "analysis"
+    ) { analysis in
+      analysis["topProcesses"] = .array([
+        .object([
+          "processKey": .object(["ipid": .integer(1)]), "pid": .integer(42),
+          "name": .string("worker"), "runningNs": .integer(10),
+          "shareOfOneCPU": .number(0.000_000_1), "sliceCount": .integer(2),
+        ])
+      ])
+      guard case .object(var sections)? = analysis["sections"] else { return }
+      sections["topProcesses"] = .object([
+        "returnedCount": .integer(1), "matchedCount": .integer(2),
+        "truncated": .bool(false),
+      ])
+      analysis["sections"] = .object(sections)
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(unexplainedProcessAggregation), invocation: invocation))
+
+    let nonAdjacent = replacingNestedObject(
+      document, first: "result", second: "analysis"
+    ) { analysis in
+      guard case .object(var latency)? = analysis["schedulingLatency"],
+        case .array(var samples)? = latency["topSamples"],
+        case .object(var sample) = samples[0]
+      else { return }
+      sample["runningStartNs"] = .integer(80_000_001)
+      samples[0] = .object(sample)
+      latency["topSamples"] = .array(samples)
+      analysis["schedulingLatency"] = .object(latency)
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(nonAdjacent), invocation: invocation))
+
+    let impossibleDuration = replacingNestedObject(
+      document, first: "result", second: "analysis"
+    ) { analysis in
+      guard case .object(var latency)? = analysis["schedulingLatency"],
+        case .array(var samples)? = latency["topSamples"],
+        case .object(var sample) = samples[0]
+      else { return }
+      sample["latencyNs"] = .integer(80_000_001)
+      samples[0] = .object(sample)
+      latency["topSamples"] = .array(samples)
+      analysis["schedulingLatency"] = .object(latency)
+    }
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(impossibleDuration), invocation: invocation))
+  }
+
   func testContextEmbeddedSummaryUsesTheRequestBudgetsRatherThanSummaryOperationDefaults()
     throws
   {
@@ -269,6 +423,75 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
     }
     XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
       try encoded(document), invocation: invocation))
+  }
+
+  /// A counter is a step function, so the value in force when the window opens
+  /// was written before the window. ArkTrace carries that one sample in; a real
+  /// DAYU 200 capture put four of them (one per CPU idle series) 37 ms ahead of
+  /// a 100 ms window, each with a duration reaching into it. Refusing those made
+  /// `kind=context` unusable on real traces, so the carry-in is admitted - but
+  /// only when the sample's own validity actually reaches the window, and only
+  /// one per series.
+  func testContextAdmitsOneCarryInCounterSamplePerSeries() throws {
+    let request = try self.request(
+      kind: .context, startNs: 100_000_000, endNs: 200_000_000,
+      maxRows: 10, maxEvents: 10)
+    let invocation = invocation(request)
+    func sample(_ timestamp: Int64, _ duration: JSONValue, rowID: Int64 = 1) -> JSONValue {
+      .object([
+        "key": .object(["table": .string("measure"), "rowID": .integer(rowID)]),
+        "timestampNs": .integer(timestamp), "value": .integer(2),
+        "durationNs": duration,
+      ])
+    }
+    func document(with samples: [JSONValue]) -> [String: JSONValue] {
+      var document = root(request)
+      document = replacingNestedObject(document, first: "result", second: "summary") {
+        summary in
+        guard case .object(var capabilities)? = summary["capabilities"] else { return }
+        capabilities["cpuCounters"] = .bool(true)
+        summary["capabilities"] = .object(capabilities)
+        summary["counterSeriesCount"] = .integer(1)
+      }
+      document = replacingNestedObject(document, first: "result", second: "truncation") {
+        $0["counters"] = status(returned: samples.count)
+      }
+      return replacingObject(document, key: "result") {
+        $0["counters"] = .array([.object([
+          "filterID": .integer(7), "name": .string("cpu_idle"),
+          "scope": .string("cpu"), "cpu": .integer(0), "processKey": .null,
+          "pid": .null, "processName": .null, "unit": .null,
+          "samples": .array(samples),
+        ])])
+      }
+    }
+
+    // Carry-in whose validity reaches the window is what a real capture emits.
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(63_000_000, .integer(50_000_000))])),
+      invocation: invocation))
+    // In-window samples keep working unchanged.
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(150_000_000, .integer(1_000))])),
+      invocation: invocation))
+    // A sample that predates the window without reaching it proves nothing.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(63_000_000, .integer(1_000))])),
+      invocation: invocation))
+    // ... and neither does one that declines to say how long it held.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(63_000_000, .null)])),
+      invocation: invocation))
+    // Two carry-ins are backfill the window cannot justify.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [
+        sample(63_000_000, .integer(50_000_000)),
+        sample(64_000_000, .integer(50_000_000), rowID: 2),
+      ])), invocation: invocation))
+    // The window's far edge is still exclusive.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(200_000_000, .integer(1_000))])),
+      invocation: invocation))
   }
 
   func testContextRowsMustIntersectTheRequestedRangeAndMatchCapabilities() throws {
@@ -889,10 +1112,13 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
     .object(["status": .string("ok"), "warnings": .array([])])
   }
 
-  private func status(returned: Int) -> JSONValue {
+  private func status(
+    returned: Int, matched: Int? = nil, truncated: Bool = false
+  ) -> JSONValue {
     .object([
       "returnedCount": .integer(Int64(returned)),
-      "matchedCount": .integer(Int64(returned)), "truncated": .bool(false),
+      "matchedCount": .integer(Int64(matched ?? returned)),
+      "truncated": .bool(truncated),
     ])
   }
 
