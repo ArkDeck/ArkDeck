@@ -53,8 +53,12 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckStorage": ["ArkDeckCore"],
     "ArkDeckHarness": ["ArkDeckCore", "ArkDeckRuntime"],
+    // ArkForgeIPC is the runtime control plane's route to the mechanics daemon:
+    // the engine issues permits and reads receipts across it. Widened here in
+    // the same review as the code that needs it (CHG-2026-059 step 5).
     "ArkDeckWorkflows": [
       "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony", "ArkDeckStorage",
+      "ArkForgeIPC",
     ],
     "ArkDeckAgentComposition": [
       "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage", "ArkDeckHarness",

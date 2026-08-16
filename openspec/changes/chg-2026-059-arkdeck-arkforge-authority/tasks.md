@@ -10,9 +10,15 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   golden frame 取自真实 daemon）、工具切到 `231a05ef…`（design 第 10 节）。
   以及第 1 步删 lowering（`wlx`/`rl`/`ppt` 及其判定逻辑全部移除，legacy journal
   译为具名不可重放拒绝，读域教训索引到 `docs/design/rockchip-read-domain.md`）。
-  未开始：第 3 步对抗矩阵、第 4 步控制端口、第 5 步引擎接线、第 6 步真机。
-  当前 `flash.dayu200` 在授权前被拒——第 5 步接线前它没有执行器，5 条端到端
-  recovery 测试因此 skip 并注明依赖第 5 步。仅在本实现 PR 经维护者 review/merge 后生效）
+  第 1、2 步与 IPC 客户端已由 #1328 merge。
+  本 PR 再加：第 3 步签发侧对抗矩阵（`ArkForgeExecutionAuthority`，七条具名拒绝
+  + 零派发断言 + AFA-AC-4 字节重放）、第 4 步 `ArkForgeManagedControlPort`
+  （四个语义动作、`EnterUpdater` 三次观测缺一不可、回执禁止事实在**构建处**拦下、
+  同一扫描覆盖 journal/UI）、第 5 步 `ArkForgeFlashSession`（watchJob 循环、
+  admission/control 应答、AFA-AC-10 取消三态；真实 client 已声明满足同一 protocol）。
+  未完成：把 session 接进 `RuntimeJobEngine` 自己的 dispatch 分支、第 6 步真机。
+  在那之前 `flash.dayu200` 仍在授权前被拒，5 条端到端 recovery 测试保持 skip。
+  仅在本实现 PR 经维护者 review/merge 后生效）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:`AFA-REQ-001`…`AFA-REQ-005`（单任务覆盖全部五条）

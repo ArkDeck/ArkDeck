@@ -8,6 +8,7 @@
 // recovery that never blind-redispatches. Unknown outcomes park in
 // waitingForRecovery; there is no automatic replay anywhere in this file.
 
+import ArkForgeIPC
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
@@ -749,6 +750,20 @@ public actor RuntimeJobEngine {
     let completeOverwriteRecovery: RuntimeCompleteOverwriteRecoveryContext?
     let recognizedRecoveryEpochID: String?
   }
+
+  /// The steps `arkforged` performs under a StepPermit rather than ArkDeck
+  /// dispatching them itself (CHG-2026-059).
+  ///
+  /// Named here rather than inferred from the step kind: `flashPartition` and
+  /// `verifyRemoteState` are catalog kinds other operations also use, and
+  /// delegating by kind would silently move somebody else's step to a daemon
+  /// that knows nothing about it.
+  package static let arkForgeDispatchedSteps: Set<String> = [
+    "flash-partitions", "verify-flash-readback",
+  ]
+
+  /// The `processKind` those steps carry in a materialized plan.
+  package static let arkForgeDispatchKind = "arkforgeStepPermit"
 
   private struct MaterializedPlanStep: Codable {
     let stepID: String
@@ -5053,6 +5068,34 @@ public actor RuntimeJobEngine {
           expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
             for: descriptor, artifact: resolved,
             artifactLeaseID: resolvedArtifactLeaseID))
+        // Steps arkforged performs have no ArkDeck action to ask for — that
+        // lowering was removed in CHG-2026-059 — so they are materialized
+        // directly. The step set, its effect, its cancellation class and its
+        // journalled arguments are unchanged (AFA-REQ-004); what changes is
+        // only who performs it, and the plan digest records that rather than
+        // hiding it.
+        if Self.arkForgeDispatchedSteps.contains(step.stepID) {
+          let workflowStep = try Self.journalStep(
+            for: step, jobID: context.jobID, inputs: request.inputs,
+            action: nil, resolvedInputArtifact: resolved,
+            operationReference: descriptor.reference)
+          materializedSteps.append(
+            MaterializedPlanStep(
+              stepID: step.stepID, kind: step.kind.rawValue,
+              effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
+              binding: step.binding.rawValue, isOptional: step.isOptional,
+              journalArguments: workflowStep.arguments,
+              processKind: Self.arkForgeDispatchKind,
+              executableSHA256: nil, argumentZero: nil, workingDirectory: nil,
+              argumentSummary: nil, processInvocations: nil, timeoutSeconds: nil,
+              // Names the toolchain the permit will be bound to. A plan
+              // materialized for one tool and executed against another is a
+              // maturity combination nobody published, and the daemon refuses
+              // it at startExecution — this is so the digest disagrees first.
+              hostManagedDescriptor:
+                "arkforge.stepPermit#toolchain-sha256:\(ArkForgeToolchainPin.signedSHA256)"))
+          continue
+        }
         let action = try provider.action(
           for: step, operation: descriptor, inputs: request.inputs,
           context: context)
