@@ -191,11 +191,14 @@ final class AnalyzerProviderContractTests: XCTestCase {
       AnalyzerProvider.traceSummary,
     ] {
       let operation = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
-      guard case .unavailable(let reason) = bare.runtimeAvailability(for: operation) else {
+      guard case .unavailable(let code, let reason) = bare.runtimeAvailability(for: operation)
+      else {
         return XCTFail("\(reference) must be unavailable with no profile")
       }
       // Machine-readable, and admission stops here: no capability is spent
-      // on an analyzer this host was never given (PRODUCT-LOOP §8).
+      // on an analyzer this host was never given (PRODUCT-LOOP §8). The code is
+      // what a caller branches on; the prose is for whoever reads the log.
+      XCTAssertEqual(code, .providerToolUnavailable)
       XCTAssertEqual(reason, "analyzer.profileUnavailable")
     }
   }
@@ -209,9 +212,11 @@ final class AnalyzerProviderContractTests: XCTestCase {
     ])
     let operation = try XCTUnwrap(
       RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.crashSignature))
-    guard case .unavailable(let reason) = provider.runtimeAvailability(for: operation) else {
+    guard case .unavailable(let code, let reason) = provider.runtimeAvailability(for: operation)
+    else {
       return XCTFail("a drifted tool must not be admitted")
     }
+    XCTAssertEqual(code, .toolIdentityDrift)
     XCTAssertEqual(reason, "analyzer.toolIdentityDrift")
   }
 

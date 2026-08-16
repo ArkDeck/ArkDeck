@@ -512,27 +512,27 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
       [.posixPermissions: 0o644], ofItemAtPath: fixture.toolURL.path)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
-      .unavailable(reason: "analyzer.toolIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.toolIdentityDrift"))
     XCTAssertEqual(
       provider.runtimeAvailability(for: analysisOperation),
-      .unavailable(reason: "analyzer.toolIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.toolIdentityDrift"))
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: fixture.toolURL.path)
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o644], ofItemAtPath: fixture.parserURL.path)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
-      .unavailable(reason: "analyzer.profileIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift"))
     XCTAssertEqual(
       provider.runtimeAvailability(for: analysisOperation),
-      .unavailable(reason: "analyzer.profileIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift"))
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: fixture.parserURL.path)
     let receiptBytes = try Data(contentsOf: fixture.receiptURL)
     try Data("receipt drift".utf8).write(to: fixture.receiptURL)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
-      .unavailable(reason: "analyzer.profileIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift"))
     try receiptBytes.write(to: fixture.receiptURL)
     XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
     let injectedResource = fixture.distributionRoot
@@ -540,7 +540,7 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
     try Data("not part of the reviewed signed tree".utf8).write(to: injectedResource)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
-      .unavailable(reason: "analyzer.profileIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift"))
     try FileManager.default.removeItem(at: injectedResource)
     XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
 
@@ -573,14 +573,14 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
     try Data("drift".utf8).write(to: fixture.parserURL)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
-      .unavailable(reason: "analyzer.profileIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift"))
     try fixture.parserBytes.write(to: fixture.parserURL)
     XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
 
     try Data("tool drift".utf8).write(to: fixture.toolURL)
     XCTAssertEqual(
       provider.runtimeAvailability(for: operation),
-      .unavailable(reason: "analyzer.toolIdentityDrift"))
+      .unavailable(code: .toolIdentityDrift, reason: "analyzer.toolIdentityDrift"))
     try fixture.toolBytes.write(to: fixture.toolURL)
     XCTAssertEqual(provider.runtimeAvailability(for: operation), .available)
 
@@ -691,7 +691,8 @@ final class ArkTraceSummaryAnalyzerContractTests: XCTestCase {
         RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.traceSummary))
       XCTAssertEqual(
         provider.runtimeAvailability(for: operation),
-        .unavailable(reason: "analyzer.arktraceSelfTestFailed"))
+        .unavailable(
+          code: .providerToolUnavailable, reason: "analyzer.arktraceSelfTestFailed"))
     }
   }
 

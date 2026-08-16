@@ -407,9 +407,11 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
 
   func testUnconfiguredInspectorReportsUnavailableAndAdmitsNothing() async throws {
     let noTool = workspaceProvider(tool: nil)
-    guard case .unavailable(let reason) = noTool.runtimeAvailability(for: inspectSource) else {
+    guard case .unavailable(let code, let reason) = noTool.runtimeAvailability(for: inspectSource)
+    else {
       return XCTFail("an unconfigured inspector must report unavailable")
     }
+    XCTAssertEqual(code, .providerToolUnavailable)
     XCTAssertEqual(reason, "no_workspace_inspector_configured")
 
     let noProject = WorkspaceProvider(
@@ -417,11 +419,12 @@ final class HostOnlyAdmissionContractTests: XCTestCase {
       tool: WorkspaceInspectorTool(
         executablePath: "/usr/bin/grep", executableSHA256: String(repeating: "a", count: 64)))
     guard
-      case .unavailable(let projectReason) =
+      case .unavailable(let projectCode, let projectReason) =
         noProject.runtimeAvailability(for: inspectSource)
     else {
       return XCTFail("no registered project must report unavailable")
     }
+    XCTAssertEqual(projectCode, .workspacePresetUnavailable)
     XCTAssertEqual(projectReason, "no_workspace_project_registered")
 
     // And admission refuses before anything is materialized or consumed.

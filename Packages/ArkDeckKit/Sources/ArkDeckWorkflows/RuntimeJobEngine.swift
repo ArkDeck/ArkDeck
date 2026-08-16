@@ -411,12 +411,24 @@ public enum RuntimeAvailabilityState: String, Sendable, Equatable {
 public struct RuntimeOperationAvailability: Sendable, Equatable {
   public let reference: String
   public let state: RuntimeAvailabilityState
+  /// Prose, for a person. Positionally paired with `reasonCodes`.
   public let reasons: [String]
+  /// The machine-readable half PRODUCT-LOOP §8 requires, in the same order as
+  /// `reasons`. `reasons` alone carried four naming conventions at once, so a
+  /// caller deciding whether to wait or stop could only substring-match
+  /// English prose that reworded silently.
+  public let reasonCodes: [RuntimeAvailabilityReasonCode]
 
-  public init(reference: String, state: RuntimeAvailabilityState, reasons: [String]) {
+  public init(
+    reference: String,
+    state: RuntimeAvailabilityState,
+    reasons: [String],
+    reasonCodes: [RuntimeAvailabilityReasonCode]
+  ) {
     self.reference = reference
     self.state = state
     self.reasons = reasons
+    self.reasonCodes = reasonCodes
   }
 }
 
@@ -933,26 +945,36 @@ public actor RuntimeJobEngine {
         return RuntimeOperationAvailability(
           reference: descriptor.reference,
           state: .unavailable,
-          reasons: ["provider \(descriptor.provider.rawValue) is not registered"])
+          reasons: ["provider \(descriptor.provider.rawValue) is not registered"],
+          reasonCodes: [.providerNotRegistered])
       }
       var reasons: [String] = []
-      if case .unavailable(let reason) = provider.runtimeAvailability(for: descriptor) {
+      var reasonCodes: [RuntimeAvailabilityReasonCode] = []
+      if case .unavailable(let code, let reason) = provider.runtimeAvailability(for: descriptor) {
         reasons.append(reason)
+        reasonCodes.append(code)
       }
       if let reason = dispatcher.unavailableReason(providerID: descriptor.provider.rawValue) {
         if !reasons.contains(reason) {
           reasons.append(reason)
+          // Every dispatcher answers this the same way: the executable, the
+          // bundled component or the host record root it needs is missing or
+          // unreadable. None of them reports a drifted identity — the identity
+          // checks live in the providers above.
+          reasonCodes.append(.providerToolUnavailable)
         }
       }
       if RuntimeArtifactService.requiresArtifactStore(reference: descriptor.reference),
         artifactStore == nil
       {
         reasons.append("runtime.artifactStoreUnavailable")
+        reasonCodes.append(.artifactStoreUnavailable)
       }
       return RuntimeOperationAvailability(
         reference: descriptor.reference,
         state: reasons.isEmpty ? .available : .unavailable,
-        reasons: reasons)
+        reasons: reasons,
+        reasonCodes: reasonCodes)
     }.sorted { $0.reference < $1.reference }
   }
 

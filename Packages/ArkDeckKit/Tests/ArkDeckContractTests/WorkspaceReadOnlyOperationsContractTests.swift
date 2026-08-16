@@ -109,11 +109,15 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
     let bareProvider = makeProvider(bare)
     for reference in ["workspace.inspect-git-status@1", "workspace.inspect-diff@1"] {
       let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
-      guard case .unavailable(let reason) = bareProvider.runtimeAvailability(for: descriptor) else {
+      guard
+        case .unavailable(let code, let reason) =
+          bareProvider.runtimeAvailability(for: descriptor)
+      else {
         return XCTFail("\(reference) must be unavailable without a pinned git")
       }
       // Machine-readable, so `operation.list` can say why rather than fail
       // at run time after a capability was already spent (PRODUCT-LOOP §8).
+      XCTAssertEqual(code, .workspacePresetUnavailable)
       XCTAssertEqual(reason, "workspace.presetUnavailable")
     }
   }

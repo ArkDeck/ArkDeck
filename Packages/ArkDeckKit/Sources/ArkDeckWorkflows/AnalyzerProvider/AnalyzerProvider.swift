@@ -366,12 +366,14 @@ package struct AnalyzerProvider: DeviceProvider {
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard let analyzerRef = Self.analyzerForOperation[operation.reference] else {
-      return .unavailable(reason: "analyzer.unsupportedOperation")
+      return .unavailable(
+        code: .operationNotSupported, reason: "analyzer.unsupportedOperation")
     }
     guard let profile = profiles[analyzerRef] else {
       // Machine-readable, and nothing is admitted: no capability is spent on
       // an analyzer this host has not been given (PRODUCT-LOOP §8).
       return .unavailable(
+        code: .providerToolUnavailable,
         reason: unavailableReasons[analyzerRef] ?? "analyzer.profileUnavailable")
     }
     guard profile.preflightAvailability == .available else {
@@ -384,7 +386,8 @@ package struct AnalyzerProvider: DeviceProvider {
       maximumByteCount: 128 * 1024 * 1024,
       requireExecutable: true)
     else {
-      return .unavailable(reason: "analyzer.toolIdentityDrift")
+      return .unavailable(
+        code: .toolIdentityDrift, reason: "analyzer.toolIdentityDrift")
     }
     for pinned in profile.pinnedFiles {
       guard ArkTraceProfileFileReader.matches(
@@ -394,14 +397,16 @@ package struct AnalyzerProvider: DeviceProvider {
         maximumByteCount: 128 * 1024 * 1024,
         requireExecutable: pinned.requireExecutable)
       else {
-        return .unavailable(reason: "analyzer.profileIdentityDrift")
+        return .unavailable(
+          code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift")
       }
     }
     for pinned in profile.pinnedTrees {
       guard ArkTraceDistributionTreeHasher.matches(
         rootPath: pinned.path, expectedSHA256: pinned.sha256)
       else {
-        return .unavailable(reason: "analyzer.profileIdentityDrift")
+        return .unavailable(
+          code: .toolIdentityDrift, reason: "analyzer.profileIdentityDrift")
       }
     }
     return .available

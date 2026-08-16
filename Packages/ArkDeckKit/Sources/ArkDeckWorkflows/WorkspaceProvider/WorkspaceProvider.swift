@@ -90,13 +90,17 @@ package struct WorkspaceProvider: DeviceProvider {
     guard operation.reference == Self.inspectSourceReference else {
       return operations?.runtimeAvailability(for: operation)
         ?? .unavailable(
-          reason: "workspace provider has no production typed plan for \(operation.reference)")
+          code: .operationNotSupported,
+          reason: "workspace provider has no production typed plan for "
+            + operation.reference)
     }
     guard tool != nil else {
-      return .unavailable(reason: "no_workspace_inspector_configured")
+      return .unavailable(
+        code: .providerToolUnavailable, reason: "no_workspace_inspector_configured")
     }
     guard !registry.projectRefs.isEmpty else {
-      return .unavailable(reason: "no_workspace_project_registered")
+      return .unavailable(
+        code: .workspacePresetUnavailable, reason: "no_workspace_project_registered")
     }
     return .available
   }

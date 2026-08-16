@@ -668,7 +668,7 @@ final class WorkspaceProviderContractTests: XCTestCase {
       nowUTC: { "2026-07-31T00:00:00Z" })
     XCTAssertEqual(
       unavailable.runtimeAvailability(for: symbolDescriptor),
-      .unavailable(reason: "workspace.presetUnavailable"))
+      .unavailable(code: .workspacePresetUnavailable, reason: "workspace.presetUnavailable"))
 
     XCTAssertNoThrow(
       try RuntimeOperationRequest(
