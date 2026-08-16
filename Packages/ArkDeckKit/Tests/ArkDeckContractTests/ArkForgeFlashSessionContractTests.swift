@@ -577,3 +577,95 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     { .init(accepted: true, facts: [:], evidenceSHA256: []) }
   }
 }
+
+/// Composing the lane from what an operator installed.
+final class ArkForgeLaneCompositionContractTests: XCTestCase {
+
+  private let full: [String: String] = [
+    "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
+    "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
+    "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
+    "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
+  ]
+
+  func testNothingConfiguredIsTheNormalStateAndSaysWhatItMeans() {
+    guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read([:]) else {
+      return XCTFail("an unconfigured daemon has no lane")
+    }
+    XCTAssertEqual(why, .notConfigured)
+    // The message has to say what it means for the product, not just that a
+    // variable is unset.
+    XCTAssertTrue(why.description.contains("flash.dayu200 refuses"), why.description)
+  }
+
+  func testAPartialConfigurationIsRefusedRatherThanHalfApplied() {
+    // Three of four is not a lane with one gap — it is a configuration nobody
+    // reviewed, and starting from it would put an unreviewed combination in
+    // front of a destructive write.
+    for omitted in full.keys {
+      var partial = full
+      partial[omitted] = nil
+      guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read(partial) else {
+        return XCTFail("\(omitted) missing must refuse")
+      }
+      XCTAssertEqual(why, .partiallyConfigured(missing: [omitted]))
+    }
+  }
+
+  func testAnEmptyValueCountsAsMissing() {
+    // An exported-but-empty variable is the shape a broken install takes.
+    var blank = full
+    blank["ARKDECK_ARKFORGED_SHA256"] = ""
+    guard case .failure = ArkForgeLaneComposition.Inputs.read(blank) else {
+      return XCTFail("an empty value is not a configured value")
+    }
+  }
+
+  func testTheToolchainDigestComesFromThisRepositoryNotTheOperator() throws {
+    // The digest is part of the maturity combination. Letting a caller name it
+    // would let a caller publish a combination nobody reviewed.
+    guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(full) else {
+      return XCTFail("a full configuration composes")
+    }
+    let argv = ArkForgeLaneComposition.daemonArguments(
+      inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 9)
+
+    let pinIndex = try XCTUnwrap(argv.firstIndex(of: "--rkdeveloptool-sha256"))
+    XCTAssertEqual(argv[pinIndex + 1], ArkForgeToolchainPin.signedSHA256)
+    XCTAssertTrue(argv.contains("--require-release-signing"))
+    XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--pair-from-stdin")) + 1], "9")
+  }
+
+  func testThePairingSecretIsNeverInArgv() throws {
+    // It travels on stdin, by construction. This asserts the argv builder has
+    // no parameter that could carry it even by accident.
+    guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(full) else {
+      return XCTFail("a full configuration composes")
+    }
+    let secret = ArkForgeLaneComposition.freshPairingSecret()
+    let argv = ArkForgeLaneComposition.daemonArguments(
+      inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 1)
+    let rendered = argv.joined(separator: " ")
+    XCTAssertFalse(rendered.contains(SHA256Hex.lowercaseHex(secret)))
+    XCTAssertFalse(rendered.lowercased().contains("secret"))
+  }
+
+  func testEachLaunchGetsItsOwnSecret() {
+    // The epoch rotates with the process, so an unconsumed permit from a
+    // previous run is void rather than merely old. A reused secret would
+    // defeat exactly that.
+    let first = ArkForgeLaneComposition.freshPairingSecret()
+    let second = ArkForgeLaneComposition.freshPairingSecret()
+    XCTAssertEqual(first.count, 32)
+    XCTAssertNotEqual(first, second)
+  }
+
+  func testTheSocketIsTheReadinessSignalAndTimesOut() async {
+    // Rather than parsing a log line: the socket is what the next step needs,
+    // and a message change should not become an outage.
+    let absent = await ArkForgeLaneComposition.awaitControllerSocket(
+      runtimeDirectory: URL(filePath: "/tmp/arkdeck-no-such-runtime-\(UUID().uuidString)"),
+      deadline: Date().addingTimeInterval(0.15), sleep: { _ in })
+    XCTAssertNil(absent, "a daemon that never opened its socket must time out, not hang")
+  }
+}
