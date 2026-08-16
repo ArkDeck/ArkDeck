@@ -249,12 +249,58 @@ enum RuntimeCLI {
       } else {
         arkTraceDescriptor = nil
       }
+      // The ArkForge lane: four inputs that go in together or not at all. A
+      // partial set is refused here rather than written, because the lane
+      // ignores an incomplete configuration and the daemon would start looking
+      // configured while having no lane at all.
+      let arkForgeLane: LaunchAgentArkForgeLaneStatus?
+      let laneFlags = [
+        "--arkforged": options.value("--arkforged"),
+        "--arkforged-sha256": options.value("--arkforged-sha256"),
+        "--arkforge-profile": options.value("--arkforge-profile"),
+        "--rkdeveloptool": options.value("--rkdeveloptool"),
+      ]
+      if laneFlags.values.contains(where: { $0 == "none" }) {
+        guard laneFlags.values.allSatisfy({ $0 == nil || $0 == "none" }) else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "--arkforged none revokes the whole lane; it cannot be combined with "
+              + "the other ArkForge options")
+        }
+        arkForgeLane = nil
+      } else if laneFlags.values.contains(where: { $0 != nil }) {
+        let missing = laneFlags.filter { $0.value == nil }.keys.sorted()
+        guard missing.isEmpty else {
+          throw CLIError(
+            exitCode: EX_USAGE,
+            message: "the ArkForge lane needs all of --arkforged, --arkforged-sha256, "
+              + "--arkforge-profile and --rkdeveloptool; missing "
+              + missing.joined(separator: ", "))
+        }
+        do {
+          arkForgeLane = try LaunchAgentArkForgeLaneStatus.measuring(
+            daemonPath: laneFlags["--arkforged"]!!,
+            declaredDaemonSHA256: laneFlags["--arkforged-sha256"]!!,
+            deviceProfilePath: laneFlags["--arkforge-profile"]!!,
+            vendorToolPath: laneFlags["--rkdeveloptool"]!!)
+        } catch let refusal as LaunchAgentArkForgeLaneStatus.Refusal {
+          // Measured at install time on purpose: one of these executables
+          // performs destructive writes, and a mistyped path should be found
+          // now rather than with a board half-written.
+          throw CLIError(exitCode: EX_USAGE, message: "\(refusal)")
+        }
+      } else if subcommand == "update" {
+        arkForgeLane = try service.arkForgeLaneForPreservingUpdate()
+      } else {
+        arkForgeLane = nil
+      }
       let receipt = try service.install(
         daemonBundleSource: URL(filePath: daemonBundlePath, directoryHint: .isDirectory),
         hdcExecutable: URL(filePath: hdcPath), workspace: workspace,
         harnessSensitiveEvidence: harnessSensitiveEvidence,
         harnessModel: harnessModel,
         arkTraceDescriptor: arkTraceDescriptor,
+        arkForgeLane: arkForgeLane,
         beforeBootstrap: beforeBootstrap)
       emit(try encodedJSON(receipt), json: json)
 

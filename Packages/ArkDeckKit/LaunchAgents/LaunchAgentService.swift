@@ -414,7 +414,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     try install(
       daemonBundleSource: daemonBundleSource, hdcExecutable: hdcExecutable,
       workspace: workspace, harnessSensitiveEvidence: harnessSensitiveEvidence,
-      harnessModel: harnessModel, arkTraceDescriptor: nil,
+      harnessModel: harnessModel, arkTraceDescriptor: nil, arkForgeLane: nil,
       beforeBootstrap: beforeBootstrap)
   }
 
@@ -425,6 +425,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     harnessSensitiveEvidence: [String] = [],
     harnessModel: LaunchAgentHarnessModelConfiguration? = nil,
     arkTraceDescriptor: URL?,
+    arkForgeLane: LaunchAgentArkForgeLaneStatus?,
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
     let daemonBundleSource = try daemonBundleValidator(daemonBundleSource)
@@ -473,7 +474,7 @@ public final class LaunchAgentService: @unchecked Sendable {
       workspace: workspace,
       harnessSensitiveEvidence: harnessSensitiveEvidence,
       harnessModel: harnessModel,
-      arkTraceDescriptor: arkTraceDescriptor)
+      arkTraceDescriptor: arkTraceDescriptor, arkForgeLane: arkForgeLane)
     try renderedPlist.write(to: paths.plist, options: .atomic)
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.plist.path)
 
@@ -530,6 +531,28 @@ public final class LaunchAgentService: @unchecked Sendable {
       removedReceipt: removedReceipt,
       preservedStateDirectory: paths.stateDirectory.path,
       preservedLogDirectory: paths.logDirectory.path)
+  }
+
+  /// The lane an `update` keeps when its flags are not restated.
+  ///
+  /// Read back from the live plist rather than remembered, so an `update` that
+  /// says nothing about the lane preserves what is actually installed — not
+  /// what some earlier receipt said was installed.
+  public func arkForgeLaneForPreservingUpdate() throws -> LaunchAgentArkForgeLaneStatus? {
+    guard let document = try? PropertyListSerialization.propertyList(
+      from: try Data(contentsOf: paths.plist), options: [], format: nil) as? [String: Any],
+      let environment = document["EnvironmentVariables"] as? [String: String]
+    else { return nil }
+    let values = ArkDeckLaunchAgent.arkForgeEnvironmentKeys.map { environment[$0] }
+    guard values.allSatisfy({ ($0?.isEmpty == false) }) else { return nil }
+    return LaunchAgentArkForgeLaneStatus(
+      daemonPath: environment[ArkDeckLaunchAgent.arkForgedPathEnvironmentKey]!,
+      daemonSHA256: environment[ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey]!,
+      deviceProfilePath: environment[ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey]!,
+      vendorToolPath: environment[ArkDeckLaunchAgent.arkForgeVendorToolEnvironmentKey]!,
+      // Re-measured by the lane at daemon startup; not re-hashed here, because
+      // this call only preserves what an operator already chose.
+      vendorToolSHA256: "")
   }
 
   public func status() throws -> LaunchAgentStatus {
@@ -751,7 +774,8 @@ public final class LaunchAgentService: @unchecked Sendable {
     daemonPath: String, hdcPath: String, stdoutPath: String, stderrPath: String,
     workspace: LaunchAgentWorkspaceConfiguration?, harnessSensitiveEvidence: [String],
     harnessModel: ValidatedHarnessModel?,
-    arkTraceDescriptor: ValidatedArkTraceDescriptor?
+    arkTraceDescriptor: ValidatedArkTraceDescriptor?,
+    arkForgeLane: LaunchAgentArkForgeLaneStatus?
   ) throws -> Data {
     guard
       let template = Self.bundledTemplateURL()
@@ -803,6 +827,11 @@ public final class LaunchAgentService: @unchecked Sendable {
     if let arkTraceDescriptor {
       environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey] =
         arkTraceDescriptor.url.path
+    }
+    // All four or none. The lane refuses a partial set, so writing three would
+    // produce a daemon that starts, looks configured, and has no lane.
+    if let arkForgeLane {
+      environment.merge(arkForgeLane.environment) { _, new in new }
     }
     document["ProgramArguments"] = arguments
     document["EnvironmentVariables"] = environment
