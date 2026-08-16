@@ -575,8 +575,44 @@ Task.detached {
     )
     .appending(path: "ArkDeck", directoryHint: .isDirectory)
     .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
+    // The ArkForge lane. Absent unless an operator installed and named all four
+    // inputs, and absence is written to the log with what it means for the
+    // product — a daemon with no lane and a daemon that failed to build one
+    // look identical from outside, and only one of them is a problem.
+    let arkForgeRuntimeDirectory = resolvedStateDirectory
+      .appending(path: "arkforge", directoryHint: .isDirectory)
+    try? FileManager.default.createDirectory(
+      at: arkForgeRuntimeDirectory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let arkForgeLane: ArkForgeLaneHost?
+    switch await ArkForgeLaneComposition.composeFromEnvironment(
+      runtimeDirectory: arkForgeRuntimeDirectory,
+      rockchipDispatcher: rockchipDispatcher,
+      rockchipExecutable: (try? rockchipResolver.resolveExecutable(providerID: "rockchip"))
+        ?? ResolvedExecutable(path: "-", sha256: String(repeating: "0", count: 64)),
+      approvedPlan: { jobID, planID in
+        // The plan facts this authority signs against. Held by the engine per
+        // job; this closure is what the lane asks when it needs them.
+        ArkForgeExecutionAuthority.ApprovedPlan(
+          jobID: jobID, planID: planID, planSHA256: [],
+          admittedDeviceFactsSHA256: [],
+          binding: ArkForgeAuthorityBinding(
+            authorityNamespace: "arkdeck", bindingID: jobID, bindingRevision: 1,
+            stableIdentityDigest: []),
+          controllerSessionID: "arkdeck-agentd")
+      }
+    ) {
+    case .success(let lane):
+      arkForgeLane = lane
+      FileHandle.standardError.write(Data("arkforge lane: composed\n".utf8))
+    case .failure(let absence):
+      arkForgeLane = nil
+      FileHandle.standardError.write(Data("\(absence)\n".utf8))
+    }
+
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: resolvedStateDirectory),
+      configuration: .init(
+        stateDirectory: resolvedStateDirectory, arkForgeLane: arkForgeLane),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,

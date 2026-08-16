@@ -163,3 +163,53 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     func snapshot() -> Record? { record }
   }
 }
+
+/// The composition root actually calls the composition.
+///
+/// A source-level check, in the same spirit as the architecture boundary
+/// tests, and for the same reason they exist: the compiler cannot see this.
+/// `compose` can be perfect and fully tested while nothing calls it, and the
+/// daemon then reports "no lane configured" — indistinguishable from a daemon
+/// nobody configured. This project shipped that state for several rounds with
+/// every unit test green.
+final class ArkForgeCompositionRootContractTests: XCTestCase {
+
+  private func mainSource() throws -> String {
+    let root = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+    return try String(
+      contentsOf: root.appending(path: "Sources/ArkDeckAgentDaemonMain/main.swift"),
+      encoding: .utf8)
+  }
+
+  func testTheDaemonComposesTheLaneAtStartup() throws {
+    let source = try mainSource()
+    XCTAssertTrue(
+      source.contains("ArkForgeLaneComposition.composeFromEnvironment"),
+      "main.swift must compose the lane; every part being built and tested is not the same "
+        + "as the daemon having one")
+  }
+
+  func testTheComposedLaneReachesTheEngine() throws {
+    // Composing it and then not passing it would be the same failure wearing a
+    // different hat.
+    let source = try mainSource()
+    XCTAssertTrue(
+      source.contains("arkForgeLane: arkForgeLane"),
+      "the composed lane must be handed to the engine's configuration")
+  }
+
+  func testAbsenceIsReportedRatherThanSilent() throws {
+    // The daemon that cannot build a lane and the daemon nobody configured
+    // must be distinguishable in the log, because only one of them is a
+    // problem an operator should act on.
+    let source = try mainSource()
+    XCTAssertTrue(
+      source.contains("arkforge lane: composed"),
+      "a composed lane must say so")
+    XCTAssertTrue(
+      source.contains("\\(absence)"),
+      "an absent lane must write the reason, not fail silently")
+  }
+}

@@ -26,7 +26,7 @@ import Foundation
 /// reports that rather than synthesising one. A receipt is the evidence a write
 /// happened; a manufactured one would make an unperformed step look confirmed,
 /// which is the single worst thing this lane could do.
-package actor ArkForgeLaneHost {
+package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
   /// How to reach a running daemon.
   ///
