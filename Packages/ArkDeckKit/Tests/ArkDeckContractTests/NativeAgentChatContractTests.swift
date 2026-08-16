@@ -1,5 +1,6 @@
 import ArkDeckAgentClient
 import ArkDeckCore
+import ArkDeckRuntime
 import Foundation
 import XCTest
 
@@ -228,6 +229,49 @@ final class NativeAgentChatContractTests: XCTestCase {
     XCTAssertTrue(result.modelContent.contains(#""maxRounds":8"#))
     XCTAssertTrue(result.modelContent.contains(#""maxE1Mutations":0"#))
     XCTAssertTrue(result.modelContent.contains(#""stopOnOutcomeUnknown":true"#))
+  }
+
+  /// GJ-5's `stopOnAuthorizationRequired`. The stop matched the English phrase
+  /// "authorization required" (with a space) while the Runtime only ever emits
+  /// the closed code `authorizationRequired`, so it could never fire: an
+  /// authorization refusal fell through to the consecutive-failure counter and
+  /// the loop retried the refused mutation once more before stopping for the
+  /// wrong reason — while still advertising the budget as active.
+  func testAnAuthorizationRefusalStopsTheLoopNamingAuthorization() async throws {
+    let exactTarget = "device-target-secret"
+    let port = AuthorizationRefusedRuntimePort(targetID: exactTarget)
+    let owner = NativeAgentChatRuntimeTools(port: port)
+    let definitions = owner.definitions()
+    let overview = try XCTUnwrap(
+      definitions.first { $0.name == "arkdeck_runtime_overview" })
+    let observe = try XCTUnwrap(
+      definitions.first { $0.name == "arkdeck_observe_device" })
+    _ = try await overview.execute(.object([:]))
+    let targetRef = HarnessDecisionContext.pseudonym(forTargetID: exactTarget)
+
+    // First attempt: the Runtime refuses on authorization.
+    do {
+      _ = try await observe.execute(.object(["targetRef": .string(targetRef)]))
+      XCTFail("the refusing Runtime must not report success")
+    } catch {}
+
+    // Second attempt: the loop must already be stopped, and it must say why.
+    // One refusal is enough — waiting for a second failure would mean
+    // re-dispatching a mutation the Runtime already refused to authorize.
+    do {
+      _ = try await observe.execute(.object(["targetRef": .string(targetRef)]))
+      XCTFail("the Agent must not keep dispatching after an authorization refusal")
+    } catch let error as AgentChatRuntimeToolError {
+      guard case .blocked(let reason) = error else {
+        return XCTFail("expected a blocked stop, got \(error)")
+      }
+      XCTAssertTrue(
+        reason.localizedCaseInsensitiveContains("authorization"),
+        "the stop must name authorization, got: \(reason)")
+      XCTAssertFalse(
+        reason.contains("failed twice consecutively"),
+        "an authorization refusal is not a repeated-failure stop: \(reason)")
+    }
   }
 
   func testNativeToolsLowerOnlyToTheClosedReadOnlyOperations() async throws {
@@ -675,6 +719,31 @@ private final class TaskBridgeRuntimePort: AgentChatRuntimePort, @unchecked Send
       "result": .object(["origin": .string(taskID)]),
       "updatedAtUtc": .string("2026-08-10T00:00:00Z"),
     ])
+  }
+}
+
+/// Refuses execution with exactly what the Runtime emits: the closed error
+/// code `authorizationRequired`, then the detail. The engine throws
+/// `RuntimeDispatchFailure.failed("authorizationRequired: …")`, which becomes
+/// the failed transition's reason, lands in the timeline as `reason: …`, and is
+/// handed back to the Agent verbatim.
+private struct AuthorizationRefusedRuntimePort: AgentChatRuntimePort {
+  let targetID: String
+
+  func request(method: String, params: [String: JSONValue]?) throws -> JSONValue {
+    try OverviewRuntimePort(targetID: targetID).request(method: method, params: params)
+  }
+
+  func run(_ request: RuntimeAgentExecutionRequest) throws -> RuntimeAgentExecutionOutcome {
+    throw RuntimeAgentExecutorError.operationRejected(
+      "\(RuntimeOperationErrorCode.authorizationRequired.rawValue): "
+        + "capability denied before mutation")
+  }
+
+  func resume(
+    resumeToken: String, selection: String?
+  ) throws -> RuntimeAgentExecutionOutcome {
+    throw OverviewRuntimePortError.unexpectedExecution
   }
 }
 

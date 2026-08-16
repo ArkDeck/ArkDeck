@@ -8,6 +8,7 @@
 import ArkDeckAgentClient
 import ArkDeckCore
 import ArkDeckHarness
+import ArkDeckRuntime
 import CryptoKit
 import Foundation
 
@@ -800,7 +801,18 @@ package actor NativeAgentChatRuntimeTools {
 
   private func noteRuntimeFailure(_ detail: String) {
     consecutiveFailures += 1
-    if detail.range(of: "authorization required", options: .caseInsensitive) != nil {
+    // Bound to the Runtime's closed error-code vocabulary, not to prose. This
+    // matched the English phrase "authorization required" (with a space) while
+    // the Runtime has only ever emitted the code `authorizationRequired`, so
+    // the branch was unreachable: an authorization refusal fell through to the
+    // consecutive-failure counter, and the loop retried the refused mutation
+    // once more before stopping for the wrong reason. Matching the case's
+    // rawValue makes a rename a compile error here rather than a silently dead
+    // stop condition.
+    if detail.range(
+      of: RuntimeOperationErrorCode.authorizationRequired.rawValue,
+      options: .caseInsensitive) != nil
+    {
       stoppedReason =
         "Runtime requires authorization. This read-only Agent cannot widen authority."
     } else if consecutiveFailures >= 2 {
