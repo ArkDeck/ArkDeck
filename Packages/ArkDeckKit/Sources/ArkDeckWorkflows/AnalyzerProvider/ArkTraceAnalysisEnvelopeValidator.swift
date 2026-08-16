@@ -742,10 +742,24 @@ package enum ArkTraceAnalysisEnvelopeValidator {
       optionalText(object["processName"], maximumBytes: 4_096),
       optionalText(object["unit"], maximumBytes: 4_096),
       let samples = array(object["samples"]),
-      samples.allSatisfy({ validateCounterSample($0, range: range) })
+      samples.allSatisfy({ validateCounterSample($0, range: range) }),
+      // A counter is a step function: its value holds until the next sample, so
+      // the value in force at the window's start was written before the window.
+      // One such carry-in sample is what makes the series readable at all; more
+      // than one would be backfill the window cannot justify.
+      samples.filter({ sampleStartsBeforeWindow($0, range: range) }).count <= 1
     else { return false }
     return scope == "cpu" ? !isNull(object["cpu"]) && isNull(object["processKey"])
       : isNull(object["cpu"]) && !isNull(object["processKey"])
+  }
+
+  private static func sampleStartsBeforeWindow(
+    _ value: JSONValue, range: (Int64, Int64)
+  ) -> Bool {
+    guard let object = object(value), let timestamp = integer(object["timestampNs"]) else {
+      return false
+    }
+    return timestamp < range.0
   }
 
   private static func validateCounterSample(
@@ -755,8 +769,15 @@ package enum ArkTraceAnalysisEnvelopeValidator {
       "key", "timestampNs", "value", "durationNs",
     ]), validateEventKey(object["key"]),
       let timestamp = integer(object["timestampNs"]),
-      timestamp >= range.0, timestamp < range.1,
+      timestamp < range.1,
       integer(object["value"]) != nil, optionalNonnegativeInteger(object["durationNs"])
+    else { return false }
+    if timestamp >= range.0 { return true }
+    // The sample predates the window, so it is only admissible as the value
+    // still in force at the window's start: its own validity has to reach the
+    // window. A bare timestamp before the window proves nothing and is refused.
+    guard let duration = integer(object["durationNs"]), duration >= 0,
+      let end = checkedSum(timestamp, duration), end > range.0
     else { return false }
     return true
   }

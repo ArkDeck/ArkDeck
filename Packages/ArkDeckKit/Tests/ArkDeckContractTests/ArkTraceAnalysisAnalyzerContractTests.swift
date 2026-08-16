@@ -425,6 +425,75 @@ final class ArkTraceAnalysisAnalyzerContractTests: XCTestCase {
       try encoded(document), invocation: invocation))
   }
 
+  /// A counter is a step function, so the value in force when the window opens
+  /// was written before the window. ArkTrace carries that one sample in; a real
+  /// DAYU 200 capture put four of them (one per CPU idle series) 37 ms ahead of
+  /// a 100 ms window, each with a duration reaching into it. Refusing those made
+  /// `kind=context` unusable on real traces, so the carry-in is admitted - but
+  /// only when the sample's own validity actually reaches the window, and only
+  /// one per series.
+  func testContextAdmitsOneCarryInCounterSamplePerSeries() throws {
+    let request = try self.request(
+      kind: .context, startNs: 100_000_000, endNs: 200_000_000,
+      maxRows: 10, maxEvents: 10)
+    let invocation = invocation(request)
+    func sample(_ timestamp: Int64, _ duration: JSONValue, rowID: Int64 = 1) -> JSONValue {
+      .object([
+        "key": .object(["table": .string("measure"), "rowID": .integer(rowID)]),
+        "timestampNs": .integer(timestamp), "value": .integer(2),
+        "durationNs": duration,
+      ])
+    }
+    func document(with samples: [JSONValue]) -> [String: JSONValue] {
+      var document = root(request)
+      document = replacingNestedObject(document, first: "result", second: "summary") {
+        summary in
+        guard case .object(var capabilities)? = summary["capabilities"] else { return }
+        capabilities["cpuCounters"] = .bool(true)
+        summary["capabilities"] = .object(capabilities)
+        summary["counterSeriesCount"] = .integer(1)
+      }
+      document = replacingNestedObject(document, first: "result", second: "truncation") {
+        $0["counters"] = status(returned: samples.count)
+      }
+      return replacingObject(document, key: "result") {
+        $0["counters"] = .array([.object([
+          "filterID": .integer(7), "name": .string("cpu_idle"),
+          "scope": .string("cpu"), "cpu": .integer(0), "processKey": .null,
+          "pid": .null, "processName": .null, "unit": .null,
+          "samples": .array(samples),
+        ])])
+      }
+    }
+
+    // Carry-in whose validity reaches the window is what a real capture emits.
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(63_000_000, .integer(50_000_000))])),
+      invocation: invocation))
+    // In-window samples keep working unchanged.
+    XCTAssertTrue(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(150_000_000, .integer(1_000))])),
+      invocation: invocation))
+    // A sample that predates the window without reaching it proves nothing.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(63_000_000, .integer(1_000))])),
+      invocation: invocation))
+    // ... and neither does one that declines to say how long it held.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(63_000_000, .null)])),
+      invocation: invocation))
+    // Two carry-ins are backfill the window cannot justify.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [
+        sample(63_000_000, .integer(50_000_000)),
+        sample(64_000_000, .integer(50_000_000), rowID: 2),
+      ])), invocation: invocation))
+    // The window's far edge is still exclusive.
+    XCTAssertFalse(ArkTraceAnalysisEnvelopeValidator.validate(
+      try encoded(document(with: [sample(200_000_000, .integer(1_000))])),
+      invocation: invocation))
+  }
+
   func testContextRowsMustIntersectTheRequestedRangeAndMatchCapabilities() throws {
     let request = try self.request(
       kind: .context, startNs: 100_000_000, endNs: 200_000_000,
