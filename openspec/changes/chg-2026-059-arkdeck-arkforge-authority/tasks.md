@@ -35,6 +35,8 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
+  - `Packages/ArkDeckKit/LaunchAgents/LaunchAgentService.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `docs/design/rockchip-read-domain.md`
   - `openspec/changes/chg-2026-059-arkdeck-arkforge-authority/**`

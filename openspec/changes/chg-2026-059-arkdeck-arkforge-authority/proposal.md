@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-059-arkdeck-arkforge-authority
-revision: 4
+revision: 5
 status: approved # r1 由 PR #1317 merge；r2 由 PR #1325 merge。TASK-AFA-001 可开工
 class: integration
 core_change_level: none
