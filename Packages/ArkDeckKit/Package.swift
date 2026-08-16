@@ -8,6 +8,7 @@ let package = Package(
   products: [
     .library(name: "ArkDeckCore", targets: ["ArkDeckCore"]),
     .library(name: "ArkDeckProcess", targets: ["ArkDeckProcess"]),
+    .library(name: "ArkForgeIPC", targets: ["ArkForgeIPC"]),
     .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
     .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
     .library(name: "ArkDeckHarness", targets: ["ArkDeckHarness"]),
@@ -32,6 +33,12 @@ let package = Package(
       name: "ArkDeckCore",
       swiftSettings: [.strictMemorySafety()]),
     .target(name: "ArkDeckProcess", dependencies: ["ArkDeckCore"]),
+    // The trust boundary to the ArkForge mechanics daemon. It carries bytes
+    // and nothing else: it can encode a permit the authority signed and a
+    // refusal the authority chose, and has no way to construct either. Kept
+    // out of ArkDeckWorkflows so the codec cannot quietly acquire an opinion
+    // about admission (CHG-2026-059).
+    .target(name: "ArkForgeIPC", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
     // Dependency direction is load-bearing (see ArchitectureBoundaryContractTests):
@@ -156,6 +163,7 @@ let package = Package(
       dependencies: [
         "ArkDeckCore",
         "ArkDeckProcess",
+        "ArkForgeIPC",
         "ArkDeckRuntime",
         "ArkDeckOpenHarmony",
         "ArkDeckHarness",

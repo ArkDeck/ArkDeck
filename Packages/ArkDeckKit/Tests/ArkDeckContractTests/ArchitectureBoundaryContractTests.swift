@@ -42,6 +42,10 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private static let allowedImports: [String: Set<String>] = [
     "ArkDeckCore": [],
     "ArkDeckProcess": ["ArkDeckCore"],
+    // The ArkForge trust boundary carries bytes and holds no admission
+    // opinion, so it sees the permit types in Core and nothing else. Widened
+    // here in the same review as the code that needs it (CHG-2026-059).
+    "ArkForgeIPC": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckStorage": ["ArkDeckCore"],
@@ -73,6 +77,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private static let targetRoots: [(target: String, path: String, carveOuts: [String])] = [
     ("ArkDeckCore", "Sources/ArkDeckCore", []),
     ("ArkDeckProcess", "Sources/ArkDeckProcess", []),
+    ("ArkForgeIPC", "Sources/ArkForgeIPC", []),
     ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
     ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
     ("ArkDeckStorage", "Sources/ArkDeckStorage", []),
