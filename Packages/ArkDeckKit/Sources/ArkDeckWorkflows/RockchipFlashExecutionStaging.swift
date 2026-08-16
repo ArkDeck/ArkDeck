@@ -184,6 +184,10 @@ enum RockchipFlashExecutionStager {
       stagingDescriptor: stagingDescriptor,
       declaredByName: declaredByName,
       mappedByMember: mappedByMember)
+    // The staging and archive descriptors above are released by their own
+    // defers; the consumer's in-flight member descriptor had none, so every
+    // error path out of the loop below leaked it.
+    defer { tar.releaseOpenDescriptor() }
     var archiveHasher = SHA256()
     var archiveSize: Int64 = 0
     var headerPending = Data()
@@ -573,6 +577,22 @@ private struct RockchipStagingTarConsumer {
         if remaining == 0 { state = .header }
       }
     }
+  }
+
+  /// Closes the in-flight member descriptor if the caller abandons this
+  /// consumer without reaching `finish()`.
+  ///
+  /// Every failure inside the streaming loop — a short write, a decompression
+  /// error, a member/size mismatch — propagates straight out of `stage()`, so
+  /// `finish()` never runs and this descriptor was leaked. `stage()` does
+  /// remove the staging directory on that path, which makes the leak worse
+  /// rather than harmless: the partial image is unlinked but still open, so its
+  /// blocks stay charged to the long-lived daemon and the next attempt's
+  /// capacity check sees space that nothing can reclaim.
+  mutating func releaseOpenDescriptor() {
+    guard currentDescriptor >= 0 else { return }
+    Darwin.close(currentDescriptor)
+    currentDescriptor = -1
   }
 
   mutating func finish() throws -> [String: StagedRockchipImage] {

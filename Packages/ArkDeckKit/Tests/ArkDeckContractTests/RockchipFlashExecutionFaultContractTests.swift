@@ -132,6 +132,72 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
     XCTAssertThrowsError(try image.revalidate())
   }
 
+  /// `stage()` calls `decompressor.feed(finalize: true)` *before* `tar.finish()`,
+  /// so a truncated archive throws out of the finalize and `finish()` — the only
+  /// place that closed the in-flight member descriptor — never runs. The staging
+  /// directory is removed on that path, which makes the leak worse rather than
+  /// harmless: the partial image is unlinked but still open, so its blocks stay
+  /// charged to the long-lived daemon and the next attempt's capacity check sees
+  /// space nothing can reclaim.
+  ///
+  /// The first member is deliberately large so the decoder emits its header and
+  /// part of its content — opening the descriptor — before the stream runs out.
+  func testATruncatedArchiveReleasesTheInFlightMemberDescriptor() throws {
+    let fixture = try RockchipExecutionTestFixture.make()
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+
+    var members: [(name: String, bytes: Data)] = []
+    for index in 0..<9 {
+      let payload =
+        index == 0
+        ? Data(repeating: 0x5A, count: 4 << 20)  // 4 MiB: spans decode chunks
+        : Data("image-\(index)".utf8)
+      members.append((name: "image\(index).img", bytes: payload))
+    }
+    let full = try RockchipExecutionTestFixture.makeGzipTar(members: members)
+    let profile = try RockchipFlashProfile(
+      archiveSizeBytes: Int64(full.count),
+      archiveSHA256: RockchipExecutionTestFixture.sha256(full),
+      members: members.map {
+        RockchipImagesArchiveMember(
+          name: $0.name, sizeBytes: Int64($0.bytes.count),
+          sha256: RockchipExecutionTestFixture.sha256($0.bytes),
+          classification: .mappedPartitionImage)
+      },
+      mappedPartitions: fixture.profile.mappedPartitions,
+      membershiplessPartitionsWriteForbidden:
+        fixture.profile.membershiplessPartitionsWriteForbidden,
+      prerequisites: fixture.profile.prerequisites)
+
+    // Cut inside the first member's compressed content.
+    let truncated = full.prefix(max(1, full.count / 2))
+    let archive = fixture.base.appending(path: "truncated.tar.gz")
+    try Data(truncated).write(to: archive)
+
+    func openDescriptorCount() -> Int {
+      (try? FileManager.default.contentsOfDirectory(atPath: "/dev/fd").count) ?? -1
+    }
+    let baseline = openDescriptorCount()
+    XCTAssertGreaterThan(baseline, 0, "/dev/fd must be readable for this test to mean anything")
+
+    for attempt in 0..<8 {
+      let root = fixture.base.appending(path: "truncated-session-\(attempt)")
+      try FileManager.default.createDirectory(
+        at: root, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      XCTAssertThrowsError(
+        try RockchipFlashExecutionStager.stage(
+          archiveURL: archive, sessionRoot: root, profile: profile),
+        "a truncated archive must be refused")
+    }
+
+    // Eight refused stages must not move the descriptor count. Before the fix
+    // this grew by one per attempt.
+    XCTAssertLessThanOrEqual(
+      openDescriptorCount(), baseline + 1,
+      "a refused stage must release its in-flight member descriptor")
+  }
+
   func testStagingCapacityPinsEveryMappedImageAndDurableMetadataReserve() throws {
     let fixture = try RockchipExecutionTestFixture.make()
     defer { try? FileManager.default.removeItem(at: fixture.base) }
