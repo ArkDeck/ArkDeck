@@ -435,6 +435,50 @@ class SchemaVocabularyLockstepTests(unittest.TestCase):
         schema_path = generate.CATALOG_DIR / "schema" / "operation.schema.json"
         cls.schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
+    def test_every_defs_reference_resolves(self):
+        """A dangling `$ref` silently disables validation of whatever it guards.
+
+        `#/$defs/identifier` was referenced twice and never defined, and the
+        only block that used it is `completeOverwriteRecovery` — carried by
+        exactly one operation, `flash.dayu200`, the destructive full flash. So
+        the one operation that most needed schema validation was the one
+        operation no validator could load. Nothing caught it because nothing in
+        the repository ever compiles this schema: the vocabulary tests below
+        compare enum tuples, which a dangling pointer does not disturb.
+        """
+        text = json.dumps(self.schema)
+        referenced = set(re.findall(r"#/\$defs/([A-Za-z0-9_]+)", text))
+        defined = set(self.schema.get("$defs", {}))
+        self.assertEqual(
+            referenced - defined,
+            set(),
+            "schema references a $defs entry that does not exist",
+        )
+
+    def test_identifier_definition_accepts_the_step_ids_it_guards(self):
+        """The `identifier` shape must actually admit the values it validates."""
+        identifier = self.schema["$defs"]["identifier"]
+        pattern = re.compile(identifier["pattern"])
+        maximum = identifier["maxLength"]
+
+        def accepts(value):
+            return bool(pattern.fullmatch(value)) and len(value) <= maximum
+
+        for path in sorted((generate.CATALOG_DIR / "operations").glob("*.json")):
+            document = json.loads(path.read_text(encoding="utf-8"))
+            recovery = document.get("completeOverwriteRecovery")
+            if not recovery:
+                continue
+            declared = {step["stepID"] for step in document["steps"]}
+            guarded = [recovery["overwriteStepID"], *recovery["verificationStepIDs"]]
+            for value in guarded:
+                self.assertTrue(accepts(value), f"{path.name}: {value!r} rejected")
+                # A well-formed identifier that names no step would still be a
+                # broken recovery declaration, so pin the reference too.
+                self.assertIn(value, declared, f"{path.name}: {value!r} is not a step")
+        for junk in ["Flash-Partitions", "flash_partitions", "-flash", "", "a" * 65]:
+            self.assertFalse(accepts(junk), f"identifier wrongly accepts {junk!r}")
+
     def test_top_level_vocabulary_matches(self):
         self.assertEqual(
             set(self.schema["required"]), set(generate.TOP_LEVEL_REQUIRED)
