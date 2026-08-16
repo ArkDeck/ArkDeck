@@ -501,7 +501,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
     XCTAssertEqual(first.stepID, "flash-partitions")
     XCTAssertEqual(second.stepID, "verify-flash-readback")
-    let starts = await started.value
+    let starts = started.value
     XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
   }
 
@@ -539,9 +539,28 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
   // MARK: - doubles
 
-  private actor StartCounter {
-    var value = 0
-    func increment() { value += 1 }
+  /// Counted under a lock rather than in an actor.
+  ///
+  /// `startExecution` is not async, so an actor could only be incremented from
+  /// a detached task — and then the assertion races the increment. This test
+  /// asserts *how many times a job was started*, so a count that arrives late
+  /// is a count that does not test anything. CI caught this; the local run
+  /// passed on timing.
+  private final class StartCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+      lock.lock()
+      defer { lock.unlock() }
+      count += 1
+    }
+
+    var value: Int {
+      lock.lock()
+      defer { lock.unlock() }
+      return count
+    }
   }
 
   private final class CountingDaemon: ArkForgeFlashSession.Daemon, @unchecked Sendable {
@@ -556,7 +575,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
       -> ArkForgeStartExecutionResponse
     {
-      Task { await counter.increment() }
+      counter.increment()
       return ArkForgeStartExecutionResponse(jobID: "JOB-1")
     }
     func submitStepPermit(_ body: ArkForgeSubmitStepPermitRequest, requestID: String) throws
