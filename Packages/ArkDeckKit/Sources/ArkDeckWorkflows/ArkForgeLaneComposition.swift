@@ -112,6 +112,116 @@ package enum ArkForgeLaneComposition {
     return Data(bytes)
   }
 
+  /// Everything a composed lane needs that this module cannot reach for
+  /// itself: the Rockchip host that performs control actions, and the plan
+  /// facts each job's authority is built from.
+  struct Dependencies: Sendable {
+    let rockchipHost: @Sendable () -> any RockchipRuntimeActionHosting
+    let rockchipExecutable: ResolvedExecutable
+    let approvedPlan:
+      @Sendable (String, String) -> ArkForgeExecutionAuthority.ApprovedPlan
+
+    init(
+      rockchipHost: @escaping @Sendable () -> any RockchipRuntimeActionHosting,
+      rockchipExecutable: ResolvedExecutable,
+      approvedPlan: @escaping @Sendable (String, String)
+        -> ArkForgeExecutionAuthority.ApprovedPlan
+    ) {
+      self.rockchipHost = rockchipHost
+      self.rockchipExecutable = rockchipExecutable
+      self.approvedPlan = approvedPlan
+    }
+  }
+
+  /// Starts `arkforged` and returns the lane, or explains why there is none.
+  ///
+  /// This is the function `main.swift` calls, and the reason it is a function
+  /// rather than inline startup code: a lane that is never composed is
+  /// indistinguishable, from outside, from a daemon that has no lane
+  /// configured — and this project already produced exactly that once, with
+  /// every part built and tested and nothing assembling them. A function can
+  /// be asserted on; a paragraph inside `main` cannot.
+  static func compose(
+    environment: [String: String], runtimeDirectory: URL,
+    pairingEpoch: UInt64, dependencies: Dependencies,
+    launch: @Sendable (ProcessIdentityBoundRequest, Data) async throws -> Void,
+    connect: @Sendable (String) throws -> (any ArkForgeFlashSession.Daemon, ArkForgeHelloAck),
+    awaitSocket: @Sendable (URL) async -> String?
+  ) async -> Result<ArkForgeLaneHost, Absence> {
+    let inputs: Inputs
+    switch Inputs.read(environment) {
+    case .success(let read): inputs = read
+    case .failure(let absence): return .failure(absence)
+    }
+
+    let secret = freshPairingSecret()
+    let request = ProcessIdentityBoundRequest(
+      process: ProcessRequest(
+        executable: URL(filePath: inputs.daemonPath),
+        arguments: daemonArguments(
+          inputs: inputs, runtimeDirectory: runtimeDirectory, pairingEpoch: pairingEpoch),
+        environment: [:], workingDirectory: runtimeDirectory),
+      expectedSHA256: inputs.daemonSHA256)
+
+    do {
+      try await launch(request, secret)
+    } catch {
+      return .failure(.daemonUnavailable("arkforged did not start: \(error)"))
+    }
+    guard let socket = await awaitSocket(runtimeDirectory) else {
+      return .failure(
+        .daemonUnavailable(
+          "arkforged started but never opened its controller socket; it is left running for "
+          + "its log rather than killed, because why it did not open is the useful fact"))
+    }
+
+    let daemon: any ArkForgeFlashSession.Daemon
+    let ack: ArkForgeHelloAck
+    do {
+      (daemon, ack) = try connect(socket)
+    } catch {
+      return .failure(.daemonUnavailable("could not open a controller session: \(error)"))
+    }
+    do {
+      // Both standing facts, checked before any job exists. Learning them
+      // mid-job is the difference between refusing to start and stopping with
+      // a capability already consumed.
+      try ArkForgeLaneHost.verifyReadiness(ack)
+    } catch {
+      return .failure(.daemonUnavailable("\(error)"))
+    }
+
+    let host = dependencies.rockchipHost
+    let executable = dependencies.rockchipExecutable
+    return .success(
+      ArkForgeLaneHost(
+        connection: .init(socketPath: socket, controllerSessionID: "arkdeck-agentd"),
+        makePerformer: { binding, jobID in
+          ArkForgeControlPerformer(
+            binding: .init(
+              connectKey: binding.connectKey,
+              stableIdentitySHA256: binding.stableIdentitySHA256,
+              usbTopology: binding.usbTopology,
+              descriptor: HostManagedProcessDescriptor(
+                identifier: "arkforge.managedControl", jobID: jobID,
+                stepID: "managed-control", targetID: binding.targetID,
+                bindingRevision: binding.bindingRevision,
+                connectKey: binding.connectKey,
+                expectedIdentitySHA256: binding.stableIdentitySHA256,
+                providerExecutableSHA256: executable.sha256,
+                actionSHA256: "", executionTuning: nil),
+              rockchipExecutable: executable),
+            host: host())
+        },
+        makeClient: { _ in daemon },
+        makeAuthority: { jobID, planID in
+          ArkForgeExecutionAuthority(
+            plan: dependencies.approvedPlan(jobID, planID),
+            secret: ArkForgePairingSecret(
+              secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
+        }))
+  }
+
   /// Waits for the daemon's controller socket to appear.
   ///
   /// The socket is the readiness signal rather than a line of stdout: it is the

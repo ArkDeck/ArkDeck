@@ -685,7 +685,8 @@ public actor RuntimeJobEngine {
     /// happen is returning a receipt the daemon did not publish — the receipt
     /// is the evidence, and inventing one would make a write look confirmed.
     func perform(
-      stepID: String, jobID: String, planID: String, planSHA256: String
+      stepID: String, jobID: String, planID: String, planSHA256: String,
+      binding: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary
   }
 
@@ -2563,10 +2564,24 @@ public actor RuntimeJobEngine {
     guard let runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
     }
+    // The binding travels with the call rather than being resolved by the
+    // lane. The engine already holds it — it is the context this very step was
+    // admitted against — and having the lane look it up again would let the
+    // two disagree about which device is under the write.
+    guard let connectKey = context.connectKey, let identity = context.expectedIdentitySHA256
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "\(step.stepID) reached the ArkForge lane without a descriptor-bound device")
+    }
     let receipt = try await lane.perform(
       stepID: step.stepID, jobID: jobID,
       planID: "\(runtime.record.request.operation)",
-      planSHA256: runtime.record.materializedPlanDigest ?? "")
+      planSHA256: runtime.record.materializedPlanDigest ?? "",
+      binding: ArkForgeLaneDeviceBinding(
+        connectKey: connectKey, stableIdentitySHA256: identity,
+        targetID: runtime.record.request.target.targetID,
+        bindingRevision: runtime.record.request.target.expectedBindingRevision ?? 1,
+        usbTopology: context.serverFacts["usbTopology"] ?? ""))
 
     // The daemon's disposition is journalled as it stands. `outcomeUnknown` is
     // not a failure to retry — it is a job that needs reconciling, and turning

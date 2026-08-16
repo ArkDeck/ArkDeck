@@ -71,14 +71,14 @@ final class ArkForgeFlashSessionContractTests: XCTestCase {
 
   private struct StubPerformer: ArkForgeFlashSession.ControlPerformer {
     let observation: ArkForgeManagedControlPort.Observation
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
     { observation }
   }
 
   private struct FailingPerformer: ArkForgeFlashSession.ControlPerformer {
     struct Boom: Error {}
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
     { throw Boom() }
   }
@@ -475,7 +475,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       ])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
-      performer: SilentPerformer(),
+      makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeAuthority: { _, _ in
         ArkForgeExecutionAuthority(
@@ -489,14 +489,19 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
           now: { 0 })
       })
 
+    let binding = ArkForgeLaneDeviceBinding(
+      connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+      targetID: "TGT-1", bindingRevision: 2, usbTopology: "0x14200000")
     let first = try await host.perform(
-      stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+      stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+      binding: binding)
     let second = try await host.perform(
-      stepID: "verify-flash-readback", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+      stepID: "verify-flash-readback", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+      binding: binding)
 
     XCTAssertEqual(first.stepID, "flash-partitions")
     XCTAssertEqual(second.stepID, "verify-flash-readback")
-    let starts = await started.value
+    let starts = started.value
     XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
   }
 
@@ -505,7 +510,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let daemon = CountingDaemon(counter: StartCounter(), events: [])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
-      performer: SilentPerformer(),
+      makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeAuthority: { _, _ in
         ArkForgeExecutionAuthority(
@@ -521,7 +526,10 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
     do {
       _ = try await host.perform(
-        stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d")
+        stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+        binding: ArkForgeLaneDeviceBinding(
+          connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+          targetID: "TGT-1", bindingRevision: 2, usbTopology: "0x14200000"))
       XCTFail("a step with no receipt must not be reported as performed")
     } catch {
       XCTAssertEqual(
@@ -531,9 +539,28 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
   // MARK: - doubles
 
-  private actor StartCounter {
-    var value = 0
-    func increment() { value += 1 }
+  /// Counted under a lock rather than in an actor.
+  ///
+  /// `startExecution` is not async, so an actor could only be incremented from
+  /// a detached task — and then the assertion races the increment. This test
+  /// asserts *how many times a job was started*, so a count that arrives late
+  /// is a count that does not test anything. CI caught this; the local run
+  /// passed on timing.
+  private final class StartCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+      lock.lock()
+      defer { lock.unlock() }
+      count += 1
+    }
+
+    var value: Int {
+      lock.lock()
+      defer { lock.unlock() }
+      return count
+    }
   }
 
   private final class CountingDaemon: ArkForgeFlashSession.Daemon, @unchecked Sendable {
@@ -548,7 +575,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     func startExecution(_ body: ArkForgeStartExecutionRequest, requestID: String) throws
       -> ArkForgeStartExecutionResponse
     {
-      Task { await counter.increment() }
+      counter.increment()
       return ArkForgeStartExecutionResponse(jobID: "JOB-1")
     }
     func submitStepPermit(_ body: ArkForgeSubmitStepPermitRequest, requestID: String) throws
@@ -572,7 +599,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
   }
 
   private struct SilentPerformer: ArkForgeFlashSession.ControlPerformer {
-    func perform(_ action: ArkForgeManagedControlAction, stepID: String) async throws
+    func perform(_ request: ArkForgeManagedControlRequest) async throws
       -> ArkForgeManagedControlPort.Observation
     { .init(accepted: true, facts: [:], evidenceSHA256: []) }
   }

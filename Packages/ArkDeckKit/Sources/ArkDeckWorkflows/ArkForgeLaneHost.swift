@@ -68,18 +68,22 @@ package actor ArkForgeLaneHost {
   private let connection: Connection
   private let makeClient: @Sendable (String) throws -> any ArkForgeFlashSession.Daemon
   private let makeAuthority: @Sendable (String, String) -> ArkForgeExecutionAuthority
-  private let performer: any ArkForgeFlashSession.ControlPerformer
+  /// Built per call from the binding the engine passes, because a performer
+  /// without a device is a performer that cannot say *whose* disconnect it saw.
+  private let makePerformer:
+    @Sendable (ArkForgeLaneDeviceBinding, String) -> any ArkForgeFlashSession.ControlPerformer
   /// jobID → the receipts that job's single ArkForge run published, by step id.
   private var receiptsByJob: [String: [String: ArkForgeActionReceiptSummary]] = [:]
 
   package init(
     connection: Connection,
-    performer: any ArkForgeFlashSession.ControlPerformer,
+    makePerformer: @escaping @Sendable (ArkForgeLaneDeviceBinding, String)
+      -> any ArkForgeFlashSession.ControlPerformer,
     makeClient: @escaping @Sendable (String) throws -> any ArkForgeFlashSession.Daemon,
     makeAuthority: @escaping @Sendable (String, String) -> ArkForgeExecutionAuthority
   ) {
     self.connection = connection
-    self.performer = performer
+    self.makePerformer = makePerformer
     self.makeClient = makeClient
     self.makeAuthority = makeAuthority
   }
@@ -87,7 +91,8 @@ package actor ArkForgeLaneHost {
   /// Runs the ArkForge job on first use for this ArkDeck job, then serves each
   /// delegated step from what that run published.
   package func perform(
-    stepID: String, jobID: String, planID: String, planSHA256: String
+    stepID: String, jobID: String, planID: String, planSHA256: String,
+    binding: ArkForgeLaneDeviceBinding
   ) async throws -> ArkForgeActionReceiptSummary {
     if let cached = receiptsByJob[jobID]?[stepID] {
       return cached
@@ -96,7 +101,8 @@ package actor ArkForgeLaneHost {
     // one that runs the ArkForge job.
     let client = try makeClient(connection.socketPath)
     let session = ArkForgeFlashSession(
-      daemon: client, authority: makeAuthority(jobID, planID), performer: performer,
+      daemon: client, authority: makeAuthority(jobID, planID),
+      performer: makePerformer(binding, jobID),
       controllerSessionID: connection.controllerSessionID)
 
     let outcome = try await session.run(
