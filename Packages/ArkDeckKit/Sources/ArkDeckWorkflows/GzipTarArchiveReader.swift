@@ -389,6 +389,17 @@ private struct TarStreamSummarizer {
     }
 
     let size = try Self.parseNumericField(block[124..<136], field: "size")
+    // A size within one alignment block of `Int64.max` cannot describe a real
+    // member, and the non-regular-file branch below adds `padding` to it. The
+    // base-256 size field is wide enough to reach `Int64.max` without tripping
+    // `parseNumericField`'s own per-shift guard, so that addition would trap
+    // and terminate the process. Untrusted bundles are parsed here before any
+    // authorization, so an unrepresentable size is refused as a corrupt header
+    // instead (POL-SAFETY-001: fail closed, never terminate).
+    guard size <= Int64.max - 511 else {
+      throw GzipTarArchiveReaderError.corruptTarHeader(
+        "member size does not leave room for its 512-byte alignment")
+    }
     let typeFlag = block[156]
     let padding = (512 - size % 512) % 512
     // Regular files only. pax/global/long-name extension records are skipped as opaque
