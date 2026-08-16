@@ -248,6 +248,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
               "reference": .string(item.reference),
               "availability": .string(item.state.rawValue),
               "reasons": .array(item.reasons.map(JSONValue.string)),
+              // PRODUCT-LOOP §8: the machine-readable half, positionally
+              // paired with `reasons`. `reasons` stays for readers that
+              // already parse it.
+              "reasonCodes": .array(item.reasonCodes.map { .string($0.rawValue) }),
             ])
           }))
 
@@ -273,6 +277,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "availabilityReasons": .array(
             (availability?.reasons ?? ["runtime availability could not be resolved"])
               .map(JSONValue.string)),
+          "availabilityReasonCodes": .array(
+            (availability?.reasonCodes ?? [.providerNotRegistered])
+              .map { .string($0.rawValue) }),
         ]))
 
     case "flash.prerequisites":

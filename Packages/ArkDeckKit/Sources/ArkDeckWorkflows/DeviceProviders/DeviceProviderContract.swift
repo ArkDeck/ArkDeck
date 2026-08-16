@@ -1805,9 +1805,34 @@ extension DeviceProviderError: CustomStringConvertible {
 
 // MARK: - The provider protocol
 
+/// The closed vocabulary `operation.list` answers "why not" with.
+///
+/// PRODUCT-LOOP §8 requires a machine-readable reason, and its example carries
+/// `reasonCode` and prose `reason` as two fields. The prose alone had grown
+/// four coexisting conventions — English sentences, dotted camelCase and
+/// snake_case, in one untyped array — so the only way to branch on it was to
+/// substring-match English, which reworded silently. These are the categories
+/// a caller can actually act on; the prose stays alongside for a person to
+/// read.
+public enum RuntimeAvailabilityReasonCode: String, Sendable, Equatable, CaseIterable, Codable {
+  /// No provider is registered for the operation's declared provider.
+  case providerNotRegistered = "provider_not_registered"
+  /// The provider is registered but publishes no complete typed plan for this
+  /// operation.
+  case operationNotSupported = "operation_not_supported"
+  /// A tool, toolchain or component the provider needs is absent or unreadable.
+  case providerToolUnavailable = "provider_tool_unavailable"
+  /// The tool is present, and is not the one that was pinned.
+  case toolIdentityDrift = "tool_identity_drift"
+  /// A workspace project or preset the operation needs is not registered.
+  case workspacePresetUnavailable = "workspace_preset_unavailable"
+  /// The Runtime Artifact store this operation publishes through is absent.
+  case artifactStoreUnavailable = "artifact_store_unavailable"
+}
+
 public enum ProviderOperationAvailability: Sendable, Equatable {
   case available
-  case unavailable(reason: String)
+  case unavailable(code: RuntimeAvailabilityReasonCode, reason: String)
 }
 
 public protocol DeviceProvider: Sendable {
@@ -1898,6 +1923,7 @@ extension DeviceProvider {
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     .unavailable(
+      code: .operationNotSupported,
       reason: "provider \(providerID) has not published runtime availability "
         + "for \(operation.reference)")
   }

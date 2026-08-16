@@ -68,8 +68,8 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       appOwnedNativeLibraryAvailability
       ?? (helper == nil
         ? .unavailable(
-          reason:
-            "bundled arm64 OpenHarmony code-sign helper cannot be verified")
+          code: .providerToolUnavailable,
+          reason: "bundled arm64 OpenHarmony code-sign helper cannot be verified")
         : .available)
   }
 
@@ -88,6 +88,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       return appOwnedNativeLibraryAvailability
     default:
       return .unavailable(
+        code: .operationNotSupported,
         reason: "HDC provider has no complete production typed plan for "
           + operation.reference)
     }
@@ -2983,6 +2984,7 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
   public init(
     factsPort: (any RockchipRuntimeFactsPort)? = nil,
     availability: ProviderOperationAvailability = .unavailable(
+      code: .providerToolUnavailable,
       reason: "production Rockchip dispatcher is not registered")
   ) {
     self.factsPort = factsPort
@@ -2994,6 +2996,7 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
   ) -> ProviderOperationAvailability {
     guard operation.reference == "flash.dayu200" else {
       return .unavailable(
+        code: .operationNotSupported,
         reason: "Rockchip provider has no typed plan for \(operation.reference)")
     }
     return availability

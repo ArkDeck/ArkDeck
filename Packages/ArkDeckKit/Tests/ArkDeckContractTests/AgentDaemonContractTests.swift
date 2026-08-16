@@ -1278,6 +1278,39 @@ final class AgentDaemonContractTests: XCTestCase {
       flash.reasons.contains { $0.contains("is not registered") },
       "the production daemon must register the rockchip provider: \(flash.reasons)")
 
+    // Every operation the production registry can answer for carries a
+    // machine-readable code beside its prose (PRODUCT-LOOP §8).
+    //
+    // The prose alone had four naming conventions at once — English sentences,
+    // dotted camelCase and snake_case in a single array — so the only way to
+    // branch on it was to substring-match English, and rewording a sentence
+    // silently changed what a caller did. The assertion just above is the
+    // living example: it has to match the engine's own wording because the
+    // `provider_not_registered` spelling it wanted never existed on this path.
+    //
+    // Stated over the whole registry rather than one reference, so a provider
+    // or dispatcher that starts contributing a reason without a code fails
+    // here rather than reaching an agent as an uncategorised string.
+    let vocabulary = Set(RuntimeAvailabilityReasonCode.allCases.map(\.rawValue))
+    for (reference, operation) in try listOperations(socketPath: socketURL.path) {
+      XCTAssertEqual(
+        operation.reasonCodes.count, operation.reasons.count,
+        "\(reference) answers with \(operation.reasons.count) reasons and "
+          + "\(operation.reasonCodes.count) codes; they are positionally paired")
+      XCTAssertTrue(
+        operation.reasonCodes.allSatisfy(vocabulary.contains),
+        "\(reference) answered outside the closed vocabulary: \(operation.reasonCodes)")
+      if operation.availability == "unavailable" {
+        XCTAssertFalse(
+          operation.reasonCodes.isEmpty,
+          "\(reference) is unavailable and says nothing a caller can branch on")
+      } else {
+        XCTAssertTrue(
+          operation.reasonCodes.isEmpty,
+          "\(reference) is available and still carries \(operation.reasonCodes)")
+      }
+    }
+
     let cliURL = productsDirectory.appending(path: "arkdeck")
     XCTAssertTrue(
       FileManager.default.isExecutableFile(atPath: cliURL.path),
@@ -1561,6 +1594,7 @@ final class AgentDaemonContractTests: XCTestCase {
   private struct DaemonOperation {
     let availability: String
     let reasons: [String]
+    let reasonCodes: [String]
   }
 
   private func listOperations(socketPath: String) throws -> [String: DaemonOperation] {
@@ -1572,12 +1606,17 @@ final class AgentDaemonContractTests: XCTestCase {
       guard case .object(let fields) = item,
         case .string(let reference)? = fields["reference"],
         case .string(let availability)? = fields["availability"],
-        case .array(let reasons)? = fields["reasons"]
+        case .array(let reasons)? = fields["reasons"],
+        case .array(let reasonCodes)? = fields["reasonCodes"]
       else { return }
       table[reference] = DaemonOperation(
         availability: availability,
         reasons: reasons.compactMap { reason in
           guard case .string(let text) = reason else { return nil }
+          return text
+        },
+        reasonCodes: reasonCodes.compactMap { code in
+          guard case .string(let text) = code else { return nil }
           return text
         })
     }

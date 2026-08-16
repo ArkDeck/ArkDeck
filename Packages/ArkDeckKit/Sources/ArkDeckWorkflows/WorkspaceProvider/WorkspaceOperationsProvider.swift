@@ -413,15 +413,17 @@ package final class WorkspaceProjectProfileRegistry: @unchecked Sendable {
 package struct UnavailableWorkspaceOperationsProvider: DeviceProvider {
   public let providerID = "workspace"
   private let reason: String
+  private let code: RuntimeAvailabilityReasonCode
 
-  public init(reason: String) {
+  public init(reason: String, code: RuntimeAvailabilityReasonCode = .providerToolUnavailable) {
     self.reason = reason
+    self.code = code
   }
 
   package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
-    .unavailable(reason: reason)
+    .unavailable(code: code, reason: reason)
   }
 
   package func resolveFacts(targetID: String) async throws -> ProviderFacts {
@@ -809,7 +811,8 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
     guard operation.provider == .workspace else {
-      return .unavailable(reason: "workspace.unsupportedProvider")
+      return .unavailable(
+        code: .operationNotSupported, reason: "workspace.unsupportedProvider")
     }
     let hasPreset: Bool
     switch operation.reference {
@@ -821,7 +824,9 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       hasPreset = !profile.buildPresets.isEmpty
     case OpenHarmonyLocalSigning.operationReference:
       guard let signingPresets else {
-        return .unavailable(reason: "workspace.signingPresetUnavailable")
+        return .unavailable(
+          code: .workspacePresetUnavailable,
+          reason: "workspace.signingPresetUnavailable")
       }
       let status = signingPresets.status()
       hasPreset = status.ready && status.projectRef == profile.projectRef
@@ -836,21 +841,25 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     case "workspace.read-source-range@1":
       hasPreset = profile.sourceReaderPreset != nil
     default:
-      return .unavailable(reason: "workspace.unsupportedOperation")
+      return .unavailable(
+        code: .operationNotSupported, reason: "workspace.unsupportedOperation")
     }
     guard hasPreset else {
-      return .unavailable(reason: "workspace.presetUnavailable")
+      return .unavailable(
+        code: .workspacePresetUnavailable, reason: "workspace.presetUnavailable")
     }
     do {
       for identity in profile.executableIdentities {
         let bytes = try Data(contentsOf: URL(filePath: identity.path))
         guard WorkspaceProviderSupport.sha256(bytes) == identity.sha256 else {
-          return .unavailable(reason: "workspace.toolIdentityDrift")
+          return .unavailable(
+            code: .toolIdentityDrift, reason: "workspace.toolIdentityDrift")
         }
       }
       return .available
     } catch {
-      return .unavailable(reason: "workspace.toolchainUnavailable")
+      return .unavailable(
+        code: .providerToolUnavailable, reason: "workspace.toolchainUnavailable")
     }
   }
 
