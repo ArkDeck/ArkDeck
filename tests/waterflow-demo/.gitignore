@@ -1,0 +1,22 @@
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+
+# Signing material never belongs in the repository. build-profile.json5 is
+# committed with an empty signingConfigs array; fill it in locally through
+# DevEco Studio (Project Structure > Signing Configs) if you want a locally
+# signed HAP. The ArkDeck path does not need one — it signs the unsigned HAP
+# through workspace.sign-openharmony-hap@1.
+*.p12
+*.p7b
+*.pem
+*.cer
