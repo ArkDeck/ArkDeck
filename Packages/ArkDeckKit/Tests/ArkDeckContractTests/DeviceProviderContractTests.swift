@@ -304,14 +304,10 @@ final class DeviceProviderContractTests: XCTestCase {
     let outcome = try await hdc.reconcile(intent: reference, context: context)
     XCTAssertEqual(outcome, .confirmedNotExecuted, "read-only re-observation is always safe")
 
-    let rockchip = RockchipFlashProviderAdapter(factsPort: RockchipFactsPort())
-    let flashIntent = ProviderDurableIntentReference(
-      jobID: "job-1", stepID: "s", intentEventID: "i",
-      action: .rockchip(.flashPartitions(flashBundle)))
-    let flashOutcome = try await rockchip.reconcile(intent: flashIntent, context: context)
-    guard case .stillUnknown = flashOutcome else {
-      return XCTFail("destructive reconcile without host evidence must stay unknown")
-    }
+    // The destructive Rockchip reconcile asserted here went with its action
+    // (CHG-2026-059). ArkDeck can no longer observe what a Rockchip write left
+    // behind, so it no longer claims to; the legacy-journal path is covered by
+    // `testALegacyRockchipWriteIntentDecodesToANamedRefusal`.
   }
 
   func testLoweredPlansCarryNoRawCommandSurface() throws {
@@ -345,7 +341,12 @@ final class DeviceProviderContractTests: XCTestCase {
     let engineSteps = Set([
       "verify-image-bundle", "hash-images", "confirm-flash-intent", "finalize-session",
     ])
-    for step in descriptor.steps where !engineSteps.contains(step.stepID) {
+    // The write and its readback are no longer ArkDeck actions: arkforged
+    // dispatches them under a StepPermit (CHG-2026-059). This loop therefore
+    // covers the steps this authority still materializes itself.
+    let arkforgeSteps = Set(["flash-partitions", "verify-flash-readback"])
+    for step in descriptor.steps
+    where !engineSteps.contains(step.stepID) && !arkforgeSteps.contains(step.stepID) {
       let stepContext = ProviderExecutionContext(
         jobID: flashContext.jobID,
         stepID: step.stepID,
@@ -419,20 +420,70 @@ final class DeviceProviderContractTests: XCTestCase {
         context: flashContext))
   }
 
-  func testRockchipRecoveryRejectsNonCanonicalArtifactPath() throws {
-    let persisted = try PersistedTypedProviderAction(
-      .rockchip(.flashPartitions(flashBundle)))
-    let encoded = try JSONEncoder().encode(persisted)
-    var object = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-    var arguments = try XCTUnwrap(object["arguments"] as? [String: Any])
-    arguments["artifactPath"] = "/private/tmp/nested/../images.tar.gz"
-    object["arguments"] = arguments
-    let tampered = try JSONSerialization.data(withJSONObject: object)
-    let decoded = try JSONDecoder().decode(
-      PersistedTypedProviderAction.self, from: tampered)
+  /// The interim contract, asserted live while the executor is absent.
+  ///
+  /// A flash that cannot be performed must be refused *before* authorization,
+  /// and the refusal must name where the capability went. The failure mode this
+  /// guards is a plan that authorizes a destructive write and only then finds
+  /// it has nobody to perform it — by then a capability has been consumed and a
+  /// job has to be reconciled rather than simply not started.
+  ///
+  /// The end-to-end recovery tests that used to cover this path are skipped
+  /// until TASK-AFA-001 step 5; this keeps the boundary itself live.
+  func testFlashStepsAreRefusedBeforeAuthorization() throws {
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+    let provider = RockchipFlashProviderAdapter(
+      factsPort: RockchipFactsPort(), availability: .available)
+    for stepID in ["flash-partitions", "verify-flash-readback"] {
+      let step = try XCTUnwrap(descriptor.steps.first { $0.stepID == stepID })
+      XCTAssertThrowsError(
+        try provider.action(
+          for: step, operation: descriptor, inputs: [:], context: flashContext),
+        stepID
+      ) { error in
+        guard case DeviceProviderError.unsupportedAction(let detail) = error else {
+          return XCTFail("\(stepID) must refuse by type, got \(error)")
+        }
+        XCTAssertTrue(detail.contains("arkforged"), detail)
+        XCTAssertTrue(detail.contains("StepPermit"), detail)
+      }
+    }
+  }
 
-    XCTAssertThrowsError(try decoded.materialize())
+  /// A journal written before CHG-2026-059 still decodes — to a refusal that
+  /// says what it is.
+  ///
+  /// This replaces a test that fed a non-canonical artifact path through the
+  /// persisted flash action. That action no longer exists, and the property
+  /// worth guarding now is the one the removal created: an intact legacy
+  /// record whose outcome is unknown must not read as a journal nobody can
+  /// parse. One answer sends a person to reconcile a device; the other sends
+  /// them looking for corruption that is not there.
+  func testALegacyRockchipWriteIntentDecodesToANamedRefusal() throws {
+    for kind in ["rockchip.flashPartitions", "rockchip.verifyFlashReadback"] {
+      let legacy = try JSONDecoder().decode(
+        PersistedTypedProviderAction.self,
+        from: Data(#"{"kind":"\#(kind)","arguments":{}}"#.utf8))
+      XCTAssertThrowsError(try legacy.materialize()) { error in
+        guard case DeviceProviderError.legacyRockchipLoweringIntent(let named) = error else {
+          return XCTFail("\(kind) must be refused by name, got \(error)")
+        }
+        XCTAssertEqual(named, kind)
+        XCTAssertTrue("\(error)".contains("not replayable"), "\(error)")
+      }
+    }
+
+    // An actually-unknown kind still reads as unknown, so the two answers stay
+    // distinguishable.
+    let unknown = try JSONDecoder().decode(
+      PersistedTypedProviderAction.self,
+      from: Data(#"{"kind":"rockchip.notAThing","arguments":{}}"#.utf8))
+    XCTAssertThrowsError(try unknown.materialize()) { error in
+      guard case DeviceProviderError.unsupportedAction = error else {
+        return XCTFail("an unknown kind must stay unsupportedAction, got \(error)")
+      }
+    }
   }
 
   private var flashBundle: RockchipRuntimeFlashBundle {

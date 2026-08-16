@@ -329,7 +329,34 @@ package struct RockchipRockUSBFlashProvider: Sendable {
   /// `db`/`gpt`/`ul` and every other Maskrom/miniloader-stage command are deliberately
   /// absent: on an inapplicable device the Provider blocks instead of trying anything
   /// similar (AC-FLASH-001-01; #218/#220 evidence).
-  package static let closedCommandSurface: [String] = ["ld", "ppt", "wlx", "wl", "rl", "rd"]
+  ///
+  /// `wlx`, `wl`, `rl` and `ppt` left with CHG-2026-059. They were the write, the
+  /// sector read and the partition-table read — the three that need a device address,
+  /// and therefore the three that belong to whoever holds the device mechanics.
+  /// `arkforged` owns that vocabulary now, behind a StepPermit this authority issues.
+  ///
+  /// What remains is what ArkDeck still issues itself: `ld` for read-only discovery,
+  /// and `rd` for the reset it keeps by authority.
+  package static let closedCommandSurface: [String] = ["ld", "rd"]
+
+  /// The verbs that moved, kept by name so a reintroduction is a failing test
+  /// rather than a code review someone has to notice.
+  package static let commandsDelegatedToArkForge: [String] = ["ppt", "wlx", "wl", "rl"]
+
+  /// What the *human* handoff may name — a different question from what this
+  /// Provider dispatches.
+  ///
+  /// When the automated route is blocked, ArkDeck prints the CHG-2026-016
+  /// manual recovery route for an operator to run themselves. That route still
+  /// names `ppt` and `wlx`, because the person runs the real tool with the real
+  /// commands; printing something else would be printing something false.
+  ///
+  /// The separation is the point: `closedCommandSurface` is what this process
+  /// may execute, and this is what it may *say*. Delegating the write did not
+  /// delete the operator's documented fallback, and a fallback that could not
+  /// name the command would be no fallback at all.
+  package static let humanHandoffCommandSurface: [String] =
+    closedCommandSurface + commandsDelegatedToArkForge
 
   package static let writeSuccessMarker = "Write LBA from file (100%)"
   package static let resetSuccessMarker = "Reset Device OK."

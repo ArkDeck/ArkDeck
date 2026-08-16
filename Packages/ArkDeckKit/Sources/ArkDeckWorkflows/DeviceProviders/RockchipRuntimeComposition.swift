@@ -508,11 +508,10 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
         hdcResolver: hdcResolver,
         runner: FoundationRockchipRuntimeCommandRunner(
           workingDirectory: toolWorkingDirectory),
-        postFlashHDCBindingStore: postFlashHDCBindingStore,
-        imageCache: RockchipFlashImageCache(
-          rootURL: stateDirectory.appending(
-            path:
-              "rockchip-image-cache", directoryHint: .isDirectory))),
+        // The staged-image cache went with the write path it fed: only
+        // `flashWrites` ever unpacked an archive here, and that lowering is
+        // arkforged's now (CHG-2026-059).
+        postFlashHDCBindingStore: postFlashHDCBindingStore),
       records: RockchipRuntimeActionRecordStore(
         rootURL: stateDirectory.appending(
           path:

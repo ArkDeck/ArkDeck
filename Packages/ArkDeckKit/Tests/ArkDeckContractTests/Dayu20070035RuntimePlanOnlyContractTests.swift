@@ -159,14 +159,20 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let inputs = flashInputs(
       lease: "lease-v1:gj4:ART-70035", profile: profile)
     let provider = RockchipFlashProviderAdapter(availability: .available)
-    guard
-      case .rockchip(.flashPartitions(let bundle)) = try provider.action(
+    // The flash step no longer lowers to an ArkDeck provider action: the write
+    // is arkforged's, reached by StepPermit (CHG-2026-059). The adapter says so
+    // rather than producing a different action, because a plan that quietly
+    // materialized something else would be a plan nobody authorized.
+    XCTAssertThrowsError(
+      try provider.action(
         for: step, operation: descriptor, inputs: inputs, context: context)
-    else {
-      return XCTFail("DAYU200 must materialize the typed Rockchip flash action")
+    ) { error in
+      guard case DeviceProviderError.unsupportedAction(let detail) = error else {
+        return XCTFail("expected a typed refusal, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("arkforged"), detail)
+      XCTAssertTrue(detail.contains("StepPermit"), detail)
     }
-    XCTAssertEqual(bundle.sha256, profile.archiveSHA256)
-    XCTAssertEqual(bundle.partitionNames, profile.mappedPartitions.map(\.partitionName))
 
     var reordered = inputs
     reordered["partitionPlan"] = .array(

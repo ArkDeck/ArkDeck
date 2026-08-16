@@ -29,7 +29,10 @@
 // architecture decision and belongs in the same review as the code that
 // needs it (see docs/ArchitectureRules.md).
 
+import Foundation
 import XCTest
+
+@testable import ArkDeckWorkflows
 
 final class ArchitectureBoundaryContractTests: XCTestCase {
 
@@ -524,5 +527,92 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       lines.append(text)
     }
     return lines.joined(separator: "\n")
+  }
+}
+
+/// `AFA-AC-1`: the Rockchip lowering is gone from product code.
+///
+/// A grep test, deliberately. The dependency and type checks above cannot see
+/// this one: a string literal `"wlx"` handed to a process is not a type
+/// boundary, and the whole point of CHG-2026-059 is that ArkDeck stops knowing
+/// how to phrase a Rockchip write.
+final class RockchipLoweringRemovalContractTests: XCTestCase {
+
+  private func productSwiftFiles() throws -> [(path: String, source: String)] {
+    let root = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appending(path: "Sources", directoryHint: .isDirectory)
+    var out: [(String, String)] = []
+    let walker = FileManager.default.enumerator(
+      at: root, includingPropertiesForKeys: nil)
+    while let url = walker?.nextObject() as? URL {
+      guard url.pathExtension == "swift" else { continue }
+      out.append((url.path, try String(contentsOf: url, encoding: .utf8)))
+    }
+    return out
+  }
+
+  /// Strips comments, so *discussing* the removal is not confused with doing it.
+  private func codeOnly(_ source: String) -> String {
+    source.split(separator: "\n", omittingEmptySubsequences: false)
+      .map { line -> Substring in
+        let trimmed = line.drop(while: { $0 == " " })
+        if trimmed.hasPrefix("//") { return "" }
+        if let comment = line.range(of: "//") { return line[line.startIndex..<comment.lowerBound] }
+        return line
+      }
+      .joined(separator: "\n")
+  }
+
+  func testProductCodeNeverPhrasesARockchipWriteOrSectorRead() throws {
+    // The three verbs that need a device address, and therefore belong to
+    // whoever holds the device mechanics. `ld` and `rd` are absent from this
+    // list on purpose: ArkDeck still issues those itself.
+    let delegated = ["\"wlx\"", "\"rl\"", "\"ppt\""]
+    for (path, source) in try productSwiftFiles() {
+      let code = codeOnly(source)
+      for verb in delegated {
+        // `commandsDelegatedToArkForge` names them precisely so their return
+        // would be a failing test; that declaration is the one allowed site.
+        if path.hasSuffix("RockchipRockUSBFlashProvider.swift") { continue }
+        XCTAssertFalse(
+          code.contains(verb),
+          "\(path) phrases \(verb) as an argv element; that lowering is arkforged's "
+            + "(CHG-2026-059)")
+      }
+    }
+  }
+
+  func testTheDispatchSurfaceIsNarrowerThanTheHumanHandoff() {
+    // Two different questions: what this process may execute, and what it may
+    // print for a person to run themselves. Collapsing them is how a delegated
+    // command quietly comes back.
+    XCTAssertEqual(RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "rd"])
+    for delegated in RockchipRockUSBFlashProvider.commandsDelegatedToArkForge {
+      XCTAssertFalse(
+        RockchipRockUSBFlashProvider.closedCommandSurface.contains(delegated),
+        "\(delegated) came back to the dispatch surface")
+      XCTAssertTrue(
+        RockchipRockUSBFlashProvider.humanHandoffCommandSurface.contains(delegated),
+        "the manual route must still be able to name \(delegated)")
+    }
+  }
+
+  func testTheReadDomainLessonSurvivedItsCode() throws {
+    // `characterizeMediumReadDomain` carried a lesson that cost a full
+    // campaign: past the read window every sector reads as uniform 0xCC, so a
+    // readback there cannot tell "not written" from "cannot be read". Deleting
+    // the code must not delete that.
+    let repoRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let index = repoRoot.appending(path: "docs/design/rockchip-read-domain.md")
+    let text = try String(contentsOf: index, encoding: .utf8)
+    XCTAssertTrue(text.contains("AD-006"), "the read-domain index must cite AD-006")
+    XCTAssertTrue(text.contains("AD-019"), "and its independent reproduction, AD-019")
+    XCTAssertTrue(text.contains("0xCC"), "and name what the window returns")
+    XCTAssertTrue(text.contains("65536"), "and where the window ends")
   }
 }

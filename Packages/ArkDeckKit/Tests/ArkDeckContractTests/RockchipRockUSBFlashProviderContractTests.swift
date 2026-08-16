@@ -84,20 +84,29 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
 
     // "No similar commands": the whole vocabulary this Provider can put in front of a human
     // is the closed design §0 surface; Maskrom/miniloader-stage commands do not exist here.
+    // What this Provider may *dispatch* narrowed with CHG-2026-059: the write,
+    // the sector read and the partition-table read went to arkforged, because
+    // they are the three that need a device address.
+    XCTAssertEqual(RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "rd"])
     XCTAssertEqual(
-      RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "ppt", "wlx", "wl", "rl", "rd"])
+      RockchipRockUSBFlashProvider.commandsDelegatedToArkForge, ["ppt", "wlx", "wl", "rl"])
     for forbidden in ["db", "gpt", "ul", "uid", "ef"] {
       XCTAssertFalse(RockchipRockUSBFlashProvider.closedCommandSurface.contains(forbidden))
+      XCTAssertFalse(
+        RockchipRockUSBFlashProvider.humanHandoffCommandSurface.contains(forbidden),
+        "the manual route must not grow a Maskrom-stage command either")
     }
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
     let handoff = RockchipHumanHandoff.make(plan: plan, profile: provider.profile)
     for command in handoff.commandLines {
       let verb = command.split(separator: " ")[2]
+      // The handoff describes the manual route, so it is checked against what
+      // this Provider may *say* rather than what it may execute.
       XCTAssertTrue(
-        RockchipRockUSBFlashProvider.closedCommandSurface.contains(String(verb)),
-        "handoff command outside the closed surface: \(command)")
+        RockchipRockUSBFlashProvider.humanHandoffCommandSurface.contains(String(verb)),
+        "handoff command outside the human-handoff surface: \(command)")
     }
-    print("TEST-AC-FLASH-001-01 PASS preflight_blocked=3 closed_surface=ld,ppt,wlx,wl,rl,rd")
+    print("TEST-AC-FLASH-001-01 PASS preflight_blocked=3 dispatch_surface=ld,rd")
   }
 
   // MARK: - TEST-AC-FLASH-002-01 prerequisites gate

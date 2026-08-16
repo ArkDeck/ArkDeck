@@ -3045,14 +3045,15 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
       return .rockchip(.waitForLoader(stableIdentitySHA256: identity))
     case ("rebind-loader-identity", .probeDevice):
       return .rockchip(.rebindLoader(stableIdentitySHA256: identity))
-    case ("flash-partitions", .flashPartition):
-      return .rockchip(
-        .flashPartitions(
-          try flashBundle(inputs: inputs, context: context)))
-    case ("verify-flash-readback", .verifyRemoteState):
-      return .rockchip(
-        .verifyFlashReadback(
-          try flashBundle(inputs: inputs, context: context)))
+    case ("flash-partitions", .flashPartition), ("verify-flash-readback", .verifyRemoteState):
+      // These two steps no longer lower to an ArkDeck provider action: the
+      // write and the readback are arkforged's, reached by StepPermit rather
+      // than by this adapter (CHG-2026-059). Until the permit route is wired,
+      // the honest answer is that this authority cannot dispatch them — not a
+      // silently different action.
+      throw DeviceProviderError.unsupportedAction(
+        "\(step.stepID) is dispatched by arkforged under a StepPermit; ArkDeck no longer "
+        + "lowers Rockchip writes or readbacks (CHG-2026-059)")
     case ("reboot-device", .rebootDevice):
       return .rockchip(.rebootToNormal(stableIdentitySHA256: identity))
     case ("wait-for-hdc", .waitForReconnect):
@@ -3114,14 +3115,6 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
       descriptor = "rockchip.rockusb.wait-loader.v1"
     case .rebindLoader:
       descriptor = "rockchip.rockusb.rebind-loader.v1"
-    case .flashPartitions(let bundle):
-      descriptor =
-        "rockchip.rockusb.flash-dayu200:"
-        + String(bundle.sha256.prefix(16))
-    case .verifyFlashReadback(let bundle):
-      descriptor =
-        "rockchip.rockusb.verify-dayu200:"
-        + String(bundle.sha256.prefix(16))
     case .rebootToNormal:
       descriptor = "rockchip.rockusb.reboot-normal.v1"
     case .waitForHDCReconnect:
@@ -3234,8 +3227,11 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
       // exact negative postcondition lets the engine finalize the parked job
       // without ever replaying its reboot command.
       action = .rockchip(.observeHDCNormalUSB(connectKey: connectKey))
-    case .rockchip(.flashPartitions(let bundle)):
-      action = .rockchip(.verifyFlashReadback(bundle))
+    // A parked Rockchip write used to recover by reading the partition back
+    // here. That readback is a read-domain judgement, and it moved with the
+    // write: ArkDeck can no longer prove what the device holds, so it must not
+    // pretend to. Falling through to `nil` keeps the job unresolved, which is
+    // the truth until arkforged reconciles it.
     case .rockchip(.rebootToNormal):
       guard let connectKey = context.connectKey, !connectKey.isEmpty else {
         throw DeviceProviderError.factsUnavailable(
