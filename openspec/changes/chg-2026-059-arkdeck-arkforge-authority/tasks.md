@@ -5,7 +5,9 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
 
 ## TASK-AFA-001 — ArkDeck 做 authority，ArkForge 做 Rockchip 执行
 
-- Status:blocked（等 proposal merge）
+- Status:in-progress（proposal PR #1317 已 merge。第 2 步 permit 签发已完成并对着
+  ArkForge 的三组交叉验证向量逐字节通过；第 1/3/4/5/6 步未开始。仅在本实现 PR
+  经维护者 review/merge 后生效）
 - Golden Journey:GJ-4
 - Platform:macos
 - Requirements:`AFA-REQ-001`…`AFA-REQ-005`（单任务覆盖全部五条）
