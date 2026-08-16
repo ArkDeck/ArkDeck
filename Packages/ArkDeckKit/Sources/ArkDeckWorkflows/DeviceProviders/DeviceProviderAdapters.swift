@@ -3127,8 +3127,6 @@ package struct RockchipFlashProviderAdapter: DeviceProvider {
       descriptor = "rockchip.hdc.wait-reconnect.v1"
     case .waitForBoundHDCReconnect:
       descriptor = "rockchip.hdc.wait-bound-reconnect.v2"
-    case .verifyBuild:
-      descriptor = "rockchip.hdc.verify-build.v1"
     case .verifyBoundBuild:
       descriptor = "rockchip.hdc.verify-bound-build.v2"
     case .capturePostFlashDiagnostics:

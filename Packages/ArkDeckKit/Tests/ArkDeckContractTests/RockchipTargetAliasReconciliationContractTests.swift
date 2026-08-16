@@ -398,7 +398,7 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
         id: stepID, kind: .probeDevice, declaredEffect: .readOnly,
         declaredCancellation: .immediate,
         declaredBindingRequirement: .confirmedDevice,
-        arguments: ["evidencePolicy": .string("verifyBuild")])
+        arguments: ["evidencePolicy": .string("postFlashBuild")])
     default:
       throw NSError(domain: "target-alias-fixture", code: 1)
     }

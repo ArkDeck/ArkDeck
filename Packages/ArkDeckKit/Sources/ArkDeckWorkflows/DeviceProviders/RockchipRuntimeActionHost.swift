@@ -614,50 +614,10 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         ],
         receipts: receipts)
 
-    case .verifyBuild(
-      let connectKey, let expectedProductModel, let expectedBuildVersion):
-      guard let expectedProductModel, !expectedProductModel.isEmpty,
-        let expectedBuildVersion, !expectedBuildVersion.isEmpty
-      else {
-        throw RuntimeDispatchFailure.failed(
-          "post-flash verification has no exact published model/build pin")
-      }
-      let hdc = try resolveHDC()
-      let modelReceipt = try await run(
-        executable: hdc,
-        arguments: [
-          "-t", connectKey, "shell", "param", "get",
-          HDCAllowlistedProperty.productModel.rawValue,
-        ],
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
-        budget: 64 * 1024)
-      let versionReceipt = try await run(
-        executable: hdc,
-        arguments: [
-          "-t", connectKey, "shell", "param", "get",
-          HDCAllowlistedProperty.fullBuildVersion.rawValue,
-        ],
-        timeoutSeconds: tuning?.readOnlyCommandTimeoutSeconds ?? 15,
-        budget: 64 * 1024)
-      let model = try property(
-        modelReceipt, key: HDCAllowlistedProperty.productModel.rawValue)
-      let version = try property(
-        versionReceipt, key: HDCAllowlistedProperty.fullBuildVersion.rawValue)
-      guard model == expectedProductModel else {
-        throw RuntimeDispatchFailure.failed(
-          "post-flash model readback does not match the published profile")
-      }
-      guard version == expectedBuildVersion else {
-        throw RuntimeDispatchFailure.failed(
-          "post-flash build readback does not match the published profile")
-      }
-      return result(
-        summary: [
-          "model": model, "firmware": version,
-          "verification": "exact-published-profile",
-        ],
-        receipts: [modelReceipt, versionReceipt])
-
+    // verifyBuild was dispatched here. It read model/build back over a bare
+    // connect key and stamped the receipt `exact-published-profile` — a
+    // post-flash verification claim resting on no identity proof. The bound arm
+    // below is the whole action: prove the device first, then read it.
     case .verifyBoundBuild(
       let expectation, let expectedProductModel, let expectedBuildVersion):
       guard !expectedProductModel.isEmpty, !expectedBuildVersion.isEmpty,
@@ -1732,9 +1692,6 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     case .rockchip(.waitForBoundHDCReconnect(let expectation)):
       return expectation.previousConnectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.wait-bound-reconnect.v2"
-    case .rockchip(.verifyBuild(let connectKey, _, _)):
-      return connectKey == descriptor.connectKey
-        && descriptor.identifier == "rockchip.hdc.verify-build.v1"
     case .rockchip(.verifyBoundBuild(let expectation, _, _)):
       return expectation.previousConnectKey == descriptor.connectKey
         && descriptor.identifier == "rockchip.hdc.verify-bound-build.v2"

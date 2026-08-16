@@ -486,6 +486,95 @@ final class DeviceProviderContractTests: XCTestCase {
     }
   }
 
+  /// The retired unbound post-flash verification cannot be revived from a
+  /// journal.
+  ///
+  /// `rockchip.verifyBuild` read the model and build back over whatever device
+  /// answered a connect key and stamped its receipt `exact-published-profile`.
+  /// `verifyBoundBuild` proves the device is the same device first, then reads
+  /// it, then publishes the durable binding. Both were `readOnly` under evidence
+  /// policy `postFlashBuild`, so no step-level fact distinguished the two
+  /// claims — the difference lived entirely inside the action.
+  ///
+  /// Nothing constructs the retired action any more, which left the decoder as
+  /// its only door: these exact bytes materialized into a live action that
+  /// lowered to `rockchip.hdc.verify-build.v1` and executed to a success
+  /// receipt. The door is now shut, and the action it opened onto is gone from
+  /// the type, so the second half of that chain no longer compiles.
+  func testARetiredUnboundBuildVerificationIsRefusedByName() throws {
+    let retired = try JSONDecoder().decode(
+      PersistedTypedProviderAction.self,
+      from: Data(
+        #"""
+        {"kind":"rockchip.verifyBuild","arguments":{
+          "connectKey":"device-1",
+          "expectedProductModel":"\#(RockchipFlashProfile.dayu200.runtimeProductModel)",
+          "expectedBuildVersion":"\#(RockchipFlashProfile.dayu200.runtimeBuildVersion)"}}
+        """#.utf8))
+    XCTAssertThrowsError(try retired.materialize()) { error in
+      guard case DeviceProviderError.unsupportedAction(let detail) = error else {
+        return XCTFail("the retired verification must be refused, got \(error)")
+      }
+      // Named, so the detail says "intact record, retired step" rather than
+      // leaving an operator hunting for a corrupt journal that is not there.
+      XCTAssertTrue(detail.contains("rockchip.verifyBuild"), detail)
+      XCTAssertTrue(detail.contains("does not prove device identity"), detail)
+      XCTAssertTrue(detail.contains("rockchip.verifyBoundBuild"), detail)
+    }
+
+    // The empty-argument form decoded too: the `string()` helper only checked
+    // presence and type, so a record naming no device at all still produced an
+    // action. It has to be refused on the kind alone, before any argument is read.
+    let bare = try JSONDecoder().decode(
+      PersistedTypedProviderAction.self,
+      from: Data(#"{"kind":"rockchip.verifyBuild","arguments":{}}"#.utf8))
+    XCTAssertThrowsError(try bare.materialize()) { error in
+      guard case DeviceProviderError.unsupportedAction(let detail) = error else {
+        return XCTFail("the retired verification must be refused, got \(error)")
+      }
+      XCTAssertTrue(detail.contains("rockchip.verifyBuild"), detail)
+    }
+
+    // And the flash operation still materializes a post-flash verification —
+    // the bound one. Retiring the weak claim must not have retired the step.
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "flash.dayu200"))
+    let step = try XCTUnwrap(
+      descriptor.steps.first { $0.stepID == "rebind-and-verify-build" })
+    let context = ProviderExecutionContext(
+      jobID: flashContext.jobID, stepID: step.stepID,
+      targetID: flashContext.targetID,
+      bindingRevision: flashContext.bindingRevision,
+      connectKey: flashContext.connectKey,
+      expectedIdentitySHA256: flashContext.expectedIdentitySHA256,
+      toolVersion: flashContext.toolVersion,
+      toolSHA256: flashContext.toolSHA256,
+      serverFacts: flashContext.serverFacts,
+      nowUTC: flashContext.nowUTC,
+      resolvedInputArtifact: flashContext.resolvedInputArtifact,
+      expectedRuntimeBuildVersion: "OpenHarmony-7.0.0.36")
+    let action = try RockchipFlashProviderAdapter(
+      factsPort: RockchipFactsPort(), availability: .available
+    ).action(
+      for: step, operation: descriptor,
+      inputs: [
+        "deviceProfile": .string("dayu200"),
+        "imageBundleLease": .string("lease:flash-artifact"),
+        "partitionPlan": .array(
+          RockchipFlashProfile.dayu200.mappedPartitions.map {
+            .string($0.partitionName)
+          }),
+        "postFlashVerification": .string("full"),
+      ],
+      context: context)
+    guard case .rockchip(.verifyBoundBuild) = action else {
+      return XCTFail("post-flash verification must be the bound one, got \(action)")
+    }
+    XCTAssertNotEqual(
+      try PersistedTypedProviderAction(action).kind,
+      PersistedTypedProviderAction.retiredUnboundBuildVerificationKind)
+  }
+
   private var flashBundle: RockchipRuntimeFlashBundle {
     RockchipRuntimeFlashBundle(
       artifactLeaseID: "lease:flash-artifact",

@@ -148,10 +148,13 @@ public enum RockchipProviderAction: Sendable, Equatable {
   case rebootToNormal(stableIdentitySHA256: String)
   case waitForHDCReconnect(connectKey: String)
   case waitForBoundHDCReconnect(expectation: RockchipHDCReconnectExpectation)
-  case verifyBuild(
-    connectKey: String,
-    expectedProductModel: String? = nil,
-    expectedBuildVersion: String? = nil)
+  // verifyBuild used to live here. It read the model/build back over whatever
+  // device answered a connect key, which is a weaker claim than the one its
+  // receipt made: `verifyBoundBuild` first proves the device is the same device
+  // and only then publishes the durable binding. The two were the same effect
+  // (`readOnly`) under the same evidence policy (`postFlashBuild`), so nothing
+  // downstream could tell which claim a journal held. Do not reintroduce it —
+  // a post-flash verification that does not prove identity verifies nothing.
   case verifyBoundBuild(
     expectation: RockchipHDCReconnectExpectation,
     expectedProductModel: String,
@@ -397,7 +400,7 @@ public enum TypedProviderAction: Sendable, Equatable {
       .rockchip(.waitForLoader),
       .rockchip(.rebindLoader),
       .rockchip(.waitForHDCReconnect), .rockchip(.waitForBoundHDCReconnect),
-      .rockchip(.verifyBuild), .rockchip(.verifyBoundBuild),
+      .rockchip(.verifyBoundBuild),
       .rockchip(.capturePostFlashDiagnostics):
       return .readOnly
     }
@@ -413,6 +416,10 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
   /// exact strings; these are never written again.
   static let legacyRockchipLoweringKinds =
     ("rockchip.flashPartitions", "rockchip.verifyFlashReadback")
+
+  /// The retired unbound post-flash verification. A journal written before the
+  /// bound (`.v2`) verification can still hold it; it is never written again.
+  static let retiredUnboundBuildVerificationKind = "rockchip.verifyBuild"
 
   let kind: String
   let arguments: [String: JSONValue]
@@ -720,16 +727,6 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       self.init(
         kind: "rockchip.waitForBoundHDCReconnect",
         arguments: Self.rockchipHDCExpectationArguments(expectation))
-    case .rockchip(
-      .verifyBuild(let connectKey, let expectedProductModel, let expectedBuildVersion)):
-      var arguments: [String: JSONValue] = ["connectKey": .string(connectKey)]
-      if let expectedProductModel {
-        arguments["expectedProductModel"] = .string(expectedProductModel)
-      }
-      if let expectedBuildVersion {
-        arguments["expectedBuildVersion"] = .string(expectedBuildVersion)
-      }
-      self.init(kind: "rockchip.verifyBuild", arguments: arguments)
     case .rockchip(
       .verifyBoundBuild(let expectation, let expectedProductModel, let expectedBuildVersion)):
       var arguments = Self.rockchipHDCExpectationArguments(expectation)
@@ -1228,12 +1225,16 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
       return .rockchip(
         .waitForBoundHDCReconnect(
           expectation: try rockchipHDCExpectation()))
-    case "rockchip.verifyBuild":
-      return .rockchip(
-        .verifyBuild(
-          connectKey: try string("connectKey"),
-          expectedProductModel: try optionalString("expectedProductModel"),
-          expectedBuildVersion: try optionalString("expectedBuildVersion")))
+    case Self.retiredUnboundBuildVerificationKind:
+      // A journal written before the bound verification. The record is intact,
+      // and the step it describes was read-only — the device carries no effect
+      // from it and nobody has to go settle one. What it cannot do is come back
+      // as evidence: it proved a model/build over whatever answered a connect
+      // key, never that the connect key still names the flashed device. Refused
+      // by name so the detail says that, rather than reading as a corrupt kind.
+      throw DeviceProviderError.unsupportedAction(
+        "\(kind) is the retired unbound post-flash verification; it does not "
+          + "prove device identity and is superseded by rockchip.verifyBoundBuild")
     case "rockchip.verifyBoundBuild":
       return .rockchip(
         .verifyBoundBuild(
