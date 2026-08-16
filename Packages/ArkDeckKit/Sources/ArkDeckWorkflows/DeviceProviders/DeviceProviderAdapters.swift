@@ -646,7 +646,13 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
           executableSHA256: "resolved-at-dispatch",
           argumentSummary: try deviceArguments(
             ["shell", "hilog", "-x"] + request.filters, context: context),
-          timeoutSeconds: request.commandTimeoutSeconds))
+          timeoutSeconds: request.commandTimeoutSeconds),
+        // `hilog -x` has no duration flag — it drains the current buffers and
+        // exits, which is why `durationSeconds` bounds the timeout above rather
+        // than the argv. The byte budget is the bound that does belong to the
+        // output, and it has to travel with the plan: the request's default is
+        // 16 MiB and the dispatcher's is 8 MiB.
+        outputByteBudget: request.byteBudget)
     case .captureCrashIndex:
       // The `-p …` payload is a single argv element after `-a`, exactly as
       // §6 records it. Faultlogger's SA id is 1201.

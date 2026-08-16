@@ -1569,19 +1569,32 @@ public struct TypedProcessPlan: Sendable, Equatable {
   /// Set only by plans whose product is a host file. The dispatcher honours
   /// it; no other plan gains host filesystem reach by declaring one.
   public let hostLanding: HostLandingExpectation?
+  /// The typed request's own stdout budget, when it declares one.
+  ///
+  /// Absent means "use the dispatcher's configured default". Present means the
+  /// request bounded its own output and that bound is the one that applies:
+  /// `HDCHilogCaptureRequest` validates a budget up to 128 MiB and **defaults
+  /// to 16 MiB**, while the descriptor-bound dispatcher's own default is 8 MiB,
+  /// so before this existed every hilog capture larger than 8 MiB came back
+  /// `truncated` even though the request had asked for twice that. The Rockchip
+  /// action host already honoured `request.byteBudget` directly; the HDC path
+  /// had no way to carry it.
+  public let outputByteBudget: Int?
 
   public init(
     action: TypedProviderAction,
     kind: Kind,
     argumentZero: String? = nil,
     workingDirectory: String? = nil,
-    hostLanding: HostLandingExpectation? = nil
+    hostLanding: HostLandingExpectation? = nil,
+    outputByteBudget: Int? = nil
   ) {
     self.action = action
     self.kind = kind
     self.argumentZero = argumentZero
     self.workingDirectory = workingDirectory
     self.hostLanding = hostLanding
+    self.outputByteBudget = outputByteBudget
   }
 }
 

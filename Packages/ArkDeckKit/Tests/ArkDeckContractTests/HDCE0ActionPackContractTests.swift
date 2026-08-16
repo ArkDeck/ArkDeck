@@ -46,6 +46,43 @@ final class HDCE0ActionPackContractTests: XCTestCase {
     XCTAssertEqual(defaulted.byteBudget, 16 * 1024 * 1024, "budget has a bounded default")
   }
 
+  /// The request's byte budget has to travel with the plan, because the
+  /// dispatcher's own default is smaller than the request's own default:
+  /// `HDCHilogCaptureRequest` defaults to 16 MiB and validates up to 128 MiB,
+  /// while `DescriptorBoundProcessDispatcher` defaults to 8 MiB. Before the
+  /// plan carried it, *every* capture larger than 8 MiB came back `truncated`
+  /// even though the request had asked for twice that — and the request's
+  /// default alone was already over the cap, so this was the ordinary case
+  /// rather than an edge one. The Rockchip action host already honoured
+  /// `request.byteBudget` directly; the HDC path had no way to express it.
+  func testHilogLoweringCarriesTheRequestedByteBudgetPastTheDispatcherDefault() throws {
+    let dispatcherDefault = 8 * 1024 * 1024
+
+    let defaulted = try HDCHilogCaptureRequest(durationSeconds: 5)
+    let defaultedPlan = try provider.lower(
+      action: .hdc(.captureHilog(defaulted)), context: context)
+    XCTAssertEqual(defaultedPlan.outputByteBudget, defaulted.byteBudget)
+    XCTAssertGreaterThan(
+      try XCTUnwrap(defaultedPlan.outputByteBudget), dispatcherDefault,
+      "the default request already exceeds the dispatcher default, so the plan must carry it")
+
+    let large = try HDCHilogCaptureRequest(
+      durationSeconds: 60, byteBudget: HDCHilogCaptureRequest.maximumByteBudget)
+    let largePlan = try provider.lower(
+      action: .hdc(.captureHilog(large)), context: context)
+    XCTAssertEqual(largePlan.outputByteBudget, HDCHilogCaptureRequest.maximumByteBudget)
+
+    // `hilog -x` drains the current buffers and exits; there is no duration
+    // flag, so `durationSeconds` bounds the timeout rather than the argv. That
+    // is deliberate and is pinned by the test below — the budget is the only
+    // bound that belongs to the output.
+    guard case .process(_, let arguments, _) = largePlan.kind else {
+      return XCTFail("HiLog capture must remain one descriptor-bound process")
+    }
+    XCTAssertFalse(
+      arguments.contains("60"), "durationSeconds is a timeout, never an argv token")
+  }
+
   func testHilogLoweringAllowsMeasuredBufferDrainAndKeepsTimeoutFailClosed() throws {
     let short = try HDCHilogCaptureRequest(durationSeconds: 5)
     let shortPlan = try provider.lower(
