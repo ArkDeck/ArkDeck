@@ -218,7 +218,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     let receipt = try service.install(
       daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-      arkTraceDescriptor: descriptor)
+      arkTraceDescriptor: descriptor, arkForgeLane: nil)
     let physicalDescriptorPath =
       descriptor.path == "/var" || descriptor.path.hasPrefix("/var/")
       ? "/private" + descriptor.path : descriptor.path
@@ -258,7 +258,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-        arkTraceDescriptor: descriptor)
+        arkTraceDescriptor: descriptor, arkForgeLane: nil)
     ) { error in
       XCTAssertTrue("\(error)".contains("owner-controlled"), "unexpected error: \(error)")
     }
@@ -271,7 +271,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-        arkTraceDescriptor: symbolic)
+        arkTraceDescriptor: symbolic, arkForgeLane: nil)
     ) { error in
       XCTAssertTrue("\(error)".contains("physical regular file"), "unexpected error: \(error)")
     }
@@ -285,7 +285,8 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-        arkTraceDescriptor: symbolicParent.appending(path: "distribution-descriptor.json"))
+        arkTraceDescriptor: symbolicParent.appending(path: "distribution-descriptor.json"),
+        arkForgeLane: nil)
     ) { error in
       XCTAssertTrue(
         "\(error)".contains("symbolic ancestor"), "unexpected error: \(error)")
@@ -298,7 +299,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertThrowsError(
       try service.install(
         daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-        arkTraceDescriptor: descriptor)
+        arkTraceDescriptor: descriptor, arkForgeLane: nil)
     ) { error in
       XCTAssertTrue("\(error)".contains("schema is invalid"), "unexpected error: \(error)")
     }
@@ -306,7 +307,7 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     try makeArkTraceDescriptor(descriptor)
     _ = try service.install(
       daemonBundleSource: daemonBundle, hdcExecutable: hdc,
-      arkTraceDescriptor: descriptor)
+      arkTraceDescriptor: descriptor, arkForgeLane: nil)
     try Data(
       #"{"distributionRoot":"/changed","formatVersion":1,"manifestSHA256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#.utf8
     ).write(to: descriptor, options: .atomic)
