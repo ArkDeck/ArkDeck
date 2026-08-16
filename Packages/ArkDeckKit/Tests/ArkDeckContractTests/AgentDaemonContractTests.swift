@@ -1636,6 +1636,66 @@ final class AgentDaemonContractTests: XCTestCase {
     return Bundle.main.bundleURL
   }
 
+  /// `job.cancel` used to answer every failure with `notFound: unknown job`.
+  /// Cancelling persists a decision, so it can fail long after the job was
+  /// found — and claiming the job does not exist, while its steps may still be
+  /// running, is the worst available answer: the caller cannot tell which gate
+  /// refused and has no reason to retry. `job.reconcile` was corrected for
+  /// exactly this; `job.cancel` was not.
+  func testCancelReportsARefusalRatherThanClaimingTheJobIsMissing() async throws {
+    let (handler, _) = try makeStack()
+    let submitJSON = """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-cancel-map","idempotencyKey":"idem-cancel-map-01",\
+      "target":{"targetId":"TGT-CANCEL-01","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """
+    let submitted = try await request(
+      handler, method: "job.submit", params: ["requestJson": .string(submitJSON)])
+    guard case .object(let submitFields)? = submitted.result,
+      case .string(let jobID)? = submitFields["jobId"]
+    else {
+      return XCTFail("submit must return a job id")
+    }
+
+    // The correct half must not regress: a genuinely absent job is notFound.
+    let absent = try await request(
+      handler, method: "job.cancel", params: ["jobId": .string("JOB-DOES-NOT-EXIST")])
+    XCTAssertFalse(absent.ok)
+    XCTAssertEqual(absent.error?.code, "notFound")
+
+    // The job exists, but its durable record can no longer be written: the
+    // atomic record write needs to create a temporary file in the job's own
+    // directory. This is a real failure of the persistence `requestCancel`
+    // performs, not a stubbed error.
+    let jobDirectory = stateDirectory
+      .appending(path: "engine", directoryHint: .isDirectory)
+      .appending(path: "jobs", directoryHint: .isDirectory)
+      .appending(path: jobID, directoryHint: .isDirectory)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o500], ofItemAtPath: jobDirectory.path)
+    defer {
+      try? FileManager.default.setAttributes(
+        [.posixPermissions: 0o700], ofItemAtPath: jobDirectory.path)
+    }
+
+    let refused = try await request(
+      handler, method: "job.cancel", params: ["jobId": .string(jobID)])
+    XCTAssertFalse(refused.ok)
+    // The property under test is that the job is not reported as missing. The
+    // exact code follows the failure kind, matching `job.reconcile`: an engine
+    // gate refusal is `rejected`, and a persistence failure like this one —
+    // which surfaces as a Foundation file error, not a `RuntimeJobEngineError`
+    // — is `internalError`. Either is actionable; `notFound` is not.
+    XCTAssertNotEqual(
+      refused.error?.code, "notFound",
+      "a cancel that failed after the job was found must not be reported as a missing job")
+    XCTAssertEqual(refused.error?.code, "internalError")
+    XCTAssertTrue(
+      (refused.error?.message ?? "").isEmpty == false,
+      "the refusal must name the failure so the caller can see which gate refused")
+  }
+
   func testJobHistorySurvivesDaemonRestart() async throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)
