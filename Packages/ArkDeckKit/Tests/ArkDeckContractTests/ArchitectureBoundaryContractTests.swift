@@ -129,6 +129,41 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       "the harness plane must not be able to spawn processes")
   }
 
+  /// The exact set of targets that claim strict memory safety.
+  ///
+  /// This setting is a claim that a target's unsafe surface has been read and
+  /// annotated, and it is invisible when it goes missing: dropping it produces
+  /// no diagnostic — that is the whole point of the diagnostic it was emitting.
+  /// The compiler cannot tell anyone the setting used to be there, so the
+  /// manifest is the only place the intent can be pinned.
+  ///
+  /// `ArkDeckProcess` owns every `posix_spawn`, raw file descriptor and PTY
+  /// site in the package, which is why it is on the list. `ArkDeckCore` is
+  /// value types and state machines with no unsafe constructs at all, so its
+  /// entry costs nothing and guards nothing — it stays only because removing a
+  /// safety setting is not this change's call to make.
+  ///
+  /// Adding a target here is not a formality: it will not compile until every
+  /// unsafe expression in that target carries `unsafe`.
+  func testStrictMemorySafetyCoversExactlyTheAuditedTargets() throws {
+    let manifest = try String(
+      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
+    var declaring: Set<String> = []
+    // Each `.target(` block runs to the start of the next one.
+    let blocks = manifest.components(separatedBy: ".target(").dropFirst()
+    for block in blocks {
+      guard let nameRange = block.range(of: #"name: ""#),
+        let closing = block[nameRange.upperBound...].firstIndex(of: "\"")
+      else { continue }
+      let name = String(block[nameRange.upperBound..<closing])
+      if block.contains(".strictMemorySafety()") { declaring.insert(name) }
+    }
+    XCTAssertEqual(
+      declaring, ["ArkDeckCore", "ArkDeckProcess"],
+      "the set of targets declaring .strictMemorySafety() changed; a target that "
+        + "drops it stops being checked with no diagnostic of any kind")
+  }
+
   /// The carved-out target directories must stay excluded from their parent
   /// targets. If an `exclude:` entry disappears, SwiftPM folds the directory
   /// back into the parent target and the parent silently regains the very

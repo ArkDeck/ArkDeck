@@ -46,7 +46,7 @@ public final class VerifiedDirectoryDescriptor: @unchecked Sendable {
     let descriptor = try openPhysicalAbsoluteDirectory(path.path)
     do {
       var metadata = stat()
-      guard fstat(descriptor, &metadata) == 0,
+      guard unsafe fstat(descriptor, &metadata) == 0,
         metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
         metadata.st_uid == geteuid(),
         metadata.st_mode & 0o022 == 0
@@ -62,7 +62,7 @@ public final class VerifiedDirectoryDescriptor: @unchecked Sendable {
   package func revalidate() throws {
     guard descriptor >= 0 else { throw VerifiedRegularFileError.descriptorInvalid }
     var retained = stat()
-    guard fstat(descriptor, &retained) == 0,
+    guard unsafe fstat(descriptor, &retained) == 0,
       retained.st_dev == openedDevice,
       retained.st_ino == openedInode,
       retained.st_uid == openedOwner,
@@ -73,7 +73,7 @@ public final class VerifiedDirectoryDescriptor: @unchecked Sendable {
     let current = try Self.openPhysicalAbsoluteDirectory(authorizedPath)
     defer { Darwin.close(current) }
     var linked = stat()
-    guard fstat(current, &linked) == 0,
+    guard unsafe fstat(current, &linked) == 0,
       linked.st_dev == openedDevice,
       linked.st_ino == openedInode,
       linked.st_uid == openedOwner,
@@ -106,12 +106,12 @@ public final class VerifiedDirectoryDescriptor: @unchecked Sendable {
     guard !components.isEmpty,
       components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
     else { throw VerifiedRegularFileError.invalidPath }
-    var directory = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    var directory = unsafe Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
     guard directory >= 0 else { throw VerifiedRegularFileError.openFailed(errno) }
     do {
       for component in components {
-        let next = component.withCString {
-          Darwin.openat(
+        let next = unsafe component.withCString {
+          unsafe Darwin.openat(
             directory, $0,
             O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
         }
@@ -195,7 +195,7 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
       path.path, flags: O_RDONLY | O_NONBLOCK)
     do {
       var metadata = stat()
-      guard fstat(descriptor, &metadata) == 0,
+      guard unsafe fstat(descriptor, &metadata) == 0,
         metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
         (metadata.st_uid == geteuid() || metadata.st_uid == 0),
         metadata.st_mode & 0o022 == 0,
@@ -212,7 +212,7 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
       let inode = UInt64(metadata.st_ino)
       let inodePath = "/.vol/\(device)/\(inode)"
       var inodeMetadata = stat()
-      guard inodePath.withCString({ lstat($0, &inodeMetadata) }) == 0,
+      guard unsafe inodePath.withCString({ unsafe lstat($0, &inodeMetadata) }) == 0,
         inodeMetadata.st_dev == metadata.st_dev,
         inodeMetadata.st_ino == metadata.st_ino,
         inodeMetadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG)
@@ -235,7 +235,7 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
   package func revalidate() throws {
     guard descriptor >= 0 else { throw VerifiedRegularFileError.descriptorInvalid }
     var metadata = stat()
-    guard fstat(descriptor, &metadata) == 0 else {
+    guard unsafe fstat(descriptor, &metadata) == 0 else {
       throw VerifiedRegularFileError.descriptorInvalid
     }
     guard
@@ -247,13 +247,13 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
       authorizedPath, flags: O_RDONLY | O_NONBLOCK)
     defer { Darwin.close(pathDescriptor) }
     var pathMetadata = stat()
-    guard fstat(pathDescriptor, &pathMetadata) == 0,
+    guard unsafe fstat(pathDescriptor, &pathMetadata) == 0,
       matchesOpenedIdentity(pathMetadata),
       pathMetadata.st_mode & 0o022 == 0,
       (!requireExecutable || pathMetadata.st_mode & 0o111 != 0)
     else { throw VerifiedRegularFileError.identityChanged }
     var inodeMetadata = stat()
-    guard inodePath.withCString({ lstat($0, &inodeMetadata) }) == 0,
+    guard unsafe inodePath.withCString({ unsafe lstat($0, &inodeMetadata) }) == 0,
       inodeMetadata.st_dev == openedDevice,
       inodeMetadata.st_ino == openedInode,
       inodeMetadata.st_uid == openedOwner,
@@ -325,12 +325,12 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
       components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
     else { throw VerifiedRegularFileError.invalidPath }
 
-    var directory = Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    var directory = unsafe Darwin.open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
     guard directory >= 0 else { throw VerifiedRegularFileError.openFailed(errno) }
     do {
       for component in components.dropLast() {
-        let next = component.withCString {
-          Darwin.openat(
+        let next = unsafe component.withCString {
+          unsafe Darwin.openat(
             directory, $0,
             O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
         }
@@ -338,8 +338,8 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
         Darwin.close(directory)
         directory = next
       }
-      let descriptor = components.last!.withCString {
-        Darwin.openat(directory, $0, flags | O_CLOEXEC | O_NOFOLLOW)
+      let descriptor = unsafe components.last!.withCString {
+        unsafe Darwin.openat(directory, $0, flags | O_CLOEXEC | O_NOFOLLOW)
       }
       guard descriptor >= 0 else { throw VerifiedRegularFileError.openFailed(errno) }
       Darwin.close(directory)
@@ -363,8 +363,8 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
     var offset: off_t = 0
     var buffer = [UInt8](repeating: 0, count: min(64 * 1_024, expectedByteCount))
     while offset < off_t(expectedByteCount) {
-      let count = buffer.withUnsafeMutableBytes { bytes in
-        pread(
+      let count = unsafe buffer.withUnsafeMutableBytes { bytes in
+        unsafe pread(
           descriptor, bytes.baseAddress,
           min(bytes.count, expectedByteCount - Int(offset)), offset)
       }
@@ -377,11 +377,11 @@ public final class VerifiedRegularFileDescriptor: @unchecked Sendable {
       offset += off_t(count)
     }
     var extra: UInt8 = 0
-    guard pread(descriptor, &extra, 1, offset) == 0 else {
+    guard unsafe pread(descriptor, &extra, 1, offset) == 0 else {
       throw VerifiedRegularFileError.identityChanged
     }
     var final = stat()
-    guard fstat(descriptor, &final) == 0,
+    guard unsafe fstat(descriptor, &final) == 0,
       final.st_dev == initial.st_dev,
       final.st_ino == initial.st_ino,
       final.st_uid == initial.st_uid,

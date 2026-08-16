@@ -32,7 +32,9 @@ let package = Package(
     .target(
       name: "ArkDeckCore",
       swiftSettings: [.strictMemorySafety()]),
-    .target(name: "ArkDeckProcess", dependencies: ["ArkDeckCore"]),
+    .target(
+      name: "ArkDeckProcess", dependencies: ["ArkDeckCore"],
+      swiftSettings: [.strictMemorySafety()]),
     // The trust boundary to the ArkForge mechanics daemon. It carries bytes
     // and nothing else: it can encode a permit the authority signed and a
     // refusal the authority chose, and has no way to construct either. Kept
