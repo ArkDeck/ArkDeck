@@ -331,6 +331,20 @@ package struct AnalyzerProvider: DeviceProvider {
     traceAnalysis: "trace-analysis@1",
   ]
 
+  /// The analyzers some component of this build can produce a profile for,
+  /// given the host configuration each one needs.
+  ///
+  /// The catalog above declares which analyzer an operation may name; it does
+  /// not promise anything can supply it. `crash-signature@1` arrives when
+  /// `ARKDECK_ANALYZER_PATH` is set, and the two ArkTrace analyzers when the
+  /// distribution descriptor is installed — all three are a host away. Nothing
+  /// in this build produces `hilog-summary@1`, so no configuration reaches it,
+  /// and reporting the two cases identically sent an operator looking for a
+  /// setting that does not exist.
+  package static let hostSuppliableAnalyzers: Set<String> = [
+    "crash-signature@1", "trace-summary@1", "trace-analysis@1",
+  ]
+
   /// The artifact each analyzer publishes. One table, used by both the
   /// descriptors and the engine's step materialization, so a rename cannot
   /// leave the two disagreeing about where the result landed.
@@ -372,6 +386,15 @@ package struct AnalyzerProvider: DeviceProvider {
     guard let profile = profiles[analyzerRef] else {
       // Machine-readable, and nothing is admitted: no capability is spent on
       // an analyzer this host has not been given (PRODUCT-LOOP §8).
+      //
+      // Which of the two "not given" it is matters to whoever reads it. An
+      // analyzer this build can be handed is a setting away; one it cannot is
+      // not, and answering both with `provider_tool_unavailable` sent an
+      // operator looking for a setting that does not exist.
+      guard Self.hostSuppliableAnalyzers.contains(analyzerRef) else {
+        return .unavailable(
+          code: .operationNotSupported, reason: "analyzer.notImplemented")
+      }
       return .unavailable(
         code: .providerToolUnavailable,
         reason: unavailableReasons[analyzerRef] ?? "analyzer.profileUnavailable")

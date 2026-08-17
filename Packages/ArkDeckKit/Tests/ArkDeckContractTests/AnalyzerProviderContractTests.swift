@@ -186,10 +186,7 @@ final class AnalyzerProviderContractTests: XCTestCase {
 
   func testAnUnconfiguredAnalyzerIsUnavailableRatherThanImprovised() throws {
     let bare = AnalyzerProvider()
-    for reference in [
-      AnalyzerProvider.crashSignature, AnalyzerProvider.hilogSummary,
-      AnalyzerProvider.traceSummary,
-    ] {
+    for reference in [AnalyzerProvider.crashSignature, AnalyzerProvider.traceSummary] {
       let operation = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: reference))
       guard case .unavailable(let code, let reason) = bare.runtimeAvailability(for: operation)
       else {
@@ -200,7 +197,40 @@ final class AnalyzerProviderContractTests: XCTestCase {
       // what a caller branches on; the prose is for whoever reads the log.
       XCTAssertEqual(code, .providerToolUnavailable)
       XCTAssertEqual(reason, "analyzer.profileUnavailable")
+      // And it stays the operator's to fix: one is an ARKDECK_ANALYZER_PATH
+      // away, the other an installed ArkTrace descriptor away.
+      XCTAssertEqual(code.origin, .hostConfiguration, reference)
     }
+  }
+
+  /// `hilog-summary@1` is declared by the catalog and produced by nothing.
+  /// It used to answer with the same code as an analyzer that is one setting
+  /// away, which sent an operator looking for a setting that does not exist.
+  func testAnAnalyzerNothingSuppliesIsNotReportedAsUnconfigured() throws {
+    let bare = AnalyzerProvider()
+    let operation = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: AnalyzerProvider.hilogSummary))
+    guard case .unavailable(let code, let reason) = bare.runtimeAvailability(for: operation)
+    else {
+      return XCTFail("summarize-hilog must be unavailable")
+    }
+    XCTAssertEqual(code, .operationNotSupported)
+    XCTAssertEqual(reason, "analyzer.notImplemented")
+    XCTAssertEqual(code.origin, .productBuild)
+  }
+
+  /// Stated over the catalog rather than over today's list, so declaring a new
+  /// analyzer forces a decision about whether anything can supply it instead
+  /// of inheriting either answer by being forgotten.
+  func testEveryDeclaredAnalyzerIsEitherSuppliableOrKnownUnimplemented() {
+    let declared = Set(AnalyzerProvider.analyzerForOperation.values)
+    XCTAssertTrue(
+      AnalyzerProvider.hostSuppliableAnalyzers.isSubset(of: declared),
+      "a suppliable analyzer that no operation names is dead vocabulary")
+    XCTAssertEqual(
+      declared.subtracting(AnalyzerProvider.hostSuppliableAnalyzers), ["hilog-summary@1"],
+      "a newly declared analyzer must be added to hostSuppliableAnalyzers, or listed here "
+        + "as one this build does not implement")
   }
 
   func testAToolThatDriftedFromItsPinIsUnavailable() throws {
