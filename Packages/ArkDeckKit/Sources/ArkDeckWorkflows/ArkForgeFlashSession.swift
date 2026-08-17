@@ -119,53 +119,133 @@ package actor ArkForgeFlashSession {
         planID: planID, planSHA256: planSHA256, executionPurpose: executionPurpose,
         controllerSessionID: controllerSessionID),
       requestID: "start-\(planID)")
+    // The daemon names the job, and every admission it sends will carry that
+    // name. Taken here, from the reply, rather than assumed from ArkDeck's own
+    // job ID — which belongs to a different namespace and matched nothing.
+    await authority.adoptDaemonJob(started.jobID)
 
     var terminal: Outcome?
-    var pendingAdmissions: [ArkForgeStepAdmissionSnapshot] = []
-    var pendingControls: [ArkForgeManagedControlRequest] = []
+    // The journal sequence already answered. `events_from` is exclusive, so
+    // this is the last sequence seen rather than one past it.
+    var cursor: UInt64 = 0
+    var quietPolls = 0
+    /// Steps whose permit this session signed and whose receipt has not arrived
+    /// yet. This is the only reason to keep asking once the daemon goes quiet:
+    /// a signed permit is a write that owes evidence.
+    var awaitingReceipts: Set<String> = []
 
-    try daemon.watchJob(
-      ArkForgeWatchJobRequest(jobID: started.jobID), requestID: "watch-\(started.jobID)"
-    ) { event in
-      switch event.kind {
-      case .stepAdmissionRequested:
-        if let admission = event.admission { pendingAdmissions.append(admission) }
-      case .managedControlRequested:
-        if let request = event.controlRequest { pendingControls.append(request) }
-      case .actionReceipt:
-        if let receipt = event.receipt { self.receipts.append(receipt) }
-      case .outcomeClassified:
-        // The daemon's own classification is authoritative for the job's end.
-        let disposition = event.facts.first { $0.key == "disposition" }?.value ?? ""
-        if disposition == "outcomeUnknown" {
-          terminal = .outcomeUnknown(
-            reason: "the daemon classified this job's outcome as unknown",
-            receipts: self.receipts)
+    // `watchJob` is one poll, not a subscription: `arkforged` replies with the
+    // events queued at that instant and ends the stream. Every event this
+    // session cares about is *caused* by an answer it sends — the permit is
+    // what causes the write, and the write is what causes the receipt — so a
+    // single poll can only ever observe the requests, never the answers to
+    // them. Polling once and answering afterwards therefore ends with the
+    // admission granted and nobody left to collect what it produced, which is
+    // exactly "arkforged published no receipt for flash-partitions". The loop
+    // this type's comment describes has to be a real loop.
+    while terminal == nil {
+      var admissions: [ArkForgeStepAdmissionSnapshot] = []
+      var controls: [ArkForgeManagedControlRequest] = []
+      var sawEvent = false
+
+      try daemon.watchJob(
+        ArkForgeWatchJobRequest(jobID: started.jobID, fromSequence: cursor),
+        requestID: "watch-\(started.jobID)-\(cursor)"
+      ) { event in
+        // The cursor is exclusive, so anything at or below it was answered on an
+        // earlier poll. Guarding here is what keeps a re-poll from counting the
+        // same receipt twice.
+        guard event.sequence > cursor else { return terminal == nil }
+        sawEvent = true
+        cursor = event.sequence
+        switch event.kind {
+        case .stepAdmissionRequested:
+          if let admission = event.admission { admissions.append(admission) }
+        case .managedControlRequested:
+          if let request = event.controlRequest { controls.append(request) }
+        case .actionReceipt:
+          if let receipt = event.receipt {
+            self.receipts.append(receipt)
+            awaitingReceipts.remove(receipt.stepID)
+          }
+        case .outcomeClassified:
+          // The daemon's own classification is authoritative for the job's end.
+          // It keys that fact `outcome`, not `disposition`; reading the wrong
+          // key meant this never saw a terminal answer at all.
+          switch event.facts.first(where: { $0.key == "outcome" })?.value ?? "" {
+          case "outcomeUnknown", "recoveryAssessable":
+            terminal = .outcomeUnknown(
+              reason: "the daemon classified this job's outcome as unknown",
+              receipts: self.receipts)
+          case "cancelledSafe":
+            terminal = .cancelledSafe(receipts: self.receipts)
+          default:
+            terminal = .completed(receipts: self.receipts)
+          }
+        default:
+          break
         }
-      default:
-        break
+        // The handler must not block on device work: the daemon polls this
+        // stream, and a handler waiting on a 15-second rebind would hold it.
+        // Requests are collected and answered between polls.
+        return terminal == nil
       }
-      // The handler must not block on device work: the daemon polls this
-      // stream, and a handler waiting on a 15-second rebind would hold it.
-      // Requests are collected and answered between polls.
-      return terminal == nil
+
+      for admission in admissions {
+        // A signed permit is what makes a receipt due. If one already arrived in
+        // the same poll as the admission, nothing is owed.
+        if try await answer(admission, jobID: started.jobID),
+          !receipts.contains(where: { $0.stepID == admission.stepID })
+        {
+          awaitingReceipts.insert(admission.stepID)
+        }
+      }
+      for control in controls {
+        try await answer(control, jobID: started.jobID)
+      }
+
+      if terminal != nil { break }
+      if sawEvent {
+        quietPolls = 0
+      } else if awaitingReceipts.isEmpty {
+        // Nothing new, nothing to answer, and no permit still owing evidence:
+        // the daemon has said everything it has to say.
+        return .completed(receipts: receipts)
+      } else {
+        // A signed permit is outstanding, so the daemon is mid-write and a
+        // partition write is minutes of exactly this silence. Back off instead
+        // of spinning, and outlast the operation's own timeout rather than
+        // calling a still-running write missing.
+        quietPolls += 1
+        if quietPolls > Self.quietPollLimit {
+          return .outcomeUnknown(
+            reason: "arkforged produced no further events for "
+              + "\(Self.quietPollLimit * Int(Self.pollIntervalMilliseconds) / 1000)s",
+            receipts: receipts)
+        }
+        try await Task.sleep(nanoseconds: Self.pollIntervalMilliseconds * 1_000_000)
+      }
     }
 
-    for admission in pendingAdmissions {
-      try await answer(admission, jobID: started.jobID)
-    }
-    for control in pendingControls {
-      try await answer(control, jobID: started.jobID)
-    }
-
-    if let terminal { return terminal }
-    return .completed(receipts: receipts)
+    return terminal ?? .completed(receipts: receipts)
   }
 
+  /// How long to wait before polling again when the daemon has nothing queued.
+  private static let pollIntervalMilliseconds: UInt64 = 500
+
+  /// How many consecutive quiet polls before the outcome is unknown. The
+  /// catalog gives `flash.dayu200` 1800 seconds, so this outlasts the operation
+  /// instead of deciding a still-running write has gone missing.
+  private static let quietPollLimit = 4200
+
   /// Answers one admission by asking the authority, then relaying its decision.
+  ///
+  /// Returns whether a permit was signed, because that — and only that — is what
+  /// leaves a receipt outstanding.
+  @discardableResult
   private func answer(
     _ admission: ArkForgeStepAdmissionSnapshot, jobID: String
-  ) async throws {
+  ) async throws -> Bool {
     switch await authority.admit(admission) {
     case .sign(let permit):
       _ = try daemon.submitStepPermit(
@@ -173,6 +253,7 @@ package actor ArkForgeFlashSession {
           jobID: jobID, requestID: admission.requestID, permitCBOR: permit.signingBody,
           integrityTag: permit.integrityTag, pairingEpoch: permit.pairingEpoch.value),
         requestID: "permit-\(admission.requestID)")
+      return true
     case .refuse(let why):
       // Reported, not withheld. Silence lets the snapshot expire and admission
       // run again; a refusal goes to `CancelledSafe` (design §3.3).
@@ -181,6 +262,7 @@ package actor ArkForgeFlashSession {
         ArkForgeSubmitStepPermitRequest(
           jobID: jobID, requestID: admission.requestID, refusal: "\(why)"),
         requestID: "refusal-\(admission.requestID)")
+      return false
     }
   }
 

@@ -112,6 +112,23 @@ package actor ArkForgeExecutionAuthority {
   /// permitID → the exact bytes that were signed, so a retransmission replays
   /// rather than re-derives.
   private var issued: [String: ArkForgeSignedPermit] = [:]
+  /// The job identity `arkforged` assigned, adopted once at `startExecution`.
+  ///
+  /// The daemon names the job. ArkDeck's own job ID is a different namespace —
+  /// `job-806a…` against the daemon's `JOB-0000…` — so checking an admission
+  /// against it refused every admission that ever arrived, and a refused
+  /// admission is a write that never happens.
+  ///
+  /// Adopting is not trusting the snapshot. This is taken from the
+  /// `startExecution` reply, before any admission exists, and it can be set
+  /// only once, so no later admission can move the job this authority approved.
+  private var daemonJobID: String?
+
+  /// Records the job identity the daemon assigned. Ignored after the first call.
+  package func adoptDaemonJob(_ jobID: String) {
+    guard daemonJobID == nil, !jobID.isEmpty else { return }
+    daemonJobID = jobID
+  }
 
   package init(
     plan: ApprovedPlan, secret: ArkForgePairingSecret,
@@ -141,8 +158,9 @@ package actor ArkForgeExecutionAuthority {
     guard !snapshot.stepID.isEmpty, !snapshot.attemptID.isEmpty else {
       return .refuse(.missingStepIdentity)
     }
-    guard snapshot.jobID == plan.jobID else {
-      return .refuse(.unknownJob(asked: snapshot.jobID, approved: plan.jobID))
+    let approvedJobID = daemonJobID ?? plan.jobID
+    guard snapshot.jobID == approvedJobID else {
+      return .refuse(.unknownJob(asked: snapshot.jobID, approved: approvedJobID))
     }
     // Compared against what this authority holds, not against the snapshot's
     // own claims. A snapshot cannot vouch for itself.
@@ -170,7 +188,10 @@ package actor ArkForgeExecutionAuthority {
       permitID: permitID,
       authorityNamespace: plan.binding.authorityNamespace,
       controllerSessionID: plan.controllerSessionID,
-      jobID: plan.jobID,
+      // The daemon's name for the job, not ArkDeck's. The permit is verified on
+      // the daemon's side against the job it created, so the id it is bound to
+      // has to be the one the daemon assigned.
+      jobID: approvedJobID,
       planID: plan.planID,
       planDigest: plan.planSHA256,
       stepID: snapshot.stepID,

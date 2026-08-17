@@ -371,13 +371,23 @@ public final class ArkForgeDaemonClient: @unchecked Sendable {
           api: .watchJob, status: response.status, error: try response.errorBody())
       }
       if !response.payload.isEmpty {
-        let event: ArkForgeJobEvent
+        // `arkforged` frames this payload as a *repeated* JobEvent at field 1,
+        // so one frame can carry several events — it writes one nested message
+        // per event it has queued. Decoding the payload as a single bare event
+        // read that wrapper's first nested message as `jobId` and failed on the
+        // first byte of it that is not UTF-8, which is what a length prefix
+        // usually is. The stream is therefore unreadable the moment arkforged
+        // has anything to say, which is every real flash.
         do {
-          event = try ArkForgeJobEvent.decode(response.payload)
+          var reader = ProtobufReader(response.payload)
+          while let field = try reader.next() {
+            guard field.field == 1 else { continue }
+            let event = try ArkForgeJobEvent.decode(Data(try field.value.asBytes()))
+            if try !handle(event) { return }
+          }
         } catch let error as ProtobufWireError {
           throw ArkForgeClientError.wire(error)
         }
-        if try !handle(event) { return }
       }
       if response.streamEnd { return }
     }
