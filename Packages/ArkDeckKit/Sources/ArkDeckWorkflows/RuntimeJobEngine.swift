@@ -6142,14 +6142,32 @@ public actor RuntimeJobEngine {
             continue
           }
         }
-        let renewable =
-          existing.lineageAllowsNewExecution
-          && {
-            if case .revoked = existing.capability.revocation { return false }
-            return existing.remainingUses == 0
-              || existing.capability.expiresAtUTC <= issuedAtUTC
-          }()
-        if renewable {
+        // A spent generation is skipped so the next one is created; a revoked
+        // lineage is not.
+        //
+        // These are different facts and only one of them is a person's answer.
+        // Exhaustion and expiry mean this bounded window closed — the policy's
+        // whole shape is one window per destructive attempt, since
+        // `maximumUses` is 1 whenever the plan digest is pinned. Revocation
+        // means somebody withdrew the lineage, and rolling that forward would
+        // reissue what they withdrew.
+        //
+        // This used to read `lineageAllowsNewExecution && (spent || expired)`,
+        // which could never hold for an exhausted capability: exhausting it is
+        // exactly what clears `lineageAllowsNewExecution`
+        // (`lineageBlocker: maximumUses exhausted`). So the engine returned the
+        // spent capability instead of rolling over, and every destructive
+        // operation after the first was refused with
+        // `capability denied [denial:exhausted]` — measured 2026-08-17, where
+        // it stopped a DAYU200 flash whose first attempt had written nothing.
+        let spent =
+          existing.remainingUses == 0
+          || existing.capability.expiresAtUTC <= issuedAtUTC
+        let revoked: Bool = {
+          if case .revoked = existing.capability.revocation { return true }
+          return false
+        }()
+        if spent && !revoked {
           continue
         }
         return RuntimeCapabilityReference(capabilityID: capabilityID)
