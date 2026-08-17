@@ -4350,6 +4350,51 @@ public actor RuntimeJobEngine {
     guard let provider = providers.provider(id: runtime.record.providerID) else {
       throw RuntimeJobEngineError.internalFailure("provider vanished for \(jobID)")
     }
+    // A cancellation whose executor no longer exists is settled here.
+    //
+    // `requestCancel` on a running job records the intent and leaves the
+    // running `run()` to carry it to a terminal at its next safe boundary.
+    // That works while the executor is alive. It is not: a job recovered from
+    // its journal after a daemon restart has a rebuilt in-memory runtime and
+    // no task advancing it, so the intent is durable and nothing will ever act
+    // on it. The job stays `cancelRequested` forever, and — because the
+    // capability lineage was already consumed before the first mutation — it
+    // holds that generation open, which refuses every later destructive job on
+    // the same policy.
+    //
+    // Measured 2026-08-17 on job-a6e76b6af6f8198cdd7ae788609e104f: its
+    // timeline reads `… wait-loader-reconnect ✓ / recovered: journal clean /
+    // running->cancelRequested`, and repeated `reconcile` calls returned its
+    // status unchanged because `outcomeUnknown` is false and the guard below
+    // returns early.
+    //
+    // Settling needs no device work. `outcomeUnknown == false` is the engine's
+    // own statement that nothing uncertain happened, and reconcile is an
+    // operator asking for exactly this. A job whose outcome *is* unknown falls
+    // through to the reconciliation below and is never closed this way,
+    // because a write of unknown outcome must be reconciled against the
+    // device, not declared cancelled.
+    if !runtime.record.outcomeUnknown,
+      let stuck = JobState(rawValue: runtime.record.state),
+      stuck == .cancelRequested || stuck == .cancellingAtSafeBoundary
+    {
+      if stuck == .cancelRequested {
+        try transition(
+          &runtime, from: .cancelRequested, to: .cancellingAtSafeBoundary,
+          reason: "cancellation executor did not survive; settling on reconcile")
+      }
+      try transition(
+        &runtime, from: .cancellingAtSafeBoundary, to: .cancelled,
+        reason: "no executor remains to carry the durable cancellation intent")
+      runtime.record.operationFailure = RuntimeOperationFailure(
+        code: .cancelled, category: .cancelled,
+        retryability: .notAutomatic, recovery: .none)
+      runtime.record.finishedAtUTC = nowUTC()
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
+      try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
+      return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+    }
     guard runtime.record.outcomeUnknown else {
       try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
       return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
