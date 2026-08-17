@@ -1300,6 +1300,18 @@ final class AgentDaemonContractTests: XCTestCase {
       XCTAssertTrue(
         operation.reasonCodes.allSatisfy(vocabulary.contains),
         "\(reference) answered outside the closed vocabulary: \(operation.reasonCodes)")
+      // The origin travels with every code, over the wire, positionally
+      // paired the same way. An operator branches on this before the code.
+      XCTAssertEqual(
+        operation.reasonOrigins.count, operation.reasonCodes.count,
+        "\(reference) pairs \(operation.reasonCodes.count) codes with "
+          + "\(operation.reasonOrigins.count) origins")
+      XCTAssertEqual(
+        operation.reasonOrigins,
+        operation.reasonCodes.compactMap {
+          RuntimeAvailabilityReasonCode(rawValue: $0)?.origin.rawValue
+        },
+        "\(reference) origins must be the ones its own codes classify to")
       if operation.availability == "unavailable" {
         XCTAssertFalse(
           operation.reasonCodes.isEmpty,
@@ -1595,6 +1607,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let availability: String
     let reasons: [String]
     let reasonCodes: [String]
+    let reasonOrigins: [String]
   }
 
   private func listOperations(socketPath: String) throws -> [String: DaemonOperation] {
@@ -1607,7 +1620,8 @@ final class AgentDaemonContractTests: XCTestCase {
         case .string(let reference)? = fields["reference"],
         case .string(let availability)? = fields["availability"],
         case .array(let reasons)? = fields["reasons"],
-        case .array(let reasonCodes)? = fields["reasonCodes"]
+        case .array(let reasonCodes)? = fields["reasonCodes"],
+        case .array(let reasonOrigins)? = fields["reasonOrigins"]
       else { return }
       table[reference] = DaemonOperation(
         availability: availability,
@@ -1617,6 +1631,10 @@ final class AgentDaemonContractTests: XCTestCase {
         },
         reasonCodes: reasonCodes.compactMap { code in
           guard case .string(let text) = code else { return nil }
+          return text
+        },
+        reasonOrigins: reasonOrigins.compactMap { origin in
+          guard case .string(let text) = origin else { return nil }
           return text
         })
     }
@@ -1812,6 +1830,48 @@ final class AgentDaemonContractTests: XCTestCase {
       handler, method: "job.list-page",
       params: ["cursor": .string("0"), "pageSize": .integer(10)])
     XCTAssertTrue(good.ok, "a valid cursor must still be served")
+  }
+
+  /// An operator reading `operation.list` could not tell "install something
+  /// and this works" from "no installation will ever make this work". Both
+  /// arrive as `unavailable` with a short reason, so both get investigated the
+  /// same way and the second search is wasted. Every code now states which
+  /// side it falls on.
+  func testEveryReasonCodeSaysWhoCanChangeTheAnswer() {
+    // Installing, registering or repinning something on this host reaches all
+    // of these.
+    for code: RuntimeAvailabilityReasonCode in [
+      .providerToolUnavailable, .toolIdentityDrift, .workspacePresetUnavailable,
+      .artifactStoreUnavailable,
+    ] {
+      XCTAssertEqual(code.origin, .hostConfiguration, code.rawValue)
+    }
+    // Nothing local reaches these: the shipped build has no implementation, or
+    // declines to offer one.
+    for code: RuntimeAvailabilityReasonCode in [
+      .providerNotRegistered, .operationNotSupported, .workspacePresetNotOffered,
+    ] {
+      XCTAssertEqual(code.origin, .productBuild, code.rawValue)
+    }
+    // Stated over the whole vocabulary so a new code cannot default into
+    // either side by being forgotten here.
+    XCTAssertEqual(
+      RuntimeAvailabilityReasonCode.allCases.count, 7,
+      "a new reason code must be classified in this test as well as in `origin`")
+  }
+
+  /// The two workspace situations that used to share one code. Registering a
+  /// project or installing the signing preset is an operator's job; a profile
+  /// that ships no symbolizer is not, and no amount of local setup reaches it.
+  func testAWorkspacePresetTheBuildDoesNotOfferIsNotAnOperatorsToInstall() {
+    XCTAssertEqual(
+      RuntimeAvailabilityReasonCode.workspacePresetUnavailable.origin, .hostConfiguration)
+    XCTAssertEqual(
+      RuntimeAvailabilityReasonCode.workspacePresetNotOffered.origin, .productBuild)
+    XCTAssertNotEqual(
+      RuntimeAvailabilityReasonCode.workspacePresetUnavailable,
+      RuntimeAvailabilityReasonCode.workspacePresetNotOffered,
+      "the whole point is that these two are no longer the same answer")
   }
 
   // MARK: damage is not absence

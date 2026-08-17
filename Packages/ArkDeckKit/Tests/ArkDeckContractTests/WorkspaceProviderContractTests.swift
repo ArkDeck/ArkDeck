@@ -666,9 +666,14 @@ final class WorkspaceProviderContractTests: XCTestCase {
       attemptStore: try WorkspacePatchAttemptStore(
         rootURL: state.appending(path: "unavailable-attempts")),
       nowUTC: { "2026-07-31T00:00:00Z" })
+    // A profile without symbol presets is every profile this build ships, so
+    // the answer names the one thing an operator cannot install rather than
+    // the generic "a preset is missing" it used to share with presets that a
+    // different project root or a signing install would supply.
     XCTAssertEqual(
       unavailable.runtimeAvailability(for: symbolDescriptor),
-      .unavailable(code: .workspacePresetUnavailable, reason: "workspace.presetUnavailable"))
+      .unavailable(code: .workspacePresetNotOffered, reason: "workspace.presetNotOffered"))
+    XCTAssertEqual(RuntimeAvailabilityReasonCode.workspacePresetNotOffered.origin, .productBuild)
 
     XCTAssertNoThrow(
       try RuntimeOperationRequest(

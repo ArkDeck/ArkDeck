@@ -119,7 +119,30 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
       // at run time after a capability was already spent (PRODUCT-LOOP §8).
       XCTAssertEqual(code, .workspacePresetUnavailable)
       XCTAssertEqual(reason, "workspace.presetUnavailable")
+      // And it stays the operator's to fix: `sourceControlPreset` exists
+      // exactly when the configured project root is a git working copy, so
+      // pointing `--workspace-project` at one reaches these two.
+      XCTAssertEqual(code.origin, .hostConfiguration, reference)
     }
+  }
+
+  /// The symbolizer is the one preset on this path an operator cannot reach.
+  /// Both profile factories pass `symbolPresets: [:]` because no generic
+  /// symbolizer may be guessed, so it must not be reported the same way as a
+  /// source-control preset that a different project root would supply.
+  func testTheSymbolizerIsReportedAsOneNoBuildOffers() throws {
+    let bare = try makeProfile(withSourceControl: false)
+    let bareProvider = makeProvider(bare)
+    let descriptor = try XCTUnwrap(
+      RuntimeOperationCatalog.descriptor(reference: "workspace.symbolize-crash@1"))
+    guard case .unavailable(let code, let reason) = bareProvider.runtimeAvailability(
+      for: descriptor)
+    else {
+      return XCTFail("symbolize-crash must be unavailable without a symbol preset")
+    }
+    XCTAssertEqual(code, .workspacePresetNotOffered)
+    XCTAssertEqual(reason, "workspace.presetNotOffered")
+    XCTAssertEqual(code.origin, .productBuild)
   }
 
   // MARK: - Semantics: an empty read is an observation
