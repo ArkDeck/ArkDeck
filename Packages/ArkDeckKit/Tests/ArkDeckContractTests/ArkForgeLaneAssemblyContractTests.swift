@@ -19,12 +19,37 @@ import XCTest
 /// what prevents producing it again.
 final class ArkForgeLaneAssemblyContractTests: XCTestCase {
 
-  private let environment = [
-    "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
-    "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
-    "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
-    "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
-  ]
+  /// A real file, because composition reads the profile's declared id out of
+  /// it before launching anything: `materializePlan` addresses a profile by
+  /// that id, and a lane that cannot name one cannot materialize a plan.
+  private var profileURL: URL!
+
+  override func setUpWithError() throws {
+    profileURL = FileManager.default.temporaryDirectory
+      .appending(path: "arkforge-assembly-\(UUID().uuidString).yaml")
+    try Data(
+      """
+      schemaVersion: arkforge.device-profile/v1
+
+      profile:
+        id: org.openharmony.dayu200
+        version: 1.0.0
+      """.utf8
+    ).write(to: profileURL)
+  }
+
+  override func tearDownWithError() throws {
+    if let profileURL { try? FileManager.default.removeItem(at: profileURL) }
+  }
+
+  private var environment: [String: String] {
+    [
+      "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
+      "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
+      "ARKDECK_ARKFORGE_PROFILE_PATH": profileURL.path,
+      "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
+    ]
+  }
 
   private static func readyAck(
     toolchain: String = ArkForgeToolchainPin.signedSHA256

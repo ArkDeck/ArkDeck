@@ -585,6 +585,10 @@ Task.detached {
       at: arkForgeRuntimeDirectory, withIntermediateDirectories: true,
       attributes: [.posixPermissions: 0o700])
     let arkForgeLane: ArkForgeLaneHost?
+    // Both or neither, from one composition. A profile id paired with a lane
+    // it was not composed with is a lane that could materialize against a
+    // profile this daemon never loaded.
+    let arkForgeDeviceProfileID: String?
     switch await ArkForgeLaneComposition.composeFromEnvironment(
       runtimeDirectory: arkForgeRuntimeDirectory,
       rockchipDispatcher: rockchipDispatcher,
@@ -602,17 +606,21 @@ Task.detached {
           controllerSessionID: "arkdeck-agentd")
       }
     ) {
-    case .success(let lane):
-      arkForgeLane = lane
-      FileHandle.standardError.write(Data("arkforge lane: composed\n".utf8))
+    case .success(let composed):
+      arkForgeLane = composed.lane
+      arkForgeDeviceProfileID = composed.deviceProfileID
+      FileHandle.standardError.write(
+        Data("arkforge lane: composed for \(composed.deviceProfileID)\n".utf8))
     case .failure(let absence):
       arkForgeLane = nil
+      arkForgeDeviceProfileID = nil
       FileHandle.standardError.write(Data("\(absence)\n".utf8))
     }
 
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: resolvedStateDirectory, arkForgeLane: arkForgeLane),
+        stateDirectory: resolvedStateDirectory, arkForgeLane: arkForgeLane,
+        arkForgeDeviceProfileID: arkForgeDeviceProfileID),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,

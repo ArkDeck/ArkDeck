@@ -227,6 +227,119 @@ public final class ArkForgeDaemonClient: @unchecked Sendable {
     return try ArkForgeCancelJobResponse.decode(payload)
   }
 
+  // MARK: - Putting a plan in the daemon's store
+
+  /// Streams an archive into the daemon's content-addressed store.
+  ///
+  /// The header states size and digest before a byte moves, so an import that
+  /// cannot succeed is refused rather than half-written. Content follows as
+  /// frames on this same connection, terminated by an empty frame — the shape
+  /// the daemon's `ContentStream` reads.
+  ///
+  /// Read in chunks rather than loaded whole: a DAYU200 daily is ~731 MB, and
+  /// a client that had to hold one in memory to send it would fail first on
+  /// the machine with the least room.
+  ///
+  /// Importing the same bytes twice is not an error. The store is addressed by
+  /// content, so a second import returns the same `artifactID` and says
+  /// `deduplicated`.
+  public func importArtifact(
+    contentsOf url: URL, expectedSHA256: String, requestID: String
+  ) throws -> ArkForgeImportArtifactResponse {
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    let size = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? UInt64) ?? 0
+
+    exchange.lock()
+    defer { exchange.unlock() }
+    try Self.writeFrame(
+      descriptor,
+      ArkForgeRequest(
+        requestID: requestID, api: .importArtifact,
+        payload: ArkForgeImportArtifactRequest(
+          expectedSizeBytes: size, expectedSHA256: expectedSHA256
+        ).encoded
+      ).encoded)
+
+    while true {
+      let chunk = try handle.read(upToCount: Self.importChunkBytes) ?? Data()
+      if chunk.isEmpty { break }
+      try Self.writeFrame(descriptor, chunk)
+    }
+    // The empty frame is the terminator, not a courtesy: without it the daemon
+    // waits for content it was told to expect.
+    try Self.writeFrame(descriptor, Data())
+
+    guard let frame = try Self.readFrame(descriptor, pending: &pending) else {
+      throw ArkForgeClientError.transport("daemon closed while taking the artifact")
+    }
+    let response = try ArkForgeResponse.decode(frame)
+    guard response.status == .ok else {
+      throw ArkForgeClientError.daemonRefused(
+        api: .importArtifact, status: response.status, error: try response.errorBody())
+    }
+    return try ArkForgeImportArtifactResponse.decode(response.payload)
+  }
+
+  /// 4 MiB: a 731 MB archive becomes ~180 frames rather than tens of
+  /// thousands, without holding the archive in memory.
+  static let importChunkBytes = 4 * 1024 * 1024
+
+  /// The bound a materialization connection needs.
+  ///
+  /// Every call in that phase is proportional to the archive rather than to a
+  /// message: `importArtifact` hashes and stores ~731 MB before answering, and
+  /// `inspectArtifact` decompresses and walks the same archive to build a
+  /// manifest. Measured 2026-08-17: both exceed the 30 s default on a DAYU200
+  /// daily, and the second one is why raising it for import alone was not
+  /// enough.
+  ///
+  /// Fifteen minutes is still a bound, and still guards the thing worth
+  /// guarding — a daemon that has stopped answering. It is not a throughput
+  /// estimate, and nothing here should be read as one.
+  public static let materializationTimeoutSeconds = 900
+
+  /// Builds the daemon's manifest for an imported artifact.
+  ///
+  /// Required before `materializePlan`, which refuses with
+  /// `ARTIFACT_NOT_INSPECTED` until it has run: the manifest is what the
+  /// provider validates the profile against.
+  public func inspectArtifact(artifactID: String, requestID: String) throws
+    -> ArkForgeInspectArtifactResponse
+  {
+    var writer = ProtobufWriter()
+    writer.string(1, artifactID)
+    let payload = try callExpectingOK(
+      ArkForgeRequest(requestID: requestID, api: .inspectArtifact, payload: writer.data))
+    return try ArkForgeInspectArtifactResponse.decode(payload)
+  }
+
+  /// Every device the daemon can see through its own transports.
+  ///
+  /// Its USB enumeration is read-only ioreg: it opens no HDC server and takes
+  /// no device, so this observes the same board ArkDeck holds rather than
+  /// competing for it.
+  public func discoverDevices(requestID: String) throws -> [ArkForgeDeviceObservation] {
+    let payload = try callExpectingOK(
+      ArkForgeRequest(requestID: requestID, api: .discoverDevices, payload: Data()))
+    return try ArkForgeDeviceObservation.decodeList(payload)
+  }
+
+  /// Materializes a plan for one artifact, profile and observed device.
+  ///
+  /// The answer is a plan **or** an assessment, and an assessment is not a
+  /// failure: it is the daemon reporting that it built the whole plan and
+  /// declined to make it executable. Both must be handled — treating an
+  /// assessment as an error discards the reasons, which are the only part an
+  /// operator can act on.
+  public func materializePlan(
+    _ body: ArkForgeMaterializePlanRequest, requestID: String
+  ) throws -> ArkForgeMaterializePlanResponse {
+    let payload = try callExpectingOK(
+      ArkForgeRequest(requestID: requestID, api: .materializePlan, payload: body.encoded))
+    return try ArkForgeMaterializePlanResponse.decode(payload)
+  }
+
   /// Streams job events, calling `handle` for each until the stream ends.
   ///
   /// `handle` returns `false` to stop reading early. The daemon polls rather
