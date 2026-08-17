@@ -152,6 +152,66 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       true)
   }
 
+  func testARebindContinuesTheLineageRatherThanRestartingIt() throws {
+    // A rebind that wrote a fresh revision-1 snapshot would publish a binding
+    // the recovery machinery cannot follow: `runtimeTargetLineageAdvance`
+    // returns nil at revision 1, so the adjacent edge from the old identity to
+    // the new one would not exist, and a job that bound the old one could
+    // never be settled against the new. This is what that regression looked
+    // like — it shipped once and had to be corrected.
+    let root = FileManager.default.temporaryDirectory
+      .appending(path: "arkdeck-rebind-\(UUID().uuidString)", directoryHint: .isDirectory)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = RockchipProductBindingStore(rootURL: root)
+
+    let original = RockchipProductUSBIdentity(
+      serial: "board-on-first-port",
+      vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "18874368", productName: "HDC Device")
+    let first = try RockchipProductBindingBootstrap(probe: { original }, store: store)
+      .installCurrentTarget()
+    XCTAssertEqual(first.revision, 1)
+
+    // The same board after a replug: a different port, and a connect identity
+    // that changed with it.
+    let moved = RockchipProductUSBIdentity(
+      serial: "board-on-second-port",
+      vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: "17956864", productName: "HDC Device")
+
+    // Without the flag the drift is still refused — the default is what stops
+    // a flash authorized for one device from landing on another.
+    XCTAssertThrowsError(
+      try RockchipProductBindingBootstrap(probe: { moved }, store: store)
+        .installCurrentTarget())
+
+    let second = try RockchipProductBindingBootstrap(probe: { moved }, store: store)
+      .installCurrentTarget(rebind: true)
+    XCTAssertEqual(second.revision, 2, "a rebind continues the lineage")
+    XCTAssertEqual(second.usbTopology, moved.topology)
+
+    let snapshot = try JSONDecoder().decode(
+      RockchipProductBindingSnapshot.self,
+      from: Data(contentsOf: root.appending(path: RockchipProductBindingStore.bindingFileName)))
+    // The four keys `runtimeTargetLineageAdvance` reads. Asserted by name
+    // because the machinery requires exactly one of each and silently returns
+    // nil otherwise, which is how a missing edge hides.
+    let previousSerialDigest = SHA256Hex.string(of: Data(original.serial.utf8))
+    XCTAssertTrue(
+      snapshot.evidence.contains("identity:previous-serial-sha256=\(previousSerialDigest)"))
+    XCTAssertTrue(snapshot.evidence.contains("binding:previous-revision=1"))
+    XCTAssertTrue(
+      snapshot.evidence.contains("binding:previous-usb-topology=\(original.topology)"))
+    XCTAssertTrue(
+      snapshot.evidence.contains { $0.hasPrefix("rebind:user-selection-sha256=") },
+      "the operator's selection is recorded as what was selected, not as a bare yes")
+    // The serials themselves never reach the document.
+    XCTAssertFalse(snapshot.evidence.contains { $0.contains(original.serial) })
+    XCTAssertFalse(snapshot.evidence.contains { $0.contains(moved.serial) })
+  }
+
   func testTypedE0CrossModeBootstrapPublishesOwnerOnlyBindingAndRejectsDrift() throws {
     let root = FileManager.default.temporaryDirectory
       .appending(path: "arkdeck-binding-\(UUID().uuidString)", directoryHint: .isDirectory)
