@@ -69,6 +69,44 @@ enum RuntimeCLI {
     }
   }
 
+  /// Which call finishes a `--wait`, given what the submit answered.
+  ///
+  /// A deduplicated submit returns an existing job, and that job is usually
+  /// already terminal — the caller is retrying precisely because it could not
+  /// tell whether the first attempt landed. `job.run` resolves against the
+  /// jobs the engine still holds in memory, which no longer include terminal
+  /// ones, so running a finished job answers `jobNotFound`. That reports a
+  /// correct idempotent replay as a rejection, for exactly the case an
+  /// idempotency key exists to make safe, and pushes a retrying caller toward
+  /// submitting under a fresh key — a second real effect for a
+  /// `deviceMutation` operation. Read the durable status for a duplicate and
+  /// keep running a fresh one.
+  ///
+  /// Absent or non-`true` `deduplicated` means fresh: only an explicit
+  /// duplicate may skip the run, so a daemon that stops sending the field
+  /// degrades to today's behaviour instead of silently never running a job.
+  static func waitedSubmitCall(_ submitted: JSONValue) -> (method: String, jobID: String)? {
+    guard case .object(let fields) = submitted,
+      case .string(let jobID)? = fields["jobId"]
+    else { return nil }
+    if case .bool(true)? = fields["deduplicated"] {
+      return ("job.status", jobID)
+    }
+    return ("job.run", jobID)
+  }
+
+  static func completeWaitedSubmit(
+    _ submitted: JSONValue, client: AgentClient, json: Bool
+  ) throws {
+    guard let call = waitedSubmitCall(submitted) else { return }
+    let response = try client.request(
+      method: call.method, params: ["jobId": .string(call.jobID)])
+    emit(response, json: json)
+    if let terminal = terminalJobExit(response) {
+      throw CLIError(exitCode: terminal.code, message: terminal.reason)
+    }
+  }
+
   private static func render(_ value: JSONValue, indent: Int) -> String {
     let pad = String(repeating: "  ", count: indent)
     switch value {
@@ -1831,15 +1869,8 @@ enum RuntimeCLI {
         let submitted = try client.request(
           method: "job.submit", params: ["requestJson": .string(json)])
         emit(submitted, json: json2Bool(rest))
-        if rest.contains("--wait"), case .object(let fields) = submitted,
-          case .string(let jobID)? = fields["jobId"]
-        {
-          let waited = try client.request(
-            method: "job.run", params: ["jobId": .string(jobID)])
-          emit(waited, json: json2Bool(rest))
-          if let terminal = terminalJobExit(waited) {
-            throw CLIError(exitCode: terminal.code, message: terminal.reason)
-          }
+        if rest.contains("--wait") {
+          try completeWaitedSubmit(submitted, client: client, json: json2Bool(rest))
         }
         return
       }
@@ -1901,15 +1932,8 @@ enum RuntimeCLI {
       let submitted = try client.request(
         method: "job.submit", params: ["requestJson": .string(requestJSON)])
       emit(submitted, json: json)
-      if rest.contains("--wait"), case .object(let fields) = submitted,
-        case .string(let jobID)? = fields["jobId"]
-      {
-        let waited = try client.request(
-          method: "job.run", params: ["jobId": .string(jobID)])
-        emit(waited, json: json)
-        if let terminal = terminalJobExit(waited) {
-          throw CLIError(exitCode: terminal.code, message: terminal.reason)
-        }
+      if rest.contains("--wait") {
+        try completeWaitedSubmit(submitted, client: client, json: json)
       }
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported job subcommand")
