@@ -35,6 +35,33 @@ if CommandLine.arguments.dropFirst().first == "--analyze-crash-ledger" {
   }
 }
 
+/// One-shot ArkTS crash symbolization, the same shape as the crash-ledger mode
+/// above: two engine-resolved absolute paths in, one deterministic report out,
+/// and normal daemon startup never entered.
+///
+/// The source map path arrives through the symbol preset's fixed arguments and
+/// the dump path is appended by the operation, which is why the order is
+/// map-then-dump rather than the other way round.
+if CommandLine.arguments.dropFirst().first == "--symbolize-crash" {
+  let values = Array(CommandLine.arguments.dropFirst(2))
+  guard values.count == 2, values.allSatisfy({ $0.hasPrefix("/") }) else {
+    FileHandle.standardError.write(
+      Data("--symbolize-crash requires an absolute source map path and dump path\n".utf8))
+    exit(64)
+  }
+  do {
+    let map = try Data(contentsOf: URL(filePath: values[0]))
+    let dump = try Data(contentsOf: URL(filePath: values[1]))
+    let text = String(decoding: dump, as: UTF8.self)
+    FileHandle.standardOutput.write(
+      Data(try JSCrashSymbolizer.symbolize(sourceMapData: map, dumpText: text).utf8))
+    exit(0)
+  } catch {
+    FileHandle.standardError.write(Data("crash symbolization failed: \(error)\n".utf8))
+    exit(1)
+  }
+}
+
 func utcNow() -> String {
   ISO8601Timestamps.string(from: Date())
 }
@@ -434,7 +461,8 @@ Task.detached {
           }
           profile = try WorkspaceProjectProfile.waterFlowDemo(
             rootURL: URL(filePath: activeRoot, directoryHint: .isDirectory),
-            projectRef: activeProjectRef, nodePath: node, hvigorScriptPath: hvigor)
+            projectRef: activeProjectRef, nodePath: node, hvigorScriptPath: hvigor,
+            symbolizerPath: ProcessInfo.processInfo.environment["ARKDECK_ANALYZER_PATH"])
           // Hvigor rejects a missing or stale inherited DEVECO_SDK_HOME with
           // configuration error 00303217. Pin the validated profile SDK on
           // this child route instead of depending on the daemon launcher.

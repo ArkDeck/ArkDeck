@@ -279,7 +279,8 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     rootURL: URL,
     projectRef: String = "demo-app",
     nodePath: String,
-    hvigorScriptPath: String
+    hvigorScriptPath: String,
+    symbolizerPath: String? = nil
   ) throws -> WorkspaceProjectProfile {
     let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
     let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
@@ -354,6 +355,27 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       presetID: "waterflow-tests", executable: node,
       fixedArguments: [canonicalScript, "test"] + commonHvigorArguments,
       timeoutSeconds: 1_800)
+    // ArkTS stacks are obfuscated in a release build: the frame names a
+    // compiled unit and a position that no one can open. `sourceMaps.map` is
+    // written beside the HAP by the same build, so the resolution is a lookup
+    // rather than a guess, and the symbolizer is the pinned daemon in its
+    // one-shot mode — the same shape `crash-signature@1` already uses.
+    //
+    // The map path is the one under `outputs`, which is produced with the HAP
+    // itself rather than an intermediate that a later task may rewrite.
+    var symbols: [String: WorkspaceCommandPreset] = [:]
+    if let symbolizerPath {
+      let symbolizer = try WorkspaceExecutableIdentity.hashing(path: symbolizerPath)
+      let preset = try WorkspaceCommandPreset(
+        presetID: "arkts-sourcemap", executable: symbolizer,
+        fixedArguments: [
+          "--symbolize-crash",
+          URL(filePath: root, directoryHint: .isDirectory)
+            .appending(path: "entry/build/default/outputs/default/mapping/sourceMaps.map").path,
+        ],
+        timeoutSeconds: 300)
+      symbols[preset.presetID] = preset
+    }
     return try WorkspaceProjectProfile(
       profileID: "waterflow-openharmony@1", projectRef: projectRef,
       projectRoot: root,
@@ -367,7 +389,7 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
       patchPreset: patching,
       buildPresets: [build.presetID: build],
       testPresets: [tests.presetID: tests],
-      symbolPresets: [:],
+      symbolPresets: symbols,
       buildProducts: [
         build.presetID: "entry/build/default/outputs/default/entry-default-unsigned.hap"
       ])
