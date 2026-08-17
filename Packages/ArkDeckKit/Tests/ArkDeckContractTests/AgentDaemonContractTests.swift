@@ -1788,6 +1788,59 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(afterFields["state"], .string("succeeded"))
   }
 
+  // MARK: damage is not absence
+
+  /// `notFound` is the one reply a caller cannot act on except by concluding
+  /// the thing was never produced. For an Artifact that conclusion is
+  /// expensive: the recovery is to re-run the operation that produced it,
+  /// which for a device operation is a repeated real effect — in response to
+  /// what may be a local disk problem. So only a genuinely missing Artifact
+  /// may be `notFound`.
+  func testOnlyAMissingArtifactIsReportedAsAbsent() {
+    XCTAssertEqual(
+      RuntimeControlPlaneHandler.artifactErrorCode(.artifactNotFound("ART-1")), .notFound)
+
+    // A damaged store is unreadable, not empty.
+    XCTAssertEqual(
+      RuntimeControlPlaneHandler.artifactErrorCode(.indexCorrupted("bad json")),
+      .recordUnreadable)
+    XCTAssertEqual(
+      RuntimeControlPlaneHandler.artifactErrorCode(.ioFailure("EIO")), .internalError)
+
+    // Gates that refused a request about an Artifact that exists.
+    for refusal: RuntimeArtifactError in [
+      .sensitiveAccessRequiresOptIn("trace"), .exportDestinationRejected("/etc"),
+      .quotaExceeded(requestedBytes: 2, remainingBytes: 1),
+      .evidenceVerificationFailed("digest"),
+    ] {
+      XCTAssertEqual(
+        RuntimeControlPlaneHandler.artifactErrorCode(refusal), .rejected, "\(refusal)")
+    }
+    XCTAssertEqual(
+      RuntimeControlPlaneHandler.artifactErrorCode(.artifactConflict("ART-1")), .conflict)
+  }
+
+  /// The same rule for a debug invocation. `load` throws
+  /// `persistenceFailure("invalid invocation document")` for a document it
+  /// cannot decode, and reporting that as a missing invocation hides the
+  /// damage behind a routine-looking answer.
+  func testOnlyAMissingInvocationIsReportedAsAbsent() {
+    XCTAssertEqual(
+      RuntimeControlPlaneHandler.debugInvocationErrorCode(.invocationNotFound("INV-1")),
+      .notFound)
+    XCTAssertEqual(
+      RuntimeControlPlaneHandler.debugInvocationErrorCode(.persistenceFailure("invalid")),
+      .recordUnreadable)
+    for refusal: RuntimeDebugInvocationError in [
+      .invalidSeedRequest("x"), .invalidCandidate("x"), .invalidProvenance("x"),
+      .invocationNotActive("expired"), .invocationExpired, .epochBudgetExhausted,
+      .evaluationAlreadyRunning, .predecessorBlocksContinuation("INV-0"),
+    ] {
+      XCTAssertEqual(
+        RuntimeControlPlaneHandler.debugInvocationErrorCode(refusal), .rejected, "\(refusal)")
+    }
+  }
+
   func testJobHistorySurvivesDaemonRestart() async throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)
