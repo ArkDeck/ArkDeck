@@ -607,6 +607,17 @@ public final class RuntimeTargetStore: @unchecked Sendable {
         toolVersion: previous.toolVersion,
         adoptedAtUTC: previous.adoptedAtUTC)
       document.targets[index] = current
+      // An alias resolution names a relation between two device identities,
+      // not between two revisions of one binding. `load` re-validates every
+      // resolution against the target records, so advancing the target without
+      // carrying its resolutions forward persists a document this same store
+      // can no longer read — silently, because `persist` does not check what
+      // `load` checks. That turned one rebind into an unusable target store.
+      document.aliasResolutions = try Self.carryAliasResolutionsForward(
+        document.aliasResolutions,
+        canonicalTargetID: current.targetID,
+        canonicalStableIdentitySHA256: advance.currentStableIdentitySHA256,
+        canonicalBindingRevision: advance.currentRevision)
       try persist(document)
       return (current, true)
     }
@@ -737,6 +748,85 @@ public final class RuntimeTargetStore: @unchecked Sendable {
       confirmedStepIDs: resolution.confirmedStepIDs,
       coveredUnknownIntents: resolution.coveredUnknownIntents,
       establishedAtUTC: resolution.establishedAtUTC)
+  }
+
+  /// Re-publishes the alias resolutions whose canonical target just advanced.
+  ///
+  /// Only the canonical identity and revision move. The alias side, the
+  /// establishing Flash proof and the covered intents are history and are
+  /// carried verbatim — that is what keeps this a lineage advance rather than
+  /// a fresh claim about the device. `resolutionID` is derived from the two
+  /// target IDs and the establishing Job, so it survives unchanged; the hash
+  /// chain does not, so the whole list is re-chained in order.
+  private static func carryAliasResolutionsForward(
+    _ resolutions: [RuntimeTargetAliasResolution]?,
+    canonicalTargetID: String,
+    canonicalStableIdentitySHA256: String,
+    canonicalBindingRevision: Int
+  ) throws -> [RuntimeTargetAliasResolution]? {
+    guard let resolutions,
+      resolutions.contains(where: { $0.canonicalTargetID == canonicalTargetID })
+    else { return resolutions }
+    var rebuilt: [RuntimeTargetAliasResolution] = []
+    var chain: String?
+    for resolution in resolutions {
+      let existing = draft(from: resolution)
+      let updated: RuntimeTargetAliasResolutionDraft
+      if resolution.canonicalTargetID == canonicalTargetID {
+        updated = RuntimeTargetAliasResolutionDraft(
+          aliasTargetID: existing.aliasTargetID,
+          aliasStableIdentitySHA256: existing.aliasStableIdentitySHA256,
+          aliasBindingRevision: existing.aliasBindingRevision,
+          canonicalTargetID: existing.canonicalTargetID,
+          canonicalStableIdentitySHA256: canonicalStableIdentitySHA256,
+          canonicalBindingRevision: canonicalBindingRevision,
+          routedHDCIdentitySHA256: existing.routedHDCIdentitySHA256,
+          routedUSBTopology: existing.routedUSBTopology,
+          establishingFlashJobID: existing.establishingFlashJobID,
+          establishingFlashPlanDigestSHA256: existing.establishingFlashPlanDigestSHA256,
+          confirmedStepIDs: existing.confirmedStepIDs,
+          coveredUnknownIntents: existing.coveredUnknownIntents,
+          establishedAtUTC: existing.establishedAtUTC)
+      } else {
+        updated = existing
+      }
+      let material = RuntimeTargetAliasResolutionMaterial(
+        resolutionID: resolutionID(for: updated),
+        aliasTargetID: updated.aliasTargetID,
+        aliasStableIdentitySHA256: updated.aliasStableIdentitySHA256,
+        aliasBindingRevision: updated.aliasBindingRevision,
+        canonicalTargetID: updated.canonicalTargetID,
+        canonicalStableIdentitySHA256: updated.canonicalStableIdentitySHA256,
+        canonicalBindingRevision: updated.canonicalBindingRevision,
+        routedHDCIdentitySHA256: updated.routedHDCIdentitySHA256,
+        routedUSBTopology: updated.routedUSBTopology,
+        establishingFlashJobID: updated.establishingFlashJobID,
+        establishingFlashPlanDigestSHA256: updated.establishingFlashPlanDigestSHA256,
+        confirmedStepIDs: updated.confirmedStepIDs,
+        coveredUnknownIntents: updated.coveredUnknownIntents,
+        establishedAtUTC: updated.establishedAtUTC,
+        previousResolutionSHA256: chain)
+      let next = RuntimeTargetAliasResolution(
+        resolutionID: material.resolutionID,
+        aliasTargetID: material.aliasTargetID,
+        aliasStableIdentitySHA256: material.aliasStableIdentitySHA256,
+        aliasBindingRevision: material.aliasBindingRevision,
+        canonicalTargetID: material.canonicalTargetID,
+        canonicalStableIdentitySHA256: material.canonicalStableIdentitySHA256,
+        canonicalBindingRevision: material.canonicalBindingRevision,
+        routedHDCIdentitySHA256: material.routedHDCIdentitySHA256,
+        routedUSBTopology: material.routedUSBTopology,
+        establishingFlashJobID: material.establishingFlashJobID,
+        establishingFlashPlanDigestSHA256: material.establishingFlashPlanDigestSHA256,
+        confirmedStepIDs: material.confirmedStepIDs,
+        coveredUnknownIntents: material.coveredUnknownIntents,
+        establishedAtUTC: material.establishedAtUTC,
+        previousResolutionSHA256: material.previousResolutionSHA256,
+        resolutionSHA256: try digest(material))
+      rebuilt.append(next)
+      chain = next.resolutionSHA256
+    }
+    return rebuilt
   }
 
   private static func digest(_ material: RuntimeTargetAliasResolutionMaterial) throws -> String {

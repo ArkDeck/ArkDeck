@@ -321,10 +321,20 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
   /// consume this result, so malformed or partial lineage cannot be rendered
   /// as a warning while still authorizing `enter-loader`.
   package func coversRuntimeTarget(_ target: RuntimeTargetRecord) throws -> Bool {
-    _ = try runtimeTargetLineageAdvance()
+    let advance = try runtimeTargetLineageAdvance()
     let currentIdentity = SHA256Hex.string(of: Data(serial.utf8))
+    // The revision the target is expected to sit at.
+    //
+    // `revision` is this document's own version. A first cross-mode bind
+    // deliberately diverges the two numberings — the binding advances from the
+    // document it replaced, the target from its own — and records the target
+    // edge under `binding:target-current-revision=` precisely because one
+    // field cannot carry both. Comparing this document's version against the
+    // target's therefore refuses the very target the bind had just advanced
+    // correctly, which left a rebuilt binding unable to cover its own board.
+    let expectedTargetRevision = advance?.currentRevision ?? revision
     guard target.stablePhysicalIdentitySHA256 == currentIdentity,
-      target.bindingRevision == revision
+      target.bindingRevision == expectedTargetRevision
     else { return false }
     if let reactivation = try reactivationEvidence(),
       reactivation.targetID != target.targetID
