@@ -78,4 +78,53 @@ final class RuntimeCLIExitStatusContractTests: XCTestCase {
     XCTAssertNil(RuntimeCLI.terminalJobExit(.string("not a status")))
     XCTAssertNil(RuntimeCLI.terminalJobExit(.object(["cancelRequested": .bool(true)])))
   }
+
+  // MARK: --wait after submit
+
+  private func submitted(jobID: String = "JOB-1", deduplicated: JSONValue?) -> JSONValue {
+    var fields: [String: JSONValue] = ["jobId": .string(jobID)]
+    if let deduplicated { fields["deduplicated"] = deduplicated }
+    return .object(fields)
+  }
+
+  /// The whole point of an idempotency key is that a caller may retry a submit
+  /// without causing a second effect. A duplicate is answered from the durable
+  /// record, because `job.run` resolves against the jobs the engine still
+  /// holds in memory and a replayed key almost always names a job that already
+  /// finished — asking it to run one answers `jobNotFound`, which reads as a
+  /// rejection and invites the caller to retry under a fresh key. For a
+  /// `deviceMutation` operation that fresh key is a second real mutation.
+  func testADeduplicatedSubmitIsAnsweredFromTheDurableRecord() {
+    guard let call = RuntimeCLI.waitedSubmitCall(submitted(deduplicated: .bool(true))) else {
+      return XCTFail("a deduplicated submit still names a job to report on")
+    }
+    XCTAssertEqual(call.method, "job.status")
+    XCTAssertEqual(call.jobID, "JOB-1")
+  }
+
+  func testAFreshSubmitIsStillRun() {
+    guard let call = RuntimeCLI.waitedSubmitCall(submitted(deduplicated: .bool(false))) else {
+      return XCTFail("a fresh submit must be run")
+    }
+    XCTAssertEqual(call.method, "job.run")
+  }
+
+  /// Only an explicit duplicate may skip the run. A daemon that stops sending
+  /// the field, or sends it as something other than `true`, must degrade to
+  /// running the job rather than silently never running one.
+  func testAnythingButAnExplicitDuplicateIsRun() {
+    for value: JSONValue? in [nil, .string("true"), .number(1)] {
+      XCTAssertEqual(
+        RuntimeCLI.waitedSubmitCall(submitted(deduplicated: value))?.method,
+        "job.run",
+        "deduplicated=\(String(describing: value)) is not an explicit duplicate")
+    }
+  }
+
+  /// A submit that named no job leaves nothing to wait on, and must not be
+  /// turned into a call with an empty or invented job id.
+  func testASubmitWithoutAJobIdHasNothingToWaitOn() {
+    XCTAssertNil(RuntimeCLI.waitedSubmitCall(.object(["deduplicated": .bool(true)])))
+    XCTAssertNil(RuntimeCLI.waitedSubmitCall(.string("not a submit")))
+  }
 }
