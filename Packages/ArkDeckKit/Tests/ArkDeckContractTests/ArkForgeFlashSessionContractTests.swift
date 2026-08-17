@@ -477,6 +477,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
+      makeMaterializer: { _ in ScriptedPlanSource.executable() },
       makeAuthority: { _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -491,12 +492,12 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
     let binding = ArkForgeLaneDeviceBinding(
       connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
-      targetID: "TGT-1", bindingRevision: 2, usbTopology: "0x14200000")
+      targetID: "TGT-1", bindingRevision: 2, usbTopology: ScriptedPlanSource.topology)
     let first = try await host.perform(
-      stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+      stepID: "flash-partitions", jobID: "JOB-1", artifact: scriptedArtifact(),
       binding: binding)
     let second = try await host.perform(
-      stepID: "verify-flash-readback", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+      stepID: "verify-flash-readback", jobID: "JOB-1", artifact: scriptedArtifact(),
       binding: binding)
 
     XCTAssertEqual(first.stepID, "flash-partitions")
@@ -505,13 +506,22 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
   }
 
-  func testAStepWithNoReceiptIsReportedRatherThanInvented() async throws {
-    // A manufactured receipt would make an unperformed step look confirmed.
-    let daemon = CountingDaemon(counter: StartCounter(), events: [])
+  func testAnAssessmentNeverBecomesAWrite() async throws {
+    // The gate that keeps AD-025 honest from this side. When the daemon
+    // answers `materializePlan` with an assessment, the combination is not one
+    // anybody published as executable — and a lane that treated that as a
+    // retryable transport failure, or that fell back to some other plan
+    // identity, would put a write on an unmeasured combination.
+    //
+    // `startExecution` must not be reached at all, which is why the daemon
+    // here counts starts: "it refused eventually" is not the same claim as
+    // "no job was ever started".
+    let counter = StartCounter()
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
       makePerformer: { _, _ in SilentPerformer() },
-      makeClient: { _ in daemon },
+      makeClient: { _ in CountingDaemon(counter: counter, events: []) },
+      makeMaterializer: { _ in ScriptedPlanSource.gated() },
       makeAuthority: { _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
@@ -526,10 +536,89 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
 
     do {
       _ = try await host.perform(
-        stepID: "flash-partitions", jobID: "JOB-1", planID: "PLAN-1", planSHA256: "d",
+        stepID: "flash-partitions", jobID: "JOB-1", artifact: scriptedArtifact(),
         binding: ArkForgeLaneDeviceBinding(
           connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
-          targetID: "TGT-1", bindingRevision: 2, usbTopology: "0x14200000"))
+          targetID: "TGT-1", bindingRevision: 2, usbTopology: ScriptedPlanSource.topology))
+      XCTFail("an assessment must not produce a receipt")
+    } catch let error as ArkForgeLaneHost.LaneError {
+      guard case .planNotExecutable(let availability, _, let unknowns) = error else {
+        return XCTFail("expected planNotExecutable, got \(error)")
+      }
+      XCTAssertEqual(availability, "unavailable")
+      XCTAssertEqual(
+        unknowns["RK-M02"],
+        "provider/profile/artifact/toolchain/platform combination is hardwareGated",
+        "the blocker is the actionable part and must survive to the operator")
+    }
+    XCTAssertEqual(counter.value, 0, "no ArkForge job may be started without an executable plan")
+  }
+
+  func testADeviceTheDaemonCannotSeeStopsTheJobBeforeItStarts() async throws {
+    // The other half of the same guarantee. If selection cannot find the bound
+    // board among the daemon's observations, materializing against some other
+    // observation would build a plan for a device nobody chose — so this
+    // refuses instead, and refuses before `startExecution`.
+    let counter = StartCounter()
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      makePerformer: { _, _ in SilentPerformer() },
+      makeClient: { _ in CountingDaemon(counter: counter, events: []) },
+      makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAuthority: { _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "JOB-1", artifact: scriptedArtifact(),
+        // A different port from the one the scripted daemon observes.
+        binding: ArkForgeLaneDeviceBinding(
+          connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+          targetID: "TGT-1", bindingRevision: 2, usbTopology: "18874369"))
+      XCTFail("a device the daemon cannot see must not be materialized against")
+    } catch let error as ArkForgeLaneHost.LaneError {
+      guard case .deviceNotObserved = error else {
+        return XCTFail("expected deviceNotObserved, got \(error)")
+      }
+    }
+    XCTAssertEqual(counter.value, 0)
+  }
+
+  func testAStepWithNoReceiptIsReportedRatherThanInvented() async throws {
+    // A manufactured receipt would make an unperformed step look confirmed.
+    let daemon = CountingDaemon(counter: StartCounter(), events: [])
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      makePerformer: { _, _ in SilentPerformer() },
+      makeClient: { _ in daemon },
+      makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAuthority: { _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "JOB-1", artifact: scriptedArtifact(),
+        binding: ArkForgeLaneDeviceBinding(
+          connectKey: "device-1", stableIdentitySHA256: String(repeating: "a", count: 64),
+          targetID: "TGT-1", bindingRevision: 2, usbTopology: ScriptedPlanSource.topology))
       XCTFail("a step with no receipt must not be reported as performed")
     } catch {
       XCTAssertEqual(
@@ -603,6 +692,77 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       -> ArkForgeManagedControlPort.Observation
     { .init(accepted: true, facts: [:], evidenceSHA256: []) }
   }
+}
+
+/// A daemon that already holds the artifact and can see one device.
+///
+/// The observation carries the digest `ArkForgeObservationSelection` computes
+/// for `Self.topology`, so selection resolves it the way it resolves a real
+/// board. A double that matched regardless would test nothing about the join,
+/// which is the part of this lane that decides *which* device gets written.
+struct ScriptedPlanSource: ArkForgePlanSource {
+  static let topology = "18874368"
+  let answer: ArkForgeMaterializePlanResponse
+
+  func importArtifact(contentsOf url: URL, expectedSHA256: String, requestID: String) throws
+    -> ArkForgeImportArtifactResponse
+  {
+    ArkForgeImportArtifactResponse(
+      artifactID: expectedSHA256, contentSHA256: expectedSHA256, sizeBytes: 1,
+      deduplicated: false)
+  }
+
+  func inspectArtifact(artifactID: String, requestID: String) throws
+    -> ArkForgeInspectArtifactResponse
+  {
+    ArkForgeInspectArtifactResponse(
+      formatID: "rockchip.dayu200", contentSHA256: artifactID, sizeBytes: 1,
+      manifestSHA256: String(repeating: "b", count: 64), buildFacts: [:])
+  }
+
+  func discoverDevices(requestID: String) throws -> [ArkForgeDeviceObservation] {
+    [
+      ArkForgeDeviceObservation(
+        observationID: "USB-2207-5000-01200000", observedAtEpochMS: 0, mode: "hdc-normal",
+        topologyDigest: ArkForgeObservationSelection.topologyDigest(usbTopology: Self.topology)!,
+        descriptorDigest: String(repeating: "c", count: 64),
+        identityStrength: "serialAndTopology", malformedDescriptor: false,
+        protocolIdentity: [:])
+    ]
+  }
+
+  func materializePlan(_ body: ArkForgeMaterializePlanRequest, requestID: String) throws
+    -> ArkForgeMaterializePlanResponse
+  { answer }
+
+  static func executable(planID: String = "PLAN-1") -> ScriptedPlanSource {
+    ScriptedPlanSource(
+      answer: .plan(
+        ArkForgeExecutablePlan(
+          planID: planID, planSHA256: String(repeating: "d", count: 64),
+          providerExecutionPlanSHA256: "", publicProjectionSHA256: "",
+          expiresAtEpochMS: .max)))
+  }
+
+  /// The shape a `hardwareGated` combination produces.
+  static func gated() -> ScriptedPlanSource {
+    ScriptedPlanSource(
+      answer: .assessment(
+        ArkForgePlanAssessment(
+          availability: "unavailable",
+          unavailableReason:
+            "materialization is complete but execution is gated; maturity is hardwareGated",
+          unknowns: [
+            "RK-M02": "provider/profile/artifact/toolchain/platform combination is hardwareGated"
+          ])))
+  }
+}
+
+/// The artifact a lane test writes, with the topology the scripted source sees.
+func scriptedArtifact() -> ArkForgeLaneArtifact {
+  ArkForgeLaneArtifact(
+    fileURL: URL(filePath: "/tmp/dayu200_img.tar.gz"),
+    sha256: String(repeating: "e", count: 64), profileID: "org.openharmony.dayu200")
 }
 
 /// Composing the lane from what an operator installed.

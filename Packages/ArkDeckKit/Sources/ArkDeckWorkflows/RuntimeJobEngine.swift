@@ -684,8 +684,21 @@ public actor RuntimeJobEngine {
     /// Throwing here is a dispatch failure like any other. What must never
     /// happen is returning a receipt the daemon did not publish — the receipt
     /// is the evidence, and inventing one would make a write look confirmed.
+    ///
+    /// # Why no plan identity is passed
+    ///
+    /// It used to take `planID` and `planSHA256` from the job record — facts
+    /// about the plan **ArkDeck** materialized through its own Rockchip lane.
+    /// `arkforged` resolves plans from its **own** content store, so those
+    /// named nothing it had and every delegated step would have died at
+    /// `PLAN_NOT_STARTABLE` (AD-026, measured 2026-08-17 against a live
+    /// daemon).
+    ///
+    /// The lane now materializes through the daemon and uses the identity the
+    /// daemon returns. What it needs for that is the *inputs* — the artifact
+    /// and the device — rather than a conclusion this side reached alone.
     func perform(
-      stepID: String, jobID: String, planID: String, planSHA256: String,
+      stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
       binding: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary
   }
@@ -724,6 +737,14 @@ public actor RuntimeJobEngine {
     /// Absent in every build that has not composed one. A delegated step then
     /// refuses by name instead of failing somewhere less legible.
     package let arkForgeLane: (any ArkForgeLane)?
+    /// The id `arkforged` filed its DeviceProfile under.
+    ///
+    /// `materializePlan` looks a profile up by the id the document declares,
+    /// so this travels with the lane rather than being derived from a path:
+    /// the daemon was given a file, and only the daemon knows what id came out
+    /// of it. Composed together with the lane, and empty exactly when the lane
+    /// is absent.
+    package let arkForgeDeviceProfileID: String?
 
     public init(
       stateDirectory: URL,
@@ -735,6 +756,7 @@ public actor RuntimeJobEngine {
       self.admissionFaultInjector = admissionFaultInjector
       self.testHooks = .none
       self.arkForgeLane = nil
+      self.arkForgeDeviceProfileID = nil
     }
 
     package init(
@@ -742,13 +764,15 @@ public actor RuntimeJobEngine {
       defaultReadOnlyPolicy: RuntimeDefaultReadOnlyPolicy = RuntimeDefaultReadOnlyPolicy(),
       admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
       testHooks: TestHooks = .none,
-      arkForgeLane: (any ArkForgeLane)? = nil
+      arkForgeLane: (any ArkForgeLane)? = nil,
+      arkForgeDeviceProfileID: String? = nil
     ) {
       self.stateDirectory = stateDirectory
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
       self.admissionFaultInjector = admissionFaultInjector
       self.testHooks = testHooks
       self.arkForgeLane = arkForgeLane
+      self.arkForgeDeviceProfileID = arkForgeDeviceProfileID
     }
   }
 
@@ -2573,10 +2597,24 @@ public actor RuntimeJobEngine {
       throw RuntimeJobEngineError.internalFailure(
         "\(step.stepID) reached the ArkForge lane without a descriptor-bound device")
     }
+    // The artifact this engine already resolved and measured. Passed rather
+    // than re-resolved for the same reason as the binding: two resolutions
+    // could disagree about which image is under the write.
+    guard let resolved = context.resolvedInputArtifact else {
+      throw RuntimeJobEngineError.internalFailure(
+        "\(step.stepID) reached the ArkForge lane with no resolved input artifact; arkforged "
+          + "materializes the plan from the archive, so there is nothing to materialize from")
+    }
+    guard let profileID = configuration.arkForgeDeviceProfileID, !profileID.isEmpty else {
+      throw RuntimeJobEngineError.rejected(
+        .invalidInput,
+        "\(step.stepID) needs the DeviceProfile id arkforged loaded, and this build composed a "
+          + "lane without one; nothing was dispatched and the device was not touched")
+    }
     let receipt = try await lane.perform(
       stepID: step.stepID, jobID: jobID,
-      planID: "\(runtime.record.request.operation)",
-      planSHA256: runtime.record.materializedPlanDigest ?? "",
+      artifact: ArkForgeLaneArtifact(
+        fileURL: resolved.fileURL, sha256: resolved.sha256, profileID: profileID),
       binding: ArkForgeLaneDeviceBinding(
         connectKey: connectKey, stableIdentitySHA256: identity,
         targetID: runtime.record.request.target.targetID,

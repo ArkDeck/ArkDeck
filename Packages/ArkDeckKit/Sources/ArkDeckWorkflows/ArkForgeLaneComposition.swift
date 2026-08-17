@@ -78,6 +78,47 @@ package enum ArkForgeLaneComposition {
     }
   }
 
+  /// The id a DeviceProfile document declares.
+  ///
+  /// Read from the same file the daemon was handed, rather than configured
+  /// separately: `materializePlan` looks a profile up by the id the document
+  /// declares, and an operator-supplied id could name a profile the daemon
+  /// never loaded. Same file, same field, no room to disagree.
+  ///
+  /// The shape is `arkforge.device-profile/v1`:
+  ///
+  /// ```yaml
+  /// profile:
+  ///   id: org.openharmony.dayu200
+  /// ```
+  ///
+  /// A targeted read rather than a YAML parser, because this needs exactly one
+  /// scalar and a parser would be a dependency and a surface. `nil` when the
+  /// document does not have that shape, which the caller turns into a refusal
+  /// rather than a guess.
+  package static func deviceProfileID(inDocument source: String) -> String? {
+    var insideProfile = false
+    for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+      let text = String(line)
+      if text.hasPrefix("#") { continue }
+      if text == "profile:" {
+        insideProfile = true
+        continue
+      }
+      // Any other column-zero key ends the block; `id` under a different
+      // top-level key is a different id.
+      if insideProfile, let first = text.first, first != " ", first != "\t", !text.isEmpty {
+        insideProfile = false
+      }
+      guard insideProfile else { continue }
+      let trimmed = text.trimmingCharacters(in: .whitespaces)
+      guard trimmed.hasPrefix("id:") else { continue }
+      let value = trimmed.dropFirst("id:".count).trimmingCharacters(in: .whitespaces)
+      return value.isEmpty ? nil : value
+    }
+    return nil
+  }
+
   /// The argv the daemon is started with.
   ///
   /// The vendor tool's digest is this repository's pin rather than anything the
@@ -110,6 +151,22 @@ package enum ArkForgeLaneComposition {
     var bytes = [UInt8](repeating: 0, count: 32)
     for index in bytes.indices { bytes[index] = UInt8.random(in: .min ... .max) }
     return Data(bytes)
+  }
+
+  /// A composed lane and the profile id it materializes against.
+  ///
+  /// Two things rather than one because the engine needs both and they must
+  /// come from the same composition: a lane paired with a profile id read from
+  /// some other configuration is a lane that could materialize against a
+  /// profile the daemon never loaded.
+  package struct Composed: Sendable {
+    package let deviceProfileID: String
+    package let lane: ArkForgeLaneHost
+
+    package init(deviceProfileID: String, lane: ArkForgeLaneHost) {
+      self.deviceProfileID = deviceProfileID
+      self.lane = lane
+    }
   }
 
   /// Everything a composed lane needs that this module cannot reach for
@@ -147,11 +204,26 @@ package enum ArkForgeLaneComposition {
     launch: @Sendable (ProcessIdentityBoundRequest, Data) async throws -> Void,
     connect: @Sendable (String) throws -> (any ArkForgeFlashSession.Daemon, ArkForgeHelloAck),
     awaitSocket: @Sendable (URL) async -> String?
-  ) async -> Result<ArkForgeLaneHost, Absence> {
+  ) async -> Result<Composed, Absence> {
     let inputs: Inputs
     switch Inputs.read(environment) {
     case .success(let read): inputs = read
     case .failure(let absence): return .failure(absence)
+    }
+
+    // Read before the daemon is started, so a profile this side cannot make
+    // sense of is a refusal rather than a daemon left running for a lane that
+    // could never materialize anything.
+    guard let source = try? String(contentsOfFile: inputs.deviceProfilePath, encoding: .utf8)
+    else {
+      return .failure(
+        .daemonUnavailable("cannot read the DeviceProfile at \(inputs.deviceProfilePath)"))
+    }
+    guard let profileID = deviceProfileID(inDocument: source) else {
+      return .failure(
+        .daemonUnavailable(
+          "the DeviceProfile at \(inputs.deviceProfilePath) declares no profile.id; "
+            + "materializePlan addresses a profile by that id, and this lane will not guess one"))
     }
 
     let secret = freshPairingSecret()
@@ -194,7 +266,9 @@ package enum ArkForgeLaneComposition {
     let host = dependencies.rockchipHost
     let executable = dependencies.rockchipExecutable
     return .success(
-      ArkForgeLaneHost(
+      Composed(
+        deviceProfileID: profileID,
+        lane: ArkForgeLaneHost(
         connection: .init(socketPath: socket, controllerSessionID: "arkdeck-agentd"),
         makePerformer: { binding, jobID in
           ArkForgeControlPerformer(
@@ -214,12 +288,20 @@ package enum ArkForgeLaneComposition {
             host: host())
         },
         makeClient: { _ in daemon },
+        // A second connection, deliberately. Materialization streams ~731 MB
+        // and the controller session is the one the job's event stream runs
+        // on; sharing it would hold that stream for the length of an import.
+        makeMaterializer: { socket in
+          try ArkForgeDaemonClient(
+            socketPath: socket,
+            timeoutSeconds: ArkForgeDaemonClient.materializationTimeoutSeconds)
+        },
         makeAuthority: { jobID, planID in
           ArkForgeExecutionAuthority(
             plan: dependencies.approvedPlan(jobID, planID),
             secret: ArkForgePairingSecret(
               secret: Array(secret), epoch: ArkForgePairingEpoch(pairingEpoch)))
-        }))
+        })))
   }
 
   /// What `main.swift` calls: composes the lane from the process environment,
@@ -237,7 +319,7 @@ package enum ArkForgeLaneComposition {
       -> ArkForgeExecutionAuthority.ApprovedPlan,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     pairingEpoch: UInt64 = UInt64(Date().timeIntervalSince1970)
-  ) async -> Result<ArkForgeLaneHost, Absence> {
+  ) async -> Result<Composed, Absence> {
     let host = rockchipDispatcher.actionHost
     return await compose(
       environment: environment, runtimeDirectory: runtimeDirectory,

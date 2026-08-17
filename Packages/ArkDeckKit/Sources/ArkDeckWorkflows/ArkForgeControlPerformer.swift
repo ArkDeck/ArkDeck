@@ -2,6 +2,29 @@ import ArkDeckCore
 import ArkForgeIPC
 import Foundation
 
+/// The archive a delegated step writes, carried from the engine to the lane.
+///
+/// The engine already resolved and measured this — it is
+/// `ProviderExecutionContext.resolvedInputArtifact`, the same bytes ArkDeck's
+/// own provider would have written — so the lane is handed it rather than
+/// resolving it again. Two resolutions could disagree about which image is
+/// under the write, which is not a disagreement worth having.
+///
+/// `profileID` is the daemon's key for the DeviceProfile, not a path: the
+/// daemon loaded its profiles at startup and `materializePlan` looks one up by
+/// the id it declared.
+package struct ArkForgeLaneArtifact: Sendable, Equatable {
+  package let fileURL: URL
+  package let sha256: String
+  package let profileID: String
+
+  package init(fileURL: URL, sha256: String, profileID: String) {
+    self.fileURL = fileURL
+    self.sha256 = sha256
+    self.profileID = profileID
+  }
+}
+
 /// The device a delegated step was admitted against, carried from the engine
 /// to the lane.
 ///
