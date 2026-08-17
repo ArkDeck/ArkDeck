@@ -630,7 +630,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
           result: try await Self.encodeCodable(
             debugInvocationController.status(invocationID: invocationID)))
       } catch let error as RuntimeDebugInvocationError {
-        return failure(id: request.id, code: .notFound, message: "\(error)")
+        return failure(
+          id: request.id, code: Self.debugInvocationErrorCode(error), message: "\(error)")
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
@@ -1516,8 +1517,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       do {
         let metadata = try await artifactStore.inspect(jobID: jobID, artifactID: artifactID)
         return success(id: request.id, result: Self.encodeArtifact(metadata))
+      } catch let error as RuntimeArtifactError {
+        return failure(id: request.id, code: Self.artifactErrorCode(error), message: "\(error)")
       } catch {
-        return failure(id: request.id, code: .notFound, message: "\(error)")
+        return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
     case "artifact.read":
@@ -1571,7 +1574,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
             id: request.id, code: .rejected,
             message: "artifact is sensitive; pass allowSensitive to read it")
         }
-        return failure(id: request.id, code: .notFound, message: "\(error)")
+        return failure(id: request.id, code: Self.artifactErrorCode(error), message: "\(error)")
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
@@ -1770,6 +1773,50 @@ public struct RuntimeControlPlaneHandler: Sendable {
     default:
       return failure(
         id: request.id, code: .unknownMethod, message: "unknown method \(request.method)")
+    }
+  }
+
+  /// Which reply an Artifact-store failure deserves.
+  ///
+  /// Only a genuinely missing Artifact is `notFound`. A corrupt index or a
+  /// failed read is the store saying it cannot answer, and reporting that as
+  /// absence tells the caller the Artifact was never produced. For a caller
+  /// whose recovery is to re-run the operation that produced it, that turns a
+  /// local disk problem into a repeated device effect — and for the evidence
+  /// chain, which resolves every Artifact by lease, it turns damaged storage
+  /// into "this evidence never existed". `job.cancel` and `job.reconcile`
+  /// already carry the same correction.
+  static func artifactErrorCode(_ error: RuntimeArtifactError) -> AgentDaemonErrorCode {
+    switch error {
+    case .artifactNotFound:
+      return .notFound
+    case .indexCorrupted:
+      return .recordUnreadable
+    case .sensitiveAccessRequiresOptIn, .exportDestinationRejected, .quotaExceeded,
+      .evidenceVerificationFailed:
+      return .rejected
+    case .artifactConflict:
+      return .conflict
+    case .ioFailure:
+      return .internalError
+    }
+  }
+
+  /// The same rule for a debug invocation. Only a missing invocation is
+  /// absent; an unreadable document is damaged state, and every other case is
+  /// a gate that refused a request about an invocation that exists.
+  static func debugInvocationErrorCode(
+    _ error: RuntimeDebugInvocationError
+  ) -> AgentDaemonErrorCode {
+    switch error {
+    case .invocationNotFound:
+      return .notFound
+    case .persistenceFailure:
+      return .recordUnreadable
+    case .invalidSeedRequest, .invalidCandidate, .invalidProvenance, .invocationNotActive,
+      .invocationExpired, .epochBudgetExhausted, .evaluationAlreadyRunning,
+      .predecessorBlocksContinuation:
+      return .rejected
     }
   }
 
