@@ -16,6 +16,26 @@ import Darwin
 import Foundation
 
 enum RuntimeCLI {
+
+  /// Every option `agentd install` and `agentd update` accept.
+  ///
+  /// One list, exposed, because the failure it prevents already happened: the
+  /// five ArkForge lane flags were read by the command and absent from this
+  /// set, so `validateAllowed` rejected them before the reader ever ran and
+  /// the lane could not be installed at all. `--arkforge-profile` was answered
+  /// with "unsupported option" by a build whose next twenty lines were about
+  /// to parse it.
+  ///
+  /// `AgentdOptionCoverageContractTests` holds this to the flags the command
+  /// actually reads, so the two cannot drift apart again.
+  static let agentdInstallOptions: Set<String> = [
+    "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
+    "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
+    "--harness-cli", "--harness-cli-timeout-seconds", "--arktrace-descriptor",
+    "--arkforged", "--arkforged-sha256", "--arkforge-profile", "--rkdeveloptool",
+    "--arkforge-campaign",
+  ]
+
   static func defaultSocketPath() -> String {
     ArkDeckAgentFilesystemLayout.defaultSocketURL().path
   }
@@ -154,11 +174,7 @@ enum RuntimeCLI {
     switch subcommand {
     case "install", "update":
       let options = try CLIOptions(rest)
-      try options.validateAllowed([
-        "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
-        "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
-        "--harness-cli", "--harness-cli-timeout-seconds", "--arktrace-descriptor",
-      ])
+      try options.validateAllowed(Self.agentdInstallOptions)
       let previousStatus = subcommand == "update" ? try? service.status() : nil
       let daemonBundlePath = options.value("--daemon") ?? defaultAgentDaemonBundlePath()
       let configuredHDC: String?
