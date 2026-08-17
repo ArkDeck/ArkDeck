@@ -1788,6 +1788,32 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(afterFields["state"], .string("succeeded"))
   }
 
+  /// `job.list-page` answered every unexpected failure with `invalidParams`.
+  /// That was right for one case and wrong for the rest: a malformed cursor is
+  /// the caller's mistake, but a daemon that cannot read its own history is
+  /// not, and telling that caller to fix its parameters sends it to correct a
+  /// request that was already correct. The cursor is now checked with the
+  /// other parameters, so it stays the caller's error by name rather than by
+  /// arriving as a storage failure.
+  func testAMalformedCursorIsTheCallersErrorAndSaysSo() async throws {
+    let (handler, _) = try makeStack()
+    for bad in ["abc", "-1", "", "12x", "9999999999999999999999"] {
+      let response = try await request(
+        handler, method: "job.list-page",
+        params: ["cursor": .string(bad), "pageSize": .integer(10)])
+      XCTAssertFalse(response.ok, "cursor \(bad) must not be accepted")
+      XCTAssertEqual(
+        response.error?.code, "invalidParams",
+        "a bad cursor is the request's fault, not the store's: \(bad)")
+    }
+
+    // A well-formed cursor still reaches the store and is answered normally.
+    let good = try await request(
+      handler, method: "job.list-page",
+      params: ["cursor": .string("0"), "pageSize": .integer(10)])
+    XCTAssertTrue(good.ok, "a valid cursor must still be served")
+  }
+
   // MARK: damage is not absence
 
   /// `notFound` is the one reply a caller cannot act on except by concluding
