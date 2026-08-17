@@ -3507,7 +3507,30 @@ public actor RuntimeJobEngine {
   // MARK: Cancel / status / recovery
 
   public func requestCancel(jobID: String) throws {
-    guard var runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    guard var runtime = jobs[jobID] else {
+      // Absent from memory is not absent. A job whose outcome is known and
+      // terminal is released from `jobs` and served from SQLite from then on,
+      // so reading residency as existence makes the answer depend on how long
+      // ago the job finished. Cancelling a terminal job is already a silent
+      // no-op while it is still resident; answering `notFound` for the same
+      // job once released contradicts `job.status` on the same daemon and
+      // tells the caller its effects never happened. `reconcile` and `status`
+      // both read through to the record, and now so does this. A job that is
+      // genuinely absent still raises `jobNotFound`, from `recordForRead`.
+      let record = try recordForRead(jobID: jobID)
+      guard JobState(rawValue: record.state)?.isTerminal == true, !record.outcomeUnknown
+      else {
+        // Exactly the condition the two eviction sites require, so anything
+        // else means a live job went missing from memory while restart
+        // recovery is supposed to reload every active one. Nothing would
+        // carry out a cancellation for it, so say so instead of returning a
+        // success the caller cannot rely on.
+        throw RuntimeJobEngineError.internalFailure(
+          "job \(jobID) is \(record.state) but is not resident, so its cancellation "
+            + "cannot be carried out")
+      }
+      return
+    }
 
     guard let currentState = JobState(rawValue: runtime.record.state),
       !currentState.isTerminal,
