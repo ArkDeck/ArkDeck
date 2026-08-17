@@ -1735,6 +1735,59 @@ final class AgentDaemonContractTests: XCTestCase {
       "the refusal must name the failure so the caller can see which gate refused")
   }
 
+  /// The other half of the same property. A job whose outcome is known and
+  /// terminal is released from the engine's in-memory table and served from
+  /// SQLite afterwards, so `requestCancel` reading residency as existence made
+  /// the answer depend on how long ago the job finished: cancelling it was a
+  /// silent no-op while still resident, then `notFound: unknown job` once
+  /// released. Two RPCs on one daemon then disagreed about whether the job
+  /// existed, and the caller was told its effects never happened.
+  func testCancellingAFinishedJobDoesNotClaimItNeverExisted() async throws {
+    let (handler, _) = try makeStack()
+    let submitJSON = """
+      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      "requestId":"req-cancel-terminal","idempotencyKey":"idem-cancel-terminal-01",\
+      "target":{"targetId":"TGT-CANCEL-02","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """
+    let submitted = try await request(
+      handler, method: "job.submit", params: ["requestJson": .string(submitJSON)])
+    guard case .object(let submitFields)? = submitted.result,
+      case .string(let jobID)? = submitFields["jobId"]
+    else {
+      return XCTFail("submit must return a job id")
+    }
+    let ran = try await request(handler, method: "job.run", params: ["jobId": .string(jobID)])
+    guard case .object(let runFields)? = ran.result,
+      case .string("succeeded")? = runFields["state"]
+    else {
+      return XCTFail("the job must reach a terminal state before it can be released")
+    }
+
+    // Reading the status is what releases a known-outcome terminal runtime,
+    // and the released state is the one this test is about. `jobs` is private,
+    // so the release is not asserted directly; the coverage evidence is that
+    // this test fails with `notFound` against the engine before the fix.
+    _ = try await request(handler, method: "job.status", params: ["jobId": .string(jobID)])
+
+    let cancelled = try await request(
+      handler, method: "job.cancel", params: ["jobId": .string(jobID)])
+    XCTAssertTrue(
+      cancelled.ok,
+      "cancelling a finished job is a no-op, and must stay one after it leaves memory")
+    XCTAssertNotEqual(
+      cancelled.error?.code, "notFound",
+      "the job is still in SQLite; reporting it as missing contradicts job.status")
+
+    // And the record still agrees it succeeded: the no-op cancel rewrote
+    // nothing.
+    let after = try await request(handler, method: "job.status", params: ["jobId": .string(jobID)])
+    guard case .object(let afterFields)? = after.result else {
+      return XCTFail("status must still answer after the no-op cancel")
+    }
+    XCTAssertEqual(afterFields["state"], .string("succeeded"))
+  }
+
   func testJobHistorySurvivesDaemonRestart() async throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)
