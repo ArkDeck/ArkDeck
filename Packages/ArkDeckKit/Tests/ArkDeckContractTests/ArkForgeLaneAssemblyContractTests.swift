@@ -65,9 +65,10 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
       rockchipHost: { RefusingRockchipRuntimeActionHost(reason: "test") },
       rockchipExecutable: ResolvedExecutable(
         path: "/opt/rkdeveloptool", sha256: String(repeating: "c", count: 64)),
-      approvedPlan: { jobID, planID in
+      approvedPlan: { jobID, planID, planDigest, _ in
         .init(
-          jobID: jobID, planID: planID, planSHA256: [], admittedDeviceFactsSHA256: [],
+          jobID: jobID, planID: planID, planSHA256: planDigest,
+          admittedDeviceFactsSHA256: planDigest,
           binding: ArkForgeAuthorityBinding(
             authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
             stableIdentityDigest: []),

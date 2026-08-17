@@ -111,7 +111,13 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// before a job exists. Widening `Daemon` would have made every scripted
   /// test daemon implement calls it never receives.
   private let makeMaterializer: @Sendable (String) throws -> any ArkForgePlanSource
-  private let makeAuthority: @Sendable (String, String) -> ArkForgeExecutionAuthority
+  /// Built from the plan that was actually materialized, not from the job alone.
+  ///
+  /// The authority signs against the plan digest and the device it approved, and
+  /// neither is knowable until `materializePlan` has answered — which is why
+  /// these arrive here rather than at composition time.
+  private let makeAuthority:
+    @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding) -> ArkForgeExecutionAuthority
   /// Built per call from the binding the engine passes, because a performer
   /// without a device is a performer that cannot say *whose* disconnect it saw.
   private let makePerformer:
@@ -125,13 +131,36 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       -> any ArkForgeFlashSession.ControlPerformer,
     makeClient: @escaping @Sendable (String) throws -> any ArkForgeFlashSession.Daemon,
     makeMaterializer: @escaping @Sendable (String) throws -> any ArkForgePlanSource,
-    makeAuthority: @escaping @Sendable (String, String) -> ArkForgeExecutionAuthority
+    makeAuthority: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
+      -> ArkForgeExecutionAuthority
   ) {
     self.connection = connection
     self.makePerformer = makePerformer
     self.makeClient = makeClient
     self.makeMaterializer = makeMaterializer
     self.makeAuthority = makeAuthority
+  }
+
+  /// Decodes a 64-character lowercase hex digest into its 32 raw bytes.
+  ///
+  /// Returns nil rather than a partial value: a digest that is not exactly 32
+  /// bytes is not a digest, and padding or truncating one would produce a permit
+  /// bound to something no daemon will recognise.
+  package static func digestBytes(_ hex: String) -> [UInt8]? {
+    guard hex.count == 64 else { return nil }
+    var out: [UInt8] = []
+    out.reserveCapacity(32)
+    var high: UInt8?
+    for character in hex {
+      guard let nibble = character.hexDigitValue, nibble >= 0, nibble <= 15 else { return nil }
+      if let first = high {
+        out.append(first << 4 | UInt8(nibble))
+        high = nil
+      } else {
+        high = UInt8(nibble)
+      }
+    }
+    return high == nil ? out : nil
   }
 
   /// Runs the ArkForge job on first use for this ArkDeck job, then serves each
@@ -147,8 +176,16 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     // one that materializes the plan and runs the ArkForge job.
     let client = try makeClient(connection.socketPath)
     let plan = try await materialize(artifact: artifact, binding: binding, jobID: jobID)
+    // `arkforged` states the plan digest as hex here and sends it as raw bytes in
+    // every admission, so it is decoded once, at the boundary between the two.
+    guard let planDigest = Self.digestBytes(plan.planSHA256) else {
+      throw LaneError.planNotExecutable(
+        availability: "unusable",
+        reason: "arkforged returned a plan digest that is not 32 hex-encoded bytes",
+        unknowns: ["planSHA256": plan.planSHA256])
+    }
     let session = ArkForgeFlashSession(
-      daemon: client, authority: makeAuthority(jobID, plan.planID),
+      daemon: client, authority: makeAuthority(jobID, plan.planID, planDigest, binding),
       performer: makePerformer(binding, jobID),
       controllerSessionID: connection.controllerSessionID)
 

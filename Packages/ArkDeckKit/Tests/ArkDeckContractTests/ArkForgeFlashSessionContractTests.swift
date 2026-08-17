@@ -478,7 +478,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
-      makeAuthority: { _, _ in
+      makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
             jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
@@ -522,7 +522,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in ScriptedPlanSource.gated() },
-      makeAuthority: { _, _ in
+      makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
             jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
@@ -565,7 +565,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
-      makeAuthority: { _, _ in
+      makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
             jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
@@ -601,7 +601,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
-      makeAuthority: { _, _ in
+      makeAuthority: { _, _, _, _ in
         ArkForgeExecutionAuthority(
           plan: .init(
             jobID: "JOB-1", planID: "PLAN-1", planSHA256: [], admittedDeviceFactsSHA256: [],
