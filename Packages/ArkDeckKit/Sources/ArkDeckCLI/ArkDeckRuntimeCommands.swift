@@ -320,7 +320,12 @@ enum RuntimeCLI {
             daemonPath: laneFlags["--arkforged"]!!,
             declaredDaemonSHA256: laneFlags["--arkforged-sha256"]!!,
             deviceProfilePath: laneFlags["--arkforge-profile"]!!,
-            vendorToolPath: laneFlags["--rkdeveloptool"]!!)
+            vendorToolPath: laneFlags["--rkdeveloptool"]!!,
+            // Optional and separate: the four above install a lane, this
+            // authorizes it to execute a combination nobody has verified yet.
+            // Omitted means hardwareGated, which is what every ordinary
+            // install wants.
+            campaign: options.value("--arkforge-campaign") ?? "")
         } catch let refusal as LaunchAgentArkForgeLaneStatus.Refusal {
           // Measured at install time on purpose: one of these executables
           // performs destructive writes, and a mistyped path should be found
