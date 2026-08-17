@@ -751,7 +751,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id, code: .recordUnreadable,
           message: "Runtime job record \(jobID) is unreadable")
       } catch {
-        return failure(id: request.id, code: .invalidParams, message: "\(error)")
+        // This used to be `invalidParams`, which was doing two jobs: it
+        // correctly named a malformed cursor as the caller's mistake, and it
+        // also told a caller whose request was fine that its parameters were
+        // wrong when the daemon had failed to read its own history — sending
+        // it to correct a correct request and retry forever. The cursor is now
+        // validated with the other parameters above, so the only thing that
+        // reaches here is unexpected, and `job.list` already ends this way.
+        return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
     case "job.status":
@@ -1903,6 +1910,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
     if let supplied = params?["cursor"] {
       guard acceptsCursor, case .string(let value) = supplied else {
         throw JobListOptionsError(description: "cursor must be a string")
+      }
+      // A cursor is opaque to the caller but not arbitrary: the repository
+      // requires a non-negative integer and rejects anything else as corrupt.
+      // Checking the same rule here keeps a bad cursor a typed request error,
+      // which is what it is, instead of letting it arrive as a storage
+      // failure that is indistinguishable from the store actually breaking.
+      guard let parsed = Int64(value), parsed >= 0 else {
+        throw JobListOptionsError(description: "cursor must be a non-negative integer")
       }
       cursor = value
     } else {
