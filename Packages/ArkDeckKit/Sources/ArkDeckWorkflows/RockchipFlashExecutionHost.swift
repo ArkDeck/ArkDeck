@@ -70,7 +70,9 @@ package enum RockchipDeviceBindingInstallation {
   /// the transition remains inside the later authorized `enterUpdater` intent.
   /// This entry point never launches rkdeveloptool and has no device-mutation surface.
   @discardableResult
-  package static func installCurrentTarget() throws -> RockchipDeviceBindingInstallationReceipt {
+  package static func installCurrentTarget(
+    rebind: Bool = false
+  ) throws -> RockchipDeviceBindingInstallationReceipt {
     let manager = FileManager.default
     let applicationSupport = try manager.url(
       for: .applicationSupportDirectory, in: .userDomainMask,
@@ -79,7 +81,7 @@ package enum RockchipDeviceBindingInstallation {
     return try RockchipProductBindingBootstrap(
       probe: { try RockchipProductUSBProbe().singleDAYU200() },
       store: RockchipProductBindingStore(rootURL: root)
-    ).installCurrentTarget()
+    ).installCurrentTarget(rebind: rebind)
   }
 }
 
@@ -453,7 +455,12 @@ package struct RockchipProductBindingStore: Sendable {
     return try load(rootDescriptor: rootDescriptor)
   }
 
-  func install(_ candidate: RockchipProductBindingSnapshot)
+  /// Writes the binding, refusing a silent change of board or port.
+  ///
+  /// `rebind` is the operator's explicit answer to a mismatch. Without it a
+  /// differing candidate is refused; with it the new binding replaces the old
+  /// one and records what it replaced.
+  func install(_ candidate: RockchipProductBindingSnapshot, rebind: Bool = false)
     throws -> (snapshot: RockchipProductBindingSnapshot, created: Bool)
   {
     try validate(candidate)
@@ -475,13 +482,28 @@ package struct RockchipProductBindingStore: Sendable {
     defer { _ = flock(lockDescriptor, LOCK_UN) }
 
     if let existing = try load(rootDescriptor: rootDescriptor) {
-      guard existing.serial == candidate.serial,
-        existing.usbTopology == candidate.usbTopology
-      else {
+      if existing.serial == candidate.serial, existing.usbTopology == candidate.usbTopology {
+        return (existing, false)
+      }
+      // The binding names one board on one port, and both halves change for
+      // ordinary reasons — a bench board moves to another USB port, or a
+      // different board is put on the bench. Neither may be adopted silently:
+      // this binding is what every destructive admission matches against, so
+      // drifting it without a person saying so would let a flash authorized
+      // for one device land on another.
+      //
+      // So the mismatch still refuses by default, and `rebind` is the person
+      // saying so. It was refusing with "explicit rebind is required" while
+      // offering no way to express one, which left a replugged board
+      // permanently unflashable: `singleDAYU200` matches on
+      // `identity.topology == selector`, so every admission — the flash, and
+      // even reconcile's read-only readback — answered "DAYU200 target
+      // unavailable" (measured 2026-08-17, binding held 18874368 while the
+      // board enumerated at 17956864).
+      guard rebind else {
         throw configurationError(
           "durable binding differs from the only connected Loader; explicit rebind is required")
       }
-      return (existing, false)
     }
 
     let encoder = JSONEncoder()
@@ -514,10 +536,14 @@ package struct RockchipProductBindingStore: Sendable {
         throw configurationError("binding temporary file cannot be closed")
       }
       temporaryOpen = false
+      // `RENAME_EXCL` is what makes a first install unable to clobber a
+      // binding that already exists. A rebind is the one case that must
+      // replace one, and it only reaches here when the operator asked — the
+      // guard above still refuses a silent change.
       guard
         renameatx_np(
           rootDescriptor, temporaryName, rootDescriptor, Self.bindingFileName,
-          UInt32(RENAME_EXCL)) == 0
+          rebind ? 0 : UInt32(RENAME_EXCL)) == 0
       else { throw configurationError("binding publication cannot be committed") }
       guard Darwin.fsync(rootDescriptor) == 0 else {
         throw configurationError("binding directory cannot be synchronized")
@@ -798,7 +824,9 @@ struct RockchipProductBindingBootstrap: Sendable {
   let probe: @Sendable () throws -> RockchipProductUSBIdentity
   let store: RockchipProductBindingStore
 
-  func installCurrentTarget() throws -> RockchipDeviceBindingInstallationReceipt {
+  func installCurrentTarget(
+    rebind: Bool = false
+  ) throws -> RockchipDeviceBindingInstallationReceipt {
     let identity = try probe()
     guard identity.isRegisteredDAYU200Mode,
       !identity.serial.isEmpty,
@@ -818,7 +846,7 @@ struct RockchipProductBindingBootstrap: Sendable {
         "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
         "identity:serial-sha256=\(serialDigest)",
       ])
-    let result = try store.install(candidate)
+    let result = try store.install(candidate, rebind: rebind)
     let storedDigest = SHA256Hex.string(of: Data(result.snapshot.serial.utf8))
     return RockchipDeviceBindingInstallationReceipt(
       revision: result.snapshot.revision,

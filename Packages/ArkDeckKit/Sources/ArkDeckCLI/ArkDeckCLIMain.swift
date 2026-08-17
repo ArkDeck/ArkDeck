@@ -232,9 +232,19 @@ struct ArkDeckCommandLine {
   }
 
   static func runInstallBinding(_ arguments: [String]) throws {
-    let options = try CLIOptions(arguments)
+    // A bench board that moved to another USB port, or a different board on
+    // the bench, changes the binding this product matches every destructive
+    // admission against. Refusing by default is right; refusing with no way to
+    // say "yes, rebind" left a replugged board permanently unflashable.
+    //
+    // Stripped before parsing because it carries no value, the same shape as
+    // `--json`.
+    var rest = arguments
+    let rebind = rest.contains("--rebind")
+    rest.removeAll { $0 == "--rebind" }
+    let options = try CLIOptions(rest)
     try options.validateAllowed([])
-    let receipt = try RockchipDeviceBindingInstallation.installCurrentTarget()
+    let receipt = try RockchipDeviceBindingInstallation.installCurrentTarget(rebind: rebind)
     print(
       receipt.created
         ? "durable DAYU200 cross-mode binding installed"
