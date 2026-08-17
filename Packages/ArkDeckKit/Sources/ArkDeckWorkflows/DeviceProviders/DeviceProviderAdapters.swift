@@ -77,6 +77,49 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
     try await factsPort.currentFacts(targetID: targetID)
   }
 
+  /// Keep the native-library facts the package readback already fetched.
+  ///
+  /// `bm dump -n <bundle>` answers with the installed bundle in full, and the
+  /// readback used it for one thing: whether the bundle name appears.
+  /// Everything else was discarded — including the three fields that say
+  /// whether the device accepted the libraries the package ships.
+  ///
+  /// That mattered on real hardware. An app whose `.so` was present in the
+  /// HAP, valid for the device's architecture and correctly signed still could
+  /// not load it, and every install reported nothing but `installed: true`.
+  /// The dump had been saying `nativeLibraryPath: ""`, `cpuAbi: ""` and
+  /// `nativeLibraryFileNames: []` all along — the device matched none of the
+  /// packaged ABI directories. Finding that took several deploy rounds and two
+  /// readings taken by hand, from bytes this step had already read.
+  ///
+  /// Empty values are the finding, so they are recorded rather than skipped:
+  /// absent and empty are two different answers here. Parsing is best-effort
+  /// and never changes the verdict above — the bundle-name gate stays a text
+  /// match, so a dump this cannot decode still installs.
+  static func appendNativeLibraryFacts(from text: String, to summary: inout [String: String]) {
+    // `bm dump` prints `<bundleName>:` before the document.
+    guard let start = text.firstIndex(of: "{"),
+      let parsed = try? JSONSerialization.jsonObject(
+        with: Data(text[start...].utf8)) as? [String: Any]
+    else { return }
+
+    if let application = parsed["applicationInfo"] as? [String: Any] {
+      if let path = application["nativeLibraryPath"] as? String {
+        summary["nativeLibraryPath"] = path
+      }
+      if let abi = application["cpuAbi"] as? String {
+        summary["cpuAbi"] = abi
+      }
+    }
+    if let modules = parsed["hapModuleInfos"] as? [[String: Any]] {
+      let counted = modules.compactMap { $0["nativeLibraryFileNames"] as? [Any] }
+      // Counted rather than listed: the count answers "did the device take any
+      // of them", and the names are already in the HAP for anyone who needs
+      // them.
+      summary["nativeLibraryFileCount"] = String(counted.reduce(0) { $0 + $1.count })
+    }
+  }
+
   package func runtimeAvailability(
     for operation: CatalogOperationDescriptor
   ) -> ProviderOperationAvailability {
@@ -2013,6 +2056,7 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
       if let digest = context.resolvedInputArtifact?.sha256 {
         summary["deployedArtifactSha256"] = digest
       }
+      HDCObservationProviderAdapter.appendNativeLibraryFacts(from: text, to: &summary)
       return .verified(summary: summary)
 
     case .startAbility:
