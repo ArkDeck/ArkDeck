@@ -525,23 +525,72 @@ package struct ProductRockchipLoaderBindingCoordinator:
         selectionEvidenceSHA256: evidence)
     }
 
-    guard target.bindingRevision == expectedBindingRevision,
-      existing.revision == expectedBindingRevision,
-      existingIdentity == target.stablePhysicalIdentitySHA256,
-      currentIdentity != existingIdentity,
-      let hdcAlias = try existing.confirmedHDCNormalAlias()
-    else {
-      throw RockchipFlashExecutionError.admissionRejected(
-        "selected target has no migratable HDC-to-Loader binding lineage")
+    // The HDC-normal alias this binding will carry.
+    //
+    // Taken from the binding being replaced when it has one, and otherwise
+    // established from the target's own connect key. That second path is what
+    // makes a cross-mode binding reachable at all after identity drift.
+    //
+    // A DAYU200's identities are not stable facts. Measured on one board over
+    // one bench session: the Loader serial moved 718d93bab7… → 94a25a89c9…,
+    // the hdc-normal connect key …834a7c4900 → …874bbf4900, and the USB
+    // topology 18874368 → 17956864 on a replug. Every one of those is matched
+    // by equality somewhere, so any of them drifting refuses every later
+    // admission — and the only path that republishes the binding used to
+    // require `confirmedHDCNormalAlias()`, which is its own output. A board
+    // whose identity moved could therefore never be rebound: the repair
+    // needed the thing that was broken.
+    //
+    // Refusing drift stays the default everywhere else. What this adds is a
+    // way to say yes, from any state, with the replaced values recorded.
+    let priorAlias = try existing.confirmedHDCNormalAlias()
+    let hdcAlias: (identitySHA256: String, usbTopology: String)
+    if let priorAlias {
+      guard target.bindingRevision == expectedBindingRevision,
+        existing.revision == expectedBindingRevision,
+        existingIdentity == target.stablePhysicalIdentitySHA256,
+        currentIdentity != existingIdentity
+      else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "selected target has no migratable HDC-to-Loader binding lineage")
+      }
+      hdcAlias = priorAlias
+    } else {
+      // First cross-mode binding for this target. The alias is the target's
+      // own connect key — the address the device answers on in hdc-normal —
+      // and the topology is the port it was just observed at. Both are read,
+      // neither is assumed.
+      guard target.bindingRevision == expectedBindingRevision,
+        !target.connectKey.isEmpty,
+        !identity.topology.isEmpty,
+        identity.topology.utf8.allSatisfy({ (48...57).contains($0) })
+      else {
+        throw RockchipFlashExecutionError.admissionRejected(
+          "first cross-mode binding needs a matching binding revision and an observed port")
+      }
+      hdcAlias = (
+        identitySHA256: SHA256Hex.string(of: Data(target.connectKey.utf8)),
+        usbTopology: identity.topology
+      )
     }
     let targetConnectIdentity = SHA256Hex.string(of: Data(target.connectKey.utf8))
     guard targetConnectIdentity == hdcAlias.identitySHA256 else {
       throw RockchipFlashExecutionError.admissionRejected(
         "selected target connect key does not match its durable HDC-normal alias")
     }
+    // Which identity names the target being migrated.
+    //
+    // On a lineage migration it is the binding's own previous identity: the
+    // point of the check is that exactly one target sat at that identity, so
+    // the edge being drawn is unambiguous. On a first cross-mode bind the
+    // binding and the target were never linked, so that identity says nothing
+    // about this target — the unambiguity that matters is the target's own.
+    let lineageIdentity = priorAlias == nil
+      ? target.stablePhysicalIdentitySHA256
+      : existingIdentity
     let matchingLineageTargets = try targetStore.list().filter {
       $0.bindingRevision == expectedBindingRevision
-        && $0.stablePhysicalIdentitySHA256 == existingIdentity
+        && $0.stablePhysicalIdentitySHA256 == lineageIdentity
     }
     guard matchingLineageTargets.map(\.targetID) == [targetID] else {
       throw RockchipFlashExecutionError.admissionRejected(
@@ -550,10 +599,30 @@ package struct ProductRockchipLoaderBindingCoordinator:
 
     try Self.authorizeSelectedTarget(identity: identity, currentIdentity: currentIdentity)
 
-    let nextRevision = expectedBindingRevision + 1
+    // The revision this replaces is the binding's own, which is the target's
+    // only when a lineage already links them. On a first cross-mode bind the
+    // two are independent, and using the target's number here would make the
+    // store's compare-and-swap fail against a binding that is simply younger.
+    let replacedRevision = existing.revision
+    // The published revision must be one past the edge this binding describes,
+    // because `runtimeTargetLineageAdvance` re-derives the edge from the
+    // document and requires `revision == previousRevision + 1`.
+    //
+    // On a migration those are the same number: the binding's own history is
+    // the edge. On a first cross-mode bind the edge is the *target's*, so the
+    // published revision follows the target — otherwise the document says
+    // "revision 2 follows revision 3", which is not a lineage anyone can read.
+    // The binding's own version: strictly one past the document it replaces,
+    // which is what the store's compare-and-swap requires.
+    let nextRevision = replacedRevision + 1
+    // The target-side edge this bind draws. On a migration it is the same
+    // pair; on a first cross-mode bind the target has its own numbering and
+    // recording it separately is what keeps the two from contradicting.
+    let targetPreviousRevision = target.bindingRevision
+    let targetCurrentRevision = target.bindingRevision + 1
     let selectionDigest = Self.selectionDigest(
       targetID: targetID,
-      previousRevision: expectedBindingRevision,
+      previousRevision: replacedRevision,
       currentRevision: nextRevision,
       previousIdentity: existingIdentity,
       currentIdentity: currentIdentity,
@@ -566,15 +635,22 @@ package struct ProductRockchipLoaderBindingCoordinator:
         "product:e0-iokit-single-loader-readback",
         "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
         "identity:serial-sha256=\(currentIdentity)",
-        "identity:previous-serial-sha256=\(existingIdentity)",
-        "binding:previous-revision=\(expectedBindingRevision)",
+        // On a first cross-mode bind the edge being drawn is the target's,
+        // not the replaced binding's: `advanceBindingLineage` looks the
+        // previous identity up in the target store and requires its revision
+        // to match, so describing the younger binding here would name a
+        // target state that never existed.
+        "identity:previous-serial-sha256=\(priorAlias == nil ? target.stablePhysicalIdentitySHA256 : existingIdentity)",
+        "binding:previous-revision=\(replacedRevision)",
+        "binding:target-previous-revision=\(targetPreviousRevision)",
+        "binding:target-current-revision=\(targetCurrentRevision)",
         "binding:previous-usb-topology=\(existing.usbTopology)",
         "identity:hdc-normal-alias-sha256=\(hdcAlias.identitySHA256)",
         "binding:hdc-normal-alias-usb-topology=\(hdcAlias.usbTopology)",
         "rebind:user-selection-sha256=\(selectionDigest)",
       ])
     let stored = try bindingStore.replace(
-      expectedRevision: expectedBindingRevision,
+      expectedRevision: replacedRevision,
       expectedSerialSHA256: existingIdentity,
       with: next)
     guard let advance = try stored.runtimeTargetLineageAdvance() else {
@@ -583,7 +659,9 @@ package struct ProductRockchipLoaderBindingCoordinator:
     }
     let advanced = try targetStore.advanceBindingLineage(advance)
     guard advanced.record.targetID == targetID,
-      advanced.record.bindingRevision == nextRevision,
+      // The target advances on its own numbering, which is the edge this bind
+      // drew — not the binding document's version.
+      advanced.record.bindingRevision == targetCurrentRevision,
       advanced.record.stablePhysicalIdentitySHA256 == currentIdentity
     else {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(

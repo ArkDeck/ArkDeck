@@ -152,6 +152,68 @@ final class RockchipFlashSupportingContractTests: XCTestCase {
       true)
   }
 
+  func testTheBindingVersionAndTheTargetEdgeAreSeparateNumbers() throws {
+    // One `revision` field used to answer two questions. The store's
+    // compare-and-swap requires the document's version to be one past the
+    // document it replaces; `runtimeTargetLineageAdvance` requires it to be
+    // one past the *target's* revision. Those coincide only while a lineage
+    // has never been interrupted, and on a first cross-mode bind they diverge,
+    // so no single value satisfies both — measured on the bench as
+    // "durable binding changed before Loader rebind" against one choice and
+    // "previous identity lineage is invalid" against the other.
+    let previousIdentity = String(repeating: "a", count: 64)
+    let currentIdentity = SHA256Hex.string(of: Data("loader-serial".utf8))
+    let snapshot = RockchipProductBindingSnapshot(
+      // The binding's own version: one past the document it replaced.
+      revision: 2,
+      serial: "loader-serial",
+      usbTopology: "17956864",
+      evidence: [
+        "product:e0-iokit-single-loader-readback",
+        "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
+        "identity:serial-sha256=\(currentIdentity)",
+        "identity:previous-serial-sha256=\(previousIdentity)",
+        "binding:previous-revision=1",
+        "binding:previous-usb-topology=18874368",
+        // The target's edge, which is numbered independently.
+        "binding:target-previous-revision=3",
+        "binding:target-current-revision=4",
+        "identity:hdc-normal-alias-sha256=\(String(repeating: "b", count: 64))",
+        "binding:hdc-normal-alias-usb-topology=17956864",
+        "rebind:user-selection-sha256=\(String(repeating: "c", count: 64))",
+      ])
+
+    let advance = try XCTUnwrap(try snapshot.runtimeTargetLineageAdvance())
+    XCTAssertEqual(
+      advance.previousRevision, 3, "the advance carries the target's numbering")
+    XCTAssertEqual(advance.currentRevision, 4)
+    XCTAssertEqual(advance.previousStableIdentitySHA256, previousIdentity)
+    XCTAssertEqual(advance.currentStableIdentitySHA256, currentIdentity)
+  }
+
+  func testWithoutATargetEdgeTheBindingNumberingStillApplies() throws {
+    // The unchanged case: a migration whose two numbers agree records no
+    // separate edge, and the advance keeps reading the binding's own.
+    let previousIdentity = String(repeating: "a", count: 64)
+    let currentIdentity = SHA256Hex.string(of: Data("loader-serial".utf8))
+    let snapshot = RockchipProductBindingSnapshot(
+      revision: 2, serial: "loader-serial", usbTopology: "17956864",
+      evidence: [
+        "product:e0-iokit-single-loader-readback",
+        "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
+        "identity:serial-sha256=\(currentIdentity)",
+        "identity:previous-serial-sha256=\(previousIdentity)",
+        "binding:previous-revision=1",
+        "binding:previous-usb-topology=18874368",
+        "identity:hdc-normal-alias-sha256=\(String(repeating: "b", count: 64))",
+        "binding:hdc-normal-alias-usb-topology=17956864",
+        "rebind:user-selection-sha256=\(String(repeating: "c", count: 64))",
+      ])
+    let advance = try XCTUnwrap(try snapshot.runtimeTargetLineageAdvance())
+    XCTAssertEqual(advance.previousRevision, 1)
+    XCTAssertEqual(advance.currentRevision, 2)
+  }
+
   func testARebindContinuesTheLineageRatherThanRestartingIt() throws {
     // A rebind that wrote a fresh revision-1 snapshot would publish a binding
     // the recovery machinery cannot follow: `runtimeTargetLineageAdvance`
