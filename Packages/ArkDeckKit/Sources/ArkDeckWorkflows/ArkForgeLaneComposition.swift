@@ -21,6 +21,15 @@ package enum ArkForgeLaneComposition {
     package static let daemonSHA256 = "ARKDECK_ARKFORGED_SHA256"
     package static let deviceProfilePath = "ARKDECK_ARKFORGE_PROFILE_PATH"
     package static let vendorToolPath = "ARKDECK_RKDEVELOPTOOL_PATH"
+    /// The acceptance campaign this lane is authorized to run, if any.
+    ///
+    /// Deliberately outside the all-or-nothing set above. Those four decide
+    /// whether a lane exists; this one decides whether the lane may execute a
+    /// combination nobody has verified yet, which is a separate decision and a
+    /// larger one. Unset is the normal state: `arkforged` then publishes
+    /// `hardwareGated`, materializes assessments only, and no write can reach
+    /// a device.
+    package static let campaign = "ARKDECK_ARKFORGE_CAMPAIGN"
   }
 
   /// Why no lane was composed. Every case names something an operator can fix.
@@ -52,6 +61,8 @@ package enum ArkForgeLaneComposition {
     package let daemonSHA256: String
     package let deviceProfilePath: String
     package let vendorToolPath: String
+    /// Empty when this lane runs no campaign, which is the normal state.
+    package let campaign: String
 
     /// Reads the four keys, or says which are missing.
     ///
@@ -74,7 +85,10 @@ package enum ArkForgeLaneComposition {
           daemonPath: environment[EnvironmentKey.daemonPath]!,
           daemonSHA256: environment[EnvironmentKey.daemonSHA256]!,
           deviceProfilePath: environment[EnvironmentKey.deviceProfilePath]!,
-          vendorToolPath: environment[EnvironmentKey.vendorToolPath]!))
+          vendorToolPath: environment[EnvironmentKey.vendorToolPath]!,
+          // Absent is not missing. The four above are a lane; this is an
+          // authorization on top of one, and its absence is the safe state.
+          campaign: environment[EnvironmentKey.campaign] ?? ""))
     }
   }
 
@@ -132,7 +146,7 @@ package enum ArkForgeLaneComposition {
   package static func daemonArguments(
     inputs: Inputs, runtimeDirectory: URL, pairingEpoch: UInt64
   ) -> [String] {
-    [
+    var arguments = [
       "--runtime-dir", runtimeDirectory.path,
       "--profile", inputs.deviceProfilePath,
       "--pair-from-stdin", String(pairingEpoch),
@@ -140,6 +154,15 @@ package enum ArkForgeLaneComposition {
       "--rkdeveloptool-sha256", ArkForgeToolchainPin.signedSHA256,
       "--require-release-signing",
     ]
+    // Appended only when an operator named one. Without it `arkforged`
+    // publishes `hardwareGated` for DAYU200, `materializePlan` answers with an
+    // assessment, and this lane refuses at the step rather than writing —
+    // which is the correct behaviour for every build nobody authorized a
+    // campaign on.
+    if !inputs.campaign.isEmpty {
+      arguments.append(contentsOf: ["--hardware-campaign", inputs.campaign])
+    }
+    return arguments
   }
 
   /// A pairing secret for one daemon lifetime.

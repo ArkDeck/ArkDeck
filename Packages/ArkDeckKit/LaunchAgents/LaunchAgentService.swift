@@ -33,8 +33,17 @@ public enum ArkDeckLaunchAgent {
   public static let arkForgedSHA256EnvironmentKey = "ARKDECK_ARKFORGED_SHA256"
   public static let arkForgeProfileEnvironmentKey = "ARKDECK_ARKFORGE_PROFILE_PATH"
   public static let arkForgeVendorToolEnvironmentKey = "ARKDECK_RKDEVELOPTOOL_PATH"
+  /// The acceptance campaign the lane is authorized to run.
+  ///
+  /// Outside the required set below on purpose. Those four decide whether a
+  /// lane exists; this decides whether it may execute a combination nobody has
+  /// verified, which is the larger decision. Unset means `arkforged` publishes
+  /// `hardwareGated`, materializes assessments only, and reaches no device.
+  public static let arkForgeCampaignEnvironmentKey = "ARKDECK_ARKFORGE_CAMPAIGN"
 
-  /// Every key the lane reads, so callers cannot set some and forget others.
+  /// Every key the lane requires, so callers cannot set some and forget others.
+  /// The campaign key is not among them — it is an authorization on a lane, not
+  /// part of one.
   public static let arkForgeEnvironmentKeys = [
     arkForgedPathEnvironmentKey, arkForgedSHA256EnvironmentKey,
     arkForgeProfileEnvironmentKey, arkForgeVendorToolEnvironmentKey,
@@ -223,16 +232,19 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
   public let deviceProfilePath: String
   public let vendorToolPath: String
   public let vendorToolSHA256: String
+  /// Empty when no campaign is authorized, which is the normal state.
+  public let campaign: String
 
   public init(
     daemonPath: String, daemonSHA256: String, deviceProfilePath: String,
-    vendorToolPath: String, vendorToolSHA256: String
+    vendorToolPath: String, vendorToolSHA256: String, campaign: String = ""
   ) {
     self.daemonPath = daemonPath
     self.daemonSHA256 = daemonSHA256
     self.deviceProfilePath = deviceProfilePath
     self.vendorToolPath = vendorToolPath
     self.vendorToolSHA256 = vendorToolSHA256
+    self.campaign = campaign
   }
 
   /// Why a lane configuration was refused. Each names something to fix.
@@ -272,7 +284,7 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
   /// part of the maturity combination.
   public static func measuring(
     daemonPath: String, declaredDaemonSHA256: String, deviceProfilePath: String,
-    vendorToolPath: String
+    vendorToolPath: String, campaign: String = ""
   ) throws -> LaunchAgentArkForgeLaneStatus {
     func verify(_ path: String) throws -> Data {
       guard path.hasPrefix("/") else { throw Refusal.notAbsolute(path) }
@@ -296,17 +308,25 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
     return LaunchAgentArkForgeLaneStatus(
       daemonPath: daemonPath, daemonSHA256: measured,
       deviceProfilePath: deviceProfilePath, vendorToolPath: vendorToolPath,
-      vendorToolSHA256: SHA256Hex.string(of: tool))
+      vendorToolSHA256: SHA256Hex.string(of: tool),
+      campaign: campaign.trimmingCharacters(in: .whitespaces))
   }
 
   /// The environment the daemon is started with.
   public var environment: [String: String] {
-    [
+    var out = [
       ArkDeckLaunchAgent.arkForgedPathEnvironmentKey: daemonPath,
       ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey: daemonSHA256,
       ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey: deviceProfilePath,
       ArkDeckLaunchAgent.arkForgeVendorToolEnvironmentKey: vendorToolPath,
     ]
+    // Written only when authorized. An empty value in the plist would read as
+    // an unnamed campaign, and an unnamed campaign is one nobody can be held
+    // to a result on.
+    if !campaign.isEmpty {
+      out[ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey] = campaign
+    }
+    return out
   }
 }
 
@@ -552,7 +572,12 @@ public final class LaunchAgentService: @unchecked Sendable {
       vendorToolPath: environment[ArkDeckLaunchAgent.arkForgeVendorToolEnvironmentKey]!,
       // Re-measured by the lane at daemon startup; not re-hashed here, because
       // this call only preserves what an operator already chose.
-      vendorToolSHA256: "")
+      vendorToolSHA256: "",
+      // Preserved too. An `update` that said nothing about the lane and
+      // silently dropped the campaign would turn an authorized bench back into
+      // a hardwareGated one — a change nobody asked for, discovered at the
+      // step rather than at the command.
+      campaign: environment[ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey] ?? "")
   }
 
   public func status() throws -> LaunchAgentStatus {

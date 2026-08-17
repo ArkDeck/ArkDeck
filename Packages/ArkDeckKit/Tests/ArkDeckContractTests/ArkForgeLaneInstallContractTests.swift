@@ -51,6 +51,76 @@ final class ArkForgeLaneInstallContractTests: XCTestCase {
       Set(status.environment.keys), Set(ArkDeckLaunchAgent.arkForgeEnvironmentKeys))
   }
 
+  func testWithoutACampaignTheDaemonIsStartedGated() throws {
+    // The default has to stay closed. `--hardware-campaign` is what lets
+    // `arkforged` back an executable DAYU200 plan at all (AD-025); a lane that
+    // passed it by default would authorize a write on an unverified
+    // combination for every operator who never asked.
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+
+    let status = try LaunchAgentArkForgeLaneStatus.measuring(
+      daemonPath: daemon.path, declaredDaemonSHA256: daemonDigest,
+      deviceProfilePath: profile.path, vendorToolPath: tool.path)
+
+    XCTAssertEqual(status.campaign, "")
+    XCTAssertNil(
+      status.environment[ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey],
+      "an empty value in the plist would read as an unnamed campaign")
+
+    let arguments = ArkForgeLaneComposition.daemonArguments(
+      inputs: .init(
+        daemonPath: daemon.path, daemonSHA256: daemonDigest,
+        deviceProfilePath: profile.path, vendorToolPath: tool.path, campaign: ""),
+      runtimeDirectory: root, pairingEpoch: 1)
+    XCTAssertFalse(arguments.contains("--hardware-campaign"))
+  }
+
+  func testANamedCampaignReachesTheDaemonsArgv() throws {
+    let (daemon, daemonDigest) = try write("arkforged", "daemon-bytes")
+    let (profile, _) = try write("dayu200.yaml", "profile")
+    let (tool, _) = try write("rkdeveloptool", "tool-bytes")
+
+    let status = try LaunchAgentArkForgeLaneStatus.measuring(
+      daemonPath: daemon.path, declaredDaemonSHA256: daemonDigest,
+      deviceProfilePath: profile.path, vendorToolPath: tool.path,
+      campaign: "AFA-AC-6")
+    XCTAssertEqual(
+      status.environment[ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey], "AFA-AC-6")
+
+    let arguments = ArkForgeLaneComposition.daemonArguments(
+      inputs: .init(
+        daemonPath: daemon.path, daemonSHA256: daemonDigest,
+        deviceProfilePath: profile.path, vendorToolPath: tool.path,
+        campaign: "AFA-AC-6"),
+      runtimeDirectory: root, pairingEpoch: 1)
+    // Adjacent, because a flag whose value drifted onto another flag would
+    // start a campaign nobody named.
+    let index = try XCTUnwrap(arguments.firstIndex(of: "--hardware-campaign"))
+    XCTAssertEqual(arguments[index + 1], "AFA-AC-6")
+  }
+
+  func testTheCampaignIsNotPartOfTheAllOrNothingSet() throws {
+    // Four inputs make a lane; the campaign authorizes one. Folding it into the
+    // required set would mean every ordinary install had to name a campaign,
+    // which is the opposite of a gate.
+    XCTAssertFalse(
+      ArkDeckLaunchAgent.arkForgeEnvironmentKeys.contains(
+        ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey))
+
+    let inputs = ArkForgeLaneComposition.Inputs.read([
+      "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
+      "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
+      "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
+      "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
+    ])
+    guard case .success(let read) = inputs else {
+      return XCTFail("a lane without a campaign is a complete lane")
+    }
+    XCTAssertEqual(read.campaign, "")
+  }
+
   func testADeclaredDigestThatDoesNotMatchIsRefused() throws {
     let (daemon, _) = try write("arkforged", "daemon-bytes")
     let (profile, _) = try write("dayu200.yaml", "profile")
