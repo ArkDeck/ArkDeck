@@ -2611,6 +2611,31 @@ public actor RuntimeJobEngine {
         "\(step.stepID) needs the DeviceProfile id arkforged loaded, and this build composed a "
           + "lane without one; nothing was dispatched and the device was not touched")
     }
+    // The port path this job's device was confirmed at, named by the constant
+    // the producer publishes rather than by a literal.
+    //
+    // It used to read `serverFacts["usbTopology"]`, a key nothing writes —
+    // `RockchipRuntimeComposition` publishes it as
+    // `dayu200HDCNormalAliasUSBTopology` — and `?? ""` turned that miss into an
+    // empty string. The lane then refused, correctly, but only after the job
+    // had put the board in Loader: a spelling mistake surfaced as a device left
+    // in the wrong mode. Missing is now a refusal here, before anything moves.
+    //
+    // The value survives the mode change on purpose. It is the alias confirmed
+    // while the device was in hdc-normal, held in the binding store, so it is
+    // still answerable once the device is in Loader and no longer enumerating
+    // as itself.
+    guard
+      let topology = context.serverFacts[
+        TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
+      !topology.isEmpty
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "\(step.stepID) reached the ArkForge lane without the confirmed HDC-normal USB "
+          + "topology (\(TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey)); the lane "
+          + "identifies the board by that port path and will not guess one. Nothing was "
+          + "dispatched and the device was not touched")
+    }
     let receipt = try await lane.perform(
       stepID: step.stepID, jobID: jobID,
       artifact: ArkForgeLaneArtifact(
@@ -2619,7 +2644,7 @@ public actor RuntimeJobEngine {
         connectKey: connectKey, stableIdentitySHA256: identity,
         targetID: runtime.record.request.target.targetID,
         bindingRevision: runtime.record.request.target.expectedBindingRevision ?? 1,
-        usbTopology: context.serverFacts["usbTopology"] ?? ""))
+        usbTopology: topology))
 
     // The daemon's disposition is journalled as it stands. `outcomeUnknown` is
     // not a failure to retry — it is a job that needs reconciling, and turning
