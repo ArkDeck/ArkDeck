@@ -161,6 +161,28 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     self.kind = kind
   }
 
+  /// Whether `root` is tracked by some git working copy, its own or one it
+  /// sits inside.
+  ///
+  /// The ArkDeck profile can ask whether its own root holds `.git`, because
+  /// its root is the repository. A project checked into a larger repository
+  /// never will, and answering "no source control" for it would be wrong: git
+  /// serves it perfectly well from the containing checkout, which is why the
+  /// git-status lowering passes a pathspec so the reply still describes the
+  /// project. `.git` is matched as a file too, which is how a worktree or
+  /// submodule records its real git directory.
+  static func isInsideGitWorkingCopy(_ root: String) -> Bool {
+    var current = URL(filePath: root, directoryHint: .isDirectory).standardizedFileURL
+    while true {
+      if FileManager.default.fileExists(atPath: current.appending(path: ".git").path) {
+        return true
+      }
+      let parent = current.deletingLastPathComponent().standardizedFileURL
+      guard parent.path != current.path else { return false }
+      current = parent
+    }
+  }
+
   /// Built-in profile for this repository. An explicit root override is
   /// configuration, not authority; the closed preset vocabulary stays here.
   package static func arkDeck(rootURL: URL) throws -> WorkspaceProjectProfile {
@@ -303,6 +325,20 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
     let checkpointing = try WorkspaceCommandPreset(
       presetID: "sealed-source-archive", executable: tar,
       fixedArguments: [], timeoutSeconds: 120)
+    // The demo is checked into a larger repository rather than owning one, so
+    // this preset only makes sense together with the pathspec the git-status
+    // lowering now passes: without it the reply would describe the containing
+    // checkout instead of the project. `inspect-diff` was already confined,
+    // because its pathspec is validated to a relative path that cannot climb
+    // out of the project root.
+    let sourceControl: WorkspaceCommandPreset?
+    if Self.isInsideGitWorkingCopy(root) {
+      let git = try WorkspaceExecutableIdentity.hashing(path: "/usr/bin/git")
+      sourceControl = try WorkspaceCommandPreset(
+        presetID: "git", executable: git, fixedArguments: [], timeoutSeconds: 120)
+    } else {
+      sourceControl = nil
+    }
     let commonHvigorArguments = [
       "--mode", "module",
       "-p", "module=entry@default",
@@ -325,7 +361,8 @@ package struct WorkspaceProjectProfile: Sendable, Equatable {
         "entry/src/main/ets/**", "entry/src/main/cpp/**",
         "entry/src/test/**", "entry/src/ohosTest/**",
       ],
-      inspectionPreset: inspection, sourceReaderPreset: sourceReader,
+      inspectionPreset: inspection, sourceControlPreset: sourceControl,
+      sourceReaderPreset: sourceReader,
       archiveCheckpointPreset: checkpointing,
       patchPreset: patching,
       buildPresets: [build.presetID: build],
@@ -1128,12 +1165,22 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       }
       // `-C <root>` first: git runs in the root this provider resolved, so
       // no input can move it elsewhere.
+      //
+      // `-- .` then confines the answer to that root. `-C` only chooses the
+      // working directory; `git status` without a pathspec describes the whole
+      // repository, so a project nested inside a larger checkout answered with
+      // the containing repository's working tree — every unrelated modified and
+      // untracked file in it. The pathspec makes the reply describe the project
+      // this operation was asked about, which is what it claims to return.
       return .workspace(
         .inspectGitStatus(
           resolved(
             operation: operation.reference, preset: preset,
             arguments: preset.fixedArguments
-              + ["-C", profile.projectRoot, "status", "--porcelain=v1", "--untracked-files=all"])))
+              + [
+                "-C", profile.projectRoot, "status", "--porcelain=v1",
+                "--untracked-files=all", "--", ".",
+              ])))
 
     case ("workspace.inspect-diff@1", .inspectWorkspaceDiff):
       guard let preset = profile.sourceControlPreset else {

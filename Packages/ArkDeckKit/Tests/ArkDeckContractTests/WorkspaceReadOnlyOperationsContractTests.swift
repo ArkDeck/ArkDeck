@@ -49,10 +49,85 @@ final class WorkspaceReadOnlyOperationsContractTests: XCTestCase {
       return XCTFail("a host-only read must lower to a process plan")
     }
     // `-C <root>` first: git runs in the root this provider resolved, and no
-    // input in the request can move it.
+    // input in the request can move it. `-- .` then confines the answer to
+    // that root: `-C` only picks the working directory, and `git status`
+    // without a pathspec describes the whole repository.
     XCTAssertEqual(
       argv,
-      ["-C", profile.projectRoot, "status", "--porcelain=v1", "--untracked-files=all"])
+      [
+        "-C", profile.projectRoot, "status", "--porcelain=v1", "--untracked-files=all",
+        "--", ".",
+      ])
+  }
+
+  /// The reason the pathspec is not cosmetic. A project checked into a larger
+  /// repository — which is how the WaterFlow demo ships — would otherwise have
+  /// its status answered with the containing repository's working tree, so a
+  /// read scoped to one project returned every unrelated modified and
+  /// untracked file around it.
+  /// What decides whether the WaterFlow profile offers source control at all.
+  /// Asking whether the project root itself holds `.git` answers "no" for
+  /// every project checked into a larger repository, which is exactly how the
+  /// demo ships — so the question is whether some ancestor does.
+  func testAProjectInsideARepositoryCountsAsSourceControlled() throws {
+    let repository = root.appending(path: "walk-repo", directoryHint: .isDirectory)
+    let nested = repository.appending(path: "a/b/c", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+    XCTAssertFalse(
+      WorkspaceProjectProfile.isInsideGitWorkingCopy(nested.path),
+      "no .git anywhere above it yet")
+
+    try FileManager.default.createDirectory(
+      at: repository.appending(path: ".git", directoryHint: .isDirectory),
+      withIntermediateDirectories: true)
+    XCTAssertTrue(
+      WorkspaceProjectProfile.isInsideGitWorkingCopy(nested.path),
+      "a project nested in a working copy is source controlled by it")
+    XCTAssertTrue(
+      WorkspaceProjectProfile.isInsideGitWorkingCopy(repository.path),
+      "and so is the repository root itself")
+  }
+
+  func testStatusOfANestedProjectDoesNotDescribeTheRepositoryAroundIt() throws {
+    let repository = root.appending(path: "outer-repo", directoryHint: .isDirectory)
+    let project = repository.appending(path: "nested/project", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+    for argv in [
+      ["init", "--quiet"], ["config", "user.email", "t@invalid.example"],
+      ["config", "user.name", "T"],
+    ] {
+      let process = Process()
+      process.executableURL = URL(filePath: "/usr/bin/git")
+      process.arguments = ["-C", repository.path] + argv
+      try process.run()
+      process.waitUntilExit()
+    }
+    try Data("outside\n".utf8).write(to: repository.appending(path: "OUTSIDE.txt"))
+    try Data("inside\n".utf8).write(to: project.appending(path: "INSIDE.txt"))
+
+    func status(_ extra: [String]) throws -> String {
+      let process = Process()
+      process.executableURL = URL(filePath: "/usr/bin/git")
+      process.arguments =
+        ["-C", project.path, "status", "--porcelain=v1", "--untracked-files=all"] + extra
+      let pipe = Pipe()
+      process.standardOutput = pipe
+      try process.run()
+      let data = pipe.fileHandleForReading.readDataToEndOfFile()
+      process.waitUntilExit()
+      return String(decoding: data, as: UTF8.self)
+    }
+
+    // Without the pathspec the containing repository leaks in.
+    let unscoped = try status([])
+    XCTAssertTrue(unscoped.contains("OUTSIDE.txt"), "precondition: git reports the whole repo")
+
+    // With it, the answer is the project the caller asked about.
+    let scoped = try status(["--", "."])
+    XCTAssertFalse(
+      scoped.contains("OUTSIDE.txt"),
+      "a status scoped to one project must not report the repository around it")
+    XCTAssertTrue(scoped.contains("INSIDE.txt"), "the project's own files still appear")
   }
 
   func testDiffLowersRevisionAndScopeAfterTheOptionTerminator() throws {
