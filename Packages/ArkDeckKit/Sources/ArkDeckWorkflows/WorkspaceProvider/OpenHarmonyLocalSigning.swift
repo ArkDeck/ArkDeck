@@ -211,11 +211,26 @@ private struct OpenHarmonySigningSecretEnvelope: Codable {
   var keyPassword: Data
 }
 
+/// What a presence probe established about one Keychain account.
+///
+/// Three-way on purpose. `contains(account:)` answers `false` for "the item is
+/// not there" and for "this process is not allowed to look", and those license
+/// opposite conclusions: the first says a preset is broken, the second says
+/// nothing at all about the preset.
+package enum OpenHarmonySigningSecretPresence: Sendable, Equatable {
+  case present
+  /// The Keychain positively answered that no such item exists.
+  case absent
+  /// No answer: a missing entitlement, a refused interaction, an error.
+  case unreadable
+}
+
 package protocol OpenHarmonySigningSecretStoring: Sendable {
   func set(_ data: Data, account: String) throws
   func read(account: String) throws -> Data
   func readLegacy(account: String) throws -> Data
   func contains(account: String) -> Bool
+  func presence(of account: String) -> OpenHarmonySigningSecretPresence
   func trustedDaemonApplicationSHA256() throws -> String?
   @discardableResult func remove(account: String) throws -> Bool
   @discardableResult func removeLegacy(account: String) throws -> Bool
@@ -226,6 +241,11 @@ extension OpenHarmonySigningSecretStoring {
   package func readLegacy(account: String) throws -> Data { try read(account: account) }
   @discardableResult
   package func removeLegacy(account: String) throws -> Bool { try remove(account: account) }
+  /// A store that cannot tell the two apart says so by never reporting
+  /// `unreadable`; an in-memory store genuinely knows what it holds.
+  package func presence(of account: String) -> OpenHarmonySigningSecretPresence {
+    contains(account: account) ? .present : .absent
+  }
 }
 
 package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring {
@@ -315,6 +335,22 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
     var value: CFTypeRef?
     return SecItemCopyMatching(
       Self.presenceQuery(account: account) as CFDictionary, &value) == errSecSuccess
+  }
+
+  /// The same query, keeping the distinction `contains` has to throw away.
+  /// `errSecItemNotFound` is the Keychain answering; every other failure —
+  /// `errSecMissingEntitlement` from a maintenance binary without the shared
+  /// access group, `errSecInteractionNotAllowed` from a non-interactive
+  /// session — means this process could not look.
+  public func presence(of account: String) -> OpenHarmonySigningSecretPresence {
+    var value: CFTypeRef?
+    let status = SecItemCopyMatching(
+      Self.presenceQuery(account: account) as CFDictionary, &value)
+    switch status {
+    case errSecSuccess: return .present
+    case errSecItemNotFound: return .absent
+    default: return .unreadable
+    }
   }
 
   static func presenceQuery(account: String) -> [String: Any] {
@@ -791,9 +827,23 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         presetID: presetID, requireSecrets: false, allowLegacyAccessSchema: true)
       let daemonIdentity = try secrets.trustedDaemonApplicationSHA256()
       if receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema {
-        guard let envelope = receipt.secretEnvelopeAccount,
-          secrets.contains(account: envelope)
-        else {
+        guard let envelope = receipt.secretEnvelopeAccount else {
+          throw OpenHarmonySigningError.secretUnavailable(
+            "Data Protection Keychain envelope is absent")
+        }
+        // Re-recording the trusted daemon identity below is a receipt-file
+        // write; it neither reads nor rewrites the envelope. So the only
+        // question this probe may answer is whether the preset is *known* to
+        // be broken. A caller that cannot read the Keychain at all — the
+        // maintenance CLI runs without the shared access group — used to land
+        // in the same branch as a genuinely missing envelope and abort here,
+        // which is why replacing the daemon left the preset permanently
+        // drifted: the one write that could repair it was gated behind a read
+        // the repairing process is not allowed to perform.
+        //
+        // Signing still fails closed later: `loadValidated(requireSecrets:)`
+        // reads the envelope for real before any signer is launched.
+        if secrets.presence(of: envelope) == .absent {
           throw OpenHarmonySigningError.secretUnavailable(
             "Data Protection Keychain envelope is absent")
         }

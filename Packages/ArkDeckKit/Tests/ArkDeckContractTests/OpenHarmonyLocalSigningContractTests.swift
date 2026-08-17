@@ -292,6 +292,55 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     }
   }
 
+  /// Replacing the daemon must stay repairable by the process that replaced it.
+  ///
+  /// `agentd update` installs a new daemon and then calls
+  /// `refreshDaemonKeychainIdentity` to re-record the trusted identity the
+  /// receipt pins. That re-record is a receipt-file write — it neither reads
+  /// nor rewrites the secret envelope — but it used to sit behind
+  /// `contains(account:)`, which answers `false` both for "the envelope is
+  /// gone" and for "this process may not look". The maintenance CLI runs
+  /// without the shared Keychain access group, so it always got the second and
+  /// was told the first: the update swapped the daemon, aborted the repair,
+  /// and left the preset permanently drifted with no supported way back —
+  /// every signing operation unavailable from then on.
+  func testDaemonIdentityRebindSurvivesAKeychainThisProcessCannotRead() throws {
+    let fixture = try makeFixture(mode: "success")
+    fixture.secrets.trustedDaemonIdentity = "daemon-before-update"
+    let receipt = try fixture.store.install(
+      configuration: fixture.configuration,
+      keystorePassword: Data("keystore-secret".utf8),
+      keyPassword: Data("key-secret".utf8))
+    let envelope = try XCTUnwrap(receipt.secretEnvelopeAccount)
+    XCTAssertEqual(receipt.trustedDaemonApplicationSHA256, "daemon-before-update")
+
+    // The daemon was replaced, and the repairing process cannot see the
+    // Keychain at all — the envelope is still there, it just cannot be probed.
+    fixture.secrets.trustedDaemonIdentity = "daemon-after-update"
+    fixture.secrets.keychainUnreadable = true
+    try fixture.store.refreshDaemonKeychainIdentity()
+    fixture.secrets.keychainUnreadable = false
+    let rebound = try fixture.store.loadValidated()
+    XCTAssertEqual(rebound.trustedDaemonApplicationSHA256, "daemon-after-update")
+    XCTAssertEqual(rebound.secretEnvelopeAccount, envelope, "the envelope is untouched")
+    XCTAssertEqual(fixture.secrets.secretReadCount, 0, "no secret was read to rebind")
+
+    // And an envelope the Keychain positively says is gone still refuses:
+    // that is a broken preset, not an unreadable one.
+    fixture.secrets.trustedDaemonIdentity = "daemon-after-second-update"
+    XCTAssertTrue(try fixture.secrets.remove(account: envelope))
+    XCTAssertThrowsError(try fixture.store.refreshDaemonKeychainIdentity()) { error in
+      XCTAssertTrue(
+        String(describing: error).contains("envelope is absent"),
+        "unexpected error: \(error)")
+    }
+    XCTAssertEqual(
+      try fixture.store.loadValidated(requireSecrets: false)
+        .trustedDaemonApplicationSHA256,
+      "daemon-after-update",
+      "a refused rebind must not have rewritten the receipt")
+  }
+
   func testPresetInstallStatusDriftAndRemovalArePrivateAndReversible() throws {
     let fixture = try makeFixture(mode: "success")
     fixture.secrets.trustedDaemonIdentity = "stable-daemon-v1"
@@ -1405,8 +1454,20 @@ private final class MemorySigningSecretStore: OpenHarmonySigningSecretStoring,
     }
   }
 
+  /// Simulates a Keychain this process is not allowed to interrogate. The
+  /// maintenance CLI's real situation: `SecItemCopyMatching` fails alike for
+  /// every query, so the boolean probe reports "not there" for an item that
+  /// is, and only the three-way probe can tell the caller it never looked.
+  var keychainUnreadable = false
+
   func contains(account: String) -> Bool {
-    lock.withLock { values[account] != nil }
+    if keychainUnreadable { return false }
+    return lock.withLock { values[account] != nil }
+  }
+
+  func presence(of account: String) -> OpenHarmonySigningSecretPresence {
+    if keychainUnreadable { return .unreadable }
+    return lock.withLock { values[account] != nil } ? .present : .absent
   }
 
   func trustedDaemonApplicationSHA256() throws -> String? {
