@@ -6111,9 +6111,32 @@ public actor RuntimeJobEngine {
           case .pending, .outcomeUnknown:
             return RuntimeCapabilityReference(capabilityID: capabilityID)
           case .confirmed:
+            // A confirmed terminal closes this generation and lets the next one
+            // open. Three states qualify, and the third is the one this list
+            // was missing.
+            //
+            // `succeeded` and `recovered` are the obvious ones. `cancelled` is
+            // the third: a confirmed-cancelled job is one the engine proved did
+            // not dispatch — `outcomeUnknown` is false, which is a stronger
+            // statement than `succeeded` makes, since a job that succeeded at
+            // least wrote something. Withholding rollover from it does not
+            // protect a device; it strands the lineage.
+            //
+            // Measured 2026-08-17: a DAYU200 flash was cancelled after
+            // refusing at the lane, having written nothing. It reconciled to
+            // `outcome: confirmed, terminalState: cancelled`, and from then on
+            // every destructive attempt on that policy was answered
+            // `capability denied [denial:exhausted]` — the cancellation had
+            // permanently closed the lane it was supposed to leave open.
+            //
+            // An unconfirmed cancellation is untouched: it arrives as
+            // `.pending` or `.outcomeUnknown` above and still returns the spent
+            // capability, because a write whose outcome is unknown must not be
+            // replayed.
             guard
               terminal.terminalState == JobState.succeeded.rawValue
                 || terminal.terminalState == JobState.recovered.rawValue
+                || terminal.terminalState == JobState.cancelled.rawValue
             else {
               return RuntimeCapabilityReference(capabilityID: capabilityID)
             }
