@@ -837,15 +837,39 @@ struct RockchipProductBindingBootstrap: Sendable {
         "the single USB identity is not a registered DAYU200 mode")
     }
     let serialDigest = SHA256Hex.string(of: Data(identity.serial.utf8))
+    var evidence = [
+      "product:e0-iokit-single-dayu200-readback",
+      "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
+      "identity:serial-sha256=\(serialDigest)",
+    ]
+    // A rebind continues the lineage; it does not restart it.
+    //
+    // `runtimeTargetLineageAdvance` reads exactly these four keys and returns
+    // nil when `revision == 1`, so a rebind that wrote a fresh revision-1
+    // snapshot would publish a binding the recovery machinery cannot follow:
+    // the adjacent edge from the old identity to the new one would simply not
+    // exist, and a job that bound the old one could never be settled against
+    // the new. Carrying the previous revision and identity forward is what
+    // makes the replacement an edge rather than an amnesia.
+    var revision = 1
+    if rebind, let previous = try store.loadIfPresent() {
+      revision = previous.revision + 1
+      let previousSerialDigest = SHA256Hex.string(of: Data(previous.serial.utf8))
+      evidence.append("identity:previous-serial-sha256=\(previousSerialDigest)")
+      evidence.append("binding:previous-revision=\(previous.revision)")
+      evidence.append("binding:previous-usb-topology=\(previous.usbTopology)")
+      // The operator's selection, recorded as what they selected rather than
+      // as a bare "yes": `--rebind` names this exact device on this exact
+      // port, and the digest is what a later audit compares against.
+      evidence.append(
+        "rebind:user-selection-sha256="
+          + SHA256Hex.string(of: Data("\(identity.serial)|\(identity.topology)".utf8)))
+    }
     let candidate = RockchipProductBindingSnapshot(
-      revision: 1,
+      revision: revision,
       serial: identity.serial,
       usbTopology: identity.topology,
-      evidence: [
-        "product:e0-iokit-single-dayu200-readback",
-        "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
-        "identity:serial-sha256=\(serialDigest)",
-      ])
+      evidence: evidence)
     let result = try store.install(candidate, rebind: rebind)
     let storedDigest = SHA256Hex.string(of: Data(result.snapshot.serial.utf8))
     return RockchipDeviceBindingInstallationReceipt(
