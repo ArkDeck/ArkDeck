@@ -252,6 +252,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
               // paired with `reasons`. `reasons` stays for readers that
               // already parse it.
               "reasonCodes": .array(item.reasonCodes.map { .string($0.rawValue) }),
+              // Positionally paired the same way, and the field an operator
+              // actually acts on: whether configuring this machine can make
+              // the operation available at all.
+              "reasonOrigins": .array(
+                item.reasonCodes.map { .string($0.origin.rawValue) }),
             ])
           }))
 
@@ -280,6 +285,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "availabilityReasonCodes": .array(
             (availability?.reasonCodes ?? [.providerNotRegistered])
               .map { .string($0.rawValue) }),
+          "availabilityReasonOrigins": .array(
+            (availability?.reasonCodes ?? [.providerNotRegistered])
+              .map { .string($0.origin.rawValue) }),
         ]))
 
     case "flash.prerequisites":

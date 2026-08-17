@@ -1824,10 +1824,47 @@ public enum RuntimeAvailabilityReasonCode: String, Sendable, Equatable, CaseIter
   case providerToolUnavailable = "provider_tool_unavailable"
   /// The tool is present, and is not the one that was pinned.
   case toolIdentityDrift = "tool_identity_drift"
-  /// A workspace project or preset the operation needs is not registered.
+  /// A workspace project or preset the operation needs is not registered on
+  /// this host, and registering it makes the operation available.
   case workspacePresetUnavailable = "workspace_preset_unavailable"
+  /// The workspace profile this build ships defines no such preset. Unlike
+  /// `workspacePresetUnavailable`, there is nothing an operator can register:
+  /// the profiles are repository-owned vocabulary, and `symbolize-crash` is
+  /// unavailable precisely because no generic symbolizer may be guessed.
+  case workspacePresetNotOffered = "workspace_preset_not_offered"
   /// The Runtime Artifact store this operation publishes through is absent.
   case artifactStoreUnavailable = "artifact_store_unavailable"
+
+  /// Who can change the answer.
+  ///
+  /// Every code above says what is missing, and an operator reading
+  /// `operation.list` still could not tell "install something and this works"
+  /// from "no installation will ever make this work, this build does not
+  /// implement it". Both arrive as `unavailable` with a short reason, so the
+  /// two get investigated the same way and the second wastes the search.
+  ///
+  /// The switch is exhaustive on purpose: a new code has to state which side
+  /// it falls on rather than defaulting into either.
+  public var origin: RuntimeAvailabilityOrigin {
+    switch self {
+    case .providerToolUnavailable, .toolIdentityDrift, .workspacePresetUnavailable,
+      .artifactStoreUnavailable:
+      return .hostConfiguration
+    case .providerNotRegistered, .operationNotSupported, .workspacePresetNotOffered:
+      return .productBuild
+    }
+  }
+}
+
+/// Whether an operator can make an operation available on this machine, or
+/// only a different build of ArkDeck can.
+public enum RuntimeAvailabilityOrigin: String, Sendable, Equatable, CaseIterable, Codable {
+  /// Something absent from this host: a tool, a registration, a preset an
+  /// operator installs. Configuring it makes the operation available.
+  case hostConfiguration = "host_configuration"
+  /// Nothing this host is missing. The shipped build has no implementation, or
+  /// deliberately declines to offer one, so no local configuration reaches it.
+  case productBuild = "product_build"
 }
 
 public enum ProviderOperationAvailability: Sendable, Equatable {

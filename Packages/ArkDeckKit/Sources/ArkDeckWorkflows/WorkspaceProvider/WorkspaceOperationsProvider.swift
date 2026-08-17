@@ -815,6 +815,12 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         code: .operationNotSupported, reason: "workspace.unsupportedProvider")
     }
     let hasPreset: Bool
+    // Whether a missing preset is one no build of ArkDeck offers, as opposed
+    // to one this host has not configured yet. Most presets here are the
+    // second: `sourceControlPreset` exists exactly when the configured project
+    // root is a git working copy, so pointing `--workspace-project` at one
+    // makes those operations available. Only the symbolizer is the first.
+    var presetIsNeverOffered = false
     switch operation.reference {
     case "workspace.prepare-isolated-copy@1":
       hasPreset = isolationManager != nil && profile.kind == .primary
@@ -834,6 +840,11 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
       hasPreset = !profile.testPresets.isEmpty
     case "workspace.symbolize-crash@1":
       hasPreset = !profile.symbolPresets.isEmpty
+      // No profile this build ships populates `symbolPresets`; both factories
+      // pass `[:]` because no generic symbolizer may be guessed, and the
+      // isolated-copy manager only rebases what it inherited. There is
+      // therefore nothing an operator can install to reach this one.
+      presetIsNeverOffered = true
     case "workspace.inspect-git-status@1", "workspace.inspect-diff@1":
       hasPreset = profile.sourceControlPreset != nil
     case "workspace.create-checkpoint@1":
@@ -846,7 +857,9 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
     }
     guard hasPreset else {
       return .unavailable(
-        code: .workspacePresetUnavailable, reason: "workspace.presetUnavailable")
+        code: presetIsNeverOffered ? .workspacePresetNotOffered : .workspacePresetUnavailable,
+        reason: presetIsNeverOffered
+          ? "workspace.presetNotOffered" : "workspace.presetUnavailable")
     }
     do {
       for identity in profile.executableIdentities {
