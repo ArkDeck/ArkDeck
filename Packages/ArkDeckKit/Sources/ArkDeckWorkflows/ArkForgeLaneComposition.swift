@@ -222,6 +222,45 @@ package enum ArkForgeLaneComposition {
         }))
   }
 
+  /// What `main.swift` calls: composes the lane from the process environment,
+  /// performing the real launch, connect and readiness check.
+  ///
+  /// Takes the dispatcher rather than a host because the host type is internal
+  /// to this module — and that is the right shape anyway. Reaching through the
+  /// dispatcher means the lane performs control on *the same* host the rest of
+  /// the Rockchip lane uses, and a second host would be a second HDC owner.
+  package static func composeFromEnvironment(
+    runtimeDirectory: URL,
+    rockchipDispatcher: BundledRockchipRuntimeDispatcher,
+    rockchipExecutable: ResolvedExecutable,
+    approvedPlan: @escaping @Sendable (String, String)
+      -> ArkForgeExecutionAuthority.ApprovedPlan,
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    pairingEpoch: UInt64 = UInt64(Date().timeIntervalSince1970)
+  ) async -> Result<ArkForgeLaneHost, Absence> {
+    let host = rockchipDispatcher.actionHost
+    return await compose(
+      environment: environment, runtimeDirectory: runtimeDirectory,
+      pairingEpoch: pairingEpoch,
+      dependencies: .init(
+        rockchipHost: { host }, rockchipExecutable: rockchipExecutable,
+        approvedPlan: approvedPlan),
+      launch: { request, secret in
+        _ = try await IdentityBoundDaemonLauncher().launch(request, secret: secret)
+      },
+      connect: { socket in
+        let client = try ArkForgeDaemonClient(socketPath: socket)
+        return (client, client.helloAck)
+      },
+      awaitSocket: { directory in
+        // Ten seconds: the measured startup is well under one, and the failure
+        // this bounds is a daemon that never opens at all rather than a slow
+        // one (the same reasoning as ArkForge's own 5-second tool self-test).
+        await awaitControllerSocket(
+          runtimeDirectory: directory, deadline: Date().addingTimeInterval(10))
+      })
+  }
+
   /// Waits for the daemon's controller socket to appear.
   ///
   /// The socket is the readiness signal rather than a line of stdout: it is the

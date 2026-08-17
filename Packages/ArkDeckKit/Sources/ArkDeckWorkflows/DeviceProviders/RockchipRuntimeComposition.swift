@@ -475,6 +475,16 @@ package struct BundledRockchipRuntimeDispatcher: RuntimeProcessDispatching {
   private let resolver: any RuntimeExecutableResolving
   private let host: any RockchipRuntimeActionHosting
 
+  /// The same host this dispatcher runs actions through, for the ArkForge lane
+  /// to perform managed control on.
+  ///
+  /// Exposed rather than rebuilt: a second host would be a second HDC owner,
+  /// and the whole point of keeping control on this side is that there is
+  /// exactly one. When this dispatcher was composed without a descriptor-bound
+  /// HDC, the host it hands back refuses — which is the same answer the
+  /// dispatcher itself would give, arrived at the same way.
+  var actionHost: any RockchipRuntimeActionHosting { host }
+
   /// `unavailableDetail` names the concrete missing piece when one is known —
   /// an unpreparable tool runtime directory reaches the operator through
   /// `operation.list` this way instead of as a generic refusal.
