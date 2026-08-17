@@ -155,6 +155,22 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
     if revision == 1 { return nil }
 
     let previousIdentities = values(prefix: "identity:previous-serial-sha256=")
+    // The target-side edge, when the document records one separately.
+    //
+    // `revision` is the binding document's own version and is what the store's
+    // compare-and-swap increments. The runtime target has its own numbering,
+    // and the two coincide only while a lineage has never been interrupted.
+    // The first cross-mode bind of a target whose binding was rebuilt is
+    // exactly the case where they diverge, and one field cannot carry both:
+    // the store requires `revision == existing.revision + 1` while this check
+    // requires `revision == previousRevision + 1`, so any single value
+    // violates one of them.
+    //
+    // So the target edge is recorded under its own key when it differs, and
+    // `binding:previous-revision=` keeps meaning what it always meant — the
+    // binding document's predecessor.
+    let targetEdgeRevisions = values(prefix: "binding:target-previous-revision=")
+    let targetEdgeCurrentRevisions = values(prefix: "binding:target-current-revision=")
     let previousRevisions = values(prefix: "binding:previous-revision=")
     let previousTopologies = values(prefix: "binding:previous-usb-topology=")
     let confirmations = values(prefix: "rebind:user-selection-sha256=")
@@ -179,11 +195,26 @@ package struct RockchipProductBindingSnapshot: Codable, Sendable, Equatable {
       throw RockchipFlashExecutionError.productionConfigurationUnavailable(
         "durable binding previous identity lineage is invalid or ambiguous")
     }
+    // The advance describes the *target's* edge. When the document records
+    // one explicitly, that is what the target store is asked to apply; the
+    // binding's own numbering is not the target's and saying otherwise is how
+    // a first cross-mode bind ended up claiming "revision 2 follows revision
+    // 3".
+    let edgePrevious = targetEdgeRevisions.count == 1
+      ? (Int(targetEdgeRevisions[0]) ?? previousRevision)
+      : previousRevision
+    let edgeCurrent = targetEdgeCurrentRevisions.count == 1
+      ? (Int(targetEdgeCurrentRevisions[0]) ?? revision)
+      : revision
+    guard edgePrevious > 0, edgeCurrent == edgePrevious + 1 else {
+      throw RockchipFlashExecutionError.productionConfigurationUnavailable(
+        "durable binding target lineage edge is invalid")
+    }
     return RuntimeTargetBindingLineageAdvance(
       previousStableIdentitySHA256: previousIdentity,
-      previousRevision: previousRevision,
+      previousRevision: edgePrevious,
       currentStableIdentitySHA256: currentIdentity,
-      currentRevision: revision)
+      currentRevision: edgeCurrent)
   }
 
   /// A DAYU200 changes both its USB serial and its IOKit topology while moving
