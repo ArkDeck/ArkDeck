@@ -971,100 +971,34 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertNotNil(router.unavailableReason(providerID: "adb"))
   }
 
-  func testBundledResolverAcceptsOnlyFixedSiblingAndExactIdentity() throws {
-    let root = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let product = root.appending(path: "arkdeck-agentd")
-    let component = root.appending(path: "rkdeveloptool")
-    try Data("product".utf8).write(to: product)
-    try Data("component".utf8).write(to: component)
-    XCTAssertEqual(chmod(component.path, 0o700), 0)
-    let componentSHA = SHA256.hash(data: Data("component".utf8))
-      .map { String(format: "%02x", $0) }.joined()
+  func testNativeResolverRemeasuresTheConfiguredArkforgedDigest() throws {
+    let path = "/usr/bin/true"
+    let canonical = URL(filePath: path).resolvingSymlinksInPath().standardizedFileURL
+    let digest = SHA256Hex.string(of: try Data(contentsOf: canonical))
+    let resolver = ArkForgeNativeRockUSBExecutableResolver(
+      daemonPath: path, declaredSHA256: digest)
 
-    let resolver = BundledRockchipExecutableResolver(
-      productExecutableURL: product, expectedSHA256: componentSHA)
     XCTAssertEqual(
       try resolver.resolveExecutable(providerID: "rockchip"),
-      ResolvedExecutable(path: component.path, sha256: componentSHA))
+      ResolvedExecutable(path: canonical.path, sha256: digest))
     XCTAssertThrowsError(try resolver.resolveExecutable(providerID: "hdc"))
 
-    let wrongIdentity = BundledRockchipExecutableResolver(
-      productExecutableURL: product, expectedSHA256: String(repeating: "f", count: 64))
-    XCTAssertThrowsError(try wrongIdentity.resolveExecutable(providerID: "rockchip")) { error in
-      guard case BundledRockchipComponentError.identityMismatch = error else {
-        return XCTFail("expected identityMismatch, got \(error)")
-      }
-    }
-
-    try FileManager.default.removeItem(at: component)
-    try FileManager.default.createSymbolicLink(
-      at: component, withDestinationURL: product)
-    let symlinkResolver = BundledRockchipExecutableResolver(
-      productExecutableURL: product,
-      expectedSHA256: SHA256.hash(data: Data("product".utf8))
-        .map { String(format: "%02x", $0) }.joined())
-    XCTAssertThrowsError(try symlinkResolver.resolveExecutable(providerID: "rockchip")) { error in
-      XCTAssertEqual(error as? BundledRockchipComponentError, .nonCanonicalPath)
+    let drifted = ArkForgeNativeRockUSBExecutableResolver(
+      daemonPath: path, declaredSHA256: String(repeating: "f", count: 64))
+    XCTAssertThrowsError(try drifted.resolveExecutable(providerID: "rockchip")) { error in
+      XCTAssertTrue("\(error)".contains("digest changed"), "\(error)")
     }
   }
 
-  func testBundledResolverFindsFixedInstalledProductWithoutCallerPath() throws {
-    let root = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let missingSibling = root.appending(path: "missing/rkdeveloptool")
-    let installedComponent = root.appending(
-      path:
-        "Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool")
-    try FileManager.default.createDirectory(
-      at: installedComponent.deletingLastPathComponent(),
-      withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    let bytes = Data("reviewed-installed-component".utf8)
-    try bytes.write(to: installedComponent)
-    XCTAssertEqual(chmod(installedComponent.path, 0o700), 0)
-    let sha256 = SHA256.hash(data: bytes)
-      .map { String(format: "%02x", $0) }.joined()
-
-    let resolver = BundledRockchipExecutableResolver(
-      componentURLs: [missingSibling, installedComponent],
-      expectedSHA256: sha256)
-    XCTAssertEqual(
-      try resolver.resolveExecutable(providerID: "rockchip"),
-      ResolvedExecutable(path: installedComponent.path, sha256: sha256))
-  }
-
-  func testBundledResolverRejectsUnsignedInstalledProduct() throws {
-    let root = try temporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let component = root.appending(path: "rkdeveloptool")
-    try Data("unsigned-component".utf8).write(to: component)
-    XCTAssertEqual(chmod(component.path, 0o700), 0)
-
-    let resolver = BundledRockchipExecutableResolver(
-      componentURLs: [component])
-    XCTAssertThrowsError(
-      try resolver.resolveExecutable(providerID: "rockchip")
-    ) { error in
-      guard case BundledRockchipComponentError.codeSignatureInvalid = error else {
-        return XCTFail("expected codeSignatureInvalid, got \(error)")
-      }
+  func testNativeResolverRefusesAnUnconfiguredLane() {
+    let resolver = ArkForgeNativeRockUSBExecutableResolver(
+      daemonPath: nil, declaredSHA256: nil)
+    XCTAssertThrowsError(try resolver.resolveExecutable(providerID: "rockchip")) { error in
+      XCTAssertTrue("\(error)".contains("not configured"), "\(error)")
     }
   }
 
-  func testBundledResolverRejectsSignedNonProductExecutable() throws {
-    let resolver = BundledRockchipExecutableResolver(
-      componentURLs: [URL(filePath: "/usr/bin/true")])
-    XCTAssertThrowsError(
-      try resolver.resolveExecutable(providerID: "rockchip")
-    ) { error in
-      guard case BundledRockchipComponentError.codeSignatureInvalid = error else {
-        return XCTFail("expected product requirement rejection, got \(error)")
-      }
-    }
-  }
-
-  func testFactsUseAdoptedIdentityBindingAndProductComponent() async throws {
+  func testFactsUseAdoptedIdentityBindingAndNativeArkForgeIdentity() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let targetStore = try RuntimeTargetStore(
@@ -1075,7 +1009,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       toolVersion: "3.2.0f", nowUTC: "2026-07-31T00:00:00Z"
     ).record
     let component = ResolvedExecutable(
-      path: "/product/Contents/MacOS/rkdeveloptool",
+      path: "/product/arkforged",
       sha256: Self.reviewedSignedComponentSHA256)
     let factsPort = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore,
@@ -1089,14 +1023,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(facts.deviceIdentitySHA256, identity)
     XCTAssertEqual(facts.executionConnectKey, "device-1")
     XCTAssertEqual(facts.toolSHA256, component.sha256)
+    XCTAssertEqual(facts.serverFacts["rockusbBackend"], "native")
     XCTAssertEqual(
-      facts.serverFacts["componentPackage"], BundledRockchipComponent.packageID)
-    XCTAssertEqual(
-      facts.serverFacts["componentSigningIdentifier"],
-      BundledRockchipComponent.signingIdentifier)
-    XCTAssertEqual(
-      facts.serverFacts["componentSigningTeam"],
-      BundledRockchipComponent.signingTeamIdentifier)
+      facts.serverFacts["arkForgeToolchainID"], ArkForgeNativeRockUSBToolchain.identifier)
     // Facts the adoption record cannot support are reported unknown, never
     // fabricated: the old "dayu200"/"hdc" literals were guesses flowing
     // into evidence as if measured. With no probe composed nothing measured
@@ -2039,7 +1968,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           path: "/product/Contents/MacOS/rkdeveloptool",
           sha256: Self.reviewedSignedComponentSHA256)
       ])
-    let dispatcher = BundledRockchipRuntimeDispatcher(
+    let dispatcher = ArkForgeNativeRockchipControlDispatcher(
       resolver: resolver,
       host: DurableRockchipRuntimeActionHost(
         executor: SuccessfulActionExecutor(log: actionLog),
@@ -2107,7 +2036,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       action: action,
       stepID: "rebind-and-verify-build",
       toolSHA256: component.sha256)
-    let dispatcher = BundledRockchipRuntimeDispatcher(
+    let dispatcher = ArkForgeNativeRockchipControlDispatcher(
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
       host: DurableRockchipRuntimeActionHost(
         executor: PostflightActionExecutor(),
@@ -2176,7 +2105,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let component = ResolvedExecutable(
       path: "/Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool",
       sha256: Self.reviewedSignedComponentSHA256)
-    let dispatcher = BundledRockchipRuntimeDispatcher(
+    let dispatcher = ArkForgeNativeRockchipControlDispatcher(
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
       host: DurableRockchipRuntimeActionHost(
         executor: SuccessfulActionExecutor(log: ActionLog()),
@@ -2263,7 +2192,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         bindingRevision: 7,
         connectKey: "device-1",
         expectedIdentitySHA256: String(repeating: "a", count: 64),
-        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: toolSHA256,
         nowUTC: "2026-07-31T00:00:00Z"))
   }
@@ -2345,9 +2274,9 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       path: "/bin/pwd", providerID: "rockchip")
     let detail = "Rockchip tool runtime directory cannot be created"
 
-    let named = BundledRockchipRuntimeDispatcher(
+    let named = ArkForgeNativeRockchipControlDispatcher(
       resolver: resolver, unavailableDetail: detail)
-    let generic = BundledRockchipRuntimeDispatcher(resolver: resolver)
+    let generic = ArkForgeNativeRockchipControlDispatcher(resolver: resolver)
 
     let reason = try XCTUnwrap(named.unavailableReason(providerID: "rockchip"))
     XCTAssertTrue(reason.hasSuffix(": \(detail)"), "unexpected refusal text: \(reason)")

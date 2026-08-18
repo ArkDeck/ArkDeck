@@ -1474,11 +1474,10 @@ final class AgentDaemonContractTests: XCTestCase {
       observe.availability, "available",
       "a configured ARKDECK_HDC_PATH must admit observation: \(observe.reasons)")
 
-    // The Rockchip half. Whether flash.dayu200 becomes available also
-    // depends on the installed product component, which no test can install
-    // (production trust is a Developer ID signature) or uninstall. What is
-    // host-independent is the direction: configuring HDC must retire the
-    // descriptor-bound blocker, leaving at most the component one.
+    // The Rockchip half. Whether flash.dayu200 becomes available also depends
+    // on a complete native ArkForge lane. What is host-independent is the
+    // direction: configuring HDC must retire the descriptor-bound blocker,
+    // leaving only the missing-lane identity blocker in this fixture.
     guard let flash = operations["flash.dayu200"] else {
       return XCTFail("production daemon must publish flash.dayu200 availability")
     }
@@ -1486,8 +1485,8 @@ final class AgentDaemonContractTests: XCTestCase {
       flash.reasons.contains { $0.contains("requires descriptor-bound HDC") },
       "configuring HDC must retire the descriptor-bound blocker: \(flash.reasons)")
     XCTAssertTrue(
-      flash.reasons.allSatisfy { $0.contains("product-owned Rockchip component is unavailable") },
-      "the only blocker left for flash must be the product component: \(flash.reasons)")
+      flash.reasons.allSatisfy { $0.contains("ArkForge native RockUSB identity is unavailable") },
+      "the only blocker left for flash must be the native lane: \(flash.reasons)")
     XCTAssertEqual(
       flash.availability, flash.reasons.isEmpty ? "available" : "unavailable")
 
@@ -1589,17 +1588,12 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
   /// The two blockers the production Rockchip composition can publish with no
-  /// HDC configured. Which one answers is host state this test does not own:
-  /// where an ArkDeck product is installed (a Developer ID-signed
-  /// rkdeveloptool under /Applications or ~/Applications) the resolver
-  /// succeeds and the refusing per-action host answers; with no product
-  /// installed the resolver's own blocker answers first. Both prove the
-  /// contract the case is about - the route is installed and refuses
-  /// concretely - so it accepts either and names what it will not accept.
-  /// Asserting only the resolver's blocker is what made this test pass or
-  /// fail on whether an app happened to be installed.
+  /// HDC configured. Which one answers depends on whether the native ArkForge
+  /// lane environment is complete: the resolver refuses first when it is not;
+  /// otherwise the per-action host names its missing descriptor-bound HDC.
+  /// Both prove the route is installed and fails closed.
   private static let unconfiguredRockchipBlockers = [
-    "product-owned Rockchip component is unavailable",
+    "ArkForge native RockUSB identity is unavailable",
     "the per-action RockUSB host requires descriptor-bound HDC and a product state directory",
   ]
 

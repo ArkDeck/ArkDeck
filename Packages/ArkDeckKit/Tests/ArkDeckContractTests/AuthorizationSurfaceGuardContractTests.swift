@@ -61,4 +61,43 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
       factsSource.contains("plan: plan, executableIdentity: toolDevice.executableIdentity"))
     XCTAssertFalse(factsSource.contains("struct RockchipTrustedAuthorizationFacts: Codable"))
   }
+
+  func testNRU004ProductRuntimeHasNoVendorToolReference() throws {
+    let packageRoot = URL(filePath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let runtimeFiles = [
+      "LaunchAgents/LaunchAgentService.swift",
+      "Sources/ArkDeckAgentDaemonMain/main.swift",
+      "Sources/ArkDeckCLI/ArkDeckCLIMain.swift",
+      "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift",
+      "Sources/ArkDeckWorkflows/ArkForgeLaneComposition.swift",
+      "Sources/ArkDeckWorkflows/ArkForgeControlPerformer.swift",
+      "Sources/ArkDeckWorkflows/RockchipDeviceAccessApplicationFacade.swift",
+      "Sources/ArkDeckWorkflows/RockchipFlashPreflight.swift",
+      "Sources/ArkDeckWorkflows/DeviceProviders/RockchipLiveModeProbe.swift",
+      "Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeComposition.swift",
+    ]
+    for relativePath in runtimeFiles {
+      let source = try String(
+        contentsOf: packageRoot.appending(path: relativePath), encoding: .utf8)
+      XCTAssertFalse(
+        source.lowercased().contains("rkdeveloptool"),
+        "\(relativePath) reintroduced the retired vendor tool into product Runtime")
+    }
+
+    let main = try String(
+      contentsOf: packageRoot.appending(
+        path: "Sources/ArkDeckAgentDaemonMain/main.swift"), encoding: .utf8)
+    XCTAssertTrue(main.contains("ArkForgeNativeRockUSBExecutableResolver"), main)
+
+    let repoRoot = packageRoot.deletingLastPathComponent().deletingLastPathComponent()
+    let project = try String(
+      contentsOf: repoRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"), encoding: .utf8)
+    XCTAssertTrue(project.contains("rkdeveloptool in Embed Rockchip Component"))
+    let retirementDoc = try String(
+      contentsOf: repoRoot.appending(
+        path: "docs/release/rockchip-component-packaging.md"), encoding: .utf8)
+    XCTAssertTrue(retirementDoc.contains("Maskrom rescue"), retirementDoc)
+    XCTAssertTrue(retirementDoc.contains("Agentd never resolves, launches"), retirementDoc)
+  }
 }

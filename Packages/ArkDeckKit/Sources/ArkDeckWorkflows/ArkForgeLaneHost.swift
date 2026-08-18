@@ -144,7 +144,7 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
 
   package init(
     connection: Connection,
-    toolchainSHA256: String = ArkForgeToolchainPin.signedSHA256,
+    toolchainSHA256: String,
     makePerformer: @escaping @Sendable (ArkForgeLaneDeviceBinding, String)
       -> any ArkForgeFlashSession.ControlPerformer,
     makeClient: @escaping @Sendable (String) throws -> any ArkForgeFlashSession.Daemon,
@@ -359,12 +359,6 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
           + "\(expectedToolchain.id); the backend identity is part of the published "
           + "maturity combination")
     }
-    if expectedToolchain.id == ArkForgeToolchainPin.toolchainID,
-      let mismatch = ArkForgeToolchainPin.mismatchExplanation(
-        reportedSHA256: ack.toolchainSHA256)
-    {
-      throw LaneError.toolchainMismatch(mismatch)
-    }
     guard ack.toolchainSHA256.lowercased() == expectedToolchain.sha256 else {
       throw LaneError.toolchainMismatch(
         "the daemon bound \(ack.toolchainSHA256.lowercased()), while this lane publishes plans "
@@ -373,13 +367,4 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
   }
 
-  /// Compatibility entry point for the ordinary vendor lane. Native callers
-  /// must pass the identity selected by composition.
-  package static func verifyReadiness(_ ack: ArkForgeHelloAck) throws {
-    try verifyReadiness(
-      ack,
-      expectedToolchain: .init(
-        id: ArkForgeToolchainPin.toolchainID,
-        sha256: ArkForgeToolchainPin.signedSHA256))
-  }
 }

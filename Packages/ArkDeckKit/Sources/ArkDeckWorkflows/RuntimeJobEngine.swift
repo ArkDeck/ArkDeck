@@ -767,8 +767,7 @@ public actor RuntimeJobEngine {
     /// is absent.
     package let arkForgeDeviceProfileID: String?
     /// Exact backend digest selected by the composed ArkForge lane. `nil`
-    /// retains the vendor pin for an absent lane so plan-only behaviour stays
-    /// byte-compatible; no delegated step can dispatch without the lane.
+    /// means no delegated step can be materialized or dispatched.
     package let arkForgeToolchainSHA256: String?
 
     public init(
@@ -5941,6 +5940,11 @@ public actor RuntimeJobEngine {
         // only who performs it, and the plan digest records that rather than
         // hiding it.
         if Self.arkForgeDispatchedSteps.contains(step.stepID) {
+          guard let toolchainSHA256 = configuration.arkForgeToolchainSHA256 else {
+            throw RuntimeJobEngineError.rejected(
+              .invalidInput,
+              "\(descriptor.reference) is runtime unavailable: ArkForge lane is not configured")
+          }
           let workflowStep = try Self.journalStep(
             for: step, jobID: context.jobID, inputs: request.inputs,
             action: nil, resolvedInputArtifact: resolved,
@@ -5959,8 +5963,7 @@ public actor RuntimeJobEngine {
               // maturity combination nobody published, and the daemon refuses
               // it at startExecution — this is so the digest disagrees first.
               hostManagedDescriptor: Self.arkForgeStepPermitDescriptor(
-                toolchainSHA256: configuration.arkForgeToolchainSHA256
-                  ?? ArkForgeToolchainPin.signedSHA256)))
+                toolchainSHA256: toolchainSHA256)))
           continue
         }
         let action = try provider.action(

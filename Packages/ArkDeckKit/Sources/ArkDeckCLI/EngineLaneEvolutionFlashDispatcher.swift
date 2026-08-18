@@ -78,13 +78,12 @@ package struct EngineLaneEvolutionFlashDispatcher: RockchipEvolutionFlashDispatc
   private let runtimeTargetID: String
   private let gateway: EngineLaneRuntimeGateway
 
-  /// Production: the nine gates run in the product-owned admitter and every
-  /// daemon call goes over the user-private socket.
+  /// Historical campaign authority is decode/export-only. New Flash requests
+  /// use the typed Runtime job API and its Runtime-owned capability.
   public init(socketPath: String, runtimeTargetID: String) throws {
-    try self.init(
-      runtimeTargetID: runtimeTargetID,
-      admitter: RockchipProductionEvolutionCampaignAttemptAdmitter(),
-      gateway: .overDaemonSocket(AgentClient(socketPath: socketPath)))
+    throw EngineLaneSubmissionRefusal(
+      detail:
+        "historical Evolution Flash dispatch is retired; submit flash.dayu200 through Runtime")
   }
 
   package init(

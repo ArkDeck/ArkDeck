@@ -544,6 +544,11 @@ final class ArkForgeLaneDispatchContractTests: XCTestCase {
 /// The lane host: two step machines, one ArkForge job.
 final class ArkForgeLaneHostContractTests: XCTestCase {
 
+  private let nativeDigest = String(repeating: "a", count: 64)
+  private var nativeToolchain: ArkForgeLaneComposition.ToolchainIdentity {
+    .init(id: "arkforged-native-rockusb", sha256: nativeDigest)
+  }
+
   private func receipt(_ stepID: String, _ disposition: String = "semanticSuccess")
     -> ArkForgeActionReceiptSummary
   {
@@ -562,8 +567,10 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let notReady = ArkForgeHelloAck(
       protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
       refusal: nil, executionReady: false, executionBlockers: ["NO_PAIRED_AUTHORITY"],
-      toolchainID: "rkdeveloptool", toolchainSHA256: ArkForgeToolchainPin.signedSHA256)
-    XCTAssertThrowsError(try ArkForgeLaneHost.verifyReadiness(notReady)) { error in
+      toolchainID: nativeToolchain.id, toolchainSHA256: nativeDigest)
+    XCTAssertThrowsError(
+      try ArkForgeLaneHost.verifyReadiness(notReady, expectedToolchain: nativeToolchain)
+    ) { error in
       XCTAssertEqual(
         error as? ArkForgeLaneHost.LaneError,
         .daemonNotReady(blockers: ["NO_PAIRED_AUTHORITY"]))
@@ -571,27 +578,28 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
   }
 
   func testADaemonBoundToAnotherToolIsRefusedWithTheReasonNamed() throws {
-    // The rehearsal build, which AD-023 showed cannot ship. The refusal names
-    // *why* rather than printing two digests to compare.
     let wrongTool = ArkForgeHelloAck(
       protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
       refusal: nil, executionReady: true, executionBlockers: [],
-      toolchainID: "rkdeveloptool",
-      toolchainSHA256: "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611")
-    XCTAssertThrowsError(try ArkForgeLaneHost.verifyReadiness(wrongTool)) { error in
+      toolchainID: "other-rockusb-backend", toolchainSHA256: nativeDigest)
+    XCTAssertThrowsError(
+      try ArkForgeLaneHost.verifyReadiness(wrongTool, expectedToolchain: nativeToolchain)
+    ) { error in
       guard case ArkForgeLaneHost.LaneError.toolchainMismatch(let detail) = error else {
         return XCTFail("expected a named toolchain refusal, got \(error)")
       }
-      XCTAssertTrue(detail.contains("libusb"), detail)
+      XCTAssertTrue(detail.contains("other-rockusb-backend"), detail)
+      XCTAssertTrue(detail.contains("arkforged-native-rockusb"), detail)
     }
   }
 
-  func testAReadyDaemonOnThePinnedToolPasses() throws {
+  func testAReadyNativeDaemonPasses() throws {
     let ready = ArkForgeHelloAck(
       protocolMajor: 1, protocolMinor: 0, sessionKind: .controller, daemonVersion: "0.1.0",
       refusal: nil, executionReady: true, executionBlockers: [],
-      toolchainID: "rkdeveloptool", toolchainSHA256: ArkForgeToolchainPin.signedSHA256)
-    XCTAssertNoThrow(try ArkForgeLaneHost.verifyReadiness(ready))
+      toolchainID: nativeToolchain.id, toolchainSHA256: nativeDigest)
+    XCTAssertNoThrow(
+      try ArkForgeLaneHost.verifyReadiness(ready, expectedToolchain: nativeToolchain))
   }
 
   func testAReadyNativeDaemonMustMatchTheIdentityBoundArkforgedDigest() throws {
@@ -638,6 +646,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       ])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
@@ -682,6 +691,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       ])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
@@ -747,6 +757,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let counter = StartCounter()
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in ScriptedPlanSource.gated() },
@@ -790,6 +801,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let counter = StartCounter()
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in CountingDaemon(counter: counter, events: []) },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
@@ -826,6 +838,7 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     let daemon = CountingDaemon(counter: StartCounter(), events: [])
     let host = ArkForgeLaneHost(
       connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      toolchainSHA256: nativeDigest,
       makePerformer: { _, _ in SilentPerformer() },
       makeClient: { _ in daemon },
       makeMaterializer: { _ in ScriptedPlanSource.executable() },
@@ -1000,7 +1013,6 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
     "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
     "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
     "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
-    "ARKDECK_RKDEVELOPTOOL_PATH": "/opt/rkdeveloptool",
   ]
 
   func testNothingConfiguredIsTheNormalStateAndSaysWhatItMeans() {
@@ -1014,7 +1026,7 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
   }
 
   func testAPartialConfigurationIsRefusedRatherThanHalfApplied() {
-    // Three of four is not a lane with one gap — it is a configuration nobody
+    // Two of three is not a lane with one gap — it is a configuration nobody
     // reviewed, and starting from it would put an unreviewed combination in
     // front of a destructive write.
     for omitted in full.keys {
@@ -1036,22 +1048,21 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
     }
   }
 
-  func testTheToolchainDigestComesFromThisRepositoryNotTheOperator() throws {
-    // The digest is part of the maturity combination. Letting a caller name it
-    // would let a caller publish a combination nobody reviewed.
+  func testTheToolchainDigestIsTheIdentityBoundNativeDaemon() throws {
     guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(full) else {
       return XCTFail("a full configuration composes")
     }
     let argv = ArkForgeLaneComposition.daemonArguments(
       inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 9)
 
-    let pinIndex = try XCTUnwrap(argv.firstIndex(of: "--rkdeveloptool-sha256"))
-    XCTAssertEqual(argv[pinIndex + 1], ArkForgeToolchainPin.signedSHA256)
-    XCTAssertTrue(argv.contains("--require-release-signing"))
+    XCTAssertEqual(inputs.expectedToolchain.id, "arkforged-native-rockusb")
+    XCTAssertEqual(inputs.expectedToolchain.sha256, String(repeating: "a", count: 64))
+    XCTAssertFalse(argv.contains("--rockusb-port"))
+    XCTAssertFalse(argv.contains("--require-release-signing"))
     XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--pair-from-stdin")) + 1], "9")
   }
 
-  func testNativeCampaignArgvContainsNoVendorToolReference() throws {
+  func testDefaultArgvUsesNativeWithoutAVendorOrBackendOverride() throws {
     var native = full
     native["ARKDECK_ARKFORGE_CAMPAIGN"] = "AFA-AC-7"
     guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(native) else {
@@ -1060,7 +1071,7 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
     let argv = ArkForgeLaneComposition.daemonArguments(
       inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 10)
 
-    XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--rockusb-port")) + 1], "native")
+    XCTAssertFalse(argv.contains("--rockusb-port"))
     XCTAssertFalse(argv.contains("--rkdeveloptool"))
     XCTAssertFalse(argv.contains("--rkdeveloptool-sha256"))
     XCTAssertFalse(argv.joined(separator: " ").contains("rkdeveloptool"))

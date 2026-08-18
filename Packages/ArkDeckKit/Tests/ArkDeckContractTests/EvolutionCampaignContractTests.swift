@@ -2800,7 +2800,7 @@ private struct UnknownOutcomeFlashFactsPort: RockchipRuntimeFactsPort {
   func currentFacts(targetID: String) async throws -> ProviderFacts {
     ProviderFacts(
       providerID: "rockchip",
-      toolVersion: BundledRockchipComponent.reportedVersion,
+      toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
       toolSHA256: String(repeating: "c", count: 64),
       serverFacts: [
         TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:

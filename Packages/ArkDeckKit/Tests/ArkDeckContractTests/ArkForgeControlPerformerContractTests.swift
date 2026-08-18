@@ -90,7 +90,7 @@ final class ArkForgeControlPerformerContractTests: XCTestCase {
         connectKey: Fixture.connectKey,
         stableIdentitySHA256: Fixture.identity,
         usbTopology: Fixture.topology,
-        rockchipExecutable: ResolvedExecutable(
+        providerIdentity: ResolvedExecutable(
           path: "/opt/rk/rkdeveloptool", sha256: String(repeating: "5c", count: 32))),
       host: DurableRockchipRuntimeActionHost(
         executor: executor,

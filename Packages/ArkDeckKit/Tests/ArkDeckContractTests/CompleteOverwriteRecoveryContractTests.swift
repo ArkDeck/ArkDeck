@@ -73,7 +73,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
-        providerID: "rockchip", toolVersion: BundledRockchipComponent.reportedVersion,
+        providerID: "rockchip", toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: toolSHA256,
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:

@@ -6,24 +6,12 @@ import Foundation
 /// Builds the ArkForge lane from what an operator installed, or explains why
 /// there isn't one.
 ///
-/// Absent is the normal state. `arkforged`, a DeviceProfile and the pinned
-/// vendor tool all have to be deployed and named before this lane can exist,
-/// and a daemon that quietly ran without them would be a daemon that appears
-/// able to flash. So every input is required, none is guessed from `PATH` or a
-/// default location, and a partial configuration is refused rather than
-/// half-applied.
+/// Absent is the normal state. `arkforged` and a DeviceProfile have to be
+/// deployed and named before this lane can exist, and a daemon that quietly
+/// ran without them would be a daemon that appears able to flash. So every
+/// input is required, none is guessed from `PATH` or a default location, and a
+/// partial configuration is refused rather than half-applied.
 package enum ArkForgeLaneComposition {
-
-  /// The RockUSB implementation selected for one daemon generation.
-  ///
-  /// Vendor remains the ordinary default until TASK-NRU-004. The AFA-AC-7
-  /// campaign is the deliberately narrow migration lane: that campaign exists
-  /// to verify the native combination, so it must not accidentally launch the
-  /// vendor backend and then attribute those receipts to native RockUSB.
-  package enum RockUsbPort: String, Sendable, Equatable {
-    case vendor
-    case native
-  }
 
   /// The exact toolchain identity ArkDeck expects back from the daemon.
   package struct ToolchainIdentity: Sendable, Equatable {
@@ -42,10 +30,9 @@ package enum ArkForgeLaneComposition {
     package static let daemonPath = "ARKDECK_ARKFORGED_PATH"
     package static let daemonSHA256 = "ARKDECK_ARKFORGED_SHA256"
     package static let deviceProfilePath = "ARKDECK_ARKFORGE_PROFILE_PATH"
-    package static let vendorToolPath = "ARKDECK_RKDEVELOPTOOL_PATH"
     /// The acceptance campaign this lane is authorized to run, if any.
     ///
-    /// Deliberately outside the all-or-nothing set above. Those four decide
+    /// Deliberately outside the all-or-nothing set above. Those three decide
     /// whether a lane exists; this one decides whether the lane may execute a
     /// combination nobody has verified yet, which is a separate decision and a
     /// larger one. Unset is the normal state: `arkforged` then publishes
@@ -82,35 +69,18 @@ package enum ArkForgeLaneComposition {
     package let daemonPath: String
     package let daemonSHA256: String
     package let deviceProfilePath: String
-    package let vendorToolPath: String
     /// Empty when this lane runs no campaign, which is the normal state.
     package let campaign: String
 
-    /// AFA-AC-7 is the native acceptance campaign approved by CHG-2026-063.
-    /// All other campaigns retain the vendor migration lane until NRU-004
-    /// changes the product default.
-    package var rockUsbPort: RockUsbPort {
-      campaign == "AFA-AC-7" ? .native : .vendor
-    }
-
     /// Native RockUSB is part of `arkforged`, so its backend digest is the
-    /// exact daemon build the identity-bound launcher verifies. The vendor
-    /// lane keeps the independently pinned component identity.
+    /// exact daemon build the identity-bound launcher verifies.
     package var expectedToolchain: ToolchainIdentity {
-      switch rockUsbPort {
-      case .vendor:
-        return ToolchainIdentity(
-          id: ArkForgeToolchainPin.toolchainID,
-          sha256: ArkForgeToolchainPin.signedSHA256)
-      case .native:
-        return ToolchainIdentity(
-          id: "arkforged-native-rockusb", sha256: daemonSHA256)
-      }
+      ToolchainIdentity(id: "arkforged-native-rockusb", sha256: daemonSHA256)
     }
 
-    /// Reads the four keys, or says which are missing.
+    /// Reads the three keys, or says which are missing.
     ///
-    /// The all-or-nothing shape is deliberate. Three of four set is not a lane
+    /// The all-or-nothing shape is deliberate. Two of three set is not a lane
     /// with one gap — it is a configuration nobody reviewed, and starting from
     /// it would put an unreviewed combination in front of a destructive write.
     package static func read(
@@ -118,7 +88,7 @@ package enum ArkForgeLaneComposition {
     ) -> Result<Inputs, Absence> {
       let keys = [
         EnvironmentKey.daemonPath, EnvironmentKey.daemonSHA256,
-        EnvironmentKey.deviceProfilePath, EnvironmentKey.vendorToolPath,
+        EnvironmentKey.deviceProfilePath,
       ]
       let present = keys.filter { (environment[$0]?.isEmpty == false) }
       if present.isEmpty { return .failure(.notConfigured) }
@@ -129,8 +99,7 @@ package enum ArkForgeLaneComposition {
           daemonPath: environment[EnvironmentKey.daemonPath]!,
           daemonSHA256: environment[EnvironmentKey.daemonSHA256]!,
           deviceProfilePath: environment[EnvironmentKey.deviceProfilePath]!,
-          vendorToolPath: environment[EnvironmentKey.vendorToolPath]!,
-          // Absent is not missing. The four above are a lane; this is an
+          // Absent is not missing. The three above are a lane; this is an
           // authorization on top of one, and its absence is the safe state.
           campaign: environment[EnvironmentKey.campaign] ?? ""))
     }
@@ -179,16 +148,9 @@ package enum ArkForgeLaneComposition {
 
   /// The argv the daemon is started with.
   ///
-  /// The vendor tool's digest is this repository's pin rather than anything the
-  /// operator supplied: the toolchain digest is part of the maturity
-  /// combination, so letting a caller name it would let a caller publish a
-  /// combination nobody reviewed. Native launches omit both vendor flags
-  /// entirely. Besides making the process incapable of opening those bytes,
-  /// that keeps the AFA-AC-7 `pgrep -f rkdeveloptool` proof literal: the only
-  /// way the name can appear at runtime is an actual vendor process.
-  /// `--require-release-signing` is likewise not optional — a build that would
-  /// accept unsigned executable code on a customer's machine is not a build
-  /// worth shipping.
+  /// Native RockUSB is `arkforged`'s product default, so ArkDeck deliberately
+  /// omits a backend-selection flag. That makes default drift observable in the
+  /// handshake instead of silently pinning an obsolete migration switch.
   ///
   /// The pairing secret is absent by construction. It travels on stdin.
   package static func daemonArguments(
@@ -198,16 +160,7 @@ package enum ArkForgeLaneComposition {
       "--runtime-dir", runtimeDirectory.path,
       "--profile", inputs.deviceProfilePath,
       "--pair-from-stdin", String(pairingEpoch),
-      "--rockusb-port", inputs.rockUsbPort.rawValue,
-      "--require-release-signing",
     ]
-    if inputs.rockUsbPort == .vendor {
-      arguments.append(
-        contentsOf: [
-          "--rkdeveloptool", inputs.vendorToolPath,
-          "--rkdeveloptool-sha256", ArkForgeToolchainPin.signedSHA256,
-        ])
-    }
     // Appended only when an operator named one. Without it `arkforged`
     // publishes `hardwareGated` for DAYU200, `materializePlan` answers with an
     // assessment, and this lane refuses at the step rather than writing —
@@ -256,19 +209,19 @@ package enum ArkForgeLaneComposition {
   /// facts each job's authority is built from.
   struct Dependencies: Sendable {
     let rockchipHost: @Sendable () -> any RockchipRuntimeActionHosting
-    let rockchipExecutable: ResolvedExecutable
+    let providerIdentity: ResolvedExecutable
     let approvedPlan:
       @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
       -> ArkForgeExecutionAuthority.ApprovedPlan
 
     init(
       rockchipHost: @escaping @Sendable () -> any RockchipRuntimeActionHosting,
-      rockchipExecutable: ResolvedExecutable,
+      providerIdentity: ResolvedExecutable,
       approvedPlan: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
         -> ArkForgeExecutionAuthority.ApprovedPlan
     ) {
       self.rockchipHost = rockchipHost
-      self.rockchipExecutable = rockchipExecutable
+      self.providerIdentity = providerIdentity
       self.approvedPlan = approvedPlan
     }
   }
@@ -361,7 +314,7 @@ package enum ArkForgeLaneComposition {
     }
 
     let host = dependencies.rockchipHost
-    let executable = dependencies.rockchipExecutable
+    let providerIdentity = dependencies.providerIdentity
     let loaderObserver = ProductArkForgeLoaderObserver(
       runtimeDirectory: runtimeDirectory)
     return .success(
@@ -387,7 +340,7 @@ package enum ArkForgeLaneComposition {
               connectKey: binding.connectKey,
               stableIdentitySHA256: binding.stableIdentitySHA256,
               usbTopology: binding.usbTopology,
-              rockchipExecutable: executable),
+              providerIdentity: providerIdentity),
             host: host(),
             loaderObserver: loaderObserver)
         },
@@ -417,8 +370,8 @@ package enum ArkForgeLaneComposition {
   /// the Rockchip lane uses, and a second host would be a second HDC owner.
   package static func composeFromEnvironment(
     runtimeDirectory: URL,
-    rockchipDispatcher: BundledRockchipRuntimeDispatcher,
-    rockchipExecutable: ResolvedExecutable,
+    rockchipDispatcher: ArkForgeNativeRockchipControlDispatcher,
+    providerIdentity: ResolvedExecutable,
     approvedPlan: @escaping @Sendable (String, String, [UInt8], ArkForgeLaneDeviceBinding)
       -> ArkForgeExecutionAuthority.ApprovedPlan,
     environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -429,7 +382,7 @@ package enum ArkForgeLaneComposition {
       environment: environment, runtimeDirectory: runtimeDirectory,
       pairingEpoch: pairingEpoch,
       dependencies: .init(
-        rockchipHost: { host }, rockchipExecutable: rockchipExecutable,
+        rockchipHost: { host }, providerIdentity: providerIdentity,
         approvedPlan: approvedPlan),
       launch: { request, secret in
         _ = try await IdentityBoundDaemonLauncher().launch(request, secret: secret)

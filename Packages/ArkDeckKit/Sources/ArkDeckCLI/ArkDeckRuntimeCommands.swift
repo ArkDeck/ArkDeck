@@ -20,7 +20,7 @@ enum RuntimeCLI {
   /// Every option `agentd install` and `agentd update` accept.
   ///
   /// One list, exposed, because the failure it prevents already happened: the
-  /// five ArkForge lane flags were read by the command and absent from this
+  /// ArkForge lane flags were read by the command and absent from this
   /// set, so `validateAllowed` rejected them before the reader ever ran and
   /// the lane could not be installed at all. `--arkforge-profile` was answered
   /// with "unsupported option" by a build whose next twenty lines were about
@@ -32,8 +32,7 @@ enum RuntimeCLI {
     "--daemon", "--hdc", "--workspace-project", "--deveco-sdk",
     "--sensitive-evidence", "--harness-model-provider", "--harness-model-name",
     "--harness-cli", "--harness-cli-timeout-seconds", "--arktrace-descriptor",
-    "--arkforged", "--arkforged-sha256", "--arkforge-profile", "--rkdeveloptool",
-    "--arkforge-campaign",
+    "--arkforged", "--arkforged-sha256", "--arkforge-profile", "--arkforge-campaign",
   ]
 
   static func defaultSocketPath() -> String {
@@ -303,7 +302,7 @@ enum RuntimeCLI {
       } else {
         arkTraceDescriptor = nil
       }
-      // The ArkForge lane: four inputs that go in together or not at all. A
+      // The ArkForge lane: three inputs that go in together or not at all. A
       // partial set is refused here rather than written, because the lane
       // ignores an incomplete configuration and the daemon would start looking
       // configured while having no lane at all.
@@ -312,7 +311,6 @@ enum RuntimeCLI {
         "--arkforged": options.value("--arkforged"),
         "--arkforged-sha256": options.value("--arkforged-sha256"),
         "--arkforge-profile": options.value("--arkforge-profile"),
-        "--rkdeveloptool": options.value("--rkdeveloptool"),
       ]
       if laneFlags.values.contains(where: { $0 == "none" }) {
         guard laneFlags.values.allSatisfy({ $0 == nil || $0 == "none" }) else {
@@ -328,7 +326,7 @@ enum RuntimeCLI {
           throw CLIError(
             exitCode: EX_USAGE,
             message: "the ArkForge lane needs all of --arkforged, --arkforged-sha256, "
-              + "--arkforge-profile and --rkdeveloptool; missing "
+              + "and --arkforge-profile; missing "
               + missing.joined(separator: ", "))
         }
         do {
@@ -336,15 +334,14 @@ enum RuntimeCLI {
             daemonPath: laneFlags["--arkforged"]!!,
             declaredDaemonSHA256: laneFlags["--arkforged-sha256"]!!,
             deviceProfilePath: laneFlags["--arkforge-profile"]!!,
-            vendorToolPath: laneFlags["--rkdeveloptool"]!!,
-            // Optional and separate: the four above install a lane, this
+            // Optional and separate: the three above install a lane, this
             // authorizes it to execute a combination nobody has verified yet.
             // Omitted means hardwareGated, which is what every ordinary
             // install wants.
             campaign: options.value("--arkforge-campaign") ?? "")
         } catch let refusal as LaunchAgentArkForgeLaneStatus.Refusal {
-          // Measured at install time on purpose: one of these executables
-          // performs destructive writes, and a mistyped path should be found
+          // Measured at install time on purpose: this executable performs
+          // destructive writes, and a mistyped path should be found
           // now rather than with a board half-written.
           throw CLIError(exitCode: EX_USAGE, message: "\(refusal)")
         }

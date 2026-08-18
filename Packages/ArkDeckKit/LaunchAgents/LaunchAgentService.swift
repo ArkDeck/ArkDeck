@@ -26,16 +26,15 @@ public enum ArkDeckLaunchAgent {
     "ARKDECK_HARNESS_EGRESS_PROJECTS"
   public static let arkTraceDescriptorEnvironmentKey =
     "ARKDECK_ARKTRACE_DESCRIPTOR"
-  /// The four the ArkForge lane needs. All four or none: three of them is a
+  /// The three the ArkForge lane needs. All three or none: two of them is a
   /// configuration nobody reviewed, and the daemon refuses to compose a lane
   /// from a partial set rather than starting one somebody has to guess about.
   public static let arkForgedPathEnvironmentKey = "ARKDECK_ARKFORGED_PATH"
   public static let arkForgedSHA256EnvironmentKey = "ARKDECK_ARKFORGED_SHA256"
   public static let arkForgeProfileEnvironmentKey = "ARKDECK_ARKFORGE_PROFILE_PATH"
-  public static let arkForgeVendorToolEnvironmentKey = "ARKDECK_RKDEVELOPTOOL_PATH"
   /// The acceptance campaign the lane is authorized to run.
   ///
-  /// Outside the required set below on purpose. Those four decide whether a
+  /// Outside the required set below on purpose. Those three decide whether a
   /// lane exists; this decides whether it may execute a combination nobody has
   /// verified, which is the larger decision. Unset means `arkforged` publishes
   /// `hardwareGated`, materializes assessments only, and reaches no device.
@@ -46,7 +45,7 @@ public enum ArkDeckLaunchAgent {
   /// part of one.
   public static let arkForgeEnvironmentKeys = [
     arkForgedPathEnvironmentKey, arkForgedSHA256EnvironmentKey,
-    arkForgeProfileEnvironmentKey, arkForgeVendorToolEnvironmentKey,
+    arkForgeProfileEnvironmentKey,
   ]
   public static let waterFlowProjectRef = "demo-app"
   public static let harnessLocalModelProviders = ["claude-code", "codex"]
@@ -222,28 +221,24 @@ public struct LaunchAgentArkTraceDescriptorStatus: Codable, Sendable, Equatable 
 /// The ArkForge lane's installed configuration, as recorded in the receipt.
 ///
 /// Every field is measured rather than taken on trust: the paths are
-/// canonical, the two executables are hashed at install time, and `status`
-/// compares those digests against what is on disk. That is the same discipline
+/// canonical, the executable is hashed at install time, and `status` compares
+/// its digest against what is on disk. That is the same discipline
 /// the HDC path and the ArkTrace descriptor already get, and it matters more
 /// here — one of these executables performs destructive writes.
 public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
   public let daemonPath: String
   public let daemonSHA256: String
   public let deviceProfilePath: String
-  public let vendorToolPath: String
-  public let vendorToolSHA256: String
   /// Empty when no campaign is authorized, which is the normal state.
   public let campaign: String
 
   public init(
     daemonPath: String, daemonSHA256: String, deviceProfilePath: String,
-    vendorToolPath: String, vendorToolSHA256: String, campaign: String = ""
+    campaign: String = ""
   ) {
     self.daemonPath = daemonPath
     self.daemonSHA256 = daemonSHA256
     self.deviceProfilePath = deviceProfilePath
-    self.vendorToolPath = vendorToolPath
-    self.vendorToolSHA256 = vendorToolSHA256
     self.campaign = campaign
   }
 
@@ -275,16 +270,13 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
     }
   }
 
-  /// Measures the four inputs, or refuses.
+  /// Measures the three inputs, or refuses.
   ///
   /// `declaredDaemonSHA256` is compared rather than trusted: the operator says
-  /// which bytes they mean, and this checks the file agrees. The vendor tool's
-  /// digest is *not* an operator input — it is measured here and checked
-  /// against this repository's pin by the lane, because the toolchain digest is
-  /// part of the maturity combination.
+  /// which bytes they mean, and this checks the file agrees.
   public static func measuring(
     daemonPath: String, declaredDaemonSHA256: String, deviceProfilePath: String,
-    vendorToolPath: String, campaign: String = ""
+    campaign: String = ""
   ) throws -> LaunchAgentArkForgeLaneStatus {
     func verify(_ path: String) throws -> Data {
       guard path.hasPrefix("/") else { throw Refusal.notAbsolute(path) }
@@ -303,12 +295,10 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
         path: daemonPath, declared: declaredDaemonSHA256, measured: measured)
     }
     _ = try verify(deviceProfilePath)
-    let tool = try verify(vendorToolPath)
 
     return LaunchAgentArkForgeLaneStatus(
       daemonPath: daemonPath, daemonSHA256: measured,
-      deviceProfilePath: deviceProfilePath, vendorToolPath: vendorToolPath,
-      vendorToolSHA256: SHA256Hex.string(of: tool),
+      deviceProfilePath: deviceProfilePath,
       campaign: campaign.trimmingCharacters(in: .whitespaces))
   }
 
@@ -318,7 +308,6 @@ public struct LaunchAgentArkForgeLaneStatus: Codable, Sendable, Equatable {
       ArkDeckLaunchAgent.arkForgedPathEnvironmentKey: daemonPath,
       ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey: daemonSHA256,
       ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey: deviceProfilePath,
-      ArkDeckLaunchAgent.arkForgeVendorToolEnvironmentKey: vendorToolPath,
     ]
     // Written only when authorized. An empty value in the plist would read as
     // an unnamed campaign, and an unnamed campaign is one nobody can be held
@@ -569,10 +558,6 @@ public final class LaunchAgentService: @unchecked Sendable {
       daemonPath: environment[ArkDeckLaunchAgent.arkForgedPathEnvironmentKey]!,
       daemonSHA256: environment[ArkDeckLaunchAgent.arkForgedSHA256EnvironmentKey]!,
       deviceProfilePath: environment[ArkDeckLaunchAgent.arkForgeProfileEnvironmentKey]!,
-      vendorToolPath: environment[ArkDeckLaunchAgent.arkForgeVendorToolEnvironmentKey]!,
-      // Re-measured by the lane at daemon startup; not re-hashed here, because
-      // this call only preserves what an operator already chose.
-      vendorToolSHA256: "",
       // Preserved too. An `update` that said nothing about the lane and
       // silently dropped the campaign would turn an authorized bench back into
       // a hardwareGated one — a change nobody asked for, discovered at the
@@ -853,7 +838,7 @@ public final class LaunchAgentService: @unchecked Sendable {
       environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey] =
         arkTraceDescriptor.url.path
     }
-    // All four or none. The lane refuses a partial set, so writing three would
+    // All three or none. The lane refuses a partial set, so writing two would
     // produce a daemon that starts, looks configured, and has no lane.
     if let arkForgeLane {
       environment.merge(arkForgeLane.environment) { _, new in new }

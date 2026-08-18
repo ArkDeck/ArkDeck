@@ -6,6 +6,7 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
+@testable import ArkForgeIPC
 
 final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
   private static let archiveEnvironmentKey = "ARKDECK_DAYU200_70035_IMAGE"
@@ -17,6 +18,29 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
 
     func record() { count += 1 }
     func snapshot() -> Int { count }
+  }
+
+  /// Supplies only the immutable native toolchain identity needed to
+  /// materialize delegated StepPermit descriptors. A plan-only request must
+  /// never call either execution method.
+  private actor NonDispatchingArkForgeLane: RuntimeJobEngine.ArkForgeLane {
+    nonisolated let toolchainSHA256: String
+
+    init(toolchainSHA256: String) {
+      self.toolchainSHA256 = toolchainSHA256
+    }
+
+    func perform(
+      stepID: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
+      binding _: ArkForgeLaneDeviceBinding
+    ) async throws -> ArkForgeActionReceiptSummary {
+      throw RuntimeDispatchFailure.failed(
+        "planOnly must never execute delegated ArkForge step \(stepID)")
+    }
+
+    func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
+      nil
+    }
   }
 
   private struct RefusingDispatcher: RuntimeProcessDispatching {
@@ -35,7 +59,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
         providerID: "rockchip",
-        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: Dayu20070035RuntimePlanOnlyContractTests.toolIdentity,
         serverFacts: [:], targetID: targetID, bindingRevision: 7,
         deviceIdentitySHA256:
@@ -148,7 +172,7 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
       targetID: "TGT-DAYU200-70035", bindingRevision: 7,
       connectKey: "sealed-plan-only-connect-key",
       expectedIdentitySHA256: Self.targetIdentity,
-      toolVersion: BundledRockchipComponent.reportedVersion,
+      toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
       toolSHA256: Self.toolIdentity,
       nowUTC: "2026-08-01T00:00:00Z",
       resolvedInputArtifact: ProviderResolvedInputArtifact(
@@ -399,7 +423,9 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     let dispatchLog = DispatchLog()
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory),
+        arkForgeLane: NonDispatchingArkForgeLane(toolchainSHA256: Self.toolIdentity),
+        arkForgeDeviceProfileID: "dayu200"),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(
           factsPort: FactsPort(), availability: .available)

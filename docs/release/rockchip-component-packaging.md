@@ -1,5 +1,14 @@
 # Rockchip bundled-component packaging contract
 
+> **NRU-004 retirement boundary (2026-08-18):** this component is retained in
+> `/Applications/ArkDeck.app` only as an operator-invoked **Maskrom rescue**
+> utility. Loader discovery, partition-table reads, writes, readback, reset,
+> target facts, preflight and the `flash.dayu200` Runtime path use native
+> RockUSB inside identity-bound `arkforged`. Agentd never resolves, launches,
+> trusts, bookmarks, or passes this component to ArkForge. Its presence in the
+> App bundle is distribution/compliance inventory, not product Runtime
+> availability or Flash authority.
+
 This document defines the TASK-BRC-003 release boundary for
 `rkdeveloptool@1.32`. The machine-readable facts live in
 `openspec/integrations/rockchip/bundled-component/1.0.0/package.json`; the

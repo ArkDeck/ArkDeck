@@ -91,12 +91,12 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
     let connectKey: String
     let stableIdentitySHA256: String
     let usbTopology: String
-    let rockchipExecutable: ResolvedExecutable
+    let providerIdentity: ResolvedExecutable
 
     init(
       jobID: String, targetID: String, bindingRevision: Int,
       connectKey: String, stableIdentitySHA256: String, usbTopology: String,
-      rockchipExecutable: ResolvedExecutable
+      providerIdentity: ResolvedExecutable
     ) {
       self.jobID = jobID
       self.targetID = targetID
@@ -104,7 +104,7 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       self.connectKey = connectKey
       self.stableIdentitySHA256 = stableIdentitySHA256
       self.usbTopology = usbTopology
-      self.rockchipExecutable = rockchipExecutable
+      self.providerIdentity = providerIdentity
     }
   }
 
@@ -279,11 +279,11 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       bindingRevision: binding.bindingRevision,
       connectKey: binding.connectKey,
       expectedIdentitySHA256: binding.stableIdentitySHA256,
-      providerExecutableSHA256: binding.rockchipExecutable.sha256,
+      providerExecutableSHA256: binding.providerIdentity.sha256,
       executionTuning: nil)
     return try await host.execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: binding.rockchipExecutable)
+      rockchipExecutable: binding.providerIdentity)
   }
 
   /// The record-store step id for one action of one control request.

@@ -1,4 +1,4 @@
-// Product-owned per-action RockUSB host for flash.dayu200.
+// Product-owned per-action control host for flash.dayu200.
 //
 // RuntimeJobEngine owns capability admission and the outer write-ahead
 // intent. This host does not construct another authorization/session model:
@@ -130,14 +130,9 @@ extension RockchipRuntimeCommandRunning {
 struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
   /// Product-owned current directory bound to every child spawned here.
   ///
-  /// Upstream rkdeveloptool locates `config.ini` and `log/` next to its own
-  /// executable through `/proc/<pid>/exe`; that lookup does not exist on
-  /// macOS, so both degrade to cwd-relative and an engine-lane job started
-  /// from a checkout wrote `log/log<date>.txt` into the caller's Git worktree.
-  /// Binding the child to `RockchipProductToolRuntimeDirectory` state is the
-  /// same intent the whole-plan lane already carried, and it also pins
-  /// `config.ini` to a reviewed empty file instead of whatever happens to sit
-  /// in the caller's directory.
+  /// Binding every remaining HDC child to product-owned Runtime state keeps
+  /// command execution independent of the daemon's launch directory and
+  /// prevents runtime output from landing in a source checkout.
   ///
   /// This is deliberately not optional: the runner is the only spawn point of
   /// the engine lane, so a composition that cannot name product-owned state
@@ -176,9 +171,8 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
         process: ProcessRequest(
           executable: URL(filePath: executable.path),
           arguments: arguments,
-          // This runner serves both the RockUSB tool and hdc transitions.
-          // The spawn base allowlist drops an inherited HDC port, so it is
-          // named explicitly; the RockUSB tool ignores it.
+          // This runner serves the remaining HDC transitions. The spawn base
+          // allowlist drops an inherited HDC port, so it is named explicitly.
           environment: HDCServerEndpointSelector.inheritedPortChildEnvironment(),
           workingDirectory: workingDirectory,
           timeout: timeoutSeconds.map(TimeInterval.init)),
@@ -583,23 +577,12 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         ],
         receipts: [])
 
-    // flashPartitions / verifyFlashReadback were dispatched here. Both were
-    // removed with the lowering they drove (CHG-2026-059): the `wlx` write,
-    // the `rl` readback and the read-domain judgement that decided what a
-    // readback meant are arkforged's, behind a StepPermit. This host keeps
-    // only the HDC-side actions, which are the ones ArkDeck alone can do.
-    case .rebootToNormal(let stableIdentitySHA256):
-      _ = try exactLoaderIdentity(
-        stableIdentitySHA256: stableIdentitySHA256)
-      let receipt = try await run(
-        executable: rockchipExecutable,
-        arguments: ["rd"],
-        timeoutSeconds: 15,
-        budget: 64 * 1024,
-        effectMayHaveOccurred: true,
-        successMarker: RockchipRockUSBFlashProvider.resetSuccessMarker)
-      return result(
-        summary: ["transition": "loader-to-normal"], receipts: [receipt])
+    // Native ArkForge owns the write, verification and reset as one delegated
+    // plan. This legacy action remains decodable for old journals, but must
+    // never launch the current provider identity as an argv-compatible CLI.
+    case .rebootToNormal:
+      throw RuntimeDispatchFailure.failed(
+        "legacy direct Rockchip reset is retired; native ArkForge owns device reset")
 
     case .waitForHDCReconnect(let connectKey):
       let receipts = try await waitForHDC(
@@ -1291,7 +1274,7 @@ struct RockchipRuntimeActionRecordStore: Sendable {
         firmware: expectedBuildVersion,
         transport: "usb",
         providerID: record.providerID,
-        toolVersion: BundledRockchipComponent.reportedVersion,
+        toolVersion: ArkForgeNativeRockUSBToolchain.reportedVersion,
         toolSHA256: receipt.providerExecutableSHA256,
         confirmedAtUTC: confirmedAtUTC,
         confirmationMethod: "machinePostflightReadback",

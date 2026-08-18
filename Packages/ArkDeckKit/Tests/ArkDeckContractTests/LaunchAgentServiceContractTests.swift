@@ -53,6 +53,33 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ArkDeckAgentFilesystemLayout.socketFilename)
   }
 
+  func testPreservingUpdateMigratesALegacyFourKeyArkForgePlistToThreeKeys() throws {
+    try FileManager.default.createDirectory(
+      at: paths.plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let environment = [
+      "ARKDECK_ARKFORGED_PATH": "/opt/arkforged",
+      "ARKDECK_ARKFORGED_SHA256": String(repeating: "a", count: 64),
+      "ARKDECK_ARKFORGE_PROFILE_PATH": "/opt/dayu200.yaml",
+      "ARKDECK_RKDEVELOPTOOL_PATH": "/legacy/rkdeveloptool",
+      "ARKDECK_ARKFORGE_CAMPAIGN": "AFA-AC-7",
+    ]
+    let data = try PropertyListSerialization.data(
+      fromPropertyList: ["EnvironmentVariables": environment],
+      format: .xml, options: 0)
+    try data.write(to: paths.plist)
+
+    let migrated = try XCTUnwrap(service.arkForgeLaneForPreservingUpdate())
+
+    XCTAssertEqual(migrated.daemonPath, "/opt/arkforged")
+    XCTAssertEqual(migrated.campaign, "AFA-AC-7")
+    XCTAssertEqual(
+      Set(migrated.environment.keys),
+      Set(ArkDeckLaunchAgent.arkForgeEnvironmentKeys + [
+        ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey
+      ]))
+    XCTAssertNil(migrated.environment["ARKDECK_RKDEVELOPTOOL_PATH"])
+  }
+
   func testDistributionHelpersShareOnlyTheProvisionedKeychainGroup() throws {
     let distribution = packageRoot.appending(path: "Distribution/macOS")
     let cliInfo = try plist(at: distribution.appending(path: "ArkDeckCLI-Info.plist"))

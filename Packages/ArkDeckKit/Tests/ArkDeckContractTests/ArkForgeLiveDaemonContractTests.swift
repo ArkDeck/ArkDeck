@@ -28,6 +28,7 @@ import XCTest
 final class ArkForgeLiveDaemonContractTests: XCTestCase {
 
   private static let socketKey = "ARKDECK_ARKFORGE_LIVE_SOCKET"
+  private static let daemonSHAKey = "ARKDECK_ARKFORGED_SHA256"
 
   private func liveClient(
     timeoutSeconds: Int = 30
@@ -199,6 +200,12 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
   func testALiveDaemonReportsTheReadinessTheLaneRequires() throws {
     let client = try liveClient()
     let ack = client.helloAck
+    guard let daemonSHA256 = ProcessInfo.processInfo.environment[Self.daemonSHAKey] else {
+      throw XCTSkip(
+        "set \(Self.daemonSHAKey) to the identity-bound arkforged executable digest")
+    }
+    let expected = ArkForgeLaneComposition.ToolchainIdentity(
+      id: "arkforged-native-rockusb", sha256: daemonSHA256)
 
     XCTAssertEqual(ack.sessionKind, .controller)
     XCTAssertTrue(
@@ -206,11 +213,10 @@ final class ArkForgeLiveDaemonContractTests: XCTestCase {
       "the deployed daemon is not execution-ready: \(ack.executionBlockers)")
     XCTAssertTrue(ack.executionBlockers.isEmpty)
     XCTAssertNoThrow(
-      try ArkForgeLaneHost.verifyReadiness(ack),
+      try ArkForgeLaneHost.verifyReadiness(ack, expectedToolchain: expected),
       "the lane refuses a daemon this deployment produced")
-    XCTAssertTrue(
-      ArkForgeToolchainPin.matchesPin(reportedSHA256: ack.toolchainSHA256),
-      "the daemon bound \(ack.toolchainSHA256); this build pins a different tool")
+    XCTAssertEqual(ack.toolchainID, "arkforged-native-rockusb")
+    XCTAssertEqual(ack.toolchainSHA256, daemonSHA256.lowercased())
   }
 
   // MARK: - The plan identity the engine actually sends

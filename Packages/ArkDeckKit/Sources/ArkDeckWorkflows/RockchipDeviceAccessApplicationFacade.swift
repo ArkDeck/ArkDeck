@@ -1,3 +1,4 @@
+import ArkForgeIPC
 import Foundation
 
 public enum RockchipDeviceAccessPresentationAvailability: Sendable, Equatable {
@@ -6,9 +7,9 @@ public enum RockchipDeviceAccessPresentationAvailability: Sendable, Equatable {
   case unavailable(reason: String)
 }
 
-/// Closed App-facing projection of the registered read-only `rkdeveloptool ld`
-/// probe. It contains diagnosis and remediation facts only; no argv, shell,
-/// privilege escalation, driver installation, or device mutation is exposed.
+/// Closed App-facing projection of ArkForge's public read-only discovery.
+/// It contains diagnosis and remediation facts only; no execution session,
+/// permit, argv, shell, privilege escalation, or device mutation is exposed.
 public struct RockchipDeviceAccessPresentation: Sendable, Equatable {
   public let availability: RockchipDeviceAccessPresentationAvailability
   public let advice: RockchipDeviceAccessAdvice?
@@ -50,26 +51,45 @@ private actor RockchipDeviceAccessProductionProvider:
   RockchipDeviceAccessApplicationProviding
 {
   func refresh() async -> RockchipDeviceAccessPresentation {
-    let settings: RockchipProductDiscoverySettings
+    let observations: [ArkForgeDeviceObservation]
     do {
-      settings = try RockchipProductExecutionSettings.loadDiscovery()
+      let applicationSupport = try FileManager.default.url(
+        for: .applicationSupportDirectory, in: .userDomainMask,
+        appropriateFor: nil, create: false)
+      let socket = applicationSupport
+        .appending(path: "ArkDeck/Agentd/arkforge/public.sock").path
+      let client = try ArkForgeDaemonClient(
+        socketPath: socket, sessionKind: .publicSession, timeoutSeconds: 15)
+      observations = try client.discoverDevices(
+        requestID: "app-device-access-\(UUID().uuidString.lowercased())")
     } catch {
       return RockchipDeviceAccessPresentation(
         availability: .unavailable(
-          reason: "The pinned rkdeveloptool selection or trust facts are unavailable"),
-        advice: RockchipDeviceAccessAdvisor.advice(
-          for: .toolBlocked(.ordinaryBookmarkMissing)),
+          reason: "ArkForge native RockUSB discovery is unavailable: \(error)"),
+        advice: RockchipDeviceAccessAdvisor.advice(for: .probeFailed),
         observationCount: 0,
         observedModes: [])
     }
-    let attempt = await RockchipProductionDiscoveryComposition.admissionDiscoveryAdapter(
-      toolWorkingDirectory: settings.toolWorkingDirectory
-    ).discover(using: settings.tool)
+    let modes = observations.compactMap { observation -> RockchipDeviceMode? in
+      switch observation.mode {
+      case "rockusb-loader", "loader": return .loader
+      case "rockusb-maskrom", "maskrom": return .maskrom
+      default: return nil
+      }
+    }
+    let verdict: RockchipDeviceAccessVerdict
+    if modes.contains(.loader) {
+      verdict = .accessible
+    } else if modes.isEmpty {
+      verdict = .offlineOrUnauthorized
+    } else {
+      verdict = .protocolBlocked
+    }
     return RockchipDeviceAccessPresentation(
       availability: .available,
-      advice: attempt.advice,
-      observationCount: attempt.observations.count,
-      observedModes: attempt.observations.map(\.mode))
+      advice: RockchipDeviceAccessAdvisor.advice(for: verdict),
+      observationCount: modes.count,
+      observedModes: modes)
   }
 }
 

@@ -66,21 +66,19 @@ package struct FoundationRockchipLiveModeProbe: RockchipLiveModeProbing {
   private let runner: any RockchipRuntimeCommandRunning
   private let loaderObserver: any ArkForgeLoaderObserving
 
-  /// `toolWorkingDirectory` is the same prepared product-owned directory the
-  /// per-action host uses for its remaining HDC reads. Loader mode is observed
-  /// separately through ArkForge's public read-only socket and IOKit.
+  /// HDC reads use the daemon's product-owned state directory. Loader mode is
+  /// observed separately through ArkForge's public read-only socket and IOKit.
   package init(
     hdcResolver: any RuntimeExecutableResolving,
-    rockchipResolver _: any RuntimeExecutableResolving,
-    toolWorkingDirectory: URL
+    stateDirectory: URL
   ) {
     self.init(
       hdcResolver: hdcResolver,
       runner: FoundationRockchipRuntimeCommandRunner(
-        workingDirectory: toolWorkingDirectory),
+        workingDirectory: stateDirectory),
       loaderObserver: ProductArkForgeLoaderObserver(
-        runtimeDirectory: toolWorkingDirectory.deletingLastPathComponent()
-          .appending(path: "arkforge", directoryHint: .isDirectory)))
+        runtimeDirectory: stateDirectory.appending(
+          path: "arkforge", directoryHint: .isDirectory)))
   }
 
   init(

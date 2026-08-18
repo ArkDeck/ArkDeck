@@ -326,43 +326,30 @@ Task.detached {
       factsPort: TargetStoreFactsPort(
         targetStore: targetStore, executablePath: configuredHDC ?? "-",
         executableSHA256: executableSHA))
-    let rockchipResolver = BundledRockchipExecutableResolver()
-    let rockchipDispatcher: BundledRockchipRuntimeDispatcher
-    // The RockUSB tool resolves `config.ini` and `log/` relative to its
-    // current directory on macOS, so every child of this lane is spawned in
-    // product-owned state instead of whatever directory the daemon was
-    // started from. Prepared here, once, before any dispatcher exists: the
-    // Process port revalidates the directory at each launch and a missing one
-    // is a refusal, so a failure has to be visible at composition rather than
-    // mid-flash. It stays under the daemon's own state directory, which keeps
-    // a `--state-dir` daemon hermetic exactly like the binding above.
-    var rockchipToolWorkingDirectory: URL?
-    var rockchipToolRuntimeFailure: String?
-    do {
-      rockchipToolWorkingDirectory = try RockchipProductToolRuntimeDirectory.prepare(
-        root: resolvedStateDirectory)
-    } catch {
-      rockchipToolRuntimeFailure = "\(error)"
-    }
+    let rockchipResolver = ArkForgeNativeRockUSBExecutableResolver(
+      daemonPath: ProcessInfo.processInfo.environment[
+        ArkForgeLaneComposition.EnvironmentKey.daemonPath],
+      declaredSHA256: ProcessInfo.processInfo.environment[
+        ArkForgeLaneComposition.EnvironmentKey.daemonSHA256])
+    let rockchipDispatcher: ArkForgeNativeRockchipControlDispatcher
     // Facts are measured only where the same per-action tool runtime is
     // composed. Without a descriptor-bound HDC there is no read-only surface
     // to measure the target's mode on, and a mode asserted without one is
     // exactly the fabrication #992 removed — so the port stays record-only.
     var rockchipProber: (any RockchipLiveModeProbing)?
-    if let hdcExecutableResolver, let toolWorkingDirectory = rockchipToolWorkingDirectory {
-      rockchipDispatcher = BundledRockchipRuntimeDispatcher(
+    if let hdcExecutableResolver {
+      rockchipDispatcher = ArkForgeNativeRockchipControlDispatcher(
         resolver: rockchipResolver,
         hdcResolver: hdcExecutableResolver,
         stateDirectory: resolvedStateDirectory,
-        toolWorkingDirectory: toolWorkingDirectory,
+        stateWorkingDirectory: resolvedStateDirectory,
         postFlashHDCBindingStore: postFlashHDCBindingStore)
       rockchipProber = FoundationRockchipLiveModeProbe(
         hdcResolver: hdcExecutableResolver,
-        rockchipResolver: rockchipResolver,
-        toolWorkingDirectory: toolWorkingDirectory)
+        stateDirectory: resolvedStateDirectory)
     } else {
-      rockchipDispatcher = BundledRockchipRuntimeDispatcher(
-        resolver: rockchipResolver, unavailableDetail: rockchipToolRuntimeFailure)
+      rockchipDispatcher = ArkForgeNativeRockchipControlDispatcher(
+        resolver: rockchipResolver)
     }
     let rockchipFactsPort = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore, resolver: rockchipResolver,
@@ -603,7 +590,7 @@ Task.detached {
     )
     .appending(path: "ArkDeck", directoryHint: .isDirectory)
     .appending(path: "AuthorizationUsage", directoryHint: .isDirectory)
-    // The ArkForge lane. Absent unless an operator installed and named all four
+    // The ArkForge lane. Absent unless an operator installed and named all three
     // inputs, and absence is written to the log with what it means for the
     // product — a daemon with no lane and a daemon that failed to build one
     // look identical from outside, and only one of them is a problem.
@@ -620,7 +607,7 @@ Task.detached {
     switch await ArkForgeLaneComposition.composeFromEnvironment(
       runtimeDirectory: arkForgeRuntimeDirectory,
       rockchipDispatcher: rockchipDispatcher,
-      rockchipExecutable: (try? rockchipResolver.resolveExecutable(providerID: "rockchip"))
+      providerIdentity: (try? rockchipResolver.resolveExecutable(providerID: "rockchip"))
         ?? ResolvedExecutable(path: "-", sha256: String(repeating: "0", count: 64)),
       approvedPlan: { jobID, planID, planDigest, deviceBinding in
         // The plan facts this authority signs against.
