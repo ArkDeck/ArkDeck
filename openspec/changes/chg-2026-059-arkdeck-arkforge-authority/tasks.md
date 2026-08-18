@@ -28,6 +28,7 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Package.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
   - `Packages/ArkDeckKit/Sources/ArkForgeIPC/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/DeviceBootstrap.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Rockchip*.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForge*.swift`
