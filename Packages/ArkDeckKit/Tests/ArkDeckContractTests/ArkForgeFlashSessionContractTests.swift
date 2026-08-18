@@ -669,6 +669,71 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
     XCTAssertEqual(starts, 1, "one ArkForge job, however many delegated steps ask")
   }
 
+  func testCancelledSafeNeverPublishesACompletedPlanReceipt() async throws {
+    let started = StartCounter()
+    let daemon = CountingDaemon(
+      counter: started,
+      events: [
+        ArkForgeJobEvent(
+          jobID: "JOB-1", sequence: 1, kind: .outcomeClassified, atEpochMs: 0,
+          journalRecordSHA256: [], jobState: "cancelledSafe", admission: nil,
+          controlRequest: nil, receipt: nil,
+          facts: [ArkForgeKeyValue(key: "outcome", value: "cancelledSafe")])
+      ])
+    let host = ArkForgeLaneHost(
+      connection: .init(socketPath: "/tmp/unused.sock", controllerSessionID: "S"),
+      makePerformer: { _, _ in SilentPerformer() },
+      makeClient: { _ in daemon },
+      makeMaterializer: { _ in ScriptedPlanSource.executable() },
+      makeAuthority: { _, _, _, _ in
+        ArkForgeExecutionAuthority(
+          plan: .init(
+            jobID: "JOB-1", planID: "PLAN-1", planSHA256: [],
+            admittedDeviceFactsSHA256: [],
+            binding: ArkForgeAuthorityBinding(
+              authorityNamespace: "arkdeck", bindingID: "T", bindingRevision: 1,
+              stableIdentityDigest: []),
+            controllerSessionID: "S"),
+          secret: ArkForgePairingSecret(
+            secret: [], epoch: ArkForgePairingEpoch(1)),
+          now: { 0 })
+      })
+
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "ARKDECK-JOB-1",
+        artifact: scriptedArtifact(),
+        binding: ArkForgeLaneDeviceBinding(
+          connectKey: "device-1",
+          stableIdentitySHA256: String(repeating: "a", count: 64),
+          targetID: "TGT-1", bindingRevision: 2,
+          usbTopology: ScriptedPlanSource.topology))
+      XCTFail("cancelledSafe must not look like a completed delegated step")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted = failure else {
+        return XCTFail("unexpected cancellation mapping: \(failure)")
+      }
+    }
+    do {
+      _ = try await host.perform(
+        stepID: "flash-partitions", jobID: "ARKDECK-JOB-1",
+        artifact: scriptedArtifact(),
+        binding: ArkForgeLaneDeviceBinding(
+          connectKey: "device-1",
+          stableIdentitySHA256: String(repeating: "a", count: 64),
+          targetID: "TGT-1", bindingRevision: 2,
+          usbTopology: ScriptedPlanSource.topology))
+      XCTFail("a second call must retain cancelledSafe, not reuse a partial receipt")
+    } catch let failure as RuntimeDispatchFailure {
+      guard case .confirmedNotExecuted = failure else {
+        return XCTFail("unexpected repeated cancellation mapping: \(failure)")
+      }
+    }
+    let completion = await host.completedPlanReceipt(jobID: "ARKDECK-JOB-1")
+    XCTAssertNil(completion)
+    XCTAssertEqual(started.value, 1)
+  }
+
   func testAnAssessmentNeverBecomesAWrite() async throws {
     // The gate that keeps AD-025 honest from this side. When the daemon
     // answers `materializePlan` with an assessment, the combination is not one

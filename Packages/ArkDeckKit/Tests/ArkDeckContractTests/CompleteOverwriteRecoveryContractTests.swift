@@ -6,6 +6,7 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
+@testable import ArkForgeIPC
 
 final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   private let identity = String(repeating: "9", count: 64)
@@ -18,6 +19,51 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
     func record(_ stepID: String) { stepIDs.append(stepID) }
     func snapshot() -> [String] { stepIDs }
+  }
+
+  /// One ArkForge execution projected through both delegated Runtime steps.
+  /// The receipt is the terminal managed-control postflight that production
+  /// `ArkForgeLaneHost` exposes only after the daemon plan completes.
+  private actor CompletedArkForgeLane: RuntimeJobEngine.ArkForgeLane {
+    nonisolated let toolchainSHA256: String
+    private let receipt: ArkForgeActionReceiptSummary
+    private var started = false
+    private var starts = 0
+
+    init(toolchainSHA256: String) {
+      self.toolchainSHA256 = toolchainSHA256
+      let facts = [
+        ArkForgeKeyValue(key: "const.product.model", value: "DAYU200"),
+        ArkForgeKeyValue(key: "const.ohos.fullname", value: "OpenHarmony-7.0.0.fixture"),
+        ArkForgeKeyValue(key: "usbTopology", value: "42"),
+      ]
+      self.receipt = ArkForgeActionReceiptSummary(
+        jobID: "JOB-RECOVERY-1", planID: "PLAN-RECOVERY-1", stepID: "STEP-023",
+        actionID: "", attemptID: "", permitID: "PERMIT-RECOVERY-23",
+        disposition: "semanticSuccess",
+        evidenceSHA256: ArkForgeManagedControlPort.canonicalFactsDigest(
+          Dictionary(uniqueKeysWithValues: facts.map { ($0.key, $0.value) })),
+        verificationOutcome: "", verificationStrength: "",
+        verifiedRangeStart: 0, verifiedRangeLength: 0,
+        typedSkipReason: "", failureClassification: "", facts: facts)
+    }
+
+    func perform(
+      stepID _: String, jobID _: String, artifact _: ArkForgeLaneArtifact,
+      binding _: ArkForgeLaneDeviceBinding
+    ) async throws -> ArkForgeActionReceiptSummary {
+      if !started {
+        started = true
+        starts += 1
+      }
+      return receipt
+    }
+
+    func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
+      started ? receipt : nil
+    }
+
+    func startCount() -> Int { starts }
   }
 
   private struct RecoveryFactsPort: RockchipRuntimeFactsPort {
@@ -475,17 +521,6 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   func testDistinctRecoveryRunsThroughRuntimeOwnedCapabilityAndTypedProvider() async throws {
-    // Drives a full `flash.dayu200` job, which cannot run in this tree: step 1
-    // of TASK-AFA-001 removed the in-process lowering and step 5 has not wired
-    // the permit route yet, so the plan is refused before authorization.
-    //
-    // Skipped rather than rewritten. What these assert — no replay, no new
-    // dispatch, supersession bookkeeping — is exactly what must still hold once
-    // arkforged performs the write, and rewriting them to assert today's
-    // refusal would throw that away. `DeviceProviderContractTests`'s
-    // `testFlashStepsAreRefusedBeforeAuthorization` covers the interim contract.
-    throw XCTSkip(
-      "flash.dayu200 has no executor until TASK-AFA-001 step 5 wires the StepPermit route")
     let old = try writeUnknownJob(
       jobID: "job-original-unknown", timestamp: "2026-08-08T00:00:00Z",
       correlatedUnknownOutcome: false)
@@ -511,8 +546,11 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let dispatchLog = DispatchLog()
+    let lane = CompletedArkForgeLane(toolchainSHA256: providerSHA256)
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: lane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200"),
       providers: DeviceProviderRegistry(providers: [
         RockchipFlashProviderAdapter(
           factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
@@ -549,6 +587,21 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       recoveryReplay.events.allSatisfy {
         $0.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion
       })
+    let requiredRecoverySteps = [
+      "flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
+      "rebind-and-verify-build",
+    ]
+    for stepID in requiredRecoverySteps {
+      XCTAssertTrue(
+        recoveryReplay.events.contains {
+          $0.kind == .stepOutcome && $0.stepID == stepID
+            && $0.payload["result"] == .string("succeeded")
+            && $0.payload["outcomeCertainty"] == .string("confirmed")
+            && $0.payload["semanticCode"]
+              == .string(RuntimeJobEngine.arkForgePlanCompletionSemanticCode)
+        },
+        "\(stepID) must retain the typed ArkForge completion proof used by epoch finalization")
+    }
     XCTAssertThrowsError(
       try JournalEvent.stateTransition(
         eventID: "legacy-recovery-edge", sequence: 0,
@@ -559,8 +612,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         schemaVersion: JournalEvent.schemaVersion))
 
     let dispatches = await dispatchLog.snapshot()
-    XCTAssertEqual(dispatches.filter { $0 == "flash-partitions" }.count, 1)
-    XCTAssertEqual(dispatches.filter { $0 == "enter-loader-mode" }.count, 1)
+    XCTAssertEqual(dispatches.filter { $0 == "flash-partitions" }.count, 0)
+    XCTAssertEqual(dispatches.filter { $0 == "enter-loader-mode" }.count, 0)
+    let laneStarts = await lane.startCount()
+    XCTAssertEqual(laneStarts, 1)
     let epochs = try await RuntimeSupersedingRecoveryStore(
       stateDirectory: stateDirectory
     ).list()

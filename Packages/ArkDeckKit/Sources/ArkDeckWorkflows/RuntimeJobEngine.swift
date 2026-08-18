@@ -671,6 +671,14 @@ public struct RuntimeAdmissionFaultInjector: @unchecked Sendable {
 
 public actor RuntimeJobEngine {
   private static let confirmedNotExecutedSemanticCode = "confirmedNotExecuted"
+  /// A confirmed Runtime step whose truth came from one completed ArkForge
+  /// plan, not from a process exit string or an ArkDeck provider action.
+  ///
+  /// Complete-overwrite finalization requires this code on every delegated
+  /// recovery step.  That keeps a generic `result=succeeded` row from being
+  /// promoted into coverage proof after the mechanics moved behind the
+  /// ArkForge authority boundary.
+  package static let arkForgePlanCompletionSemanticCode = "arkForgePlanCompletion"
 
   /// The route a delegated step takes instead of an ArkDeck provider action.
   ///
@@ -707,11 +715,13 @@ public actor RuntimeJobEngine {
       binding: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary
 
-    /// The terminal receipt of this job's completed lane run, if it ran.
+    /// The terminal receipt of this job's *completed* lane run, if it ran.
     ///
     /// The delegated postflight still owes the engine's catalog its declared
-    /// product; the facts it is built from live in this receipt.
-    func latestReceipt(jobID: String) async -> ArkForgeActionReceiptSummary?
+    /// product; the facts it is built from live in this receipt. A safe
+    /// cancellation or unknown terminal is deliberately absent: neither is a
+    /// completed plan and neither may satisfy a recovery verification step.
+    func completedPlanReceipt(jobID: String) async -> ArkForgeActionReceiptSummary?
   }
 
   public struct Configuration: Sendable {
@@ -863,6 +873,16 @@ public actor RuntimeJobEngine {
     // plan already reset to normal (measured 2026-08-18, on the first run
     // whose lane ever completed). Diagnostics capture stays engine-run — the
     // lane's plan has no hilog step.
+    "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
+  ]
+
+  /// Engine steps that occur after the one ArkForge run has returned.
+  ///
+  /// Unlike the pre-write Loader bookkeeping above, these are part of the
+  /// complete-overwrite recovery contract. They therefore need their own
+  /// durable Runtime intents and outcomes, sourced from the completed plan's
+  /// terminal semantic receipt, before an epoch can be established.
+  package static let arkForgePlanCompletionSteps: Set<String> = [
     "reboot-device", "wait-for-hdc", "rebind-and-verify-build",
   ]
 
@@ -1664,15 +1684,23 @@ public actor RuntimeJobEngine {
         appendTimeline(
           jobID: jobID,
           entry: "delegated \(step.stepID) to the ArkForge lane's own plan")
-        if step.stepID == "rebind-and-verify-build" {
-          // Delegation moves the verification, not the obligation: this step
-          // owes the catalog `post-flash-facts.json`, and the facts it is
-          // built from are in the lane's terminal receipt — the daemon's own
-          // postflight, which verified the bound identity and the published
-          // build before the lane returned. Measured 2026-08-18: the first
-          // otherwise-green run failed at finalize on exactly this missing
-          // product.
-          try await publishLanePostflightFacts(jobID: jobID, step: step, lane: lane)
+        if Self.arkForgePlanCompletionSteps.contains(step.stepID) {
+          // The first dispatched ArkForge step does not return until the
+          // daemon's whole plan is terminal. These later catalog steps are
+          // therefore not new dispatches; they are Runtime projections of
+          // that one completed plan. Persist each projection as its own WAL
+          // intent/outcome so complete-overwrite finalization has exact typed
+          // proof instead of a timeline string.
+          if step.stepID == "rebind-and-verify-build" {
+            // Delegation moves the verification, not the obligation: this
+            // step owes the catalog `post-flash-facts.json`. Publish it before
+            // closing the step outcome; a crash can then safely revisit this
+            // read-only projection, while a confirmed step can never point at
+            // a product that was not made durable.
+            try await publishLanePostflightFacts(jobID: jobID, step: step, lane: lane)
+          }
+          try await journalArkForgePlanCompletion(
+            jobID: jobID, step: step, descriptor: descriptor, lane: lane)
         }
         completedStepIDs.insert(step.stepID)
         if var runtime = jobs[jobID] {
@@ -2737,6 +2765,11 @@ public actor RuntimeJobEngine {
         targetID: runtime.record.request.target.targetID,
         bindingRevision: runtime.record.request.target.expectedBindingRevision ?? 1,
         usbTopology: topology))
+    // `ArkForgeLaneHost.perform` runs the whole daemon plan on first use and
+    // returns its terminal managed-control receipt. Validate that typed
+    // receipt before reducing it to Runtime's journal vocabulary; otherwise a
+    // bare disposition string could be mistaken for complete-overwrite proof.
+    try Self.validateArkForgePlanCompletionReceipt(receipt, jobID: jobID)
 
     // The daemon's disposition is journalled as it stands. `outcomeUnknown` is
     // not a failure to retry — it is a job that needs reconciling, and turning
@@ -2791,6 +2824,10 @@ public actor RuntimeJobEngine {
         stepID: step.stepID, attempt: 1,
         correlatesToIntentEventID: intentEventID,
         result: result, outcomeCertainty: certainty,
+        semanticCode: certainty == .confirmed
+          ? Self.arkForgePlanCompletionSemanticCode : nil,
+        summary: certainty == .confirmed
+          ? Self.arkForgePlanCompletionSummary(receipt) : nil,
         schemaVersion: Self.journalSchemaVersion(of: current.record)))
     current.nextSequence += 1
     jobs[jobID] = current
@@ -2800,6 +2837,109 @@ public actor RuntimeJobEngine {
         "\(step.stepID) returned \(receipt.disposition) from arkforged; the job needs "
           + "reconciliation and this permit must not be signed again")
     }
+  }
+
+  /// Closes one ArkDeck catalog step from the already-completed ArkForge plan.
+  ///
+  /// This method performs no device action and never calls `lane.perform`.
+  /// The only accepted source is the terminal receipt cached after the one
+  /// ArkForge execution completed.  Each catalog obligation still gets its
+  /// own WAL pair so recovery finalization can require exact typed outcomes.
+  private func journalArkForgePlanCompletion(
+    jobID: String, step: CatalogStepDescriptor,
+    descriptor: CatalogOperationDescriptor, lane: any ArkForgeLane
+  ) async throws {
+    guard Self.arkForgePlanCompletionSteps.contains(step.stepID) else {
+      throw RuntimeJobEngineError.internalFailure(
+        "\(step.stepID) is not an ArkForge plan-completion projection")
+    }
+    guard let receipt = await lane.completedPlanReceipt(jobID: jobID) else {
+      throw RuntimeDispatchFailure.failed(
+        "\(step.stepID) cannot be confirmed: ArkForge has no completed-plan receipt for \(jobID)")
+    }
+    try Self.validateArkForgePlanCompletionReceipt(receipt, jobID: jobID)
+    guard var current = jobs[jobID] else {
+      throw RuntimeJobEngineError.jobNotFound(jobID)
+    }
+    let workflowStep = try Self.journalStep(
+      for: step, jobID: jobID, inputs: current.record.request.inputs,
+      action: nil, resolvedInputArtifact: nil,
+      operationReference: descriptor.reference,
+      delegatedArkForgePlanCompletion: true)
+    let intentEventID = "intent-\(step.stepID)"
+    guard let stableIdentity = current.record.materializedStableTargetIdentitySHA256,
+      Self.isLowercaseSHA256(stableIdentity),
+      let bindingRevision = current.record.materializedBindingRevision,
+      bindingRevision > 0
+    else {
+      throw RuntimeJobEngineError.internalFailure(
+        "\(step.stepID) has no immutable Runtime target binding for its ArkForge proof")
+    }
+    try current.journal.appendAndSynchronize(
+      try JournalEvent.stepIntent(
+        eventID: intentEventID, sequence: current.nextSequence,
+        sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+        step: workflowStep,
+        target: JournalTarget(
+          scope: "device", targetID: current.record.request.target.targetID,
+          connectKey: "sha256:\(stableIdentity)",
+          identitySnapshotHash: stableIdentity),
+        attempt: 1, bindingRevision: bindingRevision,
+        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+    current.nextSequence += 1
+    current.record.recoveryStepID = step.stepID
+    current.record.recoveryIntentEventID = intentEventID
+    try persistRuntimeRecord(current.record)
+    try current.journal.appendAndSynchronize(
+      JournalEvent.stepOutcome(
+        eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
+        sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+        stepID: step.stepID, attempt: 1,
+        correlatesToIntentEventID: intentEventID,
+        result: "succeeded", outcomeCertainty: .confirmed,
+        semanticCode: Self.arkForgePlanCompletionSemanticCode,
+        summary: Self.arkForgePlanCompletionSummary(receipt),
+        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+    current.nextSequence += 1
+    jobs[jobID] = current
+  }
+
+  /// Validates the terminal managed-control receipt that subsumes the ordered
+  /// reboot/reconnect/postflight tail of an ArkForge plan.
+  ///
+  /// The evidence digest is recomputed over the exact typed facts rather than
+  /// accepted as an opaque 32-byte value. Required postflight facts keep a
+  /// write receipt, a typed skip, or an arbitrary success string from being
+  /// repurposed as plan-completion evidence.
+  private static func validateArkForgePlanCompletionReceipt(
+    _ receipt: ArkForgeActionReceiptSummary, jobID: String
+  ) throws {
+    let facts = Dictionary(
+      receipt.facts.map { ($0.key, $0.value) },
+      uniquingKeysWith: { first, _ in first })
+    guard facts.count == receipt.facts.count,
+      receipt.jobID.hasPrefix("JOB-"), receipt.planID.hasPrefix("PLAN-"),
+      receipt.stepID.hasPrefix("STEP-"), !receipt.permitID.isEmpty,
+      receipt.disposition == "semanticSuccess",
+      receipt.evidenceSHA256.count == 32,
+      receipt.evidenceSHA256
+        == ArkForgeManagedControlPort.canonicalFactsDigest(facts),
+      facts["const.product.model"]?.isEmpty == false,
+      facts["const.ohos.fullname"]?.isEmpty == false,
+      facts["usbTopology"]?.isEmpty == false
+    else {
+      throw RuntimeDispatchFailure.failed(
+        "ArkForge returned no canonical completed-plan postflight receipt for \(jobID)")
+    }
+  }
+
+  private static func arkForgePlanCompletionSummary(
+    _ receipt: ArkForgeActionReceiptSummary
+  ) -> String {
+    let evidence = receipt.evidenceSHA256.map { String(format: "%02x", $0) }.joined()
+    return
+      "arkforge-plan=\(receipt.planID); daemon-job=\(receipt.jobID); "
+      + "terminal-step=\(receipt.stepID); evidence-sha256=\(evidence)"
   }
 
   private func dispatchWithWAL(
@@ -3369,12 +3509,13 @@ public actor RuntimeJobEngine {
     step: CatalogStepDescriptor,
     lane: any ArkForgeLane
   ) async throws {
-    guard let receipt = await lane.latestReceipt(jobID: jobID) else {
+    guard let receipt = await lane.completedPlanReceipt(jobID: jobID) else {
       // No lane run has happened for this job, so nothing verified anything:
       // the required product cannot be built from facts nobody produced.
       throw RuntimeDispatchFailure.failed(
-        "\(step.stepID) was delegated but the lane holds no receipt for \(jobID)")
+        "\(step.stepID) was delegated but the lane holds no completed-plan receipt for \(jobID)")
     }
+    try Self.validateArkForgePlanCompletionReceipt(receipt, jobID: jobID)
     let facts = Dictionary(
       receipt.facts.map { ($0.key, $0.value) }, uniquingKeysWith: { first, _ in first })
     if var runtime = jobs[jobID] {
@@ -5318,7 +5459,10 @@ public actor RuntimeJobEngine {
       if seenConfirmedStepIDs.insert(stepID).inserted {
         confirmedStepIDs.append(stepID)
       }
-      if requiredSteps.contains(stepID) {
+      if requiredSteps.contains(stepID),
+        outcome.payload["semanticCode"]
+          == .string(Self.arkForgePlanCompletionSemanticCode)
+      {
         confirmedIntentByStep[stepID] = intent
       }
     }
@@ -7736,7 +7880,8 @@ public actor RuntimeJobEngine {
     inputs: [String: JSONValue] = [:],
     action: TypedProviderAction? = nil,
     resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
-    operationReference: String? = nil
+    operationReference: String? = nil,
+    delegatedArkForgePlanCompletion: Bool = false
   ) throws -> WorkflowStep {
     var bundleName: String?
     if case .string(let value)? = inputs["bundleName"] { bundleName = value }
@@ -7755,13 +7900,20 @@ public actor RuntimeJobEngine {
         "clientIdentity": .string("arkdeck-agentd"),
       ]
     case .probeDevice:
-      switch action {
+      if delegatedArkForgePlanCompletion,
+        operationReference == "flash.dayu200",
+        step.stepID == "rebind-and-verify-build"
+      {
+        arguments = ["evidencePolicy": .string("postFlashBuild")]
+      } else {
+        switch action {
       case .rockchip(.rebindLoader):
         arguments = ["evidencePolicy": .string("rockusbLoaderIdentity")]
       case .rockchip(.verifyBoundBuild):
         arguments = ["evidencePolicy": .string("postFlashBuild")]
       default:
         arguments = ["evidencePolicy": .string("coreMinimum")]
+        }
       }
     case .waitForDisconnect:
       guard case .rockchip(.waitForHDCDisconnect)? = action else {
@@ -7773,7 +7925,16 @@ public actor RuntimeJobEngine {
         "reason": .string("enterLoader"),
       ]
     case .waitForReconnect:
-      switch action {
+      if delegatedArkForgePlanCompletion,
+        operationReference == "flash.dayu200",
+        step.stepID == "wait-for-hdc"
+      {
+        arguments = [
+          "deadlineMilliseconds": .integer(120_000),
+          "reason": .string("normalModeReconnect"),
+        ]
+      } else {
+        switch action {
       case .rockchip(.waitForLoader):
         arguments = [
           "deadlineMilliseconds": .integer(45_000),
@@ -7787,6 +7948,7 @@ public actor RuntimeJobEngine {
       default:
         throw RuntimeJobEngineError.internalFailure(
           "\(step.stepID) has no exact reconnect action")
+        }
       }
     case .preflightDeviceStorage:
       if case .hdc(.observeStorage(let request))? = action {
@@ -8153,7 +8315,15 @@ public actor RuntimeJobEngine {
         "safeBoundaryId": .string("perPartitionWriteBoundary"),
       ]
     case .rebootDevice:
-      guard case .rockchip(.rebootToNormal)? = action else {
+      guard
+        (delegatedArkForgePlanCompletion
+          && operationReference == "flash.dayu200"
+          && step.stepID == "reboot-device")
+          || {
+            if case .rockchip(.rebootToNormal)? = action { return true }
+            return false
+          }()
+      else {
         throw RuntimeJobEngineError.internalFailure(
           "\(step.stepID) has no exact Rockchip reboot action")
       }

@@ -130,6 +130,17 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// for engine step names the daemon never uses, and the proof that a later
   /// lane-covered step of the same job must **never** re-run the lane.
   private var lastReceiptByJob: [String: ArkForgeActionReceiptSummary] = [:]
+  /// Jobs for which the daemon reached its completed terminal.
+  ///
+  /// Kept separately from the receipt cache because a safe cancellation may
+  /// still publish read-only receipts. Those receipts remain useful history,
+  /// but they are not proof that the plan completed and must never satisfy a
+  /// recovery verification step.
+  private var completedJobs: Set<String> = []
+  /// Terminal non-completions are sticky for this ArkDeck job. A later call
+  /// must return the same classification, never a cached partial receipt that
+  /// happens to share the requested step id.
+  private var terminalFailureByJob: [String: RuntimeDispatchFailure] = [:]
 
   package init(
     connection: Connection,
@@ -177,7 +188,12 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     stepID: String, jobID: String, artifact: ArkForgeLaneArtifact,
     binding: ArkForgeLaneDeviceBinding
   ) async throws -> ArkForgeActionReceiptSummary {
-    if let cached = receiptsByJob[jobID]?[stepID] ?? lastReceiptByJob[jobID] {
+    if let terminalFailure = terminalFailureByJob[jobID] {
+      throw terminalFailure
+    }
+    if completedJobs.contains(jobID),
+      let cached = receiptsByJob[jobID]?[stepID] ?? lastReceiptByJob[jobID]
+    {
       // The anchor fallback is load-bearing here, not a convenience: a second
       // lane-covered step of the same job (`verify-flash-readback` after
       // `flash-partitions`) misses the by-name cache — the daemon named its
@@ -206,8 +222,17 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       planID: plan.planID, planSHA256: plan.planSHA256, executionPurpose: "flash")
     let published: [ArkForgeActionReceiptSummary]
     switch outcome {
-    case .completed(let receipts), .cancelledSafe(let receipts):
+    case .completed(let receipts):
       published = receipts
+      completedJobs.insert(jobID)
+    case .cancelledSafe(let receipts):
+      published = receipts
+      receiptsByJob[jobID] = Dictionary(
+        published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
+      let failure = RuntimeDispatchFailure.confirmedNotExecuted(
+        "arkforged cancelled the plan before any external effect; no completion receipt exists")
+      terminalFailureByJob[jobID] = failure
+      throw failure
     case .outcomeUnknown(let reason, let receipts):
       // Kept, not discarded. The steps that did complete have real receipts,
       // and the engine needs them to journal what is known before it records
@@ -225,7 +250,9 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
       // `capability denied [denial:exhausted]`. An unknown outcome must reach
       // the engine as exactly that, so the job parks `waitingForRecovery` and
       // the complete-overwrite recovery lane can reopen the target.
-      throw RuntimeDispatchFailure.outcomeUnknown(reason)
+      let failure = RuntimeDispatchFailure.outcomeUnknown(reason)
+      terminalFailureByJob[jobID] = failure
+      throw failure
     }
     receiptsByJob[jobID] = Dictionary(
       published.map { ($0.stepID, $0) }, uniquingKeysWith: { first, _ in first })
@@ -300,14 +327,17 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
     }
   }
 
-  package func latestReceipt(jobID: String) -> ArkForgeActionReceiptSummary? {
-    lastReceiptByJob[jobID]
+  package func completedPlanReceipt(jobID: String) -> ArkForgeActionReceiptSummary? {
+    guard completedJobs.contains(jobID) else { return nil }
+    return lastReceiptByJob[jobID]
   }
 
   /// Drops a finished job's receipts.
   package func forget(jobID: String) {
     receiptsByJob[jobID] = nil
     lastReceiptByJob[jobID] = nil
+    completedJobs.remove(jobID)
+    terminalFailureByJob[jobID] = nil
   }
 
   /// Checks the daemon is ready and bound to the toolchain this authority

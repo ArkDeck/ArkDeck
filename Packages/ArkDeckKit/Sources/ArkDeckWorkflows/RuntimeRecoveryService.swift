@@ -892,7 +892,12 @@ struct RuntimeRecoveryService {
           $0.kind == .stepIntent && $0.eventID == intentEventID && $0.stepID == stepID
         })
       else { continue }
-      intentByConfirmedStep[stepID] = intentEventID
+      if !requiredSteps.contains(stepID)
+        || outcome.payload["semanticCode"]
+          == .string(RuntimeJobEngine.arkForgePlanCompletionSemanticCode)
+      {
+        intentByConfirmedStep[stepID] = intentEventID
+      }
       if seenStepIDs.insert(stepID).inserted { confirmedStepIDs.append(stepID) }
     }
     guard Set(requiredSteps).isSubset(of: Set(intentByConfirmedStep.keys)),
