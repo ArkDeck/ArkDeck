@@ -34,6 +34,7 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForge*.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
