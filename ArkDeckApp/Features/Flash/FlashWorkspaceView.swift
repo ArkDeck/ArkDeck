@@ -790,9 +790,10 @@ struct FlashWorkspaceView: View {
         Label(
           flashText(
             isDetailsExpanded ? "flash.workspace.details.hide" : "flash.workspace.details"),
-          systemImage: isDetailsExpanded ? "chevron.down" : "chevron.right")
-          .font(.callout.weight(.semibold))
-          .contentShape(Rectangle())
+          systemImage: isDetailsExpanded ? "chevron.down" : "chevron.right"
+        )
+        .font(.callout.weight(.semibold))
+        .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .accessibilityIdentifier("flash.workspace.details")
@@ -1108,7 +1109,6 @@ struct FlashWorkspaceView: View {
     case .driverUnavailable: "flash.deviceAccess.verdict.driverUnavailable"
     case .protocolBlocked: "flash.deviceAccess.verdict.protocolBlocked"
     case .malformedOutput: "flash.deviceAccess.verdict.malformedOutput"
-    case .toolBlocked: "flash.deviceAccess.verdict.toolBlocked"
     case .probeFailed: "flash.deviceAccess.verdict.probeFailed"
     }
   }
@@ -1131,7 +1131,7 @@ struct FlashWorkspaceView: View {
     case .offlineOrUnauthorized: "cable.connector.slash"
     case .permissionDenied: "lock.trianglebadge.exclamationmark"
     case .driverUnavailable: "wrench.and.screwdriver.fill"
-    case .protocolBlocked, .malformedOutput, .toolBlocked, .probeFailed:
+    case .protocolBlocked, .malformedOutput, .probeFailed:
       "exclamationmark.triangle.fill"
     }
   }
@@ -1140,7 +1140,7 @@ struct FlashWorkspaceView: View {
     switch verdict {
     case .accessible: .green
     case .permissionDenied, .driverUnavailable: .red
-    case .offlineOrUnauthorized, .protocolBlocked, .malformedOutput, .toolBlocked, .probeFailed:
+    case .offlineOrUnauthorized, .protocolBlocked, .malformedOutput, .probeFailed:
       .orange
     }
   }
@@ -1217,7 +1217,6 @@ struct FlashWorkspaceView: View {
       summaryRow("flash.plan.archiveHash", plan.archiveSHA256, monospaced: true)
       summaryRow("flash.plan.digest", plan.planDigestSHA256, monospaced: true)
       summaryRow("flash.plan.stepSetDigest", plan.stepSetDigestSHA256, monospaced: true)
-      summaryRow("flash.plan.toolchain", plan.toolchainFingerprint, monospaced: true)
     }
   }
 
@@ -1324,8 +1323,9 @@ struct FlashWorkspaceView: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(
-      String(localized: postflightAccessibilityResource(
-        matches: matches, label: label, expected: expected, observed: observed))
+      String(
+        localized: postflightAccessibilityResource(
+          matches: matches, label: label, expected: expected, observed: observed))
     )
     .accessibilityIdentifier("\(identifier).\(matches ? "match" : "mismatch")")
   }

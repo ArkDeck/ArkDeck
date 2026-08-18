@@ -320,9 +320,6 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(presentation.steps.contains { $0.effect == .destructive })
     XCTAssertEqual(presentation.target, target)
     XCTAssertEqual(presentation.profileReference, profile.catalogReference)
-    XCTAssertEqual(
-      presentation.toolchainFingerprint,
-      RockchipFlashProfile.pinnedToolchainFingerprint)
     XCTAssertEqual(presentation.archiveSHA256, plan.archiveSHA256)
     XCTAssertEqual(presentation.planDigestSHA256, plan.planDigestSHA256)
     XCTAssertEqual(

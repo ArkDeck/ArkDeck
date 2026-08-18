@@ -4,8 +4,8 @@ import XCTest
 
 @testable import ArkDeckWorkflows
 
-// TASK-AIN-006: strict historical-carrier parsing and the package-only manual handoff regression.
-// Parsed JSON remains inert data and cannot mint Runtime authority.
+// TASK-AIN-006: strict historical-carrier parsing and current Runtime caller-
+// authority regression. Parsed JSON remains inert data and cannot mint authority.
 final class StandingAuthorizationContractTests: XCTestCase {
   private let provider = RockchipRockUSBFlashProvider()
 
@@ -22,7 +22,8 @@ final class StandingAuthorizationContractTests: XCTestCase {
       ],
       "firmwareArchiveSHA256": plan.archiveSHA256,
       "transport": "usb",
-      "toolchainFingerprint": RockchipFlashProfile.pinnedToolchainFingerprint,
+      "toolchainFingerprint":
+        "rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611",
       "providerIdentity": RockchipRockUSBFlashProvider.providerIdentity,
       "planDigestSHA256": plan.planDigestSHA256,
       "stepSetDigestSHA256": plan.stepSetDigestSHA256,
@@ -98,40 +99,20 @@ final class StandingAuthorizationContractTests: XCTestCase {
     }
   }
 
-  func testPackageManualHandoffKeepsAgentAndCIBlockedWithZeroDispatch() async throws {
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    for authority in [RockchipExecutionAuthority.standardAgent, .ordinaryCI] {
-      let decision = await RockchipManualFlashFallbackGate().authorize(
-        authority: authority,
-        binding: .none,
-        plan: plan,
-        prerequisites: .cleared,
-        destructiveConfirmationAccepted: false,
-        manualConfirmation: nil,
-        monitor: RockchipFlashDispatchMonitor())
-      guard case .policyBlocked(let handoff) = decision.outcome else {
-        return XCTFail("\(authority) must remain policyBlocked")
+  func testCallerCannotSupplyAuthorityForRuntimeOwnedDestructivePolicy() throws {
+    XCTAssertThrowsError(
+      try RuntimeCallerAuthorityBoundary.validate(
+        policy: .runtimeCapability, hasCallerSuppliedAuthorization: true)
+    ) { error in
+      guard case RuntimeJobEngineError.rejected(let code, let detail) = error else {
+        return XCTFail("expected Runtime rejection, got \(error)")
       }
-      XCTAssertTrue(handoff.confirmationRequirements.joined().contains("Runtime capability"))
-      XCTAssertEqual(decision.evidenceEligibility, .notEligible)
-      XCTAssertEqual(decision.dispatchSnapshot.totalDispatchCount, 0)
+      XCTAssertEqual(code, .authorizationRequired)
+      XCTAssertTrue(detail.contains("caller-supplied"))
     }
-
-    let planOnly = try provider.makePlan(mode: .planOnly, archiveValidation: .valid)
-    let nonExecute = await RockchipManualFlashFallbackGate().authorize(
-      authority: .standardAgent,
-      binding: .none,
-      plan: planOnly,
-      prerequisites: .cleared,
-      destructiveConfirmationAccepted: false,
-      manualConfirmation: nil,
-      monitor: RockchipFlashDispatchMonitor())
-    XCTAssertEqual(nonExecute.outcome, .allowedNonExecuteBranch)
-    XCTAssertEqual(nonExecute.dispatchSnapshot.totalDispatchCount, 0)
-
-    print(
-      "TEST-AC-FLASH-015-01 PASS agent=policyBlocked ci=policyBlocked "
-        + "planOnly=allowed dispatch=0")
+    XCTAssertNoThrow(
+      try RuntimeCallerAuthorityBoundary.validate(
+        policy: .runtimeCapability, hasCallerSuppliedAuthorization: false))
   }
 
   private static func sha256(_ value: String) -> String {

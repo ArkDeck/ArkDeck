@@ -20,18 +20,49 @@ struct RockchipRuntimeActionExecutionResult: Sendable {
   let subprocesses: [ProviderSubprocessReceipt]
 }
 
+/// Parses the primary/backup GPT identity fields used by the fail-closed
+/// native readback regression suite. The production readback is performed by
+/// ArkForge; ArkDeck retains this pure parser as a compatibility oracle only.
+package struct RockchipGPTHeader: Equatable, Sendable {
+  package static let signature = Array("EFI PART".utf8)
+
+  package let myLBA: Int64
+  package let alternateLBA: Int64
+  package let firstUsableLBA: Int64
+  package let lastUsableLBA: Int64
+
+  package static func parse(_ sector: Data) -> RockchipGPTHeader? {
+    let bytes = [UInt8](sector)
+    guard bytes.count >= 92, Array(bytes[0..<8]) == signature else { return nil }
+    func value(at offset: Int) -> Int64 {
+      var raw: UInt64 = 0
+      for index in 0..<8 {
+        raw |= UInt64(bytes[offset + index]) << (8 * UInt64(index))
+      }
+      return raw <= UInt64(Int64.max) ? Int64(raw) : -1
+    }
+    let header = Self(
+      myLBA: value(at: 24), alternateLBA: value(at: 32),
+      firstUsableLBA: value(at: 40), lastUsableLBA: value(at: 48))
+    guard header.myLBA >= 0, header.alternateLBA > 0,
+      header.firstUsableLBA >= 0, header.lastUsableLBA >= header.firstUsableLBA
+    else { return nil }
+    return header
+  }
+}
+
 protocol RockchipRuntimeActionExecuting: Sendable {
   func unavailableReason() -> String?
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     actionDirectory: URL,
     progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult
@@ -41,13 +72,13 @@ extension RockchipRuntimeActionExecuting {
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     actionDirectory: URL,
     progress _: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
     try await execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: rockchipExecutable, actionDirectory: actionDirectory)
+      providerExecutable: providerExecutable, actionDirectory: actionDirectory)
   }
 }
 
@@ -56,12 +87,12 @@ protocol RockchipRuntimeActionHosting: Sendable {
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable
+    providerExecutable: ResolvedExecutable
   ) async throws -> RockchipRuntimeActionExecutionResult
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult
 }
@@ -70,12 +101,12 @@ extension RockchipRuntimeActionHosting {
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     progress _: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
     try await execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: rockchipExecutable)
+      providerExecutable: providerExecutable)
   }
 }
 
@@ -87,7 +118,7 @@ struct RefusingRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
   func execute(
     action _: RockchipProviderAction,
     descriptor _: HostManagedProcessDescriptor,
-    rockchipExecutable _: ResolvedExecutable
+    providerExecutable _: ResolvedExecutable
   ) async throws -> RockchipRuntimeActionExecutionResult {
     throw RuntimeDispatchFailure.failed(reason)
   }
@@ -212,85 +243,11 @@ struct FoundationRockchipRuntimeCommandRunner: RockchipRuntimeCommandRunning {
       }
     }
     if criticalNonInterruptible {
-      // A parent cancellation is observed only after one wlx child reaches
+      // A parent cancellation is observed only after one native write reaches
       // its semantic boundary. No later partition is started after that.
       return try await Task.detached(operation: operation).value
     }
     return try await operation()
-  }
-}
-
-
-/// The pinned DAYU200 partition table, as `rkdeveloptool ppt` prints it.
-///
-/// This moved here when the in-process flash executor was retired (T25): the
-/// readback that consumes it is an engine-lane action, and it is the only
-/// surviving consumer of what used to be the lowering evaluator's semantics.
-/// The primary GPT header fields this provider needs.
-///
-/// The partition table says what the medium is meant to be; the backup header
-/// it points at is what proves that medium is actually reachable, because the
-/// backup lives in the last sector of it.
-package struct RockchipGPTHeader: Equatable, Sendable {
-  package static let signature = Array("EFI PART".utf8)
-  package static let sectorBytes = 512
-
-  package let myLBA: Int64
-  package let alternateLBA: Int64
-  package let firstUsableLBA: Int64
-  package let lastUsableLBA: Int64
-
-  package static func parse(_ sector: Data) -> RockchipGPTHeader? {
-    let bytes = [UInt8](sector)
-    guard bytes.count >= 92, Array(bytes[0..<8]) == signature else { return nil }
-    func value(at offset: Int) -> Int64 {
-      var raw: UInt64 = 0
-      for index in 0..<8 {
-        raw |= UInt64(bytes[offset + index]) << (8 * UInt64(index))
-      }
-      return raw <= UInt64(Int64.max) ? Int64(raw) : -1
-    }
-    let header = Self(
-      myLBA: value(at: 24), alternateLBA: value(at: 32),
-      firstUsableLBA: value(at: 40), lastUsableLBA: value(at: 48))
-    guard header.myLBA >= 0, header.alternateLBA > 0,
-      header.firstUsableLBA >= 0, header.lastUsableLBA >= header.firstUsableLBA
-    else { return nil }
-    return header
-  }
-}
-
-enum RockchipPinnedPartitionTable {
-  static let expectedRows = [
-    "00  00002000  uboot", "01  00004000  misc", "02  00006000  bootctrl",
-    "03  00007000  resource", "04  0000A000  boot_linux", "05  0003A000  ramdisk",
-    "06  0003C000  system", "07  0043C000  vendor", "08  0063C000  sys-prod",
-    "09  00655000  chip-prod", "10  0066E000  updater", "11  0067E000  eng_system",
-    "12  00686000  eng_chipset", "13  0069E000  chip_ckm", "14  01308000  userdata",
-  ]
-
-  /// `(name, firstSector)` in table order, parsed from the same pinned rows the
-  /// device readback is compared against, so there is one source of truth for
-  /// the layout an LBA write is allowed to target.
-  static let entries: [(name: String, firstSector: Int64)] = expectedRows.compactMap {
-    let fields = $0.split(whereSeparator: \.isWhitespace)
-    guard fields.count == 3, let sector = Int64(fields[1], radix: 16) else { return nil }
-    return (String(fields[2]), sector)
-  }
-
-
-  static func matches(_ text: String) -> Bool {
-    let lines = text.split(whereSeparator: \.isNewline).map {
-      $0.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    }
-    guard lines.contains("**********Partition Info(GPT)**********") else { return false }
-    let normalizedRows = expectedRows.map {
-      $0.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    }
-    return lines.filter { line in
-      line.range(of: #"^[0-9]{2} [0-9A-F]{8} [A-Za-z0-9_-]+$"#, options: .regularExpression)
-        != nil
-    } == normalizedRows
   }
 }
 
@@ -358,13 +315,6 @@ struct ProductRockchipRuntimeUSBProbe: RockchipRuntimeUSBProbing {
   }
 }
 
-
-
-
-
-
-
-
 struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   private let hdcResolver: any RuntimeExecutableResolving
   private let runner: any RockchipRuntimeCommandRunning
@@ -414,19 +364,19 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     actionDirectory: URL
   ) async throws -> RockchipRuntimeActionExecutionResult {
     try await execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: rockchipExecutable, actionDirectory: actionDirectory,
+      providerExecutable: providerExecutable, actionDirectory: actionDirectory,
       progress: { _ in })
   }
 
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     actionDirectory: URL,
     progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
@@ -625,7 +575,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
           "post-flash binding verification is not fully configured")
       }
       // This wait is the first boot after a complete overwrite: the plan's
-      // reset is arkforged's own `rd`, so the very next thing the authority is
+      // reset is arkforged's native RockUSB action, so the very next thing the authority is
       // asked for is this verification — against a device that is still
       // initializing its freshly erased userdata before hdcd comes up. The
       // read-only command timeout (15 s) belongs to the parameter reads once
@@ -720,9 +670,6 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         subprocesses: [receipt])
     }
   }
-
-
-
 
   private func waitForHDC(
     connectKey: String,
@@ -839,10 +786,11 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         // swapped board, which is a rebind, not a reconnect.
         let byTopology = try? usbProbe.singleHDCNormal(
           usbTopology: expectation.usbTopology)
-        let byKnownAlias = byTopology != nil
+        let byKnownAlias =
+          byTopology != nil
           ? nil
           : (try? usbProbe.singleHDCNormal(
-              stableIdentitySHA256: expectation.previousIdentitySHA256))
+            stableIdentitySHA256: expectation.previousIdentitySHA256))
             .flatMap { try? usbProbe.singleHDCNormal(usbTopology: $0.topology) }
         if let identity = byTopology ?? byKnownAlias {
           let observedDigest = SHA256Hex.string(of: Data(identity.connectKey.utf8))
@@ -996,7 +944,6 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     }
   }
 
-
   private func property(
     _ receipt: ProviderSubprocessReceipt,
     key: String
@@ -1023,8 +970,6 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     }
   }
 
-
-
   private func run(
     executable: ResolvedExecutable,
     arguments: [String],
@@ -1046,7 +991,7 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
     return receipt
   }
 
-  /// `wlx` prints progress for the whole partition, so its output scales with
+  /// Native write progress covers the whole partition, so its output scales with
   /// the image, and capture keeps the *head* — while the success marker is the
   /// last thing printed. At 64 KiB the two smallest DAYU200 partitions fit and
   /// `boot_linux` (64 MiB, 16x `uboot`) did not, so every flash stopped at the
@@ -1596,24 +1541,24 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable
+    providerExecutable: ResolvedExecutable
   ) async throws -> RockchipRuntimeActionExecutionResult {
     try await execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: rockchipExecutable, progress: { _ in })
+      providerExecutable: providerExecutable, progress: { _ in })
   }
 
   func execute(
     action: RockchipProviderAction,
     descriptor: HostManagedProcessDescriptor,
-    rockchipExecutable: ResolvedExecutable,
+    providerExecutable: ResolvedExecutable,
     progress: @escaping RuntimeProcessProgressHandler
   ) async throws -> RockchipRuntimeActionExecutionResult {
     let typedAction = TypedProviderAction.rockchip(action)
     try validate(
       action: typedAction,
       descriptor: descriptor,
-      executable: rockchipExecutable)
+      executable: providerExecutable)
     let preparation = try records.prepare(
       descriptor: descriptor, action: typedAction)
     if case .replay(let result) = preparation {
@@ -1626,7 +1571,7 @@ struct DurableRockchipRuntimeActionHost: RockchipRuntimeActionHosting {
     let result = try await executor.execute(
       action: action,
       descriptor: descriptor,
-      rockchipExecutable: rockchipExecutable,
+      providerExecutable: providerExecutable,
       actionDirectory: actionDirectory,
       progress: progress)
     do {

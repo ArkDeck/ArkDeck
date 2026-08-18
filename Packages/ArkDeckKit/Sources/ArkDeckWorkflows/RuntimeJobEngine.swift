@@ -8,10 +8,10 @@
 // recovery that never blind-redispatches. Unknown outcomes park in
 // waitingForRecovery; there is no automatic replay anywhere in this file.
 
-import ArkForgeIPC
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
+import ArkForgeIPC
 import CryptoKit
 import Foundation
 
@@ -22,6 +22,22 @@ public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case jobRecordUnreadable(String)
   case jobNotRunnable(String)
   case internalFailure(String)
+}
+
+/// Closed caller-authority boundary shared by admission and its contract tests.
+/// A Runtime-owned policy never accepts a capability reference selected by a
+/// caller; only protected Runtime may issue and attach that exact capability.
+package enum RuntimeCallerAuthorityBoundary {
+  package static func validate(
+    policy: RuntimeOperationAuthorizationPolicy,
+    hasCallerSuppliedAuthorization: Bool
+  ) throws {
+    if policy == .runtimeCapability, hasCallerSuppliedAuthorization {
+      throw RuntimeJobEngineError.rejected(
+        .authorizationRequired,
+        "caller-supplied capabilities cannot admit a Runtime-owned policy")
+    }
+  }
 }
 
 public struct RuntimePlanOnlyStep: Sendable, Equatable, Codable {
@@ -727,12 +743,9 @@ public actor RuntimeJobEngine {
   public struct Configuration: Sendable {
     package struct TestHooks: Sendable {
       package let beforeDispatchInstall: (@Sendable (String, String) async -> Void)?
-      package let afterAnalyzerCommitLinearization:
-        (@Sendable (String, String) async -> Void)?
-      package let afterAnalyzerArtifactPublication:
-        (@Sendable (String, String) async -> Void)?
-      package let beforeMutationCapabilityCommit:
-        (@Sendable (String) async -> Void)?
+      package let afterAnalyzerCommitLinearization: (@Sendable (String, String) async -> Void)?
+      package let afterAnalyzerArtifactPublication: (@Sendable (String, String) async -> Void)?
+      package let beforeMutationCapabilityCommit: (@Sendable (String) async -> Void)?
 
       package init(
         beforeDispatchInstall: (@Sendable (String, String) async -> Void)? = nil,
@@ -864,7 +877,7 @@ public actor RuntimeJobEngine {
     "enter-loader-mode", "wait-loader-disconnect", "wait-loader-reconnect",
     "rebind-loader-identity",
     // The lane's plan owns the way back out as well as the way in: its own
-    // steps reset the device (`rd` through the daemon's fixed-tool port),
+    // steps reset the device through the daemon's native RockUSB backend,
     // wait out the first boot, and verify identity plus the published build
     // through the managed-control postflight — all receipted before the lane
     // returns. Running the engine's copies afterwards is not redundancy but
@@ -3692,8 +3705,9 @@ public actor RuntimeJobEngine {
             }
             contents = received
           }
-          let traceDerivation = RuntimeArtifactService.traceSummaryDerivation(
-            name: name, descriptor: descriptor, summary: summary)
+          let traceDerivation =
+            RuntimeArtifactService.traceSummaryDerivation(
+              name: name, descriptor: descriptor, summary: summary)
             ?? RuntimeArtifactService.traceAnalysisDerivation(
               name: name, descriptor: descriptor, summary: summary)
           metadata = try await artifactStore.publish(
@@ -6388,11 +6402,8 @@ public actor RuntimeJobEngine {
 
     let authorization: RuntimeCapabilityReference
     if policy == .runtimeCapability {
-      guard request.authorization == nil else {
-        throw RuntimeJobEngineError.rejected(
-          .authorizationRequired,
-          "caller-supplied capabilities cannot admit a Runtime-owned policy")
-      }
+      try RuntimeCallerAuthorityBoundary.validate(
+        policy: policy, hasCallerSuppliedAuthorization: request.authorization != nil)
       guard descriptor.defaultPolicyIssuanceEnabled else {
         throw RuntimeJobEngineError.rejected(
           .authorizationRequired,
@@ -7910,12 +7921,12 @@ public actor RuntimeJobEngine {
         arguments = ["evidencePolicy": .string("postFlashBuild")]
       } else {
         switch action {
-      case .rockchip(.rebindLoader):
-        arguments = ["evidencePolicy": .string("rockusbLoaderIdentity")]
-      case .rockchip(.verifyBoundBuild):
-        arguments = ["evidencePolicy": .string("postFlashBuild")]
-      default:
-        arguments = ["evidencePolicy": .string("coreMinimum")]
+        case .rockchip(.rebindLoader):
+          arguments = ["evidencePolicy": .string("rockusbLoaderIdentity")]
+        case .rockchip(.verifyBoundBuild):
+          arguments = ["evidencePolicy": .string("postFlashBuild")]
+        default:
+          arguments = ["evidencePolicy": .string("coreMinimum")]
         }
       }
     case .waitForDisconnect:
@@ -7938,19 +7949,19 @@ public actor RuntimeJobEngine {
         ]
       } else {
         switch action {
-      case .rockchip(.waitForLoader):
-        arguments = [
-          "deadlineMilliseconds": .integer(45_000),
-          "reason": .string("loaderReconnect"),
-        ]
-      case .rockchip(.waitForHDCReconnect), .rockchip(.waitForBoundHDCReconnect):
-        arguments = [
-          "deadlineMilliseconds": .integer(120_000),
-          "reason": .string("normalModeReconnect"),
-        ]
-      default:
-        throw RuntimeJobEngineError.internalFailure(
-          "\(step.stepID) has no exact reconnect action")
+        case .rockchip(.waitForLoader):
+          arguments = [
+            "deadlineMilliseconds": .integer(45_000),
+            "reason": .string("loaderReconnect"),
+          ]
+        case .rockchip(.waitForHDCReconnect), .rockchip(.waitForBoundHDCReconnect):
+          arguments = [
+            "deadlineMilliseconds": .integer(120_000),
+            "reason": .string("normalModeReconnect"),
+          ]
+        default:
+          throw RuntimeJobEngineError.internalFailure(
+            "\(step.stepID) has no exact reconnect action")
         }
       }
     case .preflightDeviceStorage:

@@ -857,11 +857,14 @@ private func sameManifestJournalSnapshot(_ lhs: stat, _ rhs: stat) -> Bool {
 }
 
 private enum LockedSessionManifestValidator {
-  private static let rockchipProfileIdentifier = "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0"
-  private static let rockchipReportedVersion = "rkdeveloptool ver 1.32"
-  private static let rockchipExecutableSHA256 =
+  // Read-only compatibility for already durable pre-ArkForge manifests. These
+  // constants are accepted only while decoding history and cannot participate
+  // in current discovery, admission, materialization or dispatch.
+  private static let legacyRockchipProfileIdentifier = "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0"
+  private static let legacyRockchipReportedVersion = "rkdeveloptool ver 1.32"
+  private static let legacyRockchipExecutableSHA256 =
     "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
-  private static let rockchipPathSources: Set<String> = [
+  private static let legacyRockchipPathSources: Set<String> = [
     "userSelectedSecurityScopedBookmark",
     "installedOrdinaryBookmark",
   ]
@@ -1104,10 +1107,10 @@ private enum LockedSessionManifestValidator {
         "kind", "profileIdentifier", "reportedVersion", "sha256", "pathSource",
         "descriptorIdentity",
       ])
-      guard try object.manifestString("profileIdentifier") == rockchipProfileIdentifier,
-        try object.manifestString("reportedVersion") == rockchipReportedVersion,
-        try object.manifestString("sha256") == rockchipExecutableSHA256,
-        rockchipPathSources.contains(try object.manifestString("pathSource"))
+      guard try object.manifestString("profileIdentifier") == legacyRockchipProfileIdentifier,
+        try object.manifestString("reportedVersion") == legacyRockchipReportedVersion,
+        try object.manifestString("sha256") == legacyRockchipExecutableSHA256,
+        legacyRockchipPathSources.contains(try object.manifestString("pathSource"))
       else { throw failure("rockchip toolchain does not match the pinned integration profile") }
       let identity = try object.manifestObject("descriptorIdentity")
       try identity.manifestRequireKeys(["device", "inode", "fileSize", "mode"])

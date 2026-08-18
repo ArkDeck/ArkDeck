@@ -1,10 +1,9 @@
 import ArkDeckCore
 import Foundation
 
-// TASK-AIN-006 (CHG-2026-025). This file defines and strictly parses the standing-
-// authorization document. Parsed bytes are data, not authority: only
-// MaintainerMergedAuthorizationResolver can combine them with protected-main provenance and
-// mint a VerifiedAuthorizationGrant.
+// Read-only compatibility for durable pre-Runtime authorization records.
+// Parsed bytes are historical data, never authority: this decoder cannot admit,
+// reserve, dispatch, or mint a RuntimeCapability for a new operation.
 
 public enum RockchipStandingAuthorizationParseError: Error, Equatable, Sendable {
   case invalidJSON(String)

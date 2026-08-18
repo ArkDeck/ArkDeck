@@ -465,35 +465,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// verification had nothing to compare against. Threading a fact into N call
   /// sites by hand fails at N > 1; what catches it is asking the source
   /// whether any site was left behind.
-  /// The campaign lane must not resolve a firmware build by recognising its
-  /// digest among the ones compiled into the product.
-  ///
-  /// This was the eleventh and last such pin, and the only one no test could
-  /// have caught: the admitter takes a real `RockchipProductionAdmissionPort`
-  /// with no seam to substitute, so nothing exercises it below a live
-  /// campaign. It was found by running one — the flash was refused with
-  /// `execute plan has no exact published profile` after preview, plan and
-  /// engine admission had all gone green.
-  ///
-  /// A source-shape test is the honest guard here. It cannot prove the lane
-  /// admits a new build; it can prove the lookup that refused one has not come
-  /// back, which is what a future change would most plausibly reintroduce.
-  func testTheCampaignLaneDoesNotSelectAProfileByArchiveDigest() throws {
-    let admitter = packageRoot()
-      .appending(path: "Sources/ArkDeckWorkflows/EvolutionCampaignEngineLaneAdmitter.swift")
-    let code = try String(contentsOf: admitter, encoding: .utf8)
-    XCTAssertFalse(
-      code.contains("$0.archiveSHA256 == admission.plan.archiveSHA256"),
-      "the campaign lane is matching the plan's archive against compiled-in builds again")
-    XCTAssertFalse(
-      code.contains("RockchipFlashProfile.profile(archiveSHA256:"),
-      "the campaign lane is resolving a profile by archive digest again")
-    // The archive the attempt carries is the confirmed plan's, and the
-    // partition set is the board's. Both are what the operator confirmed.
-    XCTAssertTrue(code.contains("archiveSHA256: admission.plan.archiveSHA256"), code)
-    XCTAssertTrue(code.contains("partitionPlan: board.mappedPartitions"), code)
-  }
-
   func testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion() throws {
     let engine = packageRoot()
       .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
@@ -605,36 +576,20 @@ final class RockchipLoweringRemovalContractTests: XCTestCase {
   }
 
   func testProductCodeNeverPhrasesARockchipWriteOrSectorRead() throws {
-    // The three verbs that need a device address, and therefore belong to
-    // whoever holds the device mechanics. `ld` and `rd` are absent from this
-    // list on purpose: ArkDeck still issues those itself.
-    let delegated = ["\"wlx\"", "\"rl\"", "\"ppt\""]
+    // ArkForge owns the complete RockUSB vocabulary. Product Swift may model
+    // typed actions, but it cannot reconstruct vendor argv.
+    let delegated = [
+      "\"ld\"", "\"rd\"", "\"wlx\"", "\"wl\"", "\"rl\"", "\"ppt\"",
+      "\"db\"", "\"gpt\"", "\"ul\"", "\"ef\"",
+    ]
     for (path, source) in try productSwiftFiles() {
       let code = codeOnly(source)
       for verb in delegated {
-        // `commandsDelegatedToArkForge` names them precisely so their return
-        // would be a failing test; that declaration is the one allowed site.
-        if path.hasSuffix("RockchipRockUSBFlashProvider.swift") { continue }
         XCTAssertFalse(
           code.contains(verb),
           "\(path) phrases \(verb) as an argv element; that lowering is arkforged's "
             + "(CHG-2026-059)")
       }
-    }
-  }
-
-  func testTheDispatchSurfaceIsNarrowerThanTheHumanHandoff() {
-    // Two different questions: what this process may execute, and what it may
-    // print for a person to run themselves. Collapsing them is how a delegated
-    // command quietly comes back.
-    XCTAssertEqual(RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "rd"])
-    for delegated in RockchipRockUSBFlashProvider.commandsDelegatedToArkForge {
-      XCTAssertFalse(
-        RockchipRockUSBFlashProvider.closedCommandSurface.contains(delegated),
-        "\(delegated) came back to the dispatch surface")
-      XCTAssertTrue(
-        RockchipRockUSBFlashProvider.humanHandoffCommandSurface.contains(delegated),
-        "the manual route must still be able to name \(delegated)")
     }
   }
 

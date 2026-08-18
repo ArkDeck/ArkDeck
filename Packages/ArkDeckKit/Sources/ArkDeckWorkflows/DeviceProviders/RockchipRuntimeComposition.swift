@@ -397,7 +397,7 @@ package struct ArkForgeNativeRockchipControlDispatcher: RuntimeProcessDispatchin
     let result = try await host.execute(
       action: action,
       descriptor: descriptor,
-      rockchipExecutable: executable,
+      providerExecutable: executable,
       progress: progress)
     guard let recordID = result.summary["recordID"], !recordID.isEmpty else {
       throw RuntimeDispatchFailure.outcomeUnknown(
