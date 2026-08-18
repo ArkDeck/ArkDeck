@@ -145,6 +145,10 @@ final class ArkForgeLaneAssemblyContractTests: XCTestCase {
     let arguments = await seen.snapshot()?.arguments ?? []
     let portIndex = try XCTUnwrap(arguments.firstIndex(of: "--rockusb-port"))
     XCTAssertEqual(arguments[portIndex + 1], "native")
+    XCTAssertFalse(arguments.contains("--rkdeveloptool"))
+    XCTAssertFalse(arguments.contains("--rkdeveloptool-sha256"))
+    XCTAssertFalse(arguments.contains("/opt/rkdeveloptool"))
+    XCTAssertFalse(arguments.joined(separator: " ").contains("rkdeveloptool"))
     XCTAssertEqual(
       arguments[try XCTUnwrap(arguments.firstIndex(of: "--hardware-campaign")) + 1],
       "AFA-AC-7")

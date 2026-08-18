@@ -986,6 +986,21 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
     XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--pair-from-stdin")) + 1], "9")
   }
 
+  func testNativeCampaignArgvContainsNoVendorToolReference() throws {
+    var native = full
+    native["ARKDECK_ARKFORGE_CAMPAIGN"] = "AFA-AC-7"
+    guard case .success(let inputs) = ArkForgeLaneComposition.Inputs.read(native) else {
+      return XCTFail("the native campaign composes from the installed migration lane")
+    }
+    let argv = ArkForgeLaneComposition.daemonArguments(
+      inputs: inputs, runtimeDirectory: URL(filePath: "/tmp/rt"), pairingEpoch: 10)
+
+    XCTAssertEqual(argv[try XCTUnwrap(argv.firstIndex(of: "--rockusb-port")) + 1], "native")
+    XCTAssertFalse(argv.contains("--rkdeveloptool"))
+    XCTAssertFalse(argv.contains("--rkdeveloptool-sha256"))
+    XCTAssertFalse(argv.joined(separator: " ").contains("rkdeveloptool"))
+  }
+
   func testThePairingSecretIsNeverInArgv() throws {
     // It travels on stdin, by construction. This asserts the argv builder has
     // no parameter that could carry it even by accident.

@@ -182,9 +182,13 @@ package enum ArkForgeLaneComposition {
   /// The vendor tool's digest is this repository's pin rather than anything the
   /// operator supplied: the toolchain digest is part of the maturity
   /// combination, so letting a caller name it would let a caller publish a
-  /// combination nobody reviewed. `--require-release-signing` is likewise not
-  /// optional — a build that would accept an unsigned tool on a customer's
-  /// machine is not a build worth shipping.
+  /// combination nobody reviewed. Native launches omit both vendor flags
+  /// entirely. Besides making the process incapable of opening those bytes,
+  /// that keeps the AFA-AC-7 `pgrep -f rkdeveloptool` proof literal: the only
+  /// way the name can appear at runtime is an actual vendor process.
+  /// `--require-release-signing` is likewise not optional — a build that would
+  /// accept unsigned executable code on a customer's machine is not a build
+  /// worth shipping.
   ///
   /// The pairing secret is absent by construction. It travels on stdin.
   package static func daemonArguments(
@@ -194,11 +198,16 @@ package enum ArkForgeLaneComposition {
       "--runtime-dir", runtimeDirectory.path,
       "--profile", inputs.deviceProfilePath,
       "--pair-from-stdin", String(pairingEpoch),
-      "--rkdeveloptool", inputs.vendorToolPath,
-      "--rkdeveloptool-sha256", ArkForgeToolchainPin.signedSHA256,
       "--rockusb-port", inputs.rockUsbPort.rawValue,
       "--require-release-signing",
     ]
+    if inputs.rockUsbPort == .vendor {
+      arguments.append(
+        contentsOf: [
+          "--rkdeveloptool", inputs.vendorToolPath,
+          "--rkdeveloptool-sha256", ArkForgeToolchainPin.signedSHA256,
+        ])
+    }
     // Appended only when an operator named one. Without it `arkforged`
     // publishes `hardwareGated` for DAYU200, `materializePlan` answers with an
     // assessment, and this lane refuses at the step rather than writing —
