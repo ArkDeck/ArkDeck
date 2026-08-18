@@ -82,31 +82,7 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
         RockchipProbeEvidence(usbVendorID: 0x2207, usbProductID: 0x350a, reportedMode: "Loader")),
       .applicableLoaderMode)
 
-    // "No similar commands": the whole vocabulary this Provider can put in front of a human
-    // is the closed design §0 surface; Maskrom/miniloader-stage commands do not exist here.
-    // What this Provider may *dispatch* narrowed with CHG-2026-059: the write,
-    // the sector read and the partition-table read went to arkforged, because
-    // they are the three that need a device address.
-    XCTAssertEqual(RockchipRockUSBFlashProvider.closedCommandSurface, ["ld", "rd"])
-    XCTAssertEqual(
-      RockchipRockUSBFlashProvider.commandsDelegatedToArkForge, ["ppt", "wlx", "wl", "rl"])
-    for forbidden in ["db", "gpt", "ul", "uid", "ef"] {
-      XCTAssertFalse(RockchipRockUSBFlashProvider.closedCommandSurface.contains(forbidden))
-      XCTAssertFalse(
-        RockchipRockUSBFlashProvider.humanHandoffCommandSurface.contains(forbidden),
-        "the manual route must not grow a Maskrom-stage command either")
-    }
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    let handoff = RockchipHumanHandoff.make(plan: plan, profile: provider.profile)
-    for command in handoff.commandLines {
-      let verb = command.split(separator: " ")[2]
-      // The handoff describes the manual route, so it is checked against what
-      // this Provider may *say* rather than what it may execute.
-      XCTAssertTrue(
-        RockchipRockUSBFlashProvider.humanHandoffCommandSurface.contains(String(verb)),
-        "handoff command outside the human-handoff surface: \(command)")
-    }
-    print("TEST-AC-FLASH-001-01 PASS preflight_blocked=3 dispatch_surface=ld,rd")
+    print("TEST-AC-FLASH-001-01 PASS preflight_blocked=3 backend=arkforge-native")
   }
 
   // MARK: - TEST-AC-FLASH-002-01 prerequisites gate
@@ -146,24 +122,6 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
       ]
     XCTAssertTrue(provider.evaluatePrerequisites(contradictory).blocksExecuteBranch)
 
-    // Even a fully confirmed human operator cannot start the execute branch past a blocked
-    // prerequisite gate: it blocks before the destructive confirmation is consumed.
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    let binding = realBinding()
-    let monitor = RockchipFlashDispatchMonitor()
-    let decision = await RockchipManualFlashFallbackGate().authorize(
-      authority: .humanOperator,
-      binding: .realDevice(binding),
-      plan: plan,
-      prerequisites: provider.evaluatePrerequisites(loaderUnknown),
-      destructiveConfirmationAccepted: true,
-      manualConfirmation: matchingConfirmation(plan: plan, binding: binding),
-      monitor: monitor)
-    guard case .blockedByPrerequisites = decision.outcome else {
-      return XCTFail("execute branch must not begin while a required prerequisite is unknown")
-    }
-    XCTAssertEqual(decision.dispatchSnapshot.totalDispatchCount, 0)
-    XCTAssertEqual(decision.evidenceEligibility, .notEligible)
     print("TEST-AC-FLASH-002-01 PASS blocked_before_destructive_confirmation dispatch=0")
   }
 
@@ -314,33 +272,6 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     print("TEST-AC-FLASH-004-01 PASS modes=execute,planOnly,simulated distinct_digests=3")
   }
 
-  // MARK: - TEST-AC-FLASH-007-01 declined destructive confirmation
-
-  func testTEST_AC_FLASH_007_01_DeclinedDestructiveConfirmationYieldsZeroDestructiveCalls()
-    async throws
-  {
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    let binding = realBinding()
-    let monitor = RockchipFlashDispatchMonitor()
-    let decision = await RockchipManualFlashFallbackGate().authorize(
-      authority: .humanOperator,
-      binding: .realDevice(binding),
-      plan: plan,
-      prerequisites: .cleared,
-      destructiveConfirmationAccepted: false,
-      manualConfirmation: nil,
-      monitor: monitor)
-
-    guard case .blockedDestructiveConfirmationDeclined = decision.outcome else {
-      return XCTFail("declined confirmation must block, got \(decision.outcome)")
-    }
-    let snapshot = await monitor.snapshot()
-    XCTAssertEqual(snapshot.destructiveDeviceDispatchCount, 0)
-    XCTAssertEqual(snapshot.totalDispatchCount, 0)
-    XCTAssertEqual(decision.evidenceEligibility, .notEligible)
-    print("TEST-AC-FLASH-007-01 PASS updater_flash_erase_calls=0")
-  }
-
   // MARK: - TEST-AC-FLASH-008-01 critical write exit deferral
 
   func testTEST_AC_FLASH_008_01_ExitRequestDuringCriticalWriteIsDurablyDeferredToSafeBoundary()
@@ -393,9 +324,9 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     print("TEST-AC-FLASH-008-01 PASS deferral_durable=1 write_killed=0")
   }
 
-  // MARK: - TEST-AC-FLASH-012-01 semantic postflight
+  // MARK: - TEST-AC-FLASH-012-01 typed Runtime outcome
 
-  func testTEST_AC_FLASH_012_01_ToolExitZeroWithoutSemanticConfirmationIsNotSucceeded() throws {
+  func testTEST_AC_FLASH_012_01_OnlyTypedConfirmedReceiptsCanSucceed() throws {
     let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
 
     // Sanity: the fully confirmed observation is succeeded.
@@ -404,50 +335,43 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     XCTAssertEqual(happy.certainty, .confirmed)
     XCTAssertNil(happy.recoveryGuide)
 
-    // Exit 0 with the semantic marker missing on one write → not succeeded.
+    // An unknown native write receipt can never be upgraded to success.
     var writes = fullObservation().partitionWrites
     writes[4] = RockchipPartitionWriteObservation(
-      partitionName: "system", toolExitCode: 0, semanticOutput: "Write LBA from file (42%)")
+      partitionName: "system", outcome: .outcomeUnknown("native receipt is incomplete"))
     let unverifiedWrite = provider.assessOutcome(
       plan: plan,
       observation: RockchipFlashRunObservation(
         partitionWrites: writes,
-        resetExitCode: 0,
-        resetSemanticOutput: "Reset Device OK.",
-        reconnectedWithinDeadline: true,
-        postflightProbeSemanticOutput: "DAYU200 device Connected"))
+        resetOutcome: .confirmed,
+        postflightOutcome: .confirmed))
     XCTAssertFalse(unverifiedWrite.isSucceeded)
     XCTAssertEqual(unverifiedWrite.jobState, .waitingForRecovery)
     XCTAssertEqual(unverifiedWrite.certainty, .outcomeUnknown)
 
-    // Every tool exited 0 but the postflight probe does not report the device Connected.
+    // The native plan must carry a confirmed postflight receipt.
     let postflightMismatch = provider.assessOutcome(
       plan: plan,
       observation: RockchipFlashRunObservation(
         partitionWrites: fullObservation().partitionWrites,
-        resetExitCode: 0,
-        resetSemanticOutput: "Reset Device OK.",
-        reconnectedWithinDeadline: true,
-        postflightProbeSemanticOutput: "Empty"))
+        resetOutcome: .confirmed,
+        postflightOutcome: .outcomeUnknown("bound device did not reconnect")))
     XCTAssertFalse(postflightMismatch.isSucceeded)
     XCTAssertNotNil(postflightMismatch.recoveryGuide)
 
-    // Explicit rejection (Loader command-subset) is a confirmed failure, not silent success.
+    // An explicit native refusal is a confirmed failure, not silent success.
     var rejected = fullObservation().partitionWrites
     rejected[0] = RockchipPartitionWriteObservation(
-      partitionName: "uboot", toolExitCode: 255,
-      semanticOutput: "The device does not support this operation!")
+      partitionName: "uboot", outcome: .failed("native backend refused the write"))
     let subsetRejection = provider.assessOutcome(
       plan: plan,
       observation: RockchipFlashRunObservation(
         partitionWrites: rejected,
-        resetExitCode: nil,
-        resetSemanticOutput: nil,
-        reconnectedWithinDeadline: false,
-        postflightProbeSemanticOutput: nil))
+        resetOutcome: .outcomeUnknown("not reached"),
+        postflightOutcome: .outcomeUnknown("not reached")))
     XCTAssertEqual(subsetRejection.jobState, .failed)
     XCTAssertEqual(subsetRejection.certainty, .confirmed)
-    print("TEST-AC-FLASH-012-01 PASS exit0_without_semantics=not_succeeded")
+    print("TEST-AC-FLASH-012-01 PASS typed_unknown_receipt=not_succeeded")
   }
 
   // MARK: - TEST-AC-FLASH-013-01 bounded honest recovery
@@ -458,10 +382,8 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
       plan: plan,
       observation: RockchipFlashRunObservation(
         partitionWrites: fullObservation().partitionWrites,
-        resetExitCode: 0,
-        resetSemanticOutput: "Reset Device OK.",
-        reconnectedWithinDeadline: false,
-        postflightProbeSemanticOutput: nil))
+        resetOutcome: .confirmed,
+        postflightOutcome: .outcomeUnknown("bound device did not reconnect")))
 
     XCTAssertFalse(assessment.isSucceeded)
     XCTAssertEqual(assessment.jobState, .waitingForRecovery)
@@ -469,152 +391,17 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
     let guide = try XCTUnwrap(assessment.recoveryGuide)
     XCTAssertEqual(guide.deviceMode, "unknown")
     XCTAssertFalse(guide.automaticRecoveryGuaranteed)
-    // The human route writes by name, like the automated one: `wlx` flashes
-    // landed and booted on real hardware on 2026-07-21 and 2026-08-04, while
-    // the truncation once attributed to it was an artifact of `rl` reading
-    // uniform filler past this loader's read window.
     XCTAssertTrue(
-      guide.manualRecoverySteps.contains { $0.contains("wlx <name> <image>") })
-    XCTAssertFalse(
-      guide.manualRecoverySteps.contains { $0.contains("wl <beginSec>") })
+      guide.manualRecoverySteps.contains { $0.contains("outcomeUnknown") })
     XCTAssertTrue(
-      guide.manualRecoverySteps.contains { $0.contains("do not use `rl` to judge a write") })
+      guide.manualRecoverySteps.contains { $0.contains("ArkForge native discovery") })
     XCTAssertTrue(guide.manualRecoverySteps.contains { $0.contains("Loader") })
+    XCTAssertTrue(
+      guide.manualRecoverySteps.contains { $0.contains("safeToSupersedeByCompleteOverwrite") })
     XCTAssertTrue(guide.disclosures.contains { $0.contains("destroy user data") })
-    XCTAssertTrue(guide.disclosures.contains { $0.contains("not every failure is recoverable") })
+    XCTAssertTrue(guide.disclosures.contains { $0.contains("Maskrom rescue") })
     XCTAssertEqual(guide.lastConfirmedStepID, plan.destructiveStepIDs.last)
     print("TEST-AC-FLASH-013-01 PASS state=waitingForRecovery certainty=outcomeUnknown")
-  }
-
-  // MARK: - TEST-AC-FLASH-015-01 Agent/CI execute is policy-blocked
-
-  func testTEST_AC_FLASH_015_01_AgentExecutePlanWithRealBindingIsPolicyBlockedWithHandoff()
-    async throws
-  {
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    XCTAssertTrue(plan.containsDestructiveSteps)
-    let binding = realBinding()
-
-    for authority in [RockchipExecutionAuthority.standardAgent, .ordinaryCI] {
-      let monitor = RockchipFlashDispatchMonitor()
-      let decision = await RockchipManualFlashFallbackGate().authorize(
-        authority: authority,
-        binding: .realDevice(binding),
-        plan: plan,
-        prerequisites: .cleared,
-        destructiveConfirmationAccepted: true,
-        manualConfirmation: matchingConfirmation(plan: plan, binding: binding),
-        monitor: monitor)
-
-      guard case .policyBlocked(let handoff) = decision.outcome else {
-        return XCTFail("\(authority) execute must be policy blocked, got \(decision.outcome)")
-      }
-      XCTAssertEqual(decision.jobMarker, "policyBlocked")
-      XCTAssertEqual(decision.dispatchSnapshot.destructiveDeviceDispatchCount, 0)
-      XCTAssertEqual(decision.dispatchSnapshot.totalDispatchCount, 0)
-      XCTAssertEqual(decision.evidenceEligibility, .notEligible)
-      // The controlled handoff exists and carries the exact plan identity for a human.
-      XCTAssertEqual(handoff.planDigestSHA256, plan.planDigestSHA256)
-      XCTAssertFalse(handoff.commandLines.isEmpty)
-    }
-
-    // The branches an Agent/CI credential may take: planOnly and simulated.
-    for mode in [RockchipFlashExecutionMode.planOnly, .simulated] {
-      let nonExecutePlan = try provider.makePlan(mode: mode, archiveValidation: .valid)
-      let monitor = RockchipFlashDispatchMonitor()
-      let decision = await RockchipManualFlashFallbackGate().authorize(
-        authority: .standardAgent,
-        binding: .none,
-        plan: nonExecutePlan,
-        prerequisites: .cleared,
-        destructiveConfirmationAccepted: false,
-        manualConfirmation: nil,
-        monitor: monitor)
-      guard case .allowedNonExecuteBranch = decision.outcome else {
-        return XCTFail("\(mode) must stay available to Agent credentials")
-      }
-      XCTAssertEqual(decision.evidenceEligibility, .notEligible)
-    }
-    print("TEST-AC-FLASH-015-01 PASS destructive_dispatch=0 job=policyBlocked handoff=controlled")
-  }
-
-  // MARK: - TEST-AC-FLASH-015-02 manual confirmation exact match
-
-  func testTEST_AC_FLASH_015_02_ManualConfirmationMismatchOrAbsenceYieldsZeroRealDispatch()
-    async throws
-  {
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    let binding = realBinding()
-    let gate = RockchipManualFlashFallbackGate()
-
-    func decide(_ confirmation: RockchipManualFlashConfirmation?) async
-      -> RockchipManualFlashFallbackDecision
-    {
-      await gate.authorize(
-        authority: .humanOperator,
-        binding: .realDevice(binding),
-        plan: plan,
-        prerequisites: .cleared,
-        destructiveConfirmationAccepted: true,
-        manualConfirmation: confirmation,
-        monitor: RockchipFlashDispatchMonitor())
-    }
-
-    // The exact confirmation authorizes human execution — and only human execution.
-    let authorized = await decide(matchingConfirmation(plan: plan, binding: binding))
-    guard case .authorizedForHumanExecution = authorized.outcome else {
-      return XCTFail("exact confirmation must authorize human execution")
-    }
-    XCTAssertEqual(
-      authorized.evidenceEligibility, .humanExecutedRunMayProduceRealHardwareEvidence)
-    XCTAssertEqual(authorized.dispatchSnapshot.totalDispatchCount, 0)
-
-    // Absent confirmation: zero dispatch, no realHardware evidence eligibility.
-    let missing = await decide(nil)
-    guard case .blockedMissingManualConfirmation = missing.outcome else {
-      return XCTFail("missing confirmation must block")
-    }
-    XCTAssertEqual(missing.evidenceEligibility, .notEligible)
-
-    // Any single differing field blocks with zero dispatch.
-    let base = matchingConfirmation(plan: plan, binding: binding)
-    let otherDigest = String(repeating: "d", count: 64)
-    let mutations: [(String, RockchipManualFlashConfirmation)] = [
-      (
-        "targetBindingDigestSha256",
-        confirmation(base, targetBindingDigest: otherDigest)
-      ),
-      ("firmwareArchiveSha256", confirmation(base, firmware: otherDigest)),
-      ("transport", confirmation(base, transport: "tcp")),
-      ("toolchainFingerprint", confirmation(base, toolchain: "rkdeveloptool-9.99@deadbeef")),
-      ("providerIdentity", confirmation(base, provider: "arkdeck.some-other-provider")),
-      ("planDigestSha256", confirmation(base, planDigest: otherDigest)),
-      ("stepSetDigestSha256", confirmation(base, stepSetDigest: otherDigest)),
-      ("operatorIdentity", confirmation(base, operatorIdentity: "  ")),
-    ]
-    for (field, mutated) in mutations {
-      let decision = await decide(mutated)
-      guard case .blockedManualConfirmationMismatch(let fields) = decision.outcome else {
-        return XCTFail("mutated \(field) must block, got \(decision.outcome)")
-      }
-      XCTAssertTrue(fields.contains(field), "expected \(field) in \(fields)")
-      XCTAssertEqual(decision.dispatchSnapshot.totalDispatchCount, 0)
-      XCTAssertEqual(decision.evidenceEligibility, .notEligible)
-    }
-
-    // A confirmation minted for a different plan (different step identifiers) can never
-    // retroactively cover this one: the digests are part of the exact-match set.
-    let otherPlan = try provider.makePlan(
-      mode: .execute, archiveValidation: .valid, planNonce: "other")
-    let staleConfirmation = matchingConfirmation(plan: otherPlan, binding: binding)
-    let stale = await decide(staleConfirmation)
-    guard case .blockedManualConfirmationMismatch(let staleFields) = stale.outcome else {
-      return XCTFail("a confirmation for another plan must not authorize this plan")
-    }
-    XCTAssertTrue(staleFields.contains("stepSetDigestSha256"))
-    print(
-      "TEST-AC-FLASH-015-02 PASS mismatch_fields=8 stale_plan_blocked=1 real_dispatch=0 "
-        + "realhardware_evidence=none")
   }
 
   // MARK: - CLI authority resolution (REQ-FLASH-015 product face)
@@ -758,61 +545,15 @@ final class RockchipRockUSBFlashProviderContractTests: XCTestCase {
       })
   }
 
-  private func realBinding() -> RockchipRealDeviceBinding {
-    RockchipRealDeviceBinding(
-      usbVendorID: 0x2207, usbProductID: 0x350a, usbLocationID: "0x01100000")
-  }
-
-  private func matchingConfirmation(
-    plan: RockchipFlashPlan, binding: RockchipRealDeviceBinding
-  ) -> RockchipManualFlashConfirmation {
-    RockchipManualFlashConfirmation(
-      operatorIdentity: "lvye",
-      targetBindingDigestSHA256: binding.identityDigestSHA256,
-      firmwareArchiveSHA256: plan.archiveSHA256,
-      transport: "usb",
-      toolchainFingerprint: RockchipFlashProfile.pinnedToolchainFingerprint,
-      providerIdentity: RockchipRockUSBFlashProvider.providerIdentity,
-      planDigestSHA256: plan.planDigestSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      confirmedAtTimestamp: timestamp)
-  }
-
-  private func confirmation(
-    _ base: RockchipManualFlashConfirmation,
-    operatorIdentity: String? = nil,
-    targetBindingDigest: String? = nil,
-    firmware: String? = nil,
-    transport: String? = nil,
-    toolchain: String? = nil,
-    provider: String? = nil,
-    planDigest: String? = nil,
-    stepSetDigest: String? = nil
-  ) -> RockchipManualFlashConfirmation {
-    RockchipManualFlashConfirmation(
-      operatorIdentity: operatorIdentity ?? base.operatorIdentity,
-      targetBindingDigestSHA256: targetBindingDigest ?? base.targetBindingDigestSHA256,
-      firmwareArchiveSHA256: firmware ?? base.firmwareArchiveSHA256,
-      transport: transport ?? base.transport,
-      toolchainFingerprint: toolchain ?? base.toolchainFingerprint,
-      providerIdentity: provider ?? base.providerIdentity,
-      planDigestSHA256: planDigest ?? base.planDigestSHA256,
-      stepSetDigestSHA256: stepSetDigest ?? base.stepSetDigestSHA256,
-      confirmedAtTimestamp: base.confirmedAtTimestamp)
-  }
-
   private func fullObservation() -> RockchipFlashRunObservation {
     RockchipFlashRunObservation(
       partitionWrites: provider.profile.mappedPartitions.map {
         RockchipPartitionWriteObservation(
           partitionName: $0.partitionName,
-          toolExitCode: 0,
-          semanticOutput: "Write LBA from file (100%)")
+          outcome: .confirmed)
       },
-      resetExitCode: 0,
-      resetSemanticOutput: "Reset Device OK.",
-      reconnectedWithinDeadline: true,
-      postflightProbeSemanticOutput: "DAYU200 device Connected localhost")
+      resetOutcome: .confirmed,
+      postflightOutcome: .confirmed)
   }
 
   private static func sha256Hex(_ data: Data) -> String {

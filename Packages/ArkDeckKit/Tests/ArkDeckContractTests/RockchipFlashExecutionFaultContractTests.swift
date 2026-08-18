@@ -1,9 +1,6 @@
 import ArkDeckCore
-import ArkDeckProcess
-import ArkDeckStorage
 import Compression
 import CryptoKit
-import Darwin
 import Foundation
 import XCTest
 
@@ -285,21 +282,7 @@ final class RockchipFlashExecutionFaultContractTests: XCTestCase {
 struct RockchipExecutionTestFixture {
   let base: URL
   let archive: URL
-  let executable: URL
-  let executableSHA256: String
-  let executableReceipt: ProcessExecutableIdentityReceipt
   let profile: RockchipFlashProfile
-  let plan: RockchipFlashPlan
-  let sessionsRoot: URL
-  let coordinator: HostStorageCoordinator
-
-  static let deterministicID: @Sendable (String) -> String = { prefix in
-    switch prefix {
-    case "rockchip-session": "rockchip-session-fixed"
-    case "rockchip-job": "rockchip-job-fixed"
-    default: "rockchip-target-fixed"
-    }
-  }
 
   static func make(partitionNames: [String]? = nil) throws -> RockchipExecutionTestFixture {
     let base = FileManager.default.temporaryDirectory.appending(
@@ -332,28 +315,8 @@ struct RockchipExecutionTestFixture {
         .loader: .required, .recoveryPath: .required, .unlocked: .required,
         .stablePower: .optional,
       ])
-    let plan = try RockchipRockUSBFlashProvider(profile: profile).makePlan(
-      mode: .execute, archiveValidation: .valid)
-    let packageRoot = URL(filePath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let executable = packageRoot.appending(path: ".build/debug/ArkDeckFakeRockchipFixture")
-    let executableSHA256 = sha256(try Data(contentsOf: executable))
-    let executor = FoundationProcessExecutor()
-    let prepared = try executor.prepareIdentityBoundLaunch(
-      ProcessIdentityBoundRequest(
-        process: ProcessRequest(executable: executable, arguments: ["ld"]),
-        expectedSHA256: executableSHA256))
-    let receipt = prepared.executableIdentity
-    prepared.close()
-    let sessionsRoot = base.appending(path: "Sessions", directoryHint: .isDirectory)
-    try FileManager.default.createDirectory(
-      at: sessionsRoot, withIntermediateDirectories: false,
-      attributes: [.posixPermissions: 0o700])
     return RockchipExecutionTestFixture(
-      base: base, archive: archive, executable: executable,
-      executableSHA256: executableSHA256, executableReceipt: receipt,
-      profile: profile, plan: plan, sessionsRoot: sessionsRoot,
-      coordinator: HostStorageCoordinator())
+      base: base, archive: archive, profile: profile)
   }
 
   static func sha256(_ data: Data) -> String {

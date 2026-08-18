@@ -151,7 +151,6 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
   public let mode: RockchipFlashExecutionMode
   public let target: FlashTargetPresentation?
   public let profileReference: String
-  public let toolchainFingerprint: String
   public let imageFileName: String
   public let runtimeBuildVersion: String
   public let archiveSizeBytes: Int64
@@ -178,7 +177,6 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     mode: RockchipFlashExecutionMode,
     target: FlashTargetPresentation?,
     profileReference: String,
-    toolchainFingerprint: String,
     imageFileName: String,
     runtimeBuildVersion: String,
     archiveSizeBytes: Int64,
@@ -195,7 +193,6 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
     self.mode = mode
     self.target = target
     self.profileReference = profileReference
-    self.toolchainFingerprint = toolchainFingerprint
     self.imageFileName = imageFileName
     self.runtimeBuildVersion = runtimeBuildVersion
     self.archiveSizeBytes = archiveSizeBytes
@@ -220,7 +217,7 @@ public struct FlashExactPlanPresentation: Sendable, Equatable {
       })
     return FlashExactPlanPresentation(
       mode: mode, target: target, profileReference: profileReference,
-      toolchainFingerprint: toolchainFingerprint, imageFileName: imageFileName,
+      imageFileName: imageFileName,
       runtimeBuildVersion: runtimeBuildVersion,
       archiveSizeBytes: archiveSizeBytes, archiveSHA256: archiveSHA256,
       mappedPartitionCount: mappedPartitionCount,
@@ -1209,7 +1206,6 @@ enum FlashPlanPresentationBuilder {
       mode: plan.executionMode,
       target: target,
       profileReference: profile.catalogReference,
-      toolchainFingerprint: RockchipFlashProfile.pinnedToolchainFingerprint,
       imageFileName: imageFileName,
       runtimeBuildVersion: profile.runtimeBuildVersion,
       archiveSizeBytes: profile.archiveSizeBytes,

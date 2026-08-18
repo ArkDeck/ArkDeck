@@ -321,55 +321,6 @@ final class Dayu20070035RuntimePlanOnlyContractTests: XCTestCase {
     }
   }
 
-  func testHumanExecuteGateProducesExactDAYU200HandoffWithZeroDispatch() async throws {
-    let profile = RockchipFlashProfile.dayu200
-    let provider = RockchipRockUSBFlashProvider(profile: profile)
-    let plan = try provider.makePlan(mode: .execute, archiveValidation: .valid)
-    let binding = RockchipRealDeviceBinding(
-      usbVendorID: RockchipProbeEvidence.rockUSBVendorID,
-      usbProductID: RockchipProbeEvidence.dayu200LoaderProductID,
-      usbLocationID: "42")
-    let prerequisites = provider.evaluatePrerequisites([
-      RockchipPrerequisiteObservation(identifier: .loader, status: .satisfied),
-      RockchipPrerequisiteObservation(identifier: .recoveryPath, status: .satisfied),
-      RockchipPrerequisiteObservation(identifier: .unlocked, status: .satisfied),
-    ])
-    let confirmation = RockchipManualFlashConfirmation(
-      operatorIdentity: "lvye",
-      targetBindingDigestSHA256: binding.identityDigestSHA256,
-      firmwareArchiveSHA256: profile.archiveSHA256,
-      transport: "usb",
-      toolchainFingerprint: RockchipFlashProfile.pinnedToolchainFingerprint,
-      providerIdentity: RockchipRockUSBFlashProvider.providerIdentity,
-      planDigestSHA256: plan.planDigestSHA256,
-      stepSetDigestSHA256: plan.stepSetDigestSHA256,
-      confirmedAtTimestamp: "2026-08-01T00:00:00Z")
-    let monitor = RockchipFlashDispatchMonitor()
-    let decision = await RockchipManualFlashFallbackGate(profile: profile).authorize(
-      authority: .humanOperator,
-      binding: .realDevice(binding),
-      plan: plan,
-      prerequisites: prerequisites,
-      destructiveConfirmationAccepted: true,
-      manualConfirmation: confirmation,
-      monitor: monitor)
-    guard case .authorizedForHumanExecution(let handoff) = decision.outcome else {
-      return XCTFail("dayu200 must produce a human-only exact handoff")
-    }
-    XCTAssertEqual(handoff.planDigestSHA256, plan.planDigestSHA256)
-    XCTAssertEqual(handoff.stepSetDigestSHA256, plan.stepSetDigestSHA256)
-    XCTAssertEqual(
-      handoff.commandLines,
-      ["sudo rkdeveloptool ld", "sudo rkdeveloptool ppt"]
-        + profile.mappedPartitions.map {
-          "sudo rkdeveloptool wlx \($0.partitionName) \($0.imageMemberName)"
-        }
-        + ["sudo rkdeveloptool rd"])
-    XCTAssertEqual(decision.evidenceEligibility, .humanExecutedRunMayProduceRealHardwareEvidence)
-    let dispatch = await monitor.snapshot()
-    XCTAssertEqual(dispatch.totalDispatchCount, 0)
-  }
-
   /// Manual real-input gate. CI has no 730 MB firmware archive and skips it;
   /// release verification supplies ARKDECK_DAYU200_70035_IMAGE. The test uses
   /// sealed target facts and a dispatcher that fails if called, so it never

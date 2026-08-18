@@ -23,7 +23,6 @@ let package = Package(
     .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
     .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
-    .executable(name: "ArkDeckFakeRockchipFixture", targets: ["ArkDeckFakeRockchipFixture"]),
     .executable(name: "ArkDeckEngineCrashFixture", targets: ["ArkDeckEngineCrashFixture"]),
     .executable(name: "ArkDeckRuntimeSoakFixture", targets: ["ArkDeckRuntimeSoakFixture"]),
     .executable(name: "ArkDeckFakeHapSignerFixture", targets: ["ArkDeckFakeHapSignerFixture"]),
@@ -139,10 +138,6 @@ let package = Package(
       path: "Tests/ArkDeckFakeHDCFixture"
     ),
     .executableTarget(
-      name: "ArkDeckFakeRockchipFixture",
-      path: "Tests/ArkDeckFakeRockchipFixture"
-    ),
-    .executableTarget(
       name: "ArkDeckEngineCrashFixture",
       dependencies: ["ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage", "ArkDeckWorkflows"],
       path: "Tests/ArkDeckEngineCrashFixture"
@@ -181,7 +176,6 @@ let package = Package(
         // product behaviour, so it is contract-tested here.
         "ArkDeckCLI",
         "ArkDeckFakeHDCFixture",
-        "ArkDeckFakeRockchipFixture",
         "ArkDeckFakeHapSignerFixture",
       ],
       resources: [
@@ -190,7 +184,6 @@ let package = Package(
         // paths stay valid and future pack versions cannot collide.
         .copy("Fixtures/HDC/Golden"),
         .copy("Fixtures/HDC/Probes"),
-        .copy("Fixtures/Rockchip"),
       ]
     ),
   ]

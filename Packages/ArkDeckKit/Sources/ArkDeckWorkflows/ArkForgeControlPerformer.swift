@@ -283,7 +283,7 @@ struct ArkForgeControlPerformer: ArkForgeFlashSession.ControlPerformer {
       executionTuning: nil)
     return try await host.execute(
       action: action, descriptor: descriptor,
-      rockchipExecutable: binding.providerIdentity)
+      providerExecutable: binding.providerIdentity)
   }
 
   /// The record-store step id for one action of one control request.

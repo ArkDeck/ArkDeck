@@ -35,9 +35,8 @@ package enum ArkForgeManagedControlPort {
         "waitForLoader", "rebindLoader",
       ]
     case .rebootToNormal:
-      // The device half of this one is `rd`, a Rockchip command — in Loader
-      // mode there is no HDC to talk to. ArkForge issues the reset through its
-      // own fixed-tool port; ArkDeck contributes the half only it can, which is
+      // In Loader mode there is no HDC to talk to. ArkForge issues the reset
+      // through its native RockUSB backend; ArkDeck contributes the half only it can, which is
       // watching the exact bound target come back.
       return ["waitForBoundHDCReconnect"]
     case .readProductFacts, .readBuildFacts:

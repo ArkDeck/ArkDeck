@@ -20,7 +20,7 @@ final class DeviceProviderContractTests: XCTestCase {
   private struct RockchipFactsPort: RockchipRuntimeFactsPort {
     func currentFacts(targetID: String) async throws -> ProviderFacts {
       ProviderFacts(
-        providerID: "rockchip", toolVersion: "rkdeveloptool ver 1.32",
+        providerID: "rockchip", toolVersion: "arkforged native RockUSB",
         toolSHA256: String(repeating: "c", count: 64),
         serverFacts: [
           TargetStoreRockchipRuntimeFactsPort.crossModeBindingServerFactKey:
@@ -591,7 +591,7 @@ final class DeviceProviderContractTests: XCTestCase {
       connectKey: "150100424a544e4600",
       expectedIdentitySHA256:
         "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
-      toolVersion: "rkdeveloptool ver 1.32",
+      toolVersion: "arkforged native RockUSB",
       toolSHA256: String(repeating: "c", count: 64),
       serverFacts: [
         TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey:

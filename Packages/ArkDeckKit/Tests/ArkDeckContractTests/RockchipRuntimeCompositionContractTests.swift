@@ -9,7 +9,7 @@ import XCTest
 @testable import ArkDeckWorkflows
 
 final class RockchipRuntimeCompositionContractTests: XCTestCase {
-  private static let reviewedSignedComponentSHA256 =
+  private static let nativeProviderSHA256 =
     String(repeating: "c", count: 64)
 
   private actor ActionLog {
@@ -94,7 +94,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     func execute(
       action: RockchipProviderAction,
       descriptor _: HostManagedProcessDescriptor,
-      rockchipExecutable _: ResolvedExecutable,
+      providerExecutable _: ResolvedExecutable,
       actionDirectory: URL
     ) async throws -> RockchipRuntimeActionExecutionResult {
       await log.append(
@@ -125,7 +125,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     func execute(
       action: RockchipProviderAction,
       descriptor _: HostManagedProcessDescriptor,
-      rockchipExecutable _: ResolvedExecutable,
+      providerExecutable _: ResolvedExecutable,
       actionDirectory: URL
     ) async throws -> RockchipRuntimeActionExecutionResult {
       await log.append(
@@ -143,7 +143,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     func execute(
       action _: RockchipProviderAction,
       descriptor _: HostManagedProcessDescriptor,
-      rockchipExecutable _: ResolvedExecutable,
+      providerExecutable _: ResolvedExecutable,
       actionDirectory _: URL
     ) async throws -> RockchipRuntimeActionExecutionResult {
       RockchipRuntimeActionExecutionResult(
@@ -212,12 +212,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           emptyFirstTargetList && listCount == 1
           ? "[Empty]\n"
           : "\(connectedTarget)\t\tUSB\tConnected\tlocalhost\n"
-      case ["ld"]:
-        stdout = "DevNo=1\tVid=0x2207,Pid=0x350a,LocationID=42\tLoader\n"
-      case ["ppt"]:
-        stdout = Self.partitionTable
-      case ["rd"]:
-        stdout = "Reset Device OK.\n"
       case let value
       where value.suffix(4)
         == ["shell", "param", "get", HDCAllowlistedProperty.productModel.rawValue]:
@@ -228,8 +222,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         stdout = "const.ohos.fullname = \(buildVersion)\n"
       case let value where value.count >= 3 && value.suffix(3) == ["shell", "hilog", "-x"]:
         stdout = "post-flash hilog\n"
-      case let value where value.first == "wl" || value.first == "wlx":
-        stdout = "Write LBA from file (100%)\n"
       default:
         stdout = ""
       }
@@ -243,26 +235,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     func snapshot() -> [Invocation] { invocations }
 
-    private static let partitionTable =
-      """
-      **********Partition Info(GPT)**********
-      NO  LBA       Name
-      00  00002000  uboot
-      01  00004000  misc
-      02  00006000  bootctrl
-      03  00007000  resource
-      04  0000A000  boot_linux
-      05  0003A000  ramdisk
-      06  0003C000  system
-      07  0043C000  vendor
-      08  0063C000  sys-prod
-      09  00655000  chip-prod
-      10  0066E000  updater
-      11  0067E000  eng_system
-      12  00686000  eng_chipset
-      13  0069E000  chip_ckm
-      14  01308000  userdata
-      """
   }
 
   private struct ScriptedCommandRunner: RockchipRuntimeCommandRunning {
@@ -275,16 +247,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       outputByteBudget _: Int,
       criticalNonInterruptible: Bool
     ) async throws -> ProviderSubprocessReceipt {
-      // The pre-write medium probe reads real sectors, so the script has to
-      // produce them: the primary header and the backup it names, with the
-      // DAYU200 geometry the pinned table describes.
-      if arguments.count == 4, arguments[0] == "rl",
-        let begin = Int64(arguments[1]), let count = Int64(arguments[2])
-      {
-        FileManager.default.createFile(
-          atPath: arguments[3],
-          contents: Self.sectors(begin: begin, count: count))
-      }
       return await log.run(
         executable: executable,
         arguments: arguments,
@@ -479,7 +441,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     func snapshot() -> [String] { partitions }
   }
 
-
   private struct MaterializingReadbackRunner: RockchipRuntimeCommandRunning {
     let imageBytes: Data
     let baseSector: Int64
@@ -631,7 +592,6 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       """
   }
 
-
   func testWaitForHDCReconnectSurvivesATransientMalformedTargetList() async throws {
     // One malformed snapshot is a moment in USB enumeration, not a verdict
     // about the target; the deadline is the fail-closed boundary. On
@@ -648,7 +608,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         ]),
       runner: TransientMalformedListRunner(counter: counter))
     let component = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .waitForHDCReconnect(connectKey: "device-1"),
       stepID: "wait-for-hdc", toolSHA256: component.sha256)
@@ -656,7 +616,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let result = try await executor.execute(
       action: .waitForHDCReconnect(connectKey: "device-1"),
       descriptor: hostDescriptor(plan),
-      rockchipExecutable: component, actionDirectory: root)
+      providerExecutable: component, actionDirectory: root)
 
     XCTAssertEqual(result.summary["hdcState"], "connected")
     let polls = await counter.polls
@@ -694,14 +654,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       postFlashHDCBindingStore: store,
       nowUTC: { "2026-08-08T01:02:03Z" })
     let component = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
 
     let wait = RockchipProviderAction.waitForBoundHDCReconnect(expectation: expectation)
     let waitPlan = try rockchipPlan(
       action: wait, stepID: "wait-for-hdc", toolSHA256: component.sha256)
     let waitResult = try await executor.execute(
       action: wait, descriptor: hostDescriptor(waitPlan),
-      rockchipExecutable: component, actionDirectory: root)
+      providerExecutable: component, actionDirectory: root)
     XCTAssertEqual(waitResult.summary["hdcIdentitySha256"], nextDigest)
     XCTAssertEqual(waitResult.summary["usbTopology"], expectation.usbTopology)
     XCTAssertNil(
@@ -716,7 +676,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       action: verify, stepID: "rebind-and-verify-build", toolSHA256: component.sha256)
     let verified = try await executor.execute(
       action: verify, descriptor: hostDescriptor(verifyPlan),
-      rockchipExecutable: component, actionDirectory: root)
+      providerExecutable: component, actionDirectory: root)
     XCTAssertEqual(verified.summary["verification"], "exact-published-profile-and-bound-hdc")
 
     let binding = try XCTUnwrap(store.loadIfPresent())
@@ -751,7 +711,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         .map { String(format: "%02x", $0) }.joined(),
       usbTopology: "42")
     let component = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let action = RockchipProviderAction.verifyBoundBuild(
       expectation: expectation,
       expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
@@ -779,7 +739,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     do {
       _ = try await badBuildExecutor.execute(
         action: action, descriptor: hostDescriptor(plan),
-        rockchipExecutable: component, actionDirectory: root)
+        providerExecutable: component, actionDirectory: root)
       XCTFail("a nonempty version that differs from the profile pin must fail closed")
     } catch let failure as RuntimeDispatchFailure {
       guard case .failed(let detail) = failure else {
@@ -806,7 +766,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     await XCTAssertThrowsErrorAsync(
       try await badTopologyExecutor.execute(
         action: action, descriptor: hostDescriptor(plan),
-        rockchipExecutable: component, actionDirectory: root))
+        providerExecutable: component, actionDirectory: root))
     XCTAssertNil(try topologyStore.loadIfPresent())
   }
 
@@ -1010,7 +970,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     ).record
     let component = ResolvedExecutable(
       path: "/product/arkforged",
-      sha256: Self.reviewedSignedComponentSHA256)
+      sha256: Self.nativeProviderSHA256)
     let factsPort = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore,
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
@@ -1065,8 +1025,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           "identity:serial-sha256=\(boundIdentity)",
         ]))
     let component = ResolvedExecutable(
-      path: "/product/Contents/MacOS/rkdeveloptool",
-      sha256: Self.reviewedSignedComponentSHA256)
+      path: "/product/arkforged",
+      sha256: Self.nativeProviderSHA256)
     let port = TargetStoreRockchipRuntimeFactsPort(
       targetStore: targetStore,
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
@@ -1157,8 +1117,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         jobID: "job-flash", establishedAtUTC: "2026-08-08T00:10:00Z"),
       expectedPreviousHDCIdentitySHA256: previousDigest)
     let component = ResolvedExecutable(
-      path: "/product/Contents/MacOS/rkdeveloptool",
-      sha256: Self.reviewedSignedComponentSHA256)
+      path: "/product/arkforged",
+      sha256: Self.nativeProviderSHA256)
     let probe = RecordingLiveModeProbe(
       observation: RockchipLiveModeObservation(
         deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion))
@@ -1316,8 +1276,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let hdc = ResolvedExecutable(
       path: "/product/hdc", sha256: String(repeating: "d", count: 64))
     let rockchip = ResolvedExecutable(
-      path: "/product/Contents/MacOS/rkdeveloptool",
-      sha256: Self.reviewedSignedComponentSHA256)
+      path: "/product/arkforged",
+      sha256: Self.nativeProviderSHA256)
     let resolver = FixedExecutableResolver(
       table: ["hdc": hdc, "rockchip": rockchip])
 
@@ -1385,8 +1345,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         "hdc": ResolvedExecutable(
           path: "/product/hdc", sha256: String(repeating: "d", count: 64)),
         "rockchip": ResolvedExecutable(
-          path: "/product/Contents/MacOS/rkdeveloptool",
-          sha256: Self.reviewedSignedComponentSHA256),
+          path: "/product/arkforged",
+          sha256: Self.nativeProviderSHA256),
       ])
 
     // A single `ld` observation is not enough to assign a Loader to this
@@ -1496,8 +1456,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       resolver: FixedExecutableResolver(
         table: [
           "rockchip": ResolvedExecutable(
-            path: "/product/Contents/MacOS/rkdeveloptool",
-            sha256: Self.reviewedSignedComponentSHA256)
+            path: "/product/arkforged",
+            sha256: Self.nativeProviderSHA256)
         ]),
       prober: probe,
       nowUTC: { "2026-08-03T01:02:03Z" }
@@ -1611,7 +1571,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       runner: runner, usbProbe: NormalOnlyUSBProbe(connectKey: connectKey),
       enterLoaderReadbackTimeoutSeconds: 0)
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: connectKey),
       stepID: "enter-loader-receipt-summary", toolSHA256: rockchip.sha256)
@@ -1619,7 +1579,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     do {
       _ = try await executor.execute(
         action: .enterLoader(connectKey: connectKey),
-        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        descriptor: hostDescriptor(plan), providerExecutable: rockchip,
         actionDirectory: root)
       XCTFail("a Loader transition without its postcondition must fail")
     } catch let failure as RuntimeDispatchFailure {
@@ -1650,7 +1610,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       runner: runner, usbProbe: NormalOnlyUSBProbe(connectKey: connectKey),
       enterLoaderReadbackTimeoutSeconds: 0)
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: connectKey),
       stepID: "enter-loader-signal", toolSHA256: rockchip.sha256)
@@ -1658,7 +1618,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     do {
       _ = try await executor.execute(
         action: .enterLoader(connectKey: connectKey),
-        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        descriptor: hostDescriptor(plan), providerExecutable: rockchip,
         actionDirectory: root)
       XCTFail("a Loader transition without its postcondition must fail")
     } catch let failure as RuntimeDispatchFailure {
@@ -1686,7 +1646,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       runner: runner, usbProbe: MissingUSBProbe(),
       enterLoaderReadbackTimeoutSeconds: 0)
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: connectKey),
       stepID: "enter-loader-unknown-summary", toolSHA256: rockchip.sha256)
@@ -1694,7 +1654,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     do {
       _ = try await executor.execute(
         action: .enterLoader(connectKey: connectKey),
-        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        descriptor: hostDescriptor(plan), providerExecutable: rockchip,
         actionDirectory: root)
       XCTFail("an unobserved Loader postcondition must stay unknown")
     } catch let failure as RuntimeDispatchFailure {
@@ -1750,14 +1710,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       usbProbe: LoaderAfterInitialProbe(identity: identity),
       loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: "device-1"),
       stepID: "enter-loader-readback", toolSHA256: rockchip.sha256)
 
     let result = try await executor.execute(
       action: .enterLoader(connectKey: "device-1"),
-      descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+      descriptor: hostDescriptor(plan), providerExecutable: rockchip,
       actionDirectory: root)
 
     XCTAssertEqual(result.summary["transition"], "normal-to-loader")
@@ -1792,7 +1752,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       usbProbe: LoaderAfterInitialProbe(identity: identity),
       loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: "device-1"),
       stepID: "enter-loader-tuned", toolSHA256: rockchip.sha256)
@@ -1801,7 +1761,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
 
     _ = try await executor.execute(
       action: .enterLoader(connectKey: "device-1"), descriptor: descriptor,
-      rockchipExecutable: rockchip, actionDirectory: root)
+      providerExecutable: rockchip, actionDirectory: root)
 
     let invocations = await runner.invocations()
     XCTAssertEqual(
@@ -1825,14 +1785,14 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       usbProbe: FixedUSBProbe(identity: identity),
       loaderObserver: FixedArkForgeLoaderObserver(identity: identity, topology: "42"))
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: "device-1"),
       stepID: "enter-loader-already-loader", toolSHA256: rockchip.sha256)
 
     let result = try await executor.execute(
       action: .enterLoader(connectKey: "device-1"),
-      descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+      descriptor: hostDescriptor(plan), providerExecutable: rockchip,
       actionDirectory: root)
 
     XCTAssertEqual(result.summary["transition"], "already-loader")
@@ -1860,7 +1820,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       runner: runner, usbProbe: MissingUSBProbe(),
       enterLoaderReadbackTimeoutSeconds: 0)
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: "device-1"),
       stepID: "enter-loader-unresolved", toolSHA256: rockchip.sha256)
@@ -1868,7 +1828,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     do {
       _ = try await executor.execute(
         action: .enterLoader(connectKey: "device-1"),
-        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        descriptor: hostDescriptor(plan), providerExecutable: rockchip,
         actionDirectory: root)
       XCTFail("missing Loader readback must remain unknown")
     } catch let failure as RuntimeDispatchFailure {
@@ -1897,7 +1857,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       runner: runner, usbProbe: NormalOnlyUSBProbe(connectKey: connectKey),
       enterLoaderReadbackTimeoutSeconds: 0)
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let plan = try rockchipPlan(
       action: .enterLoader(connectKey: connectKey),
       stepID: "enter-loader-normal-readback", toolSHA256: rockchip.sha256)
@@ -1905,7 +1865,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     do {
       _ = try await executor.execute(
         action: .enterLoader(connectKey: connectKey),
-        descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+        descriptor: hostDescriptor(plan), providerExecutable: rockchip,
         actionDirectory: root)
       XCTFail("exact normal USB readback must settle the transition as not completed")
     } catch let failure as RuntimeDispatchFailure {
@@ -1939,13 +1899,13 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         ]),
       runner: runner, usbProbe: probe)
     let rockchip = ResolvedExecutable(
-      path: "/product/rkdeveloptool", sha256: String(repeating: "c", count: 64))
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
     let action = RockchipProviderAction.observeHDCNormalUSB(connectKey: connectKey)
     let plan = try rockchipPlan(
       action: action, stepID: "observe-normal-usb", toolSHA256: rockchip.sha256)
 
     let result = try await executor.execute(
-      action: action, descriptor: hostDescriptor(plan), rockchipExecutable: rockchip,
+      action: action, descriptor: hostDescriptor(plan), providerExecutable: rockchip,
       actionDirectory: root)
 
     XCTAssertEqual(result.summary["hdcNormalIdentitySha256"], probe.identity)
@@ -1965,8 +1925,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let resolver = FixedExecutableResolver(
       table: [
         "rockchip": ResolvedExecutable(
-          path: "/product/Contents/MacOS/rkdeveloptool",
-          sha256: Self.reviewedSignedComponentSHA256)
+          path: "/product/arkforged",
+          sha256: Self.nativeProviderSHA256)
       ])
     let dispatcher = ArkForgeNativeRockchipControlDispatcher(
       resolver: resolver,
@@ -1984,7 +1944,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         jobID: "job-signed", stepID: "enter-loader", targetID: "TGT-1",
         bindingRevision: 1, connectKey: "device-1",
         expectedIdentitySHA256: String(repeating: "a", count: 64),
-        toolSHA256: Self.reviewedSignedComponentSHA256,
+        toolSHA256: Self.nativeProviderSHA256,
         nowUTC: "2026-07-31T00:00:00Z"))
     let receipt = try await dispatcher.dispatch(signedPlan)
     XCTAssertNotNil(receipt.hostManagedRecordID)
@@ -1992,18 +1952,17 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let signedSnapshot = await actionLog.snapshot()
     XCTAssertEqual(signedSnapshot.0.count, 1)
 
-    let legacyPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
+    let mismatchedPlan = try RockchipFlashProviderAdapter(availability: .available).lower(
       action: .rockchip(.enterLoader(connectKey: "device-1")),
       context: ProviderExecutionContext(
-        jobID: "job-legacy", stepID: "enter-loader", targetID: "TGT-1",
+        jobID: "job-mismatch", stepID: "enter-loader", targetID: "TGT-1",
         bindingRevision: 1, connectKey: "device-1",
         expectedIdentitySHA256: String(repeating: "a", count: 64),
-        toolSHA256:
-          RockchipDiscoveryIntegrationProfile.pinnedProduction.executableSHA256,
+        toolSHA256: String(repeating: "0", count: 64),
         nowUTC: "2026-07-31T00:00:00Z"))
     do {
-      _ = try await dispatcher.dispatch(legacyPlan)
-      XCTFail("a legacy external-tool plan must not authorize the bundled component")
+      _ = try await dispatcher.dispatch(mismatchedPlan)
+      XCTFail("a mismatched executable identity must not authorize ArkForge")
     } catch let failure as RuntimeDispatchFailure {
       guard case .failed(let detail) = failure else {
         return XCTFail("expected definite pre-dispatch failure, got \(failure)")
@@ -2012,8 +1971,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         detail.contains("identity changed after availability materialization"),
         detail)
     }
-    let legacySnapshot = await actionLog.snapshot()
-    XCTAssertEqual(legacySnapshot.0.count, 1)
+    let mismatchSnapshot = await actionLog.snapshot()
+    XCTAssertEqual(mismatchSnapshot.0.count, 1)
   }
 
   func testSucceededFlashProjectsPostflightFromCorrelatedDurableReceipt() async throws {
@@ -2021,8 +1980,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: root) }
     let recordRoot = root.appending(path: "rockchip-runtime", directoryHint: .isDirectory)
     let component = ResolvedExecutable(
-      path: "/product/Contents/MacOS/rkdeveloptool",
-      sha256: Self.reviewedSignedComponentSHA256)
+      path: "/product/Contents/MacOS/arkforged",
+      sha256: Self.nativeProviderSHA256)
     let expectation = RockchipHDCReconnectExpectation(
       previousConnectKey: "device-1",
       previousIdentitySHA256: SHA256.hash(data: Data("device-1".utf8))
@@ -2103,8 +2062,8 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let component = ResolvedExecutable(
-      path: "/Applications/ArkDeck.app/Contents/MacOS/rkdeveloptool",
-      sha256: Self.reviewedSignedComponentSHA256)
+      path: "/Library/PrivilegedHelperTools/com.arkdeck.arkforged",
+      sha256: Self.nativeProviderSHA256)
     let dispatcher = ArkForgeNativeRockchipControlDispatcher(
       resolver: FixedExecutableResolver(table: ["rockchip": component]),
       host: DurableRockchipRuntimeActionHost(
@@ -2197,18 +2156,16 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         nowUTC: "2026-07-31T00:00:00Z"))
   }
 
-  // MARK: - Engine-lane spawn working directory
+  // MARK: - HDC child working directory
 
-  /// The engine lane is the path a real flash job takes, and its runner used
-  /// to spawn with no working directory at all — so rkdeveloptool, which
-  /// falls back to cwd-relative `config.ini`/`log/` on macOS, wrote into
-  /// whatever directory the daemon was started from (observed as a stray
-  /// `Packages/ArkDeckKit/log/`). This spawns a real child and reads back the
-  /// directory it actually ran in.
-  func testEngineLaneRunnerSpawnsChildrenInProductOwnedToolRuntimeState() async throws {
+  /// Remaining HDC children run from product-owned state and never inherit a
+  /// source checkout as their current directory.
+  func testEngineLaneRunnerSpawnsHDCChildrenInProductOwnedState() async throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
-    let toolWorkingDirectory = try RockchipProductToolRuntimeDirectory.prepare(root: root)
+    let toolWorkingDirectory = root.appending(path: "hdc", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: toolWorkingDirectory, withIntermediateDirectories: true)
     let callerDirectory = FileManager.default.currentDirectoryPath
     XCTAssertNotEqual(
       toolWorkingDirectory.path, callerDirectory,

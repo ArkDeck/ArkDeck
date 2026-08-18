@@ -44,8 +44,8 @@ package struct RockchipMappedPartition: Equatable, Sendable {
   public let writeOrder: Int
   public let partitionName: String
   public let imageMemberName: String
-  /// FA-001 §2 sector offset. Doubles as the `wl <BeginSec>` fallback value so no human
-  /// ever has to compute an address by hand (design §0).
+  /// FA-001 §2 sector offset consumed by the native typed write plan. No caller
+  /// or human computes an address at execution time.
   package let offsetSectors: Int64
 
   public init(writeOrder: Int, partitionName: String, imageMemberName: String, offsetSectors: Int64)
@@ -80,9 +80,6 @@ package struct RockchipFlashProfile: Equatable, Sendable {
   package static let profileIdentity = "arkdeck.rockchip-rockusb-flash-profile.dayu200"
   package static let profileVersion = "1.0.0"
   package static let targetDeviceModel = "DAYU200 (RK3568)"
-  /// Readiness pin (TASK-RF-002 readiness review): rkdeveloptool 1.32, binary SHA-256.
-  package static let pinnedToolchainFingerprint =
-    "rkdeveloptool-1.32@038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
 
   package let catalogReference: String
   package let firmwareVersion: String

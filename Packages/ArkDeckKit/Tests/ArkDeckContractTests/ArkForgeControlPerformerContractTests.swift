@@ -46,7 +46,7 @@ final class ArkForgeControlPerformerContractTests: XCTestCase {
     func execute(
       action: RockchipProviderAction,
       descriptor: HostManagedProcessDescriptor,
-      rockchipExecutable: ResolvedExecutable,
+      providerExecutable: ResolvedExecutable,
       actionDirectory: URL
     ) async throws -> RockchipRuntimeActionExecutionResult {
       executed.append((action, descriptor))
@@ -91,7 +91,8 @@ final class ArkForgeControlPerformerContractTests: XCTestCase {
         stableIdentitySHA256: Fixture.identity,
         usbTopology: Fixture.topology,
         providerIdentity: ResolvedExecutable(
-          path: "/opt/rk/rkdeveloptool", sha256: String(repeating: "5c", count: 32))),
+          path: "/Library/PrivilegedHelperTools/com.arkdeck.arkforged",
+          sha256: String(repeating: "5c", count: 32))),
       host: DurableRockchipRuntimeActionHost(
         executor: executor,
         records: RockchipRuntimeActionRecordStore(rootURL: storeRoot)),

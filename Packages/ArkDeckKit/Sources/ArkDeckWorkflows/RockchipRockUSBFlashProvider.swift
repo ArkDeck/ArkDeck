@@ -3,9 +3,9 @@ import ArkDeckStorage
 import CryptoKit
 import Foundation
 
-// TASK-RF-002. Typed RockUSB Provider for the DAYU200 forward-flash path (REQ-FLASH-001).
-// The command surface is the closed design §0 face proven by CHG-2026-016 attempt #5:
-// enter Loader → `ld` mode gate → `ppt` precheck → per-partition `wlx` → `rd` → postflight.
+// Typed RockUSB Provider for the DAYU200 forward-flash path. The published
+// plan enters Loader, verifies the observed partition table, writes and reads
+// back every mapped partition, resets, then verifies the bound postflight.
 // This Provider never dispatches a device command itself: it produces typed plans,
 // prerequisite/authorization verdicts, the GJ-4 manual recovery fallback and
 // honest outcome assessments. Runtime E2 dispatch, after the protected Runtime issues and
@@ -26,7 +26,7 @@ package struct RockchipProbeEvidence: Equatable, Sendable {
 
   package let usbVendorID: UInt16
   package let usbProductID: UInt16
-  /// Mode string as reported by `rkdeveloptool ld`, e.g. "Loader" or "Maskrom".
+  /// Mode string reported by ArkForge native discovery, e.g. "Loader" or "Maskrom".
   package let reportedMode: String
 
   public init(usbVendorID: UInt16, usbProductID: UInt16, reportedMode: String) {
@@ -48,8 +48,8 @@ package enum RockchipProbeBlockReason: Equatable, Sendable, CustomStringConverti
         format: "device %04x:%04x is not the RockUSB DAYU200 Loader target; preflight blocked",
         vendorID, productID)
     case .maskromModeNotSupportedByThisProvider:
-      "device is in Maskrom mode; this Provider only supports the verified Loader-mode wlx "
-        + "path and will not attempt similar commands (a Maskrom branch is a separate Provider)"
+      "device is in Maskrom mode; this Provider only supports the verified native Loader "
+        + "path and will not infer a similar operation (Maskrom rescue is separate)"
     case .unrecognizedDeviceMode(let mode):
       "unrecognized device mode \"\(mode)\"; preflight blocked"
     }
@@ -243,39 +243,37 @@ package struct RockchipFlashPlanDocument: Codable, Equatable, Sendable {
   }
 }
 
-// MARK: - Outcome assessment (AC-FLASH-012-01 / AC-FLASH-013-01)
+// MARK: - Typed Runtime outcome assessment (AC-FLASH-012-01 / AC-FLASH-013-01)
+
+package enum RockchipObservedStepOutcome: Equatable, Sendable {
+  case confirmed
+  case failed(String)
+  case outcomeUnknown(String)
+}
 
 package struct RockchipPartitionWriteObservation: Equatable, Sendable {
   public let partitionName: String
-  package let toolExitCode: Int32
-  package let semanticOutput: String
+  package let outcome: RockchipObservedStepOutcome
 
-  public init(partitionName: String, toolExitCode: Int32, semanticOutput: String) {
+  package init(partitionName: String, outcome: RockchipObservedStepOutcome) {
     self.partitionName = partitionName
-    self.toolExitCode = toolExitCode
-    self.semanticOutput = semanticOutput
+    self.outcome = outcome
   }
 }
 
 package struct RockchipFlashRunObservation: Equatable, Sendable {
   package let partitionWrites: [RockchipPartitionWriteObservation]
-  package let resetExitCode: Int32?
-  package let resetSemanticOutput: String?
-  package let reconnectedWithinDeadline: Bool
-  package let postflightProbeSemanticOutput: String?
+  package let resetOutcome: RockchipObservedStepOutcome
+  package let postflightOutcome: RockchipObservedStepOutcome
 
-  public init(
+  package init(
     partitionWrites: [RockchipPartitionWriteObservation],
-    resetExitCode: Int32?,
-    resetSemanticOutput: String?,
-    reconnectedWithinDeadline: Bool,
-    postflightProbeSemanticOutput: String?
+    resetOutcome: RockchipObservedStepOutcome,
+    postflightOutcome: RockchipObservedStepOutcome
   ) {
     self.partitionWrites = partitionWrites
-    self.resetExitCode = resetExitCode
-    self.resetSemanticOutput = resetSemanticOutput
-    self.reconnectedWithinDeadline = reconnectedWithinDeadline
-    self.postflightProbeSemanticOutput = postflightProbeSemanticOutput
+    self.resetOutcome = resetOutcome
+    self.postflightOutcome = postflightOutcome
   }
 }
 
@@ -312,7 +310,7 @@ package struct RockchipRecoveryGuide: Equatable, Sendable {
   package let currentPhase: String
   package let lastConfirmedStepID: String?
   package let deviceMode: String
-  /// The CHG-2026-016 verified Loader-mode wlx recovery route, for a human operator.
+  /// A non-authoritative explanation of the Runtime-owned recovery route.
   package let manualRecoverySteps: [String]
   package let disclosures: [String]
   /// Honesty invariant: ArkDeck never guarantees automatic recovery (REQ-FLASH-013).
@@ -324,45 +322,6 @@ package struct RockchipRecoveryGuide: Equatable, Sendable {
 package struct RockchipRockUSBFlashProvider: Sendable {
   package static let providerIdentity = "arkdeck.rockchip-rockusb-flash-provider"
   package static let providerVersion = "1.0.0"
-
-  /// The entire rkdeveloptool vocabulary this Provider may put in front of a human.
-  /// `db`/`gpt`/`ul` and every other Maskrom/miniloader-stage command are deliberately
-  /// absent: on an inapplicable device the Provider blocks instead of trying anything
-  /// similar (AC-FLASH-001-01; #218/#220 evidence).
-  ///
-  /// `wlx`, `wl`, `rl` and `ppt` left with CHG-2026-059. They were the write, the
-  /// sector read and the partition-table read — the three that need a device address,
-  /// and therefore the three that belong to whoever holds the device mechanics.
-  /// `arkforged` owns that vocabulary now, behind a StepPermit this authority issues.
-  ///
-  /// What remains is what ArkDeck still issues itself: `ld` for read-only discovery,
-  /// and `rd` for the reset it keeps by authority.
-  package static let closedCommandSurface: [String] = ["ld", "rd"]
-
-  /// The verbs that moved, kept by name so a reintroduction is a failing test
-  /// rather than a code review someone has to notice.
-  package static let commandsDelegatedToArkForge: [String] = ["ppt", "wlx", "wl", "rl"]
-
-  /// What the *human* handoff may name — a different question from what this
-  /// Provider dispatches.
-  ///
-  /// When the automated route is blocked, ArkDeck prints the CHG-2026-016
-  /// manual recovery route for an operator to run themselves. That route still
-  /// names `ppt` and `wlx`, because the person runs the real tool with the real
-  /// commands; printing something else would be printing something false.
-  ///
-  /// The separation is the point: `closedCommandSurface` is what this process
-  /// may execute, and this is what it may *say*. Delegating the write did not
-  /// delete the operator's documented fallback, and a fallback that could not
-  /// name the command would be no fallback at all.
-  package static let humanHandoffCommandSurface: [String] =
-    closedCommandSurface + commandsDelegatedToArkForge
-
-  package static let writeSuccessMarker = "Write LBA from file (100%)"
-  package static let resetSuccessMarker = "Reset Device OK."
-  package static let loaderCommandSubsetRejectionMarker =
-    "The device does not support this operation!"
-  package static let postflightConnectedMarker = "Connected"
 
   public let profile: RockchipFlashProfile
 
@@ -621,58 +580,43 @@ package struct RockchipRockUSBFlashProvider: Sendable {
         break
       }
       currentPhase = "flashPartition:\(partition.partitionName)"
-      if write.semanticOutput.contains(Self.loaderCommandSubsetRejectionMarker) {
-        failures.append(
-          "partition \(partition.partitionName): device rejected the write "
-            + "(Loader command-subset rejection)")
+      switch write.outcome {
+      case .confirmed:
+        lastConfirmedStepID = stepID
+      case .failed(let detail):
+        failures.append("partition \(partition.partitionName): \(detail)")
         explicitFailure = true
         break
-      }
-      if write.toolExitCode != 0 {
-        failures.append(
-          "partition \(partition.partitionName): tool exit code \(write.toolExitCode)")
-        explicitFailure = true
+      case .outcomeUnknown(let detail):
+        failures.append("partition \(partition.partitionName): \(detail)")
         break
       }
-      guard write.semanticOutput.contains(Self.writeSuccessMarker) else {
-        // Exit 0 alone is never success (REQ-FLASH-012): without the semantic marker the
-        // write outcome is unknown, not confirmed.
-        failures.append(
-          "partition \(partition.partitionName): tool exited 0 but semantic marker "
-            + "\"\(Self.writeSuccessMarker)\" is absent")
-        break
-      }
-      lastConfirmedStepID = stepID
+      if !failures.isEmpty { break }
     }
 
     if failures.isEmpty {
       currentPhase = "reset"
-      if let resetExitCode = observation.resetExitCode,
-        let resetOutput = observation.resetSemanticOutput
-      {
-        if resetExitCode != 0 {
-          failures.append("reset: tool exit code \(resetExitCode)")
-          explicitFailure = true
-        } else if !resetOutput.contains(Self.resetSuccessMarker) {
-          failures.append(
-            "reset: tool exited 0 but semantic marker \"\(Self.resetSuccessMarker)\" is absent")
-        }
-      } else {
-        failures.append("reset: not observed")
+      switch observation.resetOutcome {
+      case .confirmed:
+        break
+      case .failed(let detail):
+        failures.append("reset: \(detail)")
+        explicitFailure = true
+      case .outcomeUnknown(let detail):
+        failures.append("reset: \(detail)")
       }
     }
 
     if failures.isEmpty {
       currentPhase = "postflight"
-      if !observation.reconnectedWithinDeadline {
-        failures.append("device did not reconnect within the deadline")
-      } else if let probeOutput = observation.postflightProbeSemanticOutput {
-        if !probeOutput.contains(Self.postflightConnectedMarker) {
-          failures.append(
-            "postflight probe output does not report \"\(Self.postflightConnectedMarker)\"")
-        }
-      } else {
-        failures.append("postflight probe was not observed")
+      switch observation.postflightOutcome {
+      case .confirmed:
+        break
+      case .failed(let detail):
+        failures.append("postflight: \(detail)")
+        explicitFailure = true
+      case .outcomeUnknown(let detail):
+        failures.append("postflight: \(detail)")
       }
     }
 
@@ -699,25 +643,20 @@ package struct RockchipRockUSBFlashProvider: Sendable {
       lastConfirmedStepID: context.lastConfirmedStepID,
       deviceMode: context.observedDeviceMode,
       manualRecoverySteps: [
-        "Re-enter Loader mode using the documented RECOVERY key sequence, then verify with "
-          + "`sudo rkdeveloptool ld` that the device reports 0x2207:0x350a in Loader mode.",
-        "Read the current partition table with `sudo rkdeveloptool ppt` and compare it row by "
-          + "row against the FA-001 §2 baseline (15 rows).",
-        "Re-write the 9 mapped partitions with "
-          + "`sudo rkdeveloptool wlx <name> <image>` in Profile write order from a "
-          + "validated archive. This is the CHG-2026-016 route verified on real "
-          + "hardware on 2026-07-21 and again on 2026-08-04 (flash landed and "
-          + "booted). The earlier report that `wlx` truncated a 64 MiB image came "
-          + "from an `rl` readback later shown to return uniform filler for every "
-          + "sector past this loader's read window regardless of what is on the "
-          + "medium — do not use `rl` to judge a write there; the booted system is "
-          + "the authority.",
-        "Reset with `sudo rkdeveloptool rd` and confirm the device boots and reconnects.",
+        "Keep the original Runtime job and its outcomeUnknown record intact; do not replay "
+          + "the interrupted intent or run an external RockUSB command.",
+        "Reconnect the exact bound target in Loader mode and let ArkForge native discovery "
+          + "re-establish the same topology and stable device identity.",
+        "Use the protected Runtime recovery path only when it proves "
+          + "safeToSupersedeByCompleteOverwrite for the complete nine-partition plan and the "
+          + "same immutable artifact.",
+        "Accept recovery only after ArkForge readback, reset, Runtime rebind and postflight "
+          + "evidence all reach a confirmed terminal.",
       ],
       disclosures: [
         "Flashing may destroy user data.",
         "The device may fail to boot until recovery completes.",
-        "Vendor recovery tooling may be required; not every failure is recoverable here.",
+        "Maskrom rescue is a separate operator procedure and never becomes Runtime authority.",
         "The outcome stays unknown until postflight verification confirms it.",
       ],
       automaticRecoveryGuaranteed: false)

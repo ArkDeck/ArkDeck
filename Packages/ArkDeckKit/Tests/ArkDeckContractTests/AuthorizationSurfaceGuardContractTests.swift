@@ -3,101 +3,104 @@ import XCTest
 
 @testable import ArkDeckWorkflows
 
-/// Source-shape guards on the caller-facing authorization surfaces.
-///
-/// The standing-authorization admission service this suite also covered was
-/// retired with its lane and ledger (T25/W3), and its tests went with it.
-/// This one stays because what it guards is still live: no caller-facing
-/// surface may inject trusted facts or obtain a command, and no flash
-/// subcommand may regain an in-process execution stack.
+/// Source-shape guards for the completed ArkForge cutover. Current product
+/// surfaces must not reconstruct the retired executable, its selection/trust
+/// state, its argv, or a caller-owned admission path.
 final class AuthorizationSurfaceGuardContractTests: XCTestCase {
-  func testCallerFacingSurfacesCannotInjectFactsOrObtainCommands() throws {
+  func testCurrentProductSourcesContainNoRetiredVendorToolSurface() throws {
     let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let workflowSource = try String(
-      contentsOf: packageRoot.appending(
-        path:
-          "Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift"), encoding: .utf8)
-    let cliSource = try String(
-      contentsOf: packageRoot.appending(
-        path:
-          "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"), encoding: .utf8)
+    let repoRoot = packageRoot.deletingLastPathComponent().deletingLastPathComponent()
 
-    for forbidden in [
-      "RockchipStanding" + "AuthorizationContext", "RockchipUnattended" + "ExecutionIntent",
-      "authorizedForUnattended" + "AgentExecution", "runUnattended" + "Execute",
-      "CLIUnattended" + "Context",
-    ] {
-      XCTAssertFalse(workflowSource.contains(forbidden), forbidden)
-      XCTAssertFalse(cliSource.contains(forbidden), forbidden)
+    var productFiles = try sourceFiles(
+      below: packageRoot.appending(path: "Sources", directoryHint: .isDirectory),
+      extensions: ["swift"])
+    productFiles += try sourceFiles(
+      below: repoRoot.appending(path: "ArkDeckApp", directoryHint: .isDirectory),
+      extensions: ["swift", "xcstrings"])
+
+    let retiredSymbols = [
+      "RockchipProductToolBookmarkStore",
+      "RockchipProductToolInstaller",
+      "RockchipProductToolTrustInspector",
+      "RockchipProductToolRuntimeDirectory",
+      "RockchipDeviceDiscoveryAdapter",
+      "RockchipDiscoveryIntegrationProfile",
+      "RockchipSelectedDiscoveryTool",
+      "RockchipProductionAdmissionPort",
+      "RockchipEvolutionCampaignAdmissionService",
+      "RockchipManualFlashFallbackGate",
+      "RockchipHumanHandoff",
+    ]
+    for file in productFiles {
+      let source = try String(contentsOf: file, encoding: .utf8)
+      for symbol in retiredSymbols {
+        XCTAssertFalse(source.contains(symbol), "\(file.path): \(symbol)")
+      }
+      if file.lastPathComponent != "SessionManifest.swift" {
+        XCTAssertFalse(
+          source.lowercased().contains("rkdeveloptool"),
+          "\(file.path) reintroduced the retired vendor executable")
+      }
     }
-    XCTAssertFalse(cliSource.contains("-" + "-unattended-context"))
-    XCTAssertFalse(cliSource.contains("-" + "-authorization <"))
-    let runFlashStart = try XCTUnwrap(
-      cliSource.range(of: "static func runFlash(_ arguments: [String]) async throws"))
-    let reconcileStart = try XCTUnwrap(
-      cliSource.range(
-        of: "// MARK: reconcile", range: runFlashStart.upperBound..<cliSource.endIndex))
-    let activeFlashSurface = cliSource[runFlashStart.lowerBound..<reconcileStart.lowerBound]
-    XCTAssertFalse(activeFlashSurface.contains("--authorization-id"))
-    XCTAssertTrue(activeFlashSurface.contains("historical campaign preview is retired"))
-    XCTAssertTrue(activeFlashSurface.contains("Runtime owns Flash admission"))
-    XCTAssertTrue(activeFlashSurface.contains("historical campaign continuation is retired"))
-    XCTAssertFalse(activeFlashSurface.contains("runCampaignPreview("))
-    XCTAssertFalse(activeFlashSurface.contains("runExecute("))
-    XCTAssertFalse(activeFlashSurface.contains("runCampaignContinue("))
-    // `authorizeUnattended` was the standing lane's internal bridge; it went
-    // with that lane (T25/W3). The guard that replaces it: nothing may bring
-    // an unattended standing execution back into this process.
-    XCTAssertFalse(workflowSource.contains("func authorizeUnattended("))
-    XCTAssertFalse(cliSource.contains("RockchipFlashExecutionHost"))
 
-    let factsSource = try String(
+    let manifest = try String(
       contentsOf: packageRoot.appending(
-        path:
-          "Sources/ArkDeckWorkflows/RockchipAuthorizationFacts.swift"), encoding: .utf8)
-    XCTAssertTrue(factsSource.contains("attempt.observations.count == 1"))
-    XCTAssertTrue(
-      factsSource.contains("plan: plan, executableIdentity: toolDevice.executableIdentity"))
-    XCTAssertFalse(factsSource.contains("struct RockchipTrustedAuthorizationFacts: Codable"))
+        path: "Sources/ArkDeckStorage/SessionManifest.swift"), encoding: .utf8)
+    XCTAssertTrue(manifest.contains("Read-only compatibility for already durable pre-ArkForge"))
+    XCTAssertTrue(manifest.contains("legacyRockchipReportedVersion"))
+    XCTAssertFalse(manifest.contains("RockchipProductTool"))
   }
 
-  func testNRU004ProductRuntimeHasNoVendorToolReference() throws {
+  func testCLIAndRuntimeExposeOnlyRuntimeOwnedArkForgeAdmission() throws {
     let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let runtimeFiles = [
-      "LaunchAgents/LaunchAgentService.swift",
-      "Sources/ArkDeckAgentDaemonMain/main.swift",
-      "Sources/ArkDeckCLI/ArkDeckCLIMain.swift",
-      "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift",
-      "Sources/ArkDeckWorkflows/ArkForgeLaneComposition.swift",
-      "Sources/ArkDeckWorkflows/ArkForgeControlPerformer.swift",
-      "Sources/ArkDeckWorkflows/RockchipDeviceAccessApplicationFacade.swift",
-      "Sources/ArkDeckWorkflows/RockchipFlashPreflight.swift",
-      "Sources/ArkDeckWorkflows/DeviceProviders/RockchipLiveModeProbe.swift",
-      "Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeComposition.swift",
-    ]
-    for relativePath in runtimeFiles {
-      let source = try String(
-        contentsOf: packageRoot.appending(path: relativePath), encoding: .utf8)
-      XCTAssertFalse(
-        source.lowercased().contains("rkdeveloptool"),
-        "\(relativePath) reintroduced the retired vendor tool into product Runtime")
-    }
+    let cli = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(cli.contains("Runtime owns Flash admission"))
+    XCTAssertTrue(cli.contains("historical campaign continuation is retired"))
+    XCTAssertTrue(cli.contains("legacy observation-file postflight is retired"))
+    XCTAssertFalse(cli.contains("runExecute("))
+    XCTAssertFalse(cli.contains("runPostflight("))
+    XCTAssertFalse(cli.contains("RockchipFlashExecutionHost"))
 
-    let main = try String(
+    let composition = try String(
       contentsOf: packageRoot.appending(
-        path: "Sources/ArkDeckAgentDaemonMain/main.swift"), encoding: .utf8)
-    XCTAssertTrue(main.contains("ArkForgeNativeRockUSBExecutableResolver"), main)
+        path: "Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeComposition.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(composition.contains("ArkForgeNativeRockUSBExecutableResolver"))
+    XCTAssertTrue(composition.contains("arkforged-native-rockusb"))
+    XCTAssertTrue(composition.contains(#""rockusbBackend": "native""#))
+  }
 
+  func testOnlyMaskromRescuePackagingRetainsTheStandaloneArtifact() throws {
+    let packageRoot = URL(filePath: #filePath)
+      .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let repoRoot = packageRoot.deletingLastPathComponent().deletingLastPathComponent()
     let project = try String(
-      contentsOf: repoRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"), encoding: .utf8)
+      contentsOf: repoRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
     XCTAssertTrue(project.contains("rkdeveloptool in Embed Rockchip Component"))
+    XCTAssertTrue(project.contains("ROCKCHIP_COMPONENT_INPUT"))
+
     let retirementDoc = try String(
       contentsOf: repoRoot.appending(
         path: "docs/release/rockchip-component-packaging.md"), encoding: .utf8)
     XCTAssertTrue(retirementDoc.contains("Maskrom rescue"), retirementDoc)
     XCTAssertTrue(retirementDoc.contains("Agentd never resolves, launches"), retirementDoc)
+  }
+
+  private func sourceFiles(
+    below root: URL, extensions: Set<String>
+  ) throws -> [URL] {
+    guard
+      let enumerator = FileManager.default.enumerator(
+        at: root, includingPropertiesForKeys: [.isRegularFileKey])
+    else {
+      throw CocoaError(.fileReadNoSuchFile)
+    }
+    return enumerator.compactMap { $0 as? URL }
+      .filter { extensions.contains($0.pathExtension) }
   }
 }

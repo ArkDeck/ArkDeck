@@ -125,7 +125,7 @@ private enum OpenHarmonySurface {
 // MARK: - ArkDeckWorkflows: discovery vocabulary
 
 private enum WorkflowsSurface {
-  static let pathSource = RockchipToolPathSource.explicitSupportPath
+  static let rockUSBMode = RockchipDeviceMode.loader
 }
 
 // MARK: - ArkDeckStorage: strict-JSON public error contract (#1267)
@@ -151,7 +151,8 @@ private enum LaunchAgentSurface {
   static let makeService = LaunchAgentService.init(
     paths:runner:fileManager:uid:nowUTC:)
   static let install = LaunchAgentService.install(
-    daemonBundleSource:hdcExecutable:workspace:harnessSensitiveEvidence:harnessModel:beforeBootstrap:)
+    daemonBundleSource:hdcExecutable:workspace:harnessSensitiveEvidence:harnessModel:
+    beforeBootstrap:)
   static let status = LaunchAgentService.status
   static let installed = \LaunchAgentStatus.installed
   static let loaded = \LaunchAgentStatus.loaded

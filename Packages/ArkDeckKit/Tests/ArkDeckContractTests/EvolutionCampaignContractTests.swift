@@ -14,48 +14,23 @@ final class EvolutionCampaignContractTests: XCTestCase {
   private static let validUntil = "2026-08-02T12:00:00Z"
   private static let targetDigest = String(repeating: "a", count: 64)
 
-  /// A document `flash plan` produces must not make the `flash execute` that
-  /// follows it refuse.
-  ///
-  /// The campaign lane requires the repository top level as its working
-  /// directory, and the candidate scope check counts every untracked file
-  /// `git ls-files --others --exclude-standard` reports. Writing the plan
-  /// document into the current directory therefore put a file in the tree that
-  /// is not candidate source, which is `scopeDrift` — two of this product's own
-  /// requirements colliding through a default. Observed on the 7.0.0.34 window,
-  /// where the file had to be deleted by hand between `plan` and `execute`.
-  func testProducedDocumentsDoNotDefaultIntoTheWorkingTree() throws {
+  /// The historical campaign CLI must not retain plan or handoff writers. New
+  /// destructive work is admitted and journaled exclusively by Runtime Jobs.
+  func testRetiredFlashDocumentsCannotBeProducedIntoTheWorkingTree() throws {
     let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let source = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
       encoding: .utf8)
 
-    // Both documents go through the one resolver, so there is a single place
-    // where this can regress.
     for document in ["arkdeck-flash-plan.json", "arkdeck-flash-handoff.md"] {
-      XCTAssertTrue(
-        source.contains("outputURL(options, fileName: \"\(document)\")"),
-        "\(document) no longer goes through the shared resolver")
+      XCTAssertFalse(source.contains(document), "retired document remains: \(document)")
     }
-    XCTAssertFalse(
-      source.contains("options.value(\"--out\") ?? FileManager.default.currentDirectoryPath"),
-      "the default output directory is the working directory again")
-    XCTAssertTrue(source.contains("static func defaultDocumentDirectory() -> URL"))
-
-    // And the scope check this protects still reads untracked files, so the
-    // reason above has not quietly stopped applying.
-    let pipeline = try String(
-      contentsOf: packageRoot.appending(
-        path: "Sources/ArkDeckWorkflows/EvolutionCandidatePipeline.swift"),
-      encoding: .utf8)
-    XCTAssertTrue(
-      pipeline.contains("\"ls-files\", \"--others\", \"--exclude-standard\", \"-z\""),
-      "the candidate scope check no longer reads untracked files; re-check whether "
-        + "a document in the working tree still causes scopeDrift")
+    XCTAssertFalse(source.contains("static func defaultDocumentDirectory() -> URL"))
+    XCTAssertFalse(source.contains("static func outputURL("))
   }
 
-  func testFlashCLIDefaultsToCampaignAndRemovesLegacySelectors() throws {
+  func testHistoricalFlashCLIIsDecodeOnlyAndRemovesLegacySelectors() throws {
     let packageRoot = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let sourceURL = packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckCLIMain.swift")
@@ -64,6 +39,10 @@ final class EvolutionCampaignContractTests: XCTestCase {
     for subcommand in ["preview", "execute", "continue", "status"] {
       XCTAssertTrue(source.contains("case \"\(subcommand)\":"))
     }
+    XCTAssertTrue(source.contains("historical campaign preview is retired"))
+    XCTAssertTrue(
+      source.contains("submit flash.dayu200 through the typed Job API"))
+    XCTAssertTrue(source.contains("historical campaign continuation is retired"))
     for obsolete in [
       "case \"evolution-preview\":", "case \"evolution-execute\":",
       "case \"evolution-continue\":", "case \"evolution-status\":",
@@ -72,7 +51,7 @@ final class EvolutionCampaignContractTests: XCTestCase {
     ] {
       XCTAssertFalse(source.contains(obsolete), "obsolete CLI surface remains: \(obsolete)")
     }
-    XCTAssertTrue(source.contains("--campaign-confirmation-digest-sha256"))
+    XCTAssertFalse(source.contains("--campaign-confirmation-digest-sha256"))
 
     let taskCLI = try String(
       contentsOf: packageRoot.appending(path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
@@ -348,49 +327,6 @@ final class EvolutionCampaignContractTests: XCTestCase {
           campaignID: assertion.campaignID, candidate: candidate,
           at: Self.confirmedAt))
     }
-  }
-
-  func testOrphanedGlobalReservationPermanentlyStopsBeforeLiveFactCollection() async throws {
-    let root = temporaryDirectory("campaign-orphan")
-    defer { try? FileManager.default.removeItem(at: root) }
-    let campaignLedger = try RockchipEvolutionCampaignLedger(
-      root: root.appending(path: "campaign"))
-    let usageLedger = try AgentAuthorityUsageLedger(root: root.appending(path: "usage"))
-    let assertion = try makeAssertion()
-    let candidate = try makeCandidate(assertion: assertion, ordinal: 1)
-    _ = try campaignLedger.create(assertion)
-    _ = try campaignLedger.appendCandidate(
-      campaignID: assertion.campaignID, candidate: candidate,
-      at: Self.confirmedAt)
-    let reference = try assertion.authorityReference()
-    _ = try usageLedger.reserve(
-      usageReservation(reference: reference, ordinal: 1, jobID: "job-orphan"))
-
-    let service = RockchipEvolutionCampaignAdmissionService(
-      factCollector: RejectingEvolutionFacts(), usageLedger: usageLedger,
-      campaignLedger: campaignLedger,
-      clock: FixedEvolutionClock(
-        reading: RockchipTrustedClockReading(
-          monotonicNanoseconds: 100, auditTimestamp: Self.confirmedAt)),
-      bindingSerialDigestSHA256: Self.targetDigest, bindingRevision: 1,
-      brokerExecutableDigest: { assertion.brokerExecutableDigestSHA256 })
-    let permit = try RockchipEvolutionCampaignAttemptPermit(
-      assertion: assertion, candidate: candidate)
-    do {
-      _ = try await service.admit(
-        permit: permit,
-        facts: RockchipAuthorizationFactRequest(
-          archiveURL: URL(filePath: "/tmp/images.tar.gz"),
-          sessionID: "session-next", jobID: "job-next", targetID: "target-next",
-          targetLocationSelector: "42"),
-        sessionID: "session-next", startingMode: .loader)
-      XCTFail("orphaned global use must stop before live fact collection")
-    } catch let error as RockchipEvolutionCampaignError {
-      XCTAssertEqual(error, .campaignStopped("orphanedGlobalReservation"))
-    }
-    let stopped = try campaignLedger.load(assertion.campaignID)
-    XCTAssertTrue(stopped.isTerminal)
-    XCTAssertEqual(stopped.events.last?.reasonCode, "orphanedGlobalReservation")
   }
 
   func testHistoricalReviewReceiptsDecodeAndClosedStrategyRejectExpansionOrHighSeverity() throws {
@@ -2833,20 +2769,6 @@ private struct LosesTheChildOnFirstMutationDispatcher: RuntimeProcessDispatching
     return ProviderProcessReceipt(
       exitStatus: 0, stdout: Data(), stderr: Data(),
       stdoutTruncated: false, durationSeconds: 0.01)
-  }
-}
-
-private struct FixedEvolutionClock: RockchipAdmissionClock {
-  let reading: RockchipTrustedClockReading
-  func now() -> RockchipTrustedClockReading { reading }
-}
-
-private struct RejectingEvolutionFacts: RockchipAuthorizationFactCollecting {
-  func collect(
-    request _: RockchipAuthorizationFactRequest,
-    expectation _: RockchipAuthorizationFactExpectation
-  ) async throws -> RockchipTrustedAuthorizationFacts {
-    throw RockchipAuthorizationFactError.factPortFailed(name: "must-not-run")
   }
 }
 
