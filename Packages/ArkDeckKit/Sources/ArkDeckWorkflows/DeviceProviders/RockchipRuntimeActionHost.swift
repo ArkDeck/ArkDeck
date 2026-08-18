@@ -824,12 +824,29 @@ struct FoundationRockchipRuntimeActionExecutor: RockchipRuntimeActionExecuting {
         truncated: receipt.stdoutTruncated)
       {
       case .parsed(let list):
-        if let identity = try? usbProbe.singleHDCNormal(
+        // Two routes prove the same bound device, and either suffices when
+        // there is exactly one candidate. The recorded topology was meant to
+        // be the stable half while firmware may rotate the serial — but the
+        // measured board re-enumerates its locationID across the first boot
+        // after a flash (17956864 → 18087936 on 2026-08-18, third distinct
+        // value this bench has recorded), so a topology-only pin waits out
+        // its whole deadline on a device that is present, single, and
+        // answering on its known connect key. The known key is the other
+        // route: `previousIdentitySHA256` is its alias digest by definition.
+        // Both drifting at once stays a refusal — that is a replugged or
+        // swapped board, which is a rebind, not a reconnect.
+        let byTopology = try? usbProbe.singleHDCNormal(
           usbTopology: expectation.usbTopology)
-        {
+        let byKnownAlias = byTopology != nil
+          ? nil
+          : (try? usbProbe.singleHDCNormal(
+              stableIdentitySHA256: expectation.previousIdentitySHA256))
+            .flatMap { try? usbProbe.singleHDCNormal(usbTopology: $0.topology) }
+        if let identity = byTopology ?? byKnownAlias {
           let observedDigest = SHA256Hex.string(of: Data(identity.connectKey.utf8))
-          guard identity.topology == expectation.usbTopology,
-            identity.serialDigestSHA256 == observedDigest
+          guard identity.serialDigestSHA256 == observedDigest,
+            identity.topology == expectation.usbTopology
+              || identity.serialDigestSHA256 == expectation.previousIdentitySHA256
           else {
             throw RuntimeDispatchFailure.failed(
               "topology-bound HDC USB identity is internally inconsistent")
