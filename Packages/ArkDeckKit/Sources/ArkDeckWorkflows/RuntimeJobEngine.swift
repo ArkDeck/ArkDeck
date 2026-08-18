@@ -4394,6 +4394,7 @@ public actor RuntimeJobEngine {
     guard var runtime = jobs[jobID] else {
       let record = try recordForRead(jobID: jobID)
       try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
+      try await repairTerminalCancelledLineageIfNeeded(for: record)
       return status(of: record)
     }
     guard let provider = providers.provider(id: runtime.record.providerID) else {
@@ -4843,6 +4844,36 @@ public actor RuntimeJobEngine {
       break
     }
     return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+  }
+
+  /// The twin of the repair below, for a Job that reached `cancelled` while its
+  /// capability use stayed `pending`.
+  ///
+  /// The drained-cancel path never recorded an outcome until 2026-08-18, so a
+  /// job cancelled by that code holds its use open forever and the
+  /// target-lineage guard then refuses *every* later destructive job on that
+  /// binding. The cancel path records it now; this closes the ones already
+  /// stranded, which is exactly what an operator means by reconciling a
+  /// terminal job. Nothing here touches a device.
+  ///
+  /// `.confirmed` for the reason the generation-rollover comment gives: a
+  /// drained cancellation is one the engine proved did not dispatch. A job whose
+  /// outcome *is* unknown is excluded — that is a write to reconcile against the
+  /// device, never a cancellation to declare closed.
+  private func repairTerminalCancelledLineageIfNeeded(
+    for record: RuntimeJobRecord
+  ) async throws {
+    guard !record.outcomeUnknown,
+      record.state == JobState.cancelled.rawValue,
+      let evidence = record.admissionEvidence,
+      evidence.kind == .runtimeCapability || evidence.kind == .standingAuthorization,
+      let status = try await capabilityStore.inspect(capabilityID: evidence.reference),
+      status.lineage.contains(where: {
+        $0.jobID == record.jobID && $0.outcome == .pending
+      })
+    else { return }
+    try await recordCapabilityOutcome(
+      for: record, outcome: .confirmed, state: JobState.cancelled.rawValue)
   }
 
   /// A confirmed-not-executed decision and terminal Job record become durable
